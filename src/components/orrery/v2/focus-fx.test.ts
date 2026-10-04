@@ -9,11 +9,16 @@ import {
   labelExclusions,
   labelTextAlpha,
   NO_FOCUS_SPEC,
+  occludedBodyAlpha,
   ringFocusFactor,
+  touchesOcclusion,
 } from "./focus-fx";
 import {
   FOCUS_DIM,
   LABEL_DIM_FLOOR,
+  OCCLUDE_PAD_DP,
+  OCCLUDED_BODY_ALPHA,
+  ORRERY_OCCLUSION_STYLE,
   RETICLE_LOCK_END,
   RING_FOCUS_DIM,
 } from "./visual-tunables";
@@ -147,5 +152,41 @@ describe("38.7-11 (C-M2): labels avoid the docked card", () => {
     expect(
       labelExclusions([{ x: 10, y: 10, radius: 5, visible: true }], null),
     ).toEqual([{ x: 5, y: 5, width: 10, height: 10 }]);
+  });
+});
+
+describe("38.7-14 (T-DIM): the Lab B under-a-card test", () => {
+  const card = { x: 100, y: 500, width: 200, height: 150 };
+
+  it("defaults to the proven full-rect dim; Lab B's values are kept as drawn", () => {
+    expect(ORRERY_OCCLUSION_STYLE).toBe("full-rect");
+    expect([OCCLUDED_BODY_ALPHA, OCCLUDE_PAD_DP]).toEqual([0.12, 4]);
+  });
+
+  it("a body whose reach touches a padded rect draws at Lab B's alpha; one clear of it, or no rects, at 1", () => {
+    expect(occludedBodyAlpha([card], 200, 560, 10)).toBe(OCCLUDED_BODY_ALPHA);
+    // Reach 10 + pad 4 just touches the card's top edge from above.
+    expect(occludedBodyAlpha([card], 200, 486, 10)).toBe(OCCLUDED_BODY_ALPHA);
+    expect(occludedBodyAlpha([card], 200, 485, 10)).toBe(1);
+    expect(occludedBodyAlpha(null, 200, 560, 10)).toBe(1);
+    expect(occludedBodyAlpha([card], Number.NaN, 560, 10)).toBe(1);
+  });
+
+  it("labels use the unpadded rect; empty or non-finite rects never occlude", () => {
+    expect(touchesOcclusion([card], 40, 480, 99, 499, 0)).toBe(false);
+    expect(touchesOcclusion([card], 40, 480, 100, 500, 0)).toBe(true);
+    expect(
+      touchesOcclusion(
+        [
+          { x: Number.NaN, y: 0, width: 10, height: 10 },
+          { x: 0, y: 0, width: 0, height: 10 },
+        ],
+        0,
+        0,
+        5,
+        5,
+        0,
+      ),
+    ).toBe(false);
   });
 });

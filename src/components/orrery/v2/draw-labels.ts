@@ -13,10 +13,14 @@
  * toward LABEL_DIM_FLOOR (never below it; plates keep their scrim, Lab B R1),
  * so labels stay readable.
  *
+ * 38.7-14 (T-DIM, ORRERY_OCCLUSION_STYLE "lab-b" only): a label or caption
+ * plate that touches an occlusion rect is dropped, as Lab B's R1 did.
+ *
  * Every Paragraph comes from OrreryTextService through the label spec; this
  * module only paints. Worklet helpers are defined above their callers.
  */
 import { type SkCanvas, Skia } from "@shopify/react-native-skia";
+import type { CameraRect } from "@/logic/orrery-camera-logic";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import { RADII } from "@/theme/tokens/radii";
 import {
@@ -24,7 +28,7 @@ import {
   ORRERY_TEXT_VERTICAL_PADDING,
   type PreparedOrreryText,
 } from "../resources/orrery-text-service";
-import { type FocusDraw, labelTextAlpha } from "./focus-fx";
+import { type FocusDraw, labelTextAlpha, touchesOcclusion } from "./focus-fx";
 import type { OrreryInk, OrreryLabelLayerSpecs } from "./scene-specs";
 
 /** Below this alpha nothing draws; above 1 − this no layer is needed. */
@@ -75,13 +79,14 @@ function drawPlate(
 
 /**
  * Every allocated label and caption, in the spec's label order. Returns how
- * many plates were drawn.
+ * many plates were drawn. `occluded` is null outside the "lab-b" style.
  */
 export function drawLabels(
   canvas: SkCanvas,
   specs: OrreryLabelLayerSpecs,
   allocationIndex: Readonly<Record<string, LabelAllocation>>,
   focus: FocusDraw | null = null,
+  occluded: readonly CameraRect[] | null = null,
 ): number {
   "worklet";
   let drawn = 0;
@@ -94,7 +99,17 @@ export function drawLabels(
     const alpha = Number.isFinite(item.opacity) ? item.opacity : 0;
     if (!(alpha > ALPHA_EPSILON)) continue;
     const textAlpha = labelTextAlpha(focus, id);
-    if (entry.text) {
+    if (
+      entry.text &&
+      !touchesOcclusion(
+        occluded,
+        item.rect.x,
+        item.rect.y,
+        item.rect.x + entry.text.width,
+        item.rect.y + entry.text.height,
+        0,
+      )
+    ) {
       drawPlate(
         canvas,
         item.rect.x,
@@ -106,7 +121,18 @@ export function drawLabels(
       );
       drawn++;
     }
-    if (entry.context && item.contextRect) {
+    if (
+      entry.context &&
+      item.contextRect &&
+      !touchesOcclusion(
+        occluded,
+        item.contextRect.x,
+        item.contextRect.y,
+        item.contextRect.x + entry.context.width,
+        item.contextRect.y + entry.context.height,
+        0,
+      )
+    ) {
       drawPlate(
         canvas,
         item.contextRect.x,

@@ -22,6 +22,8 @@ import type { ResolvedMode } from "@/theme/theme-types";
 import {
   FOCUS_DIM,
   LABEL_DIM_FLOOR,
+  OCCLUDE_PAD_DP,
+  OCCLUDED_BODY_ALPHA,
   RETICLE_LOCK_END,
   RING_FOCUS_DIM,
 } from "./visual-tunables";
@@ -200,4 +202,57 @@ export function collectOcclusion(
   if (card?.visible && card.width > 0 && card.height > 0)
     out.push({ x: card.x, y: card.y, width: card.width, height: card.height });
   return out;
+}
+
+/**
+ * 38.7-14 (T-DIM, ORRERY_OCCLUSION_STYLE "lab-b"): true when the box
+ * [x0, x1] × [y0, y1] touches any occlusion rect grown by `pad` (Lab B
+ * `underCard`). Non-finite or empty rects never occlude.
+ */
+export function touchesOcclusion(
+  rects: readonly CameraRect[] | null,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  pad: number,
+): boolean {
+  "worklet";
+  if (!rects) return false;
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i];
+    if (
+      !(r.width > 0) ||
+      !(r.height > 0) ||
+      !Number.isFinite(r.x) ||
+      !Number.isFinite(r.y)
+    )
+      continue;
+    if (
+      x1 >= r.x - pad &&
+      x0 <= r.x + r.width + pad &&
+      y1 >= r.y - pad &&
+      y0 <= r.y + r.height + pad
+    )
+      return true;
+  }
+  return false;
+}
+
+/**
+ * Lab B R1: the alpha factor for a body at (x, y) whose drawn reach is
+ * `reach` dp — OCCLUDED_BODY_ALPHA when it touches an occlusion rect (padded
+ * OCCLUDE_PAD_DP), else 1. `rects` is null outside the "lab-b" style.
+ */
+export function occludedBodyAlpha(
+  rects: readonly CameraRect[] | null,
+  x: number,
+  y: number,
+  reach: number,
+): number {
+  "worklet";
+  const r = reach > 0 ? reach : 0;
+  return touchesOcclusion(rects, x - r, y - r, x + r, y + r, OCCLUDE_PAD_DP)
+    ? OCCLUDED_BODY_ALPHA
+    : 1;
 }

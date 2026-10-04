@@ -607,11 +607,26 @@ export const RING_FOCUS_DIM = { dark: 0.65, light: 0.6 } as const;
  * their plates keep full scrim.
  */
 export const LABEL_DIM_FLOOR = 0.66;
-/**
- * D-55: what the Orrery draws under every Orrery text surface is dimmed
- * toward `orreryOcclusion` at this strength (the card glass itself never
- * changes, D-20/D-35). Lab B's card occlusion drew bodies under the card at
- * 0.12 alpha (≈ 0.88 dim); D-62 caps this lever at 0.7, so it starts at the
- * cap. Plan 14 tunes it by the ADR-169 contrast proof.
+/*
+ * D-55: what the Orrery draws under every Orrery text surface is dimmed. The
+ * dim's strength is a proven theme value (38.7-14): `ORRERY_OCCLUSION_DIM` in
+ * src/theme/tokens/surface.ts, capped by the owner's D-62 ceiling 0.7, read
+ * by draw-overlay through the overlay spec.
+ *
+ * ORRERY_OCCLUSION_STYLE (38.7-14 T-DIM: the owner compares the two looks):
+ *   - "full-rect": every pixel inside the text surface's rect (sky, rings,
+ *     bodies, labels) is dimmed toward `orreryOcclusion` (Plan 11's dim; the
+ *     one `surface.test.ts` proves). The default.
+ *   - "lab-b": as in Lab B (`labb-card-channel.ts:8-11`, LabLayerPictures R1):
+ *     no fill — the sky and the rings show through the glass untouched; a body
+ *     (contact, moon or sun, with its pips) whose reach touches a rect, padded
+ *     OCCLUDE_PAD_DP, draws at OCCLUDED_BODY_ALPHA, and a label or caption
+ *     plate touching a rect is dropped. Lab B applied it to the focus card
+ *     only; here it applies to every occlusion rect (the card and the static
+ *     panels), since there is no fill under them either.
  */
-export const OCCLUSION_DIM = 0.7;
+export const ORRERY_OCCLUSION_STYLE: "full-rect" | "lab-b" = "full-rect";
+/** Lab B OCCLUDED_ALPHA: a body under a card draws at this alpha. */
+export const OCCLUDED_BODY_ALPHA = 0.12;
+/** Lab B OCCLUDE_PAD: padding (dp) around a rect for the body test. */
+export const OCCLUDE_PAD_DP = 4;

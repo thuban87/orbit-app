@@ -55,9 +55,10 @@ import {
   type SkShader,
   TileMode,
 } from "@shopify/react-native-skia";
+import type { CameraRect } from "@/logic/orrery-camera-logic";
 import { type AnimatedFrame, bodyKey } from "@/logic/orrery-frame";
 import { pipAngles } from "@/logic/orrery-stack-logic";
-import { bodyDefocus, type FocusDraw } from "./focus-fx";
+import { bodyDefocus, type FocusDraw, occludedBodyAlpha } from "./focus-fx";
 import {
   BODY_OUTLINE_WIDTH,
   type BodyLit,
@@ -66,6 +67,7 @@ import {
   type SunLook,
 } from "./scene-specs";
 import {
+  BODY_ATMOSPHERE_REACH,
   FLAT_FOCUS_DIM,
   FOCUS_SINK,
   MOON_BUMP_MAX_DP,
@@ -532,6 +534,7 @@ export function drawContactBody(
   effects: OrreryBodyEffects = NO_BODY_EFFECTS,
   sun: { x: number; y: number } | null = null,
   focus: FocusDraw | null = null,
+  occlusion = 1,
 ): boolean {
   "worklet";
   const body = frame.bodies[source];
@@ -539,10 +542,12 @@ export function drawContactBody(
   const lit = spec.lit;
   const defocus = bodyDefocus(focus, spec.key, spec.kind, null);
   // The lit shader dims itself (no layer per dimmed body); a flat body
-  // (no shader) dims through its alpha instead.
+  // (no shader) dims through its alpha instead. `occlusion` is the Lab B
+  // under-a-card factor (1 outside ORRERY_OCCLUSION_STYLE "lab-b").
   const shaded =
     lit !== undefined && (spec.photo ? effects.photo : effects.swatch) !== null;
-  const alpha = bodyAlpha(body) * (shaded ? 1 : 1 - FLAT_FOCUS_DIM * defocus);
+  const alpha =
+    bodyAlpha(body) * (shaded ? 1 : 1 - FLAT_FOCUS_DIM * defocus) * occlusion;
   if (!(alpha > ALPHA_EPSILON) || !(r > 0)) return false;
   const scale = body.radius / r;
   canvas.save();
@@ -589,12 +594,13 @@ export function drawMoonBody(
   spec: OrreryBodySpec,
   source: number,
   focus: FocusDraw | null = null,
+  occlusion = 1,
 ): boolean {
   "worklet";
   const body = frame.bodies[source];
   const parent = body.satelliteTarget ? body.satelliteTarget.parentId : null;
   const defocus = bodyDefocus(focus, spec.key, spec.kind, parent);
-  const alpha = bodyAlpha(body) * (1 - FLAT_FOCUS_DIM * defocus);
+  const alpha = bodyAlpha(body) * (1 - FLAT_FOCUS_DIM * defocus) * occlusion;
   if (!(alpha > ALPHA_EPSILON)) return false;
   const scale = body.radius / MOON_RADIUS;
   canvas.save();
@@ -610,7 +616,9 @@ export function drawMoonBody(
 
 /**
  * The contacts and moons behind the sun (`which = "behind"`) or in front of
- * it, in `order`. Returns how many bodies drew.
+ * it, in `order`. Returns how many bodies drew. `occluded` (38.7-14,
+ * ORRERY_OCCLUSION_STYLE "lab-b" only, else null): the text-surface rects a
+ * body under which draws at Lab B's OCCLUDED_BODY_ALPHA, pips included.
  */
 export function drawBodies(
   canvas: SkCanvas,
@@ -620,6 +628,7 @@ export function drawBodies(
   which: "behind" | "front",
   effects: OrreryBodyEffects = NO_BODY_EFFECTS,
   focus: FocusDraw | null = null,
+  occluded: readonly CameraRect[] | null = null,
 ): number {
   "worklet";
   const from = which === "behind" ? 0 : order.sunAt + 1;
@@ -631,10 +640,26 @@ export function drawBodies(
     if (!spec || spec.kind === "sun") continue;
     const source = sourceOf(frame, spec.key);
     if (source < 0) continue;
+    const at = frame.bodies[source];
+    const occlusion = occludedBodyAlpha(
+      occluded,
+      at.x,
+      at.y,
+      at.radius * BODY_ATMOSPHERE_REACH,
+    );
     const did =
       spec.kind === "satellite"
-        ? drawMoonBody(canvas, frame, spec, source, focus)
-        : drawContactBody(canvas, frame, spec, source, effects, sun, focus);
+        ? drawMoonBody(canvas, frame, spec, source, focus, occlusion)
+        : drawContactBody(
+            canvas,
+            frame,
+            spec,
+            source,
+            effects,
+            sun,
+            focus,
+            occlusion,
+          );
     if (did) {
       drawn++;
       if (spec.kind === "contact")
@@ -645,7 +670,7 @@ export function drawBodies(
           order,
           spec,
           source,
-          bodyAlpha(frame.bodies[source]),
+          bodyAlpha(frame.bodies[source]) * occlusion,
         );
     }
   }
@@ -799,6 +824,7 @@ export function drawSun(
   order: OrreryBodyOrder,
   pulse: number,
   effects: OrreryBodyEffects = NO_BODY_EFFECTS,
+  occluded: readonly CameraRect[] | null = null,
 ): boolean {
   "worklet";
   const spec = order.sun >= 0 ? specs[order.sun] : undefined;
@@ -806,7 +832,14 @@ export function drawSun(
   const source = sourceOf(frame, spec.key);
   if (source < 0) return false;
   const body = frame.bodies[source];
-  const alpha = bodyAlpha(body);
+  const alpha =
+    bodyAlpha(body) *
+    occludedBodyAlpha(
+      occluded,
+      body.x,
+      body.y,
+      body.radius * BODY_ATMOSPHERE_REACH,
+    );
   const r = spec.worldRadius;
   if (!(alpha > ALPHA_EPSILON) || !(r > 0)) return false;
   const scale = body.radius / r;

@@ -48,11 +48,11 @@ import {
 } from "@/logic/orrery-recovery-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { RADII } from "@/theme/tokens/radii";
+import { ORRERY_OCCLUSION_DIM_MAX } from "@/theme/tokens/surface";
 import { drawPlaneRing, plainRingLine, type RingBands } from "./draw-plane";
 import type { FocusDraw } from "./focus-fx";
 import type { OrreryInk, OverlaySpec } from "./scene-specs";
 import {
-  OCCLUSION_DIM,
   RETICLE_ARM_FRAC,
   RETICLE_ARM_MAX,
   RETICLE_ARM_MIN,
@@ -104,8 +104,12 @@ const POLARIS_HALO_ALPHA = 0.25;
 const POLARIS_DOT_RADIUS = 2;
 /** The reticle flash's half-width on the lock timeline (around t = 1), Lab A. */
 const RETICLE_FLASH_SPAN = 0.35;
-/** Occlusion rects follow the glass cards' corner radius. */
-const OCCLUSION_RADIUS = RADII.lg;
+/**
+ * Occlusion rects follow the Orrery HUD plates' corner radius (`HUD_PLATE`,
+ * `RADII.sm`, 38.7-12): every Orrery glass surface the dim backs is an 8 dp
+ * plate, so the old 16 dp corners left the plates' corners undimmed (38.7-14).
+ */
+export const OCCLUSION_RADIUS = RADII.sm;
 const DEG = 180 / Math.PI;
 /** The 4-point star, about the marker centre (today's SVG path). */
 const POLARIS_STAR: readonly (readonly [number, number])[] = [
@@ -545,9 +549,10 @@ export function drawReorderHold(
 
 /**
  * D-55: inside each Orrery text surface's rect, a fill of the occlusion ink at
- * OCCLUSION_DIM, so whatever the canvas drew under it (sky, rings, bodies,
- * initials, photos, the reticle) is dimmed; the RN card glass above it is
- * never touched. Returns the number of rects drawn.
+ * the theme's proven `ORRERY_OCCLUSION_DIM` (`spec.occlusionDim`, clamped to
+ * the D-62 ceiling `ORRERY_OCCLUSION_DIM_MAX`), so whatever the canvas drew
+ * under it (sky, rings, bodies, initials, photos, the reticle) is dimmed; the
+ * RN card glass above it is never touched. Returns the number of rects drawn.
  */
 export function drawOcclusion(
   canvas: SkCanvas,
@@ -556,7 +561,11 @@ export function drawOcclusion(
 ): number {
   "worklet";
   let drawn = 0;
-  const paint = inkPaint(spec.ink.occlusion, OCCLUSION_DIM);
+  const dim = Number.isFinite(spec.occlusionDim)
+    ? Math.max(0, Math.min(ORRERY_OCCLUSION_DIM_MAX, spec.occlusionDim))
+    : 0;
+  if (!(dim > 0)) return 0;
+  const paint = inkPaint(spec.ink.occlusion, dim);
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i];
     if (

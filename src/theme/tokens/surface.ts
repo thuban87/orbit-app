@@ -198,6 +198,53 @@ export function orreryOverlayTintOpacity(
 }
 
 /**
+ * ORRERY OCCLUSION DIM (38.7-14; D-28, D-55, D-62; ADR-169 method). Under
+ * every Orrery text surface the canvas dims what it drew (sky, rings, bodies,
+ * initials, photos) toward the `orreryOcclusion` token at this strength, so a
+ * bright photo or initials pixel cannot pull card text under 4.5:1. It is the
+ * ONLY contrast lever for Orrery cards: `ORRERY_OVERLAY_TINT_OPACITY` above and
+ * every glass constant stay as decided (D-20, D-35). `surface.test.ts` proves
+ * it per theme with the both-extrema method over pure black and pure white
+ * content (which bound every sky, nebula, star, hue, swatch and photo pixel):
+ *
+ *   theme          proof minimum   value   worst ratio at value
+ *   Galaxy Dark    0.00 (4.50:1)   0.70    5.50:1 textSecondary
+ *   Galaxy Light   0.00 (4.95:1)   0.70    5.67:1 accentText (ruby)
+ *   Standard Dark  0.04 (4.39:1@0) 0.70    5.99:1 textSecondary
+ *   Standard Light 0.00 (4.64:1)   0.70    5.67:1 accentText (ruby)
+ *
+ * The values stay at Plan 11's starting point (the D-62 ceiling): the proof
+ * passes there in every theme, and lowering it is a look call for the owner
+ * (Plan 14 T-DIM), not a contrast need.
+ */
+export const ORRERY_OCCLUSION_DIM: Record<
+  ThemePackage,
+  Record<ResolvedMode, number>
+> = {
+  galaxy: { dark: 0.7, light: 0.7 },
+  standard: { dark: 0.7, light: 0.7 },
+};
+
+/**
+ * The owner's ceiling on the occlusion dim (D-62, 2026-10-02; protects D-20
+ * "don't hide the map behind the card"). No theme's `ORRERY_OCCLUSION_DIM` may
+ * exceed it; a theme that would need more to pass 4.5:1 is an owner trade-off
+ * (T-DIM), never a silent raise. The renderer clamps to it as well.
+ */
+export const ORRERY_OCCLUSION_DIM_MAX = 0.7;
+
+/** The occlusion dim for a package × resolved mode (≤ the D-62 ceiling). */
+export function orreryOcclusionDim(
+  themePackage: ThemePackage,
+  mode: ResolvedMode,
+): number {
+  return Math.min(
+    ORRERY_OCCLUSION_DIM_MAX,
+    ORRERY_OCCLUSION_DIM[themePackage][mode],
+  );
+}
+
+/**
  * True when the resolved mode matches the package's background art tone, so a
  * glassy (translucent) card stays text-readable. galaxy↔dark, standard↔light.
  *

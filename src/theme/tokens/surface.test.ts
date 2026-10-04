@@ -4,6 +4,10 @@ import {
   SWIPE_ROW_BACKING_OPACITY,
   swipeRowTintOpacity,
 } from "@/components/list-row-swipe-backing";
+import {
+  HEADER_SCRIM_BAR,
+  headerScrimInkKey,
+} from "@/components/orrery/orrery-header-scrim";
 import { applyAccent, DEFAULT_ACCENT, resolveAccent } from "../accents";
 import {
   ART_COMBINATION_KEYS,
@@ -43,7 +47,11 @@ import {
   cardTintOpacity,
   chromeScrimOpacity,
   MIN_BACKGROUND_CONTRIBUTION,
+  ORRERY_OCCLUSION_DIM,
+  ORRERY_OCCLUSION_DIM_MAX,
   ORRERY_OVERLAY_BACKDROP_VISIBILITY_CEILING,
+  ORRERY_OVERLAY_TINT_OPACITY,
+  orreryOcclusionDim,
   orreryOverlayTintOpacity,
   resolveSurfaceStyle,
   SURFACE,
@@ -882,53 +890,187 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
   }
 });
 
-describe("orrery-overlay treatment — AA over the raw brightest Orrery pixel (38.1-01)", () => {
-  // Conservative lower-bound model: the tint is composited over the RAW brightest
-  // Orrery pixel with no BlurView contribution. Where GlassSurface renders a real
-  // BlurView, it averages/dims the backdrop; on the no-blur path this raw model is
-  // exact. The on-device composite is therefore never brighter and is at least as
-  // legible as this proof.
+/**
+ * 38.7-14 (D-28, D-55, D-62; ADR-169 both-extrema method): the Orrery content a
+ * see-through Orrery card or the Orrery title can sit over. Pure black and pure
+ * white bound every photo pixel (and so every other entry); the token entries
+ * keep the set honest if the bounds ever change: the V2 sky (base, horizon,
+ * nebula, sky stars, per-System hues), the star palette, and the initials
+ * glyph and swatch extremes.
+ */
+function orreryContentPixels(palette: ThemePalette): string[] {
+  return [
+    "#000000",
+    "#FFFFFF",
+    palette.orrerySkyBase,
+    palette.orrerySkyHorizon,
+    ...palette.orreryNebula,
+    ...palette.orrerySkyStars,
+    ...palette.orrerySystemHues,
+    ...palette.starPalette,
+    ...palette.avatarSwatches,
+    palette.avatarSwatchText,
+  ].map((hex) => hex.slice(0, 7));
+}
+
+/** The darkest and brightest of a set of composites (by WCAG luminance). */
+function compositeExtrema(composites: readonly string[]): {
+  dark: string;
+  bright: string;
+} {
+  let dark = composites[0];
+  let bright = composites[0];
+  for (const c of composites) {
+    if (relativeLuminance(c) < relativeLuminance(dark)) dark = c;
+    if (relativeLuminance(c) > relativeLuminance(bright)) bright = c;
+  }
+  return { dark, bright };
+}
+
+/** A foreground clears both extrema at `floor` and lies outside their interval. */
+function assertClearsCompositeExtrema(
+  fg: string,
+  composites: readonly string[],
+  floor: number,
+  label: string,
+) {
+  const { dark, bright } = compositeExtrema(composites);
+  const e = evaluateOverExtrema(fg, dark, bright);
+  expect(e.ratioDark, `${label} vs darkest ${dark}`).toBeGreaterThanOrEqual(
+    floor,
+  );
+  expect(
+    e.ratioBright,
+    `${label} vs brightest ${bright}`,
+  ).toBeGreaterThanOrEqual(floor);
+  expect(e.outside, `${label}: outside [${dark}, ${bright}]`).toBe(true);
+}
+
+/**
+ * The palette an Orrery overlay card's text renders with: the ROOT palette with
+ * the user's accent applied (GlassSurface keeps the root palette for
+ * `treatment="orrery-overlay"`, no glass scope).
+ */
+function orreryCardPalette(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  accentId: AccentId | null,
+): ThemePalette {
+  return applyAccent(
+    resolvePalette(pkg, mode),
+    resolveAccent(accentId, pkg, mode),
+  );
+}
+
+describe("Orrery cards over the V2 sky — ADR-169 both extrema through the occlusion dim (38.7-14, D-28/D-55/D-62)", () => {
+  // Content pixel P under a card is first dimmed toward `orreryOcclusion` by
+  // the theme's ORRERY_OCCLUSION_DIM (the D-55 lever), then the card tint is
+  // composited over it at the unchanged ORRERY_OVERLAY_TINT_OPACITY. No
+  // BlurView term (the conservative model: Android draws no blur, D-61).
+  // Worst ratios at the shipped dim 0.7: Galaxy Dark 5.50, Galaxy Light 5.67,
+  // Standard Dark 5.99, Standard Light 5.67 (proof minimums in surface.ts).
   for (const pkg of PACKAGES) {
     for (const mode of MODES) {
-      it(`${pkg}/${mode}: foregrounds over the Orrery overlay meet AA and retain backdrop visibility`, () => {
-        const palette = resolvePalette(pkg, mode);
-        const brightestOrreryPixel = [
-          palette.textPrimary,
-          ...palette.starPalette,
-        ].reduce((brightest, candidate) =>
-          contrastRatio("#000000", candidate) >
-          contrastRatio("#000000", brightest)
-            ? candidate
-            : brightest,
-        );
+      it(`${pkg}/${mode}: textPrimary, textSecondary and accentText (every curated accent) clear 4.5:1 over the darkest and brightest dimmed pixel; status glyphs 3:1`, () => {
+        const dim = ORRERY_OCCLUSION_DIM[pkg][mode];
         const opacity = orreryOverlayTintOpacity(pkg, mode);
-        const composite = alphaComposite(
-          palette[SURFACE[pkg].tintTokenKey],
-          brightestOrreryPixel,
-          opacity,
-        );
+        for (const accentId of ACCENT_CHOICES) {
+          const palette = orreryCardPalette(pkg, mode, accentId);
+          const tint = palette[SURFACE[pkg].tintTokenKey];
+          const composites = orreryContentPixels(palette).map((p) =>
+            alphaComposite(
+              tint,
+              alphaComposite(palette.orreryOcclusion, p, dim),
+              opacity,
+            ),
+          );
+          const label = `${pkg}/${mode} Orrery card (${accentId ?? "default"}, dim ${dim})`;
+          for (const fg of [
+            "textPrimary",
+            "textSecondary",
+            "accentText",
+          ] as const)
+            assertClearsCompositeExtrema(
+              palette[fg],
+              composites,
+              AA_NORMAL,
+              `${label}: ${fg}`,
+            );
+          for (const fg of STATUS_FGS)
+            assertClearsCompositeExtrema(
+              palette[fg],
+              composites,
+              AA_LARGE,
+              `${label}: ${fg}`,
+            );
+        }
+      });
 
-        assertForegroundsAA(
-          composite,
-          palette,
-          `${pkg}/${mode} Orrery overlay`,
+      it(`${pkg}/${mode}: the overlay stays translucent and keeps a visible Orrery backdrop`, () => {
+        const opacity = orreryOverlayTintOpacity(pkg, mode);
+        expect(opacity).toBeLessThan(surfaceOpacityForDensity(pkg, "dense"));
+        expect(opacity).toBeLessThanOrEqual(
+          ORRERY_OVERLAY_BACKDROP_VISIBILITY_CEILING,
         );
-        expect(
-          opacity,
-          `${pkg}/${mode}: overlay remains translucent`,
-        ).toBeLessThan(surfaceOpacityForDensity(pkg, "dense"));
-        expect(
-          opacity,
-          `${pkg}/${mode}: overlay preserves a visible Orrery backdrop`,
-        ).toBeLessThanOrEqual(ORRERY_OVERLAY_BACKDROP_VISIBILITY_CEILING);
       });
     }
   }
 
-  it("does not retune the shared ordinary-card glass constants", () => {
+  it("D-62: no theme's occlusion dim exceeds the owner's 0.7 ceiling", () => {
+    expect(ORRERY_OCCLUSION_DIM_MAX).toBe(0.7);
+    for (const pkg of PACKAGES)
+      for (const mode of MODES) {
+        expect(ORRERY_OCCLUSION_DIM[pkg][mode]).toBeGreaterThanOrEqual(0);
+        expect(ORRERY_OCCLUSION_DIM[pkg][mode]).toBeLessThanOrEqual(
+          ORRERY_OCCLUSION_DIM_MAX,
+        );
+        expect(orreryOcclusionDim(pkg, mode)).toBe(
+          ORRERY_OCCLUSION_DIM[pkg][mode],
+        );
+      }
+  });
+
+  it("D-35/D-55: the dim is the only lever — card tint, glass and backdrop ceiling are unchanged", () => {
+    expect(ORRERY_OVERLAY_TINT_OPACITY).toEqual({
+      galaxy: 0.91,
+      standard: 0.87,
+    });
+    expect(ORRERY_OVERLAY_BACKDROP_VISIBILITY_CEILING).toBe(0.92);
     expect(CARD_GLASS_OPACITY.galaxy).toBe(0.05);
     expect(CARD_GLASS_OPACITY.standard).toBe(0.5);
   });
+});
+
+describe("Orrery title over the V2 sky (38.7-14, D-39)", () => {
+  // The title (ShellAppBar, unchanged) sits on its own chrome scrim
+  // (`surface` @ chromeScrimOpacity) over the Orrery-local header scrim
+  // (OrreryImmersiveHeader: `headerScrimInkKey(mode)` at ≥ HEADER_SCRIM_BAR
+  // behind the bar) over the map. Proven for the bar's glass-scoped palette
+  // and the root palette, over pure black and pure white content. Minimum
+  // header scrim for 4.5:1: Galaxy Dark 0.61, Standard Light 0.04, Galaxy
+  // Light and Standard Dark 0; at Lab B's 0.84 the worst is 10.3:1.
+  for (const pkg of PACKAGES) {
+    for (const mode of MODES) {
+      it(`${pkg}/${mode}: textPrimary on the title clears 4.5:1 over both extrema`, () => {
+        const root = resolvePalette(pkg, mode);
+        const ink = root[headerScrimInkKey(mode)];
+        const composites = orreryContentPixels(root).map((p) =>
+          alphaComposite(
+            root.surface,
+            alphaComposite(ink, p, HEADER_SCRIM_BAR),
+            chromeScrimOpacity(pkg, mode),
+          ),
+        );
+        for (const palette of [root, effectiveGlassPalette(pkg, mode)])
+          assertClearsCompositeExtrema(
+            palette.textPrimary,
+            composites,
+            AA_NORMAL,
+            `${pkg}/${mode} Orrery title`,
+          );
+      });
+    }
+  }
 });
 
 describe("mode-aware card glass model (31.1-06)", () => {

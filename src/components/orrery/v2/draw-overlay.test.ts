@@ -87,6 +87,7 @@ import {
 } from "@/logic/orrery-frame";
 import { POLARIS_RADIUS } from "@/logic/orrery-recovery-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
+import { ORRERY_OCCLUSION_DIM_MAX } from "@/theme/tokens/surface";
 import {
   drawFocusReticle,
   drawOcclusion,
@@ -160,6 +161,7 @@ function spec(overrides: Partial<OverlaySpec> = {}): OverlaySpec {
     },
     extent: 400,
     additive: false,
+    occlusionDim: 0.7,
     ...overrides,
   };
 }
@@ -608,6 +610,20 @@ describe("38.7-11 (D-55/H5): the occlusion dim", () => {
       ),
     ).toBe(1);
     expect(calls.filter((c) => c.op === "drawRRect")).toHaveLength(1);
+  });
+
+  it("38.7-14 (D-62): the fill never exceeds the 0.7 ceiling, and a zero dim draws nothing", () => {
+    const rect = [{ x: 0, y: 0, width: 10, height: 10 }];
+    const over = recordingCanvas();
+    drawOcclusion(over.canvas, rect, spec({ occlusionDim: 0.95 }));
+    const fill = paintOf(over.calls.find((c) => c.op === "drawRRect")!);
+    expect(fill.color[3]).toBeCloseTo(OCCLUSION[3] * ORRERY_OCCLUSION_DIM_MAX);
+    const none = recordingCanvas();
+    expect(drawOcclusion(none.canvas, rect, spec({ occlusionDim: 0 }))).toBe(0);
+    expect(
+      drawOcclusion(none.canvas, rect, spec({ occlusionDim: Number.NaN })),
+    ).toBe(0);
+    expect(none.calls).toHaveLength(0);
   });
 });
 

@@ -607,6 +607,11 @@ export interface OverlaySpec {
   extent: number;
   /** D-51 blend family from the resolved mode: dark additive, light src-over. */
   additive: boolean;
+  /**
+   * 38.7-14 (D-55/D-62): the occlusion dim under Orrery text surfaces, the
+   * proven per-theme `ORRERY_OCCLUSION_DIM` (`orreryOcclusionDim`).
+   */
+  occlusionDim: number;
 }
 
 export function buildOverlayInk(colors: ThemePalette): OverlayInk {
@@ -631,6 +636,7 @@ export const EMPTY_OVERLAY_SPEC: OverlaySpec = Object.freeze({
   },
   extent: 1,
   additive: false,
+  occlusionDim: 0,
 });
 
 // ── Bodies (38.7-07, D-43/D-53) ─────────────────────────────────────────────

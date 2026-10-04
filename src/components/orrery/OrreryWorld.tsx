@@ -67,6 +67,7 @@ import type {
   ThemePackage,
   ThemePalette,
 } from "@/theme/theme-types";
+import { orreryOcclusionDim } from "@/theme/tokens/surface";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import type { OrrerySatelliteSource } from "./orrery-satellite-publisher";
@@ -676,8 +677,9 @@ export function OrreryWorldInner({
       ink: buildOverlayInk(colors),
       extent: scene.extent,
       additive: themeMode === "dark",
+      occlusionDim: orreryOcclusionDim(themePackage, themeMode),
     }),
-    [colors, scene.extent, themeMode],
+    [colors, scene.extent, themeMode, themePackage],
   );
   useEffect(() => {
     overlaySpec.value = overlay;

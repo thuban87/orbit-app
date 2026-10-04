@@ -158,6 +158,7 @@ import {
   type SkySpec,
 } from "./scene-specs";
 import { orreryShader } from "./shaders";
+import { ORRERY_OCCLUSION_STYLE } from "./visual-tunables";
 
 export interface OrreryV2CanvasProps {
   /** Measured canvas size (the canvas mounts only once measured). */
@@ -236,6 +237,8 @@ const AMBIENT_CONSUMERS = {
 } as const;
 /** The first-frame cover's fade (ms). */
 const COVER_FADE_MS = 160;
+/** The overlay's occlusion fill under the "lab-b" style: none. */
+const NO_OCCLUSION_FILL: readonly CameraRect[] = Object.freeze([]);
 
 /** What a layer's ack reaction compares: its picture and the generation it read. */
 interface LayerRecord {
@@ -513,6 +516,11 @@ export function OrreryV2Canvas({
       { width, height },
     );
   });
+  // 38.7-14 (T-DIM): under ORRERY_OCCLUSION_STYLE "lab-b" the bodies and
+  // labels pictures read the occlusion rects (Lab B R1) and the overlay draws
+  // no fill; under "full-rect" (default) they never capture it, so a panel
+  // opening does not re-record them.
+  const worldOcclusion = ORRERY_OCCLUSION_STYLE === "lab-b" ? occlusion : null;
   // D-43/M14: one depth order per frame, shared by both body layers.
   const bodyOrder = useDerivedValue(() =>
     orderBodies(frame.value, bodies.value.bodies),
@@ -533,6 +541,7 @@ export function OrreryV2Canvas({
           "behind",
           bodyEffects,
           focus.value,
+          worldOcclusion ? worldOcclusion.value : null,
         );
       },
       { width, height },
@@ -548,6 +557,7 @@ export function OrreryV2Canvas({
           bodyOrder.value,
           pulse.value,
           bodyEffects,
+          worldOcclusion ? worldOcclusion.value : null,
         );
       },
       { width, height },
@@ -564,6 +574,7 @@ export function OrreryV2Canvas({
           "front",
           bodyEffects,
           focus.value,
+          worldOcclusion ? worldOcclusion.value : null,
         );
       },
       { width, height },
@@ -575,7 +586,13 @@ export function OrreryV2Canvas({
   const labelsPicture = useDerivedValue(() =>
     createPicture(
       (canvas) => {
-        drawLabels(canvas, labels.value, allocationIndex.value, focus.value);
+        drawLabels(
+          canvas,
+          labels.value,
+          allocationIndex.value,
+          focus.value,
+          worldOcclusion ? worldOcclusion.value : null,
+        );
       },
       { width, height },
     ),
@@ -594,7 +611,7 @@ export function OrreryV2Canvas({
           bands,
           aaDp,
           focus.value,
-          occlusion.value,
+          worldOcclusion ? NO_OCCLUSION_FILL : occlusion.value,
         );
       },
       { width, height },
