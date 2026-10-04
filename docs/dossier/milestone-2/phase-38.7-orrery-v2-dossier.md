@@ -87,14 +87,19 @@ It stays recognisably Orbit: contacts and relationships remain the information a
 ### People and the sun
 
 -   **[DECIDED · 2026-10-02] D-13 --- Sun-lit faces with lighter shading only.** Faces in Labs B and C were too dark. Re-check with real photos.
+    - **[DECIDED 2026-10-03, owner — Plan 10 checkpoint, G-FACE]** Face shading is **"fine"** at the "current lighter" values (floor 0.85 / 0.9, light elevation 0.9, wrap 0.5, dark / light); the other options (Lab B's, a "halfway" step, flat) are dropped. Owner: "Face shading: fine". Mirrored as CONTEXT D-71.
 -   **[DECIDED · 2026-10-02] D-14 --- Status is drawn with Lab B's rim + atmosphere glow.**
+    - **[DECIDED 2026-10-03, owner — Plan 10 checkpoint, G-DESAT]** Decay and rogue photos wash out **"stronger"** than Lab B: decay 0.6, rogue 0.9 (Lab B: 0.25 / 0.45). Owner: "Desat: Stronger". Mirrored as CONTEXT D-72.
+    - **[OPEN 2026-10-03 — Plan 10 checkpoint, G-RIM]** The status rim + glow strength stays **as in Lab B** for now. The owner read "rim" as the solid blue focus ring (the old focus outline that D-18's reticle replaces) and is clarifying; not decided. Mirrored in CONTEXT D-74.
 -   **[DECIDED · 2026-10-02] D-15 --- Lab A's star sun** (corona + granulation). It was the owner's favourite.
+    - **[DECIDED 2026-10-03, owner — Plan 10 checkpoint, G-SUN]** The sun body is **always the star**, even when its occupant (self or a contact sun) has a photo: the photo is not painted on the sun at Home. It still shows on the focus card, Profile and lists; focusing the sun is unchanged. The shimmer stays **"as in Lab A"** (D-37: corona swing 0.5, granulation swing 0.3 with the sun pulse). Owner: "Sun-look: star is good", "Sun-shimmer: as in lab A". Mirrored as CONTEXT D-70.
 -   **[DECIDED · 2026-10-02] D-16 --- Minimum body size at overview.** Small bodies read as worlds, not pins.
 -   **[DECIDED · 2026-10-02] D-17 --- Moons.** Lab B's and Lab C's moons are rejected. The owner's "perfect" moon behaviour is specified as D-31.
 
 ### Focus and controls
 
 -   **[DECIDED · 2026-10-02] D-18 --- A reticle on the focused person** (the owner loved it in both A and B).
+    - **[DECIDED 2026-10-03, owner — Plan 10 checkpoint, stated for Plan 11]** The focused-person marker must be **the lab reticle** (the one Labs A and B drew), **not a solid circle**. Owner: "I asked for the reticle that the labs used, multiple labs used, not this solid circle bullshit." Mirrored in CONTEXT D-74.
 -   **[DECIDED · 2026-10-02] D-19 --- Lab C's focus framing.**
     - The person is centred and large, with the card docked below.
     - Lab A's card-above placement is rejected.
@@ -141,6 +146,7 @@ It stays recognisably Orbit: contacts and relationships remain the information a
     - This is a **new** feature. What the owner saw in Lab A was the **stack pip** (a dot for a contact hidden behind another), which is kept as well.
     - Moon bumps and stack pips must be visually distinct.
     - Today's focus card already lists the focused person's moons (`OrreryScreen.tsx:1109-1131`). Keep it.
+    - **[DECIDED 2026-10-03, owner — Plan 10 checkpoint, G-BUMP / moon focus]** The bump stays **"as is"** (4 dp, +0.75 dp per extra moon, 6 dp cap), distinct from the D-54 pips. The D-47 difference is accepted: moons split by camera zoom, names appear by on-screen size, so under the tilt a far contact's moons can split slightly before or after its name shows. Moon focus is **accepted** as built: a moon can be focused only when fully split (zoom 2.0 and above), and zooming below that clears the moon's focus. Owner: "Bump: As is", "Moon-focus: accept". Mirrored as CONTEXT D-73.
 -   **[DECIDED · 2026-10-02] D-32 --- The star warp replaces the "not light-speed" rule. ⚠ SUPERSEDES** phase-08 `:568`.
     - Production spin, shed and capture by membership change stays underneath.
     - So do the 2100 ms / 180 ms (reduced-motion) durations, land-at-Home, and interaction readiness at progress 0.82 (`use-orrery-switch-runtime.ts:25-26`; phase-09 `:450`, `:462-479`; 30-CONTEXT D-11).
@@ -305,6 +311,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - **Tests and docs:** the tests that pin drift, and the docs listed in `audits/PROD-GROUNDING.md` §2.2.
     - **Dead code:** the legacy `drawnRadius`/`driftPush` helpers have only test consumers and can go.
 -   **[DERIVED] Rogue identity without drift.** Rogue is carried by the cold, desaturated, glow-less body (D-14). A non-colour status cue remains for colour-blind users: the ring dash/fade/trace styles. Decay/rogue photo desaturation (Lab B C-16) is product meaning: confirm it at the device checkpoint.
+    - **[DECIDED 2026-10-03, owner — Plan 10 checkpoint, G-DESAT]** Confirmed on the device: decay/rogue photo desaturation is kept and made **stronger** (decay 0.6, rogue 0.9). Mirrored as CONTEXT D-72.
 -   **[DERIVED] Steep tilt packs rings vertically.** This produces more co-angular stacks (pips), more label conflicts on the near and far sides, and possibly bare sky corners at 60°+ because of parallax (`audits/LAB-A-AUDIT.md` §5). One-finger pan at 62° moves about 2.1× the ground per point at the far rim: tune the pan mapping (D-04 stays one-finger pan).
 -   **[DERIVED] Lab C's focus-radius helper** (`orreryFocusSystemRadius`) is keyed to C's hero scale and moon geometry. Re-key it to V2's moons (D-31).
 -   **[DERIVED] Phase 30 Preview canvas.** `SystemPreviewCanvas.tsx` is a separate simplified renderer, and phase-09 `:311` says the Preview does not expose tilt or yaw. Resolved by D-57.
@@ -483,3 +490,4 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
 -   **2026-10-03** --- D-49 diagnostic: the Orrery SurfaceView holds the 6 Pro at 120 Hz at idle (SF "can't resolve refresh rate" → Max). Owner approved FR-B (native 30 Hz frame-rate vote on the SurfaceView, patch-package, release-verified on the 6 Pro). Mirrored as CONTEXT D-65.
 -   **2026-10-03** --- Owner execution policy (CONTEXT D-66, `38.7-EXECUTION-POLICY.md`): Pixel 6 Pro is the target device; the Pixel 3a leaves all mid-phase device work and keeps one end-of-phase release smoke check (Size 120 + All Contacts, no crash/ANR); its D-56 gates (G2, the 3a limits of G3/G5/G6/G7, 3a feel in G8) are retired, changing D-63. DEBUG perf measurement moves out of Plans 10–15 into Plan 16's release pass; device checks become smoke tests; tests target data/crash/leak risks.
 -   **2026-10-03** --- Plan 09 look rulings (lab-anchored redo): D-09 grid on, "weaker" (CONTEXT D-67); D-10 pulses "as in Lab B", superseding "not very obvious" (CONTEXT D-68); D-08 All Contacts untinted (CONTEXT D-69). D-08 per-System tint strength (G-SKYTINT) left OPEN, tentatively as now, pending the owner's nebula answer.
+-   **2026-10-03** --- Plan 10 body rulings: D-15 the sun is always Lab A's star, its occupant's photo no longer painted on the sun body, shimmer "as in Lab A" (CONTEXT D-70); D-13 face shading "fine" at the current lighter values (CONTEXT D-71); D-14 decay/rogue wash-out "stronger", 0.6 / 0.9 (CONTEXT D-72); D-31/D-54 moon bump "as is", the D-47 split-vs-name difference and focus-only-when-split accepted (CONTEXT D-73). D-14 rim strength (G-RIM) left OPEN while the owner clarifies; the owner restated D-18: the focus marker must be the lab reticle, not a solid circle (CONTEXT D-74).
