@@ -25,12 +25,29 @@ vi.mock("@/services/photos/orrery-derivative-store", () => ({
 vi.mock("@/utils/logger", () => ({
   Logger: { warn: vi.fn(), error: vi.fn() },
 }));
+// 38.7-13: the switch runtime's resource merge (its hooks are not used here).
+vi.mock("react-native-reanimated", () => ({
+  cancelAnimation: vi.fn(),
+  ReduceMotion: { Never: "never" },
+  runOnJS: (fn: unknown) => fn,
+  runOnUI: (fn: unknown) => fn,
+  useAnimatedReaction: vi.fn(),
+  useSharedValue: (value: unknown) => ({ value }),
+  withTiming: (value: unknown) => value,
+}));
 
+import type { WorldBody } from "@/logic/orrery-camera-logic";
+import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import {
   bumpPhotoCacheBust,
   getPhotoCacheBust,
   subscribePhotoCacheBust,
 } from "@/stores/photo-cache-bust-store";
+import {
+  nextOrreryResources,
+  type OrreryBodyResource,
+  pruneOrreryResources,
+} from "../use-orrery-switch-runtime";
 import {
   createOrrerySpecPublisher,
   ORRERY_BODY_LAYERS,
@@ -740,5 +757,109 @@ describe("C-M1: progress at a saturated cap", () => {
     await h.drain();
     expect(h.created.some((image) => image.label.startsWith(x))).toBe(false);
     expect(h.drawnKeys()).toEqual([v1, v2, v3, f].sort());
+  });
+});
+
+describe("38.7-13 (D-53, H3): photos across a System switch", () => {
+  /** Scene `generation` with contacts `ids` (the merge reads keys only). */
+  const sceneOf = (generation: number, ids: number[]) =>
+    ({
+      generation,
+      world: ids.map(
+        (id): WorldBody => ({
+          id,
+          kind: "contact",
+          x: 0,
+          y: -40 - id,
+          radius: 12,
+          ringRadius: 40 + id,
+        }),
+      ),
+    }) as unknown as OrrerySceneSnapshot;
+  /**
+   * What OrreryWorld does with the switch runtime's resources: one look per
+   * resource (contact N shows photo `paths[N]`) and one request per photo.
+   */
+  function show(
+    h: ReturnType<typeof harness>,
+    resources: readonly OrreryBodyResource[],
+    paths: Record<number, string>,
+  ) {
+    const shown = resources.map((r) => paths[r.body.id]);
+    h.publisher.setLooks(h.looks(shown));
+    h.request(shown.map((path, i) => want(path, i)));
+  }
+
+  it("a key on both sides is decoded once; an outgoing-only key stays until settle, then retires only after every body layer acks (out of order)", async () => {
+    const h = harness({ maxImages: 8, reserveImages: 0 });
+    const paths = { 1: unique("out"), 2: unique("shared"), 3: unique("in") };
+    const a = sceneOf(1, [1, 2]);
+    const b = sceneOf(2, [2, 3]);
+    let resources = nextOrreryResources([], a, false);
+    show(h, resources, paths);
+    await h.drain();
+    const outgoing = h.imageOf(paths[1]) as FakeImage;
+    const shared = h.imageOf(paths[2]) as FakeImage;
+    expect(h.created).toHaveLength(2);
+    // Publish B as a switch: the owner holds the UNION while it runs.
+    resources = nextOrreryResources(resources, b, true);
+    show(h, resources, paths);
+    await h.drain();
+    expect(h.drawnKeys()).toEqual([paths[1], paths[2], paths[3]].sort());
+    // The shared photo was never re-decoded: one decode per key, total.
+    expect(h.created.map((image) => image.label.split("#")[0]).sort()).toEqual(
+      [paths[1], paths[2], paths[3]].sort(),
+    );
+    expect(h.imageOf(paths[2])).toBe(shared);
+    expect(h.imageOf(paths[1])).toBe(outgoing);
+    // Settle: the prune drops the outgoing-only body; its image retires.
+    resources = pruneOrreryResources(resources, b);
+    show(h, resources, paths);
+    h.held.add("bodiesBehind");
+    h.ack();
+    h.cache.clearUnheld();
+    // bodiesFront and the sun acked first; bodiesBehind may still record it.
+    expect(outgoing.disposed).toBe(0);
+    expect(h.cache.stats().retired).toBe(1);
+    h.held.clear();
+    h.ack();
+    h.cache.clearUnheld();
+    expect(outgoing.disposed).toBe(1);
+    expect(shared.disposed).toBe(0);
+    expect(h.imageOf(paths[2])).toBe(shared);
+  });
+
+  it("an unmount mid-switch hands every image back in reverse creation order; a late decode for the old epoch is disposed unpublished", async () => {
+    const h = harness({ maxImages: 8, reserveImages: 0, concurrency: 1 });
+    const paths = { 1: unique("x"), 2: unique("y"), 3: unique("z") };
+    let resources = nextOrreryResources([], sceneOf(1, [1, 2]), false);
+    show(h, resources, paths);
+    await h.drain();
+    resources = nextOrreryResources(resources, sceneOf(2, [2, 3]), true);
+    show(h, resources, paths);
+    // Mid-switch: the incoming photo is still decoding when the canvas goes.
+    expect(h.loads.map((l) => l.path)).toEqual([paths[3]]);
+    const drawn = [paths[1], paths[2]].map(
+      (path) => h.imageOf(path) as FakeImage,
+    );
+    const order: string[] = [];
+    for (const image of drawn) {
+      const dispose = image.dispose.bind(image);
+      image.dispose = () => {
+        order.push(image.label);
+        dispose();
+      };
+    }
+    const published = h.publisher.generation();
+    const epoch = h.cache.release(h.owner) as number;
+    h.teardown();
+    // Reverse creation order (H3 rule 3).
+    expect(order).toEqual(drawn.map((image) => image.label).reverse());
+    // The late decode belongs to the ended epoch: disposed, never published.
+    const late = (await h.finish(paths[3])) as FakeImage;
+    expect(late.disposed).toBe(1);
+    expect(h.publisher.generation()).toBe(published);
+    h.cache.confirmReleased(h.owner, epoch);
+    expect(h.cache.stats()).toMatchObject({ images: 0, inflight: 0 });
   });
 });

@@ -19,7 +19,6 @@ import {
   cancelAnimation,
   runOnJS,
   runOnUI,
-  useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
@@ -79,6 +78,7 @@ import {
 import {
   type CameraPose,
   type CameraRect,
+  type CameraViewport,
   clampCameraPose,
   deriveHomePose,
   frameBodies,
@@ -336,10 +336,6 @@ export function OrreryScreen() {
     [],
   );
   const state = useSystemStore();
-  const switchRuntime = useOrrerySwitchRuntime(pose, reducedMotion);
-  const publishSwitch = switchRuntime.publish;
-  const pauseSwitch = switchRuntime.pause;
-  const resumeSwitch = switchRuntime.resume;
   const [systemCatalog, setSystemCatalog] = useState<SystemCatalogEntry[]>([]);
   const [systemCounts, setSystemCounts] = useState<Map<string, number>>(
     new Map(),
@@ -389,26 +385,39 @@ export function OrreryScreen() {
       setState: setSatelliteState,
     });
   const satellitePublisher = satellitePublisherRef.current;
-  const { transition: switchTransition, progress: switchProgress } =
-    switchRuntime;
   // 38.7-12 (D-19): the generation whose switch last settled. The Home effect
   // re-runs on it, so a cluster tapped while a switch was still running zooms
   // once the switch has landed (one render at settle, never per frame).
   const [settledSwitch, setSettledSwitch] = useState(-1);
+  // 38.7-13 (C4-M1, D-53): the renderer's projection/framing viewport is
+  // held while a switch runs, so an obstacle measured mid-switch (a save
+  // error, a missing-category or broken-System notice, a retry clearing one)
+  // commits nothing to the renderer until the switch settles. The panels
+  // themselves mount, measure and publish at once; the D-55 occlusion rects
+  // keep following live measurements (C5-L4).
+  const [heldViewport, setHeldViewport] = useState<CameraViewport | null>(null);
+  const worldViewport = heldViewport ?? viewport;
+  // Called by the runtime inside its settle callback (a driven switch: the
+  // prune's JS call; a settled publication: inside `publish`), so the
+  // satellite flush, the settled generation and the viewport adoption all
+  // batch into that one commit.
   const onSwitchSettled = useCallback(
     (generation: number) => {
       satellitePublisher.switchSettled(generation);
       setSettledSwitch(generation);
+      setHeldViewport(null);
     },
     [satellitePublisher],
   );
-  useAnimatedReaction(
-    () => (switchProgress.value >= 1 ? switchTransition.value.generation : -1),
-    (settled, previous) => {
-      if (settled >= 0 && settled !== previous)
-        runOnJS(onSwitchSettled)(settled);
-    },
+  const switchRuntime = useOrrerySwitchRuntime(
+    pose,
+    reducedMotion,
+    onSwitchSettled,
   );
+  const publishSwitch = switchRuntime.publish;
+  const pauseSwitch = switchRuntime.pause;
+  const resumeSwitch = switchRuntime.resume;
+  const switchProgress = switchRuntime.progress;
   useEffect(() => {
     const unsubscribe = useSystemStore.subscribe((next, previous) => {
       if (!shouldPublishSwitchScene(next, previous)) return;
@@ -438,6 +447,9 @@ export function OrreryScreen() {
       // C4-M3: a switch lands at destination Home, even with a retained focus;
       // no later card re-measure may re-frame it.
       if (sourceIds) focusFraming.current = null;
+      // C4-M1: hold the renderer viewport in use until this switch settles
+      // (batched into this publication's commit).
+      if (sourceIds) setHeldViewport((held) => held ?? viewport);
       publishSwitch(
         next.snapshot,
         !!sourceIds,
@@ -723,7 +735,8 @@ export function OrreryScreen() {
   const camera = useOrreryCamera({
     pose,
     extent: cameraExtent(scene?.extent ?? 32),
-    viewport,
+    // 38.7-13 (C4-M1): the projection/framing viewport, held mid-switch.
+    viewport: worldViewport,
     enabled: visible && !overlaysOpen,
     reduced: reducedMotion,
   });
@@ -750,13 +763,13 @@ export function OrreryScreen() {
       return focusFramingPose(
         body,
         moons,
-        viewport,
-        expectedFocusCardRect(viewport, height),
+        worldViewport,
+        expectedFocusCardRect(worldViewport, height),
         pose.value,
         scene.extent,
       );
     },
-    [satellitePublisher, viewport, pose],
+    [satellitePublisher, worldViewport, pose],
   );
   // D-19: the docked card's rect, on the UI thread from the shared frame. The
   // card positions itself from it, and the canvas reads the SAME value for the
@@ -885,11 +898,23 @@ export function OrreryScreen() {
         })();
         return;
       }
-      const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
+      const framing = frameBodies(
+        bodies,
+        worldViewport,
+        scene.extent,
+        pose.value,
+      );
       if (!framing) return;
       runOnUI(camera.recover)(framing.pose);
     },
-    [useSystemStore, pose, camera, viewport, frameSingleFocus, framedEpoch],
+    [
+      useSystemStore,
+      pose,
+      camera,
+      worldViewport,
+      frameSingleFocus,
+      framedEpoch,
+    ],
   );
   // C3-M1: the card's real height arrives after the framing (first layout,
   // then moons/context loading or a font reflow). While the framing is still
@@ -1106,7 +1131,7 @@ export function OrreryScreen() {
     const groupKey = clusterOpen
       ? `${scene.generation}:${focusedIds.join(",")}`
       : "";
-    const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(viewport)}:${groupKey}`;
+    const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(worldViewport)}:${groupKey}`;
     const domain = `${systemRefId(scene.system)}:${scene.preferences.density}`;
     // C4-M3: a real System switch lands at destination Home. The landing is
     // handled ONCE — by the first run below for that generation — and then
@@ -1185,13 +1210,17 @@ export function OrreryScreen() {
         : focusedBodies.length > 0 && clusterOpen
           ? (clusterZoomPose(
               focusedBodies,
-              viewport,
+              worldViewport,
               pose.value,
               scene.extent,
             ) ?? undefined)
           : focusedBodies.length > 0
-            ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)
-                ?.pose
+            ? frameBodies(
+                focusedBodies,
+                worldViewport,
+                scene.extent,
+                pose.value,
+              )?.pose
             : undefined;
     if (clusterOpen && focusedBodies.length > 0 && !focusedPose) {
       // H2: no safe cluster pose (beyond the horizon) — the panel stays open
@@ -1203,7 +1232,7 @@ export function OrreryScreen() {
     const home = selectSystemFraming(
       false,
       focusedPose,
-      deriveHomePose(scene.world, viewport),
+      deriveHomePose(scene.world, worldViewport),
     );
     if (!home) return; // Preserve the previous valid pose through zero measurement.
     lastHomeFrame.current = key;
@@ -1225,7 +1254,7 @@ export function OrreryScreen() {
   }, [
     scene,
     state.status,
-    viewport,
+    worldViewport,
     pose,
     focusedIds,
     camera.stop,
@@ -1247,7 +1276,7 @@ export function OrreryScreen() {
     setClusterOpen(false);
     setFocusTargets([]);
     setFocusError(null);
-    const home = deriveHomePose(state.snapshot?.world ?? [], viewport);
+    const home = deriveHomePose(state.snapshot?.world ?? [], worldViewport);
     if (!home) return;
     runOnUI(camera.recover)(home);
   };
@@ -1315,7 +1344,7 @@ export function OrreryScreen() {
             scene={scene}
             camera={camera}
             pose={pose}
-            viewport={viewport}
+            viewport={worldViewport}
             colors={colors}
             themeMode={themeMode}
             themePackage={themePackage}

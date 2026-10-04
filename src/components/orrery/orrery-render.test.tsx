@@ -24,7 +24,10 @@ import {
   type OrrerySatelliteState,
 } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
-import { OrreryWorldInner as OrreryWorld } from "./OrreryWorld";
+import {
+  OrreryWorld as MemoisedOrreryWorld,
+  OrreryWorldInner as OrreryWorld,
+} from "./OrreryWorld";
 import { createOrrerySatellitePublisher } from "./orrery-satellite-publisher";
 import { prepareOrreryText } from "./resources/orrery-text-service";
 import { useOrreryCamera } from "./use-orrery-camera";
@@ -1285,6 +1288,14 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
 });
 
 describe("38.7-13: the switch through the real runtime and frame worklet (C3-H1, C4-L2, H9)", () => {
+  it("C3-M2: the screen mounts the memoised renderer (a render with equal props commits nothing)", () => {
+    expect(MemoisedOrreryWorld).toMatchObject({
+      $$typeof: Symbol.for("react.memo"),
+      type: OrreryWorld,
+      compare: null,
+    });
+  });
+
   /** A scene with `count` contacts (All Contacts: the untinted sky). */
   async function sceneWith(count: number) {
     const exec = nodeSqliteExecutor(db);

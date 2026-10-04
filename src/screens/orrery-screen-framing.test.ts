@@ -1,8 +1,9 @@
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
-import { expect, it, vi } from "vitest";
+import { beforeAll, expect, it, vi } from "vitest";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
 import * as overlayLogic from "@/components/orrery/orrery-overlay-logic";
+import { createOrrerySatellitePublisher } from "@/components/orrery/orrery-satellite-publisher";
 import * as switchLogic from "@/components/orrery/orrery-switch-animation";
 import * as occlusionSources from "@/components/orrery/v2/occlusion-sources";
 import * as cameraLogic from "@/logic/orrery-camera-logic";
@@ -14,11 +15,17 @@ import * as recoveryLogic from "@/logic/orrery-recovery-logic";
 import * as satelliteLogic from "@/logic/orrery-satellite-logic";
 import * as sessionLogic from "@/logic/orrery-session-logic";
 import * as systemLogic from "@/logic/orrery-system-logic";
+import { createOrrerySatelliteController } from "@/services/orrery-scene";
+import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 import {
   createShellObstacleStore,
   createWindowMeasurement,
   sameWindowRect,
 } from "@/stores/shell-obstacle-store";
+
+// 38.7-13: the real store / satellite modules imported below reach these.
+vi.mock("expo-sqlite", () => ({}));
+vi.mock("react-native", () => ({ Platform: { OS: "android" } }));
 
 const require = createRequire(import.meta.url);
 const babel = require("@babel/core");
@@ -32,6 +39,12 @@ function compile(path: string): string {
   }
   return code as string;
 }
+// The one-time Babel transform of the screen (seconds under a loaded full
+// run) is paid here, outside any single test's timeout.
+beforeAll(() => {
+  compile("src/components/orrery/use-orrery-camera.ts");
+  compile("src/screens/OrreryScreen.tsx");
+}, 60_000);
 type Element = {
   type: unknown;
   props: Record<string, unknown> & { children?: Element | Element[] };
@@ -62,6 +75,19 @@ function harness(
     moons?: boolean;
     /** 38.7-12 (D-39): the floating title's window rect (an obstacle). */
     header?: cameraLogic.CameraRect;
+    /**
+     * 38.7-13 (C3-M2): the REAL System store, its scene load and preference
+     * write replaced by the test's (controlled) functions.
+     */
+    realStore?: {
+      load: (system: unknown, generation: number) => Promise<unknown>;
+      persist: () => Promise<boolean>;
+    };
+    /**
+     * 38.7-13 (C-M3): the REAL satellite publisher and controller, satellites
+     * enabled, the row read controlled by the test.
+     */
+    realSatellites?: { read: () => Promise<unknown[]> };
   } = {},
 ) {
   const camera = cameraFor(profile);
@@ -177,13 +203,25 @@ function harness(
     : satelliteLogic.EMPTY_SATELLITE_SPEC;
   const switchProgress = { value: 1 };
   const switchTransition = { value: { generation: 7 } };
+  /** 38.7-13: the screen's settle listener, as the runtime received it. */
+  let onSettled: ((generation: number) => void) | undefined;
+  /** 38.7-13: the real store / satellite publisher, when asked for. */
+  let realStore: ReturnType<typeof createOrrerySystemStore> | null = null;
+  let realPublisher: ReturnType<typeof createOrrerySatellitePublisher> | null =
+    null;
+  const theme = { colors: {} };
+  /** 38.7-13: every runtime publication (scene, isSwitch, intensity, Home). */
+  const publishes: unknown[][] = [];
   // The screen's useAnimatedReaction callbacks of the latest render.
   const reactions: {
     prepare: () => unknown;
     react: (value: unknown, previous: unknown) => void;
   }[] = [];
   const prefs = {
-    committed: { density: "balanced", satellitesEnabled: 0 },
+    committed: {
+      density: "balanced",
+      satellitesEnabled: options.realSatellites ? 1 : 0,
+    },
     hydrated: true,
     hydrate: async () => {},
   };
@@ -237,11 +275,22 @@ function harness(
     ) {
       reactions.push({ prepare, react });
     },
-    useDerivedValue: (fn: () => unknown) => ({
-      get value() {
-        return fn();
-      },
-    }),
+    // A stable SharedValue across renders (as Reanimated's), recomputed on read.
+    useDerivedValue(fn: () => unknown) {
+      const ref = hooks.useRef(null) as {
+        current: { fn: () => unknown; readonly value: unknown } | null;
+      };
+      if (!ref.current) {
+        const box = {
+          fn,
+          get value() {
+            return box.fn();
+          },
+        };
+        ref.current = box;
+      } else ref.current.fn = fn;
+      return ref.current;
+    },
     ReduceMotion: { Never: "never" },
     cancelAnimation: () => {
       for (const p of pending) p.cancelled = true;
@@ -295,23 +344,46 @@ function harness(
         if (id.includes("orrery-switch-animation")) return switchLogic;
         if (id.includes("use-orrery-switch-runtime"))
           return {
-            useOrrerySwitchRuntime: () =>
-              (
+            useOrrerySwitchRuntime: (
+              _pose: unknown,
+              _reduced: unknown,
+              settled?: (generation: number) => void,
+            ) => {
+              onSettled = settled;
+              return (
                 hooks.useRef({
-                  publish: () => {},
+                  publish: (...args: unknown[]) => {
+                    publishes.push(args);
+                  },
                   pause: () => {},
                   resume: () => {},
                   resources: [],
                   progress: switchProgress,
                   transition: switchTransition,
                 }) as { current: unknown }
-              ).current,
+              ).current;
+            },
           };
         if (id.includes("orrery-overlay-logic")) return overlayLogic;
         if (id.includes("occlusion-sources")) return occlusionSources;
         if (id.includes("orrery-obstacle-logic")) return { canvasViewport };
         if (id.includes("orrery-system-store"))
-          return { createOrrerySystemStore: () => store };
+          return {
+            createOrrerySystemStore: options.realStore
+              ? (io: Parameters<typeof createOrrerySystemStore>[0]) => {
+                  const real = createOrrerySystemStore({
+                    ...io,
+                    load: options.realStore?.load as never,
+                    persist: options.realStore?.persist as never,
+                  });
+                  realStore = real;
+                  return Object.assign(() => real.getState(), {
+                    getState: real.getState,
+                    subscribe: real.subscribe,
+                  });
+                }
+              : () => store,
+          };
         if (id.includes("orrery-preferences-store"))
           return { useOrreryPreferencesStore: prefStore };
         if (id.includes("orrery-session-store"))
@@ -343,9 +415,24 @@ function harness(
           };
         if (id.includes("orrery-scene"))
           return {
-            createOrrerySatelliteController: () => ({ reload: () => {} }),
+            createOrrerySatelliteController: options.realSatellites
+              ? createOrrerySatelliteController
+              : () => ({ reload: () => {} }),
           };
+        if (id.includes("orrery-satellites-read") && options.realSatellites)
+          return { readOrrerySatellites: options.realSatellites.read };
         // 38.7-10 (C-M3): the satellite publisher (no satellites here).
+        if (id.includes("orrery-satellite-publisher") && options.realSatellites)
+          return {
+            createOrrerySatellitePublisher: (
+              publisherOptions: Parameters<
+                typeof createOrrerySatellitePublisher
+              >[0],
+            ) => {
+              realPublisher = createOrrerySatellitePublisher(publisherOptions);
+              return realPublisher;
+            },
+          };
         if (id.includes("orrery-satellite-publisher"))
           return {
             createOrrerySatellitePublisher: () => ({
@@ -400,8 +487,9 @@ function harness(
             OrreryControls: "Controls",
             ORRERY_CONTROLS_OBSTACLE: "orrery-camera-controls",
           };
+        // A stable theme context value (as the provider's).
         if (id.includes("/theme"))
-          return { useTheme: () => ({ colors: {} }), SPACING: {} };
+          return { useTheme: () => theme, SPACING: {} };
         return new Proxy(
           {},
           {
@@ -492,12 +580,19 @@ function harness(
     session,
     obstacles,
     switchProgress,
-    /** The switch for `generation` settles: the UI reactions fire once. */
+    publishes,
+    /** 38.7-13: the real System store (options.realStore). */
+    store: () => realStore,
+    /** 38.7-13: the real satellite publisher (options.realSatellites). */
+    publisher: () => realPublisher,
+    /**
+     * The switch for `generation` settles: the runtime's settle callback
+     * (38.7-13: the screen's settle listener) runs once, then React renders.
+     */
     settleSwitch(generation: number) {
       switchTransition.value = { generation };
       switchProgress.value = 1;
-      for (const reaction of [...reactions])
-        reaction.react(reaction.prepare(), -1);
+      onSettled?.(generation);
       render();
     },
     world: () => find("World")!,
@@ -1049,4 +1144,192 @@ it("after the switch landing is consumed, a later reflow in that generation neve
   expect(h.pose().zoom).toBeCloseTo(landed.zoom, 12);
   expect(h.pose().x).toBeCloseTo(landed.x, 12);
   expect(h.pose().y).toBeCloseTo(landed.y, 12);
+});
+
+// ── 38.7-13 (D-53): the renderer never re-renders mid-switch ───────────────
+
+/** The props that changed between two OrreryWorld renders (a memo commit). */
+function changedProps(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): string[] {
+  return Object.keys({ ...a, ...b }).filter(
+    (key) => !Object.is(a[key], b[key]),
+  );
+}
+async function microtasks(rounds = 12) {
+  for (let i = 0; i < rounds; i++) await Promise.resolve();
+}
+/** A controlled promise queue. */
+function controlled<T>() {
+  const queue: { resolve(value: T): void; reject(error: Error): void }[] = [];
+  return {
+    queue,
+    next: () =>
+      new Promise<T>((resolve, reject) => queue.push({ resolve, reject })),
+  };
+}
+/** A harness on the REAL System store; `extra` adds options. */
+function storeHarness(
+  saves: ReturnType<typeof controlled<boolean>>,
+  extra: Parameters<typeof harness>[1] = {},
+) {
+  let base: ReturnType<typeof harness>["scene"] | null = null;
+  const h = harness(undefined, {
+    ...extra,
+    realStore: {
+      load: async (system, generation) => ({
+        ...(base as NonNullable<typeof base>),
+        generation,
+        system,
+        systemSnapshot: {
+          ...(base as NonNullable<typeof base>).systemSnapshot,
+          categories: [],
+        },
+      }),
+      persist: saves.next,
+    },
+  });
+  base = h.scene;
+  return h;
+}
+const FAVORITES = { kind: "builtin", id: "favorites" } as const;
+const ALL = systemLogic.ALL_CONTACTS_SYSTEM;
+
+it("C3-M2 / C4-M1: a save landing mid-switch (saved, then error) and the save notice's measurement commit nothing to OrreryWorld; the renderer adopts the new viewport only in the settle commit, with no reframe", async () => {
+  const saves = controlled<boolean>();
+  const h = storeHarness(saves);
+  await h.ready();
+  await microtasks();
+  h.render();
+  const store = h.store();
+  expect(store?.getState().status).toBe("ready");
+  saves.queue[0].resolve(true);
+  await microtasks();
+  h.render();
+  // A user selection: the switch publishes, then its save starts.
+  void store?.getState().select(FAVORITES, undefined, true);
+  await microtasks();
+  h.render();
+  expect(store?.getState()).toMatchObject({
+    status: "ready",
+    persistence: "saving",
+  });
+  expect(h.publishes.at(-1)?.[1]).toBe(true); // a real switch
+  h.switchProgress.value = 0.5;
+  h.render();
+  const running = { ...h.world().props };
+  // (1) saved, mid-switch: zero OrreryWorld commits.
+  saves.queue[1].resolve(true);
+  await microtasks();
+  h.render();
+  expect(store?.getState().persistence).toBe("saved");
+  expect(changedProps(running, h.world().props)).toEqual([]);
+  h.settleSwitch(store?.getState().generation ?? 0);
+  // (2) error, mid-switch, then the save notice measures.
+  void store?.getState().select(ALL, undefined, true);
+  await microtasks();
+  h.render();
+  const home = h.publishes.at(-1)?.[3] as cameraLogic.CameraPose;
+  h.switchProgress.value = 0.5;
+  h.render();
+  const before = { ...h.world().props };
+  const occlusions = (
+    before.occlusionRects as { value: readonly cameraLogic.CameraRect[] }
+  ).value.length;
+  saves.queue[2].reject(new Error("write failed"));
+  await microtasks();
+  h.render();
+  expect(store?.getState().persistence).toBe("error");
+  // The notice mounts at once…
+  expect(
+    h
+      .findAll("Feedback")
+      .some((node) => node.props.obstacleId === "orrery-save-feedback"),
+  ).toBe(true);
+  expect(changedProps(before, h.world().props)).toEqual([]);
+  // …and publishes its measured rect at once (as OrreryObstacle does through
+  // the window measurement): the live viewport changes, the renderer's not.
+  h.obstacles
+    .getState()
+    .publish("orrery-save-feedback", { x: 16, y: 500, width: 368, height: 80 });
+  h.render();
+  expect(changedProps(before, h.world().props)).toEqual([]);
+  // C5-L4: the D-55 occlusion rects follow the measurement right away.
+  expect(
+    (h.world().props.occlusionRects as { value: unknown[] }).value.length,
+  ).toBe(occlusions + 1);
+  // Settle: the runtime lands at the publish-time Home, then the screen's
+  // settle callback adopts the new viewport inside that one commit.
+  const pose = h.world().props.pose as { value: cameraLogic.CameraPose };
+  pose.value = { ...home };
+  h.settleSwitch(store?.getState().generation ?? 0);
+  const settled = h.world().props;
+  expect(changedProps(before, settled).sort()).toEqual(
+    ["camera", "viewport"].sort(),
+  );
+  const adopted = settled.viewport as cameraLogic.CameraViewport;
+  expect(adopted.obstacles?.length).toBe(
+    ((before.viewport as cameraLogic.CameraViewport).obstacles?.length ?? 0) +
+      1,
+  );
+  // No reframe: the Home effect only clamps the landed pose.
+  for (const axis of ["x", "y", "zoom", "tilt", "yaw"] as const)
+    expect(pose.value[axis]).toBeCloseTo(home[axis] ?? 0, 9);
+});
+
+it("C-M3: satellite rows resolving (and, separately, failing) mid-switch reach the frame only through the SharedValue publisher — zero OrreryWorld commits until settle", async () => {
+  const saves = controlled<boolean>();
+  const reads = controlled<unknown[]>();
+  const h = storeHarness(saves, { realSatellites: { read: reads.next } });
+  const rows = [
+    {
+      uid: "m-a",
+      parentId: 1,
+      parentUid: "u1",
+      personName: "Moon A",
+      relationType: null,
+    },
+  ];
+  await h.ready();
+  await microtasks();
+  h.render();
+  const store = h.store();
+  for (const read of reads.queue.splice(0)) read.resolve(rows);
+  saves.queue[0]?.resolve(true);
+  await microtasks();
+  h.render();
+  const spec = () => h.publisher()?.source.spec.value;
+  for (const [system, outcome] of [
+    [FAVORITES, "ready"],
+    [ALL, "error"],
+  ] as const) {
+    void store?.getState().select(system, undefined, true);
+    await microtasks();
+    h.render();
+    const generation = store?.getState().generation ?? 0;
+    expect(spec()).toMatchObject({ status: "loading" });
+    h.switchProgress.value = 0.5;
+    h.render();
+    const running = { ...h.world().props };
+    const read = reads.queue.at(-1);
+    if (outcome === "ready") read?.resolve(rows);
+    else read?.reject(new Error("read failed"));
+    await microtasks();
+    h.render();
+    // The frame's SharedValue has the result…
+    expect(spec()).toMatchObject({
+      status: outcome,
+      sceneGeneration: generation,
+    });
+    if (outcome === "ready") expect(spec()?.index.rows).toHaveLength(1);
+    // …and OrreryWorld committed nothing for it.
+    expect(changedProps(running, h.world().props)).toEqual([]);
+    // Settle flushes the held React copy; still no OrreryWorld commit.
+    h.settleSwitch(generation);
+    expect(changedProps(running, h.world().props)).toEqual([]);
+    saves.queue.at(-1)?.resolve(true);
+    await microtasks();
+    h.render();
+  }
 });

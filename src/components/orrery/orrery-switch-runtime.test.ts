@@ -229,7 +229,7 @@ const sceneOf = (generation: number, world: WorldBody[]) =>
   ({ generation, world }) as unknown as OrrerySceneSnapshot;
 const keysOf = (world: readonly WorldBody[]) => world.map(bodyKey);
 
-function mountRuntime() {
+function mountRuntime(onSettled?: (generation: number) => void) {
   harness.state.value = undefined;
   harness.timings.length = 0;
   harness.reactions.length = 0;
@@ -240,6 +240,7 @@ function mountRuntime() {
   const runtime = renderOrrerySwitchRuntimeOnce(
     pose as never,
     reducedMotion as never,
+    onSettled,
   );
   return {
     runtime,
@@ -251,6 +252,7 @@ function mountRuntime() {
       return renderOrrerySwitchRuntimeOnce(
         pose as never,
         reducedMotion as never,
+        onSettled,
       );
     },
     resources: () => harness.state.value as OrreryBodyResource[],
@@ -673,5 +675,33 @@ describe("38.7-05 (D-45): the switch camera carries the lens shift", () => {
         spectacle,
       ).lensShift,
     ).toBeCloseTo(0.7, 12);
+  });
+});
+
+describe("38.7-13 (C4-M1): the settle notification batches into the settle commit", () => {
+  it("a settled publication notifies inside publish; a driven switch notifies once, inside the prune's JS callback, after the prune", () => {
+    const calls: { generation: number; resources: string[] }[] = [];
+    const mounted = mountRuntime((generation) => {
+      calls.push({
+        generation,
+        resources: resourceKeys(mounted.resources()),
+      });
+    });
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    expect(calls.map((c) => c.generation)).toEqual([1]);
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    // A running switch has not settled.
+    expect(calls).toHaveLength(1);
+    const bDriver = harness.timings.at(-1) as (finished: boolean) => void;
+    mounted.runtime.progress.value = 0.4;
+    mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, homeCamera);
+    // The interrupted driver completing late notifies nothing.
+    bDriver(true);
+    expect(calls).toHaveLength(1);
+    mounted.complete();
+    expect(calls).toHaveLength(2);
+    expect(calls[1].generation).toBe(3);
+    // The prune ran first, in the same JS call: one commit at settle.
+    expect(calls[1].resources).toEqual(keysOf(cWorldOf()));
   });
 });
