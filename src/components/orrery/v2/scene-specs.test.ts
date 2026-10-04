@@ -479,6 +479,7 @@ describe("buildPhotoRequests (D-53: visible first)", () => {
     photoKey,
     initialsFontSize: 16,
     focusInk: null,
+    moonInk: [0.5, 0.5, 0.5, 1],
   });
   const looks = [
     look("contact:1", "p1"),

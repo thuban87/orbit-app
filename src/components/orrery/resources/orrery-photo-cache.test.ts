@@ -264,6 +264,7 @@ function harness(
       photoKey,
       initialsFontSize: 16,
       focusInk: null,
+      moonInk: [0.5, 0.5, 0.5, 1],
     }));
   }
   /** The canvas unmounted (clock stopped, pictures detached, one round trip). */

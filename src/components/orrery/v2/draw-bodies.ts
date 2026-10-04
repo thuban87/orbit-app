@@ -37,6 +37,11 @@ import {
   type OrreryBodySpec,
   type OrreryInk,
 } from "./scene-specs";
+import {
+  MOON_BUMP_MAX_DP,
+  MOON_BUMP_RADIUS_DP,
+  MOON_BUMP_STEP_DP,
+} from "./visual-tunables";
 
 /** Sun glow halo radius × the disc radius (today's sun). */
 export const SUN_GLOW_SCALE = 1.8;
@@ -193,6 +198,58 @@ function drawSwatch(canvas: SkCanvas, spec: OrreryBodySpec, r: number): void {
   }
 }
 
+/**
+ * 38.7-10 (D-31): the bump's on-screen radius (dp) for a parent with `count`
+ * moons: MOON_BUMP_RADIUS_DP, a little larger per extra moon, capped.
+ */
+export function moonBumpRadiusDp(count: number): number {
+  "worklet";
+  return Math.min(
+    MOON_BUMP_MAX_DP,
+    MOON_BUMP_RADIUS_DP + MOON_BUMP_STEP_DP * Math.max(0, count - 1),
+  );
+}
+
+/**
+ * The parent's moon bump, in its billboard space (body radius `r`, billboard
+ * scale `scale`): a moon-ink disc centred on the rim at the bump angle, drawn
+ * BEFORE the parent's disc so the disc covers its inner half (a half-disc on
+ * the rim). It fades out as the moons split (1 − moonSplit). Decorative only.
+ */
+function drawMoonBump(
+  canvas: SkCanvas,
+  frame: AnimatedFrame,
+  spec: OrreryBodySpec,
+  r: number,
+  scale: number,
+): void {
+  "worklet";
+  const bumps = frame.moonBumps;
+  if (!bumps) return;
+  const bump = bumps[spec.key];
+  if (!bump) return;
+  const alpha = 1 - (frame.moonSplit ?? 0);
+  if (!(alpha > ALPHA_EPSILON) || !(scale > 0)) return;
+  canvas.drawCircle(
+    Math.cos(bump.angle) * r,
+    Math.sin(bump.angle) * r,
+    moonBumpRadiusDp(bump.count) / scale,
+    inkPaint(spec.moonInk, alpha),
+  );
+}
+
+/** How far past the disc the bump reaches (billboard units), or 0. */
+function bumpReach(
+  frame: AnimatedFrame,
+  spec: OrreryBodySpec,
+  scale: number,
+): number {
+  "worklet";
+  const bump = frame.moonBumps?.[spec.key];
+  if (!bump || !(scale > 0)) return 0;
+  return moonBumpRadiusDp(bump.count) / scale;
+}
+
 /** Opacity a frame body is drawn at (0 = not drawn). */
 function bodyAlpha(body: AnimatedFrame["bodies"][number]): number {
   "worklet";
@@ -217,7 +274,8 @@ export function drawContactBody(
   canvas.translate(body.x, body.y);
   canvas.scale(scale, scale);
   const layered = alpha < 1 - ALPHA_EPSILON;
-  if (layered) boundedLayer(canvas, alpha, r);
+  if (layered) boundedLayer(canvas, alpha, r + bumpReach(frame, spec, scale));
+  drawMoonBump(canvas, frame, spec, r, scale);
   canvas.drawCircle(0, 0, r, inkPaint(spec.outlineInk, 1));
   const inner = Math.max(1, r - BODY_OUTLINE_WIDTH / 2);
   if (spec.photo) drawDiscPhoto(canvas, spec.photo, inner);
@@ -316,7 +374,12 @@ export function drawSun(
   canvas.translate(body.x, body.y);
   canvas.scale(scale, scale);
   const layered = alpha < 1 - ALPHA_EPSILON;
-  if (layered) boundedLayer(canvas, alpha, Math.max(glow, r + SUN_RIM_GAP));
+  if (layered)
+    boundedLayer(
+      canvas,
+      alpha,
+      Math.max(glow, r + SUN_RIM_GAP + bumpReach(frame, spec, scale)),
+    );
   canvas.drawCircle(
     0,
     0,
@@ -326,6 +389,7 @@ export function drawSun(
       SUN_GLOW_OPACITY * (1 + SUN_PULSE_OPACITY_FRAC * pulse),
     ),
   );
+  drawMoonBump(canvas, frame, spec, r + SUN_RIM_GAP, scale);
   canvas.drawCircle(0, 0, r + SUN_RIM_GAP, inkPaint(spec.outlineInk, 1));
   if (spec.photo) drawDiscPhoto(canvas, spec.photo, r);
   else drawSwatch(canvas, spec, r);

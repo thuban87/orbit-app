@@ -87,6 +87,7 @@ function spec(
     photoKey: null,
     initialsFontSize: kind === "sun" ? 30 : 16,
     focusInk: null,
+    moonInk: MOON,
     initials: null,
     photo: null,
     ...extra,

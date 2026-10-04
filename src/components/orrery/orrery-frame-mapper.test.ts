@@ -17,7 +17,11 @@ vi.mock("react-native-reanimated", () => ({
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
 import { projectAnimatedFrame } from "@/logic/orrery-frame";
 import { previewReorder } from "@/logic/orrery-reorder-logic";
-import { deriveSatelliteBodies } from "@/logic/orrery-satellite-logic";
+import {
+  deriveSatelliteBodies,
+  EMPTY_SATELLITE_SPEC,
+  moonSplitFactor,
+} from "@/logic/orrery-satellite-logic";
 import {
   beginSwitchChoreography,
   sampleSwitchChoreography,
@@ -110,14 +114,15 @@ it("the emitted projection closure settles after publication under the installed
     sampleSwitchChoreography,
     sampleOrrerySwitchCamera,
     pose,
-    level: cell("overview"),
     viewport: { width: 400, height: 700 },
     generation: 7,
     // 38.7-05: the camera pan extent, a primitive (the dolly focal no longer
     // encodes it).
     frameExtent: 32,
-    memberIdentities: [],
-    satellites: [],
+    // 38.7-10 (C-M3/M13): the satellite spec SharedValue (never rows or
+    // members) and the split from the frame's own camera zoom.
+    satelliteSpec: cell(EMPTY_SATELLITE_SPEC),
+    moonSplitFactor,
     reorder,
     previewReorder,
     deriveSatelliteBodies,

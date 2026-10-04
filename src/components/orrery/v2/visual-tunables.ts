@@ -211,3 +211,18 @@ export const RING_LOOKS: Readonly<
     light: { lightGain: 0.35, lightMix: 0.35, farAlpha: 0.6 },
   },
 };
+
+// ── Moons and the far-zoom bump (38.7-10: D-31, D-54) ─────────────────────
+
+/*
+ * The bump is new (no lab drew one; HARVEST-MAP class N). It reads as a moon
+ * peeking over the parent's rim: a half-disc in the moon ink, a touch smaller
+ * than a split moon (MIN_SATELLITE_PX 10 → 5 dp radius) so it never reads as a
+ * second body, and clearly larger than nothing at phone size.
+ */
+/** Bump radius (screen dp) for a parent with one moon. */
+export const MOON_BUMP_RADIUS_DP = 4;
+/** Extra radius (dp) per additional moon. */
+export const MOON_BUMP_STEP_DP = 0.75;
+/** The bump never grows past this radius (dp). */
+export const MOON_BUMP_MAX_DP = 6;

@@ -31,8 +31,40 @@ export interface FrameBodyIndex {
   keyIndex?: Record<string, number>;
   idIndex?: Record<number, number>;
 }
+/**
+ * 38.7-10 (D-31): one parent's far-zoom moon bump — decorative, never a hit
+ * target. `angle` is the mean angle of its moons (radians, screen-space
+ * billboard convention: x right, y down); `count` how many moons it stands for.
+ */
+export interface MoonBump {
+  angle: number;
+  count: number;
+}
+/**
+ * 38.7-10 (D-54): a group of visibly overlapping contacts. `front` is the
+ * frame index of the nearest (drawn on top); `hidden` the frame indices
+ * behind it, nearest first, capped at PIP_MAX; `overflow` when more were cut.
+ */
+export interface BodyStack {
+  front: number;
+  hidden: number[];
+  overflow: boolean;
+}
+/**
+ * 38.7-10: what the frame worklet adds after projection, computed in the SAME
+ * frame from the SAME sampled camera (M13: drawn == tappable).
+ */
+export interface FrameSatelliteExtras {
+  /** Parent body key → its moon bump (every parent with moons). */
+  moonBumps?: Readonly<Record<string, MoonBump>>;
+  /** 0 = bumps only, 1 = moons fully split (`moonSplitFactor(zoom)`). */
+  moonSplit?: number;
+  /** Front frame index → its stack (D-54 pips). */
+  stacks?: Readonly<Record<number, BodyStack>>;
+}
 export type AnimatedFrame = Omit<ProjectedFrame, "bodies"> &
-  FrameBodyIndex & {
+  FrameBodyIndex &
+  FrameSatelliteExtras & {
     bodies: (ProjectedFrame["bodies"][number] & {
       opacity: number;
       interactive: boolean;

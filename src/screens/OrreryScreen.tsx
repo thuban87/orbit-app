@@ -19,6 +19,7 @@ import {
   cancelAnimation,
   runOnJS,
   runOnUI,
+  useAnimatedReaction,
   useSharedValue,
 } from "react-native-reanimated";
 import {
@@ -46,6 +47,10 @@ import {
   clusterRows,
 } from "@/components/orrery/orrery-overlay-logic";
 import { satelliteContext } from "@/components/orrery/orrery-satellite-context";
+import {
+  createOrrerySatellitePublisher,
+  type OrrerySatellitePublisher,
+} from "@/components/orrery/orrery-satellite-publisher";
 import {
   computeMembershipDelta,
   switchIntensity as membershipSwitchIntensity,
@@ -87,6 +92,10 @@ import {
 } from "@/logic/orrery-focus-logic";
 import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
 import type { ReorderIntent } from "@/logic/orrery-reorder-logic";
+import {
+  EMPTY_SATELLITE_SPEC,
+  type OrrerySatelliteSpec,
+} from "@/logic/orrery-satellite-logic";
 import { restoreOrrerySession } from "@/logic/orrery-session-logic";
 import {
   ALL_CONTACTS_SYSTEM,
@@ -314,6 +323,37 @@ export function OrreryScreen() {
   const hasReadySystem = useRef(false);
   const switchSourceIds = useRef<number[] | null>(null);
   const switchHomeGeneration = useRef<number | null>(null);
+  const [satelliteState, setSatelliteState] = useState<OrrerySatelliteState>({
+    status: "ready",
+    sceneGeneration: null,
+    rows: [],
+  });
+  // 38.7-10 (C-M3): satellite rows reach OrreryWorld only through this
+  // SharedValue, written by the publisher; the React copy (focus card,
+  // companion sheet) is held while a System switch is in flight and flushed
+  // once it settles, so a satellite load commits no render mid-switch.
+  const satelliteSpec =
+    useSharedValue<OrrerySatelliteSpec>(EMPTY_SATELLITE_SPEC);
+  const satellitePublisherRef = useRef<OrrerySatellitePublisher | null>(null);
+  if (!satellitePublisherRef.current)
+    satellitePublisherRef.current = createOrrerySatellitePublisher({
+      spec: satelliteSpec,
+      setState: setSatelliteState,
+    });
+  const satellitePublisher = satellitePublisherRef.current;
+  const { transition: switchTransition, progress: switchProgress } =
+    switchRuntime;
+  const satelliteSwitchSettled = useCallback(
+    (generation: number) => satellitePublisher.switchSettled(generation),
+    [satellitePublisher],
+  );
+  useAnimatedReaction(
+    () => (switchProgress.value >= 1 ? switchTransition.value.generation : -1),
+    (settled, previous) => {
+      if (settled >= 0 && settled !== previous)
+        runOnJS(satelliteSwitchSettled)(settled);
+    },
+  );
   useEffect(() => {
     const unsubscribe = useSystemStore.subscribe((next, previous) => {
       if (!shouldPublishSwitchScene(next, previous)) return;
@@ -338,6 +378,8 @@ export function OrreryScreen() {
       );
       const destinationHome =
         deriveHomePose(next.snapshot.world, viewport) ?? pose.value;
+      // Before the satellite reload this same notification triggers.
+      if (sourceIds) satellitePublisher.switchStarted(next.generation);
       publishSwitch(
         next.snapshot,
         !!sourceIds,
@@ -363,24 +405,21 @@ export function OrreryScreen() {
       switchHomeGeneration.current = next.generation;
     });
     return unsubscribe;
-  }, [useSystemStore, publishSwitch, viewport, pose]);
-  const [satelliteState, setSatelliteState] = useState<OrrerySatelliteState>({
-    status: "ready",
-    sceneGeneration: null,
-    rows: [],
-  });
+  }, [useSystemStore, publishSwitch, viewport, pose, satellitePublisher]);
   const satelliteController = useMemo(
     () =>
-      createOrrerySatelliteController(
-        (scene) =>
-          readOrrerySatellites(
-            getExecutor(),
-            scene.systemSnapshot.members,
-            scene.system,
-          ),
-        setSatelliteState,
-      ),
-    [],
+      createOrrerySatelliteController((scene) => {
+        satellitePublisher.noteScene(
+          scene.generation,
+          scene.systemSnapshot.members,
+        );
+        return readOrrerySatellites(
+          getExecutor(),
+          scene.systemSnapshot.members,
+          scene.system,
+        );
+      }, satellitePublisher.publish),
+    [satellitePublisher],
   );
   const reloadSatellites = useCallback(() => {
     return satelliteController.reload(
@@ -1071,7 +1110,7 @@ export function OrreryScreen() {
             onReorder={onReorder}
             onReorderActivated={acknowledgeReorder}
             focusedIds={focusedIds}
-            satellites={satellites?.rows}
+            satelliteSource={satellitePublisher.source}
             focusedSatellite={focusedSatellite}
             switchRuntime={switchRuntime}
             clusterIds={clusterIds}

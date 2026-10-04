@@ -593,6 +593,8 @@ export interface OrreryBodyLook {
   initialsFontSize: number;
   /** Moon: the focused moon's accent ring ink; null otherwise. */
   focusInk: OrreryInk | null;
+  /** 38.7-10 (D-31): the moon ink (`textSecondary`) a parent's bump is drawn in. */
+  moonInk: OrreryInk;
 }
 
 /** A body's spec: its look plus the native objects its picture draws. */
@@ -679,6 +681,7 @@ export function buildBodyLooks(
     tokenInk(
       colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
     );
+  const moonInk = tokenInk(colors.textSecondary);
   for (const resource of resources) {
     const { body } = resource;
     if (body.kind === "satellite") continue;
@@ -699,6 +702,7 @@ export function buildBodyLooks(
       photoKey: identity.photo,
       initialsFontSize: bodyInitialsLayout(kind, body.radius).fontSize,
       focusInk: null,
+      moonInk,
     });
   }
   return out;
@@ -782,6 +786,7 @@ export function buildSatelliteLooks(
       photoKey: null,
       initialsFontSize: 0,
       focusInk: isFocused ? focusInk : null,
+      moonInk: ink,
     };
   });
 }

@@ -6,7 +6,10 @@ import {
   projectSwitchChoreographyFrame,
 } from "./orrery-frame";
 import { previewReorder, type ReorderDrag } from "./orrery-reorder-logic";
-import { deriveSatelliteBodies } from "./orrery-satellite-logic";
+import {
+  deriveSatelliteBodies,
+  indexSatellites,
+} from "./orrery-satellite-logic";
 import {
   ACCELERATE_END,
   BASE_RADIAL_DISPLACEMENT,
@@ -710,11 +713,10 @@ describe("D-53 settled world is shared by reference and never mutated (cycle-1 M
       const reordered = previewReorder(sampled, held);
       const moons = deriveSatelliteBodies(
         reordered,
-        rows,
-        members,
+        indexSatellites(rows, members),
         true,
-        "detail",
-      );
+        1,
+      ).moons;
       const complete = [...reordered, ...moons];
       projectAnimatedFrame(
         { generation: 3, from: complete, to: complete },

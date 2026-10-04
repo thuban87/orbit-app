@@ -46,6 +46,7 @@ import {
 } from "@/logic/orrery-focus-logic";
 import {
   deriveSatelliteBodies,
+  indexSatellites,
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
 import { restoreOrrerySession } from "@/logic/orrery-session-logic";
@@ -500,11 +501,10 @@ describe("Orrery production exploration integration", () => {
       expect(
         deriveSatelliteBodies(
           scene.world,
-          staleRows,
-          scene.systemSnapshot.members,
+          indexSatellites(staleRows, scene.systemSnapshot.members),
           true,
-          "detail",
-        ),
+          1,
+        ).moons,
       ).toEqual([]);
       const target = { ...sun, kind: "contact-sun" as const };
       const identities: OrreryContactTarget[] = [
@@ -553,11 +553,10 @@ describe("Orrery production exploration integration", () => {
       expect(io.group).toHaveBeenCalledExactlyOnceWith([identities[1], target]);
       const staleMoon = deriveSatelliteBodies(
         scene.world,
-        staleRows,
-        [sun],
+        indexSatellites(staleRows, [sun]),
         true,
-        "detail",
-      );
+        1,
+      ).moons;
       const moonFrame = projectFrame(staleMoon, HOME_CAMERA, viewport, 1);
       expect(
         resolveSatelliteTap(
@@ -584,11 +583,10 @@ describe("Orrery production exploration integration", () => {
       expect(
         deriveSatelliteBodies(
           qualified.world,
-          rows,
-          qualified.systemSnapshot.members,
+          indexSatellites(rows, qualified.systemSnapshot.members),
           true,
-          "detail",
-        ),
+          1,
+        ).moons,
       ).toHaveLength(1);
       await updateAppSettings(exec, { sunContactId: member.id }, NOW);
       await io.controller.dispatch({

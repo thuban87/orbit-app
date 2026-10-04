@@ -258,6 +258,17 @@ function harness(profile: HomeProfileName = cameraLogic.ACTIVE_HOME_PROFILE) {
             return {
               createOrrerySatelliteController: () => ({ reload: () => {} }),
             };
+          // 38.7-10 (C-M3): the satellite publisher (no satellites here).
+          if (id.includes("orrery-satellite-publisher"))
+            return {
+              createOrrerySatellitePublisher: () => ({
+                source: {},
+                noteScene: () => {},
+                publish: () => {},
+                switchStarted: () => {},
+                switchSettled: () => {},
+              }),
+            };
           if (id.includes("orrery-action-read"))
             return {
               readOrreryContactTargetValidation: async (

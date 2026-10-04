@@ -10,7 +10,6 @@ import {
   useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
-import type { OrrerySatellite } from "@/db/orrery-satellites-read";
 import type {
   CameraPose,
   CameraViewport,
@@ -46,6 +45,9 @@ import {
 } from "@/logic/orrery-reorder-logic";
 import {
   deriveSatelliteBodies,
+  EMPTY_SATELLITE_SPEC,
+  moonSplitFactor,
+  type OrrerySatelliteSpec,
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
 import { SKY_UNTINTED, systemSkyHueIndex } from "@/logic/orrery-sky-logic";
@@ -58,6 +60,7 @@ import type {
   ThemePalette,
 } from "@/theme/theme-types";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import type { OrrerySatelliteSource } from "./orrery-satellite-publisher";
 import type { OrreryGenerationLedger } from "./resources/orrery-generation-ledger";
 import { createOrreryGenerationLedger } from "./resources/orrery-generation-ledger";
 import { orreryPhotoCache } from "./resources/orrery-photo-cache";
@@ -152,7 +155,6 @@ import {
  */
 const EMPTY_IDS: readonly number[] = Object.freeze([]);
 const EMPTY_RELATIONS: Readonly<Record<number, string>> = Object.freeze({});
-const EMPTY_SATELLITES: readonly OrrerySatellite[] = Object.freeze([]);
 
 type SceneMember = OrrerySceneSnapshot["contacts"][number];
 /**
@@ -276,7 +278,7 @@ export function OrreryWorld({
   onFocusLost,
   onReorder,
   onReorderActivated,
-  satellites = EMPTY_SATELLITES,
+  satelliteSource,
   focusedSatellite,
   switchRuntime,
 }: {
@@ -299,7 +301,12 @@ export function OrreryWorld({
   onFocusLost?: () => void;
   onReorder: (intent: ReorderIntent) => void;
   onReorderActivated: () => void;
-  satellites?: readonly OrrerySatellite[];
+  /**
+   * 38.7-10 (C-M3): the satellite publisher's read side — a stable object
+   * whose SharedValue the frame worklet reads and whose JS signal rebuilds the
+   * moon looks. Never a rows prop: a satellite load commits no render here.
+   */
+  satelliteSource?: OrrerySatelliteSource;
   focusedSatellite?: OrrerySatelliteTarget | null;
   /** Screen-owned runtime survives this canvas consumer being unmounted. */
   switchRuntime: OrrerySwitchRuntime;
@@ -426,6 +433,13 @@ export function OrreryWorld({
     () => scene.systemSnapshot.members.map(({ id, uid }) => ({ id, uid })),
     [scene],
   );
+  // 38.7-10 (C-M3): the satellite spec SharedValue (a local empty one when
+  // no publisher is wired, e.g. previews and tests).
+  const ownSatelliteSpec =
+    useSharedValue<OrrerySatelliteSpec>(EMPTY_SATELLITE_SPEC);
+  const satelliteSpec = satelliteSource
+    ? satelliteSource.spec
+    : ownSatelliteSpec;
   const frame = useDerivedValue(() => {
     const sampled = sampleSwitchChoreography(
       transition.value,
@@ -444,19 +458,24 @@ export function OrreryWorld({
       sampled,
       held?.generation === generation ? held : null,
     );
-    // D-47: moons follow the last settled tier (projected size), never a
-    // tier recomputed from raw zoom inside the projection pass.
-    const moons = deriveSatelliteBodies(
+    // 38.7-10 (D-31/M13): the bump → moons split follows THIS frame's
+    // sampled camera zoom, so the moons drawn, their positions and their
+    // `interactive` flags all come from the one frame the pictures and the
+    // tap resolver read (never the previous frame's magnification or the
+    // reaction-updated tier). The index is used only for its own scene.
+    const satellite = satelliteSpec.value;
+    const sceneGeneration = transition.value.generation;
+    const moonSplit = moonSplitFactor(sampledCamera.zoom);
+    const satelliteBodies = deriveSatelliteBodies(
       world,
-      satellites,
-      memberIdentities,
-      true,
-      level.value,
+      satellite.index,
+      satellite.sceneGeneration === sceneGeneration,
+      moonSplit,
     );
-    const completeWorld = [...world, ...moons];
-    return projectAnimatedFrame(
+    const completeWorld = [...world, ...satelliteBodies.moons];
+    const projected = projectAnimatedFrame(
       {
-        generation: transition.value.generation,
+        generation: sceneGeneration,
         from: completeWorld,
         to: completeWorld,
       },
@@ -465,6 +484,9 @@ export function OrreryWorld({
       viewport,
       { extent: frameExtent },
     );
+    projected.moonBumps = satelliteBodies.bumps;
+    projected.moonSplit = moonSplit;
+    return projected;
   });
   // Conventional focus positioning consumes this same interpolated frame.
   useAnimatedReaction(
@@ -626,21 +648,43 @@ export function OrreryWorld({
     [resources, colors],
   );
   // 38.7-07 (D-43): the static body looks — contacts and the sun, then the
-  // moons (theme, resources, moons and the focused moon only).
+  // moons (theme, resources, moons and the focused moon only). 38.7-10
+  // (C-M3): the moons come from the satellite publisher's latest spec, read
+  // on its JS signal, so a satellite load republishes the looks without a
+  // React render.
   const satelliteFocusKey = focusedSatellite
     ? `${focusedSatellite.parentId}|${focusedSatellite.parentUid}|${focusedSatellite.uid}`
     : "";
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by satelliteFocusKey (the focused moon's identity), not the target object
-  const looks = useMemo(
-    () => [
-      ...buildBodyLooks(resources, colors),
-      ...buildSatelliteLooks(satellites, colors, focusedSatellite),
-    ],
-    [resources, colors, satellites, satelliteFocusKey],
+  const bodyLooks = useMemo(
+    () => buildBodyLooks(resources, colors),
+    [resources, colors],
   );
+  const lookInputs = useRef({ bodyLooks, colors, focusedSatellite });
+  lookInputs.current = { bodyLooks, colors, focusedSatellite };
+  const publishLooks = useCallback(() => {
+    const latest = lookInputs.current;
+    const rows = satelliteSource?.current().index.rows ?? [];
+    specPublisher.setLooks(
+      rows.length === 0
+        ? latest.bodyLooks
+        : [
+            ...latest.bodyLooks,
+            ...buildSatelliteLooks(
+              rows,
+              latest.colors,
+              latest.focusedSatellite,
+            ),
+          ],
+    );
+  }, [specPublisher, satelliteSource]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by satelliteFocusKey (the focused moon's identity), not the target object; publishLooks reads lookInputs
   useEffect(() => {
-    specPublisher.setLooks(looks);
-  }, [specPublisher, looks]);
+    publishLooks();
+  }, [publishLooks, bodyLooks, colors, satelliteFocusKey]);
+  useEffect(
+    () => satelliteSource?.subscribe(publishLooks),
+    [satelliteSource, publishLooks],
+  );
   useEffect(() => {
     specPublisher.setLabelPlate(tokenInk(colors.surface));
   }, [specPublisher, colors]);
@@ -661,8 +705,9 @@ export function OrreryWorld({
     [resources, focusSignature],
   );
   const photoEpoch = useRef<number | null>(null);
-  const photoInputs = useRef({ looks, focusedKeys });
-  photoInputs.current = { looks, focusedKeys };
+  // Moons carry no photo: the contact and sun looks are the whole request.
+  const photoInputs = useRef({ looks: bodyLooks, focusedKeys });
+  photoInputs.current = { looks: bodyLooks, focusedKeys };
   const visibilityRef = useRef<OrreryTextVisibility | null>(null);
   const requestPhotos = useCallback(() => {
     const { owner } = publisher;
@@ -684,7 +729,7 @@ export function OrreryWorld({
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-request when the looks (photo paths) or the focus change; requestPhotos reads them from photoInputs
   useEffect(() => {
     requestPhotos();
-  }, [requestPhotos, looks, focusedKeys]);
+  }, [requestPhotos, bodyLooks, focusedKeys]);
   // H3: a layer recorded a generation one UI frame ago. Whatever no layer can
   // still re-record goes back to its holder.
   const ackRecorded = useCallback(

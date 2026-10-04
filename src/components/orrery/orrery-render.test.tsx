@@ -6,11 +6,22 @@ import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySatellites } from "@/db/orrery-satellites-read";
 import { addRelationship } from "@/db/relationships-dao";
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
-import { IDENTITY_ENTER } from "@/logic/orrery-label-logic";
+import type { AnimatedFrame } from "@/logic/orrery-frame";
+import { IDENTITY_ENTER, IDENTITY_EXIT } from "@/logic/orrery-label-logic";
+import {
+  EMPTY_SATELLITE_SPEC,
+  moonSplitFactor,
+  resolveSatelliteTap,
+} from "@/logic/orrery-satellite-logic";
 import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
-import { loadOrreryScene } from "@/services/orrery-scene";
+import {
+  createOrrerySatelliteController,
+  loadOrreryScene,
+  type OrrerySatelliteState,
+} from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { OrreryWorld } from "./OrreryWorld";
+import { createOrrerySatellitePublisher } from "./orrery-satellite-publisher";
 import { prepareOrreryText } from "./resources/orrery-text-service";
 import { useOrreryCamera } from "./use-orrery-camera";
 import { sampleOrrerySwitchCamera } from "./use-orrery-switch-runtime";
@@ -378,40 +389,62 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("production Orrery native tree and resource contracts", () => {
-  it("renders tokenized moons in the same actual native depth batch and hides them at overview", async () => {
-    const exec = nodeSqliteExecutor(db);
-    await exec.runAsync(
-      "INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES ('p','Parent',1,30,'2026-09-07','2026-09-07')",
-    );
-    const scene = await loadOrreryScene(exec, 1);
+/** A scene with one parent contact and `moons` relationships (moons). */
+async function moonScene(moons: number) {
+  const exec = nodeSqliteExecutor(db);
+  await exec.runAsync(
+    "INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES ('p','Parent',1,30,'2026-09-07','2026-09-07')",
+  );
+  const scene = await loadOrreryScene(exec, 1);
+  for (let i = 0; i < moons; i++)
     await addRelationship(exec, {
       contactId: scene.contacts[0].id,
-      personName: "Moon",
+      personName: `Moon ${i}`,
       createdAt: "2026-09-07",
       now: "2026-09-07",
     });
-    const satellites = await readOrrerySatellites(
-      exec,
-      scene.systemSnapshot.members,
-    );
+  const rows = await readOrrerySatellites(exec, scene.systemSnapshot.members);
+  return { scene, rows };
+}
+/** 38.7-10 (C-M3): a satellite publisher with `rows` already published as ready. */
+function readySatellites(
+  scene: Awaited<ReturnType<typeof loadOrreryScene>>,
+  rows: OrrerySatelliteState["rows"],
+) {
+  const spec = { value: EMPTY_SATELLITE_SPEC };
+  const setState = vi.fn();
+  const publisher = createOrrerySatellitePublisher({ spec, setState });
+  publisher.noteScene(scene.generation, scene.systemSnapshot.members);
+  publisher.publish({
+    status: "ready",
+    sceneGeneration: scene.generation,
+    rows,
+  });
+  return { spec, setState, publisher };
+}
+
+describe("production Orrery native tree and resource contracts", () => {
+  it("renders tokenized moons in the same actual native depth batch; at overview only the decorative bump (no moon body to hit)", async () => {
+    const { scene, rows } = await moonScene(1);
+    const { publisher } = readySatellites(scene, rows);
     // Flat, so the parent's on-screen magnification is the zoom (identity tier).
     const pose = { value: { ...HOME_CAMERA, tilt: 0, zoom: 2.4 } };
+    const camera = useOrreryCamera({
+      pose: pose as never,
+      enabled: true,
+      extent: scene.extent,
+      viewport: { width: 1200, height: 1600 },
+      reduced: { value: false } as never,
+    });
     const tree = resolve(
       OrreryWorld({
         scene,
-        satellites,
+        satelliteSource: publisher.source,
         pose: pose as never,
         // Large enough that the moon is on screen wherever today's date puts
         // its parent on the ring (angles follow the real clock).
         viewport: { width: 1200, height: 1600 },
-        camera: useOrreryCamera({
-          pose: pose as never,
-          enabled: true,
-          extent: scene.extent,
-          viewport: { width: 1200, height: 1600 },
-          reduced: { value: false } as never,
-        }),
+        camera,
         colors: THEME_PRESETS.galaxy.dark,
         themeMode: "dark",
         themePackage: "galaxy",
@@ -445,7 +478,230 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(moonDraws()).toBe(1);
     pose.value = { ...pose.value, zoom: 1 };
     flushUi();
-    expect(moonDraws()).toBe(0); // overview: no moon body in the frame, nothing drawn or hit
+    // Overview (D-31): no moon body in the frame, so nothing to hit; the one
+    // moon-ink draw is the parent's bump.
+    const frame = camera.frame.value as AnimatedFrame;
+    expect(frame.bodies.some((b) => b.kind === "satellite")).toBe(false);
+    expect(frame.moonSplit).toBe(0);
+    expect(frame.moonBumps).toEqual({
+      [`contact:${scene.contacts[0].id}`]: expect.objectContaining({
+        count: 1,
+      }),
+    });
+    expect(moonDraws()).toBe(1);
+  });
+  it("M13: the split factor, the drawn moons and the tappable moons all come from one frame's sampled camera zoom — mid-zoom and mid-switch", async () => {
+    const { scene, rows } = await moonScene(2);
+    const { publisher } = readySatellites(scene, rows);
+    const pose = { value: { ...HOME_CAMERA, tilt: 0, zoom: 1 } };
+    const runtime = switchRuntime(scene, pose as never);
+    const camera = useOrreryCamera({
+      pose: pose as never,
+      enabled: true,
+      extent: scene.extent,
+      viewport: { width: 1200, height: 1600 },
+      reduced: { value: false } as never,
+    });
+    const tree = resolve(
+      OrreryWorld({
+        scene,
+        satelliteSource: publisher.source,
+        pose: pose as never,
+        viewport: { width: 1200, height: 1600 },
+        camera,
+        colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
+        fontProvider: {} as never,
+        onIntent: vi.fn(),
+        onReorder: vi.fn(),
+        onReorderActivated: vi.fn(),
+        focusedIds: [],
+        switchRuntime: runtime as never,
+      }),
+    );
+    const moonInk = [...parseInk(THEME_PRESETS.galaxy.dark.textSecondary)];
+    const drawnMoons = () =>
+      [tree[0].children[3], tree[0].children[5]]
+        .flatMap(
+          (picture) =>
+            (
+              picture.props.picture as {
+                value: { commands: { op: string; color?: number[] }[] };
+              }
+            ).value.commands,
+        )
+        .filter(
+          (c) =>
+            c.op === "drawCircle" &&
+            c.color?.every((v, i) => v === moonInk[i]) === true,
+        ).length;
+    const identities = scene.systemSnapshot.members.map((m) => ({
+      kind: "member" as const,
+      id: m.id,
+      uid: m.uid,
+    }));
+    const members = scene.systemSnapshot.members;
+    const check = (expectedZoom: number) => {
+      flushUi(1);
+      const frame = camera.frame.value as AnimatedFrame;
+      const split = moonSplitFactor(expectedZoom);
+      // The split input is THIS frame's camera (the one it was projected with).
+      expect(frame.pose.zoom).toBeCloseTo(expectedZoom, 12);
+      expect(frame.moonSplit).toBe(split);
+      const moons = frame.bodies.filter((b) => b.kind === "satellite");
+      // Drawn == the frame's moons (the bump has faded out of full ink).
+      expect(drawnMoons()).toBe(moons.length);
+      // Tappable == the frame's interactive moons, on the same frame.
+      const tappable = moons.filter(
+        (moon) =>
+          resolveSatelliteTap(frame, moon.x, moon.y, identities, members)
+            .kind === "satellite",
+      );
+      expect(tappable).toEqual(moons.filter((moon) => moon.interactive));
+      return { split, moons, tappable };
+    };
+    // Mid-zoom (settled): moons are out but not yet interactive.
+    const mid = (IDENTITY_EXIT + IDENTITY_ENTER) / 2;
+    pose.value = { ...pose.value, zoom: mid };
+    const midZoom = check(mid);
+    expect(midZoom.split).toBeGreaterThan(0);
+    expect(midZoom.split).toBeLessThan(1);
+    expect(midZoom.moons).toHaveLength(2);
+    expect(midZoom.tappable).toHaveLength(0);
+    // Fully split: interactive, and taps resolve to the moon.
+    pose.value = { ...pose.value, zoom: IDENTITY_ENTER };
+    expect(check(IDENTITY_ENTER).tappable).toHaveLength(2);
+    // Mid-switch: the switch camera, not the (stale) pose, drives the split.
+    runtime.progress.value = 0.5;
+    runtime.cameraFrom = { value: { ...pose.value, zoom: 1.7 } } as never;
+    runtime.cameraTo = { value: { ...pose.value, zoom: 2.1 } } as never;
+    const rerendered = resolve(
+      OrreryWorld({
+        scene,
+        satelliteSource: publisher.source,
+        pose: pose as never,
+        viewport: { width: 1200, height: 1600 },
+        camera,
+        colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
+        fontProvider: {} as never,
+        onIntent: vi.fn(),
+        onReorder: vi.fn(),
+        onReorderActivated: vi.fn(),
+        focusedIds: [],
+        switchRuntime: runtime as never,
+      }),
+    );
+    tree.splice(0, tree.length, ...rerendered);
+    const switchZoom = sampleOrrerySwitchCamera(
+      runtime.cameraFrom.value,
+      runtime.cameraTo.value,
+      0.5,
+    ).zoom;
+    expect(switchZoom).not.toBe(pose.value.zoom);
+    const midSwitch = check(switchZoom);
+    expect(midSwitch.split).toBeGreaterThan(0);
+    expect(midSwitch.split).toBeLessThan(1);
+  });
+  it("C-M3: a satellite load resolving mid-switch (loading, ready, error) writes the SharedValue the frame reads and commits no OrreryWorld render; the held React copy flushes once on settle", async () => {
+    const { scene, rows } = await moonScene(1);
+    const spec = { value: EMPTY_SATELLITE_SPEC };
+    const setState = vi.fn();
+    const publisher = createOrrerySatellitePublisher({ spec, setState });
+    const loads: {
+      resolve: (rows: OrrerySatelliteState["rows"]) => void;
+      reject: (error: Error) => void;
+    }[] = [];
+    const controller = createOrrerySatelliteController((loaded) => {
+      publisher.noteScene(loaded.generation, loaded.systemSnapshot.members);
+      return new Promise((resolve, reject) => loads.push({ resolve, reject }));
+    }, publisher.publish);
+    // A switch is in flight: progress 0.5, the camera already at identity.
+    const pose = { value: { ...HOME_CAMERA, tilt: 0, zoom: 2.4 } };
+    const runtime = {
+      ...switchRuntime(scene, pose as never),
+      progress: { value: 0.5 },
+    };
+    const camera = useOrreryCamera({
+      pose: pose as never,
+      enabled: true,
+      extent: scene.extent,
+      viewport: { width: 1200, height: 1600 },
+      reduced: { value: false } as never,
+    });
+    resolve(
+      OrreryWorld({
+        scene,
+        satelliteSource: publisher.source,
+        pose: pose as never,
+        viewport: { width: 1200, height: 1600 },
+        camera,
+        colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
+        fontProvider: {} as never,
+        onIntent: vi.fn(),
+        onReorder: vi.fn(),
+        onReorderActivated: vi.fn(),
+        focusedIds: [],
+        switchRuntime: runtime as never,
+      }),
+    );
+    flushUi();
+    const renders = native.renders;
+    const moonBodies = () =>
+      (camera.frame.value as AnimatedFrame).bodies.filter(
+        (b) => b.kind === "satellite",
+      ).length;
+    expect(moonBodies()).toBe(0);
+    publisher.switchStarted(scene.generation);
+    // loading (published synchronously by the controller)
+    const first = controller.reload(scene, true);
+    expect(spec.value.status).toBe("loading");
+    // ready rows land mid-switch: the NEXT frame shows the moon.
+    loads[0].resolve(rows);
+    await first;
+    expect(spec.value).toMatchObject({
+      status: "ready",
+      sceneGeneration: scene.generation,
+    });
+    flushUi();
+    expect(moonBodies()).toBe(1);
+    // The index is built once per (generation, rows), never per frame.
+    const index = spec.value.index;
+    flushUi();
+    expect(spec.value.index).toBe(index);
+    publisher.publish({
+      status: "ready",
+      sceneGeneration: scene.generation,
+      rows: spec.value.index.rows as OrrerySatelliteState["rows"],
+    });
+    // a failed reload (error)
+    const second = controller.reload({ ...scene }, true);
+    loads[1].reject(new Error("read failed"));
+    await second;
+    expect(spec.value.status).toBe("error");
+    flushUi();
+    expect(moonBodies()).toBe(0);
+    // Not one React render or state update for any of it.
+    expect(native.renders).toBe(renders);
+    expect(native.setStateCalls).toBe(0);
+    expect(setState).not.toHaveBeenCalled();
+    // Settle: the held React copy flushes exactly once, with the latest state.
+    publisher.switchSettled(scene.generation);
+    expect(setState).toHaveBeenCalledTimes(1);
+    expect(setState.mock.calls[0][0]).toMatchObject({ status: "error" });
+    publisher.switchSettled(scene.generation);
+    expect(setState).toHaveBeenCalledTimes(1);
+    // Settled: publications reach React directly again.
+    publisher.publish({
+      status: "ready",
+      sceneGeneration: scene.generation,
+      rows,
+    });
+    expect(setState).toHaveBeenCalledTimes(2);
   });
   it("draws contacts behind or in front of the sun by projected depth, and labels in their own picture", async () => {
     const exec = nodeSqliteExecutor(db);
