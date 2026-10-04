@@ -22,6 +22,16 @@ import {
 
 const require = createRequire(import.meta.url);
 const babel = require("@babel/core");
+/** Each source is transformed once per file run (every harness re-evaluates it). */
+const compiled = new Map<string, string>();
+function compile(path: string): string {
+  let code = compiled.get(path);
+  if (code === undefined) {
+    code = babel.transformFileSync(path, { envName: "production" }).code;
+    compiled.set(path, code as string);
+  }
+  return code as string;
+}
 type Element = {
   type: unknown;
   props: Record<string, unknown> & { children?: Element | Element[] };
@@ -267,142 +277,139 @@ function harness(
   };
   const load = (path: string) => {
     const exports = {};
-    runInNewContext(
-      babel.transformFileSync(path, { envName: "production" }).code,
-      {
-        exports,
-        require: (id: string) => {
-          if (modules[id]) return modules[id];
-          if (id.startsWith("@babel/runtime/")) return require(id);
-          if (id.includes("use-orrery-camera")) return cameraModule;
-          if (id.includes("orrery-camera-logic")) return camera;
-          if (id.includes("orrery-focus-card-logic")) return focusCardLogic;
-          if (id.includes("orrery-focus-logic")) return focusLogic;
-          if (id.includes("orrery-frame")) return frameLogic;
-          if (id.includes("orrery-satellite-logic")) return satelliteLogic;
-          if (id.includes("orrery-gesture-logic")) return gestureLogic;
-          if (id.includes("orrery-recovery-logic")) return recoveryLogic;
-          if (id.includes("orrery-system-logic")) return systemLogic;
-          if (id.includes("orrery-session-logic")) return sessionLogic;
-          if (id.includes("orrery-switch-animation")) return switchLogic;
-          if (id.includes("use-orrery-switch-runtime"))
-            return {
-              useOrrerySwitchRuntime: () =>
-                (
-                  hooks.useRef({
-                    publish: () => {},
-                    pause: () => {},
-                    resume: () => {},
-                    resources: [],
-                    progress: switchProgress,
-                    transition: switchTransition,
-                  }) as { current: unknown }
-                ).current,
-            };
-          if (id.includes("orrery-overlay-logic")) return overlayLogic;
-          if (id.includes("occlusion-sources")) return occlusionSources;
-          if (id.includes("orrery-obstacle-logic")) return { canvasViewport };
-          if (id.includes("orrery-system-store"))
-            return { createOrrerySystemStore: () => store };
-          if (id.includes("orrery-preferences-store"))
-            return { useOrreryPreferencesStore: prefStore };
-          if (id.includes("orrery-session-store"))
-            return { useOrrerySessionStore: sessionStore };
-          if (id.includes("shell-obstacle-store"))
-            return {
-              sameWindowRect,
-              useShellObstacleStore: (selector: (s: unknown) => unknown) =>
-                selector(obstacles.getState()),
-            };
-          if (id.includes("shell-transient-store"))
-            return {
-              shellTransientStore: Object.assign(() => false, {
-                getState: () => ({
-                  openTransient: () => {},
-                  closeTransient: () => {},
-                }),
+    runInNewContext(compile(path), {
+      exports,
+      require: (id: string) => {
+        if (modules[id]) return modules[id];
+        if (id.startsWith("@babel/runtime/")) return require(id);
+        if (id.includes("use-orrery-camera")) return cameraModule;
+        if (id.includes("orrery-camera-logic")) return camera;
+        if (id.includes("orrery-focus-card-logic")) return focusCardLogic;
+        if (id.includes("orrery-focus-logic")) return focusLogic;
+        if (id.includes("orrery-frame")) return frameLogic;
+        if (id.includes("orrery-satellite-logic")) return satelliteLogic;
+        if (id.includes("orrery-gesture-logic")) return gestureLogic;
+        if (id.includes("orrery-recovery-logic")) return recoveryLogic;
+        if (id.includes("orrery-system-logic")) return systemLogic;
+        if (id.includes("orrery-session-logic")) return sessionLogic;
+        if (id.includes("orrery-switch-animation")) return switchLogic;
+        if (id.includes("use-orrery-switch-runtime"))
+          return {
+            useOrrerySwitchRuntime: () =>
+              (
+                hooks.useRef({
+                  publish: () => {},
+                  pause: () => {},
+                  resume: () => {},
+                  resources: [],
+                  progress: switchProgress,
+                  transition: switchTransition,
+                }) as { current: unknown }
+              ).current,
+          };
+        if (id.includes("orrery-overlay-logic")) return overlayLogic;
+        if (id.includes("occlusion-sources")) return occlusionSources;
+        if (id.includes("orrery-obstacle-logic")) return { canvasViewport };
+        if (id.includes("orrery-system-store"))
+          return { createOrrerySystemStore: () => store };
+        if (id.includes("orrery-preferences-store"))
+          return { useOrreryPreferencesStore: prefStore };
+        if (id.includes("orrery-session-store"))
+          return { useOrrerySessionStore: sessionStore };
+        if (id.includes("shell-obstacle-store"))
+          return {
+            sameWindowRect,
+            useShellObstacleStore: (selector: (s: unknown) => unknown) =>
+              selector(obstacles.getState()),
+          };
+        if (id.includes("shell-transient-store"))
+          return {
+            shellTransientStore: Object.assign(() => false, {
+              getState: () => ({
+                openTransient: () => {},
+                closeTransient: () => {},
               }),
-            };
-          if (id.includes("use-window-measurement"))
-            return {
-              useWindowMeasurement: (publish: (r: unknown) => void) => {
-                hooks.useEffect(() => {
-                  publish({ x: 0, y: 0, ...canvas });
-                  return undefined;
-                }, []);
-                return {};
-              },
-            };
-          if (id.includes("orrery-scene"))
-            return {
-              createOrrerySatelliteController: () => ({ reload: () => {} }),
-            };
-          // 38.7-10 (C-M3): the satellite publisher (no satellites here).
-          if (id.includes("orrery-satellite-publisher"))
-            return {
-              createOrrerySatellitePublisher: () => ({
-                source: { current: () => satelliteSpec },
-                noteScene: () => {},
-                publish: () => {},
-                switchStarted: () => {},
-                switchSettled: () => {},
-              }),
-            };
-          if (id.includes("orrery-action-read"))
-            return {
-              readOrreryContactTargetValidation: async (
-                _: unknown,
-                __: unknown,
-                target: unknown,
-              ) => ({ status: "ready", identity: target, isMember: true }),
-            };
-          if (id.includes("systems-catalog-read"))
-            return {
-              countBuiltinAndCategorySystemMembers: async () => new Map(),
-              countSystemMembers: async () => ({ count: 0, brokenRules: [] }),
-              readSystemsCatalog: async () => [],
-            };
-          if (id.includes("/db/database")) return { getExecutor: () => ({}) };
-          if (id.includes("use-reduced-motion"))
-            return {
-              useReducedMotionShared: () => reanimated.useSharedValue(false),
-            };
-          if (id.includes("OrreryClusterPanel"))
-            return {
-              OrreryClusterPanel: "Panel",
-              CLUSTER_OBSTACLE: "orrery-cluster-panel",
-            };
-          if (id.includes("OrreryWorld")) return { OrreryWorld: "World" };
-          if (id.includes("OrreryFocusContext"))
-            return { OrreryFocusContext: "FocusCard" };
-          if (id.includes("OrreryImmersiveHeader"))
-            return {
-              OrreryImmersiveHeader: "Header",
-              ORRERY_HEADER_OBSTACLE: "orrery-immersive-header",
-            };
-          if (id.includes("ShellAppBar")) return { ShellAppBar: "ShellAppBar" };
-          if (id.includes("OrreryFeedback"))
-            return { OrreryFeedback: "Feedback", OrreryNotice: "Notice" };
-          if (id.includes("OrrerySystemSelector"))
-            return { OrrerySystemSelector: "Selector" };
-          if (id.includes("OrreryViewOptions"))
-            return { OrreryViewOptions: "ViewOptions" };
-          if (id.includes("OrreryControls"))
-            return {
-              OrreryControls: "Controls",
-              ORRERY_CONTROLS_OBSTACLE: "orrery-camera-controls",
-            };
-          if (id.includes("/theme"))
-            return { useTheme: () => ({ colors: {} }), SPACING: {} };
-          return new Proxy(
-            {},
-            {
-              get: (_target, key) => (key === "__esModule" ? true : () => null),
+            }),
+          };
+        if (id.includes("use-window-measurement"))
+          return {
+            useWindowMeasurement: (publish: (r: unknown) => void) => {
+              hooks.useEffect(() => {
+                publish({ x: 0, y: 0, ...canvas });
+                return undefined;
+              }, []);
+              return {};
             },
-          );
-        },
+          };
+        if (id.includes("orrery-scene"))
+          return {
+            createOrrerySatelliteController: () => ({ reload: () => {} }),
+          };
+        // 38.7-10 (C-M3): the satellite publisher (no satellites here).
+        if (id.includes("orrery-satellite-publisher"))
+          return {
+            createOrrerySatellitePublisher: () => ({
+              source: { current: () => satelliteSpec },
+              noteScene: () => {},
+              publish: () => {},
+              switchStarted: () => {},
+              switchSettled: () => {},
+            }),
+          };
+        if (id.includes("orrery-action-read"))
+          return {
+            readOrreryContactTargetValidation: async (
+              _: unknown,
+              __: unknown,
+              target: unknown,
+            ) => ({ status: "ready", identity: target, isMember: true }),
+          };
+        if (id.includes("systems-catalog-read"))
+          return {
+            countBuiltinAndCategorySystemMembers: async () => new Map(),
+            countSystemMembers: async () => ({ count: 0, brokenRules: [] }),
+            readSystemsCatalog: async () => [],
+          };
+        if (id.includes("/db/database")) return { getExecutor: () => ({}) };
+        if (id.includes("use-reduced-motion"))
+          return {
+            useReducedMotionShared: () => reanimated.useSharedValue(false),
+          };
+        if (id.includes("OrreryClusterPanel"))
+          return {
+            OrreryClusterPanel: "Panel",
+            CLUSTER_OBSTACLE: "orrery-cluster-panel",
+          };
+        if (id.includes("OrreryWorld")) return { OrreryWorld: "World" };
+        if (id.includes("OrreryFocusContext"))
+          return { OrreryFocusContext: "FocusCard" };
+        if (id.includes("OrreryImmersiveHeader"))
+          return {
+            OrreryImmersiveHeader: "Header",
+            ORRERY_HEADER_OBSTACLE: "orrery-immersive-header",
+          };
+        if (id.includes("ShellAppBar")) return { ShellAppBar: "ShellAppBar" };
+        if (id.includes("OrreryFeedback"))
+          return { OrreryFeedback: "Feedback", OrreryNotice: "Notice" };
+        if (id.includes("OrrerySystemSelector"))
+          return { OrrerySystemSelector: "Selector" };
+        if (id.includes("OrreryViewOptions"))
+          return { OrreryViewOptions: "ViewOptions" };
+        if (id.includes("OrreryControls"))
+          return {
+            OrreryControls: "Controls",
+            ORRERY_CONTROLS_OBSTACLE: "orrery-camera-controls",
+          };
+        if (id.includes("/theme"))
+          return { useTheme: () => ({ colors: {} }), SPACING: {} };
+        return new Proxy(
+          {},
+          {
+            get: (_target, key) => (key === "__esModule" ? true : () => null),
+          },
+        );
       },
-    );
+    });
     return exports;
   };
   cameraModule = load("src/components/orrery/use-orrery-camera.ts");
