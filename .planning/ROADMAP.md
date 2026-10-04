@@ -1367,7 +1367,7 @@ Plans:
 Several of these are superseded in part; see the dossier's "Supersessions to record at KB extraction".
 **Schema**: none expected (migration head 032, backup format 7). Any migration is head+1, verified on disk at plan time.
 **UI hint**: yes
-**Plans**: 10/16 plans executed
+**Plans**: 11/16 plans executed
 
 Plans:
 **Wave 1**
@@ -1412,7 +1412,7 @@ Plans:
 
 **Wave 11** *(blocked on Wave 10 completion)*
 
-- [ ] 38.7-11-PLAN.md — Focus framing with docked card, cluster zoom-in, reticle, dim-the-rest, occlusion dim (W11)
+- [x] 38.7-11-PLAN.md — Focus framing with docked card, cluster zoom-in, reticle, dim-the-rest, occlusion dim (W11)
 
 **Wave 12** *(blocked on Wave 11 completion)*
 
@@ -1498,7 +1498,7 @@ Plans:
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
-| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 10/16 | In Progress|  |
+| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 11/16 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
