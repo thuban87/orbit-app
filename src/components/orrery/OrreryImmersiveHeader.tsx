@@ -23,6 +23,11 @@
  * panels keep clear of the title exactly as they kept clear of the old layout
  * edge. The bar height is reported so the HUD triggers can sit below it.
  *
+ * 38.7-14: in light mode the scrim is painted in the bar's own `surface` ink
+ * and its tail is a second stack starting at the bar's clipped edge, at the
+ * bar's combined opacity, so the bar fades into the map with no step
+ * (`headerScrimLayout`; owner-approved fix). Dark mode is Lab B's as before.
+ *
  * Decorative scrim views are not touchable and are hidden from accessibility.
  * Colours come from theme tokens only; no `elevation` (Android paints an
  * opaque rect under a translucent elevated view).
@@ -30,8 +35,9 @@
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme";
+import { chromeScrimOpacity } from "@/theme/tokens/surface";
 import { OrreryObstacle } from "./OrreryObstacle";
-import { HEADER_SCRIM_TAIL, headerScrimBands } from "./orrery-header-scrim";
+import { HEADER_SCRIM_TAIL, headerScrimLayout } from "./orrery-header-scrim";
 
 export const ORRERY_HEADER_OBSTACLE = "orrery-immersive-header";
 
@@ -47,8 +53,16 @@ export function OrreryImmersiveHeader({
   /** The unchanged `<ShellAppBar variant="root" title="Orrery" />`. */
   children: ReactNode;
 }) {
-  const { colors } = useTheme();
-  const bands = headerScrimBands(barHeight);
+  const { colors, mode, package: themePackage } = useTheme();
+  // The bar's clip (and so its own chrome scrim) ends one hairline short.
+  const barEdge = barHeight - StyleSheet.hairlineWidth;
+  const layout = headerScrimLayout(
+    barHeight,
+    mode,
+    chromeScrimOpacity(themePackage, mode),
+    barEdge,
+  );
+  const ink = colors[layout.ink];
   return (
     <View pointerEvents="box-none" style={styles.root}>
       <View
@@ -58,15 +72,27 @@ export function OrreryImmersiveHeader({
         accessibilityElementsHidden
         style={[styles.scrim, { height: barHeight + HEADER_SCRIM_TAIL }]}
       >
-        {bands.map(([height, opacity]) => (
+        {layout.bar.map(([height, opacity]) => (
           <View
             key={height}
-            style={[
-              styles.band,
-              { height, opacity, backgroundColor: colors.background },
-            ]}
+            style={[styles.band, { height, opacity, backgroundColor: ink }]}
           />
         ))}
+        {layout.tail ? (
+          <View
+            style={[
+              styles.tail,
+              { top: layout.tail.top, height: HEADER_SCRIM_TAIL },
+            ]}
+          >
+            {layout.tail.bands.map(([height, opacity]) => (
+              <View
+                key={height}
+                style={[styles.band, { height, opacity, backgroundColor: ink }]}
+              />
+            ))}
+          </View>
+        ) : null}
       </View>
       <OrreryObstacle
         obstacleId={ORRERY_HEADER_OBSTACLE}
@@ -101,5 +127,6 @@ const styles = StyleSheet.create({
   },
   scrim: { position: "absolute", top: 0, left: 0, right: 0 },
   band: { position: "absolute", top: 0, left: 0, right: 0 },
+  tail: { position: "absolute", left: 0, right: 0 },
   clip: { overflow: "hidden" },
 });

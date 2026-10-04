@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   HEADER_SCRIM_BAR,
+  HEADER_SCRIM_LIGHT_CONTINUOUS,
   HEADER_SCRIM_TAIL,
   HEADER_SCRIM_TOP,
   headerScrimAlpha,
   headerScrimBands,
+  headerScrimLayout,
 } from "./orrery-header-scrim";
 
 /** Composite opacity of the nested bands at depth y. */
@@ -48,4 +50,62 @@ describe("38.7-12 (D-39): the Orrery title scrim (Lab B IMMERSE profile)", () =>
     expect(headerScrimBands(0)).toEqual([]);
     expect(headerScrimBands(Number.NaN)).toEqual([]);
   });
+});
+
+describe("38.7-14: the light-mode bar edge has no step (owner-approved fix)", () => {
+  /** The scrim + the bar's own chrome scrim seen at depth y (one ink). */
+  function seen(
+    layout: ReturnType<typeof headerScrimLayout>,
+    y: number,
+    barScrim: number,
+    barEdge: number,
+  ): number {
+    let t = 1 - composite(layout.bar, y);
+    if (layout.tail && y >= layout.tail.top)
+      t *= 1 - composite(layout.tail.bands, y - layout.tail.top);
+    if (y < barEdge) t *= 1 - barScrim;
+    return 1 - t;
+  }
+
+  it("dark mode is Lab B's single background stack, unchanged (Galaxy Dark)", () => {
+    for (const bar of [52, 56, 78])
+      expect(headerScrimLayout(bar, "dark", 0.05, bar - 0.3)).toEqual({
+        ink: "background",
+        bar: headerScrimBands(bar),
+        tail: null,
+      });
+  });
+
+  it.each([
+    [52, 0.5],
+    [56, 0.97],
+    [78, 0.5],
+  ])(
+    "light mode (bar %s, bar scrim %s): the surface composite is continuous across the bar's clipped edge, then fades to 0",
+    (bar, barScrim) => {
+      expect(HEADER_SCRIM_LIGHT_CONTINUOUS).toBe(true);
+      const edge = bar - 1 / 3.5;
+      const layout = headerScrimLayout(bar, "light", barScrim, edge);
+      expect(layout.ink).toBe("surface");
+      expect(layout.tail?.top).toBe(edge);
+      const above = seen(layout, edge - 1e-3, barScrim, edge);
+      const below = seen(layout, edge + 1e-3, barScrim, edge);
+      // Same ink on both sides, so equal opacity = no visible edge.
+      expect(Math.abs(above - below)).toBeLessThan(1e-9);
+      // Behind the title the scrim alone stays at least Lab B's SCRIM_BAR.
+      for (let y = 0; y < edge; y += 1)
+        expect(composite(layout.bar, y)).toBeGreaterThanOrEqual(
+          HEADER_SCRIM_BAR - 1e-6,
+        );
+      let prev = 1;
+      for (let y = edge; y < edge + HEADER_SCRIM_TAIL; y += 0.5) {
+        const a = seen(layout, y, barScrim, edge);
+        expect(a).toBeLessThanOrEqual(prev + 1e-9);
+        prev = a;
+      }
+      expect(seen(layout, edge + HEADER_SCRIM_TAIL + 1, barScrim, edge)).toBe(
+        0,
+      );
+    },
+  );
 });
