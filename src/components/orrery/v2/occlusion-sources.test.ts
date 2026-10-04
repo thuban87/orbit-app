@@ -14,6 +14,7 @@ function registeredIds(): string[] {
     "src/components/orrery/OrreryClusterPanel.tsx",
     "src/components/orrery/OrreryControls.tsx",
     "src/components/orrery/OrreryFocusContext.tsx",
+    "src/components/orrery/OrreryImmersiveHeader.tsx",
   ];
   const ids = new Set<string>();
   for (const file of files) {
@@ -21,7 +22,7 @@ function registeredIds(): string[] {
     for (const match of text.matchAll(/obstacleId="([^"]+)"/g))
       ids.add(match[1]);
     for (const match of text.matchAll(
-      /export const (?:CLUSTER_OBSTACLE|ORRERY_CONTROLS_OBSTACLE) = "([^"]+)"/g,
+      /export const (?:CLUSTER_OBSTACLE|ORRERY_CONTROLS_OBSTACLE|ORRERY_HEADER_OBSTACLE) = "([^"]+)"/g,
     ))
       ids.add(match[1]);
     for (const match of text.matchAll(/useWindowObstacle\(\s*"([^"]+)"/g))
@@ -35,10 +36,22 @@ describe("38.7-11 (D-55): the Orrery occlusion registry", () => {
     const ids = registeredIds();
     expect(ids.length).toBeGreaterThan(10);
     for (const id of ids) expect(ORRERY_OCCLUSION_SOURCES[id]).toBeDefined();
-    // No stale entries: every obstacle-rect / no-text id is still registered.
+    // No stale entries: every obstacle-rect / no-text / header id is still
+    // registered (38.7-12 D-30 removed the loading notice's).
     for (const [id, entry] of Object.entries(ORRERY_OCCLUSION_SOURCES))
-      if (entry.source === "obstacle-rect" || entry.source === "no-text")
-        expect(ids).toContain(id);
+      if (entry.source !== "derived-rect") expect(ids).toContain(id);
+    expect(ORRERY_OCCLUSION_SOURCES["orrery-loading-feedback"]).toBeUndefined();
+  });
+
+  it("38.7-12 (D-39): the Orrery title is a header-scrim source, never dimmed by the occlusion fill", () => {
+    expect(ORRERY_OCCLUSION_SOURCES["orrery-immersive-header"]).toEqual({
+      component: "OrreryImmersiveHeader",
+      source: "header-scrim",
+    });
+    const rect = { x: 0, y: 0, width: 400, height: 52 };
+    expect(staticOcclusionRects({ "orrery-immersive-header": rect })).toEqual(
+      [],
+    );
   });
 
   it("the focus card is a derived rect and registers no obstacle (C-M2)", () => {

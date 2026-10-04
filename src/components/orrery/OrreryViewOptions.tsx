@@ -33,8 +33,12 @@ const TRANSIENT_ID = "orrery-view-options";
 /** Orrery-specific top-right panel; its scroll height follows the measured canvas. */
 export function OrreryViewOptions({
   availableHeight,
+  topInset = 0,
 }: {
   availableHeight: number;
+  /** 38.7-12 (D-39): the floating Orrery title's height; the trigger and
+   * panel sit below it (0 = at the canvas top). */
+  topInset?: number;
 }) {
   const preferences = useOrreryPreferencesStore();
   const { colors } = useTheme();
@@ -80,7 +84,7 @@ export function OrreryViewOptions({
   }, [dismiss]);
   const busy = preferences.hydration === "loading" || preferences.saving;
   const disabled = busy || !preferences.hydrated;
-  const panelTop = SPACING.base + triggerHeight + SPACING.sm;
+  const panelTop = topInset + SPACING.base + triggerHeight + SPACING.sm;
   return (
     <View
       pointerEvents={blocked ? "none" : "box-none"}
@@ -98,7 +102,7 @@ export function OrreryViewOptions({
       ) : null}
       <OrreryObstacle
         obstacleId="orrery-view-trigger"
-        style={styles.trigger}
+        style={[styles.trigger, { top: topInset + SPACING.base }]}
         onLayout={(event) => setTriggerHeight(event.nativeEvent.layout.height)}
       >
         <GlassSurface density="dense" treatment="orrery-overlay">
@@ -229,7 +233,6 @@ const styles = StyleSheet.create({
   },
   trigger: {
     position: "absolute",
-    top: SPACING.base,
     right: SPACING.base,
     maxWidth: "44%",
   },

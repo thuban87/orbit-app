@@ -3,7 +3,7 @@ import { createFeedbackRetry, feedbackCopy } from "./orrery-feedback-logic";
 
 describe("surface-specific Orrery feedback", () => {
   it("keeps loading, missing, stale, and optional failures distinct", () => {
-    expect(feedbackCopy("world-loading").message).toBe("Loading your Orrery…");
+    expect(feedbackCopy("list-loading").message).toBe("Loading contacts…");
     expect(feedbackCopy("read")).toEqual({
       message: "Couldn't load this System. Try loading it again.",
       action: "Reload System",

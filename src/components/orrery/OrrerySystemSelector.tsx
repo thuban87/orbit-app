@@ -39,6 +39,7 @@ export function OrrerySystemSelector({
   counts,
   needsAttention,
   onOpenChange,
+  topInset = 0,
 }: {
   state: OrrerySystemState;
   availableHeight: number;
@@ -47,6 +48,9 @@ export function OrrerySystemSelector({
   counts: ReadonlyMap<string, number>;
   needsAttention: ReadonlyMap<string, boolean>;
   onOpenChange: (open: boolean, requestId: number) => void;
+  /** 38.7-12 (D-39): the floating Orrery title's height; the trigger and
+   * panel sit below it (0 = at the canvas top). */
+  topInset?: number;
 }) {
   const { colors } = useTheme();
   const navigation =
@@ -115,7 +119,7 @@ export function OrrerySystemSelector({
     });
     return () => subscription.remove();
   }, [dismiss]);
-  const top = SPACING.base + height + SPACING.sm;
+  const top = topInset + SPACING.base + height + SPACING.sm;
   return (
     <View
       pointerEvents={blocked ? "none" : "box-none"}
@@ -136,7 +140,7 @@ export function OrrerySystemSelector({
       ) : null}
       <OrreryObstacle
         obstacleId="orrery-system-trigger"
-        style={styles.trigger}
+        style={[styles.trigger, { top: topInset + SPACING.base }]}
         onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
       >
         <GlassSurface density="dense" treatment="orrery-overlay">
@@ -357,7 +361,6 @@ const styles = StyleSheet.create({
   root: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0 },
   trigger: {
     position: "absolute",
-    top: SPACING.base,
     left: SPACING.base,
     maxWidth: "44%",
   },

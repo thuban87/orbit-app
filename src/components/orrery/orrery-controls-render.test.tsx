@@ -8,8 +8,17 @@ import { OrreryClusterPanel } from "./OrreryClusterPanel";
 import { OrreryContactsSheet } from "./OrreryContactsSheet";
 import { OrreryControls } from "./OrreryControls";
 import { OrreryFocusContext } from "./OrreryFocusContext";
+import {
+  ORRERY_HEADER_OBSTACLE,
+  OrreryImmersiveHeader,
+} from "./OrreryImmersiveHeader";
 
-const native = vi.hoisted(() => ({ announce: vi.fn(), focus: vi.fn() }));
+const native = vi.hoisted(() => ({
+  announce: vi.fn(),
+  focus: vi.fn(),
+  obstacles: [] as string[],
+  insets: { top: 0, bottom: 0, left: 0, right: 0 },
+}));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useRef: (value: unknown) => ({ current: value }),
@@ -23,7 +32,11 @@ vi.mock("react-native", () => ({
   ScrollView: "ScrollView",
   Pressable: "Pressable",
   Modal: "Modal",
-  StyleSheet: { create: (styles: unknown) => styles, absoluteFill: {} },
+  StyleSheet: {
+    create: (styles: unknown) => styles,
+    absoluteFill: {},
+    hairlineWidth: 0.5,
+  },
   useWindowDimensions: () => ({ width: 400, height: 800, fontScale: 2 }),
   AccessibilityInfo: {
     announceForAccessibility: native.announce,
@@ -55,7 +68,7 @@ vi.mock("expo-blur", () => ({ BlurView: "BlurView" }));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => native.insets,
 }));
 vi.mock("react-native-gesture-handler", () => ({
   GestureHandlerRootView: "GestureHandlerRootView",
@@ -76,8 +89,13 @@ vi.mock("@/theme", () => ({
 vi.mock("@/theme/use-art-treatment", () => ({ useArtTreatment: () => null }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/navigation/use-window-measurement", () => ({
-  useWindowObstacle: () => ({ ref: { current: null }, onLayout: () => {} }),
+  useWindowObstacle: (key: string) => {
+    native.obstacles.push(key);
+    return { ref: { current: null }, onLayout: () => {} };
+  },
 }));
+// The shared bar is rendered unchanged; only its placement is under test.
+vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 
 interface Node {
   type: string;
@@ -443,5 +461,70 @@ describe("actual Orrery controls and detail sheet", () => {
     if (!state.snapshot) throw new Error("Missing fixture snapshot");
     state.snapshot.systemSnapshot.members = [];
     expect(render("ready", [row]).map((n) => n.text)).not.toContain("月");
+  });
+  it("38.7-12 (D-39/M9): the immersive header sits at top 0 of the Orrery root, adds no safe-area inset of its own, hosts the unchanged bar once and is the header obstacle", async () => {
+    // A non-zero inset: RootNavigator's SafeAreaView already applies it, so
+    // nothing in the header may read or re-apply it (no double inset).
+    native.insets = { top: 24, bottom: 0, left: 0, right: 0 };
+    native.obstacles = [];
+    const { ShellAppBar } = await import("@/components/ShellAppBar");
+    const onBarHeight = vi.fn();
+    const render = (barHeight: number) =>
+      resolve(
+        OrreryImmersiveHeader({
+          barHeight,
+          onBarHeight,
+          children: <ShellAppBar variant="root" title="Orrery" />,
+        }),
+      );
+    for (const barHeight of [0, 52]) {
+      native.obstacles = [];
+      const [root] = render(barHeight);
+      const nodes = all([root]);
+      expect(root.props.style).toMatchObject({
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+      });
+      expect(root.props.pointerEvents).toBe("box-none");
+      const flat = (style: unknown): Record<string, unknown>[] =>
+        Array.isArray(style)
+          ? style.flatMap(flat)
+          : style && typeof style === "object"
+            ? [style as Record<string, unknown>]
+            : [];
+      for (const node of nodes)
+        for (const style of flat(node.props.style))
+          for (const [key, value] of Object.entries(style)) {
+            expect(key).not.toMatch(/^(padding|margin)/);
+            if (key === "top") expect(value).toBe(0);
+          }
+      const bars = nodes.filter((node) => node.type === "ShellAppBar");
+      expect(bars).toHaveLength(1);
+      expect(bars[0].props).toEqual({ variant: "root", title: "Orrery" });
+      // Wrapped in the header obstacle (OrreryObstacle's measured view).
+      expect(native.obstacles).toEqual([ORRERY_HEADER_OBSTACLE]);
+      const obstacle = nodes.find(
+        (node) =>
+          node.props.collapsable === false &&
+          all(node.children).some((child) => child.type === "ShellAppBar"),
+      );
+      expect(obstacle).toBeDefined();
+      // The scrim is decorative: not touchable, hidden from accessibility.
+      const scrim = root.children[0];
+      expect(scrim.props).toMatchObject({
+        pointerEvents: "none",
+        importantForAccessibility: "no-hide-descendants",
+        accessibilityElementsHidden: true,
+      });
+      expect(scrim.children.length).toBe(barHeight > 0 ? 26 : 0);
+      // The bar's bottom hairline is clipped once it is measured.
+      expect(obstacle?.props.style).toEqual(
+        barHeight > 0 ? [{ overflow: "hidden" }, { height: 51.5 }] : undefined,
+      );
+    }
+    expect(ORRERY_HEADER_OBSTACLE).toBe("orrery-immersive-header");
+    native.insets = { top: 0, bottom: 0, left: 0, right: 0 };
   });
 });

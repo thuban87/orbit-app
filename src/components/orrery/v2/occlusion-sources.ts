@@ -9,12 +9,15 @@
  * - "obstacle-rect": a static panel or notice — its measured window rect from
  *   the shell obstacle store (it does not move over the map while open).
  * - "no-text": registered for layout only (icon-only controls); no dim.
- * - "header-scrim": reserved for Plan 12's title header.
+ * - "header-scrim": the Orrery title (38.7-12, D-39) — its legibility comes
+ *   from ShellAppBar's own chrome scrim plus the Orrery-local fading header
+ *   scrim (`OrreryImmersiveHeader`), not the occlusion dim; Plan 14 proves it.
  *
  * The keys are the obstacle ids the Orrery UI registers (OrreryScreen's
  * feedback notices, OrrerySystemSelector, OrreryViewOptions,
  * OrreryClusterPanel `CLUSTER_OBSTACLE`, OrreryControls
- * `ORRERY_CONTROLS_OBSTACLE`); the focus card registers none (C-M2).
+ * `ORRERY_CONTROLS_OBSTACLE`, OrreryImmersiveHeader
+ * `ORRERY_HEADER_OBSTACLE`); the focus card registers none (C-M2).
  */
 import type { CameraRect } from "@/logic/orrery-camera-logic";
 
@@ -59,10 +62,6 @@ export const ORRERY_OCCLUSION_SOURCES: Readonly<
     component: "OrreryFeedback",
     source: "obstacle-rect",
   },
-  "orrery-loading-feedback": {
-    component: "OrreryFeedback",
-    source: "obstacle-rect",
-  },
   "orrery-read-feedback": {
     component: "OrreryFeedback",
     source: "obstacle-rect",
@@ -88,6 +87,10 @@ export const ORRERY_OCCLUSION_SOURCES: Readonly<
     source: "obstacle-rect",
   },
   "orrery-camera-controls": { component: "OrreryControls", source: "no-text" },
+  "orrery-immersive-header": {
+    component: "OrreryImmersiveHeader",
+    source: "header-scrim",
+  },
 };
 
 /** The measured window rects of the static text surfaces (obstacle-rect). */

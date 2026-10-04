@@ -37,6 +37,7 @@ import {
   OrreryNotice,
 } from "@/components/orrery/OrreryFeedback";
 import { OrreryFocusContext } from "@/components/orrery/OrreryFocusContext";
+import { OrreryImmersiveHeader } from "@/components/orrery/OrreryImmersiveHeader";
 import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
@@ -221,6 +222,9 @@ export function OrreryScreen() {
     "Space Grotesk": [require("../../assets/SpaceGrotesk-SemiBold.ttf")],
   });
   const [canvasRect, setCanvasRect] = useState<CameraRect | null>(null);
+  // 38.7-12 (D-39): the floating title bar's natural height; the HUD triggers
+  // sit below it while the canvas runs under it.
+  const [headerHeight, setHeaderHeight] = useState(0);
   const obstacles = useShellObstacleStore((store) => store.rects);
   const measureCanvas = useCallback((rect: CameraRect | null) => {
     setCanvasRect((previous) =>
@@ -1279,7 +1283,8 @@ export function OrreryScreen() {
       testID="orrery-root"
       style={[styles.root, { backgroundColor: colors.background }]}
     >
-      <ShellAppBar variant="root" title="Orrery" />
+      {/* 38.7-12 (D-39): the canvas fills the whole root; the unchanged
+          ShellAppBar floats over it in the Orrery-local header below. */}
       <View
         testID="orrery-canvas-container"
         ref={canvasMeasurement.ref}
@@ -1319,8 +1324,12 @@ export function OrreryScreen() {
           counts={systemCounts}
           needsAttention={systemNeedsAttention}
           onOpenChange={onSystemSelectorOpenChange}
+          topInset={headerHeight}
         />
-        <OrreryViewOptions availableHeight={viewport.height} />
+        <OrreryViewOptions
+          availableHeight={viewport.height}
+          topInset={headerHeight}
+        />
         <OrreryControls
           viewport={controlsViewport}
           measured={measured}
@@ -1457,17 +1466,6 @@ export function OrreryScreen() {
             />
           </OrreryFeedback>
         ) : null}
-        {(state.status === "loading" || state.status === "initial") &&
-        !scene &&
-        hydration !== "error" ? (
-          <OrreryFeedback
-            obstacleId="orrery-loading-feedback"
-            style={[styles.feedback, { backgroundColor: colors.surface }]}
-            contentContainerStyle={styles.feedbackContent}
-          >
-            <OrreryNotice kind="world-loading" />
-          </OrreryFeedback>
-        ) : null}
         {state.status === "error" || state.status === "stale" ? (
           <OrreryFeedback
             obstacleId="orrery-read-feedback"
@@ -1557,6 +1555,12 @@ export function OrreryScreen() {
           </OrreryFeedback>
         ) : null}
       </View>
+      <OrreryImmersiveHeader
+        barHeight={headerHeight}
+        onBarHeight={setHeaderHeight}
+      >
+        <ShellAppBar variant="root" title="Orrery" />
+      </OrreryImmersiveHeader>
       <OrreryContactsSheet
         satellites={satellites}
         onReloadSatellites={reloadSatellites}
@@ -1577,7 +1581,17 @@ export function OrreryScreen() {
 }
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  canvasArea: { flex: 1, alignItems: "center", justifyContent: "center" },
+  // D-39: the canvas fills the root (under the title); the root still ends at
+  // the tab bar, so the measurement stays above it exactly as before.
+  canvasArea: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   feedback: {
     position: "absolute",
     top: "25%",

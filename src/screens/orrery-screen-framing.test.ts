@@ -50,6 +50,8 @@ function harness(
     canvas?: { width: number; height: number };
     controls?: cameraLogic.CameraRect;
     moons?: boolean;
+    /** 38.7-12 (D-39): the floating title's window rect (an obstacle). */
+    header?: cameraLogic.CameraRect;
   } = {},
 ) {
   const camera = cameraFor(profile);
@@ -196,6 +198,8 @@ function harness(
       "controls",
       options.controls ?? { x: 184, y: 400, width: 200, height: 180 },
     );
+  if (options.header)
+    obstacles.getState().publish("orrery-immersive-header", options.header);
   const pending: {
     target: cameraLogic.CameraPose;
     complete: (success: boolean) => void;
@@ -360,6 +364,18 @@ function harness(
           if (id.includes("OrreryWorld")) return { OrreryWorld: "World" };
           if (id.includes("OrreryFocusContext"))
             return { OrreryFocusContext: "FocusCard" };
+          if (id.includes("OrreryImmersiveHeader"))
+            return {
+              OrreryImmersiveHeader: "Header",
+              ORRERY_HEADER_OBSTACLE: "orrery-immersive-header",
+            };
+          if (id.includes("ShellAppBar")) return { ShellAppBar: "ShellAppBar" };
+          if (id.includes("OrreryFeedback"))
+            return { OrreryFeedback: "Feedback", OrreryNotice: "Notice" };
+          if (id.includes("OrrerySystemSelector"))
+            return { OrrerySystemSelector: "Selector" };
+          if (id.includes("OrreryViewOptions"))
+            return { OrreryViewOptions: "ViewOptions" };
           if (id.includes("OrreryControls"))
             return {
               OrreryControls: "Controls",
@@ -399,12 +415,16 @@ function harness(
     } while (dirty);
   }
   function find(type: string, element = tree): Element | undefined {
-    if (!element || typeof element !== "object") return undefined;
-    if (element.type === type) return element;
-    return [element.props?.children ?? []]
-      .flat()
-      .flatMap((child) => find(type, child) ?? [])
-      .at(0);
+    return findAll(type, element).at(0);
+  }
+  function findAll(type: string, element = tree): Element[] {
+    if (!element || typeof element !== "object") return [];
+    return [
+      ...(element.type === type ? [element] : []),
+      ...[element.props?.children ?? []]
+        .flat()
+        .flatMap((child) => findAll(type, child)),
+    ];
   }
   const measurement = createWindowMeasurement((rect) =>
     obstacles.getState().publish("orrery-cluster-panel", rect),
@@ -416,6 +436,8 @@ function harness(
     pending,
     render,
     find,
+    findAll,
+    tree: () => tree,
     measurement,
     async ready() {
       render();
@@ -813,3 +835,79 @@ it.each([
     expect(viewport.obstacles).toHaveLength(1);
   },
 );
+
+// ── 38.7-12 (D-39): the map runs up under the Orrery title ──────────────────
+
+it("the canvas fills the root under the title; the title's rect is a camera obstacle kept out of the usable rect", async () => {
+  const BAR = 52;
+  // The Orrery root (below the status bar) is 400 × 800. Before D-39 the bar
+  // sat in flow and the canvas was 800 − BAR tall, starting below it.
+  const h = harness("tilted", {
+    canvas: { width: 400, height: 800 },
+    controls: { x: 340, y: 560, width: 55, height: 200 },
+    header: { x: 0, y: 0, width: 400, height: BAR },
+  });
+  await h.ready();
+  const viewport = h.world().props.viewport as cameraLogic.CameraViewport;
+  // The canvas viewport grew by the header height: it is the whole root.
+  expect(viewport.height).toBe(800);
+  expect(viewport.height - BAR).toBe(800 - BAR);
+  expect(viewport.obstacles).toContainEqual({
+    x: 0,
+    y: 0,
+    width: 400,
+    height: BAR,
+  });
+  const usable = cameraLogic.usableCameraRect(viewport)!;
+  expect(usable.y).toBeGreaterThanOrEqual(BAR);
+  // Home framing keeps every body clear of the title.
+  for (const body of h.frame().bodies)
+    expect(body.y - body.hitRadius).toBeGreaterThanOrEqual(BAR - 1e-6);
+  // Layout: the canvas container is an absolute fill of the root, and the
+  // unchanged root ShellAppBar renders exactly once, inside the Orrery-local
+  // header overlay that follows (draws above) the canvas.
+  const root = h.tree();
+  const children = [root.props.children].flat() as Element[];
+  const canvasIndex = children.findIndex(
+    (child) => child?.props?.testID === "orrery-canvas-container",
+  );
+  const headerIndex = children.findIndex((child) => child?.type === "Header");
+  expect(canvasIndex).toBeGreaterThanOrEqual(0);
+  expect(headerIndex).toBeGreaterThan(canvasIndex);
+  expect(children[canvasIndex].props.style).toMatchObject({
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  });
+  const bars = h.findAll("ShellAppBar");
+  expect(bars).toHaveLength(1);
+  expect(bars[0].props).toEqual({ variant: "root", title: "Orrery" });
+  expect(h.find("ShellAppBar", children[headerIndex])).toBe(bars[0]);
+  expect(h.find("ShellAppBar", children[canvasIndex])).toBeUndefined();
+  // The HUD triggers are told the bar's height so they sit below it.
+  expect(h.find("Header")!.props.barHeight).toBe(0);
+  (h.find("Header")!.props.onBarHeight as (height: number) => void)(BAR);
+  h.render();
+  expect(h.find("Header")!.props.barHeight).toBe(BAR);
+  expect(h.find("Selector")!.props.topInset).toBe(BAR);
+  expect(h.find("ViewOptions")!.props.topInset).toBe(BAR);
+});
+
+it("38.7-12 (D-30): opening the Orrery shows no loading box while the System loads; the other notices stay", async () => {
+  const h = harness();
+  const state = h.state as unknown as Record<string, unknown>;
+  for (const status of ["initial", "loading"]) {
+    state.status = status;
+    state.snapshot = null;
+    state.current = () => null;
+    h.render();
+    expect(h.findAll("Feedback")).toEqual([]);
+    expect(h.findAll("Notice")).toEqual([]);
+  }
+  // A read failure still shows its notice.
+  state.status = "error";
+  h.render();
+  expect(h.findAll("Notice").map((n) => n.props.kind)).toEqual(["read"]);
+});

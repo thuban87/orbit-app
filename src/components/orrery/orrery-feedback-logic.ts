@@ -1,6 +1,5 @@
 /** Approved E9 copy, shared by canvas feedback and conventional surfaces. */
 const COPY = {
-  "world-loading": { message: "Loading your Orrery…" },
   "list-loading": { message: "Loading contacts…" },
   read: {
     message: "Couldn't load this System. Try loading it again.",
