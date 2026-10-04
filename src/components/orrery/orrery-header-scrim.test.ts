@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   HEADER_SCRIM_BAR,
   HEADER_SCRIM_LIGHT_CONTINUOUS,
+  HEADER_SCRIM_STANDARD_DARK_CONTINUOUS,
   HEADER_SCRIM_TAIL,
   HEADER_SCRIM_TOP,
   headerScrimAlpha,
   headerScrimBands,
+  headerScrimContinuous,
   headerScrimLayout,
 } from "./orrery-header-scrim";
 
@@ -67,25 +69,38 @@ describe("38.7-14: the light-mode bar edge has no step (owner-approved fix)", ()
     return 1 - t;
   }
 
-  it("dark mode is Lab B's single background stack, unchanged (Galaxy Dark)", () => {
+  it("Galaxy Dark is Lab B's single background stack, unchanged", () => {
+    expect(headerScrimContinuous("galaxy", "dark")).toBe(false);
     for (const bar of [52, 56, 78])
-      expect(headerScrimLayout(bar, "dark", 0.05, bar - 0.3)).toEqual({
-        ink: "background",
-        bar: headerScrimBands(bar),
-        tail: null,
-      });
+      for (const barScrim of [0.05, 1])
+        expect(
+          headerScrimLayout(bar, "galaxy", "dark", barScrim, bar - 0.3),
+        ).toEqual({
+          ink: "background",
+          bar: headerScrimBands(bar),
+          tail: null,
+        });
+  });
+
+  it("the continuous treatment covers both light themes and Standard Dark (owner 2026-10-04, SD-FIX)", () => {
+    expect(HEADER_SCRIM_STANDARD_DARK_CONTINUOUS).toBe(true);
+    expect(headerScrimContinuous("standard", "dark")).toBe(true);
+    expect(headerScrimContinuous("standard", "light")).toBe(true);
+    expect(headerScrimContinuous("galaxy", "light")).toBe(true);
   });
 
   it.each([
-    [52, 0.5],
-    [56, 0.97],
-    [78, 0.5],
-  ])(
-    "light mode (bar %s, bar scrim %s): the surface composite is continuous across the bar's clipped edge, then fades to 0",
-    (bar, barScrim) => {
+    ["galaxy", "light", 52, 0.5],
+    ["standard", "light", 56, 0.97],
+    ["galaxy", "light", 78, 0.97],
+    ["standard", "dark", 52, 1],
+    ["standard", "dark", 78, 1],
+  ] as const)(
+    "%s/%s (bar %s, bar scrim %s): the surface composite is continuous across the bar's clipped edge, then fades to 0",
+    (pkg, mode, bar, barScrim) => {
       expect(HEADER_SCRIM_LIGHT_CONTINUOUS).toBe(true);
       const edge = bar - 1 / 3.5;
-      const layout = headerScrimLayout(bar, "light", barScrim, edge);
+      const layout = headerScrimLayout(bar, pkg, mode, barScrim, edge);
       expect(layout.ink).toBe("surface");
       expect(layout.tail?.top).toBe(edge);
       const above = seen(layout, edge - 1e-3, barScrim, edge);

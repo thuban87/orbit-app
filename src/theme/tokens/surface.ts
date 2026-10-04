@@ -214,8 +214,10 @@ export function orreryOverlayTintOpacity(
  *   Standard Light 0.00 (4.64:1)   0.70    5.67:1 accentText (ruby)
  *
  * The values stay at Plan 11's starting point (the D-62 ceiling): the proof
- * passes there in every theme, and lowering it is a look call for the owner
- * (Plan 14 T-DIM), not a contrast need.
+ * passes there in every theme, and lowering it is a look call for the owner,
+ * not a contrast need. Owner ruling 2026-10-04 (T-DIM = DIM-A): the full
+ * card-area dim at 0.7 stays in every theme. Re-proven after the Plan 14
+ * rulings (Galaxy Light "dark-hues" sky, SD-FIX): the numbers above hold.
  */
 export const ORRERY_OCCLUSION_DIM: Record<
   ThemePackage,

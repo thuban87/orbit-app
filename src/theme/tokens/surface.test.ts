@@ -1044,16 +1044,19 @@ describe("Orrery cards over the V2 sky — ADR-169 both extrema through the occl
 describe("Orrery title over the V2 sky (38.7-14, D-39)", () => {
   // The title (ShellAppBar, unchanged) sits on its own chrome scrim
   // (`surface` @ chromeScrimOpacity) over the Orrery-local header scrim
-  // (OrreryImmersiveHeader: `headerScrimInkKey(mode)` at ≥ HEADER_SCRIM_BAR
+  // (OrreryImmersiveHeader: `headerScrimInkKey(pkg, mode)` at ≥ HEADER_SCRIM_BAR
   // behind the bar) over the map. Proven for the bar's glass-scoped palette
   // and the root palette, over pure black and pure white content. Minimum
   // header scrim for 4.5:1: Galaxy Dark 0.61, Standard Light 0.04, Galaxy
-  // Light and Standard Dark 0; at Lab B's 0.84 the worst is 10.3:1.
+  // Light and Standard Dark 0; at Lab B's 0.84 the worst is 10.3:1. Re-proven
+  // after the owner's 2026-10-04 rulings (T-SCRIM = SCRIM-A keeps 0.96/0.84;
+  // SD-FIX paints Standard Dark's scrim in `surface`, like the light themes;
+  // T-GLIGHT's "dark-hues" sky): the minimums are unchanged.
   for (const pkg of PACKAGES) {
     for (const mode of MODES) {
       it(`${pkg}/${mode}: textPrimary on the title clears 4.5:1 over both extrema`, () => {
         const root = resolvePalette(pkg, mode);
-        const ink = root[headerScrimInkKey(mode)];
+        const ink = root[headerScrimInkKey(pkg, mode)];
         const composites = orreryContentPixels(root).map((p) =>
           alphaComposite(
             root.surface,

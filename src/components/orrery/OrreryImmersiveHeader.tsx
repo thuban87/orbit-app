@@ -26,7 +26,9 @@
  * 38.7-14: in light mode the scrim is painted in the bar's own `surface` ink
  * and its tail is a second stack starting at the bar's clipped edge, at the
  * bar's combined opacity, so the bar fades into the map with no step
- * (`headerScrimLayout`; owner-approved fix). Dark mode is Lab B's as before.
+ * (`headerScrimLayout`; owner-approved fix). Standard Dark takes the same
+ * treatment (owner ruling 2026-10-04, SD-FIX); Galaxy Dark is Lab B's as
+ * before.
  *
  * Decorative scrim views are not touchable and are hidden from accessibility.
  * Colours come from theme tokens only; no `elevation` (Android paints an
@@ -58,6 +60,7 @@ export function OrreryImmersiveHeader({
   const barEdge = barHeight - StyleSheet.hairlineWidth;
   const layout = headerScrimLayout(
     barHeight,
+    themePackage,
     mode,
     chromeScrimOpacity(themePackage, mode),
     barEdge,

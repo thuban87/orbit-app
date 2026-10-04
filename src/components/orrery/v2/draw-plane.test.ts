@@ -56,6 +56,7 @@ import {
 import {
   applyHomography,
   planeHomography,
+  RING_DENSITY_FLOOR,
   RING_SKIP_ALPHA,
 } from "@/logic/orrery-plane-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
@@ -367,8 +368,9 @@ describe("drawPlaneRings (D-44 world plane)", () => {
     const out = recordingCanvas();
     drawPlaneRings(out.canvas, zoomedOut, specs, effect, bands, 1);
     const alphaOut = uniformsOf(draws(out.calls)[0])[14];
-    expect(alphaOut).toBeLessThan(0.3);
-    expect(alphaOut).toBeGreaterThan(0);
+    // Owner ruling 2026-10-04 (T-FADE = FADE-80): packed rings sit at the 0.8 floor.
+    expect(alphaOut).toBeLessThan(1);
+    expect(alphaOut).toBeCloseTo(RING_DENSITY_FLOOR, 9);
     const close = frameFor(many, { x: 0, y: 0, zoom: 1, tilt: 0 });
     const near = recordingCanvas();
     drawPlaneRings(near.canvas, close, specs, effect, bands, 1);

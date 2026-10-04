@@ -400,8 +400,8 @@ describe("Orrery V2 sub-palette (38.7 D-51)", () => {
 describe("38.7-14 (D-26/D-27, T-GLIGHT): Galaxy Light flavour candidates", () => {
   const HEX6 = /^#[0-9A-Fa-f]{6}$/;
 
-  it("the active flavour is the one Galaxy Light renders (default: Lab B's)", () => {
-    expect(ACTIVE_GALAXY_LIGHT_FLAVOUR).toBe("lab-b");
+  it("the active flavour is the one Galaxy Light renders (owner 2026-10-04, T-GLIGHT = GB-125: Galaxy Dark's hues)", () => {
+    expect(ACTIVE_GALAXY_LIGHT_FLAVOUR).toBe("dark-hues");
     expect(resolvePalette("galaxy", "light")).toMatchObject(
       GALAXY_LIGHT_FLAVOURS[ACTIVE_GALAXY_LIGHT_FLAVOUR],
     );

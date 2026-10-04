@@ -29,7 +29,10 @@ export const HOME_PROFILES = {
   tilted: { tilt: (62 * Math.PI) / 180, lensShift: 0.62, fitRule: "strategy" },
   flat: { tilt: 0, lensShift: 1, fitRule: "whole-disc" },
 } as const satisfies Record<string, HomeProfile>;
-/** THE single D-03 switch (the owner rules on it at the Plan 14 checkpoint). */
+/**
+ * THE single D-03 switch. Owner ruling 2026-10-04 (T-HOME = HOME-A): the 62°
+ * tilted Home stays; "flat" remains one word away.
+ */
 export const ACTIVE_HOME_PROFILE: keyof typeof HOME_PROFILES = "tilted";
 /** Maximum user (two-finger) tilt; must be ≥ every Home profile tilt. */
 export const MAX_USER_TILT = (68 * Math.PI) / 180;
@@ -47,7 +50,11 @@ export const MAX_LENS_SHIFT = 1;
 export const HOME_STRATEGY_TOP_MARGIN = 24;
 /** Strategy Home: max half-width of the System at the pivot, in viewport widths. */
 export const HOME_STRATEGY_MAX_HALF_SPAN = 0.6;
-/** Strategy Home never dollies in past this zoom (Lab C used MAX_ZOOM). */
+/**
+ * Strategy Home never dollies in past this zoom (Lab C used MAX_ZOOM). Owner
+ * ruling 2026-10-04 (T-TINYZOOM = TINY-A): 4 stays, so a tiny System opens
+ * zoomed in with names showing.
+ */
 export const HOME_STRATEGY_MAX_ZOOM = 4;
 /**
  * D-48/D-16: minimum ON-SCREEN body diameters (logical px, Lab C). A body
@@ -60,11 +67,17 @@ export const MIN_SUN_PX = 34;
 /**
  * D-06 near-side cap (Lab B CLAMP), people and moons only (the sun is the
  * anchor). Perspective may grow a body by at most this fraction above its
- * pivot-depth size; far-side shrink is untouched.
+ * pivot-depth size; far-side shrink is untouched. Owner ruling 2026-10-04
+ * (T-NEAR = NEAR-C): 0.6 (was Lab B's 0.06), so near-side planets read
+ * bigger; the nearest planet is ~55 % bigger a zoom step in. The drawn
+ * radius, hit radius, labels and framing all follow (`projectedBodyRadius`).
  */
-export const NEAR_PERSPECTIVE_KNEE = 0.06;
-/** Near-side drawn radius asymptote, as a fraction of the viewport short side. */
-export const NEAR_RADIUS_FRACTION = 0.08;
+export const NEAR_PERSPECTIVE_KNEE = 0.6;
+/**
+ * Near-side drawn radius asymptote, as a fraction of the viewport short side.
+ * Owner ruling 2026-10-04 (T-NEAR = NEAR-C): 0.12 (was 0.08).
+ */
+export const NEAR_RADIUS_FRACTION = 0.12;
 /** Where that cap starts to bend (fraction of the asymptote). */
 export const NEAR_RADIUS_KNEE = 0.7;
 /**

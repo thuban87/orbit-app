@@ -263,12 +263,14 @@ describe("ring helpers", () => {
     expect(ringScreenSpacing(0, 0, Number.NaN)).toBe(1);
     expect(ringDensityFade(RING_MIN_SPACING_PX * 3)).toBe(1);
     expect(ringDensityFade(RING_MIN_SPACING_PX)).toBe(1);
-    expect(ringDensityFade(RING_MIN_SPACING_PX * 0.8)).toBeCloseTo(0.64, 9);
+    // Owner ruling 2026-10-04 (T-FADE = FADE-80): the floor is 0.8.
+    expect(RING_DENSITY_FLOOR).toBe(0.8);
+    expect(ringDensityFade(RING_MIN_SPACING_PX * 0.95)).toBeCloseTo(0.9025, 9);
+    expect(ringDensityFade(RING_MIN_SPACING_PX * 0.8)).toBe(RING_DENSITY_FLOOR);
     expect(ringDensityFade(0)).toBe(RING_DENSITY_FLOOR);
     expect(ringDensityFade(Number.NaN)).toBe(1);
-    // All Contacts at the minimum zoom: ~34-unit gaps at 0.25 → faint.
+    // All Contacts at the minimum zoom: ~34-unit gaps at 0.25 → at the floor.
     const packed = ringDensityFade(ringScreenSpacing(34_000, 1000, 0.25));
-    expect(packed).toBeLessThan(0.25);
-    expect(packed).toBeGreaterThanOrEqual(RING_DENSITY_FLOOR);
+    expect(packed).toBe(RING_DENSITY_FLOOR);
   });
 });

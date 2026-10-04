@@ -20,8 +20,16 @@
  * light mode the scrim is now painted in the bar's own `surface` ink and its
  * tail starts, right at the bar's clipped edge, at the bar's COMBINED opacity
  * 1 − (1 − SCRIM_BAR)(1 − bar scrim): the composite is identical on both
- * sides of the edge for every map pixel, then fades as before. Dark mode
- * (Galaxy Dark matches Lab B) is unchanged.
+ * sides of the edge for every map pixel, then fades as before. Galaxy Dark
+ * (matches Lab B) is unchanged.
+ *
+ * Owner ruling 2026-10-04 (SD-FIX): Standard Dark had the same step (its bar
+ * is opaque `surface`, luma ~28, over a map at ~21–22 just below, the scrim
+ * there being `background` at SCRIM_BAR), so Standard Dark takes the same
+ * continuous treatment. Galaxy Dark's bar is glassy (chrome scrim 0.05), so
+ * it shows no step and keeps Lab B's single `background` stack.
+ *
+ * Owner ruling 2026-10-04 (T-SCRIM = SCRIM-A): Lab B's 0.96 / 0.84 stays.
  */
 
 /** Scrim opacity at the very top, continuous with the status-bar band (Lab B 0.96). */
@@ -90,26 +98,45 @@ export function headerScrimBands(barHeight: number): [number, number][] {
   return nestedBands(ends, (y) => headerScrimAlpha(y, barHeight));
 }
 
-/** The palette token the scrim is painted in, per resolved mode. */
+/**
+ * The SD-FIX (see above; owner 2026-10-04): Standard Dark's bar edge has no
+ * step either. false = Lab B's single `background` stack in Standard Dark.
+ */
+export const HEADER_SCRIM_STANDARD_DARK_CONTINUOUS = true;
+
+/**
+ * Whether a theme takes the continuous (no-step) treatment: every light
+ * theme, and Standard Dark. Galaxy Dark never does (Lab B's look, unchanged).
+ */
+export function headerScrimContinuous(
+  themePackage: "galaxy" | "standard",
+  mode: "dark" | "light",
+): boolean {
+  if (mode === "light") return HEADER_SCRIM_LIGHT_CONTINUOUS;
+  return themePackage === "standard" && HEADER_SCRIM_STANDARD_DARK_CONTINUOUS;
+}
+
+/** The palette token the scrim is painted in, per package × resolved mode. */
 export function headerScrimInkKey(
+  themePackage: "galaxy" | "standard",
   mode: "dark" | "light",
 ): "surface" | "background" {
-  return mode === "light" && HEADER_SCRIM_LIGHT_CONTINUOUS
-    ? "surface"
-    : "background";
+  return headerScrimContinuous(themePackage, mode) ? "surface" : "background";
 }
 
 /**
  * The scrim's layout. `barScrim` is the bar's own chrome scrim opacity
  * (`chromeScrimOpacity`); `barEdge` is where that scrim ends (the bar's clip:
  * its height less one hairline).
- *   - `bar`: top-anchored nested bands; in dark mode (or with the light fix
- *     off) Lab B's single stack over the bar AND the tail.
- *   - `tail`: light mode only — a second nested stack starting at `top`
- *     (= barEdge), from the bar's combined opacity down to 0 over SCRIM_TAIL.
+ *   - `bar`: top-anchored nested bands; in Galaxy Dark (or with a fix
+ *     flag off) Lab B's single stack over the bar AND the tail.
+ *   - `tail`: continuous themes only (light modes, Standard Dark) — a second
+ *     nested stack starting at `top` (= barEdge), from the bar's combined
+ *     opacity down to 0 over SCRIM_TAIL.
  */
 export function headerScrimLayout(
   barHeight: number,
+  themePackage: "galaxy" | "standard",
   mode: "dark" | "light",
   barScrim: number,
   barEdge: number,
@@ -118,7 +145,7 @@ export function headerScrimLayout(
   bar: [number, number][];
   tail: { top: number; bands: [number, number][] } | null;
 } {
-  const ink = headerScrimInkKey(mode);
+  const ink = headerScrimInkKey(themePackage, mode);
   if (ink === "background" || !(barHeight > 0) || !Number.isFinite(barHeight))
     return { ink, bar: headerScrimBands(barHeight), tail: null };
   const edge =

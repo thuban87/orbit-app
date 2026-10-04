@@ -75,8 +75,13 @@ export const GALAXY_LIGHT_FLAVOURS: Readonly<
     orreryOcclusion: "#EEEAF8",
   },
 };
-/** The Galaxy Light sky in use (T-GLIGHT; the owner's pick, default Lab B). */
-export const ACTIVE_GALAXY_LIGHT_FLAVOUR: GalaxyLightFlavour = "lab-b";
+/**
+ * The Galaxy Light sky in use. Owner ruling 2026-10-04 (T-GLIGHT = GB-125):
+ * "dark-hues" (Galaxy Dark's nebula hues), drawn at 1.25x today's nebula
+ * strength (`SKY_LOOKS.galaxy.light.nebulaStrength`). The other candidates
+ * stay selectable here for later tuning (the owner saw them; not in use).
+ */
+export const ACTIVE_GALAXY_LIGHT_FLAVOUR: GalaxyLightFlavour = "dark-hues";
 
 export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
   galaxy: {

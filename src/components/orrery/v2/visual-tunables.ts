@@ -78,8 +78,9 @@ export interface SkyLook {
  * Per package × mode. 38.7-09 rework (owner, 2026-10-03): the nebula is Lab
  * B's distant baked nebula. Galaxy Dark at 35 % of Lab B (owner, 2026-10-04); Standard Dark keeps
  * Lab B's calm graphite chart (barely-there clouds, no ember); light themes
- * Lab B's low-contrast vellum washes (no glow, src-over). Plan 14 tunes the
- * non-hero themes.
+ * Lab B's low-contrast vellum washes (no glow, src-over). Plan 14 rulings
+ * (owner, 2026-10-04): Standard Light and Standard Dark as is (T-LIGHT);
+ * Galaxy Light at 1.25x in Galaxy Dark's hues (T-GLIGHT = GB-125).
  */
 export const SKY_LOOKS: Readonly<
   Record<ThemePackage, Readonly<Record<ResolvedMode, SkyLook>>>
@@ -111,7 +112,10 @@ export const SKY_LOOKS: Readonly<
       brightRadius: [0.9, 1.3],
       starAlpha: [0.25, 0.5],
       twinkleDepth: 0,
-      nebulaStrength: 1,
+      // Owner ruling 2026-10-04 (T-GLIGHT = GB-125): 1.25x the Lab B light
+      // strength, with the "dark-hues" sky (Galaxy Dark's nebula hues;
+      // ACTIVE_GALAXY_LIGHT_FLAVOUR). 1x was "too plain", 2.5x "too strong".
+      nebulaStrength: 1.25,
       nebula: { lobeA: 0.3, lobeB: 0.24, glow: 0, ember: 0.08, dust: 0.04 },
       vignette: 0.09,
       vignetteShade: 0,
@@ -624,6 +628,8 @@ export const LABEL_DIM_FLOOR = 0.66;
  *     plate touching a rect is dropped. Lab B applied it to the focus card
  *     only; here it applies to every occlusion rect (the card and the static
  *     panels), since there is no fill under them either.
+ * Owner ruling 2026-10-04 (T-DIM = DIM-A): "full-rect" at dim 0.7 stays. He
+ * saw no difference between the two; "lab-b" is kept selectable but unused.
  */
 export const ORRERY_OCCLUSION_STYLE: "full-rect" | "lab-b" = "full-rect";
 /** Lab B OCCLUDED_ALPHA: a body under a card draws at this alpha. */

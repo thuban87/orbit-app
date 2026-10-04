@@ -31,8 +31,12 @@ import {
  * overview.
  */
 export const RING_MIN_SPACING_PX = 20;
-/** The faintest a packed ring fades to (fraction of its normal alpha). */
-export const RING_DENSITY_FLOOR = 0.15;
+/**
+ * The faintest a packed ring fades to (fraction of its normal alpha). Owner
+ * ruling 2026-10-04 (T-FADE = FADE-80): 0.8; the earlier 0.15 dimmed packed
+ * rings far too much.
+ */
+export const RING_DENSITY_FLOOR = 0.8;
 /** A ring whose final alpha is below this is not drawn at all. */
 export const RING_SKIP_ALPHA = 0.01;
 
