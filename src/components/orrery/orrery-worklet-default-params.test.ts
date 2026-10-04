@@ -105,7 +105,7 @@ interface DefaultParamHazard {
   line: number;
 }
 
-export function scanWorkletDefaultParams(
+function scanWorkletDefaultParams(
   fileName: string,
   text: string,
 ): DefaultParamHazard[] {
