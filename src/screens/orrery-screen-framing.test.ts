@@ -166,6 +166,12 @@ function harness(
       }
     : satelliteLogic.EMPTY_SATELLITE_SPEC;
   const switchProgress = { value: 1 };
+  const switchTransition = { value: { generation: 7 } };
+  // The screen's useAnimatedReaction callbacks of the latest render.
+  const reactions: {
+    prepare: () => unknown;
+    react: (value: unknown, previous: unknown) => void;
+  }[] = [];
   const prefs = {
     committed: { density: "balanced", satellitesEnabled: 0 },
     hydrated: true,
@@ -215,7 +221,12 @@ function harness(
     },
     runOnUI: (fn: unknown) => fn,
     runOnJS: (fn: unknown) => fn,
-    useAnimatedReaction: () => {},
+    useAnimatedReaction(
+      prepare: () => unknown,
+      react: (value: unknown, previous: unknown) => void,
+    ) {
+      reactions.push({ prepare, react });
+    },
     useDerivedValue: (fn: () => unknown) => ({
       get value() {
         return fn();
@@ -284,7 +295,7 @@ function harness(
                     resume: () => {},
                     resources: [],
                     progress: switchProgress,
-                    transition: { value: { generation: 7 } },
+                    transition: switchTransition,
                   }) as { current: unknown }
                 ).current,
             };
@@ -409,6 +420,7 @@ function harness(
       dirty = false;
       cursor = 0;
       effects = [];
+      reactions.length = 0;
       tree = screen.OrreryScreen();
       for (const effect of effects) effect();
       if (++turns > 20) throw new Error("Unsettled React effects");
@@ -445,11 +457,11 @@ function harness(
       await Promise.resolve();
       render();
     },
-    async group() {
+    async group(generation = 7) {
       const world = find("World")!;
       await (world.props.onIntent as (i: unknown) => Promise<void>)({
         kind: "group",
-        generation: 7,
+        generation,
         ids: [1, 2],
         targets: members.map((m) => ({ ...m, kind: "member" })),
       });
@@ -471,7 +483,16 @@ function harness(
     },
     state,
     session,
+    obstacles,
     switchProgress,
+    /** The switch for `generation` settles: the UI reactions fire once. */
+    settleSwitch(generation: number) {
+      switchTransition.value = { generation };
+      switchProgress.value = 1;
+      for (const reaction of [...reactions])
+        reaction.react(reaction.prepare(), -1);
+      render();
+    },
     world: () => find("World")!,
     /** A real System switch (in-session, retained focus) reaching listeners. */
     emitSwitch() {
@@ -494,6 +515,43 @@ function harness(
       for (const listener of [...listeners])
         listener(landed as StoreState, loading);
       render();
+    },
+    /**
+     * A real System switch that lands: the store moves to generation 8 of
+     * another System (All Contacts → Favorites) and its listeners see the
+     * loading → ready transition, as on device.
+     */
+    landSwitch() {
+      const ready = { ...state };
+      for (const listener of [...listeners])
+        listener(ready, {
+          ...state,
+          status: "loading",
+          snapshot: null,
+        } as unknown as StoreState);
+      const loading = {
+        ...state,
+        status: "loading",
+        generation: 8,
+        requested: { id: "builtin:favorites" },
+      };
+      for (const listener of [...listeners]) listener(loading, ready);
+      const landedScene = {
+        ...scene,
+        generation: 8,
+        system: { kind: "builtin" as const, id: "favorites" as const },
+      };
+      Object.assign(state, {
+        status: "ready",
+        generation: 8,
+        requested: { id: "builtin:favorites" },
+        snapshot: landedScene,
+        current: () => landedScene,
+      });
+      for (const listener of [...listeners])
+        listener(state, loading as unknown as StoreState);
+      render();
+      return landedScene;
     },
     async focus(id = 1) {
       await (find("World")!.props.onIntent as (i: unknown) => Promise<void>)({
@@ -910,4 +968,78 @@ it("38.7-12 (D-30): opening the Orrery shows no loading box while the System loa
   state.status = "error";
   h.render();
   expect(h.findAll("Notice").map((n) => n.props.kind)).toEqual(["read"]);
+});
+
+// ── 38.7-12 (carried from 38.7-11, enforces D-19): cluster zoom after a switch ──
+
+it("a cluster tap zooms into the cluster after a System switch in the same session (switch → cluster tap → zoom)", async () => {
+  const h = harness("tilted");
+  await h.ready();
+  h.landSwitch();
+  // C4-M3: the switch itself lands at destination Home (the switch runtime
+  // animates there); the screen writes no framing of its own at landing.
+  expect(h.pending).toHaveLength(0);
+  const landed = { ...h.pose() };
+  h.switchProgress.value = 1; // the switch has settled
+  await h.group(8);
+  expect(h.find("Panel")).toBeDefined();
+  expect(h.pending).toHaveLength(0); // waits for the panel's measurement
+  h.measurement.begin()(0, 400, 400, 200);
+  h.render();
+  // The cluster zoom fires: one recovery toward a closer pose.
+  expect(h.pending).toHaveLength(1);
+  expect(h.pending[0].target.zoom).toBeGreaterThan(landed.zoom);
+  h.settle();
+  const frame = h.frame(),
+    rect = cameraLogic.usableCameraRect(frame.viewport)!;
+  for (const body of frame.bodies.filter((b) => b.kind === "contact")) {
+    expect(body.y - body.hitRadius).toBeGreaterThanOrEqual(rect.y - 1e-6);
+    expect(body.y + body.hitRadius).toBeLessThanOrEqual(
+      rect.y + rect.height + 1e-6,
+    );
+  }
+});
+
+it("a cluster tapped while the switch is still running waits for it to settle (no pose fights the switch)", async () => {
+  const h = harness("tilted");
+  await h.ready();
+  h.landSwitch();
+  h.switchProgress.value = 0.4;
+  await h.group(8);
+  h.measurement.begin()(0, 400, 400, 200);
+  h.render();
+  expect(h.pending).toHaveLength(0);
+  // The switch settles (the settle reaction re-runs the Home effect).
+  h.switchProgress.value = 1;
+  h.settleSwitch(8);
+  expect(h.pending).toHaveLength(1);
+});
+
+it("after the switch landing is consumed, a later reflow in that generation never frames the retained focus (C4-M3)", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  await h.focus(1);
+  h.settle();
+  h.landSwitch();
+  // Shared focus is retained through the switch (dossier §V).
+  expect(h.world().props.focusedIds).toEqual([1]);
+  const count = h.pending.length;
+  // The switch runtime's settle writes destination Home (its own pose write).
+  const viewport = h.world().props.viewport as cameraLogic.CameraViewport;
+  const home = h.camera.deriveHomePose(h.scene.world, viewport)!;
+  (h.world().props.pose as { value: cameraLogic.CameraPose }).value = home;
+  expect(home.zoom).not.toBeCloseTo(h.pending[0].target.zoom, 3);
+  const landed = { ...h.pose() };
+  h.settleSwitch(8);
+  // A notice appears (a new obstacle), changing the viewport: the Home effect
+  // re-runs in generation 8 with the flag consumed.
+  h.obstacles
+    .getState()
+    .publish("orrery-save-feedback", { x: 16, y: 700, width: 300, height: 60 });
+  h.render();
+  h.height(320);
+  expect(h.pending).toHaveLength(count);
+  expect(h.pose().zoom).toBeCloseTo(landed.zoom, 12);
+  expect(h.pose().x).toBeCloseTo(landed.x, 12);
+  expect(h.pose().y).toBeCloseTo(landed.y, 12);
 });

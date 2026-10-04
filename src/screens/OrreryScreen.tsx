@@ -391,15 +391,22 @@ export function OrreryScreen() {
   const satellitePublisher = satellitePublisherRef.current;
   const { transition: switchTransition, progress: switchProgress } =
     switchRuntime;
-  const satelliteSwitchSettled = useCallback(
-    (generation: number) => satellitePublisher.switchSettled(generation),
+  // 38.7-12 (D-19): the generation whose switch last settled. The Home effect
+  // re-runs on it, so a cluster tapped while a switch was still running zooms
+  // once the switch has landed (one render at settle, never per frame).
+  const [settledSwitch, setSettledSwitch] = useState(-1);
+  const onSwitchSettled = useCallback(
+    (generation: number) => {
+      satellitePublisher.switchSettled(generation);
+      setSettledSwitch(generation);
+    },
     [satellitePublisher],
   );
   useAnimatedReaction(
     () => (switchProgress.value >= 1 ? switchTransition.value.generation : -1),
     (settled, previous) => {
       if (settled >= 0 && settled !== previous)
-        runOnJS(satelliteSwitchSettled)(settled);
+        runOnJS(onSwitchSettled)(settled);
     },
   );
   useEffect(() => {
@@ -1101,6 +1108,13 @@ export function OrreryScreen() {
       : "";
     const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(viewport)}:${groupKey}`;
     const domain = `${systemRefId(scene.system)}:${scene.preferences.density}`;
+    // C4-M3: a real System switch lands at destination Home. The landing is
+    // handled ONCE — by the first run below for that generation — and then
+    // consumed, so a later cluster tap in the same generation still zooms
+    // (D-19; before 38.7-12 the flag stayed set for the whole generation).
+    const switchLanding = switchHomeGeneration.current === scene.generation;
+    if (switchLanding) switchHomeGeneration.current = null;
+    void settledSwitch; // re-run once a switch settles (see onSwitchSettled)
     const session = useOrrerySessionStore.getState();
     if (sessionResume === "restore") {
       const restored = restoreOrrerySession({
@@ -1149,9 +1163,7 @@ export function OrreryScreen() {
     );
     // Dossier §V keeps a shared focus selected, but a real System switch still
     // lands at canonical Home rather than framing that retained contact.
-    const forceSwitchHome =
-      sessionResume !== "restore" &&
-      switchHomeGeneration.current === scene.generation;
+    const forceSwitchHome = sessionResume !== "restore" && switchLanding;
     if (forceSwitchHome) {
       // The screen-owned choreography already samples from the displayed pose
       // to destination Home. Assigning Home here would snap its first frame.
@@ -1159,6 +1171,10 @@ export function OrreryScreen() {
       lastHomeDomain.current = domain;
       return;
     }
+    // D-19: a cluster opened while a switch is still running waits for it to
+    // settle — the switch owns the pose until then (its settle writes
+    // destination Home). Nothing is recorded, so the settle re-run zooms.
+    if (clusterOpen && switchProgress.value < 1) return;
     // D-19/D-47: a single focus is framed above the docked card, uncapped;
     // an open cluster zooms in until its members separate (the panel, an
     // obstacle in `viewport`, stays open beside it).
@@ -1220,6 +1236,8 @@ export function OrreryScreen() {
     sessionReady,
     sessionResume,
     frameSingleFocus,
+    switchProgress,
+    settledSwitch,
   ]);
   const recenter = () => {
     focusFraming.current = null;
