@@ -22,6 +22,7 @@ import { createOrreryGenerationLedger } from "../resources/orrery-generation-led
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
 import {
   bodyInitialsLayout,
+  bodyLit,
   buildBodyLooks,
   buildFocusOutlines,
   buildOverlayInk,
@@ -42,9 +43,17 @@ import {
   type SkySpecLook,
   skyHandle,
   skyTintInk,
+  sunLook,
   textHandle,
   tokenInk,
 } from "./scene-specs";
+import {
+  BODY_LOOKS,
+  DECAY_DESATURATION,
+  FACE_PRESET,
+  FACE_PRESETS,
+  ROGUE_DESATURATION,
+} from "./visual-tunables";
 
 const inkOf = (token: string) => [...parse(token)];
 
@@ -709,5 +718,101 @@ describe("38.7-07 Task 2: moons and labels", () => {
     });
     ledger.ack(ORRERY_LAYER.labels, 3, latest.mountEpoch);
     expect(ledger.retirable()).toEqual([textHandle(2, "label-ada")]);
+  });
+});
+
+describe("38.7-10 (D-13/D-14/D-15): lit status bodies and the star sun, as numbers", () => {
+  const STATUSES = ["stable", "wobble", "decay", "rogue", null] as const;
+  const THEMES = [
+    ["galaxy dark", THEME_PRESETS.galaxy.dark, "dark"],
+    ["galaxy light", THEME_PRESETS.galaxy.light, "light"],
+    ["standard dark", THEME_PRESETS.standard.dark, "dark"],
+    ["standard light", THEME_PRESETS.standard.light, "light"],
+  ] as const;
+  it.each(THEMES)(
+    "%s: the rim and glow are the status colour; rogue is cold (rogueExtinguished) with no glow",
+    (_name, colors, mode) => {
+      for (const status of STATUSES) {
+        const lit = bodyLit(status, colors, mode);
+        const statusInk = inkOf(orreryRingStyle(status, colors).bodyFill);
+        expect(lit.rimInk).toEqual(statusInk);
+        expect(lit.glowInk).toEqual(statusInk);
+        expect(lit.highlightInk).toEqual(inkOf(colors.orreryRim));
+      }
+      const rogue = bodyLit("rogue", colors, mode);
+      expect(rogue.rimInk).toEqual(inkOf(colors.rogueExtinguished));
+      expect(rogue.atmosphere).toBe(0);
+      // No glow for a never-contacted body either; every live status glows.
+      expect(bodyLit(null, colors, mode).atmosphere).toBe(0);
+      for (const status of ["stable", "wobble", "decay"] as const)
+        expect(bodyLit(status, colors, mode).atmosphere).toBeGreaterThan(0);
+      // D-51 blend family by mode: only dark themes look additive.
+      expect(bodyLit("stable", colors, mode).atmosphereAdditive).toBe(
+        mode === "dark" ? BODY_LOOKS.dark.atmosphereAdditive : 0,
+      );
+    },
+  );
+  it("desaturation applies only to decay and rogue", () => {
+    for (const [, colors, mode] of THEMES)
+      for (const status of STATUSES)
+        expect(bodyLit(status, colors, mode).desaturate).toBe(
+          status === "decay"
+            ? DECAY_DESATURATION
+            : status === "rogue"
+              ? ROGUE_DESATURATION
+              : 0,
+        );
+  });
+  it("faces use the active preset; every option keeps faces lighter than dark (D-13: floor ≥ the lab's)", () => {
+    const colors = THEME_PRESETS.galaxy.dark;
+    expect(bodyLit("stable", colors, "dark")).toMatchObject(
+      FACE_PRESETS[FACE_PRESET].dark,
+    );
+    // The plan's lighter preset: floor ≥ 0.8 on dark, z 0.8-1.0, wrap 0.5.
+    expect(FACE_PRESETS.A.dark.floor).toBeGreaterThanOrEqual(0.8);
+    expect(FACE_PRESETS.A.dark.lightZ).toBeGreaterThanOrEqual(0.8);
+    expect(FACE_PRESETS.A.dark.lightZ).toBeLessThanOrEqual(1);
+    expect(FACE_PRESETS.A.dark.wrap).toBe(0.5);
+    expect(bodyLit("stable", colors, "dark", FACE_PRESETS.C.dark).floor).toBe(
+      1,
+    );
+  });
+  it("buildBodyLooks with a mode gives contacts a lit material, ring and pip inks, and the sun its star look; without a mode, today's look", () => {
+    const colors = THEME_PRESETS.standard.light;
+    const resources = bodyResources([
+      { status: "decay", name: "Ada", photo: null },
+      { status: "rogue", name: "Bo", photo: "avatars/bo.jpg" },
+    ]);
+    const looks = buildBodyLooks(resources, colors, "light");
+    const [sun, ada, bo] = looks;
+    expect(sun.sun).toEqual(sunLook(colors, "light"));
+    expect(sun.lit).toBeUndefined();
+    expect(ada.lit).toEqual(bodyLit("decay", colors, "light"));
+    expect(bo.lit).toEqual(bodyLit("rogue", colors, "light"));
+    expect(ada.ringInk).toEqual(inkOf(orreryRingStyle("decay", colors).color));
+    expect(ada.pipPlateInk).toEqual(inkOf(colors.orrerySkyBase));
+    for (const look of buildBodyLooks(resources, colors)) {
+      expect(look.lit).toBeUndefined();
+      expect(look.sun).toBeUndefined();
+    }
+  });
+  it("the star sun: the starlight core per mode, chart on light, screen-blended on dark only", () => {
+    const dark = sunLook(THEME_PRESETS.galaxy.dark, "dark");
+    expect(dark.starlightInk).toEqual(
+      inkOf(THEME_PRESETS.galaxy.dark.orreryRingLight),
+    );
+    expect(dark).toMatchObject({
+      chart: false,
+      additive: true,
+      coronaAlpha: 1,
+    });
+    const light = sunLook(THEME_PRESETS.galaxy.light, "light");
+    expect(light.starlightInk).toEqual(
+      inkOf(THEME_PRESETS.galaxy.light.orreryGlow),
+    );
+    expect(light.paperInk).toEqual(
+      inkOf(THEME_PRESETS.galaxy.light.background),
+    );
+    expect(light).toMatchObject({ chart: true, additive: false });
   });
 });

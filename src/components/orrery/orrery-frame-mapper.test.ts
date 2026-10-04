@@ -22,6 +22,7 @@ import {
   EMPTY_SATELLITE_SPEC,
   moonSplitFactor,
 } from "@/logic/orrery-satellite-logic";
+import { detectStacks } from "@/logic/orrery-stack-logic";
 import {
   beginSwitchChoreography,
   sampleSwitchChoreography,
@@ -123,6 +124,8 @@ it("the emitted projection closure settles after publication under the installed
     // members) and the split from the frame's own camera zoom.
     satelliteSpec: cell(EMPTY_SATELLITE_SPEC),
     moonSplitFactor,
+    // 38.7-10 (D-54): indexed stack detection on the projected bodies.
+    detectStacks,
     reorder,
     previewReorder,
     deriveSatelliteBodies,

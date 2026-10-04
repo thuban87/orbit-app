@@ -226,3 +226,148 @@ export const MOON_BUMP_RADIUS_DP = 4;
 export const MOON_BUMP_STEP_DP = 0.75;
 /** The bump never grows past this radius (dp). */
 export const MOON_BUMP_MAX_DP = 6;
+
+// ── Stack pips (38.7-10: D-54; Lab A deep-field-config §6) ────────────────
+
+/** Pip radius (screen dp), Lab A STACK_PIP_R. */
+export const PIP_RADIUS_DP = 3.2;
+/** The dark plate ring around each pip (dp beyond the pip), Lab A. */
+export const PIP_PLATE_DP = 1.3;
+/** Plate alpha (Lab A: the background at 0.95). */
+export const PIP_PLATE_ALPHA = 0.95;
+/** Angular spacing between pips (radians), Lab A STACK_PIP_STEP. */
+export const PIP_STEP = 0.42;
+/**
+ * Where the pips centre when the body has no moon bump (radians, screen
+ * convention: −0.75 is up-right, Lab A STACK_PIP_ANGLE). With a bump they
+ * centre on the opposite side (D-54).
+ */
+export const PIP_ANCHOR = -0.75;
+/** How far a pip's centre sits outside the rim (× its radius), Lab A. */
+export const PIP_OUTSET = 0.35;
+/** The overflow ("more") marker: ring stroke width (dp) and inset (dp). */
+export const PIP_MORE_STROKE_DP = 1.2;
+export const PIP_MORE_INSET_DP = 0.6;
+
+// ── Lit status bodies (38.7-10: D-13, D-14; Lab B labb-effects BODY_LIT) ──
+
+/** How the sun lights a face (one preset is active; Task 4 picks it). */
+export interface FaceLight {
+  /**
+   * The darkest a face gets on its night side (0..1; 1 = no shading at all).
+   * Lab B used 0.55 (dark) / 0.75 (light): the owner found that too dark.
+   */
+  floor: number;
+  /** Light elevation out of the screen (higher = more frontal, softer terminator). */
+  lightZ: number;
+  /** Wrap lighting: softens the terminator (0 = hard Lambert). */
+  wrap: number;
+}
+export type FacePresetId = "A" | "B" | "C";
+/**
+ * G-FACE options for the owner (Plan 10 Task 4):
+ * A "lighter" — the plan's D-13 values (floor ≥ 0.8 on dark, z 0.9, wrap 0.5);
+ * B "as in Lab B" — Lab B's own lighting, for comparison (too dark per D-13);
+ * C "flat" — no sun shading on faces at all (rim and glow still show status).
+ */
+export const FACE_PRESETS: Readonly<
+  Record<FacePresetId, Readonly<Record<ResolvedMode, FaceLight>>>
+> = {
+  A: {
+    dark: { floor: 0.85, lightZ: 0.9, wrap: 0.5 },
+    light: { floor: 0.9, lightZ: 0.9, wrap: 0.5 },
+  },
+  B: {
+    dark: { floor: 0.55, lightZ: 0.4, wrap: 0.35 },
+    light: { floor: 0.75, lightZ: 0.4, wrap: 0.35 },
+  },
+  C: {
+    dark: { floor: 1, lightZ: 1, wrap: 1 },
+    light: { floor: 1, lightZ: 1, wrap: 1 },
+  },
+};
+/** The active face preset (a one-letter edit; the owner rules at G-FACE). */
+export const FACE_PRESET: FacePresetId = "A";
+
+/** One mode's status rim + atmosphere (Lab B DARK_BODIES / LIGHT_BODIES). */
+export interface BodyLook {
+  /** Crisp inner status rim width (dp) and its strength (0..1). */
+  rimDp: number;
+  rimStrength: number;
+  /** Fresnel limb in the rim ink. */
+  fresnel: number;
+  /** Status atmosphere strength (× the status material's). */
+  atmosphere: number;
+  /** 0 = plain src-over glow, 1 = fully additive-looking (dark themes only). */
+  atmosphereAdditive: number;
+  /** Specular glint strength. */
+  spec: number;
+}
+/** Lab B's approved rim + atmosphere look, per resolved mode (D-14). */
+export const BODY_LOOKS: Readonly<Record<ResolvedMode, BodyLook>> = {
+  dark: {
+    rimDp: 1.5,
+    rimStrength: 0.9,
+    fresnel: 0.35,
+    atmosphere: 0.85,
+    atmosphereAdditive: 0.65,
+    spec: 0.14,
+  },
+  light: {
+    rimDp: 2,
+    rimStrength: 1,
+    fresnel: 0.28,
+    atmosphere: 0.22,
+    atmosphereAdditive: 0,
+    spec: 0.08,
+  },
+};
+/**
+ * The atmosphere's reach (× the body radius). Must stay ≤ the 1.3 culling
+ * reach of `projectAnimatedFrame` (Lab B BODY_REACH).
+ */
+export const BODY_ATMOSPHERE_REACH = 1.3;
+/**
+ * How far the status rim / glow lean toward the `orreryRim` / `orreryGlow`
+ * tokens (0 = the pure status colour, Lab B's look).
+ */
+export const BODY_RIM_TOKEN_MIX = 0;
+export const BODY_GLOW_TOKEN_MIX = 0;
+
+/**
+ * G-DESAT (product meaning, owner confirms at Task 4): how much a decay or
+ * rogue contact's photo / swatch is desaturated (0 = off). Lab B C-16 values.
+ * Only these two statuses are ever desaturated.
+ */
+export const DECAY_DESATURATION = 0.25;
+export const ROGUE_DESATURATION = 0.45;
+
+/**
+ * Per status: atmosphere, Fresnel and glint multipliers (Lab B
+ * labBodyMaterial). Rogue: no atmosphere — drawn cold (D-14).
+ */
+export const STATUS_MATERIALS = {
+  stable: { atmosphere: 1, fresnel: 1, spec: 1 },
+  wobble: { atmosphere: 1, fresnel: 1, spec: 1 },
+  decay: { atmosphere: 0.4, fresnel: 0.55, spec: 0.6 },
+  rogue: { atmosphere: 0, fresnel: 0.3, spec: 0.3 },
+  none: { atmosphere: 0, fresnel: 0, spec: 0 },
+} as const;
+
+// ── The star sun (38.7-10: D-15, D-37; Lab A deep-field-config §5) ────────
+
+/** Corona quad half-size (× the sun radius), Lab A CORONA_EXTENT. */
+export const SUN_CORONA_EXTENT = 2.7;
+/** Corona intensity, dark / light (Lab A CORONA_ALPHA_DARK / _LIGHT). */
+export const SUN_CORONA_ALPHA = { dark: 1, light: 0.85 } as const;
+/**
+ * D-37: the corona and granulation do not churn. Their shader time is a
+ * fixed phase (Lab A's still frame: 1.7 corona, 2.3 granulation) that swings
+ * ± these amounts with the existing sun pulse only; still under reduced motion.
+ */
+export const SUN_CORONA_TIME = 1.7;
+export const SUN_CORONA_SWING = 0.5;
+export const SUN_GRANULE_TIME = 2.3;
+export const SUN_GRANULE_SWING = 0.3;
+/** The fine limb line just outside the disc (world units), Lab A. */
+export const SUN_LIMB_GAP = 1;

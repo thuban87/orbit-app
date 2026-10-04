@@ -9,6 +9,7 @@
  */
 import { type SkImage, Skia } from "@shopify/react-native-skia";
 import { swatchIndex } from "@/components/avatar-initials";
+import type { ProfileStatus } from "@/db/contact-status-read";
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
 import type { OrrerySatelliteTarget } from "@/logic/orrery-camera-logic";
 import { bodyKey } from "@/logic/orrery-frame";
@@ -34,6 +35,14 @@ import type {
 } from "../resources/orrery-text-service";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
 import {
+  BODY_ATMOSPHERE_REACH,
+  BODY_GLOW_TOKEN_MIX,
+  BODY_LOOKS,
+  BODY_RIM_TOKEN_MIX,
+  DECAY_DESATURATION,
+  FACE_PRESET,
+  FACE_PRESETS,
+  type FaceLight,
   RING_DASHED_DUTY,
   RING_DASHED_PERIOD_DP,
   RING_FADED_ALPHA,
@@ -42,6 +51,9 @@ import {
   RING_TRACE_PERIOD_DP,
   RING_WIDTH_BASE,
   RING_WIDTH_SCALE,
+  ROGUE_DESATURATION,
+  STATUS_MATERIALS,
+  SUN_CORONA_ALPHA,
 } from "./visual-tunables";
 
 /** Premultiplication-free RGBA floats, 0..1. */
@@ -574,6 +586,113 @@ export function bodyInitialsLayout(
 }
 
 /**
+ * 38.7-10 (D-13/D-14): a contact's lit-body material — Lab B's rim +
+ * atmosphere status, lighter sun-lit faces. Numbers and inks only.
+ */
+export interface BodyLit {
+  /** The crisp inner rim and Fresnel limb (status colour). */
+  rimInk: OrreryInk;
+  /** The atmosphere outside the disc (status colour). */
+  glowInk: OrreryInk;
+  /** The specular glint (`orreryRim`). */
+  highlightInk: OrreryInk;
+  floor: number;
+  lightZ: number;
+  wrap: number;
+  /** Photo / swatch desaturation: > 0 only for decay and rogue. */
+  desaturate: number;
+  rimDp: number;
+  rimStrength: number;
+  fresnel: number;
+  /** 0 = no atmosphere (rogue, never-contacted). */
+  atmosphere: number;
+  atmosphereAdditive: number;
+  atmosphereReach: number;
+  spec: number;
+}
+
+/** 38.7-10 (D-15): the star sun's inks (Lab A's corona and disc). */
+export interface SunLook {
+  /** The white-hot core (Lab A "starlight"): `orreryRingLight` on dark, `orreryGlow` on light. */
+  starlightInk: OrreryInk;
+  /** The light themes' chart "paper" core of the disc (`background`). */
+  paperInk: OrreryInk;
+  /** Light themes: Lab A's engraved chart corona. */
+  chart: boolean;
+  coronaAlpha: number;
+  /** D-51: dark themes screen-blend the corona; light src-over. */
+  additive: boolean;
+}
+
+/** Linear blend of two inks (`amount` 0 = a, 1 = b). */
+function mixInk(a: OrreryInk, b: OrreryInk, amount: number): OrreryInk {
+  if (!(amount > 0)) return a;
+  const t = Math.min(1, amount);
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+    a[3] + (b[3] - a[3]) * t,
+  ];
+}
+
+/**
+ * A contact's lit material for `status` in `mode`: Lab B's per-status
+ * material (rogue: no atmosphere, cold `rogueExtinguished` rim), the mode's
+ * rim + atmosphere look, the active face preset, and the decay/rogue
+ * desaturation (no other status is ever desaturated).
+ */
+export function bodyLit(
+  status: ProfileStatus | null,
+  colors: ThemePalette,
+  mode: ResolvedMode,
+  face: FaceLight = FACE_PRESETS[FACE_PRESET][mode],
+): BodyLit {
+  const look = BODY_LOOKS[mode];
+  const material =
+    status === null ? STATUS_MATERIALS.none : STATUS_MATERIALS[status];
+  const statusInk = tokenInk(orreryRingStyle(status, colors).bodyFill);
+  return {
+    rimInk: mixInk(statusInk, tokenInk(colors.orreryRim), BODY_RIM_TOKEN_MIX),
+    glowInk: mixInk(
+      statusInk,
+      tokenInk(colors.orreryGlow),
+      BODY_GLOW_TOKEN_MIX,
+    ),
+    highlightInk: tokenInk(colors.orreryRim),
+    floor: face.floor,
+    lightZ: face.lightZ,
+    wrap: face.wrap,
+    desaturate:
+      status === "decay"
+        ? DECAY_DESATURATION
+        : status === "rogue"
+          ? ROGUE_DESATURATION
+          : 0,
+    rimDp: look.rimDp,
+    rimStrength: look.rimStrength,
+    fresnel: look.fresnel * material.fresnel,
+    atmosphere: look.atmosphere * material.atmosphere,
+    atmosphereAdditive: mode === "dark" ? look.atmosphereAdditive : 0,
+    atmosphereReach: BODY_ATMOSPHERE_REACH,
+    spec: look.spec * material.spec,
+  };
+}
+
+/** The star sun's look in `mode` (D-15, D-51 blend family by mode). */
+export function sunLook(colors: ThemePalette, mode: ResolvedMode): SunLook {
+  return {
+    starlightInk: tokenInk(
+      mode === "dark" ? colors.orreryRingLight : colors.orreryGlow,
+    ),
+    paperInk: tokenInk(colors.background),
+    chart: mode === "light",
+    coronaAlpha: SUN_CORONA_ALPHA[mode],
+    additive: mode === "dark",
+  };
+}
+
+/**
  * One body's static look (no native objects): rebuilt on resource, theme or
  * focus change only, never per frame.
  */
@@ -595,6 +714,14 @@ export interface OrreryBodyLook {
   focusInk: OrreryInk | null;
   /** 38.7-10 (D-31): the moon ink (`textSecondary`) a parent's bump is drawn in. */
   moonInk: OrreryInk;
+  /** 38.7-10 (D-13/D-14): a contact's lit material; absent → today's flat body. */
+  lit?: BodyLit;
+  /** 38.7-10 (D-15): the sun's star look; absent → today's glow sun. */
+  sun?: SunLook;
+  /** 38.7-10 (D-54): a contact's ring status ink — its pip colour when hidden. */
+  ringInk?: OrreryInk;
+  /** 38.7-10 (D-54): the dark plate behind a pip (`orrerySkyBase`). */
+  pipPlateInk?: OrreryInk;
 }
 
 /** A body's spec: its look plus the native objects its picture draws. */
@@ -675,8 +802,12 @@ export function bodyIdentity(
 export function buildBodyLooks(
   resources: readonly OrreryBodyResource[],
   colors: ThemePalette,
+  /** 38.7-10: the resolved mode → the V2 lit bodies and star sun; absent → today's look. */
+  mode?: ResolvedMode,
 ): OrreryBodyLook[] {
   const out: OrreryBodyLook[] = [];
+  const sun = mode ? sunLook(colors, mode) : undefined;
+  const pipPlateInk = tokenInk(colors.orrerySkyBase);
   const swatchOf = (name: string) =>
     tokenInk(
       colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
@@ -687,22 +818,30 @@ export function buildBodyLooks(
     if (body.kind === "satellite") continue;
     const identity = bodyIdentity(resource, colors);
     const kind = body.kind === "sun" ? "sun" : "contact";
+    const status =
+      kind === "contact" ? (contactOf(resource)?.status ?? null) : null;
+    const style = kind === "contact" ? orreryRingStyle(status, colors) : null;
     out.push({
       key: resource.key,
       kind,
       worldRadius: body.radius,
-      outlineInk:
-        kind === "sun"
-          ? tokenInk(identity.glowColor ?? colors.border)
-          : tokenInk(
-              orreryRingStyle(contactOf(resource)?.status ?? null, colors)
-                .bodyFill,
-            ),
+      outlineInk: style
+        ? tokenInk(style.bodyFill)
+        : tokenInk(identity.glowColor ?? colors.border),
       swatchInk: swatchOf(identity.name),
       photoKey: identity.photo,
       initialsFontSize: bodyInitialsLayout(kind, body.radius).fontSize,
       focusInk: null,
       moonInk,
+      ...(style
+        ? {
+            ringInk: tokenInk(style.color),
+            pipPlateInk,
+            ...(mode ? { lit: bodyLit(status, colors, mode) } : {}),
+          }
+        : sun
+          ? { sun }
+          : {}),
     });
   }
   return out;

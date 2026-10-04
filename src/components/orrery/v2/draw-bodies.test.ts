@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@shopify/react-native-skia", () => ({
+  BlendMode: { SrcOver: 3, Screen: 14 },
+  TileMode: { Clamp: 0 },
   ClipOp: { Difference: 0, Intersect: 1 },
   FilterMode: { Nearest: 0, Linear: 1 },
   MipmapMode: { None: 0, Nearest: 1, Linear: 2 },
@@ -25,6 +27,14 @@ vi.mock("@shopify/react-native-skia", () => ({
         setStrokeWidth: (w: number) => {
           paint.width = w;
         },
+        shader: null as unknown,
+        setShader: (shader: unknown) => {
+          paint.shader = shader;
+        },
+        blend: -1,
+        setBlendMode: (mode: number) => {
+          paint.blend = mode;
+        },
       };
       return paint;
     },
@@ -42,12 +52,19 @@ import type { AnimatedFrame } from "@/logic/orrery-frame";
 import {
   drawBodies,
   drawSun,
+  type OrreryBodyEffects,
   orderBodies,
   SUN_GLOW_OPACITY,
   SUN_GLOW_SCALE,
+  sunDetailTime,
   sunPulse,
 } from "./draw-bodies";
-import type { OrreryBodySpec, OrreryInk } from "./scene-specs";
+import type {
+  BodyLit,
+  OrreryBodySpec,
+  OrreryInk,
+  SunLook,
+} from "./scene-specs";
 
 interface Call {
   op: string;
@@ -175,7 +192,7 @@ describe("38.7-07 M14: depth order around the sun", () => {
     const specs = [spec("contact:1"), spec("contact:9")];
     const f = frame([{ key: "contact:1", depth: 0 }]);
     const order = orderBodies(f, specs);
-    expect(order).toEqual({ indices: [0], sunAt: 1, sun: -1 });
+    expect(order).toMatchObject({ indices: [0], sunAt: 1, sun: -1 });
     const front = recordingCanvas();
     expect(drawBodies(front.canvas, f, specs, order, "front")).toBe(0);
   });
@@ -334,5 +351,179 @@ describe("moon drawing (today's look, same depth rules)", () => {
     expect((circles[0].args[3] as { color: number[] }).color).toEqual([
       ...MOON,
     ]);
+  });
+});
+
+describe("38.7-10: lit bodies and the star sun fall back safely; the sun's detail is still under reduced motion", () => {
+  const LIT: BodyLit = {
+    rimInk: OUTLINE,
+    glowInk: OUTLINE,
+    highlightInk: [1, 1, 1, 1],
+    floor: 0.85,
+    lightZ: 0.9,
+    wrap: 0.5,
+    desaturate: 0,
+    rimDp: 1.5,
+    rimStrength: 0.9,
+    fresnel: 0.35,
+    atmosphere: 0.85,
+    atmosphereAdditive: 0.65,
+    atmosphereReach: 1.3,
+    spec: 0.14,
+  };
+  const SUN: SunLook = {
+    starlightInk: [1, 0.9, 0.8, 1],
+    paperInk: [1, 1, 1, 1],
+    chart: false,
+    coronaAlpha: 1,
+    additive: true,
+  };
+  const effect = (made: unknown[]) => ({
+    makeShader: (uniforms: number[]) => {
+      made.push(uniforms);
+      return { uniforms };
+    },
+    makeShaderWithChildren: (uniforms: number[], children: unknown[]) => {
+      made.push(uniforms);
+      return { uniforms, children };
+    },
+  });
+  const throwing = {
+    makeShader: () => {
+      throw new Error("bad uniforms");
+    },
+    makeShaderWithChildren: () => {
+      throw new Error("bad uniforms");
+    },
+  };
+  function drawContact(
+    effects: OrreryBodyEffects | undefined,
+    photo?: unknown,
+  ) {
+    const specs = [
+      spec("contact:1", "contact", {
+        lit: LIT,
+        photo: (photo ?? null) as never,
+      }),
+    ];
+    const f = frame([{ key: "contact:1", depth: 0, x: 50, y: 60, radius: 32 }]);
+    const { canvas, calls } = recordingCanvas();
+    const drew = drawBodies(
+      canvas,
+      f,
+      specs,
+      orderBodies(f, specs),
+      "behind",
+      effects,
+    );
+    return { drew, calls };
+  }
+  const flat = [
+    "save",
+    "translate",
+    "scale",
+    "drawCircle",
+    "drawCircle",
+    "restore",
+  ];
+
+  it("a lit contact draws ONE shader circle (r × reach) when its effect exists", () => {
+    const made: unknown[] = [];
+    const effects = {
+      swatch: effect(made),
+      photo: null,
+      corona: null,
+      sunDisc: null,
+    } as never as OrreryBodyEffects;
+    const { drew, calls } = drawContact(effects);
+    expect(drew).toBe(1);
+    const circles = calls.filter((c) => c.op === "drawCircle");
+    expect(circles).toHaveLength(1);
+    expect(circles[0].args.slice(0, 3)).toEqual([0, 0, 16 * 1.3]);
+    expect((circles[0].args[3] as { shader: unknown }).shader).toBeTruthy();
+    expect(made).toHaveLength(1);
+  });
+  it("no effect, a missing photo effect or a shader that throws → today's flat body, never a crash", () => {
+    expect(drawContact(undefined).calls.map((c) => c.op)).toEqual(flat);
+    const nullEffects = {
+      swatch: null,
+      photo: null,
+      corona: null,
+      sunDisc: null,
+    } as OrreryBodyEffects;
+    expect(drawContact(nullEffects).calls.map((c) => c.op)).toEqual(flat);
+    const broken = {
+      swatch: throwing,
+      photo: throwing,
+      corona: null,
+      sunDisc: null,
+    } as never as OrreryBodyEffects;
+    expect(drawContact(broken).calls.map((c) => c.op)).toEqual(flat);
+    // A photo whose image cannot make a shader: the flat clipped photo.
+    const made: unknown[] = [];
+    const photoOnly = {
+      swatch: null,
+      photo: effect(made),
+      corona: null,
+      sunDisc: null,
+    } as never as OrreryBodyEffects;
+    const photo = { width: () => 400, height: () => 300 };
+    const { calls } = drawContact(photoOnly, photo);
+    expect(calls.some((c) => c.op === "drawImageRectOptions")).toBe(true);
+    expect(made).toHaveLength(0);
+  });
+  it("the star sun falls back to today's glow sun without a corona effect or when it throws", () => {
+    const specs = [spec("sun:0", "sun", { sun: SUN })];
+    const f = frame([{ key: "sun:0", depth: 0, x: 5, y: 6, radius: 30 }]);
+    for (const corona of [null, throwing]) {
+      const { canvas, calls } = recordingCanvas();
+      drawSun(canvas, f, specs, orderBodies(f, specs), 0, {
+        swatch: null,
+        photo: null,
+        corona,
+        sunDisc: null,
+      } as never as OrreryBodyEffects);
+      const [glow] = calls.filter((c) => c.op === "drawCircle");
+      expect(glow.args[2]).toBeCloseTo(30 * SUN_GLOW_SCALE);
+      expect(calls.some((c) => c.op === "drawRect")).toBe(false);
+    }
+  });
+  it("D-37: the corona and granulation time is fixed under reduced motion and moves only with the pulse", () => {
+    const made: number[][] = [];
+    const specs = [spec("sun:0", "sun", { sun: SUN })];
+    const f = frame([{ key: "sun:0", depth: 0, x: 5, y: 6, radius: 30 }]);
+    const effects = {
+      swatch: null,
+      photo: null,
+      corona: effect(made),
+      sunDisc: effect(made),
+    } as never as OrreryBodyEffects;
+    const times = (clockMs: number, reduced: boolean) => {
+      made.length = 0;
+      const { canvas, calls } = recordingCanvas();
+      drawSun(
+        canvas,
+        f,
+        specs,
+        orderBodies(f, specs),
+        sunPulse(clockMs, reduced),
+        effects,
+      );
+      expect(calls.some((c) => c.op === "drawRect")).toBe(true);
+      return made.map((uniforms) => uniforms[1]);
+    };
+    expect(times(1234, true)).toEqual(times(98765, true));
+    expect(times(1234, true)).toEqual([
+      sunDetailTime(0).corona,
+      sunDetailTime(0).granule,
+    ]);
+    expect(times(0, false)).not.toEqual(times(700, false));
+    // The detail swings with the pulse only: a full pulse period repeats it.
+    const period = (Math.PI * 2) / 0.002;
+    const a = times(400, false);
+    const b = times(400 + period, false);
+    a.forEach((t, i) => {
+      expect(b[i]).toBeCloseTo(t, 6);
+    });
   });
 });

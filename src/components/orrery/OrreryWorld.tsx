@@ -51,6 +51,7 @@ import {
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
 import { SKY_UNTINTED, systemSkyHueIndex } from "@/logic/orrery-sky-logic";
+import { detectStacks } from "@/logic/orrery-stack-logic";
 import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { systemRefId } from "@/logic/orrery-system-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
@@ -486,6 +487,8 @@ export function OrreryWorld({
     );
     projected.moonBumps = satelliteBodies.bumps;
     projected.moonSplit = moonSplit;
+    // D-54: the stacks (pips), indexed, once per frame from the same bodies.
+    projected.stacks = detectStacks(projected.bodies);
     return projected;
   });
   // Conventional focus positioning consumes this same interpolated frame.
@@ -655,9 +658,11 @@ export function OrreryWorld({
   const satelliteFocusKey = focusedSatellite
     ? `${focusedSatellite.parentId}|${focusedSatellite.parentUid}|${focusedSatellite.uid}`
     : "";
+  // 38.7-10 (D-13/D-14/D-15): the resolved mode selects the lit-body and
+  // star-sun looks.
   const bodyLooks = useMemo(
-    () => buildBodyLooks(resources, colors),
-    [resources, colors],
+    () => buildBodyLooks(resources, colors, themeMode),
+    [resources, colors, themeMode],
   );
   const lookInputs = useRef({ bodyLooks, colors, focusedSatellite });
   lookInputs.current = { bodyLooks, colors, focusedSatellite };

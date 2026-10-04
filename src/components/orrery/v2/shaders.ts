@@ -172,11 +172,211 @@ half4 main(float2 u) {
 }
 `;
 
-export type OrreryShaderId = "ringPlane" | "gridPlane";
+/**
+ * 38.7-10 (D-13/D-14): one lit status body, Lab B's BODY_LIT rewritten with
+ * lighter faces. Drawn in the body's billboard space (translate + uniform
+ * scale only, units = world radius) as ONE circle of radius r × reach: inside
+ * r the surface (photo or swatch) is lit from the sun's screen direction with
+ * wrap lighting and a readability floor (no far-side haze on faces), the
+ * decay/rogue desaturation, a soft specular glint, a Fresnel limb and a crisp
+ * inner rim in the status rim ink; outside r a soft atmosphere in the status
+ * glow ink, stronger on the sun-facing side (none when uD.a = 0: rogue).
+ * `uG.x` is the defocus amount (Plan 11, D-21; 0 here). Output premultiplied.
+ *   uA = (r, local units per dp, lightX, lightY)
+ *   uB = (lightZ, floor, wrap, desaturate)
+ *   uC = (rim.rgb, rimStrength)       uD = (glow.rgb, atmosphere)
+ *   uE = (highlight.rgb, spec)        uF = (fresnel, rimDp, atmoReach, atmoAdd)
+ *   uG = (defocus, 0, 0, 0)
+ * Uniform order is mirrored by `bodyLitUniforms` (draw-bodies.ts).
+ */
+const BODY_LIT_CORE = `
+uniform float4 uA;
+uniform float4 uB;
+uniform float4 uC;
+uniform float4 uD;
+uniform float4 uE;
+uniform float4 uF;
+uniform float4 uG;
+
+half4 litBody(float2 xy, float3 surf) {
+  float r = uA.x;
+  float px = uA.y;
+  float2 d = xy / r;
+  float l = length(d);
+  float aa = px / r;
+  float inside = clamp((1.0 - l) / aa + 0.5, 0.0, 1.0);
+  float2 dir = d / max(l, 0.0001);
+  float facing = dot(dir, uA.zw);
+  float3 c = float3(0.0);
+  if (inside > 0.0) {
+    float nz = sqrt(max(0.0, 1.0 - l * l));
+    float3 n = float3(d, nz);
+    float3 lv = normalize(float3(uA.zw, uB.x));
+    float lam = clamp((dot(n, lv) + uB.z) / (1.0 + uB.z), 0.0, 1.0);
+    float shade = uB.y + (1.0 - uB.y) * lam;
+    float lum = dot(surf, float3(0.299, 0.587, 0.114));
+    c = mix(surf, float3(lum), uB.w) * shade;
+    float3 hv = normalize(lv + float3(0.0, 0.0, 1.0));
+    c += uE.rgb * pow(max(dot(n, hv), 0.0), 28.0) * uE.a;
+    float fres = pow(1.0 - nz, 2.5) * uF.x * (0.3 + 0.7 * max(0.0, facing));
+    c = mix(c, uC.rgb, clamp(fres, 0.0, 1.0));
+    float rimW = uF.y * px / r;
+    float rim = smoothstep(1.0 - rimW - aa, 1.0 - rimW, l) * uC.a;
+    c = mix(c, uC.rgb, rim);
+    float dfc = uG.x;
+    if (dfc > 0.0) {
+      float dl = dot(c, float3(0.299, 0.587, 0.114));
+      c = mix(c, float3(dl), 0.3 * dfc) * (1.0 - 0.32 * dfc);
+    }
+  }
+  float t = clamp((l - 1.0) / max(uF.z - 1.0, 0.0001), 0.0, 1.0);
+  float g = 1.0 - t;
+  g = g * g * g * uD.a * (0.4 + 0.6 * max(0.0, facing));
+  g *= 1.0 - 0.55 * uG.x;
+  float ga = g * (1.0 - 0.75 * uF.w);
+  float3 oc = uD.rgb * g;
+  return half4(half3(c * inside + oc * (1.0 - inside)),
+               half(inside + ga * (1.0 - inside)));
+}
+`;
+
+/** The swatch body: the lit swatch colour `uS.rgb` (initials drawn on top). */
+export const BODY_SWATCH_SKSL = `${BODY_LIT_CORE}
+uniform float4 uS;
+half4 main(float2 xy) {
+  return litBody(xy, uS.rgb);
+}
+`;
+
+/**
+ * The photo body: child `uImage` (the photo, identity local matrix) sampled
+ * cover-fit — the centre square (origin uI.xy, side uI.z) across the disc.
+ */
+export const BODY_PHOTO_SKSL = `${BODY_LIT_CORE}
+uniform shader uImage;
+uniform float4 uI;
+half4 main(float2 xy) {
+  float2 q = xy / uA.x;
+  float2 uv = uI.xy + (q * 0.5 + 0.5) * uI.z;
+  return litBody(xy, float3(uImage.eval(uv).rgb));
+}
+`;
+
+/**
+ * 38.7-10 (D-15): Lab A's sun as a star — a white-hot core grading to the
+ * occupant glow hue, with an edge shaped by angular harmonics and a soft
+ * bloom (dark); engraved rays + rings on light themes (uChart). Local
+ * coordinates centred on the sun, units = sun world radius. `uTime` moves only
+ * with the sun pulse (D-37) and is fixed under reduced motion; uFlare is 0
+ * (Plan 13 owns switch effects). No colour literal: core and glow are inks.
+ * Uniform order is mirrored by `coronaUniforms` (draw-bodies.ts).
+ */
+export const SUN_CORONA_SKSL = `
+uniform float uR;
+uniform float uTime;
+uniform float uFlare;
+uniform float uReach;
+uniform float uChart;
+uniform float uAlpha;
+uniform half4 uCore;
+uniform half4 uGlow;
+
+half4 main(float2 p) {
+  float d = length(p) / uR;
+  float ang = atan(p.y, p.x);
+  float t = uTime;
+  float n = 0.5 + 0.22 * sin(ang * 7.0 + t * 1.3)
+      + 0.16 * sin(ang * 13.0 - t * 1.9 + 1.7)
+      + 0.12 * sin(ang * 29.0 + t * 2.6 + 4.1);
+  float reach = 1.0 + (0.38 + 0.5 * n) * (1.0 + uFlare);
+  float x = max(d - 1.0, 0.0);
+  float fade = 1.0 - smoothstep(uReach * 0.72, uReach, d);
+  if (uChart > 0.5) {
+    float rays = pow(abs(cos(ang * 12.0 + t * 0.15)), 60.0);
+    float rayLen = 1.0 - smoothstep(1.0, reach + 0.55, d);
+    float rings = 1.0 - smoothstep(0.0, 0.05, abs(fract(d * 3.0) - 0.5));
+    float ringMask = (1.0 - smoothstep(1.2, uReach * 0.85, d)) * step(1.0, d);
+    float wash = (1.0 - smoothstep(1.0, reach, d)) * 0.28;
+    float a = clamp(rays * rayLen * 0.75 + rings * ringMask * 0.35 + wash, 0.0, 1.0);
+    a *= fade * uAlpha;
+    half3 col = mix(uGlow.rgb, uCore.rgb, half(0.65));
+    return half4(col * half(a), half(a));
+  }
+  float corona = clamp(1.0 - x / (reach - 1.0), 0.0, 1.0);
+  corona = corona * corona * corona;
+  float bloom = exp(-x * 1.25) * (0.5 + 0.5 * uFlare);
+  float hot = clamp(corona * 1.1 - 0.15, 0.0, 1.0);
+  half3 col = mix(uGlow.rgb, uCore.rgb, half(hot));
+  float a = clamp(corona * 0.9 + bloom * 0.55, 0.0, 1.0) * fade * uAlpha;
+  return half4(col * half(a), half(a));
+}
+`;
+
+/**
+ * 38.7-10 (D-15): Lab A's sun DISC — uPhoto 0: an opaque stellar surface
+ * (core → occupant hue toward the limb, limb darkening, slow granulation in
+ * O(1) coordinates, mediump-safe); uPhoto 1: only a glowing limb band framing
+ * the occupant photo (the photo stays the identity). uAA = local units per
+ * device pixel. Uniform order is mirrored by `sunDiscUniforms`.
+ */
+export const SUN_DISC_SKSL = `
+uniform float uR;
+uniform float uTime;
+uniform float uPhoto;
+uniform float uAA;
+uniform float uFlare;
+uniform half4 uCore;
+uniform half4 uGlow;
+
+half4 main(float2 p) {
+  float2 q = p / uR;
+  float d = length(q);
+  float aa = max(uAA / uR, 0.002);
+  float edge = 1.0 - smoothstep(1.0 - aa, 1.0, d);
+  if (edge <= 0.0) return half4(0.0);
+  float t = uTime;
+  float ang = atan(q.y, q.x);
+  float mu = sqrt(max(0.0, 1.0 - d * d));
+  float2 s = q / (0.35 + mu);
+  float g1 = sin(s.x * 9.1 + sin(s.y * 6.3 + t * 0.41) * 1.8 + t * 0.53)
+      * sin(s.y * 10.7 + sin(s.x * 5.9 - t * 0.33) * 1.7 - t * 0.37);
+  float g2 = sin(s.x * 23.0 + s.y * 7.0 + sin(s.y * 17.0 - t * 0.7) * 1.3)
+      * sin(s.y * 21.0 - s.x * 6.0 + sin(s.x * 15.0 + t * 0.6) * 1.2);
+  float g3 = sin(ang * 5.0 + d * 9.0 - t * 0.3);
+  float g = (g1 * 0.6 + g2 * 0.28 + g3 * 0.25) / 1.13;
+  float cells = 1.0 - abs(g1);
+  float heat = pow(mu, 1.6 - 0.6 * uFlare);
+  half3 col = mix(uGlow.rgb, uCore.rgb, half(heat));
+  col = col * half(0.5 + 0.5 * pow(mu, 0.55));
+  col = col + uCore.rgb * half((0.35 + 0.4 * uFlare) * pow(mu, 6.0));
+  col = col * half(1.0 + (0.07 * g + 0.05 * cells - 0.025) * mu);
+  float limb = smoothstep(0.86, 0.99, d) * (1.0 - smoothstep(0.99, 1.0, d));
+  col = col + uGlow.rgb * half(0.22 * limb);
+  if (uPhoto > 0.5) {
+    float band = smoothstep(0.74, 0.97, d);
+    half3 bandCol = mix(uGlow.rgb, uCore.rgb, half(0.35 * (1.0 - band)));
+    float a = band * 0.92 * edge;
+    return half4(bandCol * half(a), half(a));
+  }
+  return half4(col * half(edge), half(edge));
+}
+`;
+
+export type OrreryShaderId =
+  | "ringPlane"
+  | "gridPlane"
+  | "bodySwatch"
+  | "bodyPhoto"
+  | "sunCorona"
+  | "sunDisc";
 
 const SOURCES: Record<OrreryShaderId, string> = {
   ringPlane: RING_PLANE_SKSL,
   gridPlane: GRID_PLANE_SKSL,
+  bodySwatch: BODY_SWATCH_SKSL,
+  bodyPhoto: BODY_PHOTO_SKSL,
+  sunCorona: SUN_CORONA_SKSL,
+  sunDisc: SUN_DISC_SKSL,
 };
 
 const cache: Partial<Record<OrreryShaderId, SkRuntimeEffect | null>> = {};

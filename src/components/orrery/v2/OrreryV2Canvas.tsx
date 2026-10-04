@@ -20,7 +20,8 @@
  * - `pulses` (38.7-09, D-10): the subtle orbit light pulses — ring-shader
  *   arcs on the ambient clock, never baked, none under reduced motion;
  * - `bodiesBehind`: contacts and moons deeper than the sun (38.7-07);
- * - `sun`: the sun, its glow pulsing on the ambient clock;
+ * - `sun`: the star sun (38.7-10, D-15), its corona and granulation moving
+ *   only with the sun pulse on the ambient clock (still under reduced motion);
  * - `bodiesFront`: contacts and moons nearer than the sun;
  * - `labels`: the label backplates and Paragraphs at their allocations;
  * - `overlay`: Polaris, the reorder outline and the focus outlines.
@@ -105,7 +106,13 @@ import {
   nextBakeState,
   selectBasePicture,
 } from "./base-bake";
-import { drawBodies, drawSun, orderBodies, sunPulse } from "./draw-bodies";
+import {
+  drawBodies,
+  drawSun,
+  type OrreryBodyEffects,
+  orderBodies,
+  sunPulse,
+} from "./draw-bodies";
 import { drawLabels } from "./draw-labels";
 import { drawOverlay } from "./draw-overlay";
 import {
@@ -284,6 +291,17 @@ export function OrreryV2Canvas({
   // Static, JS-thread resources: the compiled ring effect and the unit strips.
   const ringEffect = useMemo(() => orreryShader("ringPlane"), []);
   const gridEffect = useMemo(() => orreryShader("gridPlane"), []);
+  // 38.7-10 (D-13/D-14/D-15): the lit-body and star-sun effects (lazily
+  // compiled; a null effect falls back to that body's flat look).
+  const bodyEffects = useMemo<OrreryBodyEffects>(
+    () => ({
+      swatch: orreryShader("bodySwatch"),
+      photo: orreryShader("bodyPhoto"),
+      corona: orreryShader("sunCorona"),
+      sunDisc: orreryShader("sunDisc"),
+    }),
+    [],
+  );
   const bands = useMemo(() => ringBands(), []);
   const disc = useMemo(() => gridDisc(), []);
   // The AA feather: one device pixel, in dp (a primitive capture).
@@ -437,6 +455,7 @@ export function OrreryV2Canvas({
           bodies.value.bodies,
           bodyOrder.value,
           "behind",
+          bodyEffects,
         );
       },
       { width, height },
@@ -451,6 +470,7 @@ export function OrreryV2Canvas({
           bodies.value.bodies,
           bodyOrder.value,
           pulse.value,
+          bodyEffects,
         );
       },
       { width, height },
@@ -465,6 +485,7 @@ export function OrreryV2Canvas({
           bodies.value.bodies,
           bodyOrder.value,
           "front",
+          bodyEffects,
         );
       },
       { width, height },

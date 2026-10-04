@@ -10,17 +10,35 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@shopify/react-native-skia", () => ({
-  BlendMode: { Dst: 2 },
+  BlendMode: { Dst: 2, SrcOver: 3, Screen: 14 },
+  TileMode: { Clamp: 0 },
+  ClipOp: { Difference: 0, Intersect: 1 },
+  FilterMode: { Nearest: 0, Linear: 1 },
+  MipmapMode: { None: 0, Nearest: 1, Linear: 2 },
+  PaintStyle: { Fill: 0, Stroke: 1 },
   VertexMode: { TriangleStrip: 1, TriangleFan: 2 },
   Skia: {},
 }));
 
 import {
+  bodyLitUniforms,
+  coronaUniforms,
+  sunDiscUniforms,
+} from "./draw-bodies";
+import {
   gridPlaneUniforms,
   plainRingLine,
   ringPlaneUniforms,
 } from "./draw-plane";
-import { GRID_PLANE_SKSL, RING_PLANE_SKSL } from "./shaders";
+import type { BodyLit, SunLook } from "./scene-specs";
+import {
+  BODY_PHOTO_SKSL,
+  BODY_SWATCH_SKSL,
+  GRID_PLANE_SKSL,
+  RING_PLANE_SKSL,
+  SUN_CORONA_SKSL,
+  SUN_DISC_SKSL,
+} from "./shaders";
 
 interface CanvasKitLike {
   RuntimeEffect: {
@@ -86,5 +104,55 @@ describe("V2 SkSL", () => {
       ).length,
     );
     effect?.delete();
+  });
+
+  // 38.7-10: the lit bodies and the star sun.
+  const ink = [0.5, 0.5, 0.5, 1] as const;
+  const lit: BodyLit = {
+    rimInk: ink,
+    glowInk: ink,
+    highlightInk: ink,
+    floor: 0.85,
+    lightZ: 0.9,
+    wrap: 0.5,
+    desaturate: 0.25,
+    rimDp: 1.5,
+    rimStrength: 0.9,
+    fresnel: 0.35,
+    atmosphere: 0.85,
+    atmosphereAdditive: 0.65,
+    atmosphereReach: 1.3,
+    spec: 0.14,
+  };
+  const sun: SunLook = {
+    starlightInk: ink,
+    paperInk: ink,
+    chart: false,
+    coronaAlpha: 1,
+    additive: true,
+  };
+  it("the lit swatch and photo body shaders compile and take bodyLitUniforms + their 4 floats", () => {
+    const base = bodyLitUniforms(16, 0.5, [0.6, -0.8], lit, 0).length;
+    expect(base).toBe(28);
+    for (const source of [BODY_SWATCH_SKSL, BODY_PHOTO_SKSL]) {
+      const { effect, error } = compile(source);
+      expect(error).toBe("");
+      expect(effect?.getUniformFloatCount()).toBe(base + 4);
+      effect?.delete();
+    }
+  });
+  it("the star sun's corona and disc compile and take coronaUniforms' 14 / sunDiscUniforms' 13 floats", () => {
+    const corona = compile(SUN_CORONA_SKSL);
+    expect(corona.error).toBe("");
+    expect(corona.effect?.getUniformFloatCount()).toBe(
+      coronaUniforms(30, 1.7, sun, ink).length,
+    );
+    corona.effect?.delete();
+    const disc = compile(SUN_DISC_SKSL);
+    expect(disc.error).toBe("");
+    expect(disc.effect?.getUniformFloatCount()).toBe(
+      sunDiscUniforms(30, 2.3, false, 1, sun, ink).length,
+    );
+    disc.effect?.delete();
   });
 });

@@ -233,7 +233,11 @@ vi.mock("@shopify/react-native-skia", async () => {
     MipmapMode: { None: 0, Nearest: 1, Linear: 2 },
     // A recording canvas: each command with the paint colour it drew with.
     createPicture: (draw: (canvas: unknown) => void) => {
-      const commands: { op: string; color?: number[] }[] = [];
+      const commands: {
+        op: string;
+        color?: number[];
+        shader?: { uniforms: number[] };
+      }[] = [];
       draw(
         new Proxy(
           {},
@@ -241,8 +245,14 @@ vi.mock("@shopify/react-native-skia", async () => {
             get:
               (_t, op: string) =>
               (...args: unknown[]) => {
-                const paint = args.at(-1) as { color?: number[] } | undefined;
-                commands.push({ op, color: paint?.color });
+                const paint = args.at(-1) as
+                  | { color?: number[]; shader?: { uniforms: number[] } }
+                  | undefined;
+                commands.push({
+                  op,
+                  color: paint?.color,
+                  shader: paint?.shader,
+                });
               },
           },
         ),
@@ -280,7 +290,10 @@ vi.mock("@shopify/react-native-skia", async () => {
           setStrokeCap: () => {},
           setBlendMode: () => {},
           setColorFilter: () => {},
-          setShader: () => {},
+          shader: undefined as unknown,
+          setShader: (shader: unknown) => {
+            paint.shader = shader;
+          },
           setColor: (c: Float32Array) => {
             paint.color = [...c];
           },
@@ -471,7 +484,7 @@ describe("production Orrery native tree and resource contracts", () => {
         .filter(
           (c) =>
             c.op === "drawCircle" &&
-            c.color !== undefined &&
+            c.color?.length === 4 &&
             c.color.every((v, i) => v === moonInk[i]),
         ).length;
     flushUi();
@@ -534,7 +547,8 @@ describe("production Orrery native tree and resource contracts", () => {
         .filter(
           (c) =>
             c.op === "drawCircle" &&
-            c.color?.every((v, i) => v === moonInk[i]) === true,
+            c.color?.length === 4 &&
+            c.color.every((v, i) => v === moonInk[i]),
         ).length;
     const identities = scene.systemSnapshot.members.map((m) => ({
       kind: "member" as const,
@@ -746,13 +760,15 @@ describe("production Orrery native tree and resource contracts", () => {
         }
       ).value.commands.filter((c) => c.op === "drawCircle").length;
     flushUi();
-    // Tilted: the contact is deeper than the sun → drawn behind it.
-    expect(circles(behind)).toBe(2);
+    // Tilted: the contact is deeper than the sun → drawn behind it. 38.7-10:
+    // one lit-body draw per contact (D-14); the star sun is its corona rect,
+    // the limb line and the granulated disc (D-15).
+    expect(circles(behind)).toBe(1);
     expect(circles(front)).toBe(0);
-    expect(circles(sunLayer)).toBe(3);
+    expect(circles(sunLayer)).toBe(2);
     pose.value = { ...pose.value, yaw: Math.PI };
     expect(circles(behind)).toBe(0);
-    expect(circles(front)).toBe(2);
+    expect(circles(front)).toBe(1);
     pose.value = { ...pose.value, yaw: 0 };
     const plates = () =>
       (
@@ -923,7 +939,13 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     ...(node.type === type ? [node] : []),
     ...node.children.flatMap((child) => findAll(child, type)),
   ];
-  type Recorded = { commands: { op: string; color?: number[] }[] };
+  type Recorded = {
+    commands: {
+      op: string;
+      color?: number[];
+      shader?: { uniforms: number[] };
+    }[];
+  };
   const recorded = (picture: Node) =>
     (picture.props.picture as { value: Recorded }).value.commands;
 
@@ -992,12 +1014,13 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     expect(
       recorded(small[0].children[1]).filter((c) => c.op === "drawVertices"),
     ).toHaveLength(3 + grid);
-    // Bodies are recorded draws inside the two body pictures.
+    // Bodies are recorded draws inside the two body pictures: one lit-body
+    // shader draw per contact (38.7-10; pips are plain draws beside them).
     const bodyCircles = (tree: Node[]) =>
       [tree[0].children[3], tree[0].children[5]]
         .flatMap(recorded)
-        .filter((c) => c.op === "drawCircle").length;
-    expect(bodyCircles(small)).toBe(3 * 2);
+        .filter((c) => c.op === "drawCircle" && c.shader !== undefined).length;
+    expect(bodyCircles(small)).toBe(3);
     expect(bodyCircles(large)).toBeGreaterThan(bodyCircles(small));
   });
 
@@ -1080,10 +1103,12 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     expect(native.clockCalls).toBe(1);
     flushUi();
     const sun = tree[0].children[4];
+    // 38.7-10 (D-15/D-37): the star's corona time moves only with the pulse.
     const glowAlpha = (ms: number) => {
       native.clock.value = ms;
       flushUi(1);
-      return recorded(sun).find((c) => c.op === "drawCircle")?.color?.[3];
+      return recorded(sun).find((c) => c.op === "drawRect")?.shader
+        ?.uniforms[1];
     };
     expect(glowAlpha(0)).not.toEqual(glowAlpha(700));
     // Inside one ambient step (~33 ms) nothing moves (D-49 quantisation).
@@ -1107,7 +1132,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     expect(native.clockCalls).toBe(0);
     const sun = tree[0].children[4];
     const glow = () =>
-      recorded(sun).find((c) => c.op === "drawCircle")?.color?.[3];
+      recorded(sun).find((c) => c.op === "drawRect")?.shader?.uniforms[1];
     const first = glow();
     vi.advanceTimersByTime(700);
     expect(glow()).not.toEqual(first);
@@ -1118,8 +1143,8 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     native.reducedState = true;
     const still = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     const stillGlow = () =>
-      recorded(still[0].children[4]).find((c) => c.op === "drawCircle")
-        ?.color?.[3];
+      recorded(still[0].children[4]).find((c) => c.op === "drawRect")?.shader
+        ?.uniforms[1];
     const held = stillGlow();
     vi.advanceTimersByTime(1500);
     expect(stillGlow()).toEqual(held);
