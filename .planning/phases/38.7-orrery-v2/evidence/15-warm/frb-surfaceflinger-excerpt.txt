@@ -1,0 +1,16 @@
+FR-B vote (DEBUG, Pixel 6 Pro, Size 120 idle >=60 s untouched) - HEAD 6c9d6e19 + APK built from it
+== a-idle
+    mActiveRenderFrameRate=30.0
+    mActiveSfDisplayMode=DisplayMode{id=0, width=1440, height=3120, xDpi=515.154, yDpi=511.277, peakRefreshRate=60.0, vs
+24ef9d8 SurfaceView[com.bwales.orbit[...]les.orbit.MainActivity](BLAST)#57148 requestedFrameRate: {30.00 Hz FrameRateCompatibility::Default FrameRateCategory::Default} pid=19556 uid=10490
+14 |            0 |     DEVICE |          0 |    0  145 1440 2865 |    0.0    0.0 1440.0 2720.0 |  30.00         Default      OnlySeamless    [*]
+== b-after-tab
+    mActiveRenderFrameRate=30.0
+    mActiveSfDisplayMode=DisplayMode{id=0, width=1440, height=3120, xDpi=515.154, yDpi=511.277, peakRefreshRate=60.0, vs
+a48611f SurfaceView[com.bwales.orbit[...]les.orbit.MainActivity](BLAST)#57187 requestedFrameRate: {30.00 Hz FrameRateCompatibility::Default FrameRateCategory::Default} pid=19556 uid=10490
+14 |            0 |     DEVICE |          0 |    0  145 1440 2865 |    0.0    0.0 1440.0 2720.0 |  30.00         Default      OnlySeamless    [*]
+== c-after-bgfg
+    mActiveRenderFrameRate=30.0
+    mActiveSfDisplayMode=DisplayMode{id=0, width=1440, height=3120, xDpi=515.154, yDpi=511.277, peakRefreshRate=60.0, vs
+3edeaaa SurfaceView[com.bwales.orbit[...]les.orbit.MainActivity](BLAST)#57207 requestedFrameRate: {30.00 Hz FrameRateCompatibility::Default FrameRateCategory::Default} pid=19556 uid=10490
+14 |            0 |     DEVICE |          0 |    0  145 1440 2865 |    0.0    0.0 1440.0 2720.0 |  30.00         Default      OnlySeamless    [*]
