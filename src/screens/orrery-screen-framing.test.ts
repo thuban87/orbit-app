@@ -207,6 +207,10 @@ function harness(
   /** 38.7-15: the route's focus (blur / return) and the runtime's pose. */
   let focused = true;
   let runtimePose: { value: unknown } | null = null;
+  /** 38.7-15: the store state a `tapSystem()` left (loading). */
+  let tapped: Record<string, unknown> = {};
+  /** 38.7-15 (D-76): the lead-in calls the screen made. */
+  const leadCalls: string[] = [];
   /** 38.7-15: per render turn, whether the canvas was mounted and its pose. */
   const renderLog: { world: boolean; pose: unknown }[] = [];
   /** 38.7-13: the screen's settle listener, as the runtime received it. */
@@ -374,6 +378,13 @@ function harness(
                   },
                   pause: () => {},
                   resume: () => {},
+                  // 38.7-15 (D-76): the switch lead-in starts on the tap.
+                  beginLead: () => {
+                    leadCalls.push("begin");
+                  },
+                  endLead: () => {
+                    leadCalls.push("end");
+                  },
                   // 38.7-15 (C5-M2): `finish` for a paused switch (progress
                   // 1, the pose at its destination Home, the prune's settle
                   // notification), then `done`; a no-op otherwise.
@@ -622,6 +633,7 @@ function harness(
     switchProgress,
     publishes,
     renderLog,
+    leadCalls,
     /** 38.7-15: the route blurs (false) or is focused again (true). */
     setFocused(value: boolean) {
       focused = value;
@@ -662,6 +674,37 @@ function harness(
       };
       for (const listener of [...listeners])
         listener(landed as StoreState, loading);
+      render();
+    },
+    /** 38.7-15: a System tap — the store starts loading another System. */
+    tapSystem() {
+      const ready = { ...state };
+      // The current System's ready publication (as on device) first.
+      for (const listener of [...listeners])
+        listener(ready, {
+          ...state,
+          status: "loading",
+          snapshot: null,
+        } as unknown as StoreState);
+      const loading = {
+        ...state,
+        status: "loading",
+        generation: 8,
+        requested: { id: "builtin:favorites" },
+      };
+      for (const listener of [...listeners])
+        listener(loading as unknown as StoreState, ready);
+      tapped = loading;
+      render();
+    },
+    /** 38.7-15: the tapped System's load fails (the store goes to error). */
+    failLoad() {
+      const failed = { ...tapped, status: "error", snapshot: null };
+      for (const listener of [...listeners])
+        listener(
+          failed as unknown as StoreState,
+          tapped as unknown as StoreState,
+        );
       render();
     },
     /**
@@ -1599,4 +1642,15 @@ it("38.7-15 (g): a return whose requested System differs from the retained snaps
   h.state.requested = { id: "builtin:all-contacts" };
   await open();
   expect(h.find("World")).toBeDefined();
+});
+
+it("38.7-15 (D-76): a System tap starts the switch lead-in at once (before the load lands); a failed load ends it", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  h.tapSystem();
+  // Loading only: nothing published yet, the lead is already running.
+  expect(h.leadCalls).toEqual(["begin"]);
+  expect(h.publishes.filter((p) => p[1] === true)).toHaveLength(0);
+  h.failLoad();
+  expect(h.leadCalls).toEqual(["begin", "end"]);
 });

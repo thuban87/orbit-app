@@ -750,3 +750,79 @@ describe("38.7-15 (C5-M2): settle() for the warm tab return", () => {
     expect(mounted.pose.value).toEqual({ ...homeCamera, x: 5 });
   });
 });
+
+describe("38.7-15 (D-76): the switch lead-in", () => {
+  it("starts on the tap for a settled scene, and never under reduced motion or mid-switch", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.reducedMotion.value = true;
+    mounted.runtime.beginLead();
+    expect(mounted.runtime.lead.value.active).toBe(false);
+    mounted.reducedMotion.value = false;
+    mounted.runtime.beginLead();
+    expect(mounted.runtime.lead.value).toMatchObject({
+      active: true,
+      still: false,
+    });
+    const other = mountRuntime();
+    other.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    other.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    other.runtime.progress.value = 0.3;
+    other.runtime.beginLead();
+    expect(other.runtime.lead.value.active).toBe(false);
+  });
+
+  it("publish takes over from what the lead draws: the switch inherits its momentum and the lead ends", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.beginLead();
+    mounted.runtime.leadClock.value = 1500; // mid-load, on the plateau
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    expect(mounted.runtime.lead.value.active).toBe(false);
+    expect(mounted.runtime.leadClock.value).toBe(0);
+    const transition = mounted.runtime.transition.value;
+    expect(transition.generation).toBe(2);
+    expect(transition.lead?.coast).toBeGreaterThan(0);
+    expect(mounted.runtime.cameraFrom.value).toEqual(sourceCamera);
+    expect(mounted.runtime.running.value).toBe(true);
+    mounted.runtime.progress.value = 0.6;
+    mounted.complete();
+    expect(mounted.pose.value).toEqual(homeCamera);
+    expect(mounted.entryKeys()).toEqual(keysOf(destinationWorld));
+  });
+
+  it("a failed load coasts the lead back to its own world through the settle path", () => {
+    const calls: number[] = [];
+    const mounted = mountRuntime((generation) => calls.push(generation));
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.beginLead();
+    mounted.runtime.leadClock.value = 900;
+    mounted.runtime.endLead();
+    expect(mounted.runtime.lead.value.active).toBe(false);
+    const back = mounted.runtime.transition.value;
+    expect(back.generation).toBe(1);
+    expect(back.spinTurns).toBe(0);
+    expect(back.lead?.coast).toBeGreaterThan(0);
+    expect(mounted.runtime.running.value).toBe(true);
+    mounted.complete();
+    expect(calls).toEqual([1, 1]);
+    expect(mounted.pose.value).toEqual(sourceCamera);
+    expect(mounted.entryKeys()).toEqual(keysOf(sourceWorld));
+  });
+
+  it("reduced motion mid-lead holds it still; pause holds its clock; settle() clears it", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.beginLead();
+    for (const react of harness.reactions) react(true, false);
+    expect(mounted.runtime.lead.value).toMatchObject({
+      active: true,
+      still: true,
+    });
+    mounted.runtime.pause();
+    const done = vi.fn();
+    mounted.runtime.settle(done);
+    expect(mounted.runtime.lead.value.active).toBe(false);
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+});

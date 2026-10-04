@@ -453,6 +453,7 @@ export function OrreryScreen() {
   // batch into that one commit.
   const onSwitchSettled = useCallback(
     (generation: number) => {
+      perf?.markSwitch("settled");
       satellitePublisher.switchSettled(generation);
       setSettledSwitch(generation);
       setHeldViewport(null);
@@ -465,6 +466,8 @@ export function OrreryScreen() {
     onSwitchSettled,
   );
   const publishSwitch = switchRuntime.publish;
+  const beginSwitchLead = switchRuntime.beginLead;
+  const endSwitchLead = switchRuntime.endLead;
   const pauseSwitch = switchRuntime.pause;
   const resumeSwitch = switchRuntime.resume;
   const switchProgress = switchRuntime.progress;
@@ -481,6 +484,25 @@ export function OrreryScreen() {
         switchSourceIds.current = isInSessionSwitch
           ? previous.snapshot.systemSnapshot.members.map((member) => member.id)
           : null;
+        if (isInSessionSwitch) {
+          perf?.beginSwitch();
+          // 38.7-15 (D-76, owner-required): motion starts on the tap. The
+          // switch's opening (spin, warp, streaks, Lab C breath) runs on the
+          // retained scene while the destination loads; `publishSwitch`
+          // takes over from what is drawn. The renderer viewport is held from
+          // here (C4-M1) so nothing measured meanwhile restarts the frame.
+          setHeldViewport((held) => held ?? viewport);
+          beginSwitchLead();
+          perf?.markSwitch("lead-in");
+        }
+        return;
+      }
+      // 38.7-15: a load that failed ends the lead-in (it coasts back).
+      if (
+        previous.status === "loading" &&
+        (next.status === "error" || next.status === "stale")
+      ) {
+        endSwitchLead();
         return;
       }
       if (next.status !== "ready" || !next.snapshot) return;
@@ -500,6 +522,7 @@ export function OrreryScreen() {
       // C4-M1: hold the renderer viewport in use until this switch settles
       // (batched into this publication's commit).
       if (sourceIds) setHeldViewport((held) => held ?? viewport);
+      if (sourceIds) perf?.markSwitch("load-done");
       publishSwitch(
         next.snapshot,
         !!sourceIds,
@@ -525,7 +548,15 @@ export function OrreryScreen() {
       switchHomeGeneration.current = next.generation;
     });
     return unsubscribe;
-  }, [useSystemStore, publishSwitch, viewport, pose, satellitePublisher]);
+  }, [
+    useSystemStore,
+    publishSwitch,
+    beginSwitchLead,
+    endSwitchLead,
+    viewport,
+    pose,
+    satellitePublisher,
+  ]);
   const satelliteController = useMemo(
     () =>
       createOrrerySatelliteController((scene) => {

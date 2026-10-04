@@ -310,6 +310,22 @@ export function switchTrailRoles(
   return { generation: transition.generation, byKey };
 }
 
+/**
+ * 38.7-15 (D-76): the streak roles while a lead-in spins a settled scene —
+ * every contact turns rigidly with the world (share 1). Built once per lead
+ * (its start or end), never per frame.
+ */
+export function switchLeadTrailRoles(
+  transition: Pick<SwitchChoreography, "generation" | "entries">,
+): SwitchTrailRoles {
+  "worklet";
+  const byKey: Record<string, readonly [number, number]> = {};
+  const entries = transition.entries;
+  for (let i = 0; i < entries.length; i++)
+    if (entries[i].role !== "anchor") byKey[entries[i].key] = [0, 1];
+  return { generation: transition.generation, byKey };
+}
+
 /** The streak look the canvas passes (theme-mode keyed; owner knobs). */
 export interface TrailLook {
   /** Peak alpha (TRAIL_ALPHA by mode) × the owner strength knob. */

@@ -44,7 +44,7 @@ export const SKY_HUE_START = 0.55;
 /** What the switch camera needs from the transition being drawn (C3-H1). */
 export type SwitchCameraMotion = Pick<
   SwitchChoreography,
-  "reducedMotion" | "intensity" | "spinTurns"
+  "reducedMotion" | "intensity" | "spinTurns" | "lead"
 >;
 
 /**

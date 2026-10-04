@@ -42,6 +42,24 @@ export interface SwitchChoreographyOptions {
   reducedMotion: boolean;
 }
 
+/**
+ * 38.7-15 (D-76): what a switch inherits from the lead-in it took over from
+ * (orrery-switch-lead-logic.ts) — the spin's angular momentum as a coast
+ * angle and the lead's signal levels, all fading to zero over the switch's
+ * accelerate phase, so the hand-off is continuous in position, speed, warp,
+ * streaks and camera breath. Absent on every other switch.
+ */
+export interface SwitchLeadCarry {
+  /** ω at the hand-off (rad per unit progress) × the coast window. */
+  coast: number;
+  velocity: number;
+  warp: number;
+  trail: number;
+  breath: number;
+  /** rad/s at the hand-off. */
+  angularSpeed: number;
+}
+
 export interface SwitchChoreography {
   generation: number;
   entries: SwitchChoreographyEntry[];
@@ -58,6 +76,8 @@ export interface SwitchChoreography {
    * projection); it is deep-frozen in `__DEV__` so an accidental write throws.
    */
   settledWorld?: ChoreographyWorldBody[];
+  /** 38.7-15 (D-76): set only on a switch that took over a lead-in. */
+  lead?: SwitchLeadCarry;
 }
 
 export interface SwitchChoreographySample {
@@ -206,7 +226,7 @@ function normalizedAngularVelocity(progress: number): number {
   return remaining * remaining * scale;
 }
 
-function spinTurnsForIntensity(intensity: number): number {
+export function spinTurnsForIntensity(intensity: number): number {
   "worklet";
   if (intensity <= 0) return 0;
   return 1 + Math.round(clamp01(intensity) * 2);

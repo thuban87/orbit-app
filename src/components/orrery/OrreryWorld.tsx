@@ -58,8 +58,12 @@ import {
 } from "@/logic/orrery-satellite-logic";
 import { SKY_UNTINTED, systemSkyHueIndex } from "@/logic/orrery-sky-logic";
 import { detectStacks } from "@/logic/orrery-stack-logic";
-import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
-import { sampleSwitchSignal } from "@/logic/orrery-switch-fx-logic";
+import {
+  rotateSwitchWorld,
+  sampleSwitchLead,
+  sampleSwitchSignalWithLead,
+  sampleSwitchWorld,
+} from "@/logic/orrery-switch-lead-logic";
 import { systemRefId } from "@/logic/orrery-system-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type {
@@ -91,6 +95,7 @@ import {
   NORMAL_SWITCH_DURATION_MS,
   type OrrerySwitchRuntime,
   sampleOrrerySwitchCamera,
+  sampleSwitchLeadCamera,
 } from "./use-orrery-switch-runtime";
 import {
   type BakeRegistry,
@@ -100,7 +105,11 @@ import {
   teardownBakeRegistry,
 } from "./v2/base-bake";
 import type { ReorderHoldFx } from "./v2/draw-overlay";
-import { switchTrailRoles, type TrailLook } from "./v2/draw-switch";
+import {
+  switchLeadTrailRoles,
+  switchTrailRoles,
+  type TrailLook,
+} from "./v2/draw-switch";
 import {
   buildFocusSpec,
   collectOcclusion,
@@ -474,13 +483,15 @@ export function OrreryWorldInner({
   // module functions and memoised plain values. Capturing `switchRuntime` (every
   // resource holds a full scene) or `scene` re-materialises them on the UI
   // runtime at each mapper start (orrery-frame-mapper.test.ts guards this).
-  const { transition, progress, cameraFrom, cameraTo } = switchRuntime;
-  // D-49: the base is never baked during a switch, a gesture or a camera
-  // motion (SharedValues only are captured).
+  const { transition, progress, cameraFrom, cameraTo, lead, leadClock } =
+    switchRuntime;
+  // D-49: the base is never baked during a switch (38.7-15: or its lead-in),
+  // a gesture or a camera motion (SharedValues only are captured).
   const { active: cameraActive, input: cameraInput } = camera;
   const busy = useDerivedValue(
     () =>
       progress.value < 1 ||
+      lead.value.active ||
       cameraActive.value !== null ||
       cameraInput.value.pointers > 0,
   );
@@ -500,15 +511,28 @@ export function OrreryWorldInner({
     ? satelliteSource.spec
     : ownSatelliteSpec;
   const frame = useDerivedValue(() => {
-    const sampled = sampleSwitchChoreography(
-      transition.value,
-      progress.value,
-    ).world;
+    // 38.7-15 (D-76): a lead-in turns the settled world and breathes the
+    // camera while the destination loads (pure in its state and clock).
+    const leadState = lead.value;
+    const leadNow =
+      leadState.active && progress.value >= 1
+        ? sampleSwitchLead(
+            leadState,
+            leadClock.value,
+            NORMAL_SWITCH_DURATION_MS,
+          )
+        : null;
+    const switchWorld = sampleSwitchWorld(transition.value, progress.value);
+    const sampled = leadNow
+      ? rotateSwitchWorld(switchWorld, leadNow.rotation)
+      : switchWorld;
     // C3-H1 / C4-L2: the one sampler, with the motion of the transition
     // being drawn (never the live reduced-motion flag).
     const sampledCamera =
       progress.value >= 1
-        ? pose.value
+        ? leadNow
+          ? sampleSwitchLeadCamera(pose.value, leadNow.breath)
+          : pose.value
         : sampleOrrerySwitchCamera(
             cameraFrom.value,
             cameraTo.value,
@@ -556,13 +580,20 @@ export function OrreryWorldInner({
   // transition/progress SharedValues only (C4-L2: never the live reduced-
   // motion flag); the streak roles are rebuilt once per transition.
   const switchFx = useDerivedValue(() =>
-    sampleSwitchSignal(
+    sampleSwitchSignalWithLead(
       transition.value,
       progress.value,
       NORMAL_SWITCH_DURATION_MS,
+      lead.value,
+      leadClock.value,
     ),
   );
-  const switchRoles = useDerivedValue(() => switchTrailRoles(transition.value));
+  // 38.7-15: a lead-in's streak roles (every contact turns with the world).
+  const switchRoles = useDerivedValue(() =>
+    lead.value.active && transition.value.settledWorld
+      ? switchLeadTrailRoles(transition.value)
+      : switchTrailRoles(transition.value),
+  );
   const trailLook = useMemo<TrailLook>(
     () => ({
       peak: TRAIL_ALPHA[themeMode] * TRAIL_STRENGTH,

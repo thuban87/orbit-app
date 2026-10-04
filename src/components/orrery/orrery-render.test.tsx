@@ -18,6 +18,7 @@ import {
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
 import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
+import { NO_SWITCH_LEAD } from "@/logic/orrery-switch-lead-logic";
 import {
   createOrrerySatelliteController,
   loadOrreryScene,
@@ -59,6 +60,12 @@ const switchRuntime = (
   publish: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
+  // 38.7-15: the warm settle and the switch lead-in (D-76).
+  settle: vi.fn(),
+  lead: { value: NO_SWITCH_LEAD },
+  leadClock: { value: 0 },
+  beginLead: vi.fn(),
+  endLead: vi.fn(),
 });
 
 const native = vi.hoisted(() => ({

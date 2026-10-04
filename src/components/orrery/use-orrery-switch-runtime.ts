@@ -30,6 +30,18 @@ import {
   switchBreath,
   switchHasSpectacle,
 } from "@/logic/orrery-switch-fx-logic";
+import {
+  beginSwitchLead,
+  NO_SWITCH_LEAD,
+  rotateSwitchWorld,
+  SWITCH_LEAD_MAX_MS,
+  type SwitchLeadState,
+  sampleSwitchLead,
+  sampleSwitchWorld,
+  switchLeadCarry,
+  switchLeadCoastStart,
+  switchLeadFade,
+} from "@/logic/orrery-switch-lead-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import {
   SWITCH_BREATH_PULLBACK,
@@ -71,6 +83,12 @@ function smoothstep(value: number): number {
   "worklet";
   const progress = clamp01(value);
   return progress * progress * (3 - 2 * progress);
+}
+
+/** The lead clock's timing curve: real time, unshaped. */
+function linearEase(t: number): number {
+  "worklet";
+  return t;
 }
 
 /**
@@ -137,6 +155,9 @@ function interpolateCamera(
  * lands exactly on `to` at progress 1; reduced motion (or a spinless switch)
  * is the plain crossfade. Unlike Lab C, the displayed-camera snapshot (a
  * retarget) includes the breath, so a retarget starts from what is drawn.
+ * 38.7-15 (D-76): a switch that took over a lead-in also carries the lead's
+ * breath, fading over its accelerate phase (zero from there on), so the
+ * hand-off is continuous and the landing unchanged.
  * Defined above every worklet that calls it (Hermes forward-ref hazard).
  */
 export function sampleOrrerySwitchCamera(
@@ -147,13 +168,32 @@ export function sampleOrrerySwitchCamera(
 ): CameraPose {
   "worklet";
   const base = interpolateCamera(from, to, progress);
-  if (!(progress > 0 && progress < 1) || !switchHasSpectacle(motion))
-    return base;
-  return applySwitchBreath(
-    base,
-    switchBreath(progress) * (0.5 + 0.5 * fxClamp01(motion.intensity)),
-    SWITCH_CAMERA_LOOK,
-  );
+  const own =
+    progress > 0 && progress < 1 && switchHasSpectacle(motion)
+      ? switchBreath(progress) * (0.5 + 0.5 * fxClamp01(motion.intensity))
+      : 0;
+  const carried =
+    motion.lead && progress < 1
+      ? motion.lead.breath * switchLeadFade(progress)
+      : 0;
+  const breath = own + carried;
+  return breath > 0
+    ? applySwitchBreath(base, breath, SWITCH_CAMERA_LOOK)
+    : base;
+}
+
+/**
+ * 38.7-15 (D-76): the camera drawn during a lead-in — the live pose with the
+ * lead's Lab C breath (zero = the pose itself).
+ */
+export function sampleSwitchLeadCamera(
+  pose: CameraPose,
+  breath: number,
+): CameraPose {
+  "worklet";
+  return breath > 0
+    ? applySwitchBreath(pose, breath, SWITCH_CAMERA_LOOK)
+    : pose;
 }
 
 /**
@@ -200,7 +240,8 @@ export function sampleOrrerySwitchRuntime(
   const fraction = clamp01(progress);
   const sample = sampleSwitchChoreography(runtime.transition, fraction);
   return {
-    world: sample.world,
+    // 38.7-15: the ONE world sampler (a carried lead's coast included).
+    world: sampleSwitchWorld(runtime.transition, fraction),
     camera: sampleOrrerySwitchCamera(
       runtime.cameraFrom,
       runtime.cameraTo,
@@ -311,6 +352,9 @@ export interface OrrerySwitchRuntime {
   cameraFrom: SharedValue<CameraPose>;
   cameraTo: SharedValue<CameraPose>;
   running: SharedValue<boolean>;
+  /** 38.7-15 (D-76): the lead-in state and its clock (ms since the tap). */
+  lead: SharedValue<SwitchLeadState>;
+  leadClock: SharedValue<number>;
   resources: OrreryBodyResource[];
   publish: (
     scene: OrrerySceneSnapshot,
@@ -329,6 +373,18 @@ export interface OrrerySwitchRuntime {
    * trip later) when nothing was running: a no-op then.
    */
   settle: (done?: () => void) => void;
+  /**
+   * 38.7-15 (D-76): a System was tapped (the destination is loading): the
+   * current world starts the switch's opening now — spin, warp, streaks,
+   * breath — and keeps spinning until `publish` takes over from what is
+   * drawn. Nothing under reduced motion, while a switch runs, or twice.
+   */
+  beginLead: () => void;
+  /**
+   * 38.7-15: the destination will not come (a failed load): a running lead
+   * coasts back to its own world (a crossfade under reduced motion).
+   */
+  endLead: () => void;
 }
 
 /**
@@ -354,6 +410,8 @@ export function useOrrerySwitchRuntime(
   const cameraFrom = useSharedValue({ ...pose.value });
   const cameraTo = useSharedValue({ ...pose.value });
   const running = useSharedValue(false);
+  const lead = useSharedValue<SwitchLeadState>(NO_SWITCH_LEAD);
+  const leadClock = useSharedValue(0);
   const latestScene = useRef<OrrerySceneSnapshot | null>(null);
   const [resources, setResources] = useState<OrreryBodyResource[]>([]);
   // The latest settle listener (a ref, so it never changes the runtime's identity).
@@ -413,6 +471,24 @@ export function useOrrerySwitchRuntime(
     [finish, progress, running],
   );
 
+  /** Runs the lead clock from its current value (real time, ms). */
+  const startLeadClock = useCallback(() => {
+    "worklet";
+    leadClock.value = withTiming(SWITCH_LEAD_MAX_MS, {
+      duration: Math.max(0, SWITCH_LEAD_MAX_MS - leadClock.value),
+      easing: linearEase,
+      reduceMotion: ReduceMotion.Never,
+    });
+  }, [leadClock]);
+
+  /** Ends a lead with no hand-off (the clock stops; the state clears). */
+  const clearLead = useCallback(() => {
+    "worklet";
+    cancelAnimation(leadClock);
+    lead.value = NO_SWITCH_LEAD;
+    leadClock.value = 0;
+  }, [lead, leadClock]);
+
   const publish = useCallback(
     (
       scene: OrrerySceneSnapshot,
@@ -436,6 +512,7 @@ export function useOrrerySwitchRuntime(
         cancelAnimation(progress);
         const reduced = reducedMotion.value;
         if (!isSwitch || transition.value.generation === 0) {
+          if (lead.value.active) clearLead();
           // Same choreography as beginSwitchChoreography(world, world, ...)
           // at intensity 0, plus the settled fast path (D-53).
           transition.value = beginSettledSwitchChoreography(
@@ -449,25 +526,50 @@ export function useOrrerySwitchRuntime(
           running.value = false;
           return;
         }
-        const displayed = sampleSwitchChoreography(
-          transition.value,
-          progress.value,
-        ).world;
-        // C3-H1: the camera drawn this frame, with the OUTGOING transition's
-        // motion (sampled before the new transition is written).
-        const displayedCamera = displayedSwitchCamera(
-          cameraFrom.value,
-          cameraTo.value,
-          progress.value,
-          pose.value,
-          transition.value,
-        );
-        transition.value = beginSwitchChoreography(
-          displayed,
-          world,
-          generation,
-          { intensity, reducedMotion: reduced },
-        );
+        const state = lead.value;
+        let displayed: ChoreographyWorldBody[];
+        let displayedCamera: CameraPose;
+        let carry: ReturnType<typeof switchLeadCarry> | null = null;
+        if (state.active && progress.value >= 1) {
+          // 38.7-15 (D-76): take over the lead-in from what it draws now.
+          const now = sampleSwitchLead(
+            state,
+            leadClock.value,
+            NORMAL_SWITCH_DURATION_MS,
+          );
+          const settled = sampleSwitchChoreography(transition.value, 1).world;
+          clearLead();
+          if (reduced || state.still) {
+            displayed = rotateSwitchWorld(settled, now.rotation);
+            displayedCamera = sampleSwitchLeadCamera(pose.value, now.breath);
+          } else {
+            // The switch inherits the spin's momentum: its source is turned
+            // ahead by the coast's start, which its coast offset cancels.
+            carry = switchLeadCarry(now);
+            displayed = rotateSwitchWorld(
+              settled,
+              now.rotation + switchLeadCoastStart(carry),
+            );
+            displayedCamera = { ...pose.value };
+          }
+        } else {
+          if (state.active) clearLead();
+          displayed = sampleSwitchWorld(transition.value, progress.value);
+          // C3-H1: the camera drawn this frame, with the OUTGOING transition's
+          // motion (sampled before the new transition is written).
+          displayedCamera = displayedSwitchCamera(
+            cameraFrom.value,
+            cameraTo.value,
+            progress.value,
+            pose.value,
+            transition.value,
+          );
+        }
+        const next = beginSwitchChoreography(displayed, world, generation, {
+          intensity,
+          reducedMotion: reduced,
+        });
+        transition.value = carry ? { ...next, lead: carry } : next;
         cameraFrom.value = displayedCamera;
         cameraTo.value = { ...destinationHome };
         progress.value = 0;
@@ -477,6 +579,9 @@ export function useOrrerySwitchRuntime(
     [
       cameraFrom,
       cameraTo,
+      clearLead,
+      lead,
+      leadClock,
       pose,
       progress,
       reducedMotion,
@@ -486,11 +591,74 @@ export function useOrrerySwitchRuntime(
     ],
   );
 
+  const beginLead = useCallback(() => {
+    runOnUI(() => {
+      "worklet";
+      if (reducedMotion.value || progress.value < 1 || lead.value.active)
+        return;
+      lead.value = beginSwitchLead();
+      leadClock.value = 0;
+      startLeadClock();
+    })();
+  }, [lead, leadClock, progress, reducedMotion, startLeadClock]);
+
+  const endLead = useCallback(() => {
+    runOnUI(() => {
+      "worklet";
+      const state = lead.value;
+      if (!state.active) return;
+      if (progress.value < 1) {
+        clearLead();
+        return;
+      }
+      const now = sampleSwitchLead(
+        state,
+        leadClock.value,
+        NORMAL_SWITCH_DURATION_MS,
+      );
+      const settled = sampleSwitchChoreography(transition.value, 1).world;
+      const generation = transition.value.generation;
+      clearLead();
+      const reduced = reducedMotion.value || state.still;
+      const carry = reduced ? null : switchLeadCarry(now);
+      // Back to its own world from what is drawn: a spinless switch (the
+      // carry coasts the spin out) or, under reduced motion, a crossfade.
+      const back = beginSwitchChoreography(
+        rotateSwitchWorld(
+          settled,
+          now.rotation + (carry ? switchLeadCoastStart(carry) : 0),
+        ),
+        settled,
+        generation,
+        { intensity: 0, reducedMotion: reduced },
+      );
+      transition.value = carry ? { ...back, lead: carry } : back;
+      cameraFrom.value = carry
+        ? { ...pose.value }
+        : sampleSwitchLeadCamera(pose.value, now.breath);
+      cameraTo.value = { ...pose.value };
+      progress.value = 0;
+      startDriver(1, reduced, generation);
+    })();
+  }, [
+    cameraFrom,
+    cameraTo,
+    clearLead,
+    lead,
+    leadClock,
+    pose,
+    progress,
+    reducedMotion,
+    startDriver,
+    transition,
+  ]);
+
   const settle = useCallback(
     (done?: () => void) => {
       if (done) settleWaiters.current.push(done);
       runOnUI(() => {
         "worklet";
+        if (lead.value.active) clearLead();
         // `finish` has only a generation guard: a settled switch is a no-op.
         if (progress.value >= 1) {
           runOnJS(flushSettleWaiters)();
@@ -500,21 +668,25 @@ export function useOrrerySwitchRuntime(
         finish(transition.value.generation);
       })();
     },
-    [finish, flushSettleWaiters, progress, transition],
+    [clearLead, finish, flushSettleWaiters, lead, progress, transition],
   );
 
   const pause = useCallback(() => {
     runOnUI(() => {
       "worklet";
+      // 38.7-15: a lead-in holds its clock while blurred/backgrounded.
+      if (lead.value.active) cancelAnimation(leadClock);
       if (!running.value) return;
       cancelAnimation(progress);
       running.value = false;
     })();
-  }, [progress, running]);
+  }, [lead, leadClock, progress, running]);
 
   const resume = useCallback(() => {
     runOnUI(() => {
       "worklet";
+      if (lead.value.active && !lead.value.still && progress.value >= 1)
+        startLeadClock();
       if (running.value || progress.value >= 1) return;
       startDriver(
         1 - progress.value,
@@ -522,17 +694,20 @@ export function useOrrerySwitchRuntime(
         transition.value.generation,
       );
     })();
-  }, [progress, running, startDriver, transition]);
+  }, [lead, progress, running, startDriver, startLeadClock, transition]);
 
   useAnimatedReaction(
     () => reducedMotion.value,
     (reduced, previous) => {
-      if (!reduced || previous !== false || progress.value >= 1) return;
+      if (!reduced || previous !== false) return;
+      // 38.7-15: a lead-in holds where it is (no warp, streaks or breath).
+      if (lead.value.active) {
+        cancelAnimation(leadClock);
+        lead.value = { ...lead.value, still: true };
+      }
+      if (progress.value >= 1) return;
       cancelAnimation(progress);
-      const displayed = sampleSwitchChoreography(
-        transition.value,
-        progress.value,
-      ).world;
+      const displayed = sampleSwitchWorld(transition.value, progress.value);
       // C3-H1 / C4-L2: the camera drawn this frame — the frame worklet still
       // draws the outgoing (non-reduced) transition, Lab C breath included.
       const displayedCamera = displayedSwitchCamera(
@@ -576,11 +751,15 @@ export function useOrrerySwitchRuntime(
       cameraFrom,
       cameraTo,
       running,
+      lead,
+      leadClock,
       resources,
       publish,
       pause,
       resume,
       settle,
+      beginLead,
+      endLead,
     }),
     [
       transition,
@@ -588,11 +767,15 @@ export function useOrrerySwitchRuntime(
       cameraFrom,
       cameraTo,
       running,
+      lead,
+      leadClock,
       resources,
       publish,
       pause,
       resume,
       settle,
+      beginLead,
+      endLead,
     ],
   );
 }

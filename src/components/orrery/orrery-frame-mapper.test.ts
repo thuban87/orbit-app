@@ -23,11 +23,18 @@ import {
   moonSplitFactor,
 } from "@/logic/orrery-satellite-logic";
 import { detectStacks } from "@/logic/orrery-stack-logic";
+import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import {
-  beginSwitchChoreography,
-  sampleSwitchChoreography,
-} from "@/logic/orrery-switch-choreography";
-import { sampleOrrerySwitchCamera } from "./use-orrery-switch-runtime";
+  NO_SWITCH_LEAD,
+  rotateSwitchWorld,
+  sampleSwitchLead,
+  sampleSwitchWorld,
+} from "@/logic/orrery-switch-lead-logic";
+import {
+  NORMAL_SWITCH_DURATION_MS,
+  sampleOrrerySwitchCamera,
+  sampleSwitchLeadCamera,
+} from "./use-orrery-switch-runtime";
 
 const require = createRequire(import.meta.url);
 const babel = require("@babel/core");
@@ -112,9 +119,17 @@ it("the emitted projection closure settles after publication under the installed
     progress,
     cameraFrom,
     cameraTo,
-    sampleSwitchChoreography,
     sampleOrrerySwitchCamera,
     pose,
+    // 38.7-15 (D-76): the lead-in's state and clock (SharedValues), its pure
+    // samplers and the switch duration (a primitive).
+    lead: cell(NO_SWITCH_LEAD),
+    leadClock: cell(0),
+    sampleSwitchLead,
+    sampleSwitchWorld,
+    rotateSwitchWorld,
+    sampleSwitchLeadCamera,
+    NORMAL_SWITCH_DURATION_MS,
     viewport: { width: 400, height: 700 },
     generation: 7,
     // 38.7-05: the camera pan extent, a primitive (the dolly focal no longer
