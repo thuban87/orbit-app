@@ -13,20 +13,20 @@
  *   grows with the spin through ACCELERATE, holds on the plateau and relaxes
  *   through SETTLE, scaled by an intensity floor;
  * - trail (Lab A): the orbit streaks' strength, min(1, velocity × 1.4);
- * - breath (Lab C): sin²(πp) × (0.5 + 0.5·intensity) — a dolly-out and a lift
- *   toward flat mid-switch, zero at both ends;
- * - swirl: an authored out-and-back camera yaw swing (fractional turns
- *   allowed), on top of the SHORTEST-arc yaw back to Home (the old raw linear
- *   yaw mix span the long way round across the 0/2π wrap);
+ * - breath (Lab C): sin²(πp) × (0.5 + 0.5·intensity) — the switch camera's
+ *   dolly-out, out-and-back yaw swing and lift toward top-down mid-switch, zero at
+ *   both ends. The switch camera is Lab C's, copied from its code (owner
+ *   S-SWIRL pick, 2026-10-04): Lab C's base yaw path (`switchBaseYaw`) plus
+ *   Lab C's breath (`applySwitchBreath`);
  * - skyHue (Lab B `skyHueWeight`): the per-System sky tint crossfade weight,
  *   smooth over [SKY_HUE_START, 1]; reduced motion crossfades over the whole
  *   (180 ms) switch.
- * Reduced motion: no warp, trail, breath or swirl — only the crossfade.
+ * Reduced motion: no warp, trail or breath — only the crossfade.
  *
  * Worklet helpers are declared above their callers (Hermes forward-ref rule).
  * No Skia import (node-testable).
  */
-import type { CameraPose } from "./orrery-camera-logic";
+import { type CameraPose, dollyFocalDistance } from "./orrery-camera-logic";
 import { shortestYaw } from "./orrery-recovery-logic";
 import {
   ACCELERATE_END,
@@ -47,13 +47,24 @@ export type SwitchCameraMotion = Pick<
   "reducedMotion" | "intensity" | "spinTurns"
 >;
 
-/** The camera composition's authored amounts (visual-tunables). */
+/**
+ * The switch camera's base yaw path. "lab-c": Lab C's raw linear mix
+ * from → to (its `interpolateCamera`, `mix(from.yaw, to.yaw, 0)`); stored yaw
+ * is normalised to [0, 2π) and Home's is 0, so a camera turned just short of
+ * a full turn travels nearly the whole turn back. "shortest": the shortest arc
+ * across the 0/2π wrap (Plan 13's first build).
+ */
+export type SwitchYawPath = "lab-c" | "shortest";
+
+/** The switch camera's authored amounts (visual-tunables; Lab C's numbers). */
 export interface SwitchCameraLook {
-  /** Peak extra camera turn mid-switch (fractional turns; 0 = shortest arc only). */
-  swirlTurns: number;
+  /** The base yaw path (SWITCH_YAW_PATH). */
+  yawPath: SwitchYawPath;
   /** Lab C SWITCH_PULLBACK: the dolly-out share of zoom at full breath. */
   breathPullback: number;
-  /** Lab C SWITCH_TILT: the tilt change at full breath (negative = toward flat). */
+  /** Lab C SWITCH_YAW: the yaw swing (rad) added at full breath. */
+  breathYaw: number;
+  /** Lab C SWITCH_TILT: the tilt change at full breath (negative = toward top-down). */
   breathTilt: number;
 }
 
@@ -71,8 +82,6 @@ export interface SwitchFxSignal {
   warp: number;
   trail: number;
   breath: number;
-  /** The out-and-back swirl envelope 0..1..0. */
-  swirl: number;
   /** Sky-hue crossfade weight toward the destination System's hue. */
   skyHue: number;
 }
@@ -126,12 +135,6 @@ export function switchBreath(progress: number): number {
   "worklet";
   const s = Math.sin(Math.PI * fxClamp01(progress));
   return s * s;
-}
-
-/** The swirl's out-and-back envelope: sin(π · smoothstep(p)). */
-export function switchSwirlEnvelope(progress: number): number {
-  "worklet";
-  return Math.sin(Math.PI * fxSmooth01(progress));
 }
 
 /** Lab B `skyHueWeight`: the sky tint's crossfade weight at `progress`. */
@@ -192,40 +195,34 @@ export function sampleSwitchSignal(
       (WARP_INTENSITY_FLOOR + (1 - WARP_INTENSITY_FLOOR) * intensity),
     trail: Math.min(1, velocity * TRAIL_VELOCITY_GAIN),
     breath: live ? switchBreath(progress) * scale : 0,
-    swirl: live ? switchSwirlEnvelope(progress) * scale : 0,
     skyHue: switchSkyHueWeight(progress, transition.reducedMotion),
   };
 }
 
 /**
- * The switch camera's yaw: the SHORTEST arc from `fromYaw` to `toYaw`
- * (smoothstep-eased, as every other pose axis) plus an authored out-and-back
- * swing of `swirlTurns` turns at `swirl` strength. Lands exactly on `toYaw`
- * (mod 2π) at progress 1; the swing is zero at both ends.
+ * The switch camera's base yaw at eased progress `t` (smoothstep(p), as every
+ * other pose axis). "lab-c" is Lab C's raw linear mix; "shortest" takes the
+ * shortest arc. Both are exactly `fromYaw` at t 0; at t 1 "lab-c" is exactly
+ * `toYaw` and "shortest" is `toYaw` mod 2π.
  */
-export function switchSwirlYaw(
+export function switchBaseYaw(
   fromYaw: number,
   toYaw: number,
-  progress: number,
-  swirlTurns: number,
-  swirl: number,
+  t: number,
+  path: SwitchYawPath,
 ): number {
   "worklet";
   const from = Number.isFinite(fromYaw) ? fromYaw : 0;
   const to = Number.isFinite(toYaw) ? toYaw : 0;
-  const t = fxSmooth01(progress);
-  return (
-    from +
-    shortestYaw(from, to) * t +
-    Math.PI * 2 * (Number.isFinite(swirlTurns) ? swirlTurns : 0) * swirl
-  );
+  return from + (path === "shortest" ? shortestYaw(from, to) : to - from) * t;
 }
 
 /**
- * Lab C's breath on an interpolated camera, as ONE composition with the
- * swirl: the zoom pulls back by `pullback × breath` (the focal follows, the
- * dolly model), the tilt moves by `tilt × breath` toward flat (never below
- * 0). breath 0 returns the camera unchanged, so the landing is exact.
+ * Lab C's switch-camera breath (`OrreryWorld3D` sampled-camera breath, copied):
+ * the zoom pulls back by `pullback × breath`, the focal distance is the dolly
+ * focal of that zoom (Lab C `labFocalDistance(zoom)`), the yaw swings by
+ * `yaw × breath` and the tilt moves by `tilt × breath` toward top-down (never
+ * below 0). breath 0 returns the camera unchanged, so the landing is exact.
  */
 export function applySwitchBreath(
   camera: CameraPose,
@@ -234,14 +231,13 @@ export function applySwitchBreath(
 ): CameraPose {
   "worklet";
   if (!(breath > 0)) return camera;
-  const keep = Math.max(0.05, 1 - look.breathPullback * breath);
+  // Guard only: Lab C has no floor (identical for any pullback below 0.95).
+  const zoom = camera.zoom * Math.max(0.05, 1 - look.breathPullback * breath);
   return {
     ...camera,
-    zoom: camera.zoom * keep,
-    focalDistance:
-      camera.focalDistance === undefined
-        ? undefined
-        : camera.focalDistance / keep,
+    zoom,
+    focalDistance: dollyFocalDistance(zoom),
+    yaw: (camera.yaw ?? 0) + look.breathYaw * breath,
     tilt: Math.max(0, (camera.tilt ?? 0) + look.breathTilt * breath),
   };
 }

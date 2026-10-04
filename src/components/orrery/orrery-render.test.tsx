@@ -1364,7 +1364,7 @@ describe("38.7-13: the switch through the real runtime and frame worklet (C3-H1,
     const homeC = { ...HOME_CAMERA, zoom: 1.1, yaw: 0 };
     let generation = 1;
     for (const p of [0.2, 0.5, 0.8]) {
-      // A second selection at p (a spinning switch: swirl + breath).
+      // A second selection at p (a spinning switch: Lab C breath).
       runtime.publish(regenerate(scene, ++generation), true, 1, homeB);
       expect(runtime.transition.value.spinTurns).toBeGreaterThan(0);
       runtime.progress.value = p;

@@ -121,7 +121,7 @@ const homeCamera: CameraPose = {
   focalDistance: 320,
 };
 
-/** A spinning, non-reduced switch (swirl + breath) and the plain crossfade. */
+/** A spinning, non-reduced switch (Lab C breath) and the plain crossfade. */
 const spectacle = { reducedMotion: false, intensity: 1, spinTurns: 3 };
 const plain = { reducedMotion: false, intensity: 0, spinTurns: 0 };
 

@@ -277,16 +277,24 @@ export const TRAIL_BUDGET = 120;
 export const TRAIL_STRENGTH = 0.5; // owner S-TRAIL 2026-10-04: "weaker" (D-76)
 
 /**
- * The switch camera. SWITCH_SWIRL_TURNS: the authored out-and-back yaw swing
- * (peak turns mid-switch) on top of the shortest-arc return to Home. Lab A's
- * swirl measured ≈ 0 turns of camera yaw in its pass-3/35 clip (the "whirly"
- * there is the world's own spin plus the camera's pan/zoom back to Home;
- * read from a 4 fps tile, low confidence — the device pass confirms side by
- * side). Lab C breath: SWITCH_PULLBACK 0.24, SWITCH_TILT −0.1 (its 0.38 yaw
- * swing is NOT added on top of the swirl).
+ * The switch camera is Lab C's, copied from its code (owner S-SWIRL pick,
+ * 2026-10-04: "a zigzag to get back to center and then pull back"). Lab C
+ * `use-orrery-switch-runtime.ts` interpolateCamera (every axis
+ * smoothstep-mixed, yaw a raw linear mix) plus the `OrreryWorld3D.tsx` breath:
+ * b = sin²(πp) × (0.5 + 0.5·intensity); zoom × (1 − PULLBACK·b) with the
+ * dolly focal of that zoom, yaw + YAW·b, tilt + TILT·b (never below 0). Zero at
+ * both ends; reduced motion / a spinless switch has no breath.
+ *
+ * SWITCH_YAW_PATH: the base yaw path. "lab-c" (Lab C's raw linear mix: stored
+ * yaw is in [0, 2π) and Home's is 0, so a camera turned just short of a full
+ * turn swings nearly the whole turn back) or "shortest" (the shortest arc).
  */
-export const SWITCH_SWIRL_TURNS = 0;
+export const SWITCH_YAW_PATH: "lab-c" | "shortest" = "lab-c";
+/** Lab C SWITCH_PULLBACK: dolly-out share of zoom at full breath. */
 export const SWITCH_BREATH_PULLBACK = 0.24;
+/** Lab C SWITCH_YAW: yaw swing (rad, ≈ 22°) out and back at full breath. */
+export const SWITCH_BREATH_YAW = 0.38;
+/** Lab C SWITCH_TILT: tilt change (rad) at full breath; negative = toward top-down. */
 export const SWITCH_BREATH_TILT = -0.1;
 
 // ── Orbital-plane grid (D-09) ─────────────────────────────────────────────

@@ -346,7 +346,6 @@ describe("38.7-13: the switch on the sky (D-24 warp, D-08 hue crossfade, H9)", (
     warp: 0,
     trail: 0,
     breath: 0,
-    swirl: 0,
     skyHue: 0,
     ...over,
   });

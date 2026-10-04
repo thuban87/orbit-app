@@ -11,7 +11,6 @@ import {
 } from "react-native-reanimated";
 import type { CameraPose, WorldBody } from "@/logic/orrery-camera-logic";
 import { bodyKey } from "@/logic/orrery-frame";
-import { shortestYaw } from "@/logic/orrery-recovery-logic";
 import {
   beginSettledSwitchChoreography,
   beginSwitchChoreography,
@@ -27,16 +26,16 @@ import {
   fxClamp01,
   type SwitchCameraLook,
   type SwitchCameraMotion,
+  switchBaseYaw,
   switchBreath,
   switchHasSpectacle,
-  switchSwirlEnvelope,
-  switchSwirlYaw,
 } from "@/logic/orrery-switch-fx-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import {
   SWITCH_BREATH_PULLBACK,
   SWITCH_BREATH_TILT,
-  SWITCH_SWIRL_TURNS,
+  SWITCH_BREATH_YAW,
+  SWITCH_YAW_PATH,
 } from "./v2/visual-tunables";
 
 export const NORMAL_SWITCH_DURATION_MS = 2100;
@@ -75,9 +74,21 @@ function smoothstep(value: number): number {
 }
 
 /**
- * The plain crossfade camera: every axis smoothstep-mixed; the yaw takes the
- * SHORTEST arc (38.7-13, D-53 — the old raw linear yaw mix span the long way
- * round across the 0/2π wrap).
+ * The switch camera's authored amounts (visual-tunables; one-number edits):
+ * Lab C's switch camera, copied (owner S-SWIRL pick, 2026-10-04). Declared
+ * above the worklets that read it.
+ */
+const SWITCH_CAMERA_LOOK: SwitchCameraLook = {
+  yawPath: SWITCH_YAW_PATH,
+  breathPullback: SWITCH_BREATH_PULLBACK,
+  breathYaw: SWITCH_BREATH_YAW,
+  breathTilt: SWITCH_BREATH_TILT,
+};
+
+/**
+ * The plain crossfade camera (Lab C's `interpolateCamera`): every axis
+ * smoothstep-mixed. The yaw follows SWITCH_YAW_PATH — "lab-c" is Lab C's raw
+ * linear mix (no wrap handling), "shortest" the shortest arc.
  */
 function interpolateCamera(
   from: CameraPose,
@@ -97,35 +108,35 @@ function interpolateCamera(
     const start = a ?? fallback;
     return start + ((b ?? fallback) - start) * t;
   };
-  const fromYaw = from.yaw ?? 0;
   return {
     x: mix(from.x, to.x, 0),
     y: mix(from.y, to.y, 0),
     zoom: mix(from.zoom, to.zoom, 1),
     tilt: mix(from.tilt, to.tilt, 0),
-    yaw: fromYaw + shortestYaw(fromYaw, to.yaw ?? 0) * t,
+    yaw: switchBaseYaw(
+      from.yaw ?? 0,
+      to.yaw ?? 0,
+      t,
+      SWITCH_CAMERA_LOOK.yawPath,
+    ),
     focalDistance: mix(from.focalDistance, to.focalDistance, 256),
     // 38.7-05 (D-45): the lens shift travels with the other axes.
     lensShift: mix(from.lensShift, to.lensShift, 1),
   };
 }
 
-/** The switch camera's authored amounts (visual-tunables; one-number edits). */
-const SWITCH_CAMERA_LOOK: SwitchCameraLook = {
-  swirlTurns: SWITCH_SWIRL_TURNS,
-  breathPullback: SWITCH_BREATH_PULLBACK,
-  breathTilt: SWITCH_BREATH_TILT,
-};
-
 /**
  * The ONE switch camera sampler (C3-H1). Drawing (OrreryWorld's frame
  * worklet), the displayed-camera snapshot (interrupted publish, reduced-motion
  * retarget) and `sampleOrrerySwitchRuntime` all go through it, so a snapshot is
  * always the camera drawn that frame. `motion` is the transition BEING DRAWN
- * (C4-L2: never the live reduced-motion flag): with its spectacle the
- * shortest-arc yaw gains the authored swirl and Lab C's breath, composed once
- * and exactly zero at both ends, so the camera lands exactly on `to` at
- * progress 1; reduced motion (or a spinless switch) is the plain crossfade.
+ * (C4-L2: never the live reduced-motion flag). This is Lab C's switch camera
+ * (owner S-SWIRL pick, 2026-10-04): the crossfade above plus, with the
+ * spectacle, Lab C's breath — dolly-out, yaw swing and lift toward flat, scaled
+ * by sin²(πp)·(0.5 + 0.5·intensity) — exactly zero at both ends, so the camera
+ * lands exactly on `to` at progress 1; reduced motion (or a spinless switch)
+ * is the plain crossfade. Unlike Lab C, the displayed-camera snapshot (a
+ * retarget) includes the breath, so a retarget starts from what is drawn.
  * Defined above every worklet that calls it (Hermes forward-ref hazard).
  */
 export function sampleOrrerySwitchCamera(
@@ -138,17 +149,9 @@ export function sampleOrrerySwitchCamera(
   const base = interpolateCamera(from, to, progress);
   if (!(progress > 0 && progress < 1) || !switchHasSpectacle(motion))
     return base;
-  const scale = 0.5 + 0.5 * fxClamp01(motion.intensity);
-  const yaw = switchSwirlYaw(
-    from.yaw ?? 0,
-    to.yaw ?? 0,
-    progress,
-    SWITCH_CAMERA_LOOK.swirlTurns,
-    switchSwirlEnvelope(progress) * scale,
-  );
   return applySwitchBreath(
-    { ...base, yaw },
-    switchBreath(progress) * scale,
+    base,
+    switchBreath(progress) * (0.5 + 0.5 * fxClamp01(motion.intensity)),
     SWITCH_CAMERA_LOOK,
   );
 }
@@ -494,7 +497,7 @@ export function useOrrerySwitchRuntime(
         progress.value,
       ).world;
       // C3-H1 / C4-L2: the camera drawn this frame — the frame worklet still
-      // draws the outgoing (non-reduced) transition, swirl and breath included.
+      // draws the outgoing (non-reduced) transition, Lab C breath included.
       const displayedCamera = displayedSwitchCamera(
         cameraFrom.value,
         cameraTo.value,
