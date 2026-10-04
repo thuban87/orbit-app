@@ -9,22 +9,37 @@ import { OrreryContactsSheet } from "./OrreryContactsSheet";
 import { OrreryControls } from "./OrreryControls";
 import { OrreryFocusContext } from "./OrreryFocusContext";
 import {
+  HUD_CORNER_ARM,
+  HUD_CORNER_INSET,
+  HUD_CORNER_OPACITY,
+  HUD_CORNER_STROKE,
+  ORRERY_HUD_CORNERS_TEST_ID,
+} from "./OrreryHudCorners";
+import {
   ORRERY_HEADER_OBSTACLE,
   OrreryImmersiveHeader,
 } from "./OrreryImmersiveHeader";
+import { OrrerySystemSelector } from "./OrrerySystemSelector";
+import { OrreryViewOptions } from "./OrreryViewOptions";
 
 const native = vi.hoisted(() => ({
   announce: vi.fn(),
   focus: vi.fn(),
   obstacles: [] as string[],
   insets: { top: 0, bottom: 0, left: 0, right: 0 },
+  /** Opens the selector / view options panels (their `useState(false)`). */
+  open: false,
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useRef: (value: unknown) => ({ current: value }),
   useMemo: (factory: () => unknown) => factory(),
   useEffect: () => {},
-  useState: (value: unknown) => [value, () => {}],
+  useCallback: (callback: unknown) => callback,
+  useState: (value: unknown) => [
+    native.open && value === false ? true : value,
+    () => {},
+  ],
 }));
 vi.mock("react-native", () => ({
   View: "View",
@@ -32,6 +47,8 @@ vi.mock("react-native", () => ({
   ScrollView: "ScrollView",
   Pressable: "Pressable",
   Modal: "Modal",
+  Switch: "Switch",
+  AppState: { addEventListener: () => ({ remove: () => {} }) },
   StyleSheet: {
     create: (styles: unknown) => styles,
     absoluteFill: {},
@@ -63,7 +80,27 @@ vi.mock("react-native-reanimated", () => ({
     },
   }),
 }));
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => true }));
+vi.mock("@react-navigation/native", () => ({
+  useIsFocused: () => true,
+  useNavigation: () => ({ navigate: vi.fn() }),
+}));
+vi.mock("@/stores/shell-transient-store", () => ({
+  shellTransientStore: Object.assign(
+    (selector: (s: { entries: unknown[] }) => unknown) =>
+      selector({ entries: [] }),
+    { getState: () => ({ entries: [] }) },
+  ),
+}));
+vi.mock("@/db/database", () => ({ getExecutor: () => ({}) }));
+vi.mock("@/stores/orrery-preferences-store", () => ({
+  useOrreryPreferencesStore: () => ({
+    hydration: "ready",
+    saving: false,
+    hydrated: true,
+    saveError: null,
+    committed: { density: "balanced", satellitesEnabled: 0 },
+  }),
+}));
 vi.mock("expo-blur", () => ({ BlurView: "BlurView" }));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("react-native-safe-area-context", () => ({
@@ -176,11 +213,14 @@ describe("actual Orrery controls and detail sheet", () => {
       ? group.props.children
       : [group.props.children];
     expect(surfaces).toHaveLength(3);
-    for (const surface of surfaces)
-      expect((surface as ReactElement).props).toMatchObject({
-        treatment: "orrery-overlay",
-        style: { width: 55, height: 55 },
+    for (const surface of surfaces) {
+      const props = (surface as ReactElement<{ style: unknown[] }>).props;
+      expect(props).toMatchObject({ treatment: "orrery-overlay" });
+      expect(Object.assign({}, ...props.style)).toMatchObject({
+        width: 55,
+        height: 55,
       });
+    }
     for (const node of ui.nodes.filter((node) => node.type === "Text")) {
       expect(node.props.numberOfLines).toBeUndefined();
       expect(node.props.allowFontScaling).toBeUndefined();
@@ -526,5 +566,147 @@ describe("actual Orrery controls and detail sheet", () => {
     }
     expect(ORRERY_HEADER_OBSTACLE).toBe("orrery-immersive-header");
     native.insets = { top: 0, bottom: 0, left: 0, right: 0 };
+  });
+  it("38.7-12 (D-22): every Orrery HUD panel and button carries Lab B's four instrument corner brackets, decorative and hidden from accessibility, with every accessible name unchanged", () => {
+    const corners = (nodes: Node[]) =>
+      nodes.filter((node) => node.props.testID === ORRERY_HUD_CORNERS_TEST_ID);
+    const labels = (nodes: Node[]) =>
+      nodes
+        .map((node) => node.props.accessibilityLabel)
+        .filter((label) => label !== undefined);
+    const expectBrackets = (nodes: Node[], count: number) => {
+      const found = corners(nodes);
+      expect(found).toHaveLength(count);
+      for (const chrome of found) {
+        expect(chrome.props).toMatchObject({
+          pointerEvents: "none",
+          accessible: false,
+          importantForAccessibility: "no-hide-descendants",
+          accessibilityElementsHidden: true,
+        });
+        expect(chrome.props.style).toMatchObject({
+          opacity: HUD_CORNER_OPACITY,
+        });
+        expect(chrome.children).toHaveLength(4);
+        const inner = all(chrome.children);
+        // No text, no label, nothing touchable.
+        expect(inner.every((node) => node.type === "View")).toBe(true);
+        expect(labels(inner)).toEqual([]);
+        for (const bracket of chrome.children) {
+          const style = Object.assign(
+            {},
+            ...(bracket.props.style as object[]),
+          ) as Record<string, unknown>;
+          expect(style).toMatchObject({
+            width: HUD_CORNER_ARM,
+            height: HUD_CORNER_ARM,
+            borderColor: THEME_PRESETS.galaxy.dark.orreryInstrument,
+          });
+          // Two edges per bracket, at Lab B's inset and stroke.
+          const edges = Object.entries(style).filter(([k]) =>
+            /^border(Top|Bottom|Left|Right)Width$/.test(k),
+          );
+          expect(edges.map(([, v]) => v)).toEqual([
+            HUD_CORNER_STROKE,
+            HUD_CORNER_STROKE,
+          ]);
+          const offsets = ["top", "bottom", "left", "right"]
+            .map((k) => style[k])
+            .filter((v) => v !== undefined);
+          expect(offsets).toEqual([HUD_CORNER_INSET, HUD_CORNER_INSET]);
+        }
+      }
+    };
+    // Camera controls: one bracket set per button.
+    const ui = controls();
+    expectBrackets(ui.nodes, 3);
+    expect(labels(ui.nodes)).toEqual([
+      "Contacts in this System",
+      "Recenter Orrery",
+      "Reset north",
+    ]);
+    // Cluster panel.
+    const target = { kind: "contact-sun" as const, id: 3, uid: "sun" };
+    const cluster = all(
+      resolve(
+        OrreryClusterPanel({
+          targets: [target],
+          scene: {
+            systemSnapshot: { members: [] },
+            sun: { sunContactName: "Outside sun" },
+          } as never,
+          viewport: { width: 400, height: 700 },
+          stale: false,
+          blocked: false,
+          onClose: vi.fn(),
+          onAction: vi.fn(),
+          onReload: vi.fn(),
+        }),
+      ),
+    );
+    expectBrackets(cluster, 1);
+    expect(labels(cluster)).toEqual([
+      "Close contact group",
+      "Focus in Orrery: Outside sun",
+      "Open Profile: Outside sun",
+    ]);
+    // Focus card.
+    const card = all(
+      resolve(
+        OrreryFocusContext({
+          target: { kind: "member", id: 1, uid: "a" },
+          name: "Ada",
+          placement: { value: HIDDEN_FOCUS_CARD } as never,
+          cardHeight: { value: 180 } as never,
+          blocked: false,
+          onClear: vi.fn(),
+          onProfile: vi.fn(),
+        }),
+      ),
+    );
+    expectBrackets(card, 1);
+    expect(labels(card)).toEqual(["Clear focus", "Open Profile: Ada"]);
+    // System selector and view options: trigger closed, then trigger + panel.
+    const selector = () =>
+      all(
+        resolve(
+          OrrerySystemSelector({
+            state: {
+              status: "ready",
+              requested: { id: "builtin:all-contacts", name: "All Contacts" },
+              select: vi.fn(),
+              reload: vi.fn(),
+            } as unknown as OrrerySystemState,
+            availableHeight: 700,
+            enabled: true,
+            catalog: [],
+            counts: new Map(),
+            needsAttention: new Map(),
+            onOpenChange: vi.fn(),
+          }),
+        ),
+      );
+    const options = () =>
+      all(resolve(OrreryViewOptions({ availableHeight: 700 })));
+    native.open = false;
+    const closedSelector = selector();
+    const closedOptions = options();
+    expectBrackets(closedSelector, 1);
+    expectBrackets(closedOptions, 1);
+    native.open = true;
+    try {
+      const openSelector = selector();
+      const openOptions = options();
+      expectBrackets(openSelector, 2);
+      expectBrackets(openOptions, 2);
+      expect(labels(openSelector)).toContain("Choose System");
+      expect(labels(openOptions)).toContain("Close view options");
+    } finally {
+      native.open = false;
+    }
+    expect(labels(closedSelector)).toEqual([
+      "Choose System. Current System: All Contacts",
+    ]);
+    expect(labels(closedOptions)).toEqual(["View options"]);
   });
 });

@@ -21,6 +21,7 @@ import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
+import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import { OrreryObstacle } from "./OrreryObstacle";
 
 const LABELS = {
@@ -105,7 +106,12 @@ export function OrreryViewOptions({
         style={[styles.trigger, { top: topInset + SPACING.base }]}
         onLayout={(event) => setTriggerHeight(event.nativeEvent.layout.height)}
       >
-        <GlassSurface density="dense" treatment="orrery-overlay">
+        <GlassSurface
+          density="dense"
+          treatment="orrery-overlay"
+          style={HUD_PLATE}
+        >
+          <OrreryHudCorners />
           <Pressable
             ref={trigger}
             onPress={() => setOpen((value) => !value)}
@@ -124,7 +130,12 @@ export function OrreryViewOptions({
           style={[styles.panel, { top: panelTop }]}
           accessibilityViewIsModal
         >
-          <GlassSurface density="dense" treatment="orrery-overlay">
+          <GlassSurface
+            density="dense"
+            treatment="orrery-overlay"
+            style={HUD_PLATE}
+          >
+            <OrreryHudCorners />
             <ScrollView
               style={{
                 maxHeight: Math.max(

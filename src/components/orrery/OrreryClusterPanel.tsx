@@ -8,6 +8,7 @@ import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
+import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import { OrreryObstacle } from "./OrreryObstacle";
 import { clusterCount, clusterRegion } from "./orrery-overlay-logic";
 
@@ -46,7 +47,12 @@ export function OrreryClusterPanel({
         maxHeight: region.height,
       }}
     >
-      <GlassSurface density="dense" treatment="orrery-overlay">
+      <GlassSurface
+        density="dense"
+        treatment="orrery-overlay"
+        style={HUD_PLATE}
+      >
+        <OrreryHudCorners />
         <ScrollView
           style={{ maxHeight: region.height }}
           contentContainerStyle={styles.content}

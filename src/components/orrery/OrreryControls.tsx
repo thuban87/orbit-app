@@ -17,6 +17,7 @@ import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { CameraPose, CameraViewport } from "@/logic/orrery-camera-logic";
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
 import { SPACING } from "@/theme/tokens/spacing";
+import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import {
   cameraControlState,
   controlsRegion,
@@ -93,8 +94,9 @@ export function OrreryControls({
         <GlassSurface
           density="dense"
           treatment="orrery-overlay"
-          style={styles.controlSurface}
+          style={[styles.controlSurface, HUD_PLATE]}
         >
+          <OrreryHudCorners />
           <Pressable
             ref={trigger}
             style={styles.control}
@@ -112,8 +114,9 @@ export function OrreryControls({
         <GlassSurface
           density="dense"
           treatment="orrery-overlay"
-          style={styles.controlSurface}
+          style={[styles.controlSurface, HUD_PLATE]}
         >
+          <OrreryHudCorners />
           <Pressable
             style={styles.control}
             accessibilityRole="button"
@@ -130,8 +133,9 @@ export function OrreryControls({
         <GlassSurface
           density="dense"
           treatment="orrery-overlay"
-          style={styles.controlSurface}
+          style={[styles.controlSurface, HUD_PLATE]}
         >
+          <OrreryHudCorners />
           <AnimatedPressable
             style={styles.control}
             accessibilityRole="button"

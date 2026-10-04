@@ -21,6 +21,7 @@ import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import { OrreryObstacle } from "./OrreryObstacle";
 import {
   buildSystemChoiceGroups,
@@ -143,7 +144,12 @@ export function OrrerySystemSelector({
         style={[styles.trigger, { top: topInset + SPACING.base }]}
         onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
       >
-        <GlassSurface density="dense" treatment="orrery-overlay">
+        <GlassSurface
+          density="dense"
+          treatment="orrery-overlay"
+          style={HUD_PLATE}
+        >
+          <OrreryHudCorners />
           <Pressable
             ref={trigger}
             style={styles.triggerRow}
@@ -171,7 +177,12 @@ export function OrrerySystemSelector({
           style={[styles.panel, { top }]}
           accessibilityViewIsModal
         >
-          <GlassSurface density="dense" treatment="orrery-overlay">
+          <GlassSurface
+            density="dense"
+            treatment="orrery-overlay"
+            style={HUD_PLATE}
+          >
+            <OrreryHudCorners />
             <ScrollView
               style={{
                 maxHeight: Math.max(44, availableHeight - top - SPACING.base),

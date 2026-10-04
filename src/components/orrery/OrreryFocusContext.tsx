@@ -13,6 +13,7 @@ import type { FocusCardRect } from "@/logic/orrery-focus-card-logic";
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
+import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 
 /**
  * Lightweight identity, docked at the canvas bottom below the focused body
@@ -79,7 +80,12 @@ export function OrreryFocusContext({
         onHeight?.(height);
       }}
     >
-      <GlassSurface density="dense" treatment="orrery-overlay">
+      <GlassSurface
+        density="dense"
+        treatment="orrery-overlay"
+        style={HUD_PLATE}
+      >
+        <OrreryHudCorners />
         <Animated.ScrollView
           style={scrollBounds}
           contentContainerStyle={styles.content}
