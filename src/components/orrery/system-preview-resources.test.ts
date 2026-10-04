@@ -401,6 +401,57 @@ describe("38.7-14 (C-H2): the Preview's own ledger epoch and layer ids", () => {
     );
   });
 
+  it("38.7-15 (D-58): a Preview unmount does not dispose an Orrery-warm entry", async () => {
+    const world = harness();
+    const warmPath = unique("warm");
+    const worldOwner = "orrery-world:warm";
+    const photoEpoch = world.photos.mount(worldOwner, () => {});
+    world.photos.request(worldOwner, [
+      { key: warmPath, relativePath: warmPath, priority: 0 },
+    ]);
+    world.loads[0].resolve(image("photo:warm") as unknown as SkImage);
+    await settle();
+    // The Orrery tab blurs: the world's photo goes to the warm owner.
+    world.photos.release(worldOwner);
+    expect(world.photos.handOffWarm(worldOwner, photoEpoch)).toHaveLength(1);
+    const preview = harness({ photos: world.photos, loads: world.loads });
+    // …and a warm Orrery Paragraph in the shared text service.
+    const request = {
+      text: "Warm",
+      role: "label" as const,
+      fontScale: 1,
+      maxWidth: 200,
+      ink: "ink",
+      family: "Inter",
+      fontProvider: {} as never,
+    };
+    const textEpoch = preview.textService.mount(worldOwner);
+    preview.textService.prepare(request);
+    const key = preview.textService.keyOf(request) as string;
+    preview.textService.acquire(worldOwner, [key], 1, textEpoch);
+    const released = preview.textService.release(worldOwner);
+    expect(preview.textService.handOffWarm(worldOwner, released)).toEqual([
+      key,
+    ]);
+    // The Preview draws the warm photo (no decode) plus one of its own.
+    const ownPath = unique("own");
+    preview.preview.setLooks([
+      look("contact:1", warmPath),
+      look("contact:2", ownPath),
+    ]);
+    // One new decode (the harness keeps settled loads): the warm one is reused.
+    expect(world.loads.map((load) => load.path)).toEqual([warmPath, ownPath]);
+    world.loads[1].resolve(image("photo:own") as unknown as SkImage);
+    await settle();
+    preview.ackBodies();
+    preview.preview.release()();
+    // Only what the Preview alone held goes; the warm entries survive.
+    expect(fake.disposed).toEqual(["photo:own"]);
+    expect(world.photos.stats()).toMatchObject({ images: 1, warm: 1 });
+    expect(preview.textService.peek(key)).toBeDefined();
+    expect(preview.textService.stats().warm).toBe(1);
+  });
+
   it("remount: a new Preview mount starts its own epoch; the old mount's late acks change nothing", async () => {
     const old = harness();
     old.preview.setLooks([look("contact:1", null)]);

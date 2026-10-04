@@ -13,9 +13,12 @@
  *   - `release` (unmount: blur or background) ends the epoch at once and
  *     returns `finish`, which the caller runs after one UI round trip (the
  *     pictures detached, no mapper can still record): every retained object
- *     goes back in reverse creation order, the photo and text pins of the
- *     "system-preview" owner are confirmed released and unheld entries are
- *     cleared;
+ *     goes back in reverse creation order, then the photo and text entries
+ *     the "system-preview" owner released are confirmed and DISPOSED — only
+ *     those (38.7-15, D-58): the Preview never clears the shared caches'
+ *     other unheld entries, so the Orrery's warm entries (held by the warm
+ *     owner, `orrery-warm-cache.ts`) survive a Preview unmount and the next
+ *     Orrery return stays warm;
  *   - late acks, decodes and shapes tagged with an ended epoch are discarded
  *     and disposed by the holders (ledger rule 4).
  *
@@ -194,10 +197,12 @@ export function createPreviewResources(
         finished = true;
         if (ledgerEpoch !== null)
           ledger.teardown((handle) => route([handle], true), ledgerEpoch);
-        if (photoMount !== null) photos.confirmReleased(owner, photoMount);
-        photos.clearUnheld();
-        if (textEpoch !== null) textService.confirmReleased(owner, textEpoch);
-        textService.clearUnheld();
+        // 38.7-15 (D-58): dispose only what this owner released; never
+        // `clearUnheld()` (it would drop the Orrery's warm entries too).
+        if (photoMount !== null)
+          photos.confirmReleased(owner, photoMount, { dispose: true });
+        if (textEpoch !== null)
+          textService.confirmReleased(owner, textEpoch, { dispose: true });
       };
     },
     epoch: () => (released ? null : ledger.epoch()),
