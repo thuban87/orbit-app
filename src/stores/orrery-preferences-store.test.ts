@@ -225,3 +225,17 @@ describe("Orrery preferences commit-before-publish", () => {
     });
   });
 });
+
+describe("38.7-15: a re-hydrate on every Orrery focus", () => {
+  it("keeps the same committed object when the stored values are unchanged, a new one when they changed", async () => {
+    const { store, read } = fixture();
+    await store.getState().hydrate(exec);
+    const first = store.getState().committed;
+    await store.getState().hydrate(exec);
+    expect(store.getState().committed).toBe(first);
+    read.mockResolvedValueOnce({ ...defaults, density: "compact" });
+    await store.getState().hydrate(exec);
+    expect(store.getState().committed).not.toBe(first);
+    expect(store.getState().committed.density).toBe("compact");
+  });
+});

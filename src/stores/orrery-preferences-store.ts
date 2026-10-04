@@ -131,13 +131,24 @@ export function createOrreryPreferencesStore(
           try {
             const stored = await io.read(exec);
             if (request === generation) {
-              const committed = { ...get().committed };
+              const previous = get().committed;
+              const committed = { ...previous };
               for (const key of KEYS) {
                 Object.assign(committed, {
                   [key]: stored[key] ?? DEFAULT_ORRERY_PREFERENCES[key],
                 });
               }
-              set({ committed, hydrated: true, hydration: "ready" });
+              // 38.7-15: a re-hydrate that read the same values keeps the
+              // same object, so subscribers (the Orrery, on every tab focus)
+              // do not re-render for nothing.
+              const unchanged =
+                get().hydrated &&
+                KEYS.every((key) => committed[key] === previous[key]);
+              set({
+                committed: unchanged ? previous : committed,
+                hydrated: true,
+                hydration: "ready",
+              });
             } else set({ hydration: get().hydrated ? "ready" : "idle" });
           } catch {
             if (request === generation) set({ hydration: "error" });

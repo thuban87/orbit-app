@@ -337,7 +337,12 @@ export function OrreryScreen() {
     (store) => store.hydrate,
   );
   const hydrated = useOrreryPreferencesStore((store) => store.hydrated);
-  const hydration = useOrreryPreferencesStore((store) => store.hydration);
+  // 38.7-15: only the failure matters here; a boolean selector keeps every
+  // focus's re-hydrate (idle → loading → ready) from re-rendering the screen
+  // while a warm canvas mounts.
+  const hydrationFailed = useOrreryPreferencesStore(
+    (store) => store.hydration === "error",
+  );
   const [focusTargets, setFocusTargets] = useState<OrreryContactTarget[]>([]);
   const [focusedSatellite, setFocusedSatellite] =
     useState<OrrerySatelliteTarget | null>(null);
@@ -854,12 +859,16 @@ export function OrreryScreen() {
   });
   // 38.7-15 (C4-M2 / C5-M2 / C5-L3): the warm return's pose, BEFORE the warm
   // canvas mounts: (1) settle any paused switch through the runtime's own
-  // settle (its prune adopts Plan 13's held viewport); (2) from that
-  // completion, Home from the retained scene under the adopted (live)
-  // viewport, and focus, satellite, cluster and focus error cleared as the
-  // Home branch does; (3) resume stays "home" (no `resumed()` here, so the
-  // sessionReady Home re-derives from the reloaded scene); (4) the Home write
-  // happens in a UI round trip that releases the mount. Once per focus.
+  // settle (its prune adopts Plan 13's held viewport); (2) Home from the
+  // retained scene under the live viewport — the one the settle adopts — and
+  // focus, satellite, cluster and focus error cleared as the Home branch
+  // does; (3) resume stays "home" (no `resumed()` here, so the sessionReady
+  // Home re-derives from the reloaded scene); (4) the Home write happens in a
+  // UI job queued right behind the settle's (FIFO: it lands after `finish`
+  // wrote the switch's own destination), and its round trip releases the
+  // mount. One JS hop, not two: neither the retained snapshot (already the
+  // switch's destination) nor the live viewport changes across the settle,
+  // so nothing here needs to wait for its completion. Once per focus.
   const settleSwitch = switchRuntime.settle;
   const stopCamera = camera.stop;
   const warmPrepared = useCallback((ticket: number) => {
@@ -873,27 +882,25 @@ export function OrreryScreen() {
     const ticket = warmTicket.current;
     if (warmPrepTicket.current === ticket) return;
     warmPrepTicket.current = ticket;
-    settleSwitch(() => {
-      if (ticket !== warmTicket.current) return;
-      const retained = useSystemStore.getState().snapshot;
-      const home = retained
-        ? deriveHomePose(retained.world, viewportRef.current)
-        : null;
-      // No Home (no usable measurement): the sessionReady mount, as today.
-      if (!home) return;
-      focusFraming.current = null;
-      setFocusTargets([]);
-      setFocusedSatellite(null);
-      setClusterOpen(false);
-      setFocusError(null);
-      warmHome.current = home;
-      runOnUI(() => {
-        "worklet";
-        stopCamera();
-        pose.value = home;
-        runOnJS(warmPrepared)(ticket);
-      })();
-    });
+    const retained = useSystemStore.getState().snapshot;
+    const home = retained
+      ? deriveHomePose(retained.world, viewportRef.current)
+      : null;
+    settleSwitch();
+    // No Home (no usable measurement): the sessionReady mount, as today.
+    if (!home) return;
+    focusFraming.current = null;
+    setFocusTargets((targets) => (targets.length === 0 ? targets : []));
+    setFocusedSatellite(null);
+    setClusterOpen(false);
+    setFocusError(null);
+    warmHome.current = home;
+    runOnUI(() => {
+      "worklet";
+      stopCamera();
+      pose.value = home;
+      runOnJS(warmPrepared)(ticket);
+    })();
   }, [
     warmReturn,
     sessionReady,
@@ -1407,7 +1414,10 @@ export function OrreryScreen() {
     lastHomeFrame.current = key;
     lastHomeDomain.current = domain;
     if (sessionResume !== "active") {
-      setFocusTargets([]);
+      // 38.7-15: keep the same empty list (the warm prep already cleared it),
+      // so OrreryWorld's focusedIds — and its label/text inputs — are not
+      // rebuilt at sessionReady for an unchanged, empty focus.
+      setFocusTargets((targets) => (targets.length === 0 ? targets : []));
       setFocusedSatellite(null);
       setClusterOpen(false);
       setFocusError(null);
@@ -1737,7 +1747,7 @@ export function OrreryScreen() {
             ) : null}
           </OrreryFeedback>
         ) : null}
-        {hydration === "error" && !hydrated ? (
+        {hydrationFailed && !hydrated ? (
           <OrreryFeedback
             obstacleId="orrery-settings-feedback"
             style={[styles.feedback, { backgroundColor: colors.surface }]}

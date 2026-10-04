@@ -667,6 +667,10 @@ export function OrreryWorldInner({
           ? { hue: hueIndex, from: last.hue, generation }
           : last;
     skyTint.current = tint;
+    // 38.7-15: the first run (this mount's first commit) has exactly the
+    // inputs `initialSky` was built from in the same render: no second build
+    // and no SharedValue write (which would re-record the sky at mount).
+    if (last === null) return;
     skySpec.value = buildSkySpec({
       colors,
       mode: themeMode,
