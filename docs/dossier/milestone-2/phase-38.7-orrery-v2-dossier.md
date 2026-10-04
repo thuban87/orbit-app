@@ -63,7 +63,10 @@ It stays recognisably Orbit: contacts and relationships remain the information a
     - Lab B's light-mode sky is good.
     - Motion: see D-36.
 -   **[DECIDED · 2026-10-02] D-08 --- Each System gets its own sky tint** (Lab B HUE). No schema change (see D-50).
+    - **[DECIDED 2026-10-03, owner — Plan 09 checkpoint, G-ALLSKY]** All Contacts keeps the **untinted** neutral sky (Lab B's rule); every other System is tinted. Owner: "G-ALLSKY: untinted". Mirrored as CONTEXT D-69.
+    - **[OPEN 2026-10-03 — Plan 09 checkpoint, G-SKYTINT]** Per-System tint strength: tentatively "as now" (Galaxy Dark `tintStrength` 0.35 / `tintWash` 0.05). The owner said "As now I guess" but asked why the background differs so much from Lab B's (V2's nebula is deliberately quiet, D-07/D-27), which makes the tint hard to judge; a nebula comparison was offered and is unanswered. Not decided.
 -   **[DECIDED · 2026-10-02] D-09 --- Optional orbital-plane grid in Lab C's style.** The owner is unsure about having a grid at all, so it is tunable down to off and gets an owner device checkpoint. Lab B's gravity-well grid is rejected.
+    - **[DECIDED 2026-10-03, owner — Plan 09 checkpoint, G-GRID]** The grid is **on, "weaker"** than Lab C: opacity 0.15, 1.0 dp half-width, Lab C's 9 guide circles and 24 spokes. Owner: "G-GRID: weaker". Mirrored as CONTEXT D-67.
 
 ### Ambient motion
 
@@ -71,6 +74,7 @@ It stays recognisably Orbit: contacts and relationships remain the information a
     - This is a deliberate exception to HANDOFF §7 "Motion encodes data, not mood".
     - The pulses carry no data and are identical for every status.
     - They must stay on the single unmountable clock (ADR-048/077) and stop under reduced motion (ADR-085).
+    - **[DECIDED 2026-10-03, owner — Plan 09 checkpoint, G-PULSE]** The pulses take **the full Lab B FLOW look** ("as in Lab B"): intensity 0.55, budget 40, cycle 12 s and always travelling, speed 0.15 rad/s, arc half 0.5 rad, 1.0 dp. This **supersedes the "not very obvious" wording** above; the other D-10 constraints stand. Owner: "G-PULSE: as in lab B". Idle cost at budget 40 is measured in Plan 16's release pass (D-49/D-40: report, don't silently drop). Mirrored as CONTEXT D-68.
 
 ### Orbits
 
@@ -478,3 +482,4 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
 -   **2026-10-03** --- Plan 08 release spike decided by the owner: D-44 world-plane rings, opaque (SurfaceView) canvas and GPU-baked base on; D-49 frame-clock ambient driver, with the 6 Pro's 120 Hz idle reported and a diagnostic before any frame-rate hint (no Skia bump). Failing gates G1/G5/G6 carry to Plan 16, not waived. Mirrored as CONTEXT D-64.
 -   **2026-10-03** --- D-49 diagnostic: the Orrery SurfaceView holds the 6 Pro at 120 Hz at idle (SF "can't resolve refresh rate" → Max). Owner approved FR-B (native 30 Hz frame-rate vote on the SurfaceView, patch-package, release-verified on the 6 Pro). Mirrored as CONTEXT D-65.
 -   **2026-10-03** --- Owner execution policy (CONTEXT D-66, `38.7-EXECUTION-POLICY.md`): Pixel 6 Pro is the target device; the Pixel 3a leaves all mid-phase device work and keeps one end-of-phase release smoke check (Size 120 + All Contacts, no crash/ANR); its D-56 gates (G2, the 3a limits of G3/G5/G6/G7, 3a feel in G8) are retired, changing D-63. DEBUG perf measurement moves out of Plans 10–15 into Plan 16's release pass; device checks become smoke tests; tests target data/crash/leak risks.
+-   **2026-10-03** --- Plan 09 look rulings (lab-anchored redo): D-09 grid on, "weaker" (CONTEXT D-67); D-10 pulses "as in Lab B", superseding "not very obvious" (CONTEXT D-68); D-08 All Contacts untinted (CONTEXT D-69). D-08 per-System tint strength (G-SKYTINT) left OPEN, tentatively as now, pending the owner's nebula answer.
