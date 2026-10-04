@@ -229,6 +229,39 @@ export function registerUatProbes(): void {
       })();
     },
   );
+  // 38.7 Plan 10 Task 3: the fictional test portraits (copied with `run-as`
+  // into `<app files dir>/orrery-portraits`) onto the first Size 20 members,
+  // for the owner's face/desaturation look rulings. A separate visual
+  // workload: "Orrery: restore perf fixture" puts the baseline photos back (H8).
+  DevSettings.addMenuItem(
+    "Orrery: assign test portraits (app files/orrery-portraits)",
+    () => {
+      if (orreryFixtureBusy) return console.log("orrery-portraits busy");
+      orreryFixtureBusy = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const seed = require("./orrery-seed") as typeof import("./orrery-seed");
+      void (async () => {
+        try {
+          const { getExecutor } =
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            require("@/db/database") as typeof import("@/db/database");
+          // assignOrreryTestPortraits logs the `orrery-portraits …` line.
+          await seed.assignOrreryTestPortraits(
+            getExecutor(),
+            "orrery-portraits",
+          );
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { bumpShellRefresh } =
+            require("@/stores/shell-refresh-store") as typeof import("@/stores/shell-refresh-store");
+          bumpShellRefresh();
+        } catch (error) {
+          console.log("orrery-portraits failed", String(error));
+        } finally {
+          orreryFixtureBusy = false;
+        }
+      })();
+    },
+  );
   // 38.7 Plan 08 (D-44/D-49, DEBUG screening only — D-59): flip the render
   // host's spike variants. The canvas reads the host at mount, so leave and
   // re-enter the Orrery tab after a flip. Each logs the effective host.

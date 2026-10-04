@@ -25,6 +25,8 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { ALL_CONTACTS_SYSTEM } from "@/logic/orrery-system-logic";
 import {
+  assignOrreryTestPortraits,
+  PORTRAIT_SYSTEM_NAME,
   reanchorOrreryPerfFixture,
   restoreOrreryPerfFixturePhotos,
   restoreOrreryPerfFixturePreferences,
@@ -338,6 +340,74 @@ describe("restoreOrreryPerfFixturePhotos", () => {
       )?.photo,
     ).toBeNull();
   }, 60_000);
+});
+
+describe("assignOrreryTestPortraits (Plan 10, H8)", () => {
+  async function photoSet() {
+    return (
+      await exec.getAllAsync<{ id: number; photo: string | null }>(
+        "SELECT id, photo FROM contacts ORDER BY id",
+      )
+    ).map((row) => `${row.id}:${row.photo ?? "-"}`);
+  }
+
+  it("assigns portraits to Size 20 in name order and the restore returns the seeded photo state", async () => {
+    await seedOrreryPerfFixture(exec, fakeDeps().deps);
+    const seededPhotos = await photoSet();
+    const files = Array.from(
+      { length: 16 },
+      (_, i) =>
+        `file:///data/files/orrery-portraits/${String(16 - i).padStart(2, "0")}-p.jpg`,
+    );
+    const assignedTo: Array<[number, string]> = [];
+    const logs: string[] = [];
+    const result = await assignOrreryTestPortraits(exec, "orrery-portraits", {
+      listPortraits: async () => [...files, "file:///x/PROVENANCE.md"],
+      async assignPhoto(e, id, source) {
+        assignedTo.push([id, source]);
+        await inWriteTransaction(e, () =>
+          setContactPhotoCore(
+            e,
+            id,
+            `avatars/portrait-${id}.jpg`,
+            localDateTime(NOW),
+          ),
+        );
+      },
+      log: (message) => logs.push(message),
+    });
+
+    const names = (await members(PORTRAIT_SYSTEM_NAME))
+      .map((m) => m.name)
+      .sort((a, b) => (a < b ? -1 : 1));
+    expect(result.problems).toEqual([]);
+    expect(result.assigned.map((a) => a.name)).toEqual(names.slice(0, 16));
+    expect(result.assigned[0].source).toMatch(/01-p\.jpg$/);
+    expect(result.assigned[15].source).toMatch(/16-p\.jpg$/);
+    expect(assignedTo).toHaveLength(16);
+    expect(logs[0]).toContain("orrery-portraits assigned=16");
+    expect(await photoSet()).not.toEqual(seededPhotos);
+    expect((await verifyOrreryPerfFixture(exec, NOW)).ok).toBe(false);
+
+    const restored = await restoreOrreryPerfFixturePhotos(
+      exec,
+      fakeDeps().deps,
+    );
+    expect(restored).toMatchObject({ ok: true, problems: [] });
+    expect(await photoSet()).toEqual(seededPhotos);
+  }, 60_000);
+
+  it("reports a missing Size 20 or an empty folder and assigns nothing", async () => {
+    const assignPhoto = vi.fn();
+    const empty = await assignOrreryTestPortraits(exec, "orrery-portraits", {
+      listPortraits: async () => [],
+      assignPhoto,
+    });
+    expect(empty.assigned).toEqual([]);
+    expect(empty.problems.join("\n")).toContain(PORTRAIT_SYSTEM_NAME);
+    expect(empty.problems.join("\n")).toContain("no JPEG portraits");
+    expect(assignPhoto).not.toHaveBeenCalled();
+  });
 });
 
 describe("Orrery preferences and ring order (C-M5)", () => {

@@ -68,6 +68,7 @@ import {
   SEED_SPEC_VERSION,
   type SeedMember,
   type SeedPart,
+  SIZE_SYSTEM_SIZES,
   STRESS_SYSTEM_NAME,
 } from "./orrery-seed-spec";
 
@@ -816,6 +817,77 @@ export async function restoreOrreryPerfFixturePhotos(
   return verifyOrreryPerfFixture(exec, nowDate, options);
 }
 
+// --- Test portraits (Plan 10 Task 3) --------------------------------------------
+/** The System whose cast receives the test portraits. */
+export const PORTRAIT_SYSTEM_NAME = `Size ${SIZE_SYSTEM_SIZES[2]}`;
+
+export interface OrreryPortraitDeps {
+  /** The portrait files in `dir` (URIs or paths), in any order. */
+  listPortraits(dir: string): Promise<string[]>;
+  /** Make `source` the contact's photo (owned master + `setContactPhotoCore`). */
+  assignPhoto(
+    exec: SqlExecutor,
+    contactId: number,
+    source: string,
+  ): Promise<void>;
+  log?(message: string): void;
+}
+
+export interface OrreryPortraitResult {
+  assigned: Array<{ name: string; contactId: number; source: string }>;
+  problems: string[];
+}
+
+/** The file's own name, for a stable sort independent of URI prefixes. */
+function baseName(source: string): string {
+  return source.slice(source.lastIndexOf("/") + 1);
+}
+
+/**
+ * Give the first N members of Size 20 (N = the number of portraits, sorted by
+ * file name) the test portraits, in name order. A visual workload for owner
+ * look decisions ONLY: portraits are never part of the baseline-comparable
+ * fixture (H8) and `restoreOrreryPerfFixturePhotos` puts every touched contact
+ * back (it rewrites each spec photo and clears every photo the spec lacks).
+ */
+export async function assignOrreryTestPortraits(
+  exec: SqlExecutor,
+  dir: string,
+  deps: OrreryPortraitDeps = defaultOrreryPortraitDeps,
+): Promise<OrreryPortraitResult> {
+  const problems: string[] = [];
+  const sources = (await deps.listPortraits(dir))
+    .filter((source) => /\.jpe?g$/i.test(source))
+    .sort((a, b) => (baseName(a) < baseName(b) ? -1 : 1));
+  const system = (await systemsByName(exec)).get(PORTRAIT_SYSTEM_NAME);
+  if (!system) problems.push(`System "${PORTRAIT_SYSTEM_NAME}" is missing`);
+  if (sources.length === 0) problems.push(`no JPEG portraits in ${dir}`);
+  const assigned: OrreryPortraitResult["assigned"] = [];
+  if (system && sources.length) {
+    const byName = await memberIdsByName(exec, system);
+    const names = [...byName.keys()].sort((a, b) => (a < b ? -1 : 1));
+    if (names.length < sources.length)
+      problems.push(
+        `${PORTRAIT_SYSTEM_NAME} has ${names.length} members for ${sources.length} portraits`,
+      );
+    for (let i = 0; i < Math.min(names.length, sources.length); i += 1) {
+      const ids = byName.get(names[i]) ?? [];
+      if (ids.length !== 1) {
+        problems.push(`"${names[i]}" resolves to ${ids.length} contacts`);
+        continue;
+      }
+      await deps.assignPhoto(exec, ids[0], sources[i]);
+      assigned.push({ name: names[i], contactId: ids[0], source: sources[i] });
+    }
+  }
+  deps.log?.(
+    `orrery-portraits assigned=${assigned.length} ${assigned
+      .map((a) => `${a.name}<-${baseName(a.source)}`)
+      .join(", ")} problems=${problems.length ? problems.join(" | ") : "none"}`,
+  );
+  return { assigned, problems };
+}
+
 // --- Restore Orrery preferences (C-M5) ------------------------------------------
 /**
  * Reset the persistent Orrery inputs the workload depends on: density,
@@ -987,5 +1059,41 @@ export const defaultOrrerySeedDeps: OrrerySeedDeps = {
     });
   },
   now: () => new Date(),
+  log: (message) => console.log(message),
+};
+
+/**
+ * Device portrait deps: the JPEGs in `<app files dir>/<dir>` (copied there with
+ * `run-as` on a test phone) → the owned crash-safe master write → the photo
+ * reference, the same path `defaultOrrerySeedDeps.writePhoto` takes.
+ */
+export const defaultOrreryPortraitDeps: OrreryPortraitDeps = {
+  async listPortraits(dir) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Directory, File, Paths } =
+      require("expo-file-system") as typeof import("expo-file-system");
+    const folder = new Directory(Paths.document, dir);
+    if (!folder.exists) return [];
+    return folder
+      .list()
+      .filter((entry) => entry instanceof File)
+      .map((entry) => entry.uri);
+  },
+  async assignPhoto(exec, contactId, source) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { persistOwnedMaster } =
+      require("@/services/photos/owned-master") as typeof import("@/services/photos/owned-master");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { contactPhotoRelPath } =
+      require("@/db/photo-relative-path") as typeof import("@/db/photo-relative-path");
+    const relative = await persistOwnedMaster(
+      exec,
+      source,
+      contactPhotoRelPath(contactId),
+    );
+    await inWriteTransaction(exec, () =>
+      setContactPhotoCore(exec, contactId, relative, localDateTime()),
+    );
+  },
   log: (message) => console.log(message),
 };
