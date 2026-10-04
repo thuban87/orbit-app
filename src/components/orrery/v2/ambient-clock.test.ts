@@ -17,6 +17,7 @@ import {
   AMBIENT_STILL,
   AmbientFrameClockDriver,
   AmbientIntervalDriver,
+  ambientFrameRateVote,
   ambientNeeded,
   createAmbientIntervalController,
   quantiseAmbient,
@@ -73,6 +74,18 @@ describe("quantised ambient value (D-49)", () => {
         orbitPulses: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe("FR-B frame-rate vote (D-65)", () => {
+  it("votes the ambient rate only while the ambient clock alone animates", () => {
+    expect(ambientFrameRateVote(false, false)).toBe(AMBIENT_HZ);
+    expect(AMBIENT_HZ).toBe(30);
+  });
+  it("withdraws the vote (0) under reduced motion and while busy", () => {
+    expect(ambientFrameRateVote(true, false)).toBe(0);
+    expect(ambientFrameRateVote(false, true)).toBe(0);
+    expect(ambientFrameRateVote(true, true)).toBe(0);
   });
 });
 

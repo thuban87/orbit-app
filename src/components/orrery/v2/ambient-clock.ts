@@ -51,6 +51,23 @@ export function quantiseAmbient(clockMs: number, reduced: boolean): number {
   return (Math.floor((clockMs * AMBIENT_HZ) / 1000) * 1000) / AMBIENT_HZ;
 }
 
+/**
+ * 38.7-15 (D-65, FR-B): the Orrery SurfaceView's explicit frame-rate vote
+ * (`Surface.setFrameRate`, patched into @shopify/react-native-skia 2.6.2).
+ * The D-49 diagnostic (38.7-SPIKE) found the SurfaceView, posting ~30
+ * presents/s with no vote, held the 120 Hz panel at Max. So: AMBIENT_HZ while
+ * the ambient clock alone animates the canvas; 0 (the vote withdrawn: the
+ * platform's own estimate, as before) under reduced motion — the ambient value
+ * is still and nothing presents — and while a switch, gesture or camera
+ * motion runs (`busy`), which keep the panel's full rate (an explicit 30 Hz
+ * vote then could cap a switch at a 60 Hz panel or a 30 Hz render rate).
+ * Changes only on those edges, never per frame.
+ */
+export function ambientFrameRateVote(reduced: boolean, busy: boolean): number {
+  "worklet";
+  return reduced || busy ? 0 : AMBIENT_HZ;
+}
+
 /** Which ambient consumers are on screen (all of them today). */
 export interface AmbientConsumers {
   twinkle: boolean;

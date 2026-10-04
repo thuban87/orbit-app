@@ -1,0 +1,272 @@
+diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
+index f012c45..4c0671e 100644
+--- a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
++++ b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
+@@ -16,6 +16,11 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+     private final boolean debug = false;
+     private final String tag = "SkiaView";
+ 
++    // orbit-app patch (38.7-15, D-65 FR-B): the requested frame-rate vote,
++    // kept here so it survives the opaque view swap below.
++    private float mFrameRateVote = 0f;
++    private boolean mFrameRateVoteSet = false;
++
+     public SkiaBaseView(Context context) {
+         super(context);
+         mView = new SkiaTextureView(context, this, debug);
+@@ -36,6 +41,9 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+         if (value && mView instanceof SkiaTextureView) {
+             removeView(mView);
+             mView = new SkiaSurfaceView(getContext(), this, debug);
++            if (mFrameRateVoteSet) {
++                ((SkiaSurfaceView) mView).setFrameRateVote(mFrameRateVote);
++            }
+             addView(mView);
+         } else if (!value && mView instanceof SkiaSurfaceView) {
+             removeView(mView);
+@@ -44,6 +52,23 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+         }
+     }
+ 
++    /**
++     * orbit-app patch (38.7-15, D-65 FR-B): an explicit frame-rate vote (fps,
++     * 0 = no preference) for the opaque SurfaceView; a TextureView has no
++     * surface of its own to vote with, so it only remembers the value.
++     */
++    public void setFrameRateVote(float fps) {
++        float next = (Float.isNaN(fps) || fps < 0f) ? 0f : fps;
++        if (mFrameRateVoteSet && next == mFrameRateVote) {
++            return;
++        }
++        mFrameRateVote = next;
++        mFrameRateVoteSet = true;
++        if (mView instanceof SkiaSurfaceView) {
++            ((SkiaSurfaceView) mView).setFrameRateVote(next);
++        }
++    }
++
+     void dropInstance() {
+         if (!RNSkiaModule.isModuleValid()) {
+             return;
+diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java
+index 402380f..7497e12 100644
+--- a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java
++++ b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java
+@@ -1,6 +1,7 @@
+ package com.shopify.reactnative.skia;
+ 
+ import com.facebook.react.uimanager.ThemedReactContext;
++import com.facebook.react.uimanager.annotations.ReactProp;
+ import com.facebook.react.viewmanagers.SkiaPictureViewManagerDelegate;
+ import com.facebook.react.viewmanagers.SkiaPictureViewManagerInterface;
+ 
+@@ -41,4 +42,12 @@ public class SkiaPictureViewManager extends SkiaBaseViewManager<SkiaPictureView>
+     public void setAndroidWarmup(SkiaPictureView view, boolean value) {
+         view.setAndroidWarmup(value);
+     }
++
++    // orbit-app patch (38.7-15, D-65 FR-B): the codegen prop `androidFrameRate`
++    // (also a @ReactProp, so the native view config lists it for setNativeProps).
++    @Override
++    @ReactProp(name = "androidFrameRate", defaultFloat = 0f)
++    public void setAndroidFrameRate(SkiaPictureView view, float value) {
++        view.setFrameRateVote(value);
++    }
+ }
+diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaSurfaceView.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaSurfaceView.java
+index 5e28a08..2d4e866 100644
+--- a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaSurfaceView.java
++++ b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaSurfaceView.java
+@@ -2,6 +2,9 @@ package com.shopify.reactnative.skia;
+ 
+ import android.annotation.SuppressLint;
+ import android.content.Context;
++import android.os.Build;
++import android.util.Log;
++import android.view.Surface;
+ import android.view.SurfaceHolder;
+ import android.view.SurfaceView;
+ import androidx.annotation.NonNull;
+@@ -12,6 +15,10 @@ public class SkiaSurfaceView extends SurfaceView implements SurfaceHolder.Callba
+     SkiaViewAPI mApi;
+     boolean mDebug;
+ 
++    // orbit-app patch (38.7-15, D-65 FR-B): the explicit frame-rate vote.
++    private float mFrameRateVote = 0f;
++    private boolean mFrameRateVoteSet = false;
++
+     public SkiaSurfaceView(Context context, SkiaViewAPI api, boolean debug) {
+         super(context);
+         mApi = api;
+@@ -25,14 +32,42 @@ public class SkiaSurfaceView extends SurfaceView implements SurfaceHolder.Callba
+         mApi.onSurfaceDestroyed();
+     }
+ 
++    /**
++     * orbit-app patch (38.7-15, D-65 FR-B): votes `fps` for this SurfaceView's
++     * surface (0 withdraws the vote) and re-applies it whenever the surface is
++     * (re)created. API 30+ only; a no-op below. Never called = stock behaviour.
++     */
++    void setFrameRateVote(float fps) {
++        mFrameRateVote = fps;
++        mFrameRateVoteSet = true;
++        applyFrameRateVote(getHolder().getSurface());
++    }
++
++    private void applyFrameRateVote(Surface surface) {
++        if (!mFrameRateVoteSet || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
++            return;
++        }
++        if (surface == null || !surface.isValid()) {
++            return;
++        }
++        try {
++            surface.setFrameRate(mFrameRateVote, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
++            Log.i("SkiaView", "orbit frame-rate vote " + mFrameRateVote);
++        } catch (RuntimeException e) {
++            Log.w("SkiaView", "orbit frame-rate vote failed", e);
++        }
++    }
++
+     @Override
+     public void surfaceCreated(@NonNull SurfaceHolder holder) {
+         mApi.onSurfaceCreated(holder.getSurface(), getWidth(), getHeight());
++        applyFrameRateVote(holder.getSurface());
+     }
+ 
+     @Override
+     public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
+         mApi.onSurfaceChanged(holder.getSurface(), getWidth(), getHeight());
++        applyFrameRateVote(holder.getSurface());
+     }
+ 
+     @Override
+diff --git a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java
+index b1eb969..6f6386f 100644
+--- a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java
++++ b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java
+@@ -34,6 +34,9 @@ public class SkiaPictureViewManagerDelegate<T extends View, U extends BaseViewMa
+       case "androidWarmup":
+         mViewManager.setAndroidWarmup(view, value != null && (boolean) value);
+         break;
++      case "androidFrameRate":
++        mViewManager.setAndroidFrameRate(view, value == null ? 0f : ((Double) value).floatValue());
++        break;
+       default:
+         super.setProperty(view, propName, value);
+     }
+diff --git a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java
+index 2cd385a..3bc7a1b 100644
+--- a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java
++++ b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java
+@@ -17,4 +17,5 @@ public interface SkiaPictureViewManagerInterface<T extends View> {
+   void setOpaque(T view, boolean value);
+   void setColorSpace(T view, @Nullable String value);
+   void setAndroidWarmup(T view, boolean value);
++  void setAndroidFrameRate(T view, float value);
+ }
+diff --git a/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts b/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts
+index 461d5df..43e130e 100644
+--- a/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts
++++ b/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts
+@@ -10,6 +10,7 @@ export interface CanvasRef extends FC<CanvasProps> {
+     getNativeId(): number;
+     measure(callback: MeasureOnSuccessCallback): void;
+     measureInWindow(callback: MeasureInWindowOnSuccessCallback): void;
++    setFrameRateVote(fps: number): void;
+ }
+ export declare const useCanvasRef: () => RefObject<CanvasRef | null>;
+ export declare const useCanvasSize: (userRef?: RefObject<CanvasRef | null>) => {
+@@ -26,6 +27,7 @@ export interface CanvasProps extends Omit<ViewProps, "onLayout"> {
+     colorSpace?: "p3" | "srgb";
+     ref?: React.Ref<CanvasRef>;
+     androidWarmup?: boolean;
++    androidFrameRate?: number;
+     __destroyWebGLContextAfterRender?: boolean;
+ }
+ export declare const Canvas: ({ debug, opaque, children, onSize, colorSpace, androidWarmup, ref, onLayout, ...viewProps }: CanvasProps) => React.JSX.Element;
+diff --git a/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts b/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts
+index 0f8668b..178fe9c 100644
+--- a/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts
++++ b/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts
+@@ -1,10 +1,11 @@
+ import { type ViewProps } from "react-native";
+-import type { WithDefault } from "react-native/Libraries/Types/CodegenTypes";
++import type { Float, WithDefault } from "react-native/Libraries/Types/CodegenTypes";
+ export interface NativeProps extends ViewProps {
+     debug?: boolean;
+     opaque?: boolean;
+     colorSpace?: string;
+     androidWarmup?: boolean;
++    androidFrameRate?: WithDefault<Float, 0>;
+     pointerEvents?: WithDefault<"auto" | "none" | "box-none" | "box-only", "auto">;
+ }
+ declare const _default: import("react-native").HostComponent<NativeProps>;
+diff --git a/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx b/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx
+index 8c630d6..908f1d5 100644
+--- a/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx
++++ b/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx
+@@ -33,6 +33,11 @@ export interface CanvasRef extends FC<CanvasProps> {
+   getNativeId(): number;
+   measure(callback: MeasureOnSuccessCallback): void;
+   measureInWindow(callback: MeasureInWindowOnSuccessCallback): void;
++  /**
++   * orbit-app patch (38.7-15, D-65 FR-B): sets the `androidFrameRate` vote on
++   * the native view imperatively (`setNativeProps`), with no React render.
++   */
++  setFrameRateVote(fps: number): void;
+ }
+ 
+ export const useCanvasRef = () => useRef<CanvasRef>(null);
+@@ -71,6 +76,13 @@ export interface CanvasProps extends Omit<ViewProps, "onLayout"> {
+   colorSpace?: "p3" | "srgb";
+   ref?: React.Ref<CanvasRef>;
+   androidWarmup?: boolean;
++  /**
++   * orbit-app patch (38.7-15, D-65 FR-B), Android API 30+, opaque canvas only:
++   * an explicit `Surface.setFrameRate(fps, FRAME_RATE_COMPATIBILITY_DEFAULT)`
++   * vote on the SurfaceView, re-applied whenever the surface is (re)created.
++   * 0 withdraws it (no preference). Never set: no vote at all (stock behaviour).
++   */
++  androidFrameRate?: number;
+   __destroyWebGLContextAfterRender?: boolean;
+ }
+ 
+@@ -157,6 +169,13 @@ export const Canvas = ({
+         measureInWindow: (callback) => {
+           viewRef.current?.measureInWindow(callback);
+         },
++        setFrameRateVote: (fps: number) => {
++          (
++            viewRef.current as {
++              setNativeProps?: (props: { androidFrameRate: number }) => void;
++            } | null
++          )?.setNativeProps?.({ androidFrameRate: fps });
++        },
+       }) as CanvasRef
+   );
+ 
+diff --git a/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts b/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts
+index 5794593..13f2a06 100644
+--- a/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts
++++ b/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts
+@@ -1,5 +1,8 @@
+ import { codegenNativeComponent, type ViewProps } from "react-native";
+-import type { WithDefault } from "react-native/Libraries/Types/CodegenTypes";
++import type {
++  Float,
++  WithDefault,
++} from "react-native/Libraries/Types/CodegenTypes";
+ 
+ // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+ // @ts-ignore - pointerEvents needs to be redeclared for codegen to generate native bindings
+@@ -8,6 +11,9 @@ export interface NativeProps extends ViewProps {
+   opaque?: boolean;
+   colorSpace?: string;
+   androidWarmup?: boolean;
++  // orbit-app patch (38.7-15, D-65 FR-B): an explicit Surface.setFrameRate
++  // vote (fps) on the opaque (SurfaceView) canvas; 0 = no preference.
++  androidFrameRate?: WithDefault<Float, 0>;
+   pointerEvents?: WithDefault<
+     "auto" | "none" | "box-none" | "box-only",
+     "auto"

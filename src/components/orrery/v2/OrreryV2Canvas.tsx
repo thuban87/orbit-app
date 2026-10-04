@@ -68,6 +68,16 @@
  * picture at once. Snapshots are `base`-layer objects in the H3 ledger
  * (base-bake.ts); the base picture acks like every other layer.
  *
+ * ── Frame-rate vote (38.7-15, D-65 FR-B) ────────────────────────────────────
+ * On the opaque canvas (Android SurfaceView) the canvas votes AMBIENT_HZ
+ * (`Surface.setFrameRate`, API 30+, patched into Skia 2.6.2) while only the
+ * ambient clock animates it, and withdraws the vote (0) under reduced motion
+ * and while a switch, gesture or camera motion runs (`ambientFrameRateVote`).
+ * A UI reaction sends the vote only on change, through the Canvas ref's
+ * imperative `setFrameRateVote` (a native prop update) — never React state,
+ * so no render commits mid-switch (D-53). The native view re-applies it on
+ * every surface (re)creation; a remount (tab return, foreground) votes again.
+ *
  * ── Platform seam (D-46) ───────────────────────────────────────────────────
  * Platform/GPU choices come from `resolveOrreryRenderHost()` as values
  * (`opaqueCanvas`, the device pixel ratio for the AA feather), never as forks.
@@ -86,7 +96,7 @@ import {
   createPicture,
   Picture,
 } from "@shopify/react-native-skia";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type ComposedGesture,
   GestureDetector,
@@ -107,7 +117,11 @@ import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import type { SwitchFxSignal } from "@/logic/orrery-switch-fx-logic";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
-import { ambientNeeded, useOrreryAmbient } from "./ambient-clock";
+import {
+  ambientFrameRateVote,
+  ambientNeeded,
+  useOrreryAmbient,
+} from "./ambient-clock";
 import {
   type BakedBase,
   type BakeRegistry,
@@ -595,6 +609,17 @@ export function OrreryV2Canvas({
   const coverStyle = useAnimatedStyle(() => ({
     opacity: withTiming(cover.value, { duration: COVER_FADE_MS }),
   }));
+  // 38.7-15 (D-65 FR-B): the SurfaceView's frame-rate vote, on change only.
+  const opaque = host.opaqueCanvas;
+  const applyFrameRateVote = useCallback((fps: number) => {
+    canvasRef.current?.setFrameRateVote?.(fps);
+  }, []);
+  useAnimatedReaction(
+    () => ambientFrameRateVote(reducedMotion.value, busy.value),
+    (vote, previous) => {
+      if (opaque && vote !== previous) runOnJS(applyFrameRateVote)(vote);
+    },
+  );
   return (
     <>
       {driver}
