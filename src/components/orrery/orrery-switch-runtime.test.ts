@@ -705,3 +705,48 @@ describe("38.7-13 (C4-M1): the settle notification batches into the settle commi
     expect(calls[1].resources).toEqual(keysOf(cWorldOf()));
   });
 });
+
+describe("38.7-15 (C5-M2): settle() for the warm tab return", () => {
+  it("settles a paused switch exactly as finish does: progress 1, pose = cameraTo, choreography settled, prune, then done", () => {
+    const order: string[] = [];
+    const mounted = mountRuntime((generation) => {
+      order.push(`settled:${generation}`);
+    });
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    mounted.runtime.progress.value = 0.5;
+    mounted.runtime.pause();
+    expect(mounted.runtime.running.value).toBe(false);
+    mounted.runtime.settle(() => {
+      order.push("done");
+      // The prune already ran: only the destination's resources remain.
+      expect(resourceKeys(mounted.resources())).toEqual(
+        keysOf(destinationWorld),
+      );
+    });
+    expect(order).toEqual(["settled:1", "settled:2", "done"]);
+    expect(mounted.runtime.progress.value).toBe(1);
+    expect(mounted.pose.value).toEqual(homeCamera);
+    expect(mounted.runtime.transition.value.settledWorld).toBeDefined();
+    expect(mounted.entryKeys()).toEqual(keysOf(destinationWorld));
+    // settle() cancelled the driver: its callback reports unfinished.
+    (harness.timings.at(-1) as (finished: boolean) => void)(false);
+    expect(order).toEqual(["settled:1", "settled:2", "done"]);
+  });
+
+  it("is a no-op when nothing is running (explicit progress >= 1 guard), and done still runs", () => {
+    const calls: number[] = [];
+    const mounted = mountRuntime((generation) => {
+      calls.push(generation);
+    });
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.pose.value = { ...homeCamera, x: 5 };
+    const transition = mounted.runtime.transition.value;
+    const done = vi.fn();
+    mounted.runtime.settle(done);
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([1]);
+    expect(mounted.runtime.transition.value).toBe(transition);
+    expect(mounted.pose.value).toEqual({ ...homeCamera, x: 5 });
+  });
+});

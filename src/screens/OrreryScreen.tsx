@@ -140,6 +140,41 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 
+/** 38.7-15 (D-56/D-76): the DEBUG timing marks (`src/__dev__/orrery-perf-marks.ts`). */
+interface OrreryPerfMarks {
+  beginFocus(): void;
+  mark(name: string): void;
+  beginSwitch(): void;
+  markSwitch(name: string): void;
+}
+// DEBUG only: Metro folds this to null in a release bundle.
+const perf: OrreryPerfMarks | null =
+  typeof __DEV__ !== "undefined" && __DEV__
+    ? require("@/__dev__/orrery-perf-marks")
+    : null;
+
+/**
+ * 38.7-15 (C4-M2): the warm return already drew Home; the reload's Home is
+ * reassigned only when it moved beyond this (unchanged data → no camera move).
+ */
+const WARM_HOME_TOLERANCE = 1e-3;
+function sameHomePose(a: CameraPose, b: CameraPose): boolean {
+  const keys = [
+    "x",
+    "y",
+    "zoom",
+    "tilt",
+    "yaw",
+    "focalDistance",
+    "lensShift",
+  ] as const;
+  return keys.every(
+    (key) =>
+      Math.abs((a[key] ?? 0) - (b[key] ?? 0)) <=
+      WARM_HOME_TOLERANCE * Math.max(1, Math.abs(b[key] ?? 0)),
+  );
+}
+
 const acknowledgeReorder = () => {
   void Haptics.selectionAsync().catch(() => {});
 };
@@ -191,6 +226,17 @@ export function OrreryScreen() {
   >(() => {});
   const captureGeneration = useRef(0);
   const [sessionReady, setSessionReady] = useState(false);
+  // 38.7-15 (D-56, C5-M1): an ordinary tab return (session resume "home",
+  // the retained snapshot is the requested System, app active) mounts the
+  // canvas on the retained snapshot while the reload runs — LATCHED once per
+  // focus (never a live `resume` read), cleared on blur and at sessionReady.
+  const [warmReturn, setWarmReturn] = useState(false);
+  // C4-M2/C5-L3: set from a UI round trip after the Home pose write.
+  const [warmPosePrepared, setWarmPosePrepared] = useState(false);
+  const warmTicket = useRef(0);
+  const warmPrepTicket = useRef(-1);
+  /** The Home the warm canvas drew (the sessionReady Home compares to it). */
+  const warmHome = useRef<CameraPose | null>(null);
   const sessionResume = useOrrerySessionStore((store) => store.resume);
   const restoreContactsFocus = useRef<(() => void) | null>(null);
   const overlaysOpen = shellTransientStore((store) =>
@@ -241,6 +287,9 @@ export function OrreryScreen() {
     () => canvasViewport(canvasRect, Object.values(obstacles)),
     [canvasRect, obstacles],
   );
+  // 38.7-15: the live (unheld) viewport — what the renderer adopts at settle.
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
   const controlsViewport = useMemo(
     () =>
       canvasViewport(
@@ -554,18 +603,36 @@ export function OrreryScreen() {
     useCallback(() => {
       routeLive.current = true;
       setSessionReady(false);
+      perf?.beginFocus();
+      // C5-M1: latch the warm-return eligibility at the start of this focus.
+      warmTicket.current++;
+      const retained = useSystemStore.getState();
+      setWarmReturn(
+        appActive &&
+          useOrrerySessionStore.getState().resume === "home" &&
+          !!retained.snapshot &&
+          systemRefId(retained.snapshot.system) === retained.requested.id,
+      );
       let cancelled = false;
       if (appActive)
         void (async () => {
           await hydratePreferences(getExecutor());
           if (cancelled) return;
+          perf?.mark("hydrated");
           if (initialized.current) await useSystemStore.getState().reload();
-          if (!cancelled) setSessionReady(true);
+          if (!cancelled) {
+            perf?.mark("reloaded");
+            setSessionReady(true);
+          }
         })();
       return () => {
         pauseSwitch();
         routeLive.current = false;
         setSessionReady(false);
+        warmTicket.current++;
+        warmHome.current = null;
+        setWarmReturn(false);
+        setWarmPosePrepared(false);
         cancelIntent.current("blur");
         cancelled = true;
         useSystemStore.getState().cancel();
@@ -573,6 +640,11 @@ export function OrreryScreen() {
       };
     }, [useSystemStore, hydratePreferences, appActive, pose, pauseSwitch]),
   );
+  useEffect(() => {
+    if (!sessionReady) return;
+    perf?.mark("session-ready");
+    setWarmReturn(false);
+  }, [sessionReady]);
   const reconciledCommittedOrigin = useRef<unknown>(undefined);
   useEffect(() => {
     if (!hydrated || !isFocused || !appActive) return;
@@ -746,6 +818,60 @@ export function OrreryScreen() {
     enabled: visible && !overlaysOpen,
     reduced: reducedMotion,
   });
+  // 38.7-15 (C4-M2 / C5-M2 / C5-L3): the warm return's pose, BEFORE the warm
+  // canvas mounts: (1) settle any paused switch through the runtime's own
+  // settle (its prune adopts Plan 13's held viewport); (2) from that
+  // completion, Home from the retained scene under the adopted (live)
+  // viewport, and focus, satellite, cluster and focus error cleared as the
+  // Home branch does; (3) resume stays "home" (no `resumed()` here, so the
+  // sessionReady Home re-derives from the reloaded scene); (4) the Home write
+  // happens in a UI round trip that releases the mount. Once per focus.
+  const settleSwitch = switchRuntime.settle;
+  const stopCamera = camera.stop;
+  const warmPrepared = useCallback((ticket: number) => {
+    if (ticket !== warmTicket.current) return;
+    perf?.mark("warm-pose");
+    setWarmPosePrepared(true);
+  }, []);
+  useEffect(() => {
+    if (!warmReturn || sessionReady || warmPosePrepared || !visible || !scene)
+      return;
+    const ticket = warmTicket.current;
+    if (warmPrepTicket.current === ticket) return;
+    warmPrepTicket.current = ticket;
+    settleSwitch(() => {
+      if (ticket !== warmTicket.current) return;
+      const retained = useSystemStore.getState().snapshot;
+      const home = retained
+        ? deriveHomePose(retained.world, viewportRef.current)
+        : null;
+      // No Home (no usable measurement): the sessionReady mount, as today.
+      if (!home) return;
+      focusFraming.current = null;
+      setFocusTargets([]);
+      setFocusedSatellite(null);
+      setClusterOpen(false);
+      setFocusError(null);
+      warmHome.current = home;
+      runOnUI(() => {
+        "worklet";
+        stopCamera();
+        pose.value = home;
+        runOnJS(warmPrepared)(ticket);
+      })();
+    });
+  }, [
+    warmReturn,
+    sessionReady,
+    warmPosePrepared,
+    visible,
+    scene,
+    settleSwitch,
+    stopCamera,
+    pose,
+    warmPrepared,
+    useSystemStore,
+  ]);
   // 38.7-11 (D-19/D-47): a single focus framed above the docked card, its
   // moons (full split, from the satellite publisher's index for this scene)
   // inside the frame. The card's space is its expected docked rect over the
@@ -1147,6 +1273,9 @@ export function OrreryScreen() {
     if (switchLanding) switchHomeGeneration.current = null;
     void settledSwitch; // re-run once a switch settles (see onSwitchSettled)
     const session = useOrrerySessionStore.getState();
+    // 38.7-15 (C4-M2): the Home a warm return already drew, consumed here.
+    const warmPose = warmHome.current;
+    warmHome.current = null;
     if (sessionResume === "restore") {
       const restored = restoreOrrerySession({
         saved: session.saved,
@@ -1251,7 +1380,9 @@ export function OrreryScreen() {
       session.resumed();
     }
     if (clusterOpen) runOnUI(camera.recover)(home);
-    else
+    // C4-M2: unchanged data after a warm return → Home is already drawn: no
+    // camera change; changed data → this one reframe.
+    else if (!(warmPose && sameHomePose(warmPose, home)))
       runOnUI(() => {
         "worklet";
         camera.stop();
@@ -1345,7 +1476,9 @@ export function OrreryScreen() {
         style={styles.canvasArea}
         onLayout={canvasMeasurement.onLayout}
       >
-        {visible && sessionReady && scene ? (
+        {visible &&
+        scene &&
+        (sessionReady || (warmReturn && warmPosePrepared)) ? (
           <OrreryWorld
             scene={scene}
             camera={camera}

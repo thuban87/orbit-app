@@ -248,6 +248,17 @@ function orreryTextEligibility(
 let worldSerial = 0;
 type OrreryLedger = OrreryGenerationLedger<string>;
 
+/** 38.7-15 (D-56): DEBUG tab-return marks (`src/__dev__/orrery-perf-marks.ts`). */
+interface OrreryPerfMarks {
+  mark(name: string): void;
+  markOnce(name: string): void;
+}
+// DEBUG only: Metro folds this to null in a release bundle.
+const perf: OrreryPerfMarks | null =
+  typeof __DEV__ !== "undefined" && __DEV__
+    ? require("@/__dev__/orrery-perf-marks")
+    : null;
+
 /**
  * 38.7-07 (H3): routes the native objects the ledger released back to their
  * holders, in the order given (teardown passes reverse creation order). A
@@ -571,6 +582,7 @@ export function OrreryWorldInner({
     mounted.current = true;
     // 38.7-15 (D-58): the warm set is this world's to reuse; no idle release.
     orreryWarmCache.resumeOnFocus();
+    perf?.mark("canvas-mount");
     return () => {
       mounted.current = false;
     };
@@ -899,6 +911,7 @@ export function OrreryWorldInner({
   const ackRecorded = useCallback(
     (layer: OrreryLayerId, generation: number, epoch: number) => {
       if (!ledger.ack(layer, generation, epoch)) return;
+      perf?.markOnce("first-recorded");
       routeRetired(
         publisher.owner,
         publisher,

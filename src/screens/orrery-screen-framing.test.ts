@@ -169,9 +169,10 @@ function harness(
     status: "ready",
     generation: 7,
     requested: { id: "builtin:all-contacts" },
-    current: () => scene,
+    current: () => scene as unknown,
     select: vi.fn(),
     reload: vi.fn(),
+    cancel: vi.fn(),
   };
   type StoreState = typeof state;
   const listeners = new Set<(next: StoreState, previous: StoreState) => void>();
@@ -203,6 +204,11 @@ function harness(
     : satelliteLogic.EMPTY_SATELLITE_SPEC;
   const switchProgress = { value: 1 };
   const switchTransition = { value: { generation: 7 } };
+  /** 38.7-15: the route's focus (blur / return) and the runtime's pose. */
+  let focused = true;
+  let runtimePose: { value: unknown } | null = null;
+  /** 38.7-15: per render turn, whether the canvas was mounted and its pose. */
+  const renderLog: { world: boolean; pose: unknown }[] = [];
   /** 38.7-13: the screen's settle listener, as the runtime received it. */
   let onSettled: ((generation: number) => void) | undefined;
   /** 38.7-13: the real store / satellite publisher, when asked for. */
@@ -326,9 +332,11 @@ function harness(
     },
     "react-native-reanimated": reanimated,
     "@react-navigation/native": {
-      useIsFocused: () => true,
+      useIsFocused: () => focused,
       useNavigation: () => navigation,
-      useFocusEffect: (fn: () => () => void) => hooks.useEffect(fn, [fn]),
+      // Runs while focused; the cleanup runs on blur (38.7-15 warm returns).
+      useFocusEffect: (fn: () => () => void) =>
+        hooks.useEffect(() => (focused ? fn() : undefined), [fn, focused]),
     },
     "@shopify/react-native-skia": { useFonts: () => null },
   };
@@ -353,11 +361,12 @@ function harness(
         if (id.includes("use-orrery-switch-runtime"))
           return {
             useOrrerySwitchRuntime: (
-              _pose: unknown,
+              pose: { value: unknown },
               _reduced: unknown,
               settled?: (generation: number) => void,
             ) => {
               onSettled = settled;
+              runtimePose = pose;
               return (
                 hooks.useRef({
                   publish: (...args: unknown[]) => {
@@ -365,6 +374,19 @@ function harness(
                   },
                   pause: () => {},
                   resume: () => {},
+                  // 38.7-15 (C5-M2): `finish` for a paused switch (progress
+                  // 1, the pose at its destination Home, the prune's settle
+                  // notification), then `done`; a no-op otherwise.
+                  settle: (done?: () => void) => {
+                    if (switchProgress.value < 1) {
+                      switchProgress.value = 1;
+                      const destination = publishes.at(-1)?.[3];
+                      if (runtimePose && destination)
+                        runtimePose.value = { ...(destination as object) };
+                      onSettled?.(switchTransition.value.generation);
+                    }
+                    done?.();
+                  },
                   resources: [],
                   progress: switchProgress,
                   transition: switchTransition,
@@ -528,6 +550,13 @@ function harness(
       effects = [];
       reactions.length = 0;
       tree = screen.OrreryScreen();
+      const world = find("World", tree);
+      renderLog.push({
+        world: !!world,
+        pose: world
+          ? { ...(world.props.pose as { value: object }).value }
+          : null,
+      });
       for (const effect of effects) effect();
       if (++turns > 20) throw new Error("Unsettled React effects");
     } while (dirty);
@@ -592,6 +621,12 @@ function harness(
     obstacles,
     switchProgress,
     publishes,
+    renderLog,
+    /** 38.7-15: the route blurs (false) or is focused again (true). */
+    setFocused(value: boolean) {
+      focused = value;
+      render();
+    },
     /** 38.7-13: the real System store (options.realStore). */
     store: () => realStore,
     /** 38.7-13: the real satellite publisher (options.realSatellites). */
@@ -1343,4 +1378,225 @@ it("C-M3: satellite rows resolving (and, separately, failing) mid-switch reach t
     await microtasks();
     h.render();
   }
+});
+
+// ── 38.7-15 (D-56, C4-M2, C5-M1/M2/L2/L3): the warm tab return ────────────────
+
+type Harness = ReturnType<typeof harness>;
+type Pose = cameraLogic.CameraPose;
+const poseOf = (h: Harness) => (h.world().props.pose as { value: Pose }).value;
+async function ticks(count = 6): Promise<void> {
+  for (let i = 0; i < count; i++) await Promise.resolve();
+}
+
+/**
+ * Holds the focus reload open: the store is loading (no `current()`, so no
+ * action can act on the retained snapshot) until `open()`; then it is ready,
+ * optionally with a changed scene.
+ */
+function holdReload(h: Harness, next?: () => Harness["scene"]) {
+  let open!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  const ready = h.state.current;
+  h.state.reload = vi.fn(async () => {
+    h.state.status = "loading";
+    h.state.current = () => null;
+    await gate;
+    const scene = next?.() ?? h.state.snapshot;
+    Object.assign(h.state, {
+      status: "ready",
+      snapshot: scene,
+      current: next ? () => scene : ready,
+    });
+  });
+  return async () => {
+    open();
+    await ticks();
+    h.render();
+  };
+}
+
+/** Leaves the tab (OrreryStack's blur → leaveTab: resume "home") and returns. */
+async function leaveAndReturn(
+  h: Harness,
+  resume: "home" | "restore" = "home",
+): Promise<void> {
+  h.setFocused(false);
+  expect(h.find("World")).toBeUndefined();
+  h.session.resume = resume;
+  h.renderLog.length = 0;
+  h.setFocused(true);
+  await ticks();
+  h.render();
+}
+
+const firstMounted = (h: Harness) => h.renderLog.find((turn) => turn.world);
+
+it("38.7-15 (a): a warm return from a panned, focused pose draws its first frame at Home with no focus, before sessionReady; unchanged data → no camera change after", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  const viewport = h.world().props.viewport as cameraLogic.CameraViewport;
+  const home = h.camera.deriveHomePose(h.scene.world, viewport) as Pose;
+  await h.focus(1);
+  h.settle();
+  (h.world().props.pose as { value: Pose }).value = {
+    ...poseOf(h),
+    x: 40,
+    y: -30,
+    zoom: 2.2,
+  };
+  expect(h.world().props.focusedIds).toEqual([1]);
+  const open = holdReload(h);
+  await leaveAndReturn(h);
+  // Mounted on the retained snapshot while the reload is still running.
+  expect(h.state.status).toBe("loading");
+  const first = firstMounted(h);
+  expect(first?.pose).toEqual(home);
+  expect(h.world().props.focusedIds).toEqual([]);
+  expect(h.find("FocusCard")).toBeUndefined();
+  // Warm prep never calls resumed(): the sessionReady Home branch does.
+  expect(h.session.resume).toBe("home");
+  // Taps during the warm window act on nothing (loading: no current()).
+  expect(h.world().props.interactive).toBe(false);
+  await (h.world().props.onIntent as (i: unknown) => Promise<void>)({
+    kind: "focus",
+    generation: 7,
+    ids: [1],
+    targets: [{ kind: "member", id: 1, uid: "u1" }],
+  });
+  h.render();
+  expect(h.world().props.focusedIds).toEqual([]);
+  const warmPose = poseOf(h);
+  await open();
+  // sessionReady: same data → the drawn Home is kept (no camera change).
+  expect(poseOf(h)).toBe(warmPose);
+  expect(h.session.resume).toBe("active");
+});
+
+it("38.7-15 (b): a warm return mid-switch (paused at 0.5) settles the switch and draws its destination Home first, with no focus and no jump at sessionReady", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  await h.focus(1);
+  const landed = h.landSwitch();
+  h.switchProgress.value = 0.5;
+  const open = holdReload(h);
+  await leaveAndReturn(h);
+  expect(h.switchProgress.value).toBe(1);
+  const viewport = h.world().props.viewport as cameraLogic.CameraViewport;
+  const home = h.camera.deriveHomePose(landed.world, viewport);
+  expect(firstMounted(h)?.pose).toEqual(home);
+  expect(h.world().props.focusedIds).toEqual([]);
+  const warmPose = poseOf(h);
+  await open();
+  expect(poseOf(h)).toBe(warmPose);
+});
+
+it("38.7-15 (d, C5-M2): an obstacle measured mid-switch is adopted by the warm settle, and warm Home is derived under the adopted viewport", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  const landed = h.landSwitch();
+  h.switchProgress.value = 0.5;
+  const held = h.world().props.viewport as cameraLogic.CameraViewport;
+  // A save-error banner measures mid-switch: the renderer keeps the held one.
+  h.obstacles
+    .getState()
+    .publish("orrery-save-feedback", { x: 16, y: 600, width: 368, height: 80 });
+  h.render();
+  expect(h.world().props.viewport).toEqual(held);
+  const open = holdReload(h);
+  await leaveAndReturn(h);
+  const adopted = h.world().props.viewport as cameraLogic.CameraViewport;
+  expect(adopted).not.toEqual(held);
+  const home = h.camera.deriveHomePose(landed.world, adopted);
+  expect(firstMounted(h)?.pose).toEqual(home);
+  expect(h.switchProgress.value).toBe(1);
+  const warmPose = poseOf(h);
+  await open();
+  expect(poseOf(h)).toBe(warmPose);
+});
+
+it("38.7-15 (e): a contact added while away reframes Home exactly once at sessionReady", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  const grown = {
+    ...h.scene,
+    generation: 9,
+    world: [
+      ...h.scene.world,
+      {
+        id: 3,
+        kind: "contact" as const,
+        x: 0,
+        y: -160,
+        radius: 16,
+        ringRadius: 160,
+      },
+    ],
+  };
+  const open = holdReload(h, () => grown);
+  await leaveAndReturn(h);
+  const sv = h.world().props.pose as { value: Pose };
+  let writes = 0;
+  let current = sv.value;
+  Object.defineProperty(sv, "value", {
+    get: () => current,
+    set: (next: Pose) => {
+      writes++;
+      current = next;
+    },
+  });
+  await open();
+  const viewport = h.world().props.viewport as cameraLogic.CameraViewport;
+  expect(writes).toBe(1);
+  expect(current).toEqual(h.camera.deriveHomePose(grown.world, viewport));
+});
+
+it("38.7-15 (f, C5-M1): the warm return is latched per focus — resume flipping to active mid-window keeps the canvas mounted", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  const open = holdReload(h);
+  await leaveAndReturn(h);
+  expect(h.find("World")).toBeDefined();
+  h.session.resume = "active";
+  h.render();
+  expect(h.find("World")).toBeDefined();
+  await open();
+  expect(h.find("World")).toBeDefined();
+});
+
+it.each([["Profile Back"], ["a background return"]])(
+  "38.7-15 (c/c2/g): %s (resume restore) draws no early canvas; the restored pose and validated focus appear only after restore",
+  async () => {
+    const h = harness("tilted", PHONE);
+    await h.ready();
+    const saved = cameraLogic.clampCameraPose(
+      { ...cameraLogic.HOME_CAMERA, x: 5, y: -40, zoom: 1.4 },
+      400,
+    );
+    h.session.saved = {
+      pose: saved,
+      focus: { kind: "member", id: 1, uid: "u1" },
+      systemId: "builtin:all-contacts",
+    };
+    const open = holdReload(h);
+    await leaveAndReturn(h, "restore");
+    expect(h.renderLog.some((turn) => turn.world)).toBe(false);
+    await open();
+    expect(poseOf(h)).toEqual(saved);
+    expect(h.world().props.focusedIds).toEqual([1]);
+  },
+);
+
+it("38.7-15 (g): a return whose requested System differs from the retained snapshot does not mount warm", async () => {
+  const h = harness("tilted", PHONE);
+  await h.ready();
+  const open = holdReload(h);
+  h.state.requested = { id: "builtin:favorites" };
+  await leaveAndReturn(h);
+  expect(h.renderLog.some((turn) => turn.world)).toBe(false);
+  h.state.requested = { id: "builtin:all-contacts" };
+  await open();
+  expect(h.find("World")).toBeDefined();
 });

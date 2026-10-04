@@ -320,6 +320,15 @@ export interface OrrerySwitchRuntime {
   ) => void;
   pause: () => void;
   resume: () => void;
+  /**
+   * 38.7-15 (C5-M2): settles a running or paused switch now, through the
+   * same path a driven switch completes by (`finish`: progress 1, the pose
+   * at the switch's destination, the choreography settled, the prune — whose
+   * settle notification adopts Plan 13's held renderer viewport). `done`
+   * runs on JS after that prune and settle notification, or (one UI round
+   * trip later) when nothing was running: a no-op then.
+   */
+  settle: (done?: () => void) => void;
 }
 
 /**
@@ -350,16 +359,27 @@ export function useOrrerySwitchRuntime(
   // The latest settle listener (a ref, so it never changes the runtime's identity).
   const settledRef = useRef(onSettled);
   settledRef.current = onSettled;
-
-  const prune = useCallback((generation: number) => {
-    setResources((current) => {
-      const scene = latestScene.current;
-      if (!scene || scene.generation !== generation) return current;
-      return pruneOrreryResources(current, scene);
-    });
-    // Same JS callback as the prune: the screen's settle state joins its commit.
-    settledRef.current?.(generation);
+  // 38.7-15 (C5-M2): `settle()` callers waiting for the next settle.
+  const settleWaiters = useRef<(() => void)[]>([]);
+  const flushSettleWaiters = useCallback(() => {
+    const waiting = settleWaiters.current;
+    settleWaiters.current = [];
+    for (const done of waiting) done();
   }, []);
+
+  const prune = useCallback(
+    (generation: number) => {
+      setResources((current) => {
+        const scene = latestScene.current;
+        if (!scene || scene.generation !== generation) return current;
+        return pruneOrreryResources(current, scene);
+      });
+      // Same JS callback as the prune: the screen's settle state joins its commit.
+      settledRef.current?.(generation);
+      flushSettleWaiters();
+    },
+    [flushSettleWaiters],
+  );
 
   const finish = useCallback(
     (generation: number) => {
@@ -466,6 +486,23 @@ export function useOrrerySwitchRuntime(
     ],
   );
 
+  const settle = useCallback(
+    (done?: () => void) => {
+      if (done) settleWaiters.current.push(done);
+      runOnUI(() => {
+        "worklet";
+        // `finish` has only a generation guard: a settled switch is a no-op.
+        if (progress.value >= 1) {
+          runOnJS(flushSettleWaiters)();
+          return;
+        }
+        cancelAnimation(progress);
+        finish(transition.value.generation);
+      })();
+    },
+    [finish, flushSettleWaiters, progress, transition],
+  );
+
   const pause = useCallback(() => {
     runOnUI(() => {
       "worklet";
@@ -543,6 +580,7 @@ export function useOrrerySwitchRuntime(
       publish,
       pause,
       resume,
+      settle,
     }),
     [
       transition,
@@ -554,6 +592,7 @@ export function useOrrerySwitchRuntime(
       publish,
       pause,
       resume,
+      settle,
     ],
   );
 }
