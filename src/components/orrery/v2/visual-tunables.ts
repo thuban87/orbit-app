@@ -76,7 +76,7 @@ export interface SkyLook {
 
 /**
  * Per package × mode. 38.7-09 rework (owner, 2026-10-03): the nebula is Lab
- * B's distant baked nebula. Galaxy Dark "as in Lab B"; Standard Dark keeps
+ * B's distant baked nebula. Galaxy Dark at 35 % of Lab B (owner, 2026-10-04); Standard Dark keeps
  * Lab B's calm graphite chart (barely-there clouds, no ember); light themes
  * Lab B's low-contrast vellum washes (no glow, src-over). Plan 14 tunes the
  * non-hero themes.
@@ -92,12 +92,14 @@ export const SKY_LOOKS: Readonly<
       brightRadius: [1.1, 1.8],
       starAlpha: [0.35, 0.9],
       twinkleDepth: 0.45,
-      nebulaStrength: 1,
+      // Owner ruling 2026-10-04 (G-NEBULA, CONTEXT D-75): 35 % of Lab B's
+      // clouds, with the quieter far-star field.
+      nebulaStrength: 0.35,
       nebula: { lobeA: 0.47, lobeB: 0.42, glow: 0.26, ember: 0.3, dust: 0.38 },
       vignette: 0.62,
       vignetteShade: 0.55,
-      farStarAlpha: 0.9,
-      farStarDensity: 0.5,
+      farStarAlpha: 1.0,
+      farStarDensity: 0.8,
       tintStrength: 0.35,
       tintWash: 0.05,
       horizonStop: 0.6,
