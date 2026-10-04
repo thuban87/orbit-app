@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const record = vi.hoisted(() => ({ paths: [] as string[][] }));
 vi.mock("@shopify/react-native-skia", () => ({
-  BlendMode: { Dst: 2 },
+  BlendMode: { Dst: 2, Plus: 12 },
   PaintStyle: { Fill: 0, Stroke: 1 },
   StrokeCap: { Butt: 0, Round: 1 },
   VertexMode: { Triangles: 0, TriangleStrip: 1, TriangleFan: 2 },
@@ -31,6 +31,10 @@ vi.mock("@shopify/react-native-skia", () => ({
           paint.shader = shader;
         },
         setStrokeCap: () => {},
+        blend: undefined as number | undefined,
+        setBlendMode: (mode: number) => {
+          paint.blend = mode;
+        },
       };
       return paint;
     },
@@ -48,7 +52,8 @@ vi.mock("@shopify/react-native-skia", () => ({
         return {
           moveTo: (x: number, y: number) => commands.push(`M${x},${y}`),
           lineTo: (x: number, y: number) => commands.push(`L${x},${y}`),
-          addArc: () => commands.push("A"),
+          addArc: (_rect: unknown, start: number, sweep: number) =>
+            commands.push(`A${start},${sweep}`),
           close: () => commands.push("Z"),
         };
       },
@@ -87,7 +92,12 @@ import {
   drawOcclusion,
   drawOverlay,
   drawPolaris,
-  drawReorderOutline,
+  drawReorderHold,
+  HELD_GLOW_DP,
+  HELD_LINE_DP,
+  holdRingRadius,
+  NO_HOLD_FX,
+  type ReorderHoldFx,
   reticleGeometry,
   reticleLockState,
 } from "./draw-overlay";
@@ -113,6 +123,7 @@ const TEXT: OrreryInk = [0.875, 0.875, 0.9375, 1];
 const HALO: OrreryInk = [0.75, 0.625, 0.25, 1];
 const RETICLE: OrreryInk = [0.375, 0.5, 1, 1];
 const OCCLUSION: OrreryInk = [0.03125, 0.0625, 0.125, 1];
+const INSTRUMENT: OrreryInk = [0.25, 0.375, 0.9375, 1];
 
 interface Call {
   op: string;
@@ -145,8 +156,10 @@ function spec(overrides: Partial<OverlaySpec> = {}): OverlaySpec {
       polarisHalo: HALO,
       reticle: RETICLE,
       occlusion: OCCLUSION,
+      instrument: INSTRUMENT,
     },
     extent: 400,
+    additive: false,
     ...overrides,
   };
 }
@@ -243,46 +256,140 @@ describe("Polaris (overlay picture)", () => {
   });
 });
 
-describe("reorder outline (overlay picture)", () => {
-  it("while held: the held orbit on the world plane in accent ink, plus the ring around the body", () => {
-    const frame = frameFor(ringWorld(3), {
-      ...HOME_CAMERA,
-      zoom: 1,
-      tilt: 0,
-      lensShift: 1,
-    });
-    const held = frame.bodies.find((b) => b.id === 2)!;
-    const { canvas, calls } = recordingCanvas();
-    expect(
-      drawReorderOutline(canvas, frame, drag(2), spec(), effect, bands, 0.5),
-    ).toBe(true);
-    const vertices = calls.filter((c) => c.op === "drawVertices");
-    expect(vertices).toHaveLength(1);
-    const uniforms = (vertices[0].args[2] as { shader: { uniforms: number[] } })
-      .shader.uniforms;
-    expect(uniforms[9]).toBe(held.worldRingRadius);
-    expect(uniforms[10]).toBe(1); // 2 dp line
-    expect(uniforms[12]).toBe(0); // solid
-    expect(uniforms.slice(15, 19)).toEqual([...ACCENT]);
-    // A plain outline: no sun light, no depth fade, the whole ring.
-    expect(uniforms.slice(19, 24)).toEqual([1, 0, 1, 0, 1]);
-    expect(uniforms.slice(28, 30)).toEqual([0, 0]);
-    const circle = calls.find((c) => c.op === "drawCircle")!;
-    expect(circle.args.slice(0, 3)).toEqual([held.x, held.y, held.radius + 4]);
-    expect(paintOf(circle)).toMatchObject({ style: 1, width: 2 });
-    expect(paintOf(circle).color).toEqual([...ACCENT]);
+describe("38.7-12 (D-23): the reorder hold (overlay picture)", () => {
+  const home = { ...HOME_CAMERA, zoom: 1, tilt: 0, lensShift: 1 };
+  const hold = (over: Partial<ReorderHoldFx> = {}): ReorderHoldFx => ({
+    ...NO_HOLD_FX,
+    ...over,
   });
-  it("nothing without an active hold", () => {
-    const frame = frameFor(ringWorld(3), { ...HOME_CAMERA, zoom: 1 });
-    for (const held of [null, drag(2, false), drag(99)]) {
+  const uniformsOf = (call: Call) =>
+    (call.args[2] as { shader: { uniforms: number[] } }).shader.uniforms;
+  it("while charging: a screen-space track and an arc whose sweep follows the charge; no held orbit yet", () => {
+    const frame = frameFor(ringWorld(3), home);
+    const body = frame.bodies.find((b) => b.id === 2)!;
+    for (const charge of [0, 0.25, 0.5, 1]) {
+      record.paths = [];
       const { canvas, calls } = recordingCanvas();
       expect(
-        drawReorderOutline(canvas, frame, held, spec(), effect, bands, 0.5),
+        drawReorderHold(
+          canvas,
+          frame,
+          drag(2, false),
+          hold({ charge }),
+          spec(),
+          effect,
+          bands,
+          0.5,
+        ),
+      ).toBe(true);
+      expect(calls.filter((c) => c.op === "drawVertices")).toHaveLength(0);
+      const track = calls.find((c) => c.op === "drawCircle")!;
+      expect(track.args.slice(0, 3)).toEqual([
+        body.x,
+        body.y,
+        holdRingRadius(body.radius),
+      ]);
+      const arcs = record.paths.flat().filter((cmd) => cmd.startsWith("A"));
+      // From 12 o'clock, charge × 360°; nothing to sweep at 0.
+      expect(arcs).toEqual(charge > 0 ? [`A-90,${360 * charge}`] : []);
+    }
+  });
+  it("once armed: the held orbit glows on the world plane at the preview slot's radius, with the reticle locked on the body and no ghost ring", () => {
+    const frame = frameFor(ringWorld(3), home);
+    const body = frame.bodies.find((b) => b.id === 2)!;
+    for (const flash of [1, 0.3]) {
+      record.paths = [];
+      const { canvas, calls } = recordingCanvas();
+      expect(
+        drawReorderHold(
+          canvas,
+          frame,
+          drag(2),
+          hold({ charge: 1, flash }),
+          spec(),
+          effect,
+          bands,
+          0.5,
+        ),
+      ).toBe(true);
+      const rings = calls.filter((c) => c.op === "drawVertices");
+      // Glow + line, plus the slot flash while its timer runs.
+      expect(rings).toHaveLength(flash < 1 ? 3 : 2);
+      for (const ring of rings)
+        expect(uniformsOf(ring)[9]).toBe(body.worldRingRadius);
+      expect(rings.slice(0, 2).map((r) => uniformsOf(r)[10] * 2)).toEqual([
+        HELD_GLOW_DP,
+        HELD_LINE_DP,
+      ]);
+      // The locked reticle: its four brackets, no charge arc, and no plain
+      // circle hugging the body (the old ghost ring).
+      expect(calls.some((c) => c.op === "drawPath")).toBe(true);
+      expect(
+        calls.some(
+          (c) =>
+            c.op === "drawCircle" &&
+            c.args[0] === body.x &&
+            c.args[1] === body.y &&
+            c.args[2] === holdRingRadius(body.radius),
+        ),
+      ).toBe(false);
+    }
+  });
+  it("adds the glow and flash on dark themes (D-51), never the line", () => {
+    const frame = frameFor(ringWorld(3), home);
+    const { canvas, calls } = recordingCanvas();
+    drawReorderHold(
+      canvas,
+      frame,
+      drag(2),
+      hold({ flash: 0.2 }),
+      spec({ additive: true }),
+      effect,
+      bands,
+      0.5,
+    );
+    const blends = calls
+      .filter((c) => c.op === "drawVertices")
+      .map((c) => (c.args[2] as { blend?: number }).blend);
+    expect(blends).toEqual([12, undefined, 12]);
+  });
+  it("nothing without a hold or for an absent body; a hidden body gets no charge arc", () => {
+    const frame = frameFor(ringWorld(3), home);
+    for (const held of [null, drag(99), drag(99, false)]) {
+      const { canvas, calls } = recordingCanvas();
+      expect(
+        drawReorderHold(
+          canvas,
+          frame,
+          held,
+          hold({ charge: 0.5 }),
+          spec(),
+          effect,
+          bands,
+          0.5,
+        ),
       ).toBe(false);
       expect(calls).toHaveLength(0);
     }
+    const hidden = { ...frame, bodies: [...frame.bodies] };
+    const index = hidden.bodies.findIndex((b) => b.id === 2);
+    hidden.bodies[index] = { ...hidden.bodies[index], visible: false };
+    const { canvas, calls } = recordingCanvas();
+    expect(
+      drawReorderHold(
+        canvas,
+        hidden,
+        drag(2, false),
+        hold({ charge: 0.5 }),
+        spec(),
+        effect,
+        bands,
+        0.5,
+      ),
+    ).toBe(false);
+    expect(calls).toHaveLength(0);
   });
-  it("H2: a culled held body gets no screen circle; its orbit is skipped when the disc is wholly beyond the horizon", () => {
+  it("H2: a culled held body gets no reticle; its orbit is skipped when the disc is wholly beyond the horizon", () => {
     const pose = {
       ...HOME_CAMERA,
       x: 0,
@@ -306,10 +413,11 @@ describe("reorder outline (overlay picture)", () => {
     expect(frame.bodies[0].culled).toBe(true);
     const inner = recordingCanvas();
     expect(
-      drawReorderOutline(
+      drawReorderHold(
         inner.canvas,
         frame,
         drag(1),
+        hold(),
         spec(),
         effect,
         bands,
@@ -318,21 +426,22 @@ describe("reorder outline (overlay picture)", () => {
     ).toBe(false);
     expect(inner.calls).toHaveLength(0);
     // The outer ring still crosses the screen: its visible arc is drawn even
-    // when the held body itself is culled (no circle then).
+    // when the held body itself is culled (no reticle then).
     const culledOuter = { ...frame, bodies: [...frame.bodies] };
     culledOuter.bodies[1] = { ...culledOuter.bodies[1], culled: true };
     const outer = recordingCanvas();
-    drawReorderOutline(
+    drawReorderHold(
       outer.canvas,
       culledOuter,
       drag(2),
+      hold(),
       spec(),
       effect,
       bands,
       1,
     );
-    expect(outer.calls.filter((c) => c.op === "drawVertices")).toHaveLength(1);
-    expect(outer.calls.filter((c) => c.op === "drawCircle")).toHaveLength(0);
+    expect(outer.calls.filter((c) => c.op === "drawVertices")).toHaveLength(2);
+    expect(outer.calls.filter((c) => c.op === "drawPath")).toHaveLength(0);
   });
 });
 
@@ -546,7 +655,12 @@ describe("H2: the whole overlay on a 1,000-ring System at the pan/yaw extremes",
                     canvas,
                     frame,
                     overlay,
-                    drag(500),
+                    drag(500, lock !== 0),
+                    {
+                      charge: lock / RETICLE_LOCK_END,
+                      flash: 0.5,
+                      reduced: false,
+                    },
                     effect,
                     bands,
                     0.4,

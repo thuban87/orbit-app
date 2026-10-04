@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createOrreryGestures } from "@/components/orrery/use-orrery-camera";
+import {
+  createOrreryGestures,
+  REORDER_SLOT_FLASH_MS,
+  REORDER_SLOT_FLASH_REDUCED_MS,
+} from "@/components/orrery/use-orrery-camera";
 import {
   clampCameraPose,
   MAX_USER_TILT,
@@ -10,7 +14,9 @@ import type { ReorderDrag } from "./orrery-reorder-logic";
 import {
   captureReorder,
   moveReorder,
+  previewReorder,
   releaseReorder,
+  reorderTargetSlot,
 } from "./orrery-reorder-logic";
 
 const request = {
@@ -39,7 +45,15 @@ const frame = projectFrame(
   { width: 500, height: 700 },
   7,
 );
-vi.mock("react-native-reanimated", () => ({ runOnJS: (fn: unknown) => fn }));
+// withTiming → a marker of where the value animates to and over how long.
+vi.mock("react-native-reanimated", () => ({
+  runOnJS: (fn: unknown) => fn,
+  withTiming: (to: number, config: { duration: number }) => ({
+    animating: to,
+    duration: config.duration,
+  }),
+  ReduceMotion: { Never: "never" },
+}));
 vi.mock("react-native-gesture-handler", () => {
   const builder = () => {
     const handlers: Record<string, (...args: unknown[]) => void> = {};
@@ -151,7 +165,15 @@ describe("deliberate ring drag", () => {
 });
 
 describe("registered hold recognizer", () => {
-  function harness(initialFrame = frame, expectation = request) {
+  function harness(
+    initialFrame = frame,
+    expectation = request,
+    fx: {
+      charge?: { value: unknown };
+      flash?: { value: unknown };
+      reduced?: { value: boolean };
+    } = {},
+  ) {
     const drag = { value: null as ReorderDrag | null };
     const input = { value: initialInput() };
     const live = { value: true };
@@ -184,6 +206,7 @@ describe("registered hold recognizer", () => {
         generation: 7,
         acknowledge,
         commit,
+        ...(fx as Record<string, never>),
       },
     }) as unknown as {
       gestures: [Native, { gestures: [Native, { gestures: Native[] }] }];
@@ -207,6 +230,7 @@ describe("registered hold recognizer", () => {
     const move = () =>
       hold.handlers.onUpdate({ ...frame.bodies[2], numberOfPointers: 1 });
     return {
+      tap,
       hold,
       pan,
       drag,
@@ -330,5 +354,228 @@ describe("registered hold recognizer", () => {
     h.hold.handlers.onEnd({ numberOfPointers: 1 }, true);
     expect(h.acknowledge).not.toHaveBeenCalled();
     expect(h.commit).not.toHaveBeenCalled();
+  });
+
+  // ── 38.7-12 (D-23): the charge follows the hold's own state ──────────────
+  const FILL = { animating: 1, duration: HOLD_MS };
+  function charged(reduced = false) {
+    const fx = {
+      charge: { value: 0 as unknown },
+      flash: { value: 1 as unknown },
+      reduced: { value: reduced },
+    };
+    return { ...harness(frame, request, fx), ...fx };
+  }
+  it("charges only after a successful capture, linearly toward 1 over exactly HOLD_MS", () => {
+    const h = charged();
+    expect(h.charge.value).toEqual(FILL);
+    expect(h.flash.value).toBe(1); // no flash before arming
+    // A touch on empty space captures nothing: no charge, the hold fails.
+    const miss = charged();
+    const fail = vi.fn();
+    miss.charge.value = 0.4;
+    miss.hold.handlers.onTouchesDown(
+      { numberOfTouches: 1, allTouches: [{ x: -500, y: -500 }] },
+      { fail },
+    );
+    expect(fail).toHaveBeenCalledOnce();
+    expect(miss.drag.value).toBeNull();
+    expect(miss.charge.value).toBe(0);
+  });
+  it.each([
+    [
+      "slop before activation",
+      (h: ReturnType<typeof charged>) =>
+        h.hold.handlers.onTouchesMove(
+          {
+            numberOfTouches: 1,
+            allTouches: [{ x: frame.bodies[0].x + 40, y: frame.bodies[0].y }],
+          },
+          { fail: vi.fn() },
+        ),
+    ],
+    [
+      "a second finger (hold)",
+      (h: ReturnType<typeof charged>) =>
+        h.hold.handlers.onTouchesDown(
+          { numberOfTouches: 2, allTouches: [] },
+          { fail: vi.fn() },
+        ),
+    ],
+    [
+      "a second finger (camera gestures)",
+      (h: ReturnType<typeof charged>) =>
+        h.pan.handlers.onTouchesDown({ numberOfTouches: 2 }),
+    ],
+    [
+      "a failed activation (the pan owns the touch)",
+      (h: ReturnType<typeof charged>) => {
+        h.pan.handlers.onUpdate({
+          numberOfPointers: 1,
+          translationX: 20,
+          translationY: 0,
+        });
+        h.start();
+      },
+    ],
+    [
+      "finalize",
+      (h: ReturnType<typeof charged>) => h.hold.handlers.onFinalize(),
+    ],
+    [
+      "end without activation",
+      (h: ReturnType<typeof charged>) =>
+        h.hold.handlers.onEnd({ numberOfPointers: 1 }, false),
+    ],
+  ] as const)("returns to 0 on %s", (_reason, fail) => {
+    const h = charged();
+    expect(h.charge.value).toEqual(FILL);
+    fail(h);
+    expect(h.charge.value).toBe(0);
+    expect(h.acknowledge).not.toHaveBeenCalled();
+  });
+  it("is full at activation (haptic unchanged), flashes on arming and on every slot change, and empties on release or cancel", () => {
+    const h = charged();
+    h.start();
+    expect(h.drag.value?.active).toBe(true);
+    expect(h.charge.value).toBe(1);
+    expect(h.acknowledge).toHaveBeenCalledOnce();
+    expect(h.flash.value).toEqual({
+      animating: 1,
+      duration: REORDER_SLOT_FLASH_MS,
+    });
+    // The same slot: no new flash.
+    h.flash.value = 1;
+    const a = frame.bodies[0];
+    h.hold.handlers.onUpdate({ x: a.x, y: a.y, numberOfPointers: 1 });
+    expect(reorderTargetSlot(h.drag.value)).toBe(0);
+    expect(h.flash.value).toBe(1);
+    // A new slot: the flash restarts.
+    h.move();
+    expect(reorderTargetSlot(h.drag.value)).toBe(2);
+    expect(h.flash.value).toEqual({
+      animating: 1,
+      duration: REORDER_SLOT_FLASH_MS,
+    });
+    expect(h.charge.value).toBe(1);
+    h.hold.handlers.onEnd({ numberOfPointers: 1 }, true);
+    expect(h.charge.value).toBe(0);
+    expect(h.commit).toHaveBeenCalledOnce();
+    // An armed drag cancelled mid-move (blur) empties too.
+    const blurred = charged();
+    blurred.start();
+    blurred.live.value = false;
+    blurred.move();
+    expect(blurred.drag.value).toBeNull();
+    expect(blurred.charge.value).toBe(0);
+  });
+  it("is never animated under reduced motion: 0 while holding, 1 at activation", () => {
+    const h = charged(true);
+    expect(h.drag.value).not.toBeNull();
+    expect(h.charge.value).toBe(0);
+    h.start();
+    expect(h.charge.value).toBe(1);
+    expect(h.flash.value).toEqual({
+      animating: 1,
+      duration: REORDER_SLOT_FLASH_REDUCED_MS,
+    });
+    expect(h.acknowledge).toHaveBeenCalledOnce();
+  });
+});
+
+// ── 38.7-12 (carried from 38.7-03): the indexed capture and preview ─────────
+
+/** The pre-38.7-12 scans, kept as the reference the indexed versions match. */
+function referencePreview<T extends (typeof world)[number]>(
+  bodies: readonly T[],
+  held: ReorderDrag,
+): T[] {
+  return bodies.map((body) => {
+    const index = held.reorderedVisibleIds.indexOf(body.id);
+    if (index < 0 || body.kind !== "contact") return body;
+    const radius = held.radii[index],
+      distance = Math.hypot(body.x, body.y);
+    return {
+      ...body,
+      ringRadius: radius,
+      x: distance ? (body.x * radius) / distance : 0,
+      y: distance ? (body.y * radius) / distance : -radius,
+    };
+  });
+}
+function referenceRadii(
+  bodies: readonly { id: number; worldRingRadius: number }[],
+  ids: readonly number[],
+) {
+  return ids.map((id) => bodies.find((b) => b.id === id)?.worldRingRadius);
+}
+
+describe("38.7-12: indexed reorder capture and preview match the old scans", () => {
+  it("preview: the same bodies, slots and positions for every reordering (duplicate ids keep the first slot)", () => {
+    let seed = 7;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    for (let trial = 0; trial < 40; trial++) {
+      const count = 3 + Math.floor(random() * 30);
+      const bodies = Array.from({ length: count }, (_, i) => {
+        const ring = 40 + i * 12;
+        const angle = random() * Math.PI * 2;
+        return {
+          id: i + 1,
+          kind: (random() < 0.15 ? "satellite" : "contact") as "contact",
+          x: ring * Math.sin(angle),
+          y: -ring * Math.cos(angle),
+          radius: 10,
+          ringRadius: ring,
+        };
+      });
+      const ids = bodies
+        .filter(() => random() < 0.8)
+        .map((b) => b.id)
+        .sort(() => random() - 0.5);
+      // A duplicated id: indexOf (and the index) take its FIRST slot.
+      if (ids.length > 1 && trial % 3 === 0) ids.push(ids[0]);
+      const held: ReorderDrag = {
+        generation: 7,
+        id: ids[0] ?? 1,
+        request: {} as never,
+        radii: ids.map((_, i) => 40 + i * 9),
+        offset: { x: 0, y: 0 },
+        reorderedVisibleIds: ids,
+        active: true,
+        origin: { x: 0, y: 0 },
+      };
+      expect(previewReorder(bodies, held)).toEqual(
+        referencePreview(bodies, held),
+      );
+    }
+  });
+  it("capture: the same slot radii as the per-id scan, first match per id, any kind", () => {
+    const a = frame.bodies[0];
+    // A later duplicate id (e.g. a stale body) never replaces the first match.
+    const duplicated = {
+      ...frame,
+      bodies: [
+        ...frame.bodies,
+        { ...frame.bodies[2], worldRingRadius: 999, x: -900, y: -900 },
+      ],
+    };
+    for (const current of [frame, duplicated]) {
+      const captured = captureReorder(current, request, a.x, a.y)!;
+      expect(captured.radii).toEqual(
+        referenceRadii(current.bodies, request.expectedEligibleVisibleIds),
+      );
+    }
+    // An eligible id with no body still refuses the capture, as before.
+    expect(
+      captureReorder(
+        frame,
+        { ...request, expectedEligibleVisibleIds: [1, 2, 3, 42] },
+        a.x,
+        a.y,
+      ),
+    ).toBeNull();
   });
 });

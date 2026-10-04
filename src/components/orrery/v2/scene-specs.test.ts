@@ -336,6 +336,8 @@ describe("overlay specs", () => {
       // inks come from their Orrery tokens.
       reticle: inkOf(colors.orreryReticle),
       occlusion: inkOf(colors.orreryOcclusion),
+      // 38.7-12 (D-23): the reorder hold's instrument ink (follows the accent).
+      instrument: inkOf(colors.orreryInstrument),
     });
   });
 });

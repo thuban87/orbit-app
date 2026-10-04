@@ -45,7 +45,62 @@ import {
   type ReorderExpectation,
   type ReorderIntent,
   releaseReorder,
+  reorderTargetSlot,
 } from "@/logic/orrery-reorder-logic";
+
+// ── 38.7-12 (D-23): the reorder hold's feedback timers (Lab B as drawn) ─────
+
+/** Lab B `SLOT_FLASH_MS`: the armed ring's flash on arming and each slot change. */
+export const REORDER_SLOT_FLASH_MS = 340;
+/** Lab B `RM_FLASH_MS`: the same flash, shorter and static, under reduced motion. */
+export const REORDER_SLOT_FLASH_REDUCED_MS = 150;
+
+/** Linear easing (the charge fills at a constant rate over the hold). */
+function linearEase(t: number): number {
+  "worklet";
+  return t;
+}
+
+/**
+ * The charge after a successful capture: 0 → 1, linear, over exactly
+ * HOLD_MS (the long-press the hold activates after). Under reduced motion it
+ * stays 0 until activation (no animated fill).
+ */
+function startReorderCharge(
+  charge: CameraCell<number> | undefined,
+  reduced: boolean,
+): void {
+  "worklet";
+  if (!charge) return;
+  charge.value = 0;
+  if (!reduced)
+    charge.value = withTiming(1, {
+      duration: HOLD_MS,
+      easing: linearEase,
+      reduceMotion: ReduceMotion.Never,
+    });
+}
+
+/** Every failure path: the charge (and any running fill) back to 0. */
+function resetReorderCharge(charge: CameraCell<number> | undefined): void {
+  "worklet";
+  if (charge) charge.value = 0;
+}
+
+/** Arming or a slot change: the armed ring's flash timer restarts (0 → 1). */
+function flashReorderSlot(
+  flash: CameraCell<number> | undefined,
+  reduced: boolean,
+): void {
+  "worklet";
+  if (!flash) return;
+  flash.value = 0;
+  flash.value = withTiming(1, {
+    duration: reduced ? REORDER_SLOT_FLASH_REDUCED_MS : REORDER_SLOT_FLASH_MS,
+    easing: linearEase,
+    reduceMotion: ReduceMotion.Never,
+  });
+}
 
 interface GestureSamples {
   panX: number;
@@ -92,6 +147,10 @@ export function useOrreryCamera({
   const samples = useSharedValue(initialSamples());
   const live = useSharedValue(enabled);
   const reorder = useSharedValue<ReorderDrag | null>(null);
+  // 38.7-12 (D-23): the hold's charge (0..1) and the armed slot flash timer
+  // (0..1, 1 = idle), written only by the hold gesture's state transitions.
+  const reorderCharge = useSharedValue(0);
+  const reorderFlash = useSharedValue(1);
   const epoch = useSharedValue(0);
   const active = useSharedValue<MotionRequest | null>(null);
   const frame = useSharedValue<ProjectedFrame | null>(null);
@@ -143,6 +202,7 @@ export function useOrreryCamera({
       live.value = enabled;
       if (!enabled) {
         reorder.value = null;
+        reorderCharge.value = 0;
         frame.value = null;
         samples.value = initialSamples();
         stop();
@@ -154,19 +214,42 @@ export function useOrreryCamera({
         "worklet";
         live.value = false;
         reorder.value = null;
+        reorderCharge.value = 0;
         frame.value = null;
         samples.value = initialSamples();
         input.value = cancelInput(input.value);
         stop();
       })();
     };
-  }, [enabled, live, input, stop, reorder, frame, samples]);
+  }, [enabled, live, input, stop, reorder, reorderCharge, frame, samples]);
   // 38.7-11 (C3-M1): `epoch` bumps on every stop — any touch, recovery,
   // coast or cancel — so a focus framing can tell whether it is still the
   // camera's last word.
   return useMemo(
-    () => ({ input, samples, live, active, frame, reorder, epoch, ...motion }),
-    [input, samples, live, active, frame, reorder, epoch, motion],
+    () => ({
+      input,
+      samples,
+      live,
+      active,
+      frame,
+      reorder,
+      reorderCharge,
+      reorderFlash,
+      epoch,
+      ...motion,
+    }),
+    [
+      input,
+      samples,
+      live,
+      active,
+      frame,
+      reorder,
+      reorderCharge,
+      reorderFlash,
+      epoch,
+      motion,
+    ],
   );
 }
 
@@ -208,6 +291,15 @@ export function createOrreryGestures({
     generation: number;
     acknowledge: () => void;
     commit: (intent: ReorderIntent) => void;
+    /**
+     * 38.7-12 (D-23): the hold's charge — 0 → 1 over HOLD_MS from a
+     * successful capture, 0 on every failure path, 1 at activation — and the
+     * armed ring's slot-flash timer. Both optional (tests, previews).
+     */
+    charge?: CameraCell<number>;
+    flash?: CameraCell<number>;
+    /** Reduced motion: no animated charge fill (armed state only). */
+    reduced?: CameraCell<boolean>;
   };
 }) {
   const { input, samples, live } = camera;
@@ -215,7 +307,10 @@ export function createOrreryGestures({
     "worklet";
     stop();
     input.value = moveInput(input.value, pointers, 0);
-    if (pointers > 1 && reorder) reorder.drag.value = null;
+    if (pointers > 1 && reorder) {
+      reorder.drag.value = null;
+      resetReorderCharge(reorder.charge);
+    }
   };
   const tap = Gesture.Tap()
     .enabled(enabled)
@@ -464,6 +559,7 @@ export function createOrreryGestures({
         frame.value.generation !== reorder.generation
       ) {
         reorder.drag.value = null;
+        resetReorderCharge(reorder.charge);
         manager.fail();
         return;
       }
@@ -474,7 +570,13 @@ export function createOrreryGestures({
         point.x,
         point.y,
       );
-      if (!reorder.drag.value) manager.fail();
+      if (!reorder.drag.value) {
+        resetReorderCharge(reorder.charge);
+        manager.fail();
+        return;
+      }
+      // D-23: the charge fills over the hold itself (never its own timer).
+      startReorderCharge(reorder.charge, reorder.reduced?.value === true);
     })
     .onTouchesMove((event, manager) => {
       "worklet";
@@ -491,6 +593,7 @@ export function createOrreryGestures({
             HOLD_SLOP)
       ) {
         reorder.drag.value = null;
+        resetReorderCharge(reorder.charge);
         manager.fail();
       }
     })
@@ -505,11 +608,15 @@ export function createOrreryGestures({
         Math.hypot(event.translationX, event.translationY) > HOLD_SLOP
       ) {
         reorder.drag.value = null;
+        resetReorderCharge(reorder.charge);
         return;
       }
       stop();
       input.value = { ...input.value, owner: "reorder" };
       reorder.drag.value = { ...drag, active: true };
+      // Armed: full charge (also the reduced-motion jump), the slot flash.
+      if (reorder.charge) reorder.charge.value = 1;
+      flashReorderSlot(reorder.flash, reorder.reduced?.value === true);
       runOnJS(reorder.acknowledge)();
     })
     .onUpdate((event) => {
@@ -523,10 +630,18 @@ export function createOrreryGestures({
         frame.value.generation !== drag.generation
       ) {
         reorder.drag.value = null;
+        resetReorderCharge(reorder.charge);
         return;
       }
-      reorder.drag.value = moveReorder(drag, frame.value, event.x, event.y);
-      if (!reorder.drag.value) input.value = cancelInput(input.value);
+      const moved = moveReorder(drag, frame.value, event.x, event.y);
+      reorder.drag.value = moved;
+      if (!moved) {
+        resetReorderCharge(reorder.charge);
+        input.value = cancelInput(input.value);
+        return;
+      }
+      if (reorderTargetSlot(moved) !== reorderTargetSlot(drag))
+        flashReorderSlot(reorder.flash, reorder.reduced?.value === true);
     })
     .onEnd((event, success) => {
       "worklet";
@@ -541,11 +656,13 @@ export function createOrreryGestures({
           event.numberOfPointers <= 1,
       );
       reorder.drag.value = null;
+      resetReorderCharge(reorder.charge);
       if (intent) runOnJS(reorder.commit)(intent);
     })
     .onFinalize(() => {
       "worklet";
       reorder.drag.value = null;
+      resetReorderCharge(reorder.charge);
       if (input.value.owner === "reorder")
         input.value = cancelInput(input.value);
     });

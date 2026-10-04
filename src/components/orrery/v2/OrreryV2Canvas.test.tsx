@@ -324,6 +324,7 @@ function mount() {
     }),
     overlay: rt.sv({}),
     reorder: rt.sv(null),
+    hold: rt.sv({ charge: 0, flash: 1, reduced: false }),
     focus: rt.sv({ spec: {}, mix: 0, lock: 2 }),
     occlusion: rt.sv([]),
     bodies: rt.sv({ generation: 1, mountEpoch: 1, bodies: [] }),

@@ -63,9 +63,19 @@ export function captureReorder(
   if (!center || !pointer) return null;
   // D-12: bodies sit on their rings, so the frame's world ring radius is the
   // slot geometry directly (no projected-radius / zoom recovery, no drift).
-  const radii = request.expectedEligibleVisibleIds.map(
-    (id) => frame.bodies.find((b) => b.id === id)?.worldRingRadius,
-  );
+  // 38.7-12: one keyed pass (id → the FIRST body with that id, any kind —
+  // exactly `find`'s match) instead of a scan per eligible id.
+  const firstById: Record<number, number> = {};
+  for (let i = 0; i < frame.bodies.length; i++) {
+    const id = frame.bodies[i].id;
+    if (firstById[id] === undefined) firstById[id] = i;
+  }
+  const radii = request.expectedEligibleVisibleIds.map((id) => {
+    const index = firstById[id];
+    return index === undefined
+      ? undefined
+      : frame.bodies[index].worldRingRadius;
+  });
   if (radii.some((radius) => radius === undefined || !Number.isFinite(radius)))
     return null;
   return {
@@ -105,6 +115,14 @@ export function moveReorder(
     ),
   };
 }
+/**
+ * 38.7-12 (D-23): the slot the held body would drop into (its index in the
+ * reordered ids), −1 without a drag. A change while armed flashes the ring.
+ */
+export function reorderTargetSlot(drag: ReorderDrag | null): number {
+  "worklet";
+  return drag ? drag.reorderedVisibleIds.indexOf(drag.id) : -1;
+}
 export function releaseReorder(
   drag: ReorderDrag | null,
   generation: number,
@@ -133,8 +151,16 @@ export function previewReorder<T extends WorldBody>(
 ): T[] {
   "worklet";
   if (!drag?.active) return [...world];
+  // 38.7-12: one keyed pass per frame (id → its FIRST index in the reordered
+  // ids, exactly `indexOf`'s match) instead of a scan per body (~10^6
+  // comparisons per frame at All Contacts).
+  const slotOf: Record<number, number> = {};
+  const ids = drag.reorderedVisibleIds;
+  for (let i = 0; i < ids.length; i++)
+    if (slotOf[ids[i]] === undefined) slotOf[ids[i]] = i;
   return world.map((body) => {
-    const index = drag.reorderedVisibleIds.indexOf(body.id);
+    const slot = slotOf[body.id];
+    const index = slot === undefined ? -1 : slot;
     if (index < 0 || body.kind !== "contact") return body;
     const radius = drag.radii[index],
       distance = Math.hypot(body.x, body.y);

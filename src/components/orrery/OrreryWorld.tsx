@@ -96,6 +96,7 @@ import {
   EMPTY_BAKE_REGISTRY,
   teardownBakeRegistry,
 } from "./v2/base-bake";
+import type { ReorderHoldFx } from "./v2/draw-overlay";
 import {
   buildFocusSpec,
   collectOcclusion,
@@ -620,8 +621,12 @@ export function OrreryWorld({
   const overlaySpec = useSharedValue<OverlaySpec>(EMPTY_OVERLAY_SPEC);
   const focusSignature = focusedIds.join(",");
   const overlay = useMemo<OverlaySpec>(
-    () => ({ ink: buildOverlayInk(colors), extent: scene.extent }),
-    [colors, scene.extent],
+    () => ({
+      ink: buildOverlayInk(colors),
+      extent: scene.extent,
+      additive: themeMode === "dark",
+    }),
+    [colors, scene.extent, themeMode],
   );
   useEffect(() => {
     overlaySpec.value = overlay;
@@ -688,6 +693,14 @@ export function OrreryWorld({
     focusReleased,
     reducedMotion,
   ]);
+  // 38.7-12 (D-23): the reorder hold's live feedback for the overlay — the
+  // gesture-owned charge and slot flash (never React state per frame).
+  const { reorderCharge, reorderFlash } = camera;
+  const holdFx = useDerivedValue<ReorderHoldFx>(() => ({
+    charge: reorderCharge.value,
+    flash: reorderFlash.value,
+    reduced: reducedMotion.value,
+  }));
   const focusDraw = useDerivedValue<FocusDraw>(() => ({
     spec: focusState.value,
     mix: focusMix.value,
@@ -1062,6 +1075,9 @@ export function OrreryWorld({
           generation: scene.generation,
           acknowledge: onReorderActivated,
           commit: onReorder,
+          charge: camera.reorderCharge,
+          flash: camera.reorderFlash,
+          reduced: reducedMotion,
         },
         resolveTap: (current, x, y) => {
           "worklet";
@@ -1095,6 +1111,7 @@ export function OrreryWorld({
       onReorder,
       onReorderActivated,
       scene.generation,
+      reducedMotion,
     ],
   );
   const singleFocus = focusedIds.length === 1 ? focusedIds[0] : null;
@@ -1152,6 +1169,7 @@ export function OrreryWorld({
       plane={planeSpec}
       overlay={overlaySpec}
       reorder={camera.reorder}
+      hold={holdFx}
       focus={focusDraw}
       occlusion={occlusion}
       bodies={bodySpecs}

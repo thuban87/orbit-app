@@ -26,7 +26,8 @@
  *   only with the sun pulse on the ambient clock (still under reduced motion);
  * - `bodiesFront`: contacts and moons nearer than the sun;
  * - `labels`: the label backplates and Paragraphs at their allocations;
- * - `overlay`: Polaris, the reorder outline, the focus reticle and the
+ * - `overlay`: Polaris, the reorder hold (38.7-12: Lab B's charge arc, then
+ *   the glowing held orbit and a locked reticle), the focus reticle and the
  *   occlusion dim under every Orrery text surface (38.7-11).
  * 38.7-11 (D-21): the `focus` value (spec + Lab B's mix + Lab A's lock-on)
  * dims every other body, orbit and label while someone is focused; the base,
@@ -121,7 +122,7 @@ import {
   sunPulse,
 } from "./draw-bodies";
 import { drawLabels } from "./draw-labels";
-import { drawOverlay } from "./draw-overlay";
+import { drawOverlay, type ReorderHoldFx } from "./draw-overlay";
 import {
   drawPlaneGrid,
   drawPlanePulses,
@@ -167,8 +168,10 @@ export interface OrreryV2CanvasProps {
   plane: SharedValue<PlaneSpec>;
   /** Overlay inks (accent, Polaris, reticle, occlusion) and the Polaris extent (JS-built). */
   overlay: SharedValue<OverlaySpec>;
-  /** The reorder hold (gesture-owned), for the held-orbit outline. */
+  /** The reorder hold (gesture-owned), for the charge arc and held orbit. */
   reorder: SharedValue<ReorderDrag | null>;
+  /** 38.7-12 (D-23): the hold's charge and slot-flash timers (gesture-owned). */
+  hold: SharedValue<ReorderHoldFx>;
   /** 38.7-11: focus emphasis, world response and reticle lock-on (UI-derived). */
   focus: SharedValue<FocusDraw>;
   /** 38.7-11 (D-55): canvas rects of every Orrery text surface (UI-derived). */
@@ -282,6 +285,7 @@ export function OrreryV2Canvas({
   plane,
   overlay,
   reorder,
+  hold,
   focus,
   occlusion,
   bodies,
@@ -533,6 +537,7 @@ export function OrreryV2Canvas({
           frame.value,
           overlay.value,
           reorder.value,
+          hold.value,
           ringEffect,
           bands,
           aaDp,

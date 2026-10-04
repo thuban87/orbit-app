@@ -4,11 +4,17 @@
  * (drawn == tappable).
  *
  * Polaris is today's halo, 4-point star and centre dot (`hitPolaris`/
- * `onNorth` still reset north); the reorder hold shows the held orbit (on the
- * world plane, D-44) and a ring around the held body in the accent token.
+ * `onNorth` still reset north).
  * 38.7-11: the focused person carries Lab A's reticle (D-18) — the old solid
  * accent focus ring is gone — and every Orrery text surface gets the D-55
  * occlusion dim under it, drawn last.
+ * 38.7-12 (D-23): the reorder hold, ported as drawn from Lab B
+ * (`LabFocusFx.tsx` LabFeedbackPicture): while charging, a track ring and a
+ * charge arc filling with the hold around the held body (screen space); once
+ * armed, the held orbit as a glowing outline on the world plane (soft glow
+ * under a bright line, D-44 ring shader) that flashes on arming and on every
+ * slot change, and the D-18 reticle locked on the held body. The old plain
+ * accent outline and the ghost ring around the body are gone.
  *
  * Horizon safety (H2): every projection goes through Plan 05's non-throwing
  * primitives (`polarisProjection`, the frame's `culled` flag, the plane
@@ -21,6 +27,7 @@
  * Worklet helpers are defined above their callers (Hermes forward-ref rule).
  */
 import {
+  BlendMode,
   PaintStyle,
   type SkCanvas,
   Skia,
@@ -66,10 +73,31 @@ import {
   RETICLE_TICK_DP,
 } from "./visual-tunables";
 
-/** Today's reorder outline stroke: 2 dp. */
-const OUTLINE_WIDTH = 2;
-/** Today's reorder ring: 4 dp outside the held body's drawn disc. */
-const REORDER_RING_GAP = 4;
+// ── 38.7-12 (D-23) tunables: the reorder hold, Lab B values as drawn ──────
+
+/** Charge track and arc stroke, dp (Lab B `CHARGE_DP` 2). */
+export const HOLD_CHARGE_DP = 2;
+/** Charge track ring alpha (Lab B `CHARGE_TRACK_ALPHA` 0.22). */
+export const HOLD_CHARGE_TRACK_ALPHA = 0.22;
+/** Charge arc alpha (Lab B 0.9). */
+export const HOLD_CHARGE_ARC_ALPHA = 0.9;
+/** Charge ring radius: max(MIN, drawn × REACH + PAD) (Lab B `bracketRadius` 1.22 / 6 / 12). */
+export const HOLD_RING_REACH = 1.22;
+export const HOLD_RING_PAD = 6;
+export const HOLD_RING_MIN = 12;
+/** Armed orbit outline: soft glow width / alpha (Lab B `HELD_GLOW_DP` 7, `HELD_GLOW_ALPHA` 0.18). */
+export const HELD_GLOW_DP = 7;
+export const HELD_GLOW_ALPHA = 0.18;
+/** Armed orbit outline: line width / alpha (Lab B `HELD_LINE_DP` 1.6, `HELD_LINE_ALPHA` 0.9). */
+export const HELD_LINE_DP = 1.6;
+export const HELD_LINE_ALPHA = 0.9;
+/** Slot flash (Lab B `slotFlash`): width 3 → 3 + 12 dp (ease-out cubic), alpha 0.55·(1 − u)². */
+export const SLOT_FLASH_BASE_DP = 3;
+export const SLOT_FLASH_GROW_DP = 12;
+export const SLOT_FLASH_ALPHA = 0.55;
+/** Reduced motion: a static 3 dp flash fading 0.6·(1 − u) (Lab B). */
+export const SLOT_FLASH_REDUCED_ALPHA = 0.6;
+
 /** Polaris halo: 1.5 × the marker radius at 0.25 alpha. */
 const POLARIS_HALO_SCALE = 1.5;
 const POLARIS_HALO_ALPHA = 0.25;
@@ -140,46 +168,6 @@ export function drawPolaris(
   canvas.drawPath(star, ink);
   canvas.drawCircle(p.x, p.y, POLARIS_DOT_RADIUS, ink);
   return true;
-}
-
-/**
- * The held orbit (world plane, accent) and the ring around the held body
- * while a reorder drag is active. The frame is the reorder preview frame, so
- * `worldRingRadius` is the slot the body would drop into.
- */
-export function drawReorderOutline(
-  canvas: SkCanvas,
-  frame: AnimatedFrame,
-  drag: ReorderDrag | null,
-  spec: OverlaySpec,
-  effect: SkRuntimeEffect | null,
-  bands: RingBands | null,
-  aaDp: number,
-): boolean {
-  "worklet";
-  if (!drag?.active) return false;
-  const body = frameBodyById(frame, drag.id);
-  if (!body) return false;
-  let drawn = false;
-  if (body.worldRingRadius > 0)
-    drawn = drawPlaneRing(
-      canvas,
-      planeHomography(frame.pose, frame.viewport),
-      body.worldRingRadius,
-      plainRingLine(OUTLINE_WIDTH / 2, aaDp, spec.ink.accent),
-      effect,
-      bands,
-    );
-  if (!body.culled) {
-    canvas.drawCircle(
-      body.x,
-      body.y,
-      body.radius + REORDER_RING_GAP,
-      strokePaint(spec.ink.accent, 1, OUTLINE_WIDTH),
-    );
-    drawn = true;
-  }
-  return drawn;
 }
 
 /** Lab A `reticleGeometry`: the bracket box half-size and arm (screen dp). */
@@ -358,6 +346,204 @@ export function drawFocusReticle(
 }
 
 /**
+ * 38.7-12 (D-23): the hold's live feedback inputs — the charge (0..1, from
+ * the hold gesture), the slot-flash timer (0..1, 1 = idle) and reduced motion.
+ */
+export interface ReorderHoldFx {
+  charge: number;
+  flash: number;
+  reduced: boolean;
+}
+export const NO_HOLD_FX: ReorderHoldFx = Object.freeze({
+  charge: 0,
+  flash: 1,
+  reduced: false,
+});
+
+/** Lab B `bracketRadius`: the charge ring around a drawn disc of radius `drawn`. */
+export function holdRingRadius(drawn: number): number {
+  "worklet";
+  const r = drawn > 0 ? drawn : 0;
+  return Math.max(HOLD_RING_MIN, r * HOLD_RING_REACH + HOLD_RING_PAD);
+}
+
+/** ease-out cubic on 0..1. */
+function easeOutCubic(x: number): number {
+  "worklet";
+  const t = 1 - Math.max(0, Math.min(1, x));
+  return 1 - t * t * t;
+}
+
+/**
+ * Lab B `slotFlash`: the armed ring's flash at timer `u` (0 → 1), or null
+ * when idle (u ≥ 1, or not a number).
+ */
+export function slotFlashLook(
+  u: number,
+  reduced: boolean,
+): { widthDp: number; alpha: number } | null {
+  "worklet";
+  if (!(u >= 0) || u >= 1) return null;
+  if (reduced)
+    return {
+      widthDp: SLOT_FLASH_BASE_DP,
+      alpha: SLOT_FLASH_REDUCED_ALPHA * (1 - u),
+    };
+  return {
+    widthDp: SLOT_FLASH_BASE_DP + SLOT_FLASH_GROW_DP * easeOutCubic(u),
+    alpha: SLOT_FLASH_ALPHA * (1 - u) * (1 - u),
+  };
+}
+
+/** A round-capped stroke, added (D-51) on dark themes. */
+function holdPaint(
+  ink: OrreryInk,
+  alpha: number,
+  width: number,
+  additive: boolean,
+): SkPaint {
+  "worklet";
+  const paint = capPaint(ink, alpha, width, true);
+  if (additive) paint.setBlendMode(BlendMode.Plus);
+  return paint;
+}
+
+/** One world-plane outline pass of the held orbit (the D-44 ring shader). */
+function drawHeldRing(
+  canvas: SkCanvas,
+  frame: AnimatedFrame,
+  radius: number,
+  widthDp: number,
+  alpha: number,
+  ink: OrreryInk,
+  additive: boolean,
+  effect: SkRuntimeEffect | null,
+  bands: RingBands | null,
+  aaDp: number,
+): boolean {
+  "worklet";
+  return drawPlaneRing(
+    canvas,
+    planeHomography(frame.pose, frame.viewport),
+    radius,
+    { ...plainRingLine(widthDp / 2, aaDp, ink), alpha },
+    effect,
+    bands,
+    additive ? BlendMode.Plus : undefined,
+  );
+}
+
+/**
+ * D-23, Lab B as drawn. While the hold charges (a drag that is not yet
+ * active): a track ring and an arc from 12 o'clock sweeping `charge × 360°`
+ * around the held body — screen space, never under the perspective matrix,
+ * nothing for a culled or hidden body. Once armed: the held orbit (the
+ * preview frame's `worldRingRadius`, which follows the drag) as a soft glow
+ * under a bright line on the world plane, the slot flash, and the D-18
+ * reticle locked (still) on the held body. Returns whether anything drew.
+ */
+export function drawReorderHold(
+  canvas: SkCanvas,
+  frame: AnimatedFrame,
+  drag: ReorderDrag | null,
+  hold: ReorderHoldFx | null,
+  spec: OverlaySpec,
+  effect: SkRuntimeEffect | null,
+  bands: RingBands | null,
+  aaDp: number,
+): boolean {
+  "worklet";
+  if (!drag) return false;
+  const body = frameBodyById(frame, drag.id);
+  if (!body) return false;
+  const fx = hold ?? NO_HOLD_FX;
+  const ink = spec.ink.instrument;
+  const additive = spec.additive === true;
+  if (!drag.active) {
+    if (body.culled || !body.visible) return false;
+    const r = holdRingRadius(body.radius);
+    canvas.drawCircle(
+      body.x,
+      body.y,
+      r,
+      holdPaint(ink, HOLD_CHARGE_TRACK_ALPHA, HOLD_CHARGE_DP, false),
+    );
+    const sweep = Number.isFinite(fx.charge)
+      ? Math.max(0, Math.min(1, fx.charge))
+      : 0;
+    if (sweep > 0) {
+      const arc = Skia.Path.Make();
+      arc.addArc(
+        Skia.XYWHRect(body.x - r, body.y - r, r * 2, r * 2),
+        -90,
+        360 * sweep,
+      );
+      canvas.drawPath(
+        arc,
+        holdPaint(ink, HOLD_CHARGE_ARC_ALPHA, HOLD_CHARGE_DP, additive),
+      );
+    }
+    return true;
+  }
+  let drawn = false;
+  const radius = body.worldRingRadius;
+  if (radius > 0) {
+    drawn = drawHeldRing(
+      canvas,
+      frame,
+      radius,
+      HELD_GLOW_DP,
+      HELD_GLOW_ALPHA,
+      ink,
+      additive,
+      effect,
+      bands,
+      aaDp,
+    );
+    if (drawn) {
+      drawHeldRing(
+        canvas,
+        frame,
+        radius,
+        HELD_LINE_DP,
+        HELD_LINE_ALPHA,
+        ink,
+        false,
+        effect,
+        bands,
+        aaDp,
+      );
+      const flash = slotFlashLook(fx.flash, fx.reduced);
+      if (flash)
+        drawHeldRing(
+          canvas,
+          frame,
+          radius,
+          flash.widthDp,
+          flash.alpha,
+          ink,
+          additive,
+          effect,
+          bands,
+          aaDp,
+        );
+    }
+  }
+  if (!body.culled && body.visible)
+    drawn =
+      drawReticle(
+        canvas,
+        body.x,
+        body.y,
+        body.radius,
+        RETICLE_LOCK_END,
+        spec.ink.reticle,
+        1,
+      ) || drawn;
+  return drawn;
+}
+
+/**
  * D-55: inside each Orrery text surface's rect, a fill of the occlusion ink at
  * OCCLUSION_DIM, so whatever the canvas drew under it (sky, rings, bodies,
  * initials, photos, the reticle) is dimmed; the RN card glass above it is
@@ -394,7 +580,7 @@ export function drawOcclusion(
 }
 
 /**
- * The whole overlay picture: Polaris, the reorder outline, the focus reticle,
+ * The whole overlay picture: Polaris, the reorder hold, the focus reticle,
  * then the occlusion dim over everything under the text surfaces.
  */
 export function drawOverlay(
@@ -402,6 +588,7 @@ export function drawOverlay(
   frame: AnimatedFrame,
   spec: OverlaySpec,
   drag: ReorderDrag | null,
+  hold: ReorderHoldFx | null,
   effect: SkRuntimeEffect | null,
   bands: RingBands | null,
   aaDp: number,
@@ -410,7 +597,7 @@ export function drawOverlay(
 ): void {
   "worklet";
   drawPolaris(canvas, frame, spec);
-  drawReorderOutline(canvas, frame, drag, spec, effect, bands, aaDp);
+  drawReorderHold(canvas, frame, drag, hold, spec, effect, bands, aaDp);
   drawFocusReticle(canvas, frame, spec, focus);
   drawOcclusion(canvas, occlusion, spec);
 }

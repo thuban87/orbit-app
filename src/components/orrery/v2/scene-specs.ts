@@ -583,11 +583,15 @@ export interface OverlayInk {
   polarisHalo: OrreryInk;
   reticle: OrreryInk;
   occlusion: OrreryInk;
+  /** 38.7-12 (D-23): the reorder hold's charge arc and armed outline (accent-following). */
+  instrument: OrreryInk;
 }
 export interface OverlaySpec {
   ink: OverlayInk;
   /** The world extent Polaris sits beyond (`scene.extent`). */
   extent: number;
+  /** D-51 blend family from the resolved mode: dark additive, light src-over. */
+  additive: boolean;
 }
 
 export function buildOverlayInk(colors: ThemePalette): OverlayInk {
@@ -597,6 +601,7 @@ export function buildOverlayInk(colors: ThemePalette): OverlayInk {
     polarisHalo: tokenInk(colors.starPalette[0] ?? colors.textPrimary),
     reticle: tokenInk(colors.orreryReticle),
     occlusion: tokenInk(colors.orreryOcclusion),
+    instrument: tokenInk(colors.orreryInstrument),
   };
 }
 
@@ -607,8 +612,10 @@ export const EMPTY_OVERLAY_SPEC: OverlaySpec = Object.freeze({
     polarisHalo: NO_INK,
     reticle: NO_INK,
     occlusion: NO_INK,
+    instrument: NO_INK,
   },
   extent: 1,
+  additive: false,
 });
 
 // ── Bodies (38.7-07, D-43/D-53) ─────────────────────────────────────────────
