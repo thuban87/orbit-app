@@ -26,6 +26,58 @@ import type {
  * galaxy-dark hues are INFRASTRUCTURE seeds the owner may retune (HANDOFF §7+Q4);
  * the newly-authored palettes are AA-tuned at Claude's discretion (23-CONTEXT).
  */
+/**
+ * 38.7-14 (D-26/D-27, owner item T-GLIGHT: "galaxy light should have more
+ * flavor"): candidate Galaxy Light Orrery skies. No lab built a Galaxy Light
+ * flavour, so the owner picks between rendered candidates; the single
+ * constant ACTIVE_GALAXY_LIGHT_FLAVOUR selects one. Only the Orrery sky
+ * tokens differ (the app's other Galaxy Light tokens are untouched), and the
+ * contrast proofs bound every one (they composite over pure black and white).
+ *   - "lab-b" (GL-A, the baseline): Lab B's light vellum sky with Plan 09's
+ *     cool lavender washes — today's look.
+ *   - "dark-hues" (GL-B): the same sky with Galaxy Dark's own nebula hues as
+ *     the wash inks (deeper blue / violet / teal) and its star hues deepened
+ *     into ink specks (navy, blue, gold, cyan).
+ *   - "warm-violet" (GL-C): a warmer lavender sky with violet / rose / amber
+ *     washes and plum-violet specks.
+ */
+export type GalaxyLightFlavour = "lab-b" | "dark-hues" | "warm-violet";
+export type OrrerySkyTokens = Pick<
+  ThemePalette,
+  | "orrerySkyBase"
+  | "orrerySkyHorizon"
+  | "orreryNebula"
+  | "orrerySkyStars"
+  | "orreryOcclusion"
+>;
+export const GALAXY_LIGHT_FLAVOURS: Readonly<
+  Record<GalaxyLightFlavour, OrrerySkyTokens>
+> = {
+  "lab-b": {
+    orrerySkyBase: "#E8ECFA",
+    orrerySkyHorizon: "#D6DDF6",
+    orreryNebula: ["#9DAEEA", "#C0A6E8", "#98CDE2"],
+    orrerySkyStars: ["#515A78", "#3F4A8C", "#6B5A9E"],
+    orreryOcclusion: "#E8ECFA",
+  },
+  "dark-hues": {
+    orrerySkyBase: "#E8ECFA",
+    orrerySkyHorizon: "#D6DDF6",
+    orreryNebula: ["#3E52A8", "#6A4FAE", "#2E708E"],
+    orrerySkyStars: ["#3F4A8C", "#4A63C9", "#9A7420", "#2E7FA8"],
+    orreryOcclusion: "#E8ECFA",
+  },
+  "warm-violet": {
+    orrerySkyBase: "#EEEAF8",
+    orrerySkyHorizon: "#DDD3F1",
+    orreryNebula: ["#9C84D8", "#D58FBF", "#E9B07E"],
+    orrerySkyStars: ["#4F3F86", "#7A4F9E", "#9E5A6E"],
+    orreryOcclusion: "#EEEAF8",
+  },
+};
+/** The Galaxy Light sky in use (T-GLIGHT; the owner's pick, default Lab B). */
+export const ACTIVE_GALAXY_LIGHT_FLAVOUR: GalaxyLightFlavour = "lab-b";
+
 export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
   galaxy: {
     id: "galaxy",
@@ -229,12 +281,10 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       markerInteraction: "#2A46C7",
       markerLifecycle: "#515A78",
       // Orrery sub-palette, Galaxy Light (D-26: Lab B's light sky, with its own
-      // cool lavender flavour so it differs from Standard Light; Plan 14
-      // refines it). Light modes draw ink tokens with src-over.
-      orrerySkyBase: "#E8ECFA",
-      orrerySkyHorizon: "#D6DDF6",
-      orreryNebula: ["#9DAEEA", "#C0A6E8", "#98CDE2"],
-      orrerySkyStars: ["#515A78", "#3F4A8C", "#6B5A9E"],
+      // flavour so it differs from Standard Light). Light modes draw ink tokens
+      // with src-over. 38.7-14: the sky tokens (base, horizon, nebula, sky
+      // stars, occlusion) come from the selected T-GLIGHT candidate.
+      ...GALAXY_LIGHT_FLAVOURS[ACTIVE_GALAXY_LIGHT_FLAVOUR],
       // 12 deeper per-System tints (src-over ink washes on the light sky).
       orrerySystemHues: [
         "#3355E6",
@@ -258,7 +308,6 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       orreryReticle: "#3355E6",
       orreryInstrument: "#3355E6",
       orreryWarp: "#3355E6",
-      orreryOcclusion: "#E8ECFA",
     },
   },
   // The SECOND package — a calmer, FLATTER treatment vs galaxy's deep-space

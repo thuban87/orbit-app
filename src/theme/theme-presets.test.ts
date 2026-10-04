@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 // this suite too).
 import { assertSelfSunColour, SELF_SUN_COLOUR_RE } from "@/db/app-settings-dao";
 import {
+  ACTIVE_GALAXY_LIGHT_FLAVOUR,
   DEFAULT_PRESET_ID,
+  GALAXY_LIGHT_FLAVOURS,
   resolveMode,
   resolvePalette,
   THEME_PRESETS,
@@ -391,6 +393,39 @@ describe("Orrery V2 sub-palette (38.7 D-51)", () => {
       const palette = resolvePalette(pkg, mode);
       expect(palette.orreryReticle).toBe(palette.accent);
       expect(palette.orreryInstrument).toBe(palette.accent);
+    }
+  });
+});
+
+describe("38.7-14 (D-26/D-27, T-GLIGHT): Galaxy Light flavour candidates", () => {
+  const HEX6 = /^#[0-9A-Fa-f]{6}$/;
+
+  it("the active flavour is the one Galaxy Light renders (default: Lab B's)", () => {
+    expect(ACTIVE_GALAXY_LIGHT_FLAVOUR).toBe("lab-b");
+    expect(resolvePalette("galaxy", "light")).toMatchObject(
+      GALAXY_LIGHT_FLAVOURS[ACTIVE_GALAXY_LIGHT_FLAVOUR],
+    );
+  });
+
+  it("every candidate is a complete, valid sky that stays distinct from Standard Light (D-27)", () => {
+    const standard = resolvePalette("standard", "light");
+    for (const [id, sky] of Object.entries(GALAXY_LIGHT_FLAVOURS)) {
+      for (const hex of [
+        sky.orrerySkyBase,
+        sky.orrerySkyHorizon,
+        sky.orreryOcclusion,
+        ...sky.orreryNebula,
+        ...sky.orrerySkyStars,
+      ])
+        expect(hex, id).toMatch(HEX6);
+      expect(sky.orreryNebula.length, id).toBeGreaterThanOrEqual(2);
+      expect(sky.orreryNebula.length, id).toBeLessThanOrEqual(3);
+      expect(sky.orrerySkyStars.length, id).toBeGreaterThan(0);
+      // The occlusion dim sinks toward the sky's own base.
+      expect(sky.orreryOcclusion, id).toBe(sky.orrerySkyBase);
+      expect(sky.orrerySkyBase, id).not.toBe(standard.orrerySkyBase);
+      expect(sky.orrerySkyHorizon, id).not.toBe(standard.orrerySkyHorizon);
+      expect(sky.orreryNebula, id).not.toEqual(standard.orreryNebula);
     }
   });
 });
