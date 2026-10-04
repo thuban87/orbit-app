@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.7
 current_phase_name: Orrery V2 — Renderer, Camera & Visual Language
 status: executing
-stopped_at: Completed 38.7-11-PLAN.md
-last_updated: "2026-10-04T05:00:00.000Z"
-last_activity: 2026-10-03
-last_activity_desc: "38.7-11 complete (Lab C focus framing above a docked card, past IDENTITY_ZOOM; D-60 taps; Lab A reticle lock-on replaces the solid ring; Lab B dim-the-rest, sun exempt; occlusion dim under Orrery text surfaces; cluster tap zooms with panel kept; 6 Pro device pass: reticle matches the lab look, no tuning; surfaced: cluster zoom never fires after an in-session System switch (pre-existing forceSwitchHome early return), card occlusion dim invisible under 0.91 glass; 6611 tests); next 38.7-12"
+stopped_at: Completed 38.7-12-PLAN.md
+last_updated: "2026-10-04T06:20:00.000Z"
+last_activity: 2026-10-04
+last_activity_desc: "38.7-12 complete (Lab B corner brackets on every Orrery HUD plate; map under the Orrery title via an Orrery-local header with the Lab B fading scrim, ShellAppBar untouched; loading box removed; reorder charge arc + armed glow orbit + slot flash + locked reticle; carried-in fixes: cluster zoom after a System switch, focus card moon rows; 6 Pro device pass: every look matches Lab B, no tuning; surfaced: first-open System label flicker (All Contacts > Unavailable System > Size 20) over an empty sky, View options pushes camera controls under +; 6640 tests); next 38.7-13"
 state_head: 5268e6a0f37a4ec36be68abbcb11d8fb5fa0305e
 progress:
   total_phases: 29
   completed_phases: 20
   total_plans: 275
-  completed_plans: 268
+  completed_plans: 269
 carried_forward:
 
   - "38.7 INSERTED (owner 2026-10-02): Orrery V2 — Renderer, Camera & Visual Language, before Phase 39. Built from the Orrery renderer R&D (labs A/B/C; synthesis docs/experiments/orrery-renderer/synthesis/). Dossier docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md ACCEPTED after codex review: D-01..D-58, no OPEN items. Day 1 = release baseline of main on both phones, then the owner locks numeric perf gates (D-56). Lab branches experiment/orrery-* are local-only evidence; keep them until V2 ships."
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.7 (Orrery V2 — Renderer, Camera & Visual Language) — EXECUTING
-Plan: 12 of 16
+Plan: 13 of 16
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
@@ -419,6 +419,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.7 P09 | ~4h | 5 tasks | 31 files |
 | Phase 38.7 P10 | ~2.5h | 5 tasks | 30 files |
 | Phase 38.7 P11 | code + ~35 min device | 3 tasks | 25 files |
+| Phase 38.7 P12 | code + ~20 min device | 3 tasks | 26 files |
 
 ## Accumulated Context
 
@@ -946,6 +947,8 @@ Foundational decisions affecting current work:
 - [Phase 38.7]: 38.7-10: D-73: moon bump as is, D-47 difference and focus-only-when-split accepted; D-74: G-RIM OPEN, Plan 11 must draw the lab reticle, not a solid circle
 - [Phase 38.7]: 38.7-11: reticle kept as the Lab A port (no Lab B under-glow); on the 6 Pro it matches the lab references' weight
 - [Phase 38.7]: 38.7-11: OCCLUSION_DIM stays 0.7 — invisible under the 0.91 galaxy card glass, cannot hide the map; Plan 14 tunes it by the contrast proof
+- [Phase 38.7]: 38.7-12: every Plan 12 look (brackets, title over the map, charge arc, armed glow orbit, slot flash) matches its Lab B reference on the 6 Pro; no tuning commit
+- [Phase 38.7]: 38.7-12: no ring field exists (Plan 08 chose world-plane), so the armed outline runs on the world-plane ring shader only; the H6 ring-field half was skipped
 
 ### Pending Todos
 
@@ -1015,8 +1018,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-04T05:00:00.000Z
-**Stopped at:** Completed 38.7-11-PLAN.md
+**Last session:** 2026-10-04T06:20:00.000Z
+**Stopped at:** Completed 38.7-12-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
