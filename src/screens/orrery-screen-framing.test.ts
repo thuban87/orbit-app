@@ -667,7 +667,7 @@ it("refits once when the real card is taller, once more on growth, never within 
   expect(h.pending).toHaveLength(started + 2);
 });
 
-it("never refits after a manual camera gesture, or while a switch is running", async () => {
+it("never refits after a manual camera gesture", async () => {
   const gesture = harness("tilted", PHONE);
   await gesture.ready();
   await gesture.focus(1);
@@ -679,7 +679,9 @@ it("never refits after a manual camera gesture, or while a switch is running", a
   gesture.height(300);
   expect(gesture.pending).toHaveLength(count);
   expect(gesture.pose()).toEqual(pose);
+});
 
+it("never writes a pose from the refit while a switch is running", async () => {
   const switching = harness("tilted", PHONE);
   await switching.ready();
   await switching.focus(1);
@@ -706,7 +708,7 @@ it("a retained focus stays at destination Home after a System switch, even when 
   expect(h.pose()).toEqual(pose);
 });
 
-it("a restored session, Recenter or a density change ends the framing's authority (C4-M3)", async () => {
+it("a restored session (Profile Back) ends the framing's authority (C4-M3)", async () => {
   const restored = harness("tilted", PHONE);
   await restored.ready();
   await restored.focus(1);
@@ -727,19 +729,31 @@ it("a restored session, Recenter or a density change ends the framing's authorit
   restored.height(300);
   expect(restored.pending).toHaveLength(count);
   expect(restored.pose()).toEqual(saved);
+});
 
+it("Recenter ends the framing's authority (C4-M3)", async () => {
   const recentered = harness("tilted", PHONE);
   await recentered.ready();
   await recentered.focus(1);
   recentered.settle();
+  // A layout callback from the card that is still in flight at Recenter.
+  const lateHeight = recentered.find("FocusCard")!.props.onHeight as (
+    h: number,
+  ) => void;
   (recentered.find("Controls")!.props.onRecenter as () => void)();
   recentered.render();
   recentered.settle();
-  const afterRecenter = recentered.pending.length;
-  // Recenter clears focus; the card is gone, so re-focus and re-centre.
+  // Recenter clears focus and goes Home; the late re-measure moves nothing.
   expect(recentered.find("FocusCard")).toBeUndefined();
-  expect(afterRecenter).toBeGreaterThan(0);
+  const home = { ...recentered.pose() };
+  const count = recentered.pending.length;
+  lateHeight(300);
+  recentered.render();
+  expect(recentered.pending).toHaveLength(count);
+  expect(recentered.pose()).toEqual(home);
+});
 
+it("a density change ends the framing's authority (C4-M3)", async () => {
   const density = harness("tilted", PHONE);
   await density.ready();
   await density.focus(1);

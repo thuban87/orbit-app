@@ -4,6 +4,7 @@ import {
   type CameraPose,
   type CameraViewport,
   clampCameraPose,
+  frameBodies,
   HOME_CAMERA,
   IDENTITY_ZOOM,
   MAX_ZOOM,
@@ -15,6 +16,8 @@ import {
   worldExtent,
 } from "./orrery-camera-logic";
 import {
+  CLUSTER_SEPARATION_PX,
+  clusterZoomPose,
   expectedFocusCardRect,
   FOCUS_CARD_ESTIMATED_HEIGHT,
   FOCUS_TARGET_PX,
@@ -394,5 +397,113 @@ describe("38.7-11 (D-60): taps after the new framing go through the real tap pat
     await staleUid.actions.dispatch(intent);
     expect(staleUid.io.openProfile).not.toHaveBeenCalled();
     expect(staleUid.io.reject).toHaveBeenCalledWith("removed");
+  });
+});
+
+describe("38.7-11 (D-19): a cluster tap zooms into the cluster", () => {
+  /** The cluster panel docked at the bottom (an obstacle, as today). */
+  const panelled: CameraViewport = {
+    ...viewport,
+    obstacles: [
+      ...(viewport.obstacles ?? []),
+      { x: 0, y: 470, width: 412, height: 230 },
+    ],
+  };
+  const tight = [
+    contact(21, -14, -200),
+    contact(22, 0, -200),
+    contact(23, 14, -200),
+  ];
+  const wide = [
+    contact(31, -150, -60),
+    contact(32, 150, -60),
+    contact(33, 152, -62),
+  ];
+
+  function closest(
+    frame: ReturnType<typeof projectFrame>,
+    ids: number[],
+  ): number {
+    const bodies = frame.bodies.filter((b) => ids.includes(b.id));
+    let best = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < bodies.length; i++)
+      for (let j = i + 1; j < bodies.length; j++)
+        best = Math.min(
+          best,
+          Math.hypot(bodies[i].x - bodies[j].x, bodies[i].y - bodies[j].y),
+        );
+    return best;
+  }
+  function inside(
+    frame: ReturnType<typeof projectFrame>,
+    ids: number[],
+    view: CameraViewport,
+  ) {
+    const rect = usableCameraRect(view)!;
+    for (const b of frame.bodies.filter((body) => ids.includes(body.id))) {
+      expect(b.culled).toBe(false);
+      expect(b.x - b.radius).toBeGreaterThanOrEqual(rect.x - 1e-3);
+      expect(b.x + b.radius).toBeLessThanOrEqual(rect.x + rect.width + 1e-3);
+      expect(b.y - b.radius).toBeGreaterThanOrEqual(rect.y - 1e-3);
+      expect(b.y + b.radius).toBeLessThanOrEqual(rect.y + rect.height + 1e-3);
+    }
+  }
+
+  it.each(TILTS)(
+    "zooms in until the members separate, never below frameBodies, inside the usable rect (tilt %s)",
+    (tilt) => {
+      const start = poseAt(tilt, { zoom: 0.5 });
+      const all = [sun, ...tight];
+      const ext = worldExtent(all);
+      const base = frameBodies(tight, panelled, ext, start)!;
+      const zoomed = clusterZoomPose(tight, panelled, start, ext);
+      expect(zoomed).not.toBeNull();
+      expect(zoomed!.zoom).toBeGreaterThanOrEqual(base.pose.zoom - 1e-9);
+      const frame = projectFrame(all, zoomed!, panelled, 1, { extent: ext });
+      // Separated, unless MAX_ZOOM bounds it first.
+      if (zoomed!.zoom < MAX_ZOOM - 1e-6)
+        expect(closest(frame, [21, 22, 23])).toBeGreaterThanOrEqual(
+          CLUSTER_SEPARATION_PX - 0.5,
+        );
+      expect(zoomed!.zoom).toBeGreaterThan(start.zoom);
+      inside(frame, [21, 22, 23], panelled);
+    },
+  );
+
+  it.each(TILTS)(
+    "a group that cannot separate within the frame zooms only as far as it still fits (tilt %s)",
+    (tilt) => {
+      const start = poseAt(tilt, { zoom: 0.5 });
+      const all = [sun, ...wide];
+      const ext = worldExtent(all);
+      const base = frameBodies(wide, panelled, ext, start)!;
+      const zoomed = clusterZoomPose(wide, panelled, start, ext)!;
+      expect(zoomed.zoom).toBeGreaterThanOrEqual(base.pose.zoom - 1e-9);
+      const frame = projectFrame(all, zoomed, panelled, 1, { extent: ext });
+      inside(frame, [31, 32, 33], panelled);
+    },
+  );
+
+  it("never throws for a cluster straddling the horizon at 62°; null keeps the camera", () => {
+    const rim = 58 + 999 * 34;
+    const straddle = [contact(41, 0, rim), contact(42, 4, rim + 2)];
+    const ext = rim + 40;
+    for (const zoom of [MIN_ZOOM, 1, MAX_ZOOM])
+      for (const yaw of [0, Math.PI]) {
+        const start = clampCameraPose(
+          { ...HOME_CAMERA, tilt: 62 * DEG, zoom, yaw },
+          ext,
+        );
+        let result: CameraPose | null = null;
+        expect(() => {
+          result = clusterZoomPose(straddle, panelled, start, ext);
+        }).not.toThrow();
+        if (result)
+          for (const body of straddle)
+            expect(tryProjectWorldPoint(body, result, panelled)).not.toBeNull();
+      }
+    expect(
+      clusterZoomPose(straddle, { width: 0, height: 0 }, poseAt(0), ext),
+    ).toBeNull();
   });
 });

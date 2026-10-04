@@ -88,6 +88,7 @@ import {
   type WorldBody,
 } from "@/logic/orrery-camera-logic";
 import {
+  clusterZoomPose,
   expectedFocusCardRect,
   FOCUS_CARD_ESTIMATED_HEIGHT,
   FOCUS_CARD_REFIT_PX,
@@ -1154,14 +1155,31 @@ export function OrreryScreen() {
       lastHomeDomain.current = domain;
       return;
     }
-    // D-19/D-47: a single focus is framed above the docked card, uncapped.
+    // D-19/D-47: a single focus is framed above the docked card, uncapped;
+    // an open cluster zooms in until its members separate (the panel, an
+    // obstacle in `viewport`, stays open beside it).
     const focusedPose =
       focusedBodies.length === 1 && !clusterOpen
         ? (frameSingleFocus(focusedBodies[0], scene, lastCardHeight.current) ??
           undefined)
-        : focusedBodies.length > 0
-          ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
-          : undefined;
+        : focusedBodies.length > 0 && clusterOpen
+          ? (clusterZoomPose(
+              focusedBodies,
+              viewport,
+              pose.value,
+              scene.extent,
+            ) ?? undefined)
+          : focusedBodies.length > 0
+            ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)
+                ?.pose
+            : undefined;
+    if (clusterOpen && focusedBodies.length > 0 && !focusedPose) {
+      // H2: no safe cluster pose (beyond the horizon) — the panel stays open
+      // and the camera stays where it is.
+      lastHomeFrame.current = key;
+      lastHomeDomain.current = domain;
+      return;
+    }
     const home = selectSystemFraming(
       false,
       focusedPose,
