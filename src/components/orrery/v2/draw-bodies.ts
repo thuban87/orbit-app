@@ -8,8 +8,11 @@
  *     lighter shading, the status rim and the soft status atmosphere (rogue:
  *     cold, no glow; decay/rogue desaturated);
  *   - the sun with a star look (`spec.sun`, D-15/D-37): Lab A's corona and
- *     granulated disc (a limb band over a photo), their detail moving only
- *     with the sun pulse and still under reduced motion;
+ *     granulated disc, their detail moving only with the sun pulse and still
+ *     under reduced motion. Owner G-SUN (2026-10-03): the star is drawn even
+ *     when the sun's occupant has a photo — the star sun's spec never carries
+ *     one (`buildBodyLooks`), so the photo branch below serves only a sun
+ *     without the star look;
  *   - a parent's far-zoom moon bump (D-31): a moon-ink half-disc on its rim,
  *     fading out as the moons split;
  *   - a stack's pips (D-54): ring-coloured dots along the front body's rim,

@@ -5,8 +5,10 @@
  * sizes and speeds only.
  *
  * Owner rulings (2026-10-03, 38.7-09): the grid "weaker" (D-09) and the
- * pulses "as in Lab B" (D-10); see the phase 38.7 planning record
- * 38.7-VISUAL-TUNING.md `## Rulings`.
+ * pulses "as in Lab B" (D-10); (38.7-10) faces "fine", wash-out "stronger",
+ * the sun's shimmer "as in Lab A", the moon bump "as is"; see the phase 38.7
+ * planning record 38.7-VISUAL-TUNING.md `## Rulings` and
+ * `## Body rulings`.
  */
 import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 
@@ -218,7 +220,9 @@ export const RING_LOOKS: Readonly<
  * The bump is new (no lab drew one; HARVEST-MAP class N). It reads as a moon
  * peeking over the parent's rim: a half-disc in the moon ink, a touch smaller
  * than a split moon (MIN_SATELLITE_PX 10 → 5 dp radius) so it never reads as a
- * second body, and clearly larger than nothing at phone size.
+ * second body, and clearly larger than nothing at phone size. Owner G-BUMP
+ * (2026-10-03, 38.7-10): "as is", with the D-47 split-by-zoom / names-by-size
+ * difference accepted.
  */
 /** Bump radius (screen dp) for a parent with one moon. */
 export const MOON_BUMP_RADIUS_DP = 4;
@@ -251,7 +255,7 @@ export const PIP_MORE_INSET_DP = 0.6;
 
 // ── Lit status bodies (38.7-10: D-13, D-14; Lab B labb-effects BODY_LIT) ──
 
-/** How the sun lights a face (one preset is active; Task 4 picks it). */
+/** How the sun lights a face. */
 export interface FaceLight {
   /**
    * The darkest a face gets on its night side (0..1; 1 = no shading at all).
@@ -263,31 +267,15 @@ export interface FaceLight {
   /** Wrap lighting: softens the terminator (0 = hard Lambert). */
   wrap: number;
 }
-export type FacePresetId = "A" | "B" | "C";
 /**
- * G-FACE options for the owner (Plan 10 Task 4):
- * A "lighter" — the plan's D-13 values (floor ≥ 0.8 on dark, z 0.9, wrap 0.5);
- * B "as in Lab B" — Lab B's own lighting, for comparison (too dark per D-13);
- * C "flat" — no sun shading on faces at all (rim and glow still show status).
+ * The face shading per resolved mode (D-13). Owner G-FACE (2026-10-03,
+ * 38.7-10): "fine" — the "current lighter" values (floor >= 0.8 on dark,
+ * z 0.9, wrap 0.5) stay; the Lab B, halfway and flat options were dropped.
  */
-export const FACE_PRESETS: Readonly<
-  Record<FacePresetId, Readonly<Record<ResolvedMode, FaceLight>>>
-> = {
-  A: {
-    dark: { floor: 0.85, lightZ: 0.9, wrap: 0.5 },
-    light: { floor: 0.9, lightZ: 0.9, wrap: 0.5 },
-  },
-  B: {
-    dark: { floor: 0.55, lightZ: 0.4, wrap: 0.35 },
-    light: { floor: 0.75, lightZ: 0.4, wrap: 0.35 },
-  },
-  C: {
-    dark: { floor: 1, lightZ: 1, wrap: 1 },
-    light: { floor: 1, lightZ: 1, wrap: 1 },
-  },
+export const FACE_LIGHT: Readonly<Record<ResolvedMode, FaceLight>> = {
+  dark: { floor: 0.85, lightZ: 0.9, wrap: 0.5 },
+  light: { floor: 0.9, lightZ: 0.9, wrap: 0.5 },
 };
-/** The active face preset (a one-letter edit; the owner rules at G-FACE). */
-export const FACE_PRESET: FacePresetId = "A";
 
 /** One mode's status rim + atmosphere (Lab B DARK_BODIES / LIGHT_BODIES). */
 export interface BodyLook {
@@ -303,7 +291,11 @@ export interface BodyLook {
   /** Specular glint strength. */
   spec: number;
 }
-/** Lab B's approved rim + atmosphere look, per resolved mode (D-14). */
+/**
+ * Lab B's approved rim + atmosphere look, per resolved mode (D-14). Owner
+ * G-RIM is OPEN (2026-10-03, 38.7-10): the owner is clarifying; these are
+ * the "as in Lab B" values.
+ */
 export const BODY_LOOKS: Readonly<Record<ResolvedMode, BodyLook>> = {
   dark: {
     rimDp: 1.5,
@@ -335,12 +327,13 @@ export const BODY_RIM_TOKEN_MIX = 0;
 export const BODY_GLOW_TOKEN_MIX = 0;
 
 /**
- * G-DESAT (product meaning, owner confirms at Task 4): how much a decay or
- * rogue contact's photo / swatch is desaturated (0 = off). Lab B C-16 values.
- * Only these two statuses are ever desaturated.
+ * How much a decay or rogue contact's photo / swatch is desaturated
+ * (0 = off). Owner G-DESAT (2026-10-03, 38.7-10): "stronger" — rogue almost
+ * grey, decay clearly muted (Lab B's C-16 values were 0.25 / 0.45). Only these
+ * two statuses are ever desaturated.
  */
-export const DECAY_DESATURATION = 0.25;
-export const ROGUE_DESATURATION = 0.45;
+export const DECAY_DESATURATION = 0.6;
+export const ROGUE_DESATURATION = 0.9;
 
 /**
  * Per status: atmosphere, Fresnel and glint multipliers (Lab B
@@ -364,6 +357,7 @@ export const SUN_CORONA_ALPHA = { dark: 1, light: 0.85 } as const;
  * D-37: the corona and granulation do not churn. Their shader time is a
  * fixed phase (Lab A's still frame: 1.7 corona, 2.3 granulation) that swings
  * ± these amounts with the existing sun pulse only; still under reduced motion.
+ * Owner G-SUN (2026-10-03, 38.7-10): the shimmer "as in Lab A".
  */
 export const SUN_CORONA_TIME = 1.7;
 export const SUN_CORONA_SWING = 0.5;

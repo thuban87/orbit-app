@@ -40,8 +40,7 @@ import {
   BODY_LOOKS,
   BODY_RIM_TOKEN_MIX,
   DECAY_DESATURATION,
-  FACE_PRESET,
-  FACE_PRESETS,
+  FACE_LIGHT,
   type FaceLight,
   RING_DASHED_DUTY,
   RING_DASHED_PERIOD_DP,
@@ -639,14 +638,14 @@ function mixInk(a: OrreryInk, b: OrreryInk, amount: number): OrreryInk {
 /**
  * A contact's lit material for `status` in `mode`: Lab B's per-status
  * material (rogue: no atmosphere, cold `rogueExtinguished` rim), the mode's
- * rim + atmosphere look, the active face preset, and the decay/rogue
+ * rim + atmosphere look, the mode's face shading, and the decay/rogue
  * desaturation (no other status is ever desaturated).
  */
 export function bodyLit(
   status: ProfileStatus | null,
   colors: ThemePalette,
   mode: ResolvedMode,
-  face: FaceLight = FACE_PRESETS[FACE_PRESET][mode],
+  face: FaceLight = FACE_LIGHT[mode],
 ): BodyLit {
   const look = BODY_LOOKS[mode];
   const material =
@@ -706,7 +705,10 @@ export interface OrreryBodyLook {
   outlineInk: OrreryInk;
   /** The fallback swatch behind the initials (contact, sun). */
   swatchInk: OrreryInk;
-  /** The photo key (relative path) the body shows, or null (initials only). */
+  /**
+   * The photo key (relative path) the body shows, or null (initials only).
+   * Always null for the star sun (D-15, owner G-SUN 2026-10-03).
+   */
   photoKey: string | null;
   /** Initials glyph font size (body-local px; `bodyInitialsLayout`). */
   initialsFontSize: number;
@@ -829,7 +831,11 @@ export function buildBodyLooks(
         ? tokenInk(style.bodyFill)
         : tokenInk(identity.glowColor ?? colors.border),
       swatchInk: swatchOf(identity.name),
-      photoKey: identity.photo,
+      // Owner G-SUN (2026-10-03, 38.7-10, D-15): the sun body is always
+      // Lab A's star — the occupant's photo is never painted on it (nor
+      // loaded for it). The photo still shows on the focus card, Profile
+      // and lists, which do not read these looks.
+      photoKey: kind === "sun" && sun ? null : identity.photo,
       initialsFontSize: bodyInitialsLayout(kind, body.radius).fontSize,
       focusInk: null,
       moonInk,

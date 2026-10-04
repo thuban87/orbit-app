@@ -50,8 +50,7 @@ import {
 import {
   BODY_LOOKS,
   DECAY_DESATURATION,
-  FACE_PRESET,
-  FACE_PRESETS,
+  FACE_LIGHT,
   ROGUE_DESATURATION,
 } from "./visual-tunables";
 
@@ -763,19 +762,17 @@ describe("38.7-10 (D-13/D-14/D-15): lit status bodies and the star sun, as numbe
               : 0,
         );
   });
-  it("faces use the active preset; every option keeps faces lighter than dark (D-13: floor ≥ the lab's)", () => {
+  it("faces use the ruled shading; it keeps faces lighter than dark (D-13: floor >= the lab's)", () => {
     const colors = THEME_PRESETS.galaxy.dark;
-    expect(bodyLit("stable", colors, "dark")).toMatchObject(
-      FACE_PRESETS[FACE_PRESET].dark,
-    );
-    // The plan's lighter preset: floor ≥ 0.8 on dark, z 0.8-1.0, wrap 0.5.
-    expect(FACE_PRESETS.A.dark.floor).toBeGreaterThanOrEqual(0.8);
-    expect(FACE_PRESETS.A.dark.lightZ).toBeGreaterThanOrEqual(0.8);
-    expect(FACE_PRESETS.A.dark.lightZ).toBeLessThanOrEqual(1);
-    expect(FACE_PRESETS.A.dark.wrap).toBe(0.5);
-    expect(bodyLit("stable", colors, "dark", FACE_PRESETS.C.dark).floor).toBe(
-      1,
-    );
+    expect(bodyLit("stable", colors, "dark")).toMatchObject(FACE_LIGHT.dark);
+    expect(bodyLit("stable", colors, "light")).toMatchObject(FACE_LIGHT.light);
+    // Owner G-FACE "fine": floor >= 0.8 on dark, z 0.8-1.0, wrap 0.5.
+    expect(FACE_LIGHT.dark.floor).toBeGreaterThanOrEqual(0.8);
+    expect(FACE_LIGHT.dark.lightZ).toBeGreaterThanOrEqual(0.8);
+    expect(FACE_LIGHT.dark.lightZ).toBeLessThanOrEqual(1);
+    expect(FACE_LIGHT.dark.wrap).toBe(0.5);
+    const flat = { floor: 1, lightZ: 1, wrap: 1 };
+    expect(bodyLit("stable", colors, "dark", flat).floor).toBe(1);
   });
   it("buildBodyLooks with a mode gives contacts a lit material, ring and pip inks, and the sun its star look; without a mode, today's look", () => {
     const colors = THEME_PRESETS.standard.light;
@@ -796,6 +793,51 @@ describe("38.7-10 (D-13/D-14/D-15): lit status bodies and the star sun, as numbe
       expect(look.sun).toBeUndefined();
     }
   });
+  it.each([
+    ["self sun with a photo", {}, "avatars/self.jpg"],
+    [
+      "contact sun with a photo",
+      {
+        sunContactId: 7,
+        sunContactName: "Sun Contact",
+        occupant: {
+          photo: "avatars/sun.jpg",
+          status: "stable",
+          archived: false,
+        },
+      },
+      "avatars/sun.jpg",
+    ],
+    ["self sun without a photo", { selfPhoto: null }, null],
+  ] as const)(
+    "owner G-SUN (D-15): %s is always the star — no photo on the sun body, none requested",
+    (_name, occupant, plainPhoto) => {
+      for (const [, colors, mode] of THEMES) {
+        const resources = bodyResources(
+          [{ status: "stable", name: "Ada", photo: "avatars/ada.jpg" }],
+          occupant as Partial<Sun>,
+        );
+        const [sun, ada] = buildBodyLooks(resources, colors, mode);
+        expect(sun.kind).toBe("sun");
+        expect(sun.sun).toEqual(sunLook(colors, mode));
+        expect(sun.photoKey).toBeNull();
+        // A contact keeps its photo.
+        expect(ada.photoKey).toBe("avatars/ada.jpg");
+        expect(
+          buildPhotoRequests([sun, ada], new Set([sun.key]), null).map(
+            (request) => request.key,
+          ),
+        ).toEqual(["avatars/ada.jpg"]);
+      }
+      // Without the star look (no mode) the sun keeps today's photo body.
+      const plain = buildBodyLooks(
+        bodyResources([], occupant as Partial<Sun>),
+        THEME_PRESETS.galaxy.dark,
+      )[0];
+      expect(plain.sun).toBeUndefined();
+      expect(plain.photoKey).toBe(plainPhoto);
+    },
+  );
   it("the star sun: the starlight core per mode, chart on light, screen-blended on dark only", () => {
     const dark = sunLook(THEME_PRESETS.galaxy.dark, "dark");
     expect(dark.starlightInk).toEqual(
