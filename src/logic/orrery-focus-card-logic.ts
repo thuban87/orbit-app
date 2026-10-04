@@ -76,7 +76,7 @@ const EPSILON = 1e-6;
 /** Where the card sits (canvas coordinates); `visible: false` = not drawn. */
 export interface FocusCardRect extends CameraRect {
   visible: boolean;
-  /** The card's maximum height (half the usable rect, as today). */
+  /** The card's maximum height (half its column, at least half the usable rect). */
   maxHeight: number;
 }
 export const HIDDEN_FOCUS_CARD: FocusCardRect = Object.freeze({
@@ -115,7 +115,15 @@ export function focusCardDock(
     region.width,
     reserved >= FOCUS_CARD_MIN_WIDTH ? reserved : region.width,
   );
-  const maxHeight = region.height / 2;
+  // 38.7-12: half the card's own column — from the top of the usable rect
+  // (below the title and HUD triggers) down to its dock — and never less than
+  // half the usable rect. The usable rect alone can be the band ABOVE the
+  // controls' wide free column, which cut the card's last moon row off.
+  const maxHeight =
+    Math.max(
+      region.height,
+      viewport.height - FOCUS_CARD_BOTTOM_GAP - region.y,
+    ) / 2;
   const measured =
     Number.isFinite(height) && height > 0
       ? height

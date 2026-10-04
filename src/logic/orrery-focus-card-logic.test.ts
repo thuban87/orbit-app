@@ -123,15 +123,17 @@ describe("38.7-11 (D-19): the docked focus card", () => {
     expect(far.x).toBe(usableCameraRect(viewport)?.x);
   });
 
-  it("caps the card at half the usable height and is hidden without a body", () => {
+  it("caps the card at half its own column (below the top HUD, down to its dock) and is hidden without a body", () => {
     const card = focusCardPlacement(
       viewport,
       { x: 170, y: 300, radius: 30 },
       2000,
     );
     const usable = usableCameraRect(viewport)!;
-    expect(card.height).toBeCloseTo(usable.height / 2, 6);
-    expect(card.maxHeight).toBeCloseTo(usable.height / 2, 6);
+    // Never below today's half-usable cap.
+    const cap = Math.max(700 - 8 - usable.y, usable.height) / 2;
+    expect(card.height).toBeCloseTo(cap, 6);
+    expect(card.maxHeight).toBeCloseTo(cap, 6);
     expect(focusCardPlacement(viewport, null, 180)).toBe(HIDDEN_FOCUS_CARD);
     expect(
       focusCardPlacement(viewport, { x: 1, y: 1, radius: 0 }, 180).visible,
@@ -143,6 +145,30 @@ describe("38.7-11 (D-19): the docked focus card", () => {
         180,
       ).visible,
     ).toBe(false);
+  });
+});
+
+describe("38.7-12: the focus card shows every moon row", () => {
+  // As on the Pixel: the controls stack's measured obstacle is its wide
+  // (200 dp) free column, so the largest usable rect is the band ABOVE the
+  // controls, not the card's own column at the canvas bottom.
+  const phone: CameraViewport = {
+    width: 412,
+    height: 700,
+    obstacles: [
+      { x: 0, y: 0, width: 412, height: 60 },
+      { x: 196, y: 430, width: 200, height: 270 },
+    ],
+  };
+  it("a card with two moon rows (~250 dp) is not cut to half the band above the controls", () => {
+    const usable = usableCameraRect(phone)!;
+    expect(usable.y + usable.height).toBe(430); // the band above the controls
+    const card = focusCardPlacement(phone, { x: 150, y: 250, radius: 30 }, 250);
+    expect(card.height).toBe(250);
+    expect(card.y + card.height).toBeCloseTo(700 - 8, 6);
+    expect(card.y).toBeGreaterThanOrEqual(usable.y);
+    // The framing reserves the same full-height card.
+    expect(expectedFocusCardRect(phone, 250).height).toBe(250);
   });
 });
 

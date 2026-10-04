@@ -15,6 +15,9 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
 import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 
+/** GlassSurface's 1 dp border, top + bottom (read inside a worklet). */
+const GLASS_BORDER_PX = 2;
+
 /**
  * Lightweight identity, docked at the canvas bottom below the focused body
  * (38.7-11, D-19). Its position comes from `placement` — the UI-thread
@@ -64,9 +67,13 @@ export function OrreryFocusContext({
       top: rect.y,
     };
   });
+  // The scroll viewport fits INSIDE the glass border, so the outer box's
+  // maxHeight never clips its last row (38.7-12; as OrreryControls does).
   const scrollBounds = useAnimatedStyle(() => {
     const rect = placement.value;
-    return { maxHeight: rect.visible ? rect.maxHeight : 180 };
+    return {
+      maxHeight: (rect.visible ? rect.maxHeight : 180) - GLASS_BORDER_PX,
+    };
   });
   return (
     <Animated.View
