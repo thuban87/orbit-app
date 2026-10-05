@@ -67,12 +67,16 @@ export function OrreryControls({
   };
   // Zero native measurement is brief; controls retain their names/disabled state in
   // normal flow until a free column is measured. Covered controls never accept input.
+  // 38.7-16: the root keeps the full free-column width (the measured obstacle
+  // is unchanged) but takes no touches itself ("box-none"); only the plate
+  // column below does, so nothing beside the plates (the docked focus card's
+  // buttons) is ever swallowed by the invisible part of the column.
   return (
     <View
       ref={measurement.ref}
       collapsable={false}
       onLayout={measurement.onLayout}
-      pointerEvents={inputBlocked ? "none" : "auto"}
+      pointerEvents={inputBlocked ? "none" : "box-none"}
       accessibilityElementsHidden={inputBlocked}
       importantForAccessibility={inputBlocked ? "no-hide-descendants" : "auto"}
       style={[
@@ -88,7 +92,10 @@ export function OrreryControls({
       ]}
     >
       <ScrollView
-        style={region ? { maxHeight: region.height - 2 } : undefined}
+        style={[
+          styles.plates,
+          region ? { maxHeight: region.height - 2 } : undefined,
+        ]}
         contentContainerStyle={styles.stack}
       >
         <GlassSurface
@@ -158,7 +165,9 @@ const styles = StyleSheet.create({
   root: { position: "absolute", zIndex: 12, elevation: 12 },
   unmeasured: { right: SPACING.base, bottom: SPACING.base, maxWidth: "90%" },
   // The region is a deliberately wide free column so it can avoid measured
-  // obstacles. Pin the 55px controls to its right edge, directly above the FAB.
+  // obstacles. Pin the 55px controls to its right edge, directly above the FAB;
+  // 38.7-16: the scroll view is only the plate column wide (the touch area).
+  plates: { width: CONTROL_SIZE, alignSelf: "flex-end" },
   stack: { gap: SPACING.xs, alignItems: "flex-end" },
   controlSurface: { width: CONTROL_SIZE, height: CONTROL_SIZE },
   control: {

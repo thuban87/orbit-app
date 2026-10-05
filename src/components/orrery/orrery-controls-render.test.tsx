@@ -249,6 +249,59 @@ describe("actual Orrery controls and detail sheet", () => {
       true,
     );
   });
+  it("38.7-16: the controls take touches only on their plate column; the docked focus card stacks above them, and a hidden card sits off-screen", () => {
+    const ui = controls();
+    const root = ui.nodes[0];
+    // The root keeps the full free-column width (the measured obstacle) but
+    // takes no touches itself.
+    expect(root.props.pointerEvents).toBe("box-none");
+    const rootStyle = Object.assign({}, ...[root.props.style].flat());
+    expect(rootStyle).toMatchObject({ width: 200, zIndex: 12, elevation: 12 });
+    // Only the 55 dp plate column (pinned right) is a touch target.
+    const scroll = ui.nodes.find((node) => node.type === "ScrollView");
+    if (!scroll) throw new Error("Missing the controls' plate column");
+    expect(Object.assign({}, ...[scroll.props.style].flat())).toMatchObject({
+      width: 55,
+      alignSelf: "flex-end",
+    });
+    const card = (visible: boolean) =>
+      all(
+        resolve(
+          OrreryFocusContext({
+            target: { kind: "member", id: 1, uid: "a" },
+            name: "Ada",
+            placement: {
+              value: visible
+                ? {
+                    x: 40,
+                    y: 500,
+                    width: 280,
+                    height: 180,
+                    maxHeight: 300,
+                    visible: true,
+                  }
+                : HIDDEN_FOCUS_CARD,
+            } as never,
+            cardHeight: { value: 180 } as never,
+            blocked: false,
+            onClear: vi.fn(),
+            onProfile: vi.fn(),
+          }),
+        ),
+      )[0];
+    const shown = card(true);
+    expect(shown.type).toBe("AnimatedView");
+    const shownStyle = Object.assign({}, ...[shown.props.style].flat());
+    // Above the controls (12), below the title (20).
+    expect(shownStyle.zIndex).toBeGreaterThan(rootStyle.zIndex);
+    expect(shownStyle.elevation).toBeGreaterThan(rootStyle.elevation);
+    expect(shownStyle.zIndex).toBeLessThan(20);
+    expect(shownStyle).toMatchObject({ opacity: 1, left: 40, top: 500 });
+    // Hidden: never left at its last rect on the map (no taps land on it).
+    const hiddenStyle = Object.assign({}, ...[card(false).props.style].flat());
+    expect(hiddenStyle.opacity).toBe(0);
+    expect(hiddenStyle.left).toBeLessThan(-10_000);
+  });
   it.each(["initial", "loading", "error", "stale", "ready"] as const)(
     "opens the real detail modal for shared %s state with truthful copy",
     (status) => {

@@ -17,6 +17,11 @@ import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 
 /** GlassSurface's 1 dp border, top + bottom (read inside a worklet). */
 const GLASS_BORDER_PX = 2;
+/**
+ * 38.7-16: a hidden card moves this far off the left edge (read inside a
+ * worklet), so it never keeps its last rect on the map and takes no touches.
+ */
+const HIDDEN_CARD_LEFT = -100_000;
 
 /**
  * Lightweight identity, docked at the canvas bottom below the focused body
@@ -27,6 +32,9 @@ const GLASS_BORDER_PX = 2;
  * a camera obstacle (C-M2): only its height leaves here, through `cardHeight`
  * (the placement) and `onHeight` (the screen's framing refit).
  * Optional relationship content belongs to the qualified parent (D-11).
+ * 38.7-16: it stacks above the camera controls (zIndex/elevation 13 over
+ * their 12, below the title's 20), so a docked card's buttons always take
+ * their own taps; a hidden card sits off-screen.
  */
 export function OrreryFocusContext({
   target,
@@ -58,7 +66,7 @@ export function OrreryFocusContext({
 }) {
   const position = useAnimatedStyle(() => {
     const rect = placement.value;
-    if (!rect.visible) return { opacity: 0 };
+    if (!rect.visible) return { opacity: 0, left: HIDDEN_CARD_LEFT, top: 0 };
     return {
       opacity: 1,
       width: rect.width,
@@ -117,6 +125,6 @@ export function OrreryFocusContext({
   );
 }
 const styles = StyleSheet.create({
-  root: { position: "absolute", overflow: "hidden" },
+  root: { position: "absolute", overflow: "hidden", zIndex: 13, elevation: 13 },
   content: { padding: SPACING.sm, gap: SPACING.sm },
 });
