@@ -559,5 +559,5 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
     - **Sign-off:** the owner declined further device testing. He installed the fix release `orbit-38.7-release-2026-10-05.apk` (code `09c6c579`, SHA-256 `2af90914…`), delivered to his Drive with his approval, on his personal Moto Razr. He checked that the map stays put, that the focus card takes taps, and that camera moves are smoother: "All 3 look good."
     - **Explicit acceptances:** FV-1 fixed; SW-2; MEM-1 (G7); G3 All Contacts 1.008 s and G5 Size 120 ↔ All Contacts 174.7 ms.
     - **Not measured --- owner declined further testing (2026-10-05):** the recorded pan/pinch windows (G1 owner part), the G8 recorded-window feel ratings, the portrait scenario, the D-11 churn set and the TalkBack by-ear check.
-    - **Not ruled, listed in the report's gap list:** G6 Size 120 warm-start temperature, the animations-on idle CPU cost, emoji initials ellipsizing, and the 3a companion sheet at All Contacts.
+    - **Ruled at phase close (CONTEXT D-80):** T-1 G6 Size 120 warm-start temperature accepted; CPU-1 animations-on idle CPU → todo; EMO-1 emoji initials ellipsizing → todo; 3A-1 3a companion sheet at All Contacts → todo.
     - **D-52:** the Choose System ANR todo is closed (did not reproduce on DEBUG or release).
