@@ -106,7 +106,8 @@
  * frame state over, the body specs published), the canvas arms the native
  * "presented" probe (patched Skia: `armPresentProbe` / `onAndroidPresented`)
  * and the cover lifts on its answer — the frame drawn, its GPU work done and
- * latched — or at the bounded fallbacks of `cover-gate.ts` (never sticks).
+ * (round 3) composited on the display, not just queued — or at the bounded
+ * fallbacks of `cover-gate.ts` (never sticks).
  */
 import {
   Canvas,

@@ -14,8 +14,18 @@
  * content (the first-frame state over, the body specs published), the
  * canvas arms the native "presented" probe with a fresh token (patched
  * Skia 2.6.2: the SurfaceView answers once that frame was drawn, its GPU
- * work finished and SurfaceFlinger latched it) and the cover lifts on the
- * answer carrying that token. Bounded, so it can never stick:
+ * work finished and SurfaceFlinger COMPOSITED it on the display) and the
+ * cover lifts on the answer carrying that token.
+ *
+ * 38.7-15 round 3 (cold open: "presented", then ~0.3 s of black on the
+ * process's first surface): a copy of the newest queued buffer did not prove
+ * the display showed it. The native probe now also requires a non-black
+ * buffer and composite evidence — API 34+ SurfaceFlinger's trusted-
+ * presentation callback on the SurfaceView's layer, API 29–33 the window's
+ * next frame commit — answering "presented"; without that evidence within
+ * its bound it answers "unlatched" (lifted at once, reason
+ * "presented-unconfirmed", so the device logs tell them apart).
+ * Bounded, so it can never stick:
  * COVER_PRESENT_TIMEOUT_MS after arming, and COVER_HARD_MAX_MS after the
  * canvas mounted, it lifts whatever happened (a binary without the patch,
  * a probe that could not tell, a scene whose specs never come).
@@ -35,6 +45,8 @@ export const COVER_HARD_MAX_MS = 6000;
 
 export type CoverLiftReason =
   | "presented"
+  /** The content frame was drawn and copied; its composite was not confirmed. */
+  | "presented-unconfirmed"
   | "probe-failed"
   | "present-timeout"
   | "cap";
@@ -104,7 +116,13 @@ export function createCoverGate(deps: CoverGateDeps): CoverGate {
     },
     presented(answered, outcome) {
       if (done || token === null || answered !== token) return;
-      finish(outcome === "presented" ? "presented" : "probe-failed");
+      finish(
+        outcome === "presented"
+          ? "presented"
+          : outcome === "unlatched"
+            ? "presented-unconfirmed"
+            : "probe-failed",
+      );
     },
     dispose() {
       done = true;

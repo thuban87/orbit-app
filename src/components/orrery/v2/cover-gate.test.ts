@@ -60,6 +60,27 @@ it("a probe that could not tell lifts at once; no answer lifts at the present ti
   expect(lifts).toEqual(["present-timeout"]);
 });
 
+it("round 3: a frame copied but not confirmed on the display lifts at once, told apart; only composite evidence is 'presented'", () => {
+  const a = gate();
+  a.contentReady();
+  // The native probe waits for the composite before answering: no lift
+  // meanwhile (well inside the present timeout).
+  vi.advanceTimersByTime(600);
+  expect(lifts).toEqual([]);
+  a.presented(armed[0], "unlatched");
+  expect(lifts).toEqual(["presented-unconfirmed"]);
+  lifts = [];
+  const b = gate();
+  b.contentReady();
+  b.presented(armed[1], "detached");
+  expect(lifts).toEqual(["probe-failed"]);
+  lifts = [];
+  const c = gate();
+  c.contentReady();
+  c.presented(armed[2], "presented");
+  expect(lifts).toEqual(["presented"]);
+});
+
 it("never sticks: content that never records lifts at the hard cap from mount", () => {
   const g = gate();
   vi.advanceTimersByTime(COVER_HARD_MAX_MS - 1);
