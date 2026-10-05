@@ -20,9 +20,11 @@
  * 38.7-15 round 3 (cold open: "presented", then ~0.3 s of black on the
  * process's first surface): a copy of the newest queued buffer did not prove
  * the display showed it. The native probe now also requires a non-black
- * buffer and composite evidence — API 34+ SurfaceFlinger's trusted-
- * presentation callback on the SurfaceView's layer, API 29–33 the window's
- * next frame commit — answering "presented"; without that evidence within
+ * buffer and composite evidence — API 29+ the window's next frame commit,
+ * then a vsync (API 34 races SurfaceFlinger's trusted-presentation callback
+ * against it; from API 35 that callback is not used: on SDK 37 it never
+ * answered on the process's first surface, so every cold open waited the
+ * whole bound) — answering "presented"; without that evidence within
  * its bound it answers "unlatched" (lifted at once, reason
  * "presented-unconfirmed", so the device logs tell them apart).
  * Bounded, so it can never stick:

@@ -1,5 +1,5 @@
 diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
-index f012c45..171d726 100644
+index f012c45..8a38692 100644
 --- a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
 +++ b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
 @@ -1,12 +1,26 @@
@@ -29,7 +29,7 @@ index f012c45..171d726 100644
  import com.facebook.react.uimanager.PointerEvents;
  import com.facebook.react.views.view.ReactViewGroup;
  
-@@ -16,6 +30,51 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+@@ -16,6 +30,54 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
      private final boolean debug = false;
      private final String tag = "SkiaView";
  
@@ -55,10 +55,15 @@ index f012c45..171d726 100644
 +    // samples and counts as content only when a sample has a colour channel
 +    // >= PROBE_MIN_CHANNEL (every Orrery sky is lighter than black; an
 +    // all-black buffer is retried), and then the frame must be COMPOSITED:
-+    // API 34+, SurfaceFlinger's trusted-presentation callback on the
-+    // SurfaceView's layer (the layer drawn on the display, >= LATCH_MIN_ALPHA,
-+    // >= LATCH_MIN_FRACTION of it unoccluded); API 29-33, the window's next
-+    // frame commit after the copy, then a vsync. Bounded by PRESENT_LATCH_MAX_MS.
++    // API 29+, the window's next frame commit after the copy, then a vsync
++    // ("commit"). Round 3 re-check (Pixel 6 Pro, SDK 37): the layer-level
++    // trusted-presentation callback (deprecated from API 35) NEVER answered
++    // on the process's first surface, so every cold open waited the whole
++    // bound ("unlatched"), while the commit evidence answered in 54-84 ms
++    // with no black frames. It is no longer used from API 35; on API 34
++    // (not deprecated there) it is raced against the commit evidence and the
++    // first to answer wins (the layer drawn on the display, >= LATCH_MIN_ALPHA,
++    // >= LATCH_MIN_FRACTION of it unoccluded). Bounded by PRESENT_LATCH_MAX_MS.
 +    private static final int PROBE_GRID = 4;
 +    private static final int PROBE_MIN_CHANNEL = 3;
 +    private static final long PRESENT_LATCH_MAX_MS = 600;
@@ -66,12 +71,10 @@ index f012c45..171d726 100644
 +    private static final float LATCH_MIN_FRACTION = 0.25f;
 +    // Trusted presentation needs the state to hold this long (>= 1 ms).
 +    private static final int LATCH_STABILITY_MS = 1;
++    // The only API level that races trusted presentation (deprecated from 35).
++    private static final int TRUSTED_PRESENTATION_SDK = 34;
 +    // Whether any probe of this process answered yet (the first surface).
 +    private static boolean sProbeAnswered = false;
-+    // Whether trusted presentation answers on this device: 0 unknown, 1 it
-+    // has answered, -1 it never answered within the bound (later probes then
-+    // use the frame-commit evidence, so a silent API costs one bound once).
-+    private static int sLatchEvidence = 0;
 +    private final Handler mProbeHandler = new Handler(Looper.getMainLooper());
 +    private int mSkiaNativeId = -1;
 +    private int mPresentProbeToken = 0;
@@ -81,7 +84,7 @@ index f012c45..171d726 100644
      public SkiaBaseView(Context context) {
          super(context);
          mView = new SkiaTextureView(context, this, debug);
-@@ -36,6 +95,9 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+@@ -36,6 +98,9 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
          if (value && mView instanceof SkiaTextureView) {
              removeView(mView);
              mView = new SkiaSurfaceView(getContext(), this, debug);
@@ -91,7 +94,7 @@ index f012c45..171d726 100644
              addView(mView);
          } else if (!value && mView instanceof SkiaSurfaceView) {
              removeView(mView);
-@@ -44,6 +106,259 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+@@ -44,6 +109,270 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
          }
      }
  
@@ -130,9 +133,9 @@ index f012c45..171d726 100644
 +     *    buffer into a few samples; the copy waits for that buffer's GPU
 +     *    fence. No buffer yet, a fence wait that timed out, or an all-black
 +     *    buffer: retried each frame, for at most PRESENT_PROBE_MAX_MS.
-+     * 3. The composite (see PRESENT_LATCH_MAX_MS): API 34+, SurfaceFlinger's
-+     *    trusted-presentation callback; API 29-33, the window's next frame
-+     *    commit, then a vsync; older, two vsyncs.
++     * 3. The composite (see PRESENT_LATCH_MAX_MS): API 29+, the window's next
++     *    frame commit, then a vsync (API 34 races SurfaceFlinger's
++     *    trusted-presentation callback against it); older, two vsyncs.
 +     * A TextureView composites with the window: one frame after the draw.
 +     * Every step is logged (tag SkiaView, "orbit present probe ...").
 +     */
@@ -235,75 +238,86 @@ index f012c45..171d726 100644
 +     * The copied content frame must be on the display: see PRESENT_LATCH_MAX_MS.
 +     * Answers "presented" on the evidence, else "unlatched" at the bound.
 +     */
-+    @SuppressWarnings("deprecation") // the layer-level trusted presentation API (34+)
 +    private void awaitComposite(int token, long armedAt, long copiedAt) {
 +        final boolean[] answered = {false};
-+        final boolean[] trusted = {false};
-+        final Runnable answer = () -> {
-+            if (answered[0] || token != mPresentProbeToken) {
-+                return;
-+            }
-+            answered[0] = true;
-+            if (trusted[0]) {
-+                sLatchEvidence = 1;
-+            }
-+            clearLatchCallback();
-+            long now = SystemClock.uptimeMillis();
-+            Log.i(tag, "orbit present probe " + token + " composited +" + (now - copiedAt)
-+                    + "ms after the copy, +" + (now - armedAt) + "ms after arming, trusted="
-+                    + trusted[0]);
-+            emitPresented(token, "presented");
-+        };
++        final boolean trusted = armTrustedPresentation(token, armedAt, copiedAt, answered);
 +        mProbeHandler.postDelayed(() -> {
 +            if (answered[0] || token != mPresentProbeToken) {
 +                return;
 +            }
 +            answered[0] = true;
-+            if (trusted[0] && sLatchEvidence == 0) {
-+                sLatchEvidence = -1;
-+            }
 +            clearLatchCallback();
 +            Log.i(tag, "orbit present probe " + token + " no composite evidence within "
-+                    + PRESENT_LATCH_MAX_MS + "ms trusted=" + trusted[0]);
++                    + PRESENT_LATCH_MAX_MS + "ms trusted=" + trusted);
 +            emitPresented(token, isAttachedToWindow() ? "unlatched" : "detached");
 +        }, PRESENT_LATCH_MAX_MS);
-+        if (Build.VERSION.SDK_INT >= 34 && sLatchEvidence >= 0 && mView instanceof SurfaceView) {
-+            SurfaceControl layer = ((SurfaceView) mView).getSurfaceControl();
-+            if (layer != null && layer.isValid()) {
-+                try {
-+                    SurfaceControl.TrustedPresentationThresholds thresholds =
-+                            new SurfaceControl.TrustedPresentationThresholds(
-+                                    LATCH_MIN_ALPHA, LATCH_MIN_FRACTION, LATCH_STABILITY_MS);
-+                    new SurfaceControl.Transaction()
-+                            .setTrustedPresentationCallback(layer, thresholds, mProbeHandler::post,
-+                                    presented -> {
-+                                        if (presented) {
-+                                            answer.run();
-+                                        }
-+                                    })
-+                            .apply();
-+                    mLatchControl = layer;
-+                    trusted[0] = true;
-+                    // SurfaceFlinger evaluates the callback when it composites:
-+                    // make the window draw while waiting (a still canvas under
-+                    // reduced motion composites nothing by itself).
-+                    keepCompositing(token, answered);
-+                    return;
-+                } catch (RuntimeException e) {
-+                    Log.w(tag, "orbit present probe trusted presentation failed", e);
-+                    clearLatchCallback();
-+                }
-+            }
-+        }
 +        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 +            ViewTreeObserver observer = getViewTreeObserver();
 +            if (observer.isAlive()) {
-+                observer.registerFrameCommitCallback(() -> nextFrame(answer));
++                observer.registerFrameCommitCallback(() -> nextFrame(
++                        () -> composited(token, armedAt, copiedAt, answered, "commit")));
 +                invalidate();
 +                return;
 +            }
 +        }
-+        nextFrame(() -> nextFrame(answer));
++        nextFrame(() -> nextFrame(
++                () -> composited(token, armedAt, copiedAt, answered, "vsync")));
++    }
++
++    /** The first composite evidence for `token` answers "presented"; later ones are ignored. */
++    private void composited(int token, long armedAt, long copiedAt, boolean[] answered,
++            String evidence) {
++        if (answered[0] || token != mPresentProbeToken) {
++            return;
++        }
++        answered[0] = true;
++        clearLatchCallback();
++        long now = SystemClock.uptimeMillis();
++        Log.i(tag, "orbit present probe " + token + " composited +" + (now - copiedAt)
++                + "ms after the copy, +" + (now - armedAt) + "ms after arming, evidence="
++                + evidence);
++        emitPresented(token, "presented");
++    }
++
++    /**
++     * API 34 only: SurfaceFlinger's trusted-presentation callback on the
++     * SurfaceView's layer, raced against the commit evidence (deprecated from
++     * API 35, and silent on the process's first surface there). True when the
++     * callback was registered.
++     */
++    @SuppressWarnings("deprecation") // the layer-level trusted presentation API (34)
++    private boolean armTrustedPresentation(int token, long armedAt, long copiedAt,
++            boolean[] answered) {
++        if (Build.VERSION.SDK_INT != TRUSTED_PRESENTATION_SDK || !(mView instanceof SurfaceView)) {
++            return false;
++        }
++        SurfaceControl layer = ((SurfaceView) mView).getSurfaceControl();
++        if (layer == null || !layer.isValid()) {
++            return false;
++        }
++        try {
++            SurfaceControl.TrustedPresentationThresholds thresholds =
++                    new SurfaceControl.TrustedPresentationThresholds(
++                            LATCH_MIN_ALPHA, LATCH_MIN_FRACTION, LATCH_STABILITY_MS);
++            new SurfaceControl.Transaction()
++                    .setTrustedPresentationCallback(layer, thresholds, mProbeHandler::post,
++                            presented -> {
++                                if (presented) {
++                                    composited(token, armedAt, copiedAt, answered, "trusted");
++                                }
++                            })
++                    .apply();
++            mLatchControl = layer;
++            // SurfaceFlinger evaluates the callback when it composites: make
++            // the window draw while waiting (a still canvas under reduced
++            // motion composites nothing by itself).
++            keepCompositing(token, answered);
++            return true;
++        } catch (RuntimeException e) {
++            Log.w(tag, "orbit present probe trusted presentation failed", e);
++            clearLatchCallback();
++            return false;
++        }
 +    }
 +
 +    private void keepCompositing(int token, boolean[] answered) {
@@ -314,11 +328,11 @@ index f012c45..171d726 100644
 +        nextFrame(() -> keepCompositing(token, answered));
 +    }
 +
-+    @SuppressWarnings("deprecation") // the layer-level trusted presentation API (34+)
++    @SuppressWarnings("deprecation") // the layer-level trusted presentation API (34)
 +    private void clearLatchCallback() {
 +        SurfaceControl layer = mLatchControl;
 +        mLatchControl = null;
-+        if (layer == null || Build.VERSION.SDK_INT < 34) {
++        if (layer == null || Build.VERSION.SDK_INT < TRUSTED_PRESENTATION_SDK) {
 +            return;
 +        }
 +        try {
@@ -351,7 +365,7 @@ index f012c45..171d726 100644
      void dropInstance() {
          if (!RNSkiaModule.isModuleValid()) {
              return;
-@@ -59,6 +374,8 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+@@ -59,6 +388,8 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
  
      @Override
      public void onSurfaceCreated(Surface surface, int width, int height) {
