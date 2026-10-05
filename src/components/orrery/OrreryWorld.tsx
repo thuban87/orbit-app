@@ -260,6 +260,8 @@ type OrreryLedger = OrreryGenerationLedger<string>;
 interface OrreryPerfMarks {
   mark(name: string): void;
   markOnce(name: string): void;
+  /** Logs only while a System switch is open (tap → settled). */
+  markSwitch(name: string): void;
 }
 // DEBUG only: Metro folds this to null in a release bundle.
 const perf: OrreryPerfMarks | null =
@@ -413,11 +415,16 @@ export function OrreryWorldInner({
   if (!specPublisherRef.current)
     specPublisherRef.current = createOrrerySpecPublisher({
       ledger,
+      // 38.7-15 (DEBUG): every full spec write during a switch (tap →
+      // settled) is marked with its size — each is deserialised and
+      // re-recorded on the UI thread (the switch-stall evidence).
       writeBodies: (specs) => {
         bodySpecs.value = specs;
+        perf?.markSwitch(`write-bodies-${specs.bodies.length}`);
       },
       writeLabels: (specs) => {
         labelSpecs.value = specs;
+        perf?.markSwitch(`write-labels-${specs.measured.length}`);
       },
     });
   const specPublisher = specPublisherRef.current;
@@ -1076,9 +1083,14 @@ export function OrreryWorldInner({
     [publisher, requestPhotos],
   );
   // D-47: the semantic tier follows on-screen magnification, not raw zoom.
+  // 38.7-15 (D-76): held while a switch lead-in spins the retained System
+  // (it is leaving): its breath must not re-tier every label of the outgoing
+  // System (a full text republish, ~880 Paragraphs at All Contacts). The
+  // reaction re-runs when the lead ends (null → the magnification).
   useAnimatedReaction(
-    () => frame.value.labelMagnification,
+    () => (lead.value.active ? null : frame.value.labelMagnification),
     (magnification) => {
+      if (magnification === null) return;
       level.value = semanticLevel(magnification, level.value);
     },
   );
@@ -1092,13 +1104,26 @@ export function OrreryWorldInner({
   // H4: visibility/initials eligibility, computed at most every
   // ORRERY_TEXT_ELIGIBILITY_INTERVAL_MS (a trailing timer catches the final
   // pose) and sent only when a key set changed.
+  // 38.7-15 (D-76): nothing is reported while a switch lead-in spins the
+  // retained System. Its spin and breath change which bodies are on screen
+  // and big enough for initials every few frames; each report re-ran the
+  // text and photo publishers over the OUTGOING System and rewrote its full
+  // body/label specs (DEBUG All Contacts: the UI thread stalled ~0.2–0.5 s
+  // per report, so the lead barely moved until the destination landed).
+  // Reporting resumes with the first frame after the lead ends.
   const textReport = useSharedValue({ at: -1e12, signature: "", timer: false });
   useAnimatedReaction(
-    () => frame.value,
-    () => {
+    () => (lead.value.active ? null : frame.value),
+    (current) => {
+      if (current === null) return;
       const state = textReport.value;
       if (state.timer) return;
       const run = () => {
+        if (lead.value.active) {
+          // A trailing report that fires mid-lead waits for the lead's end.
+          textReport.value = { ...textReport.value, timer: false };
+          return;
+        }
         const latest = orreryTextEligibility(
           frame.value,
           ORRERY_INITIALS_MIN_RADIUS_PX,

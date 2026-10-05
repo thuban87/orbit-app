@@ -947,6 +947,61 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(plates()).toBe(1);
     expect(native.painted).toContain("Zoë");
   });
+  it("38.7-15 (D-76): while a switch lead-in spins the retained System, no tier or text report reaches the publishers; they resume when it ends", async () => {
+    const exec = nodeSqliteExecutor(db);
+    await exec.runAsync(
+      "INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES ('lead','Zoë',1,30,'2026-09-07','2026-09-07')",
+    );
+    const scene = await loadOrreryScene(exec, 1);
+    const pose = { value: { ...HOME_CAMERA, tilt: 0.5 } };
+    const runtime = switchRuntime(scene, pose as never);
+    const tree = resolve(
+      OrreryWorld({
+        camera: useOrreryCamera({
+          pose: { value: HOME_CAMERA } as never,
+          enabled: true,
+          extent: scene.extent,
+          viewport: { width: 400, height: 600 },
+          reduced: { value: false } as never,
+        }),
+        scene,
+        pose: pose as never,
+        viewport: { width: 500, height: 700 },
+        colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
+        fontProvider: {} as never,
+        onIntent: () => {},
+        onReorder: () => {},
+        onReorderActivated: () => {},
+        focusedIds: [],
+        switchRuntime: runtime as never,
+      }),
+    );
+    const labels = tree[0].children[7];
+    const plates = () =>
+      (
+        labels.props.picture as { value: { commands: { op: string }[] } }
+      ).value.commands.filter((c) => c.op === "drawRRect").length;
+    flushUi();
+    expect(plates()).toBe(0);
+    // A lead-in runs (held still: no spin, so only the camera below moves).
+    (runtime.lead as { value: unknown }).value = {
+      active: true,
+      turns: 0,
+      intensity: 0,
+      still: true,
+    };
+    // The frame magnifies the contact past IDENTITY_ENTER (as the label
+    // test above): reported now, this would re-tier and publish its label.
+    pose.value = { ...pose.value, yaw: 0, zoom: 2.4 };
+    flushUi();
+    expect(plates()).toBe(0);
+    // The lead ends (the destination took over): reporting resumes.
+    (runtime.lead as { value: unknown }).value = NO_SWITCH_LEAD;
+    flushUi();
+    expect(plates()).toBe(1);
+  });
   it("M3: a switch whose camera crosses IDENTITY_ENTER publishes label text through UI reactions and commits no OrreryWorld render", async () => {
     const exec = nodeSqliteExecutor(db);
     await exec.runAsync(
