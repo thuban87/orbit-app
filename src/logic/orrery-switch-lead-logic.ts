@@ -63,8 +63,15 @@ export const SWITCH_LEAD_INTENSITY = 0.5;
 export const SWITCH_LEAD_BREATH_CAP = ACCELERATE_END;
 /** The coast window (progress units): the switch's accelerate phase. */
 export const SWITCH_LEAD_COAST = ACCELERATE_END;
-/** The lead clock's ceiling (ms): a load slower than this freezes the spin. */
+/**
+ * The lead clock's ceiling (ms). IN-05: a load slower than this does not
+ * freeze mid-spin — over the last SWITCH_LEAD_REST_MS before it the spin,
+ * warp, streaks and breath coast back to rest together (the accelerate phase
+ * mirrored), so at the ceiling the world is still and nothing animates.
+ */
 export const SWITCH_LEAD_MAX_MS = 60_000;
+/** IN-05: the coast to rest before the ceiling (ms). Tunable. */
+export const SWITCH_LEAD_REST_MS = 2_000;
 
 /** The UI-thread lead state (a SharedValue; the clock is its own). */
 export interface SwitchLeadState {
@@ -121,6 +128,52 @@ export function switchLeadRotationIntegral(a: number): number {
   return ACCELERATE_END / 3 + (a - ACCELERATE_END);
 }
 
+/**
+ * IN-05: the lead's motion at lead progress `a`, on the switch's time scale
+ * `durationMs`: its normalised velocity, the rotation integral (∫ velocity,
+ * plateau-progress units) and the level scale of its breath (1 until the rest
+ * window, then easing to 0 with the velocity). Inside the rest window
+ * [start, end] the velocity is r² (r = (end − a) / (end − start): the
+ * accelerate phase mirrored); from `end` (the clock's ceiling) on, all rest.
+ */
+export function switchLeadMotion(
+  a: number,
+  durationMs: number,
+): { velocity: number; integral: number; ease: number } {
+  "worklet";
+  const end = durationMs > 0 ? SWITCH_LEAD_MAX_MS / durationMs : 0;
+  const start = Math.max(
+    ACCELERATE_END,
+    end - (durationMs > 0 ? SWITCH_LEAD_REST_MS / durationMs : 0),
+  );
+  const at = end > 0 ? Math.min(a, end) : a;
+  if (!(end > start) || !(at > start))
+    return {
+      velocity: switchLeadVelocity(at),
+      integral: switchLeadRotationIntegral(at),
+      ease: 1,
+    };
+  const span = end - start;
+  const r = (end - at) / span;
+  return {
+    velocity: r * r,
+    integral: switchLeadRotationIntegral(start) + (span / 3) * (1 - r * r * r),
+    ease: r * r,
+  };
+}
+
+/**
+ * IN-05: whether a lead is still moving (the canvas's `busy`): active and
+ * short of the clock's ceiling, where it has come to rest.
+ */
+export function switchLeadMoving(
+  lead: SwitchLeadState,
+  clockMs: number,
+): boolean {
+  "worklet";
+  return lead.active && !(clockMs >= SWITCH_LEAD_MAX_MS);
+}
+
 /** The lead's plateau spin rate in rad per unit progress (a switch's own). */
 export function switchLeadPlateau(turns: number): number {
   "worklet";
@@ -152,7 +205,8 @@ export function sampleSwitchLead(
       ? Math.max(0, clockMs) / durationMs
       : 0;
   const plateau = switchLeadPlateau(lead.turns);
-  const rotation = lead.active ? plateau * switchLeadRotationIntegral(a) : 0;
+  const motion = switchLeadMotion(a, durationMs);
+  const rotation = lead.active ? plateau * motion.integral : 0;
   if (!lead.active || lead.still)
     return {
       rotation,
@@ -163,7 +217,7 @@ export function sampleSwitchLead(
       breath: 0,
       angularSpeed: 0,
     };
-  const v = switchLeadVelocity(a);
+  const v = motion.velocity;
   const i = fxClamp01(lead.intensity);
   return {
     rotation,
@@ -171,7 +225,10 @@ export function sampleSwitchLead(
     omega: plateau * v,
     warp: v * (WARP_INTENSITY_FLOOR + (1 - WARP_INTENSITY_FLOOR) * i),
     trail: Math.min(1, v * TRAIL_VELOCITY_GAIN),
-    breath: switchBreath(Math.min(a, SWITCH_LEAD_BREATH_CAP)) * (0.5 + 0.5 * i),
+    breath:
+      switchBreath(Math.min(a, SWITCH_LEAD_BREATH_CAP)) *
+      (0.5 + 0.5 * i) *
+      motion.ease,
     angularSpeed: durationMs > 0 ? (plateau * v) / (durationMs / 1000) : 0,
   };
 }

@@ -63,6 +63,7 @@ import {
   sampleSwitchLead,
   sampleSwitchSignalWithLead,
   sampleSwitchWorld,
+  switchLeadMoving,
 } from "@/logic/orrery-switch-lead-logic";
 import { systemRefId } from "@/logic/orrery-system-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
@@ -541,13 +542,14 @@ export function OrreryWorldInner({
   // runtime at each mapper start (orrery-frame-mapper.test.ts guards this).
   const { transition, progress, cameraFrom, cameraTo, lead, leadClock } =
     switchRuntime;
-  // D-49: the base is never baked during a switch (38.7-15: or its lead-in),
-  // a gesture or a camera motion (SharedValues only are captured).
+  // D-49: the base is never baked during a switch (38.7-15: or its lead-in,
+  // IN-05: until it came to rest at its clock's ceiling), a gesture or a
+  // camera motion (SharedValues only are captured).
   const { active: cameraActive, input: cameraInput } = camera;
   const busy = useDerivedValue(
     () =>
       progress.value < 1 ||
-      lead.value.active ||
+      switchLeadMoving(lead.value, leadClock.value) ||
       cameraActive.value !== null ||
       cameraInput.value.pointers > 0,
   );

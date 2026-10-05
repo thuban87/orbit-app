@@ -35,12 +35,15 @@ import {
   rotateSwitchWorld,
   SWITCH_LEAD_COAST,
   SWITCH_LEAD_INTENSITY,
+  SWITCH_LEAD_MAX_MS,
+  SWITCH_LEAD_REST_MS,
   sampleSwitchLead,
   sampleSwitchSignalWithLead,
   sampleSwitchWorld,
   switchLeadCarry,
   switchLeadCoastOffset,
   switchLeadCoastStart,
+  switchLeadMoving,
   switchLeadPlateau,
   switchLeadVelocity,
 } from "./orrery-switch-lead-logic";
@@ -113,6 +116,44 @@ describe("the lead-in opens like a switch (D-76)", () => {
     const h = 1e-3;
     const rate = (at(t + h).rotation - at(t - h).rotation) / ((2 * h) / D);
     expect(rate).toBeCloseTo(switchLeadPlateau(lead.turns), 4);
+  });
+
+  it("IN-05: a load slower than the clock's ceiling coasts everything back to rest together — spin, warp, streaks and breath — never a frozen spin under full streaks", () => {
+    const lead = beginSwitchLead(SWITCH_LEAD_INTENSITY);
+    const at = (ms: number) => sampleSwitchLead(lead, ms, D);
+    const restStart = SWITCH_LEAD_MAX_MS - SWITCH_LEAD_REST_MS;
+    // The plateau holds until the rest window.
+    expect(at(restStart - 1).velocity).toBe(1);
+    expect(at(restStart - 1).breath).toBeCloseTo(at(5_000).breath, 12);
+    // Inside it every level eases down together, monotonically.
+    let previous = at(restStart);
+    for (let ms = restStart + 100; ms <= SWITCH_LEAD_MAX_MS; ms += 100) {
+      const now = at(ms);
+      for (const key of ["velocity", "warp", "trail", "breath"] as const)
+        expect(now[key]).toBeLessThanOrEqual(previous[key] + 1e-12);
+      // The world keeps turning forward (never backward) while it slows.
+      expect(now.rotation).toBeGreaterThanOrEqual(previous.rotation);
+      previous = now;
+    }
+    // At the ceiling (and after it: the clock stops there) all is at rest.
+    for (const ms of [SWITCH_LEAD_MAX_MS, SWITCH_LEAD_MAX_MS + 5_000]) {
+      const s = at(ms);
+      expect([s.velocity, s.omega, s.warp, s.trail, s.breath]).toEqual([
+        0, 0, 0, 0, 0,
+      ]);
+      expect(s.angularSpeed).toBe(0);
+      expect(s.rotation).toBeCloseTo(at(SWITCH_LEAD_MAX_MS).rotation, 9);
+    }
+    // The rotation is continuous and its rate is plateau × velocity throughout.
+    const h = 1e-3;
+    for (const t of [restStart - 50, restStart + 1, restStart + 900, 59_990]) {
+      const rate = (at(t + h).rotation - at(t - h).rotation) / ((2 * h) / D);
+      expect(rate).toBeCloseTo(at(t).omega, 3);
+    }
+    // At rest the lead no longer counts as motion (busy clears).
+    expect(switchLeadMoving(lead, restStart)).toBe(true);
+    expect(switchLeadMoving(lead, SWITCH_LEAD_MAX_MS)).toBe(false);
+    expect(switchLeadMoving(NO_SWITCH_LEAD, 0)).toBe(false);
   });
 
   it("under reduced motion (still) it holds: no warp, streaks or breath", () => {
