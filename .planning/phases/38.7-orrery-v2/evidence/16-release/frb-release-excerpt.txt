@@ -1,0 +1,5 @@
+FR-B vote (RELEASE 68748e93, Pixel 6 Pro, Size 120 at Home, idle >=20 s untouched, Galaxy Dark; animation scales 1.0/1.0/1.0) - 2026-10-04 22:09:01
+    mActiveSfDisplayMode=DisplayMode{id=0, width=1440, height=3120, xDpi=515.154, yDpi=511.277, peakRefreshRate=60.0, vsyncRate=60.0
+    mActiveRenderFrameRate=30.0
+c9c30ac SurfaceView[com.bwales.orbit[...]les.orbit.MainActivity](BLAST)#58650 requestedFrameRate: {30.00 Hz FrameRateCompatibility::Default FrameRateCategory::Default} pid=23095 uid=10490
+atrace -t 4 gfx view: SurfaceView frames 1586..1647 = 61 frames in 1.93 s (31.6/s); VSYNC-sf toggles 119 in 4 s
