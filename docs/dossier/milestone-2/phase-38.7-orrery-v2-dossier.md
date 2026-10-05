@@ -123,6 +123,17 @@ It stays recognisably Orbit: contacts and relationships remain the information a
     Lab B as built was janky and "a bit sloppy", so it must be clean and smooth, especially on the 3a.
     - **[DECIDED 2026-10-04, owner — Plan 13 checkpoint, S-WARP / S-TRAIL / S-SMOOTH]** The star warp runs at **Lab B's own numbers** (`WARP_STRENGTH` 1; the 1.6 "by eye" bump is reverted). The orbit streaks are **"weaker"** than Lab A (`TRAIL_STRENGTH` 0.5). The 2–2.5 s wait between the tap and any motion on an All Contacts switch must be **fixed** (0.75 s on Size switches is "more acceptable" but not great); the fix is folded into Plan 15 (target: motion within ~100–200 ms). Owner: "S-WARP: Do the lab B numbers / S-TRAIL: weaker … I absolutely don't want a 2+ second wait". Mirrored as CONTEXT D-76.
     - **[DECIDED 2026-10-04, owner — Plan 13 checkpoint, S-SWIRL] ⚠ Corrects the third bullet above:** the camera move the owner picked is **Lab C's**, not Lab A's ("I had said I liked Lab C's swirl the most, which was more of a zigzag to get back to center and then pull back"; OWNER-REVIEW.md:39/:88 had filed it under Lab A, and the owner's correction governs). The switch camera is **copied from Lab C's code**: Lab C's raw linear yaw return to Home plus its breath, sin²(πp)·(0.5 + 0.5·intensity) × (dolly-out 0.24, yaw swing 0.38 rad, tilt −0.1 toward top-down). After a side-by-side clip (Lab C | as copied | swing calmer 0.19 | swing stronger 1.0), the owner chose **SW-A, "as in Lab C"**; calmer and stronger are rejected. Lab C's bodies falling below / rising above the plane during a switch are not built (not asked for). Mirrored as CONTEXT D-77.
+    - **[DERIVED 2026-10-04 — Plan 15, the D-76 wait fix; no new ruling]** The switch now starts on the tap (`9da65b30`).
+      - **The lead-in:** the current scene spins up as the switch's accelerate phase does. Warp and streaks rise with it, and Lab C's breath eases in, while the destination loads.
+      - **The hand-off:** the switch inherits that momentum. The landing at Home is unchanged, and reduced motion still crossfades.
+      - **Cost fixes from three DEBUG device rounds:**
+        - the lead's UI job runs first;
+        - the outgoing moons are kept;
+        - there is no text or tier report during the lead;
+        - body specs are sent as patches (34 → 8 writes per switch);
+        - the base layer is reused during the lead.
+      - **Still on DEBUG:** about 1 s stretches at ~5–7 fps in both directions. Leaving All Contacts, the sheet closes ~0.45–0.7 s after the tap.
+      - **Next:** Plan 16 judges both on release against D-76's ~100–200 ms. If they remain, the owner gets an option with clips and a recommendation. The likely lever (simpler rings while moving) changes the look.
 -   **[DECIDED · 2026-10-02] D-25 --- No camera effects:** no bloom, tilt-shift, lens flare or heat-haze.
 
 ### Themes
@@ -279,6 +290,11 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - If D-10's pulses cannot meet D-40, **report it to the owner rather than silently dropping them.**
     - **[DECIDED 2026-10-03, owner — Plan 08 spike checkpoint]** Ambient driver: **frame-clock** (Skia's clock, quantised to ~30 Hz). Reported per this entry: with the SurfaceView the Pixel 6 Pro panel stays at 120 Hz at idle under both drivers, and with animations on V2 idles above main's resting CPU (41.8 % vs 34.2 %). The owner chose to **diagnose first** which layer holds 120 Hz before deciding on a native frame-rate hint ("FR-B"); no Skia bump (research: no 2.x release up to 2.14.0 has a frame-rate control; Expo 57 pins 2.6.2). Mirrored as CONTEXT D-64.
     - **[DECIDED 2026-10-03, owner — after the D-49 diagnostic]** **FR-B approved.** The diagnostic showed the Orrery SurfaceView alone holds the 6 Pro at 120 Hz at idle (no explicit vote → SurfaceFlinger cannot resolve its ~30 Hz presents → Max). A native 30 Hz `Surface.setFrameRate` vote (`FRAME_RATE_COMPATIBILITY_DEFAULT`) goes on the Orrery SurfaceView via patch-package (no Skia bump), withdrawn when ambient stops and re-applied on surface recreate, proven on a release build on the 6 Pro. Mirrored as CONTEXT D-65.
+    - **[DERIVED 2026-10-04 — Plan 15, what landed; no new ruling]** FR-B is built (`8b4925e5`).
+      - **The native side:** the patched Skia 2.6.2 adds a view prop `androidFrameRate`. On API 30+ it calls `Surface.setFrameRate(fps, FRAME_RATE_COMPATIBILITY_DEFAULT)` and re-applies it on every surface create/change.
+      - **The JS side:** OrreryV2Canvas sends 30 while only the ambient clock animates. It sends 0 under reduced motion and during a switch, a gesture or camera motion. It sends only on change, never per frame.
+      - **DEBUG on the 6 Pro:** the vote is set at idle, after a tab return and after background → foreground. The idle panel runs at 60 Hz and renders at 30 (it was 120 / 120). The vote comes back within about 0.5 s after switches and after a fling during a switch.
+      - **Still to prove:** the release proof is Plan 16.
 -   **[DERIVED] D-50 --- Per-System sky hue from the stable id, no schema change.**
     - The hue is derived from `systemRefId` through theme tokens (the ADR-022 swatch pattern), with more than Lab B's 6 buckets so Systems rarely collide.
     - A duplicated System gets a new uid and therefore a different hue. This is accepted.
@@ -368,6 +384,11 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
     - **The cache is bounded.** It has explicit size caps and eviction (LRU), and is released on background or memory pressure and when the Orrery has not been visited for a while (the timeout is an engineering tunable).
     - **It must stay within 38.6 D-11's "working memory stays flat" gate**, measured with the 38.6 fixed method (graphics and GL growth limit). "Fix slow tab return" must not become "the Orrery keeps everything forever".
     - **ADR-170 is clarified, not contradicted.** It retires *settled switch* resources, so memory must not grow with the number of switches. That stays fully in force. It says nothing about reusable caches across a tab blur; record the new cache policy as its own ADR that cites ADR-170 and 38.6 D-11.
+    - **[DERIVED 2026-10-04 — Plan 15, what landed; no new ruling]** Built as specified.
+      - **The cache** (`ebbc29ec`): `orrery-warm-cache.ts` puts one warm owner over the photo cache, the text service and a sky store. That owner never pins and holds CPU-backed images only. Caps are `ORRERY_WARM_MAX_BYTES` 64 MiB, 128 Paragraphs and 4 sky images, with an LRU trim at the hand-off. It is released on background (either event order), after 5 min idle, and on a memory warning (Android RN emits none).
+      - **The Preview** no longer clears the Orrery's warm entries on unmount (`3409313f`).
+      - **The tab return** (`d8a080c6`, D-56): an ordinary return mounts on the retained snapshot, already at Home. Profile Back and background keep the restore path.
+      - **Memory is not measured yet.** Under D-66 the 38.6 D-11 check with the cache on moves to Plan 16 G7. The lever is `ORRERY_WARM_MAX_BYTES`. Caveat: a drawn warm photo may keep a GPU texture attached.
 
 ## Scope
 
@@ -507,3 +528,12 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
 -   **2026-10-04** --- D-07/D-27 nebula: Lab B's distant baked nebula ported (Plan 09 rework, 47b1b039); owner chose Galaxy Dark at 35 % of Lab B (CONTEXT D-75). The earlier soft-haze nebula is rejected.
 -   **2026-10-04** --- Plan 13 switch rulings: D-24 star warp at Lab B's numbers, orbit streaks "weaker", the tap-to-motion wait to be fixed in Plan 15 (CONTEXT D-76); S-SWIRL corrected to Lab C's camera and ruled SW-A "as in Lab C" after a side-by-side clip (CONTEXT D-77). The D-53 "shortest-arc yaw plus an authored spin" bullet is superseded by the Lab C copy (raw linear yaw path plus Lab C's breath).
 -   **2026-10-04** --- Plan 14 theme/Home rulings (CONTEXT D-78): D-03 62° tilted Home stays; D-26 Standard Light as is, Galaxy Light = Galaxy Dark's nebula hues at 1.25×; D-27 themes distinct; D-39 Lab B title scrim stays, Standard Dark's bar edge smoothed like the light themes (Galaxy Dark unchanged); D-55/D-62 full card-area dim at 0.7 stays; D-45 ring-fade floor 80 % and tiny-System zoom 4; D-06 near-side cap loosened (knee 0.6, asymptote 0.12); D-57 flat V2 Preview approved. Contrast re-proven in all four themes.
+-   **2026-10-04** --- Plan 15 complete; there were no new owner rulings.
+    - **D-58:** the bounded warm cache across tab blur (64 MiB / 128 Paragraphs / 4 sky images, released on background, 5 min idle or memory warning). The Preview no longer clears it.
+    - **D-56:** a warm tab return mounts on the retained snapshot at Home.
+    - **D-65:** FR-B is built: a native 30 Hz vote, idle 60 Hz panel / 30 render on DEBUG.
+    - **D-76:** the switch starts on the tap with a lead-in.
+    - **First frame:** the theme's sky, never black. The cover lifts on native composite evidence (patched Skia).
+    - **Selector:** never shows another System's name.
+    - **How it went:** three DEBUG device fix rounds. Their causes were a worklet default-parameter crash, JS/UI ordering, per-update cost on ~1,000 bodies, and proxy "on screen" signals. A final native fix moves the cold-open composite evidence off the trusted-presentation callback, which is silent on SDK 37.
+    - **Carried to Plan 16:** memory with the cache on (G7), switch smoothness on release, and the cold-open fix.
