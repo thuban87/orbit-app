@@ -30,6 +30,30 @@ export function shouldPublishSwitchScene(
 }
 
 /**
+ * 38.7-15 (D-76): whether requesting System `nextId` from `current` starts an
+ * in-session System switch — a System already shown (`hasReadySystem`), ready
+ * with its scene retained, and a DIFFERENT System requested. The tap path
+ * (to start the switch lead-in before anything else runs) and the store's
+ * loading notification apply this same test.
+ */
+export function startsInSessionSwitch(
+  current: {
+    status: string;
+    snapshot: unknown;
+    requested: { id: string };
+  },
+  nextId: string,
+  hasReadySystem: boolean,
+): boolean {
+  return (
+    hasReadySystem &&
+    current.status === "ready" &&
+    !!current.snapshot &&
+    current.requested.id !== nextId
+  );
+}
+
+/**
  * Measures the two System memberships as sets so intensity reflects turnover,
  * rather than the absolute number of contacts in either System.
  */

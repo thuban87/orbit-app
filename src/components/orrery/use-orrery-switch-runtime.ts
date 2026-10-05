@@ -403,17 +403,32 @@ export function useOrrerySwitchRuntime(
   reducedMotion: SharedValue<boolean>,
   onSettled?: OrrerySwitchSettled,
 ): OrrerySwitchRuntime {
-  const empty = useRef(
-    createSettledOrrerySwitchRuntime([], 0, pose.value),
-  ).current;
+  // 38.7-15: the initial values are computed ONCE. A JS-thread `pose.value`
+  // read is a synchronous UI-runtime call (it takes the UI runtime's lock and
+  // waits out a frame in progress); evaluated as plain hook arguments it ran
+  // three times on every render of the screen, including the System tap's.
+  const initial = useRef<{
+    empty: OrrerySwitchRuntimeState;
+    pose: CameraPose;
+  } | null>(null);
+  if (!initial.current) {
+    const start = { ...pose.value };
+    initial.current = {
+      empty: createSettledOrrerySwitchRuntime([], 0, start),
+      pose: start,
+    };
+  }
+  const empty = initial.current.empty;
   const transition = useSharedValue(empty.transition);
   const progress = useSharedValue(1);
-  const cameraFrom = useSharedValue({ ...pose.value });
-  const cameraTo = useSharedValue({ ...pose.value });
+  const cameraFrom = useSharedValue({ ...initial.current.pose });
+  const cameraTo = useSharedValue({ ...initial.current.pose });
   const running = useSharedValue(false);
   const lead = useSharedValue<SwitchLeadState>(NO_SWITCH_LEAD);
   const leadClock = useSharedValue(0);
   const latestScene = useRef<OrrerySceneSnapshot | null>(null);
+  /** 38.7-15: a scene was published (JS mirror; see `publish`). */
+  const published = useRef(false);
   const [resources, setResources] = useState<OrreryBodyResource[]>([]);
   // The latest settle listener (a ref, so it never changes the runtime's identity).
   const settledRef = useRef(onSettled);
@@ -498,6 +513,13 @@ export function useOrrerySwitchRuntime(
       destinationHome: CameraPose,
     ) => {
       latestScene.current = scene;
+      // 38.7-15: whether a scene was ever published — a JS mirror of the UI
+      // check `transition.value.generation === 0`. Never read
+      // `transition.value` on JS: that is a synchronous copy of the whole
+      // choreography (every body of the drawn System, e.g. All Contacts)
+      // out of the UI runtime under its lock — a UI stall at the hand-off.
+      const first = !published.current;
+      published.current = true;
       setResources((current) => nextOrreryResources(current, scene, isSwitch));
       // D-52: ship only the geometry the UI thread needs. Capturing `scene`
       // would serialise the whole snapshot (contacts, members, gravity map) to
@@ -506,13 +528,12 @@ export function useOrrerySwitchRuntime(
       const generation = scene.generation;
       // A settled publication (the branch below) settles now: notify inside
       // this JS call so the screen's settle state joins the publish commit.
-      if (!isSwitch || transition.value.generation === 0)
-        settledRef.current?.(generation);
+      if (!isSwitch || first) settledRef.current?.(generation);
       runOnUI(() => {
         "worklet";
         cancelAnimation(progress);
         const reduced = reducedMotion.value;
-        if (!isSwitch || transition.value.generation === 0) {
+        if (!isSwitch || first) {
           if (lead.value.active) clearLead();
           // Same choreography as beginSwitchChoreography(world, world, ...)
           // at intensity 0, plus the settled fast path (D-53).

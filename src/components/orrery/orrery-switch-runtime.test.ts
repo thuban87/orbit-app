@@ -17,6 +17,8 @@ const harness = vi.hoisted(() => {
     reactions: [] as ((current: unknown, previous: unknown) => void)[],
     slots: [] as unknown[],
     cursor: 0,
+    /** 38.7-15: > 0 while a worklet runs "on the UI thread" (runOnUI). */
+    onUI: 0,
   };
   const slot = <T>(init: () => T): { fresh: boolean; value: T } => {
     const index = state.cursor++;
@@ -61,8 +63,29 @@ vi.mock("react", () => ({
 vi.mock("react-native-reanimated", () => ({
   cancelAnimation: vi.fn(),
   ReduceMotion: { Never: "never" },
-  runOnJS: (fn: unknown) => fn,
-  runOnUI: (fn: unknown) => fn,
+  // 38.7-15: synchronous, but tracking which "thread" runs (a JS-thread read
+  // of a SharedValue is a synchronous UI-runtime copy on device).
+  runOnJS:
+    (fn: (...args: unknown[]) => unknown) =>
+    (...args: unknown[]) => {
+      const saved = harness.onUI;
+      harness.onUI = 0;
+      try {
+        return fn(...args);
+      } finally {
+        harness.onUI = saved;
+      }
+    },
+  runOnUI:
+    (fn: (...args: unknown[]) => unknown) =>
+    (...args: unknown[]) => {
+      harness.onUI++;
+      try {
+        return fn(...args);
+      } finally {
+        harness.onUI--;
+      }
+    },
   useAnimatedReaction: (
     _prepare: unknown,
     react: (current: unknown, previous: unknown) => void,
@@ -824,5 +847,36 @@ describe("38.7-15 (D-76): the switch lead-in", () => {
     mounted.runtime.settle(done);
     expect(mounted.runtime.lead.value.active).toBe(false);
     expect(done).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("38.7-15 (D-76): no JS-thread read of the choreography", () => {
+  it("publish, the lead, endLead and settle read `transition` only on the UI thread (a JS read copies every body out of the UI runtime under its lock)", () => {
+    const mounted = mountRuntime();
+    let current = mounted.runtime.transition.value;
+    let jsReads = 0;
+    Object.defineProperty(mounted.runtime.transition, "value", {
+      get() {
+        if (harness.onUI === 0) jsReads++;
+        return current;
+      },
+      set(next) {
+        current = next;
+      },
+    });
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.beginLead();
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    // The driver's completion runs on the UI thread.
+    harness.onUI++;
+    mounted.complete();
+    harness.onUI--;
+    mounted.runtime.beginLead();
+    mounted.runtime.endLead();
+    mounted.runtime.settle();
+    expect(jsReads).toBe(0);
+    // The first publication still settles at once; the switch still runs.
+    expect(current.generation).toBe(2);
+    expect(mounted.entryKeys()).toEqual(keysOf(destinationWorld));
   });
 });

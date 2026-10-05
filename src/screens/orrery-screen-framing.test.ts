@@ -211,6 +211,8 @@ function harness(
   let tapped: Record<string, unknown> = {};
   /** 38.7-15 (D-76): the lead-in calls the screen made. */
   const leadCalls: string[] = [];
+  /** 38.7-15 (D-76): the System store's status at each `beginLead`. */
+  const leadStatus: string[] = [];
   /** 38.7-15: per render turn, whether the canvas was mounted and its pose. */
   const renderLog: { world: boolean; pose: unknown }[] = [];
   /** 38.7-13: the screen's settle listener, as the runtime received it. */
@@ -381,6 +383,9 @@ function harness(
                   // 38.7-15 (D-76): the switch lead-in starts on the tap.
                   beginLead: () => {
                     leadCalls.push("begin");
+                    leadStatus.push(
+                      String((realStore?.getState() ?? state).status),
+                    );
                   },
                   endLead: () => {
                     leadCalls.push("end");
@@ -458,7 +463,7 @@ function harness(
           return {
             createOrrerySatelliteController: options.realSatellites
               ? createOrrerySatelliteController
-              : () => ({ reload: () => {} }),
+              : () => ({ reload: () => {}, cancel: () => {} }),
           };
         if (id.includes("orrery-satellites-read") && options.realSatellites)
           return { readOrrerySatellites: options.realSatellites.read };
@@ -634,6 +639,7 @@ function harness(
     publishes,
     renderLog,
     leadCalls,
+    leadStatus,
     /** 38.7-15: the route blurs (false) or is focused again (true). */
     setFocused(value: boolean) {
       focused = value;
@@ -1659,4 +1665,103 @@ it("38.7-15 (D-76): a System tap starts the switch lead-in at once (before the l
   expect(h.publishes.filter((p) => p[1] === true)).toHaveLength(0);
   h.failLoad();
   expect(h.leadCalls).toEqual(["begin", "end"]);
+});
+
+it("38.7-15 (D-76): a System row tap starts the lead-in BEFORE the store's select notifies (its UI job is the tap's first), once; a same-System request starts none", async () => {
+  const saves = controlled<boolean>();
+  const h = storeHarness(saves);
+  await h.ready();
+  await microtasks();
+  h.render();
+  const store = h.store();
+  expect(store?.getState().status).toBe("ready");
+  const onSelect = h.find("Selector")?.props.onSelect as (
+    system: unknown,
+    name: string,
+  ) => void;
+  onSelect(FAVORITES, "Favorites");
+  // Begun while the store was still ready (before its loading notification
+  // queued React's render), and not again from that notification.
+  expect(h.leadCalls).toEqual(["begin"]);
+  expect(h.leadStatus).toEqual(["ready"]);
+  expect(store?.getState()).toMatchObject({
+    status: "loading",
+    requested: { id: "builtin:favorites" },
+  });
+  await microtasks();
+  h.render();
+  expect(h.leadCalls).toEqual(["begin"]);
+  expect(h.publishes.at(-1)?.[1]).toBe(true); // the switch took over
+  // Re-selecting the System already shown is a reload: no lead.
+  onSelect(FAVORITES, "Favorites");
+  await microtasks();
+  h.render();
+  expect(h.leadCalls).toEqual(["begin"]);
+});
+
+it("38.7-15 (D-76): an in-session switch's loading keeps the outgoing System's moons (no satellite publish at the tap); the destination's satellites load when it lands", async () => {
+  const saves = controlled<boolean>();
+  const reads = controlled<unknown[]>();
+  const loads = controlled<void>();
+  let hold = false;
+  let base: Harness["scene"] | null = null;
+  const h = harness(undefined, {
+    realSatellites: { read: reads.next },
+    realStore: {
+      load: async (system, generation) => {
+        if (hold) await loads.next();
+        return {
+          ...(base as NonNullable<typeof base>),
+          generation,
+          system,
+          systemSnapshot: {
+            ...(base as NonNullable<typeof base>).systemSnapshot,
+            categories: [],
+          },
+        };
+      },
+      persist: saves.next,
+    },
+  });
+  base = h.scene;
+  await h.ready();
+  await microtasks();
+  h.render();
+  const rows = [
+    {
+      uid: "m-a",
+      parentId: 1,
+      parentUid: "u1",
+      personName: "Moon A",
+      relationType: null,
+    },
+  ];
+  for (const read of reads.queue.splice(0)) read.resolve(rows);
+  saves.queue[0]?.resolve(true);
+  await microtasks();
+  h.render();
+  const spec = () => h.publisher()?.source.spec.value;
+  const shown = spec();
+  expect(shown).toMatchObject({ status: "ready" });
+  expect(shown?.index.rows).toHaveLength(1);
+  hold = true;
+  const onSelect = h.find("Selector")?.props.onSelect as (
+    s: unknown,
+    n: string,
+  ) => void;
+  onSelect(FAVORITES, "Favorites");
+  await microtasks();
+  h.render();
+  // Loading: the drawn spec (the outgoing moons) is untouched, no read starts.
+  expect(h.store()?.getState().status).toBe("loading");
+  expect(spec()).toBe(shown);
+  expect(reads.queue).toHaveLength(0);
+  loads.queue[0]?.resolve();
+  await microtasks();
+  h.render();
+  expect(spec()).toMatchObject({
+    status: "loading",
+    sceneGeneration: h.store()?.getState().generation,
+  });
+  expect(reads.queue).toHaveLength(1);
 });

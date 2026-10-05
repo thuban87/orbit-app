@@ -243,6 +243,43 @@ describe("eligible Orrery relationship projection", () => {
     await enabled;
     expect(states.at(-1)?.rows).toEqual([]);
   });
+  it("38.7-15 (D-76): cancel() publishes nothing and discards a pending read; the last publication stays until the next reload", async () => {
+    await add();
+    const scene = await loadOrreryScene(exec, 1);
+    const rows = await readOrrerySatellites(exec, parents);
+    const pending: ((value: typeof rows) => void)[] = [];
+    const states: OrrerySatelliteState[] = [];
+    const controller = createOrrerySatelliteController(
+      () => new Promise((resolve) => pending.push(resolve)),
+      (state) => states.push(state),
+    );
+    const first = controller.reload(scene, true);
+    pending[0](rows);
+    await first;
+    expect(states.at(-1)).toMatchObject({
+      status: "ready",
+      sceneGeneration: 1,
+    });
+    const published = states.length;
+    // A refresh read in flight, then an in-session switch begins loading.
+    const refresh = controller.reload({ ...scene, generation: 2 }, true);
+    const atCancel = states.length;
+    controller.cancel();
+    expect(states).toHaveLength(atCancel); // nothing published by cancel()
+    pending[1](rows);
+    await refresh;
+    expect(states).toHaveLength(atCancel); // the cancelled read never lands
+    expect(published).toBeLessThan(atCancel);
+    // The destination's reload publishes again as usual.
+    const next = controller.reload({ ...scene, generation: 3 }, true);
+    pending[2]([]);
+    await next;
+    expect(states.at(-1)).toEqual({
+      status: "ready",
+      sceneGeneration: 3,
+      rows: [],
+    });
+  });
   it("separate optional generations discard excluded-parent, disabled and out-of-order completions; retry never erases contacts", async () => {
     await add();
     const scene = await loadOrreryScene(exec, 1);

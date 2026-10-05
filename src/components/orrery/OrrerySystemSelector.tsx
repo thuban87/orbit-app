@@ -16,6 +16,7 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { SystemCatalogEntry } from "@/db/systems-catalog-read";
+import type { OrrerySystemRef } from "@/logic/orrery-system-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
@@ -41,6 +42,7 @@ export function OrrerySystemSelector({
   counts,
   needsAttention,
   onOpenChange,
+  onSelect,
   topInset = 0,
 }: {
   state: OrrerySystemState;
@@ -50,6 +52,12 @@ export function OrrerySystemSelector({
   counts: ReadonlyMap<string, number>;
   needsAttention: ReadonlyMap<string, boolean>;
   onOpenChange: (open: boolean, requestId: number) => void;
+  /**
+   * 38.7-15 (D-76): a System row was chosen (user-initiated). The Orrery
+   * screen starts the switch lead-in here, before the store's select; the
+   * default is the store's own `select`.
+   */
+  onSelect?: (system: OrrerySystemRef, name: string) => void;
   /** 38.7-12 (D-39): the floating Orrery title's height; the trigger and
    * panel sit below it (0 = at the canvas top). */
   topInset?: number;
@@ -284,7 +292,8 @@ export function OrrerySystemSelector({
                               },
                             ]}
                             onPress={() => {
-                              void state.select(row.ref, row.name, true);
+                              if (onSelect) onSelect(row.ref, row.name);
+                              else void state.select(row.ref, row.name, true);
                               dismiss();
                             }}
                           >

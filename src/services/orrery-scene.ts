@@ -268,6 +268,10 @@ export interface OrrerySatelliteState {
 }
 /** Optional reads own a separate generation and cannot publish into core scene state.
  * Call reload(null,false) synchronously when the System request/lifecycle changes.
+ * 38.7-15 (D-76): an in-session System switch's loading calls `cancel()`
+ * instead — pending reads are invalidated, but the retained System's last
+ * publication stays (it is still drawn, spinning in the switch lead-in); the
+ * destination's reload runs when it lands.
  */
 export function createOrrerySatelliteController(
   load: (scene: OrrerySceneSnapshot) => Promise<OrrerySatellite[]>,
@@ -277,6 +281,11 @@ export function createOrrerySatelliteController(
   let pending: { scene: OrrerySceneSnapshot; work: Promise<void> } | null =
     null;
   return {
+    /** Invalidates any pending read; publishes nothing (see above). */
+    cancel(): void {
+      generation++;
+      pending = null;
+    },
     reload(scene: OrrerySceneSnapshot | null, enabled: boolean): Promise<void> {
       if (enabled && scene && pending?.scene === scene) return pending.work;
       const ticket = ++generation;

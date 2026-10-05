@@ -61,6 +61,7 @@ import {
   preservedFocus,
   selectSystemFraming,
   shouldPublishSwitchScene,
+  startsInSessionSwitch,
 } from "@/components/orrery/orrery-switch-animation";
 import { orreryWarmCache } from "@/components/orrery/resources/orrery-warm-cache";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
@@ -118,6 +119,7 @@ import {
 import { restoreOrrerySession } from "@/logic/orrery-session-logic";
 import {
   ALL_CONTACTS_SYSTEM,
+  type OrrerySystemRef,
   parseSystemRef,
   systemRefId,
 } from "@/logic/orrery-system-logic";
@@ -487,6 +489,31 @@ export function OrreryScreen() {
   const pauseSwitch = switchRuntime.pause;
   const resumeSwitch = switchRuntime.resume;
   const switchProgress = switchRuntime.progress;
+  // 38.7-15 (D-76, owner-required): motion starts on the tap. The switch's
+  // opening (spin, warp, streaks, Lab C breath) runs on the retained scene
+  // while the destination loads; `publishSwitch` takes over from what is
+  // drawn. Its UI job must be the FIRST thing the tap schedules: a UI job
+  // leaves JS in a microtask, and the store's loading notification first
+  // queues React's render of the whole screen (and its effects) ahead of it.
+  const startSwitchLead = useCallback(() => {
+    perf?.beginSwitch();
+    beginSwitchLead();
+    perf?.markSwitch("lead-in");
+  }, [beginSwitchLead]);
+  /** The System whose lead the tap path already started (the store's loading notification then does not). */
+  const tapLead = useRef<string | null>(null);
+  const selectSystem = useCallback(
+    (system: OrrerySystemRef, name?: string) => {
+      const current = useSystemStore.getState();
+      const id = systemRefId(system);
+      if (startsInSessionSwitch(current, id, hasReadySystem.current)) {
+        tapLead.current = id;
+        startSwitchLead();
+      }
+      return current.select(system, name, true);
+    },
+    [useSystemStore, startSwitchLead],
+  );
   useEffect(() => {
     const unsubscribe = useSystemStore.subscribe((next, previous) => {
       if (!shouldPublishSwitchScene(next, previous)) return;
@@ -495,22 +522,22 @@ export function OrreryScreen() {
         previous.status === "ready" &&
         previous.snapshot
       ) {
-        const isInSessionSwitch =
-          hasReadySystem.current && next.requested.id !== previous.requested.id;
+        const isInSessionSwitch = startsInSessionSwitch(
+          previous,
+          next.requested.id,
+          hasReadySystem.current,
+        );
+        // 38.7-15 (D-76): a tap through `selectSystem` already started the
+        // lead; any other request (e.g. a refresh) starts it here.
+        const leadStarted = tapLead.current === next.requested.id;
+        tapLead.current = null;
+        if (isInSessionSwitch && !leadStarted) startSwitchLead();
         switchSourceIds.current = isInSessionSwitch
           ? previous.snapshot.systemSnapshot.members.map((member) => member.id)
           : null;
-        if (isInSessionSwitch) {
-          perf?.beginSwitch();
-          // 38.7-15 (D-76, owner-required): motion starts on the tap. The
-          // switch's opening (spin, warp, streaks, Lab C breath) runs on the
-          // retained scene while the destination loads; `publishSwitch`
-          // takes over from what is drawn. The renderer viewport is held from
-          // here (C4-M1) so nothing measured meanwhile restarts the frame.
-          setHeldViewport((held) => held ?? viewport);
-          beginSwitchLead();
-          perf?.markSwitch("lead-in");
-        }
+        // The renderer viewport is held from the tap (C4-M1) so nothing
+        // measured meanwhile restarts the frame.
+        if (isInSessionSwitch) setHeldViewport((held) => held ?? viewport);
         return;
       }
       // 38.7-15: a load that failed ends the lead-in (it coasts back).
@@ -571,7 +598,7 @@ export function OrreryScreen() {
   }, [
     useSystemStore,
     publishSwitch,
-    beginSwitchLead,
+    startSwitchLead,
     endSwitchLead,
     viewport,
     pose,
@@ -604,8 +631,25 @@ export function OrreryScreen() {
         next.generation !== previous.generation ||
         next.snapshot !== previous.snapshot ||
         next.status !== previous.status
-      )
-        reloadSatellites();
+      ) {
+        // 38.7-15 (D-76): an in-session switch's loading keeps the outgoing
+        // System's moons drawn (the lead spins them with their parents) and
+        // only cancels its reads. Publishing the empty spec here removed
+        // them at the tap AND rewrote every body spec of the outgoing System
+        // in the same UI job as the lead's start (All Contacts, moons on:
+        // ~880 bodies deserialised and re-recorded before the lead's first
+        // frame). The destination's satellites load when it lands.
+        if (
+          next.status === "loading" &&
+          startsInSessionSwitch(
+            previous,
+            next.requested.id,
+            hasReadySystem.current,
+          )
+        )
+          satelliteController.cancel();
+        else reloadSatellites();
+      }
     });
     reloadSatellites();
     return () => {
@@ -1518,7 +1562,7 @@ export function OrreryScreen() {
     scene?.systemSnapshot.validity,
     brokenRules.length,
   );
-  const showAll = () => state.select(ALL_CONTACTS_SYSTEM, undefined, true);
+  const showAll = () => selectSystem(ALL_CONTACTS_SYSTEM);
 
   return (
     <View
@@ -1571,6 +1615,7 @@ export function OrreryScreen() {
           counts={systemCounts}
           needsAttention={systemNeedsAttention}
           onOpenChange={onSystemSelectorOpenChange}
+          onSelect={selectSystem}
           topInset={headerHeight}
         />
         <OrreryViewOptions
