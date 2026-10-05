@@ -149,6 +149,7 @@ interface OrreryPerfMarks {
   mark(name: string): void;
   beginSwitch(): void;
   markSwitch(name: string): void;
+  endSwitch(name: string): void;
 }
 // DEBUG only: Metro folds this to null in a release bundle.
 const perf: OrreryPerfMarks | null =
@@ -459,9 +460,16 @@ export function OrreryScreen() {
   // prune's JS call; a settled publication: inside `publish`), so the
   // satellite flush, the settled generation and the viewport adoption all
   // batch into that one commit.
+  // 38.7-15 (DEBUG): the generation of the real switch whose settle closes
+  // the `switch:` clock. A settled publication that is no switch (a warm
+  // return's reload, a refresh) also calls back here and must not log.
+  const switchMarkGeneration = useRef<number | null>(null);
   const onSwitchSettled = useCallback(
     (generation: number) => {
-      perf?.markSwitch("settled");
+      if (switchMarkGeneration.current === generation) {
+        switchMarkGeneration.current = null;
+        perf?.endSwitch("settled");
+      }
       satellitePublisher.switchSettled(generation);
       setSettledSwitch(generation);
       setHeldViewport(null);
@@ -511,6 +519,7 @@ export function OrreryScreen() {
         (next.status === "error" || next.status === "stale")
       ) {
         endSwitchLead();
+        perf?.endSwitch("load-failed");
         return;
       }
       if (next.status !== "ready" || !next.snapshot) return;
@@ -530,7 +539,10 @@ export function OrreryScreen() {
       // C4-M1: hold the renderer viewport in use until this switch settles
       // (batched into this publication's commit).
       if (sourceIds) setHeldViewport((held) => held ?? viewport);
-      if (sourceIds) perf?.markSwitch("load-done");
+      if (sourceIds) {
+        perf?.markSwitch("load-done");
+        switchMarkGeneration.current = next.generation;
+      }
       publishSwitch(
         next.snapshot,
         !!sourceIds,

@@ -9,7 +9,9 @@
  *     session-ready);
  *   - "switch": a System tap starts it (`beginSwitch`); `markSwitch(name)`
  *     logs `orrery-perf switch:<name> <ms since tap>` — where the switch wait
- *     goes (tap, lead-in, load-done, publish, settled).
+ *     goes (tap, lead-in, load-done, settled — `endSwitch` closes the clock, so
+ *     a settled publication that is no switch, e.g. a warm return's reload,
+ *     never logs `switch:settled` against the last tap).
  *
  * Lines go through `console.log`, so they land in `adb logcat -s ReactNativeJS`
  * or the Metro pane (check both, by delta). App code reaches this module only
@@ -58,8 +60,23 @@ export function beginSwitch(): void {
   log("orrery-perf switch:tap 0");
 }
 
-/** `orrery-perf switch:<name> <ms since the tap>`. */
+/**
+ * `orrery-perf switch:<name> <ms since the tap>` — only while a switch is
+ * open (between `beginSwitch` and `endSwitch`), so a later settle or write
+ * never logs against an old tap.
+ */
 export function markSwitch(name: string): void {
   if (switchAt === null) return;
   log(`orrery-perf switch:${name} ${Math.round(now() - switchAt)}`);
+}
+
+/** Logs `switch:<name>` (the switch's last mark) and closes the switch clock. */
+export function endSwitch(name: string): void {
+  markSwitch(name);
+  switchAt = null;
+}
+
+/** Whether a switch clock is open (DEBUG write marks are logged only then). */
+export function switchOpen(): boolean {
+  return switchAt !== null;
 }
