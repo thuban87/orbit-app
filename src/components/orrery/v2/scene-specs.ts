@@ -54,6 +54,17 @@ import {
   SUN_CORONA_ALPHA,
 } from "./visual-tunables";
 
+// --- Tunable constants (top-of-file per project convention) ------------------
+
+/**
+ * 38.7-15: the bounded window (ms) in which the Orrery's photo and initials
+ * updates share ONE body-spec write. The first update after a quiet window is
+ * written at once; the rest of a burst (photo decodes completing, initials
+ * re-shaped by an eligibility report) lands at the window's end, at most this
+ * late. Tunable.
+ */
+export const ORRERY_SPEC_COALESCE_MS = 64;
+
 /**
  * 38.7-14 (D-57): what the spec builders read from a body resource — its key,
  * world body and the scene's contacts and sun. The Orrery's switch-runtime
@@ -1096,11 +1107,112 @@ export function parseLedgerHandle(handle: string): OrreryLedgerHandle | null {
   return null;
 }
 
+/**
+ * 38.7-15: an incremental body-spec write — only the bodies that changed
+ * cross to the UI thread; every other body keeps the spec object the UI
+ * already holds. Applied by `applyBodySpecsPatch` on the UI runtime.
+ */
+export interface OrreryBodySpecsPatch {
+  /** The body-spec generation the UI value must hold (else it is not applied). */
+  base: number;
+  /** The new generation and its epoch (the same epoch as `base`). */
+  generation: number;
+  mountEpoch: number;
+  /** The new body count. */
+  length: number;
+  /**
+   * New index → the index of the UI's current spec it keeps, or −1 (carried in
+   * `changes`). Null: index-aligned (index i keeps i unless `changes` has it).
+   */
+  keep: readonly number[] | null;
+  /** The bodies the UI does not hold yet, by their new index. */
+  changes: readonly { index: number; spec: OrreryBodySpec }[];
+}
+
+/**
+ * 38.7-15 (UI runtime): `current` with `patch` applied, or null when the patch
+ * was computed against another value (generation / epoch / a missing body) —
+ * the caller then asks for a full write. Pure (a new specs object; the kept
+ * spec objects are shared, never mutated).
+ */
+export function applyBodySpecsPatch(
+  current: OrreryBodySpecs,
+  patch: OrreryBodySpecsPatch,
+): OrreryBodySpecs | null {
+  "worklet";
+  if (
+    current.generation !== patch.base ||
+    current.mountEpoch !== patch.mountEpoch
+  )
+    return null;
+  const from = current.bodies;
+  const keep = patch.keep;
+  const bodies: OrreryBodySpec[] = [];
+  for (let i = 0; i < patch.length; i++) {
+    const j = keep === null ? i : keep[i];
+    bodies.push(from[j]);
+  }
+  const changes = patch.changes;
+  for (let c = 0; c < changes.length; c++) {
+    const change = changes[c];
+    if (change.index < 0 || change.index >= patch.length) return null;
+    bodies[change.index] = change.spec;
+  }
+  for (let i = 0; i < bodies.length; i++)
+    if (bodies[i] === undefined) return null;
+  return {
+    generation: patch.generation,
+    mountEpoch: patch.mountEpoch,
+    bodies,
+  };
+}
+
+/**
+ * Structural equality of two body looks (plain values: numbers, strings,
+ * booleans, null, ink arrays and the nested lit / sun looks). Two looks built
+ * from the same contact and theme are equal even when rebuilt (a new
+ * resources list at a switch's hand-off or settle).
+ */
+function samePlain(a: unknown, b: unknown, depth: number): boolean {
+  if (a === b) return true;
+  if (
+    depth <= 0 ||
+    a === null ||
+    b === null ||
+    typeof a !== "object" ||
+    typeof b !== "object"
+  )
+    return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  for (const key of aKeys) {
+    if (!Object.hasOwn(right, key)) return false;
+    if (!samePlain(left[key], right[key], depth - 1)) return false;
+  }
+  return true;
+}
+const LOOK_EQUALITY_DEPTH = 4;
 export interface OrrerySpecPublisherOptions {
   /** The H3 ledger every native object the specs reference is tracked by. */
   ledger: OrreryGenerationLedger<string>;
   /** Writes the body specs SharedValue (never React state). */
   writeBodies: (specs: OrreryBodySpecs) => void;
+  /**
+   * 38.7-15: writes only the changed bodies (`applyBodySpecsPatch` on the UI
+   * runtime, behind every earlier write: the UI job queue is FIFO). Absent →
+   * every body write is a full one (the System Preview, tests).
+   */
+  patchBodies?: (patch: OrreryBodySpecsPatch) => void;
+  /**
+   * 38.7-15: photo and initials updates within this window (ms) share one
+   * body write (`ORRERY_SPEC_COALESCE_MS`); the first one after a quiet window
+   * is written at once. Absent / 0 → every update is written at once.
+   */
+  coalesceMs?: number;
   /** Writes the label specs SharedValue (never React state). */
   writeLabels?: (specs: OrreryLabelLayerSpecs) => void;
   /**
@@ -1111,7 +1223,7 @@ export interface OrrerySpecPublisherOptions {
 }
 
 export interface OrrerySpecPublisher {
-  /** Resource / theme / focus change: the static looks. */
+  /** Resource / theme / focus change: the static looks (written at once). */
   setLooks(looks: readonly OrreryBodyLook[]): void;
   /** The text publisher's initials spec (body key → Paragraph, its cache keys). */
   setInitials(spec: OrreryInitialsSpec): void;
@@ -1124,6 +1236,11 @@ export interface OrrerySpecPublisher {
     photos: ReadonlyMap<string, OrreryDrawnPhoto>,
     photoEpoch: number,
   ): void;
+  /**
+   * 38.7-15: the UI could not apply a body patch (its value was not the
+   * patch's base): the latest body specs are written in full, now.
+   */
+  resync(): void;
   /**
    * 38.7-09: the current publishing epoch, begun now if none is (the sky bake
    * owner tags its images with it before any body spec was published).
@@ -1138,15 +1255,25 @@ export interface OrrerySpecPublisher {
 /**
  * 38.7-07 (D-43/H3): the JS-thread spec publisher. It composes the body looks
  * with the native objects (initials Paragraphs, photo SkImages) into one
- * immutable spec array, writes it with a monotonically increasing shared
+ * immutable spec array, publishes it with a monotonically increasing shared
  * generation, and tells the ledger which native objects that generation
  * references for which layers. A photo arriving republishes the specs without
  * any React state change; an unchanged input writes nothing.
+ *
+ * 38.7-15 (switch stalls at All Contacts): a body whose look, photo and
+ * initials are unchanged keeps its spec OBJECT, and a write sends the UI only
+ * the bodies it does not hold yet (`patchBodies`), not ~1,000 re-serialised
+ * specs per photo decode. Photo and initials bursts share one write per
+ * `coalesceMs` window. Every composed generation is published to the ledger
+ * at once, written or not: acks only ever name generations the UI recorded,
+ * so an object referenced by an unwritten generation retires only after a
+ * later written generation dropped it and every body layer acked that one.
  */
 export function createOrrerySpecPublisher(
   options: OrrerySpecPublisherOptions,
 ): OrrerySpecPublisher {
-  const { ledger, writeBodies, writeLabels } = options;
+  const { ledger, writeBodies, writeLabels, patchBodies } = options;
+  const coalesceMs = Math.max(0, options.coalesceMs ?? 0);
   const bodyLayers = options.bodyLayers ?? ORRERY_BODY_LAYERS;
   let looks: readonly OrreryBodyLook[] = [];
   let initials: Readonly<Record<string, PreparedOrreryText | null>> = {};
@@ -1157,42 +1284,141 @@ export function createOrrerySpecPublisher(
   let photoEpoch = 0;
   let generation = 0;
   let epoch: number | null = null;
+  /** The latest composed (ledger-published) bodies and the looks they came from. */
   let published: readonly OrreryBodySpec[] | null = null;
+  let publishedGeneration = 0;
   let publishedLooks: readonly OrreryBodyLook[] | null = null;
+  /** What the UI holds (the last body write, full or patched). */
+  let written: {
+    generation: number;
+    epoch: number;
+    bodies: readonly OrreryBodySpec[];
+  } | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastWriteAt = Number.NEGATIVE_INFINITY;
 
-  function publishBodies(): void {
+  function cancelTimer(): void {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  }
+
+  /**
+   * The spec a body keeps from the previous composition: the same key, photo
+   * and initials, and an identical (or structurally equal) look.
+   */
+  function reusable(
+    previous: OrreryBodySpec | undefined,
+    previousLook: OrreryBodyLook | undefined,
+    look: OrreryBodyLook,
+    photo: SkImage | null,
+    text: PreparedOrreryText | null,
+  ): OrreryBodySpec | null {
+    if (!previous || !previousLook || previous.key !== look.key) return null;
+    if (previous.photo !== photo || previous.initials !== text) return null;
+    if (previousLook === look) return previous;
+    return samePlain(previousLook, look, LOOK_EQUALITY_DEPTH) ? previous : null;
+  }
+
+  /** Composes the bodies; returns false when nothing changed (no generation). */
+  function compose(force: boolean): boolean {
+    const previous = published;
+    const previousLooks = publishedLooks;
+    // Index-aligned when the looks array is unchanged (photos, initials) or
+    // keeps its order; keyed otherwise (a switch's resource merge or prune).
+    let byKey: Map<string, number> | null = null;
     const bodies: OrreryBodySpec[] = [];
     const handles = new Set<string>();
-    let same =
-      published !== null &&
-      publishedLooks === looks &&
-      published.length === looks.length;
     for (const handle of initialsHandles) handles.add(handle);
+    let same =
+      previous !== null &&
+      previousLooks !== null &&
+      previous.length === looks.length;
     for (let i = 0; i < looks.length; i++) {
       const look = looks[i];
       const drawn =
         look.photoKey === null ? undefined : photos.get(look.photoKey);
-      const spec: OrreryBodySpec = {
-        ...look,
-        initials: initials[look.key] ?? null,
-        photo: drawn?.image ?? null,
-      };
+      const photo = drawn?.image ?? null;
+      const text = initials[look.key] ?? null;
       if (drawn) handles.add(photoHandle(photoEpoch, drawn.id));
-      if (
-        same &&
-        (published?.[i]?.photo !== spec.photo ||
-          published?.[i]?.initials !== spec.initials)
-      )
-        same = false;
-      bodies.push(spec);
+      let spec: OrreryBodySpec | null = null;
+      if (previous !== null && previousLooks !== null) {
+        let j = i;
+        if (previous[i]?.key !== look.key) {
+          if (byKey === null) {
+            byKey = new Map();
+            for (let k = 0; k < previous.length; k++)
+              if (!byKey.has(previous[k].key)) byKey.set(previous[k].key, k);
+          }
+          j = byKey.get(look.key) ?? -1;
+        }
+        if (j >= 0)
+          spec = reusable(previous[j], previousLooks[j], look, photo, text);
+        if (spec === null || j !== i) same = false;
+      }
+      bodies.push(spec ?? { ...look, initials: text, photo });
     }
-    if (same) return;
+    if (same && !force) {
+      // Unchanged bodies: adopt the new looks array (identity) for the fast path.
+      publishedLooks = looks;
+      return false;
+    }
     if (epoch === null) epoch = ledger.beginEpoch();
     generation++;
     published = bodies;
+    publishedGeneration = generation;
     publishedLooks = looks;
     ledger.publish(generation, bodyLayers, handles);
-    writeBodies({ generation, mountEpoch: epoch, bodies });
+    return true;
+  }
+
+  /** Writes the latest composition to the UI: a patch when it can, else full. */
+  function flush(): void {
+    cancelTimer();
+    const bodies = published;
+    if (bodies === null || epoch === null) return;
+    if (written !== null && written.generation === publishedGeneration) return;
+    lastWriteAt = Date.now();
+    const base = written;
+    if (patchBodies && base !== null && base.epoch === epoch) {
+      const held = new Map<OrreryBodySpec, number>();
+      for (let k = 0; k < base.bodies.length; k++)
+        if (!held.has(base.bodies[k])) held.set(base.bodies[k], k);
+      const keep: number[] = [];
+      const changes: { index: number; spec: OrreryBodySpec }[] = [];
+      let aligned = true;
+      for (let i = 0; i < bodies.length; i++) {
+        const j = held.get(bodies[i]) ?? -1;
+        keep.push(j);
+        if (j < 0) changes.push({ index: i, spec: bodies[i] });
+        else if (j !== i) aligned = false;
+      }
+      if (changes.length < bodies.length) {
+        written = { generation: publishedGeneration, epoch, bodies };
+        patchBodies({
+          base: base.generation,
+          generation: publishedGeneration,
+          mountEpoch: epoch,
+          length: bodies.length,
+          keep: aligned ? null : keep,
+          changes,
+        });
+        return;
+      }
+    }
+    written = { generation: publishedGeneration, epoch, bodies };
+    writeBodies({ generation: publishedGeneration, mountEpoch: epoch, bodies });
+  }
+
+  /** A photo / initials update: written at once after a quiet window, else coalesced. */
+  function flushSoon(): void {
+    if (coalesceMs <= 0) {
+      flush();
+      return;
+    }
+    if (timer !== null) return;
+    const wait = lastWriteAt + coalesceMs - Date.now();
+    if (wait <= 0) flush();
+    else timer = setTimeout(flush, wait);
   }
 
   function publishLabels(): void {
@@ -1217,7 +1443,10 @@ export function createOrrerySpecPublisher(
   return {
     setLooks(next) {
       looks = next;
-      publishBodies();
+      compose(false);
+      // A look change (resources, theme, moons) is written at once, with any
+      // coalesced photo/initials update.
+      flush();
     },
     setInitials(next) {
       initials = next.initials;
@@ -1226,8 +1455,7 @@ export function createOrrerySpecPublisher(
       );
       // Always a new generation: the text epoch in the handles may change
       // even when every Paragraph is reused from the cache (a remount).
-      publishedLooks = null;
-      publishBodies();
+      if (compose(true)) flushSoon();
     },
     setLabels(next) {
       labelSpec = next;
@@ -1247,17 +1475,25 @@ export function createOrrerySpecPublisher(
     setPhotos(next, nextEpoch) {
       photos = next;
       photoEpoch = nextEpoch;
-      publishBodies();
+      if (compose(false)) flushSoon();
+    },
+    resync() {
+      written = null;
+      flush();
     },
     ensureEpoch() {
       if (epoch === null) epoch = ledger.beginEpoch();
       return epoch;
     },
     detach() {
+      cancelTimer();
       const ended = epoch;
       epoch = null;
       published = null;
+      publishedGeneration = 0;
       publishedLooks = null;
+      written = null;
+      lastWriteAt = Number.NEGATIVE_INFINITY;
       labelSpec = null;
       initials = {};
       initialsHandles = [];

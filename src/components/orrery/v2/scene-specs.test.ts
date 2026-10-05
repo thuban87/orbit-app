@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** A deterministic stand-in for Skia's token parser: distinct per token. */
 const parse = vi.hoisted(() => (token: string) => {
@@ -21,6 +21,7 @@ import { THEME_PRESETS } from "@/theme/theme-presets";
 import { createOrreryGenerationLedger } from "../resources/orrery-generation-ledger";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
 import {
+  applyBodySpecsPatch,
   bodyInitialsLayout,
   bodyLit,
   buildBodyLooks,
@@ -35,6 +36,7 @@ import {
   ORRERY_LAYER,
   type OrreryBodyLook,
   type OrreryBodySpecs,
+  type OrreryBodySpecsPatch,
   type OrreryLabelLayerSpecs,
   parseLedgerHandle,
   photoHandle,
@@ -643,6 +645,306 @@ describe("createOrrerySpecPublisher (D-43/H3)", () => {
       key: "a\u0001b",
     });
     expect(parseLedgerHandle("junk")).toBeNull();
+  });
+});
+
+describe("38.7-15: incremental, coalesced body-spec writes (switch stalls)", () => {
+  const colors = THEME_PRESETS.galaxy.dark;
+  const image = (label: string) => ({ label }) as never;
+  const text = (label: string) =>
+    ({ text: label, paragraph: {}, width: 20, height: 12 }) as never;
+  const rows = [
+    { status: "stable" as const, name: "Ada", photo: "avatars/ada.jpg" },
+    { status: "wobble" as const, name: "Bo", photo: "avatars/bo.jpg" },
+    { status: "decay" as const, name: "Cy", photo: null },
+  ];
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  /**
+   * A publisher whose writes land on a simulated UI value: a full write
+   * replaces it; a patch is applied with `applyBodySpecsPatch` (null → the
+   * UI asks for a resync, like OrreryWorld's worklet).
+   */
+  function setup(coalesceMs = 0) {
+    const ledger = createOrreryGenerationLedger<string>();
+    const full: OrreryBodySpecs[] = [];
+    const patches: OrreryBodySpecsPatch[] = [];
+    const ui: { value: OrreryBodySpecs } = {
+      value: {
+        generation: 0,
+        mountEpoch: 0,
+        bodies: [],
+      } as OrreryBodySpecs,
+    };
+    let mismatches = 0;
+    const publisher = createOrrerySpecPublisher({
+      ledger,
+      coalesceMs,
+      writeBodies: (specs) => {
+        full.push(specs);
+        ui.value = specs;
+      },
+      patchBodies: (patch) => {
+        patches.push(patch);
+        const next = applyBodySpecsPatch(ui.value, patch);
+        if (next === null) mismatches++;
+        else ui.value = next;
+      },
+    });
+    const looks = buildBodyLooks(bodyResources(rows), colors);
+    return {
+      ledger,
+      full,
+      patches,
+      ui,
+      publisher,
+      looks,
+      mismatches: () => mismatches,
+    };
+  }
+  /** What the bodies draw: key, photo and initials, in order. */
+  const drawn = (specs: OrreryBodySpecs) =>
+    specs.bodies.map((b) => [b.key, b.photo, b.initials]);
+
+  it("a photo decode sends only its body; the UI value equals a full composition", () => {
+    const { full, patches, ui, publisher, looks } = setup();
+    publisher.setLooks(looks);
+    expect(full).toHaveLength(1);
+    const ada = image("ada");
+    publisher.setPhotos(
+      new Map([["avatars/ada.jpg", { id: 1, image: ada }]]),
+      7,
+    );
+    expect(full).toHaveLength(1);
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toMatchObject({
+      base: 1,
+      generation: 2,
+      length: 4,
+      keep: null,
+    });
+    expect(patches[0].changes.map((c) => c.index)).toEqual([1]);
+    expect(ui.value.generation).toBe(2);
+    expect(drawn(ui.value)).toEqual([
+      ["sun:0", null, null],
+      ["contact:1", ada, null],
+      ["contact:2", null, null],
+      ["contact:3", null, null],
+    ]);
+    // Unchanged bodies keep the very spec object the UI already held.
+    expect(ui.value.bodies[0]).toBe(full[0].bodies[0]);
+    expect(ui.value.bodies[2]).toBe(full[0].bodies[2]);
+  });
+  it("initials re-shaped for a few bodies send those bodies; a forced generation with no change sends an empty patch", () => {
+    const { patches, ui, publisher, looks } = setup();
+    publisher.setLooks(looks);
+    const bo = text("BO");
+    publisher.setInitials({
+      generation: 1,
+      mountEpoch: 3,
+      keys: ["k-bo"],
+      initials: { "contact:2": bo },
+    });
+    expect(patches.at(-1)?.changes.map((c) => c.index)).toEqual([2]);
+    expect(ui.value.bodies[2].initials).toBe(bo);
+    // Same Paragraphs (a remount's new text epoch): a new generation, no body.
+    publisher.setInitials({
+      generation: 2,
+      mountEpoch: 4,
+      keys: ["k-bo"],
+      initials: { "contact:2": bo },
+    });
+    expect(patches.at(-1)?.changes).toEqual([]);
+    expect(ui.value.generation).toBe(patches.at(-1)?.generation);
+  });
+  it("moons appended to the same looks send only the moons; rebuilt equal looks in a new order send none", () => {
+    const { full, patches, ui, publisher, looks } = setup();
+    publisher.setLooks(looks);
+    const moons = buildSatelliteLooks(
+      [
+        { uid: "m1", parentId: 1, parentUid: "p1" },
+        { uid: "m2", parentId: 1, parentUid: "p1" },
+      ] as never,
+      colors,
+    );
+    publisher.setLooks([...looks, ...moons]);
+    expect(full).toHaveLength(1);
+    expect(patches.at(-1)?.changes.map((c) => c.index)).toEqual([4, 5]);
+    expect(ui.value.bodies.map((b) => b.key)).toEqual([
+      ...looks.map((l) => l.key),
+      ...moons.map((l) => l.key),
+    ]);
+    // A switch's resource merge/prune rebuilds equal looks in another order:
+    // every body is kept (by key), none re-sent.
+    const rebuilt = buildBodyLooks(bodyResources(rows), colors).reverse();
+    publisher.setLooks(rebuilt);
+    const last = patches.at(-1) as OrreryBodySpecsPatch;
+    expect(last.changes).toEqual([]);
+    expect(last.keep).toEqual([3, 2, 1, 0]);
+    expect(ui.value.bodies.map((b) => b.key)).toEqual(
+      rebuilt.map((l) => l.key),
+    );
+    // A changed look (a status change) is re-sent.
+    const changed = buildBodyLooks(
+      bodyResources([rows[0], { ...rows[1], status: "rogue" }, rows[2]]),
+      colors,
+    );
+    publisher.setLooks(changed);
+    expect(patches.at(-1)?.changes.map((c) => c.index)).toEqual([2]);
+    expect(full).toHaveLength(1);
+  });
+  it("a burst inside the window is ONE write, at most the window late; a quiet update is written at once", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const { ledger, full, patches, ui, publisher, looks } = setup(64);
+    publisher.setLooks(looks);
+    expect(full).toHaveLength(1);
+    vi.advanceTimersByTime(10);
+    publisher.setPhotos(
+      new Map([["avatars/ada.jpg", { id: 1, image: image("ada") }]]),
+      2,
+    );
+    vi.advanceTimersByTime(10);
+    const bo = image("bo");
+    publisher.setPhotos(
+      new Map([
+        ["avatars/ada.jpg", { id: 1, image: image("ada") }],
+        ["avatars/bo.jpg", { id: 2, image: bo }],
+      ]),
+      2,
+    );
+    // Both compositions reached the ledger at once; nothing written yet.
+    expect(publisher.generation()).toBe(3);
+    expect(ledger.holds(photoHandle(2, 2))).toBe(true);
+    expect(patches).toHaveLength(0);
+    vi.advanceTimersByTime(43);
+    expect(patches).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toMatchObject({ base: 1, generation: 3 });
+    expect(patches[0].changes.map((c) => c.index)).toEqual([1, 2]);
+    expect(ui.value.bodies[2].photo).toBe(bo);
+    // Quiet for a window: the next update is written at once.
+    vi.advanceTimersByTime(64);
+    publisher.setPhotos(new Map(), 2);
+    expect(patches).toHaveLength(2);
+  });
+  it("a look change writes at once, carrying a pending photo; detach drops a pending write", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const { patches, ui, publisher, looks } = setup(64);
+    publisher.setLooks(looks);
+    const ada = image("ada");
+    publisher.setPhotos(
+      new Map([["avatars/ada.jpg", { id: 1, image: ada }]]),
+      2,
+    );
+    expect(patches).toHaveLength(0);
+    const moons = buildSatelliteLooks(
+      [{ uid: "m1", parentId: 1, parentUid: "p1" }] as never,
+      colors,
+    );
+    publisher.setLooks([...looks, ...moons]);
+    expect(patches).toHaveLength(1);
+    expect(patches[0].changes.map((c) => c.index)).toEqual([1, 4]);
+    expect(ui.value.bodies[1].photo).toBe(ada);
+    // The timer that was pending writes nothing more.
+    vi.advanceTimersByTime(200);
+    expect(patches).toHaveLength(1);
+    // A pending write never lands after detach.
+    vi.advanceTimersByTime(64);
+    publisher.setPhotos(new Map(), 2);
+    publisher.setPhotos(
+      new Map([["avatars/bo.jpg", { id: 2, image: image("bo") }]]),
+      2,
+    );
+    const count = patches.length;
+    publisher.detach();
+    vi.advanceTimersByTime(200);
+    expect(patches).toHaveLength(count);
+  });
+  it("H3: a photo drawn only by an unwritten generation retires once the body layers ack the written one, never before", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const { ledger, patches, ui, publisher, looks } = setup(64);
+    publisher.setLooks(looks);
+    const epoch = ui.value.mountEpoch;
+    const a = image("a");
+    // Written at once (quiet window): generation 2 draws photo 1.
+    vi.advanceTimersByTime(64);
+    publisher.setPhotos(new Map([["avatars/ada.jpg", { id: 1, image: a }]]), 2);
+    expect(ui.value.generation).toBe(2);
+    // Generation 3 (photo 2) is never written: generation 4 replaces it.
+    publisher.setPhotos(
+      new Map([["avatars/ada.jpg", { id: 2, image: image("b") }]]),
+      2,
+    );
+    publisher.setPhotos(
+      new Map([["avatars/ada.jpg", { id: 3, image: image("c") }]]),
+      2,
+    );
+    vi.advanceTimersByTime(64);
+    expect(patches.at(-1)?.generation).toBe(4);
+    expect(ui.value.generation).toBe(4);
+    // The UI recorded generation 2 (photo 1) only: nothing may retire.
+    for (const layer of ORRERY_BODY_LAYERS) ledger.ack(layer, 2, epoch);
+    expect(ledger.retirable()).toEqual([]);
+    // Every body layer recorded generation 4: photos 1 and 2 retire.
+    for (const layer of ORRERY_BODY_LAYERS) ledger.ack(layer, 4, epoch);
+    expect(ledger.retirable()).toEqual([photoHandle(2, 1), photoHandle(2, 2)]);
+  });
+  it("a patch computed against another UI value is refused; resync writes the latest in full", () => {
+    const { full, ui, publisher, looks, mismatches } = setup();
+    publisher.setLooks(looks);
+    // Something else replaced the UI value (never expected: FIFO).
+    ui.value = { ...ui.value, generation: 99 };
+    publisher.setPhotos(
+      new Map([["avatars/ada.jpg", { id: 1, image: image("ada") }]]),
+      2,
+    );
+    expect(mismatches()).toBe(1);
+    expect(ui.value.generation).toBe(99);
+    publisher.resync();
+    expect(full).toHaveLength(2);
+    expect(ui.value.generation).toBe(2);
+    expect(ui.value.bodies[1].photo).not.toBeNull();
+  });
+  it("applyBodySpecsPatch: keeps by index or map, refuses another epoch or a hole", () => {
+    const specs = (keys: string[]) =>
+      keys.map((key) => ({ key }) as never as OrreryBodySpecs["bodies"][0]);
+    const current: OrreryBodySpecs = {
+      generation: 5,
+      mountEpoch: 2,
+      bodies: specs(["a", "b", "c"]),
+    };
+    const [d] = specs(["d"]);
+    const patch = (
+      over: Partial<OrreryBodySpecsPatch>,
+    ): OrreryBodySpecsPatch => ({
+      base: 5,
+      generation: 6,
+      mountEpoch: 2,
+      length: 3,
+      keep: null,
+      changes: [],
+      ...over,
+    });
+    const aligned = applyBodySpecsPatch(
+      current,
+      patch({ length: 4, changes: [{ index: 3, spec: d }] }),
+    );
+    expect(aligned?.bodies.map((b) => b.key)).toEqual(["a", "b", "c", "d"]);
+    expect(aligned?.bodies[0]).toBe(current.bodies[0]);
+    expect(aligned?.generation).toBe(6);
+    const mapped = applyBodySpecsPatch(
+      current,
+      patch({ length: 2, keep: [2, -1], changes: [{ index: 1, spec: d }] }),
+    );
+    expect(mapped?.bodies.map((b) => b.key)).toEqual(["c", "d"]);
+    expect(applyBodySpecsPatch(current, patch({ base: 4 }))).toBeNull();
+    expect(applyBodySpecsPatch(current, patch({ mountEpoch: 3 }))).toBeNull();
+    expect(applyBodySpecsPatch(current, patch({ length: 4 }))).toBeNull();
+    expect(
+      applyBodySpecsPatch(current, patch({ keep: [0, -1, 2] })),
+    ).toBeNull();
   });
 });
 

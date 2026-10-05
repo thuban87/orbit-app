@@ -128,6 +128,7 @@ import {
 } from "./v2/nebula-bake";
 import { OrreryV2Canvas } from "./v2/OrreryV2Canvas";
 import {
+  applyBodySpecsPatch,
   bodyIdentity,
   bodyInitialsLayout,
   buildBodyLooks,
@@ -144,7 +145,9 @@ import {
   EMPTY_PLANE_SPEC,
   EMPTY_RING_SPECS,
   EMPTY_SKY_IMAGE,
+  ORRERY_SPEC_COALESCE_MS,
   type OrreryBodySpecs,
+  type OrreryBodySpecsPatch,
   type OrreryLabelLayerSpecs,
   type OrreryLayerId,
   type OrrerySpecPublisher,
@@ -268,6 +271,24 @@ const perf: OrreryPerfMarks | null =
   typeof __DEV__ !== "undefined" && __DEV__
     ? require("@/__dev__/orrery-perf-marks")
     : null;
+
+/**
+ * 38.7-15 (UI runtime): applies an incremental body-spec write — only the
+ * changed bodies crossed from JS; every other body keeps the spec object the
+ * UI already holds. A patch computed against another value (never expected:
+ * the UI job queue is FIFO) asks JS for a full write instead.
+ * A module-level worklet defined above its only caller (Hermes forward-ref rule).
+ */
+function writeBodySpecsPatch(
+  target: SharedValue<OrreryBodySpecs>,
+  patch: OrreryBodySpecsPatch,
+  resync: () => void,
+): void {
+  "worklet";
+  const next = applyBodySpecsPatch(target.value, patch);
+  if (next === null) runOnJS(resync)();
+  else target.value = next;
+}
 
 /**
  * 38.7-07 (H3): routes the native objects the ledger released back to their
@@ -412,16 +433,30 @@ export function OrreryWorldInner({
   if (!ledgerRef.current) ledgerRef.current = createOrreryGenerationLedger();
   const ledger = ledgerRef.current;
   const specPublisherRef = useRef<OrrerySpecPublisher | null>(null);
+  // 38.7-15: a body patch the UI could not apply → one full write (stable).
+  const resyncBodies = useRef(() => {
+    specPublisherRef.current?.resync();
+  }).current;
   if (!specPublisherRef.current)
     specPublisherRef.current = createOrrerySpecPublisher({
       ledger,
-      // 38.7-15 (DEBUG): every full spec write during a switch (tap →
-      // settled) is marked with its size — each is deserialised and
-      // re-recorded on the UI thread (the switch-stall evidence).
+      // 38.7-15 (DEBUG): every spec write during a switch (tap → settled) is
+      // marked with its size — a full write is deserialised whole on the UI
+      // thread (the switch-stall evidence); a patch carries only the changed
+      // bodies (changed/total).
       writeBodies: (specs) => {
         bodySpecs.value = specs;
         perf?.markSwitch(`write-bodies-${specs.bodies.length}`);
       },
+      // 38.7-15 (switch stalls): photo decodes and initials updates send
+      // only the bodies that changed, coalesced per ORRERY_SPEC_COALESCE_MS.
+      patchBodies: (patch) => {
+        runOnUI(writeBodySpecsPatch)(bodySpecs, patch, resyncBodies);
+        perf?.markSwitch(
+          `patch-bodies-${patch.changes.length}/${patch.length}`,
+        );
+      },
+      coalesceMs: ORRERY_SPEC_COALESCE_MS,
       writeLabels: (specs) => {
         labelSpecs.value = specs;
         perf?.markSwitch(`write-labels-${specs.measured.length}`);
