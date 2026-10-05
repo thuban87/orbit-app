@@ -71,8 +71,9 @@
  * ── Frame-rate vote (38.7-15, D-65 FR-B) ────────────────────────────────────
  * On the opaque canvas (Android SurfaceView) the canvas votes AMBIENT_HZ
  * (`Surface.setFrameRate`, API 30+, patched into Skia 2.6.2) while only the
- * ambient clock animates it, and withdraws the vote (0) under reduced motion
- * and while a switch, gesture or camera motion runs (`ambientFrameRateVote`).
+ * ambient clock animates it, MOTION_VOTE_HZ (the panel's top rate; 38.7-16
+ * FV-1) while a switch, gesture or camera motion runs, and withdraws the vote
+ * (0) under reduced motion (`ambientFrameRateVote`).
  * A UI reaction sends the vote only on change, through the Canvas ref's
  * imperative `setFrameRateVote` (a native prop update) — never React state,
  * so no render commits mid-switch (D-53). The native view re-applies it on

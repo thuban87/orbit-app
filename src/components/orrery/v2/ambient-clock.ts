@@ -52,20 +52,28 @@ export function quantiseAmbient(clockMs: number, reduced: boolean): number {
 }
 
 /**
- * 38.7-15 (D-65, FR-B): the Orrery SurfaceView's explicit frame-rate vote
- * (`Surface.setFrameRate`, patched into @shopify/react-native-skia 2.6.2).
- * The D-49 diagnostic (38.7-SPIKE) found the SurfaceView, posting ~30
- * presents/s with no vote, held the 120 Hz panel at Max. So: AMBIENT_HZ while
- * the ambient clock alone animates the canvas; 0 (the vote withdrawn: the
- * platform's own estimate, as before) under reduced motion — the ambient value
- * is still and nothing presents — and while a switch, gesture or camera
- * motion runs (`busy`), which keep the panel's full rate (an explicit 30 Hz
- * vote then could cap a switch at a 60 Hz panel or a 30 Hz render rate).
- * Changes only on those edges, never per frame.
+ * 38.7-16 (D-65 FV-1, D-79): the frame-rate vote while a switch, gesture or
+ * camera motion runs — the panel's top rate. SurfaceFlinger picks the nearest
+ * supported rate, so a 60 Hz panel simply runs at 60. Tunable.
+ */
+export const MOTION_VOTE_HZ = 120;
+
+/**
+ * 38.7-15 (D-65, FR-B; 38.7-16 FV-1): the Orrery SurfaceView's explicit
+ * frame-rate vote (`Surface.setFrameRate`, patched into
+ * @shopify/react-native-skia 2.6.2). The D-49 diagnostic (38.7-SPIKE) found
+ * the SurfaceView, posting ~30 presents/s with no vote, held the 120 Hz panel
+ * at Max. So: AMBIENT_HZ while the ambient clock alone animates the canvas;
+ * MOTION_VOTE_HZ (the panel's top rate) while a switch, gesture or camera
+ * motion runs (`busy`) — 38.7-16 (FV-1) found a withdrawn vote (0) there let
+ * the platform keep a low rate under motion; 0 (the vote withdrawn: the
+ * platform's own estimate) under reduced motion — the ambient value is still
+ * and nothing ambient presents. Changes only on those edges, never per frame.
  */
 export function ambientFrameRateVote(reduced: boolean, busy: boolean): number {
   "worklet";
-  return reduced || busy ? 0 : AMBIENT_HZ;
+  if (reduced) return 0;
+  return busy ? MOTION_VOTE_HZ : AMBIENT_HZ;
 }
 
 /** Which ambient consumers are on screen (all of them today). */
