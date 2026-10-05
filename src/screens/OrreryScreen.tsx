@@ -679,13 +679,13 @@ export function OrreryScreen() {
     if (!isFocused || !appActive) closeContacts(false);
   }, [isFocused, appActive, closeContacts]);
   // 38.7-15 (D-58): the warm cache tracks AppState itself (background and a
-  // memory warning release it; nothing is retained while not active).
+  // memory warning release it; nothing is retained while not active). IN-03:
+  // the listener below does not release it again (that double-counted
+  // `releases.background`).
   useEffect(() => orreryWarmCache.attach(AppState), []);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (value) => {
       if (value !== "active") {
-        // D-58: nothing reusable survives app background.
-        orreryWarmCache.release("background");
         pauseSwitch();
         if (routeLive.current) captureSession.current("background");
         cancelIntent.current("background");

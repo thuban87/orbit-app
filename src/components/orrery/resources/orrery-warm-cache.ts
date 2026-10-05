@@ -220,9 +220,13 @@ export function createOrreryWarmCache(
     idle = null;
   }
 
-  function release(reason: OrreryWarmReleaseReason): void {
+  /**
+   * `counted` false: a repeat clear while the app is already not active
+   * (IN-03: `releases.background` counts one per visit to the background).
+   */
+  function release(reason: OrreryWarmReleaseReason, counted = true): void {
     stopIdle();
-    releases[reason]++;
+    if (counted) releases[reason]++;
     state = "cold";
     // Everything unheld goes: the warm owner's entries and any other unheld
     // entry. Pinned (a mounted world's or the Preview's current generation)
@@ -285,8 +289,11 @@ export function createOrreryWarmCache(
     release,
     accepting: () => appState === "active",
     noteAppState(next) {
+      const was = appState;
       appState = next ?? "active";
-      if (appState !== "active") release("background");
+      // Every non-active change clears (idempotent); only the edge from
+      // active counts (inactive → background is one background).
+      if (appState !== "active") release("background", was === "active");
     },
     attach(source) {
       if (attached?.appState === source) return attached.detach;

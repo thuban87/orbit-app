@@ -670,6 +670,14 @@ describe("release: background, idle and memory", () => {
     expect(env.warm.stats()).toMatchObject(empty);
     expect(alive(env)).toBe(0);
     expect(env.timers.size).toBe(0);
+    // IN-03: one background visit counts once (inactive → background too).
+    expect(env.warm.stats().releases.background).toBe(1);
+    listeners.get("change")?.("background");
+    expect(env.warm.stats().releases.background).toBe(1);
+    listeners.get("change")?.("active");
+    listeners.get("change")?.("inactive");
+    listeners.get("change")?.("background");
+    expect(env.warm.stats().releases.background).toBe(2);
     listeners.get("change")?.("active");
     const again = await warmEnv();
     again.warm.attach(appState);
