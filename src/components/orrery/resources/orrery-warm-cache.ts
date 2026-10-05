@@ -155,10 +155,16 @@ export interface OrreryWarmCache {
    * pictures detached, one UI round trip done). Transfers the world's
    * released objects to the warm owner and trims to the warm caps before it
    * returns; while the app is not active it releases instead. Arms the idle
-   * timer. Returns what it did.
+   * timer — IN-01: only when no world is mounted any more (each call ends one
+   * `resumeOnFocus`; a world that remounted before this world's round trip
+   * finished keeps the warm set, with no idle release under it). Returns what
+   * it did.
    */
   retainOnBlur(handoff: OrreryWarmHandoff): "retained" | "released";
-  /** The world mounted again: the idle timer stops; warm entries are reusable. */
+  /**
+   * A world mounted: the idle timer stops; warm entries are reusable. Each
+   * call is matched by that world's later `retainOnBlur`.
+   */
   resumeOnFocus(): void;
   /** Disposes the whole warm set (every unheld entry in each cache). */
   release(reason: OrreryWarmReleaseReason): void;
@@ -199,6 +205,8 @@ export function createOrreryWarmCache(
   let appState = "active";
   let state: OrreryWarmStats["state"] = "cold";
   let idle: unknown = null;
+  /** IN-01: worlds mounted (resumeOnFocus) whose hand-off has not run yet. */
+  let mountedWorlds = 0;
   let attached: { appState: OrreryWarmAppState; detach: () => void } | null =
     null;
   const releases: Record<OrreryWarmReleaseReason, number> = {
@@ -237,6 +245,7 @@ export function createOrreryWarmCache(
     limits,
     retainOnBlur(handoff) {
       const skies = handoff.skies ?? [];
+      mountedWorlds = Math.max(0, mountedWorlds - 1);
       if (!cache.accepting()) {
         // Background wins: hand the objects back as unheld, then drop all.
         if (handoff.photos)
@@ -254,8 +263,14 @@ export function createOrreryWarmCache(
       // M15: `put` disposes anything not CPU-backed.
       for (const sky of skies) deps.sky.put(sky);
       trim();
-      state = "warm";
       stopIdle();
+      if (mountedWorlds > 0) {
+        // IN-01: another world is already on screen (a fast remount): the
+        // warm set is its to reuse, and no idle release may run under it.
+        state = "resumed";
+        return "retained";
+      }
+      state = "warm";
       idle = arm(() => {
         idle = null;
         release("idle");
@@ -263,6 +278,7 @@ export function createOrreryWarmCache(
       return "retained";
     },
     resumeOnFocus() {
+      mountedWorlds++;
       stopIdle();
       if (state === "warm") state = "resumed";
     },

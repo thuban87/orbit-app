@@ -633,6 +633,28 @@ describe("release: background, idle and memory", () => {
     expect(ORRERY_WARM_IDLE_TIMEOUT_MS).toBe(5 * 60 * 1000);
   });
 
+  it("IN-01: a world that remounts before the old world's hand-off runs keeps the warm set — no idle release is armed under it", async () => {
+    const env = environment();
+    const first = mountWorld(env);
+    first.show([unique("fast")], ["Fast"]);
+    await env.resolveLoads();
+    first.ack();
+    const finish = first.unmount([]);
+    // The new world mounts inside the old one's round trip …
+    const second = mountWorld(env);
+    // … then the old world's hand-off runs.
+    expect(finish()).toBe("retained");
+    expect(env.timers.size).toBe(0);
+    expect(env.warm.stats()).toMatchObject({
+      idleTimer: false,
+      state: "resumed",
+    });
+    // When the second world leaves, the idle release is armed as usual.
+    second.unmount([])();
+    expect(env.timers.size).toBe(1);
+    expect(env.warm.stats().state).toBe("warm");
+  });
+
   it("app background releases everything (AppState change), and so does a memory warning", async () => {
     const listeners = new Map<string, (state?: string) => void>();
     const appState: OrreryWarmAppState = {
