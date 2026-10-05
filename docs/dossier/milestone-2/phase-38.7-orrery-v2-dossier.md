@@ -108,6 +108,14 @@ It stays recognisably Orbit: contacts and relationships remain the information a
     - Lab A's card-above placement is rejected.
     - **New:** tapping a cluster at far zoom zooms into the cluster. Prod frames the group and opens the cluster panel; it does not zoom in enough.
     - The panel stays (phase-08 `:250-257` is enforced).
+    - **[DECIDED 2026-10-05, owner — Plan 16 checkpoint] ⚠ Supersedes the cluster panel as a viewport obstacle.** "The canvas needs to stay in its place no matter what buttons are clicked or which dropdowns open." The map's framing (projection centre, Home, Recenter, focus and cluster framing) now comes from **persistent chrome only**:
+      - the shell tab bar and FAB;
+      - a full-width band down to the title and the System / View triggers, so a System name that widens or narrows its trigger can't move the map;
+      - the camera controls column at its resting place.
+    - The System and View panels, the cluster "Contacts here" panel, the focus card and every feedback notice **no longer shift the framing**. They keep their own layout, the D-55 occlusion dim and the label exclusion.
+    - A cluster tap still zooms into the cluster. It is framed in the area the open panel leaves uncovered, under the fixed projection; the panel stays open beside it.
+    - This also retires `docs/systems/orrery.md`'s rule that measured shell tabs/FAB/HUD/feedback are shared framing exclusions: feedback no longer is one. The owner approved the reversal explicitly. Mirrored as CONTEXT D-79 (`c84742de`).
+    - **[DERIVED 2026-10-05 — Plan 16, owner-found bug; no new ruling]** The focus card's buttons ignored taps. The camera controls' invisible 200 dp column lay over ~30–45 % of each card button, and a hidden card kept its last rect, invisible but tappable. The controls now take touches only on their plates, the card stacks above them (below the title), and a hidden card moves off-screen (`fd502ba5`).
 -   **[DECIDED · 2026-10-02] D-20 --- Do not hide the map behind the card.** Keep today's glass (see D-35). ADR-149 is unchanged.
 -   **[DECIDED · 2026-10-02] D-21 --- Dim everyone else while someone is focused** (Lab B). The sun is not dimmed. Labels stay readable.
 -   **[DECIDED · 2026-10-02] D-22 --- Lab B's corner-bracket instrument chrome** on the Orrery's HUD panels and buttons. The map running under the header is D-39.
@@ -134,6 +142,8 @@ It stays recognisably Orbit: contacts and relationships remain the information a
         - the base layer is reused during the lead.
       - **Still on DEBUG:** about 1 s stretches at ~5–7 fps in both directions. Leaving All Contacts, the sheet closes ~0.45–0.7 s after the tap.
       - **Next:** Plan 16 judges both on release against D-76's ~100–200 ms. If they remain, the owner gets an option with clips and a recommendation. The likely lever (simpler rings while moving) changes the look.
+    - **[DECIDED 2026-10-05, owner — Plan 16 checkpoint, SW-2]** On release, motion starts within ~100 ms both ways. The All Contacts switch smoothness (8–16 frames/s for ~1–1.25 s around All Contacts) is **accepted as it is**. The "simpler rings while moving" option is not built. Mirrored as CONTEXT D-79.
+    - **[DECIDED 2026-10-05, owner — Plan 16 checkpoint; the D-76 hold]** The Plan 13 viewport hold (C4-M1) is removed. It froze the map's framing for the length of a switch and then adopted the live one at settle. A switch started from the open System panel therefore played off to the side of the map, then snapped back to centre in one frame when it settled. Under D-19's 2026-10-05 ruling, no panel or notice reaches the framing, so there is nothing to hold or adopt. The projection centre never changes at settle. Mirrored as CONTEXT D-79 (`c84742de`).
 -   **[DECIDED · 2026-10-02] D-25 --- No camera effects:** no bloom, tilt-shift, lens flare or heat-haze.
 
 ### Themes
@@ -295,6 +305,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
       - **The JS side:** OrreryV2Canvas sends 30 while only the ambient clock animates. It sends 0 under reduced motion and during a switch, a gesture or camera motion. It sends only on change, never per frame.
       - **DEBUG on the 6 Pro:** the vote is set at idle, after a tab return and after background → foreground. The idle panel runs at 60 Hz and renders at 30 (it was 120 / 120). The vote comes back within about 0.5 s after switches and after a fling during a switch.
       - **Still to prove:** the release proof is Plan 16.
+    - **[DECIDED 2026-10-05, owner — Plan 16 checkpoint, FV-1]** On release the idle vote works: the panel leaves 120 Hz (60 Hz mode, 30 render). But withdrawing the vote (0) during motion left motion that no finger drives at 30 fps. That covers Recenter, focus flights, and the part of a switch after the tap's touch boost ends. **Fix:** while a switch, gesture or camera motion runs, the vote is the panel's top rate (`MOTION_VOTE_HZ` 120; SurfaceFlinger picks the nearest supported rate, so a 60 Hz panel runs at 60). Idle stays 30 and reduced motion stays 0. JS only; the patched native side forwards any rate. Mirrored as CONTEXT D-79 (`cd08e8c0`).
 -   **[DERIVED] D-50 --- Per-System sky hue from the stable id, no schema change.**
     - The hue is derived from `systemRefId` through theme tokens (the ADR-022 swatch pattern), with more than Lab B's 6 buckets so Systems rarely collide.
     - A duplicated System gets a new uid and therefore a different hue. This is accepted.
@@ -537,3 +548,10 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
     - **Selector:** never shows another System's name.
     - **How it went:** three DEBUG device fix rounds. Their causes were a worklet default-parameter crash, JS/UI ordering, per-update cost on ~1,000 bodies, and proxy "on screen" signals. A final native fix moves the cold-open composite evidence off the trusted-presentation callback, which is silent on SDK 37.
     - **Carried to Plan 16:** memory with the cache on (G7), switch smoothness on release, and the cold-open fix.
+-   **2026-10-05** --- Plan 16 owner rulings after the release device pass (CONTEXT D-79):
+    - **D-65 (FV-1):** motion votes the panel's top rate instead of withdrawing the vote.
+    - **D-24 (SW-2):** the All Contacts switch smoothness is accepted as it is.
+    - **D-56 (G7, MEM-1):** the Graphics/GL growth is accepted. It comes from the opaque canvas and the base bake, and total PSS is 26–31 % below Day 1.
+    - **D-56 (G3, G5):** the All Contacts tab return (1.008 s) and the Size 120 ↔ All Contacts switch stall (174.7 ms) are accepted.
+    - **D-19 (viewport, owner-directed reversal):** the map's framing is persistent chrome only. Dropdowns, panels (including the cluster panel) and notices no longer move it, and the D-76 viewport hold is gone.
+    - **Owner-found bug:** the focus card's buttons ignored taps because they sat under the controls' invisible column. Fixed.
