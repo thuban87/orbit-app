@@ -465,7 +465,10 @@ half4 main(float2 xy) {
  *   uVigTone = (rgb, 1 = wash toward this ink instead of the shaded sky)
  *   uCam = (viewport cx, cy, yaw, nebula zoom scale)
  *   uOff = (nebula offset x, y, drift x, y)      (dp)
- *   uMotion = (breathing warp dp, time s, far-star zoom scale, 0)
+ *   uMotion = (breathing warp dp, warp phase A rad, far-star zoom scale,
+ *              warp phase B rad) — WR-02: the phases arrive wrapped mod 2π
+ *              (SKY_WARP_RATE_A/B × the unwrapped ambient time), never a
+ *              wrapped time, so the warp never jumps
  *   uFar = (far offset x, y, star alpha, star density)
  *   uStarA = (rgb, 1 = additive), uStarB / uStarC = (rgb, 0)
  * Uniform order is mirrored by `skyNebulaUniforms` (draw-sky.ts).
@@ -494,8 +497,8 @@ float2 nbSky(float2 xy) {
   float s = sin(uCam.z);
   float2 p = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / uCam.w;
   p += uOff.zw;
-  p += uMotion.x * float2(sin(p.y * 0.011 + uMotion.y * 0.21),
-                          cos(p.x * 0.013 - uMotion.y * 0.17));
+  p += uMotion.x * float2(sin(p.y * 0.011 + uMotion.y),
+                          cos(p.x * 0.013 - uMotion.w));
   return p;
 }
 

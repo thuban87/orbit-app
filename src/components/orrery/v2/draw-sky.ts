@@ -72,9 +72,24 @@ import {
   SKY_TILT_BASE,
   SKY_TILT_SHIFT,
   SKY_TWINKLE_SPEED,
+  SKY_WARP_RATE_A,
+  SKY_WARP_RATE_B,
   SKY_ZOOM_DEPTH,
   WARP_STRENGTH,
 } from "./visual-tunables";
+
+const TAU = Math.PI * 2;
+
+/**
+ * WR-02: `rate × seconds` wrapped into [0, 2π) in double precision, so a
+ * periodic shader term stays continuous at any elapsed time (the shader never
+ * sees a wrapped time, only wrapped phases).
+ */
+export function skyPhase(seconds: number, rate: number): number {
+  "worklet";
+  const phase = (seconds * rate) % TAU;
+  return phase < 0 ? phase + TAU : phase;
+}
 
 /**
  * A star batch's alpha at ambient time `ambientMs`: it swings by `depth` of
@@ -181,9 +196,12 @@ export function skyNebulaUniforms(
     SKY_DRIFT_MAX_DP,
   );
   const still = !(ambientMs >= 0) || !Number.isFinite(ambientMs);
-  const t = still ? SKY_STILL_S : (ambientMs / 1000) % 1000;
+  // WR-02: the unwrapped ambient time; every periodic term is wrapped by its
+  // own period (no shared wrap, so no term jumps).
+  const t = still ? SKY_STILL_S : ambientMs / 1000;
   const warp =
-    SKY_BREATH_DP * (0.55 + 0.45 * Math.sin((t * Math.PI * 2) / SKY_BREATH_S));
+    SKY_BREATH_DP *
+    (0.55 + 0.45 * Math.sin(((t % SKY_BREATH_S) * TAU) / SKY_BREATH_S));
   const vt = n.vignetteInk;
   const s0 = n.farStars[0];
   const s1 = n.farStars[1];
@@ -230,9 +248,9 @@ export function skyNebulaUniforms(
     drift.x,
     drift.y,
     warp,
-    t,
+    skyPhase(t, SKY_WARP_RATE_A),
     far.zs * farPush,
-    0,
+    skyPhase(t, SKY_WARP_RATE_B),
     far.ox,
     far.oy,
     n.farStarAlpha,

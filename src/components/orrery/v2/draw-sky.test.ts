@@ -72,11 +72,17 @@ import type { SwitchFxSignal } from "@/logic/orrery-switch-fx-logic";
 import {
   drawSky,
   skyNebulaUniforms,
+  skyPhase,
   skyStarAlpha,
   skyTintNow,
 } from "./draw-sky";
 import type { SkyImageSpec, SkyNebulaSpec, SkySpec } from "./scene-specs";
-import { SKY_TWINKLE_SPEED } from "./visual-tunables";
+import {
+  SKY_STILL_S,
+  SKY_TWINKLE_SPEED,
+  SKY_WARP_RATE_A,
+  SKY_WARP_RATE_B,
+} from "./visual-tunables";
 
 interface Call {
   op: string;
@@ -330,6 +336,48 @@ describe("drawSky", () => {
     drawSky(canvas, spec(), IMAGE, { x: 1e6, y: 1e6, zoom: 4 }, -1, EFFECT);
     const stars = calls.find((c) => c.op === "translate")?.args as number[];
     expect(Math.abs(stars[0])).toBeLessThanOrEqual(22);
+  });
+
+  it("WR-02: the breathing warp is continuous at every elapsed time — no jump at the old 1,000 s wrap (or any multiple)", () => {
+    // Uniforms 40 (breath dp), 41 and 43 (the two domain-warp phases).
+    const motion = (ms: number) => {
+      const u = skyNebulaUniforms(spec(), HUE, HOME, ms);
+      return { breath: u[40], a: u[41], b: u[43] };
+    };
+    /** The shader sees sin/cos of each phase: compare those (wrap-proof). */
+    const step = (from: number, to: number) => {
+      const p = motion(from);
+      const q = motion(to);
+      return Math.max(
+        Math.abs(p.breath - q.breath),
+        Math.abs(Math.sin(p.a) - Math.sin(q.a)),
+        Math.abs(Math.cos(p.b) - Math.cos(q.b)),
+      );
+    };
+    // One ambient step (~33 ms) is a tiny move anywhere, across the old wrap
+    // and after hours open.
+    for (const at of [1_000_000, 2_000_000, 7_200_000, 86_400_000])
+      expect(step(at - 33, at)).toBeLessThan(0.05);
+    // The phases are wrapped mod 2π (finite, bounded) and equal rate × time.
+    for (const ms of [0, 999_967, 1_000_000, 86_400_000]) {
+      const { a, b } = motion(ms);
+      expect(a).toBeGreaterThanOrEqual(0);
+      expect(a).toBeLessThan(Math.PI * 2);
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThan(Math.PI * 2);
+      expect(Math.sin(a)).toBeCloseTo(
+        Math.sin((ms / 1000) * SKY_WARP_RATE_A),
+        6,
+      );
+      expect(Math.cos(b)).toBeCloseTo(
+        Math.cos((ms / 1000) * SKY_WARP_RATE_B),
+        6,
+      );
+    }
+    // Reduced motion keeps its fixed composition.
+    const still = motion(-1);
+    expect(still.a).toBeCloseTo(skyPhase(SKY_STILL_S, SKY_WARP_RATE_A), 12);
+    expect(still.b).toBeCloseTo(skyPhase(SKY_STILL_S, SKY_WARP_RATE_B), 12);
   });
 });
 

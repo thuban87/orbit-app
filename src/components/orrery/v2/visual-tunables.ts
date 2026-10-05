@@ -206,6 +206,14 @@ export const SKY_TILT_BASE = 0.25;
 /** The nebula's slow breathing warp: amplitude (dp) and period (s). */
 export const SKY_BREATH_DP = 9;
 export const SKY_BREATH_S = 40;
+/**
+ * The breathing warp's two domain-warp phase rates (rad/s; Lab B's 0.21 and
+ * 0.17, formerly literals in SKY_NEBULA_SKSL). WR-02: the shader receives the
+ * phases already wrapped mod 2π from the unwrapped ambient time, so the
+ * nebula never jumps however long the Orrery stays open.
+ */
+export const SKY_WARP_RATE_A = 0.21;
+export const SKY_WARP_RATE_B = 0.17;
 /** The frozen composition time under reduced motion (s). */
 export const SKY_STILL_S = 23;
 /** Canvas sizes are bucketed to this step (dp) for the bake cache key. */
