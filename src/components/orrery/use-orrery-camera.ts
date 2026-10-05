@@ -103,6 +103,13 @@ function flashReorderSlot(
 }
 
 interface GestureSamples {
+  /**
+   * CR-02: a bit per recognizer that is tracking touches (set on its
+   * begin/start, cleared on its finalize). When the last one finalizes no
+   * finger is down, and the input's pointer count returns to 0 (the canvas
+   * `busy` signal reads it). Absent = none.
+   */
+  tracking?: number;
   panX: number;
   panY: number;
   scale: number;
@@ -117,6 +124,7 @@ interface GestureSamples {
 const initialSamples = (): GestureSamples => {
   "worklet";
   return {
+    tracking: 0,
     panX: 0,
     panY: 0,
     scale: 1,
@@ -125,6 +133,45 @@ const initialSamples = (): GestureSamples => {
     tiltActive: false,
   };
 };
+
+/** CR-02: the recognizer bits of `GestureSamples.tracking`. */
+const TRACK_TAP = 1;
+const TRACK_PAN = 2;
+const TRACK_PINCH = 4;
+const TRACK_ROTATION = 8;
+const TRACK_TILT = 16;
+const TRACK_HOLD = 32;
+
+/**
+ * CR-02: a recognizer began (or activated) tracking touches. Idempotent, so
+ * both its begin and its start may mark it.
+ */
+function markTracking(samples: CameraCell<GestureSamples>, bit: number): void {
+  "worklet";
+  const tracking = samples.value.tracking ?? 0;
+  if ((tracking & bit) === 0)
+    samples.value = { ...samples.value, tracking: tracking | bit };
+}
+
+/**
+ * CR-02: a recognizer finalized. Once none is still tracking, every finger
+ * is up: the pointer count returns to 0. Ownership is left alone — the next
+ * touch's begin re-establishes it — because a recognizer can finalize while
+ * another one is still activating on the same touch (a tap cancelled by the
+ * winning pan or hold), and clearing the owner there would strand that one.
+ */
+function clearTracking(
+  samples: CameraCell<GestureSamples>,
+  input: CameraCell<CameraInput>,
+  bit: number,
+): void {
+  "worklet";
+  const tracking = (samples.value.tracking ?? 0) & ~bit;
+  if (tracking !== (samples.value.tracking ?? 0))
+    samples.value = { ...samples.value, tracking };
+  if (tracking === 0 && input.value.pointers !== 0)
+    input.value = { ...input.value, pointers: 0 };
+}
 export interface OrreryCameraInput {
   input: CameraCell<CameraInput>;
   samples: CameraCell<GestureSamples>;
@@ -319,6 +366,7 @@ export function createOrreryGestures({
       "worklet";
       stop();
       input.value = beginInput(input.value, 1);
+      markTracking(samples, TRACK_TAP);
     })
     .onTouchesDown((event) => {
       "worklet";
@@ -333,6 +381,10 @@ export function createOrreryGestures({
           ? resolveTap(frame.value, event.x, event.y)
           : tapIntent(frame.value, event.x, event.y, true),
       );
+    })
+    .onFinalize(() => {
+      "worklet";
+      clearTracking(samples, input, TRACK_TAP);
     });
   const pan = Gesture.Pan()
     .enabled(enabled)
@@ -350,6 +402,7 @@ export function createOrreryGestures({
         panOriginX: event?.x,
         panOriginY: event?.y,
       };
+      markTracking(samples, TRACK_PAN);
       if (panStart) panStart.value = pose.value;
     })
     .onTouchesDown((event) => {
@@ -408,13 +461,19 @@ export function createOrreryGestures({
       if (panStart) panStart.value = null;
       // Losing a race may finalize Pan before the winning hold's onStart.
       if (input.value.owner === "pan") input.value = cancelInput(input.value);
+      clearTracking(samples, input, TRACK_PAN);
     });
   const pinch = Gesture.Pinch()
     .enabled(enabled)
+    .onBegin(() => {
+      "worklet";
+      markTracking(samples, TRACK_PINCH);
+    })
     .onStart((event) => {
       "worklet";
       touch(2);
       samples.value = { ...samples.value, scale: event.scale };
+      markTracking(samples, TRACK_PINCH);
     })
     .onUpdate((event) => {
       "worklet";
@@ -441,13 +500,19 @@ export function createOrreryGestures({
     .onFinalize(() => {
       "worklet";
       samples.value = { ...samples.value, scale: 1 };
+      clearTracking(samples, input, TRACK_PINCH);
     });
   const rotation = Gesture.Rotation()
     .enabled(enabled)
+    .onBegin(() => {
+      "worklet";
+      markTracking(samples, TRACK_ROTATION);
+    })
     .onStart((event) => {
       "worklet";
       touch(2);
       samples.value = { ...samples.value, rotation: event.rotation };
+      markTracking(samples, TRACK_ROTATION);
     })
     .onUpdate((event) => {
       "worklet";
@@ -475,6 +540,7 @@ export function createOrreryGestures({
     .onFinalize(() => {
       "worklet";
       samples.value = { ...samples.value, rotation: 0 };
+      clearTracking(samples, input, TRACK_ROTATION);
     });
   const tilt = Gesture.Pan()
     .enabled(enabled)
@@ -482,6 +548,10 @@ export function createOrreryGestures({
     .maxPointers(2)
     .averageTouches(true)
     .manualActivation(true)
+    .onBegin(() => {
+      "worklet";
+      markTracking(samples, TRACK_TILT);
+    })
     .onTouchesDown((event) => {
       "worklet";
       samples.value = {
@@ -517,6 +587,7 @@ export function createOrreryGestures({
         tiltY: event.translationY,
         tiltActive: true,
       };
+      markTracking(samples, TRACK_TILT);
     })
     .onUpdate((event) => {
       "worklet";
@@ -544,6 +615,7 @@ export function createOrreryGestures({
     .onFinalize(() => {
       "worklet";
       samples.value = { ...samples.value, tiltActive: false };
+      clearTracking(samples, input, TRACK_TILT);
     });
   const cameraGestures = Gesture.Simultaneous(pan, pinch, rotation, tilt);
   if (!reorder) return Gesture.Race(tap, cameraGestures);
@@ -551,6 +623,10 @@ export function createOrreryGestures({
     .enabled(enabled)
     .maxPointers(1)
     .activateAfterLongPress(HOLD_MS)
+    .onBegin(() => {
+      "worklet";
+      markTracking(samples, TRACK_HOLD);
+    })
     .onTouchesDown((event, manager) => {
       "worklet";
       if (
@@ -613,6 +689,7 @@ export function createOrreryGestures({
       }
       stop();
       input.value = { ...input.value, owner: "reorder" };
+      markTracking(samples, TRACK_HOLD);
       reorder.drag.value = { ...drag, active: true };
       // Armed: full charge (also the reduced-motion jump), the slot flash.
       if (reorder.charge) reorder.charge.value = 1;
@@ -665,6 +742,7 @@ export function createOrreryGestures({
       resetReorderCharge(reorder.charge);
       if (input.value.owner === "reorder")
         input.value = cancelInput(input.value);
+      clearTracking(samples, input, TRACK_HOLD);
     });
   return Gesture.Race(tap, Gesture.Race(hold, cameraGestures));
 }

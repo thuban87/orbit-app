@@ -86,6 +86,7 @@ describe("production camera worklet boundaries", () => {
       camera.samples.value = { panX: 100, scale: 3 };
       cleanup();
       expect(camera.samples.value).toEqual({
+        tracking: 0,
         panX: 0,
         panY: 0,
         scale: 1,

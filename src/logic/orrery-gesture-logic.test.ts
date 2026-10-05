@@ -167,6 +167,159 @@ describe("camera input ownership", () => {
       generation: 7,
     });
   });
+  it("CR-02: the pointer count (the canvas `busy` input) returns to 0 once every recognizer finalized — after a tap, a pinch, a rotation and a hold", () => {
+    type Native = { handlers: Record<string, (...args: unknown[]) => void> };
+    function setup(withReorder: boolean) {
+      const pose = { value: home };
+      const frame = {
+        get value() {
+          return {
+            generation: 7,
+            pose: pose.value,
+            viewport,
+            bodies: [],
+            center: { x: 200, y: 300 },
+            labelMagnification: 1,
+          };
+        },
+      };
+      const input = { value: initialInput() };
+      const samples = {
+        value: {
+          panX: 0,
+          panY: 0,
+          scale: 1,
+          rotation: 0,
+          tiltY: 0,
+          tiltActive: false,
+        },
+      };
+      const send = vi.fn();
+      const tree = createOrreryGestures({
+        pose,
+        frame,
+        extent,
+        send,
+        stop: vi.fn(),
+        camera: { input, samples, live: { value: true } },
+        ...(withReorder
+          ? {
+              reorder: {
+                drag: { value: null },
+                expectation: {} as never,
+                generation: 6, // ≠ the frame's: the hold fails at touch-down
+                acknowledge: vi.fn(),
+                commit: vi.fn(),
+              },
+            }
+          : {}),
+      }) as unknown as {
+        gestures: [
+          Native,
+          Native | { gestures: [Native, { gestures: Native[] }] },
+        ];
+      };
+      const [tap, rest] = tree.gestures;
+      const hold = withReorder
+        ? (rest as { gestures: [Native, { gestures: Native[] }] }).gestures[0]
+        : null;
+      const group = withReorder
+        ? (rest as { gestures: [Native, { gestures: Native[] }] }).gestures[1]
+        : (rest as unknown as { gestures: Native[] });
+      const [pan, pinch, rotation, tilt] = group.gestures;
+      /** A first finger down: every recognizer begins tracking. */
+      const down = () => {
+        tap.handlers.onBegin();
+        pan.handlers.onBegin({ x: 200, y: 300 });
+        pinch.handlers.onBegin();
+        rotation.handlers.onBegin();
+        tilt.handlers.onBegin();
+        hold?.handlers.onBegin();
+      };
+      return { pose, input, send, tap, hold, pan, pinch, rotation, tilt, down };
+    }
+    // A tap: before, the pointer count stuck at 1 (busy forever).
+    {
+      const g = setup(false);
+      g.down();
+      expect(g.input.value.pointers).toBe(1);
+      g.tap.handlers.onEnd({ x: 0, y: 0 }, true);
+      expect(g.send).toHaveBeenCalledOnce();
+      for (const r of [g.tap, g.pan, g.pinch, g.rotation])
+        r.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(1); // tilt still tracks the finger
+      g.tilt.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(0);
+    }
+    // A tap cancelled by the pan that wins the touch: ownership is untouched
+    // and the pan still moves the camera (no reset mid-gesture).
+    {
+      const g = setup(false);
+      g.down();
+      g.tap.handlers.onFinalize({}, false);
+      expect(g.input.value).toMatchObject({ owner: "pending", pointers: 1 });
+      g.pan.handlers.onUpdate({
+        numberOfPointers: 1,
+        translationX: 20,
+        translationY: 0,
+      });
+      expect(g.input.value.owner).toBe("pan");
+      expect(g.pose.value.x).not.toBe(home.x);
+      for (const r of [g.pinch, g.rotation, g.tilt, g.pan])
+        r.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(0);
+    }
+    // A pinch with a rotation: pointers 2 while either still tracks.
+    {
+      const g = setup(false);
+      g.down();
+      g.pan.handlers.onTouchesDown({ numberOfTouches: 2 });
+      g.tap.handlers.onFinalize({}, false);
+      g.pan.handlers.onFinalize({}, false);
+      g.pinch.handlers.onStart({ scale: 1 });
+      g.rotation.handlers.onStart({ rotation: 0 });
+      g.pinch.handlers.onUpdate({
+        numberOfPointers: 2,
+        scale: 1.5,
+        focalX: 200,
+        focalY: 300,
+      });
+      expect(g.input.value).toMatchObject({ owner: "multi", pointers: 2 });
+      g.pinch.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(2);
+      g.rotation.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(2);
+      g.tilt.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(0);
+    }
+    // A rotation alone (the pinch recognizer never activates).
+    {
+      const g = setup(false);
+      g.down();
+      g.tap.handlers.onFinalize({}, false);
+      g.pan.handlers.onFinalize({}, false);
+      g.rotation.handlers.onStart({ rotation: 0 });
+      g.rotation.handlers.onUpdate({ numberOfPointers: 2, rotation: 0.4 });
+      expect(g.pose.value.yaw).toBeCloseTo(0.4);
+      for (const r of [g.rotation, g.pinch, g.tilt])
+        r.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(0);
+    }
+    // With the reorder hold in the race: its tracking counts too.
+    {
+      const g = setup(true);
+      g.down();
+      g.hold?.handlers.onTouchesDown(
+        { numberOfTouches: 1, allTouches: [{ x: 0, y: 0 }] },
+        { fail: vi.fn() },
+      );
+      for (const r of [g.tap, g.pan, g.pinch, g.rotation, g.tilt])
+        r.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(1);
+      g.hold?.handlers.onFinalize({}, false);
+      expect(g.input.value.pointers).toBe(0);
+    }
+  });
   it("movement before a stationary prolonged hold belongs to pan", () => {
     const pending = beginInput(initialInput(), 1);
     expect(claimHold(pending, HOLD_MS - 1, 0).owner).toBe("pending");
