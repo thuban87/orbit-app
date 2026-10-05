@@ -156,6 +156,8 @@ export interface OrreryTextStats {
   refused: number;
   /** Builders made (one per font provider). */
   builders: number;
+  /** IN-02: owners the service still tracks (mounted, or awaiting confirmation). */
+  owners: number;
 }
 
 export interface OrreryTextServiceOptions {
@@ -249,6 +251,8 @@ interface OwnerState {
   epoch: number;
   pinned: Set<string>;
   generation: number;
+  /** Between `mount` and `release` (IN-02: never pruned while mounted). */
+  mounted: boolean;
 }
 
 let providerSerial = 0;
@@ -297,10 +301,28 @@ export function createOrreryTextService(
   function ownerState(owner: string): OwnerState {
     let state = owners.get(owner);
     if (!state) {
-      state = { epoch: ++epochSerial, pinned: new Set(), generation: 0 };
+      state = {
+        epoch: ++epochSerial,
+        pinned: new Set(),
+        generation: 0,
+        mounted: false,
+      };
       owners.set(owner, state);
     }
     return state;
+  }
+
+  /**
+   * IN-02: forgets a released owner once nothing references it — no pins and
+   * no retirement mark left on any entry (each mount uses a fresh owner id,
+   * so the map otherwise grew by one per Orrery or Preview visit).
+   */
+  function pruneOwner(owner: string): void {
+    const state = owners.get(owner);
+    if (!state || state.mounted || state.pinned.size > 0) return;
+    for (const entry of entries.values())
+      if (entry.pins.has(owner) || entry.retired.has(owner)) return;
+    owners.delete(owner);
   }
 
   function dispose(entry: Entry): void {
@@ -442,11 +464,13 @@ export function createOrreryTextService(
       const state = ownerState(owner);
       state.epoch = ++epochSerial;
       state.generation = 0;
+      state.mounted = true;
       return state.epoch;
     },
     acquire(owner, keys, generation, epoch) {
-      const state = ownerState(owner);
-      if (epoch !== state.epoch) return;
+      // An unknown owner has no current epoch (never mounted, or pruned).
+      const state = owners.get(owner);
+      if (!state || epoch !== state.epoch) return;
       const next = new Set<string>();
       for (const key of keys) if (entries.has(key)) next.add(key);
       for (const key of state.pinned) {
@@ -476,6 +500,7 @@ export function createOrreryTextService(
         // 38.7-15: another owner's teardown never disposes a warm-owner entry.
         if (confirmOptions.dispose && !entry.warm) dispose(entry);
       }
+      pruneOwner(owner);
       return freed(cleared);
     },
     release(owner) {
@@ -488,6 +513,7 @@ export function createOrreryTextService(
         entry.retired.set(owner, { epoch, generation: Infinity });
       }
       state.pinned = new Set();
+      state.mounted = false;
       // End the epoch: confirmations now clear only this epoch's own marks.
       state.epoch = ++epochSerial;
       return epoch;
@@ -502,6 +528,7 @@ export function createOrreryTextService(
         cleared++;
         if (releaseOptions.dispose && !entry.warm) dispose(entry);
       }
+      pruneOwner(owner);
       return freed(cleared);
     },
     handOffWarm(owner, epoch) {
@@ -514,6 +541,7 @@ export function createOrreryTextService(
         entry.warm = true;
         kept.push(entry.key);
       }
+      pruneOwner(owner);
       freed(kept.length);
       return kept;
     },
@@ -562,7 +590,7 @@ export function createOrreryTextService(
         else if (entry.retired.size > 0) retired++;
         else warm++;
       }
-      return { pinned, warm, retired, ...counters };
+      return { pinned, warm, retired, ...counters, owners: owners.size };
     },
     onCapacityFreed(listener) {
       listeners.add(listener);

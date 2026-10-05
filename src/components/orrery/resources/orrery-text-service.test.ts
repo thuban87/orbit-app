@@ -217,6 +217,33 @@ describe("OrreryTextService cache", () => {
     expect(service.clearUnheld()).toBe(2);
     expect(service.peek(key("B1"))).toBeDefined();
     expect(fake.disposes).toBe(3);
+    // IN-02: the released owner is forgotten; the mounted one is kept.
+    expect(service.stats().owners).toBe(1);
+  });
+
+  it("IN-02: owners are pruned once released and confirmed (warm hand-off too), never while mounted or awaiting a mark", () => {
+    const service = createOrreryTextService();
+    const key = (t: string) => service.keyOf(request(t)) as string;
+    // 50 visits, each a fresh owner id (orrery-world:N / system-preview:N).
+    for (let visit = 0; visit < 50; visit++) {
+      const owner = `visit:${visit}`;
+      const epoch = service.mount(owner);
+      service.prepare(request(`V${visit % 3}`));
+      service.acquire(owner, [key(`V${visit % 3}`)], 1, epoch);
+      const released = service.release(owner);
+      // A mounted-and-released owner awaiting confirmation is still tracked.
+      expect(service.stats().owners).toBe(1);
+      if (visit % 2 === 0) service.handOffWarm(owner, released);
+      else service.confirmReleased(owner, released);
+      expect(service.stats().owners).toBe(0);
+    }
+    // A mounted owner with nothing pinned is never pruned (its epoch holds).
+    const epoch = service.mount("live");
+    service.confirmReleased("live", epoch);
+    service.handOffWarm("live", epoch);
+    expect(service.stats().owners).toBe(1);
+    service.acquire("live", [key("V0")], 1, epoch);
+    expect(service.stats().pinned).toBe(1);
   });
 
   it("a re-render with unchanged inputs builds nothing and disposes nothing", () => {
