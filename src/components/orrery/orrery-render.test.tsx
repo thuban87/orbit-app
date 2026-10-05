@@ -1385,6 +1385,22 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     expect(stillGlow()).toEqual(held);
     expect(native.clockCalls).toBe(0);
   });
+  it("WR-01: under reduced motion the default frame-clock driver is not mounted (no per-vsync callback) and the ambient value holds still", async () => {
+    native.reducedState = true;
+    native.reduced.value = true;
+    const scene = await sceneWith(2);
+    const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    expect(native.clockCalls).toBe(0);
+    flushUi(2);
+    const glow = () =>
+      recorded(tree[0].children[5]).find((c) => c.op === "drawRect")?.shader
+        ?.uniforms[1];
+    const held = glow();
+    native.clock.value = 700;
+    flushUi(2);
+    expect(glow()).toEqual(held);
+    expect(native.clockCalls).toBe(0);
+  });
 });
 
 describe("38.7-13: the switch through the real runtime and frame worklet (C3-H1, C4-L2, H9)", () => {

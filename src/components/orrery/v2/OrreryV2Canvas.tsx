@@ -137,7 +137,10 @@ import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import type { SwitchFxSignal } from "@/logic/orrery-switch-fx-logic";
-import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+import {
+  useReducedMotion,
+  useReducedMotionShared,
+} from "@/theme/use-reduced-motion";
 import {
   ambientFrameRateVote,
   ambientNeeded,
@@ -349,12 +352,16 @@ export function OrreryV2Canvas({
   const host = useMemo(() => resolveOrreryRenderHost(), []);
   // THEME-06: the live reduced-motion signal as a SharedValue (no setState).
   const reducedMotion = useReducedMotionShared();
+  // WR-01: its state twin decides whether a driver is mounted at all — under
+  // reduced motion none runs (no per-vsync frame callback), and the value
+  // holds at AMBIENT_STILL. Never read for drawing (that is the SharedValue).
+  const reducedMotionJs = useReducedMotion();
   // M5/D-49: the ONE quantised ambient value (−1 under reduced motion) and
   // its driver, inside this unmountable subtree.
   const { ambient, driver } = useOrreryAmbient(
     host,
     reducedMotion,
-    ambientNeeded(false, AMBIENT_CONSUMERS),
+    ambientNeeded(reducedMotionJs, AMBIENT_CONSUMERS),
   );
   // Static, JS-thread resources: the compiled ring effect and the unit strips.
   const ringEffect = useMemo(() => orreryShader("ringPlane"), []);

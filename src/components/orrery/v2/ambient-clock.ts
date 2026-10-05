@@ -175,6 +175,8 @@ interface AmbientDriverProps {
  * "frame-clock": the canvas's ONE `useClock()`, quantised. The reaction runs
  * every vsync (that is this driver's cost) but writes only when the
  * quantised value changes, so pictures re-record at most AMBIENT_HZ.
+ * WR-01: unmounted under reduced motion (the canvas's `ambientNeeded`); on
+ * unmount the value returns to AMBIENT_STILL, so nothing freezes mid-phase.
  */
 export function AmbientFrameClockDriver({
   ambient,
@@ -186,6 +188,12 @@ export function AmbientFrameClockDriver({
     (value) => {
       if (ambient.value !== value) ambient.value = value;
     },
+  );
+  useEffect(
+    () => () => {
+      ambient.value = AMBIENT_STILL;
+    },
+    [ambient],
   );
   return null;
 }
@@ -209,7 +217,15 @@ export function AmbientIntervalDriver({ ambient }: AmbientDriverProps): null {
   useEffect(() => {
     controller.update(!reduced);
   }, [controller, reduced]);
-  useEffect(() => () => controller.dispose(), [controller]);
+  // WR-01: unmounted (reduced motion, or nothing ambient): the value holds
+  // at AMBIENT_STILL rather than at its last tick.
+  useEffect(
+    () => () => {
+      controller.dispose();
+      ambient.value = AMBIENT_STILL;
+    },
+    [controller, ambient],
+  );
   return null;
 }
 
