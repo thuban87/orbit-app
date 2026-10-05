@@ -45,7 +45,11 @@ import {
   systemDisplayName,
   systemEmptyCopy,
 } from "@/components/orrery/orrery-controls-logic";
-import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
+import {
+  canvasViewport,
+  framingViewport,
+  sameCameraViewport,
+} from "@/components/orrery/orrery-obstacle-logic";
 import {
   closeBeforeAction,
   clusterRows,
@@ -83,7 +87,6 @@ import {
 import {
   type CameraPose,
   type CameraRect,
-  type CameraViewport,
   clampCameraPose,
   deriveHomePose,
   frameBodies,
@@ -289,13 +292,21 @@ export function OrreryScreen() {
     true,
     obstacles["shell-tabs"],
   );
-  const viewport = useMemo(
-    () => canvasViewport(canvasRect, Object.values(obstacles)),
-    [canvasRect, obstacles],
-  );
-  // 38.7-15: the live (unheld) viewport — what the renderer adopts at settle.
+  // 38.7-16 (D-79, owner-directed): the map's framing viewport — projection
+  // centre, Home, Recenter, focus/cluster framing, the camera and the frame —
+  // is built from PERSISTENT chrome only (`framingViewport`): the System and
+  // View panels, the cluster panel and every feedback notice no longer move
+  // the map. Its identity changes only when its content does, so an obstacle
+  // that is not a framing input commits nothing to the renderer.
+  const nextViewport = framingViewport(canvasRect, obstacles);
+  const stableViewport = useRef(nextViewport);
+  if (!sameCameraViewport(stableViewport.current, nextViewport))
+    stableViewport.current = nextViewport;
+  const viewport = stableViewport.current;
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
+  // The controls column still steps aside for open panels and notices; the
+  // framing reserves its RESTING place instead (`framingViewport`).
   const controlsViewport = useMemo(
     () =>
       canvasViewport(
@@ -450,18 +461,19 @@ export function OrreryScreen() {
   // re-runs on it, so a cluster tapped while a switch was still running zooms
   // once the switch has landed (one render at settle, never per frame).
   const [settledSwitch, setSettledSwitch] = useState(-1);
-  // 38.7-13 (C4-M1, D-53): the renderer's projection/framing viewport is
-  // held while a switch runs, so an obstacle measured mid-switch (a save
-  // error, a missing-category or broken-System notice, a retry clearing one)
-  // commits nothing to the renderer until the switch settles. The panels
-  // themselves mount, measure and publish at once; the D-55 occlusion rects
-  // keep following live measurements (C5-L4).
-  const [heldViewport, setHeldViewport] = useState<CameraViewport | null>(null);
-  const worldViewport = heldViewport ?? viewport;
+  // 38.7-13 (C4-M1, D-53) held the renderer's viewport through a switch and
+  // adopted the live one at settle — which snapped the projection centre when
+  // a panel or notice had changed it (38.7-16). Since 38.7-16 (D-79) no panel
+  // or notice is a framing input, so an obstacle measured mid-switch (a save
+  // error, a missing-category or broken-System notice, a retry clearing one,
+  // the System panel closing on the row tap) commits nothing to the renderer
+  // and there is nothing to adopt: the hold is gone and the projection centre
+  // never changes at settle. The panels still mount, measure and publish at
+  // once; the D-55 occlusion rects keep following live measurements (C5-L4).
+  const worldViewport = viewport;
   // Called by the runtime inside its settle callback (a driven switch: the
   // prune's JS call; a settled publication: inside `publish`), so the
-  // satellite flush, the settled generation and the viewport adoption all
-  // batch into that one commit.
+  // satellite flush and the settled generation batch into that one commit.
   // 38.7-15 (DEBUG): the generation of the real switch whose settle closes
   // the `switch:` clock. A settled publication that is no switch (a warm
   // return's reload, a refresh) also calls back here and must not log.
@@ -474,7 +486,6 @@ export function OrreryScreen() {
       }
       satellitePublisher.switchSettled(generation);
       setSettledSwitch(generation);
-      setHeldViewport(null);
     },
     [satellitePublisher],
   );
@@ -535,9 +546,6 @@ export function OrreryScreen() {
         switchSourceIds.current = isInSessionSwitch
           ? previous.snapshot.systemSnapshot.members.map((member) => member.id)
           : null;
-        // The renderer viewport is held from the tap (C4-M1) so nothing
-        // measured meanwhile restarts the frame.
-        if (isInSessionSwitch) setHeldViewport((held) => held ?? viewport);
         return;
       }
       // 38.7-15: a load that failed ends the lead-in (it coasts back).
@@ -563,9 +571,6 @@ export function OrreryScreen() {
       // C4-M3: a switch lands at destination Home, even with a retained focus;
       // no later card re-measure may re-frame it.
       if (sourceIds) focusFraming.current = null;
-      // C4-M1: hold the renderer viewport in use until this switch settles
-      // (batched into this publication's commit).
-      if (sourceIds) setHeldViewport((held) => held ?? viewport);
       if (sourceIds) {
         perf?.markSwitch("load-done");
         switchMarkGeneration.current = next.generation;
@@ -915,8 +920,8 @@ export function OrreryScreen() {
   });
   // 38.7-15 (C4-M2 / C5-M2 / C5-L3): the warm return's pose, BEFORE the warm
   // canvas mounts: (1) settle any paused switch through the runtime's own
-  // settle (its prune adopts Plan 13's held viewport); (2) Home from the
-  // retained scene under the live viewport — the one the settle adopts — and
+  // settle; (2) Home from the retained scene under the framing viewport
+  // (38.7-16, D-79: the one the renderer draws with; nothing is held) — and
   // focus, satellite, cluster and focus error cleared as the Home branch
   // does; (3) resume stays "home" (no `resumed()` here, so the sessionReady
   // Home re-derives from the reloaded scene); (4) the Home write happens in a
@@ -1349,7 +1354,19 @@ export function OrreryScreen() {
   }, [scene, state.status]);
   const lastHomeFrame = useRef("");
   const lastHomeDomain = useRef("");
-  const clusterMeasured = !!obstacles[CLUSTER_OBSTACLE];
+  const clusterRect = obstacles[CLUSTER_OBSTACLE];
+  const clusterMeasured = !!clusterRect;
+  // 38.7-16 (D-79): the cluster panel is no framing obstacle. A cluster is
+  // framed in the area the panel leaves uncovered (canvas units), under the
+  // map's fixed projection; a re-measured panel (font reflow) re-frames.
+  const clusterRegion = useMemo(() => {
+    if (!clusterRect) return null;
+    const panel = canvasViewport(canvasRect, [clusterRect]).obstacles ?? [];
+    return usableCameraRect({
+      ...worldViewport,
+      obstacles: [...(worldViewport.obstacles ?? []), ...panel],
+    });
+  }, [canvasRect, clusterRect, worldViewport]);
   useEffect(() => {
     if (!scene || state.status !== "ready" || !visible || !sessionReady) return;
     // Native measurement may arrive after opening or be cleared during font reflow.
@@ -1358,7 +1375,7 @@ export function OrreryScreen() {
       return;
     }
     const groupKey = clusterOpen
-      ? `${scene.generation}:${focusedIds.join(",")}`
+      ? `${scene.generation}:${focusedIds.join(",")}:${JSON.stringify(clusterRegion)}`
       : "";
     const key = `${systemRefId(scene.system)}:${scene.preferences.density}:${JSON.stringify(worldViewport)}:${groupKey}`;
     const domain = `${systemRefId(scene.system)}:${scene.preferences.density}`;
@@ -1433,8 +1450,9 @@ export function OrreryScreen() {
     // destination Home). Nothing is recorded, so the settle re-run zooms.
     if (clusterOpen && switchProgress.value < 1) return;
     // D-19/D-47: a single focus is framed above the docked card, uncapped;
-    // an open cluster zooms in until its members separate (the panel, an
-    // obstacle in `viewport`, stays open beside it).
+    // an open cluster zooms in until its members separate, framed in the
+    // area its panel leaves uncovered (38.7-16, D-79: the panel stays open
+    // beside it and the projection centre does not move).
     const focusedPose =
       focusedBodies.length === 1 && !clusterOpen
         ? (frameSingleFocus(focusedBodies[0], scene, lastCardHeight.current) ??
@@ -1445,6 +1463,7 @@ export function OrreryScreen() {
               worldViewport,
               pose.value,
               scene.extent,
+              clusterRegion,
             ) ?? undefined)
           : focusedBodies.length > 0
             ? frameBodies(
@@ -1498,6 +1517,7 @@ export function OrreryScreen() {
     camera.recover,
     clusterOpen,
     clusterMeasured,
+    clusterRegion,
     visible,
     sessionReady,
     sessionResume,

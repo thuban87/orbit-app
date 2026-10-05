@@ -11,13 +11,20 @@ import {
   createWindowMeasurement,
 } from "@/stores/shell-obstacle-store";
 import {
+  CONTROLS_STACK_HEIGHT,
   cameraControlState,
   canvasViewport,
   controlsRegion,
+  controlsRestingRect,
+  FRAMING_CHROME_OBSTACLES,
+  FRAMING_TOP_BAND_OBSTACLES,
+  framingViewport,
   northOrientation,
   polarisWorldPoint,
   resetNorthPose,
+  sameCameraViewport,
 } from "./orrery-obstacle-logic";
+import { ORRERY_OCCLUSION_SOURCES } from "./v2/occlusion-sources";
 
 describe("measured shell obstacles", () => {
   it("updates keyed rectangles without duplicate publications and removes invalid bounds", () => {
@@ -204,5 +211,100 @@ describe("reachable camera controls", () => {
     );
     expect(north.y).toBeLessThan(300);
     expect(east.x).toBeGreaterThan(200);
+  });
+});
+
+describe("38.7-16 (D-79): the map's framing viewport is persistent chrome only", () => {
+  const canvas = { x: 0, y: 24, width: 412, height: 800 };
+  const chrome = {
+    "shell-tabs": { x: 0, y: 824, width: 412, height: 80 },
+    "shell-fab": { x: 340, y: 752, width: 56, height: 56 },
+    "orrery-immersive-header": { x: 0, y: 24, width: 412, height: 56 },
+    "orrery-system-trigger": { x: 16, y: 96, width: 150, height: 44 },
+    "orrery-view-trigger": { x: 280, y: 96, width: 116, height: 44 },
+    // The controls' live measurement (at rest): never read by the framing.
+    "orrery-camera-controls": { x: 196, y: 571, width: 200, height: 173 },
+  };
+  const TRANSIENT = Object.keys(ORRERY_OCCLUSION_SOURCES).filter(
+    (id) =>
+      id === "orrery-system-panel" ||
+      id === "orrery-view-panel" ||
+      id === "orrery-cluster-panel" ||
+      id === "orrery-focus-context" ||
+      id.endsWith("-feedback"),
+  );
+
+  it("keeps the shell, a full-width top band and the controls' resting place; drops every panel, the focus card and every notice", () => {
+    expect(FRAMING_CHROME_OBSTACLES).toEqual(["shell-tabs", "shell-fab"]);
+    expect(FRAMING_TOP_BAND_OBSTACLES).toEqual([
+      "orrery-immersive-header",
+      "orrery-system-trigger",
+      "orrery-view-trigger",
+    ]);
+    // Three 55 dp plates with a 4 dp gap (the render suite pins both).
+    expect(CONTROLS_STACK_HEIGHT).toBe(173);
+    const viewport = framingViewport(canvas, chrome);
+    expect(viewport.obstacles).toEqual([
+      { x: 340, y: 728, width: 56, height: 56 },
+      // The band: the canvas width, down to the triggers' bottom.
+      { x: 0, y: 0, width: 412, height: 116 },
+      // The controls at rest: bottom-anchored above the FAB (the rect the
+      // controls measure when nothing else is open).
+      { x: 196, y: 547, width: 200, height: 173 },
+    ]);
+    expect(viewport.obstacles?.[2]).toEqual({
+      ...chrome["orrery-camera-controls"],
+      y: chrome["orrery-camera-controls"].y - canvas.y,
+    });
+    expect(TRANSIENT).toHaveLength(12);
+    for (const id of TRANSIENT) {
+      const opened = framingViewport(canvas, {
+        ...chrome,
+        [id]: { x: 16, y: 150, width: 380, height: 500 },
+        // The controls step aside for it: their live rect moves.
+        "orrery-camera-controls": { x: 196, y: 658, width: 200, height: 62 },
+      });
+      expect(sameCameraViewport(opened, viewport)).toBe(true);
+      expect(usableCameraRect(opened)).toEqual(usableCameraRect(viewport));
+    }
+  });
+
+  it("a System name that widens or narrows its trigger never moves the map", () => {
+    const viewport = framingViewport(canvas, chrome);
+    for (const width of [60, 120, 181]) {
+      const renamed = framingViewport(canvas, {
+        ...chrome,
+        "orrery-system-trigger": { x: 16, y: 96, width, height: 44 },
+      });
+      expect(sameCameraViewport(renamed, viewport)).toBe(true);
+    }
+  });
+
+  it("the resting rect is the stack bottom-anchored in the free column (or the column, when shorter)", () => {
+    expect(controlsRestingRect({ width: 400, height: 700 })).toEqual({
+      x: 184,
+      y: 684 - 173,
+      width: 200,
+      height: 173,
+    });
+    expect(
+      controlsRestingRect({
+        width: 160,
+        height: 300,
+        obstacles: [{ x: 0, y: 240, width: 160, height: 60 }],
+      }),
+    ).toEqual({ x: 16, y: 16 + 216 - 173, width: 128, height: 173 });
+    expect(
+      controlsRestingRect({
+        width: 400,
+        height: 160,
+      }),
+    ).toEqual({ x: 184, y: 16, width: 200, height: 128 });
+    expect(controlsRestingRect({ width: 40, height: 700 })).toBeNull();
+    expect(framingViewport(null, chrome)).toEqual({
+      width: 0,
+      height: 0,
+      obstacles: [],
+    });
   });
 });

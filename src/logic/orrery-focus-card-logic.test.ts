@@ -10,6 +10,7 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   projectFrame,
+  projectWorldPoint,
   tryProjectWorldPoint,
   usableCameraRect,
   type WorldBody,
@@ -507,6 +508,42 @@ describe("38.7-11 (D-19): a cluster tap zooms into the cluster", () => {
       expect(zoomed.zoom).toBeGreaterThanOrEqual(base.pose.zoom - 1e-9);
       const frame = projectFrame(all, zoomed, panelled, 1, { extent: ext });
       inside(frame, [31, 32, 33], panelled);
+    },
+  );
+
+  it.each(TILTS)(
+    "38.7-16 (D-79): with the panel's uncovered area as the region, the group is framed there under the unchanged (panel-free) projection (tilt %s)",
+    (tilt) => {
+      const start = poseAt(tilt, { zoom: 0.5 });
+      const all = [sun, ...tight];
+      const ext = worldExtent(all);
+      const region = usableCameraRect(panelled)!;
+      expect(region).not.toEqual(usableCameraRect(viewport));
+      const zoomed = clusterZoomPose(tight, viewport, start, ext, region);
+      expect(zoomed).not.toBeNull();
+      expect(zoomed!.zoom).toBeGreaterThan(start.zoom);
+      // Projected with the framing viewport (no panel in it) …
+      const frame = projectFrame(all, zoomed!, viewport, 1, { extent: ext });
+      // … the group lies inside the area the panel leaves uncovered.
+      inside(frame, [21, 22, 23], panelled);
+      // The projection centre is the panel-free one: the pivot projects to
+      // the same screen point as under any other pose of the same lens.
+      const centre = projectWorldPoint(
+        { x: zoomed!.x, y: zoomed!.y },
+        zoomed!,
+        viewport,
+      );
+      const home = projectWorldPoint(
+        { x: start.x, y: start.y },
+        start,
+        viewport,
+      );
+      expect(centre.x).toBeCloseTo(home.x, 6);
+      expect(centre.y).toBeCloseTo(home.y, 6);
+      // Without a region it is today's usable-rect framing.
+      expect(clusterZoomPose(tight, panelled, start, ext)).toEqual(
+        clusterZoomPose(tight, panelled, start, ext, undefined),
+      );
     },
   );
 

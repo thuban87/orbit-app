@@ -1231,6 +1231,10 @@ export function OrreryWorldInner({
     });
     // C-M2: the docked card is no viewport obstacle, so labels avoid it here.
     const exclusions = labelExclusions(current.bodies, cardRect.value);
+    // 38.7-16 (D-79): neither are the static panels and notices (the framing
+    // viewport is persistent chrome only), so labels avoid their rects here.
+    const panels = staticRects.value;
+    for (let i = 0; i < panels.length; i++) exclusions.push(panels[i]);
     return allocateLabels(
       candidates,
       semanticLevel(current.labelMagnification, level.value),

@@ -12,9 +12,10 @@
  *   the card, with their moons inside that space. Zoom grows until the body
  *   reaches FOCUS_TARGET_PX on screen or the frame would no longer fit, up to
  *   MAX_ZOOM — no IDENTITY_ZOOM cap (D-47).
- * - `clusterZoomPose`: a tapped cluster is centred and zoomed until its
- *   closest pair separates on screen (or it would no longer fit), never below
- *   today's `frameBodies` zoom (D-19).
+ * - `clusterZoomPose`: a tapped cluster is centred (in the area its panel
+ *   leaves uncovered, under the map's fixed projection — 38.7-16, D-79) and
+ *   zoomed until its closest pair separates on screen (or it would no longer
+ *   fit), never below today's `frameBodies` zoom (D-19).
  *
  * Horizon safety (H2): every projection goes through the non-throwing
  * primitives (`tryProjectWithBasis`, `basisPerspectiveScale`,
@@ -402,20 +403,24 @@ function closestPair(points: readonly WorldPoint[]): number {
 }
 
 /**
- * D-19: a cluster tap frames the group in the usable rect (the cluster panel
- * is an obstacle there, as today) and zooms until the closest pair's projected
- * centres are CLUSTER_SEPARATION_PX apart or the group (its drawn discs) would
- * no longer fit, bounded by MAX_ZOOM — never below `frameBodies`' zoom for
- * the same set. Null when `frameBodies` is null (the caller keeps the camera).
+ * D-19: a cluster tap frames the group and zooms until the closest pair's
+ * projected centres are CLUSTER_SEPARATION_PX apart or the group (its drawn
+ * discs) would no longer fit, bounded by MAX_ZOOM — never below `frameBodies`'
+ * zoom for the same set. Null when `frameBodies` is null (the caller keeps the
+ * camera). 38.7-16 (D-79): the cluster panel is no longer a viewport obstacle
+ * — `viewport` is the map's fixed framing viewport (its projection centre does
+ * not move) and `region`, when given, is the area the panel leaves uncovered:
+ * the group is centred and fitted there. Without `region`, the usable rect.
  */
 export function clusterZoomPose(
   bodies: readonly WorldBody[],
   viewport: CameraViewport,
   pose: CameraPose,
   extent: number,
+  region?: CameraRect | null,
 ): CameraPose | null {
   "worklet";
-  const base = frameBodies(bodies, viewport, extent, pose);
+  const base = frameBodies(bodies, viewport, extent, pose, region);
   if (!base) return null;
   if (!base.fits || bodies.length < 2) return base.pose;
   const usable = base.usable;

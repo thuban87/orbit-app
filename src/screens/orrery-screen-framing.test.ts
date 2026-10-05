@@ -1,7 +1,11 @@
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { beforeAll, expect, it, vi } from "vitest";
-import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
+import {
+  canvasViewport,
+  framingViewport,
+  sameCameraViewport,
+} from "@/components/orrery/orrery-obstacle-logic";
 import * as overlayLogic from "@/components/orrery/orrery-overlay-logic";
 import { createOrrerySatellitePublisher } from "@/components/orrery/orrery-satellite-publisher";
 import * as switchLogic from "@/components/orrery/orrery-switch-animation";
@@ -266,10 +270,13 @@ function harness(
     { getState: () => session },
   );
   const obstacles = createShellObstacleStore();
+  // The camera controls' live measurement (the cluster panel lays out around
+  // it). 38.7-16 (D-79): the framing reserves the controls' RESTING place
+  // (`framingViewport`), never this rect.
   obstacles
     .getState()
     .publish(
-      "controls",
+      "orrery-camera-controls",
       options.controls ?? { x: 184, y: 400, width: 200, height: 180 },
     );
   if (options.header)
@@ -412,7 +419,8 @@ function harness(
           };
         if (id.includes("orrery-overlay-logic")) return overlayLogic;
         if (id.includes("occlusion-sources")) return occlusionSources;
-        if (id.includes("orrery-obstacle-logic")) return { canvasViewport };
+        if (id.includes("orrery-obstacle-logic"))
+          return { canvasViewport, framingViewport, sameCameraViewport };
         if (id.includes("orrery-system-store"))
           return {
             createOrrerySystemStore: options.realStore
@@ -822,13 +830,14 @@ it.each([
   ["flat", 180],
   ["flat", 200],
 ] as const)(
-  "frames a group from the %s Home after delayed measurement and font reflow to y=%s; close rejects late measurement",
+  "frames a group from the %s Home after delayed measurement and font reflow to y=%s, in the area its panel leaves uncovered under a fixed projection (D-79); close rejects late measurement",
   async (profile, top) => {
     const h = harness(profile);
     await h.ready();
+    const fixed = h.world().props.viewport as cameraLogic.CameraViewport;
     await h.group();
     expect(h.find("Panel")).toBeDefined();
-    expect(h.pending).toHaveLength(0); // No recovery against the pre-panel viewport.
+    expect(h.pending).toHaveLength(0); // No recovery before the panel measures.
     const measured = h.measurement.begin();
     measured(0, 200, 400, 200);
     h.render();
@@ -842,8 +851,18 @@ it.each([
     expect(old.cancelled).toBe(true);
     old.complete(true); // generation check rejects the stale animation completion.
     h.settle();
-    const frame = h.frame(),
-      rect = cameraLogic.usableCameraRect(frame.viewport)!;
+    // 38.7-16 (D-79): the panel never reaches the framing viewport — the
+    // projection is the one Home used — and the group sits in the area the
+    // panel leaves uncovered.
+    const frame = h.frame();
+    expect(frame.viewport).toBe(fixed);
+    const rect = cameraLogic.usableCameraRect({
+      ...fixed,
+      obstacles: [
+        ...(fixed.obstacles ?? []),
+        { x: 0, y: top, width: 400, height: 400 - top },
+      ],
+    })!;
     for (const body of frame.bodies) {
       expect(body.y - body.hitRadius).toBeGreaterThanOrEqual(rect.y - 1e-6);
       expect(body.y + body.hitRadius).toBeLessThanOrEqual(
@@ -1187,14 +1206,25 @@ it("a cluster tap zooms into the cluster after a System switch in the same sessi
   await h.group(8);
   expect(h.find("Panel")).toBeDefined();
   expect(h.pending).toHaveLength(0); // waits for the panel's measurement
-  h.measurement.begin()(0, 400, 400, 200);
+  const fixed = h.world().props.viewport as cameraLogic.CameraViewport;
+  h.measurement.begin()(0, 300, 400, 300);
   h.render();
   // The cluster zoom fires: one recovery toward a closer pose.
   expect(h.pending).toHaveLength(1);
   expect(h.pending[0].target.zoom).toBeGreaterThan(landed.zoom);
   h.settle();
-  const frame = h.frame(),
-    rect = cameraLogic.usableCameraRect(frame.viewport)!;
+  // 38.7-16 (D-79): framed in the area the panel leaves uncovered, under the
+  // unchanged framing viewport (the panel is no framing obstacle).
+  const frame = h.frame();
+  expect(frame.viewport).toBe(fixed);
+  const rect = cameraLogic.usableCameraRect({
+    ...fixed,
+    obstacles: [
+      ...(fixed.obstacles ?? []),
+      { x: 0, y: 300, width: 400, height: 300 },
+    ],
+  })!;
+  expect(rect).not.toEqual(cameraLogic.usableCameraRect(fixed));
   for (const body of frame.bodies.filter((b) => b.kind === "contact")) {
     expect(body.y - body.hitRadius).toBeGreaterThanOrEqual(rect.y - 1e-6);
     expect(body.y + body.hitRadius).toBeLessThanOrEqual(
@@ -1297,7 +1327,7 @@ function storeHarness(
 const FAVORITES = { kind: "builtin", id: "favorites" } as const;
 const ALL = systemLogic.ALL_CONTACTS_SYSTEM;
 
-it("C3-M2 / C4-M1: a save landing mid-switch (saved, then error) and the save notice's measurement commit nothing to OrreryWorld; the renderer adopts the new viewport only in the settle commit, with no reframe", async () => {
+it("C3-M2 / D-79: a save landing mid-switch (saved, then error) and the save notice's measurement commit nothing to OrreryWorld — not mid-switch and not at settle (the notice is no framing input: nothing to adopt, no centre change, no reframe)", async () => {
   const saves = controlled<boolean>();
   const h = storeHarness(saves);
   await h.ready();
@@ -1350,7 +1380,7 @@ it("C3-M2 / C4-M1: a save landing mid-switch (saved, then error) and the save no
   ).toBe(true);
   expect(changedProps(before, h.world().props)).toEqual([]);
   // …and publishes its measured rect at once (as OrreryObstacle does through
-  // the window measurement): the live viewport changes, the renderer's not.
+  // the window measurement): the framing viewport does not change (D-79).
   h.obstacles
     .getState()
     .publish("orrery-save-feedback", { x: 16, y: 500, width: 368, height: 80 });
@@ -1360,20 +1390,15 @@ it("C3-M2 / C4-M1: a save landing mid-switch (saved, then error) and the save no
   expect(
     (h.world().props.occlusionRects as { value: unknown[] }).value.length,
   ).toBe(occlusions + 1);
-  // Settle: the runtime lands at the publish-time Home, then the screen's
-  // settle callback adopts the new viewport inside that one commit.
+  // Settle: the runtime lands at the publish-time Home; the settle commit
+  // changes nothing in OrreryWorld (38.7-16: no viewport adoption, so the
+  // projection centre cannot jump at settle).
   const pose = h.world().props.pose as { value: cameraLogic.CameraPose };
   pose.value = { ...home };
   h.settleSwitch(store?.getState().generation ?? 0);
   const settled = h.world().props;
-  expect(changedProps(before, settled).sort()).toEqual(
-    ["camera", "viewport"].sort(),
-  );
-  const adopted = settled.viewport as cameraLogic.CameraViewport;
-  expect(adopted.obstacles?.length).toBe(
-    ((before.viewport as cameraLogic.CameraViewport).obstacles?.length ?? 0) +
-      1,
-  );
+  expect(changedProps(before, settled)).toEqual([]);
+  expect(settled.viewport).toBe(before.viewport);
   // No reframe: the Home effect only clamps the landed pose.
   for (const axis of ["x", "y", "zoom", "tilt", "yaw"] as const)
     expect(pose.value[axis]).toBeCloseTo(home[axis] ?? 0, 9);
@@ -1548,23 +1573,23 @@ it("38.7-15 (b): a warm return mid-switch (paused at 0.5) settles the switch and
   expect(poseOf(h)).toBe(warmPose);
 });
 
-it("38.7-15 (d, C5-M2): an obstacle measured mid-switch is adopted by the warm settle, and warm Home is derived under the adopted viewport", async () => {
+it("38.7-15 (d, C5-M2; 38.7-16 D-79): an obstacle measured mid-switch is no framing input — the warm settle keeps the same viewport and warm Home is derived under it", async () => {
   const h = harness("tilted", PHONE);
   await h.ready();
   const landed = h.landSwitch();
   h.switchProgress.value = 0.5;
-  const held = h.world().props.viewport as cameraLogic.CameraViewport;
-  // A save-error banner measures mid-switch: the renderer keeps the held one.
+  const fixed = h.world().props.viewport as cameraLogic.CameraViewport;
+  // A save-error banner measures mid-switch: the framing viewport is unchanged.
   h.obstacles
     .getState()
     .publish("orrery-save-feedback", { x: 16, y: 600, width: 368, height: 80 });
   h.render();
-  expect(h.world().props.viewport).toEqual(held);
+  expect(h.world().props.viewport).toBe(fixed);
   const open = holdReload(h);
   await leaveAndReturn(h);
-  const adopted = h.world().props.viewport as cameraLogic.CameraViewport;
-  expect(adopted).not.toEqual(held);
-  const home = h.camera.deriveHomePose(landed.world, adopted);
+  const settled = h.world().props.viewport as cameraLogic.CameraViewport;
+  expect(settled).toBe(fixed);
+  const home = h.camera.deriveHomePose(landed.world, settled);
   expect(firstMounted(h)?.pose).toEqual(home);
   expect(h.switchProgress.value).toBe(1);
   const warmPose = poseOf(h);
@@ -1764,4 +1789,126 @@ it("38.7-15 (D-76): an in-session switch's loading keeps the outgoing System's m
     sceneGeneration: h.store()?.getState().generation,
   });
   expect(reads.queue).toHaveLength(1);
+});
+
+// ── 38.7-16 (D-79, owner-directed): the map stays in its place ─────────────────
+
+const HEADER = { x: 0, y: 0, width: 400, height: 52 };
+/** Every transient Orrery surface: dropdown panels, the cluster panel, the focus card and every notice. */
+const TRANSIENT_SURFACES = Object.keys(
+  occlusionSources.ORRERY_OCCLUSION_SOURCES,
+).filter(
+  (id) =>
+    id === "orrery-system-panel" ||
+    id === "orrery-view-panel" ||
+    id === "orrery-cluster-panel" ||
+    id === "orrery-focus-context" ||
+    id.endsWith("-feedback"),
+);
+/** The screen point the camera pivot projects to: the projection centre. */
+function projectionCentre(h: Harness) {
+  const pose = poseOf(h);
+  return cameraLogic.projectWorldPoint(
+    { x: pose.x, y: pose.y },
+    pose,
+    h.world().props.viewport as cameraLogic.CameraViewport,
+  );
+}
+
+it("38.7-16 (D-79): opening and closing each dropdown, panel and notice leaves the framing viewport, the renderer's props and the projection centre unchanged", async () => {
+  const h = harness("tilted", { ...PHONE, header: HEADER });
+  await h.ready();
+  const fixed = h.world().props.viewport;
+  const props = { ...h.world().props };
+  const centre = projectionCentre(h);
+  const pending = h.pending.length;
+  expect(TRANSIENT_SURFACES).toHaveLength(12);
+  for (const id of TRANSIENT_SURFACES) {
+    h.obstacles
+      .getState()
+      .publish(id, { x: 16, y: 120, width: 368, height: 520 });
+    h.render();
+    expect(h.world().props.viewport).toBe(fixed);
+    expect(changedProps(props, h.world().props)).toEqual([]);
+    expect(projectionCentre(h)).toEqual(centre);
+    h.obstacles.getState().publish(id, null);
+    h.render();
+    expect(h.world().props.viewport).toBe(fixed);
+    expect(changedProps(props, h.world().props)).toEqual([]);
+  }
+  expect(h.pending).toHaveLength(pending);
+  // The D-55 occlusion dim still follows a panel's live rect.
+  h.obstacles
+    .getState()
+    .publish("orrery-view-panel", { x: 16, y: 120, width: 368, height: 520 });
+  h.render();
+  expect(
+    (h.world().props.occlusionRects as { value: unknown[] }).value,
+  ).toContainEqual({ x: 16, y: 120, width: 368, height: 520 });
+});
+
+it("38.7-16 (D-79): a System name that widens or narrows its trigger never moves the map (a fixed top band)", async () => {
+  const h = harness("tilted", { ...PHONE, header: HEADER });
+  h.obstacles
+    .getState()
+    .publish("orrery-view-trigger", { x: 250, y: 68, width: 134, height: 44 });
+  h.obstacles
+    .getState()
+    .publish("orrery-system-trigger", { x: 16, y: 68, width: 90, height: 44 });
+  await h.ready();
+  const fixed = h.world().props.viewport as cameraLogic.CameraViewport;
+  expect(cameraLogic.usableCameraRect(fixed)!.y).toBeGreaterThanOrEqual(112);
+  for (const width of [60, 176, 120]) {
+    h.obstacles
+      .getState()
+      .publish("orrery-system-trigger", { x: 16, y: 68, width, height: 44 });
+    h.render();
+    expect(h.world().props.viewport).toBe(fixed);
+  }
+});
+
+it("38.7-16 (D-79): a switch started with the System panel open (row tap: select, then dismiss) lands at the panel-free Home and settles with no projection-centre change", async () => {
+  const saves = controlled<boolean>();
+  const h = storeHarness(saves, { ...PHONE, header: HEADER });
+  await h.ready();
+  await microtasks();
+  h.render();
+  saves.queue[0]?.resolve(true);
+  await microtasks();
+  h.render();
+  const fixed = h.world().props.viewport as cameraLogic.CameraViewport;
+  const camera = h.world().props.camera;
+  // The System panel is open over the left of the map.
+  h.obstacles
+    .getState()
+    .publish("orrery-system-panel", { x: 16, y: 120, width: 320, height: 600 });
+  h.render();
+  expect(h.world().props.viewport).toBe(fixed);
+  // The row's onPress: onSelect, THEN dismiss (the panel unmeasures).
+  const onSelect = h.find("Selector")?.props.onSelect as (
+    s: unknown,
+    n: string,
+  ) => void;
+  onSelect(FAVORITES, "Favorites");
+  h.obstacles.getState().publish("orrery-system-panel", null);
+  await microtasks();
+  h.render();
+  const published = h.publishes.at(-1);
+  expect(published?.[1]).toBe(true); // a real switch
+  const home = published?.[3] as cameraLogic.CameraPose;
+  // Destination Home is framed under the panel-free viewport.
+  expect(home).toEqual(h.camera.deriveHomePose(h.scene.world, fixed));
+  h.switchProgress.value = 0.5;
+  h.render();
+  expect(h.world().props.viewport).toBe(fixed);
+  // The runtime lands at that Home; the settle commit changes no framing.
+  const pose = h.world().props.pose as { value: cameraLogic.CameraPose };
+  pose.value = { ...home };
+  const centre = projectionCentre(h);
+  h.settleSwitch(h.store()?.getState().generation ?? 0);
+  expect(h.world().props.viewport).toBe(fixed);
+  expect(h.world().props.camera).toBe(camera);
+  expect(projectionCentre(h)).toEqual(centre);
+  for (const axis of ["x", "y", "zoom", "tilt", "yaw"] as const)
+    expect(pose.value[axis]).toBeCloseTo(home[axis] ?? 0, 9);
 });

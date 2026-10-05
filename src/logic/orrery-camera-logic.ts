@@ -792,6 +792,8 @@ export function deriveHomePose(
   );
 }
 
+/** 38.7-16: zoom samples `frameBodies` tries for an off-centre fit region. */
+const REGION_ZOOM_SAMPLES = 24;
 export interface CameraFraming {
   pose: CameraPose;
   fits: boolean;
@@ -801,21 +803,30 @@ export interface CameraFraming {
  * Infeasible sets still return a bounded recovery pose, with fits:false. A
  * trial pose that puts any selected body beyond the horizon never fits; when
  * no trial pose is safe the result is null (callers keep the previous pose).
+ * 38.7-16 (D-79): `region` (canvas units), when given, is where the set is
+ * centred and fitted instead of the usable rect — the projection itself still
+ * comes from `viewport` (e.g. a cluster framed beside its panel while the map's
+ * projection centre stays put). `usable` in the result is that fit rect.
  */
 export function frameBodies(
   world: readonly WorldBody[],
   viewport: CameraViewport,
   extent: number,
   framingOrientation?: CameraPose,
+  region?: CameraRect | null,
 ): CameraFraming | null {
   "worklet";
   // No module identifier in a worklet default parameter (it runs before the
   // captured closure is unpacked: a ReferenceError on the UI runtime).
   const orientation =
     framingOrientation === undefined ? HOME_CAMERA : framingOrientation;
-  const usable = usableCameraRect(viewport);
+  const projected = usableCameraRect(viewport);
+  const usable =
+    projected && region !== undefined && region !== null ? region : projected;
   if (
     !usable ||
+    !(usable.width > 0) ||
+    !(usable.height > 0) ||
     world.length === 0 ||
     world.some(
       (b) =>
@@ -910,6 +921,21 @@ export function frameBodies(
   let low = MIN_ZOOM,
     high = MAX_ZOOM,
     result = candidate(low);
+  // 38.7-16 (D-79): an off-centre `region` can be out of the pan clamp's reach
+  // at the lowest zooms (the offset from the projection centre is larger in
+  // world units there), so "fits" need not hold at MIN_ZOOM: start from the
+  // lowest sampled zoom that fits. Without a region, unchanged.
+  if (!result?.fits && usable !== projected)
+    for (let i = 1; i <= REGION_ZOOM_SAMPLES; i++) {
+      const zoom =
+        MIN_ZOOM * (MAX_ZOOM / MIN_ZOOM) ** (i / REGION_ZOOM_SAMPLES);
+      const next = candidate(zoom);
+      if (next?.fits) {
+        low = zoom;
+        result = next;
+        break;
+      }
+    }
   if (!result?.fits) return result;
   const maximum = candidate(high);
   if (maximum?.fits) return maximum;
