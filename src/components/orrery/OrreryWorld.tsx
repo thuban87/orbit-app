@@ -409,6 +409,14 @@ export function OrreryWorldInner({
   }
   const resources = switchRuntime.resources;
   const mounted = useRef(true);
+  // CR-01: set (JS and UI) at the start of the H3 teardown and never cleared:
+  // a visibility report, photo request or photo callback that lands after
+  // unmount (a trailing UI timer, a queued runOnJS) must never re-mount this
+  // owner in the shared photo cache (re-pinning its images for the rest of
+  // the process) or begin a ledger epoch no teardown would end. The System
+  // Preview's controller has the same guard (system-preview-resources.ts).
+  const released = useRef(false);
+  const alive = useSharedValue(true);
   const focusKey = JSON.stringify([
     scene.generation,
     focusedIds,
@@ -988,11 +996,12 @@ export function OrreryWorldInner({
   photoInputs.current = { looks: bodyLooks, focusedKeys };
   const visibilityRef = useRef<OrreryTextVisibility | null>(null);
   const requestPhotos = useCallback(() => {
+    if (released.current) return;
     const { owner } = publisher;
     if (photoEpoch.current === null)
       photoEpoch.current = orreryPhotoCache.mount(owner, () => {
         const epoch = photoEpoch.current;
-        if (epoch !== null)
+        if (epoch !== null && !released.current)
           specPublisher.setPhotos(orreryPhotoCache.drawn(owner), epoch);
       });
     orreryPhotoCache.request(
@@ -1060,6 +1069,13 @@ export function OrreryWorldInner({
       // hands back the rest of the epoch in reverse creation order — the
       // baked base snapshots (GPU textures, never retained), then the
       // offscreen surface (UI thread).
+      // CR-01: first, refuse everything that lands after this point (JS now;
+      // the UI eligibility timer at its next run).
+      released.current = true;
+      runOnUI(() => {
+        "worklet";
+        alive.value = false;
+      })();
       const { owner } = publisher;
       const textEpoch = publisher.release();
       // 38.7-09: no new sky bake may publish from here on.
@@ -1102,7 +1118,15 @@ export function OrreryWorldInner({
         })();
       }, 0);
     },
-    [publisher, specPublisher, ledger, bakeRegistry, skyOwner, retireSky],
+    [
+      publisher,
+      specPublisher,
+      ledger,
+      bakeRegistry,
+      skyOwner,
+      retireSky,
+      alive,
+    ],
   );
   const sendTier = useCallback(
     (tier: SemanticLevel) => publisher.setTier(tier),
@@ -1110,6 +1134,8 @@ export function OrreryWorldInner({
   );
   const sendVisibility = useCallback(
     (visibility: OrreryTextVisibility) => {
+      // CR-01: a report queued before the unmount (runOnJS) lands after it.
+      if (released.current) return;
       publisher.setVisibility(visibility);
       // D-53: visible photos first (the same throttled UI report).
       visibilityRef.current = visibility;
@@ -1150,10 +1176,12 @@ export function OrreryWorldInner({
   useAnimatedReaction(
     () => (lead.value.active ? null : frame.value),
     (current) => {
-      if (current === null) return;
+      if (current === null || !alive.value) return;
       const state = textReport.value;
       if (state.timer) return;
       const run = () => {
+        // CR-01: a trailing timer that fires after the unmount reports nothing.
+        if (!alive.value) return;
         if (lead.value.active) {
           // A trailing report that fires mid-lead waits for the lead's end.
           textReport.value = { ...textReport.value, timer: false };

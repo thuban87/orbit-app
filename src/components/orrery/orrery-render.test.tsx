@@ -237,11 +237,14 @@ const photoCache = vi.hoisted(() => ({
   drawn: new Map<string, { id: number; image: unknown }>(),
   ready: null as null | (() => void),
   requests: [] as unknown[][],
+  /** CR-01: every owner mount (a re-mount after unmount re-pins photos). */
+  mounts: 0,
 }));
 vi.mock("./resources/orrery-photo-cache", () => ({
   orreryPhotoCache: {
     mount: (_owner: string, onReady: () => void) => {
       photoCache.ready = onReady;
+      photoCache.mounts++;
       return 1;
     },
     request: (_owner: string, entries: unknown[]) => {
@@ -1550,5 +1553,54 @@ describe("38.7-13: the switch through the real runtime and frame worklet (C3-H1,
     expect(native.skyOwners).toHaveLength(1);
     expect(owner.owner.stats().bakes).toBe(bakes);
     expect(new Set(owner.keys)).toEqual(new Set(keys));
+  });
+
+  it("CR-01: a visibility report whose trailing timer fires after unmount re-mounts nothing and requests nothing", async () => {
+    const scene = await sceneWith(3);
+    const pose = { value: { ...HOME_CAMERA, zoom: 1 } };
+    const runtime = useOrrerySwitchRuntime(
+      pose as never,
+      native.reduced as never,
+    );
+    runtime.publish(scene, false, 0, pose.value);
+    const props = useWorldProps(scene, runtime, pose);
+    native.slots = { cells: [], cursor: 0 };
+    resolve(OrreryWorld(props));
+    flushUi();
+    /** One pass of every UI reaction, without advancing the clock. */
+    const react = () => {
+      for (const reaction of native.reactions) {
+        const value = reaction.prepare();
+        reaction.react(value, reaction.previous);
+        reaction.previous = value;
+      }
+    };
+    const near = { ...HOME_CAMERA, zoom: 1 };
+    // Panned well away: every body leaves the viewport (a new key set).
+    const far = { ...HOME_CAMERA, zoom: 12, x: 200 };
+    // Precondition: a report within the interval arms the trailing timer,
+    // and that timer sends a changed visibility (a photo request).
+    react();
+    pose.value = far;
+    react();
+    const before = photoCache.requests.length;
+    vi.advanceTimersByTime(300);
+    expect(photoCache.requests.length).toBeGreaterThan(before);
+    // Again, but the world unmounts while the trailing timer is pending.
+    pose.value = near;
+    react();
+    const mounts = photoCache.mounts;
+    const requests = photoCache.requests.length;
+    expect(mounts).toBeGreaterThan(0);
+    for (const cell of (native.slots as NonNullable<typeof native.slots>).cells)
+      if (typeof cell.cleanup === "function") (cell.cleanup as () => void)();
+    vi.advanceTimersByTime(300);
+    // The teardown's own UI round trip, then any late photo callback.
+    for (const frame of native.frames.splice(0)) frame();
+    photoCache.ready?.();
+    react();
+    vi.advanceTimersByTime(300);
+    expect(photoCache.mounts).toBe(mounts);
+    expect(photoCache.requests.length).toBe(requests);
   });
 });

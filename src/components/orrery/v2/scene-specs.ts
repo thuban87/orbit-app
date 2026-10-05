@@ -1243,10 +1243,18 @@ export interface OrrerySpecPublisher {
   resync(): void;
   /**
    * 38.7-09: the current publishing epoch, begun now if none is (the sky bake
-   * owner tags its images with it before any body spec was published).
+   * owner tags its images with it before any body spec was published). After
+   * `detach` it begins nothing and returns -1 (never a current epoch, so a
+   * result tagged with it is stale under H3 rule 4).
    */
   ensureEpoch(): number;
-  /** Ends the publishing epoch now (unmount); returns it for the later teardown. */
+  /**
+   * Ends the publishing epoch now (unmount); returns it for the later
+   * teardown. Terminal (CR-01): every later input is ignored — nothing is
+   * composed or written and no ledger epoch is begun, so a callback that
+   * lands after unmount (a photo decode, a late visibility report) can never
+   * open an epoch that no teardown would end.
+   */
   detach(): number | null;
   generation(): number;
   epoch(): number | null;
@@ -1296,6 +1304,8 @@ export function createOrrerySpecPublisher(
   } | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let lastWriteAt = Number.NEGATIVE_INFINITY;
+  /** CR-01: set once by `detach`; the publisher is inert from then on. */
+  let detached = false;
 
   function cancelTimer(): void {
     if (timer !== null) clearTimeout(timer);
@@ -1321,6 +1331,7 @@ export function createOrrerySpecPublisher(
 
   /** Composes the bodies; returns false when nothing changed (no generation). */
   function compose(force: boolean): boolean {
+    if (detached) return false;
     const previous = published;
     const previousLooks = publishedLooks;
     // Index-aligned when the looks array is unchanged (photos, initials) or
@@ -1422,7 +1433,7 @@ export function createOrrerySpecPublisher(
   }
 
   function publishLabels(): void {
-    if (!writeLabels || !labelSpec) return;
+    if (detached || !writeLabels || !labelSpec) return;
     if (epoch === null) epoch = ledger.beginEpoch();
     generation++;
     const textEpoch = labelSpec.mountEpoch;
@@ -1442,6 +1453,7 @@ export function createOrrerySpecPublisher(
 
   return {
     setLooks(next) {
+      if (detached) return;
       looks = next;
       compose(false);
       // A look change (resources, theme, moons) is written at once, with any
@@ -1449,6 +1461,7 @@ export function createOrrerySpecPublisher(
       flush();
     },
     setInitials(next) {
+      if (detached) return;
       initials = next.initials;
       initialsHandles = next.keys.map((key) =>
         textHandle(next.mountEpoch, key),
@@ -1458,10 +1471,12 @@ export function createOrrerySpecPublisher(
       if (compose(true)) flushSoon();
     },
     setLabels(next) {
+      if (detached) return;
       labelSpec = next;
       publishLabels();
     },
     setLabelPlate(ink) {
+      if (detached) return;
       if (
         ink[0] === plateInk[0] &&
         ink[1] === plateInk[1] &&
@@ -1473,19 +1488,23 @@ export function createOrrerySpecPublisher(
       publishLabels();
     },
     setPhotos(next, nextEpoch) {
+      if (detached) return;
       photos = next;
       photoEpoch = nextEpoch;
       if (compose(false)) flushSoon();
     },
     resync() {
+      if (detached) return;
       written = null;
       flush();
     },
     ensureEpoch() {
+      if (detached) return -1;
       if (epoch === null) epoch = ledger.beginEpoch();
       return epoch;
     },
     detach() {
+      detached = true;
       cancelTimer();
       const ended = epoch;
       epoch = null;
@@ -1497,6 +1516,8 @@ export function createOrrerySpecPublisher(
       labelSpec = null;
       initials = {};
       initialsHandles = [];
+      looks = [];
+      photos = new Map();
       return ended;
     },
     generation: () => generation,

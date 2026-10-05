@@ -623,15 +623,56 @@ describe("createOrrerySpecPublisher (D-43/H3)", () => {
     ledger.ack("sun", 3, epoch);
     expect(ledger.retirable()).toEqual([photoHandle(2, 1)]);
   });
-  it("detach ends the epoch; the next publish starts a new one", () => {
-    const { ledger, writes, publisher, looks } = setup();
+  it("CR-01: detach ends the epoch and is terminal — a late photo, look, initials or label input composes nothing and begins no epoch", () => {
+    const ledger = createOrreryGenerationLedger<string>();
+    const writes: OrreryBodySpecs[] = [];
+    const labelWrites: unknown[] = [];
+    const publisher = createOrrerySpecPublisher({
+      ledger,
+      writeBodies: (specs) => writes.push(specs),
+      writeLabels: (specs) => labelWrites.push(specs),
+    });
+    const looks = buildBodyLooks(
+      bodyResources([
+        { status: "stable", name: "Ada", photo: "avatars/ada.jpg" },
+        { status: "wobble", name: "Bo", photo: null },
+      ]),
+      colors,
+    );
     publisher.setLooks(looks);
     const first = publisher.detach();
     expect(first).toBe(writes[0].mountEpoch);
     expect(publisher.epoch()).toBeNull();
+    const generation = publisher.generation();
+    const epochs = ledger.stats().epochs;
+    // The zombie callbacks of an unmounted world.
+    publisher.setPhotos(
+      new Map([["avatars/ada.jpg", { id: 1, image: image("ada") }]]),
+      2,
+    );
     publisher.setLooks([...looks]);
-    expect(writes[1].mountEpoch).not.toBe(first);
-    expect(ledger.stats().epochs).toBe(2);
+    publisher.setInitials({
+      generation: 1,
+      mountEpoch: 3,
+      keys: ["k"],
+      initials: { "contact:2": null },
+    });
+    publisher.setLabels({
+      generation: 1,
+      mountEpoch: 3,
+      keys: ["k"],
+      labels: {},
+      measured: [],
+    } as never);
+    publisher.setLabelPlate([0.1, 0.2, 0.3, 1] as never);
+    publisher.resync();
+    expect(publisher.ensureEpoch()).toBe(-1);
+    expect(writes).toHaveLength(1);
+    expect(labelWrites).toHaveLength(0);
+    expect(publisher.generation()).toBe(generation);
+    expect(publisher.epoch()).toBeNull();
+    expect(ledger.stats().epochs).toBe(epochs);
+    expect(ledger.holds(photoHandle(2, 1))).toBe(false);
   });
   it("ledger handles round-trip", () => {
     expect(parseLedgerHandle(photoHandle(4, 17))).toEqual({
