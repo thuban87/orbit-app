@@ -1367,7 +1367,7 @@ Plans:
 Several of these are superseded in part; see the dossier's "Supersessions to record at KB extraction".
 **Schema**: none expected (migration head 032, backup format 7). Any migration is head+1, verified on disk at plan time.
 **UI hint**: yes
-**Plans**: 15/16 plans executed
+**Plans**: 16/16 plans executed
 
 Plans:
 **Wave 1**
@@ -1432,7 +1432,7 @@ Plans:
 
 **Wave 16** *(blocked on Wave 15 completion)*
 
-- [ ] 38.7-16-PLAN.md — Device pass, one release build vs baseline and locked gates, docs, owner sign-off (W16)
+- [x] 38.7-16-PLAN.md — Device pass, one release build vs baseline and locked gates, docs, owner sign-off (W16)
 
 > **Inserted 2026-10-02 (owner).** See `38.7-CONTEXT.md` (shim). Decisions that reverse recorded rules, each owner-ruled, each to get a superseding ADR at KB extraction:
 > - tilted Home (D-03);
@@ -1498,7 +1498,7 @@ Plans:
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
-| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 15/16 | In Progress|  |
+| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
