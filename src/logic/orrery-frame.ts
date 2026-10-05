@@ -230,7 +230,15 @@ export function projectAnimatedFrame(
   options?: ProjectFrameOptions,
 ): AnimatedFrame {
   "worklet";
-  const world = sampleWorldTransition(transition, fraction);
+  // 38.7-15: a transition from a world to itself (the Orrery's frame
+  // worklet: every frame at rest, panning, in a switch's lead-in) samples
+  // to exactly its bodies — a + (a − a)·t is a — so they are projected as
+  // they are, without a copy of every body per frame (~1,000 at All
+  // Contacts; projection reads them and never mutates them).
+  const world =
+    transition.from === transition.to
+      ? transition.to
+      : sampleWorldTransition(transition, fraction);
   const frame = projectFrame(
     world,
     pose,

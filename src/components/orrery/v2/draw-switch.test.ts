@@ -149,7 +149,16 @@ function recordingCanvas() {
       get:
         (_t, op: string) =>
         (...args: unknown[]) => {
-          calls.push({ op, args });
+          // Like an SkPicture recording, a draw keeps a COPY of its paint
+          // (38.7-15: one paint is re-shaded for every ring of a recording).
+          calls.push({
+            op,
+            args: args.map((arg) =>
+              arg !== null && typeof arg === "object" && "setShader" in arg
+                ? { ...arg }
+                : arg,
+            ),
+          });
         },
     },
   );

@@ -219,6 +219,15 @@ vi.mock("./draw-sky", () => ({
   ) => canvas.sky(sky.tag, image.generation, pose.tag, ambient),
 }));
 vi.mock("./draw-plane", () => ({
+  // 38.7-15: the base key — a frame's `ringTag` (what its rings and grid
+  // depend on), else its tag. A spinning world under a still camera keeps it.
+  basePlaneKey: (frame: { tag: unknown; ringTag?: unknown }) => ({
+    tag: frame.ringTag ?? frame.tag,
+  }),
+  sameBasePlaneKey: (
+    key: { tag: unknown },
+    frame: { tag: unknown; ringTag?: unknown },
+  ) => key.tag === (frame.ringTag ?? frame.tag),
   drawPlaneRings: (
     canvas: { rings(tag: unknown): void },
     frame: { tag: unknown },
@@ -683,6 +692,50 @@ describe("OrreryV2Canvas: grid and orbit pulses (38.7-09: D-09, D-10, D-37)", ()
     clock.value = 9000;
     flush();
     expect(layer(PULSES)).toBe(still);
+  });
+
+  it("38.7-15: a frame that moves bodies but not the base (a spin under a still camera) reuses the base picture; a base change re-records it", () => {
+    const { props, layer } = mount();
+    flush();
+    const base = layer(BASE);
+    expect(base.ops).toEqual([["rings", "frame-1"]]);
+    layer(PULSES);
+    const scans = rt.pulseScans;
+    // The lead's plateau: bodies spin, camera still — same base key.
+    props.frame.value = {
+      tag: "frame-2",
+      ringTag: "frame-1",
+      pose: { tag: "pose-1" },
+    } as never;
+    flush();
+    expect(layer(BASE)).toBe(base);
+    // The frame itself did change (the pulses' ring scan re-ran for it).
+    layer(PULSES);
+    expect(rt.pulseScans).toBeGreaterThan(scans);
+    // The camera moves (a new key): re-recorded at once.
+    props.frame.value = { tag: "frame-3", pose: { tag: "pose-3" } };
+    flush();
+    expect(layer(BASE).ops).toEqual([["rings", "frame-3"]]);
+    // Same key, but new ring specs / grid / focus dim: each re-records.
+    const keyed = layer(BASE);
+    props.ringSpecs.value = { "contact:1": {} };
+    flush();
+    expect(layer(BASE)).not.toBe(keyed);
+    const respecced = layer(BASE);
+    props.plane.value = {
+      grid: { opacity: 0.12 },
+      pulse: { budget: 8, intensity: 0.25 },
+    };
+    flush();
+    expect(layer(BASE).ops).toEqual([
+      ["grid", 0.12],
+      ["rings", "frame-3"],
+    ]);
+    expect(layer(BASE)).not.toBe(respecced);
+    const gridded = layer(BASE);
+    props.focus.value = { spec: {}, mix: 0.5, lock: 2 };
+    flush();
+    expect(layer(BASE)).not.toBe(gridded);
   });
 
   it("an ambient tick reuses the eligible-ring scan; a frame or ring-spec change re-runs it", () => {

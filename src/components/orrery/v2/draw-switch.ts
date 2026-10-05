@@ -42,6 +42,7 @@ import {
   PointMode,
   type SkCanvas,
   Skia,
+  type SkPaint,
   type SkRuntimeEffect,
   StrokeCap,
 } from "@shopify/react-native-skia";
@@ -396,6 +397,8 @@ export function drawOrbitTrails(
   };
   const blend = look.additive ? BlendMode.Plus : BlendMode.SrcOver;
   const count = Math.min(chosen.length, Math.floor(look.budget));
+  // 38.7-15: one paint (and blend) for every streak of this recording.
+  let shared: SkPaint | undefined;
   let drawn = 0;
   for (let n = 0; n < count; n++) {
     const item = chosen[n];
@@ -435,8 +438,21 @@ export function drawOrbitTrails(
     line.arcHalf = arc;
     line.arcTrail = 1;
     line.arcMid = TRAIL_RAMP_MID;
+    if (shared === undefined) {
+      shared = Skia.Paint();
+      shared.setBlendMode(blend);
+    }
     if (
-      drawPlaneRing(canvas, h, body.worldRingRadius, line, effect, bands, blend)
+      drawPlaneRing(
+        canvas,
+        h,
+        body.worldRingRadius,
+        line,
+        effect,
+        bands,
+        undefined,
+        shared,
+      )
     )
       drawn++;
   }

@@ -62,6 +62,7 @@ import {
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import {
+  basePlaneKey,
   drawPlaneGrid,
   drawPlanePulses,
   drawPlaneRings,
@@ -73,6 +74,7 @@ import {
   RING_BAND_SEGMENTS,
   ringBandIndex,
   ringDashCount,
+  sameBasePlaneKey,
 } from "./draw-plane";
 import {
   buildRingSpecs,
@@ -110,7 +112,16 @@ function recordingCanvas() {
       get:
         (_target, op: string) =>
         (...args: unknown[]) => {
-          calls.push({ op, args });
+          // Like an SkPicture recording, a draw keeps a COPY of its paint
+          // (38.7-15: one paint is re-shaded for every ring of a recording).
+          calls.push({
+            op,
+            args: args.map((arg) =>
+              arg !== null && typeof arg === "object" && "setShader" in arg
+                ? { ...arg }
+                : arg,
+            ),
+          });
         },
     },
   );
@@ -621,5 +632,98 @@ describe("drawPlanePulses (D-10/D-37/D-49: subtle orbit pulses on the ambient cl
       }
     }
     expect(blends).toBeGreaterThan(0);
+  });
+});
+
+describe("38.7-15: the base key (what the grid and rings read from a frame)", () => {
+  const pose = { x: 0, y: 0, zoom: 1, tilt: 62 * DEG, lensShift: 0.62 };
+  const sun: WorldBody = {
+    id: 0,
+    kind: "sun",
+    x: 0,
+    y: 0,
+    radius: 30,
+    ringRadius: 0,
+  };
+  const world = (turn: number) => [
+    sun,
+    contact(1, 60, turn),
+    contact(2, 120, 2 + turn),
+    contact(3, 180, 4 + turn),
+  ];
+  const specs: RingSpecs = {
+    "contact:1": spec(),
+    "contact:2": spec({ dashPeriodDp: 6, dashDuty: 0.5 }),
+    "contact:3": spec({ lightGain: 0.4, lightMix: 0.5 }),
+  };
+  const grid: GridSpec = {
+    ink: ink(5),
+    opacity: 0.12,
+    rings: 6,
+    spokes: 12,
+    halfWidthDp: 0.4,
+    extent: 1.12,
+    farAlpha: 0.55,
+  };
+  const record = (frame: AnimatedFrame) => {
+    const { canvas, calls } = recordingCanvas();
+    drawPlaneGrid(canvas, frame, grid, effect, makeGridDisc(), 0.4);
+    drawPlaneRings(canvas, frame, specs, effect, makeRingBands(), 0.4);
+    return calls.map((call) => ({
+      op: call.op,
+      args: call.args.map((arg) =>
+        arg !== null && typeof arg === "object" && "shader" in arg
+          ? (arg as { shader: unknown }).shader
+          : arg,
+      ),
+    }));
+  };
+  it("a world turned about the sun under the same camera keeps the key — and records the very same grid and rings", () => {
+    const still = frameFor(world(0), pose);
+    const turned = frameFor(world(0.7), pose);
+    expect(turned.bodies.map((b) => b.x)).not.toEqual(
+      still.bodies.map((b) => b.x),
+    );
+    expect(sameBasePlaneKey(basePlaneKey(still, null), turned)).toBe(true);
+    // The memo's premise: body positions draw nothing in the base.
+    expect(record(turned)).toEqual(record(still));
+  });
+  it("a camera, zoom, opacity, orbit or contact-set change breaks it; the key is rewritten in place", () => {
+    const base = frameFor(world(0), pose);
+    const key = basePlaneKey(base, null);
+    const arrays = [key.h, key.ids, key.opacity, key.radius];
+    expect(
+      sameBasePlaneKey(key, frameFor(world(0), { ...pose, yaw: 0.2 })),
+    ).toBe(false);
+    expect(
+      sameBasePlaneKey(key, frameFor(world(0), { ...pose, zoom: 1.2 })),
+    ).toBe(false);
+    expect(sameBasePlaneKey(key, frameFor(world(0), pose, { 2: 0.5 }))).toBe(
+      false,
+    );
+    expect(
+      sameBasePlaneKey(
+        key,
+        frameFor(
+          [sun, contact(1, 60), contact(2, 130, 2), contact(3, 180, 4)],
+          pose,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      sameBasePlaneKey(key, frameFor([...world(0), contact(4, 240)], pose)),
+    ).toBe(false);
+    expect(sameBasePlaneKey(key, frameFor(world(0).slice(0, 3), pose))).toBe(
+      false,
+    );
+    // Rewritten in place (no new arrays per frame on the UI runtime).
+    const moved = frameFor(world(0), { ...pose, yaw: 0.2 });
+    const next = basePlaneKey(moved, key);
+    expect(next).toBe(key);
+    [next.h, next.ids, next.opacity, next.radius].forEach((array, i) => {
+      expect(array).toBe(arrays[i]);
+    });
+    expect(sameBasePlaneKey(next, moved)).toBe(true);
+    expect(sameBasePlaneKey(next, base)).toBe(false);
   });
 });

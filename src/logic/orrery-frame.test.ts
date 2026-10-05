@@ -405,3 +405,25 @@ describe("D-52 per-frame O(1) body indexes", () => {
     );
   });
 });
+
+describe("38.7-15: a transition from a world to itself", () => {
+  it("projects exactly what sampling it did (a + (a − a)·t is a), with no per-body copy", () => {
+    const world: AnimatedWorldBody[] = [
+      { ...body(0, 0), opacity: 1, interactive: true },
+      { ...body(1, 70), x: 31.7, y: -62.9, opacity: 0.37, interactive: true },
+      { ...body(2, 140), x: -0.1, y: 0.3, opacity: 0, interactive: false },
+      { ...body(3, 210), x: 1e-9, y: -210, opacity: 1, interactive: true },
+    ];
+    const same = { generation: 3, from: world, to: world };
+    const sampled = sampleWorldTransition(same, 1);
+    // The same transition with distinct (equal) arrays takes the sampled path.
+    const copied = { generation: 3, from: [...world], to: [...world] };
+    for (const fraction of [0, 0.4, 1]) {
+      const pose = { ...HOME_CAMERA, tilt: 0.9, yaw: 0.3, zoom: 1.4 };
+      expect(projectAnimatedFrame(same, fraction, pose, viewport)).toEqual(
+        projectAnimatedFrame(copied, fraction, pose, viewport),
+      );
+    }
+    expect(sampled).toEqual(world);
+  });
+});

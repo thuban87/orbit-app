@@ -27,6 +27,7 @@ import {
   BlendMode,
   type SkCanvas,
   Skia,
+  type SkPaint,
   type SkPoint,
   type SkRuntimeEffect,
   type SkVertices,
@@ -248,6 +249,11 @@ export function ringPlaneUniforms(
  * Returns false (nothing drawn) when the ring cannot show: no compiled effect
  * or strips, a non-positive radius, or a disc wholly beyond the horizon.
  * `blend` (optional) is the paint's blend mode (pulses: additive on dark).
+ * 38.7-15: `shared` (optional) is a paint the caller reuses for every ring of
+ * one recording (its blend already set; `blend` is then not applied): one
+ * Paint per picture instead of one per ring (~1,000 per frame at All
+ * Contacts). A recorded draw keeps its own copy of the paint, so re-shading
+ * the shared paint for the next ring never changes one already recorded.
  */
 export function drawPlaneRing(
   canvas: SkCanvas,
@@ -257,6 +263,7 @@ export function drawPlaneRing(
   effect: SkRuntimeEffect | null,
   bands: RingBands | null,
   blend?: BlendMode,
+  shared?: SkPaint,
 ): boolean {
   "worklet";
   if (!effect || !bands || bands.length === 0) return false;
@@ -264,9 +271,9 @@ export function drawPlaneRing(
   if (band < 0) return false;
   if (discBeyondHorizon(h, radius * (1 + RING_BAND_EPS[band]) * BAND_GROW))
     return false;
-  const paint = Skia.Paint();
+  const paint = shared === undefined ? Skia.Paint() : shared;
   paint.setShader(effect.makeShader(ringPlaneUniforms(h, radius, line)));
-  if (blend !== undefined) paint.setBlendMode(blend);
+  if (shared === undefined && blend !== undefined) paint.setBlendMode(blend);
   canvas.save();
   canvas.concat(ringMatrix(h, radius));
   canvas.drawVertices(bands[band], BlendMode.Dst, paint);
@@ -333,6 +340,76 @@ export function frameRingExtent(frame: AnimatedFrame): {
 }
 
 /**
+ * 38.7-15 (switch lead-in at All Contacts): what the base picture (the grid
+ * and the orbit rings) reads from a frame besides its specs — the plane
+ * homography (pose and viewport), the zoom (the ring density fade) and, per
+ * contact, its id, transition opacity and world ring radius. Body POSITIONS
+ * are not read: a world spinning about the sun with a still camera (the
+ * lead-in's plateau) leaves every ring and the grid exactly where they were,
+ * so the ~1,000-ring picture need not be re-recorded each frame.
+ */
+export interface BasePlaneKey {
+  h: number[];
+  zoom: number;
+  ids: number[];
+  opacity: number[];
+  radius: number[];
+}
+
+/** `frame`'s base key, written into `into` when given (its arrays reused). */
+export function basePlaneKey(
+  frame: AnimatedFrame,
+  into: BasePlaneKey | null,
+): BasePlaneKey {
+  "worklet";
+  const key: BasePlaneKey =
+    into === null ? { h: [], zoom: 0, ids: [], opacity: [], radius: [] } : into;
+  const h = planeHomography(frame.pose, frame.viewport);
+  key.h.length = 0;
+  for (let i = 0; i < h.length; i++) key.h.push(h[i]);
+  key.zoom = frame.pose.zoom;
+  key.ids.length = 0;
+  key.opacity.length = 0;
+  key.radius.length = 0;
+  const bodies = frame.bodies;
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (body.kind !== "contact") continue;
+    key.ids.push(body.id);
+    key.opacity.push(body.opacity);
+    key.radius.push(body.worldRingRadius);
+  }
+  return key;
+}
+
+/** Whether `frame` draws the same base as the frame `key` was taken from. */
+export function sameBasePlaneKey(
+  key: BasePlaneKey,
+  frame: AnimatedFrame,
+): boolean {
+  "worklet";
+  if (key.zoom !== frame.pose.zoom) return false;
+  const h = planeHomography(frame.pose, frame.viewport);
+  if (h.length !== key.h.length) return false;
+  for (let i = 0; i < h.length; i++) if (h[i] !== key.h[i]) return false;
+  const bodies = frame.bodies;
+  let n = 0;
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (body.kind !== "contact") continue;
+    if (
+      n >= key.ids.length ||
+      key.ids[n] !== body.id ||
+      key.opacity[n] !== body.opacity ||
+      key.radius[n] !== body.worldRingRadius
+    )
+      return false;
+    n++;
+  }
+  return n === key.ids.length;
+}
+
+/**
  * Every contact's orbit ring for `frame`, under the frame's homography.
  * A ring is drawn when its body has a spec, a positive world ring radius and a
  * final alpha (transition opacity × status alpha × density fade) of at least
@@ -361,6 +438,8 @@ export function drawPlaneRings(
   );
   const h = planeHomography(frame.pose, frame.viewport);
   const lightRadius = Math.max(1, outer * RING_SUN_LIGHT_RADIUS);
+  // 38.7-15: one paint for every ring of this recording (see drawPlaneRing).
+  let shared: SkPaint | undefined;
   let drawn = 0;
   for (let i = 0; i < bodies.length; i++) {
     const body = bodies[i];
@@ -372,6 +451,7 @@ export function drawPlaneRings(
       body.opacity * spec.alpha * fade * ringFocusFactor(focus, key);
     if (!(alpha >= RING_SKIP_ALPHA)) continue;
     const radius = body.worldRingRadius;
+    if (shared === undefined) shared = Skia.Paint();
     if (
       drawPlaneRing(
         canvas,
@@ -386,6 +466,8 @@ export function drawPlaneRings(
         ),
         effect,
         bands,
+        undefined,
+        shared,
       )
     )
       drawn++;
@@ -536,6 +618,8 @@ export function drawPlanePulses(
   const line = plainRingLine(PULSE_HALF_WIDTH_DP, aaDp, pulse.ink);
   line.farAlpha = pulse.farAlpha;
   line.arcHalf = PULSE_ARC_HALF;
+  // 38.7-15: one paint (and blend) for every pulse of this recording.
+  let shared: SkPaint | undefined;
   let drawn = 0;
   for (let slot = 0; slot < pulse.budget; slot++) {
     const place = pulsePlacement(slot, pulse.budget, ambientMs, rings.rings);
@@ -549,6 +633,10 @@ export function drawPlanePulses(
     if (!(alpha >= RING_SKIP_ALPHA)) continue;
     line.alpha = alpha;
     line.arcCentre = place.centre;
+    if (shared === undefined) {
+      shared = Skia.Paint();
+      shared.setBlendMode(blend);
+    }
     if (
       drawPlaneRing(
         canvas,
@@ -557,7 +645,8 @@ export function drawPlanePulses(
         line,
         effect,
         bands,
-        blend,
+        undefined,
+        shared,
       )
     )
       drawn++;

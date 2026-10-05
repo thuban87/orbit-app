@@ -114,6 +114,7 @@ import {
   type CanvasRef,
   createPicture,
   Picture,
+  type SkPicture,
 } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
@@ -123,6 +124,7 @@ import {
 } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
+  runOnUI,
   type SharedValue,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -168,12 +170,15 @@ import {
 import { drawLabels } from "./draw-labels";
 import { drawOverlay, type ReorderHoldFx } from "./draw-overlay";
 import {
+  type BasePlaneKey,
+  basePlaneKey,
   drawPlaneGrid,
   drawPlanePulses,
   drawPlaneRings,
   gridDisc,
   pulseRings,
   ringBands,
+  sameBasePlaneKey,
 } from "./draw-plane";
 import { drawSky } from "./draw-sky";
 import {
@@ -186,6 +191,7 @@ import type { FocusDraw } from "./focus-fx";
 import { useLayerAck } from "./layer-ack";
 import { resolveOrreryRenderHost } from "./render-host";
 import {
+  type GridSpec,
   ORRERY_LAYER,
   type OrreryBodySpecs,
   type OrreryLabelLayerSpecs,
@@ -295,6 +301,20 @@ const FIRST_FRAME_SKY_IMAGE: SkyImageSpec = Object.freeze({
   image: null,
   key: "",
 });
+/**
+ * 38.7-15: the live base's last recording and what it was recorded from
+ * (UI runtime only; created there, mutated in place, never re-assigned by the
+ * base mapper, so it is no input change for that mapper).
+ */
+interface BaseMemo {
+  key: BasePlaneKey | null;
+  picture: SkPicture | null;
+  rings: RingSpecs | null;
+  grid: GridSpec | null;
+  focus: FocusDraw | null;
+  width: number;
+  height: number;
+}
 /** The first-frame cover's fade (ms). */
 const COVER_FADE_MS = 160;
 /** The overlay's occlusion fill under the "lab-b" style: none. */
@@ -385,33 +405,65 @@ export function OrreryV2Canvas({
     ),
   );
   useLayerAck(ORRERY_LAYER.sky, skyPicture, skyImage, ackRecorded);
-  // The LIVE base: re-recorded only when the frame or ring specs change.
-  const baseLive = useDerivedValue(() =>
-    firstFrame.value
-      ? emptyPicture
-      : createPicture(
-          (canvas) => {
-            drawPlaneGrid(
-              canvas,
-              frame.value,
-              plane.value.grid,
-              gridEffect,
-              disc,
-              aaDp,
-            );
-            drawPlaneRings(
-              canvas,
-              frame.value,
-              ringSpecs.value,
-              ringEffect,
-              bands,
-              aaDp,
-              focus.value,
-            );
-          },
-          { width, height },
-        ),
-  );
+  // The LIVE base: re-recorded only when what it draws changed — the ring
+  // specs, the grid, the focus dim, the canvas size or the frame's
+  // BasePlaneKey (homography, zoom, each contact's opacity and orbit). 38.7-15
+  // (All Contacts lead-in): a world spinning under a still camera moves no
+  // ring, so its ~1,000-ring picture is reused instead of re-recorded (~7,000
+  // Skia calls) every frame. The memo lives on the UI runtime (created there
+  // after mount); the first run (JS) and tests without it record as before.
+  const baseMemo = useSharedValue<BaseMemo | null>(null);
+  useEffect(() => {
+    runOnUI(() => {
+      "worklet";
+      baseMemo.value = {
+        key: null,
+        picture: null,
+        rings: null,
+        grid: null,
+        focus: null,
+        width: 0,
+        height: 0,
+      };
+    })();
+  }, [baseMemo]);
+  const baseLive = useDerivedValue(() => {
+    if (firstFrame.value) return emptyPicture;
+    const current = frame.value;
+    const rings = ringSpecs.value;
+    const grid = plane.value.grid;
+    const dim = focus.value;
+    const memo = baseMemo.value;
+    if (
+      memo !== null &&
+      memo.picture !== null &&
+      memo.key !== null &&
+      memo.rings === rings &&
+      memo.grid === grid &&
+      memo.focus === dim &&
+      memo.width === width &&
+      memo.height === height &&
+      sameBasePlaneKey(memo.key, current)
+    )
+      return memo.picture;
+    const picture = createPicture(
+      (canvas) => {
+        drawPlaneGrid(canvas, current, grid, gridEffect, disc, aaDp);
+        drawPlaneRings(canvas, current, rings, ringEffect, bands, aaDp, dim);
+      },
+      { width, height },
+    );
+    if (memo !== null) {
+      memo.key = basePlaneKey(current, memo.key);
+      memo.picture = picture;
+      memo.rings = rings;
+      memo.grid = grid;
+      memo.focus = dim;
+      memo.width = width;
+      memo.height = height;
+    }
+    return picture;
+  });
   // D-49 base bake (see the header). Primitives only are captured.
   const bakeOn = host.bakePath === "gpu-offscreen";
   const dpr = host.devicePixelRatio();
