@@ -1,8 +1,32 @@
 diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
-index f012c45..4c0671e 100644
+index f012c45..7353d4d 100644
 --- a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
 +++ b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseView.java
-@@ -16,6 +16,11 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+@@ -1,12 +1,23 @@
+ package com.shopify.reactnative.skia;
+ 
+ import android.content.Context;
++import android.graphics.Bitmap;
++import android.graphics.Rect;
+ import android.graphics.SurfaceTexture;
++import android.os.Build;
++import android.os.Handler;
++import android.os.Looper;
++import android.os.SystemClock;
+ import android.util.Log;
++import android.view.Choreographer;
+ import android.view.MotionEvent;
++import android.view.PixelCopy;
+ import android.view.Surface;
+ import android.view.View;
+ 
++import com.facebook.react.bridge.Arguments;
++import com.facebook.react.bridge.ReactContext;
++import com.facebook.react.bridge.WritableMap;
+ import com.facebook.react.uimanager.PointerEvents;
+ import com.facebook.react.views.view.ReactViewGroup;
+ 
+@@ -16,6 +27,24 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
      private final boolean debug = false;
      private final String tag = "SkiaView";
  
@@ -11,10 +35,23 @@ index f012c45..4c0671e 100644
 +    private float mFrameRateVote = 0f;
 +    private boolean mFrameRateVoteSet = false;
 +
++    // orbit-app patch (38.7-15): the "content frame presented" probe. The JS
++    // side arms it (prop `androidPresentProbe`, a token) once the frame it
++    // needs on screen is recorded; the view answers with the device event
++    // PRESENTED_EVENT { nativeId, token, outcome } once that frame has been
++    // drawn, its GPU work has finished and SurfaceFlinger has latched it.
++    static final String PRESENTED_EVENT = "SkiaViewPresented";
++    // A slow first frame (shader compiles, texture uploads) is waited for; a
++    // probe that cannot tell gives up after this (the JS side is bounded too).
++    private static final long PRESENT_PROBE_MAX_MS = 4000;
++    private final Handler mProbeHandler = new Handler(Looper.getMainLooper());
++    private int mSkiaNativeId = -1;
++    private int mPresentProbeToken = 0;
++
      public SkiaBaseView(Context context) {
          super(context);
          mView = new SkiaTextureView(context, this, debug);
-@@ -36,6 +41,9 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+@@ -36,6 +65,9 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
          if (value && mView instanceof SkiaTextureView) {
              removeView(mView);
              mView = new SkiaSurfaceView(getContext(), this, debug);
@@ -24,7 +61,7 @@ index f012c45..4c0671e 100644
              addView(mView);
          } else if (!value && mView instanceof SkiaSurfaceView) {
              removeView(mView);
-@@ -44,6 +52,23 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
+@@ -44,6 +76,129 @@ public abstract class SkiaBaseView extends ReactViewGroup implements SkiaViewAPI
          }
      }
  
@@ -45,11 +82,130 @@ index f012c45..4c0671e 100644
 +        }
 +    }
 +
++    /** orbit-app patch (38.7-15): the Skia nativeId (echoed in PRESENTED_EVENT). */
++    void setSkiaNativeId(int nativeId) {
++        mSkiaNativeId = nativeId;
++    }
++
++    /**
++     * orbit-app patch (38.7-15): arms the presented probe for `token` (0 or a
++     * repeat is ignored; a newer token supersedes an older one).
++     *
++     * 1. Skia draws on the main thread (RNSkView::requestRedraw ->
++     *    runOnMainThread: run at once when the picture is set there, as
++     *    Reanimated does, else a main-looper post). A plain post from here
++     *    runs after both, so the frame recorded before arming was drawn and
++     *    swapped.
++     * 2. On the next vsync, PixelCopy reads one pixel of the SurfaceView's
++     *    newest queued buffer; the copy waits for that buffer's GPU fence
++     *    (no buffer yet, or the fence wait timed out: retried each frame,
++     *    for at most PRESENT_PROBE_MAX_MS).
++     * 3. One more vsync, so SurfaceFlinger has latched it; then the event.
++     * A TextureView composites with the window: one frame after the draw.
++     */
++    public void armPresentProbe(int token) {
++        if (token == 0 || token == mPresentProbeToken) {
++            return;
++        }
++        mPresentProbeToken = token;
++        final long armedAt = SystemClock.uptimeMillis();
++        mProbeHandler.post(() -> nextFrame(() -> probePresent(token, armedAt)));
++    }
++
++    private void nextFrame(Runnable run) {
++        Choreographer.getInstance().postFrameCallback(frameTimeNanos -> run.run());
++    }
++
++    private void probePresent(int token, long armedAt) {
++        if (token != mPresentProbeToken) {
++            return;
++        }
++        if (!isAttachedToWindow()) {
++            emitPresented(token, "detached");
++            return;
++        }
++        if (!(mView instanceof SkiaSurfaceView)) {
++            nextFrame(() -> emitPresented(token, "presented"));
++            return;
++        }
++        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
++            nextFrame(() -> nextFrame(() -> emitPresented(token, "presented")));
++            return;
++        }
++        SkiaSurfaceView surfaceView = (SkiaSurfaceView) mView;
++        Surface surface = surfaceView.getHolder().getSurface();
++        int width = surfaceView.getWidth();
++        int height = surfaceView.getHeight();
++        if (surface == null || !surface.isValid() || width <= 0 || height <= 0) {
++            retryPresentProbe(token, armedAt);
++            return;
++        }
++        final Bitmap pixel = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
++        int x = width / 2;
++        int y = height / 2;
++        try {
++            PixelCopy.request(surfaceView, new Rect(x, y, x + 1, y + 1), pixel, result -> {
++                pixel.recycle();
++                if (token != mPresentProbeToken) {
++                    return;
++                }
++                if (result == PixelCopy.SUCCESS) {
++                    nextFrame(() -> emitPresented(token, "presented"));
++                } else {
++                    // No buffer yet, or its GPU work is still running (the
++                    // copy's fence wait timed out): try the newest one again.
++                    retryPresentProbe(token, armedAt);
++                }
++            }, mProbeHandler);
++        } catch (RuntimeException e) {
++            pixel.recycle();
++            Log.w(tag, "orbit present probe copy failed", e);
++            retryPresentProbe(token, armedAt);
++        }
++    }
++
++    private void retryPresentProbe(int token, long armedAt) {
++        if (SystemClock.uptimeMillis() - armedAt >= PRESENT_PROBE_MAX_MS) {
++            emitPresented(token, "timeout");
++            return;
++        }
++        nextFrame(() -> probePresent(token, armedAt));
++    }
++
++    private void emitPresented(int token, String outcome) {
++        if (token != mPresentProbeToken) {
++            return;
++        }
++        Log.i(tag, "orbit present probe " + token + " " + outcome);
++        Context context = getContext();
++        if (!(context instanceof ReactContext)) {
++            return;
++        }
++        WritableMap event = Arguments.createMap();
++        event.putInt("nativeId", mSkiaNativeId);
++        event.putInt("token", token);
++        event.putString("outcome", outcome);
++        ((ReactContext) context).emitDeviceEvent(PRESENTED_EVENT, event);
++    }
++
      void dropInstance() {
          if (!RNSkiaModule.isModuleValid()) {
              return;
+diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseViewManager.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseViewManager.java
+index 08e07b8..e2f4740 100644
+--- a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseViewManager.java
++++ b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaBaseViewManager.java
+@@ -15,6 +15,8 @@ public abstract class SkiaBaseViewManager<T extends SkiaBaseView> extends ReactV
+     public void setNativeId(@NonNull ReactViewGroup view, @Nullable String nativeId) {
+         super.setNativeId(view, nativeId);
+         int nativeIdResolved = Integer.parseInt(nativeId);
++        // orbit-app patch (38.7-15): the presented probe echoes this id.
++        ((SkiaBaseView)view).setSkiaNativeId(nativeIdResolved);
+         ((SkiaBaseView)view).registerView(nativeIdResolved);
+     }
+ 
 diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java
-index 402380f..7497e12 100644
+index 402380f..f2df947 100644
 --- a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java
 +++ b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaPictureViewManager.java
 @@ -1,6 +1,7 @@
@@ -60,7 +216,7 @@ index 402380f..7497e12 100644
  import com.facebook.react.viewmanagers.SkiaPictureViewManagerDelegate;
  import com.facebook.react.viewmanagers.SkiaPictureViewManagerInterface;
  
-@@ -41,4 +42,12 @@ public class SkiaPictureViewManager extends SkiaBaseViewManager<SkiaPictureView>
+@@ -41,4 +42,20 @@ public class SkiaPictureViewManager extends SkiaBaseViewManager<SkiaPictureView>
      public void setAndroidWarmup(SkiaPictureView view, boolean value) {
          view.setAndroidWarmup(value);
      }
@@ -71,6 +227,14 @@ index 402380f..7497e12 100644
 +    @ReactProp(name = "androidFrameRate", defaultFloat = 0f)
 +    public void setAndroidFrameRate(SkiaPictureView view, float value) {
 +        view.setFrameRateVote(value);
++    }
++
++    // orbit-app patch (38.7-15): the codegen prop `androidPresentProbe` (a
++    // token; 0 = none) arms the "content frame presented" probe.
++    @Override
++    @ReactProp(name = "androidPresentProbe", defaultInt = 0)
++    public void setAndroidPresentProbe(SkiaPictureView view, int value) {
++        view.armPresentProbe(value);
 +    }
  }
 diff --git a/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaSurfaceView.java b/node_modules/@shopify/react-native-skia/android/src/main/java/com/shopify/reactnative/skia/SkiaSurfaceView.java
@@ -142,71 +306,90 @@ index 5e28a08..2d4e866 100644
  
      @Override
 diff --git a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java
-index b1eb969..6f6386f 100644
+index b1eb969..1dcf5a4 100644
 --- a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java
 +++ b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerDelegate.java
-@@ -34,6 +34,9 @@ public class SkiaPictureViewManagerDelegate<T extends View, U extends BaseViewMa
+@@ -34,6 +34,12 @@ public class SkiaPictureViewManagerDelegate<T extends View, U extends BaseViewMa
        case "androidWarmup":
          mViewManager.setAndroidWarmup(view, value != null && (boolean) value);
          break;
 +      case "androidFrameRate":
 +        mViewManager.setAndroidFrameRate(view, value == null ? 0f : ((Double) value).floatValue());
 +        break;
++      case "androidPresentProbe":
++        mViewManager.setAndroidPresentProbe(view, value == null ? 0 : ((Double) value).intValue());
++        break;
        default:
          super.setProperty(view, propName, value);
      }
 diff --git a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java
-index 2cd385a..3bc7a1b 100644
+index 2cd385a..19778ab 100644
 --- a/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java
 +++ b/node_modules/@shopify/react-native-skia/android/src/paper/java/com/facebook/react/viewmanagers/SkiaPictureViewManagerInterface.java
-@@ -17,4 +17,5 @@ public interface SkiaPictureViewManagerInterface<T extends View> {
+@@ -17,4 +17,6 @@ public interface SkiaPictureViewManagerInterface<T extends View> {
    void setOpaque(T view, boolean value);
    void setColorSpace(T view, @Nullable String value);
    void setAndroidWarmup(T view, boolean value);
 +  void setAndroidFrameRate(T view, float value);
++  void setAndroidPresentProbe(T view, int value);
  }
 diff --git a/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts b/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts
-index 461d5df..43e130e 100644
+index 461d5df..306f130 100644
 --- a/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts
 +++ b/node_modules/@shopify/react-native-skia/lib/typescript/src/renderer/Canvas.d.ts
-@@ -10,6 +10,7 @@ export interface CanvasRef extends FC<CanvasProps> {
+@@ -10,6 +10,8 @@ export interface CanvasRef extends FC<CanvasProps> {
      getNativeId(): number;
      measure(callback: MeasureOnSuccessCallback): void;
      measureInWindow(callback: MeasureInWindowOnSuccessCallback): void;
 +    setFrameRateVote(fps: number): void;
++    armPresentProbe(token: number): void;
  }
  export declare const useCanvasRef: () => RefObject<CanvasRef | null>;
  export declare const useCanvasSize: (userRef?: RefObject<CanvasRef | null>) => {
-@@ -26,6 +27,7 @@ export interface CanvasProps extends Omit<ViewProps, "onLayout"> {
+@@ -26,6 +28,11 @@ export interface CanvasProps extends Omit<ViewProps, "onLayout"> {
      colorSpace?: "p3" | "srgb";
      ref?: React.Ref<CanvasRef>;
      androidWarmup?: boolean;
 +    androidFrameRate?: number;
++    onAndroidPresented?: (event: {
++        token: number;
++        outcome: string;
++    }) => void;
      __destroyWebGLContextAfterRender?: boolean;
  }
- export declare const Canvas: ({ debug, opaque, children, onSize, colorSpace, androidWarmup, ref, onLayout, ...viewProps }: CanvasProps) => React.JSX.Element;
+-export declare const Canvas: ({ debug, opaque, children, onSize, colorSpace, androidWarmup, ref, onLayout, ...viewProps }: CanvasProps) => React.JSX.Element;
++export declare const Canvas: ({ debug, opaque, children, onSize, colorSpace, androidWarmup, ref, onLayout, onAndroidPresented, ...viewProps }: CanvasProps) => React.JSX.Element;
 diff --git a/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts b/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts
-index 0f8668b..178fe9c 100644
+index 0f8668b..c7c21c6 100644
 --- a/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts
 +++ b/node_modules/@shopify/react-native-skia/lib/typescript/src/specs/SkiaPictureViewNativeComponent.d.ts
-@@ -1,10 +1,11 @@
+@@ -1,10 +1,12 @@
  import { type ViewProps } from "react-native";
 -import type { WithDefault } from "react-native/Libraries/Types/CodegenTypes";
-+import type { Float, WithDefault } from "react-native/Libraries/Types/CodegenTypes";
++import type { Float, Int32, WithDefault } from "react-native/Libraries/Types/CodegenTypes";
  export interface NativeProps extends ViewProps {
      debug?: boolean;
      opaque?: boolean;
      colorSpace?: string;
      androidWarmup?: boolean;
 +    androidFrameRate?: WithDefault<Float, 0>;
++    androidPresentProbe?: WithDefault<Int32, 0>;
      pointerEvents?: WithDefault<"auto" | "none" | "box-none" | "box-only", "auto">;
  }
  declare const _default: import("react-native").HostComponent<NativeProps>;
 diff --git a/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx b/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx
-index 8c630d6..908f1d5 100644
+index 8c630d6..f809037 100644
 --- a/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx
 +++ b/node_modules/@shopify/react-native-skia/src/renderer/Canvas.tsx
-@@ -33,6 +33,11 @@ export interface CanvasRef extends FC<CanvasProps> {
+@@ -15,6 +15,7 @@ import type {
+   View,
+   ViewProps,
+ } from "react-native";
++import { DeviceEventEmitter } from "react-native";
+ import type { SharedValue } from "react-native-reanimated";
+ 
+ import Rea from "../external/reanimated/ReanimatedProxy";
+@@ -33,6 +34,19 @@ export interface CanvasRef extends FC<CanvasProps> {
    getNativeId(): number;
    measure(callback: MeasureOnSuccessCallback): void;
    measureInWindow(callback: MeasureInWindowOnSuccessCallback): void;
@@ -215,10 +398,18 @@ index 8c630d6..908f1d5 100644
 +   * the native view imperatively (`setNativeProps`), with no React render.
 +   */
 +  setFrameRateVote(fps: number): void;
++  /**
++   * orbit-app patch (38.7-15), Android: arms the "content frame presented"
++   * probe with `token` (a positive integer, new per arm) through the
++   * `androidPresentProbe` native prop (`setNativeProps`, no React render).
++   * The frame recorded before arming is answered by `onAndroidPresented`
++   * once it has been drawn, its GPU work finished and it was latched.
++   */
++  armPresentProbe(token: number): void;
  }
  
  export const useCanvasRef = () => useRef<CanvasRef>(null);
-@@ -71,6 +76,13 @@ export interface CanvasProps extends Omit<ViewProps, "onLayout"> {
+@@ -71,6 +85,18 @@ export interface CanvasProps extends Omit<ViewProps, "onLayout"> {
    colorSpace?: "p3" | "srgb";
    ref?: React.Ref<CanvasRef>;
    androidWarmup?: boolean;
@@ -229,10 +420,53 @@ index 8c630d6..908f1d5 100644
 +   * 0 withdraws it (no preference). Never set: no vote at all (stock behaviour).
 +   */
 +  androidFrameRate?: number;
++  /**
++   * orbit-app patch (38.7-15), Android: the answer to `armPresentProbe`
++   * (outcome "presented", or "timeout"/"detached" when it could not tell).
++   */
++  onAndroidPresented?: (event: { token: number; outcome: string }) => void;
    __destroyWebGLContextAfterRender?: boolean;
  }
  
-@@ -157,6 +169,13 @@ export const Canvas = ({
+@@ -83,6 +109,7 @@ export const Canvas = ({
+   androidWarmup = false,
+   ref,
+   onLayout,
++  onAndroidPresented,
+   ...viewProps
+ }: CanvasProps) => {
+   if (onLayout && isFabric) {
+@@ -123,6 +150,29 @@ export const Canvas = ({
+     }
+   }, !!onSize);
+ 
++  // orbit-app patch (38.7-15): the presented probe's answers for this view.
++  const presentedRef = useRef(onAndroidPresented);
++  presentedRef.current = onAndroidPresented;
++  const listensPresented = !!onAndroidPresented;
++  useEffect(() => {
++    if (!listensPresented || Platform.OS !== "android") {
++      return undefined;
++    }
++    const subscription = DeviceEventEmitter.addListener(
++      "SkiaViewPresented",
++      (event: { nativeId?: number; token?: number; outcome?: string }) => {
++        if (event?.nativeId !== nativeId || typeof event.token !== "number") {
++          return;
++        }
++        presentedRef.current?.({
++          token: event.token,
++          outcome: event.outcome ?? "presented",
++        });
++      }
++    );
++    return () => subscription.remove();
++  }, [listensPresented, nativeId]);
++
+   // Render effects
+   useLayoutEffect(() => {
+     root.render(children);
+@@ -157,6 +207,20 @@ export const Canvas = ({
          measureInWindow: (callback) => {
            viewRef.current?.measureInWindow(callback);
          },
@@ -243,30 +477,41 @@ index 8c630d6..908f1d5 100644
 +            } | null
 +          )?.setNativeProps?.({ androidFrameRate: fps });
 +        },
++        armPresentProbe: (token: number) => {
++          (
++            viewRef.current as {
++              setNativeProps?: (props: { androidPresentProbe: number }) => void;
++            } | null
++          )?.setNativeProps?.({ androidPresentProbe: token });
++        },
        }) as CanvasRef
    );
  
 diff --git a/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts b/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts
-index 5794593..13f2a06 100644
+index 5794593..cdbda9e 100644
 --- a/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts
 +++ b/node_modules/@shopify/react-native-skia/src/specs/SkiaPictureViewNativeComponent.ts
-@@ -1,5 +1,8 @@
+@@ -1,5 +1,9 @@
  import { codegenNativeComponent, type ViewProps } from "react-native";
 -import type { WithDefault } from "react-native/Libraries/Types/CodegenTypes";
 +import type {
 +  Float,
++  Int32,
 +  WithDefault,
 +} from "react-native/Libraries/Types/CodegenTypes";
  
  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
  // @ts-ignore - pointerEvents needs to be redeclared for codegen to generate native bindings
-@@ -8,6 +11,9 @@ export interface NativeProps extends ViewProps {
+@@ -8,6 +12,12 @@ export interface NativeProps extends ViewProps {
    opaque?: boolean;
    colorSpace?: string;
    androidWarmup?: boolean;
 +  // orbit-app patch (38.7-15, D-65 FR-B): an explicit Surface.setFrameRate
 +  // vote (fps) on the opaque (SurfaceView) canvas; 0 = no preference.
 +  androidFrameRate?: WithDefault<Float, 0>;
++  // orbit-app patch (38.7-15): arms the "content frame presented" probe with
++  // a token (0 = none); the view answers with the SkiaViewPresented event.
++  androidPresentProbe?: WithDefault<Int32, 0>;
    pointerEvents?: WithDefault<
      "auto" | "none" | "box-none" | "box-only",
      "auto"

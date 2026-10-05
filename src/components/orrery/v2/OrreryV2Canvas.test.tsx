@@ -275,6 +275,7 @@ vi.mock("./shaders", () => ({ orreryShader: () => null }));
 
 import { AMBIENT_STEP_MS } from "./ambient-clock";
 import { BAKE_AFTER_STILL_TICKS, EMPTY_BAKE_REGISTRY } from "./base-bake";
+import { COVER_PRESENT_TIMEOUT_MS } from "./cover-gate";
 import { OrreryV2Canvas } from "./OrreryV2Canvas";
 
 interface Node {
@@ -561,10 +562,20 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
     expect(layer(SWITCH)).toBe(rest);
   });
 
-  it("opaque canvas: a non-touchable cover in the sky base colour fades once the first frame is up", () => {
+  it("opaque canvas: a non-touchable cover in the sky base colour lifts only once the content frame is presented (38.7-15)", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     rt.host = { opaqueCanvas: true };
-    const { tree } = mount();
+    const { tree, props } = mount();
+    // The native view (ref): the presented probe's arm calls.
+    const armed: number[] = [];
+    (tree[0].props.ref as { current: unknown }).current = {
+      getNativeId: () => null,
+      armPresentProbe: (token: number) => armed.push(token),
+    };
+    const answer = tree[0].props.onAndroidPresented as (event: {
+      token: number;
+      outcome: string;
+    }) => void;
     const cover = tree[1];
     expect(cover.type).toBe("animatedView");
     expect(cover.props.pointerEvents).toBe("none");
@@ -579,25 +590,53 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
       height: 800,
     });
     expect(animated.value.opacity).toBe(1);
+    // A warm return whose body specs have not been published yet.
+    props.bodies.value = { generation: 0, mountEpoch: 0, bodies: [] };
     // The layers are recorded, but the native surface has not reported yet:
     // the cover stays.
     flush(2);
     expect(animated.value.opacity).toBe(1);
-    // 38.7-15: until the surface exists (plus two frames), the first-frame
-    // state draws the sky's plain gradient (no baked nebula) and no other
-    // layer: the first buffer posts at once and is the theme's sky.
+    // Until the surface exists (plus two frames), the first-frame state
+    // draws the sky's plain gradient (no baked nebula) and no other layer:
+    // the first buffer posts at once and is the theme's sky.
     const sky = mountedLayer(tree, 0);
     expect(sky.ops[0]).toEqual(["sky", "sky-1", 0, "pose-1", 0]);
     expect(mountedLayer(tree, 1).ops).toEqual([]);
     // No native view API in node: the bounded fallback reports the surface;
-    // two UI frames later the full scene records; two more lift the cover.
+    // two UI frames later the full scene records.
     vi.advanceTimersByTime(1000);
-    flush(1);
-    expect(animated.value.opacity).toBe(1);
-    flush(2);
+    flush(3);
     expect(mountedLayer(tree, 1).ops).toEqual([["rings", "frame-1"]]);
-    expect(animated.value.opacity).toBe(1);
+    // No content yet (no body specs): nothing is armed, the cover stays.
     flush(2);
+    expect(armed).toEqual([]);
+    expect(animated.value.opacity).toBe(1);
+    // The specs land: the probe is armed for the frame just recorded…
+    props.bodies.value = { generation: 1, mountEpoch: 1, bodies: [] };
+    flush(1);
+    expect(armed).toHaveLength(1);
+    // …and the cover waits for ITS answer (not a proxy, not another token).
+    flush(4);
+    answer({ token: armed[0] + 1, outcome: "presented" });
+    expect(animated.value.opacity).toBe(1);
+    answer({ token: armed[0], outcome: "presented" });
+    expect(animated.value.opacity).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("opaque canvas: without an answer the cover still lifts (bounded: it never sticks)", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    rt.host = { opaqueCanvas: true };
+    const { tree } = mount();
+    const [, animated] = tree[1].props.style as [
+      unknown,
+      { value: { opacity: number } },
+    ];
+    vi.advanceTimersByTime(1000);
+    flush(3);
+    // Armed (no native view in node: nothing answers).
+    expect(animated.value.opacity).toBe(1);
+    vi.advanceTimersByTime(COVER_PRESENT_TIMEOUT_MS);
     expect(animated.value.opacity).toBe(0);
     vi.useRealTimers();
   });

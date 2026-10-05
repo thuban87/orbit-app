@@ -100,6 +100,13 @@
  * at once; two frames after the surface exists the full scene records, while
  * the sky-only buffer stays on screen through any shader compile, and only
  * then does the cover fade. Light themes never flash black.
+ * 38.7-15 (cold open ~0.42 s / All Contacts warm return ~1.8 s near-black
+ * after the cover lifted): the cover no longer lifts on proxies (surface
+ * size, first-frame end, two frames). Once the content is RECORDED (first-
+ * frame state over, the body specs published), the canvas arms the native
+ * "presented" probe (patched Skia: `armPresentProbe` / `onAndroidPresented`)
+ * and the cover lifts on its answer — the frame drawn, its GPU work done and
+ * latched — or at the bounded fallbacks of `cover-gate.ts` (never sticks).
  */
 import {
   Canvas,
@@ -144,6 +151,12 @@ import {
   nextBakeState,
   selectBasePicture,
 } from "./base-bake";
+import {
+  type CoverGate,
+  type CoverLiftReason,
+  createCoverGate,
+  nextPresentToken,
+} from "./cover-gate";
 import {
   drawBodies,
   drawSun,
@@ -625,25 +638,53 @@ export function OrreryV2Canvas({
           { width, height },
         ),
   );
-  // First-frame cover (opaque canvas only; see the header). It lifts only
-  // when BOTH the native surface exists (JS poll) AND the first UI mapper
-  // pass has recorded the layers (a reaction on the last, non-ambient
-  // pictures), then two frames later: a surface can exist seconds before the
-  // first content frame on a heavy System (DEBUG All Contacts, 38.7-09).
+  // First-frame cover (opaque canvas only; see the header). It lifts when
+  // the canvas's first CONTENT frame was presented (the native probe's
+  // answer), bounded by cover-gate.ts's fallbacks: a surface can exist
+  // seconds before the first content frame on a heavy System (DEBUG All
+  // Contacts, 38.7-09), and a recorded frame can sit in the GPU (38.7-15).
   const canvasRef = useRef<CanvasRef | null>(null);
   const cover = useSharedValue(host.opaqueCanvas ? 1 : 0);
   const surfaceReady = useSharedValue(false);
+  const coverGate = useRef<CoverGate | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per canvas mount (the cover belongs to this native view)
   useEffect(() => {
     if (!host.opaqueCanvas) return;
-    return watchFirstSurfaceFrame(
+    const gate = createCoverGate({
+      arm: (token) => {
+        perf?.mark("present-armed");
+        canvasRef.current?.armPresentProbe?.(token);
+      },
+      lift: (reason: CoverLiftReason) => {
+        cover.value = 0;
+        perf?.mark(`cover-lift-${reason}`);
+      },
+      nextToken: nextPresentToken,
+    });
+    coverGate.current = gate;
+    const stopWatching = watchFirstSurfaceFrame(
       () => canvasRef.current?.getNativeId?.() ?? null,
       () => {
         perf?.mark("surface-ready");
         surfaceReady.value = true;
       },
     );
+    return () => {
+      stopWatching();
+      gate.dispose();
+      coverGate.current = null;
+    };
   }, []);
+  const contentRecorded = useCallback(() => {
+    coverGate.current?.contentReady();
+  }, []);
+  const onPresented = useCallback(
+    (event: { token: number; outcome: string }) => {
+      perf?.mark(`present-${event.outcome}`);
+      coverGate.current?.presented(event.token, event.outcome);
+    },
+    [],
+  );
   // 38.7-15: two frames after the surface exists (the sky-only first buffer
   // posted), the full scene records.
   useAnimatedReaction(
@@ -658,27 +699,23 @@ export function OrreryV2Canvas({
       });
     },
   );
+  // 38.7-15: the content is recorded — the full scene (first-frame state
+  // over) with the body specs published (a warm return's specs can arrive
+  // late): arm the presented probe for the frame just recorded. The JS hop
+  // and the native prop update land after that frame was drawn.
+  const opaque = host.opaqueCanvas;
   useAnimatedReaction(
     () =>
-      surfaceReady.value &&
-      !firstFrame.value &&
-      labelsPicture.value !== null &&
-      overlayPicture.value !== null,
+      surfaceReady.value && !firstFrame.value && bodies.value.generation > 0,
     (ready, previous) => {
-      if (!ready || previous === true || cover.value === 0) return;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          cover.value = 0;
-          runOnJS(markPerf)("cover-lift");
-        });
-      });
+      if (!opaque || !ready || previous === true) return;
+      runOnJS(contentRecorded)();
     },
   );
   const coverStyle = useAnimatedStyle(() => ({
     opacity: withTiming(cover.value, { duration: COVER_FADE_MS }),
   }));
   // 38.7-15 (D-65 FR-B): the SurfaceView's frame-rate vote, on change only.
-  const opaque = host.opaqueCanvas;
   const applyFrameRateVote = useCallback((fps: number) => {
     canvasRef.current?.setFrameRateVote?.(fps);
   }, []);
@@ -696,6 +733,7 @@ export function OrreryV2Canvas({
           testID="orrery-canvas"
           ref={canvasRef}
           opaque={host.opaqueCanvas}
+          onAndroidPresented={host.opaqueCanvas ? onPresented : undefined}
           style={{ width, height }}
         >
           <Picture picture={skyPicture} />
