@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.8
 current_phase_name: History Navigation UX
-status: planning
-stopped_at: Phase 38.8 inserted (dossier accepted), ready for plan-phase
-last_updated: "2026-10-05T09:02:52.514Z"
+status: ready_to_execute
+stopped_at: Phase 38.8 planned (6 plans, 6 waves; checker passed), ready for execute-phase
+last_updated: "2026-10-08T19:48:02.960Z"
 last_activity: 2026-10-08
-last_activity_desc: Phase 38.8 History Navigation UX inserted before Phase 39
-state_head: c095d39b045c25afdb8e37d6204fd91a61a87c11
+last_activity_desc: Phase 38.8 planned — 6 plans, plan-checker passed (iteration 2)
+state_head: eb39743053b4670afb01159601e4cdfba3e0a9df
 progress:
   total_phases: 30
   completed_phases: 21
-  total_plans: 275
+  total_plans: 281
   completed_plans: 273
 carried_forward:
 
@@ -45,9 +45,9 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 ## Current Position
 
-Phase: 38.8 — History Navigation UX (INSERTED)
+Phase: 38.8 (History Navigation UX) — READY TO EXECUTE
 Plan: Not started
-Status: Ready for plan-phase (dossier accepted; discuss not needed)
+Status: Ready to execute — 6 plans in 6 sequential waves (01 seed → 02 stream → 03 heatmap jump/highlight → 04 Jump to date → 05 heatmap items → 06 device pass + owner sign-off). Run phase code review before Plan 06.
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
