@@ -35,7 +35,6 @@ const VIRTUALIZED_LIST = /<(FlatList|SectionList)\b/;
 
 /** The files that own a scroll container inside a compact/detail sheet. */
 const EXPECTED_OPT_OUTS = [
-  "src/components/history/DateDetailSheet.tsx",
   "src/components/orrery/OrreryContactsSheet.tsx",
   "src/components/profile/ProfileRelationshipSheets.tsx",
 ];
@@ -170,7 +169,8 @@ describe("Sheet consumers and the compact/detail scroll body (D-32)", () => {
 
   it("finds the Sheet consumers", () => {
     // 21 blocks across 17 files at Plan 18 (2026-09-26); a floor, not a pin.
-    expect(blocks.length).toBeGreaterThanOrEqual(21);
+    // 2026-10-08: 20 — 38.8 D-19/D-22 retired the History date-detail sheet.
+    expect(blocks.length).toBeGreaterThanOrEqual(20);
   });
 
   it("opts out every compact/detail sheet that owns its own scroll container", () => {

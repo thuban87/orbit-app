@@ -11,7 +11,6 @@ import { describe, expect, it } from "vitest";
  * `useUnscopedTheme()`, as ConfirmDialog does.
  */
 const HOSTS = [
-  { file: "history/DateDetailSheet.tsx", component: "DateDetailSheet" },
   {
     file: "group/GroupTitlePromptSheet.tsx",
     component: "GroupTitlePromptSheet",

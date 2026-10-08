@@ -61,31 +61,38 @@ export function isEmptyHistory(history: {
   );
 }
 
-/** The typed LogContact navigation payload (contact preselected + date prefilled). */
+/** The typed LogContact navigation payload (contact preselected, date optional). */
 export interface LogContactRoute {
   /** The detailed-log route name — never a quick-log surface (HIST-15). */
   readonly screen: "LogContact";
   readonly params: {
     /** The contact this interaction is being logged for (preselected). */
     readonly contactId: number;
-    /** The local `YYYY-MM-DD` the empty date/cell action prefills. */
-    readonly prefillDate: string;
+    /**
+     * The local `YYYY-MM-DD` an empty DAY prefills. Absent for an empty span
+     * or month, so the Log form starts at its normal default, now (38.8 D-28).
+     */
+    readonly prefillDate?: string;
   };
 }
 
 /**
- * Build the TYPED LogContact { contactId, prefillDate } navigation contract for
- * an empty date/cell "Log interaction" action (HIST-15). The contact is
- * preselected and the tapped date is prefilled. This is the detailed-log route
- * contract — NEVER a quick-log payload. Phase 32 owns only this contract + the
- * placeholder target; Phase 34 fills the real detailed-log form that consumes
- * `prefillDate`.
+ * Build the TYPED LogContact navigation contract for a History "Log
+ * interaction" offer (HIST-15). The contact is preselected. An empty day (and
+ * the no-history state) passes its date, which the form prefills; an empty
+ * cycle span or month passes none — the key is omitted, never an invented date
+ * such as the span's end — so the form starts at now (38.8 D-21, D-28). This is
+ * the detailed-log route contract — NEVER a quick-log payload.
  */
 export function buildLogRoute(
   contactId: number,
-  prefillDate: string,
+  prefillDate?: string,
 ): LogContactRoute {
-  return { screen: "LogContact", params: { contactId, prefillDate } };
+  return {
+    screen: "LogContact",
+    params:
+      prefillDate === undefined ? { contactId } : { contactId, prefillDate },
+  };
 }
 
 /**

@@ -5,16 +5,14 @@
  * `ProfileModuleHost.renderHistory()` in place of the old vertical-timeline stub.
  *
  * From the top (38.8 D-10), over ONE shared analysis window (ADR-120):
- *   • ActivityHeatmap (count-only, lens-switchable, ADR-119) + its anchored
- *     context card — the overview;
+ *   • ActivityHeatmap (count-only, lens-switchable, ADR-119) — the overview —
+ *     with the empty-target note directly under it when one is showing;
  *   • IntensityChart (window-scoped, neutral) — the overview;
  *   • HistoryStream — the contact's actual records, newest first, grouped
  *     year → month → day, with the current year open, older years collapsed
  *     and Show older chunks (38.8 D-14/D-15/D-34..D-39). Records are visible the
  *     moment History opens, with no date pick and no new screen (D-11);
- *   • the shared DateDetailSheet (reached only from the heatmap card's "See
- *     details" until 38.8 Plan 03 replaces that flow) and InteractionDetail
- *     (Edit / hard-delete, ADR-122).
+ *   • InteractionDetail (Edit / hard-delete, ADR-122).
  *
  * It owns the lens/window/cycle-preset state (persisted globally in
  * `app_settings` via the DAO) and the stream's transient view state (fresh on
@@ -23,16 +21,21 @@
  * (38.3 RG-024, ADR-165 — the Profile snapshot load is the single invalidation
  * owner; Profile focus always produces a revision), and wires the cross-surface
  * behaviors:
- *   - a heatmap cell opens the context card FIRST; only its explicit "See
- *     details" opens the shared Detail Sheet, and only "Log interaction" routes
- *     the typed LogContact contract (never auto-opening the sheet, HIST-09/07).
- *   - a tapped stream (or sheet) interaction opens InteractionDetail; a
- *     knowledge-change row reuses the profile's EXISTING knowledge nav to its
- *     MemoryHistory (decision-preserving, no new cross-stack target); lifecycle
- *     rows are read-only.
- *   - an empty date/cell "Log interaction" navigates the TYPED LogContact
- *     { contactId, prefillDate } route (contact preselected + date prefilled),
- *     NEVER a quick-log payload (HIST-15).
+ *   - a heatmap day or cycle with records of ANY family jumps: the stream
+ *     opens and grows to render the target, the Profile scrolls to it (the
+ *     newest record of a span) and its days are highlighted for about five
+ *     seconds, announced once to screen readers (38.8 D-19/D-20/D-23/D-53/D-54).
+ *     The stream is never filtered and the heatmap window never moves (D-56).
+ *   - a truly empty day or span shows a dismissible note under the heatmap
+ *     ("Nothing logged on Tue Oct 5"); it clears on close, another heatmap tap,
+ *     a lens or preset change and paging, and the stream does not move (D-55).
+ *     Its "Log interaction" navigates the TYPED LogContact route: dated for an
+ *     empty day, undated for an empty span so the form starts at now
+ *     (D-21/D-28), NEVER a quick-log payload (HIST-15).
+ *   - a tapped stream interaction opens InteractionDetail; a knowledge-change
+ *     row reuses the profile's EXISTING knowledge nav to its MemoryHistory
+ *     (decision-preserving, no new cross-stack target); lifecycle rows are
+ *     read-only.
  *
  * The empty-section state ("No history yet") shows ONLY when the contact has none
  * of the three record families — no interactions AND no lifecycle records AND no
@@ -61,8 +64,6 @@ import { AccessibilityInfo, StyleSheet, View } from "react-native";
 import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
 import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
 import { ActivityHeatmap } from "@/components/history/ActivityHeatmap";
-import { DateDetailSheet } from "@/components/history/DateDetailSheet";
-import { HeatmapContextCard } from "@/components/history/HeatmapContextCard";
 import {
   HIGHLIGHT_CLEAR_SLACK_MS,
   HIGHLIGHT_FADE_MS,
@@ -71,6 +72,7 @@ import {
   HistoryStream,
   type HistoryStreamHighlight,
 } from "@/components/history/HistoryStream";
+import { HistoryTargetNote } from "@/components/history/HistoryTargetNote";
 import {
   advanceHistoryDay,
   buildLogRoute,
@@ -95,6 +97,11 @@ import {
 import {
   buildStreamModel,
   dayNodeKey,
+  emptyDayNoteText,
+  emptySpanNoteText,
+  type HistoryNote,
+  type HistoryNoteEvent,
+  historyNoteOn,
   historyScrollMode,
   initialStreamState,
   isCurrentScroll,
@@ -148,27 +155,6 @@ const LOG_SCOPE = "history-section";
  */
 const HISTORY_SCROLL_RETRY_MS = 300;
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
-
-/** "Aug 4" from a local `YYYY-MM-DD` — local parts only (never UTC slicing). */
-function humanDate(date: string): string {
-  const [, m, d] = date.split("-").map(Number);
-  return `${MONTHS[m - 1]} ${d}`;
-}
-
 /**
  * A minimal window spanning [start, end] for the cycles lens's Intensity, which
  * has no date grid of its own. `intensityWindow` reads only `start`/`end` (and
@@ -176,13 +162,6 @@ function humanDate(date: string): string {
  */
 function spanWindow(start: string, end: string): HistoryWindow {
   return { lens: "7days", ref: end, start, end, cells: [] };
-}
-
-/** What the shared Detail Sheet is scoped to (single date -> start==end). */
-interface SheetScope {
-  readonly title: string;
-  readonly start: string;
-  readonly end: string;
 }
 
 export interface HistorySectionProps {
@@ -267,8 +246,13 @@ export function HistorySection({
   );
   const history = readState.phase === "loaded" ? readState.data : null;
 
-  const [card, setCard] = useState<HeatmapCellTarget | null>(null);
-  const [sheet, setSheet] = useState<SheetScope | null>(null);
+  // The empty-target note under the heatmap (38.8 D-21/D-55), changed only
+  // through the pure `historyNoteOn` reducer.
+  const [note, setNote] = useState<HistoryNote>(null);
+  const dispatchNote = useCallback(
+    (event: HistoryNoteEvent) => setNote((n) => historyNoteOn(n, event)),
+    [],
+  );
   const [detailId, setDetailId] = useState<number | null>(null);
   const [converting, setConverting] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
@@ -357,6 +341,7 @@ export function HistorySection({
       const changed = persistedPrefOnUserChange(lensPrefRef.current, next);
       commitLensPref(changed);
       commitPending({ type: "stream-action" });
+      dispatchNote({ type: "lens-change" });
       setDay(historyDayAfterLensChange);
       updateAppSettings(
         getExecutor(),
@@ -373,7 +358,7 @@ export function HistorySection({
         );
       });
     },
-    [commitLensPref, commitPending],
+    [commitLensPref, commitPending, dispatchNote],
   );
   const onPresetChange = useCallback(
     (next: HistoryCycleCount) => {
@@ -381,6 +366,7 @@ export function HistorySection({
       const changed = persistedPrefOnUserChange(cyclePrefRef.current, next);
       commitCyclePref(changed);
       commitPending({ type: "stream-action" });
+      dispatchNote({ type: "preset-change" });
       updateAppSettings(
         getExecutor(),
         { historyCycleCount: next },
@@ -396,7 +382,7 @@ export function HistorySection({
         );
       });
     },
-    [commitCyclePref, commitPending],
+    [commitCyclePref, commitPending, dispatchNote],
   );
 
   // --- The one shared window everything reads --------------------------------
@@ -438,44 +424,28 @@ export function HistorySection({
 
   const onPrev = useCallback(() => {
     commitPending({ type: "stream-action" });
+    dispatchNote({ type: "page" });
     if (window) setDay(historyDayAfterPrev(day, prevWindow(window, today).ref));
-  }, [commitPending, day, window, today]);
+  }, [commitPending, dispatchNote, day, window, today]);
   const onNext = useCallback(() => {
     commitPending({ type: "stream-action" });
+    dispatchNote({ type: "page" });
     if (window) {
       setDay(
         historyDayAfterNext(day, window.lens, nextWindow(window, today).ref),
       );
     }
-  }, [commitPending, day, window, today]);
+  }, [commitPending, dispatchNote, day, window, today]);
   const canGoNext = window ? window.end < today : false;
 
   // --- Cross-surface routing helpers -----------------------------------------
+  // A dated Log prefills that day; an undated one starts at now (D-21/D-28).
   const log = useCallback(
-    (date: string) => {
+    (date?: string) => {
       const route = buildLogRoute(contactId, date);
       navigation.navigate(route.screen, route.params);
     },
     [contactId, navigation],
-  );
-  const openSheetForDate = useCallback((date: string) => {
-    setCard(null);
-    setSheet({ title: humanDate(date), start: date, end: date });
-  }, []);
-  const openSheetForCard = useCallback(
-    (target: HeatmapCellTarget) => {
-      if (target.kind === "date") {
-        openSheetForDate(target.date);
-      } else {
-        setCard(null);
-        setSheet({
-          title: `${humanDate(target.start)} – ${humanDate(target.end)}`,
-          start: target.start,
-          end: target.end,
-        });
-      }
-    },
-    [openSheetForDate],
   );
 
   const detailInteraction = interactions.find((i) => i.id === detailId) ?? null;
@@ -588,10 +558,14 @@ export function HistorySection({
       setHighlight((current) => (current?.gen === gen ? null : current));
     }, HIGHLIGHT_FADE_MS + HIGHLIGHT_CLEAR_SLACK_MS);
   }, []);
+  // Every heatmap tap resolves against the all-family day index (D-21): a
+  // populated target jumps, an empty one shows the note and leaves the stream
+  // alone. Any tap clears the previous note and replaces any pending jump.
   const onCellPress = useCallback(
     (target: HeatmapCellTarget) => {
       if (streamModel) {
         const resolution = resolveHeatmapTarget(streamModel, target);
+        dispatchNote({ type: "heatmap", resolution });
         if (resolution.kind === "reveal") {
           const key = dayNodeKey(resolution.scrollDay);
           // Read before the reveal update: not yet rendered = await its layout.
@@ -601,7 +575,6 @@ export function HistorySection({
           setStreamState((s) =>
             streamStateOnReveal(s, streamModel, resolution.days),
           );
-          setCard(null);
           commitPending(
             onRequestHistoryScroll
               ? { type: "request", key, gen, mode }
@@ -616,23 +589,20 @@ export function HistorySection({
         }
       }
       commitPending({ type: "stream-action" });
-      setCard(target);
     },
-    [commitPending, onRequestHistoryScroll, showHighlight, streamModel, today],
+    [
+      commitPending,
+      dispatchNote,
+      onRequestHistoryScroll,
+      showHighlight,
+      streamModel,
+      today,
+    ],
   );
-
-  // Records scoped to the open sheet (single date or cycle range, inclusive).
-  const sheetRecords = useMemo(() => {
-    if (!sheet || !history) {
-      return { interactions: [], lifecycleEvents: [], knowledgeChanges: [] };
-    }
-    const inScope = (d: string) => d >= sheet.start && d <= sheet.end;
-    return {
-      interactions: history.interactions.filter((i) => inScope(i.date)),
-      lifecycleEvents: history.lifecycleEvents.filter((e) => inScope(e.date)),
-      knowledgeChanges: history.knowledgeChanges.filter((k) => inScope(k.date)),
-    };
-  }, [sheet, history]);
+  const closeNote = useCallback(() => {
+    commitPending({ type: "stream-action" });
+    dispatchNote({ type: "close" });
+  }, [commitPending, dispatchNote]);
 
   if (readState.phase === "error") {
     return (
@@ -703,19 +673,21 @@ export function HistorySection({
         onNext={onNext}
         canGoNext={canGoNext}
       />
-      {card ? (
-        <HeatmapContextCard
-          title={
-            card.kind === "date"
-              ? humanDate(card.date)
-              : `${humanDate(card.start)} – ${humanDate(card.end)}`
+      {note ? (
+        <HistoryTargetNote
+          text={
+            note.kind === "empty-day"
+              ? emptyDayNoteText(note.date)
+              : emptySpanNoteText(note.start, note.end)
           }
-          count={card.count}
-          onSeeDetails={() => openSheetForCard(card)}
+          // Dated for an empty day; an empty span carries no date (D-28). The
+          // note closes as Log opens, so it never survives the new record.
           onLog={() => {
-            log(card.kind === "date" ? card.date : card.end);
-            setCard(null);
+            closeNote();
+            if (note.kind === "empty-day") log(note.date);
+            else log();
           }}
+          onClose={closeNote}
         />
       ) : null}
       <IntensityChart intensity={intensity} />
@@ -738,20 +710,6 @@ export function HistorySection({
           highlight={highlight}
         />
       ) : null}
-      <DateDetailSheet
-        visible={sheet !== null}
-        onRequestClose={() => setSheet(null)}
-        title={sheet?.title ?? ""}
-        interactions={sheetRecords.interactions}
-        lifecycleEvents={sheetRecords.lifecycleEvents}
-        knowledgeChanges={sheetRecords.knowledgeChanges}
-        onOpenInteraction={(id) => setDetailId(id)}
-        onOpenKnowledgeChange={(fieldKey) => {
-          setSheet(null);
-          onOpenKnowledgeChange(fieldKey);
-        }}
-        onLogInteraction={sheet ? () => log(sheet.end) : undefined}
-      />
       {detailInteraction ? (
         <InteractionDetail
           visible

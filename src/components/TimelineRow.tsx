@@ -23,10 +23,11 @@ import { useTheme } from "@/theme";
 
 /**
  * Human-readable label for each lifecycle event type. EXPORTED as the single
- * shared label map: DateDetailSheet's own semantic-icon lifecycle renderer
+ * shared label map: the History stream's lifecycle row (`HistoryStreamRows`)
  * imports and consumes it (this TimelineRow component is currently unmounted in
- * production — no importer — so the sheet, not this component, is the live
- * consumer that keeps the bind/unbind labels exercised rather than dead code).
+ * production — no importer — so the stream row, not this component, is the
+ * live consumer that keeps the bind/unbind labels exercised rather than dead
+ * code).
  */
 export const EVENT_LABELS: Record<string, string> = {
   archive: "Archived",

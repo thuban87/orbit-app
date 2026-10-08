@@ -41,8 +41,6 @@
         "src/components/PostLogNoteEditor.tsx",
         "src/components/RelationshipEditor.tsx",
         "src/components/history/ActivityHeatmap.tsx",
-        "src/components/history/DateDetailSheet.tsx",
-        "src/components/history/HeatmapContextCard.tsx",
         "src/screens/ComposeResearchScreen.tsx",
         "src/screens/ComposeScreen.tsx",
         "src/screens/CreateContactScreen.tsx",

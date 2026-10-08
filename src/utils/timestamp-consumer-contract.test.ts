@@ -27,16 +27,11 @@ interface Consumer {
 
 const CONSUMERS: readonly Consumer[] = [
   {
-    path: "src/components/history/DateDetailSheet.tsx",
-    formatters: ["formatTimeMinuteOrFallback"],
-    // 3 visible time captions + 3 accessibility labels.
-    minCalls: 6,
-  },
-  {
     path: "src/components/history/HistoryStreamRows.tsx",
     formatters: ["formatTimeMinuteOrFallback"],
     // The History stream rows (38.8 D-22): 3 visible time captions + 3
-    // accessibility labels.
+    // accessibility labels. They own the History row contract since the
+    // date-detail sheet was retired (38.8 D-19/D-22).
     minCalls: 6,
   },
   {
@@ -96,15 +91,6 @@ describe("timestamp consumer contract (RG-038)", () => {
       expect(calls).toBeGreaterThanOrEqual(c.minCalls);
     },
   );
-
-  it("DateDetailSheet announces the formatted time in every row label", () => {
-    const source = read("src/components/history/DateDetailSheet.tsx");
-    const labels = source.match(/accessibilityLabel=\{`[^`]*`\}/g) ?? [];
-    expect(labels.length).toBe(3);
-    for (const label of labels) {
-      expect(label).toContain("formatTimeMinuteOrFallback(");
-    }
-  });
 
   it("HistoryStreamRows announces the formatted time in every row label", () => {
     const source = read("src/components/history/HistoryStreamRows.tsx");

@@ -1,7 +1,8 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
 /**
  * HistoryRecordRow (38.8 D-16, D-22, D-40..D-46) — one record row in the
- * Profile History stream, relocated from the DateDetailSheet row presentation.
+ * Profile History stream, relocated from the row presentation of the History
+ * date-detail sheet (retired in 38.8 D-19/D-22).
  *
  * Three record families (D-08, ADR-122), told apart by semantic icon + label,
  * never colour alone (D-07):

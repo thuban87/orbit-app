@@ -554,6 +554,51 @@ export function revealAnnouncement(
   return `Showing ${dayAccessibilityLabel(resolution.scrollDay, today)}`;
 }
 
+// --- The empty-target note (D-21, D-55) --------------------------------------
+
+/**
+ * The note under the heatmap for a truly empty target (no record of any
+ * family). It replaces the old count card; the stream does not move for it.
+ */
+export type HistoryNote =
+  | { readonly kind: "empty-day"; readonly date: string }
+  | {
+      readonly kind: "empty-span";
+      readonly start: string;
+      readonly end: string;
+    }
+  | null;
+
+export type HistoryNoteEvent =
+  | { readonly type: "heatmap"; readonly resolution: HeatmapResolution }
+  | { readonly type: "close" | "lens-change" | "preset-change" | "page" };
+
+/**
+ * The note reducer (D-55): an empty heatmap target sets it, a populated one
+ * clears it, and the close control, a lens change, a preset change and
+ * prev/next paging each clear it — the note never outlives the window it
+ * described (the old stale-card bug).
+ */
+export function historyNoteOn(
+  _note: HistoryNote,
+  event: HistoryNoteEvent,
+): HistoryNote {
+  if (event.type !== "heatmap") return null;
+  const { resolution } = event;
+  switch (resolution.kind) {
+    case "empty-day":
+      return { kind: "empty-day", date: resolution.date };
+    case "empty-span":
+      return {
+        kind: "empty-span",
+        start: resolution.start,
+        end: resolution.end,
+      };
+    case "reveal":
+      return null;
+  }
+}
+
 // --- Labels (D-33) -----------------------------------------------------------
 
 const WEEKDAY_SHORT = [
@@ -654,4 +699,21 @@ export function interactionCountLabel(interactionCount: number): string {
 /** A collapsed older year row: '<year> · <n> interaction(s)' (D-35). */
 export function yearRowLabel(year: number, interactionCount: number): string {
   return `${year} · ${interactionCountLabel(interactionCount)}`;
+}
+
+/** "Sep 1" from a local `YYYY-MM-DD` (local components only). */
+function monthDayLabel(date: string): string {
+  const local = localDateFromParts(date);
+  return `${MONTH_SHORT[local.getMonth()]} ${local.getDate()}`;
+}
+
+/** The empty-day note: "Nothing logged on Tue Oct 5" (D-21). */
+export function emptyDayNoteText(date: string): string {
+  const local = localDateFromParts(date);
+  return `Nothing logged on ${WEEKDAY_SHORT[local.getDay()]} ${monthDayLabel(date)}`;
+}
+
+/** The empty-span note: "Nothing logged Sep 1 – Sep 7" (D-21). */
+export function emptySpanNoteText(start: string, end: string): string {
+  return `Nothing logged ${monthDayLabel(start)} – ${monthDayLabel(end)}`;
 }
