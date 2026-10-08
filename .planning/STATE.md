@@ -4,12 +4,12 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.8
 current_phase_name: History Navigation UX
-status: ready_to_execute
+status: executing
 stopped_at: Phase 38.8 planned + cross-AI converged (5 cycles codex+claude, final 0 HIGH; D-66..D-68 added), ready for execute-phase
-last_updated: "2026-10-08T19:48:02.960Z"
+last_updated: "2026-10-08T22:44:57.950Z"
 last_activity: 2026-10-08
-last_activity_desc: Phase 38.8 plan-review convergence done — 5 cycles, final review 0 HIGH + 1 LOW (fixed inline), owner rulings D-66..D-68
-state_head: eb39743053b4670afb01159601e4cdfba3e0a9df
+last_activity_desc: Phase 38.8 execution started
+state_head: 0170c6b399af46084749468230744fd31ec3784d
 progress:
   total_phases: 30
   completed_phases: 21
@@ -41,20 +41,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 38.8 — History Navigation UX (inserted), then Phase 39 — Onboarding
+**Current focus:** Phase 38.8 — History Navigation UX
 
 ## Current Position
 
-Phase: 38.8 (History Navigation UX) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute — 6 plans in 6 sequential waves (01 seed → 02 stream → 03 heatmap jump/highlight → 04 Jump to date → 05 heatmap items → 06 device pass + owner sign-off). Run phase code review before Plan 06.
+Phase: 38.8 (History Navigation UX) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 38.8
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-08 — Phase 38.8 History Navigation UX inserted before Phase 39
+Last activity: 2026-10-08 — Phase 38.8 execution started
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 38.8, 39, 40. (38.7 completed 2026-10-05.)
 Next: Plan Phase 38.8 (History Navigation UX), then Phase 39 (Onboarding). The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
