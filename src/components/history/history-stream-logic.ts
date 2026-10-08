@@ -348,6 +348,179 @@ export function streamStateOnShowOlder(
   return { openYears: state.openYears, shown };
 }
 
+// --- Heatmap → stream navigation (D-19..D-21, D-18, D-56) --------------------
+
+/**
+ * The registry key of a rendered day group (the scroll target of a jump). The
+ * stream registers each day group's View under it; Plan 04 adds month keys.
+ */
+export function dayNodeKey(date: string): string {
+  return `day:${date}`;
+}
+
+/** A heatmap target the stream can resolve (a day cell). */
+export type HeatmapTarget = { readonly kind: "date"; readonly date: string };
+
+/**
+ * What a heatmap tap does to the stream (D-19..D-21). `reveal` lists the target
+ * days that hold records (newest first): the stream opens and grows to render
+ * them, scrolls to `scrollDay` and highlights `highlightDays`. An empty target
+ * leaves the stream alone and shows a note instead.
+ */
+export type HeatmapResolution =
+  | {
+      readonly kind: "reveal";
+      readonly days: readonly string[];
+      readonly scrollDay: string;
+      readonly highlightDays: readonly string[];
+    }
+  | { readonly kind: "empty-day"; readonly date: string }
+  | {
+      readonly kind: "empty-span";
+      readonly start: string;
+      readonly end: string;
+    };
+
+/**
+ * Resolve a heatmap tap against the stream model (D-19, D-21). Emptiness is
+ * decided from the all-family day index, never from the heatmap's interaction
+ * count: a day holding only lifecycle or knowledge records still reveals.
+ */
+export function resolveHeatmapTarget(
+  model: StreamModel,
+  target: HeatmapTarget,
+): HeatmapResolution {
+  if (model.dayIndex.has(target.date)) {
+    return {
+      kind: "reveal",
+      days: [target.date],
+      scrollDay: target.date,
+      highlightDays: [target.date],
+    };
+  }
+  return { kind: "empty-day", date: target.date };
+}
+
+/**
+ * Open and grow the stream so every target day renders whole (D-18, D-20). For
+ * each day: open its year (the current year is always open) and raise that
+ * year's requested count in whole STREAM_CHUNK steps until the day-snapped
+ * visible slice covers the day's oldest record. It never shrinks a count and
+ * never touches another year. Transient view state only — the heatmap window is
+ * not part of it (D-56).
+ */
+export function streamStateOnReveal(
+  state: StreamViewState,
+  model: StreamModel,
+  days: readonly string[],
+): StreamViewState {
+  let openYears: Set<number> | null = null;
+  let shown: Map<number, number> | null = null;
+  for (const date of days) {
+    const year = yearOf(date);
+    const entry = findYear(model, year);
+    if (!entry) continue;
+    let last = -1;
+    for (let i = entry.records.length - 1; i >= 0; i--) {
+      if (entry.records[i].date === date) {
+        last = i;
+        break;
+      }
+    }
+    if (last < 0) continue;
+    if (
+      year !== model.currentYear &&
+      !(openYears ?? state.openYears).has(year)
+    ) {
+      openYears = openYears ?? new Set(state.openYears);
+      openYears.add(year);
+    }
+    const current = (shown ?? state.shown).get(year) ?? STREAM_INITIAL_VISIBLE;
+    let requested = current;
+    while (snapToDayEnd(entry.records, requested) < last + 1) {
+      requested += STREAM_CHUNK;
+    }
+    if (requested !== current) {
+      shown = shown ?? new Map(state.shown);
+      shown.set(year, requested);
+    }
+  }
+  if (!openYears && !shown) return state;
+  return {
+    openYears: openYears ?? state.openYears,
+    shown: shown ?? state.shown,
+  };
+}
+
+// --- Jump scroll requests (RESEARCH Pattern 3 Timing; C1-01, C2-01..C2-03) ---
+
+/**
+ * How a jump's scroll is issued, read at tap time BEFORE the reveal update. A
+ * target already rendered (registered) scrolls right after the reveal commits:
+ * the reveal only grows content below it. A target not yet rendered waits for
+ * its own first layout, when the Profile content has grown to include it.
+ */
+export function historyScrollMode(
+  registry: { has(key: string): boolean },
+  key: string,
+): "immediate" | "await-layout" {
+  return registry.has(key) ? "immediate" : "await-layout";
+}
+
+/** The one outstanding jump scroll of a HistorySection mount, if any. */
+export type PendingHistoryScroll = {
+  readonly key: string;
+  readonly gen: number;
+  readonly mode: "immediate" | "await-layout";
+  /** The single retry after a measure failure has been used. */
+  readonly retried: boolean;
+} | null;
+
+export type PendingScrollEvent =
+  | {
+      readonly type: "request";
+      readonly key: string;
+      readonly gen: number;
+      readonly mode: "immediate" | "await-layout";
+    }
+  | { readonly type: "result"; readonly gen: number; readonly ok: boolean }
+  | { readonly type: "stream-action" };
+
+/**
+ * The pending-scroll reducer (C2-02, C2-03). A request replaces any older one;
+ * a result for any other generation changes nothing; success clears; the first
+ * failure arms one retry and a second failure clears; every other stream
+ * action (lens, preset, paging, Show older, year expand, note close) clears.
+ */
+export function pendingScrollOn(
+  pending: PendingHistoryScroll,
+  event: PendingScrollEvent,
+): PendingHistoryScroll {
+  switch (event.type) {
+    case "request":
+      return {
+        key: event.key,
+        gen: event.gen,
+        mode: event.mode,
+        retried: false,
+      };
+    case "result":
+      if (!pending || pending.gen !== event.gen) return pending;
+      if (event.ok || pending.retried) return null;
+      return { ...pending, retried: true };
+    case "stream-action":
+      return null;
+  }
+}
+
+/** Whether generation `gen` is still the outstanding request. */
+export function isCurrentScroll(
+  pending: PendingHistoryScroll,
+  gen: number,
+): boolean {
+  return pending !== null && pending.gen === gen;
+}
+
 // --- Labels (D-33) -----------------------------------------------------------
 
 const WEEKDAY_SHORT = [

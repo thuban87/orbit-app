@@ -22,6 +22,7 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { HistoryRecordRow } from "./HistoryStreamRows";
 import {
+  dayNodeKey,
   emptyYearLabel,
   interactionCountLabel,
   isYearOpen,
@@ -39,6 +40,13 @@ export interface HistoryStreamProps {
   onShowOlder: (year: number) => void;
   onOpenInteraction: (interactionId: number) => void;
   onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
+  /**
+   * Each rendered day group's View, keyed by `dayNodeKey(date)` (null when it
+   * unmounts) — the scroll targets of a heatmap jump (38.8 D-19/D-20).
+   */
+  registerNode: (key: string, node: View | null) => void;
+  /** A day group laid out (a jump waiting for its target scrolls then). */
+  onNodeLayout: (key: string) => void;
   testID?: string;
 }
 
@@ -49,6 +57,8 @@ export function HistoryStream({
   onShowOlder,
   onOpenInteraction,
   onOpenKnowledgeChange,
+  registerNode,
+  onNodeLayout,
   testID = "history-stream",
 }: HistoryStreamProps) {
   return (
@@ -63,6 +73,8 @@ export function HistoryStream({
             onShowOlder={onShowOlder}
             onOpenInteraction={onOpenInteraction}
             onOpenKnowledgeChange={onOpenKnowledgeChange}
+            registerNode={registerNode}
+            onNodeLayout={onNodeLayout}
             testID={testID}
           />
         ) : (
@@ -85,6 +97,8 @@ interface OpenYearProps {
   onShowOlder: (year: number) => void;
   onOpenInteraction: (interactionId: number) => void;
   onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
+  registerNode: (key: string, node: View | null) => void;
+  onNodeLayout: (key: string) => void;
   testID: string;
 }
 
@@ -126,6 +140,8 @@ function OpenYear({
   onShowOlder,
   onOpenInteraction,
   onOpenKnowledgeChange,
+  registerNode,
+  onNodeLayout,
   testID,
 }: OpenYearProps) {
   const { colors } = useTheme();
@@ -165,6 +181,10 @@ function OpenYear({
               <View
                 key={day.date}
                 testID={`${testID}-day-${day.date}`}
+                // A real native view (never flattened) so a jump can measure it.
+                collapsable={false}
+                ref={(node) => registerNode(dayNodeKey(day.date), node)}
+                onLayout={() => onNodeLayout(dayNodeKey(day.date))}
                 style={[styles.day, { borderColor: colors.border }]}
               >
                 <AppText

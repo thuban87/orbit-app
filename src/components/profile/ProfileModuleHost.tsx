@@ -19,6 +19,7 @@ import {
 } from "@/db/profile-presentation-dao";
 import type { ProfileSnapshot } from "@/db/profile-read";
 import {
+  completeHistoryScroll,
   createHistoryRevealScroll,
   type HistoryRevealScroll,
   resolveHistoryReveal,
@@ -35,6 +36,7 @@ import type {
 } from "@/profile/persisted-contract";
 import type { ProfilePresentation } from "@/profile/types";
 import { SPACING } from "@/theme/tokens/spacing";
+import { Logger } from "@/utils/logger";
 import { ProfileRelationshipSheets } from "./ProfileRelationshipSheets";
 import {
   RelationshipOverview,
@@ -46,6 +48,8 @@ import {
   type KnowledgeViewAllIntent,
   ThingsToRemember,
 } from "./ThingsToRemember";
+
+const LOG_SCOPE = "profile-module-host";
 
 type CollapsePlacement = {
   id: ProfileCollapsibleModuleId;
@@ -303,6 +307,32 @@ export function ProfileModuleHost({
     );
   };
   const openHistory = historyReveal.available ? revealHistory : undefined;
+
+  // 38.8 D-19/D-20 (RESEARCH Pattern 3; C2-01): a heatmap jump scrolls to a
+  // day group inside History. The target is measured against the History
+  // anchor (the ref form of measureLayout, not a node handle) and the request
+  // carries its own staleness check; the host keeps no request state.
+  const historyAnchorRef = useRef<View>(null);
+  const requestHistoryScroll = (
+    target: View,
+    isCurrent: () => boolean,
+    onResult: (ok: boolean) => void,
+  ) => {
+    const anchor = historyAnchorRef.current;
+    if (!anchor) {
+      if (isCurrent()) onResult(false);
+      return;
+    }
+    target.measureLayout(
+      anchor,
+      (_x, y) => completeHistoryScroll(scroller, y, isCurrent, onResult),
+      () => {
+        // Content-free: no contact data in the log line.
+        Logger.warn(LOG_SCOPE, "history scroll measure failed");
+        if (isCurrent()) onResult(false);
+      },
+    );
+  };
   const openInsights = () => {
     closeRelationshipSheet();
     onOpenInsights?.();
@@ -438,18 +468,20 @@ export function ProfileModuleHost({
     if (snapshot.history.status === "error") {
       return <AppText role="body">{snapshot.history.message}</AppText>;
     }
-    // The assembled Profile History section (Plan 08): Heatmap + Intensity +
-    // the History stream (38.8 D-10) behind this renderer seam, replacing the old
-    // channel·occurredAt + "View all history" stub. Layout persistence and the
-    // interaction-history summary case are untouched.
+    // The assembled Profile History section (Plan 08; 38.8 D-10): the heatmap,
+    // Intensity and the History stream behind this renderer seam. Keyed by the
+    // contact so its transient view state starts fresh on a contact change
+    // (38.8 D-62); a heatmap jump scrolls through `requestHistoryScroll`.
     return (
       <HistorySection
+        key={snapshot.identity.id}
         contactId={snapshot.identity.id}
         revision={historyRevision}
         intervalDays={snapshot.identity.intervalDays}
         trackingEnabled={snapshot.identity.trackingEnabled}
         impactInputs={snapshot.impactInputs}
         onOpenKnowledgeChange={onOpenKnowledgeChange}
+        onRequestHistoryScroll={requestHistoryScroll}
       />
     );
   };
@@ -525,6 +557,8 @@ export function ProfileModuleHost({
         return (
           <View
             key={id}
+            ref={historyAnchorRef}
+            collapsable={false}
             testID="profile-history-anchor"
             onLayout={(event: LayoutChangeEvent) =>
               scroller.historyLayout(

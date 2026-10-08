@@ -47,6 +47,7 @@ vi.mock("./ThingsToRemember", () => ({
 
 interface Node {
   type: string;
+  key?: string | null;
   props: Record<string, unknown>;
   text: string;
   children: Node[];
@@ -68,6 +69,7 @@ function resolve(node: ReactNode): Node[] {
   return [
     {
       type: element.type,
+      key: element.key,
       props: element.props,
       text: "",
       children: resolve(element.props.children),
@@ -399,6 +401,108 @@ describe("ProfileModuleHost History reveal", () => {
       }),
     );
     // The scroll waits for the expanded History layout.
+    expect(onRequestScrollTo).not.toHaveBeenCalled();
+  });
+  // 38.8 D-19/D-20 (C2-01): a heatmap jump measures its target against the
+  // History anchor and scrolls the Profile there; the request's own
+  // isCurrent() decides staleness and the host keeps no request state.
+  it("keys HistorySection by the contact and hands it a History scroll request", () => {
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: true, expanded: true }),
+    );
+    const section = nodes.find((node) => node.type === "HistorySection");
+    expect(section?.props.onRequestHistoryScroll).toBeTypeOf("function");
+    expect(section?.key).toBe("7");
+    const anchor = nodes.find(
+      (node) => node.props.testID === "profile-history-anchor",
+    );
+    expect(anchor?.props.collapsable).toBe(false);
+  });
+
+  it("scrolls a current jump request to host + anchor + target offsets and reports success", () => {
+    const onRequestScrollTo = vi.fn();
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: true, expanded: true }),
+      onRequestScrollTo,
+    );
+    const host = nodes.find(
+      (node) => node.props.testID === "profile-module-host",
+    );
+    const anchor = nodes.find(
+      (node) => node.props.testID === "profile-history-anchor",
+    );
+    handler<(event: unknown) => void>(host, "onLayout")(layout(240));
+    handler<(event: unknown) => void>(anchor, "onLayout")(layout(600));
+    const anchorRef = anchor?.props.ref as { current: unknown };
+    const anchorNode = { anchor: true };
+    anchorRef.current = anchorNode;
+    const target = {
+      measureLayout: vi.fn(
+        (
+          relativeTo: unknown,
+          onSuccess: (x: number, y: number) => void,
+          _onFail: () => void,
+        ) => {
+          expect(relativeTo).toBe(anchorNode);
+          onSuccess(0, 120);
+        },
+      ),
+    };
+    const request = handler<
+      (
+        target: unknown,
+        isCurrent: () => boolean,
+        onResult: (ok: boolean) => void,
+      ) => void
+    >(
+      nodes.find((node) => node.type === "HistorySection"),
+      "onRequestHistoryScroll",
+    );
+
+    const onResult = vi.fn();
+    request(target, () => true, onResult);
+    expect(onRequestScrollTo).toHaveBeenCalledExactlyOnceWith(960);
+    expect(onResult).toHaveBeenCalledExactlyOnceWith(true);
+
+    const staleResult = vi.fn();
+    request(target, () => false, staleResult);
+    expect(onRequestScrollTo).toHaveBeenCalledTimes(1);
+    expect(staleResult).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed measure only to a current request", () => {
+    const onRequestScrollTo = vi.fn();
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: true, expanded: true }),
+      onRequestScrollTo,
+    );
+    const anchor = nodes.find(
+      (node) => node.props.testID === "profile-history-anchor",
+    );
+    (anchor?.props.ref as { current: unknown }).current = {};
+    const target = {
+      measureLayout: (
+        _relativeTo: unknown,
+        _onSuccess: (x: number, y: number) => void,
+        onFail: () => void,
+      ) => onFail(),
+    };
+    const request = handler<
+      (
+        target: unknown,
+        isCurrent: () => boolean,
+        onResult: (ok: boolean) => void,
+      ) => void
+    >(
+      nodes.find((node) => node.type === "HistorySection"),
+      "onRequestHistoryScroll",
+    );
+    const current = vi.fn();
+    request(target, () => true, current);
+    expect(current).toHaveBeenCalledExactlyOnceWith(false);
+    const stale = vi.fn();
+    request(target, () => false, stale);
+    expect(stale).not.toHaveBeenCalled();
     expect(onRequestScrollTo).not.toHaveBeenCalled();
   });
 });

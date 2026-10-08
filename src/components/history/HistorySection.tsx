@@ -49,7 +49,14 @@
  */
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { StyleSheet, View } from "react-native";
 import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
 import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
@@ -80,8 +87,16 @@ import {
 } from "@/components/history/history-section-logic";
 import {
   buildStreamModel,
+  dayNodeKey,
+  historyScrollMode,
   initialStreamState,
+  isCurrentScroll,
+  type PendingHistoryScroll,
+  type PendingScrollEvent,
+  pendingScrollOn,
+  resolveHeatmapTarget,
   streamStateOnExpandYear,
+  streamStateOnReveal,
   streamStateOnShowOlder,
 } from "@/components/history/history-stream-logic";
 import { IntensityChart } from "@/components/history/IntensityChart";
@@ -118,6 +133,12 @@ import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "history-section";
+
+/**
+ * A heatmap jump whose target measure failed gets ONE retry: on the target's
+ * next layout or after this many ms, whichever comes first (38.8 C2-02).
+ */
+const HISTORY_SCROLL_RETRY_MS = 300;
 
 const MONTHS = [
   "Jan",
@@ -175,6 +196,17 @@ export interface HistorySectionProps {
    * row's edit (decision-preserving — no new cross-stack target introduced).
    */
   onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
+  /**
+   * Scroll the Profile to a rendered stream node (38.8 D-19/D-20). The host
+   * measures `target` against the History anchor and scrolls only while the
+   * request's own `isCurrent()` holds; `onResult` reports a measure success or
+   * failure (never called for a stale request).
+   */
+  onRequestHistoryScroll?: (
+    target: View,
+    isCurrent: () => boolean,
+    onResult: (ok: boolean) => void,
+  ) => void;
   testID?: string;
 }
 
@@ -185,6 +217,7 @@ export function HistorySection({
   trackingEnabled,
   impactInputs,
   onOpenKnowledgeChange,
+  onRequestHistoryScroll,
   testID = "history-section",
 }: HistorySectionProps) {
   const navigation =
@@ -231,6 +264,38 @@ export function HistorySection({
   const [detailId, setDetailId] = useState<number | null>(null);
   const [converting, setConverting] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
+
+  // --- Heatmap jump: the one pending scroll (38.8 D-19/D-20, C2-01..C2-03) ---
+  // Changed only through `pendingScrollOn`, via `commitPending`, which writes
+  // the ref synchronously before setting state: on the new architecture
+  // `measureLayout` calls back synchronously, so the host's `isCurrent()` can
+  // run inside this section's own layout effect, before any effect-mirrored
+  // ref would have updated (C3-06). Never mirrored in an effect.
+  const [pending, setPending] = useState<PendingHistoryScroll>(null);
+  const pendingRef = useRef<PendingHistoryScroll>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearRetry = useCallback(() => {
+    if (retryTimer.current !== null) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+  }, []);
+  const commitPending = useCallback(
+    (event: PendingScrollEvent) => {
+      const previous = pendingRef.current;
+      pendingRef.current = pendingScrollOn(previous, event);
+      // A replaced or cleared request drops its retry.
+      if (pendingRef.current?.gen !== previous?.gen) clearRetry();
+      setPending(pendingRef.current);
+    },
+    [clearRetry],
+  );
+  // On unmount nothing from this mount is current any more: a late measure
+  // callback neither scrolls nor reports, and the retry never fires.
+  useEffect(
+    () => () => commitPending({ type: "stream-action" }),
+    [commitPending],
+  );
 
   // One latest-request authority for this section's reads: an older read never
   // publishes over a newer one, and nothing publishes after unmount.
@@ -283,6 +348,7 @@ export function HistorySection({
       const previous = lensPrefRef.current.value;
       const changed = persistedPrefOnUserChange(lensPrefRef.current, next);
       commitLensPref(changed);
+      commitPending({ type: "stream-action" });
       setDay(historyDayAfterLensChange);
       updateAppSettings(
         getExecutor(),
@@ -299,13 +365,14 @@ export function HistorySection({
         );
       });
     },
-    [commitLensPref],
+    [commitLensPref, commitPending],
   );
   const onPresetChange = useCallback(
     (next: HistoryCycleCount) => {
       const previous = cyclePrefRef.current.value;
       const changed = persistedPrefOnUserChange(cyclePrefRef.current, next);
       commitCyclePref(changed);
+      commitPending({ type: "stream-action" });
       updateAppSettings(
         getExecutor(),
         { historyCycleCount: next },
@@ -321,7 +388,7 @@ export function HistorySection({
         );
       });
     },
-    [commitCyclePref],
+    [commitCyclePref, commitPending],
   );
 
   // --- The one shared window everything reads --------------------------------
@@ -362,15 +429,17 @@ export function HistorySection({
   }, [lens, cyclesResult, window, impactInputs]);
 
   const onPrev = useCallback(() => {
+    commitPending({ type: "stream-action" });
     if (window) setDay(historyDayAfterPrev(day, prevWindow(window, today).ref));
-  }, [day, window, today]);
+  }, [commitPending, day, window, today]);
   const onNext = useCallback(() => {
+    commitPending({ type: "stream-action" });
     if (window) {
       setDay(
         historyDayAfterNext(day, window.lens, nextWindow(window, today).ref),
       );
     }
-  }, [day, window, today]);
+  }, [commitPending, day, window, today]);
   const canGoNext = window ? window.end < today : false;
 
   // --- Cross-surface routing helpers -----------------------------------------
@@ -413,6 +482,108 @@ export function HistorySection({
     [history, today],
   );
   const [streamState, setStreamState] = useState(initialStreamState);
+
+  // --- Heatmap → stream jump (38.8 D-19/D-20; RESEARCH Pattern 3 Timing) -----
+  // Rendered day groups register here (a null node unregisters). A jump to a
+  // target that is already rendered scrolls from the layout effect below once
+  // the reveal commits (the reveal only grows content below it); a target not
+  // yet rendered scrolls from its own first layout. Each request carries this
+  // mount's own generation, so a fresh mount (History collapse/reopen, a
+  // contact change) never inherits staleness. None of this writes `day` — the
+  // heatmap/Intensity window — (D-56).
+  const nodeRegistry = useRef(new Map<string, View>());
+  const registerNode = useCallback((key: string, node: View | null) => {
+    if (node) nodeRegistry.current.set(key, node);
+    else nodeRegistry.current.delete(key);
+  }, []);
+  const genRef = useRef(0);
+  // The last issued attempt (`gen:attempt`), so one attempt is issued once.
+  const issuedRef = useRef<string | null>(null);
+  const issueScroll = useCallback(
+    function issue(request: NonNullable<PendingHistoryScroll>) {
+      const attempt = `${request.gen}:${request.retried ? 1 : 0}`;
+      if (issuedRef.current === attempt) return;
+      issuedRef.current = attempt;
+      clearRetry();
+      const { gen } = request;
+      const onResult = (ok: boolean) => {
+        commitPending({ type: "result", gen, ok });
+        const next = pendingRef.current;
+        // The first failure arms the single retry: the target's next layout
+        // (`onNodeLayout`) or this timer, whichever comes first. One plain
+        // timeout, not an animation or per-frame state timer.
+        if (!ok && next?.gen === gen && next.retried) {
+          clearRetry();
+          retryTimer.current = setTimeout(() => {
+            retryTimer.current = null;
+            const current = pendingRef.current;
+            if (current?.gen === gen && current.retried) issue(current);
+          }, HISTORY_SCROLL_RETRY_MS);
+        }
+      };
+      const node = nodeRegistry.current.get(request.key);
+      if (!node || !onRequestHistoryScroll) {
+        onResult(false);
+        return;
+      }
+      onRequestHistoryScroll(
+        node,
+        () => isCurrentScroll(pendingRef.current, gen),
+        onResult,
+      );
+    },
+    [clearRetry, commitPending, onRequestHistoryScroll],
+  );
+  // `immediate`: the target was already rendered, so scroll right after the
+  // reveal commits. A retried request is never re-issued from here.
+  useLayoutEffect(() => {
+    if (
+      pending !== null &&
+      pending === pendingRef.current &&
+      pending.mode === "immediate" &&
+      !pending.retried
+    ) {
+      issueScroll(pending);
+    }
+  }, [pending, issueScroll]);
+  // `await-layout`: the target has just laid out (the Profile content now
+  // includes it). Also the first chance for a retry after a failed measure.
+  const onNodeLayout = useCallback(
+    (key: string) => {
+      const current = pendingRef.current;
+      if (!current || current.key !== key) return;
+      if (current.mode === "await-layout" || current.retried) {
+        issueScroll(current);
+      }
+    },
+    [issueScroll],
+  );
+  const onCellPress = useCallback(
+    (target: HeatmapCellTarget) => {
+      if (target.kind === "date" && streamModel) {
+        const resolution = resolveHeatmapTarget(streamModel, target);
+        if (resolution.kind === "reveal") {
+          const key = dayNodeKey(resolution.scrollDay);
+          // Read before the reveal update: not yet rendered = await its layout.
+          const mode = historyScrollMode(nodeRegistry.current, key);
+          setStreamState((s) =>
+            streamStateOnReveal(s, streamModel, resolution.days),
+          );
+          setCard(null);
+          if (onRequestHistoryScroll) {
+            genRef.current += 1;
+            commitPending({ type: "request", key, gen: genRef.current, mode });
+          } else {
+            commitPending({ type: "stream-action" });
+          }
+          return;
+        }
+      }
+      commitPending({ type: "stream-action" });
+      setCard(target);
+    },
+    [commitPending, onRequestHistoryScroll, streamModel],
+  );
 
   // Records scoped to the open sheet (single date or cycle range, inclusive).
   const sheetRecords = useMemo(() => {
@@ -491,7 +662,7 @@ export function HistorySection({
         cycleCounts={cycleCounts}
         onLensChange={onLensChange}
         onPresetChange={onPresetChange}
-        onCellPress={setCard}
+        onCellPress={onCellPress}
         onPrev={onPrev}
         onNext={onNext}
         canGoNext={canGoNext}
@@ -516,14 +687,18 @@ export function HistorySection({
         <HistoryStream
           model={streamModel}
           state={streamState}
-          onExpandYear={(year) =>
-            setStreamState((s) => streamStateOnExpandYear(s, year))
-          }
-          onShowOlder={(year) =>
-            setStreamState((s) => streamStateOnShowOlder(s, streamModel, year))
-          }
+          onExpandYear={(year) => {
+            commitPending({ type: "stream-action" });
+            setStreamState((s) => streamStateOnExpandYear(s, year));
+          }}
+          onShowOlder={(year) => {
+            commitPending({ type: "stream-action" });
+            setStreamState((s) => streamStateOnShowOlder(s, streamModel, year));
+          }}
           onOpenInteraction={setDetailId}
           onOpenKnowledgeChange={onOpenKnowledgeChange}
+          registerNode={registerNode}
+          onNodeLayout={onNodeLayout}
         />
       ) : null}
       <DateDetailSheet

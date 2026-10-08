@@ -274,6 +274,8 @@ function renderStream(
     onShowOlder: vi.fn(),
     onOpenInteraction: vi.fn(),
     onOpenKnowledgeChange: vi.fn(),
+    registerNode: vi.fn(),
+    onNodeLayout: vi.fn(),
   };
   const tree = resolve(HistoryStream({ model, state, ...handlers }));
   return { tree, nodes: all(tree), handlers, model };
@@ -381,6 +383,24 @@ describe("HistoryStream", () => {
     expect(
       byTestID(short.nodes, "history-stream-show-older-2026"),
     ).toBeUndefined();
+  });
+
+  it("registers each day group as a measurable jump target and reports its layout (D-19)", () => {
+    const { nodes, handlers } = renderStream({
+      interactions: [interaction(1, "2026-10-02 09:00:00")],
+    });
+    const day = byTestID(nodes, "history-stream-day-2026-10-02") as Node;
+    expect(day.props.collapsable).toBe(false);
+    const node = { native: true };
+    (day.props.ref as (n: unknown) => void)(node);
+    expect(handlers.registerNode).toHaveBeenCalledWith("day:2026-10-02", node);
+    (day.props.ref as (n: unknown) => void)(null);
+    expect(handlers.registerNode).toHaveBeenLastCalledWith(
+      "day:2026-10-02",
+      null,
+    );
+    (day.props.onLayout as () => void)();
+    expect(handlers.onNodeLayout).toHaveBeenCalledWith("day:2026-10-02");
   });
 
   it("renders no nested scroll container anywhere", () => {

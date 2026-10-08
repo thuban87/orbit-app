@@ -18,15 +18,22 @@ import {
   buildStreamModel,
   dayAccessibilityLabel,
   dayLabel,
+  dayNodeKey,
   emptyYearLabel,
+  historyScrollMode,
   initialStreamState,
+  isCurrentScroll,
   isYearOpen,
   orderStreamRecords,
+  type PendingHistoryScroll,
+  pendingScrollOn,
+  resolveHeatmapTarget,
   STREAM_CHUNK,
   STREAM_INITIAL_VISIBLE,
   type StreamSource,
   snapToDayEnd,
   streamStateOnExpandYear,
+  streamStateOnReveal,
   streamStateOnShowOlder,
   visibleYear,
   yearRowLabel,
@@ -521,5 +528,191 @@ describe("year labels (D-35, D-36)", () => {
 
   it("names an empty current year", () => {
     expect(emptyYearLabel(2027)).toBe("Nothing logged in 2027 yet");
+  });
+});
+
+describe("resolveHeatmapTarget — a day (D-19, D-21)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [interaction(1, "2026-10-02 09:00:00")],
+      lifecycleEvents: [lifecycle(2, "2026-10-05 08:00:00")],
+      knowledgeChanges: [knowledge(3, "2026-10-04 08:00:00")],
+    }),
+    TODAY,
+  );
+
+  it("reveals a day with interactions", () => {
+    expect(
+      resolveHeatmapTarget(model, { kind: "date", date: "2026-10-02" }),
+    ).toEqual({
+      kind: "reveal",
+      days: ["2026-10-02"],
+      scrollDay: "2026-10-02",
+      highlightDays: ["2026-10-02"],
+    });
+  });
+
+  it("reveals a lifecycle-only or knowledge-only day (emptiness from the day index)", () => {
+    expect(
+      resolveHeatmapTarget(model, { kind: "date", date: "2026-10-05" }).kind,
+    ).toBe("reveal");
+    expect(
+      resolveHeatmapTarget(model, { kind: "date", date: "2026-10-04" }).kind,
+    ).toBe("reveal");
+  });
+
+  it("resolves a day with no record of any family to empty-day", () => {
+    expect(
+      resolveHeatmapTarget(model, { kind: "date", date: "2026-10-06" }),
+    ).toEqual({ kind: "empty-day", date: "2026-10-06" });
+  });
+
+  it("keys day nodes by date", () => {
+    expect(dayNodeKey("2026-10-02")).toBe("day:2026-10-02");
+  });
+});
+
+describe("streamStateOnReveal (D-18)", () => {
+  // 2025: 39 single-record days (Dec 31 → Nov 23), then 3 records on Nov 20,
+  // then 20 single-record days from Nov 15. 2026: a few current-year days.
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        ...dailyInteractions(5, { y: 2026, m: 10, d: 7 }, 1),
+        ...dailyInteractions(39, { y: 2025, m: 12, d: 31 }, 100),
+        ...sameDayInteractions(3, "2025-11-20", 200),
+        ...dailyInteractions(20, { y: 2025, m: 11, d: 15 }, 300),
+      ],
+    }),
+    TODAY,
+  );
+
+  it("changes nothing for a day already visible in the open current year", () => {
+    const state = initialStreamState();
+    expect(streamStateOnReveal(state, model, ["2026-10-05"])).toBe(state);
+  });
+
+  it("opens a collapsed older year and grows it in whole chunks until the whole day renders", () => {
+    const state = initialStreamState();
+    const next = streamStateOnReveal(state, model, ["2025-11-20"]);
+    expect(isYearOpen(next, model, 2025)).toBe(true);
+    // Records 39..41 are the target day: 40 = 20 + one chunk reaches it, and
+    // day snapping extends the slice to the day's end.
+    expect(next.shown.get(2025)).toBe(40);
+    const visible = visibleYear(next, model, 2025);
+    expect(visible.visibleCount).toBe(42);
+    expect(visible.hasOlder).toBe(true);
+    const day = visible.months
+      .flatMap((m) => m.days)
+      .find((d) => d.date === "2025-11-20");
+    expect(day?.records).toHaveLength(3);
+    // The original state is untouched and other years are unchanged.
+    expect(state.openYears.size).toBe(0);
+    expect(next.shown.has(2026)).toBe(false);
+  });
+
+  it("never shrinks a year that already shows more", () => {
+    const state = {
+      openYears: new Set([2025]),
+      shown: new Map([[2025, 80]]),
+    };
+    expect(streamStateOnReveal(state, model, ["2025-11-20"])).toBe(state);
+  });
+
+  it("ignores a day with no records", () => {
+    const state = initialStreamState();
+    expect(streamStateOnReveal(state, model, ["2024-01-01"])).toBe(state);
+  });
+});
+
+describe("historyScrollMode (C2-02)", () => {
+  it("scrolls immediately when the target is already rendered (the reveal only grows content below it)", () => {
+    const registry = new Map([["day:2026-10-02", {}]]);
+    expect(historyScrollMode(registry, "day:2026-10-02")).toBe("immediate");
+  });
+
+  it("waits for the target's layout when it is not rendered yet (a collapsed year)", () => {
+    const registry = new Map([["day:2026-10-02", {}]]);
+    expect(historyScrollMode(registry, "day:2025-06-01")).toBe("await-layout");
+  });
+});
+
+describe("pendingScrollOn / isCurrentScroll (C2-02, C2-03)", () => {
+  const request = (gen: number, key = "day:2026-10-02") =>
+    ({ type: "request", key, gen, mode: "immediate" }) as const;
+
+  it("records a request as not yet retried", () => {
+    expect(pendingScrollOn(null, request(1))).toEqual({
+      key: "day:2026-10-02",
+      gen: 1,
+      mode: "immediate",
+      retried: false,
+    });
+  });
+
+  it("clears on a successful result", () => {
+    const pending = pendingScrollOn(null, request(1));
+    expect(pendingScrollOn(pending, { type: "result", gen: 1, ok: true })).toBe(
+      null,
+    );
+  });
+
+  it("ignores an older generation's result", () => {
+    const pending = pendingScrollOn(
+      pendingScrollOn(null, request(1)),
+      request(2),
+    );
+    expect(pendingScrollOn(pending, { type: "result", gen: 1, ok: true })).toBe(
+      pending,
+    );
+    expect(
+      pendingScrollOn(pending, { type: "result", gen: 1, ok: false }),
+    ).toBe(pending);
+    expect(isCurrentScroll(pending, 1)).toBe(false);
+    expect(isCurrentScroll(pending, 2)).toBe(true);
+  });
+
+  it("retries once after a failure, then clears", () => {
+    const pending = pendingScrollOn(null, request(1));
+    const retried = pendingScrollOn(pending, {
+      type: "result",
+      gen: 1,
+      ok: false,
+    });
+    expect(retried).toEqual({ ...pending, retried: true });
+    expect(isCurrentScroll(retried, 1)).toBe(true);
+    expect(
+      pendingScrollOn(retried, { type: "result", gen: 1, ok: false }),
+    ).toBe(null);
+  });
+
+  it("drops an older pending retry on a newer stream action", () => {
+    const retried = pendingScrollOn(pendingScrollOn(null, request(1)), {
+      type: "result",
+      gen: 1,
+      ok: false,
+    });
+    const cleared = pendingScrollOn(retried, { type: "stream-action" });
+    expect(cleared).toBe(null);
+    expect(isCurrentScroll(cleared, 1)).toBe(false);
+  });
+
+  it("replaces a retried request with a newer one", () => {
+    const retried: PendingHistoryScroll = pendingScrollOn(
+      pendingScrollOn(null, request(1)),
+      { type: "result", gen: 1, ok: false },
+    );
+    const next = pendingScrollOn(retried, request(2, "day:2026-10-05"));
+    expect(next).toEqual({
+      key: "day:2026-10-05",
+      gen: 2,
+      mode: "immediate",
+      retried: false,
+    });
+    expect(isCurrentScroll(next, 1)).toBe(false);
+  });
+
+  it("is never current with nothing pending", () => {
+    expect(isCurrentScroll(null, 1)).toBe(false);
   });
 });

@@ -76,6 +76,14 @@ export interface HistoryRevealScroll {
   reveal(needsExpand: boolean): void;
   /** The expand write settled; `expanded` false (write failed) scrolls at once. */
   expandSettled(expanded: boolean): void;
+  /**
+   * 38.8 D-19/D-20: scroll to a point INSIDE History, `offsetY` below the
+   * History anchor (a heatmap jump target). A plain additive scroll: it holds
+   * no request or generation state (a HistorySection remounts on every collapse
+   * and contact change, so the caller owns staleness — `completeHistoryScroll`)
+   * and never touches a pending expand reveal (D-61).
+   */
+  scrollWithinHistory(offsetY: number): void;
 }
 
 /**
@@ -115,5 +123,28 @@ export function createHistoryRevealScroll(
     expandSettled(expanded) {
       if (awaitingExpand && !expanded) scroll();
     },
+    scrollWithinHistory(offsetY) {
+      scrollTo(hostY + historyY + offsetY);
+    },
   };
+}
+
+/**
+ * 38.8 D-19/D-20 (RESEARCH Pattern 3; C2-01): the measure-success step of a
+ * History jump. The request carries its own `isCurrent()` (a closure over the
+ * requesting HistorySection mount's generation), checked right before the
+ * scroll: a superseded or cancelled request, or one whose mount is gone,
+ * neither scrolls nor reports a result, and returns false. Otherwise it scrolls
+ * `offsetY` below the History anchor, reports success and returns true.
+ */
+export function completeHistoryScroll(
+  scroller: HistoryRevealScroll,
+  offsetY: number,
+  isCurrent: () => boolean,
+  onResult: (ok: boolean) => void,
+): boolean {
+  if (!isCurrent()) return false;
+  scroller.scrollWithinHistory(offsetY);
+  onResult(true);
+  return true;
 }

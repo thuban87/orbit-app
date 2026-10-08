@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  completeHistoryScroll,
   createHistoryRevealScroll,
   resolveHistoryReveal,
   resolveProfileModuleHostState,
@@ -155,5 +156,80 @@ describe("createHistoryRevealScroll", () => {
     reveal.historyLayout(45, true);
     reveal.reveal(false);
     expect(scrollTo).toHaveBeenCalledExactlyOnceWith(60);
+  });
+});
+
+// 38.8 D-19/D-20 (C2-01): a heatmap jump scrolls to a point inside History,
+// measured relative to the History anchor. The controller holds no request or
+// generation state; each request carries its own `isCurrent()`.
+describe("scrollWithinHistory / completeHistoryScroll", () => {
+  function scroller() {
+    const scrollTo = vi.fn();
+    return { scrollTo, reveal: createHistoryRevealScroll(scrollTo) };
+  }
+
+  it("scrolls to the host offset plus the History offset plus the in-History offset", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(240);
+    reveal.historyLayout(600, true);
+    reveal.scrollWithinHistory(120);
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(960);
+  });
+
+  it("scrolls and reports success when the request is current", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(240);
+    reveal.historyLayout(600, true);
+    const onResult = vi.fn();
+    expect(completeHistoryScroll(reveal, 120, () => true, onResult)).toBe(true);
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(960);
+    expect(onResult).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it("neither scrolls nor reports when the request is no longer current", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(240);
+    reveal.historyLayout(600, true);
+    const onResult = vi.fn();
+    expect(completeHistoryScroll(reveal, 120, () => false, onResult)).toBe(
+      false,
+    );
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(onResult).not.toHaveBeenCalled();
+  });
+
+  it("scrolls a fresh mount's first request after an earlier mount's requests (C2-01)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(10);
+    reveal.historyLayout(20, true);
+    // One HistorySection mount completes gens 1..5.
+    let sessionA = 0;
+    for (let gen = 1; gen <= 5; gen++) {
+      sessionA = gen;
+      const current = gen;
+      completeHistoryScroll(reveal, gen, () => sessionA === current, vi.fn());
+    }
+    expect(scrollTo).toHaveBeenCalledTimes(5);
+    // History collapses and reopens: a new mount starts its own counter at 1.
+    const sessionB = 1;
+    const onResult = vi.fn();
+    expect(
+      completeHistoryScroll(reveal, 7, () => sessionB === 1, onResult),
+    ).toBe(true);
+    expect(scrollTo).toHaveBeenLastCalledWith(37);
+    expect(onResult).toHaveBeenCalledWith(true);
+  });
+
+  it("leaves a pending expand reveal untouched (D-61)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(100);
+    reveal.historyLayout(200, false);
+    reveal.reveal(true);
+    reveal.scrollWithinHistory(50);
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(350);
+    // The expand reveal still lands on the History header once expanded.
+    reveal.historyLayout(200, true);
+    expect(scrollTo).toHaveBeenLastCalledWith(300);
+    expect(scrollTo).toHaveBeenCalledTimes(2);
   });
 });
