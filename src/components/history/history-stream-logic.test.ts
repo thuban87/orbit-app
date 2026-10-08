@@ -28,6 +28,7 @@ import {
   type PendingHistoryScroll,
   pendingScrollOn,
   resolveHeatmapTarget,
+  revealAnnouncement,
   STREAM_CHUNK,
   STREAM_INITIAL_VISIBLE,
   type StreamSource,
@@ -714,5 +715,133 @@ describe("pendingScrollOn / isCurrentScroll (C2-02, C2-03)", () => {
 
   it("is never current with nothing pending", () => {
     expect(isCurrentScroll(null, 1)).toBe(false);
+  });
+});
+
+describe("resolveHeatmapTarget — a cycle span (D-20, D-21)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        interaction(1, "2026-09-02 09:00:00"),
+        interaction(2, "2026-09-08 09:00:00"),
+      ],
+      lifecycleEvents: [lifecycle(3, "2026-09-06 08:00:00")],
+      knowledgeChanges: [
+        knowledge(4, "2026-09-05 08:00:00"),
+        knowledge(5, "2026-08-20 08:00:00"),
+      ],
+    }),
+    TODAY,
+  );
+
+  it("reveals every day of the span with records (any family), newest first, scrolling to the newest", () => {
+    expect(
+      resolveHeatmapTarget(model, {
+        kind: "cycle",
+        start: "2026-09-01",
+        end: "2026-09-07",
+      }),
+    ).toEqual({
+      kind: "reveal",
+      days: ["2026-09-06", "2026-09-05", "2026-09-02"],
+      scrollDay: "2026-09-06",
+      highlightDays: ["2026-09-06", "2026-09-05", "2026-09-02"],
+      span: { start: "2026-09-01", end: "2026-09-07" },
+    });
+  });
+
+  it("reveals a span whose only records are knowledge changes (interaction count zero)", () => {
+    const resolution = resolveHeatmapTarget(model, {
+      kind: "cycle",
+      start: "2026-08-15",
+      end: "2026-08-28",
+    });
+    expect(resolution.kind).toBe("reveal");
+    if (resolution.kind === "reveal") {
+      expect(resolution.days).toEqual(["2026-08-20"]);
+    }
+  });
+
+  it("resolves a span with no record of any family to empty-span", () => {
+    expect(
+      resolveHeatmapTarget(model, {
+        kind: "cycle",
+        start: "2026-09-09",
+        end: "2026-09-15",
+      }),
+    ).toEqual({ kind: "empty-span", start: "2026-09-09", end: "2026-09-15" });
+  });
+});
+
+describe("a span crossing New Year (Pitfall 4)", () => {
+  // 2026: 30 daily records Oct 7 back, plus Jan 1 (record 30). 2025: 22
+  // records on Dec 31, then Dec 28 (record 22).
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        ...dailyInteractions(30, { y: 2026, m: 10, d: 7 }, 1),
+        interaction(50, "2026-01-01 09:00:00"),
+        ...sameDayInteractions(22, "2025-12-31", 100),
+        interaction(200, "2025-12-28 09:00:00"),
+      ],
+    }),
+    TODAY,
+  );
+
+  it("returns days in both years and opens and grows every year it touches", () => {
+    const resolution = resolveHeatmapTarget(model, {
+      kind: "cycle",
+      start: "2025-12-27",
+      end: "2026-01-02",
+    });
+    expect(resolution.kind).toBe("reveal");
+    if (resolution.kind !== "reveal") return;
+    expect(resolution.days).toEqual(["2026-01-01", "2025-12-31", "2025-12-28"]);
+    expect(resolution.scrollDay).toBe("2026-01-01");
+    const next = streamStateOnReveal(
+      initialStreamState(),
+      model,
+      resolution.days,
+    );
+    expect(isYearOpen(next, model, 2025)).toBe(true);
+    expect(next.shown.get(2026)).toBe(40);
+    expect(next.shown.get(2025)).toBe(40);
+    const rendered = (year: number) =>
+      visibleYear(next, model, year)
+        .months.flatMap((m) => m.days)
+        .map((d) => d.date);
+    expect(rendered(2026)).toContain("2026-01-01");
+    expect(rendered(2025)).toContain("2025-12-28");
+  });
+});
+
+describe("revealAnnouncement (D-23)", () => {
+  it("names a day's full date with the year", () => {
+    expect(
+      revealAnnouncement(
+        {
+          kind: "reveal",
+          days: ["2026-10-02"],
+          scrollDay: "2026-10-02",
+          highlightDays: ["2026-10-02"],
+        },
+        TODAY,
+      ),
+    ).toBe("Showing Friday, October 2, 2026");
+  });
+
+  it("names both ends of a span with their years", () => {
+    expect(
+      revealAnnouncement(
+        {
+          kind: "reveal",
+          days: ["2026-09-02"],
+          scrollDay: "2026-09-02",
+          highlightDays: ["2026-09-02"],
+          span: { start: "2026-09-01", end: "2026-09-07" },
+        },
+        TODAY,
+      ),
+    ).toBe("Showing Tuesday, September 1, 2026 to Monday, September 7, 2026");
   });
 });

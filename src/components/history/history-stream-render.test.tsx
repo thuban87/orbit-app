@@ -44,6 +44,8 @@ vi.mock("@/theme", () => ({
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
+// Reanimated must never load under vitest: the highlight overlay is a stub.
+vi.mock("./HistoryHighlight", () => ({ HistoryHighlight: "HistoryHighlight" }));
 
 interface Node {
   type: string;
@@ -267,6 +269,7 @@ describe("HistoryRecordRow", () => {
 function renderStream(
   parts: Partial<StreamSource>,
   state = initialStreamState(),
+  highlight: { days: ReadonlySet<string>; gen: number } | null = null,
 ) {
   const model = buildStreamModel(source(parts), TODAY);
   const handlers = {
@@ -277,7 +280,7 @@ function renderStream(
     registerNode: vi.fn(),
     onNodeLayout: vi.fn(),
   };
-  const tree = resolve(HistoryStream({ model, state, ...handlers }));
+  const tree = resolve(HistoryStream({ model, state, highlight, ...handlers }));
   return { tree, nodes: all(tree), handlers, model };
 }
 
@@ -401,6 +404,45 @@ describe("HistoryStream", () => {
     );
     (day.props.onLayout as () => void)();
     expect(handlers.onNodeLayout).toHaveBeenCalledWith("day:2026-10-02");
+  });
+
+  it("mounts the highlight overlay, keyed by the jump generation, only on highlighted days (D-53)", () => {
+    const { nodes } = renderStream(
+      {
+        interactions: [
+          interaction(1, "2026-10-07 09:00:00"),
+          interaction(2, "2026-10-02 09:00:00"),
+        ],
+        lifecycleEvents: [LIFECYCLE],
+      },
+      initialStreamState(),
+      { days: new Set(["2026-10-02", "2026-10-05"]), gen: 3 },
+    );
+    for (const date of ["2026-10-02", "2026-10-05"]) {
+      const day = byTestID(nodes, `history-stream-day-${date}`) as Node;
+      expect(day.children[0]?.type).toBe("HistoryHighlight");
+      expect(day.children[0]?.props.gen).toBe(3);
+    }
+    const today = byTestID(nodes, "history-stream-day-2026-10-07") as Node;
+    expect(all([today]).some((n) => n.type === "HistoryHighlight")).toBe(false);
+    expect(nodes.filter((n) => n.type === "HistoryHighlight")).toHaveLength(2);
+  });
+
+  it("renders no highlight without a jump and never a live region on day groups or rows (D-23)", () => {
+    const parts = {
+      interactions: [interaction(2, "2026-10-02 09:00:00")],
+      lifecycleEvents: [LIFECYCLE],
+      knowledgeChanges: [KNOWLEDGE],
+    };
+    const plain = renderStream(parts);
+    expect(plain.nodes.some((n) => n.type === "HistoryHighlight")).toBe(false);
+    const lit = renderStream(parts, initialStreamState(), {
+      days: new Set(["2026-10-02", "2026-10-04", "2026-10-05"]),
+      gen: 1,
+    });
+    expect(
+      lit.nodes.some((n) => n.props.accessibilityLiveRegion !== undefined),
+    ).toBe(false);
   });
 
   it("renders no nested scroll container anywhere", () => {
