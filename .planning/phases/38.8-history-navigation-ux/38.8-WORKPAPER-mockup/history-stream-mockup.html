@@ -1,0 +1,373 @@
+<title>Orbit History Stream</title>
+<style>
+/* Layout: one phone-width Profile History section, interactive, plus two static reference states beside it. Tokens mirror Orbit's galaxy palette (light + dark). */
+:root {
+  --bg: #EDF0F9; --surface: #FBFCFE; --raised: #F1F4FB; --fg: #1A1F33; --muted: #515A78;
+  --border: #D2D9EA; --accent: #3355E6; --on-accent: #FFFFFF; --tint: rgba(51,85,230,0.12);
+  --h0: #DDE3F5; --h1: #B9C6F0; --h2: #8CA0E6; --h3: #5B72D6; --h4: #3355E6;
+  --font: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Roboto Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0B0E1A; --surface: #141828; --raised: #1A2036; --fg: #E6E9F5; --muted: #8B93B0;
+  --border: #2A3048; --accent: #6C8CFF; --on-accent: #0B0E1A; --tint: rgba(108,140,255,0.14);
+  --h0: #1A2138; --h1: #2E3E6E; --h2: #42579E; --h3: #5A78D6; --h4: #8AA6FF; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0B0E1A; --surface: #141828; --raised: #1A2036; --fg: #E6E9F5; --muted: #8B93B0;
+  --border: #2A3048; --accent: #6C8CFF; --on-accent: #0B0E1A; --tint: rgba(108,140,255,0.14);
+  --h0: #1A2138; --h1: #2E3E6E; --h2: #42579E; --h3: #5A78D6; --h4: #8AA6FF; color-scheme: dark }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500&display=swap">
+<style>
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.4; padding-inline: 16px; padding-block: 24px 48px }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 24px }
+.intro h1 { font-size: 22px; margin: 0 0 6px; text-wrap: balance }
+.intro p { margin: 0; color: var(--muted); max-width: 70ch }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start }
+.frame { width: 100%; max-width: 380px; display: grid; gap: 8px; min-width: 0 }
+.frame > .cap { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500 }
+.phone { border: 1px solid var(--border); border-radius: 22px; background: var(--bg); padding: 14px 12px; position: relative; overflow: hidden }
+.section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; display: grid; gap: 14px }
+.sec-head { display: flex; justify-content: space-between; align-items: center }
+.sec-head h2 { margin: 0; font-size: 20px; font-weight: 500 }
+.chev { color: var(--muted); font-size: 18px }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px }
+.seg button, .presets button { font: inherit; font-size: 13px; padding: 8px 2px; border-radius: 10px; border: 1px solid var(--border); background: var(--raised); color: var(--fg); cursor: pointer; white-space: nowrap }
+.seg button[aria-pressed="true"], .presets button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 500 }
+.presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px }
+.navrow { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted) }
+.navrow button { font: inherit; border: 1px solid var(--border); background: var(--raised); color: var(--fg); border-radius: 10px; width: 40px; height: 34px; cursor: pointer }
+.navrow button:disabled { opacity: .35; cursor: default }
+.grid { display: grid; gap: 6px; justify-content: center }
+.cell { width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; padding: 0 }
+.cell.cur { outline: 2px solid var(--fg); outline-offset: 1px }
+.cell.blank { background: transparent; border-color: transparent; cursor: default }
+.cell.future { opacity: .3; cursor: default }
+.dow { font-size: 11px; color: var(--muted); text-align: center; width: 40px }
+.intensity { display: grid; gap: 4px }
+.intensity .lbl { font-size: 12px; letter-spacing: .08em; font-weight: 700; color: var(--muted) }
+.intensity .big { font-size: 17px; font-weight: 700 }
+.intensity .sub { font-size: 13px; color: var(--muted) }
+.bar { height: 6px; border-radius: 3px; background: var(--muted); opacity: .6 }
+.note { border: 1px solid var(--border); background: var(--raised); border-radius: 12px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px }
+.note .x { border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer }
+.linkbtn { font: inherit; font-weight: 500; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer }
+.jumprow { display: flex; justify-content: flex-end }
+.btn { font: inherit; font-size: 14px; font-weight: 500; border: 1px solid var(--border); background: var(--raised); color: var(--accent); border-radius: 12px; padding: 8px 14px; cursor: pointer }
+.stream { display: grid; gap: 4px; max-height: 560px; overflow-y: auto; scroll-behavior: smooth; padding-right: 2px }
+@media (prefers-reduced-motion: reduce) { .stream { scroll-behavior: auto } }
+.yearhdr { font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--muted); padding: 10px 0 2px; border-bottom: 1px solid var(--border) }
+.yearrow { font: inherit; text-align: left; width: 100%; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--fg); padding: 12px 2px; cursor: pointer; display: flex; gap: 8px; font-weight: 500 }
+.yearrow .n { color: var(--muted); font-weight: 400 }
+.month { font-size: 15px; font-weight: 500; padding: 12px 0 2px }
+.day { border-top: 1px solid var(--border); padding: 8px 0 6px 0; display: grid; gap: 6px; border-left: 3px solid transparent; transition: background-color 5s linear, border-color 5s linear; padding-left: 6px; border-radius: 2px }
+.day.hl { background: var(--tint); border-left-color: var(--accent); transition: none }
+@media (prefers-reduced-motion: reduce) { .day { transition: none } }
+.daylbl { font-size: 13px; font-weight: 700; color: var(--fg) }
+.row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding-left: 12px; cursor: pointer; border-radius: 8px }
+.row:hover { background: var(--raised) }
+.row.life { cursor: default; color: var(--muted) }
+.row.life:hover { background: none }
+.ico { font-size: 15px; line-height: 20px; text-align: center }
+.rhead { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline }
+.rhead .t { font-weight: 500 }
+.meta { font-size: 13px; color: var(--muted) }
+.notetext { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }
+.grp { font-size: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; color: var(--muted) }
+.empty-yr { font-size: 14px; color: var(--muted); padding: 8px 0 }
+.more { justify-self: start; margin: 8px 0 6px 12px }
+.sheet { border: 1px solid var(--border); background: var(--surface); border-radius: 18px 18px 0 0; padding: 16px; display: grid; gap: 12px }
+.sheet h3 { margin: 0; font-size: 17px; font-weight: 500 }
+.ystep { display: flex; justify-content: center; align-items: center; gap: 18px; font-weight: 700; font-family: var(--mono) }
+.ystep button { font: inherit; border: 1px solid var(--border); background: var(--raised); color: var(--fg); border-radius: 10px; width: 40px; height: 34px; cursor: pointer }
+.ystep button:disabled { opacity: .35 }
+.months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px }
+.months button { font: inherit; padding: 12px 0; border-radius: 10px; border: 1px solid var(--border); background: var(--raised); color: var(--fg); cursor: pointer; position: relative }
+.months button.sel { border-color: var(--accent); border-width: 2px }
+.months button:disabled { opacity: .3; cursor: default }
+.months button .dot { position: absolute; bottom: 4px; left: 50%; width: 5px; height: 5px; border-radius: 50%; background: var(--fg); transform: translateX(-50%) }
+.overlay { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end }
+.overlay .sheet { width: 100%; border-radius: 18px 18px 0 0 }
+.legend { font-size: 13px; color: var(--muted); display: grid; gap: 4px; max-width: 70ch }
+.legend b { color: var(--fg); font-weight: 500 }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <h1>Phase 38.8: the new History section (mockup)</h1>
+    <p>Throwaway mockup built from the dossier decisions, for review. Sample contact, today = Wed Oct 7, 2026. The left frame works: tap heatmap squares, Jump to date, expand years, Show older. The other two frames are fixed states for reference. Real spacing and type will follow the app's components.</p>
+  </div>
+
+  <div class="frames">
+    <div class="frame">
+      <div class="cap">A · Interactive</div>
+      <div class="phone" id="phoneA">
+        <div class="section">
+          <div class="sec-head"><h2>History</h2><span class="chev" aria-hidden="true">⌄</span></div>
+          <div class="seg" id="lenses"></div>
+          <div class="presets" id="presets"></div>
+          <div class="navrow" id="navrow"></div>
+          <div id="heat"></div>
+          <div id="emptynote"></div>
+          <div class="intensity">
+            <div class="lbl">INTENSITY</div>
+            <div class="big">3× this period</div>
+            <div class="sub">Weekly intended · 6-day average</div>
+            <div class="bar"></div>
+          </div>
+          <div class="jumprow"><button class="btn" id="jumpBtn">Jump to date</button></div>
+          <div class="stream" id="stream" aria-label="History records"></div>
+        </div>
+        <div class="overlay" id="jumpOverlay" hidden></div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="cap">B · Jump to date sheet</div>
+      <div class="phone">
+        <div class="sheet" id="staticSheet"></div>
+      </div>
+      <div class="cap" style="margin-top:12px">C · Early January, empty current year</div>
+      <div class="phone">
+        <div class="section">
+          <div class="stream" style="max-height:none">
+            <div class="yearhdr">2027</div>
+            <div class="empty-yr">Nothing logged in 2027 yet</div>
+            <button class="yearrow">▸ 2026 <span class="n">· 61 interactions</span></button>
+            <button class="yearrow">▸ 2025 <span class="n">· 34 interactions</span></button>
+            <button class="yearrow">▸ 2024 <span class="n">· 12 interactions</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame legend">
+      <div class="cap">What to look at</div>
+      <div><b>Records first.</b> Newest first, grouped by year, then month, then day. Day labels read Today, Yesterday, then "Fri Oct 2" (D-14, D-15, D-33).</div>
+      <div><b>Rows.</b> Interactions show channel, time, direction / No reply / quality, and two lines of note. Group interactions add the event name. Status events (Snoozed etc.) are grey and can't be tapped. Profile updates show the field and the new value (D-16, D-40 to D-43).</div>
+      <div><b>Older years</b> are collapsed rows with an interaction count. An open year shows about 20 records, then "Show older" (D-34, D-35, D-39).</div>
+      <div><b>Heatmap tap</b> scrolls to that day or cycle and highlights it with a bar and tint for about 5 seconds. An empty day shows a note under the heatmap with Log interaction. An empty cycle offers Log without a date (D-19 to D-21, D-53 to D-55).</div>
+      <div><b>Jump to date</b> opens a year stepper and month grid. Dots mark months with records. It opens on the month in view (D-48 to D-50).</div>
+      <div><b>Unchanged:</b> lenses and presets (labels now in full), the Intensity line, and the no-history, loading and error states.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const TODAY = new Date(2026, 9, 7);
+  const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONF = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  // ---- sample records (example data, not anyone's real history) ----
+  const recs = [];
+  const add = (y, m, d, hh, mm, r) => recs.push(Object.assign({ at: new Date(y, m, d, hh, mm) }, r));
+  const call = (dir, note, q) => ({ kind: "i", ch: "Call", ico: "📞", dir, q, note });
+  const text = (dir, note) => ({ kind: "i", ch: "Text", ico: "💬", dir, note });
+  add(2026,9,7,8,40, text("Outbound","Sent the article about the Lisbon trip."));
+  add(2026,9,6,19,5, call("Inbound","She called about the house inspection. Closing moved to the 20th; nervous about the roof report.", "Great"));
+  add(2026,9,2,15,14, call("Outbound","Talked about the move to Austin. Wants restaurant recommendations near South Congress and a mover who isn't a scam.", "Good"));
+  add(2026,9,2,15,20, { kind: "l", label: "Snoozed", ico: "⏸", detail: "until Oct 16" });
+  add(2026,9,2,18,2, { kind: "k", field: "Current location", value: "Austin, TX" });
+  add(2026,9,1,9,2, text("Inbound", null));
+  add(2026,8,24,12,30, { kind: "i", ch: "Coffee", ico: "☕", dir: "Mutual", note: "Lent her the Murakami. Ask how the new job is going next time.", q: "Great" });
+  add(2026,8,14,20,10, Object.assign(text("Outbound", "Happy birthday message."), { noreply: true }));
+  add(2026,8,3,17,45, call("Outbound","Quick catch-up about her sister's wedding plans."));
+  add(2026,7,17,10,0, { kind: "i", ch: "Meetup", ico: "👥", dir: "Mutual", grp: "Book club", note: "Book club at Ada's. Maya picked the next book and is hosting in September." });
+  add(2026,7,5,13,0, { kind: "k", field: "Last talked about", value: "Her sister's wedding in Porto" });
+  const filler = [[2026,6,28],[2026,6,19],[2026,6,11],[2026,5,30],[2026,5,22],[2026,5,9],[2026,4,27],[2026,4,12],[2026,3,30],[2026,3,15],[2026,2,28],[2026,2,9],[2026,1,20],[2026,1,3],[2026,0,22],[2026,0,8]];
+  filler.forEach(([y,m,d], i) => add(y,m,d,12 + (i % 6),15, i % 3 ? text(i % 2 ? "Inbound" : "Outbound", i % 4 ? "Checked in about the week." : null) : call("Outbound","Long call, mostly about work.", "Good")));
+  add(2026,2,2,11,0, { kind: "l", label: "Restored", ico: "↺" });
+  add(2025,11,24,10,0, call("Inbound","Christmas call from Lisbon."));
+  add(2025,10,3,9,0, text("Outbound","Congrats on the new job."));
+  add(2025,5,14,19,0, { kind: "i", ch: "Dinner", ico: "🍽", dir: "Mutual", note: "Dinner at Ostra. Talked about moving out of Boston." });
+  add(2025,1,11,8,30, text("Outbound", null));
+  add(2024,8,2,16,0, call("Outbound","First call after meeting at the conference."));
+  add(2024,3,22,12,0, { kind: "l", label: "Bound", ico: "◉" });
+  const yearInteractionTotals = { 2026: null, 2025: 34, 2024: 12 };
+  const order = { i: 0, l: 1, k: 2 };
+  recs.sort((a, b) => b.at - a.at || order[a.kind] - order[b.kind]);
+
+  const byYear = {};
+  recs.forEach(r => (byYear[r.at.getFullYear()] ||= []).push(r));
+  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+  const interactionCount = y => yearInteractionTotals[y] ?? byYear[y].filter(r => r.kind === "i").length;
+
+  // ---- state ----
+  const S = { lens: "cycles", preset: 10, page: 0, open: { [TODAY.getFullYear()]: true }, shown: {}, note: null, hl: null, hlTimer: null };
+  const CHUNK = 20;
+  const $ = id => document.getElementById(id);
+
+  const dayKey = d => ymd(d);
+  const recsOn = key => recs.filter(r => dayKey(r.at) === key);
+  const interOn = key => recsOn(key).filter(r => r.kind === "i").length;
+  const level = n => n <= 0 ? "var(--h0)" : n === 1 ? "var(--h1)" : n === 2 ? "var(--h2)" : n === 3 ? "var(--h3)" : "var(--h4)";
+
+  // ---- heatmap ----
+  function renderLenses() {
+    const L = [["cycles","Cycles"],["7days","7 Days"],["month","Month"],["year","Year"]];
+    $("lenses").innerHTML = L.map(([k, t]) => `<button aria-pressed="${S.lens === k}" data-lens="${k}">${t}</button>`).join("");
+    $("presets").hidden = S.lens !== "cycles";
+    $("presets").innerHTML = [5,10,15,20].map(n => `<button aria-pressed="${S.preset === n}" data-preset="${n}">${n}</button>`).join("");
+  }
+  function cycleSpans() {
+    // weekly cadence: spans ending today, shifted back by whole pages
+    const spans = [];
+    const end0 = new Date(TODAY); end0.setDate(end0.getDate() - S.page * S.preset * 7);
+    for (let i = 0; i < S.preset; i++) {
+      const end = new Date(end0); end.setDate(end.getDate() - i * 7);
+      const start = new Date(end); start.setDate(start.getDate() - 6);
+      spans.unshift({ start, end, cur: S.page === 0 && i === 0 });
+    }
+    return spans;
+  }
+  function inSpan(r, s) { const k = dayKey(r.at); return k >= ymd(s.start) && k <= ymd(s.end); }
+  function renderHeat() {
+    const nav = $("navrow");
+    if (S.lens === "cycles") {
+      const spans = cycleSpans();
+      nav.innerHTML = `<button data-nav="-1" aria-label="Previous cycles">◀</button><span>${MON[spans[0].start.getMonth()]} ${spans[0].start.getDate()} – ${MON[spans.at(-1).end.getMonth()]} ${spans.at(-1).end.getDate()}</span><button data-nav="1" aria-label="Next cycles" ${S.page === 0 ? "disabled" : ""}>▶</button>`;
+      $("heat").innerHTML = `<div class="grid" style="grid-template-columns:repeat(5,52px)">` + spans.map((s, i) => {
+        const n = recs.filter(r => r.kind === "i" && inSpan(r, s)).length;
+        return `<button class="cell ${s.cur ? "cur" : ""}" style="width:52px;height:52px;background:${level(n)}" data-span="${i}" aria-label="${MON[s.start.getMonth()]} ${s.start.getDate()} to ${MON[s.end.getMonth()]} ${s.end.getDate()}, ${n} interactions${s.cur ? ", current cycle" : ""}"></button>`;
+      }).join("") + `</div>`;
+      S._spans = spans;
+    } else {
+      // Month lens (7 Days / Year behave like their current versions; Month shown here)
+      const ref = new Date(TODAY.getFullYear(), TODAY.getMonth() + S.page, 1);
+      nav.innerHTML = `<button data-nav="-1" aria-label="Previous month">◀</button><span>${MONF[ref.getMonth()]} ${ref.getFullYear()}</span><button data-nav="1" aria-label="Next month" ${S.page === 0 ? "disabled" : ""}>▶</button>`;
+      const first = ref.getDay(); const dim = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+      let h = `<div class="grid" style="grid-template-columns:repeat(7,40px)">` + DOW.map(d => `<div class="dow">${d[0]}</div>`).join("");
+      for (let i = 0; i < first; i++) h += `<span class="cell blank"></span>`;
+      for (let d = 1; d <= dim; d++) {
+        const dt = new Date(ref.getFullYear(), ref.getMonth(), d); const k = ymd(dt);
+        const fut = dt > TODAY; const n = interOn(k);
+        h += `<button class="cell ${fut ? "future" : ""} ${k === ymd(TODAY) ? "cur" : ""}" ${fut ? "disabled" : ""} style="background:${level(n)}" data-day="${k}" aria-label="${MON[dt.getMonth()]} ${d}, ${n} interactions"></button>`;
+      }
+      $("heat").innerHTML = h + `</div>`;
+    }
+  }
+  function renderNote() {
+    const n = S.note;
+    $("emptynote").innerHTML = n ? `<div class="note" role="status"><span>${n.text}</span><span style="display:flex;gap:12px;align-items:center"><button class="linkbtn" data-log="1">Log interaction</button><button class="x" aria-label="Close" data-closenote="1">✕</button></span></div>` : "";
+  }
+
+  // ---- stream ----
+  const dayLabel = d => {
+    const k = ymd(d); const y = new Date(TODAY); y.setDate(y.getDate() - 1);
+    if (k === ymd(TODAY)) return "Today";
+    if (k === ymd(y)) return "Yesterday";
+    return `${DOW[d.getDay()]} ${MON[d.getMonth()]} ${d.getDate()}`;
+  };
+  const time = d => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  function rowHTML(r) {
+    if (r.kind === "l") return `<div class="row life"><span class="ico">${r.ico}</span><div><div class="rhead"><span>${r.label}</span><span class="meta">${time(r.at)}</span></div>${r.detail ? `<div class="meta">${r.detail}</div>` : ""}</div></div>`;
+    if (r.kind === "k") return `<div class="row" role="button" tabindex="0"><span class="ico">✎</span><div><div class="rhead"><span class="t">${r.field}</span><span class="meta">${time(r.at)}</span></div><div class="notetext" style="-webkit-line-clamp:1">${r.value}</div></div></div>`;
+    const meta = [r.dir, r.noreply ? "No reply" : null, r.q].filter(Boolean).join(" · ");
+    return `<div class="row" role="button" tabindex="0"><span class="ico">${r.ico}</span><div><div class="rhead"><span class="t">${r.ch}</span><span class="meta">${time(r.at)}</span>${r.grp ? `<span class="grp">${r.grp}</span>` : ""}</div>${meta ? `<div class="meta">${meta}</div>` : ""}${r.note ? `<div class="notetext">${r.note}</div>` : ""}</div></div>`;
+  }
+  function renderStream() {
+    let h = "";
+    years.forEach(y => {
+      if (!S.open[y]) { h += `<button class="yearrow" data-year="${y}" aria-expanded="false">▸ ${y} <span class="n">· ${interactionCount(y)} interaction${interactionCount(y) === 1 ? "" : "s"}</span></button>`; return; }
+      h += `<div class="yearhdr" data-yearhdr="${y}">${y}</div>`;
+      const list = byYear[y]; const lim = S.shown[y] || CHUNK; const vis = list.slice(0, lim);
+      let curMonth = -1, curDay = null;
+      vis.forEach(r => {
+        const m = r.at.getMonth(); const k = ymd(r.at);
+        if (m !== curMonth) { if (curDay) h += `</div>`; curDay = null; h += `<div class="month" data-month="${y}-${m}">${MONF[m]}</div>`; curMonth = m; }
+        if (k !== curDay) { if (curDay) h += `</div>`; h += `<div class="day" data-daykey="${k}"><div class="daylbl">${dayLabel(r.at)}</div>`; curDay = k; }
+        h += rowHTML(r);
+      });
+      if (curDay) h += `</div>`;
+      if (list.length > lim) h += `<button class="btn more" data-more="${y}">Show older</button>`;
+    });
+    $("stream").innerHTML = h;
+  }
+
+  function ensureVisible(key) {
+    const y = Number(key.slice(0, 4)); S.open[y] = true;
+    const idx = byYear[y].findIndex(r => ymd(r.at) === key);
+    if (idx >= 0) S.shown[y] = Math.max(S.shown[y] || CHUNK, Math.ceil((idx + 1) / CHUNK) * CHUNK);
+  }
+  function highlight(keys) {
+    renderStream();
+    const els = keys.map(k => document.querySelector(`[data-daykey="${k}"]`)).filter(Boolean);
+    if (!els.length) return;
+    const st = $("stream");
+    st.scrollTop = els[0].offsetTop - st.offsetTop - 8;
+    els.forEach(e => e.classList.add("hl"));
+    requestAnimationFrame(() => requestAnimationFrame(() => els.forEach(e => e.classList.remove("hl"))));
+  }
+  function jumpToDays(keys) { keys.forEach(ensureVisible); highlight(keys); }
+
+  // ---- jump sheet ----
+  function sheetHTML(year, selMonth, interactive) {
+    const minY = Math.min(...years); const maxY = TODAY.getFullYear();
+    const has = m => recs.some(r => r.at.getFullYear() === year && r.at.getMonth() === m);
+    return `<h3>Jump to</h3>
+      <div class="ystep"><button ${interactive ? 'data-ystep="-1"' : ""} ${year <= minY ? "disabled" : ""} aria-label="Previous year">◀</button><span>${year}</span><button ${interactive ? 'data-ystep="1"' : ""} ${year >= maxY ? "disabled" : ""} aria-label="Next year">▶</button></div>
+      <div class="months">${MON.map((m, i) => {
+        const fut = year === maxY && i > TODAY.getMonth();
+        return `<button ${interactive ? `data-jm="${i}"` : ""} class="${i === selMonth ? "sel" : ""}" ${fut ? "disabled" : ""} aria-label="${MONF[i]} ${year}${has(i) ? ", has records" : ""}">${m}${has(i) ? '<span class="dot"></span>' : ""}</button>`;
+      }).join("")}</div>`;
+  }
+  let sheetYear = TODAY.getFullYear();
+  function monthInView() {
+    const st = $("stream"); const top = st.scrollTop + st.offsetTop;
+    let best = null;
+    document.querySelectorAll("#stream [data-month]").forEach(e => { if (e.offsetTop <= top + 20) best = e.dataset.month; });
+    return best ? best.split("-").map(Number) : [TODAY.getFullYear(), TODAY.getMonth()];
+  }
+  function openSheet() {
+    const [y, m] = monthInView(); sheetYear = y;
+    const o = $("jumpOverlay"); o.hidden = false;
+    o.innerHTML = `<div class="sheet">${sheetHTML(sheetYear, m, true)}</div>`;
+    o.dataset.sel = m;
+  }
+  function jumpMonth(y, m) {
+    $("jumpOverlay").hidden = true;
+    const inMonth = recs.filter(r => r.at.getFullYear() === y && r.at.getMonth() === m);
+    if (inMonth.length) { const k = ymd(inMonth[0].at); ensureVisible(k); renderStream(); const e = document.querySelector(`[data-month="${y}-${m}"]`); if (e) { const st = $("stream"); st.scrollTop = e.offsetTop - st.offsetTop - 4; } return; }
+    const before = recs.find(r => r.at < new Date(y, m, 1));
+    const after = [...recs].reverse().find(r => r.at >= new Date(y, m + 1, 1));
+    const fmt = r => r ? `${MON[r.at.getMonth()]} ${r.at.getDate()}, ${r.at.getFullYear()}` : null;
+    S.note = { text: `No activity in ${MONF[m]} ${y}. Nearest: ${[fmt(after), fmt(before)].filter(Boolean).join(" · ")}` };
+    renderNote();
+  }
+
+  // ---- events ----
+  document.getElementById("phoneA").addEventListener("click", e => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.lens) { S.lens = t.dataset.lens === "cycles" ? "cycles" : "month"; S.page = 0; S.note = null; renderAll(); }
+    else if (t.dataset.preset) { S.preset = Number(t.dataset.preset); S.page = 0; renderAll(); }
+    else if (t.dataset.nav) { S.page = Math.min(0, S.page + Number(t.dataset.nav)); S.note = null; renderHeat(); renderNote(); }
+    else if (t.dataset.day) {
+      const k = t.dataset.day; S.note = null;
+      if (recsOn(k).length) { renderNote(); jumpToDays([k]); }
+      else { const d = new Date(k + "T12:00"); S.note = { text: `Nothing logged on ${DOW[d.getDay()]} ${MON[d.getMonth()]} ${d.getDate()}` }; renderNote(); }
+    }
+    else if (t.dataset.span) {
+      const s = S._spans[Number(t.dataset.span)]; const inS = recs.filter(r => inSpan(r, s)); S.note = null;
+      if (inS.length) { renderNote(); jumpToDays([...new Set(inS.map(r => ymd(r.at)))]); }
+      else { S.note = { text: `Nothing logged ${MON[s.start.getMonth()]} ${s.start.getDate()} – ${MON[s.end.getMonth()]} ${s.end.getDate()}` }; renderNote(); }
+    }
+    else if (t.dataset.closenote) { S.note = null; renderNote(); }
+    else if (t.dataset.log) { t.textContent = "Opens detailed Log"; }
+    else if (t.dataset.year) { S.open[t.dataset.year] = true; renderStream(); }
+    else if (t.dataset.more) { const y = t.dataset.more; S.shown[y] = (S.shown[y] || CHUNK) + CHUNK; renderStream(); }
+    else if (t.id === "jumpBtn") openSheet();
+    else if (t.dataset.ystep) { sheetYear += Number(t.dataset.ystep); $("jumpOverlay").innerHTML = `<div class="sheet">${sheetHTML(sheetYear, -1, true)}</div>`; }
+    else if (t.dataset.jm) jumpMonth(sheetYear, Number(t.dataset.jm));
+  });
+  $("jumpOverlay").addEventListener("click", e => { if (e.target.id === "jumpOverlay") $("jumpOverlay").hidden = true; });
+
+  function renderAll() { renderLenses(); renderHeat(); renderNote(); renderStream(); }
+  renderAll();
+  $("staticSheet").innerHTML = sheetHTML(2026, 9, false);
+})();
+</script>
