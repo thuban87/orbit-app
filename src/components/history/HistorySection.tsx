@@ -49,6 +49,7 @@ import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
 import { ActivityHeatmap } from "@/components/history/ActivityHeatmap";
 import { DateDetailSheet } from "@/components/history/DateDetailSheet";
 import { HeatmapContextCard } from "@/components/history/HeatmapContextCard";
+import { HistoryStream } from "@/components/history/HistoryStream";
 import {
   advanceHistoryDay,
   buildLogRoute,
@@ -70,9 +71,13 @@ import {
   persistedPrefOnWriteFailed,
   resolveActiveWindow,
 } from "@/components/history/history-section-logic";
+import {
+  buildStreamModel,
+  initialStreamState,
+  streamStateOnExpandYear,
+} from "@/components/history/history-stream-logic";
 import { IntensityChart } from "@/components/history/IntensityChart";
 import { InteractionDetail } from "@/components/history/InteractionDetail";
-import { RolodexBrowser } from "@/components/history/RolodexBrowser";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import {
@@ -390,6 +395,17 @@ export function HistorySection({
 
   const detailInteraction = interactions.find((i) => i.id === detailId) ?? null;
 
+  // --- The stream (38.8 D-10/D-14/D-15/D-62) ---------------------------------
+  // The model is derived from the loaded history and today; the view state
+  // (open years, Show older chunks) is created fresh on each mount and is NOT
+  // reset by Profile-revision re-reads while mounted (D-31). Never persisted
+  // (D-18). Both hooks sit above the early returns below (hook order).
+  const streamModel = useMemo(
+    () => (history ? buildStreamModel(history, today) : null),
+    [history, today],
+  );
+  const [streamState, setStreamState] = useState(initialStreamState);
+
   // Records scoped to the open sheet (single date or cycle range, inclusive).
   const sheetRecords = useMemo(() => {
     if (!sheet || !history) {
@@ -488,12 +504,18 @@ export function HistorySection({
         />
       ) : null}
       <IntensityChart intensity={intensity} />
-      <RolodexBrowser
-        markers={history.markers}
-        today={today}
-        onSeeDetails={openSheetForDate}
-        onLogInteraction={log}
-      />
+      {streamModel ? (
+        <HistoryStream
+          model={streamModel}
+          state={streamState}
+          onExpandYear={(year) =>
+            setStreamState((s) => streamStateOnExpandYear(s, year))
+          }
+          onShowOlder={() => {}}
+          onOpenInteraction={setDetailId}
+          onOpenKnowledgeChange={onOpenKnowledgeChange}
+        />
+      ) : null}
       <DateDetailSheet
         visible={sheet !== null}
         onRequestClose={() => setSheet(null)}
