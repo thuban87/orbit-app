@@ -12,6 +12,10 @@
  * own line with that day's records indented beneath and a thin divider between
  * days. No per-day cards, no gap markers (D-37), nothing sticky (D-32). Every
  * colour is a theme token read through `useTheme()` inside the glass card (D-07).
+ *
+ * Heatmap jumps (38.8 D-19/D-20/D-53): every day group registers its View as a
+ * measurable scroll target and reports its layout; a highlighted day mounts the
+ * HistoryHighlight overlay, keyed by the jump generation.
  */
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
@@ -20,6 +24,7 @@ import { Button } from "@/components/ui/Button";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { HistoryHighlight } from "./HistoryHighlight";
 import { HistoryRecordRow } from "./HistoryStreamRows";
 import {
   dayNodeKey,
@@ -47,7 +52,17 @@ export interface HistoryStreamProps {
   registerNode: (key: string, node: View | null) => void;
   /** A day group laid out (a jump waiting for its target scrolls then). */
   onNodeLayout: (key: string) => void;
+  /**
+   * The days a heatmap jump highlights, keyed by the jump generation (38.8
+   * D-53/D-54); null when no highlight is showing.
+   */
+  highlight: HistoryStreamHighlight | null;
   testID?: string;
+}
+
+export interface HistoryStreamHighlight {
+  readonly days: ReadonlySet<string>;
+  readonly gen: number;
 }
 
 export function HistoryStream({
@@ -59,6 +74,7 @@ export function HistoryStream({
   onOpenKnowledgeChange,
   registerNode,
   onNodeLayout,
+  highlight,
   testID = "history-stream",
 }: HistoryStreamProps) {
   return (
@@ -75,6 +91,7 @@ export function HistoryStream({
             onOpenKnowledgeChange={onOpenKnowledgeChange}
             registerNode={registerNode}
             onNodeLayout={onNodeLayout}
+            highlight={highlight}
             testID={testID}
           />
         ) : (
@@ -99,6 +116,7 @@ interface OpenYearProps {
   onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
   registerNode: (key: string, node: View | null) => void;
   onNodeLayout: (key: string) => void;
+  highlight: HistoryStreamHighlight | null;
   testID: string;
 }
 
@@ -142,6 +160,7 @@ function OpenYear({
   onOpenKnowledgeChange,
   registerNode,
   onNodeLayout,
+  highlight,
   testID,
 }: OpenYearProps) {
   const { colors } = useTheme();
@@ -187,6 +206,10 @@ function OpenYear({
                 onLayout={() => onNodeLayout(dayNodeKey(day.date))}
                 style={[styles.day, { borderColor: colors.border }]}
               >
+                {highlight?.days.has(day.date) ? (
+                  // First child, so it paints behind the day's label and rows.
+                  <HistoryHighlight key={highlight.gen} gen={highlight.gen} />
+                ) : null}
                 <AppText
                   role="label"
                   accessibilityLabel={day.accessibilityLabel}
@@ -254,6 +277,8 @@ const styles = StyleSheet.create({
   },
   day: {
     borderTopWidth: StyleSheet.hairlineWidth,
+    // Clears the jump highlight's left accent bar (mockup `.day` padding-left).
+    paddingLeft: SPACING.sm,
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.xs,
     gap: SPACING.xs,

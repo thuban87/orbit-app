@@ -358,8 +358,10 @@ export function dayNodeKey(date: string): string {
   return `day:${date}`;
 }
 
-/** A heatmap target the stream can resolve (a day cell). */
-export type HeatmapTarget = { readonly kind: "date"; readonly date: string };
+/** A heatmap target the stream can resolve: a day cell or a cycle span. */
+export type HeatmapTarget =
+  | { readonly kind: "date"; readonly date: string }
+  | { readonly kind: "cycle"; readonly start: string; readonly end: string };
 
 /**
  * What a heatmap tap does to the stream (D-19..D-21). `reveal` lists the target
@@ -373,6 +375,8 @@ export type HeatmapResolution =
       readonly days: readonly string[];
       readonly scrollDay: string;
       readonly highlightDays: readonly string[];
+      /** The tapped cycle span (inclusive), for the announcement (D-23). */
+      readonly span?: { readonly start: string; readonly end: string };
     }
   | { readonly kind: "empty-day"; readonly date: string }
   | {
@@ -382,14 +386,28 @@ export type HeatmapResolution =
     };
 
 /**
- * Resolve a heatmap tap against the stream model (D-19, D-21). Emptiness is
+ * Resolve a heatmap tap against the stream model (D-19..D-21). Emptiness is
  * decided from the all-family day index, never from the heatmap's interaction
- * count: a day holding only lifecycle or knowledge records still reveals.
+ * count: a day or span holding only lifecycle or knowledge records still
+ * reveals. A span reveals every day in it with records, newest first, and
+ * scrolls to the newest (D-20); its days may sit in two years (Pitfall 4).
  */
 export function resolveHeatmapTarget(
   model: StreamModel,
   target: HeatmapTarget,
 ): HeatmapResolution {
+  if (target.kind === "cycle") {
+    const { start, end } = target;
+    const days = model.days.filter((date) => date >= start && date <= end);
+    if (days.length === 0) return { kind: "empty-span", start, end };
+    return {
+      kind: "reveal",
+      days,
+      scrollDay: days[0],
+      highlightDays: days,
+      span: { start, end },
+    };
+  }
   if (model.dayIndex.has(target.date)) {
     return {
       kind: "reveal",
@@ -519,6 +537,21 @@ export function isCurrentScroll(
   gen: number,
 ): boolean {
   return pending !== null && pending.gen === gen;
+}
+
+/**
+ * The one-time screen-reader announcement of a jump (D-23): the full date with
+ * its year, or both ends of a tapped span. On-screen dates only — no contact
+ * content.
+ */
+export function revealAnnouncement(
+  resolution: Extract<HeatmapResolution, { kind: "reveal" }>,
+  today: string,
+): string {
+  if (resolution.span) {
+    return `Showing ${dayAccessibilityLabel(resolution.span.start, today)} to ${dayAccessibilityLabel(resolution.span.end, today)}`;
+  }
+  return `Showing ${dayAccessibilityLabel(resolution.scrollDay, today)}`;
 }
 
 // --- Labels (D-33) -----------------------------------------------------------

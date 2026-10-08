@@ -57,13 +57,20 @@ import {
   useRef,
   useState,
 } from "react";
-import { StyleSheet, View } from "react-native";
+import { AccessibilityInfo, StyleSheet, View } from "react-native";
 import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
 import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
 import { ActivityHeatmap } from "@/components/history/ActivityHeatmap";
 import { DateDetailSheet } from "@/components/history/DateDetailSheet";
 import { HeatmapContextCard } from "@/components/history/HeatmapContextCard";
-import { HistoryStream } from "@/components/history/HistoryStream";
+import {
+  HIGHLIGHT_CLEAR_SLACK_MS,
+  HIGHLIGHT_FADE_MS,
+} from "@/components/history/HistoryHighlight";
+import {
+  HistoryStream,
+  type HistoryStreamHighlight,
+} from "@/components/history/HistoryStream";
 import {
   advanceHistoryDay,
   buildLogRoute,
@@ -95,6 +102,7 @@ import {
   type PendingScrollEvent,
   pendingScrollOn,
   resolveHeatmapTarget,
+  revealAnnouncement,
   streamStateOnExpandYear,
   streamStateOnReveal,
   streamStateOnShowOlder,
@@ -558,31 +566,59 @@ export function HistorySection({
     },
     [issueScroll],
   );
+  // The jump highlight (D-53/D-54): set once per jump, keyed by its generation,
+  // and cleared once after the fade by one timeout per generation, so a later
+  // revision re-read never replays it. The fade itself is a Reanimated shared
+  // value inside HistoryHighlight.
+  const [highlight, setHighlight] = useState<HistoryStreamHighlight | null>(
+    null,
+  );
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
+  const showHighlight = useCallback((days: readonly string[], gen: number) => {
+    setHighlight({ days: new Set(days), gen });
+    if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => {
+      highlightTimer.current = null;
+      setHighlight((current) => (current?.gen === gen ? null : current));
+    }, HIGHLIGHT_FADE_MS + HIGHLIGHT_CLEAR_SLACK_MS);
+  }, []);
   const onCellPress = useCallback(
     (target: HeatmapCellTarget) => {
-      if (target.kind === "date" && streamModel) {
+      if (streamModel) {
         const resolution = resolveHeatmapTarget(streamModel, target);
         if (resolution.kind === "reveal") {
           const key = dayNodeKey(resolution.scrollDay);
           // Read before the reveal update: not yet rendered = await its layout.
           const mode = historyScrollMode(nodeRegistry.current, key);
+          genRef.current += 1;
+          const gen = genRef.current;
           setStreamState((s) =>
             streamStateOnReveal(s, streamModel, resolution.days),
           );
           setCard(null);
-          if (onRequestHistoryScroll) {
-            genRef.current += 1;
-            commitPending({ type: "request", key, gen: genRef.current, mode });
-          } else {
-            commitPending({ type: "stream-action" });
-          }
+          commitPending(
+            onRequestHistoryScroll
+              ? { type: "request", key, gen, mode }
+              : { type: "stream-action" },
+          );
+          showHighlight(resolution.highlightDays, gen);
+          // Once per jump; no live region on the rows, so focus stays put (D-23).
+          AccessibilityInfo.announceForAccessibility(
+            revealAnnouncement(resolution, today),
+          );
           return;
         }
       }
       commitPending({ type: "stream-action" });
       setCard(target);
     },
-    [commitPending, onRequestHistoryScroll, streamModel],
+    [commitPending, onRequestHistoryScroll, showHighlight, streamModel, today],
   );
 
   // Records scoped to the open sheet (single date or cycle range, inclusive).
@@ -699,6 +735,7 @@ export function HistorySection({
           onOpenKnowledgeChange={onOpenKnowledgeChange}
           registerNode={registerNode}
           onNodeLayout={onNodeLayout}
+          highlight={highlight}
         />
       ) : null}
       <DateDetailSheet
