@@ -1,8 +1,8 @@
-# Runbook: Desktop build pipeline (Android APK on `droid` → Pixel 6 Pro)
+# Runbook: Desktop build pipeline (Android APK on `droid` → attached test phone)
 
 **Why this exists.** This Linux box cannot build Android APKs (2012 Ivy Bridge CPU; no
 local emulator either). All Android builds run on the owner's Windows desktop **`droid`**
-over SSH/Tailscale, and the APK is installed on the wired **Pixel 6 Pro**. This runbook is
+over SSH/Tailscale, and the APK is installed on whichever test phone is wired to this box. This runbook is
 the proven procedure — **do not improvise a different pipeline.** It was proven end-to-end
 for FND-01 (plan 01-05) and for the Phase 10 native share-target build.
 
@@ -21,7 +21,7 @@ for FND-01 (plan 01-05) and for the Phase 10 native share-target build.
 | **Remote repo path** | **`C:\Users\bwales\projects\orbit-app`** (the native `C:\…` path form is what works; NOT `/cygdrive/c/…`) |
 | droid toolchain | OpenJDK 17, `ANDROID_HOME=C:\Users\bwales\AppData\Local\Android\Sdk`, node (v25.x), npm (v11.x), **bsdtar** (`tar` present), `scp` present |
 | **`rsync` on droid** | **ABSENT** — `ssh droid 'rsync --version'` fails. Use the **tar-over-ssh** transport below. |
-| Physical device | Pixel 6 Pro, serial **`1A071FDEE002BU`** (model `raven`), authorised over USB. **Always read the serial from `~/.local/bin/adb devices` — never hardcode `emulator-5554`.** |
+| Physical device | Whichever test phone is attached and authorised over USB. **Never assume which phone, and never hardcode a serial: read it from `~/.local/bin/adb devices -l` at run time** (exactly one device in state `device`; if none, ask the owner). |
 | Lock screen | **No device lock is configured.** If the lock screen is showing, dismiss it with `adb shell input keyevent 82` (or an upward swipe); do not treat it as an authentication blocker. |
 | APK artifact | `android\app\build\outputs\apk\release\app-release.apk` (standalone release, ~73 MB) |
 
@@ -128,12 +128,12 @@ scp -o BatchMode=yes \
 (OpenSSH `scp` on Windows accepts forward slashes; this avoids the `C:` being read as a host
 separator.)
 
-### 1e. Install on the physical Pixel + assert the themed shell
+### 1e. Install on the attached phone + assert the themed shell
 
 ```bash
 emu-connect                       # picks the phone if attached, else the desktop emulator
 ~/.local/bin/adb devices -l       # READ the serial here — never hardcode emulator-5554
-S=1A071FDEE002BU                  # the Pixel 6 Pro (resolve yours from the line above)
+S=<serial from the line above>    # never hardcode a serial
 
 ~/.local/bin/adb -s $S install -r ./app-release.apk        # -> Success  (no adb reverse needed)
 ~/.local/bin/adb -s $S shell monkey -p com.bwales.orbit -c android.intent.category.LAUNCHER 1
