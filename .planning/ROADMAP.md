@@ -163,6 +163,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - Completed 2026-09-29: 9/9 plans + 3-pass code review (all fixed); verification passed 14/14 after owner UAT (Pixel 6 Pro + Pixel 3a sign-off). 12 lossless light/dark WebPs, signed v3 treatment table, ADR-177. End-of-phase rulings D-50..D-53: the four persistent Galaxy Dark danger strings get an opaque backing (D25-B) and the picker tiles are fixed (G2); Orrery ANR (G1) and the Your Week wrap (G3) are deferred. D-54: the Events list and detail show the art under full cards. Final release orbit-38.5-release-2026-09-29-b74eed7.apk (owner-approved). No migration, no backup bump.
 - [x] **Phase 38.6: Photo Handling — Sync, Sizes & Lightbox** (INSERTED) - Completed 2026-09-30: 9/9 plans + 6 code-review passes (all blocker/warning findings fixed); verification passed 19/19 + owner UAT (pinch, TalkBack, sizes) on the release build. Display-revision fix (no file renames), WebP ≤1024 masters, bigger Profile/List/Grid photos, lightbox, missing-photo + backup-skip integrity (D-23..D-35), banner in flow (D-38), "too large" backups (D-39), on-disk Orrery derivatives (D-41; D-11 memory +2.9 %/+4.2 %). Owner rulings D-01..D-42. No migration (head 032), backup format 7. Release orbit-phase38.6-release-2026-09-30-c2dc1cb.apk.
 - [x] **Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language** (INSERTED) - A Skia 2.5D Orrery V2 from the Orrery renderer R&D labs: a tilted strategy-map Home, a new imperative renderer, a painted sky, thin sun-lit orbits with subtle pulses, rim-lit status bodies, Lab A's star sun, moon bumps, reticle focus with a docked card, a star-warp System switch, plus five production Orrery defect fixes. Dossier accepted after codex review (D-01..D-58); complete (2026-10-05).
+- [ ] **Phase 38.8: History Navigation UX** (INSERTED) - Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1446,6 +1447,44 @@ Plans:
 >
 > Owner device checkpoints throughout, and plans stay sized by affected area (CLAUDE.md).
 
+### Phase 38.8: History Navigation UX (INSERTED)
+
+**Goal**: Opening a contact's History shows their actual records right away, newest first, without operating date wheels; any past month is a couple of taps away; a heatmap tap lands on the matching records. Replaces the Rolodex and the card-then-sheet flow, and keeps the heatmap, Intensity, canonical record management and detailed backfill logging.
+**Depends on**: Phase 38.7
+**Requirements**: None formal. Owner decisions in `38.8-CONTEXT.md` (2026-10-07/08 interrogation, provenance in `38.8-LEDGER.md`).
+**Success Criteria**:
+- The in-Profile History section shows a newest-first stream:
+  - grouped year → month → day, with only dates that have records;
+  - the current year open and older years collapsed with interaction counts;
+  - ~20 records, then Show older, inside an open year (D-14, D-15, D-34, D-35, D-39).
+- Jump to date: a year stepper and month grid, dots on months with records, and an explicit empty-month state (D-17, D-48..D-52).
+- A heatmap day or cycle tap jumps to and highlights its records (accent bar + tint, ~5 s fade). An empty day shows a dismissible note under the heatmap with Log. An empty span or month offers Log without inventing a date (D-19..D-21, D-28, D-53..D-55).
+- The Rolodex is archived outside `src/` and DateDetailSheet / HeatmapContextCard are retired, with no regressions to InteractionDetail, Edit, Delete, group scope, LogContact routing, the Profile reveal, layout preferences or Digest Your Week (D-01..D-09, D-12, D-13, D-22).
+- `tsc`, `check:colors` and vitest are green.
+- The agent device pass on the Pixel 6 Pro uses synthetic datasets.
+- The owner gives a look-and-feel sign-off on the 6 Pro against the accepted mockup (D-30, D-63).
+
+**Scope source**: .planning/phases/38.8-history-navigation-ux/38.8-CONTEXT.md (the dossier; authoritative)
+**Evidence**: `38.8-WORKPAPER-history-navigation.md` and `38.8-WORKPAPER-mockup/history-stream-mockup.html` (the accepted mockup), in the phase folder.
+**Canonical refs**:
+- docs/dossier/milestone-2/phase-11-interaction-history-insights-dossier-v0.2-group-events.md;
+- docs/systems/interaction-history.md;
+- ADR-119, ADR-120, ADR-121, ADR-122, ADR-123, ADR-127, ADR-152, ADR-165, ADR-174.
+
+Some of these are superseded in part; see the CONTEXT's `<supersessions>`.
+**Schema**: none expected (migration head 032, backup format 7). Preferences `history_lens` / `history_cycle_count` are unchanged.
+**UI hint**: yes
+**Plans**: 0 plans. Ready for plan-phase: the dossier has no OPEN items, and discuss-phase is not needed.
+
+> **Inserted 2026-10-08 (owner).** Phase 39's detailed History teaching was deferred pending this
+> redesign (`docs/dossier/workpapers/phase-39-onboarding-design-decisions.md:252`). Decisions that
+> reverse recorded rules, each owner-ruled, each to get a superseding ADR at KB extraction:
+> - the stream replaces the Rolodex (D-10: ADR-121 in full, ADR-123 in part, phase-11 §A/§B);
+> - jump-and-highlight replaces card → sheet (D-19: phase-11 §L, ADR-122/123 in part);
+> - Cycles paging by whole page only (D-25: phase-11 §F in part).
+>
+> Plans stay sized by affected area (CLAUDE.md).
+
 ### Phase 39: Onboarding
 
 **Goal**: First-run setup and teaching designed against the real, implemented product rather than an imagined one.
@@ -1499,6 +1538,7 @@ Plans:
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
+| 38.8 History Navigation UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 

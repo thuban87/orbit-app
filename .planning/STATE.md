@@ -2,21 +2,22 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 39
-current_phase_name: Onboarding
+current_phase: 38.8
+current_phase_name: History Navigation UX
 status: planning
-stopped_at: Phase 38.7 complete, ready to plan Phase 39
+stopped_at: Phase 38.8 inserted (dossier accepted), ready for plan-phase
 last_updated: "2026-10-05T09:02:52.514Z"
-last_activity: 2026-10-05
-last_activity_desc: Phase 38.7 complete, transitioned to Phase 39
+last_activity: 2026-10-08
+last_activity_desc: Phase 38.8 History Navigation UX inserted before Phase 39
 state_head: c095d39b045c25afdb8e37d6204fd91a61a87c11
 progress:
-  total_phases: 29
+  total_phases: 30
   completed_phases: 21
   total_plans: 275
   completed_plans: 273
 carried_forward:
 
+  - "38.8 INSERTED (owner 2026-10-08): History Navigation UX, before Phase 39. Replaces the Profile History Rolodex with an activity-first stream + Jump to date + heatmap jump-and-highlight; section renamed 'History'; Rolodex archived as reference. Dossier .planning/phases/38.8-history-navigation-ux/38.8-CONTEXT.md ACCEPTED (D-01..D-63, no OPEN items; provenance 38.8-LEDGER.md; accepted mockup 38.8-WORKPAPER-mockup/). Phase 39's detailed History teaching waits on this phase."
   - "38.7 INSERTED (owner 2026-10-02): Orrery V2 — Renderer, Camera & Visual Language, before Phase 39. Built from the Orrery renderer R&D (labs A/B/C; synthesis docs/experiments/orrery-renderer/synthesis/). Dossier docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md ACCEPTED after codex review: D-01..D-58, no OPEN items. Day 1 = release baseline of main on both phones, then the owner locks numeric perf gates (D-56). Lab branches experiment/orrery-* are local-only evidence; keep them until V2 ships."
   - "38.6 INSERTED (owner 2026-09-29): Phase 38.6 Photo Handling — Sync, Sizes & Lightbox, before Phase 39. Promotes backlog 999.1 (38.4 D-73), retired from the backlog. Owner requests D-01..D-09. Root cause of stale photos verified: expo-image on Android ignores cacheKey for file:// URIs + fixed per-contact photo path. OPEN for discuss: O-1 photo resolution (reverses 07-photos 512-master decision if changed), O-2 coverage scope, O-3/O-4 lightbox reach/behaviour, restore-progress photo-library todo pull-in. Dossier docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md."
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -40,22 +41,22 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 38.7 — Orrery V2 — Renderer, Camera & Visual Language
+**Current focus:** Phase 38.8 — History Navigation UX (inserted), then Phase 39 — Onboarding
 
 ## Current Position
 
-Phase: 39 — Onboarding
+Phase: 38.8 — History Navigation UX (INSERTED)
 Plan: Not started
-Status: Ready to plan
+Status: Ready for plan-phase (dossier accepted; discuss not needed)
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-05 — Phase 38.7 complete, transitioned to Phase 39
-Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 38.7, 39, 40.
-Next: Plan Phase 38.7 (Orrery V2), then Phase 39 (Onboarding). The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
+Last activity: 2026-10-08 — Phase 38.8 History Navigation UX inserted before Phase 39
+Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 38.8, 39, 40. (38.7 completed 2026-10-05.)
+Next: Plan Phase 38.8 (History Navigation UX), then Phase 39 (Onboarding). The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
