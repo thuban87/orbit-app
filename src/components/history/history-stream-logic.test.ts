@@ -19,7 +19,12 @@ import {
   dayAccessibilityLabel,
   dayLabel,
   dayNodeKey,
+  emptyDayNoteText,
+  emptySpanNoteText,
   emptyYearLabel,
+  type HeatmapResolution,
+  type HistoryNote,
+  historyNoteOn,
   historyScrollMode,
   initialStreamState,
   isCurrentScroll,
@@ -843,5 +848,66 @@ describe("revealAnnouncement (D-23)", () => {
         TODAY,
       ),
     ).toBe("Showing Tuesday, September 1, 2026 to Monday, September 7, 2026");
+  });
+});
+
+describe("historyNoteOn (D-21, D-55)", () => {
+  const emptyDay: HeatmapResolution = { kind: "empty-day", date: "2026-10-05" };
+  const emptySpan: HeatmapResolution = {
+    kind: "empty-span",
+    start: "2026-09-01",
+    end: "2026-09-07",
+  };
+  const reveal: HeatmapResolution = {
+    kind: "reveal",
+    days: ["2026-10-02"],
+    scrollDay: "2026-10-02",
+    highlightDays: ["2026-10-02"],
+  };
+
+  it("shows an empty-day note for an empty day", () => {
+    expect(
+      historyNoteOn(null, { type: "heatmap", resolution: emptyDay }),
+    ).toEqual({ kind: "empty-day", date: "2026-10-05" });
+  });
+
+  it("shows an empty-span note for an empty span", () => {
+    expect(
+      historyNoteOn(null, { type: "heatmap", resolution: emptySpan }),
+    ).toEqual({ kind: "empty-span", start: "2026-09-01", end: "2026-09-07" });
+  });
+
+  it("replaces one note with another on a new heatmap tap", () => {
+    const day = historyNoteOn(null, { type: "heatmap", resolution: emptyDay });
+    expect(
+      historyNoteOn(day, { type: "heatmap", resolution: emptySpan })?.kind,
+    ).toBe("empty-span");
+  });
+
+  it("clears on a reveal, close, lens change, preset change and paging", () => {
+    const note: HistoryNote = { kind: "empty-day", date: "2026-10-05" };
+    expect(historyNoteOn(note, { type: "heatmap", resolution: reveal })).toBe(
+      null,
+    );
+    for (const type of [
+      "close",
+      "lens-change",
+      "preset-change",
+      "page",
+    ] as const) {
+      expect(historyNoteOn(note, { type })).toBe(null);
+    }
+  });
+});
+
+describe("empty-target note text (D-21)", () => {
+  it("names an empty day by weekday, month and day", () => {
+    expect(emptyDayNoteText("2026-10-05")).toBe("Nothing logged on Mon Oct 5");
+  });
+
+  it("names an empty span by both ends", () => {
+    expect(emptySpanNoteText("2026-09-01", "2026-09-07")).toBe(
+      "Nothing logged Sep 1 – Sep 7",
+    );
   });
 });

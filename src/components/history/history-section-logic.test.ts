@@ -126,6 +126,19 @@ describe("buildLogRoute — typed LogContact preselect + prefill contract", () =
     expect(route.params.prefillDate).toBe("2026-08-04");
   });
 
+  it("keeps the dated route for an empty day (D-21)", () => {
+    expect(buildLogRoute(42, "2026-08-04")).toEqual({
+      screen: "LogContact",
+      params: { contactId: 42, prefillDate: "2026-08-04" },
+    });
+  });
+
+  it("omits prefillDate entirely for an empty span, so the Log form starts at now (D-28)", () => {
+    const route = buildLogRoute(42);
+    expect(route).toEqual({ screen: "LogContact", params: { contactId: 42 } });
+    expect(route.params).not.toHaveProperty("prefillDate");
+  });
+
   it("is a detailed-log contract, never a quick-log payload", () => {
     const route = buildLogRoute(7, "2026-01-01");
     // No quick-log discriminator; the screen is the typed detailed-log route.
