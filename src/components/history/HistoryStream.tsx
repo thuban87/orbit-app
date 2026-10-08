@@ -13,19 +13,23 @@
  * days. No per-day cards, no gap markers (D-37), nothing sticky (D-32). Every
  * colour is a theme token read through `useTheme()` inside the glass card (D-07).
  */
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
+import { Button } from "@/components/ui/Button";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { HistoryRecordRow } from "./HistoryStreamRows";
 import {
   emptyYearLabel,
+  interactionCountLabel,
   isYearOpen,
   type StreamModel,
   type StreamViewState,
   type StreamYear,
   visibleYear,
+  yearRowLabel,
 } from "./history-stream-logic";
 
 export interface HistoryStreamProps {
@@ -61,7 +65,14 @@ export function HistoryStream({
             onOpenKnowledgeChange={onOpenKnowledgeChange}
             testID={testID}
           />
-        ) : null,
+        ) : (
+          <CollapsedYearRow
+            key={entry.year}
+            entry={entry}
+            onExpandYear={onExpandYear}
+            testID={testID}
+          />
+        ),
       )}
     </View>
   );
@@ -77,16 +88,48 @@ interface OpenYearProps {
   testID: string;
 }
 
+interface CollapsedYearRowProps {
+  entry: StreamYear;
+  onExpandYear: (year: number) => void;
+  testID: string;
+}
+
+/** An older year: one full-width row, '<year> · <n> interaction(s)' (D-35). */
+function CollapsedYearRow({
+  entry,
+  onExpandYear,
+  testID,
+}: CollapsedYearRowProps) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      testID={`${testID}-year-row-${entry.year}`}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: false }}
+      accessibilityLabel={yearRowLabel(entry.year, entry.interactionCount)}
+      onPress={() => onExpandYear(entry.year)}
+      style={[styles.yearRow, { borderColor: colors.border }]}
+    >
+      <Icon name="forward" tone="textSecondary" size="sm" />
+      <AppText role="label">{String(entry.year)}</AppText>
+      <AppText role="caption" style={{ color: colors.textSecondary }}>
+        {`· ${interactionCountLabel(entry.interactionCount)}`}
+      </AppText>
+    </Pressable>
+  );
+}
+
 function OpenYear({
   entry,
   model,
   state,
+  onShowOlder,
   onOpenInteraction,
   onOpenKnowledgeChange,
   testID,
 }: OpenYearProps) {
   const { colors } = useTheme();
-  const { months } = visibleYear(state, model, entry.year);
+  const { months, hasOlder } = visibleYear(state, model, entry.year);
   return (
     <View testID={`${testID}-year-${entry.year}`}>
       <View
@@ -143,6 +186,17 @@ function OpenYear({
           </View>
         ))
       )}
+      {hasOlder ? (
+        <View style={styles.more}>
+          <Button
+            role="tertiary"
+            label="Show older"
+            accessibilityLabel={`Show older records from ${entry.year}`}
+            testID={`${testID}-show-older-${entry.year}`}
+            onPress={() => onShowOlder(entry.year)}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -158,6 +212,18 @@ const styles = StyleSheet.create({
   },
   yearHeaderText: {
     letterSpacing: 1,
+  },
+  yearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: 44,
+  },
+  more: {
+    alignItems: "flex-start",
+    paddingLeft: SPACING.md,
   },
   emptyYear: {
     paddingVertical: SPACING.sm,

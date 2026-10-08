@@ -75,6 +75,7 @@ import {
   buildStreamModel,
   initialStreamState,
   streamStateOnExpandYear,
+  streamStateOnShowOlder,
 } from "@/components/history/history-stream-logic";
 import { IntensityChart } from "@/components/history/IntensityChart";
 import { InteractionDetail } from "@/components/history/InteractionDetail";
@@ -511,7 +512,9 @@ export function HistorySection({
           onExpandYear={(year) =>
             setStreamState((s) => streamStateOnExpandYear(s, year))
           }
-          onShowOlder={() => {}}
+          onShowOlder={(year) =>
+            setStreamState((s) => streamStateOnShowOlder(s, streamModel, year))
+          }
           onOpenInteraction={setDetailId}
           onOpenKnowledgeChange={onOpenKnowledgeChange}
         />

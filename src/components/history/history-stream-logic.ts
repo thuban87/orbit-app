@@ -292,19 +292,60 @@ function groupMonths(
   });
 }
 
+/**
+ * Extend a visible count to the end of the day holding record `count - 1`, so a
+ * Show older boundary never splits a day (D-18, D-39). Clamped to the list.
+ */
+export function snapToDayEnd(
+  records: readonly StreamRecord[],
+  count: number,
+): number {
+  let end = Math.max(0, Math.min(count, records.length));
+  if (end === 0) return 0;
+  const lastDate = records[end - 1].date;
+  while (end < records.length && records[end].date === lastDate) end++;
+  return end;
+}
+
+/** The year's requested count (initial or extended), before day snapping. */
+function requestedCount(state: StreamViewState, year: number): number {
+  return state.shown.get(year) ?? STREAM_INITIAL_VISIBLE;
+}
+
 /** The months/days an open year renders, and whether older records remain. */
 export function visibleYear(
-  _state: StreamViewState,
+  state: StreamViewState,
   model: StreamModel,
   year: number,
 ): { months: readonly StreamMonth[]; hasOlder: boolean; visibleCount: number } {
   const entry = findYear(model, year);
   if (!entry) return { months: [], hasOlder: false, visibleCount: 0 };
+  const visibleCount = snapToDayEnd(entry.records, requestedCount(state, year));
   return {
-    months: groupMonths(entry.records, model.today),
-    hasOlder: false,
-    visibleCount: entry.records.length,
+    months: groupMonths(entry.records.slice(0, visibleCount), model.today),
+    hasOlder: visibleCount < entry.records.length,
+    visibleCount,
   };
+}
+
+/**
+ * Show older (D-39): the year's request becomes its current (snapped) visible
+ * count + STREAM_CHUNK. It never shrinks and never touches another year.
+ */
+export function streamStateOnShowOlder(
+  state: StreamViewState,
+  model: StreamModel,
+  year: number,
+): StreamViewState {
+  const entry = findYear(model, year);
+  if (!entry) return state;
+  const requested = requestedCount(state, year);
+  const visible = snapToDayEnd(entry.records, requested);
+  const next = Math.max(requested, visible + STREAM_CHUNK);
+  if (next === state.shown.get(year)) return state;
+  const shown = new Map(state.shown);
+  shown.set(year, next);
+  return { openYears: state.openYears, shown };
 }
 
 // --- Labels (D-33) -----------------------------------------------------------
@@ -397,4 +438,14 @@ export function dayAccessibilityLabel(date: string, today: string): string {
 /** The current year's empty state (D-36). */
 export function emptyYearLabel(year: number): string {
   return `Nothing logged in ${year} yet`;
+}
+
+/** "1 interaction" / "34 interactions" — correct singular/plural (D-35). */
+export function interactionCountLabel(interactionCount: number): string {
+  return `${interactionCount} ${interactionCount === 1 ? "interaction" : "interactions"}`;
+}
+
+/** A collapsed older year row: '<year> · <n> interaction(s)' (D-35). */
+export function yearRowLabel(year: number, interactionCount: number): string {
+  return `${year} · ${interactionCountLabel(interactionCount)}`;
 }

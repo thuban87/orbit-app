@@ -329,7 +329,7 @@ describe("HistoryStream", () => {
     expect(row?.props.accessibilityLabel).toBe("2025 · 2 interactions");
     expect(textOf(row as Node)).toContain("2025");
     expect(textOf(row as Node)).toContain("2 interactions");
-    (row?.props.onPress as () => void)();
+    ((row as Node).props.onPress as () => void)();
     expect(handlers.onExpandYear).toHaveBeenCalledWith(2025);
     // Its records are not rendered while collapsed.
     expect(byTestID(nodes, "history-stream-day-2025-06-01")).toBeUndefined();
@@ -374,7 +374,7 @@ describe("HistoryStream", () => {
     expect(more?.type).toBe("Button");
     expect(more?.props.label).toBe("Show older");
     expect(more?.props.accessibilityLabel).toBe("Show older records from 2026");
-    (more?.props.onPress as () => void)();
+    ((more as Node).props.onPress as () => void)();
     expect(long.handlers.onShowOlder).toHaveBeenCalledWith(2026);
 
     const short = renderStream({ interactions: manyInteractions(12) });
