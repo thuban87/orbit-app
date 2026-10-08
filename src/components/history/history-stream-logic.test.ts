@@ -18,8 +18,18 @@ import {
   buildStreamModel,
   dayAccessibilityLabel,
   dayLabel,
+  emptyYearLabel,
+  initialStreamState,
+  isYearOpen,
   orderStreamRecords,
+  STREAM_CHUNK,
+  STREAM_INITIAL_VISIBLE,
   type StreamSource,
+  snapToDayEnd,
+  streamStateOnExpandYear,
+  streamStateOnShowOlder,
+  visibleYear,
+  yearRowLabel,
 } from "./history-stream-logic";
 
 const TODAY = "2026-10-07";
@@ -267,5 +277,249 @@ describe("dayLabel / dayAccessibilityLabel (D-33)", () => {
     expect(dayAccessibilityLabel("2026-12-31", "2027-01-01")).toBe(
       "Yesterday, Thursday, December 31, 2026",
     );
+  });
+});
+
+// --- Task 2: view state, chunking and year labels (D-34, D-35, D-36, D-39) ---
+
+/** `count` interactions, one per day going back from `start`, newest first. */
+function dailyInteractions(
+  count: number,
+  start: { y: number; m: number; d: number },
+  firstId = 1,
+): HistoryInteractionRecord[] {
+  const out: HistoryInteractionRecord[] = [];
+  for (let i = 0; i < count; i++) {
+    const day = new Date(start.y, start.m - 1, start.d - i);
+    const ymd = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    out.push(interaction(firstId + i, `${ymd} 10:00:00`));
+  }
+  return out;
+}
+
+/** `count` interactions on one date, newest first. */
+function sameDayInteractions(
+  count: number,
+  date: string,
+  firstId = 1,
+): HistoryInteractionRecord[] {
+  const out: HistoryInteractionRecord[] = [];
+  for (let i = 0; i < count; i++) {
+    const minute = String(59 - i).padStart(2, "0");
+    out.push(interaction(firstId + i, `${date} 10:${minute}:00`));
+  }
+  return out;
+}
+
+describe("view state (D-34, D-62)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        interaction(1, "2026-10-01 09:00:00"),
+        interaction(2, "2025-06-01 09:00:00"),
+        interaction(3, "2024-06-01 09:00:00"),
+      ],
+    }),
+    TODAY,
+  );
+
+  it("starts fresh with only the current year open and no extra chunks", () => {
+    const state = initialStreamState();
+    expect(state.openYears.size).toBe(0);
+    expect(state.shown.size).toBe(0);
+    expect(isYearOpen(state, model, 2026)).toBe(true);
+    expect(isYearOpen(state, model, 2025)).toBe(false);
+    expect(isYearOpen(state, model, 2024)).toBe(false);
+  });
+
+  it("opens an older year only after it is expanded", () => {
+    const state = streamStateOnExpandYear(initialStreamState(), 2025);
+    expect(isYearOpen(state, model, 2025)).toBe(true);
+    expect(isYearOpen(state, model, 2024)).toBe(false);
+  });
+
+  it("expanding is immutable and idempotent", () => {
+    const initial = initialStreamState();
+    const once = streamStateOnExpandYear(initial, 2025);
+    expect(initial.openYears.has(2025)).toBe(false);
+    expect(streamStateOnExpandYear(once, 2025)).toBe(once);
+  });
+});
+
+describe("snapToDayEnd", () => {
+  const records = orderStreamRecords(
+    source({
+      interactions: [
+        ...sameDayInteractions(3, "2026-10-05", 1),
+        ...sameDayInteractions(2, "2026-10-04", 10),
+      ],
+    }),
+  );
+
+  it("extends a cut that falls inside a day to the end of that day", () => {
+    expect(snapToDayEnd(records, 1)).toBe(3);
+    expect(snapToDayEnd(records, 2)).toBe(3);
+    expect(snapToDayEnd(records, 4)).toBe(5);
+  });
+
+  it("keeps a cut that already falls on a day boundary", () => {
+    expect(snapToDayEnd(records, 3)).toBe(3);
+    expect(snapToDayEnd(records, 5)).toBe(5);
+  });
+
+  it("clamps to the record count and never goes below zero", () => {
+    expect(snapToDayEnd(records, 99)).toBe(5);
+    expect(snapToDayEnd(records, 0)).toBe(0);
+    expect(snapToDayEnd([], 20)).toBe(0);
+  });
+});
+
+describe("visibleYear chunking (D-39, D-18)", () => {
+  it("exposes both tunables at 20", () => {
+    expect(STREAM_INITIAL_VISIBLE).toBe(20);
+    expect(STREAM_CHUNK).toBe(20);
+  });
+
+  it("shows the newest STREAM_INITIAL_VISIBLE records and flags older ones", () => {
+    const model = buildStreamModel(
+      source({ interactions: dailyInteractions(45, { y: 2026, m: 10, d: 7 }) }),
+      TODAY,
+    );
+    const view = visibleYear(initialStreamState(), model, 2026);
+    expect(view.visibleCount).toBe(20);
+    expect(view.hasOlder).toBe(true);
+    const shownDays = view.months.flatMap((m) => m.days);
+    expect(shownDays).toHaveLength(20);
+    expect(shownDays[0].date).toBe("2026-10-07");
+    expect(shownDays[0].label).toBe("Today");
+  });
+
+  it("extends the cut to the end of the day when records 20 and 21 share a date", () => {
+    const model = buildStreamModel(
+      source({
+        interactions: [
+          ...dailyInteractions(19, { y: 2026, m: 10, d: 7 }, 1),
+          ...sameDayInteractions(3, "2026-09-18", 100),
+          ...dailyInteractions(10, { y: 2026, m: 9, d: 10 }, 200),
+        ],
+      }),
+      TODAY,
+    );
+    const view = visibleYear(initialStreamState(), model, 2026);
+    expect(view.visibleCount).toBe(22);
+    expect(view.hasOlder).toBe(true);
+    const lastDay = view.months.at(-1)?.days.at(-1);
+    expect(lastDay?.date).toBe("2026-09-18");
+    expect(lastDay?.records).toHaveLength(3);
+  });
+
+  it("shows a dense 25-record day whole on first render", () => {
+    const model = buildStreamModel(
+      source({
+        interactions: [
+          ...sameDayInteractions(25, "2026-10-06", 1),
+          ...dailyInteractions(30, { y: 2026, m: 9, d: 30 }, 100),
+        ],
+      }),
+      TODAY,
+    );
+    const view = visibleYear(initialStreamState(), model, 2026);
+    expect(view.visibleCount).toBe(25);
+    expect(view.hasOlder).toBe(true);
+    expect(view.months[0].days[0].records).toHaveLength(25);
+  });
+
+  it("has no older records once the year is fully shown", () => {
+    const model = buildStreamModel(
+      source({ interactions: dailyInteractions(12, { y: 2026, m: 10, d: 7 }) }),
+      TODAY,
+    );
+    const view = visibleYear(initialStreamState(), model, 2026);
+    expect(view.visibleCount).toBe(12);
+    expect(view.hasOlder).toBe(false);
+  });
+
+  it("groups the visible slice by month with full-name labels", () => {
+    const model = buildStreamModel(
+      source({
+        interactions: [
+          interaction(1, "2026-10-02 09:00:00"),
+          interaction(2, "2026-09-28 09:00:00"),
+        ],
+      }),
+      TODAY,
+    );
+    const view = visibleYear(initialStreamState(), model, 2026);
+    expect(
+      view.months.map((m) => [m.key, m.label, m.accessibilityLabel]),
+    ).toEqual([
+      ["2026-10", "October", "October 2026"],
+      ["2026-09", "September", "September 2026"],
+    ]);
+    expect(view.months[0].days[0].label).toBe("Fri Oct 2");
+    expect(view.months[0].days[0].accessibilityLabel).toBe(
+      "Friday, October 2, 2026",
+    );
+  });
+});
+
+describe("streamStateOnShowOlder (D-39)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        ...dailyInteractions(19, { y: 2026, m: 10, d: 7 }, 1),
+        ...sameDayInteractions(3, "2026-09-18", 100),
+        ...dailyInteractions(60, { y: 2026, m: 9, d: 10 }, 200),
+        ...dailyInteractions(30, { y: 2025, m: 12, d: 31 }, 400),
+      ],
+    }),
+    TODAY,
+  );
+
+  it("adds STREAM_CHUNK records to the snapped visible count", () => {
+    const next = streamStateOnShowOlder(initialStreamState(), model, 2026);
+    // First render shows 22 (snapped), so the request becomes 22 + 20.
+    expect(next.shown.get(2026)).toBe(42);
+    expect(visibleYear(next, model, 2026).visibleCount).toBe(42);
+  });
+
+  it("never shrinks and never touches other years", () => {
+    const once = streamStateOnShowOlder(initialStreamState(), model, 2026);
+    const twice = streamStateOnShowOlder(once, model, 2026);
+    expect(twice.shown.get(2026)).toBeGreaterThan(once.shown.get(2026) ?? 0);
+    expect(twice.shown.has(2025)).toBe(false);
+    expect(once.openYears).toBe(twice.openYears);
+  });
+
+  it("is immutable", () => {
+    const initial = initialStreamState();
+    streamStateOnShowOlder(initial, model, 2026);
+    expect(initial.shown.size).toBe(0);
+  });
+
+  it("eventually shows the whole year, then hasOlder is false", () => {
+    let state = initialStreamState();
+    for (let i = 0; i < 10; i++)
+      state = streamStateOnShowOlder(state, model, 2026);
+    const view = visibleYear(state, model, 2026);
+    expect(view.visibleCount).toBe(82);
+    expect(view.hasOlder).toBe(false);
+  });
+
+  it("ignores a year the model does not have", () => {
+    const initial = initialStreamState();
+    expect(streamStateOnShowOlder(initial, model, 1999)).toBe(initial);
+  });
+});
+
+describe("year labels (D-35, D-36)", () => {
+  it("pluralises interaction counts", () => {
+    expect(yearRowLabel(2025, 1)).toBe("2025 · 1 interaction");
+    expect(yearRowLabel(2025, 34)).toBe("2025 · 34 interactions");
+    expect(yearRowLabel(2023, 0)).toBe("2023 · 0 interactions");
+  });
+
+  it("names an empty current year", () => {
+    expect(emptyYearLabel(2027)).toBe("Nothing logged in 2027 yet");
   });
 });

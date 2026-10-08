@@ -33,6 +33,13 @@ const CONSUMERS: readonly Consumer[] = [
     minCalls: 6,
   },
   {
+    path: "src/components/history/HistoryStreamRows.tsx",
+    formatters: ["formatTimeMinuteOrFallback"],
+    // The History stream rows (38.8 D-22): 3 visible time captions + 3
+    // accessibility labels.
+    minCalls: 6,
+  },
+  {
     path: "src/components/digest/DigestDayDetail.tsx",
     formatters: ["formatTimeMinuteOrFallback"],
     // Rows sit within a known day: 2 visible time captions + 2 a11y labels.
@@ -94,6 +101,15 @@ describe("timestamp consumer contract (RG-038)", () => {
     const source = read("src/components/history/DateDetailSheet.tsx");
     const labels = source.match(/accessibilityLabel=\{`[^`]*`\}/g) ?? [];
     expect(labels.length).toBe(3);
+    for (const label of labels) {
+      expect(label).toContain("formatTimeMinuteOrFallback(");
+    }
+  });
+
+  it("HistoryStreamRows announces the formatted time in every row label", () => {
+    const source = read("src/components/history/HistoryStreamRows.tsx");
+    const labels = source.match(/accessibilityLabel=\{`[^`]*`\}/g) ?? [];
+    expect(labels.length).toBeGreaterThanOrEqual(3);
     for (const label of labels) {
       expect(label).toContain("formatTimeMinuteOrFallback(");
     }
