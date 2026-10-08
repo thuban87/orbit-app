@@ -74,9 +74,9 @@ describe("buildHistorySeedPlan", () => {
     expect(empty?.knowledge).toEqual([]);
     expect(empty?.lifecycle).toEqual([]);
     expect(empty?.archive).toBe(false);
-    expect(
-      plan.groupEvents.some((g) => g.participants.includes("empty")),
-    ).toBe(false);
+    expect(plan.groupEvents.some((g) => g.participants.includes("empty"))).toBe(
+      false,
+    );
     const notes = byKey.get("notes-only");
     expect(notes?.interactions).toEqual([]);
     expect(
