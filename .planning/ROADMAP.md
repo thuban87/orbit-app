@@ -1453,6 +1453,7 @@ Plans:
 **Depends on**: Phase 38.7
 **Requirements**: None formal. Owner decisions in `38.8-CONTEXT.md` (2026-10-07/08 interrogation, provenance in `38.8-LEDGER.md`).
 **Success Criteria**:
+
 - The in-Profile History section shows a newest-first stream:
   - grouped year → month → day, with only dates that have records;
   - the current year open and older years collapsed with interaction counts;
@@ -1467,6 +1468,7 @@ Plans:
 **Scope source**: .planning/phases/38.8-history-navigation-ux/38.8-CONTEXT.md (the dossier; authoritative)
 **Evidence**: `38.8-WORKPAPER-history-navigation.md` and `38.8-WORKPAPER-mockup/history-stream-mockup.html` (the accepted mockup), in the phase folder.
 **Canonical refs**:
+
 - docs/dossier/milestone-2/phase-11-interaction-history-insights-dossier-v0.2-group-events.md;
 - docs/systems/interaction-history.md;
 - ADR-119, ADR-120, ADR-121, ADR-122, ADR-123, ADR-127, ADR-152, ADR-165, ADR-174.
@@ -1474,12 +1476,12 @@ Plans:
 Some of these are superseded in part; see the CONTEXT's `<supersessions>`.
 **Schema**: none expected (migration head 032, backup format 7). Preferences `history_lens` / `history_cycle_count` are unchanged.
 **UI hint**: yes
-**Plans**: 6 plans
+**Plans**: 1/6 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 38.8-01-PLAN.md — Dev-only synthetic History seed (long multi-year, dense, sparse, notes-only, Unbound, quiet-year, archived, empty, group-linked) through the Core writers (W1)
+- [x] 38.8-01-PLAN.md — Dev-only synthetic History seed (long multi-year, dense, sparse, notes-only, Unbound, quiet-year, archived, empty, group-linked) through the Core writers (W1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -1563,7 +1565,7 @@ Plans:
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
-| 38.8 History Navigation UX | 0/6 | Planned | - |
+| 38.8 History Navigation UX | 1/6 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 

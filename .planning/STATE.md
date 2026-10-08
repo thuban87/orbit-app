@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.8
 current_phase_name: History Navigation UX
 status: executing
-stopped_at: Phase 38.8 planned + cross-AI converged (5 cycles codex+claude, final 0 HIGH; D-66..D-68 added), ready for execute-phase
-last_updated: "2026-10-08T22:44:57.950Z"
+stopped_at: Completed 38.8-01-PLAN.md
+last_updated: "2026-10-08T23:25:12.601Z"
 last_activity: 2026-10-08
 last_activity_desc: Phase 38.8 execution started
-state_head: 0170c6b399af46084749468230744fd31ec3784d
+state_head: 0589ce2bf0d88016a7a437f2c49f7318a8bf385e
 progress:
   total_phases: 30
   completed_phases: 21
   total_plans: 281
-  completed_plans: 273
+  completed_plans: 274
 carried_forward:
 
   - "38.8 INSERTED (owner 2026-10-08): History Navigation UX, before Phase 39. Replaces the Profile History Rolodex with an activity-first stream + Jump to date + heatmap jump-and-highlight; section renamed 'History'; Rolodex archived as reference. Dossier .planning/phases/38.8-history-navigation-ux/38.8-CONTEXT.md ACCEPTED (D-01..D-63, no OPEN items; provenance 38.8-LEDGER.md; accepted mockup 38.8-WORKPAPER-mockup/). Phase 39's detailed History teaching waits on this phase."
@@ -46,8 +46,8 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.8 (History Navigation UX) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 38.8
+Plan: 2 of 6
+Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
@@ -423,6 +423,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.7 P11 | code + ~35 min device | 3 tasks | 25 files |
 | Phase 38.7 P12 | code + ~20 min device | 3 tasks | 26 files |
 | Phase 38.7 P13 | code + device + 2 owner rounds | 5 tasks | 19 files |
+| Phase 38.8 P01 | 39 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -962,6 +963,7 @@ Foundational decisions affecting current work:
 - [Phase 38.7]: 38.7-16: D-79 (owner): FV-1 fixed (motion votes MOTION_VOTE_HZ 120, idle 30, reduced motion 0); SW-2, MEM-1 (G7), G3 All Contacts 1.008 s and G5 Size 120 to All Contacts 174.7 ms accepted
 - [Phase 38.7]: 38.7-16: D-79 owner-directed reversal: the map's framing is persistent chrome only (framingViewport); supersedes D-19's cluster-panel obstacle and the feedback-framing rule; C4-M1 switch viewport hold removed
 - [Phase 38.7]: 38.7-16: owner sign-off 2026-10-05 on his Moto Razr with the fix release ("All 3 look good."); further device testing declined, the deferred items recorded as not measured
+- [Phase 38.8]: 38.8-01: History seed Sparse = 1 own + 2 group-linked interactions (three in three years); verifyHistoryFixture also flags missing/unexpectedly-archived datasets
 
 ### Pending Todos
 
@@ -1031,8 +1033,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-05T07:05:00.000Z
-**Stopped at:** Phase 38.7 complete, ready to plan Phase 39
+**Last session:** 2026-10-08T23:25:09.891Z
+**Stopped at:** Completed 38.8-01-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
