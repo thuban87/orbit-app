@@ -6,7 +6,8 @@
  * decisions (which window a lens resolves to, when the section is empty, and the
  * shape of the detailed-log navigation payload) live in a node-testable `.ts`,
  * not the un-loadable `HistorySection.tsx`. Mirrors the repo convention of
- * `services/history/*` and the co-located `heatmap-cell.ts` / `rolodex-logic.ts`.
+ * `services/history/*` and the co-located `heatmap-cell.ts` /
+ * `history-stream-logic.ts`.
  *
  * DATE DISCIPLINE (CLAUDE.md, dates.ts): every date is a local `YYYY-MM-DD`
  * string. `YYYY-MM-DD` string comparison is chronological, so `<=`/`>=` on the
@@ -43,10 +44,10 @@ export function resolveActiveWindow(
  * history-aware knowledge changes. A contact with only ONE family populated is
  * NOT empty — a lifecycle-only contact (via Plan 03's `hasLifecycleRecords`
  * discriminator) and a knowledge-change-only contact (edited fields but zero
- * interactions/lifecycle) both show the zero-count Heatmap/Browser surfaces and
- * their DateDetailSheet rows, never the empty section. Omitting `knowledgeChanges`
- * here wrongly hid the third family's rows behind "No history yet" (dossier: the
- * three record families are preserved; item #13).
+ * interactions/lifecycle) both show the zero-count Heatmap surfaces and their
+ * rows in the History stream (38.8 D-10), never the empty section. Omitting
+ * `knowledgeChanges` here wrongly hid the third family's rows behind "No history
+ * yet" (dossier: the three record families are preserved; item #13; D-57).
  */
 export function isEmptyHistory(history: {
   readonly interactions: readonly unknown[];
@@ -165,7 +166,7 @@ export function historyReadStateOnPublish<T>(
  *
  * On a new local day a following view advances its window to the new today,
  * while a past window the user picked stays put. Every today-bound limit
- * (next-window navigation, Rolodex max day, Log prefill, cycles `now`) reads
+ * (next-window navigation, stream day labels, Log prefill, cycles `now`) reads
  * `today`, so it always follows the new day. Day changes are detected only on
  * lifecycle events (mount, Profile revision) — never a timer (D-22). All dates
  * are local `YYYY-MM-DD` strings from `formatLocalDate()`; no UTC slicing.

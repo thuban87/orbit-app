@@ -6,7 +6,14 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!.planning", "!android", "!ios", "!**/dist"]
+    "includes": [
+      "**",
+      "!.planning",
+      "!android",
+      "!ios",
+      "!**/dist",
+      "!docs/archive"
+    ]
   },
   "assist": {
     "actions": {
@@ -36,8 +43,6 @@
         "src/components/history/ActivityHeatmap.tsx",
         "src/components/history/DateDetailSheet.tsx",
         "src/components/history/HeatmapContextCard.tsx",
-        "src/components/history/RolodexBrowser.tsx",
-        "src/components/history/RolodexWheel.tsx",
         "src/screens/ComposeResearchScreen.tsx",
         "src/screens/ComposeScreen.tsx",
         "src/screens/CreateContactScreen.tsx",

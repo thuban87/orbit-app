@@ -1,10 +1,10 @@
 /**
  * Canonical single-contact history read (HIST-02/10/16, D-10/D-12).
  *
- * The one read behind the Phase-32 History surfaces (Heatmap / Intensity /
- * Rolodex Browser / Detail Sheet). It SUPERSEDES the renderer contract of the
- * interim `profile-history-read.ts` (its header invites exactly this) WITHOUT
- * changing persistence, and drops that read's `LIMIT 3`.
+ * The one read behind the Profile History surfaces (Heatmap / Intensity /
+ * the History stream (38.8) / Detail Sheet). It SUPERSEDES the renderer
+ * contract of the interim `profile-history-read.ts` (its header invites exactly
+ * this) WITHOUT changing persistence, and drops that read's `LIMIT 3`.
  *
  * It returns, for one contact:
  *   • date-indexed interaction records (channel, occurred_at, direction,
@@ -97,10 +97,11 @@ export interface ContactHistory {
 }
 
 /**
- * The group-link discriminator (D-12). Keys on a group-event-id field that is
- * UNDEFINED in Phase 32 — no such column is selected — so it resolves hard-false
- * for every row. Phase 33's migration 026+ adds the column and makes the seam
- * live; nothing in Phase 32 references it.
+ * The group-link discriminator (D-12). Live since Phase 33 (ADR-124/127): the
+ * interactions read selects `group_event_id` and LEFT JOINs `group_events` for
+ * the title and note, so a group-linked child is still ONE ordinary interaction
+ * row (counted once) that the History stream labels with its group-event title
+ * (38.8 D-16). The parent event is never an `interactions` row.
  */
 export function isGroupLinked(row: { groupEventId?: number | null }): boolean {
   return row.groupEventId != null;

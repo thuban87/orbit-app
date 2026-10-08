@@ -46,7 +46,7 @@ describe("Profile module renderer registry", () => {
       }),
     ).toEqual({
       expanded: false,
-      accessibilityLabel: "Expand Interaction History",
+      accessibilityLabel: "Expand History",
     });
     expect(
       resolveProfileModuleHostState({

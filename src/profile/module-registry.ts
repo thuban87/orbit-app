@@ -40,7 +40,7 @@ export const PROFILE_MODULE_REGISTRY: Readonly<
   },
   "interaction-history": {
     id: "interaction-history",
-    label: "Interaction History",
+    label: "History",
     parent: "profile",
     collapsible: true,
     supportedSizes: [],

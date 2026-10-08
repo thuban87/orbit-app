@@ -1,31 +1,38 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
 /**
- * HistorySection (Plan 08, HIST-01/HIST-06/HIST-15/HIST-18) — the assembled
- * Profile History section, mounted by `ProfileModuleHost.renderHistory()` in
- * place of the old vertical-timeline stub.
+ * HistorySection (Plan 08, HIST-01/HIST-06/HIST-15/HIST-18; 38.8) — the
+ * assembled Profile History section, mounted by
+ * `ProfileModuleHost.renderHistory()` in place of the old vertical-timeline stub.
  *
- * It composes the Plan 05/06/07 presentational children over ONE shared window:
- *   • ActivityHeatmap (count-only, lens-switchable) + its anchored context card
- *   • IntensityChart (window-scoped, neutral)
- *   • RolodexBrowser (three synchronized wheels + summary drawer)
- *   • the shared DateDetailSheet -> InteractionDetail (Edit / hard-delete)
+ * From the top (38.8 D-10), over ONE shared analysis window (ADR-120):
+ *   • ActivityHeatmap (count-only, lens-switchable, ADR-119) + its anchored
+ *     context card — the overview;
+ *   • IntensityChart (window-scoped, neutral) — the overview;
+ *   • HistoryStream — the contact's actual records, newest first, grouped
+ *     year → month → day, with the current year open, older years collapsed
+ *     and Show older chunks (38.8 D-14/D-15/D-34..D-39). Records are visible the
+ *     moment History opens, with no date pick and no new screen (D-11);
+ *   • the shared DateDetailSheet (reached only from the heatmap card's "See
+ *     details" until 38.8 Plan 03 replaces that flow) and InteractionDetail
+ *     (Edit / hard-delete, ADR-122).
  *
  * It owns the lens/window/cycle-preset state (persisted globally in
- * `app_settings` via the DAO), reads the canonical history on mount and on every
- * parent Profile revision (38.3 RG-024 — the Profile snapshot load is the single
- * invalidation owner; Profile focus always produces a revision, so ADR-123's
- * on-focus read is preserved), and wires the cross-surface behaviors:
+ * `app_settings` via the DAO) and the stream's transient view state (fresh on
+ * each mount, kept across revision re-reads, never persisted — 38.8 D-18/D-62).
+ * It reads the canonical history on mount and on every parent Profile revision
+ * (38.3 RG-024, ADR-165 — the Profile snapshot load is the single invalidation
+ * owner; Profile focus always produces a revision), and wires the cross-surface
+ * behaviors:
  *   - a heatmap cell opens the context card FIRST; only its explicit "See
  *     details" opens the shared Detail Sheet, and only "Log interaction" routes
  *     the typed LogContact contract (never auto-opening the sheet, HIST-09/07).
- *   - the browser drawer's "See details"/"Log interaction" do the same.
- *   - the Detail Sheet interleaves the three record families; a tapped
- *     interaction opens InteractionDetail; a knowledge-change row reuses the
- *     profile's EXISTING knowledge nav (decision-preserving, no new cross-stack
- *     target).
+ *   - a tapped stream (or sheet) interaction opens InteractionDetail; a
+ *     knowledge-change row reuses the profile's EXISTING knowledge nav to its
+ *     MemoryHistory (decision-preserving, no new cross-stack target); lifecycle
+ *     rows are read-only.
  *   - an empty date/cell "Log interaction" navigates the TYPED LogContact
  *     { contactId, prefillDate } route (contact preselected + date prefilled),
- *     NEVER a quick-log payload (HIST-15). Phase 34 fills the real form.
+ *     NEVER a quick-log payload (HIST-15).
  *
  * The empty-section state ("No history yet") shows ONLY when the contact has none
  * of the three record families — no interactions AND no lifecycle records AND no

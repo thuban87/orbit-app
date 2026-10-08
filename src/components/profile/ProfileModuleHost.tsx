@@ -439,7 +439,7 @@ export function ProfileModuleHost({
       return <AppText role="body">{snapshot.history.message}</AppText>;
     }
     // The assembled Profile History section (Plan 08): Heatmap + Intensity +
-    // Rolodex browser behind this renderer seam, replacing the old
+    // the History stream (38.8 D-10) behind this renderer seam, replacing the old
     // channel·occurredAt + "View all history" stub. Layout persistence and the
     // interaction-history summary case are untouched.
     return (
