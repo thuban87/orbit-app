@@ -3,6 +3,8 @@ import { DevSettings } from "react-native";
 let registered = false;
 /** One Orrery perf-fixture action at a time (seed and restore both write). */
 let orreryFixtureBusy = false;
+/** One History seed run at a time (38.8 Plan 01). */
+let historyFixtureBusy = false;
 
 /**
  * The re-anchor target the measurement runbook writes with `run-as` to
@@ -185,6 +187,42 @@ export function registerUatProbes(): void {
       })();
     },
   );
+  // 38.8 Plan 01 (D-30): the synthetic History datasets (long, dense, sparse,
+  // notes-only, Unbound, quiet year, archived, empty, group-linked), written
+  // through the real Core writers on a test phone. Counts-only log lines.
+  DevSettings.addMenuItem("History: seed fixture (38.8)", () => {
+    if (historyFixtureBusy) return console.log("history-seed busy");
+    historyFixtureBusy = true;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { defaultHistorySeedDeps, seedHistoryFixture } =
+      require("./history-seed") as typeof import("./history-seed");
+    void (async () => {
+      try {
+        const { getExecutor } =
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          require("@/db/database") as typeof import("@/db/database");
+        // seedHistoryFixture logs the `history-seed …` line itself.
+        const result = await seedHistoryFixture(
+          getExecutor(),
+          defaultHistorySeedDeps,
+        );
+        console.log(`history-seed result status=${result.status}`);
+        if (result.status === "created") {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { bumpShellRefresh } =
+            require("@/stores/shell-refresh-store") as typeof import("@/stores/shell-refresh-store");
+          bumpShellRefresh();
+        }
+      } catch (error) {
+        console.log(
+          "history-seed failed",
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        historyFixtureBusy = false;
+      }
+    })();
+  });
   DevSettings.addMenuItem(
     "Orrery: restore perf fixture (photos + re-anchor)",
     () => {
