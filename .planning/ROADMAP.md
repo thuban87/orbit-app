@@ -1476,11 +1476,11 @@ Plans:
 Some of these are superseded in part; see the CONTEXT's `<supersessions>`.
 **Schema**: none expected (migration head 032, backup format 7). Preferences `history_lens` / `history_cycle_count` are unchanged.
 **UI hint**: yes
-**Plans**: 6/7 plans executed
+**Plans**: 7/7 plans executed
 
 Plans:
 
-- [ ] 38.8-07-PLAN.md
+- [x] 38.8-07-PLAN.md — Gap closure (W7): G1 collapsed-History reveal settles after load (D-72), G2 empty-day note scrolls into view (D-73), YEARS on day-lens labels and the empty-day note (D-74); device re-check passed
 
 **Wave 1**
 
@@ -1568,7 +1568,7 @@ Plans:
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
-| 38.8 History Navigation UX | 6/7 | In Progress|  |
+| 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 

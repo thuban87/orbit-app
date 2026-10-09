@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.8
 current_phase_name: History Navigation UX
 status: executing
-stopped_at: Completed 38.8-06-PLAN.md
-last_updated: "2026-10-09T12:00:00.000Z"
+stopped_at: Completed 38.8-07-PLAN.md
+last_updated: "2026-10-09T21:15:42.000Z"
 last_activity: 2026-10-09
-last_activity_desc: 38.8-06 device pass complete; owner signed off; gaps G1/G2/YEARS approved for 38.8-07
+last_activity_desc: 38.8-07 gap plan complete (G1 fixed in two steps, G2, YEARS; device re-check passed); all 7 plans done, phase close next
 state_head: 0feda5f1d12b54afc5282f279b13e8702bed433f
 progress:
   total_phases: 30
   completed_phases: 21
   total_plans: 281
-  completed_plans: 279
+  completed_plans: 280
 carried_forward:
 
   - "38.8 INSERTED (owner 2026-10-08): History Navigation UX, before Phase 39. Replaces the Profile History Rolodex with an activity-first stream + Jump to date + heatmap jump-and-highlight; section renamed 'History'; Rolodex archived as reference. Dossier .planning/phases/38.8-history-navigation-ux/38.8-CONTEXT.md ACCEPTED (D-01..D-63, no OPEN items; provenance 38.8-LEDGER.md; accepted mockup 38.8-WORKPAPER-mockup/). Phase 39's detailed History teaching waits on this phase."
@@ -46,17 +46,17 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.8 (History Navigation UX) — EXECUTING
-Plan: 6 of 6 complete (gap plan 38.8-07 pending)
-Status: Plan 06 complete — owner signed off look and feel 2026-10-09; approved gaps G1 (collapsed-History reveal), G2 (Year-view note off-screen), YEARS (day dates carry the year off the current year) await gap plan 38.8-07
+Plan: 7 of 7 complete (gap plan 38.8-07 done)
+Status: Plan 07 complete — G1 collapsed-History reveal settles after load (D-72; needed a second fix, 9bcb48b7: the Year heatmap never reported its layout), G2 empty-day note scrolls into view (D-73), YEARS on day-lens labels and the empty-day note (D-74); device re-check on the fallback phone (DEBUG): G1 11/11, G2 pass, YEARS pass. Owner ruling D-75: 7 Days title stays without a year. All plans done; phase close (verification) next
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-09 — 38.8-06 device pass + release measurement + docs done; owner sign-off recorded (38.8-PHASE-END-REPORT.md)
+Last activity: 2026-10-09 — 38.8-07 gap plan done (G1/G2/YEARS fixed and re-checked on the device; 38.8-07-SUMMARY.md); 38.8-06 device pass + owner sign-off before it (38.8-PHASE-END-REPORT.md)
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 38.8, 39, 40. (38.7 completed 2026-10-05.)
-Next: write and execute gap plan 38.8-07 (G1, G2, YEARS; device re-checks need the preferred phone reattached + adb reverse tcp:8081 tcp:8082), then close 38.8, then Phase 39 (Onboarding). The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
+Next: close 38.8 (verification; open question for the owner: whether G1 needs a release-build check, since the DEBUG Year-lens settle comes ~1.5–2.5 s after the heatmap paints and release timing was not measured), then Phase 39 (Onboarding). The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -428,6 +428,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.8 P03 | 16min | 3 tasks | 21 files |
 | Phase 38.8 P04 | 14min | 3 tasks | 10 files |
 | Phase 38.8 P05 | 11min | 3 tasks | 6 files |
+| Phase 38.8 P07 | 2h 12min (incl. G1 debug + 2 device re-checks) | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -975,6 +976,11 @@ Foundational decisions affecting current work:
 - [Phase 38.8]: 38.8-04: D-31 anchor is consumed on a new history object (not a model rebuild); earliestYear clamped to the current year; empty-month state closes when its Log is pressed
 - [Phase 38.8]: 38.8-05: Cycles page = unchanged cycles() series ending at refDate (isCurrent only on the page ending today); cyclesAvailable computed for today independent of paging; lens taps routed through lensTapIntent, global history_lens written only on a non-null persist
 - [Phase 38.8]: 38.8-05: SegmentedControl density prop (regular default unchanged; compact = COMPACT_SEGMENT gap 6 / padding 4 / font 16) used only by the History lens row; on-device label check + tuning in Plan 06
+- [Phase 38.8]: 38.8-07: D-72 (owner, G1): with History collapsed, Last Interaction / View history land at the top of History even while it is still loading; the reveal stays pending past its clamped first scroll and settles on History's loaded content layout (heatmap onLaidOut, empty state, read error), never a timer
+- [Phase 38.8]: 38.8-07: D-72 follow-up: ActivityHeatmap reports onLaidOut on the first layout whose grid is final (Year and the no-cadence Cycles explanation never wait on the width, so no second layout follows); fixed in 9bcb48b7 after the first device re-check failed 11/11 in the Year lens
+- [Phase 38.8]: 38.8-07: D-73 (owner, G2): the empty-day/span note scrolls only far enough to be seen (noteRevealLeadIn: app bar to tab bar/FAB), keeps its D-55 slot, no scroll when visible, no pull-back on re-render
+- [Phase 38.8]: 38.8-07: D-74 (owner, YEARS): 7 Days / Month / Year cell accessible labels and the empty-day note carry the year off the current year (dayDateLabel, D-70's rule, local date parts)
+- [Phase 38.8]: 38.8-07: D-75 (owner): the 7 Days window title (e.g. "Dec 27 – Jan 2") stays month-day only, with no year
 
 ### Pending Todos
 
@@ -1044,8 +1050,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-09T00:28:24.922Z
-**Stopped at:** Completed 38.8-05-PLAN.md
+**Last session:** 2026-10-09T21:15:42.000Z
+**Stopped at:** Completed 38.8-07-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
