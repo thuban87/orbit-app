@@ -37,6 +37,7 @@ import {
   nearestDateLabel,
   nearestRecordDays,
   nearestRemainingDay,
+  noteRevealLeadIn,
   orderStreamRecords,
   type PendingHistoryScroll,
   PICKER_IN_VIEW_SLACK_DP,
@@ -1155,6 +1156,142 @@ describe("only one empty note at a time (D-69)", () => {
       "const closeNote",
     );
     expect(onCellPress).toContain("setMonthNote(null)");
+  });
+});
+
+// 38.8 D-73 (G2): the Year heatmap is taller than the screen, so the
+// empty-day/span note under it (D-55) can land below the fold. It scrolls only
+// far enough to show it: its bottom lands at the visible bottom (above the tab
+// bar and the shell FAB when they cover it), and nothing scrolls when it is
+// already wholly visible. The result is the lead-in above the note's top.
+describe("noteRevealLeadIn (D-73)", () => {
+  const view = { viewportTop: 100, viewportBottom: 2000 };
+  const tabs = { x: 0, y: 1900, width: 412, height: 100 };
+  const fab = { x: 340, y: 1820, width: 56, height: 56 };
+
+  it("does not scroll a wholly visible note", () => {
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: 500, width: 380, height: 80 },
+        obstacles: [tabs, fab],
+      }),
+    ).toBe(null);
+  });
+
+  it("brings a note below the fold up to the visible bottom", () => {
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: 2100, width: 380, height: 80 },
+        obstacles: [],
+      }),
+    ).toBe(2000 - 100 - 80);
+  });
+
+  it("keeps the note above the tab bar and the FAB that cover it", () => {
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: 1790, width: 380, height: 80 },
+        obstacles: [tabs, fab],
+      }),
+    ).toBe(1820 - 100 - 80);
+  });
+
+  it("ignores an obstacle beside the note", () => {
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: 1790, width: 300, height: 80 },
+        obstacles: [tabs, fab],
+      }),
+    ).toBe(null);
+  });
+
+  it("scrolls a note that is only partly visible", () => {
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: 1950, width: 380, height: 80 },
+        obstacles: [],
+      }),
+    ).toBe(2000 - 100 - 80);
+  });
+
+  it("lands a note taller than the visible area at the visible top", () => {
+    expect(
+      noteRevealLeadIn({
+        viewportTop: 100,
+        viewportBottom: 300,
+        note: { x: 16, y: 400, width: 380, height: 500 },
+        obstacles: [],
+      }),
+    ).toBe(0);
+  });
+
+  it("lands a note above the visible top at the visible top", () => {
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: 40, width: 380, height: 80 },
+        obstacles: [],
+      }),
+    ).toBe(0);
+  });
+
+  it("does not scroll on an unusable measurement", () => {
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: Number.NaN, width: 380, height: 80 },
+        obstacles: [],
+      }),
+    ).toBe(null);
+    expect(
+      noteRevealLeadIn({
+        ...view,
+        note: { x: 16, y: 2100, width: 380, height: 0 },
+        obstacles: [],
+      }),
+    ).toBe(null);
+  });
+});
+
+// HistorySection wiring (no HistorySection render harness exists).
+describe("HistorySection reveal and note wiring (D-72, D-73)", () => {
+  const source = readFileSync(
+    new URL("./HistorySection.tsx", import.meta.url),
+    "utf8",
+  );
+  const between = (start: string, end: string) => {
+    const from = source.indexOf(start);
+    const to = source.indexOf(end, from);
+    expect(from).toBeGreaterThan(-1);
+    expect(to).toBeGreaterThan(from);
+    return source.slice(from, to);
+  };
+
+  it("reports its laid-out content, never the loading placeholder (D-72)", () => {
+    const loading = between("if (!history) {", "const refreshNotice");
+    expect(loading).not.toContain("onContentLayout");
+    expect(
+      between('if (readState.phase === "error") {', "if (!history) {"),
+    ).toContain("onLayout={onContentLayout}");
+    expect(
+      between("if (isEmptyHistory(history)) {", "<ActivityHeatmap"),
+    ).toContain("onLayout={onContentLayout}");
+    expect(between("<View testID={testID}", "<ActivityHeatmap")).toContain(
+      "onLayout={onContentLayout}",
+    );
+  });
+
+  it("measures the note in its D-55 slot and asks for a lead-in scroll (D-73)", () => {
+    const slot = between("{note ? (", "<IntensityChart");
+    expect(slot).toContain("ref={noteViewRef}");
+    expect(slot).toContain("<HistoryTargetNote");
+    expect(source).toContain("noteRevealLeadIn(");
+    expect(source).toMatch(/onRequestHistoryScroll\(\s*view,[\s\S]*leadIn/);
   });
 });
 

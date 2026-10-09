@@ -157,6 +157,88 @@ describe("createHistoryRevealScroll", () => {
     reveal.reveal(false);
     expect(scrollTo).toHaveBeenCalledExactlyOnceWith(60);
   });
+
+  // 38.8 D-72 (G1, D-61): an expanding reveal's first scroll lands while the
+  // freshly mounted History still shows "Loading history…", so the Profile is
+  // too short and the ScrollView clamps it. The reveal settles once History's
+  // loaded content has laid out: it scrolls once more, then never again.
+  it("scrolls again once the expanded History's loaded content lays out (D-72)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(100);
+    reveal.historyLayout(200, false);
+    reveal.reveal(true);
+    reveal.historyLayout(200, true);
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(300);
+    reveal.historyContentLayout();
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+    expect(scrollTo).toHaveBeenLastCalledWith(300);
+    // Settled: later content and anchor relayouts never scroll again.
+    reveal.historyContentLayout();
+    reveal.historyLayout(200, true);
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+  });
+
+  it("settles on the latest offsets when the content lays out (D-72)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(100);
+    reveal.historyLayout(200, false);
+    reveal.reveal(true);
+    reveal.historyLayout(200, true);
+    reveal.hostLayout(110);
+    reveal.historyLayout(240, true);
+    reveal.historyContentLayout();
+    expect(scrollTo).toHaveBeenLastCalledWith(350);
+  });
+
+  it("does not scroll twice for a reveal of an already open History (D-72)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(100);
+    reveal.historyLayout(200, true);
+    reveal.reveal(false);
+    reveal.historyContentLayout();
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(300);
+  });
+
+  it("does not wait for content after a failed expand write (D-72)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(10);
+    reveal.historyLayout(90, false);
+    reveal.reveal(true);
+    reveal.expandSettled(false);
+    reveal.historyContentLayout();
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(100);
+  });
+
+  it("drops the settle scroll when History collapses before its content loads (D-72)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(10);
+    reveal.historyLayout(20, false);
+    reveal.reveal(true);
+    reveal.historyLayout(20, true);
+    reveal.historyLayout(20, false);
+    reveal.historyContentLayout();
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(30);
+  });
+
+  it("never scrolls on a content layout without a reveal (D-72)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(10);
+    reveal.historyLayout(20, true);
+    reveal.historyContentLayout();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("a new reveal replaces a pending settle scroll (D-72)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(10);
+    reveal.historyLayout(20, false);
+    reveal.reveal(true);
+    reveal.historyLayout(20, true);
+    // History is open now; a second reveal scrolls at once and is settled.
+    reveal.reveal(false);
+    reveal.historyContentLayout();
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+  });
 });
 
 // 38.8 D-19/D-20 (C2-01): a heatmap jump scrolls to a point inside History,
@@ -218,6 +300,20 @@ describe("scrollWithinHistory / completeHistoryScroll", () => {
     ).toBe(true);
     expect(scrollTo).toHaveBeenLastCalledWith(37);
     expect(onResult).toHaveBeenCalledWith(true);
+  });
+
+  // 38.8 D-73 (G2): the empty-day note scrolls only far enough to show it,
+  // so the request lands `leadIn` above the target's top.
+  it("lands a lead-in above the target when one is given (D-73)", () => {
+    const { scrollTo, reveal } = scroller();
+    reveal.hostLayout(240);
+    reveal.historyLayout(600, true);
+    const onResult = vi.fn();
+    expect(completeHistoryScroll(reveal, 900, () => true, onResult, 500)).toBe(
+      true,
+    );
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(1240);
+    expect(onResult).toHaveBeenCalledExactlyOnceWith(true);
   });
 
   it("leaves a pending expand reveal untouched (D-61)", () => {

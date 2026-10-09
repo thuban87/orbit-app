@@ -470,6 +470,100 @@ describe("ProfileModuleHost History reveal", () => {
     expect(staleResult).not.toHaveBeenCalled();
   });
 
+  // 38.8 D-73 (G2): the empty-day note asks to land `leadIn` above itself.
+  it("subtracts a requested lead-in from the measured target offset (D-73)", () => {
+    const onRequestScrollTo = vi.fn();
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: true, expanded: true }),
+      onRequestScrollTo,
+    );
+    const host = nodes.find(
+      (node) => node.props.testID === "profile-module-host",
+    );
+    const anchor = nodes.find(
+      (node) => node.props.testID === "profile-history-anchor",
+    );
+    handler<(event: unknown) => void>(host, "onLayout")(layout(240));
+    handler<(event: unknown) => void>(anchor, "onLayout")(layout(600));
+    (anchor?.props.ref as { current: unknown }).current = {};
+    const target = {
+      measureLayout: (
+        _relativeTo: unknown,
+        onSuccess: (x: number, y: number) => void,
+      ) => onSuccess(0, 120),
+    };
+    const request = handler<
+      (
+        target: unknown,
+        isCurrent: () => boolean,
+        onResult: (ok: boolean) => void,
+        leadIn?: number,
+      ) => void
+    >(
+      nodes.find((node) => node.type === "HistorySection"),
+      "onRequestHistoryScroll",
+    );
+    request(target, () => true, vi.fn(), 50);
+    expect(onRequestScrollTo).toHaveBeenCalledExactlyOnceWith(910);
+  });
+
+  // 38.8 D-72 (G1): History reports its loaded content's layout so an
+  // expanding reveal can settle; an already-open reveal never scrolls twice.
+  it("hands HistorySection a content-layout signal that never re-scrolls an open reveal (D-72)", () => {
+    const onRequestScrollTo = vi.fn();
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: true, expanded: true }),
+      onRequestScrollTo,
+    );
+    const host = nodes.find(
+      (node) => node.props.testID === "profile-module-host",
+    );
+    const anchor = nodes.find(
+      (node) => node.props.testID === "profile-history-anchor",
+    );
+    handler<(event: unknown) => void>(host, "onLayout")(layout(240));
+    handler<(event: unknown) => void>(anchor, "onLayout")(layout(600));
+    handler<() => void>(
+      nodes.find((node) => node.type === "RelationshipOverview"),
+      "onOpenHistory",
+    )();
+    handler<() => void>(
+      nodes.find((node) => node.type === "HistorySection"),
+      "onContentLayout",
+    )();
+    expect(onRequestScrollTo).toHaveBeenCalledExactlyOnceWith(840);
+  });
+
+  it("treats a History read error as History's laid-out content (D-72)", () => {
+    const nodes = all(
+      resolve(
+        ProfileModuleHost({
+          snapshot: {
+            identity: { id: 7, name: "Ada", intervalDays: 30 },
+            knowledge: { status: "ready", data: {} },
+            history: { status: "error", message: "Couldn't load" },
+          } as unknown as ProfileSnapshot,
+          presentation: historyPresentation({ visible: true, expanded: true }),
+          todayLocal: "2026-09-19",
+          historyRevision: 0,
+          onRequestScrollTo: vi.fn(),
+          onSetFrequency: vi.fn(async () => {}),
+          onSnooze: vi.fn(async () => {}),
+          onUnsnooze: vi.fn(async () => {}),
+          onKnowledgeAction: vi.fn(),
+          onKnowledgeViewAll: vi.fn(),
+          onOpenValueHistory: vi.fn(),
+          onOpenKnowledgeChange: vi.fn(),
+          onContactMethodAction: vi.fn(),
+        }),
+      ),
+    );
+    const error = nodes.find(
+      (node) => node.props.testID === "profile-history-error",
+    );
+    expect(error?.props.onLayout).toBeTypeOf("function");
+  });
+
   it("reports a failed measure only to a current request", () => {
     const onRequestScrollTo = vi.fn();
     const nodes = historyHostNodes(
