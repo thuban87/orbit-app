@@ -2,7 +2,8 @@
  * Canonical single-contact history read (HIST-02/10/16, D-10/D-12).
  *
  * The one read behind the Profile History surfaces (Heatmap / Intensity /
- * the History stream (38.8) / Detail Sheet). It SUPERSEDES the renderer
+ * the History stream (38.8); the date-detail sheet was retired in 38.8
+ * D-19/D-22). It SUPERSEDES the renderer
  * contract of the interim `profile-history-read.ts` (its header invites exactly
  * this) WITHOUT changing persistence, and drops that read's `LIMIT 3`.
  *

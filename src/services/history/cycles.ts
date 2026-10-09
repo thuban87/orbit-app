@@ -10,8 +10,9 @@
  * impact.ts's `{ available: false }` guard shape VERBATIM — the same tagged
  * unavailable result Phase 31's intensity treatment returns — and returns it
  * BEFORE any arithmetic, so cadence math NEVER divides by (or multiplies) a null
- * interval. Callers map the fallback to the 7-Days lens (rendering Cycles as
- * unavailable). No throw, no NaN, no Infinity.
+ * interval. History shows the Month lens with a short note for that contact
+ * when the saved lens is Cycles, and Cycles as unavailable after an explicit
+ * Cycles tap (38.8 D-27). No throw, no NaN, no Infinity.
  *
  * Pure: no DB/store/component import, no transaction. All date math is local
  * (dates.ts convention) — never UTC ISO slicing.
