@@ -372,28 +372,86 @@ describe("ActivityHeatmap tap zones never overlap (D-42 B)", () => {
   });
 });
 
-// 38.8 D-72 (G1): the grid renders only once the width is measured, so the
-// heatmap reports "laid out" only from a layout seen with a measured width —
-// never the first, grid-less one. An expanding History reveal settles on it.
-describe("ActivityHeatmap reports its measured layout (D-72)", () => {
+// 38.8 D-72 (G1): an expanding History reveal settles on the heatmap's
+// "laid out" report, so it must come from the first layout that shows the
+// final grid. 7 Days, Month and Cycles render their grid only once the width
+// is measured: their first layout is grid-less and is not reported; the
+// measured grid's layout (a height change) is. The Year grid (fixed cell edge)
+// and the no-cadence Cycles explanation never wait on the width: their first
+// layout is already final and NO second layout follows (the width re-render
+// changes no size), so that first layout must report — on the device the
+// Year reveal otherwise never settled (G1 fix re-check).
+describe("ActivityHeatmap reports its laid-out grid (D-72)", () => {
   const layoutEvent = { nativeEvent: { layout: { width: 254 } } };
-  const rootLayout = (onLaidOut: () => void) => {
-    const nodes = all(resolve(ActivityHeatmap(props({ onLaidOut }))));
-    const root = nodes.find((node) => node.props.testID === "activity-heatmap");
-    return root?.props.onLayout as (event: unknown) => void;
-  };
+  const render = (overrides: Partial<ActivityHeatmapProps>) =>
+    all(resolve(ActivityHeatmap(props(overrides))));
+  const rootLayout = (nodes: Node[]) =>
+    nodes.find((node) => node.props.testID === "activity-heatmap")?.props
+      .onLayout as (event: unknown) => void;
 
-  it("does not report the first, unmeasured layout", () => {
-    measuredWidth = 0;
-    const onLaidOut = vi.fn();
-    rootLayout(onLaidOut)(layoutEvent);
-    expect(onLaidOut).not.toHaveBeenCalled();
-  });
+  const widthGrids: Array<[string, Partial<ActivityHeatmapProps>, string]> = [
+    ["7 Days", { lens: "7days" }, "activity-heatmap-day-grid"],
+    [
+      "Month",
+      { lens: "month", window: { ...DAY_WINDOW, lens: "month" } },
+      "activity-heatmap-day-grid",
+    ],
+    [
+      "Cycles",
+      { lens: "cycles", window: null, cycles: CYCLES, cycleCounts: [0, 1] },
+      "activity-heatmap-cycles-grid",
+    ],
+  ];
+  it.each(widthGrids)(
+    "%s: does not report the first, unmeasured (grid-less) layout",
+    (_name, overrides, gridID) => {
+      measuredWidth = 0;
+      const onLaidOut = vi.fn();
+      const nodes = render({ ...overrides, onLaidOut });
+      expect(nodes.some((node) => node.props.testID === gridID)).toBe(false);
+      rootLayout(nodes)(layoutEvent);
+      expect(onLaidOut).not.toHaveBeenCalled();
+    },
+  );
+  it.each(widthGrids)(
+    "%s: reports the layout once the grid has its measured width",
+    (_name, overrides, gridID) => {
+      measuredWidth = 254;
+      const onLaidOut = vi.fn();
+      const nodes = render({ ...overrides, onLaidOut });
+      expect(nodes.some((node) => node.props.testID === gridID)).toBe(true);
+      rootLayout(nodes)(layoutEvent);
+      expect(onLaidOut).toHaveBeenCalledTimes(1);
+    },
+  );
 
-  it("reports a layout once the grid has its measured width", () => {
+  const fixedGrids: Array<[string, Partial<ActivityHeatmapProps>, string]> = [
+    [
+      "Year",
+      { lens: "year", window: { ...DAY_WINDOW, lens: "year" } },
+      "activity-heatmap-year-grid",
+    ],
+    [
+      "Cycles without a cadence",
+      { lens: "cycles", window: null, cycles: { available: false } },
+      "activity-heatmap-cycles-unavailable",
+    ],
+  ];
+  it.each(fixedGrids)(
+    "%s: reports its first layout, which already shows the final grid",
+    (_name, overrides, gridID) => {
+      measuredWidth = 0;
+      const onLaidOut = vi.fn();
+      const nodes = render({ ...overrides, onLaidOut });
+      expect(nodes.some((node) => node.props.testID === gridID)).toBe(true);
+      rootLayout(nodes)(layoutEvent);
+      expect(onLaidOut).toHaveBeenCalledTimes(1);
+    },
+  );
+  it.each(fixedGrids)("%s: reports a later layout too", (_name, overrides) => {
     measuredWidth = 254;
     const onLaidOut = vi.fn();
-    rootLayout(onLaidOut)(layoutEvent);
+    rootLayout(render({ ...overrides, onLaidOut }))(layoutEvent);
     expect(onLaidOut).toHaveBeenCalledTimes(1);
   });
 });
