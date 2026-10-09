@@ -15,6 +15,8 @@ const HOSTS = [
     file: "group/GroupTitlePromptSheet.tsx",
     component: "GroupTitlePromptSheet",
   },
+  // 38.8 D-48: opens from the Profile History glass card.
+  { file: "history/JumpToDateSheet.tsx", component: "JumpToDateSheet" },
 ];
 
 describe("opaque sheet hosts read the root palette (Lane B2 WR-01)", () => {

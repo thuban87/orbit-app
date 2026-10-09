@@ -28,6 +28,10 @@ import { pickerModel, type StreamModel } from "./history-stream-logic";
 
 /** Minimum month-cell and stepper target (D-06 reach). */
 const PICKER_TARGET_DP = 44;
+/** A future (disabled) month cell's opacity (mockup `.months button:disabled`). */
+const PICKER_DISABLED_OPACITY = 0.35;
+/** The has-records dot's diameter (mockup `.dot`). */
+const PICKER_DOT_DP = 5;
 
 export interface JumpToDateSheetProps {
   visible: boolean;
@@ -117,13 +121,22 @@ export function JumpToDateSheet({
                 styles.month,
                 {
                   backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
+                  borderColor: month.selected ? colors.accent : colors.border,
                 },
+                month.selected ? styles.monthSelected : null,
+                month.disabled ? styles.monthDisabled : null,
               ]}
             >
               <AppText role="label" style={{ color: colors.textPrimary }}>
                 {month.label}
               </AppText>
+              {month.hasRecords ? (
+                // Decorative: the cell's accessible label carries "has records".
+                <View
+                  testID={`history-jump-dot-${month.monthKey}`}
+                  style={[styles.dot, { backgroundColor: colors.textPrimary }]}
+                />
+              ) : null}
             </Pressable>
           ))}
         </View>
@@ -157,5 +170,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: PICKER_TARGET_DP,
     paddingVertical: SPACING.sm,
+  },
+  monthSelected: { borderWidth: 2 },
+  monthDisabled: { opacity: PICKER_DISABLED_OPACITY },
+  dot: {
+    borderRadius: PICKER_DOT_DP / 2,
+    bottom: SPACING.xs,
+    height: PICKER_DOT_DP,
+    left: "50%",
+    marginLeft: -PICKER_DOT_DP / 2,
+    position: "absolute",
+    width: PICKER_DOT_DP,
   },
 });

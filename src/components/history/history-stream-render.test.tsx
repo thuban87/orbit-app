@@ -521,10 +521,10 @@ describe("HistoryTargetNote — the empty-month variant (D-17, D-64, D-65)", () 
     const { nodes, handlers } = renderNote(true);
     const log = byTestID(nodes, "history-target-note-log");
     expect(log?.props.label).toBe("Log interaction");
-    (log?.props.onPress as () => void)();
+    ((log as Node).props.onPress as () => void)();
     expect(handlers.onLog).toHaveBeenCalled();
     const close = byTestID(nodes, "history-target-note-close");
-    (close?.props.onPress as () => void)();
+    ((close as Node).props.onPress as () => void)();
     expect(handlers.onClose).toHaveBeenCalled();
     expect(textOf(nodes[0])).toContain("No activity in October 2025.");
   });

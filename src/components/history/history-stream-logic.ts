@@ -39,6 +39,13 @@ export const STREAM_INITIAL_VISIBLE = 20;
 /** Records each Show older tap adds (extended to a day's end). */
 export const STREAM_CHUNK = 20;
 
+/**
+ * Jump to date opening month (D-50, RESEARCH Pattern 5): a month header counts
+ * as in view when its window y is at most this far below the Profile app bar's
+ * bottom edge (the accepted mockup's `offsetTop <= top + 20`).
+ */
+export const PICKER_IN_VIEW_SLACK_DP = 20;
+
 // --- Records -----------------------------------------------------------------
 
 export type StreamFamily = "interaction" | "lifecycle" | "knowledge";
@@ -721,12 +728,98 @@ export function resolveMonthJump(
   // `days` is newest first, so the first match is the month's newest day.
   const newest = model.days.find((date) => date.slice(0, 7) === monthKey);
   if (newest) return { kind: "reveal-month", monthKey, days: [newest] };
-  return { kind: "empty-month", monthKey, before: null, after: null };
+  let before: string | null = null;
+  let after: string | null = null;
+  for (const date of model.days) {
+    const month = date.slice(0, 7);
+    if (month > monthKey)
+      after = date; // keeps the oldest later day
+    else if (month < monthKey) {
+      before = date; // the first earlier day is the newest one
+      break;
+    }
+  }
+  return { kind: "empty-month", monthKey, before, after };
+}
+
+/**
+ * The record days nearest `date` (any family): the newest day strictly before
+ * it and the oldest strictly after it, null past either end of history.
+ */
+export function nearestRecordDays(
+  model: StreamModel,
+  date: string,
+): { before: string | null; after: string | null } {
+  let before: string | null = null;
+  let after: string | null = null;
+  for (const day of model.days) {
+    if (day > date) after = day;
+    else if (day < date) {
+      before = day;
+      break;
+    }
+  }
+  return { before, after };
+}
+
+/**
+ * The Profile app bar's bottom edge in window coordinates — the stream's
+ * visible top (D-50, C3-02): the top safe-area inset, plus the in-flow shell
+ * content above the tab navigator (the assist banner, 0 when none), plus the
+ * app bar, which sits absolutely at the top of the Profile screen.
+ */
+export function pickerViewportTop({
+  insetTop,
+  shellTopOffset,
+  appBarHeight,
+}: {
+  insetTop: number;
+  shellTopOffset: number;
+  appBarHeight: number;
+}): number {
+  return insetTop + shellTopOffset + appBarHeight;
+}
+
+/**
+ * The month the picker opens on (D-50, RESEARCH Pattern 5): the last month
+ * header, in stream order (newest first), whose window y is at or above the
+ * viewport top plus PICKER_IN_VIEW_SLACK_DP — headers hidden under the overlay
+ * bar count as scrolled past. When none qualifies the user has not scrolled
+ * into the stream, so it opens on `fallbackMonthKey` (the current month).
+ * Entries may arrive in any order. Under D-32's non-sticky Jump button this
+ * resolves to the current month in practice (D-68, accepted).
+ */
+export function pickerInitialMonth(
+  entries: readonly { monthKey: string; windowY: number }[],
+  viewportTop: number,
+  fallbackMonthKey: string,
+): string {
+  const inStreamOrder = [...entries].sort((a, b) =>
+    a.monthKey < b.monthKey ? 1 : a.monthKey > b.monthKey ? -1 : 0,
+  );
+  let result: string | null = null;
+  for (const entry of inStreamOrder) {
+    if (entry.windowY <= viewportTop + PICKER_IN_VIEW_SLACK_DP) {
+      result = entry.monthKey;
+    }
+  }
+  return result ?? fallbackMonthKey;
 }
 
 /** The one-time screen-reader announcement of a month jump: "Showing October 2025". */
 export function monthAnnouncement(monthKey: string): string {
   return `Showing ${monthLongLabel(monthKey)}`;
+}
+
+/** The empty-month state's heading: "No activity in October 2025." (D-17). */
+export function emptyMonthNoteText(monthKey: string): string {
+  return `No activity in ${monthLongLabel(monthKey)}.`;
+}
+
+/** A nearest-date link: "Nov 3, 2025" (local components only). */
+export function nearestDateLabel(date: string): string {
+  const local = localDateFromParts(date);
+  return `${MONTH_SHORT[local.getMonth()]} ${local.getDate()}, ${local.getFullYear()}`;
 }
 
 /** "October 2025" from `YYYY-MM`. */

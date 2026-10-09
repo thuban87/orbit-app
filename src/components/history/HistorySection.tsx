@@ -8,6 +8,11 @@
  *   • ActivityHeatmap (count-only, lens-switchable, ADR-119) — the overview —
  *     with the empty-target note directly under it when one is showing;
  *   • IntensityChart (window-scoped, neutral) — the overview;
+ *   • 'Jump to date' — the stream header's only control (D-29, D-32): a year
+ *     stepper + month grid sheet (JumpToDateSheet, D-48..D-52). A month with
+ *     records scrolls the Profile to its header (no highlight); an empty month
+ *     shows an explicit state right under the button with tappable nearest
+ *     dates and an undated Log (D-17, D-28, D-64, D-65);
  *   • HistoryStream — the contact's actual records, newest first, grouped
  *     year → month → day, with the current year open, older years collapsed
  *     and Show older chunks (38.8 D-14/D-15/D-34..D-39). Records are visible the
@@ -61,8 +66,8 @@ import {
   useState,
 } from "react";
 import { AccessibilityInfo, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
-import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
 import { ActivityHeatmap } from "@/components/history/ActivityHeatmap";
 import {
   HIGHLIGHT_CLEAR_SLACK_MS,
@@ -96,9 +101,12 @@ import {
 } from "@/components/history/history-section-logic";
 import {
   buildStreamModel,
+  dayAccessibilityLabel,
   dayNodeKey,
   emptyDayNoteText,
+  emptyMonthNoteText,
   emptySpanNoteText,
+  type HeatmapTarget,
   type HistoryNote,
   type HistoryNoteEvent,
   historyNoteOn,
@@ -107,9 +115,12 @@ import {
   isCurrentScroll,
   monthAnnouncement,
   monthNodeKey,
+  nearestDateLabel,
   type PendingHistoryScroll,
   type PendingScrollEvent,
   pendingScrollOn,
+  pickerInitialMonth,
+  pickerViewportTop,
   resolveHeatmapTarget,
   resolveMonthJump,
   revealAnnouncement,
@@ -135,6 +146,7 @@ import type { ImpactInputs } from "@/db/impact-read";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import { newUid } from "@/db/uid";
 import type { RootStackParamList } from "@/navigation/types";
+import { PROFILE_APP_BAR } from "@/screens/contact-profile-logic";
 import { buckets } from "@/services/history/buckets";
 import { cycles } from "@/services/history/cycles";
 import {
@@ -146,6 +158,7 @@ import {
   nextWindow,
   prevWindow,
 } from "@/services/history/window";
+import { useShellTopOffset } from "@/stores/shell-offset-store";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatLocalDate } from "@/utils/dates";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
@@ -158,6 +171,13 @@ const LOG_SCOPE = "history-section";
  * next layout or after this many ms, whichever comes first (38.8 C2-02).
  */
 const HISTORY_SCROLL_RETRY_MS = 300;
+
+/**
+ * Jump to date waits at most this long for the stream's month headers to
+ * report their window position before opening on the current month instead
+ * (38.8 D-50; the picker never waits on a header that does not report).
+ */
+const PICKER_MEASURE_TIMEOUT_MS = 150;
 
 /**
  * A minimal window spanning [start, end] for the cycles lens's Intensity, which
@@ -264,6 +284,22 @@ export function HistorySection({
   const [jumpInitialMonth, setJumpInitialMonth] = useState(() =>
     formatLocalDate(new Date()).slice(0, 7),
   );
+  // The empty-month state under the Jump to date button (D-17, D-64): the
+  // month and its nearest record days. Per-mount view state (D-62).
+  const [monthNote, setMonthNote] = useState<{
+    monthKey: string;
+    before: string | null;
+    after: string | null;
+  } | null>(null);
+  // The Profile app bar's bottom edge in window coordinates: the stream's
+  // visible top for the picker's opening month (D-50, C3-02).
+  const insets = useSafeAreaInsets();
+  const shellTopOffset = useShellTopOffset();
+  const appBarBottom = pickerViewportTop({
+    insetTop: insets.top,
+    shellTopOffset,
+    appBarHeight: PROFILE_APP_BAR.height,
+  });
   const [converting, setConverting] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
 
@@ -570,9 +606,12 @@ export function HistorySection({
   }, []);
   // Every heatmap tap resolves against the all-family day index (D-21): a
   // populated target jumps, an empty one shows the note and leaves the stream
-  // alone. Any tap clears the previous note and replaces any pending jump.
+  // alone. Any tap clears the previous note (and the empty-month state, C4-03)
+  // and replaces any pending jump. A nearest-date jump from the empty-month
+  // state runs this same handler (D-65).
   const onCellPress = useCallback(
-    (target: HeatmapCellTarget) => {
+    (target: HeatmapTarget) => {
+      setMonthNote(null);
       if (streamModel) {
         const resolution = resolveHeatmapTarget(streamModel, target);
         dispatchNote({ type: "heatmap", resolution });
@@ -616,22 +655,80 @@ export function HistorySection({
 
   // --- Jump to date (38.8 D-17, D-48..D-52) ----------------------------------
   // Opening the picker is a stream action: it drops any pending jump scroll and
-  // its retry (C2-03).
+  // its retry (C2-03). It opens on the month in view (D-50, Pattern 5): each
+  // rendered month header is measured in window coordinates, and the picker
+  // opens once every header has reported, or on the current month after
+  // PICKER_MEASURE_TIMEOUT_MS. Under D-32's non-sticky button this is the
+  // current month in practice (D-68, accepted).
+  const measureToken = useRef(0);
+  const measureTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      measureToken.current += 1;
+      if (measureTimer.current !== null) clearTimeout(measureTimer.current);
+    },
+    [],
+  );
   const openJump = useCallback(() => {
     commitPending({ type: "stream-action" });
-    setJumpInitialMonth(today.slice(0, 7));
-    setJumpOpen(true);
-  }, [commitPending, today]);
+    const currentMonth = today.slice(0, 7);
+    measureToken.current += 1;
+    const token = measureToken.current;
+    if (measureTimer.current !== null) clearTimeout(measureTimer.current);
+    measureTimer.current = null;
+    const open = (monthKey: string) => {
+      if (measureToken.current !== token) return;
+      measureToken.current += 1;
+      if (measureTimer.current !== null) clearTimeout(measureTimer.current);
+      measureTimer.current = null;
+      setJumpInitialMonth(monthKey);
+      setJumpOpen(true);
+    };
+    const headers = [...nodeRegistry.current.entries()].filter(
+      ([key, node]) =>
+        key.startsWith("month:") && typeof node.measureInWindow === "function",
+    );
+    if (headers.length === 0) {
+      open(currentMonth);
+      return;
+    }
+    const entries: { monthKey: string; windowY: number }[] = [];
+    let reported = 0;
+    measureTimer.current = setTimeout(() => {
+      measureTimer.current = null;
+      open(currentMonth);
+    }, PICKER_MEASURE_TIMEOUT_MS);
+    for (const [key, node] of headers) {
+      node.measureInWindow((_x, y) => {
+        if (measureToken.current !== token) return;
+        // A header that reports no position is skipped.
+        if (Number.isFinite(y)) {
+          entries.push({ monthKey: key.slice("month:".length), windowY: y });
+        }
+        reported += 1;
+        if (reported === headers.length) {
+          open(pickerInitialMonth(entries, appBarBottom, currentMonth));
+        }
+      });
+    }
+  }, [appBarBottom, commitPending, today]);
   // A month with records opens and grows the stream until its header renders,
   // then scrolls the Profile to that header — no highlight (D-17). A month
-  // with no record issues no scroll.
+  // with no record issues no scroll and shows the empty-month state under the
+  // Jump to date button (D-64). Choosing a month replaces any earlier state.
   const onSelectMonth = useCallback(
     (monthKey: string) => {
       setJumpOpen(false);
+      setMonthNote(null);
       if (!streamModel) return;
       const jump = resolveMonthJump(streamModel, monthKey);
       if (jump.kind !== "reveal-month") {
         commitPending({ type: "stream-action" });
+        setMonthNote({
+          monthKey: jump.monthKey,
+          before: jump.before,
+          after: jump.after,
+        });
         return;
       }
       const key = monthNodeKey(monthKey);
@@ -648,6 +745,16 @@ export function HistorySection({
       AccessibilityInfo.announceForAccessibility(monthAnnouncement(monthKey));
     },
     [commitPending, onRequestHistoryScroll, streamModel],
+  );
+  const closeMonthNote = useCallback(() => {
+    commitPending({ type: "stream-action" });
+    setMonthNote(null);
+  }, [commitPending]);
+  // A nearest date jumps and highlights exactly as a heatmap day tap does
+  // (D-65); that handler also clears the empty-month state.
+  const onNearest = useCallback(
+    (date: string) => onCellPress({ kind: "date", date }),
+    [onCellPress],
   );
 
   if (readState.phase === "error") {
@@ -748,6 +855,30 @@ export function HistorySection({
             onPress={openJump}
           />
         </View>
+      ) : null}
+      {monthNote ? (
+        // The empty-month state: directly under Jump to date, above the stream,
+        // never in the heatmap note slot (D-64). Nearest dates: after first.
+        <HistoryTargetNote
+          testID="history-month-note"
+          text={emptyMonthNoteText(monthNote.monthKey)}
+          nearest={[monthNote.after, monthNote.before]
+            .filter((date): date is string => date !== null)
+            .map((date) => ({
+              date,
+              label: nearestDateLabel(date),
+              accessibilityLabel: `Jump to ${dayAccessibilityLabel(date, today)}`,
+            }))}
+          onNearest={onNearest}
+          // Undated (D-28): the Log form starts at now. The state closes as
+          // Log opens, so it never survives the new record.
+          onLog={() => {
+            closeMonthNote();
+            const route = buildLogRoute(contactId);
+            navigation.navigate(route.screen, route.params);
+          }}
+          onClose={closeMonthNote}
+        />
       ) : null}
       {streamModel ? (
         <HistoryStream
