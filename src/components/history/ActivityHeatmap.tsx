@@ -10,10 +10,11 @@
  * (CLAUDE.md / check:colors) — no hex/named literal anywhere, including in styles.
  *
  * PURELY PRESENTATIONAL, PARENT-OWNED STATE (mirrors IntensityLine /
- * SegmentedControl): it imports NO DAO and opens NO sheet. The parent (Plan 08)
- * owns the lens/preset persistence (through app-settings-dao) and the context
- * card / sheet; this component only renders the supplied window + counts and
- * emits `onLensChange` / `onPresetChange` / `onCellPress` / `onPrev` / `onNext`.
+ * SegmentedControl): it imports NO DAO and opens NO sheet. The parent
+ * (HistorySection) owns the lens/preset persistence (through app-settings-dao),
+ * the paging and the no-cadence fallback; this component only renders the
+ * supplied window + counts and emits `onLensChange` / `onPresetChange` /
+ * `onCellPress` / `onPrev` / `onNext`.
  *
  * COUNT-ONLY (D-10): saturation is driven solely by the per-date/per-cycle
  * interaction COUNTS the parent supplies from Plan 03's count-only bucketing;
@@ -153,7 +154,12 @@ const PRESET_OPTIONS: { label: string; value: `${HistoryCycleCount}` }[] =
     value: String(n) as `${HistoryCycleCount}`,
   }));
 
-/** What the parent needs to open the anchored context card for a tapped cell. */
+/**
+ * The tapped cell, for the parent's heatmap → History stream jump (38.8
+ * D-19/D-20): a day, or a cycle span. `count` is the interaction count only and
+ * never decides whether a target is empty — that is resolved across all three
+ * record families (D-21).
+ */
 export type HeatmapCellTarget =
   | { kind: "date"; date: string; count: number }
   | {
@@ -372,6 +378,9 @@ export function ActivityHeatmap({
         options={LENS_OPTIONS}
         value={lens}
         onChange={onLensChange}
+        // Compact so all four labels read in full (D-24); the preset row and
+        // every other SegmentedControl keep the default density.
+        density="compact"
       />
 
       {/* No-cadence fallback: why Month shows instead of Cycles (D-27). */}

@@ -471,3 +471,25 @@ describe("ActivityHeatmap no-cadence fallback note (38.8 D-27)", () => {
     }
   });
 });
+
+describe("ActivityHeatmap lens labels read in full (38.8 D-24)", () => {
+  it("uses the compact density on the lens control only", () => {
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({ lens: "cycles", window: null, cycles: CYCLES }),
+        ),
+      ),
+    );
+    const lens = nodes.find(
+      (node) => node.props.testID === "activity-heatmap-lens",
+    );
+    const preset = nodes.find(
+      (node) => node.props.testID === "activity-heatmap-preset",
+    );
+    expect(lens?.type).toBe("SegmentedControl");
+    expect(lens?.props.density).toBe("compact");
+    expect(preset?.type).toBe("SegmentedControl");
+    expect(preset?.props.density).toBeUndefined();
+  });
+});

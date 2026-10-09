@@ -22,6 +22,18 @@ import type { IconName } from "@/components/icons/icon-registry";
 import { useTheme } from "@/theme";
 
 /**
+ * Tunables for the opt-in `density="compact"` row (38.8 D-24): tighter gaps and
+ * segment padding so four labels such as "Cycles / 7 Days / Month / Year" read
+ * in full on a phone-width Profile section. Applied ONLY when a caller asks for
+ * compact; the default ("regular") styles below are unchanged (Pitfall 11).
+ */
+const COMPACT_SEGMENT = {
+  gap: 6,
+  paddingHorizontal: 4,
+  fontSize: 16,
+} as const;
+
+/**
  * One selectable segment — a display label paired with its value, and an
  * OPTIONAL semantic icon. When `icon` is present the segment renders the
  * semantic `Icon` (filled when active, outline when inactive) instead of the
@@ -49,6 +61,13 @@ export interface SegmentedControlProps<V extends string> {
    * orrery view toggle's id; overridable so the control stays reusable elsewhere.
    */
   testID?: string;
+  /**
+   * Row density. `"regular"` (the default) is the shipped look every existing
+   * caller uses. `"compact"` narrows the gaps and segment padding
+   * (`COMPACT_SEGMENT`) so more label width fits per segment; it is opt-in and
+   * currently used only by the History lens row (38.8 D-24).
+   */
+  density?: "regular" | "compact";
 }
 
 export function SegmentedControl<V extends string>({
@@ -56,11 +75,16 @@ export function SegmentedControl<V extends string>({
   value,
   onChange,
   testID = "orrery-view-toggle",
+  density = "regular",
 }: SegmentedControlProps<V>) {
   const { colors } = useTheme();
+  const compact = density === "compact";
 
   return (
-    <View testID={testID} style={styles.row}>
+    <View
+      testID={testID}
+      style={[styles.row, compact ? { gap: COMPACT_SEGMENT.gap } : null]}
+    >
       {options.map((option) => {
         const isActive = option.value === value;
         return (
@@ -73,6 +97,9 @@ export function SegmentedControl<V extends string>({
             onPress={() => onChange(option.value)}
             style={[
               styles.segment,
+              compact
+                ? { paddingHorizontal: COMPACT_SEGMENT.paddingHorizontal }
+                : null,
               isActive
                 ? {
                     backgroundColor: colors.accent,
@@ -96,6 +123,7 @@ export function SegmentedControl<V extends string>({
                 numberOfLines={1}
                 style={[
                   styles.label,
+                  compact ? { fontSize: COMPACT_SEGMENT.fontSize } : null,
                   {
                     color: isActive ? colors.onAccent : colors.textSecondary,
                   },
