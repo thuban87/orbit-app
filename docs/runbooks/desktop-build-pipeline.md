@@ -1,4 +1,4 @@
-# Runbook: Desktop build pipeline (Android APK on `droid` → attached test phone)
+# Runbook: Desktop build pipeline (Android APK on `droid` → test phone)
 
 **Why this exists.** This Linux box cannot build Android APKs (2012 Ivy Bridge CPU; no
 local emulator either). All Android builds run on the owner's Windows desktop **`droid`**
@@ -21,7 +21,7 @@ for FND-01 (plan 01-05) and for the Phase 10 native share-target build.
 | **Remote repo path** | **`C:\Users\bwales\projects\orbit-app`** (the native `C:\…` path form is what works; NOT `/cygdrive/c/…`) |
 | droid toolchain | OpenJDK 17, `ANDROID_HOME=C:\Users\bwales\AppData\Local\Android\Sdk`, node (v25.x), npm (v11.x), **bsdtar** (`tar` present), `scp` present |
 | **`rsync` on droid** | **ABSENT** — `ssh droid 'rsync --version'` fails. Use the **tar-over-ssh** transport below. |
-| Physical device | Whichever test phone is attached and authorised over USB. **Never assume which phone, and never hardcode a serial: read it from `~/.local/bin/adb devices -l` at run time** (exactly one device in state `device`; if none, ask the owner). |
+| Physical device | Two test phones, authorised over USB. **Preferred: Pixel 6 Pro**, serial **`1A071FDEE002BU`** (model `raven`). **Fallback: Pixel 3a**, serial **`943AY0JR4P`** (model `sargo`) — fine to use when the 6 Pro is not attached. Check `~/.local/bin/adb devices -l`: use the 6 Pro if it is listed in state `device`, otherwise the 3a. If neither is attached, ask the owner. Never hardcode `emulator-5554`. |
 | Lock screen | **No device lock is configured.** If the lock screen is showing, dismiss it with `adb shell input keyevent 82` (or an upward swipe); do not treat it as an authentication blocker. |
 | APK artifact | `android\app\build\outputs\apk\release\app-release.apk` (standalone release, ~73 MB) |
 
@@ -128,12 +128,12 @@ scp -o BatchMode=yes \
 (OpenSSH `scp` on Windows accepts forward slashes; this avoids the `C:` being read as a host
 separator.)
 
-### 1e. Install on the attached phone + assert the themed shell
+### 1e. Install on the test phone + assert the themed shell
 
 ```bash
 emu-connect                       # picks the phone if attached, else the desktop emulator
 ~/.local/bin/adb devices -l       # READ the serial here — never hardcode emulator-5554
-S=<serial from the line above>    # never hardcode a serial
+S=1A071FDEE002BU                  # Pixel 6 Pro (preferred); if it is not listed above, use the 3a: S=943AY0JR4P
 
 ~/.local/bin/adb -s $S install -r ./app-release.apk        # -> Success  (no adb reverse needed)
 ~/.local/bin/adb -s $S shell monkey -p com.bwales.orbit -c android.intent.category.LAUNCHER 1
