@@ -185,6 +185,11 @@ export interface ActivityHeatmapProps {
   onNext: () => void;
   /** Whether next-window navigation is allowed (future is blocked when false). */
   canGoNext: boolean;
+  /**
+   * The no-cadence fallback note (38.8 D-27), shown under the lens control
+   * when History shows Month in place of the persisted Cycles lens.
+   */
+  fallbackNote?: string | null;
   testID?: string;
 }
 
@@ -243,6 +248,7 @@ export function ActivityHeatmap({
   onPrev,
   onNext,
   canGoNext,
+  fallbackNote = null,
   testID = "activity-heatmap",
 }: ActivityHeatmapProps) {
   const { colors } = useTheme();
@@ -367,6 +373,17 @@ export function ActivityHeatmap({
         value={lens}
         onChange={onLensChange}
       />
+
+      {/* No-cadence fallback: why Month shows instead of Cycles (D-27). */}
+      {fallbackNote ? (
+        <AppText
+          testID={`${testID}-fallback-note`}
+          role="caption"
+          style={{ color: colors.textSecondary }}
+        >
+          {fallbackNote}
+        </AppText>
+      ) : null}
 
       {/* Cycles-only preset selector (5/10/15/20). */}
       {lens === "cycles" ? (

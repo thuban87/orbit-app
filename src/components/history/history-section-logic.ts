@@ -27,6 +27,13 @@ import {
 import { formatLocalDate } from "@/utils/dates";
 
 /**
+ * The note shown under the lens row when a contact with no cadence opens on the
+ * persisted Cycles lens and History shows Month instead (38.8 D-27).
+ */
+export const NO_CADENCE_FALLBACK_NOTE =
+  "Showing Month: this contact has no set frequency, so Cycles aren't available.";
+
+/**
  * Resolve the active date-grid window for a lens. The three day-oriented lenses
  * (`7days`/`month`/`year`) generate a `HistoryWindow`; the `cycles` lens is a
  * cadence grid, not a date grid, so it has NO window (the Heatmap renders its
@@ -211,6 +218,13 @@ export function historyDayAfterLensChange(
   return initialHistoryDayState(state.today);
 }
 
+/** A cycle preset change returns to the current page (38.8 D-26). */
+export function historyDayAfterPresetChange(
+  state: HistoryDayState,
+): HistoryDayState {
+  return initialHistoryDayState(state.today);
+}
+
 /** Stepping back always leaves the current window. */
 export function historyDayAfterPrev(
   state: HistoryDayState,
@@ -356,4 +370,102 @@ export function persistedPrefOnWriteFailed<T>(
   return pref.held && pref.userGen === gen
     ? { value: previous, userGen: pref.userGen, held: false }
     : pref;
+}
+
+// --- The no-cadence Month fallback (38.8 D-27, D-66, D-67) -------------------
+// The global `history_lens` is shared by every contact, so a contact with no
+// cadence (tracking off or no interval) must never change it through Cycles:
+// with Cycles persisted it SHOWS Month, with a short note, and writes nothing;
+// an explicit Cycles tap shows the existing "Cycles need a set frequency"
+// explanation through a per-mount flag (never persisted, D-62).
+
+/** The lens History shows, and whether it is the no-cadence Month fallback. */
+export interface EffectiveLens {
+  readonly lens: HistoryLens;
+  readonly fallback: boolean;
+}
+
+export function resolveEffectiveLens(input: {
+  readonly persisted: HistoryLens;
+  readonly cyclesAvailable: boolean;
+  readonly cyclesExplained: boolean;
+}): EffectiveLens {
+  if (!input.cyclesAvailable) {
+    // An explicit Cycles tap shows the explanation, whatever is persisted.
+    if (input.cyclesExplained) return { lens: "cycles", fallback: false };
+    if (input.persisted === "cycles") return { lens: "month", fallback: true };
+  }
+  return { lens: input.persisted, fallback: false };
+}
+
+/** The effect of one lens-segment tap (see `lensTapIntent`). */
+export interface LensTapIntent {
+  readonly persist: HistoryLens | null;
+  readonly explainCycles: boolean;
+  readonly clearExplained: boolean;
+  readonly resetDay: boolean;
+}
+
+/**
+ * What one lens-segment tap does. `SegmentedControl` reports a tap on the
+ * already-active segment too, so this decides every case:
+ *   - `persist`: the lens to write globally, or null for no write;
+ *   - `explainCycles` / `clearExplained`: set or clear the per-mount flag;
+ *   - `resetDay`: return to the current page (D-26) — on every write, on
+ *     entering the explanation and on leaving it; never on the no-op tap of the
+ *     Month already shown in the fallback (C3-03) or a repeat Cycles tap while
+ *     the explanation shows.
+ * With a cadence every tap persists and resets, the shown segment included
+ * (C4-02). Without one a Cycles tap never persists (D-67), and leaving the
+ * explanation for the lens that is already persisted — or for Month with
+ * Cycles persisted, which returns to the fallback (D-66) — writes nothing.
+ */
+export function lensTapIntent(input: {
+  readonly persisted: HistoryLens;
+  readonly cyclesAvailable: boolean;
+  readonly effective: EffectiveLens;
+  readonly tapped: HistoryLens;
+}): LensTapIntent {
+  const { persisted, effective, tapped } = input;
+  if (input.cyclesAvailable) {
+    return {
+      persist: tapped,
+      explainCycles: false,
+      clearExplained: false,
+      resetDay: true,
+    };
+  }
+  const explaining = effective.lens === "cycles" && !effective.fallback;
+  if (tapped === "cycles") {
+    return {
+      persist: null,
+      explainCycles: true,
+      clearExplained: false,
+      resetDay: !explaining,
+    };
+  }
+  if (explaining) {
+    const backToPersisted =
+      tapped === persisted || (persisted === "cycles" && tapped === "month");
+    return {
+      persist: backToPersisted ? null : tapped,
+      explainCycles: false,
+      clearExplained: true,
+      resetDay: true,
+    };
+  }
+  if (effective.fallback && tapped === effective.lens) {
+    return {
+      persist: null,
+      explainCycles: false,
+      clearExplained: false,
+      resetDay: false,
+    };
+  }
+  return {
+    persist: tapped,
+    explainCycles: false,
+    clearExplained: false,
+    resetDay: true,
+  };
 }

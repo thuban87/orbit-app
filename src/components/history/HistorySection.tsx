@@ -22,6 +22,11 @@
  * It owns the lens/window/cycle-preset state (persisted globally in
  * `app_settings` via the DAO) and the stream's transient view state (fresh on
  * each mount, kept across revision re-reads, never persisted — 38.8 D-18/D-62).
+ * Cycles page by whole displayed pages and Intensity follows the page; a lens
+ * or preset change returns to the current page (D-25, D-26). A contact with no
+ * cadence whose persisted lens is Cycles shows Month with a note, and no tap
+ * there writes Cycles or the fallback's Month to the global lens (D-27, D-66,
+ * D-67).
  * After an edit, redate or delete started from a row, the re-read keeps the
  * user's place: the Profile keeps its scroll offset, and a one-shot anchor
  * scrolls once to the record's new day or the nearest remaining day only when
@@ -92,6 +97,7 @@ import {
   historyDayAfterCyclesNext,
   historyDayAfterLensChange,
   historyDayAfterNext,
+  historyDayAfterPresetChange,
   historyDayAfterPrev,
   historyReadStateOnFail,
   historyReadStateOnPublish,
@@ -100,12 +106,15 @@ import {
   initialHistoryReadState,
   initialPersistedPref,
   isEmptyHistory,
+  lensTapIntent,
+  NO_CADENCE_FALLBACK_NOTE,
   type PersistedPref,
   pagedCycles,
   persistedPrefOnRead,
   persistedPrefOnUserChange,
   persistedPrefOnWriteFailed,
   resolveActiveWindow,
+  resolveEffectiveLens,
 } from "@/components/history/history-section-logic";
 import {
   buildStreamModel,
@@ -158,6 +167,7 @@ import { newUid } from "@/db/uid";
 import type { RootStackParamList } from "@/navigation/types";
 import { PROFILE_APP_BAR } from "@/screens/contact-profile-logic";
 import { buckets } from "@/services/history/buckets";
+import { cycles } from "@/services/history/cycles";
 import {
   type IntensityWindowResult,
   intensityWindow,
@@ -272,8 +282,33 @@ export function HistorySection({
     },
     [],
   );
-  const lens = lensPref.value;
   const cycleCount = cyclePref.value;
+  // The no-cadence Month fallback (38.8 D-27, D-66, D-67): an explicit Cycles
+  // tap on a contact with no cadence shows the "Cycles need a set frequency"
+  // explanation through this per-mount flag (never persisted, D-62), mirrored
+  // in a ref so the tap handler reads the committed value.
+  const [cyclesExplained, setCyclesExplained] = useState(false);
+  const cyclesExplainedRef = useRef(cyclesExplained);
+  const commitCyclesExplained = useCallback((next: boolean) => {
+    cyclesExplainedRef.current = next;
+    setCyclesExplained(next);
+  }, []);
+  // Whether this contact has a cadence at all, independent of paging.
+  const cyclesAvailable = useMemo(
+    () =>
+      cycles({ intervalDays, trackingEnabled, count: cycleCount, now: today })
+        .available,
+    [intervalDays, trackingEnabled, cycleCount, today],
+  );
+  // The lens History SHOWS: the persisted lens, except Month (with a note) for
+  // persisted Cycles without a cadence, and the Cycles explanation after an
+  // explicit Cycles tap there. Everything the shown lens drives reads this.
+  const effective = resolveEffectiveLens({
+    persisted: lensPref.value,
+    cyclesAvailable,
+    cyclesExplained,
+  });
+  const lens = effective.lens;
   const [readState, setReadState] = useState<HistoryReadState<ContactHistory>>(
     initialHistoryReadState,
   );
@@ -390,14 +425,35 @@ export function HistorySection({
   // --- Persisted lens / preset (global app_settings, never per-contact) ------
   // A failed write logs content-free and reverts explicitly (never silently via
   // a later re-read), unless a newer choice has superseded it.
+  // Every lens tap goes through `lensTapIntent` (D-26, D-27, D-66, D-67,
+  // C3-03, C4-02): it is a stream action and clears the note; it sets or clears
+  // the Cycles explanation; it returns to the current page whenever it writes,
+  // enters or leaves the explanation; and only a non-null `persist` writes the
+  // global lens — never the fallback's shown Month, never a Cycles tap without
+  // a cadence.
   const onLensChange = useCallback(
-    (next: HistoryLens) => {
-      const previous = lensPrefRef.current.value;
-      const changed = persistedPrefOnUserChange(lensPrefRef.current, next);
-      commitLensPref(changed);
+    (tapped: HistoryLens) => {
+      const persisted = lensPrefRef.current.value;
+      const intent = lensTapIntent({
+        persisted,
+        cyclesAvailable,
+        effective: resolveEffectiveLens({
+          persisted,
+          cyclesAvailable,
+          cyclesExplained: cyclesExplainedRef.current,
+        }),
+        tapped,
+      });
       commitPending({ type: "stream-action" });
       dispatchNote({ type: "lens-change" });
-      setDay(historyDayAfterLensChange);
+      if (intent.explainCycles) commitCyclesExplained(true);
+      if (intent.clearExplained) commitCyclesExplained(false);
+      if (intent.resetDay) setDay(historyDayAfterLensChange);
+      if (intent.persist === null) return;
+      const next = intent.persist;
+      const previous = persisted;
+      const changed = persistedPrefOnUserChange(lensPrefRef.current, next);
+      commitLensPref(changed);
       updateAppSettings(
         getExecutor(),
         { historyLens: next },
@@ -413,8 +469,15 @@ export function HistorySection({
         );
       });
     },
-    [commitLensPref, commitPending, dispatchNote],
+    [
+      commitCyclesExplained,
+      commitLensPref,
+      commitPending,
+      cyclesAvailable,
+      dispatchNote,
+    ],
   );
+  // A preset change returns to the current page (D-26).
   const onPresetChange = useCallback(
     (next: HistoryCycleCount) => {
       const previous = cyclePrefRef.current.value;
@@ -422,6 +485,7 @@ export function HistorySection({
       commitCyclePref(changed);
       commitPending({ type: "stream-action" });
       dispatchNote({ type: "preset-change" });
+      setDay(historyDayAfterPresetChange);
       updateAppSettings(
         getExecutor(),
         { historyCycleCount: next },
@@ -945,6 +1009,7 @@ export function HistorySection({
         onPrev={onPrev}
         onNext={onNext}
         canGoNext={canGoNext}
+        fallbackNote={effective.fallback ? NO_CADENCE_FALLBACK_NOTE : null}
       />
       {note ? (
         <HistoryTargetNote
