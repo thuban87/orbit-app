@@ -1128,8 +1128,9 @@ export function HistorySection({
         canGoNext={canGoNext}
         today={today}
         fallbackNote={effective.fallback ? NO_CADENCE_FALLBACK_NOTE : null}
-        // The populated section is fully laid out once the heatmap's measured
-        // grid is (its only width-measured child): settle a reveal (D-72).
+        // The populated section is fully laid out once the heatmap's final
+        // grid is (its only width-measured child; Year's grid is final on its
+        // first layout): settle a reveal (D-72).
         onLaidOut={onContentLayout}
       />
       {note ? (

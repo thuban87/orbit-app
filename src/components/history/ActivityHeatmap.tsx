@@ -212,9 +212,12 @@ export interface ActivityHeatmapProps {
    */
   fallbackNote?: string | null;
   /**
-   * Called on each layout seen with a measured width, i.e. once the grid has
-   * rendered — never on the first, grid-less layout. The parent's History
-   * reveal settles on it (38.8 D-72).
+   * Called on each layout whose render already shows the final grid. 7 Days,
+   * Month and Cycles render their grid only once the width is measured, so
+   * their first, grid-less layout is never reported. Year (fixed cell edge)
+   * and the no-cadence Cycles explanation never wait on the width: their
+   * first layout is final and no second one follows, so it is reported. The
+   * parent's History reveal settles on it (38.8 D-72).
    */
   onLaidOut?: () => void;
   testID?: string;
@@ -286,10 +289,16 @@ export function ActivityHeatmap({
   // Measured available width (layout measurement, not animation); 0 until the
   // first layout pass, so the day/cycle grids render nothing until measured.
   const [availableWidth, setAvailableWidth] = useState(0);
+  // Only the 7 Days / Month and cadence Cycles grids wait on that width (see
+  // the grid below); Year cells have a fixed edge and the no-cadence Cycles
+  // explanation is text.
+  const gridWaitsOnWidth =
+    lens === "cycles" ? cycles.available : lens !== "year";
   const onLayout = (event: LayoutChangeEvent) => {
     setAvailableWidth(event.nativeEvent.layout.width);
-    // This render already had a measured width, so its grid is laid out.
-    if (availableWidth > 0) onLaidOut?.();
+    // This render's grid is final — measured, or never width-dependent — so
+    // it is laid out (38.8 D-72).
+    if (!gridWaitsOnWidth || availableWidth > 0) onLaidOut?.();
   };
   const dayCellEdge = fitHeatmapCell({
     availableWidth,
