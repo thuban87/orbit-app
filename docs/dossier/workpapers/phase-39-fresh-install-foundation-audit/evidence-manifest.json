@@ -1,0 +1,255 @@
+{
+  "package": "com.bwales.orbit.foundation39",
+  "source_commit": "305ed1eabe580a4c8122f5261aabe16c7fea8a0e",
+  "apk_sha256": "81a5a3e40bee0590f1f6148441ff2c0568b8d8c5a461de628f9568a3d1cdd395",
+  "references": [
+    {
+      "file": "01-first-launch-digest.png",
+      "sha256": "55a0b2f47c1c6c46c245070de55ca8ed2313e91878708e1d84a4c597ef04b801"
+    },
+    {
+      "file": "02-empty-contacts.png",
+      "sha256": "ad7a2b7c9da4a2c645bcdd7537259590b16a48ee15616c36d2d28eadfdc1b4d8"
+    },
+    {
+      "file": "03-empty-fab.png",
+      "sha256": "d69e84d5940f63109b3553033fb713d40a17b1d54d6af3d377e2b569dce53d26"
+    },
+    {
+      "file": "04-empty-action-picker.png",
+      "sha256": "d95ae39493ae49320ecb90c19b70188ca140965416188ef5db868f851a51e13b"
+    },
+    {
+      "file": "05-manual-initial-form.png",
+      "sha256": "c3a99be0d2506e2c3e4617161b81a4fe009c0a1df4387030a3811465daae18be"
+    },
+    {
+      "file": "06-manual-default-profile.png",
+      "sha256": "f05cd37aae21448f8e747091cee59155a4ed0e3efc4d34d5af167d1999228d38"
+    },
+    {
+      "file": "07-default-person-hidden-contacts.png",
+      "sha256": "278a050427754ab8f017423f6f19b2d99f0cfd9004e96803663646b8deade1ab"
+    },
+    {
+      "file": "08-default-manual-digest.png",
+      "sha256": "45a7a05e27cf6ef49a2155063f1ea9d298c20a06d1d6658e328faa319ba239d9"
+    },
+    {
+      "file": "09-manual-starting-activity.png",
+      "sha256": "d222eda85b7fc7e3f9dfe94c038573481e3bf848f96bbe636afc33171962450f"
+    },
+    {
+      "file": "10-manual-relationship-defaults.png",
+      "sha256": "4508dceaf836eba6f300bc67c4fa9a49c3ddd02539c45e9f66bfc5e57029e9f6"
+    },
+    {
+      "file": "11-bound-needs-frequency.png",
+      "sha256": "ae9dc8743aa80419a1ee355c85ebc6d873c9fd61dc708a262bb33983a15ff406"
+    },
+    {
+      "file": "12-manual-enrichment.png",
+      "sha256": "f75d9dc59fe0d234e662748a20284c00547ef379d6a0d46e635e3c85f3cc0911"
+    },
+    {
+      "file": "13-manual-bound-not-yet-profile.png",
+      "sha256": "d07d7ff4450f78a29353d1240b81e1053bd4bd91d4811c0c2420d59a14ebb59e"
+    },
+    {
+      "file": "14-bound-not-yet-horizon.png",
+      "sha256": "e6e5e5a7a966a6c9ca50f609544c4686509fc80605bdbc68b112db224614bf08"
+    },
+    {
+      "file": "15-not-yet-empty-history.png",
+      "sha256": "169b8183e489e967ffd0293d4ca12fee0c6732016324d04d95c79c0e34978183"
+    },
+    {
+      "file": "16-bound-not-yet-contacts.png",
+      "sha256": "133867870e47cf08f029e2497f29766ca6c76e9a5c55d1d3d62761bd5e1e5d5e"
+    },
+    {
+      "file": "17-manual-picked-date.png",
+      "sha256": "14c66b65c81ed2e4b023954862b5c941aea1a9970a319a5e36ebdce8c4e183a5"
+    },
+    {
+      "file": "18-manual-attention-digest.png",
+      "sha256": "143679007b4c5cc246739617e0eb70a79b24b1d4dd2022b6a9b2882734f20701"
+    },
+    {
+      "file": "20-manual-later-import-entry.png",
+      "sha256": "bec52bbb272859b6da2ee1a55994e278cb5277bfba73b03355ea139dd2f4bfdf"
+    },
+    {
+      "file": "21-import-permission-primer.png",
+      "sha256": "7ddb75c9d9041b2452693a7842df79c14d228f4d8a43f2787e5245c4792d2ecd"
+    },
+    {
+      "file": "22-android-contacts-permission.png",
+      "sha256": "4ec12be3d982659958b87b4c36b5261a40aeaaa0f30e6fef0b412d253fc4a86b"
+    },
+    {
+      "file": "23-import-denied-recovery.png",
+      "sha256": "d75a80a41891f3ea0554da847fed6dd5f4ee4a35f92b9aeb22fd099315334173"
+    },
+    {
+      "file": "24-import-filtered-fictional-picker.png",
+      "sha256": "b9704bded90981dbce512a22f4bd7c35300d53321d63f16550f0e7b45bc0629f"
+    },
+    {
+      "file": "25-single-import-review.png",
+      "sha256": "5d03e50413066368c3b3255bd3b9f262ab73827434c08225832a39b689c57562"
+    },
+    {
+      "file": "26-fresh-category-choices.png",
+      "sha256": "d3867dc2255b10d4fb840e81d7a3b49626f8838ee096f0199c12b4e00964d934"
+    },
+    {
+      "file": "27-single-import-profile.png",
+      "sha256": "5998672b18849a9dbabaebc28fd477ee3a49c13ee3335d8d676b1314e7ca7243"
+    },
+    {
+      "file": "28-single-import-contacts.png",
+      "sha256": "c82510c1a274bdb0737e2f8966a7cd14468e51069e81cf2c5d9be1c1b8a59587"
+    },
+    {
+      "file": "29-single-import-digest.png",
+      "sha256": "2eeefeda2df7a89212fb4115d85d9141a2f5b5157c5a79ddf34af279115494f2"
+    },
+    {
+      "file": "30-batch-import-setup.png",
+      "sha256": "b303049a53ef01d567925cd97b0f526ea405f063b3aea26f877627dcd5f3cebf"
+    },
+    {
+      "file": "31-batch-import-complete.png",
+      "sha256": "7cde6979200d5cb18967bf808bff8a4737248dda7be701becc4a85735fe5deb0"
+    },
+    {
+      "file": "32-batch-possible-match.png",
+      "sha256": "007ba66d2fd9f1f53b1c77d54dd16190822dc6a4aeaa95ef120a67fa0852c588"
+    },
+    {
+      "file": "33-match-resolution-actions.png",
+      "sha256": "bdf48ad14a6912ad85add7cfe0cda23262e2c4093dfeacc8cba670bdc402e043"
+    },
+    {
+      "file": "34-batch-resolved-complete.png",
+      "sha256": "ca1974bf2954f0db87010213b0b3d4646680d100d9d6131d78a5c8463e4e2844"
+    },
+    {
+      "file": "35-batch-result-hidden-contacts.png",
+      "sha256": "4f56828b5f024c373734b1f1cf13dcbb81d2c064d8cf7fbf2a6b6cc54376664c"
+    },
+    {
+      "file": "36-batch-result-empty-digest.png",
+      "sha256": "5a44760eb3e9a24daaf41cc38ab825548395e1ef7cffde0426c5125c1b635681"
+    },
+    {
+      "file": "37-unbound-imported-people.png",
+      "sha256": "4caf6a103ab655ec3c687994bf6a48a3a5e64e95c0643d456a40fec14f8c2f40"
+    },
+    {
+      "file": "38-first-imported-bound-profile.png",
+      "sha256": "b9186634adf176fe9c701bbb6c5c82e21ef8ab23210984814bde4ec3ccf0088c"
+    },
+    {
+      "file": "39-first-detailed-log.png",
+      "sha256": "9a74dd461f45d674d98e12ec10eb9896ff222fca6bf0b7efbe6266beea8a3a00"
+    },
+    {
+      "file": "40-core-loop-attention.png",
+      "sha256": "6de22844d705d0d1128513a4a81373479936fef4505202affcce23f512e25464"
+    },
+    {
+      "file": "41-first-active-contact.png",
+      "sha256": "dbb0d9f2df25e53a7dcc2cae085c3fca4b76bb0a655c9c851711c9f290e5a436"
+    },
+    {
+      "file": "42-backdated-log-save.png",
+      "sha256": "ff3fd4dd0a91f1d93324f9a9d044c5972c8d06403d72db251665d2f5b67a31f8"
+    },
+    {
+      "file": "43-first-relationship-overview.png",
+      "sha256": "3eb301aa97c0b954c7d66083cd462fedbd23994ac58fd4511b266668024f9011"
+    },
+    {
+      "file": "44-imported-knowledge.png",
+      "sha256": "4df45f986af34206e58588c194b999a67006ae591015bf0e2f7597d8c6735f03"
+    },
+    {
+      "file": "45-first-memory-editor.png",
+      "sha256": "4260eb6ab5bde6204c7dd376d599554bd58374d377083f2b6ba82249c5f7b5bb"
+    },
+    {
+      "file": "46-first-update-contact.png",
+      "sha256": "e3ae14ad1b6434e6c70117e3b5dbec3bad34c7b5d0645926872769049d70a897"
+    },
+    {
+      "file": "47-focused-update-committed.png",
+      "sha256": "4eaf48a4308415cc724fa135cda97c3c3c210260f9cd4d130ec7bce11d245dde"
+    },
+    {
+      "file": "48-first-compose.png",
+      "sha256": "3b702bc78a03be28e575191db8ae2fceb1308f3b0ed37a085fcf33e9f5445dea"
+    },
+    {
+      "file": "49-compose-research.png",
+      "sha256": "ed45f70bc4eb3c316a3cfdf95fd42d8b0c6dbab576acfdb5684b5bf7dca20085"
+    },
+    {
+      "file": "51-safe-sms-handoff.png",
+      "sha256": "7fa642f2cc4ae8bbf8e5233e4753ec87a5d00e1605ffab83208c47dca3f4e71a"
+    },
+    {
+      "file": "52-compose-after-handoff.png",
+      "sha256": "64f55ba218edf752e6cb845c40f3be299d821e873e00caf4ae619a727d182404"
+    },
+    {
+      "file": "54-quick-log-feedback.png",
+      "sha256": "bee38c60e423a1d608b918938339578fc65d652012f23ec5c6a6cbd47bf6cbf8"
+    },
+    {
+      "file": "55-quick-log-undone.png",
+      "sha256": "64f2ead9fc7d2363dde16b8c582cf8bf5d9e753dcdca37c21c773ffdaefba026"
+    },
+    {
+      "file": "56-quick-log-kept-digest.png",
+      "sha256": "257858c52383644d424bbde9bb1173291ab322001f39bcb442e7e03379946f70"
+    },
+    {
+      "file": "57-saved-history.png",
+      "sha256": "32c2918242ea82d41d3d875a8cd232b5d3c4868ec847320cdaab3004c7607363"
+    },
+    {
+      "file": "59-first-group-log.png",
+      "sha256": "17eaa6810d476f951883b4083ce86ed7432e2238a9dc6697618c7c5587a94107"
+    },
+    {
+      "file": "60-group-log-participants.png",
+      "sha256": "60c7c94d805634df9005a6f34ef2d33ac9a1756b6a20d07c4184685f660fd20f"
+    },
+    {
+      "file": "61-populated-digest-after-group.png",
+      "sha256": "c29e16f93d217190d9774b482179aaaf3104674ba27946a88ef679f6ea5e31b4"
+    },
+    {
+      "file": "62-import-first-later-add.png",
+      "sha256": "ac3d134a33019cb1cdce8a723686c4fb129d6c273d12dae32c71bd52f1c0df7d"
+    },
+    {
+      "file": "63-first-relaunch-digest.png",
+      "sha256": "c29e16f93d217190d9774b482179aaaf3104674ba27946a88ef679f6ea5e31b4"
+    },
+    {
+      "file": "64-memory-list-after-import.png",
+      "sha256": "ba1156368d23ad25bf8e02f045a642bb794987cb48f0bdf9ed93beb44cdbbb89"
+    },
+    {
+      "file": "65-history-day-detail.png",
+      "sha256": "ccf3e227a6f2b3bbc80c82899e38b21145a818c8b053cd878efbbf0a11da56ef"
+    },
+    {
+      "file": "66-first-day-details.png",
+      "sha256": "1f78af79a2f8b3df547e87a98eafb19cb6cc9c3b7449eba7383f47acae0244f2"
+    }
+  ]
+}
