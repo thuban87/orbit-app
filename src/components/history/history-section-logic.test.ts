@@ -22,6 +22,7 @@ import {
   historyDayAfterCyclesNext,
   historyDayAfterLensChange,
   historyDayAfterNext,
+  historyDayAfterPresetChange,
   historyDayAfterPrev,
   historyReadStateOnFail,
   historyReadStateOnPublish,
@@ -30,12 +31,16 @@ import {
   initialHistoryReadState,
   initialPersistedPref,
   isEmptyHistory,
+  lensTapIntent,
+  NO_CADENCE_FALLBACK_NOTE,
   pagedCycles,
   persistedPrefOnRead,
   persistedPrefOnUserChange,
   persistedPrefOnWriteFailed,
   resolveActiveWindow,
+  resolveEffectiveLens,
 } from "@/components/history/history-section-logic";
+import type { HistoryLens } from "@/db/app-settings-dao";
 import { type CycleBlock, cycles } from "@/services/history/cycles";
 import { nextWindow, prevWindow } from "@/services/history/window";
 
@@ -538,5 +543,318 @@ describe("Cycles paging by whole pages (38.8 D-25, D-26)", () => {
     );
     expect(back[0].start).toBe("2025-08-14");
     expect(cyclesPrevRef(back)).toBe("2025-08-13");
+  });
+});
+
+describe("a preset change returns to the current page (38.8 D-26)", () => {
+  it("resets a paged-back day state to today, following", () => {
+    const past = historyDayAfterPrev(
+      initialHistoryDayState("2026-10-08"),
+      "2026-09-03",
+    );
+    expect(historyDayAfterPresetChange(past)).toEqual(
+      initialHistoryDayState("2026-10-08"),
+    );
+  });
+});
+
+describe("the no-cadence Month fallback (38.8 D-27, D-66, D-67)", () => {
+  it("the note names Month and the missing frequency", () => {
+    expect(NO_CADENCE_FALLBACK_NOTE.length).toBeGreaterThan(0);
+    expect(NO_CADENCE_FALLBACK_NOTE).toMatch(/Month/);
+    expect(NO_CADENCE_FALLBACK_NOTE).toMatch(/frequency/);
+  });
+
+  describe("resolveEffectiveLens", () => {
+    it("shows the Cycles explanation whatever the persisted lens once explained (no cadence)", () => {
+      for (const persisted of ["cycles", "7days", "month", "year"] as const) {
+        expect(
+          resolveEffectiveLens({
+            persisted,
+            cyclesAvailable: false,
+            cyclesExplained: true,
+          }),
+        ).toEqual({ lens: "cycles", fallback: false });
+      }
+    });
+
+    it("falls back to Month for persisted Cycles with no cadence", () => {
+      expect(
+        resolveEffectiveLens({
+          persisted: "cycles",
+          cyclesAvailable: false,
+          cyclesExplained: false,
+        }),
+      ).toEqual({ lens: "month", fallback: true });
+    });
+
+    it("keeps Cycles with a cadence and any other persisted lens as itself", () => {
+      expect(
+        resolveEffectiveLens({
+          persisted: "cycles",
+          cyclesAvailable: true,
+          cyclesExplained: false,
+        }),
+      ).toEqual({ lens: "cycles", fallback: false });
+      for (const persisted of ["7days", "month", "year"] as const) {
+        for (const cyclesAvailable of [true, false]) {
+          expect(
+            resolveEffectiveLens({
+              persisted,
+              cyclesAvailable,
+              cyclesExplained: false,
+            }),
+          ).toEqual({ lens: persisted, fallback: false });
+        }
+      }
+    });
+  });
+
+  describe("lensTapIntent", () => {
+    const FALLBACK = { lens: "month", fallback: true } as const;
+    const EXPLAINED = { lens: "cycles", fallback: false } as const;
+
+    it("in the fallback: the shown Month is a no-op that keeps the page", () => {
+      expect(
+        lensTapIntent({
+          persisted: "cycles",
+          cyclesAvailable: false,
+          effective: FALLBACK,
+          tapped: "month",
+        }),
+      ).toEqual({
+        persist: null,
+        explainCycles: false,
+        clearExplained: false,
+        resetDay: false,
+      });
+    });
+
+    it("in the fallback: Cycles shows the explanation without a write", () => {
+      expect(
+        lensTapIntent({
+          persisted: "cycles",
+          cyclesAvailable: false,
+          effective: FALLBACK,
+          tapped: "cycles",
+        }),
+      ).toEqual({
+        persist: null,
+        explainCycles: true,
+        clearExplained: false,
+        resetDay: true,
+      });
+    });
+
+    it("in the fallback: 7 Days and Year persist", () => {
+      for (const tapped of ["7days", "year"] as const) {
+        expect(
+          lensTapIntent({
+            persisted: "cycles",
+            cyclesAvailable: false,
+            effective: FALLBACK,
+            tapped,
+          }),
+        ).toEqual({
+          persist: tapped,
+          explainCycles: false,
+          clearExplained: false,
+          resetDay: true,
+        });
+      }
+    });
+
+    it("D-66: persisted Cycles, explanation showing — Month writes nothing and clears the flag", () => {
+      expect(
+        lensTapIntent({
+          persisted: "cycles",
+          cyclesAvailable: false,
+          effective: EXPLAINED,
+          tapped: "month",
+        }),
+      ).toEqual({
+        persist: null,
+        explainCycles: false,
+        clearExplained: true,
+        resetDay: true,
+      });
+      for (const tapped of ["7days", "year"] as const) {
+        expect(
+          lensTapIntent({
+            persisted: "cycles",
+            cyclesAvailable: false,
+            effective: EXPLAINED,
+            tapped,
+          }),
+        ).toEqual({
+          persist: tapped,
+          explainCycles: false,
+          clearExplained: true,
+          resetDay: true,
+        });
+      }
+    });
+
+    it("D-67: a Cycles tap on a no-cadence contact never persists, from any persisted lens", () => {
+      for (const persisted of ["month", "7days", "year"] as const) {
+        expect(
+          lensTapIntent({
+            persisted,
+            cyclesAvailable: false,
+            effective: { lens: persisted, fallback: false },
+            tapped: "cycles",
+          }),
+        ).toEqual({
+          persist: null,
+          explainCycles: true,
+          clearExplained: false,
+          resetDay: true,
+        });
+      }
+    });
+
+    it("D-67: while the explanation shows, Cycles again keeps the page; the persisted lens returns without a write", () => {
+      for (const persisted of ["cycles", "month", "7days", "year"] as const) {
+        expect(
+          lensTapIntent({
+            persisted,
+            cyclesAvailable: false,
+            effective: EXPLAINED,
+            tapped: "cycles",
+          }),
+        ).toEqual({
+          persist: null,
+          explainCycles: true,
+          clearExplained: false,
+          resetDay: false,
+        });
+      }
+      for (const persisted of ["month", "7days", "year"] as const) {
+        expect(
+          lensTapIntent({
+            persisted,
+            cyclesAvailable: false,
+            effective: EXPLAINED,
+            tapped: persisted,
+          }),
+        ).toEqual({
+          persist: null,
+          explainCycles: false,
+          clearExplained: true,
+          resetDay: true,
+        });
+      }
+    });
+
+    it("D-67: while the explanation shows, a different non-Cycles lens persists and clears the flag", () => {
+      expect(
+        lensTapIntent({
+          persisted: "month",
+          cyclesAvailable: false,
+          effective: EXPLAINED,
+          tapped: "year",
+        }),
+      ).toEqual({
+        persist: "year",
+        explainCycles: false,
+        clearExplained: true,
+        resetDay: true,
+      });
+    });
+
+    it("with a cadence, a Cycles tap persists as before", () => {
+      expect(
+        lensTapIntent({
+          persisted: "month",
+          cyclesAvailable: true,
+          effective: { lens: "month", fallback: false },
+          tapped: "cycles",
+        }),
+      ).toEqual({
+        persist: "cycles",
+        explainCycles: false,
+        clearExplained: false,
+        resetDay: true,
+      });
+    });
+
+    it("C4-02: with a cadence, re-tapping the shown Month persists and resets the page", () => {
+      expect(
+        lensTapIntent({
+          persisted: "month",
+          cyclesAvailable: true,
+          effective: { lens: "month", fallback: false },
+          tapped: "month",
+        }),
+      ).toEqual({
+        persist: "month",
+        explainCycles: false,
+        clearExplained: false,
+        resetDay: true,
+      });
+    });
+  });
+
+  describe("tap sequences make zero global writes", () => {
+    const T = "2026-10-08";
+
+    function run(
+      persisted: HistoryLens,
+      taps: readonly HistoryLens[],
+    ): {
+      writes: HistoryLens[];
+      effective: ReturnType<typeof resolveEffectiveLens>;
+      day: ReturnType<typeof initialHistoryDayState>;
+    } {
+      let day = historyDayAfterPrev(initialHistoryDayState(T), "2026-08-15");
+      let explained = false;
+      const writes: HistoryLens[] = [];
+      for (const tapped of taps) {
+        const effective = resolveEffectiveLens({
+          persisted,
+          cyclesAvailable: false,
+          cyclesExplained: explained,
+        });
+        const intent = lensTapIntent({
+          persisted,
+          cyclesAvailable: false,
+          effective,
+          tapped,
+        });
+        if (intent.explainCycles) explained = true;
+        if (intent.clearExplained) explained = false;
+        if (intent.persist !== null) writes.push(intent.persist);
+        if (intent.resetDay) day = historyDayAfterLensChange(day);
+      }
+      return {
+        writes,
+        effective: resolveEffectiveLens({
+          persisted,
+          cyclesAvailable: false,
+          cyclesExplained: explained,
+        }),
+        day,
+      };
+    }
+
+    it("(a) C3-03: persisted Cycles, paged Month fallback → Cycles → Month", () => {
+      const result = run("cycles", ["cycles", "month"]);
+      expect(result.writes).toEqual([]);
+      expect(result.effective).toEqual({ lens: "month", fallback: true });
+      expect(result.day).toEqual(initialHistoryDayState(T));
+    });
+
+    it("(b) D-67: persisted Month → Cycles → Month", () => {
+      const result = run("month", ["cycles", "month"]);
+      expect(result.writes).toEqual([]);
+      expect(result.effective).toEqual({ lens: "month", fallback: false });
+      expect(result.day).toEqual(initialHistoryDayState(T));
+    });
+
+    it("the fallback Month tap alone keeps the paged day", () => {
+      const result = run("cycles", ["month"]);
+      expect(result.writes).toEqual([]);
+      expect(result.day.followingToday).toBe(false);
+    });
   });
 });

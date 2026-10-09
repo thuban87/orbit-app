@@ -444,3 +444,30 @@ describe("ActivityHeatmap Cycles paging row (38.8 D-25)", () => {
     );
   });
 });
+
+describe("ActivityHeatmap no-cadence fallback note (38.8 D-27)", () => {
+  const NOTE_ID = "activity-heatmap-fallback-note";
+
+  it("renders the note as a caption directly under the lens control", () => {
+    const root = resolve(
+      ActivityHeatmap(
+        props({ lens: "month", fallbackNote: "Showing Month because." }),
+      ),
+    )[0];
+    const lensIndex = root.children.findIndex(
+      (node) => node.props.testID === "activity-heatmap-lens",
+    );
+    const note = root.children[lensIndex + 1];
+    expect(note?.props.testID).toBe(NOTE_ID);
+    expect(note?.type).toBe("AppText");
+    expect(note?.props.role).toBe("caption");
+    expect(note?.props.children).toBe("Showing Month because.");
+  });
+
+  it("renders no note when none is given", () => {
+    for (const fallbackNote of [undefined, null]) {
+      const nodes = all(resolve(ActivityHeatmap(props({ fallbackNote }))));
+      expect(nodes.some((node) => node.props.testID === NOTE_ID)).toBe(false);
+    }
+  });
+});
