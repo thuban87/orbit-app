@@ -19,6 +19,11 @@
  *     value; a tap opens that field's MemoryHistory through the Profile's
  *     existing knowledge navigation (D-43).
  *
+ * Each row's accessibility label carries what the row shows — the interaction
+ * meta, group label and whole note, the lifecycle detail, the knowledge value —
+ * so a screen reader hears the record, not just its family and time (review
+ * WR-01).
+ *
  * Row times (visible caption AND accessibility label) render through the shared
  * minute-precision `formatTimeMinuteOrFallback` (12-hour AM/PM, no seconds,
  * neutral fallback) — never a slice of the stored string (ADR-152; covered by
@@ -92,16 +97,23 @@ export function HistoryRecordRow({
     const direction = r.direction
       ? (DIRECTION_LABEL[r.direction] ?? r.direction)
       : null;
-    const meta = [direction, r.connected === 0 ? "No reply" : null, r.quality]
-      .filter((part): part is string => !!part)
-      .join(" · ");
+    const metaParts = [
+      direction,
+      r.connected === 0 ? "No reply" : null,
+      r.quality,
+    ].filter((part): part is string => !!part);
+    const meta = metaParts.join(" · ");
     const groupTitle = r.groupLinked && r.groupTitle ? r.groupTitle : null;
+    // The spoken label carries what the row shows (review WR-01): the meta,
+    // the group label and the whole note (the visible note is cut at two lines).
+    const metaSuffix = metaParts.length > 0 ? `, ${metaParts.join(", ")}` : "";
     const groupSuffix = groupTitle ? `, group event ${groupTitle}` : "";
+    const noteSuffix = r.note ? `. ${r.note}` : "";
     return (
       <Pressable
         testID={`history-row-${item.key}`}
         accessibilityRole="button"
-        accessibilityLabel={`Interaction, ${r.channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}${groupSuffix}`}
+        accessibilityLabel={`Interaction, ${r.channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}${metaSuffix}${groupSuffix}${noteSuffix}`}
         style={styles.row}
         onPress={() => onOpenInteraction(r.id, item.date)}
       >
@@ -146,10 +158,11 @@ export function HistoryRecordRow({
     const r = item.record;
     const label = EVENT_LABELS[r.type] ?? r.type;
     const icon = EVENT_ICON[r.type] ?? "list";
+    const detailSuffix = r.detail ? `, ${r.detail}` : "";
     return (
       <View
         testID={`history-row-${item.key}`}
-        accessibilityLabel={`${label}, ${formatTimeMinuteOrFallback(r.occurredAt)}`}
+        accessibilityLabel={`${label}, ${formatTimeMinuteOrFallback(r.occurredAt)}${detailSuffix}`}
         style={styles.row}
       >
         <Icon name={icon} tone="textSecondary" size="sm" />
@@ -176,11 +189,12 @@ export function HistoryRecordRow({
   // existing knowledge navigation.
   const r = item.record;
   const fieldLabel = CURRENT_STATE_FIELD_REGISTRY[r.fieldKey].displayName;
+  const valueSuffix = r.value ? `. ${r.value}` : "";
   return (
     <Pressable
       testID={`history-row-${item.key}`}
       accessibilityRole="button"
-      accessibilityLabel={`Knowledge change, ${fieldLabel}, ${formatTimeMinuteOrFallback(r.createdAt)}`}
+      accessibilityLabel={`Knowledge change, ${fieldLabel}, ${formatTimeMinuteOrFallback(r.createdAt)}${valueSuffix}`}
       style={styles.row}
       onPress={() => onOpenKnowledgeChange(r.fieldKey, item.date)}
     >

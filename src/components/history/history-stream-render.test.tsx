@@ -170,7 +170,25 @@ describe("HistoryRecordRow", () => {
     (root.props.onPress as () => void)();
     expect(onOpenInteraction).toHaveBeenCalledWith(7, "2026-10-06");
     expect(all(tree).filter((n) => n.type === "Pressable")).toHaveLength(1);
-    expect(root.props.accessibilityLabel).toBe("Interaction, Call, 2:05 PM");
+    // The label carries what the row shows: meta and the whole note (WR-01).
+    expect(root.props.accessibilityLabel).toBe(
+      "Interaction, Call, 2:05 PM, Outbound, Great. A long note that should wrap onto at most two lines in the row.",
+    );
+  });
+
+  it("labels an interaction with no meta or note by channel and time only", () => {
+    const { tree } = renderRow(
+      recordOf({
+        interactions: [
+          interaction(7, "2026-10-06 14:05:00", {
+            direction: null,
+            quality: null,
+            note: null,
+          }),
+        ],
+      }),
+    );
+    expect(tree[0].props.accessibilityLabel).toBe("Interaction, Call, 2:05 PM");
   });
 
   it("shows the note on at most two lines, the title-cased direction and no duration or sparkle", () => {
@@ -203,6 +221,9 @@ describe("HistoryRecordRow", () => {
       }),
     );
     expect(textOf(tree[0])).toContain("Outbound · No reply");
+    expect(tree[0].props.accessibilityLabel).toBe(
+      "Interaction, Call, 2:05 PM, Outbound, No reply. A long note that should wrap onto at most two lines in the row.",
+    );
   });
 
   it("shows the group-event label inside the same Pressable for a group-linked child", () => {
@@ -222,7 +243,7 @@ describe("HistoryRecordRow", () => {
     expect(all(tree).filter((n) => n.type === "Pressable")).toHaveLength(1);
     expect(textOf(root)).toContain("Synthetic group dinner");
     expect(root.props.accessibilityLabel).toBe(
-      "Interaction, Call, 7:30 PM, group event Synthetic group dinner",
+      "Interaction, Call, 7:30 PM, Outbound, Great, group event Synthetic group dinner. A long note that should wrap onto at most two lines in the row.",
     );
     (root.props.onPress as () => void)();
     expect(onOpenInteraction).toHaveBeenCalledWith(8, "2026-10-06");
@@ -247,7 +268,9 @@ describe("HistoryRecordRow", () => {
     expect(textOf(root)).toContain("until Oct 20");
     const icon = all(tree).find((n) => n.type === "Icon");
     expect(icon?.props.tone).toBe("textSecondary");
-    expect(root.props.accessibilityLabel).toBe("Snoozed, 8:00 AM");
+    expect(root.props.accessibilityLabel).toBe(
+      "Snoozed, 8:00 AM, until Oct 20",
+    );
   });
 
   it("opens the knowledge field's history from a knowledge row", () => {
@@ -267,6 +290,9 @@ describe("HistoryRecordRow", () => {
       (n) => n.type === "AppText" && textOf(n) === "Lisbon",
     );
     expect(value?.props.numberOfLines).toBe(1);
+    expect(root.props.accessibilityLabel).toBe(
+      "Knowledge change, Current location, 8:00 AM. Lisbon",
+    );
   });
 });
 
