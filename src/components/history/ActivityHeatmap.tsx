@@ -26,7 +26,8 @@
  * interaction(s)" (singular for one, via `interactionCountLabel`; review
  * WR-02) so the grid is fully usable without colour. A cycle cell's range, like
  * the Cycles page title, carries the year when its span is not wholly in the
- * current year (`spanRangeLabel`, 38.8 D-70). Dense Year/large-
+ * current year (`spanRangeLabel`, 38.8 D-70); a day cell's date does too
+ * (`dayDateLabel`, 38.8 D-74). Dense Year/large-
  * preset cells render visually below the 44px floor (an accepted departure,
  * dossier §AC / Phase 40) but stay a11y-labelled and carry a touch `hitSlop`.
  * That slop grows toward 44dp but never past the midpoint of the gap to the
@@ -51,6 +52,7 @@ import {
   classifyHeatmapCell,
 } from "@/components/history/heatmap-cell";
 import {
+  dayDateLabel,
   interactionCountLabel,
   spanRangeLabel,
 } from "@/components/history/history-stream-logic";
@@ -200,7 +202,8 @@ export interface ActivityHeatmapProps {
   canGoNext: boolean;
   /**
    * The parent's local `YYYY-MM-DD` today (D-12). Cycles dates carry the year
-   * when a span is not wholly in today's year (38.8 D-70).
+   * when a span is not wholly in today's year (38.8 D-70), and day-cell dates
+   * when the day is not in today's year (38.8 D-74).
    */
   today: string;
   /**
@@ -349,7 +352,8 @@ export function ActivityHeatmap({
         key={key}
         testID={`${testID}-cell-${date}`}
         accessibilityRole="button"
-        accessibilityLabel={`${formatMonthDay(date)}, ${interactionCountLabel(count)}`}
+        // The year when the day is not in the current year (38.8 D-74).
+        accessibilityLabel={`${dayDateLabel(date, today)}, ${interactionCountLabel(count)}`}
         hitSlop={slop}
         onPress={() => onCellPress({ kind: "date", date, count })}
         style={[

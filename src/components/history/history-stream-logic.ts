@@ -1135,15 +1135,30 @@ function monthDayLabel(date: string): string {
   return `${MONTH_SHORT[local.getMonth()]} ${local.getDate()}`;
 }
 
-/** The empty-day note: "Nothing logged on Tue Oct 5" (D-21). */
-export function emptyDayNoteText(date: string): string {
-  const local = localDateFromParts(date);
-  return `Nothing logged on ${WEEKDAY_SHORT[local.getDay()]} ${monthDayLabel(date)}`;
-}
-
 /** "Sep 1, 2025" from a local `YYYY-MM-DD` (local components only). */
 function monthDayYearLabel(date: string): string {
   return `${monthDayLabel(date)}, ${yearOf(date)}`;
+}
+
+/**
+ * A day-lens date (38.8 D-74, D-70's rule): "Jan 12" in the current year
+ * (`today`'s, a local `YYYY-MM-DD`), else "Jan 12, 2021". The 7 Days, Month
+ * and Year cells' accessible labels and the empty-day note use it.
+ */
+export function dayDateLabel(date: string, today: string): string {
+  return yearOf(date) === yearOf(today)
+    ? monthDayLabel(date)
+    : monthDayYearLabel(date);
+}
+
+/**
+ * The empty-day note: "Nothing logged on Tue Oct 5" (D-21), with the year when
+ * the day is not in the current year: "Nothing logged on Tue Apr 21, 2025"
+ * (D-74).
+ */
+export function emptyDayNoteText(date: string, today: string): string {
+  const local = localDateFromParts(date);
+  return `Nothing logged on ${WEEKDAY_SHORT[local.getDay()]} ${dayDateLabel(date, today)}`;
 }
 
 /**

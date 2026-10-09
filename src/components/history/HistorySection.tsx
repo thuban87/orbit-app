@@ -1143,7 +1143,7 @@ export function HistorySection({
           <HistoryTargetNote
             text={
               note.kind === "empty-day"
-                ? emptyDayNoteText(note.date)
+                ? emptyDayNoteText(note.date, today)
                 : emptySpanNoteText(note.start, note.end, today)
             }
             // Dated for an empty day; an empty span carries no date (D-28). The
