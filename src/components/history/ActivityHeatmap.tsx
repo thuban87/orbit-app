@@ -23,7 +23,8 @@
  * accessibility label — NEVER a second hue (dossier §G).
  *
  * ACCESSIBILITY (HIST-18): every real cell exposes "{date/range}, {n}
- * interactions" so the grid is fully usable without colour. Dense Year/large-
+ * interaction(s)" (singular for one, via `interactionCountLabel`; review
+ * WR-02) so the grid is fully usable without colour. Dense Year/large-
  * preset cells render visually below the 44px floor (an accepted departure,
  * dossier §AC / Phase 40) but stay a11y-labelled and carry a touch `hitSlop`.
  * That slop grows toward 44dp but never past the midpoint of the gap to the
@@ -47,6 +48,7 @@ import {
   classifyCycleBlock,
   classifyHeatmapCell,
 } from "@/components/history/heatmap-cell";
+import { interactionCountLabel } from "@/components/history/history-stream-logic";
 import { Icon } from "@/components/icons/Icon";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { AppText } from "@/components/ui/AppText";
@@ -324,7 +326,7 @@ export function ActivityHeatmap({
         key={key}
         testID={`${testID}-cell-${date}`}
         accessibilityRole="button"
-        accessibilityLabel={`${formatMonthDay(date)}, ${count} interactions`}
+        accessibilityLabel={`${formatMonthDay(date)}, ${interactionCountLabel(count)}`}
         hitSlop={slop}
         onPress={() => onCellPress({ kind: "date", date, count })}
         style={[
@@ -345,7 +347,7 @@ export function ActivityHeatmap({
         key={block.index}
         testID={`${testID}-cycle-${block.index}`}
         accessibilityRole="button"
-        accessibilityLabel={`${rangeLabel}, ${count} interactions${currentSuffix}`}
+        accessibilityLabel={`${rangeLabel}, ${interactionCountLabel(count)}${currentSuffix}`}
         hitSlop={cellHitSlop({ edge, gaps: CYCLE_CELL_GAPS })}
         onPress={() =>
           onCellPress({

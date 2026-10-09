@@ -370,6 +370,61 @@ describe("ActivityHeatmap tap zones never overlap (D-42 B)", () => {
   });
 });
 
+describe("ActivityHeatmap cell labels pluralise the count (review WR-02)", () => {
+  const label = (nodes: Node[], id: string) =>
+    nodes.find((node) => node.props.testID === id)?.props.accessibilityLabel;
+
+  it("reads 1 interaction, never 1 interactions, on a day cell", () => {
+    measuredWidth = 254;
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            counts: new Map([
+              ["2026-01-01", 1],
+              ["2026-01-02", 2],
+            ]),
+          }),
+        ),
+      ),
+    );
+    expect(label(nodes, "activity-heatmap-cell-2026-01-01")).toBe(
+      "Jan 1, 1 interaction",
+    );
+    expect(label(nodes, "activity-heatmap-cell-2026-01-02")).toBe(
+      "Jan 2, 2 interactions",
+    );
+    expect(label(nodes, "activity-heatmap-cell-2026-01-03")).toBe(
+      "Jan 3, 0 interactions",
+    );
+  });
+
+  it("reads 1 interaction, never 1 interactions, on a cycle cell", () => {
+    measuredWidth = 254;
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            lens: "cycles",
+            window: null,
+            cycles: CYCLES,
+            cycleCounts: [0, 1, 2, 3, 4],
+          }),
+        ),
+      ),
+    );
+    expect(label(nodes, "activity-heatmap-cycle-1")).toBe(
+      "Feb 1 – Feb 10, 1 interaction",
+    );
+    expect(label(nodes, "activity-heatmap-cycle-0")).toBe(
+      "Jan 1 – Jan 10, 0 interactions",
+    );
+    expect(label(nodes, "activity-heatmap-cycle-4")).toBe(
+      "May 1 – May 10, 4 interactions, Current cycle",
+    );
+  });
+});
+
 describe("ActivityHeatmap Cycles paging row (38.8 D-25)", () => {
   const find = (nodes: Node[], id: string) =>
     nodes.find((node) => node.props.testID === id);
