@@ -77,6 +77,12 @@ export interface HistoryRevealScroll {
   /** The expand write settled; `expanded` false (write failed) scrolls at once. */
   expandSettled(expanded: boolean): void;
   /**
+   * 38.8 D-72: History's loaded content (stream, empty state or read error)
+   * laid out — never its "Loading history…" placeholder. An expanding reveal
+   * scrolls once more here and is then settled.
+   */
+  historyContentLayout(): void;
+  /**
    * 38.8 D-19/D-20: scroll to a point INSIDE History, `offsetY` below the
    * History anchor (a heatmap jump target). A plain additive scroll: it holds
    * no request or generation state (a HistorySection remounts on every collapse
@@ -92,36 +98,55 @@ export interface HistoryRevealScroll {
  * clamps `scrollTo` to its current content height — a collapsed History at the
  * bottom of the Profile could not be brought up until its body exists. So an
  * expanding reveal scrolls on the first expanded History layout (or at once if
- * the expand write failed, landing on the header's Retry). Plain callbacks, no
- * timers and no animation state (the screen owns reduced-motion).
+ * the expand write failed, landing on the header's Retry).
+ *
+ * 38.8 D-72 (G1): History mounts fresh on every expand and first shows
+ * "Loading history…", so that first scroll can still be clamped short. The
+ * expanding reveal therefore stays pending until History's loaded content
+ * lays out, scrolls once more there, and is settled; a collapse before that
+ * drops it. A reveal of an already open History scrolls once, at once.
+ * Plain callbacks, no timers and no animation state (the screen owns
+ * reduced-motion).
  */
 export function createHistoryRevealScroll(
   scrollTo: (y: number) => void,
 ): HistoryRevealScroll {
   let hostY = 0;
   let historyY = 0;
-  let awaitingExpand = false;
-  const scroll = () => {
-    awaitingExpand = false;
-    scrollTo(hostY + historyY);
-  };
+  // idle → (expanding reveal) expand → (expanded layout) content → idle.
+  let pending: "idle" | "expand" | "content" = "idle";
+  const scroll = () => scrollTo(hostY + historyY);
   return {
     hostLayout(y) {
       hostY = y;
     },
     historyLayout(y, expanded) {
       historyY = y;
-      if (awaitingExpand && expanded) scroll();
+      if (pending === "expand" && expanded) {
+        pending = "content";
+        scroll();
+      } else if (pending === "content" && !expanded) {
+        pending = "idle";
+      }
     },
     reveal(needsExpand) {
       if (needsExpand) {
-        awaitingExpand = true;
+        pending = "expand";
         return;
       }
+      pending = "idle";
       scroll();
     },
     expandSettled(expanded) {
-      if (awaitingExpand && !expanded) scroll();
+      if (pending === "expand" && !expanded) {
+        pending = "idle";
+        scroll();
+      }
+    },
+    historyContentLayout() {
+      if (pending === "idle") return;
+      pending = "idle";
+      scroll();
     },
     scrollWithinHistory(offsetY) {
       scrollTo(hostY + historyY + offsetY);
@@ -135,16 +160,19 @@ export function createHistoryRevealScroll(
  * requesting HistorySection mount's generation), checked right before the
  * scroll: a superseded or cancelled request, or one whose mount is gone,
  * neither scrolls nor reports a result, and returns false. Otherwise it scrolls
- * `offsetY` below the History anchor, reports success and returns true.
+ * `offsetY` below the History anchor, less `leadIn` (38.8 D-73: the empty-day
+ * note lands that far below the visible top, so it scrolls only far enough to
+ * show it; 0 for a jump), reports success and returns true.
  */
 export function completeHistoryScroll(
   scroller: HistoryRevealScroll,
   offsetY: number,
   isCurrent: () => boolean,
   onResult: (ok: boolean) => void,
+  leadIn = 0,
 ): boolean {
   if (!isCurrent()) return false;
-  scroller.scrollWithinHistory(offsetY);
+  scroller.scrollWithinHistory(offsetY - leadIn);
   onResult(true);
   return true;
 }

@@ -929,6 +929,56 @@ export function pickerViewportTop({
   return insetTop + shellTopOffset + appBarHeight;
 }
 
+/** A view's box in window coordinates (`measureInWindow`). */
+export interface WindowBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * 38.8 D-73 (G2): the empty-day/span note sits under the heatmap (D-55), and
+ * the Year heatmap is taller than the screen, so the note can land below the
+ * fold. It scrolls only far enough to be seen. The visible area runs from
+ * `viewportTop` (the app bar's bottom, `pickerViewportTop`) to the lowest of
+ * `viewportBottom` (the window) and the top of every shell obstacle (tab bar,
+ * FAB) that overlaps the note horizontally. Returns null when the note is
+ * wholly visible or its measurement is unusable; otherwise the lead-in: how
+ * far below the visible top the note's top should land — its bottom at the
+ * visible bottom, or its top at the visible top when it is above the area or
+ * taller than it.
+ */
+export function noteRevealLeadIn({
+  note,
+  viewportTop,
+  viewportBottom,
+  obstacles,
+}: {
+  note: WindowBox;
+  viewportTop: number;
+  viewportBottom: number;
+  obstacles: readonly WindowBox[];
+}): number | null {
+  const usable =
+    [note.x, note.y, note.width, note.height].every(Number.isFinite) &&
+    note.width > 0 &&
+    note.height > 0;
+  if (!usable) return null;
+  let visibleBottom = viewportBottom;
+  for (const obstacle of obstacles) {
+    const overlaps =
+      obstacle.x < note.x + note.width && obstacle.x + obstacle.width > note.x;
+    if (overlaps && obstacle.y > viewportTop) {
+      visibleBottom = Math.min(visibleBottom, obstacle.y);
+    }
+  }
+  const noteBottom = note.y + note.height;
+  if (note.y >= viewportTop && noteBottom <= visibleBottom) return null;
+  if (note.y < viewportTop) return 0;
+  return Math.max(0, visibleBottom - viewportTop - note.height);
+}
+
 /**
  * The month the picker opens on (D-50, RESEARCH Pattern 5): the last month
  * header, in stream order (newest first), whose window y is at or above the

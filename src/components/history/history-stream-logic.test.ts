@@ -1281,8 +1281,13 @@ describe("HistorySection reveal and note wiring (D-72, D-73)", () => {
     expect(
       between("if (isEmptyHistory(history)) {", "<ActivityHeatmap"),
     ).toContain("onLayout={onContentLayout}");
-    expect(between("<View testID={testID}", "<ActivityHeatmap")).toContain(
-      "onLayout={onContentLayout}",
+    // The populated section reports once the heatmap has rendered its
+    // measured grid (its only width-measured child), not its first layout.
+    expect(between("<View testID={testID}", "<ActivityHeatmap")).not.toContain(
+      "onLayout",
+    );
+    expect(between("<ActivityHeatmap", "/>")).toContain(
+      "onLaidOut={onContentLayout}",
     );
   });
 
@@ -1291,7 +1296,11 @@ describe("HistorySection reveal and note wiring (D-72, D-73)", () => {
     expect(slot).toContain("ref={noteViewRef}");
     expect(slot).toContain("<HistoryTargetNote");
     expect(source).toContain("noteRevealLeadIn(");
-    expect(source).toMatch(/onRequestHistoryScroll\(\s*view,[\s\S]*leadIn/);
+    // The host's History scroll request, carrying the lead-in.
+    expect(source).toContain(
+      "const request = noteViewInputs.current.onRequestHistoryScroll;",
+    );
+    expect(source).toMatch(/request\(view, isCurrent, [^;]*, leadIn\)/);
   });
 });
 

@@ -208,6 +208,12 @@ export interface ActivityHeatmapProps {
    * when History shows Month in place of the persisted Cycles lens.
    */
   fallbackNote?: string | null;
+  /**
+   * Called on each layout seen with a measured width, i.e. once the grid has
+   * rendered — never on the first, grid-less layout. The parent's History
+   * reveal settles on it (38.8 D-72).
+   */
+  onLaidOut?: () => void;
   testID?: string;
 }
 
@@ -270,14 +276,18 @@ export function ActivityHeatmap({
   canGoNext,
   today,
   fallbackNote = null,
+  onLaidOut,
   testID = "activity-heatmap",
 }: ActivityHeatmapProps) {
   const { colors } = useTheme();
   // Measured available width (layout measurement, not animation); 0 until the
   // first layout pass, so the day/cycle grids render nothing until measured.
   const [availableWidth, setAvailableWidth] = useState(0);
-  const onLayout = (event: LayoutChangeEvent) =>
+  const onLayout = (event: LayoutChangeEvent) => {
     setAvailableWidth(event.nativeEvent.layout.width);
+    // This render already had a measured width, so its grid is laid out.
+    if (availableWidth > 0) onLaidOut?.();
+  };
   const dayCellEdge = fitHeatmapCell({
     availableWidth,
     columns: HEATMAP_GEOMETRY.columns,

@@ -311,12 +311,14 @@ export function ProfileModuleHost({
   // 38.8 D-19/D-20 (RESEARCH Pattern 3; C2-01): a heatmap jump scrolls to a
   // day group inside History. The target is measured against the History
   // anchor (the ref form of measureLayout, not a node handle) and the request
-  // carries its own staleness check; the host keeps no request state.
+  // carries its own staleness check; the host keeps no request state. The
+  // empty-day note (38.8 D-73) asks to land `leadIn` above its own top.
   const historyAnchorRef = useRef<View>(null);
   const requestHistoryScroll = (
     target: View,
     isCurrent: () => boolean,
     onResult: (ok: boolean) => void,
+    leadIn = 0,
   ) => {
     const anchor = historyAnchorRef.current;
     if (!anchor) {
@@ -325,7 +327,8 @@ export function ProfileModuleHost({
     }
     target.measureLayout(
       anchor,
-      (_x, y) => completeHistoryScroll(scroller, y, isCurrent, onResult),
+      (_x, y) =>
+        completeHistoryScroll(scroller, y, isCurrent, onResult, leadIn),
       () => {
         // Content-free: no contact data in the log line.
         Logger.warn(LOG_SCOPE, "history scroll measure failed");
@@ -466,12 +469,23 @@ export function ProfileModuleHost({
 
   const renderHistory = () => {
     if (snapshot.history.status === "error") {
-      return <AppText role="body">{snapshot.history.message}</AppText>;
+      // History's laid-out content too, so an expanding reveal settles on it
+      // (38.8 D-72).
+      return (
+        <AppText
+          role="body"
+          testID="profile-history-error"
+          onLayout={scroller.historyContentLayout}
+        >
+          {snapshot.history.message}
+        </AppText>
+      );
     }
     // The assembled Profile History section (Plan 08; 38.8 D-10): the heatmap,
     // Intensity and the History stream behind this renderer seam. Keyed by the
     // contact so its transient view state starts fresh on a contact change
-    // (38.8 D-62); a heatmap jump scrolls through `requestHistoryScroll`.
+    // (38.8 D-62); a heatmap jump scrolls through `requestHistoryScroll`, and
+    // its loaded content's layout settles an expanding reveal (38.8 D-72).
     return (
       <HistorySection
         key={snapshot.identity.id}
@@ -482,6 +496,7 @@ export function ProfileModuleHost({
         impactInputs={snapshot.impactInputs}
         onOpenKnowledgeChange={onOpenKnowledgeChange}
         onRequestHistoryScroll={requestHistoryScroll}
+        onContentLayout={scroller.historyContentLayout}
       />
     );
   };

@@ -78,7 +78,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { AccessibilityInfo, StyleSheet, View } from "react-native";
+import {
+  AccessibilityInfo,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
 import { ActivityHeatmap } from "@/components/history/ActivityHeatmap";
@@ -139,6 +144,7 @@ import {
   monthNodeKey,
   nearestDateLabel,
   nearestRemainingDay,
+  noteRevealLeadIn,
   type PendingHistoryScroll,
   type PendingScrollEvent,
   pendingScrollOn,
@@ -184,6 +190,7 @@ import {
   nextWindow,
   prevWindow,
 } from "@/services/history/window";
+import { useShellObstacleStore } from "@/stores/shell-obstacle-store";
 import { useShellTopOffset } from "@/stores/shell-offset-store";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatLocalDate } from "@/utils/dates";
@@ -204,6 +211,13 @@ const HISTORY_SCROLL_RETRY_MS = 300;
  * (38.8 D-50; the picker never waits on a header that does not report).
  */
 const PICKER_MEASURE_TIMEOUT_MS = 150;
+
+/**
+ * The shell views that cover the bottom of the Profile (their window rects in
+ * the shell obstacle store): the empty-day note scrolls clear of them (38.8
+ * D-73).
+ */
+const NOTE_COVERING_OBSTACLES = ["shell-tabs", "shell-fab"] as const;
 
 /**
  * A minimal window spanning [start, end] for the cycles lens's Intensity, which
@@ -243,7 +257,16 @@ export interface HistorySectionProps {
     target: View,
     isCurrent: () => boolean,
     onResult: (ok: boolean) => void,
+    /** Land the target this far below the visible top (38.8 D-73); 0 if absent. */
+    leadIn?: number,
   ) => void;
+  /**
+   * History's loaded content laid out — the populated section once its
+   * heatmap grid has its measured width, the empty state or the read error;
+   * never the "Loading history…" placeholder. The host settles an expanding
+   * Last Interaction / View history reveal on it (38.8 D-72, D-61).
+   */
+  onContentLayout?: () => void;
   testID?: string;
 }
 
@@ -255,6 +278,7 @@ export function HistorySection({
   impactInputs,
   onOpenKnowledgeChange,
   onRequestHistoryScroll,
+  onContentLayout,
   testID = "history-section",
 }: HistorySectionProps) {
   const navigation =
@@ -798,6 +822,54 @@ export function HistorySection({
     dispatchNote({ type: "close" });
   }, [commitPending, dispatchNote]);
 
+  // --- The empty-day/span note into view (38.8 D-73) --------------------------
+  // The note keeps its D-55 slot under the heatmap. When it appears (or shows
+  // another target) partly or wholly outside the visible area — the Year
+  // heatmap is taller than the screen — the Profile scrolls only far enough to
+  // show it (`noteRevealLeadIn`), through the same anchor-measured History
+  // scroll a jump uses. Nothing scrolls when it is already visible. Only a new
+  // note measures: the inputs below are read from a ref, so a Profile
+  // re-render never re-scrolls a note the user has scrolled away from.
+  const noteViewRef = useRef<View>(null);
+  const shownNoteRef = useRef<HistoryNote>(null);
+  const { height: windowHeight } = useWindowDimensions();
+  const noteViewInputs = useRef({
+    appBarBottom,
+    windowHeight,
+    onRequestHistoryScroll,
+  });
+  noteViewInputs.current = {
+    appBarBottom,
+    windowHeight,
+    onRequestHistoryScroll,
+  };
+  useLayoutEffect(() => {
+    shownNoteRef.current = note;
+    const view = noteViewRef.current;
+    const request = noteViewInputs.current.onRequestHistoryScroll;
+    if (note === null || !view || !request) return;
+    const shown = note;
+    const isCurrent = () => shownNoteRef.current === shown;
+    view.measureInWindow((x, y, width, height) => {
+      if (!isCurrent()) return;
+      const { rects } = useShellObstacleStore.getState();
+      const leadIn = noteRevealLeadIn({
+        note: { x, y, width, height },
+        viewportTop: noteViewInputs.current.appBarBottom,
+        viewportBottom: noteViewInputs.current.windowHeight,
+        obstacles: NOTE_COVERING_OBSTACLES.flatMap((key) => {
+          const rect = rects[key];
+          return rect ? [rect] : [];
+        }),
+      });
+      if (leadIn === null) return;
+      request(view, isCurrent, () => {}, leadIn);
+    });
+    return () => {
+      shownNoteRef.current = null;
+    };
+  }, [note]);
+
   // --- Jump to date (38.8 D-17, D-48..D-52) ----------------------------------
   // Opening the picker is a stream action: it drops any pending jump scroll and
   // its retry (C2-03). It opens on the month in view (D-50, Pattern 5): each
@@ -980,7 +1052,11 @@ export function HistorySection({
 
   if (readState.phase === "error") {
     return (
-      <View testID={`${testID}-error`} style={styles.empty}>
+      <View
+        testID={`${testID}-error`}
+        style={styles.empty}
+        onLayout={onContentLayout}
+      >
         <AppText role="caption">Couldn't load history</AppText>
         <Button
           role="tertiary"
@@ -1015,7 +1091,11 @@ export function HistorySection({
 
   if (isEmptyHistory(history)) {
     return (
-      <View testID={`${testID}-empty`} style={styles.empty}>
+      <View
+        testID={`${testID}-empty`}
+        style={styles.empty}
+        onLayout={onContentLayout}
+      >
         {refreshNotice}
         <AppText role="heading">No history yet</AppText>
         <AppText role="caption">
@@ -1048,23 +1128,34 @@ export function HistorySection({
         canGoNext={canGoNext}
         today={today}
         fallbackNote={effective.fallback ? NO_CADENCE_FALLBACK_NOTE : null}
+        // The populated section is fully laid out once the heatmap's measured
+        // grid is (its only width-measured child): settle a reveal (D-72).
+        onLaidOut={onContentLayout}
       />
       {note ? (
-        <HistoryTargetNote
-          text={
-            note.kind === "empty-day"
-              ? emptyDayNoteText(note.date)
-              : emptySpanNoteText(note.start, note.end, today)
-          }
-          // Dated for an empty day; an empty span carries no date (D-28). The
-          // note closes as Log opens, so it never survives the new record.
-          onLog={() => {
-            closeNote();
-            if (note.kind === "empty-day") log(note.date);
-            else log();
-          }}
-          onClose={closeNote}
-        />
+        // The measured slot (D-73) is a plain wrapper: the note keeps its D-55
+        // place directly under the heatmap.
+        <View
+          ref={noteViewRef}
+          collapsable={false}
+          testID="history-target-note-slot"
+        >
+          <HistoryTargetNote
+            text={
+              note.kind === "empty-day"
+                ? emptyDayNoteText(note.date)
+                : emptySpanNoteText(note.start, note.end, today)
+            }
+            // Dated for an empty day; an empty span carries no date (D-28). The
+            // note closes as Log opens, so it never survives the new record.
+            onLog={() => {
+              closeNote();
+              if (note.kind === "empty-day") log(note.date);
+              else log();
+            }}
+            onClose={closeNote}
+          />
+        </View>
       ) : null}
       <IntensityChart intensity={intensity} />
       {streamModel ? (

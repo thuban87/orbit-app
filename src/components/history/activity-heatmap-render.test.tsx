@@ -372,6 +372,32 @@ describe("ActivityHeatmap tap zones never overlap (D-42 B)", () => {
   });
 });
 
+// 38.8 D-72 (G1): the grid renders only once the width is measured, so the
+// heatmap reports "laid out" only from a layout seen with a measured width —
+// never the first, grid-less one. An expanding History reveal settles on it.
+describe("ActivityHeatmap reports its measured layout (D-72)", () => {
+  const layoutEvent = { nativeEvent: { layout: { width: 254 } } };
+  const rootLayout = (onLaidOut: () => void) => {
+    const nodes = all(resolve(ActivityHeatmap(props({ onLaidOut }))));
+    const root = nodes.find((node) => node.props.testID === "activity-heatmap");
+    return root?.props.onLayout as (event: unknown) => void;
+  };
+
+  it("does not report the first, unmeasured layout", () => {
+    measuredWidth = 0;
+    const onLaidOut = vi.fn();
+    rootLayout(onLaidOut)(layoutEvent);
+    expect(onLaidOut).not.toHaveBeenCalled();
+  });
+
+  it("reports a layout once the grid has its measured width", () => {
+    measuredWidth = 254;
+    const onLaidOut = vi.fn();
+    rootLayout(onLaidOut)(layoutEvent);
+    expect(onLaidOut).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("ActivityHeatmap cell labels pluralise the count (review WR-02)", () => {
   const label = (nodes: Node[], id: string) =>
     nodes.find((node) => node.props.testID === id)?.props.accessibilityLabel;
