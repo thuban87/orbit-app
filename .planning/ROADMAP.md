@@ -1476,9 +1476,12 @@ Plans:
 Some of these are superseded in part; see the CONTEXT's `<supersessions>`.
 **Schema**: none expected (migration head 032, backup format 7). Preferences `history_lens` / `history_cycle_count` are unchanged.
 **UI hint**: yes
-**Plans**: 5/6 plans executed
+**Plans**: 6/7 plans executed
 
 Plans:
+
+- [ ] 38.8-07-PLAN.md
+
 **Wave 1**
 
 - [x] 38.8-01-PLAN.md — Dev-only synthetic History seed (long multi-year, dense, sparse, notes-only, Unbound, quiet-year, archived, empty, group-linked) through the Core writers (W1)
@@ -1501,7 +1504,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion; phase code review + fixes run before it)*
 
-- [ ] 38.8-06-PLAN.md — Device pass on the 6 Pro, one release build (long-history measurement, seed-free bundle), 3a end smoke, docs, owner look-and-feel sign-off (W6)
+- [x] 38.8-06-PLAN.md — Device pass on the 6 Pro, one release build (long-history measurement, seed-free bundle), 3a end smoke, docs, owner look-and-feel sign-off (W6)
 
 > **Inserted 2026-10-08 (owner).** Phase 39's detailed History teaching was deferred pending this
 > redesign (`docs/dossier/workpapers/phase-39-onboarding-design-decisions.md:252`). Decisions that
@@ -1565,7 +1568,7 @@ Plans:
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
-| 38.8 History Navigation UX | 5/6 | In Progress|  |
+| 38.8 History Navigation UX | 6/7 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 

@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.8
 current_phase_name: History Navigation UX
 status: executing
-stopped_at: Completed 38.8-05-PLAN.md
-last_updated: "2026-10-09T00:28:27.707Z"
-last_activity: 2026-10-08
-last_activity_desc: Phase 38.8 execution started
+stopped_at: Completed 38.8-06-PLAN.md
+last_updated: "2026-10-09T12:00:00.000Z"
+last_activity: 2026-10-09
+last_activity_desc: 38.8-06 device pass complete; owner signed off; gaps G1/G2/YEARS approved for 38.8-07
 state_head: 0feda5f1d12b54afc5282f279b13e8702bed433f
 progress:
   total_phases: 30
   completed_phases: 21
   total_plans: 281
-  completed_plans: 278
+  completed_plans: 279
 carried_forward:
 
   - "38.8 INSERTED (owner 2026-10-08): History Navigation UX, before Phase 39. Replaces the Profile History Rolodex with an activity-first stream + Jump to date + heatmap jump-and-highlight; section renamed 'History'; Rolodex archived as reference. Dossier .planning/phases/38.8-history-navigation-ux/38.8-CONTEXT.md ACCEPTED (D-01..D-63, no OPEN items; provenance 38.8-LEDGER.md; accepted mockup 38.8-WORKPAPER-mockup/). Phase 39's detailed History teaching waits on this phase."
@@ -46,17 +46,17 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.8 (History Navigation UX) — EXECUTING
-Plan: 6 of 6
-Status: Ready to execute
+Plan: 6 of 6 complete (gap plan 38.8-07 pending)
+Status: Plan 06 complete — owner signed off look and feel 2026-10-09; approved gaps G1 (collapsed-History reveal), G2 (Year-view note off-screen), YEARS (day dates carry the year off the current year) await gap plan 38.8-07
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-08 — Phase 38.8 execution started
+Last activity: 2026-10-09 — 38.8-06 device pass + release measurement + docs done; owner sign-off recorded (38.8-PHASE-END-REPORT.md)
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 38.8, 39, 40. (38.7 completed 2026-10-05.)
-Next: Plan Phase 38.8 (History Navigation UX), then Phase 39 (Onboarding). The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
+Next: write and execute gap plan 38.8-07 (G1, G2, YEARS; device re-checks need the preferred phone reattached + adb reverse tcp:8081 tcp:8082), then close 38.8, then Phase 39 (Onboarding). The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
