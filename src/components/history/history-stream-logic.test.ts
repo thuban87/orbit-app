@@ -668,6 +668,40 @@ describe("streamStateOnModelChange — keeping the place across a re-read (D-31,
   });
 });
 
+describe("streamStateOnModelChange — a New Year rollover while mounted (D-31, D-62; WR-03)", () => {
+  const daily = dailyInteractions(60, { y: 2026, m: 12, d: 31 }, 1);
+  const before = buildStreamModel(
+    source({ interactions: daily }),
+    "2026-12-31",
+  );
+  const after = buildStreamModel(source({ interactions: daily }), "2027-01-01");
+
+  it("keeps the year being browsed open, with its chunks, when today crosses Jan 1", () => {
+    const shown = streamStateOnShowOlder(initialStreamState(), before, 2026);
+    const view = visibleYear(shown, before, 2026);
+    // Without carrying it over, the old current year collapses: the defect.
+    expect(isYearOpen(shown, after, 2026)).toBe(false);
+    const kept = streamStateOnModelChange(shown, before, after);
+    expect(isYearOpen(kept, after, 2026)).toBe(true);
+    expect(isYearOpen(kept, after, 2027)).toBe(true);
+    expect(visibleYear(kept, after, 2026).visibleCount).toBe(view.visibleCount);
+  });
+
+  it("does not open any other year", () => {
+    const kept = streamStateOnModelChange(initialStreamState(), before, after);
+    expect([...kept.openYears]).toEqual([2026]);
+  });
+
+  it("changes nothing when today stays in the same year", () => {
+    const state = initialStreamState();
+    const nextDay = buildStreamModel(
+      source({ interactions: daily }),
+      "2026-12-31",
+    );
+    expect(streamStateOnModelChange(state, before, nextDay)).toBe(state);
+  });
+});
+
 describe("isDayRendered (D-31; CR-01)", () => {
   const model = buildStreamModel(
     source({

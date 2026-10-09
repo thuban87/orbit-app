@@ -238,7 +238,11 @@ export function buildStreamModel(
 // --- View state (transient; never persisted — D-18, D-62) --------------------
 
 export interface StreamViewState {
-  /** Older years the user expanded. The current year is always open. */
+  /**
+   * Older years the user expanded, plus a year that was current when today
+   * crossed into a new year while mounted (WR-03). The current year is always
+   * open.
+   */
   readonly openYears: ReadonlySet<number>;
   /** Year → requested visible record count (before day snapping). */
   readonly shown: ReadonlyMap<number, number>;
@@ -398,8 +402,9 @@ export function streamStateOnShowOlder(
  * (newer or equal), so the same boundary stays rendered. The position is a sort
  * position, not a key, so it holds when the boundary record itself was deleted
  * or redated. It never shrinks a request (a deletion above only grows content
- * below the user) and never touches a collapsed year. Returns `state` itself
- * when nothing changes.
+ * below the user) and never touches a collapsed year. When today crosses into
+ * a new year, the year that was current stays open (WR-03). Returns `state`
+ * itself when nothing changes.
  */
 export function streamStateOnModelChange(
   state: StreamViewState,
@@ -426,8 +431,23 @@ export function streamStateOnModelChange(
       shown.set(entry.year, through);
     }
   }
-  if (!shown) return state;
-  return { openYears: state.openYears, shown };
+  // A New Year rollover while mounted (review WR-03): the year that was
+  // current, and so always open, becomes an older year. Carry it into
+  // `openYears` so it stays open with its chunks instead of collapsing to a
+  // year row under the user.
+  let openYears: Set<number> | null = null;
+  if (
+    next.currentYear > prev.currentYear &&
+    !state.openYears.has(prev.currentYear)
+  ) {
+    openYears = new Set(state.openYears);
+    openYears.add(prev.currentYear);
+  }
+  if (!shown && !openYears) return state;
+  return {
+    openYears: openYears ?? state.openYears,
+    shown: shown ?? state.shown,
+  };
 }
 
 /**
