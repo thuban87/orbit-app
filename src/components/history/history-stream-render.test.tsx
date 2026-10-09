@@ -168,7 +168,7 @@ describe("HistoryRecordRow", () => {
     expect(root.type).toBe("Pressable");
     expect(root.props.onLongPress).toBeUndefined();
     (root.props.onPress as () => void)();
-    expect(onOpenInteraction).toHaveBeenCalledWith(7);
+    expect(onOpenInteraction).toHaveBeenCalledWith(7, "2026-10-06");
     expect(all(tree).filter((n) => n.type === "Pressable")).toHaveLength(1);
     expect(root.props.accessibilityLabel).toBe("Interaction, Call, 2:05 PM");
   });
@@ -225,7 +225,7 @@ describe("HistoryRecordRow", () => {
       "Interaction, Call, 7:30 PM, group event Synthetic group dinner",
     );
     (root.props.onPress as () => void)();
-    expect(onOpenInteraction).toHaveBeenCalledWith(8);
+    expect(onOpenInteraction).toHaveBeenCalledWith(8, "2026-10-06");
   });
 
   it("renders no group label for a standalone interaction", () => {
@@ -257,7 +257,10 @@ describe("HistoryRecordRow", () => {
     const [root] = tree;
     expect(root.type).toBe("Pressable");
     (root.props.onPress as () => void)();
-    expect(onOpenKnowledgeChange).toHaveBeenCalledWith("current_location");
+    expect(onOpenKnowledgeChange).toHaveBeenCalledWith(
+      "current_location",
+      "2026-10-04",
+    );
     const icon = all(tree).find((n) => n.type === "Icon");
     expect(icon?.props.name).toBe("edit");
     const value = all(tree).find(
@@ -444,6 +447,39 @@ describe("HistoryStream", () => {
     expect(
       lit.nodes.some((n) => n.props.accessibilityLiveRegion !== undefined),
     ).toBe(false);
+  });
+
+  it("passes each row's local date with its open callbacks (the D-31 anchor)", () => {
+    const { nodes, handlers } = renderStream({
+      interactions: [interaction(5, "2026-10-02 09:00:00")],
+      knowledgeChanges: [KNOWLEDGE],
+    });
+    (
+      (byTestID(nodes, "history-row-interaction-5") as Node).props
+        .onPress as () => void
+    )();
+    expect(handlers.onOpenInteraction).toHaveBeenCalledWith(5, "2026-10-02");
+    (
+      (byTestID(nodes, "history-row-knowledge-4") as Node).props
+        .onPress as () => void
+    )();
+    expect(handlers.onOpenKnowledgeChange).toHaveBeenCalledWith(
+      "current_location",
+      "2026-10-04",
+    );
+  });
+
+  it("registers each month group as a measurable jump target (D-17, D-50)", () => {
+    const { nodes, handlers } = renderStream({
+      interactions: [interaction(1, "2026-10-02 09:00:00")],
+    });
+    const month = byTestID(nodes, "history-stream-month-2026-10") as Node;
+    expect(month.props.collapsable).toBe(false);
+    const node = { native: true };
+    (month.props.ref as (n: unknown) => void)(node);
+    expect(handlers.registerNode).toHaveBeenCalledWith("month:2026-10", node);
+    (month.props.onLayout as () => void)();
+    expect(handlers.onNodeLayout).toHaveBeenCalledWith("month:2026-10");
   });
 
   it("renders no nested scroll container anywhere", () => {

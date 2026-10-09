@@ -34,6 +34,7 @@ import {
   monthNodeKey,
   nearestDateLabel,
   nearestRecordDays,
+  nearestRemainingDay,
   orderStreamRecords,
   type PendingHistoryScroll,
   PICKER_IN_VIEW_SLACK_DP,
@@ -41,6 +42,7 @@ import {
   pickerInitialMonth,
   pickerModel,
   pickerViewportTop,
+  recordDay,
   resolveHeatmapTarget,
   resolveMonthJump,
   revealAnnouncement,
@@ -1255,5 +1257,91 @@ describe("empty-month texts (D-17)", () => {
 
   it("labels a nearest date with month, day and year", () => {
     expect(nearestDateLabel("2025-11-03")).toBe("Nov 3, 2025");
+  });
+});
+
+// --- 38.8-04 Task 3: keeping the user's place (D-31) -------------------------
+
+describe("nearestRemainingDay (D-31)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        interaction(1, "2026-10-05 09:00:00"),
+        interaction(2, "2026-09-25 09:00:00"),
+      ],
+      knowledgeChanges: [knowledge(3, "2026-09-20 08:00:00")],
+    }),
+    TODAY,
+  );
+
+  it("keeps a day that still has records", () => {
+    expect(nearestRemainingDay(model, "2026-09-25")).toBe("2026-09-25");
+  });
+
+  it("picks the nearer of the closest earlier and later record days", () => {
+    // Sep 27: Sep 25 is 2 days back, Oct 5 is 8 days ahead.
+    expect(nearestRemainingDay(model, "2026-09-27")).toBe("2026-09-25");
+    // Oct 3: Oct 5 is 2 days ahead, Sep 25 is 8 days back.
+    expect(nearestRemainingDay(model, "2026-10-03")).toBe("2026-10-05");
+  });
+
+  it("gives a tie to the newer day", () => {
+    // Sep 30: Sep 25 and Oct 5 are both 5 days away.
+    expect(nearestRemainingDay(model, "2026-09-30")).toBe("2026-10-05");
+  });
+
+  it("measures calendar distance across a month end with local dates", () => {
+    const edge = buildStreamModel(
+      source({
+        interactions: [
+          interaction(1, "2026-03-02 09:00:00"),
+          interaction(2, "2026-02-25 09:00:00"),
+        ],
+      }),
+      TODAY,
+    );
+    // Feb 28 2026: Mar 2 is 2 days ahead, Feb 25 is 3 days back.
+    expect(nearestRemainingDay(edge, "2026-02-28")).toBe("2026-03-02");
+  });
+
+  it("falls back to the only side that exists", () => {
+    expect(nearestRemainingDay(model, "2026-10-07")).toBe("2026-10-05");
+    expect(nearestRemainingDay(model, "2026-01-01")).toBe("2026-09-20");
+  });
+
+  it("returns null when the history is empty", () => {
+    expect(
+      nearestRemainingDay(buildStreamModel(source({}), TODAY), "2026-10-01"),
+    ).toBe(null);
+  });
+});
+
+describe("recordDay (D-31)", () => {
+  it("reports the day now holding a record, a redated record its new day", () => {
+    const before = buildStreamModel(
+      source({ interactions: [interaction(7, "2026-09-02 09:00:00")] }),
+      TODAY,
+    );
+    expect(recordDay(before, "interaction-7")).toBe("2026-09-02");
+    const after = buildStreamModel(
+      source({ interactions: [interaction(7, "2026-10-04 09:00:00")] }),
+      TODAY,
+    );
+    expect(recordDay(after, "interaction-7")).toBe("2026-10-04");
+  });
+
+  it("keys by family, so equal ids in other families never match", () => {
+    const model = buildStreamModel(
+      source({ knowledgeChanges: [knowledge(7, "2026-09-02 09:00:00")] }),
+      TODAY,
+    );
+    expect(recordDay(model, "interaction-7")).toBe(null);
+    expect(recordDay(model, "knowledge-7")).toBe("2026-09-02");
+  });
+
+  it("returns null once the record is gone", () => {
+    expect(
+      recordDay(buildStreamModel(source({}), TODAY), "interaction-7"),
+    ).toBe(null);
   });
 });
