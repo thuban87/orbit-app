@@ -206,9 +206,21 @@ function pairWeeks<T>(weeks: readonly T[][]): T[][][] {
   return pairs;
 }
 
-/** The header window title per lens ("Mar 4 – Mar 10" / "March 2026" / "2026"). */
-function windowTitle(lens: HistoryLens, window: HistoryWindow | null): string {
-  if (lens === "cycles") return "Cycles";
+/**
+ * The header window title per lens ("Mar 4 – Mar 10" / "March 2026" / "2026");
+ * Cycles shows the displayed page's span, first block start to last block end.
+ */
+function windowTitle(
+  lens: HistoryLens,
+  window: HistoryWindow | null,
+  cycles: CyclesResult,
+): string {
+  if (lens === "cycles") {
+    if (!cycles.available || cycles.blocks.length === 0) return "Cycles";
+    const first = cycles.blocks[0];
+    const last = cycles.blocks[cycles.blocks.length - 1];
+    return `${formatMonthDay(first.start)} – ${formatMonthDay(last.end)}`;
+  }
   if (!window) return "";
   if (lens === "7days") {
     return `${formatMonthDay(window.start)} – ${formatMonthDay(window.end)}`;
@@ -366,14 +378,16 @@ export function ActivityHeatmap({
         />
       ) : null}
 
-      {/* Window navigation — prev/next; next is blocked at today. Cycles are
-          always anchored at now, so navigation is day-lens only. */}
-      {lens !== "cycles" ? (
+      {/* Window navigation — prev/next; next is blocked at today. Cycles page
+          by whole displayed pages (38.8 D-25) when the contact has a cadence. */}
+      {lens !== "cycles" || cycles.available ? (
         <View style={styles.navRow}>
           <Pressable
             testID={`${testID}-prev`}
             accessibilityRole="button"
-            accessibilityLabel="Previous period"
+            accessibilityLabel={
+              lens === "cycles" ? "Previous cycles" : "Previous period"
+            }
             hitSlop={8}
             onPress={onPrev}
             style={styles.navButton}
@@ -381,12 +395,14 @@ export function ActivityHeatmap({
             <Icon name="back" tone="textSecondary" size="md" />
           </Pressable>
           <AppText role="label" style={{ color: colors.textPrimary }}>
-            {windowTitle(lens, window)}
+            {windowTitle(lens, window, cycles)}
           </AppText>
           <Pressable
             testID={`${testID}-next`}
             accessibilityRole="button"
-            accessibilityLabel="Next period"
+            accessibilityLabel={
+              lens === "cycles" ? "Next cycles" : "Next period"
+            }
             accessibilityState={{ disabled: !canGoNext }}
             disabled={!canGoNext}
             hitSlop={8}

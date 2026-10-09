@@ -14,12 +14,17 @@
  * strings is a valid date-range test. UTC ISO slicing is NEVER used here.
  */
 import type { HistoryLens } from "@/db/app-settings-dao";
-import type { CycleBlock } from "@/services/history/cycles";
+import {
+  type CycleBlock,
+  type CyclesResult,
+  cycles,
+} from "@/services/history/cycles";
 import {
   buildWindow,
   type DateLens,
   type HistoryWindow,
 } from "@/services/history/window";
+import { formatLocalDate } from "@/utils/dates";
 
 /**
  * Resolve the active date-grid window for a lens. The three day-oriented lenses
@@ -225,6 +230,79 @@ export function historyDayAfterNext(
     today: state.today,
     refDate: nextRef,
     followingToday: window.start <= state.today && state.today <= window.end,
+  };
+}
+
+// --- Cycles paging (38.8 D-25, D-26) ------------------------------------------
+// The Cycles lens pages by whole displayed pages (the selected preset count).
+// Cycles stay current-cadence spans: a page is the unchanged `cycles()` series
+// ending at `refDate` instead of today, so paging only shifts that series and
+// never reconstructs historical cadence (`services/history/cycles.ts` is
+// unchanged).
+
+/** Shift a local `YYYY-MM-DD` by whole days with local components (never UTC). */
+function addLocalDays(date: string, delta: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const shifted = new Date(y, m - 1, d);
+  shifted.setDate(shifted.getDate() + delta);
+  return formatLocalDate(shifted);
+}
+
+/**
+ * The displayed Cycles page: `count` cadence blocks ending at `refDate`.
+ * `cycles()` flags its last block current whatever its `now`, so the flag is
+ * re-derived here — only the page ending today has a current cycle. A contact
+ * with no cadence returns `{ available: false }` (the unchanged guard).
+ */
+export function pagedCycles(input: {
+  readonly intervalDays: number | null;
+  readonly trackingEnabled: number;
+  readonly count: number;
+  readonly today: string;
+  readonly refDate: string;
+}): CyclesResult {
+  const result = cycles({
+    intervalDays: input.intervalDays,
+    trackingEnabled: input.trackingEnabled,
+    count: input.count,
+    now: input.refDate,
+  });
+  if (!result.available) return result;
+  const onToday = input.refDate === input.today;
+  return {
+    available: true,
+    blocks: result.blocks.map((block) => ({
+      ...block,
+      isCurrent: onToday && block.index === input.count - 1,
+    })),
+  };
+}
+
+/** One page back: the page ending the day before the shown page's first block. */
+export function cyclesPrevRef(blocks: readonly CycleBlock[]): string {
+  return addLocalDays(blocks[0].start, -1);
+}
+
+/** One page forward, never past today. */
+export function cyclesNextRef(input: {
+  readonly refDate: string;
+  readonly intervalDays: number;
+  readonly count: number;
+  readonly today: string;
+}): string {
+  const next = addLocalDays(input.refDate, input.count * input.intervalDays);
+  return next < input.today ? next : input.today;
+}
+
+/** Stepping forward in Cycles follows today again once the page ends today. */
+export function historyDayAfterCyclesNext(
+  state: HistoryDayState,
+  nextRef: string,
+): HistoryDayState {
+  return {
+    today: state.today,
+    refDate: nextRef,
+    followingToday: nextRef === state.today,
   };
 }
 

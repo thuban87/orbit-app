@@ -16,7 +16,10 @@ import {
   advanceHistoryDay,
   buildLogRoute,
   countByCycle,
+  cyclesNextRef,
+  cyclesPrevRef,
   type HistoryReadState,
+  historyDayAfterCyclesNext,
   historyDayAfterLensChange,
   historyDayAfterNext,
   historyDayAfterPrev,
@@ -27,12 +30,13 @@ import {
   initialHistoryReadState,
   initialPersistedPref,
   isEmptyHistory,
+  pagedCycles,
   persistedPrefOnRead,
   persistedPrefOnUserChange,
   persistedPrefOnWriteFailed,
   resolveActiveWindow,
 } from "@/components/history/history-section-logic";
-import type { CycleBlock } from "@/services/history/cycles";
+import { type CycleBlock, cycles } from "@/services/history/cycles";
 import { nextWindow, prevWindow } from "@/services/history/window";
 
 const TODAY = "2026-09-11";
@@ -383,5 +387,156 @@ describe("persisted History pref generations never collide (38.3 review A-WR-08)
     expect(persistedPrefOnWriteFailed(third, first.userGen, "cycles")).toEqual(
       third,
     );
+  });
+});
+
+describe("Cycles paging by whole pages (38.8 D-25, D-26)", () => {
+  const T = "2026-10-08";
+  const cadence = { intervalDays: 7, trackingEnabled: 1, count: 5 };
+  const page = (refDate: string, today = T) =>
+    pagedCycles({ ...cadence, today, refDate });
+  const blocksOf = (result: ReturnType<typeof pagedCycles>) => {
+    if (!result.available) throw new Error("cycles expected");
+    return result.blocks;
+  };
+
+  it("page 0 equals cycles() ending today, with the last block current", () => {
+    const current = page(T);
+    expect(current).toEqual(cycles({ ...cadence, now: T }));
+    const blocks = blocksOf(current);
+    expect(blocks[4]).toMatchObject({ end: T, isCurrent: true });
+    expect(blocks.filter((b) => b.isCurrent)).toHaveLength(1);
+  });
+
+  it("one page back ends the day before the current first block and has no current block", () => {
+    const current = blocksOf(page(T));
+    expect(current[0].start).toBe("2026-09-04");
+    const ref = cyclesPrevRef(current);
+    expect(ref).toBe("2026-09-03");
+    const back = blocksOf(page(ref));
+    expect(back[4].end).toBe("2026-09-03");
+    expect(back[0].start).toBe("2026-07-31");
+    expect(back.some((b) => b.isCurrent)).toBe(false);
+    // Contiguous with the page after it.
+    expect(back).toHaveLength(5);
+  });
+
+  it("next from one page back returns to today and follows it again", () => {
+    let day = initialHistoryDayState(T);
+    day = historyDayAfterPrev(day, cyclesPrevRef(blocksOf(page(day.refDate))));
+    expect(day.followingToday).toBe(false);
+    const nextRef = cyclesNextRef({
+      refDate: day.refDate,
+      intervalDays: 7,
+      count: 5,
+      today: day.today,
+    });
+    expect(nextRef).toBe(T);
+    day = historyDayAfterCyclesNext(day, nextRef);
+    expect(day).toEqual(initialHistoryDayState(T));
+    expect(blocksOf(page(day.refDate))[4].isCurrent).toBe(true);
+  });
+
+  it("next never passes today", () => {
+    expect(
+      cyclesNextRef({
+        refDate: "2026-10-01",
+        intervalDays: 30,
+        count: 20,
+        today: T,
+      }),
+    ).toBe(T);
+    expect(
+      cyclesNextRef({ refDate: T, intervalDays: 7, count: 5, today: T }),
+    ).toBe(T);
+  });
+
+  it("two pages back and forward again steps one whole page at a time", () => {
+    let day = initialHistoryDayState(T);
+    day = historyDayAfterPrev(day, cyclesPrevRef(blocksOf(page(day.refDate))));
+    day = historyDayAfterPrev(day, cyclesPrevRef(blocksOf(page(day.refDate))));
+    expect(day.refDate).toBe("2026-07-30");
+    const forward = cyclesNextRef({
+      refDate: day.refDate,
+      intervalDays: 7,
+      count: 5,
+      today: T,
+    });
+    expect(forward).toBe("2026-09-03");
+    day = historyDayAfterCyclesNext(day, forward);
+    expect(day.followingToday).toBe(false);
+  });
+
+  it("a rollover keeps a past page put (D-04), and next realigns to today one step later", () => {
+    const seed = initialHistoryDayState(T);
+    const R = cyclesPrevRef(blocksOf(page(T)));
+    let day = historyDayAfterPrev(seed, R);
+    // A new local day: the past page stays put; next is still allowed.
+    day = advanceHistoryDay(day, "2026-10-09");
+    expect(day).toEqual({
+      today: "2026-10-09",
+      refDate: R,
+      followingToday: false,
+    });
+    expect(day.refDate < day.today).toBe(true);
+    // First next: min(R + 5·7, T + 1) = the old today T — a page ending at T,
+    // not following.
+    const first = cyclesNextRef({
+      refDate: day.refDate,
+      intervalDays: 7,
+      count: 5,
+      today: day.today,
+    });
+    expect(first).toBe(T);
+    day = historyDayAfterCyclesNext(day, first);
+    expect(day.followingToday).toBe(false);
+    expect(
+      blocksOf(page(day.refDate, day.today)).some((b) => b.isCurrent),
+    ).toBe(false);
+    // Second next: min(T + 35, T + 1) = T + 1, and it follows today again.
+    const second = cyclesNextRef({
+      refDate: day.refDate,
+      intervalDays: 7,
+      count: 5,
+      today: day.today,
+    });
+    expect(second).toBe("2026-10-09");
+    day = historyDayAfterCyclesNext(day, second);
+    expect(day).toEqual(initialHistoryDayState("2026-10-09"));
+  });
+
+  it("an unavailable cadence returns { available: false } on any page", () => {
+    expect(
+      pagedCycles({
+        intervalDays: null,
+        trackingEnabled: 1,
+        count: 5,
+        today: T,
+        refDate: "2026-09-01",
+      }),
+    ).toEqual({ available: false });
+    expect(
+      pagedCycles({
+        intervalDays: 7,
+        trackingEnabled: 0,
+        count: 5,
+        today: T,
+        refDate: T,
+      }),
+    ).toEqual({ available: false });
+  });
+
+  it("pages across a year boundary with local dates", () => {
+    const back = blocksOf(
+      pagedCycles({
+        intervalDays: 30,
+        trackingEnabled: 1,
+        count: 5,
+        today: "2026-01-10",
+        refDate: "2026-01-10",
+      }),
+    );
+    expect(back[0].start).toBe("2025-08-14");
+    expect(cyclesPrevRef(back)).toBe("2025-08-13");
   });
 });

@@ -86,7 +86,10 @@ import {
   advanceHistoryDay,
   buildLogRoute,
   countByCycle,
+  cyclesNextRef,
+  cyclesPrevRef,
   type HistoryReadState,
+  historyDayAfterCyclesNext,
   historyDayAfterLensChange,
   historyDayAfterNext,
   historyDayAfterPrev,
@@ -98,6 +101,7 @@ import {
   initialPersistedPref,
   isEmptyHistory,
   type PersistedPref,
+  pagedCycles,
   persistedPrefOnRead,
   persistedPrefOnUserChange,
   persistedPrefOnWriteFailed,
@@ -154,7 +158,6 @@ import { newUid } from "@/db/uid";
 import type { RootStackParamList } from "@/navigation/types";
 import { PROFILE_APP_BAR } from "@/screens/contact-profile-logic";
 import { buckets } from "@/services/history/buckets";
-import { cycles } from "@/services/history/cycles";
 import {
   type IntensityWindowResult,
   intensityWindow,
@@ -444,10 +447,19 @@ export function HistorySection({
     () => (window ? buckets(window, interactions) : new Map<string, number>()),
     [window, interactions],
   );
+  // The displayed Cycles page (38.8 D-25/D-26): the current-cadence series
+  // ending at the paged reference date; a day lens reads the current page.
+  const cyclesRef = lens === "cycles" ? refDate : today;
   const cyclesResult = useMemo(
     () =>
-      cycles({ intervalDays, trackingEnabled, count: cycleCount, now: today }),
-    [intervalDays, trackingEnabled, cycleCount, today],
+      pagedCycles({
+        intervalDays,
+        trackingEnabled,
+        count: cycleCount,
+        today,
+        refDate: cyclesRef,
+      }),
+    [intervalDays, trackingEnabled, cycleCount, today, cyclesRef],
   );
   const cycleCounts = useMemo(
     () =>
@@ -474,21 +486,61 @@ export function HistorySection({
       : { available: false };
   }, [lens, cyclesResult, window, impactInputs]);
 
+  // Paging (D-25): a day lens steps one window; Cycles steps one whole
+  // displayed page (the preset count), and next stops at the page ending
+  // today. Every branch is a stream action and clears the note (D-55, C3-05).
   const onPrev = useCallback(() => {
     commitPending({ type: "stream-action" });
     dispatchNote({ type: "page" });
+    if (lens === "cycles") {
+      if (cyclesResult.available) {
+        setDay(historyDayAfterPrev(day, cyclesPrevRef(cyclesResult.blocks)));
+      }
+      return;
+    }
     if (window) setDay(historyDayAfterPrev(day, prevWindow(window, today).ref));
-  }, [commitPending, dispatchNote, day, window, today]);
+  }, [commitPending, dispatchNote, cyclesResult, day, lens, window, today]);
   const onNext = useCallback(() => {
     commitPending({ type: "stream-action" });
     dispatchNote({ type: "page" });
+    if (lens === "cycles") {
+      if (cyclesResult.available && intervalDays !== null) {
+        setDay(
+          historyDayAfterCyclesNext(
+            day,
+            cyclesNextRef({
+              refDate: day.refDate,
+              intervalDays,
+              count: cycleCount,
+              today,
+            }),
+          ),
+        );
+      }
+      return;
+    }
     if (window) {
       setDay(
         historyDayAfterNext(day, window.lens, nextWindow(window, today).ref),
       );
     }
-  }, [commitPending, dispatchNote, day, window, today]);
-  const canGoNext = window ? window.end < today : false;
+  }, [
+    commitPending,
+    dispatchNote,
+    cycleCount,
+    cyclesResult,
+    day,
+    intervalDays,
+    lens,
+    window,
+    today,
+  ]);
+  const canGoNext =
+    lens === "cycles"
+      ? cyclesResult.available && refDate < today
+      : window
+        ? window.end < today
+        : false;
 
   // --- Cross-surface routing helpers -----------------------------------------
   // A dated Log prefills that day; an undated one starts at now (D-21/D-28).

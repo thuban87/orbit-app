@@ -369,3 +369,78 @@ describe("ActivityHeatmap tap zones never overlap (D-42 B)", () => {
     expect(source.match(/cellHitSlop\(/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("ActivityHeatmap Cycles paging row (38.8 D-25)", () => {
+  const find = (nodes: Node[], id: string) =>
+    nodes.find((node) => node.props.testID === id);
+
+  it("renders prev/next for available cycles, titled with the page span", () => {
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            lens: "cycles",
+            window: null,
+            cycles: CYCLES,
+            canGoNext: true,
+          }),
+        ),
+      ),
+    );
+    const prev = find(nodes, "activity-heatmap-prev");
+    const next = find(nodes, "activity-heatmap-next");
+    expect(prev?.props.accessibilityLabel).toBe("Previous cycles");
+    expect(next?.props.accessibilityLabel).toBe("Next cycles");
+    expect(next?.props.accessibilityState).toEqual({ disabled: false });
+    const title = nodes.find(
+      (node) =>
+        node.type === "AppText" && node.props.children === "Jan 1 – May 10",
+    );
+    expect(title).toBeDefined();
+  });
+
+  it("disables next on the page that ends today", () => {
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            lens: "cycles",
+            window: null,
+            cycles: CYCLES,
+            canGoNext: false,
+          }),
+        ),
+      ),
+    );
+    const next = find(nodes, "activity-heatmap-next");
+    expect(next?.props.accessibilityState).toEqual({ disabled: true });
+    expect(next?.props.disabled).toBe(true);
+  });
+
+  it("has no nav row for unavailable cycles and shows the unavailable caption", () => {
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            lens: "cycles",
+            window: null,
+            cycles: { available: false },
+          }),
+        ),
+      ),
+    );
+    expect(find(nodes, "activity-heatmap-prev")).toBeUndefined();
+    expect(find(nodes, "activity-heatmap-next")).toBeUndefined();
+    expect(find(nodes, "activity-heatmap-cycles-unavailable")).toBeDefined();
+  });
+
+  it("keeps the day-lens labels", () => {
+    const nodes = all(resolve(ActivityHeatmap(props({}))));
+    expect(find(nodes, "activity-heatmap-prev")?.props.accessibilityLabel).toBe(
+      "Previous period",
+    );
+    expect(find(nodes, "activity-heatmap-next")?.props.accessibilityLabel).toBe(
+      "Next period",
+    );
+  });
+});
