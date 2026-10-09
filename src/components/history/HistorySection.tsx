@@ -22,6 +22,10 @@
  * It owns the lens/window/cycle-preset state (persisted globally in
  * `app_settings` via the DAO) and the stream's transient view state (fresh on
  * each mount, kept across revision re-reads, never persisted — 38.8 D-18/D-62).
+ * After an edit, redate or delete started from a row, the re-read keeps the
+ * user's place: the Profile keeps its scroll offset, and a one-shot anchor
+ * scrolls once to the record's new day or the nearest remaining day only when
+ * its day moved or vanished (D-31).
  * It reads the canonical history on mount and on every parent Profile revision
  * (38.3 RG-024, ADR-165 — the Profile snapshot load is the single invalidation
  * owner; Profile focus always produces a revision), and wires the cross-surface
@@ -116,11 +120,13 @@ import {
   monthAnnouncement,
   monthNodeKey,
   nearestDateLabel,
+  nearestRemainingDay,
   type PendingHistoryScroll,
   type PendingScrollEvent,
   pendingScrollOn,
   pickerInitialMonth,
   pickerViewportTop,
+  recordDay,
   resolveHeatmapTarget,
   resolveMonthJump,
   revealAnnouncement,
@@ -757,6 +763,68 @@ export function HistorySection({
     [onCellPress],
   );
 
+  // --- Keeping the user's place (38.8 D-31, RESEARCH Pattern 7) ---------------
+  // The Profile ScrollView keeps its numeric offset across the revision
+  // re-read (the stream never swaps to a loading state over loaded rows), so
+  // an ordinary refresh leaves the user where they were. On top of that, a
+  // one-shot anchor is set ONLY when a row opens InteractionDetail or
+  // MemoryHistory (never by a jump) and consumed by the first newly published
+  // history read after it — a new `history` object, so a today-only model
+  // rebuild across midnight does not use it up (C2-06):
+  //   • the opened record moved to a newer day (content inserted above it):
+  //     scroll once to its new day;
+  //   • else the anchored day is gone (a delete or a redate emptied it): scroll
+  //     once to the nearest remaining day;
+  //   • otherwise nothing. No highlight, no announcement, never persisted
+  //     (D-62). A failed delete keeps its row and InteractionDetail's own
+  //     retry; nothing is removed optimistically.
+  const anchorRef = useRef<{ day: string; recordKey: string | null } | null>(
+    null,
+  );
+  const lastHistoryRef = useRef<ContactHistory | null>(null);
+  const onOpenInteraction = useCallback((id: number, date: string) => {
+    anchorRef.current = { day: date, recordKey: `interaction-${id}` };
+    setDetailId(id);
+  }, []);
+  // A knowledge row anchors its day only (MemoryHistory edits a field, not
+  // this record).
+  const onOpenKnowledgeRow = useCallback(
+    (fieldKey: CurrentStateFieldKey, date: string) => {
+      anchorRef.current = { day: date, recordKey: null };
+      onOpenKnowledgeChange(fieldKey);
+    },
+    [onOpenKnowledgeChange],
+  );
+  useEffect(() => {
+    if (history === lastHistoryRef.current) return;
+    lastHistoryRef.current = history;
+    const anchor = anchorRef.current;
+    if (!history || !anchor || !streamModel) return;
+    anchorRef.current = null;
+    const moved =
+      anchor.recordKey === null
+        ? null
+        : recordDay(streamModel, anchor.recordKey);
+    let target: string | null = null;
+    if (moved !== null && moved > anchor.day) target = moved;
+    else if (!streamModel.dayIndex.has(anchor.day)) {
+      target = nearestRemainingDay(streamModel, anchor.day);
+    }
+    if (target === null) return;
+    const day = target;
+    const key = dayNodeKey(day);
+    // Read before the reveal update: not yet rendered = await its layout.
+    const mode = historyScrollMode(nodeRegistry.current, key);
+    genRef.current += 1;
+    const gen = genRef.current;
+    setStreamState((s) => streamStateOnReveal(s, streamModel, [day]));
+    commitPending(
+      onRequestHistoryScroll
+        ? { type: "request", key, gen, mode }
+        : { type: "stream-action" },
+    );
+  }, [commitPending, history, onRequestHistoryScroll, streamModel]);
+
   if (readState.phase === "error") {
     return (
       <View testID={`${testID}-error`} style={styles.empty}>
@@ -892,8 +960,8 @@ export function HistorySection({
             commitPending({ type: "stream-action" });
             setStreamState((s) => streamStateOnShowOlder(s, streamModel, year));
           }}
-          onOpenInteraction={setDetailId}
-          onOpenKnowledgeChange={onOpenKnowledgeChange}
+          onOpenInteraction={onOpenInteraction}
+          onOpenKnowledgeChange={onOpenKnowledgeRow}
           registerNode={registerNode}
           onNodeLayout={onNodeLayout}
           highlight={highlight}

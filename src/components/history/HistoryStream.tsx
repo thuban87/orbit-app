@@ -44,8 +44,8 @@ export interface HistoryStreamProps {
   state: StreamViewState;
   onExpandYear: (year: number) => void;
   onShowOlder: (year: number) => void;
-  onOpenInteraction: (interactionId: number) => void;
-  onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
+  onOpenInteraction: (interactionId: number, date: string) => void;
+  onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey, date: string) => void;
   /**
    * Each rendered day group's View, keyed by `dayNodeKey(date)`, and each month
    * group's View, keyed by `monthNodeKey(YYYY-MM)` (null when it unmounts) — the
@@ -114,8 +114,8 @@ interface OpenYearProps {
   model: StreamModel;
   state: StreamViewState;
   onShowOlder: (year: number) => void;
-  onOpenInteraction: (interactionId: number) => void;
-  onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
+  onOpenInteraction: (interactionId: number, date: string) => void;
+  onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey, date: string) => void;
   registerNode: (key: string, node: View | null) => void;
   onNodeLayout: (key: string) => void;
   highlight: HistoryStreamHighlight | null;

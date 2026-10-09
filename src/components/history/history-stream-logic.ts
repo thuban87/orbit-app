@@ -762,6 +762,46 @@ export function nearestRecordDays(
   return { before, after };
 }
 
+/** Whole calendar days from `a` to `b` (local components; DST-safe rounding). */
+function calendarDaysBetween(a: string, b: string): number {
+  const ms = localDateFromParts(b).getTime() - localDateFromParts(a).getTime();
+  return Math.round(ms / 86_400_000);
+}
+
+/**
+ * Where a kept place lands when its day is gone (D-31): `day` itself while it
+ * still holds a record, otherwise the nearer of the closest earlier and later
+ * record days by calendar distance (a tie goes to the newer day), or null when
+ * the history is empty.
+ */
+export function nearestRemainingDay(
+  model: StreamModel,
+  day: string,
+): string | null {
+  if (model.dayIndex.has(day)) return day;
+  const { before, after } = nearestRecordDays(model, day);
+  if (before === null) return after;
+  if (after === null) return before;
+  return calendarDaysBetween(day, after) <= calendarDaysBetween(before, day)
+    ? after
+    : before;
+}
+
+/**
+ * The day now holding the record keyed `${family}-${id}` (a redated record
+ * reports its new day), or null when the record is gone (D-31).
+ */
+export function recordDay(
+  model: StreamModel,
+  recordKey: string,
+): string | null {
+  for (const year of model.years) {
+    const found = year.records.find((record) => record.key === recordKey);
+    if (found) return found.date;
+  }
+  return null;
+}
+
 /**
  * The Profile app bar's bottom edge in window coordinates — the stream's
  * visible top (D-50, C3-02): the top safe-area inset, plus the in-flow shell

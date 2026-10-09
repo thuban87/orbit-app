@@ -70,10 +70,13 @@ const DIRECTION_LABEL: Record<string, string> = {
 
 export interface HistoryRecordRowProps {
   item: StreamRecord;
-  /** Open the canonical InteractionDetail for this interaction. */
-  onOpenInteraction: (interactionId: number) => void;
-  /** Open this knowledge field's history (MemoryHistory). */
-  onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
+  /**
+   * Open the canonical InteractionDetail for this interaction. `date` is the
+   * row's local day, which the section keeps as its place (38.8 D-31).
+   */
+  onOpenInteraction: (interactionId: number, date: string) => void;
+  /** Open this knowledge field's history (MemoryHistory), with the row's day. */
+  onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey, date: string) => void;
 }
 
 export function HistoryRecordRow({
@@ -100,7 +103,7 @@ export function HistoryRecordRow({
         accessibilityRole="button"
         accessibilityLabel={`Interaction, ${r.channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}${groupSuffix}`}
         style={styles.row}
-        onPress={() => onOpenInteraction(r.id)}
+        onPress={() => onOpenInteraction(r.id, item.date)}
       >
         <Icon name={icon} tone="textPrimary" size="sm" />
         <View style={styles.rowBody}>
@@ -179,7 +182,7 @@ export function HistoryRecordRow({
       accessibilityRole="button"
       accessibilityLabel={`Knowledge change, ${fieldLabel}, ${formatTimeMinuteOrFallback(r.createdAt)}`}
       style={styles.row}
-      onPress={() => onOpenKnowledgeChange(r.fieldKey)}
+      onPress={() => onOpenKnowledgeChange(r.fieldKey, item.date)}
     >
       <Icon name="edit" tone="textPrimary" size="sm" />
       <View style={styles.rowBody}>
