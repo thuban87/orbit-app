@@ -29,10 +29,14 @@ import {
   initialStreamState,
   isCurrentScroll,
   isYearOpen,
+  monthAnnouncement,
+  monthNodeKey,
   orderStreamRecords,
   type PendingHistoryScroll,
   pendingScrollOn,
+  pickerModel,
   resolveHeatmapTarget,
+  resolveMonthJump,
   revealAnnouncement,
   STREAM_CHUNK,
   STREAM_INITIAL_VISIBLE,
@@ -909,5 +913,162 @@ describe("empty-target note text (D-21)", () => {
     expect(emptySpanNoteText("2026-09-01", "2026-09-07")).toBe(
       "Nothing logged Sep 1 – Sep 7",
     );
+  });
+});
+
+// --- 38.8-04: Jump to date (D-17, D-18, D-48..D-52) ---------------------------
+
+describe("buildStreamModel — months with records and the earliest year (D-18, D-52)", () => {
+  it("marks a month holding any family, a knowledge-only and a lifecycle-only month included", () => {
+    const model = buildStreamModel(
+      source({
+        interactions: [interaction(1, "2026-10-02 09:00:00")],
+        lifecycleEvents: [lifecycle(2, "2025-03-05 08:00:00")],
+        knowledgeChanges: [knowledge(3, "2024-07-04 08:00:00")],
+      }),
+      TODAY,
+    );
+    expect([...model.monthsWithRecords].sort()).toEqual([
+      "2024-07",
+      "2025-03",
+      "2026-10",
+    ]);
+    expect(model.monthsWithRecords.has("2025-04")).toBe(false);
+  });
+
+  it("takes the earliest year across all three families", () => {
+    const model = buildStreamModel(
+      source({
+        interactions: [interaction(1, "2025-10-02 09:00:00")],
+        knowledgeChanges: [knowledge(3, "2021-07-04 08:00:00")],
+        lifecycleEvents: [lifecycle(2, "2023-03-05 08:00:00")],
+      }),
+      TODAY,
+    );
+    expect(model.earliestYear).toBe(2021);
+  });
+
+  it("uses the current year when there are no records", () => {
+    const model = buildStreamModel(source({}), TODAY);
+    expect(model.earliestYear).toBe(2026);
+    expect(model.monthsWithRecords.size).toBe(0);
+  });
+});
+
+describe("pickerModel (D-48, D-18)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        interaction(1, "2026-03-02 09:00:00"),
+        interaction(2, "2024-11-02 09:00:00"),
+      ],
+    }),
+    TODAY,
+  );
+
+  it("lists 12 months of the year and disables the current year's future months", () => {
+    const picker = pickerModel({ model, year: 2026, selectedMonthKey: null });
+    expect(picker.months.map((m) => m.monthKey)).toEqual(
+      Array.from(
+        { length: 12 },
+        (_, i) => `2026-${String(i + 1).padStart(2, "0")}`,
+      ),
+    );
+    expect(picker.months.map((m) => m.label)).toEqual([
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ]);
+    // TODAY is 2026-10-07: October is choosable, November and December are not.
+    expect(
+      picker.months.filter((m) => m.disabled).map((m) => m.monthKey),
+    ).toEqual(["2026-11", "2026-12"]);
+  });
+
+  it("enables every month of a past year", () => {
+    const picker = pickerModel({ model, year: 2025, selectedMonthKey: null });
+    expect(picker.months.some((m) => m.disabled)).toBe(false);
+  });
+
+  it("runs the years from the earliest record's year to the current year", () => {
+    const newest = pickerModel({ model, year: 2026, selectedMonthKey: null });
+    expect(newest.minYear).toBe(2024);
+    expect(newest.maxYear).toBe(2026);
+    expect(newest.canNext).toBe(false);
+    expect(newest.canPrev).toBe(true);
+    const oldest = pickerModel({ model, year: 2024, selectedMonthKey: null });
+    expect(oldest.canPrev).toBe(false);
+    expect(oldest.canNext).toBe(true);
+  });
+
+  it("clamps a year outside the bounds", () => {
+    expect(
+      pickerModel({ model, year: 2030, selectedMonthKey: null }).year,
+    ).toBe(2026);
+    expect(
+      pickerModel({ model, year: 1999, selectedMonthKey: null }).year,
+    ).toBe(2024);
+  });
+
+  it("offers only the current year when there are no records", () => {
+    const empty = buildStreamModel(source({}), TODAY);
+    const picker = pickerModel({
+      model: empty,
+      year: 2026,
+      selectedMonthKey: null,
+    });
+    expect([picker.minYear, picker.maxYear]).toEqual([2026, 2026]);
+    expect([picker.canPrev, picker.canNext]).toEqual([false, false]);
+  });
+});
+
+describe("resolveMonthJump — a month with records (D-17)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        interaction(1, "2026-10-02 09:00:00"),
+        interaction(2, "2025-03-20 09:00:00"),
+        interaction(3, "2025-03-04 09:00:00"),
+      ],
+      knowledgeChanges: [knowledge(4, "2024-07-04 08:00:00")],
+    }),
+    TODAY,
+  );
+
+  it("reveals a populated month in a collapsed older year at its newest day", () => {
+    const jump = resolveMonthJump(model, "2025-03");
+    expect(jump).toEqual({
+      kind: "reveal-month",
+      monthKey: "2025-03",
+      days: ["2025-03-20"],
+    });
+    // Revealing that day opens the collapsed year, so the month header renders.
+    const state = streamStateOnReveal(
+      initialStreamState(),
+      model,
+      jump.kind === "reveal-month" ? jump.days : [],
+    );
+    expect(isYearOpen(state, model, 2025)).toBe(true);
+    expect(visibleYear(state, model, 2025).months.map((m) => m.key)).toContain(
+      "2025-03",
+    );
+  });
+
+  it("reveals a knowledge-only month (any family counts)", () => {
+    expect(resolveMonthJump(model, "2024-07").kind).toBe("reveal-month");
+  });
+
+  it("keys month nodes and announces the month", () => {
+    expect(monthNodeKey("2025-03")).toBe("month:2025-03");
+    expect(monthAnnouncement("2025-10")).toBe("Showing October 2025");
   });
 });

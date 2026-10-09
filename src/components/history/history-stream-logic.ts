@@ -145,6 +145,14 @@ export interface StreamModel {
   readonly dayIndex: ReadonlyMap<string, readonly StreamRecord[]>;
   /** Every date holding any record, newest first. */
   readonly days: readonly string[];
+  /** Every `YYYY-MM` holding a record of any family (the picker dots, D-52). */
+  readonly monthsWithRecords: ReadonlySet<string>;
+  /**
+   * The earliest record's year (any family), or the current year when there
+   * are no records: the picker's first year (D-18, D-48). Never after the
+   * current year.
+   */
+  readonly earliestYear: number;
 }
 
 function yearOf(date: string): number {
@@ -162,8 +170,12 @@ export function buildStreamModel(
   const byYear = new Map<number, StreamRecord[]>();
   const dayIndex = new Map<string, StreamRecord[]>();
   const days: string[] = [];
+  const monthsWithRecords = new Set<string>();
+  let earliestYear = currentYear;
   for (const record of ordered) {
     const year = yearOf(record.date);
+    if (year < earliestYear) earliestYear = year;
+    monthsWithRecords.add(record.date.slice(0, 7));
     const yearList = byYear.get(year);
     if (yearList) yearList.push(record);
     else byYear.set(year, [record]);
@@ -192,7 +204,15 @@ export function buildStreamModel(
       records,
     }));
 
-  return { today, currentYear, years, dayIndex, days };
+  return {
+    today,
+    currentYear,
+    years,
+    dayIndex,
+    days,
+    monthsWithRecords,
+    earliestYear,
+  };
 }
 
 // --- View state (transient; never persisted — D-18, D-62) --------------------
@@ -352,10 +372,19 @@ export function streamStateOnShowOlder(
 
 /**
  * The registry key of a rendered day group (the scroll target of a jump). The
- * stream registers each day group's View under it; Plan 04 adds month keys.
+ * stream registers each day group's View under it.
  */
 export function dayNodeKey(date: string): string {
   return `day:${date}`;
+}
+
+/**
+ * The registry key of a rendered month group (`YYYY-MM`): the scroll target of
+ * a Jump to date month jump, and a header measured for the picker's opening
+ * month (38.8 D-17, D-50).
+ */
+export function monthNodeKey(monthKey: string): string {
+  return `month:${monthKey}`;
 }
 
 /** A heatmap target the stream can resolve: a day cell or a cycle span. */
@@ -597,6 +626,113 @@ export function historyNoteOn(
     case "reveal":
       return null;
   }
+}
+
+// --- Jump to date (D-17, D-18, D-48..D-52) -----------------------------------
+
+/** One month cell of the Jump to date picker. */
+export interface PickerMonth {
+  /** `YYYY-MM`. */
+  readonly monthKey: string;
+  /** "Mar". */
+  readonly label: string;
+  /** Holds a record of any family (D-49, D-52). */
+  readonly hasRecords: boolean;
+  /** After today's month: cannot be chosen (D-48). */
+  readonly disabled: boolean;
+  /** The month the picker opened on (cosmetic). */
+  readonly selected: boolean;
+  /** "March 2026", plus ", has records" when it holds any (D-49: never colour-only). */
+  readonly accessibilityLabel: string;
+}
+
+/**
+ * The picker for one displayed year (D-48): 12 months, future months disabled,
+ * and the year stepper's bounds — the earliest record's year (or the current
+ * year when there are none) to the current year (D-18). A year outside the
+ * bounds is clamped into them.
+ */
+export function pickerModel({
+  model,
+  year,
+  selectedMonthKey,
+}: {
+  model: StreamModel;
+  year: number;
+  selectedMonthKey: string | null;
+}): {
+  year: number;
+  minYear: number;
+  maxYear: number;
+  canPrev: boolean;
+  canNext: boolean;
+  months: readonly PickerMonth[];
+} {
+  const minYear = Math.min(model.earliestYear, model.currentYear);
+  const maxYear = model.currentYear;
+  const shown = Math.max(minYear, Math.min(maxYear, year));
+  const todayMonth = model.today.slice(0, 7);
+  const months = MONTH_SHORT.map((label, index): PickerMonth => {
+    const monthKey = `${shown}-${String(index + 1).padStart(2, "0")}`;
+    const hasRecords = model.monthsWithRecords.has(monthKey);
+    return {
+      monthKey,
+      label,
+      hasRecords,
+      disabled: monthKey > todayMonth,
+      selected: monthKey === selectedMonthKey,
+      accessibilityLabel: `${MONTH_LONG[index]} ${shown}${hasRecords ? ", has records" : ""}`,
+    };
+  });
+  return {
+    year: shown,
+    minYear,
+    maxYear,
+    canPrev: shown > minYear,
+    canNext: shown < maxYear,
+    months,
+  };
+}
+
+/**
+ * What choosing a month does (D-17). A month holding a record of any family
+ * reveals its newest day (which renders the month header) and scrolls to the
+ * header, with no highlight. An empty month shows an explicit state with the
+ * nearest record days after and before it (null at the ends of history).
+ */
+export type MonthJump =
+  | {
+      readonly kind: "reveal-month";
+      readonly monthKey: string;
+      readonly days: readonly string[];
+    }
+  | {
+      readonly kind: "empty-month";
+      readonly monthKey: string;
+      readonly before: string | null;
+      readonly after: string | null;
+    };
+
+/** Resolve a picker month against the all-family day index (D-17, D-52). */
+export function resolveMonthJump(
+  model: StreamModel,
+  monthKey: string,
+): MonthJump {
+  // `days` is newest first, so the first match is the month's newest day.
+  const newest = model.days.find((date) => date.slice(0, 7) === monthKey);
+  if (newest) return { kind: "reveal-month", monthKey, days: [newest] };
+  return { kind: "empty-month", monthKey, before: null, after: null };
+}
+
+/** The one-time screen-reader announcement of a month jump: "Showing October 2025". */
+export function monthAnnouncement(monthKey: string): string {
+  return `Showing ${monthLongLabel(monthKey)}`;
+}
+
+/** "October 2025" from `YYYY-MM`. */
+function monthLongLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  return `${MONTH_LONG[m - 1]} ${y}`;
 }
 
 // --- Labels (D-33) -----------------------------------------------------------

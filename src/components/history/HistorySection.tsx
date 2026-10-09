@@ -105,10 +105,13 @@ import {
   historyScrollMode,
   initialStreamState,
   isCurrentScroll,
+  monthAnnouncement,
+  monthNodeKey,
   type PendingHistoryScroll,
   type PendingScrollEvent,
   pendingScrollOn,
   resolveHeatmapTarget,
+  resolveMonthJump,
   revealAnnouncement,
   streamStateOnExpandYear,
   streamStateOnReveal,
@@ -116,6 +119,7 @@ import {
 } from "@/components/history/history-stream-logic";
 import { IntensityChart } from "@/components/history/IntensityChart";
 import { InteractionDetail } from "@/components/history/InteractionDetail";
+import { JumpToDateSheet } from "@/components/history/JumpToDateSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import {
@@ -254,6 +258,12 @@ export function HistorySection({
     [],
   );
   const [detailId, setDetailId] = useState<number | null>(null);
+  // The Jump to date picker (38.8 D-17, D-48): open state and the month it
+  // opens on. Per-mount view state, never persisted (D-18, D-62).
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const [jumpInitialMonth, setJumpInitialMonth] = useState(() =>
+    formatLocalDate(new Date()).slice(0, 7),
+  );
   const [converting, setConverting] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
 
@@ -604,6 +614,42 @@ export function HistorySection({
     dispatchNote({ type: "close" });
   }, [commitPending, dispatchNote]);
 
+  // --- Jump to date (38.8 D-17, D-48..D-52) ----------------------------------
+  // Opening the picker is a stream action: it drops any pending jump scroll and
+  // its retry (C2-03).
+  const openJump = useCallback(() => {
+    commitPending({ type: "stream-action" });
+    setJumpInitialMonth(today.slice(0, 7));
+    setJumpOpen(true);
+  }, [commitPending, today]);
+  // A month with records opens and grows the stream until its header renders,
+  // then scrolls the Profile to that header — no highlight (D-17). A month
+  // with no record issues no scroll.
+  const onSelectMonth = useCallback(
+    (monthKey: string) => {
+      setJumpOpen(false);
+      if (!streamModel) return;
+      const jump = resolveMonthJump(streamModel, monthKey);
+      if (jump.kind !== "reveal-month") {
+        commitPending({ type: "stream-action" });
+        return;
+      }
+      const key = monthNodeKey(monthKey);
+      // Read before the reveal update: not yet rendered = await its layout.
+      const mode = historyScrollMode(nodeRegistry.current, key);
+      genRef.current += 1;
+      const gen = genRef.current;
+      setStreamState((s) => streamStateOnReveal(s, streamModel, jump.days));
+      commitPending(
+        onRequestHistoryScroll
+          ? { type: "request", key, gen, mode }
+          : { type: "stream-action" },
+      );
+      AccessibilityInfo.announceForAccessibility(monthAnnouncement(monthKey));
+    },
+    [commitPending, onRequestHistoryScroll, streamModel],
+  );
+
   if (readState.phase === "error") {
     return (
       <View testID={`${testID}-error`} style={styles.empty}>
@@ -692,6 +738,18 @@ export function HistorySection({
       ) : null}
       <IntensityChart intensity={intensity} />
       {streamModel ? (
+        // The stream header's only control (D-29, D-32, D-51): directly above
+        // the first record, below Intensity; nothing is sticky.
+        <View style={styles.jumpRow}>
+          <Button
+            role="secondary"
+            label="Jump to date"
+            testID="history-jump"
+            onPress={openJump}
+          />
+        </View>
+      ) : null}
+      {streamModel ? (
         <HistoryStream
           model={streamModel}
           state={streamState}
@@ -754,6 +812,15 @@ export function HistorySection({
           onDeleted={() => setDetailId(null)}
         />
       ) : null}
+      {streamModel ? (
+        <JumpToDateSheet
+          visible={jumpOpen}
+          onRequestClose={() => setJumpOpen(false)}
+          model={streamModel}
+          initialMonthKey={jumpInitialMonth}
+          onSelectMonth={onSelectMonth}
+        />
+      ) : null}
       <GroupTitlePromptSheet
         visible={converting && detailInteraction !== null}
         onRequestClose={() => setConverting(false)}
@@ -786,6 +853,7 @@ export function HistorySection({
 const styles = StyleSheet.create({
   stack: { gap: SPACING.lg },
   empty: { gap: SPACING.sm },
+  jumpRow: { alignItems: "flex-end" },
   notice: {
     alignItems: "center",
     flexDirection: "row",

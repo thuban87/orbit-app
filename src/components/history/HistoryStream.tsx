@@ -13,9 +13,9 @@
  * days. No per-day cards, no gap markers (D-37), nothing sticky (D-32). Every
  * colour is a theme token read through `useTheme()` inside the glass card (D-07).
  *
- * Heatmap jumps (38.8 D-19/D-20/D-53): every day group registers its View as a
- * measurable scroll target and reports its layout; a highlighted day mounts the
- * HistoryHighlight overlay, keyed by the jump generation.
+ * Jumps (38.8 D-17, D-19/D-20/D-53): every day group and month group registers
+ * its View as a measurable scroll target and reports its layout; a highlighted
+ * day mounts the HistoryHighlight overlay, keyed by the jump generation.
  */
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
@@ -31,6 +31,7 @@ import {
   emptyYearLabel,
   interactionCountLabel,
   isYearOpen,
+  monthNodeKey,
   type StreamModel,
   type StreamViewState,
   type StreamYear,
@@ -46,11 +47,12 @@ export interface HistoryStreamProps {
   onOpenInteraction: (interactionId: number) => void;
   onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
   /**
-   * Each rendered day group's View, keyed by `dayNodeKey(date)` (null when it
-   * unmounts) — the scroll targets of a heatmap jump (38.8 D-19/D-20).
+   * Each rendered day group's View, keyed by `dayNodeKey(date)`, and each month
+   * group's View, keyed by `monthNodeKey(YYYY-MM)` (null when it unmounts) — the
+   * scroll targets of a heatmap jump and a month jump (38.8 D-17, D-19/D-20).
    */
   registerNode: (key: string, node: View | null) => void;
-  /** A day group laid out (a jump waiting for its target scrolls then). */
+  /** A day or month group laid out (a jump waiting for it scrolls then). */
   onNodeLayout: (key: string) => void;
   /**
    * The days a heatmap jump highlights, keyed by the jump generation (38.8
@@ -187,7 +189,16 @@ function OpenYear({
         </AppText>
       ) : (
         months.map((month) => (
-          <View key={month.key} testID={`${testID}-month-${month.key}`}>
+          <View
+            key={month.key}
+            testID={`${testID}-month-${month.key}`}
+            // A real native view starting at the month header, so a Jump to
+            // date month jump can scroll to it and the picker can measure it
+            // (38.8 D-17, D-50).
+            collapsable={false}
+            ref={(node) => registerNode(monthNodeKey(month.key), node)}
+            onLayout={() => onNodeLayout(monthNodeKey(month.key))}
+          >
             <AppText
               role="body"
               accessibilityRole="header"
