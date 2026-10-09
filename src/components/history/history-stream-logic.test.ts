@@ -29,6 +29,7 @@ import {
   historyScrollMode,
   initialStreamState,
   isCurrentScroll,
+  isDayRendered,
   isYearOpen,
   monthAnnouncement,
   monthNodeKey,
@@ -48,9 +49,12 @@ import {
   revealAnnouncement,
   STREAM_CHUNK,
   STREAM_INITIAL_VISIBLE,
+  type StreamModel,
   type StreamSource,
+  type StreamViewState,
   snapToDayEnd,
   streamStateOnExpandYear,
+  streamStateOnModelChange,
   streamStateOnReveal,
   streamStateOnShowOlder,
   visibleYear,
@@ -534,6 +538,169 @@ describe("streamStateOnShowOlder (D-39)", () => {
   it("ignores a year the model does not have", () => {
     const initial = initialStreamState();
     expect(streamStateOnShowOlder(initial, model, 1999)).toBe(initial);
+  });
+});
+
+describe("streamStateOnModelChange — keeping the place across a re-read (D-31, D-62; CR-01)", () => {
+  // One record per day from Oct 6 back (TODAY is Oct 7), all in 2026.
+  const daily = dailyInteractions(60, { y: 2026, m: 10, d: 6 }, 1);
+  const before = buildStreamModel(source({ interactions: daily }), TODAY);
+  const renderedDays = (view: ReturnType<typeof visibleYear>) =>
+    view.months.flatMap((m) => m.days).map((d) => d.date);
+  const lastRenderedDay = (state: StreamViewState, model: StreamModel) =>
+    renderedDays(visibleYear(state, model, 2026)).at(-1) ?? "";
+
+  it("keeps the last visible day after Show older when a record is added today", () => {
+    const shown = streamStateOnShowOlder(initialStreamState(), before, 2026);
+    const lastDay = lastRenderedDay(shown, before);
+    expect(lastDay).toBe("2026-08-28");
+    // A Log from the Profile + button lands a record today, above the user.
+    const after = buildStreamModel(
+      source({
+        interactions: [interaction(999, "2026-10-07 09:00:00"), ...daily],
+      }),
+      TODAY,
+    );
+    // The count-only slice drops that day: the defect this guards against.
+    expect(renderedDays(visibleYear(shown, after, 2026))).not.toContain(
+      lastDay,
+    );
+    const kept = streamStateOnModelChange(shown, before, after);
+    expect(renderedDays(visibleYear(kept, after, 2026))).toContain(lastDay);
+    expect(lastRenderedDay(kept, after)).toBe(lastDay);
+    expect(isDayRendered(kept, after, lastDay)).toBe(true);
+  });
+
+  it("keeps the initial chunk's last day when records are added above it", () => {
+    const initial = initialStreamState();
+    const lastDay = lastRenderedDay(initial, before);
+    const after = buildStreamModel(
+      source({
+        interactions: [
+          interaction(998, "2026-10-07 08:00:00"),
+          interaction(999, "2026-10-07 09:00:00"),
+          ...daily,
+        ],
+      }),
+      TODAY,
+    );
+    const kept = streamStateOnModelChange(initial, before, after);
+    expect(lastRenderedDay(kept, after)).toBe(lastDay);
+  });
+
+  it("keeps an expanded older year's place when a record is added above it", () => {
+    const older = dailyInteractions(60, { y: 2025, m: 12, d: 31 }, 500);
+    const prev = buildStreamModel(source({ interactions: older }), TODAY);
+    const state = streamStateOnShowOlder(
+      streamStateOnExpandYear(initialStreamState(), 2025),
+      prev,
+      2025,
+    );
+    const lastDay = renderedDays(visibleYear(state, prev, 2025)).at(-1) ?? "";
+    // A redate from another year lands at the top of 2025.
+    const next = buildStreamModel(
+      source({
+        interactions: [interaction(997, "2025-12-31 23:00:00"), ...older],
+      }),
+      TODAY,
+    );
+    const kept = streamStateOnModelChange(state, prev, next);
+    expect(renderedDays(visibleYear(kept, next, 2025)).at(-1)).toBe(lastDay);
+  });
+
+  it("changes nothing when nothing was added above the boundary", () => {
+    const shown = streamStateOnShowOlder(initialStreamState(), before, 2026);
+    const same = buildStreamModel(source({ interactions: daily }), TODAY);
+    expect(streamStateOnModelChange(shown, before, same)).toBe(shown);
+    // A record added below the boundary does not move it either.
+    const below = buildStreamModel(
+      source({
+        interactions: [...daily, interaction(999, "2026-01-02 09:00:00")],
+      }),
+      TODAY,
+    );
+    expect(streamStateOnModelChange(shown, before, below)).toBe(shown);
+  });
+
+  it("never shrinks a year when records above the boundary are deleted", () => {
+    const shown = streamStateOnShowOlder(initialStreamState(), before, 2026);
+    const after = buildStreamModel(
+      source({ interactions: daily.slice(3) }),
+      TODAY,
+    );
+    const kept = streamStateOnModelChange(shown, before, after);
+    expect(kept).toBe(shown);
+    // The old boundary day still renders; content only grows below it.
+    expect(renderedDays(visibleYear(kept, after, 2026))).toContain(
+      "2026-08-28",
+    );
+  });
+
+  it("holds the boundary when the boundary record itself is deleted", () => {
+    const shown = streamStateOnShowOlder(initialStreamState(), before, 2026);
+    // Drop the boundary record (Aug 28) and add one today.
+    const after = buildStreamModel(
+      source({
+        interactions: [
+          interaction(999, "2026-10-07 09:00:00"),
+          ...daily.filter((r) => r.date !== "2026-08-28"),
+        ],
+      }),
+      TODAY,
+    );
+    const kept = streamStateOnModelChange(shown, before, after);
+    expect(renderedDays(visibleYear(kept, after, 2026))).toContain(
+      "2026-08-29",
+    );
+  });
+
+  it("leaves a collapsed older year alone", () => {
+    const older = dailyInteractions(30, { y: 2025, m: 12, d: 31 }, 500);
+    const prev = buildStreamModel(source({ interactions: older }), TODAY);
+    const next = buildStreamModel(
+      source({
+        interactions: [interaction(997, "2025-12-31 23:00:00"), ...older],
+      }),
+      TODAY,
+    );
+    const state = initialStreamState();
+    expect(streamStateOnModelChange(state, prev, next)).toBe(state);
+  });
+});
+
+describe("isDayRendered (D-31; CR-01)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        ...dailyInteractions(30, { y: 2026, m: 10, d: 6 }, 1),
+        interaction(500, "2025-06-01 09:00:00"),
+      ],
+    }),
+    TODAY,
+  );
+
+  it("is true for a day inside the open year's visible slice", () => {
+    expect(isDayRendered(initialStreamState(), model, "2026-10-06")).toBe(true);
+  });
+
+  it("is false for a day past the visible chunk", () => {
+    expect(isDayRendered(initialStreamState(), model, "2026-09-10")).toBe(
+      false,
+    );
+  });
+
+  it("is false for a day in a collapsed year until it is expanded", () => {
+    expect(isDayRendered(initialStreamState(), model, "2025-06-01")).toBe(
+      false,
+    );
+    const open = streamStateOnExpandYear(initialStreamState(), 2025);
+    expect(isDayRendered(open, model, "2025-06-01")).toBe(true);
+  });
+
+  it("is false for a day with no records", () => {
+    expect(isDayRendered(initialStreamState(), model, "2026-10-07")).toBe(
+      false,
+    );
   });
 });
 

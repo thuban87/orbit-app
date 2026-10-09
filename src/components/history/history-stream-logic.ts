@@ -15,7 +15,10 @@
  *   • View state (D-34/D-39/D-62): only the current year is open on a fresh
  *     mount; an older year opens on tap; an open year shows its newest
  *     STREAM_INITIAL_VISIBLE records and Show older adds STREAM_CHUNK more.
- *     A cut never splits a day. The state is transient and never persisted.
+ *     A cut never splits a day. Across a re-read while mounted, each open year
+ *     is pinned to the oldest record it rendered, so records added above the
+ *     user never push it out (D-31; CR-01). The state is transient and never
+ *     persisted.
  *   • Rows open the canonical InteractionDetail / MemoryHistory (ADR-122); the
  *     three record families are preserved (D-08).
  *
@@ -85,6 +88,23 @@ function sortableAt(at: string): string {
 }
 
 /**
+ * The stream order (D-18): negative when `a` sorts before (is newer than) `b`.
+ * Timestamp desc, then interaction / lifecycle / knowledge, then id desc —
+ * unique per record, so it also places a record that is no longer present.
+ */
+function compareStreamRecords(
+  a: Pick<StreamRecord, "at" | "family" | "id">,
+  b: Pick<StreamRecord, "at" | "family" | "id">,
+): number {
+  const atA = sortableAt(a.at);
+  const atB = sortableAt(b.at);
+  if (atA !== atB) return atA < atB ? 1 : -1;
+  const rank = FAMILY_RANK[a.family] - FAMILY_RANK[b.family];
+  if (rank !== 0) return rank;
+  return b.id - a.id;
+}
+
+/**
  * Merge the three families into one deterministic newest-first list (D-18):
  * timestamp desc, then interaction / lifecycle / knowledge, then id desc.
  */
@@ -121,14 +141,7 @@ export function orderStreamRecords(history: StreamSource): StreamRecord[] {
       }),
     ),
   ];
-  records.sort((a, b) => {
-    const atA = sortableAt(a.at);
-    const atB = sortableAt(b.at);
-    if (atA !== atB) return atA < atB ? 1 : -1;
-    const rank = FAMILY_RANK[a.family] - FAMILY_RANK[b.family];
-    if (rank !== 0) return rank;
-    return b.id - a.id;
-  });
+  records.sort(compareStreamRecords);
   return records;
 }
 
@@ -373,6 +386,74 @@ export function streamStateOnShowOlder(
   const shown = new Map(state.shown);
   shown.set(year, next);
   return { openYears: state.openYears, shown };
+}
+
+/**
+ * Keep each open year's place across a re-read while mounted (D-31, D-62;
+ * review CR-01). A year's request is a record COUNT, so records added above the
+ * user (a Log from the Profile + button, a MemoryHistory edit, a redate into
+ * the year) would otherwise push the last rendered day out of the slice. This
+ * pins each open year to the oldest record it rendered under `prev`: in `next`
+ * the request becomes the number of records sorting at or before that position
+ * (newer or equal), so the same boundary stays rendered. The position is a sort
+ * position, not a key, so it holds when the boundary record itself was deleted
+ * or redated. It never shrinks a request (a deletion above only grows content
+ * below the user) and never touches a collapsed year. Returns `state` itself
+ * when nothing changes.
+ */
+export function streamStateOnModelChange(
+  state: StreamViewState,
+  prev: StreamModel,
+  next: StreamModel,
+): StreamViewState {
+  let shown: Map<number, number> | null = null;
+  for (const entry of prev.years) {
+    if (!isYearOpen(state, prev, entry.year)) continue;
+    const requested = requestedCount(state, entry.year);
+    const visible = snapToDayEnd(entry.records, requested);
+    if (visible === 0) continue;
+    const boundary = entry.records[visible - 1];
+    const nextEntry = findYear(next, entry.year);
+    if (!nextEntry) continue;
+    // Newest first: count until the first record older than the boundary.
+    let through = 0;
+    for (const record of nextEntry.records) {
+      if (compareStreamRecords(record, boundary) > 0) break;
+      through++;
+    }
+    if (through > requested) {
+      shown = shown ?? new Map(state.shown);
+      shown.set(entry.year, through);
+    }
+  }
+  if (!shown) return state;
+  return { openYears: state.openYears, shown };
+}
+
+/**
+ * Whether `day` is actually rendered: its year is open and the year's visible
+ * (day-snapped) slice reaches the day's oldest record. A day can exist in the
+ * model and still not be rendered (a collapsed year, past Show older), so the
+ * D-31 keep-place check uses this rather than the day index alone (CR-01).
+ */
+export function isDayRendered(
+  state: StreamViewState,
+  model: StreamModel,
+  day: string,
+): boolean {
+  const year = yearOf(day);
+  if (!isYearOpen(state, model, year)) return false;
+  const entry = findYear(model, year);
+  if (!entry) return false;
+  let last = -1;
+  for (let i = entry.records.length - 1; i >= 0; i--) {
+    if (entry.records[i].date === day) {
+      last = i;
+      break;
+    }
+  }
+  if (last < 0) return false;
+  return snapToDayEnd(entry.records, requestedCount(state, year)) >= last + 1;
 }
 
 // --- Heatmap → stream navigation (D-19..D-21, D-18, D-56) --------------------

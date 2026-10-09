@@ -28,9 +28,11 @@
  * there writes Cycles or the fallback's Month to the global lens (D-27, D-66,
  * D-67).
  * After an edit, redate or delete started from a row, the re-read keeps the
- * user's place: the Profile keeps its scroll offset, and a one-shot anchor
- * scrolls once to the record's new day or the nearest remaining day only when
- * its day moved or vanished (D-31).
+ * user's place: the Profile keeps its scroll offset, each open year stays
+ * pinned to the oldest record it rendered (so records added above the user
+ * never push it out), and a one-shot anchor scrolls once to the record's new
+ * day or the nearest remaining day only when its day moved, vanished or is no
+ * longer rendered (D-31, review CR-01).
  * It reads the canonical history on mount and on every parent Profile revision
  * (38.3 RG-024, ADR-165 — the Profile snapshot load is the single invalidation
  * owner; Profile focus always produces a revision), and wires the cross-surface
@@ -130,6 +132,7 @@ import {
   historyScrollMode,
   initialStreamState,
   isCurrentScroll,
+  isDayRendered,
   monthAnnouncement,
   monthNodeKey,
   nearestDateLabel,
@@ -143,7 +146,9 @@ import {
   resolveHeatmapTarget,
   resolveMonthJump,
   revealAnnouncement,
+  type StreamModel,
   streamStateOnExpandYear,
+  streamStateOnModelChange,
   streamStateOnReveal,
   streamStateOnShowOlder,
 } from "@/components/history/history-stream-logic";
@@ -622,12 +627,28 @@ export function HistorySection({
   // The model is derived from the loaded history and today; the view state
   // (open years, Show older chunks) is created fresh on each mount and is NOT
   // reset by Profile-revision re-reads while mounted (D-31). Never persisted
-  // (D-18). Both hooks sit above the early returns below (hook order).
+  // (D-18). These hooks sit above the early returns below (hook order).
   const streamModel = useMemo(
     () => (history ? buildStreamModel(history, today) : null),
     [history, today],
   );
   const [streamState, setStreamState] = useState(initialStreamState);
+  // Keep each open year's place across a new model (D-31, D-62; review
+  // CR-01): records added above the user must not push the last rendered day
+  // out. The state is pinned against the PREVIOUS model while rendering (the
+  // React "adjust state when a prop changes" pattern), so the re-render with
+  // the pinned state replaces this one before anything commits and the slice
+  // never shrinks for a frame (which would let the ScrollView clamp).
+  const [pinnedModel, setPinnedModel] = useState<StreamModel | null>(
+    streamModel,
+  );
+  if (pinnedModel !== streamModel) {
+    setPinnedModel(streamModel);
+    if (pinnedModel && streamModel) {
+      const prev = pinnedModel;
+      setStreamState((s) => streamStateOnModelChange(s, prev, streamModel));
+    }
+  }
 
   // --- Heatmap → stream jump (38.8 D-19/D-20; RESEARCH Pattern 3 Timing) -----
   // Rendered day groups register here (a null node unregisters). A jump to a
@@ -891,6 +912,9 @@ export function HistorySection({
   //     scroll once to its new day;
   //   • else the anchored day is gone (a delete or a redate emptied it): scroll
   //     once to the nearest remaining day;
+  //   • else the anchored day still exists but is no longer RENDERED (the
+  //     model-change pin above should prevent this; CR-01): reveal it and
+  //     scroll once to it;
   //   • otherwise nothing. No highlight, no announcement, never persisted
   //     (D-62). A failed delete keeps its row and InteractionDetail's own
   //     retry; nothing is removed optimistically.
@@ -925,6 +949,8 @@ export function HistorySection({
     if (moved !== null && moved > anchor.day) target = moved;
     else if (!streamModel.dayIndex.has(anchor.day)) {
       target = nearestRemainingDay(streamModel, anchor.day);
+    } else if (!isDayRendered(streamState, streamModel, anchor.day)) {
+      target = anchor.day;
     }
     if (target === null) return;
     const day = target;
@@ -939,7 +965,13 @@ export function HistorySection({
         ? { type: "request", key, gen, mode }
         : { type: "stream-action" },
     );
-  }, [commitPending, history, onRequestHistoryScroll, streamModel]);
+  }, [
+    commitPending,
+    history,
+    onRequestHistoryScroll,
+    streamModel,
+    streamState,
+  ]);
 
   if (readState.phase === "error") {
     return (
