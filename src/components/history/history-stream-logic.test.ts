@@ -54,6 +54,7 @@ import {
   type StreamSource,
   type StreamViewState,
   snapToDayEnd,
+  spanRangeLabel,
   streamStateOnExpandYear,
   streamStateOnModelChange,
   streamStateOnReveal,
@@ -1163,8 +1164,46 @@ describe("empty-target note text (D-21)", () => {
   });
 
   it("names an empty span by both ends", () => {
-    expect(emptySpanNoteText("2026-09-01", "2026-09-07")).toBe(
+    expect(emptySpanNoteText("2026-09-01", "2026-09-07", "2026-10-08")).toBe(
       "Nothing logged Sep 1 – Sep 7",
+    );
+  });
+
+  it("carries the year when the span is not wholly in the current year (D-70)", () => {
+    expect(emptySpanNoteText("2025-09-01", "2025-09-07", "2026-10-08")).toBe(
+      "Nothing logged Sep 1, 2025 – Sep 7, 2025",
+    );
+    expect(emptySpanNoteText("2025-12-28", "2026-01-03", "2026-10-08")).toBe(
+      "Nothing logged Dec 28, 2025 – Jan 3, 2026",
+    );
+  });
+});
+
+describe("spanRangeLabel (D-70)", () => {
+  it("keeps month-day only for a span wholly in the current year", () => {
+    expect(spanRangeLabel("2026-03-01", "2026-10-22", "2026-10-08")).toBe(
+      "Mar 1 – Oct 22",
+    );
+  });
+
+  it("adds the year to both ends of a span wholly in an earlier year", () => {
+    expect(spanRangeLabel("2025-03-01", "2025-10-22", "2026-10-08")).toBe(
+      "Mar 1, 2025 – Oct 22, 2025",
+    );
+  });
+
+  it("adds the year to both ends of a span that crosses into the current year", () => {
+    expect(spanRangeLabel("2025-12-20", "2026-01-18", "2026-10-08")).toBe(
+      "Dec 20, 2025 – Jan 18, 2026",
+    );
+  });
+
+  it("decides from the local today it is given, not the device clock", () => {
+    expect(spanRangeLabel("2025-03-01", "2025-03-30", "2025-12-31")).toBe(
+      "Mar 1 – Mar 30",
+    );
+    expect(spanRangeLabel("2025-03-01", "2025-03-30", "2026-01-01")).toBe(
+      "Mar 1, 2025 – Mar 30, 2025",
     );
   });
 });

@@ -1046,6 +1046,7 @@ export function HistorySection({
         onPrev={onPrev}
         onNext={onNext}
         canGoNext={canGoNext}
+        today={today}
         fallbackNote={effective.fallback ? NO_CADENCE_FALLBACK_NOTE : null}
       />
       {note ? (
@@ -1053,7 +1054,7 @@ export function HistorySection({
           text={
             note.kind === "empty-day"
               ? emptyDayNoteText(note.date)
-              : emptySpanNoteText(note.start, note.end)
+              : emptySpanNoteText(note.start, note.end, today)
           }
           // Dated for an empty day; an empty span carries no date (D-28). The
           // note closes as Log opens, so it never survives the new record.

@@ -24,7 +24,9 @@
  *
  * ACCESSIBILITY (HIST-18): every real cell exposes "{date/range}, {n}
  * interaction(s)" (singular for one, via `interactionCountLabel`; review
- * WR-02) so the grid is fully usable without colour. Dense Year/large-
+ * WR-02) so the grid is fully usable without colour. A cycle cell's range, like
+ * the Cycles page title, carries the year when its span is not wholly in the
+ * current year (`spanRangeLabel`, 38.8 D-70). Dense Year/large-
  * preset cells render visually below the 44px floor (an accepted departure,
  * dossier §AC / Phase 40) but stay a11y-labelled and carry a touch `hitSlop`.
  * That slop grows toward 44dp but never past the midpoint of the gap to the
@@ -48,7 +50,10 @@ import {
   classifyCycleBlock,
   classifyHeatmapCell,
 } from "@/components/history/heatmap-cell";
-import { interactionCountLabel } from "@/components/history/history-stream-logic";
+import {
+  interactionCountLabel,
+  spanRangeLabel,
+} from "@/components/history/history-stream-logic";
 import { Icon } from "@/components/icons/Icon";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { AppText } from "@/components/ui/AppText";
@@ -194,6 +199,11 @@ export interface ActivityHeatmapProps {
   /** Whether next-window navigation is allowed (future is blocked when false). */
   canGoNext: boolean;
   /**
+   * The parent's local `YYYY-MM-DD` today (D-12). Cycles dates carry the year
+   * when a span is not wholly in today's year (38.8 D-70).
+   */
+  today: string;
+  /**
    * The no-cadence fallback note (38.8 D-27), shown under the lens control
    * when History shows Month in place of the persisted Cycles lens.
    */
@@ -221,18 +231,20 @@ function pairWeeks<T>(weeks: readonly T[][]): T[][][] {
 
 /**
  * The header window title per lens ("Mar 4 – Mar 10" / "March 2026" / "2026");
- * Cycles shows the displayed page's span, first block start to last block end.
+ * Cycles shows the displayed page's span, first block start to last block end,
+ * with years when the page is not wholly in the current year (D-70).
  */
 function windowTitle(
   lens: HistoryLens,
   window: HistoryWindow | null,
   cycles: CyclesResult,
+  today: string,
 ): string {
   if (lens === "cycles") {
     if (!cycles.available || cycles.blocks.length === 0) return "Cycles";
     const first = cycles.blocks[0];
     const last = cycles.blocks[cycles.blocks.length - 1];
-    return `${formatMonthDay(first.start)} – ${formatMonthDay(last.end)}`;
+    return spanRangeLabel(first.start, last.end, today);
   }
   if (!window) return "";
   if (lens === "7days") {
@@ -256,6 +268,7 @@ export function ActivityHeatmap({
   onPrev,
   onNext,
   canGoNext,
+  today,
   fallbackNote = null,
   testID = "activity-heatmap",
 }: ActivityHeatmapProps) {
@@ -340,7 +353,8 @@ export function ActivityHeatmap({
   /** Render one Cycles-lens block cell with structural current-cycle marking. */
   const renderCycleCell = (block: CycleBlock, count: number, edge: number) => {
     const fill = classifyCycleBlock(count);
-    const rangeLabel = `${formatMonthDay(block.start)} – ${formatMonthDay(block.end)}`;
+    // Years unless this cell's own span is wholly in the current year (D-70).
+    const rangeLabel = spanRangeLabel(block.start, block.end, today);
     const currentSuffix = block.isCurrent ? ", Current cycle" : "";
     return (
       <Pressable
@@ -423,7 +437,7 @@ export function ActivityHeatmap({
             <Icon name="back" tone="textSecondary" size="md" />
           </Pressable>
           <AppText role="label" style={{ color: colors.textPrimary }}>
-            {windowTitle(lens, window, cycles)}
+            {windowTitle(lens, window, cycles, today)}
           </AppText>
           <Pressable
             testID={`${testID}-next`}

@@ -1091,7 +1091,38 @@ export function emptyDayNoteText(date: string): string {
   return `Nothing logged on ${WEEKDAY_SHORT[local.getDay()]} ${monthDayLabel(date)}`;
 }
 
-/** The empty-span note: "Nothing logged Sep 1 – Sep 7" (D-21). */
-export function emptySpanNoteText(start: string, end: string): string {
-  return `Nothing logged ${monthDayLabel(start)} – ${monthDayLabel(end)}`;
+/** "Sep 1, 2025" from a local `YYYY-MM-DD` (local components only). */
+function monthDayYearLabel(date: string): string {
+  return `${monthDayLabel(date)}, ${yearOf(date)}`;
+}
+
+/**
+ * A Cycles span's dates (D-70): "Mar 1 – Oct 22" when the span is wholly in
+ * the current year (`today`'s, a local `YYYY-MM-DD`), else both ends carry
+ * their year: "Mar 1, 2025 – Oct 22, 2025" / "Dec 20, 2025 – Jan 18, 2026".
+ * Used by the Cycles page title, the cycle cells' accessible labels and the
+ * empty-span note.
+ */
+export function spanRangeLabel(
+  start: string,
+  end: string,
+  today: string,
+): string {
+  const currentYear = yearOf(today);
+  if (yearOf(start) === currentYear && yearOf(end) === currentYear) {
+    return `${monthDayLabel(start)} – ${monthDayLabel(end)}`;
+  }
+  return `${monthDayYearLabel(start)} – ${monthDayYearLabel(end)}`;
+}
+
+/**
+ * The empty-span note: "Nothing logged Sep 1 – Sep 7" (D-21), with years when
+ * the span is not wholly in the current year (D-70).
+ */
+export function emptySpanNoteText(
+  start: string,
+  end: string,
+  today: string,
+): string {
+  return `Nothing logged ${spanRangeLabel(start, end, today)}`;
 }

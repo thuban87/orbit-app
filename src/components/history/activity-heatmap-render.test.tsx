@@ -97,6 +97,7 @@ describe("ActivityHeatmap Year render", () => {
       onPrev: vi.fn(),
       onNext: vi.fn(),
       canGoNext: false,
+      today: "2026-10-08",
     });
     const nodes = all(resolve(tree));
 
@@ -153,6 +154,7 @@ function props(overrides: Partial<ActivityHeatmapProps>): ActivityHeatmapProps {
     onPrev: vi.fn(),
     onNext: vi.fn(),
     canGoNext: false,
+    today: "2026-10-08",
     ...overrides,
   };
 }
@@ -422,6 +424,74 @@ describe("ActivityHeatmap cell labels pluralise the count (review WR-02)", () =>
     expect(label(nodes, "activity-heatmap-cycle-4")).toBe(
       "May 1 – May 10, 4 interactions, Current cycle",
     );
+  });
+});
+
+describe("ActivityHeatmap Cycles dates carry the year off the current year (D-70)", () => {
+  const label = (nodes: Node[], id: string) =>
+    nodes.find((node) => node.props.testID === id)?.props.accessibilityLabel;
+  const titled = (nodes: Node[], text: string) =>
+    nodes.some(
+      (node) => node.type === "AppText" && node.props.children === text,
+    );
+  // A page from 2025 into 2026: blocks 0-2 wholly in 2025, block 3 crosses
+  // the new year, block 4 wholly in 2026 (the current year).
+  const SPANNING = {
+    available: true as const,
+    blocks: [
+      { index: 0, start: "2025-09-01", end: "2025-09-30", isCurrent: false },
+      { index: 1, start: "2025-10-01", end: "2025-10-30", isCurrent: false },
+      { index: 2, start: "2025-10-31", end: "2025-11-29", isCurrent: false },
+      { index: 3, start: "2025-12-20", end: "2026-01-18", isCurrent: false },
+      { index: 4, start: "2026-01-19", end: "2026-02-17", isCurrent: true },
+    ],
+  };
+  const render = (cycles: typeof SPANNING, today = "2026-10-08") =>
+    all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            lens: "cycles",
+            window: null,
+            cycles,
+            cycleCounts: [0, 1, 2, 3, 4],
+            today,
+          }),
+        ),
+      ),
+    );
+
+  it("titles a page that is not wholly in the current year with both years", () => {
+    expect(titled(render(SPANNING), "Sep 1, 2025 – Feb 17, 2026")).toBe(true);
+  });
+
+  it("labels each cycle cell with years unless its own span is wholly current-year", () => {
+    const nodes = render(SPANNING);
+    expect(label(nodes, "activity-heatmap-cycle-0")).toBe(
+      "Sep 1, 2025 – Sep 30, 2025, 0 interactions",
+    );
+    expect(label(nodes, "activity-heatmap-cycle-3")).toBe(
+      "Dec 20, 2025 – Jan 18, 2026, 3 interactions",
+    );
+    expect(label(nodes, "activity-heatmap-cycle-4")).toBe(
+      "Jan 19 – Feb 17, 4 interactions, Current cycle",
+    );
+  });
+
+  it("keeps month-day only when the whole page is in the current year", () => {
+    const nodes = render(CYCLES);
+    expect(titled(nodes, "Jan 1 – May 10")).toBe(true);
+    expect(label(nodes, "activity-heatmap-cycle-1")).toBe(
+      "Feb 1 – Feb 10, 1 interaction",
+    );
+  });
+
+  it("decides the current year from the today prop", () => {
+    const nodes = render(SPANNING, "2025-11-30");
+    expect(label(nodes, "activity-heatmap-cycle-0")).toBe(
+      "Sep 1 – Sep 30, 0 interactions",
+    );
+    expect(titled(nodes, "Sep 1, 2025 – Feb 17, 2026")).toBe(true);
   });
 });
 
