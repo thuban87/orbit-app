@@ -23,7 +23,8 @@ for FND-01 (plan 01-05) and for the Phase 10 native share-target build.
 | **`rsync` on droid** | **ABSENT** — `ssh droid 'rsync --version'` fails. Use the **tar-over-ssh** transport below. |
 | Physical device | Two test phones, authorised over USB. **Preferred: Pixel 6 Pro**, serial **`1A071FDEE002BU`** (model `raven`). **Fallback: Pixel 3a**, serial **`943AY0JR4P`** (model `sargo`) — fine to use when the 6 Pro is not attached. Check `~/.local/bin/adb devices -l`: use the 6 Pro if it is listed in state `device`, otherwise the 3a. If neither is attached, ask the owner. Never hardcode `emulator-5554`. |
 | Lock screen | **No device lock is configured.** If the lock screen is showing, dismiss it with `adb shell input keyevent 82` (or an upward swipe); do not treat it as an authentication blocker. |
-| APK artifact | `android\app\build\outputs\apk\release\app-release.apk` (standalone release, ~73 MB) |
+| **CPU architecture** | **Build arm64-v8a only** — always pass `-PreactNativeArchitectures=arm64-v8a` to `assembleRelease` and `assembleDebug` (owner, 2026-10-03, after the four-ABI build ran droid out of disk). Both test phones are arm64. Verify with `unzip -l app-release.apk | grep lib/` — only `lib/arm64-v8a/` may appear. |
+| APK artifact | `android\app\build\outputs\apk\release\app-release.apk` (standalone arm64 release, ~81 MB; a four-ABI build is ~208 MB) |
 
 **Permissions caveat.** This repo's `.claude/settings.local.json` allows `rsync`/`scp`/`ssh`
 but **NOT** `adb`/`emu-connect`. Outside YOLO mode those commands prompt for approval — that
@@ -104,7 +105,7 @@ ssh -o BatchMode=yes droid "cd /d \"$DEST\" & npm ci"
 ssh -o BatchMode=yes droid "cd /d \"$DEST\" & set \"CI=1\" & npx expo prebuild --platform android --clean --no-install"
 
 # Standalone RELEASE build (Windows batch script). APK embeds the JS bundle.
-ssh -o BatchMode=yes droid "cd /d \"$DEST\\android\" & gradlew.bat assembleRelease --console=plain"
+ssh -o BatchMode=yes droid "cd /d \"$DEST\\android\" & gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain"
 # -> BUILD SUCCESSFUL ; artifact: android\app\build\outputs\apk\release\app-release.apk
 ```
 
@@ -169,7 +170,7 @@ For iterating on JS/UI, a debug APK + live Metro is faster than rebuilding a rel
 
 ```bash
 # One-time (or when native deps change): build + install the DEBUG APK.
-ssh -o BatchMode=yes droid "cd /d \"C:\\Users\\bwales\\projects\\orbit-app\\android\" & gradlew.bat assembleDebug --console=plain"
+ssh -o BatchMode=yes droid "cd /d \"C:\\Users\\bwales\\projects\\orbit-app\\android\" & gradlew.bat assembleDebug -PreactNativeArchitectures=arm64-v8a --console=plain"
 scp -o BatchMode=yes "droid:C:/Users/bwales/projects/orbit-app/android/app/build/outputs/apk/debug/app-debug.apk" ./app-debug.apk
 ~/.local/bin/adb -s $S install -r ./app-debug.apk
 
@@ -301,7 +302,7 @@ not track the display name.
 Phase 31's standalone release exposed a missing `react-native-screens` generated manager interface. The repository carries the source-set repair in `patches/react-native-screens+4.26.2.patch`; `npm ci` must apply it before every clean prebuild.
 
 1. Sync source to `droid` and run the exact `npm ci` command from §1c. A rejected patch is a hard stop; do not continue with an unpatched dependency tree.
-2. Run the clean non-interactive Expo prebuild, then `assembleRelease --console=plain --no-daemon` when reproducing release acceptance.
+2. Run the clean non-interactive Expo prebuild, then `assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain --no-daemon` when reproducing release acceptance.
 3. Install the resulting standalone APK without clearing app data, launch it with Metro unavailable, and verify the affected native screen opens rather than merely checking that Gradle succeeded.
 4. When a dependency version changes, regenerate and review the patch against that exact version instead of weakening `patch-package`'s loud failure.
 
