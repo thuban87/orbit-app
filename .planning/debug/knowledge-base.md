@@ -34,3 +34,15 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 - **Recurrence guard:** Regression test `keeps the prior world mounted while a different System loads, then clears it if the switch fails` in `src/stores/orrery-system-store.test.ts`; revert-and-reconfirm proves it fails against the former lifecycle.
 
 ---
+
+## g1-history-reveal-no-settle — A layout-settle callback that only fired after a measured-width re-render
+
+- **Date:** 2026-10-09
+- **Error patterns:** History reveal stops short, collapsed History, Last Interaction, View history, Loading history placeholder, scrollTo clamped, onLayout fires once, onLaidOut never fires, Year lens, settle scroll missing
+- **Root cause(s):** `ActivityHeatmap` reported `onLaidOut` only from a layout whose render already had a measured width. The Year grid (fixed cell edge) and the no-cadence Cycles explanation do not depend on the width, so their first layout is final and the width re-render changes no size: no second layout event, so `historyContentLayout` never ran and the expanding reveal stayed pending at its clamped first scroll.
+- **Fix:** Report `onLaidOut` on any layout whose grid is final: `gridWaitsOnWidth = lens === "cycles" ? cycles.available : lens !== "year"`; fire when `!gridWaitsOnWidth || availableWidth > 0` (`9bcb48b7`, RED tests `5fed8265`).
+- **Files changed:** src/components/history/ActivityHeatmap.tsx, src/components/history/HistorySection.tsx (comment only), src/components/history/activity-heatmap-render.test.tsx
+- **Why not caught:** The first fix's tests covered the width-dependent lenses only; the device check ran in the Year lens, where the screen-level behaviour differs. A component test cannot see that RN delivers no second `onLayout` when nothing changes size.
+- **Recurrence guard:** `activity-heatmap-render.test.tsx` "ActivityHeatmap reports its laid-out grid (D-72)" covers Year and Cycles-without-cadence first layouts plus the width-dependent boundary cases. Rule of thumb: a "content is ready" layout signal must fire on the first final layout, never assume a second layout will follow.
+
+---
