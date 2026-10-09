@@ -12,7 +12,7 @@ source: 38.6 device pass S16; owner ruling D-40 (log for later), 2026-09-30
 
 ## Problem
 
-On the Pixel 6 Pro at font scale 1.15 the F-3 keep card's label "No meaningful change — keep Orbit photo" is cut to "No meaningful change — ke…", and "No meaningful change" reads oddly when the Orbit photo and the Contacts photo visibly differ. Evidence: `~/orbit-art/38.6/device-pass/D-25__F-3__update-from-contacts-joyce.png`.
+On the Pixel 6 Pro at font scale 1.15 the F-3 keep card's label "No meaningful change — keep Orbit photo" is cut to "No meaningful change — ke…", and "No meaningful change" reads oddly when the Orbit photo and the Contacts photo visibly differ. Evidence: `untracked/artifacts/38.6/device-pass/D-25__F-3__update-from-contacts-joyce.png`.
 
 ## Solution
 

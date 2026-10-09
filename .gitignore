@@ -54,3 +54,6 @@ app-debug.apk
 
 # Dossier-audit prior test runs only; the current LEDGER.md / AUDIT-REPORT.md are tracked.
 docs/dossier/milestone-2/audit/prior-runs/
+
+# Local untracked workspace (build artifacts, screenshots, scratch) — never committed
+/untracked/

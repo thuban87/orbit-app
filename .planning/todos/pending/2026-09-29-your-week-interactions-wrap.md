@@ -13,7 +13,7 @@ source: 38.5 D-28 gap list G3; owner ruling D-53 (G3-LATER), UAT 2026-09-29
 ## Problem
 
 On the Pixel 3a at font scale 1.15, the Your Week stat tile's label breaks as "Interaction / s". It shows in every
-38.5 Digest shot (`~/orbit-art/38.5/device-pass/raw/*-digest2.png`). This is layout, not art.
+38.5 Digest shot (`untracked/artifacts/38.5/device-pass/raw/*-digest2.png`). This is layout, not art.
 
 ## Solution
 

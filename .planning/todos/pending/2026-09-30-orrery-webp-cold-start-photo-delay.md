@@ -13,7 +13,7 @@ source: 38.6 D-41 re-measure (38.6-DEVICE-PASS.md "## D-41 re-measure", cold-sta
 
 ## Problem
 
-With every Orrery copy already on disk (D-41), a cold-start Orrery open still shows the 50 fixture photos about 4 s later for the WebP 1024 library than for the JPEG 512 library: last probed planet photo at 9.7 s vs 5.6 s after the tab tap, all photos arriving in one frame about 5.4 s after the bodies (UI-observable, `screenrecord` at 10 fps on the Pixel 6 Pro; `~/orbit-art/38.6/device-pass/d11-r3/d11-webp1024-run1.mp4` vs `d11-jpeg512-run1.mp4`). Return visits are equal (photos arrive with the bodies). Memory is within D-11. The hit path should read only the master's signature (`photoFileStat`) and the 512 copy, so the extra time has not been explained.
+With every Orrery copy already on disk (D-41), a cold-start Orrery open still shows the 50 fixture photos about 4 s later for the WebP 1024 library than for the JPEG 512 library: last probed planet photo at 9.7 s vs 5.6 s after the tab tap, all photos arriving in one frame about 5.4 s after the bodies (UI-observable, `screenrecord` at 10 fps on the Pixel 6 Pro; `untracked/artifacts/38.6/device-pass/d11-r3/d11-webp1024-run1.mp4` vs `d11-jpeg512-run1.mp4`). Return visits are equal (photos arrive with the bodies). Memory is within D-11. The hit path should read only the master's signature (`photoFileStat`) and the 512 copy, so the extra time has not been explained.
 
 ## Solution
 

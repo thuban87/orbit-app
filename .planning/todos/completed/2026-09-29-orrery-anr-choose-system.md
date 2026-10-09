@@ -14,7 +14,7 @@ source: 38.5 D-28 gap list G1; owner ruling D-51 (G1-LATER), UAT 2026-09-29
 
 The 38.5 device pass hit two `am_anr` events ("Input dispatching timed out, waited 5 s") on the UI thread when opening
 Choose System on the Orrery. This was the Pixel 3a on a **debug** build. No Orrery source changed in 38.5. Image:
-`~/orbit-art/38.5/device-pass/owner/G1_orrery-anr.jpg`.
+`untracked/artifacts/38.5/device-pass/owner/G1_orrery-anr.jpg`.
 
 ## Solution
 

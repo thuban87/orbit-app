@@ -20,7 +20,7 @@ print `PASS` on every line.
 > or `--model "Pixel_3a"` and refuses to run when zero or several attached phones match.
 > Never name a serial, never measure on the desktop emulator (its frame timing is the
 > emulator's, not the app's), never `apt install adb` (use `~/.local/bin/adb`).
-> Raw outputs go to `$HOME/orbit-art/38.7/<pass>/<model>/`, never into the repo, never to
+> Raw outputs go to `untracked/artifacts/38.7/<pass>/<model>/` (gitignored, never committed), never to
 > Google Drive.
 
 ---
@@ -274,7 +274,7 @@ layer or thread it covers:
 | Direction | Run 1 | Run 2 | Run 3 | Median | Layer | Outcome notes |
 |-----------|------:|------:|------:|-------:|-------|---------------|
 | Size 5 → Size 120 | `<ms>` | `<ms>` | `<ms>` | `<ms>` | `<layer kind + name>` | `<valid / outcome per run>` |
-Raw: `~/orbit-art/38.7/baseline/Pixel_6_Pro/switch-5-120.json`
+Raw: `untracked/artifacts/38.7/baseline/Pixel_6_Pro/switch-5-120.json`
 ```
 
 Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |`.

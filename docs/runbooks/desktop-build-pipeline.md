@@ -24,6 +24,7 @@ for FND-01 (plan 01-05) and for the Phase 10 native share-target build.
 | Physical device | Two test phones, authorised over USB. **Preferred: Pixel 6 Pro**, serial **`1A071FDEE002BU`** (model `raven`). **Fallback: Pixel 3a**, serial **`943AY0JR4P`** (model `sargo`) — fine to use when the 6 Pro is not attached. Check `~/.local/bin/adb devices -l`: use the 6 Pro if it is listed in state `device`, otherwise the 3a. If neither is attached, ask the owner. Never hardcode `emulator-5554`. |
 | Lock screen | **No device lock is configured.** If the lock screen is showing, dismiss it with `adb shell input keyevent 82` (or an upward swipe); do not treat it as an authentication blocker. |
 | **CPU architecture** | **Build arm64-v8a only** — always pass `-PreactNativeArchitectures=arm64-v8a` to `assembleRelease` and `assembleDebug` (owner, 2026-10-03, after the four-ABI build ran droid out of disk). Both test phones are arm64. Verify with `unzip -l app-release.apk | grep lib/` — only `lib/arm64-v8a/` may appear. |
+| **Local artifacts** | Pulled APKs, screenshots, recordings and other local output go under the repo's gitignored **`untracked/artifacts/<phase>/<plan>/`** (e.g. `untracked/artifacts/38.8/06/app-release.apk`). Never commit them; never use `~/orbit-art` (retired 2026-10-08). |
 | APK artifact | `android\app\build\outputs\apk\release\app-release.apk` (standalone arm64 release, ~81 MB; a four-ABI build is ~208 MB) |
 
 **Permissions caveat.** This repo's `.claude/settings.local.json` allows `rsync`/`scp`/`ssh`
