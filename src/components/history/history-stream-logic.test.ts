@@ -8,6 +8,7 @@
  *   • dayLabel / dayAccessibilityLabel: Today / Yesterday from local dates,
  *     otherwise "Fri Oct 2"; accessible labels carry the full date and year.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type {
   HistoryInteractionRecord,
@@ -1110,6 +1111,49 @@ describe("historyNoteOn (D-21, D-55)", () => {
     ] as const) {
       expect(historyNoteOn(note, { type })).toBe(null);
     }
+  });
+
+  it("clears an empty-day or empty-span note on a Jump to date month choice (D-69)", () => {
+    const day: HistoryNote = { kind: "empty-day", date: "2026-10-05" };
+    const span: HistoryNote = {
+      kind: "empty-span",
+      start: "2026-09-01",
+      end: "2026-09-07",
+    };
+    expect(historyNoteOn(day, { type: "month-jump" })).toBe(null);
+    expect(historyNoteOn(span, { type: "month-jump" })).toBe(null);
+  });
+});
+
+describe("only one empty note at a time (D-69)", () => {
+  const source = readFileSync(
+    new URL("./HistorySection.tsx", import.meta.url),
+    "utf8",
+  );
+  const body = (start: string, end: string) => {
+    const from = source.indexOf(start);
+    const to = source.indexOf(end, from);
+    expect(from).toBeGreaterThan(-1);
+    expect(to).toBeGreaterThan(from);
+    return source.slice(from, to);
+  };
+
+  it("any month choice clears the heatmap note, before the populated/empty branch", () => {
+    const onSelectMonth = body(
+      "const onSelectMonth = useCallback(",
+      "const closeMonthNote",
+    );
+    const clear = onSelectMonth.indexOf('dispatchNote({ type: "month-jump" })');
+    expect(clear).toBeGreaterThan(-1);
+    expect(clear).toBeLessThan(onSelectMonth.indexOf("if (!streamModel)"));
+  });
+
+  it("a heatmap tap still clears the empty-month note", () => {
+    const onCellPress = body(
+      "const onCellPress = useCallback(",
+      "const closeNote",
+    );
+    expect(onCellPress).toContain("setMonthNote(null)");
   });
 });
 

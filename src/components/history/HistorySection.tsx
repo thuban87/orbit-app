@@ -44,7 +44,9 @@
  *     The stream is never filtered and the heatmap window never moves (D-56).
  *   - a truly empty day or span shows a dismissible note under the heatmap
  *     ("Nothing logged on Tue Oct 5"); it clears on close, another heatmap tap,
- *     a lens or preset change and paging, and the stream does not move (D-55).
+ *     a lens or preset change, paging and any Jump to date month choice (only
+ *     one empty note shows at a time, D-69), and the stream does not move
+ *     (D-55).
  *     Its "Log interaction" navigates the TYPED LogContact route: dated for an
  *     empty day, undated for an empty span so the form starts at now
  *     (D-21/D-28), NEVER a quick-log payload (HIST-15).
@@ -858,11 +860,14 @@ export function HistorySection({
   // A month with records opens and grows the stream until its header renders,
   // then scrolls the Profile to that header — no highlight (D-17). A month
   // with no record issues no scroll and shows the empty-month state under the
-  // Jump to date button (D-64). Choosing a month replaces any earlier state.
+  // Jump to date button (D-64). Choosing a month replaces any earlier state,
+  // and any month choice also clears the empty-day/span note under the
+  // heatmap, so only one empty note shows at a time (D-69).
   const onSelectMonth = useCallback(
     (monthKey: string) => {
       setJumpOpen(false);
       setMonthNote(null);
+      dispatchNote({ type: "month-jump" });
       if (!streamModel) return;
       const jump = resolveMonthJump(streamModel, monthKey);
       if (jump.kind !== "reveal-month") {
@@ -887,7 +892,7 @@ export function HistorySection({
       );
       AccessibilityInfo.announceForAccessibility(monthAnnouncement(monthKey));
     },
-    [commitPending, onRequestHistoryScroll, streamModel],
+    [commitPending, dispatchNote, onRequestHistoryScroll, streamModel],
   );
   const closeMonthNote = useCallback(() => {
     commitPending({ type: "stream-action" });

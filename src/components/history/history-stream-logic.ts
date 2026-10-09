@@ -708,13 +708,21 @@ export type HistoryNote =
 
 export type HistoryNoteEvent =
   | { readonly type: "heatmap"; readonly resolution: HeatmapResolution }
-  | { readonly type: "close" | "lens-change" | "preset-change" | "page" };
+  | {
+      readonly type:
+        | "close"
+        | "lens-change"
+        | "preset-change"
+        | "page"
+        | "month-jump";
+    };
 
 /**
  * The note reducer (D-55): an empty heatmap target sets it, a populated one
  * clears it, and the close control, a lens change, a preset change and
  * prev/next paging each clear it — the note never outlives the window it
- * described (the old stale-card bug).
+ * described (the old stale-card bug). Any Jump to date month choice clears it
+ * too, so only one empty note shows at a time (D-69).
  */
 export function historyNoteOn(
   _note: HistoryNote,
