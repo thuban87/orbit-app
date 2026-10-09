@@ -1476,7 +1476,7 @@ Plans:
 Some of these are superseded in part; see the CONTEXT's `<supersessions>`.
 **Schema**: none expected (migration head 032, backup format 7). Preferences `history_lens` / `history_cycle_count` are unchanged.
 **UI hint**: yes
-**Plans**: 2/6 plans executed
+**Plans**: 3/6 plans executed
 
 Plans:
 **Wave 1**
@@ -1489,7 +1489,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 38.8-03-PLAN.md — Heatmap → stream: day/cycle jump with the 5 s highlight, empty-target note with honest Log offers; count card and date-detail sheet retired (W3)
+- [x] 38.8-03-PLAN.md — Heatmap → stream: day/cycle jump with the 5 s highlight, empty-target note with honest Log offers; count card and date-detail sheet retired (W3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -1565,7 +1565,7 @@ Plans:
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
-| 38.8 History Navigation UX | 2/6 | In Progress|  |
+| 38.8 History Navigation UX | 3/6 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
