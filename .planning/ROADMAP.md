@@ -1581,3 +1581,9 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 ## Backlog
 
 *Backlog 999.1 (profile photos) promoted to Phase 38.6 on 2026-09-29.*
+
+### Phase 999.2: Markdown export format (BACKLOG)
+
+**Goal:** Offer Markdown as an export-format option alongside the current single plaintext JSON export (Phase 16). Owner request from the Phase 15 discuss (2026-08-23); it was meant to be raised at Phase 16 planning but never was. Changing the export format revises Phase 16's `[DECIDED]` JSON-only export, so it needs an owner discuss before planning.
+**Source:** owner request 2026-08-23 (recorded in `.planning/phases/15-weekly-digest/15-CONTEXT.md` `<deferred>`); added to the backlog on the owner's instruction 2026-10-09.
+**Plans:** 0 plans (not planned)
