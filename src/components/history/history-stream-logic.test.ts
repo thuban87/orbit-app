@@ -20,6 +20,7 @@ import {
   dayLabel,
   dayNodeKey,
   emptyDayNoteText,
+  emptyMonthNoteText,
   emptySpanNoteText,
   emptyYearLabel,
   type HeatmapResolution,
@@ -31,10 +32,15 @@ import {
   isYearOpen,
   monthAnnouncement,
   monthNodeKey,
+  nearestDateLabel,
+  nearestRecordDays,
   orderStreamRecords,
   type PendingHistoryScroll,
+  PICKER_IN_VIEW_SLACK_DP,
   pendingScrollOn,
+  pickerInitialMonth,
   pickerModel,
+  pickerViewportTop,
   resolveHeatmapTarget,
   resolveMonthJump,
   revealAnnouncement,
@@ -1070,5 +1076,184 @@ describe("resolveMonthJump — a month with records (D-17)", () => {
   it("keys month nodes and announces the month", () => {
     expect(monthNodeKey("2025-03")).toBe("month:2025-03");
     expect(monthAnnouncement("2025-10")).toBe("Showing October 2025");
+  });
+});
+
+// --- 38.8-04 Task 2: dots, the month in view, the empty-month state ----------
+
+describe("pickerModel — dots and labels (D-49, D-52)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [interaction(1, "2026-03-02 09:00:00")],
+      lifecycleEvents: [lifecycle(2, "2026-05-02 09:00:00")],
+    }),
+    TODAY,
+  );
+
+  it("flags a month with any record and says so in its accessible label", () => {
+    const picker = pickerModel({ model, year: 2026, selectedMonthKey: null });
+    const byKey = new Map(picker.months.map((m) => [m.monthKey, m]));
+    expect(byKey.get("2026-03")?.hasRecords).toBe(true);
+    expect(byKey.get("2026-03")?.accessibilityLabel).toBe(
+      "March 2026, has records",
+    );
+    expect(byKey.get("2026-05")?.hasRecords).toBe(true);
+    expect(byKey.get("2026-04")?.hasRecords).toBe(false);
+    expect(byKey.get("2026-04")?.accessibilityLabel).toBe("April 2026");
+  });
+
+  it("keeps empty months choosable", () => {
+    const picker = pickerModel({ model, year: 2026, selectedMonthKey: null });
+    const april = picker.months.find((m) => m.monthKey === "2026-04");
+    expect(april?.disabled).toBe(false);
+  });
+});
+
+describe("pickerViewportTop / pickerInitialMonth (D-50, Pattern 5, C3-01, C3-02)", () => {
+  it("sums the top inset, the shell offset and the app bar height", () => {
+    expect(
+      pickerViewportTop({ insetTop: 24, shellTopOffset: 48, appBarHeight: 56 }),
+    ).toBe(128);
+    expect(
+      pickerViewportTop({ insetTop: 24, shellTopOffset: 0, appBarHeight: 56 }),
+    ).toBe(80);
+  });
+
+  it("is a 20dp slack (the mockup's top + 20)", () => {
+    expect(PICKER_IN_VIEW_SLACK_DP).toBe(20);
+  });
+
+  it("opens on the current month when no header has reached the app bar", () => {
+    // Current month October is empty; September's header is the first one,
+    // below the bar and its slack (the user has not scrolled into the stream).
+    const entries = [
+      { monthKey: "2026-09", windowY: 400 },
+      { monthKey: "2026-08", windowY: 700 },
+    ];
+    expect(pickerInitialMonth(entries, 80, "2026-10")).toBe("2026-10");
+  });
+
+  it("takes the last header in stream order at or above the bar, whatever the arrival order", () => {
+    const entries = [
+      { monthKey: "2026-07", windowY: 300 },
+      { monthKey: "2026-09", windowY: -400 },
+      { monthKey: "2026-08", windowY: 40 },
+    ];
+    // September and August are scrolled past (above 80); July is below.
+    expect(pickerInitialMonth(entries, 80, "2026-10")).toBe("2026-08");
+  });
+
+  it("counts a header just under the bar, within the slack, as in view", () => {
+    const entries = [
+      { monthKey: "2026-08", windowY: 80 + 10 },
+      { monthKey: "2026-09", windowY: 40 },
+    ];
+    expect(pickerInitialMonth(entries, 80, "2026-10")).toBe("2026-08");
+  });
+
+  it("does not count a header one dp past the slack", () => {
+    const entries = [
+      { monthKey: "2026-08", windowY: 80 + PICKER_IN_VIEW_SLACK_DP + 1 },
+      { monthKey: "2026-09", windowY: 40 },
+    ];
+    expect(pickerInitialMonth(entries, 80, "2026-10")).toBe("2026-09");
+  });
+
+  it("includes the shell offset (the assist banner) in the viewport top", () => {
+    const viewportTop = pickerViewportTop({
+      insetTop: 24,
+      shellTopOffset: 48,
+      appBarHeight: 56,
+    });
+    const entries = [
+      { monthKey: "2026-08", windowY: 138 },
+      { monthKey: "2026-09", windowY: 40 },
+    ];
+    expect(pickerInitialMonth(entries, viewportTop, "2026-10")).toBe("2026-08");
+    // Against the offset-less 80, the header at 138 is past 80 + 20.
+    expect(pickerInitialMonth(entries, 80, "2026-10")).toBe("2026-09");
+  });
+});
+
+describe("resolveMonthJump — an empty month (D-17, D-52)", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        interaction(1, "2025-11-03 09:00:00"),
+        interaction(2, "2025-11-20 09:00:00"),
+        interaction(3, "2025-08-14 09:00:00"),
+      ],
+      knowledgeChanges: [knowledge(4, "2025-09-30 08:00:00")],
+    }),
+    TODAY,
+  );
+
+  it("returns the oldest record day after the month and the newest before it", () => {
+    expect(resolveMonthJump(model, "2025-10")).toEqual({
+      kind: "empty-month",
+      monthKey: "2025-10",
+      before: "2025-09-30",
+      after: "2025-11-03",
+    });
+  });
+
+  it("returns null at the ends of history", () => {
+    expect(resolveMonthJump(model, "2026-01")).toEqual({
+      kind: "empty-month",
+      monthKey: "2026-01",
+      before: "2025-11-20",
+      after: null,
+    });
+    expect(resolveMonthJump(model, "2025-02")).toEqual({
+      kind: "empty-month",
+      monthKey: "2025-02",
+      before: null,
+      after: "2025-08-14",
+    });
+  });
+});
+
+describe("nearestRecordDays", () => {
+  const model = buildStreamModel(
+    source({
+      interactions: [
+        interaction(1, "2026-10-05 09:00:00"),
+        interaction(2, "2026-10-01 09:00:00"),
+      ],
+      lifecycleEvents: [lifecycle(3, "2026-09-20 09:00:00")],
+    }),
+    TODAY,
+  );
+
+  it("returns the newest day strictly before and the oldest strictly after", () => {
+    expect(nearestRecordDays(model, "2026-10-03")).toEqual({
+      before: "2026-10-01",
+      after: "2026-10-05",
+    });
+    expect(nearestRecordDays(model, "2026-10-01")).toEqual({
+      before: "2026-09-20",
+      after: "2026-10-05",
+    });
+  });
+
+  it("returns null past either end", () => {
+    expect(nearestRecordDays(model, "2026-10-06")).toEqual({
+      before: "2026-10-05",
+      after: null,
+    });
+    expect(nearestRecordDays(model, "2026-09-01")).toEqual({
+      before: null,
+      after: "2026-09-20",
+    });
+  });
+});
+
+describe("empty-month texts (D-17)", () => {
+  it("names the month", () => {
+    expect(emptyMonthNoteText("2025-10")).toBe("No activity in October 2025.");
+  });
+
+  it("labels a nearest date with month, day and year", () => {
+    expect(nearestDateLabel("2025-11-03")).toBe("Nov 3, 2025");
   });
 });

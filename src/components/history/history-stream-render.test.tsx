@@ -16,6 +16,7 @@ import type {
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { HistoryStream } from "./HistoryStream";
 import { HistoryRecordRow } from "./HistoryStreamRows";
+import { HistoryTargetNote } from "./HistoryTargetNote";
 import {
   buildStreamModel,
   initialStreamState,
@@ -454,6 +455,86 @@ describe("HistoryStream", () => {
     expect(
       nodes.some((n) =>
         ["ScrollView", "FlatList", "SectionList"].includes(n.type),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("HistoryTargetNote — the empty-month variant (D-17, D-64, D-65)", () => {
+  function renderNote(withNearest: boolean) {
+    const handlers = {
+      onLog: vi.fn(),
+      onClose: vi.fn(),
+      onNearest: vi.fn(),
+    };
+    const tree = resolve(
+      HistoryTargetNote({
+        text: "No activity in October 2025.",
+        onLog: handlers.onLog,
+        onClose: handlers.onClose,
+        ...(withNearest
+          ? {
+              nearest: [
+                {
+                  date: "2025-11-03",
+                  label: "Nov 3, 2025",
+                  accessibilityLabel: "Jump to Monday, November 3, 2025",
+                },
+                {
+                  date: "2025-09-30",
+                  label: "Sep 30, 2025",
+                  accessibilityLabel: "Jump to Tuesday, September 30, 2025",
+                },
+              ],
+              onNearest: handlers.onNearest,
+            }
+          : {}),
+      }),
+    );
+    return { tree, nodes: all(tree), handlers };
+  }
+
+  it("renders one pressable per nearest date, after first, each jumping to its date", () => {
+    const { nodes, handlers } = renderNote(true);
+    const links = nodes.filter((n) =>
+      String(n.props.testID ?? "").startsWith("history-target-note-nearest-"),
+    );
+    expect(links.map((n) => n.props.testID)).toEqual([
+      "history-target-note-nearest-2025-11-03",
+      "history-target-note-nearest-2025-09-30",
+    ]);
+    expect(links.map((n) => n.props.label)).toEqual([
+      "Nov 3, 2025",
+      "Sep 30, 2025",
+    ]);
+    expect(links[0].props.accessibilityLabel).toBe(
+      "Jump to Monday, November 3, 2025",
+    );
+    (links[0].props.onPress as () => void)();
+    expect(handlers.onNearest).toHaveBeenCalledWith("2025-11-03");
+    (links[1].props.onPress as () => void)();
+    expect(handlers.onNearest).toHaveBeenLastCalledWith("2025-09-30");
+    expect(textOf(nodes[0])).toContain("Nearest:");
+  });
+
+  it("keeps the Log interaction offer and the close control", () => {
+    const { nodes, handlers } = renderNote(true);
+    const log = byTestID(nodes, "history-target-note-log");
+    expect(log?.props.label).toBe("Log interaction");
+    (log?.props.onPress as () => void)();
+    expect(handlers.onLog).toHaveBeenCalled();
+    const close = byTestID(nodes, "history-target-note-close");
+    (close?.props.onPress as () => void)();
+    expect(handlers.onClose).toHaveBeenCalled();
+    expect(textOf(nodes[0])).toContain("No activity in October 2025.");
+  });
+
+  it("renders no Nearest line without nearest dates (the empty-day note)", () => {
+    const { nodes } = renderNote(false);
+    expect(textOf(nodes[0])).not.toContain("Nearest:");
+    expect(
+      nodes.some((n) =>
+        String(n.props.testID ?? "").startsWith("history-target-note-nearest-"),
       ),
     ).toBe(false);
   });
