@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-10-08
+**Updated by phase:** 38.8-history-navigation-ux
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -96,7 +96,7 @@ Tiles are then **sized** from the preview card's own measured width with the sam
 
 The editor's per-module visibility switch uses the themed `trackColor`/`thumbColor` tokens and keeps its "Show {module}" accessible name (RG-030 `ui-accessibility/AUD-UIA-003`).
 
-Interaction History renders the full History & Insights section (Heatmap, Intensity, Rolodex, Detail Sheet) behind the stable `interaction-history` semantic key via `ProfileModuleHost.renderHistory()`; the replacement of the earlier bounded stub migrated no layouts or collapse state. Knowledge-change rows in its Detail Sheet route back through the screen's existing knowledge navigation via a threaded `onOpenKnowledgeChange`. See `interaction-history.md`.
+Interaction History renders the full History & Insights section (Heatmap, Intensity, Jump to date and the History stream; since 38.8 the stream replaces the Rolodex and the date Detail Sheet) behind the stable `interaction-history` semantic key via `ProfileModuleHost.renderHistory()`; its visible title is "History" on the Profile and in the layout editor (38.8 D-60), and the key, saved layouts and collapse state are unchanged. `HistorySection` is keyed by the contact so its stream state starts fresh per contact (D-62), and `ProfileModuleHost` measures heatmap/Jump targets against the History anchor to scroll the Profile to them (`requestHistoryScroll`). Knowledge-change rows in the stream route back through the screen's existing knowledge navigation via a threaded `onOpenKnowledgeChange`. See `interaction-history.md`.
 
 ### History actions reveal the in-Profile History section (38.3, RG-021)
 
@@ -211,3 +211,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-26 | 38.4 | Layout preview geometry (RG-033 AUD-UIA-021): the preview packs against the Profile overview width basis (window − 66dp) and sizes tiles with the shared `overviewColumnWidth`/`overviewTileWidth` helpers and `SPACING.sm` gaps, so compact/auto/wide rows match the real Profile; the layout switch uses themed track/thumb tokens (RG-030 AUD-UIA-003). |
 | 2026-09-26 | 38.4 | Profile shell refresh skips while the app is backgrounded (38.3 VERIFICATION W2, D-10): the shell subscription is gated by `shouldRunProfileShellRefresh(AppState.currentState)`; focus and the post-sweep foreground (resume) reads are unchanged, and hidden-but-foregrounded behavior is untouched (Plan 15 owns that evidence-gated decision). No legacy-data repair (38.2 D-23). |
 | 2026-09-27 | 38.4 | Layout editor live preview hidden behind `PROFILE_LAYOUT_PREVIEW_VISIBLE = false`; the component and its geometry tests stay (D-47, OA-B2). |
+| 2026-10-08 | 38.8 | The History module renders the new History stream (Heatmap, Intensity, Jump to date, stream) instead of the Rolodex and Detail Sheet, under the visible title "History" with the `interaction-history` key and saved layouts unchanged; the host scrolls the Profile to heatmap/Jump targets measured against the History anchor. Device pass: the collapsed-History reveal from Last Interaction / View history can stop short while History is still loading (open, see the 38.8 phase-end report). |
