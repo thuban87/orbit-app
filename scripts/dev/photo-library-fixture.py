@@ -7,7 +7,7 @@ backup-size (D-20) and Orrery-memory (D-11) checks run against realistic bytes
 instead of flat test images (research A5: flat images under-state sizes).
 
   python3 scripts/dev/photo-library-fixture.py --count 50 \
-      --sources $HOME/orbit-art/38.6/device-pass/sources \
+      --sources untracked/artifacts/38.6/device-pass/sources \
       --format webp --edge 1024 --uid-prefix fxwebp- \
       --modified-at "2026-09-01 00:00:00" --out fixture.json
 

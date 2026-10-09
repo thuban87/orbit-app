@@ -40,7 +40,7 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 REPO = Path(__file__).resolve().parents[2]
-DEFAULT_OUT = Path.home() / "orbit-art/38.5/signoff-v3"
+DEFAULT_OUT = REPO / "untracked/artifacts/38.5/signoff-v3"
 WIDTH = 540
 QUALITY = 80
 

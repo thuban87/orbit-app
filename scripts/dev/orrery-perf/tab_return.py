@@ -34,7 +34,7 @@ run's own settled frame stop changing.
 
 Each run saves the frame before, at and after t_full as PNGs for a hand check.
 
-  tab_return.py --model "Pixel 6 Pro" --runs 3 --out-dir ~/orbit-art/38.7/baseline/tab-6pro
+  tab_return.py --model "Pixel 6 Pro" --runs 3 --out-dir untracked/artifacts/38.7/baseline/tab-6pro
   tab_return.py --model "Pixel_3a" --background --runs 3 --out-dir …
 """
 from __future__ import annotations

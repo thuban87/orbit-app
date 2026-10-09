@@ -45,7 +45,7 @@ OVERRIDE = REPO / "src/theme/__dev__/art-treatment-dev-overrides.json"
 DISABLED = '{\n  "enabled": false\n}\n'
 ADB = os.path.expanduser("~/.local/bin/adb")
 PKG_ID = "com.bwales.orbit"
-DEFAULT_OUT = Path.home() / "orbit-art/38.5/signoff-v3"
+DEFAULT_OUT = REPO / "untracked/artifacts/38.5/signoff-v3"
 FONT_SCALE = "1.15"
 
 # Seconds to wait after writing the override for Metro's refresh and the settle
