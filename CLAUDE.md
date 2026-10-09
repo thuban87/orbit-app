@@ -81,6 +81,20 @@ Everything else proceeds automatically. Ordinary count changes below that thresh
 
 ---
 
+## Rules carry their source (non-negotiable)
+
+Rules have leaked from one plan into every later one: a phone named for one phase became "the device", a per-plan device check nobody asked for spread into every plan, and a folder one agent invented became the default output location. Each time, a plan-specific instruction or an agent's own guess was copied forward as if the owner had decided it.
+
+- **Every constraint in a plan, dossier or agent prompt cites its source:** a `D-NN` decision, an ADR, `HANDOFF.md`, this file, a runbook, or a note that quotes the owner. A constraint with no source is labelled **"this plan only"**. A later planner never carries it forward.
+- **Planners do not copy constraints from earlier phases' plans.** Re-derive them from the sources above. Earlier plans are history, not policy.
+- **Plan checkers and reviewers flag any constraint that has no source.** Treat it as a finding, not a nit.
+- **Never put an assumption into the recommended option of an owner question** (a device, a process, a location). The owner answers the question asked; anything riding along in the option text is not his decision.
+- **New or changed rules are reported, not hidden.** When an agent adds or changes a standing rule (a memory note, a runbook rule, a convention), it keeps working, and lists the change at the end of its reply under **"Rules added/changed"** so the owner can veto it.
+
+**Orchestrators:** include this section verbatim in every planner, replanner, plan-checker and reviewer prompt.
+
+---
+
 ## Data layer rules (project-specific, non-negotiable)
 
 ### Local-first is a product commitment, not an implementation detail
@@ -136,6 +150,7 @@ Full design in `HANDOFF.md` §14. These are the rules an agent is most likely to
 | `.planning/` | GSD workflow workspace (in-flight phase artifacts, research, brainstorming) |
 | `.planning/graphs/` | Graphify discovery index |
 | `HANDOFF.md` | Pre-repo decision record. Authoritative. |
+| `untracked/` | Gitignored local workspace, never committed. Build/test output goes in `untracked/artifacts/<phase>/<plan>/`. |
 
 ## The legacy Obsidian plugin — `~/projects/Orbit`
 
