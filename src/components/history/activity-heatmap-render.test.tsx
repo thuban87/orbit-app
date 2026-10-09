@@ -453,6 +453,60 @@ describe("ActivityHeatmap cell labels pluralise the count (review WR-02)", () =>
   });
 });
 
+describe("ActivityHeatmap day cells carry the year off the current year (D-74)", () => {
+  const label = (nodes: Node[], id: string) =>
+    nodes.find((node) => node.props.testID === id)?.props.accessibilityLabel;
+
+  it("labels a past-year 7 Days cell with its year", () => {
+    measuredWidth = 254;
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({ counts: new Map([["2026-01-01", 1]]), today: "2027-03-01" }),
+        ),
+      ),
+    );
+    expect(label(nodes, "activity-heatmap-cell-2026-01-01")).toBe(
+      "Jan 1, 2026, 1 interaction",
+    );
+  });
+
+  it("labels a past-year Year cell with its year", () => {
+    measuredWidth = 254;
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            lens: "year",
+            window: {
+              lens: "year",
+              ref: "2021-01-01",
+              start: "2021-01-01",
+              end: "2021-01-07",
+              cells: [
+                { date: "2021-01-01", isPlaceholder: false, isFuture: false },
+                { date: "2021-01-02", isPlaceholder: false, isFuture: false },
+              ],
+            },
+            counts: new Map([["2021-01-02", 3]]),
+          }),
+        ),
+      ),
+    );
+    expect(label(nodes, "activity-heatmap-cell-2021-01-02")).toBe(
+      "Jan 2, 2021, 3 interactions",
+    );
+  });
+
+  it("keeps month and day for a current-year cell", () => {
+    measuredWidth = 254;
+    const nodes = all(resolve(ActivityHeatmap(props({ today: "2026-01-07" }))));
+    expect(label(nodes, "activity-heatmap-cell-2026-01-03")).toBe(
+      "Jan 3, 0 interactions",
+    );
+  });
+});
+
 describe("ActivityHeatmap Cycles dates carry the year off the current year (D-70)", () => {
   const label = (nodes: Node[], id: string) =>
     nodes.find((node) => node.props.testID === id)?.props.accessibilityLabel;

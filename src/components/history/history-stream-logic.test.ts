@@ -18,6 +18,7 @@ import type {
 import {
   buildStreamModel,
   dayAccessibilityLabel,
+  dayDateLabel,
   dayLabel,
   dayNodeKey,
   emptyDayNoteText,
@@ -1304,9 +1305,42 @@ describe("HistorySection reveal and note wiring (D-72, D-73)", () => {
   });
 });
 
+// 38.8 D-74 (YEARS): a day-lens cell's date carries the year when it is not
+// in the current year, by D-70's rule; local date parts only.
+describe("dayDateLabel (D-74)", () => {
+  it("keeps month and day in the current year", () => {
+    expect(dayDateLabel("2026-01-12", "2026-10-08")).toBe("Jan 12");
+  });
+
+  it("adds the year off the current year", () => {
+    expect(dayDateLabel("2021-01-12", "2026-10-08")).toBe("Jan 12, 2021");
+    expect(dayDateLabel("2025-12-31", "2026-01-01")).toBe("Dec 31, 2025");
+  });
+});
+
 describe("empty-target note text (D-21)", () => {
   it("names an empty day by weekday, month and day", () => {
-    expect(emptyDayNoteText("2026-10-05")).toBe("Nothing logged on Mon Oct 5");
+    expect(emptyDayNoteText("2026-10-05", "2026-10-08")).toBe(
+      "Nothing logged on Mon Oct 5",
+    );
+  });
+
+  it("carries the year when the empty day is not in the current year (D-74)", () => {
+    expect(emptyDayNoteText("2025-10-05", "2026-10-08")).toBe(
+      "Nothing logged on Sun Oct 5, 2025",
+    );
+    expect(emptyDayNoteText("2021-04-21", "2026-10-08")).toBe(
+      "Nothing logged on Wed Apr 21, 2021",
+    );
+  });
+
+  it("decides the current year from today (D-74)", () => {
+    expect(emptyDayNoteText("2025-12-31", "2025-12-31")).toBe(
+      "Nothing logged on Wed Dec 31",
+    );
+    expect(emptyDayNoteText("2025-12-31", "2026-01-01")).toBe(
+      "Nothing logged on Wed Dec 31, 2025",
+    );
   });
 
   it("names an empty span by both ends", () => {
