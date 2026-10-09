@@ -193,11 +193,13 @@ export function registerUatProbes(): void {
   DevSettings.addMenuItem("History: seed fixture (38.8)", () => {
     if (historyFixtureBusy) return console.log("history-seed busy");
     historyFixtureBusy = true;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { defaultHistorySeedDeps, seedHistoryFixture } =
-      require("./history-seed") as typeof import("./history-seed");
     void (async () => {
       try {
+        // Required inside the try so a throwing require still reaches the
+        // finally and clears the busy flag (review IN-09).
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { defaultHistorySeedDeps, seedHistoryFixture } =
+          require("./history-seed") as typeof import("./history-seed");
         const { getExecutor } =
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           require("@/db/database") as typeof import("@/db/database");
