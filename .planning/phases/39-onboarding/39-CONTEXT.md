@@ -366,7 +366,7 @@ explain away.
 - Lesson identity: wording edit keeps done-state; new identity is offered (D-64).
 - Lesson state excluded from the portable settings snapshot and export (D-62).
 - No literal app name in onboarding strings (D-79).
-- Prerequisite fixes (**now built and unit-tested in 38.11/38.12, D-102; listed here as the contract those phases meet**): create defaults Bound + Monthly + Not yet with no interaction written (D-50, D-51); possible-match tap opens the three actions (D-75); one asker per pending record and the same three answers everywhere (D-76); not-contacted-yet status (D-77) with no progress or bucket.
+- Prerequisite fixes (**now built and unit-tested in 38.11/38.12, D-102; listed here as the contract those phases meet**): create defaults Bound + Monthly + Not yet with no interaction written (D-50, D-51); possible-match tap opens the three actions (D-75); one asker per pending record while Compose's panel shows, with the panel's Yes, log it / No, don't log / Later, while the banner and pending list keep their ADR-071 answer sets (D-76 as revised by Q-45; corrected 2026-10-10 — the earlier "same three answers everywhere" wording predated that revision); not-contacted-yet status (D-77) with no progress or bucket.
 - Keep existing suites green; grep every consumer of a changed contract, including tests. The post-merge gate runs `tsc --noEmit` and `check:colors`.
 
 **Device:**

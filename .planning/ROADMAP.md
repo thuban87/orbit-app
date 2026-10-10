@@ -1525,7 +1525,7 @@ Plans:
 **Depends on**: Phase 38.8
 **Requirements**: None formal. Owner decisions to come from this phase's dossier (phase-dossier skill).
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (owner, 2026-10-10): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (orchestrator's reading of owner ruling R1, 39-LEDGER Batch 14; not owner wording): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: TBD
 

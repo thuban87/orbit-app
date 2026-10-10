@@ -29,12 +29,12 @@ Note: ROADMAP 38.11's provisional scope lists areas A, B, C, D, F and J (no E). 
 
 | Home | Audit findings | of which High | Non-UX items | Total |
 |---|---:|---:|---:|---:|
-| 38.9 UX standards | 53 | 2 | 1 | 54 |
+| 38.9 UX standards | 52 | 2 | 1 | 53 |
 | 38.10 Fuel retirement, TTR & sharing | 48 | 3 | 1 | 49 |
 | 38.11 Everyday screens | 116 | 3 | 5 | 121 |
 | 38.12 Lifecycle, import & Settings | 71 | 3 | 0 | 71 |
 | 39 Onboarding (copy notes only) | 0 | 0 | 0 | 0 |
-| 40 Responsive & release hardening | 8 | 0 | 0 | 8 |
+| 40 Responsive & release hardening | 9 | 0 | 0 | 9 |
 | No action | 1 | 0 | 0 | 1 |
 | **Total** | **297** | **11** | **7** | **304** |
 
@@ -44,7 +44,7 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 
 ## 3. Assignment by home
 
-### 38.9 UX standards — 53 findings
+### 38.9 UX standards — 52 findings
 
 | id | sev | code | short title | theme | fix | 39 link | touches | report line |
 |---|---|---|---|---|---|---|---|---:|
@@ -100,7 +100,6 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | K-30 | M | VIS | The + button covers controls throughout Settings | X-06 | NI | — | 39 (D-92 Tutorials screen clearance) | 3478 |
 | K-32 | L | INC | Interactions page wording doesn't match itself or the rest of the app | X-36 | QW | C D-34, D-16, D-44 | **39 copy note** | 3500 |
 | K-43 | L | COPY | Systems vocabulary: Favorites/Favorite, "Needs Attention · Needs attention",… | X-36, X-37, X-38 | NI | — | — | 3603 |
-| A-30 | M | A11Y | Screen-reader labels: icon glyphs in tab labels, nameless star buttons, stale… | X-39 | NI | C D-32, D-68 (frame 07 TalkBack) | 39 copy note (frame 07 TalkBack "Add, button"); moved from 40 by orchestrator 2026-10-10 (stale FAB label read by 39 frame 07) | 422 |
 
 ### 38.10 Fuel retirement, TTR & sharing — 48 findings
 
@@ -358,10 +357,11 @@ No fix findings. Every Phase 39 prerequisite fold moved to a fix phase (Batch 15
 
 39 copy notes (home in parentheses): A-19 (38.11), A-30 (40), A-36 (38.11), B-08 (38.11), B-12 (38.9), C-11 (38.9), C-13 (38.11), D-16 (38.11), D-22 (38.10), E-11 (38.11), E-20 (38.9), E-23 (38.9), F-02 (38.11), F-03 (38.11), F-04 (38.11), F-20 (38.11), G-10 (38.10), G-23 (38.10), H-14 (38.12), H-26 (38.12), J-18 (38.9), K-04 (38.9), K-05 (38.12), K-32 (38.9), K-34 (38.12), K-35 (38.12).
 
-### 40 Responsive & release hardening — 8 findings
+### 40 Responsive & release hardening — 9 findings
 
 | id | sev | code | short title | theme | fix | 39 link | touches | report line |
 |---|---|---|---|---|---|---|---|---:|
+| A-30 | M | A11Y | Screen-reader labels: icon glyphs in tab labels, nameless star buttons, stale… | X-39 | NI | C D-32, D-68 (frame 07 TalkBack) | 39 copy note (frame 07 TalkBack "Add, button") | 422 |
 | B-22 | L | A11Y | Screen-reader labels on Events lose context | X-39 | QW | — | — | 693 |
 | C-12 | L | A11Y | Avatars are announced with internal status names ("rogue status") | X-37, X-39 | QW | — | 38.9 (status vocabulary) | 840 |
 | D-20 | L | VIS | The Overview grid leaves an empty half-width gap beside Contact Frequency and… | — | NI | — | 40-CONTEXT D-01 "Relationship Overview packing" | 1045 |
@@ -380,6 +380,8 @@ D-35 is superseded by H-01 (report §4.1); H-01 (38.12) owns the fix.
 | D-35 | M | DEAD | After a restore from Settings → Archived contacts, the Archived screen in the… | X-10 | QW | — | superseded by H-01 (38.12 owns) | 1134 |
 
 ## 4. Themes
+
+> Note (2026-10-10): member counts below predate the orchestrator's move of G-05/G-06/G-07/G-20/G-22 to 38.12; the per-home tables in §3 are authoritative.
 
 Homes = where the theme's member findings are assigned above (count per home). Standard-setting = slice5 "Std" column (Y / lite / N).
 
@@ -486,7 +488,7 @@ Each line: finding(s) → chosen home, the alternative, and why. These are my re
 29. **J-06 → 38.11** with D-76 (slice4 class D). Not in the D-102 list, but same surfaces and same phase now.
 30. **I-06 → 38.10** (alt 38.11). Area I by rule; it must read the same default constant as D-51 (now built in 38.11, D-102). Showing the frequency on the share sheet is an owner call (suspected 10-capture reversal).
 31. **D-20 → 40** (alt 38.11). 40-CONTEXT D-01 lists "Relationship Overview packing". F-16 stays in 38.11 with 40 under touches ("yearly heatmap rendering").
-32. **[Orchestrator ruling 2026-10-10: moved to 38.9 — the stale FAB label is read by 39 frame 07.]** **A-30 → 40** per the X-39 rule, though its stale FAB label ("Add / capture") is what mockup frame 07's TalkBack line depends on; a cheap early fix in 38.9/38.11 is reasonable.
+32. **[Orchestrator move to 38.9 REVERTED 2026-10-10: it contradicted owner ruling R3 (Phase 40 keeps the accessibility-label sweep). Stays in 40; 39 frame 07's TalkBack copy follows whatever label ships.]** **A-30 → 40** per the X-39 rule, though its stale FAB label ("Add / capture") is what mockup frame 07's TalkBack line depends on; a cheap early fix in 38.9/38.11 is reasonable.
 33. **X-30 keyboard members stay in areas** (A-25, F-11, I-02, J-07 half, K-11, K-31). No owner rule names X-30; slice5 marks it standard-setting, so a shared Sheet keyboard behaviour in 38.9 is the alternative.
 
 
