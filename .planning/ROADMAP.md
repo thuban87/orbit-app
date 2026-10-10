@@ -1595,3 +1595,9 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 **Overlaps:** `.planning/todos/pending/2026-09-27-retire-old-fuel-editor.md` (38.4 D-54) covers the Off Limits / Fuel-editor half; fold it in here. Touches ADR-131 (form composition) and ADR-150 (Off Limits editor choice); superseding either is an owner decision.
 **Source:** owner, Phase 39 interrogation 2026-10-09 (out of Phase 39 scope by owner ruling).
 **Plans:** 0 plans (not planned)
+
+### Phase 999.4: App name through one constant everywhere (BACKLOG)
+
+**Goal:** Every visible use of the app's name reads from `APP_NAME` (`src/constants/app.ts`, sourced from `app-name.json`) so a rename is one edit. Today only `app.config.ts` uses it. Known literals include `ABOUT_APP_NAME = "Orbit"` (`src/screens/settings-about-model.ts:29`), the Contacts header `title="Orbit"` (`src/screens/HomeScreen.tsx:1797`) and copy such as "Orbit reads your contacts on this device…" (`LegacyContactPickerScreen.tsx:200-204`). Words that name the orbit *idea* rather than the app (e.g. "your active orbit") stay as they are; which labels fall on which side is settled at that phase's discuss (Phase 39 Q-42).
+**Source:** owner, Phase 39 interrogation 2026-10-09 (Phase 39 D-79/D-90; onboarding copy already uses `APP_NAME`).
+**Plans:** 0 plans (not planned)
