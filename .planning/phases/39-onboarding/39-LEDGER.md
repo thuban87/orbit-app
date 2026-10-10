@@ -23,7 +23,7 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 
 ## Resume here
 
-- **Next:** UX audit checked against this dossier (2026-10-10, Batch 13); D-94..D-99 recorded. Next: sequence the audit fix phases (incl. a fuel-retirement phase) relative to 39 and 40, then `/gsd-plan-phase 39` when its prerequisites are placed.
+- **Next:** UX audit checked against this dossier (2026-10-10, Batch 13); D-94..D-100 recorded. Fix phases 38.9–38.12 run first (D-100 lists what they build for 39). Plan 39 after 38.12.
 - **Queue (0):** none.
   - **Later stage:** Settings placement/wording; presentation/visuals; copy
 - **Blockers:** none. (Device refresh done 2026-10-09 on the Pixel 3a, `untracked/artifacts/39/discovery-refresh/`.)
@@ -131,6 +131,7 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 | D-97 | Lessons may show on their own trigger form or sheet (widens D-84) | LOCKED | Batch 13 Q5 | D-58, D-84 |
 | D-98 | Tucked-away empty state: real "not yet contacted" button + Unbound line | LOCKED | Batch 13 Q6 | D-81, D-52 |
 | D-99 | Sharing lesson: share → person → chosen TTR section; waits on fuel-retirement phase | LOCKED | Batch 13 Q3 | D-93, D-27, D-23 |
+| D-100 | Audit class-A items built in 38.9–38.12; Phase 39 consumes, does not redo | LOCKED | Batch 14 R2 | D-03 |
 
 ## Locked decisions migrated from the legacy ledger
 
@@ -523,6 +524,16 @@ Owner answer (verbatim):
 - **Owner direction (P1):** fuel is removed from the app; each former fuel kind gets its own place on the Profile. To be a phase of its own.
 - **Class A prerequisites (enforcement of D-02/D-03, not owner decisions):** E-01, E-02, F-01, F-05, A-02, A-23, G-11, J-01, K-36 (borderline), list-row TalkBack "Log Interaction" runs Quick Log (found in triage), I-01/I-04 (with D-99). Folds: E-05 → D-50/D-51; H-02, H-03 → D-75; J-02, J-05, J-08 → D-76; D-09 → D-77.
 - **Planner-level notes (planner's bucket):** D-24 trigger must also cover the native category dropdown (sheet only above `CATEGORY_SEARCH_THRESHOLD`); Android Back in a lesson matches the card's Back (phase-01 §C); D-67 "Tap any day" copy is untrue on the default Cycles lens; import below Android SDK 37 uses `LegacyContactPicker` (`use-contact-import-mode.ts:6-8`), unaudited — device-check before the Import lesson.
+
+### Batch 14 — 2026-10-10 — Cluster: homing the audit fixes
+
+Context: Phases 38.9–38.12 inserted before 39 (`bbbb1763`). Asked: R1 38.9 builds shared pieces and does the mechanical app-wide conversions, area phases fix their own screens; R2 class-A items go to the fix phase owning their area, the four existing 39 prerequisites stay in 39; R3 Phase 40 keeps the accessibility-label sweep and large-text items; R4 List-view memory growth and slow taps (A-X01, A-X02): a) investigate at the start of 38.11, b) leave in 40; R5 go-ahead for the triage copy, the assignment table, per-phase intake workpapers and backlog edits.
+
+Owner answer (verbatim):
+> R1R1-R3 look good. For R4, option A is preferred. Usage isn't really an issue anymore so feel free to make that as robust as it needs to be. R5 is also approved. The only thing I'd mention is taht the items you're moving from phase 39 to these new phases need to be recorded as moved in the 39 docs so they know not to redo work. I assume you have planned for that though
+
+- **R2 → D-100 LOCKED** — class-A items built in 38.9–38.12 (table in 39-CONTEXT D-100); 39 consumes them and adds no plan for them.
+- **R1, R3, R4, R5** — not Phase 39 decisions; carried into `.planning/ux-audit/FINDINGS-ASSIGNMENT.md` and the 38.9–38.12 intake workpapers. A-X01/A-X02 investigation → start of 38.11 (owner R4 a; "as robust as it needs to be").
 
 ## Stage F audit — 2026-10-09
 

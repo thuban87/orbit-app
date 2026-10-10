@@ -1568,7 +1568,7 @@ Plans:
 **Goal**: A new user gets a short guided start (Welcome → add a first person → a four-step tour of Digest, Contacts, Orrery and the + button), then learns the core loop (Orient → Prepare → Reach Out → Record) and a few unusual features at the moment they first meet them, through one small, accessible, skippable lesson system. The product behaviours those lessons would otherwise have to explain away are fixed first.
 **Depends on**: Phase 38.12
 **Requirements**: None formal. Owner decisions in `39-CONTEXT.md` (2026-10-09 interrogation; provenance in `39-LEDGER.md`, migrated from the codex/ChatGPT legacy ledger).
-**Success Criteria**: Defined at planning from `39-CONTEXT.md` (D-01..D-99).
+**Success Criteria**: Defined at planning from `39-CONTEXT.md` (D-01..D-100).
 **Scope source**: .planning/phases/39-onboarding/39-CONTEXT.md (the dossier; authoritative)
 **Design reference**: `39-WORKPAPER-mockup/onboarding-mockup.html` (owner-accepted mockup, D-74)
 **Plans**: TBD

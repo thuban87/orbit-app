@@ -1,6 +1,6 @@
 # Phase 39: Onboarding - Context
 
-**Gathered:** 2026-10-09 · **Status:** Accepted by the owner 2026-10-09. UX audit checked 2026-10-10; amendments D-94..D-99 recorded. Planning waits on the audit fix phases being sequenced (see ledger Batch 13).
+**Gathered:** 2026-10-09 · **Status:** Accepted by the owner 2026-10-09. UX audit checked 2026-10-10; amendments D-94..D-100 recorded (ledger Batches 13–14). Planned after Phases 38.9–38.12, which build the audit items listed in D-100.
 
 > **Dossier.** This CONTEXT is the authoritative phase dossier. The provenance (every question, the
 > verbatim answer, the rationale and every revision) is in `39-LEDGER.md`. The research inputs are
@@ -111,6 +111,26 @@ explain away.
   - Today the panel is ADDITIVE to the global surfaces (`ComposeScreen.tsx:21-25`), offers "Yes, log interaction" / "Not yet" only (`:1757-1786`), and "Not yet" just closes it (`:1152-1156`); "Don't log" exists only on the global surfaces (`AssistBanner.tsx:140-150`, `markAssistDismissed`). Yes on either surface calls `markAssistLogged` on the same record (`ComposeScreen.tsx:1094`, `AssistBanner.tsx:108`, `interaction-assist-dao.ts:91`).
 - **D-77:** [DECIDED · 2026-10-09] A Bound contact with no interaction yet shows a distinct not-contacted-yet Orbit Status, not "Not tracked — Set a contact frequency to see Orbit Status." Exact copy at planning. It is display-only: no status bucket, no progress, the clock does not start, so ADR-011 :18/:26 and `docs/systems/status-engine.md:62` stay intact. (owner, Q-28; confirmed Q-48) ⚠ AMENDS phase-10 dossier :323-327 (a fifth Orbit Status label).
   - Cause: `resolveProfileStatus` returns "Not tracked" when `lastContact === null` even with a cadence (`src/services/profile-metrics.ts:154-167`). Under D-50/D-51 this is every new manual contact's state (device screenshot 29).
+
+### Audit prerequisites homed in Phases 38.9–38.12 (do not redo here)
+- **D-100:** [DECIDED · 2026-10-10] The UX audit's fix-before-the-lesson items (class A, 39-LEDGER Batch 13) are built in the inserted fix phases that own their area, not in Phase 39. Phase 39 consumes them: its planner checks each one has landed (D-03) and adds no plan for it. If one has not landed when 39 is planned, raise it with the owner rather than rebuilding it here. (owner, Batch 14 R2)
+
+  | Audit item | What is fixed | Lesson it unblocks | Built in |
+  |---|---|---|---|
+  | E-01 | Add Contact Back warns before discarding typed work | first-run Add (frame 03), D-86 | 38.9 |
+  | F-01 | Log Interaction Back warns before discarding | Record (D-16) | 38.9 |
+  | E-02 | Save with an empty name says why and moves to the field | first-run Add | 38.9 (inline validation standard) |
+  | A-02 | An old search no longer survives app close with the box hidden | Orient Contacts (D-71, D-81) | 38.11 |
+  | A-23 | After a right swipe the row no longer stays open on a dead "Log" panel | D-71, D-53 | 38.11 |
+  | F-05 | Bulk "Log Interaction" with 2+ selected is labelled Group Log | Group Log (D-26) | 38.11 |
+  | J-01 | Compose shows the channel Transmit will actually use | Reach Out (D-15) | 38.11 |
+  | (triage) | List-row TalkBack action named for what it runs (Quick Log vs Log Interaction) | D-71, D-16 | 38.11 |
+  | G-11 | Saving from + → Memory no longer lands on another person's Profile | Memory (D-23) | 38.10 |
+  | I-01, I-04 | Cold-start share not covered by resume prompts; share confirms with Undo | sharing (D-99) | 38.10 |
+  | K-36 | AI connection screen reflects a completed OpenRouter connection | AI setup (D-20, D-69) | 38.12 |
+
+  - **Stay in Phase 39** (its own prerequisite plans): D-50/D-51/D-87 + D-94 (with audit E-05, E-13), D-75 (with H-02, H-03), D-76 (with J-02, J-05, J-08), D-77 (with D-09), and D-95..D-98.
+  - Full finding → phase map: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 
 ### First run
 - **D-08:** [DECIDED · ≤2026-10-07] First run is Welcome → Acquire → Orient → normal app. At least one person is acquired before Orient. (legacy §5)
