@@ -1525,7 +1525,7 @@ Plans:
 **Depends on**: Phase 38.8
 **Requirements**: None formal. Owner decisions to come from this phase's dossier (phase-dossier skill).
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (owner, 2026-10-10): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes).
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (owner, 2026-10-10): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: TBD
 
@@ -1537,7 +1537,7 @@ Plans:
 **Depends on**: Phase 38.9
 **Requirements**: None formal. Owner direction 2026-10-09/10 (39-LEDGER Batch 10: "rip fuel out of the app root and stem"; Batch 13 P1 and Q3 → 39-CONTEXT D-99). Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: TBD
 
@@ -1549,7 +1549,7 @@ Plans:
 **Depends on**: Phase 38.10
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A, B, C, D, F and J, minus items owned by 38.9, 38.10 or the Phase 39 prerequisites.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A, B, C, D, E, F and J, minus items owned by 38.9 or 38.10; plus Phase 39's prerequisite fixes D-50/D-51/D-87/D-94, D-76, D-77, D-95, D-98 (39-CONTEXT D-101, D-102) and the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: TBD
 
@@ -1559,7 +1559,7 @@ Plans:
 **Depends on**: Phase 38.11
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas H and K, minus items owned by earlier phases or the Phase 39 prerequisites.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas H and K, the custom-field and category management findings, and Phase 39's possible-match fix D-75 (39-CONTEXT D-102), minus items owned by earlier phases. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: TBD
 
