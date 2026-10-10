@@ -1568,7 +1568,7 @@ Plans:
 **Goal**: A new user gets a short guided start (Welcome → add a first person → a four-step tour of Digest, Contacts, Orrery and the + button), then learns the core loop (Orient → Prepare → Reach Out → Record) and a few unusual features at the moment they first meet them, through one small, accessible, skippable lesson system. The product behaviours those lessons would otherwise have to explain away are fixed first.
 **Depends on**: Phase 38.12
 **Requirements**: None formal. Owner decisions in `39-CONTEXT.md` (2026-10-09 interrogation; provenance in `39-LEDGER.md`, migrated from the codex/ChatGPT legacy ledger).
-**Success Criteria**: Defined at planning from `39-CONTEXT.md` (D-01..D-100).
+**Success Criteria**: Defined at planning from `39-CONTEXT.md` (D-01..D-101).
 **Scope source**: .planning/phases/39-onboarding/39-CONTEXT.md (the dossier; authoritative)
 **Design reference**: `39-WORKPAPER-mockup/onboarding-mockup.html` (owner-accepted mockup, D-74)
 **Plans**: TBD
@@ -1644,8 +1644,10 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 
 ### Phase 999.3: Inline knowledge inputs on the contact forms (BACKLOG)
 
+**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative.
+
 **Goal:** Make Memories and Off Limits work like the rest of the Create/Edit Contact form: fields you fill in right there, instead of the outlier editors that behave like a separate page. Retire the old Fuel editor along the way. Owner request (2026-10-09): "Those will need to be corrected to be form fields you can fill in there rather than get directed to another page."
-**Current state (code, `main @ 19caf50c`; confirm on device at discuss):** Create/Edit Contact host `MemoryEditor` (`CreateContactScreen.tsx:716`, `EditContactScreen.tsx:1599`) and the old `FuelEditor` for Off Limits (with a misleading Kind picker). Profile → Off Limits opens a separate `OffLimitsEditor` route. Fuel itself is still live: Off Limits entries are `fuel` rows with `kind = 'off_limits'`, and Android Share → Capture writes `fuel` (`CaptureScreen.tsx:273`); ADR-081 retired only AI-proposed fuel.
+**Current state (code, `main @ 19caf50c`; confirm on device at discuss):** Create/Edit Contact host `MemoryEditor` (`CreateContactScreen.tsx:716`, `EditContactScreen.tsx:1599`) and the old `FuelEditor` for Off Limits (with a misleading Kind picker). Profile → Off Limits opens a separate `OffLimitsEditor` route. Fuel itself is still live: Off Limits entries are `fuel` rows with `kind = 'off_limits'`, and Android Share → Capture writes `fuel` (`CaptureScreen.tsx:273`). ADR-081 (migration 017) retired AI-proposed fuel and also copied the share-capture topic fuel existing at that time into share-provenance, AI-off Memories; `CaptureScreen` was never changed, so later shares went back into `fuel` (corrected 2026-10-10, UX-audit triage slice 3).
 **Overlaps:** `.planning/todos/pending/2026-09-27-retire-old-fuel-editor.md` (38.4 D-54) covers the Off Limits / Fuel-editor half; fold it in here. Touches ADR-131 (form composition) and ADR-150 (Off Limits editor choice); superseding either is an owner decision.
 **Source:** owner, Phase 39 interrogation 2026-10-09 (out of Phase 39 scope by owner ruling).
 **Plans:** 0 plans (not planned)
@@ -1658,6 +1660,8 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 
 ### Phase 999.5: Shared items get their own Things to Remember section, with optional reminders (BACKLOG)
 
+**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative.
+
 **Goal:** Things shared into the app from other Android apps land somewhere visible and fitting. Owner, 2026-10-09: a text block that "made me think of my niece" was shared to her contact and "currently it doesn't show anywhere. I don't really want that to show in memories though, it's not a memory, it's just something that made me think of them."
 - A new Things to Remember section for these items (working name "Made Me Think of Them"; name to be decided).
 - After sharing and choosing the contact, offer "Add a reminder about this?" leading into reminder setup (owner's example: an article found at 2 a.m., reminded two days later at 8 a.m. to send before her soccer game).
@@ -1668,6 +1672,8 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 **Plans:** 0 plans (not planned)
 
 ### Phase 999.6: Move an entry between Things to Remember sections (BACKLOG)
+
+**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative.
 
 **Goal:** Tap an entry and move it to the section it really belongs in (owner's example: a Memory that is really a "Last talked about" item). Owner, 2026-10-09: "It looks like we have a watered down version of this already, I just tried to move a memory and it allows me to move them to 'Imported from Contacts App' and 'Custom' which appears to create a new custom field." Needs data-format reconciliation between sections (memories, current-state fields, custom fields, the 999.5 section). Out of Phase 39 scope.
 **Source:** owner, Phase 39 interrogation 2026-10-09.

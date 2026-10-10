@@ -23,7 +23,7 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 
 ## Resume here
 
-- **Next:** UX audit checked against this dossier (2026-10-10, Batch 13); D-94..D-100 recorded. Fix phases 38.9–38.12 run first (D-100 lists what they build for 39). Plan 39 after 38.12.
+- **Next:** UX audit checked against this dossier (2026-10-10, Batch 13); D-94..D-101 recorded. Fix phases 38.9–38.12 run first (D-100 lists what they build for 39). Plan 39 after 38.12.
 - **Queue (0):** none.
   - **Later stage:** Settings placement/wording; presentation/visuals; copy
 - **Blockers:** none. (Device refresh done 2026-10-09 on the Pixel 3a, `untracked/artifacts/39/discovery-refresh/`.)
@@ -132,6 +132,7 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 | D-98 | Tucked-away empty state: real "not yet contacted" button + Unbound line | LOCKED | Batch 13 Q6 | D-81, D-52 |
 | D-99 | Sharing lesson: share → person → chosen TTR section; waits on fuel-retirement phase | LOCKED | Batch 13 Q3 | D-93, D-27, D-23 |
 | D-100 | Audit class-A items built in 38.9–38.12; Phase 39 consumes, does not redo | LOCKED | Batch 14 R2 | D-03 |
+| D-101 | D-95 and D-98 built in 38.11, not 39 | LOCKED | Batch 15 | D-95, D-98, D-100 |
 
 ## Locked decisions migrated from the legacy ledger
 
@@ -534,6 +535,13 @@ Owner answer (verbatim):
 
 - **R2 → D-100 LOCKED** — class-A items built in 38.9–38.12 (table in 39-CONTEXT D-100); 39 consumes them and adds no plan for them.
 - **R1, R3, R4, R5** — not Phase 39 decisions; carried into `.planning/ux-audit/FINDINGS-ASSIGNMENT.md` and the 38.9–38.12 intake workpapers. A-X01/A-X02 investigation → start of 38.11 (owner R4 a; "as robust as it needs to be").
+
+### Batch 15 — 2026-10-10 — D-95 / D-98 placement
+
+- **Asked:** D-95 (Active Contacts in the menu) and D-98 (empty-state button + Unbound line) are Contacts-tab changes; keep in 39 or move to 38.11?
+- **Answer (verbatim):**
+  > I'd say yes to moving those two items to 38.11, let's try to keep 39 focused on the tutorial journeys and not fixing the stuff that composes those journeys.
+- **Recorded:** D-101 LOCKED — D-95 and D-98 built in 38.11. The principle is recorded as the owner's words; whether it also moves the remaining 39 prerequisite fixes (D-50/D-51/D-87/D-94, D-75, D-76, D-77) was asked separately, not inferred.
 
 ## Stage F audit — 2026-10-09
 

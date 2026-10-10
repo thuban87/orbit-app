@@ -1,6 +1,6 @@
 # Phase 39: Onboarding - Context
 
-**Gathered:** 2026-10-09 · **Status:** Accepted by the owner 2026-10-09. UX audit checked 2026-10-10; amendments D-94..D-100 recorded (ledger Batches 13–14). Planned after Phases 38.9–38.12, which build the audit items listed in D-100.
+**Gathered:** 2026-10-09 · **Status:** Accepted by the owner 2026-10-09. UX audit checked 2026-10-10; amendments D-94..D-101 recorded (ledger Batches 13–15). Planned after Phases 38.9–38.12, which build the audit items listed in D-100.
 
 > **Dossier.** This CONTEXT is the authoritative phase dossier. The provenance (every question, the
 > verbatim answer, the rationale and every revision) is in `39-LEDGER.md`. The research inputs are
@@ -128,9 +128,12 @@ explain away.
   | G-11 | Saving from + → Memory no longer lands on another person's Profile | Memory (D-23) | 38.10 |
   | I-01, I-04 | Cold-start share not covered by resume prompts; share confirms with Undo | sharing (D-99) | 38.10 |
   | K-36 | AI connection screen reflects a completed OpenRouter connection | AI setup (D-20, D-69) | 38.12 |
+  | D-95 (A-04) | "Active Contacts" listed and selected in the Population menu | Orient Contacts (D-12, D-81) | 38.11 (moved 2026-10-10, D-101) |
+  | D-98 | Tucked-away empty state: real "not yet contacted" button + Unbound line | D-81, adapted Orient (D-52) | 38.11 (moved 2026-10-10, D-101) |
 
-  - **Stay in Phase 39** (its own prerequisite plans): D-50/D-51/D-87 + D-94 (with audit E-05, E-13), D-75 (with H-02, H-03), D-76 (with J-02, J-05, J-08), D-77 (with D-09), and D-95..D-98.
+  - **Stay in Phase 39** (its own prerequisite plans): D-50/D-51/D-87 + D-94 (with audit E-05, E-13), D-75 (with H-02, H-03), D-76 (with J-02, J-05, J-08), D-77 (with D-09), D-96 and D-97.
   - Full finding → phase map: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
+- **D-101:** [DECIDED · 2026-10-10] D-95 and D-98 are built in Phase 38.11, not here; Phase 39 relies on them as landed (D-100 rules apply). Owner principle: "let's try to keep 39 focused on the tutorial journeys and not fixing the stuff that composes those journeys." (owner, Batch 15)
 
 ### First run
 - **D-08:** [DECIDED · ≤2026-10-07] First run is Welcome → Acquire → Orient → normal app. At least one person is acquired before Orient. (legacy §5)
