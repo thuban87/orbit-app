@@ -1601,3 +1601,20 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 **Goal:** Every visible use of the app's name reads from `APP_NAME` (`src/constants/app.ts`, sourced from `app-name.json`) so a rename is one edit. Today only `app.config.ts` uses it. Known literals include `ABOUT_APP_NAME = "Orbit"` (`src/screens/settings-about-model.ts:29`), the Contacts header `title="Orbit"` (`src/screens/HomeScreen.tsx:1797`) and copy such as "Orbit reads your contacts on this device…" (`LegacyContactPickerScreen.tsx:200-204`). Words that name the orbit *idea* rather than the app (e.g. "your active orbit") stay as they are; which labels fall on which side is settled at that phase's discuss (Phase 39 Q-42).
 **Source:** owner, Phase 39 interrogation 2026-10-09 (Phase 39 D-79/D-90; onboarding copy already uses `APP_NAME`).
 **Plans:** 0 plans (not planned)
+
+### Phase 999.5: Shared items get their own Things to Remember section, with optional reminders (BACKLOG)
+
+**Goal:** Things shared into the app from other Android apps land somewhere visible and fitting. Owner, 2026-10-09: a text block that "made me think of my niece" was shared to her contact and "currently it doesn't show anywhere. I don't really want that to show in memories though, it's not a memory, it's just something that made me think of them."
+- A new Things to Remember section for these items (working name "Made Me Think of Them"; name to be decided).
+- After sharing and choosing the contact, offer "Add a reminder about this?" leading into reminder setup (owner's example: an article found at 2 a.m., reminded two days later at 8 a.m. to send before her soccer game).
+- After choosing the contact, a second choice of where to save it, defaulting to the new section (it may sometimes be a Memory).
+- Must not write to `fuel` (owner: fuel is being removed root and stem; see 999.3). Memories are their own `memories` table (`src/db/memories-dao.ts:111`).
+**Current state (`main @ c2c0d191`):** Share → Capture writes `fuel` `kind: "topic"`, `source: "share"` (`CaptureScreen.tsx:273-276`); the Profile reads only `off_limits` fuel (`src/db/profile-knowledge-read.ts:259-266`), so captures are invisible on the Profile. Changes Phase 34's capture design (owner decision at discuss). Likely a new table/migration and backup-format impact.
+**Source:** owner, Phase 39 interrogation 2026-10-09 (Phase 39 Q-51). Wanted before Phase 39 executes if possible, so the Memory lesson teaches the final behaviour.
+**Plans:** 0 plans (not planned)
+
+### Phase 999.6: Move an entry between Things to Remember sections (BACKLOG)
+
+**Goal:** Tap an entry and move it to the section it really belongs in (owner's example: a Memory that is really a "Last talked about" item). Owner, 2026-10-09: "It looks like we have a watered down version of this already, I just tried to move a memory and it allows me to move them to 'Imported from Contacts App' and 'Custom' which appears to create a new custom field." Needs data-format reconciliation between sections (memories, current-state fields, custom fields, the 999.5 section). Out of Phase 39 scope.
+**Source:** owner, Phase 39 interrogation 2026-10-09.
+**Plans:** 0 plans (not planned)
