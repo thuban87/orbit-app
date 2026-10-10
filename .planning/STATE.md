@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 38.9
 current_phase_name: UX Standards
 status: discussing
-stopped_at: UX audit triaged against Phase 39 (D-94..D-99); fix phases 38.9-38.12 inserted before 39; next: assign audit findings to them, then phase-dossier 38.9
-last_updated: "2026-10-10T03:33:44.938Z"
+stopped_at: Phase 38.9 context gathered
+last_updated: "2026-10-10T22:06:58.883Z"
 last_activity: 2026-10-10
-last_activity_desc: UX audit triage; Phases 38.9-38.12 inserted
-state_head: 7cc65d4afa0d3e9ddf609ab321d0a764af6fe8e8
+last_activity_desc: Phase 38.9 dossier accepted (38.9-CONTEXT.md); next /gsd-plan-phase 38.9
+state_head: 8ded53e776d6fd00e3b10da46840be362d8275aa
 progress:
   total_phases: 34
   completed_phases: 22
@@ -18,7 +18,6 @@ progress:
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
-
   - "38.8 INSERTED (owner 2026-10-08): History Navigation UX, before Phase 39. Replaces the Profile History Rolodex with an activity-first stream + Jump to date + heatmap jump-and-highlight; section renamed 'History'; Rolodex archived as reference. Dossier .planning/phases/38.8-history-navigation-ux/38.8-CONTEXT.md ACCEPTED (D-01..D-63, no OPEN items; provenance 38.8-LEDGER.md; accepted mockup 38.8-WORKPAPER-mockup/). Phase 39's detailed History teaching waits on this phase."
   - "38.7 INSERTED (owner 2026-10-02): Orrery V2 — Renderer, Camera & Visual Language, before Phase 39. Built from the Orrery renderer R&D (labs A/B/C; synthesis docs/experiments/orrery-renderer/synthesis/). Dossier docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md ACCEPTED after codex review: D-01..D-58, no OPEN items. Day 1 = release baseline of main on both phones, then the owner locks numeric perf gates (D-56). Lab branches experiment/orrery-* are local-only evidence; keep them until V2 ships."
   - "38.6 INSERTED (owner 2026-09-29): Phase 38.6 Photo Handling — Sync, Sizes & Lightbox, before Phase 39. Promotes backlog 999.1 (38.4 D-73), retired from the backlog. Owner requests D-01..D-09. Root cause of stale photos verified: expo-image on Android ignores cacheKey for file:// URIs + fixed per-contact photo path. OPEN for discuss: O-1 photo resolution (reverses 07-photos 512-master decision if changed), O-2 coverage scope, O-3/O-4 lightbox reach/behaviour, restore-progress photo-library todo pull-in. Dossier docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md."
@@ -1053,12 +1052,12 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-10T03:33:41.897Z
-**Stopped at:** UX audit triaged vs Phase 39 (D-94..D-99 recorded); Phases 38.9-38.12 inserted; next: assign findings, then phase-dossier 38.9
+**Last session:** 2026-10-10T22:06:55.702Z
+**Stopped at:** Phase 38.9 context gathered
 _Prior stop:_ Phase 39 context gathered (dossier accepted; UX audit next, then plan-phase 39)
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/39-onboarding/39-LEDGER.md (Batch 13)
+**Resume file:** .planning/phases/38.9-ux-standards/38.9-CONTEXT.md
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
