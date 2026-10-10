@@ -1,6 +1,6 @@
 # Phase 39: Onboarding - Context
 
-**Gathered:** 2026-10-09 · **Status:** Accepted by the owner 2026-10-09. UX audit checked 2026-10-10; amendments D-94..D-101 recorded (ledger Batches 13–15). Planned after Phases 38.9–38.12, which build the audit items listed in D-100.
+**Gathered:** 2026-10-09 · **Status:** Accepted by the owner 2026-10-09. UX audit checked 2026-10-10; amendments D-94..D-102 recorded (ledger Batches 13–16). Planned after Phases 38.9–38.12, which build the audit items listed in D-100.
 
 > **Dossier.** This CONTEXT is the authoritative phase dossier. The provenance (every question, the
 > verbatim answer, the rationale and every revision) is in `39-LEDGER.md`. The research inputs are
@@ -41,7 +41,8 @@ explain away.
 - Settings → Tutorials screen (D-92).
 - Prerequisite product fixes: manual-create defaults and visible Relationship Basics (D-04, D-50,
   D-51, D-87), possible-match tap (D-06, D-75), one "Did you send it?" model (D-07, D-76),
-  not-contacted-yet Orbit Status (D-77).
+  not-contacted-yet Orbit Status (D-77). **Built in Phases 38.11/38.12 (D-102); Phase 39 only
+  verifies they landed.**
 
 **Out of scope**
 - A tutorial for any feature the triage ruled out (D-25, D-27, D-29..D-31): current-state fields,
@@ -130,10 +131,15 @@ explain away.
   | K-36 | AI connection screen reflects a completed OpenRouter connection | AI setup (D-20, D-69) | 38.12 |
   | D-95 (A-04) | "Active Contacts" listed and selected in the Population menu | Orient Contacts (D-12, D-81) | 38.11 (moved 2026-10-10, D-101) |
   | D-98 | Tucked-away empty state: real "not yet contacted" button + Unbound line | D-81, adapted Orient (D-52) | 38.11 (moved 2026-10-10, D-101) |
+  | D-50, D-51, D-87, D-94 (+ E-05, E-13) | New-contact defaults Bound + Monthly + Not yet; Relationship Basics open; "Not yet" looks selected | first-run Add (frame 03), Orient | 38.11 (moved 2026-10-10, D-102) |
+  | D-75 (+ H-02, H-03) | Tapping a possible match opens Link / Import as New / Skip | first-run Import (D-52) | 38.12 (moved 2026-10-10, D-102) |
+  | D-76 (+ J-02, J-05, J-08) | One "Did you send it?" asker while Compose's panel shows | Reach Out (D-15) | 38.11 (moved 2026-10-10, D-102) |
+  | D-77 (+ D-09) | Distinct not-contacted-yet Orbit Status | Prepare (D-14) | 38.11 (moved 2026-10-10, D-102) |
 
-  - **Stay in Phase 39** (its own prerequisite plans): D-50/D-51/D-87 + D-94 (with audit E-05, E-13), D-75 (with H-02, H-03), D-76 (with J-02, J-05, J-08), D-77 (with D-09), D-96 and D-97.
+  - **Stay in Phase 39:** the lesson system, first run, the lessons, Settings → Tutorials, and the journey rules D-96 (first-run restore) and D-97 (lessons on their own trigger form). No product-fix plans remain here (D-102).
   - Full finding → phase map: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 - **D-101:** [DECIDED · 2026-10-10] D-95 and D-98 are built in Phase 38.11, not here; Phase 39 relies on them as landed (D-100 rules apply). Owner principle: "let's try to keep 39 focused on the tutorial journeys and not fixing the stuff that composes those journeys." (owner, Batch 15)
+- **D-102:** [DECIDED · 2026-10-10] The prerequisite product fixes are also built outside this phase: D-50/D-51/D-87/D-94 → 38.11, D-75 → 38.12, D-76 → 38.11, D-77 → 38.11, each with its folded audit findings. Their decisions stay recorded here and bind those phases; Phase 39 verifies they landed (D-03, D-100). The verification bullets and obsolete-test notes below for these fixes move with them. (owner, Batch 16)
 
 ### First run
 - **D-08:** [DECIDED · ≤2026-10-07] First run is Welcome → Acquire → Orient → normal app. At least one person is acquired before Orient. (legacy §5)
@@ -360,7 +366,7 @@ explain away.
 - Lesson identity: wording edit keeps done-state; new identity is offered (D-64).
 - Lesson state excluded from the portable settings snapshot and export (D-62).
 - No literal app name in onboarding strings (D-79).
-- Prerequisite fixes: create defaults Bound + Monthly + Not yet with no interaction written (D-50, D-51); possible-match tap opens the three actions (D-75); one asker per pending record and the same three answers everywhere (D-76); not-contacted-yet status (D-77) with no progress or bucket.
+- Prerequisite fixes (**now built and unit-tested in 38.11/38.12, D-102; listed here as the contract those phases meet**): create defaults Bound + Monthly + Not yet with no interaction written (D-50, D-51); possible-match tap opens the three actions (D-75); one asker per pending record and the same three answers everywhere (D-76); not-contacted-yet status (D-77) with no progress or bucket.
 - Keep existing suites green; grep every consumer of a changed contract, including tests. The post-merge gate runs `tsc --noEmit` and `check:colors`.
 
 **Device:**
@@ -371,7 +377,7 @@ explain away.
 
 **Owner device checkpoints:** one look-and-feel sign-off of the first run and the four lesson patterns against the mockup (D-74, D-80..D-85, D-89), and the final lesson copy (Claude's Discretion item 1).
 
-**Obsolete / rewritten tests:** tests pinning the current create defaults (Unbound, Today), the Compose panel's Yes / Not yet pair and additive behaviour, the `resolveProfileStatus` "Not tracked" result for Bound + no contact, and the Create → Profile landing are rewritten for D-50/D-51, D-76, D-77, D-86. Identify them at planning by grep.
+**Obsolete / rewritten tests:** tests pinning the current create defaults (Unbound, Today), the Compose panel's Yes / Not yet pair and additive behaviour, the `resolveProfileStatus` "Not tracked" result for Bound + no contact, and the Create → Profile landing are rewritten for D-50/D-51, D-76, D-77, D-86. Identify them at planning by grep. Since D-102 the D-50/D-51, D-76 and D-77 rewrites belong to the 38.11 plans that change that code; Phase 39 keeps only the D-86 landing rewrite.
 </verification>
 
 ---

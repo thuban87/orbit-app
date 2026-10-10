@@ -23,7 +23,7 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 
 ## Resume here
 
-- **Next:** UX audit checked against this dossier (2026-10-10, Batch 13); D-94..D-101 recorded. Fix phases 38.9–38.12 run first (D-100 lists what they build for 39). Plan 39 after 38.12.
+- **Next:** UX audit checked against this dossier (2026-10-10, Batch 13); D-94..D-102 recorded. Fix phases 38.9–38.12 run first (D-100 lists what they build for 39). Plan 39 after 38.12.
 - **Queue (0):** none.
   - **Later stage:** Settings placement/wording; presentation/visuals; copy
 - **Blockers:** none. (Device refresh done 2026-10-09 on the Pixel 3a, `untracked/artifacts/39/discovery-refresh/`.)
@@ -133,6 +133,7 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 | D-99 | Sharing lesson: share → person → chosen TTR section; waits on fuel-retirement phase | LOCKED | Batch 13 Q3 | D-93, D-27, D-23 |
 | D-100 | Audit class-A items built in 38.9–38.12; Phase 39 consumes, does not redo | LOCKED | Batch 14 R2 | D-03 |
 | D-101 | D-95 and D-98 built in 38.11, not 39 | LOCKED | Batch 15 | D-95, D-98, D-100 |
+| D-102 | Prerequisite fixes D-50/51/87/94, D-76, D-77 built in 38.11; D-75 in 38.12 | LOCKED | Batch 16 | D-03, D-100 |
 
 ## Locked decisions migrated from the legacy ledger
 
@@ -542,6 +543,13 @@ Owner answer (verbatim):
 - **Answer (verbatim):**
   > I'd say yes to moving those two items to 38.11, let's try to keep 39 focused on the tutorial journeys and not fixing the stuff that composes those journeys.
 - **Recorded:** D-101 LOCKED — D-95 and D-98 built in 38.11. The principle is recorded as the owner's words; whether it also moves the remaining 39 prerequisite fixes (D-50/D-51/D-87/D-94, D-75, D-76, D-77) was asked separately, not inferred.
+
+### Batch 16 — 2026-10-10 — Remaining prerequisite fixes
+
+- **Asked (M1):** by the Batch 15 principle, move the remaining prerequisite fixes out of 39 — new-contact defaults (D-50/D-51/D-87/D-94) → 38.11, possible match (D-75) → 38.12, one "Did you send it?" (D-76) → 38.11, not-contacted status (D-77) → 38.11? Recommendation: a, move all four.
+- **Answer (verbatim):**
+  > Yes, please move those as well
+- **Recorded:** D-102 LOCKED. Decisions stay in this dossier and bind the building phases; 39 verifies they landed.
 
 ## Stage F audit — 2026-10-09
 
