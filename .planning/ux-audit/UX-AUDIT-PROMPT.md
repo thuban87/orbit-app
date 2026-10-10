@@ -110,7 +110,7 @@ Each finding:
 
 ## 7. Keep your own context lean: workers write files, you read summaries
 
-The owner will keep using this session after the audit (fixes, follow-ups), so **you never load screenshots, UI dumps or full findings files yourself** [owner, 2026-10-09]. Work through files and short summaries:
+The owner will keep using this session after the audit (fixes, follow-ups), so keep its context lean: **the screenshot and findings work belongs to the agents below, not to you** [owner, 2026-10-09: "I just don't want it to be the main agent handling them"]. You are not barred from them: open a specific screenshot or findings file when it helps you, for example to settle a finding the verifier and retest agent disagree on, to judge something before it goes into the top-10, or to answer the owner. Just don't make it your routine. Work mainly through files and short summaries:
 
 - **Every agent writes its full output to a file** and returns at most ~15 lines to you: counts by category and severity, the file path, blockers, and anything needing your decision.
 - **Per area, three agents in sequence**, so device work stays strictly one-at-a-time:
@@ -120,7 +120,7 @@ The owner will keep using this session after the audit (fixes, follow-ups), so *
   The verifier then (same agent, continued, or a fresh one given both files) writes the area's final `findings.md`: confirmed and retest-confirmed findings only, plus a short list of what was dropped and why.
 - You may start the next area's audit agent as soon as the previous retest agent has finished with the phone. The verifier for area N can run while area N+1's audit agent uses the phone.
 - **Cross-cutting comparison (§5)** is done by one non-device agent that reads every area's `findings.md` and the screenshots it needs, and writes `cross-cutting.md`.
-- **The report (§8)** is assembled by one writer agent from the area `findings.md` files and `cross-cutting.md`. You read only its summary section before committing.
+- **The report (§8)** is assembled by one writer agent from the area `findings.md` files and `cross-cutting.md`. Read its summary before committing, and whatever else you need to stand behind it.
 
 ## 8. Outputs
 
