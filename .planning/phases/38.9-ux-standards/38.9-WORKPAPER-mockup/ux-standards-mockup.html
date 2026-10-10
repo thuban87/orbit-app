@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit UX Standards</title>
+<style>
+/* Review document for Phase 38.9 (C7 visual questions). Chrome outside the screens follows the viewer's theme.
+   Every screen interior uses the app's real palette tokens: src/theme/theme-presets.ts galaxy.dark and standard.light;
+   radii src/theme/tokens/radii.ts (md 12, lg 16, pill); button roles src/components/ui/button-roles.ts.
+   Theme background art is omitted (flat background token); it is not under review here. */
+:root {
+  --page-bg: #F2F4F9; --panel: #FFFFFF; --ink: #161A2B; --ink-2: #4F5772; --rule: #D6DBE8;
+  --chrome-accent: #2A46C7; --chip-bg: #E6EBFA; --chip-ink: #2A3A8F; --rec-bg: #E3F4EA; --rec-ink: #1E5E3C; --rec-rule: #7CC39A;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page-bg: #10131F; --panel: #171B2B; --ink: #E6E9F5; --ink-2: #A0A8C4; --rule: #2C3350;
+  --chrome-accent: #8FA6FF; --chip-bg: #222A48; --chip-ink: #BCC8F2; --rec-bg: #15301F; --rec-ink: #A8E3BF; --rec-rule: #3E7D57; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page-bg: #10131F; --panel: #171B2B; --ink: #E6E9F5; --ink-2: #A0A8C4; --rule: #2C3350;
+  --chrome-accent: #8FA6FF; --chip-bg: #222A48; --chip-ink: #BCC8F2; --rec-bg: #15301F; --rec-ink: #A8E3BF; --rec-rule: #3E7D57; color-scheme: dark }
+
+/* App palettes */
+.gd { --background:#0B0E1A; --surface:#141828; --surfaceElevated:#1D2235; --accent:#6C8CFF; --onAccent:#0A1330; --accentText:#8FA6FF;
+      --textPrimary:#E6E9F5; --textSecondary:#8B93B0; --border:#2A3048; --borderStrong:#3C4568; --danger:#E5484D; --onDanger:#FFFFFF; --scrim:#05070FB3; }
+.sl { --background:#F2F3F6; --surface:#FFFFFF; --surfaceElevated:#FDFDFE; --accent:#4453B0; --onAccent:#FFFFFF; --accentText:#3C4AA0;
+      --textPrimary:#1B1E26; --textSecondary:#565D6B; --border:#DADEE6; --borderStrong:#BCC3CF; --danger:#B21D22; --onDanger:#FFFFFF; --scrim:#1B1E2666; }
+
+* { box-sizing: border-box }
+body { background: var(--page-bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; margin: 0; padding: 28px 16px 64px }
+main { max-width: 1180px; margin: 0 auto }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; margin: 0; text-wrap: balance }
+h1 { font-size: 28px } h2 { font-size: 21px; margin-top: 8px } h3 { font-size: 15px }
+p { margin: 6px 0; max-width: 76ch }
+.lede { color: var(--ink-2) }
+.eyebrow { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); font-weight: 600 }
+section.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 16px; padding: 20px; margin-top: 22px }
+.qhead { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline }
+.qid { font-family: var(--font-display); color: var(--chrome-accent); font-weight: 600 }
+.ref { font-size: 12px; font-weight: 600; background: var(--chip-bg); color: var(--chip-ink); border-radius: 6px; padding: 1px 8px }
+.answers { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px }
+.answers table { border-collapse: collapse; width: 100%; font-size: 14px }
+.answers td, .answers th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top }
+.answers th { font-size: 12px; color: var(--ink-2); font-weight: 600 }
+.code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 700; color: var(--chrome-accent); white-space: nowrap }
+.recline { display: inline-block; margin-top: 10px; background: var(--rec-bg); color: var(--rec-ink); border: 1px solid var(--rec-rule); border-radius: 10px; padding: 6px 12px; font-size: 14px }
+.opts { display: grid; gap: 18px; margin-top: 14px }
+.opt { border: 1px solid var(--rule); border-radius: 14px; padding: 12px }
+.opt.rec { border-color: var(--rec-rule); box-shadow: 0 0 0 1px var(--rec-rule) inset }
+.opthead { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 10px }
+.opthead .tag { font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: 16px; color: var(--chrome-accent) }
+.opthead .rtag { font-size: 12px; font-weight: 600; color: var(--rec-ink); background: var(--rec-bg); border-radius: 6px; padding: 1px 8px }
+.opthead .desc { color: var(--ink-2); font-size: 14px }
+.pair { display: flex; flex-wrap: wrap; gap: 14px }
+.pair > figure { margin: 0; flex: 1 1 280px; max-width: 340px; min-width: 0 }
+figcaption { font-size: 12px; color: var(--ink-2); margin-top: 4px }
+
+/* Screen snippet */
+.scr { background: var(--background); color: var(--textPrimary); border-radius: 18px; overflow: hidden; position: relative; font-size: 13.5px; line-height: 19px; border: 1px solid #00000022 }
+.scr .pad { padding: 14px }
+.t-heading { font-family: var(--font-display); font-weight: 600; font-size: 16px; line-height: 21px }
+.t-body { font-size: 13.5px }
+.t-cap { font-size: 12px; color: var(--textSecondary); line-height: 16px }
+.muted { color: var(--textSecondary) }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 12px; font-weight: 600; font-size: 13.5px; border: 1px solid transparent; white-space: nowrap }
+.btn.pri { background: var(--accent); color: var(--onAccent) }
+.btn.sec { background: var(--surface); color: var(--textPrimary); border-color: var(--border) }
+.btn.ter { color: var(--accentText); padding: 0 8px }
+.btn.des { background: var(--danger); color: var(--onDanger) }
+.btn.full { width: 100% }
+.row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: nowrap }
+.stack { display: grid; gap: 8px }
+svg.i { width: 18px; height: 18px; flex: none }
+
+/* Dialog */
+.dimbg { padding: 26px 14px; background: linear-gradient(var(--scrim), var(--scrim)), repeating-linear-gradient(0deg, var(--surface) 0 44px, var(--background) 44px 46px) }
+.dlg { background: var(--surfaceElevated); border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: grid; gap: 10px }
+.dlg.strong { border: 2px solid var(--borderStrong); box-shadow: 0 10px 28px #00000059 }
+.dlg .warn { color: var(--danger) }
+
+/* Header */
+.hdr { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border); min-height: 52px }
+.hdr .back { color: var(--textPrimary); font-weight: 600; padding: 6px 4px; display: inline-flex; align-items: center; gap: 2px }
+.hdr .title { font-family: var(--font-display); font-weight: 600; font-size: 17px }
+.hdr .sub { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--textSecondary) }
+.av { width: 20px; height: 20px; border-radius: 50%; background: #5B6CB8; color: #F2F4FB; font-size: 9.5px; font-weight: 700; display: inline-grid; place-items: center; flex: none }
+.field { margin-top: 10px }
+.field label { font-size: 12px; color: var(--textSecondary); display: block; margin-bottom: 4px }
+.input { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 9px 12px; color: var(--textPrimary) }
+.input.err { border-color: var(--danger) }
+.errtxt { color: var(--danger); font-size: 12px; margin-top: 4px; display: flex; gap: 4px; align-items: center }
+
+/* Snackbar */
+.snack { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 8px 8px 8px 16px; display: flex; align-items: center; gap: 4px; box-shadow: 0 6px 16px #0000004d }
+.snack .msg { flex: 1; min-width: 0 }
+.snack .act { color: var(--accentText); font-weight: 600; padding: 4px 8px; white-space: nowrap }
+.snack.err .msg { color: var(--textPrimary) }
+.snackwrap { display: grid; gap: 10px; padding: 14px; background: var(--background) }
+.snack .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex: none; margin-right: 4px }
+
+/* Switch */
+.swrow { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border) }
+.swrow:last-child { border-bottom: 0 }
+.swrow.dis { opacity: .45 }
+.sw { width: 44px; height: 24px; border-radius: 999px; position: relative; flex: none }
+.sw i { position: absolute; top: 2px; width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 1px 2px #0006 }
+.sw.on i { right: 2px } .sw.off i { left: 2px }
+/* SW-A today: thumb surfaceElevated; track off border, on accent */
+.swA.off { background: var(--border) } .swA.on { background: var(--accent) } .swA i { background: var(--surfaceElevated) }
+/* SW-B: tokens only, RN Switch: off track borderStrong + thumb textSecondary; on track accent + thumb onAccent */
+.swB.off { background: var(--borderStrong) } .swB.off i { background: var(--textSecondary) }
+.swB.on { background: var(--accent) } .swB.on i { background: var(--onAccent); box-shadow: 0 0 0 1px var(--accent) }
+/* SW-C: custom AppSwitch: off = outlined track, small thumb; on = filled track, large thumb */
+.swC { width: 48px; height: 28px }
+.swC.off { background: transparent; box-shadow: inset 0 0 0 2px var(--borderStrong) }
+.swC.off i { width: 14px; height: 14px; top: 7px; left: 7px; background: var(--textSecondary); box-shadow: none }
+.swC.on { background: var(--accent) } .swC.on i { width: 22px; height: 22px; top: 3px; right: 3px; background: var(--onAccent); box-shadow: none }
+.swC.on i::after { content: ""; position: absolute; inset: 0; background: no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%236C8CFF' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") }
+.sl .swC.on i::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%234453B0' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") }
+
+/* Chips, list, sheet */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px }
+.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 12.5px }
+.chip.solid { background: var(--accent); color: var(--onAccent); border-color: var(--accent); font-weight: 600 }
+.chip.outl { border-color: var(--accent); color: var(--accentText); font-weight: 600 }
+.sheet { background: var(--surfaceElevated); border-top-left-radius: 16px; border-top-right-radius: 16px; border-top: 1px solid var(--border); padding: 10px 14px 14px }
+.grab { width: 36px; height: 4px; border-radius: 4px; background: var(--borderStrong); margin: 0 auto 10px }
+.optrow { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); margin-top: 6px; background: var(--surface) }
+.optrow.sel { background: var(--accent); color: var(--onAccent); border-color: var(--accent); font-weight: 600 }
+.dtrow { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px }
+.dtrow:last-child { border-bottom: 0 }
+.dtrow .k { color: var(--textSecondary) }
+.empty { text-align: center; padding: 26px 18px; display: grid; gap: 8px; justify-items: center }
+.empty .ic { width: 44px; height: 44px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--textSecondary) }
+.ell { display: inline-block; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom }
+.decided { border-style: dashed }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Phase 38.9 · UX Standards · decision mockup</p>
+  <h1>Orbit UX standards: the visual questions</h1>
+  <p class="lede">Each question shows its options side by side in <b>Galaxy Dark</b> and <b>Standard Light</b>, using the app's real colour tokens. Background art is left out on purpose; only the component is under review. Reply with the codes, e.g. <span class="code">DLG-B BK-A PN-A SN-A SW-C DT-A</span>, or “approve all recs”.</p>
+  <p class="recline">Recommended set: <span class="code">DLG-B · BK-A · PN-A · SN-A · SW-C · DT-A</span> (plus Q-17 in the chat)</p>
+
+  <!-- Q-18 DIALOGS -->
+  <section class="q" id="q18">
+    <div class="qhead"><span class="qid">Q-18</span><h2>Dialog look</h2><span class="ref">D-27 themed dialogs replace Android Alerts</span></div>
+    <p>Every confirm, destructive confirm and one-button notice uses this card. The layout rules are already decided (ADR-174: one row when both buttons fit, otherwise stacked with Cancel first; destructive cannot be dismissed by tapping outside). The only question is how the card is drawn.</p>
+    <div class="opts">
+      <div class="opt">
+        <div class="opthead"><span class="tag">DLG-A</span><span class="desc">Today's dialog: elevated card, hairline border.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="dimbg"><div class="dlg">
+            <svg class="i warn" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 1.5 21h21L12 3zm0 5.5 1 .1v6.8h-2V8.6l1-.1zm0 9a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6z"/></svg>
+            <div class="t-heading">Remove photo?</div><div class="t-body muted">Ann Lee's photo will be removed. This can't be undone.</div>
+            <div class="row"><span class="btn sec">Cancel</span><span class="btn des">⚠ Remove photo</span></div></div></div></div><figcaption>Galaxy Dark · destructive</figcaption></figure>
+          <figure><div class="scr sl"><div class="dimbg"><div class="dlg">
+            <svg class="i warn" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 1.5 21h21L12 3zm0 5.5 1 .1v6.8h-2V8.6l1-.1zm0 9a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6z"/></svg>
+            <div class="t-heading">Remove photo?</div><div class="t-body muted">Ann Lee's photo will be removed. This can't be undone.</div>
+            <div class="row"><span class="btn sec">Cancel</span><span class="btn des">⚠ Remove photo</span></div></div></div></div><figcaption>Standard Light · destructive</figcaption></figure>
+          <figure><div class="scr gd"><div class="dimbg"><div class="dlg">
+            <div class="t-heading">Couldn't save</div><div class="t-body muted">Something went wrong saving Ann Lee. Your changes are still here.</div>
+            <div class="row"><span class="btn pri">OK</span></div></div></div></div><figcaption>Galaxy Dark · one-button notice</figcaption></figure>
+        </div>
+      </div>
+      <div class="opt rec">
+        <div class="opthead"><span class="tag">DLG-B</span><span class="rtag">Recommended</span><span class="desc">Same card with a stronger border, matching Phase 39's lesson cards (39 D-80), so dialogs and lessons look like one family.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="dimbg"><div class="dlg strong">
+            <svg class="i warn" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 1.5 21h21L12 3zm0 5.5 1 .1v6.8h-2V8.6l1-.1zm0 9a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6z"/></svg>
+            <div class="t-heading">Remove photo?</div><div class="t-body muted">Ann Lee's photo will be removed. This can't be undone.</div>
+            <div class="row"><span class="btn sec">Cancel</span><span class="btn des">⚠ Remove photo</span></div></div></div></div><figcaption>Galaxy Dark · destructive</figcaption></figure>
+          <figure><div class="scr sl"><div class="dimbg"><div class="dlg strong">
+            <svg class="i warn" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 1.5 21h21L12 3zm0 5.5 1 .1v6.8h-2V8.6l1-.1zm0 9a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6z"/></svg>
+            <div class="t-heading">Remove photo?</div><div class="t-body muted">Ann Lee's photo will be removed. This can't be undone.</div>
+            <div class="row"><span class="btn sec">Cancel</span><span class="btn des">⚠ Remove photo</span></div></div></div></div><figcaption>Standard Light · destructive</figcaption></figure>
+          <figure><div class="scr sl"><div class="dimbg"><div class="dlg strong">
+            <div class="t-heading">Couldn't save</div><div class="t-body muted">Something went wrong saving Ann Lee. Your changes are still here.</div>
+            <div class="row"><span class="btn pri">OK</span></div></div></div></div><figcaption>Standard Light · one-button notice</figcaption></figure>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin-top:18px">Already decided, shown for reference (no answer needed)</h3>
+    <div class="pair" style="margin-top:8px">
+      <figure><div class="scr gd"><div class="dimbg"><div class="dlg">
+        <div class="t-heading">Discard changes?</div><div class="t-body muted">Your unsaved changes will be lost.</div>
+        <div class="row"><span class="btn sec">Keep editing</span><span class="btn des">⚠ Discard changes</span></div></div></div></div>
+        <figcaption>Unsaved-work prompt with the shell dossier's wording (D-13). Drawn in whichever look wins Q-18.</figcaption></figure>
+      <figure><div class="scr sl"><div class="dimbg"><div class="dlg">
+        <svg class="i warn" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 1.5 21h21L12 3zm0 5.5 1 .1v6.8h-2V8.6l1-.1zm0 9a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6z"/></svg>
+        <div class="t-heading">Delete group event?</div><div class="t-body muted">The event and all 4 of its interactions will be deleted. This can't be undone.</div>
+        <div class="stack"><span class="btn sec full">Cancel</span><span class="btn des full">⚠ Delete group &amp; interactions</span></div></div></div></div>
+        <figcaption>Long labels stack full-width with Cancel first (ADR-174, kept by D-06).</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- Q-19 BACK -->
+  <section class="q" id="q19">
+    <div class="qhead"><span class="qid">Q-19</span><h2>Back button on the shared header</h2><span class="ref">D-16 one header on every pushed screen</span></div>
+    <p>About 25 screens with their own boxed or in-page Back move onto the shared header. Today that header shows the word “Back” (16 screens). The Profile alone uses a chevron. Phase 39's mockup frames draw the word “Back”.</p>
+    <div class="opts">
+      <div class="opt rec"><div class="opthead"><span class="tag">BK-A</span><span class="rtag">Recommended</span><span class="desc">Word “Back”, as on the shared header today. Fewest changes, and it matches Phase 39's frames.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="hdr"><span class="back">Back</span><span class="title">&nbsp;Edit contact</span></div><div class="pad t-cap">…form…</div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="hdr"><span class="back">Back</span><span class="title">&nbsp;Edit contact</span></div><div class="pad t-cap">…form…</div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+      <div class="opt"><div class="opthead"><span class="tag">BK-B</span><span class="desc">Chevron only, like the Profile today. The most compact; still read as “Back” by TalkBack.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="hdr"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="title">Edit contact</span></div><div class="pad t-cap">…form…</div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="hdr"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="title">Edit contact</span></div><div class="pad t-cap">…form…</div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+      <div class="opt"><div class="opthead"><span class="tag">BK-C</span><span class="desc">Chevron plus “Back”. The most explicit, and the widest.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="hdr"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Back</span><span class="title">&nbsp;Edit contact</span></div><div class="pad t-cap">…form…</div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="hdr"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Back</span><span class="title">&nbsp;Edit contact</span></div><div class="pad t-cap">…form…</div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+    </div>
+    <p class="t-cap" style="color:var(--ink-2)">Whichever wins, the Profile keeps its own top bar layout; 38.11 decides whether its glyph changes to match.</p>
+  </section>
+
+  <!-- Q-20 PERSON NAME -->
+  <section class="q" id="q20">
+    <div class="qhead"><span class="qid">Q-20</span><h2>Showing who a form is for</h2><span class="ref">E-10 · F-08</span></div>
+    <p>Update Contact, Log Interaction, Edit interaction and the Add Note sheet never say which person they are for. These are drawn with the BK-A header; the person line works with any Back style.</p>
+    <div class="opts">
+      <div class="opt"><div class="opthead"><span class="tag">PN-0</span><span class="desc">Today: no name.</span></div>
+        <div class="pair"><figure><div class="scr gd"><div class="hdr"><span class="back">Back</span><span class="title">&nbsp;Log Interaction</span></div><div class="pad t-cap">Channel · Date · Note…</div></div><figcaption>Galaxy Dark</figcaption></figure></div></div>
+      <div class="opt rec"><div class="opthead"><span class="tag">PN-A</span><span class="rtag">Recommended</span><span class="desc">The title stays the same everywhere; a line under it shows the person's avatar and name.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="hdr" style="align-items:flex-start"><span class="back">Back</span><div>&nbsp;<span class="title">Log Interaction</span><div class="sub">&nbsp;<span class="av">AL</span>Ann Lee</div></div></div><div class="pad t-cap">Channel · Date · Note…</div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="hdr" style="align-items:flex-start"><span class="back">Back</span><div>&nbsp;<span class="title">Update Contact</span><div class="sub">&nbsp;<span class="av">AL</span>Ann Lee</div></div></div><div class="pad t-cap">Last spoke · Frequency…</div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+      <div class="opt"><div class="opthead"><span class="tag">PN-B</span><span class="desc">The name goes into the title. Shorter, but the title changes per person and long names get cut off.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="hdr"><span class="back">Back</span><span class="title">&nbsp;Log with Ann Lee</span></div><div class="pad t-cap">Channel · Date · Note…</div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="hdr"><span class="back">Back</span><span class="title ell">&nbsp;Update Alexandra Montgomery-Smith</span></div><div class="pad t-cap">Last spoke · Frequency…</div></div><figcaption>Standard Light · long name</figcaption></figure>
+        </div></div>
+    </div>
+  </section>
+
+  <!-- Q-21 SNACKBAR -->
+  <section class="q" id="q21">
+    <div class="qhead"><span class="qid">Q-21</span><h2>Snackbar wording</h2><span class="ref">D-39 every silent write names the person</span></div>
+    <p>The pattern every snackbar follows. Today Quick Log just says “Logged”.</p>
+    <div class="opts">
+      <div class="opt rec"><div class="opthead"><span class="tag">SN-A</span><span class="rtag">Recommended</span><span class="desc">Verb first: what happened, then to whom. Matches today's “Logged”.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="snackwrap"><div class="snack"><span class="msg">Logged Message with Ann</span><span class="act">Undo</span><span class="act">Add note</span></div><div class="snack"><span class="msg">Archived Ann Lee</span><span class="act">Undo</span></div></div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="snackwrap"><div class="snack"><span class="msg">Logged Message with Ann</span><span class="act">Undo</span><span class="act">Add note</span></div><div class="snack"><span class="msg">Archived Ann Lee</span><span class="act">Undo</span></div></div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+      <div class="opt"><div class="opthead"><span class="tag">SN-B</span><span class="desc">Thing first, verb last.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="snackwrap"><div class="snack"><span class="msg">Message with Ann logged</span><span class="act">Undo</span><span class="act">Add note</span></div><div class="snack"><span class="msg">Ann Lee archived</span><span class="act">Undo</span></div></div></div><figcaption>Galaxy Dark</figcaption></figure>
+        </div></div>
+      <div class="opt"><div class="opthead"><span class="tag">SN-C</span><span class="desc">Person first, then a dot.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="snackwrap"><div class="snack"><span class="msg">Ann · Message logged</span><span class="act">Undo</span><span class="act">Add note</span></div><div class="snack"><span class="msg">Ann Lee · Archived</span><span class="act">Undo</span></div></div></div><figcaption>Galaxy Dark</figcaption></figure>
+        </div></div>
+    </div>
+    <h3 style="margin-top:18px">Follows from the rule (shown in SN-A wording)</h3>
+    <div class="pair" style="margin-top:8px">
+      <figure><div class="scr gd"><div class="snackwrap"><div class="snack"><span class="msg">Log removed</span></div><div class="snack err"><span class="dot"></span><span class="msg">Couldn't log. Check your connection to storage.</span><span class="act">Retry</span></div></div></div><figcaption>After Undo the snackbar confirms itself; errors carry a red mark and Retry when there's something to retry. 6 seconds, unchanged (D-04).</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- Q-22 SWITCHES -->
+  <section class="q" id="q22">
+    <div class="qhead"><span class="qid">Q-22</span><h2>Switches</h2><span class="ref">E-22 · K-29 · D-25 one shared switch</span></div>
+    <p>Each option shows on, off and disabled (disabled rows are dimmed and always show Off, per D-26). All 30 switches change together.</p>
+    <div class="opts">
+      <div class="opt"><div class="opthead"><span class="tag">SW-A</span><span class="desc">Today. In dark themes an off switch nearly disappears.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="pad"><div class="swrow"><span>Birthday reminders</span><span class="sw swA on"><i></i></span></div><div class="swrow"><span>Weekly digest</span><span class="sw swA off"><i></i></span></div><div class="swrow dis"><span>Quiet hours</span><span class="sw swA off"><i></i></span></div></div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="pad"><div class="swrow"><span>Birthday reminders</span><span class="sw swA on"><i></i></span></div><div class="swrow"><span>Weekly digest</span><span class="sw swA off"><i></i></span></div><div class="swrow dis"><span>Quiet hours</span><span class="sw swA off"><i></i></span></div></div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+      <div class="opt"><div class="opthead"><span class="tag">SW-B</span><span class="desc">Same Android switch with stronger colours: the off track and thumb are clearly visible.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="pad"><div class="swrow"><span>Birthday reminders</span><span class="sw swB on"><i></i></span></div><div class="swrow"><span>Weekly digest</span><span class="sw swB off"><i></i></span></div><div class="swrow dis"><span>Quiet hours</span><span class="sw swB off"><i></i></span></div></div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="pad"><div class="swrow"><span>Birthday reminders</span><span class="sw swB on"><i></i></span></div><div class="swrow"><span>Weekly digest</span><span class="sw swB off"><i></i></span></div><div class="swrow dis"><span>Quiet hours</span><span class="sw swB off"><i></i></span></div></div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+      <div class="opt rec"><div class="opthead"><span class="tag">SW-C</span><span class="rtag">Recommended</span><span class="desc">Orbit's own switch: off is an outlined track with a small thumb; on is filled with a large thumb and a check. On and off differ by shape as well as colour.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="pad"><div class="swrow"><span>Birthday reminders</span><span class="sw swC on"><i></i></span></div><div class="swrow"><span>Weekly digest</span><span class="sw swC off"><i></i></span></div><div class="swrow dis"><span>Quiet hours</span><span class="sw swC off"><i></i></span></div></div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="pad"><div class="swrow"><span>Birthday reminders</span><span class="sw swC on"><i></i></span></div><div class="swrow"><span>Weekly digest</span><span class="sw swC off"><i></i></span></div><div class="swrow dis"><span>Quiet hours</span><span class="sw swC off"><i></i></span></div></div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+    </div>
+  </section>
+
+  <!-- Q-23 DATES -->
+  <section class="q" id="q23">
+    <div class="qhead"><span class="qid">Q-23</span><h2>How dates read</h2><span class="ref">C-06 · D-21 · D-23 one date formatter</span></div>
+    <p>One format for every date-only display. The examples assume today is Sat, Oct 10, 2026.</p>
+    <div class="opts">
+      <div class="opt"><div class="opthead"><span class="tag">DT-0</span><span class="desc">Today: raw stored dates in several places.</span></div>
+        <div class="pair"><figure><div class="scr gd"><div class="pad"><div class="dtrow"><span class="k">Digest birthday</span><span>2026-10-13</span></div><div class="dtrow"><span class="k">Snoozed until</span><span>2026-10-17</span></div><div class="dtrow"><span class="k">Recently Deleted</span><span>Deleted 2026-10-10 04:38:09</span></div><div class="dtrow"><span class="k">Profile date field</span><span>2025-06-02</span></div></div></div><figcaption>Galaxy Dark</figcaption></figure></div></div>
+      <div class="opt rec"><div class="opthead"><span class="tag">DT-A</span><span class="rtag">Recommended</span><span class="desc">History's existing style: no year when it's this year, year shown otherwise.</span></div>
+        <div class="pair">
+          <figure><div class="scr gd"><div class="pad"><div class="dtrow"><span class="k">Digest birthday</span><span>Tue, Oct 13</span></div><div class="dtrow"><span class="k">Snoozed until</span><span>Oct 17</span></div><div class="dtrow"><span class="k">Recently Deleted</span><span>Deleted Oct 10</span></div><div class="dtrow"><span class="k">Profile date field</span><span>Jun 2, 2025</span></div></div></div><figcaption>Galaxy Dark</figcaption></figure>
+          <figure><div class="scr sl"><div class="pad"><div class="dtrow"><span class="k">Digest birthday</span><span>Tue, Oct 13</span></div><div class="dtrow"><span class="k">Snoozed until</span><span>Oct 17</span></div><div class="dtrow"><span class="k">Recently Deleted</span><span>Deleted Oct 10</span></div><div class="dtrow"><span class="k">Profile date field</span><span>Jun 2, 2025</span></div></div></div><figcaption>Standard Light</figcaption></figure>
+        </div></div>
+      <div class="opt"><div class="opthead"><span class="tag">DT-B</span><span class="desc">Always show the year.</span></div>
+        <div class="pair"><figure><div class="scr sl"><div class="pad"><div class="dtrow"><span class="k">Digest birthday</span><span>Tue, Oct 13, 2026</span></div><div class="dtrow"><span class="k">Snoozed until</span><span>Oct 17, 2026</span></div><div class="dtrow"><span class="k">Recently Deleted</span><span>Deleted Oct 10, 2026</span></div><div class="dtrow"><span class="k">Profile date field</span><span>Jun 2, 2025</span></div></div></div><figcaption>Standard Light</figcaption></figure></div></div>
+    </div>
+    <p class="t-cap" style="color:var(--ink-2)">Weekday only where the day matters (upcoming items). Time only where it matters (events, interaction detail), as today. Storage dates are unaffected.</p>
+  </section>
+
+  <!-- DECIDED REFERENCE -->
+  <section class="q decided" id="ref">
+    <div class="qhead"><span class="qid">Ref</span><h2>Already decided: how they look in the new pieces</h2><span class="ref">no answer needed · speak up if one looks wrong</span></div>
+    <div class="pair" style="margin-top:12px">
+      <figure><div class="scr gd"><div class="pad t-cap" style="padding-bottom:0">New contact form, dimmed behind the sheet</div><div style="height:16px"></div><div class="sheet"><div class="grab"></div><div class="t-heading" style="margin-bottom:4px">Category</div><div class="optrow sel"><span>Friends</span><span>Selected</span></div><div class="optrow"><span>Family</span></div><div class="optrow"><span>Work</span></div><div class="optrow"><span>Community</span></div></div></div><figcaption>D-28 · one themed option sheet replaces every Android spinner (from today's category sheet)</figcaption></figure>
+      <figure><div class="scr sl"><div class="pad"><div class="t-cap">Category</div><div class="chips"><span class="chip solid">Friends</span><span class="chip">Family</span><span class="chip">Work</span></div><div class="t-cap" style="margin-top:10px">Frequency</div><div class="chips"><span class="chip">Weekly</span><span class="chip outl">Monthly</span><span class="chip">Quarterly</span></div><div class="t-cap" style="margin-top:10px">Last spoke</div><div class="chips"><span class="chip outl">Not yet</span><span class="chip">Pick date</span></div></div></div><figcaption>D-05 · top-level choices solid, sub-options outlined (your N-10 ruling); “Not yet” must look selected when chosen (D-94; its exact tier is 38.11's)</figcaption></figure>
+      <figure><div class="scr gd"><div class="hdr"><span class="back">Back</span><span class="title">&nbsp;New contact</span></div><div class="pad"><div class="field"><label>Name</label><div class="input err">&nbsp;</div><div class="errtxt">⚠ Enter a name to save.</div></div><div class="field"><label>Category</label><div class="input">Friends</div></div></div></div><figcaption>D-19 · error under the field; the form scrolls to it; it clears as you type</figcaption></figure>
+      <figure><div class="scr sl"><div class="empty"><div class="ic"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><div class="t-heading">No matches for “<span class="ell" style="max-width:150px">alexandra montgomery-smi</span>”</div><div class="t-cap">Search looks at names, nicknames and notes.</div><span class="btn sec">Clear search</span></div></div><figcaption>D-20 · empty state: icon, heading, one help line, one action; long search terms are cut off</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="q">
+    <div class="qhead"><span class="qid">Answer key</span></div>
+    <div class="answers"><table>
+      <tr><th>Question</th><th>Options</th><th>Recommended</th></tr>
+      <tr><td>Q-18 Dialog look</td><td><span class="code">DLG-A</span> today · <span class="code">DLG-B</span> stronger border</td><td><span class="code">DLG-B</span></td></tr>
+      <tr><td>Q-19 Back</td><td><span class="code">BK-A</span> word · <span class="code">BK-B</span> chevron · <span class="code">BK-C</span> both</td><td><span class="code">BK-A</span></td></tr>
+      <tr><td>Q-20 Person on forms</td><td><span class="code">PN-0</span> none · <span class="code">PN-A</span> name line · <span class="code">PN-B</span> name in title</td><td><span class="code">PN-A</span></td></tr>
+      <tr><td>Q-21 Snackbar wording</td><td><span class="code">SN-A</span> verb first · <span class="code">SN-B</span> verb last · <span class="code">SN-C</span> person first</td><td><span class="code">SN-A</span></td></tr>
+      <tr><td>Q-22 Switches</td><td><span class="code">SW-A</span> today · <span class="code">SW-B</span> stronger colours · <span class="code">SW-C</span> Orbit switch</td><td><span class="code">SW-C</span></td></tr>
+      <tr><td>Q-23 Dates</td><td><span class="code">DT-0</span> today · <span class="code">DT-A</span> no year this year · <span class="code">DT-B</span> always year</td><td><span class="code">DT-A</span></td></tr>
+    </table></div>
+  </section>
+</main>
+</body>
+</html>
