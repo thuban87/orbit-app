@@ -1,0 +1,954 @@
+<title>Orbit Onboarding Mockup</title>
+<style>
+/* Layout: review document. Chrome (outside the phones) follows the viewer's theme; every phone interior is a fixed Galaxy-dark render using the app's real palette tokens (src/theme/theme-presets.ts → galaxy.dark), type roles (src/theme/tokens/typography.ts) and radii (src/theme/tokens/radii.ts), drawn at ~78% of device size. */
+:root {
+  /* page chrome — light */
+  --page-bg: #F2F4F9; --panel: #FFFFFF; --ink: #161A2B; --ink-2: #4F5772; --rule: #D6DBE8;
+  --chrome-accent: #2A46C7; --chip-bg: #E6EBFA; --chip-ink: #2A3A8F; --warn-bg: #FFF4D9; --warn-ink: #6B4C00; --warn-rule: #E8C15C;
+  --bezel: #1B1F2E; --bezel-edge: #3C4568;
+
+  /* phone interiors — Galaxy dark tokens, named after the app's tokens (identical in both page themes) */
+  --background: #0B0E1A; --surface: #141828; --surfaceElevated: #1D2235;
+  --accent: #6C8CFF; --onAccent: #0A1330; --accentText: #8FA6FF;
+  --textPrimary: #E6E9F5; --textSecondary: #8B93B0; --border: #2A3048; --borderStrong: #3C4568;
+  --statusStable: #45B98A; --statusWobble: #E8C15C; --statusDecay: #E56A52;
+  --orrerySkyBase: #070A16; --orrerySkyHorizon: #121A36; --orreryNebulaA: #3E52A8; --orreryNebulaB: #6A4FAE;
+  --orreryRingLight: #FFF3DC; --orreryGlow: #9FB4FF; --orreryRim: #DCE6FF; --orreryReticle: #6C8CFF;
+  --heat0: #1A2138; --heat1: #2E3E6E; --heat2: #42579E; --heat3: #5A78D6; --heat4: #8AA6FF;
+  --sw1: #5B6CB8; --sw2: #4E8A8A; --sw3: #8A6BB0; --sw4: #B07A5B; --sw5: #5B9E6B; --swText: #F2F4FB;
+  /* proposal: tutorial scrim = background token @ 80% (BaseOverlay uses 85%) */
+  --scrim: #0B0E1ACC;
+
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page-bg: #10131F; --panel: #171B2B; --ink: #E6E9F5; --ink-2: #A0A8C4; --rule: #2C3350;
+  --chrome-accent: #8FA6FF; --chip-bg: #222A48; --chip-ink: #BCC8F2; --warn-bg: #2E2714; --warn-ink: #F2D88E; --warn-rule: #7A6528;
+  --bezel: #03050B; --bezel-edge: #3C4568; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page-bg: #10131F; --panel: #171B2B; --ink: #E6E9F5; --ink-2: #A0A8C4; --rule: #2C3350;
+  --chrome-accent: #8FA6FF; --chip-bg: #222A48; --chip-ink: #BCC8F2; --warn-bg: #2E2714; --warn-ink: #F2D88E; --warn-rule: #7A6528;
+  --bezel: #03050B; --bezel-edge: #3C4568; color-scheme: dark }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@600&display=swap">
+<style>
+* { box-sizing: border-box }
+body { background: var(--page-bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 28px 64px; margin: 0 }
+.wrap { max-width: 1140px; margin: 0 auto; display: grid; gap: 40px }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0 }
+h1 { font-size: 30px; line-height: 1.15 }
+h2 { font-size: 22px }
+p { margin: 0 }
+a { color: var(--chrome-accent) }
+.lede { color: var(--ink-2); max-width: 72ch }
+.banner { border: 1px solid var(--warn-rule); background: var(--warn-bg); color: var(--warn-ink); border-radius: 12px; padding: 10px 14px; font-size: 14px; max-width: 72ch }
+.banner b { font-weight: 600 }
+.head { display: grid; gap: 14px }
+.eyebrow { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); font-weight: 600 }
+.part { display: grid; gap: 18px }
+.part > header { display: grid; gap: 6px }
+.part > header p { color: var(--ink-2); max-width: 72ch }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--ink-2) }
+.legend span { display: inline-flex; gap: 6px; align-items: center }
+
+/* frame grid: wraps on wide screens so the whole run is visible at rest; becomes a swipe strip on phones */
+.frames { display: flex; flex-wrap: wrap; gap: 36px 28px; align-items: flex-start }
+.frame { width: 320px; flex: none; margin: 0; display: grid; gap: 12px; min-width: 0 }
+@media (max-width: 720px) {
+  .frames { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 12px; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px }
+  .frame { scroll-snap-align: start; width: min(320px, calc(100vw - 48px)) }
+  .frame .phone { transform-origin: top left }
+}
+.strip-hint { display: none; font-size: 13px; color: var(--ink-2) }
+@media (max-width: 720px) { .strip-hint { display: block } }
+
+figcaption { display: grid; gap: 8px; font-size: 13.5px; line-height: 1.5 }
+figcaption h3 { font-size: 16px; display: flex; gap: 8px; align-items: baseline }
+.num { font-family: var(--font-display); font-size: 13px; color: var(--chrome-accent); font-variant-numeric: tabular-nums; min-width: 1.6em }
+.ids { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; padding: 0; margin: 0 }
+.ids li { font-size: 11.5px; font-weight: 600; background: var(--chip-bg); color: var(--chip-ink); border-radius: 6px; padding: 1px 7px; font-variant-numeric: tabular-nums }
+.ids li.prov { background: var(--warn-bg); color: var(--warn-ink); border: 1px dashed var(--warn-rule) }
+dl.cap { display: grid; grid-template-columns: 74px 1fr; gap: 4px 10px; margin: 0 }
+dl.cap dt { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; padding-top: 2px }
+dl.cap dd { margin: 0; min-width: 0 }
+dl.cap q { font-style: italic; quotes: "\201C" "\201D" }
+
+/* ===================== PHONE ===================== */
+.phone { width: 320px; height: 660px; position: relative; border-radius: 30px; background: var(--bezel); padding: 8px; box-shadow: 0 0 0 1px var(--bezel-edge), 0 12px 32px rgba(0,0,0,.18) }
+.scr { position: absolute; inset: 8px; border-radius: 23px; overflow: hidden; background: var(--background); color: var(--textPrimary); font-family: var(--font-body); font-size: 13px; line-height: 19px; isolation: isolate }
+.sky { position: absolute; inset: 0; z-index: -1;
+  background:
+    radial-gradient(1px 1px at 22px 40px, #E6E9F5AA 60%, transparent 61%),
+    radial-gradient(1px 1px at 120px 150px, #BCC8F299 60%, transparent 61%),
+    radial-gradient(1px 1px at 240px 90px, #F2DCAE88 60%, transparent 61%),
+    radial-gradient(1px 1px at 270px 320px, #A4D6F288 60%, transparent 61%),
+    radial-gradient(1px 1px at 60px 420px, #E6E9F566 60%, transparent 61%),
+    radial-gradient(1px 1px at 190px 520px, #BCC8F277 60%, transparent 61%),
+    radial-gradient(ellipse 70% 40% at 75% 35%, #3E52A833, transparent 70%),
+    radial-gradient(ellipse 60% 45% at 20% 75%, #6A4FAE26, transparent 70%),
+    var(--background);
+  background-size: 160px 260px, 220px 300px, 260px 240px, 300px 380px, 180px 460px, 240px 560px, auto, auto, auto }
+.status { height: 22px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; font-size: 11px; color: var(--textPrimary); font-variant-numeric: tabular-nums }
+.status .r { display: flex; gap: 5px; align-items: center }
+.status svg { width: 11px; height: 11px; fill: var(--textPrimary) }
+.body { position: absolute; top: 22px; left: 0; right: 0; bottom: 56px; overflow: hidden }
+.body.full { bottom: 0 }
+.tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: var(--surface); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center }
+.tab { display: grid; justify-items: center; gap: 1px; font-size: 9.5px; color: var(--textSecondary); line-height: 12px; padding-top: 4px; position: relative; height: 100% ; align-content: center }
+.tab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round }
+.tab.on { color: var(--accent) }
+.tab.on::after { content: ""; position: absolute; bottom: 3px; left: 22%; right: 22%; height: 2px; border-radius: 2px; background: var(--textPrimary) }
+.fab { position: absolute; right: 14px; bottom: 70px; width: 46px; height: 46px; border-radius: 50%; background: var(--accent); color: var(--onAccent); display: grid; place-items: center; box-shadow: 0 4px 10px #00000066 }
+.fab svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round }
+
+/* app type roles at ~78% */
+.t-display { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 27px }
+.t-heading { font-family: var(--font-display); font-weight: 600; font-size: 16px; line-height: 20px }
+.t-label { font-weight: 600; font-size: 11.5px; line-height: 16px }
+.t-caption { font-size: 11.5px; line-height: 16px; color: var(--textSecondary) }
+.apphdr { padding: 6px 14px 8px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center }
+.apphdr .t-heading { font-size: 18px }
+.pad { padding: 10px 14px; display: grid; gap: 6px }
+.sec { display: grid; gap: 3px; padding: 6px 0 }
+
+/* app buttons (button-roles.ts: primary/secondary/tertiary, radius md=12, min 44dp) */
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 12px; border-radius: 10px; font-weight: 600; font-size: 12px; line-height: 16px; white-space: nowrap; cursor: default; user-select: none }
+.btn.pri { background: var(--accent); color: var(--onAccent) }
+.btn.sec { background: var(--surface); color: var(--textPrimary); border: 1px solid var(--border) }
+.btn.ter { color: var(--accentText); padding: 0 6px }
+.btn.block { display: flex; width: 100% }
+.seg { display: flex; gap: 6px }
+.seg > span { flex: 1; text-align: center; border: 1px solid var(--border); border-radius: 9px; padding: 6px 2px; font-size: 11px; color: var(--textPrimary); background: var(--surface) }
+.seg > span.solid { background: var(--accent); color: var(--onAccent); border-color: var(--accent); font-weight: 600 }
+.seg > span.outl { border-color: var(--accent); color: var(--accentText); font-weight: 600 }
+.seg > span.dim { color: var(--textSecondary) }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px }
+.acc { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px }
+.acc .t-heading { font-size: 15px }
+.acc .chev { color: var(--textSecondary); font-size: 12px }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px }
+.stats > div { background: var(--surface); border-radius: 9px; padding: 6px 8px; font-size: 11px; line-height: 14px; color: var(--textSecondary) }
+.stats b { display: block; color: var(--textPrimary); font-weight: 400; font-size: 13px }
+.av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--swText); font-weight: 600; font-size: 11px; flex: none }
+.row { display: flex; gap: 10px; align-items: center; padding: 7px 0 }
+.row .nm { font-weight: 600; font-size: 12.5px; line-height: 16px }
+.row .sub { font-size: 11px; color: var(--textSecondary); line-height: 14px; display: flex; gap: 5px; align-items: center }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block }
+.chipbar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 6px 6px 0 }
+.chipbar > div { border: 1px solid var(--border); background: var(--surface); border-radius: 9px; padding: 4px 7px; font-size: 10.5px; line-height: 13px; color: var(--textSecondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.chipbar b { display: block; color: var(--textPrimary); font-weight: 600 }
+.toolrow { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px }
+.toolrow .ic { width: 32px; height: 30px; border-radius: 8px; border: 1px solid var(--border); display: grid; place-items: center }
+.toolrow .ic.on { background: var(--accent); border-color: var(--accent) }
+.toolrow svg { width: 15px; height: 15px; stroke: var(--textPrimary); fill: none; stroke-width: 1.8; stroke-linecap: round }
+.toolrow .ic.on svg { stroke: var(--onAccent) }
+.bracket { position: relative; padding: 5px 9px; font-size: 12px; font-weight: 600; color: var(--textPrimary); background: #0B0E1A99 }
+.bracket::before, .bracket::after { content: ""; position: absolute; width: 7px; height: 7px; border: 1.5px solid var(--orreryReticle) }
+.bracket::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0 }
+.bracket::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0 }
+
+/* ===================== TUTORIAL LAYER (proposal) ===================== */
+svg.scrim { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none }
+.spotring { fill: none; stroke: var(--accent); stroke-width: 2 }
+@media (prefers-reduced-motion: no-preference) {
+  .spotring.pulse { animation: ring 2.4s ease-in-out infinite }
+  @keyframes ring { 0%,100% { stroke-opacity: 1 } 50% { stroke-opacity: .45 } }
+}
+.coach { position: absolute; left: 10px; right: 10px; z-index: 6; background: var(--surfaceElevated); border: 1px solid var(--borderStrong); border-radius: 16px; padding: 12px 12px 10px; display: grid; gap: 7px; box-shadow: 0 10px 28px #000000AA }
+.coach .top { display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; color: var(--textSecondary); font-weight: 600; letter-spacing: .02em; font-variant-numeric: tabular-nums }
+.pips { display: flex; gap: 4px }
+.pips i { width: 14px; height: 3px; border-radius: 2px; background: var(--borderStrong) }
+.pips i.on { background: var(--accent) }
+.coach .ttl { font-family: var(--font-display); font-weight: 600; font-size: 15px; line-height: 19px }
+.coach .txt { font-size: 12px; line-height: 17px; color: var(--textPrimary); display: grid; gap: 5px }
+.coach .txt .mut { color: var(--textSecondary) }
+.coach ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px }
+.coach li { padding-left: 11px; position: relative }
+.coach li::before { content: ""; position: absolute; left: 0; top: 7px; width: 4px; height: 4px; border-radius: 50%; background: var(--accentText) }
+.coach .acts { display: flex; gap: 6px; align-items: center; margin-top: 2px }
+.coach .acts .sp { flex: 1 }
+.coach .btn { min-height: 32px }
+.caret { position: absolute; width: 12px; height: 12px; background: var(--surfaceElevated); border: 1px solid var(--borderStrong); transform: rotate(45deg) }
+.caret.up { top: -7px; border-right: 0; border-bottom: 0 }
+.caret.down { bottom: -7px; border-left: 0; border-top: 0 }
+.coach.dialog { top: 50%; transform: translateY(-50%); left: 18px; right: 18px; padding: 16px 14px 12px; gap: 9px }
+.focusmark { position: absolute; z-index: 7; inset: -4px; border: 2px dashed #FFF3DC; border-radius: 19px; pointer-events: none; opacity: .0 }
+.showfocus .coach .focusmark { opacity: .9 }
+.tag-not-final { display: inline-block; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; border: 1px dashed var(--statusWobble); color: var(--statusWobble); border-radius: 5px; padding: 0 5px; line-height: 15px; font-weight: 600 }
+
+/* ===================== PLAYER ===================== */
+.player { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; align-items: start; background: var(--panel); border: 1px solid var(--rule); border-radius: 18px; padding: 20px }
+.player[hidden] { display: none !important }
+.stage { width: 368px; height: 759px; position: relative }
+.stage .phone { transform: scale(1.15); transform-origin: top left }
+.pctl { display: grid; gap: 12px; align-content: start; min-width: 0 }
+.pctl .btns { display: flex; flex-wrap: wrap; gap: 8px }
+.cbtn { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; border: 1px solid var(--rule); background: var(--page-bg); color: var(--ink); padding: 8px 14px; cursor: pointer }
+.cbtn.primary { background: var(--chrome-accent); color: var(--panel); border-color: var(--chrome-accent) }
+.cbtn:focus-visible, .linkbtn:focus-visible, .frames:focus-visible { outline: 3px solid var(--chrome-accent); outline-offset: 2px }
+.pcap { font-size: 14px; display: grid; gap: 8px }
+.pcount { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px }
+.stage .coach .btn[data-act] { cursor: pointer }
+.stage .coach .btn[data-act]:hover { filter: brightness(1.12) }
+@media (max-width: 760px) {
+  .player { grid-template-columns: 1fr; padding: 14px }
+  .stage { width: 320px; height: 660px; justify-self: center }
+  .stage .phone { transform: none }
+}
+
+/* ===================== NOTES ===================== */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 18px }
+.note { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 16px 18px; display: grid; gap: 10px; align-content: start; min-width: 0 }
+.note h3 { font-size: 16px }
+.note ul, .note ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px }
+.note p { font-size: 14px; color: var(--ink-2) }
+.ptable { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px }
+.ptable th, .ptable td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--rule) }
+.ptable th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2) }
+.tablewrap { overflow-x: auto }
+.oq { counter-reset: q; list-style: none; padding: 0 !important }
+.oq li { counter-increment: q; padding-left: 34px; position: relative }
+.oq li::before { content: "Q" counter(q); position: absolute; left: 0; top: 0; font-family: var(--font-display); font-size: 13px; color: var(--chrome-accent) }
+.oq b { font-weight: 600 }
+.linkbtn { font: inherit; font-weight: 600; color: var(--chrome-accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-contacts" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></symbol>
+    <symbol id="i-events" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="16.5" cy="8.5" r="2.6"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5H3zM15.5 13.6c2.9 0 5.5 1.9 5.5 5.4h-4"/></symbol>
+    <symbol id="i-digest" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01"/></symbol>
+    <symbol id="i-orrery" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M3.5 15.5c-1.2-2 2.3-5.4 7.8-7.6 5.5-2.2 10.3-2.4 11.1-.5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8l1.6 2.3 2.7-.6.9 2.6 2.6.9-.6 2.7 2.3 1.6-2.3 1.6.6 2.7-2.6.9-.9 2.6-2.7-.6L12 21.2l-1.6-2.3-2.7.6-.9-2.6-2.6-.9.6-2.7L2.8 12l2.3-1.6-.6-2.7 2.6-.9.9-2.6 2.7.6z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-sig" viewBox="0 0 24 24"><path d="M2 20h20V4z"/></symbol>
+    <symbol id="i-bat" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="19" rx="2"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+<header class="head">
+  <div class="eyebrow">Phase 39 · Onboarding · Design workpaper (D-74)</div>
+  <h1><span data-app-name>Orbit</span> onboarding: how the lessons look and step through</h1>
+  <p class="banner"><b>Proposal, not final.</b> Built from the locked decisions in <code>39-LEDGER.md</code> for the owner's design review. All lesson copy below is draft wording; the D-IDs under each frame are the decisions it implements. People shown are fictional.</p>
+  <p class="lede">Part 1 walks one complete first run (manual add path) frame by frame. Part 2 shows the first frame of four other lessons, each using a different presentation pattern. Part 3 lists the accessibility treatment and the visual choices that need your call. Phones are drawn at about 78% of device size in <span data-app-name>Orbit</span>'s Galaxy dark theme, using the app's real colour tokens, fonts, radii and button styles.</p>
+  <div class="legend" aria-label="Legend">
+    <span><svg width="22" height="14" aria-hidden="true"><rect x="1" y="1" width="20" height="12" rx="4" fill="none" stroke="#6C8CFF" stroke-width="2"/></svg>Spotlight cutout (what the step is about)</span>
+    <span><svg width="22" height="14" aria-hidden="true"><rect x="1" y="1" width="20" height="12" rx="4" fill="#1D2235" stroke="#3C4568"/></svg>Lesson card</span>
+    <span><span class="ids"><li>D-12</li></span>Locked decision implemented</span>
+    <span><span class="ids"><li class="prov">D-35</li></span>Provisional or a mockup assumption</span>
+  </div>
+</header>
+
+<!-- ======================================================= PART 1 -->
+<section class="part" id="part1" aria-labelledby="p1h">
+  <header>
+    <div class="eyebrow">Part 1 · One complete run</div>
+    <h2 id="p1h">First run: Welcome → Acquire → add Maya → Orient → release</h2>
+    <p>The user installs <span data-app-name>Orbit</span>, taps Get Started, chooses to add someone manually, saves Maya Chen, and then takes the four-step Orient tour over the normal app. Every frame is a separate screen state. <button class="linkbtn" type="button" id="openPlayer">Step through this run in one large phone</button>.</p>
+  </header>
+
+  <div class="player" id="player" hidden aria-label="Run player">
+    <div class="stage" id="stage" aria-live="off"></div>
+    <div class="pctl">
+      <div class="pcount" id="pcount">Frame 1 of 9</div>
+      <div class="btns">
+        <button class="cbtn" type="button" id="pPrev">Previous</button>
+        <button class="cbtn primary" type="button" id="pNext">Next</button>
+        <button class="cbtn" type="button" id="pAuto" aria-pressed="false">Auto-play</button>
+        <button class="cbtn" type="button" id="pFocus" aria-pressed="false">Show focus target</button>
+        <button class="cbtn" type="button" id="pClose">Close player</button>
+      </div>
+      <p class="pcount">The lesson card's own Back, Next, Skip and Done buttons also work in the large phone.</p>
+      <div class="pcap" id="pcap" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <p class="strip-hint">Swipe sideways through the frames.</p>
+  <div class="frames" id="run" tabindex="0" aria-label="First-run frames">
+
+  <!-- 1 WELCOME -->
+  <figure class="frame" data-title="Welcome">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body full" style="display:flex;flex-direction:column;padding:0 22px 22px">
+        <div style="flex:1;display:grid;align-content:center;gap:16px;justify-items:start">
+          <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+            <defs><radialGradient id="sunA"><stop offset="0" stop-color="#FFF3DC"/><stop offset=".55" stop-color="#F2C14E"/><stop offset="1" stop-color="#F2C14E00"/></radialGradient></defs>
+            <circle cx="48" cy="48" r="44" fill="none" stroke="#3C4568" stroke-width="1"/>
+            <circle cx="48" cy="48" r="31" fill="none" stroke="#45B98A" stroke-width="1.3"/>
+            <circle cx="48" cy="48" r="19" fill="none" stroke="#E8C15C" stroke-width="1.3" stroke-dasharray="4 3"/>
+            <circle cx="48" cy="48" r="13" fill="url(#sunA)"/>
+            <circle cx="48" cy="4" r="5" fill="#5B6CB8" stroke="#DCE6FF" stroke-width="1"/>
+            <circle cx="77" cy="71" r="5" fill="#45B98A"/>
+            <circle cx="31" cy="38" r="4" fill="#E8C15C"/>
+          </svg>
+          <div class="t-display" style="font-size:28px;line-height:32px"><span data-app-name>Orbit</span></div>
+          <p style="font-size:14px;line-height:21px">Relationships are an n-body problem. <span data-app-name>Orbit</span> helps you keep the people in your life organized, remember what matters, and know when it's time to reconnect.</p>
+          <span class="tag-not-final">Copy not final</span>
+          <p class="t-caption" style="border:1px dashed var(--borderStrong);border-radius:9px;padding:6px 9px">No account needed. What you add is stored on this phone. <span style="color:var(--statusWobble)">(optional line, D-35)</span></p>
+        </div>
+        <div style="display:grid;gap:8px">
+          <span class="btn pri block" style="min-height:40px;font-size:13px">Get Started</span>
+          <span class="btn sec block" style="min-height:40px;font-size:13px">Skip Tutorials</span>
+        </div>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">01</span>Welcome</h3>
+      <ul class="ids"><li>D-08</li><li>D-09</li><li>D-55</li><li>D-70</li><li>D-72</li><li>D-73</li><li class="prov">D-35</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>A single full-screen page, no tab bar and no carousel. Logo mark, the n-body framing line (draft copy), and an optional one-line local-first note. No theme picker, no backup prompt.</dd>
+        <dt>Buttons</dt><dd><b>Get Started</b> opens Acquire. <b>Skip Tutorials</b> ends first run, turns all tutorials off (re-enable in Settings brings back unseen lessons) and lands in the app.</dd>
+        <dt>TalkBack</dt><dd>Focus starts on the heading: <q><span data-app-name>Orbit</span>. Heading.</q> then the paragraph, then <q>Get Started, button</q>, <q>Skip Tutorials, button</q>.</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- 2 ACQUIRE -->
+  <figure class="frame" data-title="Acquire choice">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body full" style="display:flex;flex-direction:column;padding:4px 18px 20px;gap:14px">
+        <div style="display:flex;align-items:center;gap:6px;color:var(--textSecondary)"><svg width="18" height="18" style="stroke:currentColor;fill:none;stroke-width:2"><use href="#i-back"/></svg><span class="t-caption">Back</span></div>
+        <div style="display:grid;gap:6px;margin-top:18px">
+          <div class="t-display">Add your first person</div>
+          <p class="t-caption" style="font-size:12.5px;line-height:18px">Start with one person. You can add more at any time.</p>
+        </div>
+        <div style="display:grid;gap:10px;margin-top:6px">
+          <div class="card" style="padding:14px;display:grid;gap:4px;border-color:var(--borderStrong)">
+            <div class="t-heading" style="font-size:15px">Add someone manually</div>
+            <div class="t-caption">Type their name. Everything else is optional.</div>
+          </div>
+          <div class="card" style="padding:14px;display:grid;gap:4px;border-color:var(--borderStrong)">
+            <div class="t-heading" style="font-size:15px">Import from Contacts</div>
+            <div class="t-caption">Pick people from your phone's contacts. <span data-app-name>Orbit</span> asks for permission first.</div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:4px"><span class="btn ter" style="font-weight:600">Restoring from a backup?</span></div>
+        <div style="flex:1"></div>
+        <span class="btn sec block" style="min-height:40px;font-size:13px">Skip Tutorials</span>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">02</span>Acquire choice</h3>
+      <ul class="ids"><li>D-08</li><li>D-10</li><li>D-61</li><li>D-63</li><li>D-62</li><li>D-70</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>Full-screen, no tab bar. Two choices as large tappable cards. Only the chosen path is taught; the other stays untaught until the user meets it later.</dd>
+        <dt>Buttons</dt><dd><b>Add someone manually</b> opens the New contact form (frame 3). <b>Import from Contacts</b> runs the import flow with its own participation-step teaching (D-52). <b>Restoring from a backup?</b> opens the existing restore flow; a restore that brings people in ends first run. <b>Skip Tutorials</b> as on Welcome. <b>Back</b> returns to Welcome. If the app is closed or an import is cancelled, first run reopens here.</dd>
+        <dt>TalkBack</dt><dd><q>Add your first person. Heading.</q> Each card reads as one button with its description: <q>Add someone manually. Type their name. Everything else is optional. Button.</q></dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- 3 ADD CONTACT COACH -->
+  <figure class="frame" data-title="Add Contact: one teaching step">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>9:42</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body full" style="padding:4px 10px 0;display:grid;gap:8px;align-content:start">
+        <div style="display:flex;gap:10px;align-items:center"><span class="btn sec" style="min-height:28px;padding:0 9px">Back</span><span class="t-display" style="font-size:20px">New contact</span></div>
+        <div class="card" style="padding:0">
+          <div class="acc" style="border-bottom:1px solid var(--border);padding:7px 12px"><span class="t-heading" style="font-size:14px">Identity</span><span class="chev">−</span></div>
+          <div style="padding:6px 12px 8px">
+            <div style="border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:12.5px;color:var(--textSecondary);background:var(--background)">Their name</div>
+          </div>
+        </div>
+        <div class="card" style="padding:0" data-anchor="basics">
+          <div class="acc" style="border-bottom:1px solid var(--border);padding:7px 12px"><span class="t-heading" style="font-size:14px">Relationship Basics</span><span class="chev">−</span></div>
+          <div style="padding:7px 12px 10px;display:grid;gap:6px">
+            <span class="t-caption" style="color:var(--textSecondary)">Last spoke</span>
+            <div class="seg"><span>Today</span><span>Pick date</span><span class="solid">Not yet</span></div>
+            <span class="t-caption" style="color:var(--textSecondary)">Orbit participation</span>
+            <div class="seg"><span class="solid">Bound</span><span>Unbound</span></div>
+            <span class="t-caption" style="font-size:10.5px;line-height:14px">Bound contacts appear in your active orbit and receive cadence reminders.</span>
+            <span class="t-caption" style="color:var(--textSecondary)">Frequency</span>
+            <div class="seg"><span>Weekly</span><span>Bi-Weekly</span><span class="outl">Monthly</span><span>Quarterly</span></div>
+          </div>
+        </div>
+      </div>
+      <svg class="scrim" data-spot="basics"></svg>
+      <div class="coach" role="dialog" aria-labelledby="c3t" style="bottom:12px">
+        <span class="caret up" style="left:40px"></span>
+        <div class="ttl" id="c3t">How <span data-app-name>Orbit</span> keeps track</div>
+        <div class="txt"><p>New people start as <b>Bound</b>, checking in <b>Monthly</b>, so they appear in your Digest and the Orrery.</p><p>Last spoke stays at <b>Not yet</b> until you log a conversation. Change any of this now or later.</p></div>
+        <div class="acts"><span class="btn ter" data-act="next">Skip</span><span class="sp"></span><span class="btn pri" data-act="next">Got it</span></div>
+        <span class="focusmark"></span>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">03</span>Add Contact: one teaching step</h3>
+      <ul class="ids"><li>D-50</li><li>D-51</li><li>D-04</li><li>D-10</li><li>D-36</li><li>D-58</li><li class="prov">Form layout</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>The real New contact form with the new defaults: Last spoke <b>Not yet</b>, <b>Bound</b>, Frequency <b>Monthly</b> (outlined sub-option, matching the app's chip style). The spotlight sits on Relationship Basics; the card sits below it, never over it. Assumption: Relationship Basics opens expanded on this form so the frequency is visible (today it starts collapsed); exact placement is a planning call.</dd>
+        <dt>Buttons</dt><dd><b>Got it</b> closes the tip and leaves the user on the form to type a name and save. <b>Skip</b> does the same and marks the tip skipped (see Q4 on one-step Skip). Saving Maya completes acquisition and moves to Orient.</dd>
+        <dt>TalkBack</dt><dd>Focus moves into the card: <q>How <span data-app-name>Orbit</span> keeps track. Dialog.</q> then the text and buttons. Closing returns focus to the Name field.</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- 4 ORIENT: DIGEST -->
+  <figure class="frame" data-title="Orient 1 of 4: Digest">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>9:43</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body">
+        <div class="apphdr"><span class="t-heading">Digest</span></div>
+        <div class="pad" data-anchor="digest" style="gap:0;padding-top:6px;padding-bottom:4px">
+          <div class="sec"><span class="t-heading">Up Next</span><span class="t-label">You're all caught up</span><span class="t-caption">No one needs a nudge right now.</span></div>
+          <div class="sec"><span class="t-heading">Horizon</span><span class="t-label">Never Contacted</span><span class="t-caption">1 person has never been contacted</span>
+            <div class="row" style="padding:3px 0"><span class="av" style="background:var(--sw1);width:24px;height:24px;font-size:9.5px">MC</span><span class="nm">Maya Chen</span></div></div>
+          <div class="sec"><span class="t-heading">Your Week</span>
+            <div class="seg" style="margin:3px 0"><span class="solid">Rolling 7 Days</span><span>Calendar Week</span></div>
+            <div class="stats"><div><b>0</b>People reached</div><div><b>0</b>Interactions</div><div><b>0</b>Events</div></div></div>
+        </div>
+      </div>
+      <div class="fab"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab on" data-anchor="tabDigest"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot="digest,tabDigest"></svg>
+      <div class="coach" role="dialog" aria-labelledby="c4t" style="bottom:64px">
+        <div class="top"><span>Getting around · Step 1 of 4</span><span class="pips"><i class="on"></i><i></i><i></i><i></i></span></div>
+        <div class="ttl" id="c4t">Digest: your daily check-in</div>
+        <div class="txt"><ul><li><b>Up Next</b>: who's due for a check-in.</li><li><b>Horizon</b>: birthdays, and people you haven't contacted yet, like Maya.</li><li><b>Your Week</b>: what you've done lately.</li></ul></div>
+        <div class="acts"><span class="btn ter" data-act="skip">Skip</span><span class="sp"></span><span class="btn pri" data-act="next">Next</span></div>
+        <span class="focusmark"></span>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">04</span>Orient 1 of 4: Digest</h3>
+      <ul class="ids"><li>D-12</li><li>D-08</li><li>D-70</li><li>D-32</li><li>D-58</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>Orient now runs over the normal app with the tab bar. Two cutouts: the Digest content and the Digest tab, so the user learns where it lives. Maya (Bound, Not yet) appears under Horizon → Never Contacted, as the app does today. Conceptual only: no metric or filter tour.</dd>
+        <dt>Buttons</dt><dd><b>Next</b> switches the tab underneath to Contacts and moves to step 2. <b>Skip</b> ends Orient (it counts as done and only returns via Restart tutorials). No Back on step 1.</dd>
+        <dt>TalkBack</dt><dd><q>Getting around, step 1 of 4. Digest: your daily check-in. Dialog.</q> then each line. The spotlight is decorative; the card text names what it points at.</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- 5 ORIENT: CONTACTS -->
+  <figure class="frame" data-title="Orient 2 of 4: Contacts">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>9:43</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body">
+        <div class="apphdr"><span class="t-heading"><span data-app-name>Orbit</span></span><span style="color:var(--textSecondary);letter-spacing:2px">•••</span></div>
+        <div class="chipbar"><div><b>Population</b>Active Cont…</div><div><b>Filters</b>Filters</div><div><b>Sort</b>Default</div></div>
+        <div class="toolrow"><svg style="stroke:var(--textSecondary)"><use href="#i-search"/></svg><span style="display:flex;gap:6px"><span class="ic on"><svg><use href="#i-list"/></svg></span><span class="ic"><svg><use href="#i-grid"/></svg></span></span></div>
+        <div data-anchor="cempty" style="margin:40px 26px 0;padding:8px 6px;display:grid;gap:4px">
+          <span class="t-heading" style="font-size:15px">Everyone's tucked away</span>
+          <span style="color:var(--textSecondary);font-size:12.5px">1 not yet contacted →</span>
+        </div>
+      </div>
+      <div class="fab"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab on" data-anchor="tabContacts"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot="cempty,tabContacts"></svg>
+      <div class="coach" role="dialog" aria-labelledby="c5t" style="bottom:64px">
+        <span class="caret up" style="left:60px;display:none"></span>
+        <div class="top"><span>Getting around · Step 2 of 4</span><span class="pips"><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+        <div class="ttl" id="c5t">Contacts: everyone in one list</div>
+        <div class="txt"><p>Search, sort and filter the people you keep in touch with.</p><p>New people wait under <b>Not yet contacted</b> until you log a conversation.</p><p><b>Swipe someone right to log, left to edit.</b></p></div>
+        <div class="acts"><span class="btn ter" data-act="skip">Skip</span><span class="sp"></span><span class="btn sec" data-act="back">Back</span><span class="btn pri" data-act="next">Next</span></div>
+        <span class="focusmark"></span>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">05</span>Orient 2 of 4: Contacts</h3>
+      <ul class="ids"><li>D-12</li><li>D-71</li><li>D-34</li><li>D-48</li><li>D-32</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>The Contacts tab exactly as it looks with only Maya: Bound + Not yet people are outside the default Active population, so the list reads "Everyone's tucked away · 1 not yet contacted". The swipe line is the one-time gesture teaching (no permanent in-list hint). See Q2: there is no row here to demonstrate the swipe on.</dd>
+        <dt>Buttons</dt><dd><b>Next</b> switches to the Orrery tab. <b>Back</b> returns to the Digest step. <b>Skip</b> ends Orient.</dd>
+        <dt>TalkBack</dt><dd>Reads the card, and the swipe line gains a non-gesture alternative: <q>Swipe someone right to log, left to edit. With TalkBack, use a person's actions to Log Interaction or Edit Contact.</q></dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- 6 ORIENT: ORRERY -->
+  <figure class="frame" data-title="Orient 3 of 4: Orrery">
+    <div class="phone"><div class="scr">
+      <div class="sky" style="background:radial-gradient(1px 1px at 30px 60px,#E6E9F5AA 60%,transparent 61%),radial-gradient(1px 1px at 200px 140px,#BCC8F299 60%,transparent 61%),radial-gradient(1px 1px at 110px 330px,#F2DCAE88 60%,transparent 61%),radial-gradient(ellipse 80% 50% at 50% 40%,#121A36,transparent 75%),#070A16;background-size:150px 240px,230px 300px,260px 420px,auto,auto"></div>
+      <div class="status"><span>9:44</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body">
+        <div style="padding:6px 14px 4px"><span class="t-heading" style="font-size:18px">Orrery</span></div>
+        <svg viewBox="0 0 304 300" width="304" height="300" style="position:absolute;top:18px;left:0" aria-hidden="true">
+          <defs><radialGradient id="sunO"><stop offset="0" stop-color="#FFF3DC"/><stop offset=".45" stop-color="#F2C14E"/><stop offset=".75" stop-color="#E8944A55"/><stop offset="1" stop-color="#E8944A00"/></radialGradient></defs>
+          <g fill="none" stroke="#2A3048" stroke-width="1"><circle cx="152" cy="150" r="40"/><circle cx="152" cy="150" r="105"/><circle cx="152" cy="150" r="140"/></g>
+          <circle cx="152" cy="150" r="72" fill="none" stroke="#3C4568" stroke-width="1.4"/>
+          <circle cx="152" cy="150" r="30" fill="url(#sunO)"/>
+          <circle cx="152" cy="150" r="11" fill="#FFF3DC"/>
+          <text x="152" y="175" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#E6E9F5">You</text>
+          <circle cx="152" cy="78" r="13" fill="#5B6CB8" stroke="#DCE6FF" stroke-width="1.2"/>
+          <text x="152" y="82" text-anchor="middle" font-family="Inter, sans-serif" font-weight="600" font-size="9.5" fill="#F2F4FB">MC</text>
+          <text x="170" y="70" font-family="Inter, sans-serif" font-size="10" fill="#E6E9F5">Maya</text>
+        </svg>
+        <div style="position:absolute;top:34px;left:10px;right:10px;display:flex;justify-content:space-between">
+          <span class="bracket">All Contacts ⌄</span><span class="bracket">View options</span>
+        </div>
+        <div data-anchor="orrery" data-shape="circle" style="position:absolute;left:72px;top:88px;width:160px;height:160px"></div>
+      </div>
+      <div class="fab"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab on" data-anchor="tabOrrery"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot="orrery,tabOrrery"></svg>
+      <div class="coach" role="dialog" aria-labelledby="c6t" style="bottom:64px">
+        <div class="top"><span>Getting around · Step 3 of 4</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+        <div class="ttl" id="c6t">Orrery: your people around you</div>
+        <div class="txt">
+          <ul>
+            <li>Each person orbits you. Clockwise from the top shows how far into their check-in cycle they are.</li>
+            <li>The orbit's look shows status: <span style="color:var(--statusStable)">solid when Stable</span>, <span style="color:var(--statusWobble)">dashed when Wobbly</span>, <span style="color:var(--statusDecay)">faded when Decaying</span>.</li>
+            <li>Tap someone to focus on them, then open their profile.</li>
+          </ul>
+          <p class="mut">New people start at the top until you log a conversation. Pinch and drag to explore.</p>
+        </div>
+        <div class="acts"><span class="btn ter" data-act="skip">Skip</span><span class="sp"></span><span class="btn sec" data-act="back">Back</span><span class="btn pri" data-act="next">Next</span></div>
+        <span class="focusmark"></span>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">06</span>Orient 3 of 4: Orrery</h3>
+      <ul class="ids"><li>D-65</li><li>D-22</li><li>D-12</li><li>D-32</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>The Orrery tab with "You" as the sun and Maya at 12 o'clock on a neutral ring (never contacted). A circular cutout frames the sun and Maya. The three points, the "start at the top" line and the pinch-and-drag line are the D-65 content, worded against the real V2 encodings (clockwise from top = progress through the interval; solid / dashed / faded ring = Stable / Wobbly / Decaying).</dd>
+        <dt>Buttons</dt><dd><b>Next</b> returns to the Digest tab for the last step. <b>Back</b> returns to Contacts. <b>Skip</b> ends Orient.</dd>
+        <dt>TalkBack</dt><dd>Reads the card. The pinch line is followed by the non-gesture route: <q>Or open All Contacts to see everyone in this view as a list.</q> (the existing Contacts-in-this-System sheet).</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- 7 ORIENT: + BUTTON -->
+  <figure class="frame" data-title="Orient 4 of 4: the + button">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>9:44</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body">
+        <div class="apphdr"><span class="t-heading">Digest</span></div>
+        <div class="pad" style="gap:4px">
+          <div class="sec"><span class="t-heading">Up Next</span><span class="t-label">You're all caught up</span><span class="t-caption">No one needs a nudge right now.</span></div>
+          <div class="sec"><span class="t-heading">Horizon</span><span class="t-label">Never Contacted</span><span class="t-caption">1 person has never been contacted</span>
+            <div class="row" style="padding:3px 0"><span class="av" style="background:var(--sw1);width:24px;height:24px;font-size:9.5px">MC</span><span class="nm">Maya Chen</span></div></div>
+          <div class="sec"><span class="t-heading">Your Week</span>
+            <div class="seg" style="margin:3px 0"><span class="solid">Rolling 7 Days</span><span>Calendar Week</span></div>
+            <div class="stats"><div><b>0</b>People reached</div><div><b>0</b>Interactions</div><div><b>0</b>Events</div></div></div>
+        </div>
+      </div>
+      <div class="fab" data-anchor="fab" data-shape="circle"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab on"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot="fab"></svg>
+      <div class="coach" role="dialog" aria-labelledby="c7t" style="bottom:136px">
+        <span class="caret down" style="right:28px"></span>
+        <div class="top"><span>Getting around · Step 4 of 4</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
+        <div class="ttl" id="c7t">The + button</div>
+        <div class="txt"><p>Use + to add someone new, log a conversation, or update what you know about someone.</p><p class="mut">Each option has its own screen. Some save straight away, others when you tap Save.</p></div>
+        <div class="acts"><span class="btn ter" data-act="skip">Skip</span><span class="sp"></span><span class="btn sec" data-act="back">Back</span><span class="btn pri" data-act="next">Done</span></div>
+        <span class="focusmark"></span>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">07</span>Orient 4 of 4: the + button</h3>
+      <ul class="ids"><li>D-68</li><li>D-17</li><li>D-19</li><li>D-32</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>Back on Digest, a circular cutout on the + button with the card just above it and its pointer aimed at the button. The copy names what + holds without promising one save behaviour, and leaves Import out (it is not a + action). The dial is not opened during the tour.</dd>
+        <dt>Buttons</dt><dd><b>Done</b> finishes Orient and first run. <b>Back</b> returns to the Orrery step. <b>Skip</b> also ends Orient; the result is the same.</dd>
+        <dt>TalkBack</dt><dd><q>Getting around, step 4 of 4. The + button. Dialog.</q> After Done, focus moves to the + button itself, so the next swipe lands on it: <q>Add, button.</q></dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- 8 RELEASE -->
+  <figure class="frame" data-title="Release">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>9:45</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>100%</span></div>
+      <div class="body">
+        <div class="apphdr"><span class="t-heading">Digest</span></div>
+        <div class="pad" style="gap:4px">
+          <div class="sec"><span class="t-heading">Up Next</span><span class="t-label">You're all caught up</span><span class="t-caption">No one needs a nudge right now.</span></div>
+          <div class="sec"><span class="t-heading">Horizon</span><span class="t-label">Never Contacted</span><span class="t-caption">1 person has never been contacted</span>
+            <div class="row" style="padding:3px 0"><span class="av" style="background:var(--sw1);width:24px;height:24px;font-size:9.5px">MC</span><span class="nm">Maya Chen</span></div></div>
+          <div class="sec"><span class="t-heading">Your Week</span>
+            <div class="seg" style="margin:3px 0"><span class="solid">Rolling 7 Days</span><span>Calendar Week</span></div>
+            <div class="stats"><div><b>0</b>People reached</div><div><b>0</b>Interactions</div><div><b>0</b>Events</div></div>
+            <span class="t-label" style="margin-top:6px">A quiet week</span><span class="t-caption">No logged activity in this period yet.</span></div>
+        </div>
+      </div>
+      <div class="fab" style="outline:2px solid var(--orreryRingLight);outline-offset:3px"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab on"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">08</span>Release</h3>
+      <ul class="ids"><li>D-08</li><li>D-01</li><li>D-36</li><li>D-60</li><li>D-62</li></ul>
+      <dl class="cap">
+        <dt>Shows</dt><dd>The normal Digest, nothing over it. No "You're all set" toast or banner: the tour ending is the signal. The pale ring on + marks where accessibility focus lands (drawn here only to show it). From now on lessons appear one at a time, only at their own moments (Part 2).</dd>
+        <dt>State</dt><dd>First run and Orient are recorded as done, on this device only. A later "Restart tutorials" replays Orient on next open, not Welcome or Acquire.</dd>
+        <dt>TalkBack</dt><dd>The overlay closes and focus is on <q>Add, button</q>.</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  </div>
+</section>
+
+<!-- ======================================================= PART 2 -->
+<section class="part" id="part2" aria-labelledby="p2h">
+  <header>
+    <div class="eyebrow">Part 2 · Entrance screens</div>
+    <h2 id="p2h">Four later lessons, four presentation patterns</h2>
+    <p>Weeks later, with Maya, Jordan, Priya, Sam and Lena in the app. Each lesson appears once, at its own moment, and only when nothing else (a form, a sheet, another lesson) is open. Only the first frame of each is shown.</p>
+  </header>
+  <p class="strip-hint">Swipe sideways through the frames.</p>
+  <div class="frames" tabindex="0" aria-label="Lesson entrance frames">
+
+  <!-- A QUICK LOG INTERCEPT -->
+  <figure class="frame">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>18:20</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>82%</span></div>
+      <div class="body">
+        <div class="apphdr"><span class="t-heading"><span data-app-name>Orbit</span></span><span style="color:var(--textSecondary);letter-spacing:2px">•••</span></div>
+        <div class="chipbar"><div><b>Population</b>Active Cont…</div><div><b>Filters</b>Filters</div><div><b>Sort</b>Default</div></div>
+        <div class="toolrow"><svg style="stroke:var(--textSecondary)"><use href="#i-search"/></svg><span style="display:flex;gap:6px"><span class="ic on"><svg><use href="#i-list"/></svg></span><span class="ic"><svg><use href="#i-grid"/></svg></span></span></div>
+        <div style="padding:0 12px">
+          <div style="position:relative;border-bottom:1px solid var(--border);overflow:hidden;border-radius:8px">
+            <div style="position:absolute;inset:0;background:var(--accent);color:var(--onAccent);font-weight:600;font-size:11.5px;display:flex;align-items:center;padding-left:12px">Quick Log</div>
+            <div class="row" style="background:var(--background);transform:translateX(86px);padding-left:4px"><span class="av" style="background:var(--sw1)">MC</span><span><span class="nm">Maya Chen</span><br><span class="sub"><i class="dot" style="background:var(--statusWobble)"></i>Wobbly · Monthly</span></span></div>
+          </div>
+          <div class="row" style="border-bottom:1px solid var(--border)"><span class="av" style="background:var(--sw2)">JR</span><span><span class="nm">Jordan Reyes</span><br><span class="sub"><i class="dot" style="background:var(--statusDecay)"></i>Decaying · Weekly</span></span></div>
+          <div class="row" style="border-bottom:1px solid var(--border)"><span class="av" style="background:var(--sw3)">PN</span><span><span class="nm">Priya Nair</span><br><span class="sub"><i class="dot" style="background:var(--statusStable)"></i>Stable · Bi-Weekly</span></span></div>
+          <div class="row" style="border-bottom:1px solid var(--border)"><span class="av" style="background:var(--sw4)">SO</span><span><span class="nm">Sam Okafor</span><br><span class="sub"><i class="dot" style="background:var(--statusStable)"></i>Stable · Monthly</span></span></div>
+          <div class="row"><span class="av" style="background:var(--sw5)">LF</span><span><span class="nm">Lena Fischer</span><br><span class="sub"><i class="dot" style="background:var(--statusStable)"></i>Stable · Quarterly</span></span></div>
+        </div>
+      </div>
+      <div class="fab"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab on"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot=""></svg>
+      <div class="coach dialog" role="dialog" aria-labelledby="cAt">
+        <div class="top"><span>Logging</span></div>
+        <div class="ttl" id="cAt">Quick Log saves right away</div>
+        <div class="txt"><p>Quick Log saves a Message with Maya Chen as soon as you continue.</p><p>To add details first, like the type, the date or a note, use <b>Log Interaction</b> from the + button instead.</p><p class="mut">Swiping right uses Quick Log. You can change that in Settings.</p></div>
+        <div class="acts"><span class="sp"></span><span class="btn sec">Skip</span><span class="btn pri">Log it</span></div>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">A</span>Record: Quick Log intercept</h3>
+      <ul class="ids"><li>D-16</li><li>D-53</li><li>D-34</li><li>D-44</li><li>D-54</li><li>D-19</li></ul>
+      <dl class="cap">
+        <dt>Pattern</dt><dd><b>Intercept card.</b> One centred card, no step counter, no spotlight. It appears the first time any in-app Quick Log runs (here a right swipe on Maya), after the gesture and before anything is written.</dd>
+        <dt>Buttons</dt><dd><b>Both continue the log.</b> <b>Log it</b> closes the card and saves the Quick Log. <b>Skip</b> also saves it and marks the lesson skipped. Neither cancels. The usual "Logged" snackbar follows. The copy does not promise Undo.</dd>
+        <dt>TalkBack</dt><dd><q>Logging. Quick Log saves right away. Dialog.</q> The same card appears when Quick Log is triggered from the row's TalkBack action. Android Back acts like Skip (the log still saves).</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- B PREPARE -->
+  <figure class="frame">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>12:05</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>74%</span></div>
+      <div class="body">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;color:var(--textPrimary)"><svg width="18" height="18" style="stroke:currentColor;fill:none;stroke-width:2"><use href="#i-back"/></svg><span style="display:flex;gap:14px;align-items:center"><svg width="17" height="17" style="stroke:currentColor;fill:none;stroke-width:1.6"><use href="#i-star"/></svg><span style="letter-spacing:2px">•••</span></span></div>
+        <div style="display:grid;justify-items:center;gap:6px;padding:0 12px">
+          <span class="av" style="background:var(--sw5);width:96px;height:96px;font-size:38px;font-family:var(--font-display)">MC</span>
+          <span class="t-display">Maya Chen</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%"><span class="btn pri">Message</span><span class="btn sec">Call</span></div>
+        </div>
+        <div style="padding:10px 12px;display:grid;gap:7px">
+          <div class="card acc"><span class="t-heading">Relationship Overview</span><span class="chev">⌄</span></div>
+          <div class="card acc" data-anchor="ttr"><span class="t-heading">Things to Remember</span><span class="chev">⌄</span></div>
+          <div class="card acc"><span class="t-heading">Contact Methods</span><span class="chev">⌄</span></div>
+          <div class="card acc"><span class="t-heading">History</span><span class="chev">⌄</span></div>
+        </div>
+      </div>
+      <div class="fab"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab on"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot="ttr"></svg>
+      <div class="coach" role="dialog" aria-labelledby="cBt" style="bottom:64px">
+        <span class="caret up" style="left:60px"></span>
+        <div class="top"><span>Getting ready · Step 1 of 4</span><span class="pips"><i class="on"></i><i></i><i></i><i></i></span></div>
+        <div class="ttl" id="cBt">Things to Remember</div>
+        <div class="txt"><p>Keep what you know about Maya here: her kids' names, the new job, the trip she's planning. It's knowledge about the person, separate from your log of conversations.</p><p class="mut">Sections start closed. Tap one to open it.</p></div>
+        <div class="acts"><span class="btn ter">Skip</span><span class="sp"></span><span class="btn pri">Next</span></div>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">B</span>Prepare: first normal Profile visit</h3>
+      <ul class="ids"><li>D-14</li><li>D-33</li><li>D-13</li><li>D-58</li><li>D-19</li></ul>
+      <dl class="cap">
+        <dt>Pattern</dt><dd><b>Spotlight steps</b>, same as Orient. Step 1 of 4 leads with Things to Remember, the emphasised section. Card above the target so the rest of the Profile stays readable. Later steps: Relationship Overview, Contact Methods, History (what has happened with this person).</dd>
+        <dt>Trigger</dt><dd>The first time a Profile is opened normally (from Contacts, Digest or the Orrery), not when it is reached after creating, importing or merging someone.</dd>
+        <dt>TalkBack</dt><dd><q>Getting ready, step 1 of 4. Things to Remember. Dialog.</q> Reads "Sections start closed. Double-tap a section to open it."</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- C SYSTEMS -->
+  <figure class="frame">
+    <div class="phone"><div class="scr">
+      <div class="sky" style="background:radial-gradient(ellipse 80% 50% at 50% 50%,#121A36,transparent 75%),#070A16"></div>
+      <div class="status"><span>21:10</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>61%</span></div>
+      <div class="body">
+        <div style="padding:6px 14px 4px"><span class="t-heading" style="font-size:18px">Orrery</span></div>
+        <svg viewBox="0 0 304 460" width="304" height="460" style="position:absolute;top:30px;left:0;opacity:.8" aria-hidden="true">
+          <g fill="none" stroke-width="1.2"><circle cx="152" cy="250" r="60" stroke="#45B98A"/><circle cx="152" cy="250" r="96" stroke="#E8C15C" stroke-dasharray="5 4"/><circle cx="152" cy="250" r="130" stroke="#E56A52" stroke-opacity=".45"/><circle cx="152" cy="250" r="160" stroke="#45B98A"/></g>
+          <circle cx="152" cy="250" r="24" fill="#F2C14E"/>
+        </svg>
+        <div style="position:absolute;top:34px;left:10px;right:10px;display:flex;justify-content:space-between"><span class="bracket">All Contacts ⌄</span><span class="bracket">View options</span></div>
+        <div data-anchor="sheet" style="position:absolute;top:66px;left:10px;right:22px;background:var(--surface);border:1px solid var(--borderStrong);border-radius:12px;padding:10px;display:grid;gap:5px">
+          <span class="t-heading" style="font-size:15px">Choose System</span>
+          <span class="t-label" style="display:flex;justify-content:space-between">Built-in <span style="color:var(--textSecondary)">6 ⌄</span></span>
+          <span style="border:1.5px solid var(--accent);border-radius:7px;padding:5px 8px;font-size:11.5px;font-weight:600">All Contacts — 5 — Selected</span>
+          <span style="border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:11.5px">Favorites — 1</span>
+          <span style="border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:11.5px">Needs Attention — 2</span>
+          <span style="border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:11.5px">Not Contacted — 0 <span style="color:var(--statusWobble)">Empty</span></span>
+          <span class="t-label" style="display:flex;justify-content:space-between">Categories <span style="color:var(--textSecondary)">4 ›</span></span>
+          <span class="t-label" style="color:var(--accentText)">Manage Systems</span>
+        </div>
+      </div>
+      <div class="fab"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab on"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot="sheet" data-dim="0.55"></svg>
+      <div class="coach" role="dialog" aria-labelledby="cCt" style="bottom:66px;left:32px;right:10px">
+        <span class="caret up" style="left:40px"></span>
+        <div class="top"><span>Tip</span></div>
+        <div class="ttl" id="cCt">Systems</div>
+        <div class="txt"><p>A System is a saved view of who's in your Orrery. The built-in ones and one per category are ready to use.</p><p class="mut">Make your own in Manage Systems.</p></div>
+        <div class="acts"><span class="btn ter">Skip</span><span class="sp"></span><span class="btn pri">Got it</span></div>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">C</span>Systems: first switcher open</h3>
+      <ul class="ids"><li>D-66</li><li>D-30</li><li class="prov">D-58 tension</li></ul>
+      <dl class="cap">
+        <dt>Pattern</dt><dd><b>One-step tip</b> attached to an open panel. Lighter scrim (the panel is the subject, so it stays bright) and a smaller card below the panel. No builder walkthrough.</dd>
+        <dt>Buttons</dt><dd><b>Got it</b> closes the tip and leaves the panel open so the user can pick a System. <b>Skip</b> does the same (see Q4).</dd>
+        <dt>TalkBack</dt><dd><q>Tip. Systems. Dialog.</q> Closing returns focus to the selected row, <q>All Contacts, 5, selected</q>.</dd>
+        <dt>Note</dt><dd>D-58 says a lesson never starts over an open sheet, but D-66's trigger is the panel opening. Q5 asks which wins.</dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  <!-- D HISTORY HINT -->
+  <figure class="frame">
+    <div class="phone"><div class="scr">
+      <div class="sky"></div>
+      <div class="status"><span>08:31</span><span class="r"><svg><use href="#i-sig"/></svg><svg><use href="#i-bat"/></svg>93%</span></div>
+      <div class="body">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px"><svg width="18" height="18" style="stroke:var(--textPrimary);fill:none;stroke-width:2"><use href="#i-back"/></svg><span style="letter-spacing:2px">•••</span></div>
+        <div style="padding:0 12px;display:grid;gap:7px">
+          <div class="card acc"><span class="t-heading">Contact Methods</span><span class="chev">⌄</span></div>
+          <div class="card" style="padding:10px 12px;display:grid;gap:8px">
+            <div style="display:flex;justify-content:space-between"><span class="t-heading" style="font-size:15px">History</span><span class="chev" style="color:var(--textSecondary)">⌃</span></div>
+            <div class="seg"><span>Cycles</span><span>7 Days</span><span class="solid">Month</span><span>Year</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;padding:0 10px"><span style="color:var(--textSecondary)">‹</span>Oct 2026<span style="color:var(--textSecondary);opacity:.4">›</span></div>
+            <div data-anchor="heat" id="heatgrid" style="display:grid;grid-template-columns:repeat(7,26px);gap:4px;justify-content:center;padding:2px 0"></div>
+            <div style="display:grid;gap:2px"><span style="font-size:10px;letter-spacing:.08em;font-weight:600;color:var(--textSecondary)">INTENSITY</span><span class="t-label">4× this period</span><span class="t-caption" style="font-size:10.5px">Monthly intended · 7-day average</span></div>
+            <div style="display:flex;justify-content:flex-end"><span class="btn sec" style="min-height:28px">Jump to date</span></div>
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--textSecondary);border-bottom:1px solid var(--border);padding-bottom:3px">2026</span>
+            <span style="font-size:12.5px">October</span>
+          </div>
+        </div>
+      </div>
+      <div class="fab"><svg><use href="#i-plus"/></svg></div>
+      <div class="tabs"><div class="tab on"><svg><use href="#i-contacts"/></svg>Contacts</div><div class="tab"><svg><use href="#i-events"/></svg>Events</div><div class="tab"><svg><use href="#i-digest"/></svg>Digest</div><div class="tab"><svg><use href="#i-orrery"/></svg>Orrery</div><div class="tab"><svg><use href="#i-settings"/></svg>Settings</div></div>
+      <svg class="scrim" data-spot="heat" data-dim="0.5"></svg>
+      <div class="coach" role="dialog" aria-labelledby="cDt" style="top:356px;left:24px;right:24px;padding:10px 12px 8px">
+        <span class="caret up" style="left:50%;margin-left:-6px"></span>
+        <div class="txt"><p id="cDt" style="font-size:12.5px"><b>Tap any day in the chart to jump to it.</b></p></div>
+        <div class="acts"><span class="btn ter">Skip</span><span class="sp"></span><span class="btn pri">Got it</span></div>
+      </div>
+    </div></div>
+    <figcaption>
+      <h3><span class="num">D</span>History hint</h3>
+      <ul class="ids"><li>D-67</li><li>D-42</li><li>D-32</li></ul>
+      <dl class="cap">
+        <dt>Pattern</dt><dd><b>One-step tip</b>, the lightest pattern: a short tooltip pointing at the activity chart, no title, no counter. It appears the first time History is opened with a chart showing. No further History walkthrough.</dd>
+        <dt>Buttons</dt><dd><b>Got it</b> closes the tip; the chart is usable right away. <b>Skip</b> does the same.</dd>
+        <dt>TalkBack</dt><dd><q>Tip. Tap any day in the chart to jump to it. Each day is a button, for example "Oct 2, 1 interaction".</q></dd>
+      </dl>
+    </figcaption>
+  </figure>
+
+  </div>
+</section>
+
+<!-- ======================================================= PART 3 -->
+<section class="part" id="part3" aria-labelledby="p3h">
+  <header>
+    <div class="eyebrow">Part 3 · Design notes</div>
+    <h2 id="p3h">Patterns, accessibility, and choices for you to make</h2>
+  </header>
+  <div class="notes">
+    <div class="note" style="grid-column:1/-1">
+      <h3>The four presentation patterns</h3>
+      <div class="tablewrap">
+      <table class="ptable">
+        <thead><tr><th>Pattern</th><th>Used for</th><th>Looks like</th><th>Controls</th></tr></thead>
+        <tbody>
+          <tr><td>Full-screen page</td><td>Welcome, Acquire</td><td>A real route with the tab bar hidden; no overlay.</td><td>Get Started / choice cards, Skip Tutorials</td></tr>
+          <tr><td>Spotlight steps</td><td>Orient (4), Prepare (4)</td><td>Dim scrim with a cutout and accent outline around the target; card beside the target; "Step n of N" plus progress bars.</td><td>Skip · Back · Next / Done</td></tr>
+          <tr><td>Intercept card</td><td>Record (first Quick Log)</td><td>One centred card that pauses an action before it writes. No cutout, no counter.</td><td>Skip · Log it (both continue)</td></tr>
+          <tr><td>One-step tip</td><td>Add Contact defaults, Systems, History</td><td>Small card with a pointer; lighter scrim when the target is itself an open panel.</td><td>Skip · Got it</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="note">
+      <h3>Accessibility treatment (D-32)</h3>
+      <ul>
+        <li>Each card is a labelled dialog. Focus moves into it on open (the same as BaseOverlay today) and goes back to a sensible control on close.</li>
+        <li>The card's text always names what the spotlight points at, so the cutout is never the only way to know.</li>
+        <li>Skip can be reached on every step. Android Back acts as Skip, never as cancel for the underlying action.</li>
+        <li>No step needs a gesture to advance. Gesture lines (swipe, pinch) come with a TalkBack equivalent in the dialog's label.</li>
+        <li>Reduced motion: no spotlight pulse, no slide between steps, cards appear without fading.</li>
+        <li>Text uses the app's type roles and scales with system font size; the card grows upward and scrolls internally rather than clipping.</li>
+        <li>Buttons keep the 44dp minimum touch target. Card text on surfaceElevated meets AA.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>Open questions for the owner</h3>
+      <ol class="oq">
+        <li><b>Card style.</b> Opaque surfaceElevated card with a strong border and a pointer, as drawn. Alternative: the glassy card treatment used elsewhere in Galaxy.</li>
+        <li><b>Contacts step with nobody visible.</b> With only Maya (Bound, Not yet), the Contacts list is empty by design. Keep the step as drawn (point at "1 not yet contacted"), or show a sample row while the step is open?</li>
+        <li><b>Scrim darkness.</b> 80% of the background colour for spotlight steps, 50–55% for tips over a panel or chart. Darker, lighter, or one value everywhere?</li>
+        <li><b>Skip on one-step tips.</b> D-18 puts Skip on every lesson, but on a one-step tip Skip and Got it do the same thing. Keep both, or show only Got it there?</li>
+        <li><b>Systems tip over the open panel.</b> D-58 forbids starting a lesson over a sheet; D-66 triggers on the panel opening. Allow this one exception, or show the tip on the Orrery just before the panel opens?</li>
+        <li><b>Step counter form.</b> "Step 2 of 4" text plus small progress bars. Alternatives: text only, or bars only.</li>
+        <li><b>Where Orient begins.</b> Drawn as: after saving Maya, the app moves to Digest and Orient starts. Today saving lands on the new Profile.</li>
+        <li><b>Relationship Basics on the form.</b> Drawn expanded so the Monthly default is visible (D-51). Confirm, or prefer a one-line summary such as "Bound · Monthly · Not yet" that opens the section?</li>
+        <li><b>Welcome's local-first line (D-35).</b> Keep it, reword it, or drop it?</li>
+        <li><b>Lesson names on the card.</b> Drawn as "Getting around", "Getting ready", "Logging", "Tip". Keep, rename, or drop the eyebrow?</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // History heatmap cells (Oct 2026 starts on a Thursday)
+  var hg = document.getElementById("heatgrid");
+  if (hg) {
+    var lv = { 2: 4, 5: 1, 9: 2, 12: 1, 16: 3, 21: 1, 26: 2, 30: 1 };
+    var ramp = ["--heat0", "--heat1", "--heat2", "--heat3", "--heat4"];
+    var html = "";
+    for (var i = 0; i < 4; i++) html += '<span style="width:26px;height:22px"></span>';
+    for (var d = 1; d <= 31; d++) {
+      var future = d > 9;
+      var c = lv[d] && !future ? ramp[lv[d]] : "--heat0";
+      html += '<span style="width:26px;height:22px;border-radius:6px;background:var(' + c + ');' + (future ? "opacity:.55;" : "") + (d === 9 ? "outline:1.5px solid var(--textPrimary);outline-offset:1px;" : "") + '"></span>';
+    }
+    hg.innerHTML = html;
+  }
+
+  var NS = "http://www.w3.org/2000/svg";
+  var uid = 0;
+  // Paint each scrim: a dim layer with holes cut around the anchors named in data-spot.
+  function paint(scope) {
+    scope.querySelectorAll("svg.scrim").forEach(function (s) {
+      var scr = s.parentNode;
+      var sr = scr.getBoundingClientRect();
+      var k = sr.width / scr.offsetWidth || 1;
+      var W = scr.offsetWidth, H = scr.offsetHeight;
+      s.setAttribute("viewBox", "0 0 " + W + " " + H);
+      s.setAttribute("aria-hidden", "true");
+      while (s.firstChild) s.removeChild(s.firstChild);
+      var id = "m" + (++uid);
+      var mask = document.createElementNS(NS, "mask"); mask.setAttribute("id", id);
+      var base = document.createElementNS(NS, "rect");
+      base.setAttribute("width", W); base.setAttribute("height", H); base.setAttribute("fill", "#fff");
+      mask.appendChild(base);
+      var rings = [];
+      (s.getAttribute("data-spot") || "").split(",").filter(Boolean).forEach(function (name) {
+        var a = scr.querySelector('[data-anchor="' + name + '"]');
+        if (!a) return;
+        var r = a.getBoundingClientRect();
+        var x = (r.left - sr.left) / k, y = (r.top - sr.top) / k, w = r.width / k, h = r.height / k, p = 5, hole, ring;
+        if (a.getAttribute("data-shape") === "circle") {
+          var cx = x + w / 2, cy = y + h / 2, rad = Math.max(w, h) / 2 + p;
+          hole = document.createElementNS(NS, "circle"); hole.setAttribute("cx", cx); hole.setAttribute("cy", cy); hole.setAttribute("r", rad);
+        } else {
+          hole = document.createElementNS(NS, "rect");
+          hole.setAttribute("x", x - p); hole.setAttribute("y", y - p); hole.setAttribute("width", w + 2 * p); hole.setAttribute("height", h + 2 * p); hole.setAttribute("rx", 14);
+        }
+        hole.setAttribute("fill", "#000");
+        ring = hole.cloneNode(); ring.setAttribute("class", "spotring pulse"); ring.removeAttribute("fill");
+        mask.appendChild(hole); rings.push(ring);
+      });
+      var defs = document.createElementNS(NS, "defs"); defs.appendChild(mask); s.appendChild(defs);
+      var dim = document.createElementNS(NS, "rect");
+      dim.setAttribute("width", W); dim.setAttribute("height", H);
+      dim.setAttribute("fill", "#0B0E1A");
+      dim.setAttribute("fill-opacity", s.getAttribute("data-dim") || "0.8");
+      dim.setAttribute("mask", "url(#" + id + ")");
+      s.appendChild(dim);
+      rings.forEach(function (r) { s.appendChild(r); });
+    });
+  }
+  function paintAll() { paint(document); }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintAll);
+  window.addEventListener("load", paintAll);
+  window.addEventListener("resize", paintAll);
+  paintAll();
+
+  // ---------- Player ----------
+  var frames = Array.prototype.slice.call(document.querySelectorAll("#run .frame"));
+  var player = document.getElementById("player"), stage = document.getElementById("stage");
+  var pcount = document.getElementById("pcount"), pcap = document.getElementById("pcap");
+  var idx = 0, timer = null, reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Card buttons: Next/Done advance, Back goes back, Skip jumps to Release (or past the Orient steps)
+  function show(i) {
+    idx = Math.max(0, Math.min(frames.length - 1, i));
+    var f = frames[idx];
+    stage.innerHTML = "";
+    var ph = f.querySelector(".phone").cloneNode(true);
+    ph.querySelectorAll("[id]").forEach(function (n) { n.removeAttribute("id"); });
+    stage.appendChild(ph);
+    paint(stage);
+    var cap = f.querySelector("figcaption").cloneNode(true);
+    cap.querySelectorAll("[id]").forEach(function (n) { n.removeAttribute("id"); });
+    pcap.innerHTML = ""; pcap.appendChild(cap);
+    pcount.textContent = "Frame " + (idx + 1) + " of " + frames.length + " · " + (f.getAttribute("data-title") || "");
+    document.getElementById("pPrev").disabled = idx === 0;
+    document.getElementById("pNext").disabled = idx === frames.length - 1;
+  }
+  stage.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-act]"); if (!b) return;
+    var act = b.getAttribute("data-act");
+    if (act === "next") show(idx + 1);
+    else if (act === "back") show(idx - 1);
+    else if (act === "skip") show(frames.length - 1);
+  });
+  function stopAuto() { if (timer) { clearInterval(timer); timer = null; } var a = document.getElementById("pAuto"); a.setAttribute("aria-pressed", "false"); a.textContent = "Auto-play"; }
+  document.getElementById("openPlayer").addEventListener("click", function () { player.hidden = false; show(0); document.getElementById("pNext").focus(); player.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); });
+  document.getElementById("pClose").addEventListener("click", function () { stopAuto(); player.hidden = true; document.getElementById("openPlayer").focus(); });
+  document.getElementById("pPrev").addEventListener("click", function () { stopAuto(); show(idx - 1); });
+  document.getElementById("pNext").addEventListener("click", function () { stopAuto(); show(idx + 1); });
+  document.getElementById("pFocus").addEventListener("click", function () {
+    var on = stage.classList.toggle("showfocus"); this.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  document.getElementById("pAuto").addEventListener("click", function () {
+    if (timer) { stopAuto(); return; }
+    this.setAttribute("aria-pressed", "true"); this.textContent = "Pause";
+    timer = setInterval(function () { if (idx >= frames.length - 1) { stopAuto(); return; } show(idx + 1); }, 4000);
+  });
+  window.addEventListener("resize", function () { if (!player.hidden) paint(stage); });
+})();
+</script>
+
+<script>
+/* One app-name constant for the whole mockup, mirroring APP_NAME in src/constants/app.ts.
+   In the app, every lesson string takes the name from APP_NAME (Phase 39 D-79). */
+const APP_NAME = "Orbit";
+document.querySelectorAll("[data-app-name]").forEach((el) => { el.textContent = APP_NAME; });
+</script>

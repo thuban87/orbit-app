@@ -164,7 +164,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.6: Photo Handling — Sync, Sizes & Lightbox** (INSERTED) - Completed 2026-09-30: 9/9 plans + 6 code-review passes (all blocker/warning findings fixed); verification passed 19/19 + owner UAT (pinch, TalkBack, sizes) on the release build. Display-revision fix (no file renames), WebP ≤1024 masters, bigger Profile/List/Grid photos, lightbox, missing-photo + backup-skip integrity (D-23..D-35), banner in flow (D-38), "too large" backups (D-39), on-disk Orrery derivatives (D-41; D-11 memory +2.9 %/+4.2 %). Owner rulings D-01..D-42. No migration (head 032), backup format 7. Release orbit-phase38.6-release-2026-09-30-c2dc1cb.apk.
 - [x] **Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language** (INSERTED) - A Skia 2.5D Orrery V2 from the Orrery renderer R&D labs: a tilted strategy-map Home, a new imperative renderer, a painted sky, thin sun-lit orbits with subtle pulses, rim-lit status bodies, Lab A's star sun, moon bumps, reticle focus with a docked card, a star-warp System switch, plus five production Orrery defect fixes. Dossier accepted after codex review (D-01..D-58); complete (2026-10-05).
 - [x] **Phase 38.8: History Navigation UX** (INSERTED) - Completed 2026-10-09: 7/7 plans (incl. gap plan 07: G1/G2/YEARS) + deep code review (1 blocker, 3 warnings, fixed); verification passed 76/76; owner look-and-feel sign-off on the Pixel and his Moto; final release orbit-38.8-release-2026-10-09.apk (arm64). Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
-- [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
+- [ ] **Phase 39: Onboarding** - A short guided first run (Welcome → add a first person → a four-step Orient tour) and contextual, skippable lessons for the core loop and a few unusual features, through one accessible lesson system, after the prerequisite product fixes they depend on. Dossier accepted (D-01..D-93); UX audit before planning.
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
 ## Phase Details
@@ -1517,14 +1517,16 @@ Plans:
 
 ### Phase 39: Onboarding
 
-**Goal**: First-run setup and teaching designed against the real, implemented product rather than an imagined one.
-**Depends on**: Substantive implementation of the milestone, including Phases 37 and 38
-**Requirements**: None yet — deferred planning
-**Success Criteria**: Defined at planning time
-**Canonical refs**: docs/dossier/milestone-2/planning-notes/phase-15-17-18-stub-contracts.md
+**Goal**: A new user gets a short guided start (Welcome → add a first person → a four-step tour of Digest, Contacts, Orrery and the + button), then learns the core loop (Orient → Prepare → Reach Out → Record) and a few unusual features at the moment they first meet them, through one small, accessible, skippable lesson system. The product behaviours those lessons would otherwise have to explain away are fixed first.
+**Depends on**: Phase 38.8
+**Requirements**: None formal. Owner decisions in `39-CONTEXT.md` (2026-10-09 interrogation; provenance in `39-LEDGER.md`, migrated from the codex/ChatGPT legacy ledger).
+**Success Criteria**: Defined at planning from `39-CONTEXT.md` (D-01..D-93).
+**Scope source**: .planning/phases/39-onboarding/39-CONTEXT.md (the dossier; authoritative)
+**Design reference**: `39-WORKPAPER-mockup/onboarding-mockup.html` (owner-accepted mockup, D-74)
 **Plans**: TBD
 
-> **Deferred planning — interrogated later against the implemented product; do not plan or discuss yet.**
+> **Before planning (owner, 2026-10-09):** run the hands-on UX audit (`.planning/ux-audit/UX-AUDIT-PROMPT.md`), check its findings against `39-CONTEXT.md`, and set the sharing lesson (D-93) by dated amendment. Then `/gsd-plan-phase 39`.
+> Decisions that reverse or amend recorded rules, each owner-confirmed, to get superseding ADRs at KB extraction: ADR-016 and ADR-131 (new-contact defaults); phase-06 §O / 27-CONTEXT D-09 (first-run swipe choice); ADR-082 / ADR-132 (one-time pre-write Quick Log lesson); 35-CONTEXT D-04 (one "Did you send it?" asker in Compose); ADR-140 (Tutorials Settings row); ADR-057 / ADR-138 (tutorial state not backed up). Full table in the dossier's `<supersessions>`.
 
 ### Phase 40: Responsive & Release Hardening
 
