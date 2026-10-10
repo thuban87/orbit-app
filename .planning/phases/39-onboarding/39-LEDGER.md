@@ -23,7 +23,7 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 
 ## Resume here
 
-- **Next:** Owner runs the UX audit (`.planning/ux-audit/UX-AUDIT-PROMPT.md`). Then check its findings against `39-CONTEXT.md` and set D-93's sharing lesson by dated amendment (D-94+). Then `/gsd-plan-phase 39`.
+- **Next:** UX audit checked against this dossier (2026-10-10, Batch 13); D-94..D-99 recorded. Next: sequence the audit fix phases (incl. a fuel-retirement phase) relative to 39 and 40, then `/gsd-plan-phase 39` when its prerequisites are placed.
 - **Queue (0):** none.
   - **Later stage:** Settings placement/wording; presentation/visuals; copy
 - **Blockers:** none. (Device refresh done 2026-10-09 on the Pixel 3a, `untracked/artifacts/39/discovery-refresh/`.)
@@ -125,6 +125,12 @@ Legacy wording "Owner + ChatGPT" is historical; triage continues owner + Claude.
 | D-91 | "Orbit Status / Orbit participation / Orbit Center" are the concept, not the app name | LOCKED | Q-42 | backlog 999.4 |
 | D-92 | Settings home row "Tutorials" (on/off + Restart), placed just above About | LOCKED | Q-43 | Settings hub |
 | D-93 | Sharing into the app is taught; lesson content pinned until UX audit + 999.5 | LOCKED | Q-51 (corrected) | D-23, 999.5 |
+| D-94 | Add Contact "Not yet" looks selected when chosen | LOCKED | Batch 13 Q1 | D-50 |
+| D-95 | "Active Contacts" default population listed and shown selected in the menu | LOCKED | Batch 13 Q2 | D-12, D-81 |
+| D-96 | First-run restore runs full-screen; ends on Digest + Orient or back at Acquire | LOCKED | Batch 13 Q4 | D-63 |
+| D-97 | Lessons may show on their own trigger form or sheet (widens D-84) | LOCKED | Batch 13 Q5 | D-58, D-84 |
+| D-98 | Tucked-away empty state: real "not yet contacted" button + Unbound line | LOCKED | Batch 13 Q6 | D-81, D-52 |
+| D-99 | Sharing lesson: share → person → chosen TTR section; waits on fuel-retirement phase | LOCKED | Batch 13 Q3 | D-93, D-27, D-23 |
 
 ## Locked decisions migrated from the legacy ledger
 
@@ -494,6 +500,29 @@ Owner answer (verbatim):
   > Context draft is approved otherwise.
 - **Recorded:** D-93 revised (LOCKED) — Sharing into the app is taught in Phase 39 (Memory discovery line or its own lesson); content pinned until the UX audit and backlog 999.5 settle the flow, then set by a dated amendment before planning. No longer amends D-23. The Batch 11 reading ("drop the Share line") was wrong; recorded under Revisions.
 - **Acceptance:** owner accepted `39-CONTEXT.draft.md` with this correction.
+
+### Batch 13 — 2026-10-10 — Cluster: UX audit vs Phase 39
+
+Source: `.planning/ux-audit/UX-AUDIT-REPORT.md` (main @ 05b85252; no `src/` change since), triaged by five read-only subagents, load-bearing claims re-verified by the orchestrator in code.
+
+Owner answer (verbatim):
+> Q1. A
+> Q2. A
+> Q3. This is part of the fuel conversation. My goal here is to have the fuel options broken into individual tables and locations in the profile. Then shares get put into one of those entries. So if I see a link on Amazon I can share it to orbit, choose the contact and choose Gift Ideas. If I see an article about something we talked about, I can share it to a contact as a Last Talked About item. If I come across a joke that I want to tell them, I can share it to a new Thought of Them section. See what I mean?
+> Q4. Agreed
+> Q5. Agreed
+> Q6. Agreed
+
+- **Q1 → D-94 LOCKED** — "Not yet" looks selected when chosen (audit E-13; `TriStateLastSpoke.tsx:101-110` mutes it by design). ⚠ AMENDS 34-UI-SPEC :115.
+- **Q2 → D-95 LOCKED** — Keep "Active Contacts" as the default population; list it in the Population menu, selected by default (audit A-04; `control-labels.ts:17`). Keeps ADR-093. ⚠ AMENDS phase-05 dossier :235. Rejected alternative: empty selection = All Contacts (would reverse ADR-093 and void D-81's premise).
+- **Q3 → D-99 LOCKED** — Share → person → chosen Things to Remember section (Gift Ideas, Last Talked About, a new "Thought of Them"). Depends on a separate fuel-retirement phase (owner direction, also Batch 10: "rip fuel out of the app root and stem"). Section list set in that phase. ⚠ AMENDS D-27, D-23. Also needs audit I-01 and I-04 fixed first.
+- **Q4 → D-96 LOCKED** — First-run restore runs full-screen; ends on Digest + Orient (people restored) or back at Acquire (none). ⚠ AMENDS D-63 (audit K-19, K-20).
+- **Q5 → D-97 LOCKED** — Lessons may show on their own trigger form/sheet. ⚠ AMENDS D-58, D-84.
+- **Q6 → D-98 LOCKED** — "N not yet contacted →" becomes a real button; add an Unbound line (found in triage: `HomeScreen.tsx:1734-1755`).
+- **Owner direction, not a Phase 39 decision (P1):** new shares get a per-item "Allow AI" switch, off by default. Verified: share-captured `fuel` `topic` rows reach the AI prompt with no per-item permission (`CaptureScreen.tsx:273-276` → `ai-context-read.ts:288` → `prompt-template.ts:363-391`). Homed in the fuel-retirement phase.
+- **Owner direction (P1):** fuel is removed from the app; each former fuel kind gets its own place on the Profile. To be a phase of its own.
+- **Class A prerequisites (enforcement of D-02/D-03, not owner decisions):** E-01, E-02, F-01, F-05, A-02, A-23, G-11, J-01, K-36 (borderline), list-row TalkBack "Log Interaction" runs Quick Log (found in triage), I-01/I-04 (with D-99). Folds: E-05 → D-50/D-51; H-02, H-03 → D-75; J-02, J-05, J-08 → D-76; D-09 → D-77.
+- **Planner-level notes (planner's bucket):** D-24 trigger must also cover the native category dropdown (sheet only above `CATEGORY_SEARCH_THRESHOLD`); Android Back in a lesson matches the card's Back (phase-01 §C); D-67 "Tap any day" copy is untrue on the default Cycles lens; import below Android SDK 37 uses `LegacyContactPicker` (`use-contact-import-mode.ts:6-8`), unaudited — device-check before the Import lesson.
 
 ## Stage F audit — 2026-10-09
 
