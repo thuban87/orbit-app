@@ -1587,3 +1587,11 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 **Goal:** Offer Markdown as an export-format option alongside the current single plaintext JSON export (Phase 16). Owner request from the Phase 15 discuss (2026-08-23); it was meant to be raised at Phase 16 planning but never was. Changing the export format revises Phase 16's `[DECIDED]` JSON-only export, so it needs an owner discuss before planning.
 **Source:** owner request 2026-08-23 (recorded in `.planning/phases/15-weekly-digest/15-CONTEXT.md` `<deferred>`); added to the backlog on the owner's instruction 2026-10-09.
 **Plans:** 0 plans (not planned)
+
+### Phase 999.3: Inline knowledge inputs on the contact forms (BACKLOG)
+
+**Goal:** Make Memories and Off Limits work like the rest of the Create/Edit Contact form: fields you fill in right there, instead of the outlier editors that behave like a separate page. Retire the old Fuel editor along the way. Owner request (2026-10-09): "Those will need to be corrected to be form fields you can fill in there rather than get directed to another page."
+**Current state (code, `main @ 19caf50c`; confirm on device at discuss):** Create/Edit Contact host `MemoryEditor` (`CreateContactScreen.tsx:716`, `EditContactScreen.tsx:1599`) and the old `FuelEditor` for Off Limits (with a misleading Kind picker). Profile → Off Limits opens a separate `OffLimitsEditor` route. Fuel itself is still live: Off Limits entries are `fuel` rows with `kind = 'off_limits'`, and Android Share → Capture writes `fuel` (`CaptureScreen.tsx:273`); ADR-081 retired only AI-proposed fuel.
+**Overlaps:** `.planning/todos/pending/2026-09-27-retire-old-fuel-editor.md` (38.4 D-54) covers the Off Limits / Fuel-editor half; fold it in here. Touches ADR-131 (form composition) and ADR-150 (Off Limits editor choice); superseding either is an owner decision.
+**Source:** owner, Phase 39 interrogation 2026-10-09 (out of Phase 39 scope by owner ruling).
+**Plans:** 0 plans (not planned)
