@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.9
 current_phase_name: UX Standards
 status: executing
-stopped_at: Completed 38.9-10-PLAN.md
-last_updated: "2026-10-11T10:48:03.384Z"
+stopped_at: Completed 38.9-11-PLAN.md
+last_updated: "2026-10-11T11:20:00.000Z"
 last_activity: 2026-10-11
-last_activity_desc: "38.9-10 complete (shared header on the last 20 Settings-stack pushed screens; System builder in-builder Back; pending-conversion list deleted)"
-state_head: b561a9544d67b11d8a9b3bf1a622c8d545f03cf3
+last_activity_desc: "38.9-11 complete (Orbit switch replaces all 30 RN switches; selected swatch ring + check; chipTone tiers)"
+state_head: c3338e8f7bb73365375dbd58a9e0deb1108ccddf
 progress:
   total_phases: 37
   completed_phases: 22
   total_plans: 299
-  completed_plans: 290
+  completed_plans: 291
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -47,15 +47,15 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.9 (UX Standards) — EXECUTING
-Plan: 11 of 17
-Status: Executing Phase 38.9 — Plans 01-10 complete (overlay/dialog foundation; unsaved-work guards incl. sub-editor variant, requestClose for Cancel/fold; overlay guard on the pending-confirmation note, Capture Back order, Backup schedule save-on-leave; inline validation FieldError + scroll-to-first-error on Add/Edit Contact, Group Log, System builder, bulk frequency, Photo URL; everyday-surface native Alert sweep to themed confirm/notice/snackbar; Settings/backup/import/Systems Alert sweep + app-wide no-native-Alert contract, identical confirms share one dialog, Backup schedule saves on app background; shell navigation: history Back with Digest exit, + forms over the current tab, Settings Add Contact finishes on a Contacts-tab Profile, ComposeResearch focused; house header: chevron Back, onBack override, Cancel kind, person line on Update Contact/Log Interaction/Memory/Add Note, all-stack single-Back contract; Plan 09 header conversions on the 16 Contacts/Digest/Events/Orrery pushed screens; Plan 10 header conversions on the last 20 Settings-stack screens incl. Custom Fields header on every branch, System builder in-builder Back (Preview -> editing, Members -> Definition) with a top-anchored Preview header, AI Preview D-17 fill removed — pending-conversion list deleted, only Profile/Capture keep own chrome); 17 plans sequential; run the phase code review before Plan 17 (device plan)
+Plan: 12 of 17
+Status: Executing Phase 38.9 — Plans 01-11 complete (overlay/dialog foundation; unsaved-work guards incl. sub-editor variant, requestClose for Cancel/fold; overlay guard on the pending-confirmation note, Capture Back order, Backup schedule save-on-leave; inline validation FieldError + scroll-to-first-error on Add/Edit Contact, Group Log, System builder, bulk frequency, Photo URL; everyday-surface native Alert sweep to themed confirm/notice/snackbar; Settings/backup/import/Systems Alert sweep + app-wide no-native-Alert contract, identical confirms share one dialog, Backup schedule saves on app background; shell navigation: history Back with Digest exit, + forms over the current tab, Settings Add Contact finishes on a Contacts-tab Profile, ComposeResearch focused; house header: chevron Back, onBack override, Cancel kind, person line on Update Contact/Log Interaction/Memory/Add Note, all-stack single-Back contract; Plan 09 header conversions on the 16 Contacts/Digest/Events/Orrery pushed screens; Plan 10 header conversions on the last 20 Settings-stack screens incl. Custom Fields header on every branch, System builder in-builder Back (Preview -> editing, Members -> Definition) with a top-anchored Preview header, AI Preview D-17 fill removed — pending-conversion list deleted, only Profile/Capture keep own chrome; Plan 11 Orbit switch (D-47) replaces all 30 RN switches with a no-RN-Switch contract, disabled shows Off but announces the stored value, selected Appearance swatches get a textPrimary ring + surface gap + check (D-60), chipTone codifies the two chip tiers (D-05)); 17 plans sequential; run the phase code review before Plan 17 (device plan)
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-11 — Phase 38.9 Plan 10 complete (header conversions, Settings stack; single-Back contract final)
+Last activity: 2026-10-11 — Phase 38.9 Plan 11 complete (Orbit switch sweep, swatch ring, chip tiers)
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 39, 40. (38.8 completed 2026-10-09.) (38.7 completed 2026-10-05.)
 Next: assign the UX-audit findings to Phases 38.9-38.12, then run phase-dossier for 38.9. Phase 39 is planned after 38.12. The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
