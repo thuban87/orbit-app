@@ -1189,6 +1189,8 @@ export function EditContactScreen({
   const { requestClose } = useDiscardKeepGuard({
     hasUnsavedChanges,
     bypassRef,
+    // A save in flight holds every exit, with no prompt (fix-pass WR-02).
+    busyRef: savingRef,
     subEditor: {
       open: pickedDraft.open,
       dirty: pickedDraft.dirty,
@@ -1263,8 +1265,9 @@ export function EditContactScreen({
     <View style={styles.root}>
       {/* House header (38.9 D-16, D-44). Title only: this is where the name and
           photo are edited, so no person line (D-64). Its Back calls goBack,
-          which the unsaved-work guard above intercepts (D-13). */}
-      <ShellAppBar variant="child" title="Edit contact" />
+          which the unsaved-work guard above intercepts (D-13). While a save
+          runs the guard holds Back, so it draws disabled (D-26; WR-02). */}
+      <ShellAppBar variant="child" title="Edit contact" backDisabled={saving} />
       <ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}

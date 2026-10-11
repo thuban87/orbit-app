@@ -61,3 +61,26 @@ describe.each([
     expect(body.split("endInFlight(savingRef)")).toHaveLength(2);
   });
 });
+
+describe.each([
+  ["src/screens/CreateContactScreen.tsx", "New contact"],
+  ["src/screens/EditContactScreen.tsx", "Edit contact"],
+])("%s holds its exits while a save runs (fix-pass WR-02)", (path, title) => {
+  const source = readFileSync(join(ROOT, path), "utf8").replace(/\r\n/g, "\n");
+
+  it("passes the save ref to the guard, so Back cannot offer Discard mid-save", () => {
+    expect(source).toMatch(
+      /useDiscardKeepGuard\(\{[\s\S]*?busyRef: savingRef,[\s\S]*?\}\);/,
+    );
+  });
+
+  it("draws the header Back disabled while saving (D-26)", () => {
+    const header = source.match(
+      new RegExp(`<ShellAppBar[^>]*title="${title}"[^>]*/>`, "g"),
+    );
+    // Edit Contact's loading header has no save to hold; the form's does.
+    expect(header?.some((tag) => tag.includes("backDisabled={saving}"))).toBe(
+      true,
+    );
+  });
+});

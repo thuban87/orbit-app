@@ -438,6 +438,8 @@ export function CreateContactScreen({
       createFormSeedSignature(formState),
     ),
     bypassRef,
+    // A save in flight holds every exit, with no prompt (fix-pass WR-02).
+    busyRef: savingRef,
     subEditor: {
       open: pickedDraft.open,
       dirty: pickedDraft.dirty,
@@ -531,8 +533,9 @@ export function CreateContactScreen({
   return (
     <View style={styles.root}>
       {/* House header (38.9 D-16, D-44): its Back calls goBack, which the
-          unsaved-work guard above intercepts (D-13). */}
-      <ShellAppBar variant="child" title="New contact" />
+          unsaved-work guard above intercepts (D-13). While a save runs the
+          guard holds Back, so the header draws it disabled (D-26; WR-02). */}
+      <ShellAppBar variant="child" title="New contact" backDisabled={saving} />
       <ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}

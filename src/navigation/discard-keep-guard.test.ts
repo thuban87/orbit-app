@@ -38,6 +38,7 @@ function mountGuard(
   hasUnsavedChanges: boolean,
   bypass = false,
   subEditor?: SubEditor,
+  busyRef?: { current: boolean },
 ) {
   nav.listener = null;
   const bypassRef = { current: bypass };
@@ -46,6 +47,7 @@ function mountGuard(
     hasUnsavedChanges,
     bypassRef,
     subEditor,
+    busyRef,
   });
   const fire = (action: unknown = { type: "GO_BACK" }) => {
     const event: BeforeRemoveEvent = {
@@ -177,6 +179,47 @@ describe("decideGuardOnRemove (D-13, D-14)", () => {
   });
 });
 
+describe("decideGuardOnRemove busy hold (fix-pass WR-02)", () => {
+  it("holds every removal while a save is in flight, even with nothing dirty", () => {
+    for (const actionType of ["GO_BACK", "POP", "RESET", "NAVIGATE"]) {
+      for (const hasUnsavedChanges of [true, false]) {
+        expect(
+          decideGuardOnRemove({
+            actionType,
+            bypass: false,
+            busy: true,
+            hasUnsavedChanges,
+            subEditorOpen: true,
+            subEditorDirty: true,
+          }),
+        ).toBe("hold");
+      }
+    }
+  });
+
+  it("the save's own navigation still leaves: bypass wins over busy", () => {
+    expect(
+      decideGuardOnRemove({
+        actionType: "REPLACE",
+        bypass: true,
+        busy: true,
+        hasUnsavedChanges: true,
+      }),
+    ).toBe("allow");
+  });
+
+  it("not busy keeps today's rule", () => {
+    expect(
+      decideGuardOnRemove({
+        actionType: "GO_BACK",
+        bypass: false,
+        busy: false,
+        hasUnsavedChanges: true,
+      }),
+    ).toBe("prompt-leave");
+  });
+});
+
 describe("confirmDiscard() (D-13, D-52)", () => {
   it("enqueues the themed Discard changes? prompt", () => {
     void confirmDiscard();
@@ -279,6 +322,44 @@ describe("useDiscardKeepGuard (D-13, D-14)", () => {
     confirmStore.getState().resolveCurrent(true);
     await flush();
     expect(nav.dispatch).toHaveBeenCalledOnce();
+  });
+});
+
+describe("useDiscardKeepGuard busyRef (fix-pass WR-02)", () => {
+  it("holds Back with no prompt while the save runs, then prompts again once it settles", async () => {
+    const busyRef = { current: true };
+    const close = vi.fn();
+    const { fire } = mountGuard(
+      true,
+      false,
+      { open: true, dirty: true, close },
+      busyRef,
+    );
+    const held = fire({ type: "GO_BACK" });
+    expect(held.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+    expect(close).not.toHaveBeenCalled();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+
+    // The save failed and released its ref: the next Back follows the rule.
+    busyRef.current = false;
+    const after = fire({ type: "GO_BACK" });
+    expect(after.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+  });
+
+  it("the save's bypassed navigation leaves even while the ref is still held", () => {
+    const busyRef = { current: true };
+    const { fire, bypassRef } = mountGuard(true, false, undefined, busyRef);
+    bypassRef.current = true;
+    const event = fire({ type: "REPLACE" });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("no busyRef keeps today's behaviour", () => {
+    const { fire } = mountGuard(true);
+    fire();
+    expect(confirmStore.getState().queue).toHaveLength(1);
   });
 });
 

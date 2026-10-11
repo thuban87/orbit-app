@@ -17,6 +17,13 @@ type DiscardKeepGuardOptions = {
   bypassRef: RefObject<boolean>;
   /** In-screen sub-editor variant (D-14). Absent for plain route guards. */
   subEditor?: GuardSubEditor;
+  /**
+   * Set while the screen's save is in flight (38.9 fix-pass WR-02): every
+   * removal is held, with no prompt, because the save owns the exit. Its
+   * success leaves through the bypass; its failure keeps the user here. Read
+   * at removal time, so pass the screen's synchronous single-flight ref.
+   */
+  busyRef?: RefObject<boolean>;
 };
 
 export type DiscardKeepGuard = {
@@ -30,6 +37,7 @@ export type DiscardKeepGuard = {
 
 export type GuardDecision =
   | "allow"
+  | "hold"
   | "prompt-leave"
   | "close-sub-editor"
   | "prompt-close-sub-editor";
@@ -55,6 +63,10 @@ const BACK_ACTION_TYPES: ReadonlySet<string> = new Set(["GO_BACK", "POP"]);
  * What a route removal does (D-13, D-14):
  *
  * - bypass (a confirmed save is navigating) → "allow", for every action.
+ * - busy (a save is in flight, not yet navigating) → "hold", for every action:
+ *   stay, with no prompt. Offering "Discard changes?" now would let the user
+ *   discard and leave while the save still commits and navigates (fix-pass
+ *   WR-02). The save's own navigation sets bypass first, so it still leaves.
  * - Back (`GO_BACK` / `POP`) with an open sub-editor → close that editor and
  *   stay: "close-sub-editor" when it is clean, "prompt-close-sub-editor" when
  *   it holds typed text. With no sub-editor open, the route rule applies.
@@ -65,18 +77,21 @@ const BACK_ACTION_TYPES: ReadonlySet<string> = new Set(["GO_BACK", "POP"]);
  */
 export function decideGuardOnRemove({
   bypass,
+  busy = false,
   hasUnsavedChanges,
   subEditorOpen = false,
   subEditorDirty = false,
   actionType,
 }: {
   bypass: boolean;
+  busy?: boolean;
   hasUnsavedChanges: boolean;
   subEditorOpen?: boolean;
   subEditorDirty?: boolean;
   actionType: string;
 }): GuardDecision {
   if (bypass) return "allow";
+  if (busy) return "hold";
   if (BACK_ACTION_TYPES.has(actionType)) {
     if (subEditorOpen) {
       return subEditorDirty ? "prompt-close-sub-editor" : "close-sub-editor";
@@ -128,6 +143,9 @@ export function confirmDiscard(): Promise<boolean> {
  * Sub-editor variant (D-14): with `subEditor`, Back first closes the open
  * editor and keeps the route, prompting only when it holds typed text.
  *
+ * Busy hold (fix-pass WR-02): with `busyRef` set, every removal is prevented
+ * with no prompt until the save settles (see `decideGuardOnRemove`).
+ *
  * Android native-stack note (review M5): every stack here is a native stack
  * with `headerShown: false`; on Android `nativeBackButtonDismissalEnabled` is
  * false, predictive back is off and `gestureEnabled` is iOS-only, so the
@@ -140,6 +158,7 @@ export function useDiscardKeepGuard({
   hasUnsavedChanges,
   bypassRef,
   subEditor,
+  busyRef,
 }: DiscardKeepGuardOptions): DiscardKeepGuard {
   const navigation = useNavigation();
   const promptPendingRef = useRef(false);
@@ -176,6 +195,7 @@ export function useDiscardKeepGuard({
         }
         const decision = decideGuardOnRemove({
           bypass: false,
+          busy: busyRef?.current === true,
           hasUnsavedChanges,
           subEditorOpen,
           subEditorDirty,
@@ -184,6 +204,7 @@ export function useDiscardKeepGuard({
         if (decision === "allow") return;
 
         event.preventDefault();
+        if (decision === "hold") return; // the in-flight save owns the exit
         if (decision === "close-sub-editor") {
           subEditorCloseRef.current?.();
           return;
@@ -198,7 +219,14 @@ export function useDiscardKeepGuard({
           if (discard) navigation.dispatch(event.data.action);
         });
       }),
-    [bypassRef, hasUnsavedChanges, navigation, subEditorDirty, subEditorOpen],
+    [
+      busyRef,
+      bypassRef,
+      hasUnsavedChanges,
+      navigation,
+      subEditorDirty,
+      subEditorOpen,
+    ],
   );
 
   return { requestClose };
