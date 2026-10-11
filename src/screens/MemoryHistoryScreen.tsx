@@ -1,13 +1,8 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button } from "@/components/ui";
 import {
   editHistoryEntry,
@@ -31,7 +26,6 @@ import { Logger } from "@/utils/logger";
 const LOG_SCOPE = "memory-history";
 
 export function MemoryHistoryScreen({
-  navigation,
   route,
 }: RootStackScreenProps<"MemoryHistory">) {
   const { colors } = useTheme();
@@ -134,19 +128,8 @@ export function MemoryHistoryScreen({
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <AppText role="caption">Back</AppText>
-        </Pressable>
-        <AppText accessibilityRole="header" role="display">
-          {title}
-        </AppText>
-      </View>
+      {/* House header (38.9 D-16, D-44), titled with the field's name. */}
+      <ShellAppBar variant="child" title={title} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -298,12 +281,6 @@ export function MemoryHistoryScreen({
 }
 
 const styles = StyleSheet.create({
-  back: {
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
   content: { gap: SPACING.md, padding: SPACING.base },
   current: {
     borderRadius: 12,
@@ -326,12 +303,6 @@ const styles = StyleSheet.create({
     padding: SPACING.base,
   },
   formActions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.md,
-    padding: SPACING.base,
-  },
   history: { gap: SPACING.sm },
   input: {
     borderRadius: 8,

@@ -72,7 +72,7 @@ import { resolvePrompt } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { AIComposeContextReview } from "@/components/AIComposeContextReview";
-import { Avatar } from "@/components/Avatar";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
@@ -390,7 +390,7 @@ export function ComposeScreen({
     [contactId, clearSession, returnToOrigin],
   );
 
-  // Ordinary Back (Button + hardware): preserve the session, return toward origin.
+  // Ordinary Back (header + hardware): preserve the session, return toward origin.
   const onBack = useCallback(() => performExit("back"), [performExit]);
 
   // Mirror the editor body into a ref so the lifecycle's isEditorEmpty /
@@ -1174,28 +1174,34 @@ export function ComposeScreen({
 
   // ---- Render --------------------------------------------------------------
 
-  const backControl = (
-    <ChromeScrim style={styles.backScrim} radius={RADII.sm}>
-      <Button
-        testID="compose-back"
-        role="tertiary"
-        label="Back"
-        accessibilityLabel="Back"
-        onPress={onBack}
-      />
-    </ChromeScrim>
+  // House header titled "Compose" (38.9 D-16, D-58) with the person line
+  // (D-45). Its Back runs the SAME origin-aware exit as the hardware handler
+  // above (`performExit("back")` → returnToOrigin, COMP-14), after any open
+  // shell transient closes.
+  const appBar = (
+    <ShellAppBar
+      variant="child"
+      title="Compose"
+      onBack={() => performExit("back")}
+      person={
+        header !== null
+          ? { name: header.name, photo: header.photo, contactId }
+          : null
+      }
+    />
   );
 
-  // "loading" shows minimal chrome + Back; "error" shows Back after its notice;
+  // "loading" shows the header alone; "error" shows it after its notice;
   // "missing" has already navigated home (render nothing meaningful).
   if (screenState !== "ready" || header === null) {
     return (
-      <ScrollView
-        testID="compose-screen"
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.header}>{backControl}</View>
-      </ScrollView>
+      <View style={styles.root}>
+        {appBar}
+        <ScrollView
+          testID="compose-screen"
+          contentContainerStyle={styles.content}
+        />
+      </View>
     );
   }
 
@@ -1259,602 +1265,580 @@ export function ComposeScreen({
   const showPicker = pickerCandidates.length >= 2 && !hasExplicitPrimary;
 
   return (
-    <ScrollView testID="compose-screen" contentContainerStyle={styles.content}>
-      {/* Header row: Back, Avatar, contact name (heading). */}
-      <View style={styles.header}>
-        {backControl}
-        <Avatar
-          photo={header.photo}
-          name={header.name}
-          contactId={contactId}
-          size={64}
-        />
-        <ChromeScrim style={styles.nameScrim} radius={RADII.sm}>
-          <AppText
-            testID="compose-name"
-            role="heading"
-            accessibilityRole="header"
-          >
-            {header.name}
-          </AppText>
-        </ChromeScrim>
-      </View>
-
-      {/* Email Subject field (COMP-04) — rendered only in Email mode, above the
+    <View style={styles.root}>
+      {appBar}
+      <ScrollView
+        testID="compose-screen"
+        contentContainerStyle={styles.content}
+      >
+        {/* Email Subject field (COMP-04) — rendered only in Email mode, above the
           Body. Bound to the session store `subject`/`setSubject` (owned by plan
           35-01), so it survives nav/background exactly like the body. Its own
           lightweight Copy affordance copies the Subject only. */}
-      {mode === "email" ? (
-        <View testID="compose-subject" style={styles.section}>
+        {mode === "email" ? (
+          <View testID="compose-subject" style={styles.section}>
+            <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+              <AppText role="label">Subject</AppText>
+            </ChromeScrim>
+            <TextInput
+              testID="compose-subject-input"
+              value={subject}
+              onChangeText={setSubject}
+              placeholder="Subject"
+              placeholderTextColor={colors.textPlaceholder}
+              style={[
+                styles.subjectInput,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                  fontSize: TYPOGRAPHY.body.size,
+                  lineHeight: TYPOGRAPHY.body.lineHeight,
+                  fontFamily: "Inter-Regular",
+                },
+              ]}
+            />
+            <View style={styles.affordance}>
+              <Button
+                testID="compose-copy-subject"
+                role="tertiary"
+                label="Copy subject"
+                accessibilityLabel="Copy subject"
+                onPress={() => void onCopySubject()}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {/* Editor-first: the BLANK multiline body editor is the primary surface. */}
+        <View testID="compose-draft" style={styles.section}>
           <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
-            <AppText role="label">Subject</AppText>
+            <AppText role="label">Your message</AppText>
           </ChromeScrim>
           <TextInput
-            testID="compose-subject-input"
-            value={subject}
-            onChangeText={setSubject}
-            placeholder="Subject"
+            testID="compose-draft-input"
+            value={body}
+            onChangeText={setBody}
+            multiline
+            placeholder="Write your message…"
             placeholderTextColor={colors.textPlaceholder}
             style={[
-              styles.subjectInput,
+              styles.draftInput,
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
                 color: colors.textPrimary,
+                // Token-driven body typography (16/24) — not a raw literal; AppText
+                // cannot wrap a TextInput, so the role's tokens are applied here.
                 fontSize: TYPOGRAPHY.body.size,
                 lineHeight: TYPOGRAPHY.body.lineHeight,
                 fontFamily: "Inter-Regular",
               },
             ]}
           />
-          <View style={styles.affordance}>
-            <Button
-              testID="compose-copy-subject"
-              role="tertiary"
-              label="Copy subject"
-              accessibilityLabel="Copy subject"
-              onPress={() => void onCopySubject()}
-            />
-          </View>
         </View>
-      ) : null}
 
-      {/* Editor-first: the BLANK multiline body editor is the primary surface. */}
-      <View testID="compose-draft" style={styles.section}>
-        <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
-          <AppText role="label">Your message</AppText>
-        </ChromeScrim>
-        <TextInput
-          testID="compose-draft-input"
-          value={body}
-          onChangeText={setBody}
-          multiline
-          placeholder="Write your message…"
-          placeholderTextColor={colors.textPlaceholder}
-          style={[
-            styles.draftInput,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              color: colors.textPrimary,
-              // Token-driven body typography (16/24) — not a raw literal; AppText
-              // cannot wrap a TextInput, so the role's tokens are applied here.
-              fontSize: TYPOGRAPHY.body.size,
-              lineHeight: TYPOGRAPHY.body.lineHeight,
-              fontFamily: "Inter-Regular",
-            },
-          ]}
-        />
-      </View>
-
-      {/* Ad-hoc mode switch (COMP-02) — flips the session mode ONLY (never the
+        {/* Ad-hoc mode switch (COMP-02) — flips the session mode ONLY (never the
           durable preference), tertiary accentText link tone. */}
-      <View style={styles.affordance}>
-        <Button
-          testID="compose-mode-switch"
-          role="tertiary"
-          label={mode === "email" ? "Make this a text" : "Make this an email"}
-          accessibilityLabel={
-            mode === "email" ? "Make this a text" : "Make this an email"
-          }
-          onPress={onSwitchMode}
-        />
-      </View>
+        <View style={styles.affordance}>
+          <Button
+            testID="compose-mode-switch"
+            role="tertiary"
+            label={mode === "email" ? "Make this a text" : "Make this an email"}
+            accessibilityLabel={
+              mode === "email" ? "Make this a text" : "Make this an email"
+            }
+            onPress={onSwitchMode}
+          />
+        </View>
 
-      {/* Things to Remember Research entry (COMP-08) — a tertiary accentText link to
+        {/* Things to Remember Research entry (COMP-08) — a tertiary accentText link to
           the sibling full-screen Research side, carrying the populated count. The
           navigate PRESERVES the compose session (no startSession/clear here), so the
           draft, mode, Subject, and Message Focus survive the Compose↔Research
           transition (COMP-07 / D-10). Shown only when there is populated knowledge. */}
-      {researchCount > 0 ? (
-        <View style={styles.affordance}>
-          <Button
-            testID="compose-research-entry"
-            role="tertiary"
-            label={`Things to Remember · ${researchCount}`}
-            accessibilityLabel={`Things to Remember, ${researchCount} items`}
-            onPress={() =>
-              navigation.navigate("ComposeResearch", { contactId })
-            }
-          />
-        </View>
-      ) : null}
+        {researchCount > 0 ? (
+          <View style={styles.affordance}>
+            <Button
+              testID="compose-research-entry"
+              role="tertiary"
+              label={`Things to Remember · ${researchCount}`}
+              accessibilityLabel={`Things to Remember, ${researchCount} items`}
+              onPress={() =>
+                navigation.navigate("ComposeResearch", { contactId })
+              }
+            />
+          </View>
+        ) : null}
 
-      {/* Compact Message Focus summary (COMP-11) — reflects the ≤3 session-only
+        {/* Compact Message Focus summary (COMP-11) — reflects the ≤3 session-only
           selection the human toggled Add to AI on the Research side. HIDDEN when
           empty. Off Limits can never appear here: the store only ever holds
           aiEligible, non-off-limits items (COMP-10 display / T-35-16). */}
-      {messageFocus.length > 0 ? (
-        <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
-          <AppText testID="compose-message-focus" role="label">
-            {`Message focus · ${messageFocus.length}`}
-          </AppText>
-        </ChromeScrim>
-      ) : null}
+        {messageFocus.length > 0 ? (
+          <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+            <AppText testID="compose-message-focus" role="label">
+              {`Message focus · ${messageFocus.length}`}
+            </AppText>
+          </ChromeScrim>
+        ) : null}
 
-      {/* Adaptive AI action (COMP-12 / D-09) — a single primary action that reads
+        {/* Adaptive AI action (COMP-12 / D-09) — a single primary action that reads
           'Draft with AI' on an empty editor and 'Rewrite with AI' when it holds
           meaningful text. Rendered only when AI is configured and nothing is in
           flight (idle). It NEVER auto-starts; begin() runs only on this tap. */}
-      {aiState.status === "idle" && aiPosture.showAiActions ? (
-        <>
-          <View style={styles.affordance}>
-            <Button
-              testID="compose-ai-action"
-              role="primary"
-              label={aiActionLabel}
-              accessibilityLabel={aiActionLabel}
-              onPress={onAiAction}
-            />
-          </View>
-          {body.trim().length > 0 ? (
+        {aiState.status === "idle" && aiPosture.showAiActions ? (
+          <>
             <View style={styles.affordance}>
               <Button
-                testID="compose-ai-adjust-open"
-                role="tertiary"
-                label="Adjust"
-                accessibilityLabel="Adjust this message with AI"
-                onPress={() => setAdjustOpen((open) => !open)}
+                testID="compose-ai-action"
+                role="primary"
+                label={aiActionLabel}
+                accessibilityLabel={aiActionLabel}
+                onPress={onAiAction}
               />
             </View>
-          ) : null}
-        </>
-      ) : null}
+            {body.trim().length > 0 ? (
+              <View style={styles.affordance}>
+                <Button
+                  testID="compose-ai-adjust-open"
+                  role="tertiary"
+                  label="Adjust"
+                  accessibilityLabel="Adjust this message with AI"
+                  onPress={() => setAdjustOpen((open) => !open)}
+                />
+              </View>
+            ) : null}
+          </>
+        ) : null}
 
-      {aiState.status === "idle" && aiPosture.showAiActions && adjustOpen ? (
-        <View
-          testID="compose-ai-adjust"
-          style={[
-            styles.panel,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText role="label">Adjust this message</AppText>
-          <View style={styles.panelActions}>
-            {AI_ADJUST_QUICK_ACTIONS.map((guidance) => (
-              <Button
-                key={guidance}
-                testID={`compose-ai-adjust-${guidance.toLowerCase().replace(/\s+/g, "-")}`}
-                role="secondary"
-                label={guidance}
-                accessibilityLabel={`Adjust: ${guidance}`}
-                onPress={() => onAiAdjust(guidance)}
-              />
-            ))}
-          </View>
-          <TextInput
-            testID="compose-ai-adjust-input"
-            value={adjustGuidance}
-            onChangeText={setAdjustGuidance}
-            placeholder="Tell Orbit what to change…"
-            placeholderTextColor={colors.textPlaceholder}
-            multiline
+        {aiState.status === "idle" && aiPosture.showAiActions && adjustOpen ? (
+          <View
+            testID="compose-ai-adjust"
             style={[
-              styles.adjustInput,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-                fontSize: TYPOGRAPHY.body.size,
-                lineHeight: TYPOGRAPHY.body.lineHeight,
-                fontFamily: "Inter-Regular",
-              },
+              styles.panel,
+              { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
-          />
-          <View style={styles.panelActions}>
-            <Button
-              testID="compose-ai-adjust-cancel"
-              role="secondary"
-              label="Cancel"
-              accessibilityLabel="Cancel adjustment"
-              onPress={() => setAdjustOpen(false)}
+          >
+            <AppText role="label">Adjust this message</AppText>
+            <View style={styles.panelActions}>
+              {AI_ADJUST_QUICK_ACTIONS.map((guidance) => (
+                <Button
+                  key={guidance}
+                  testID={`compose-ai-adjust-${guidance.toLowerCase().replace(/\s+/g, "-")}`}
+                  role="secondary"
+                  label={guidance}
+                  accessibilityLabel={`Adjust: ${guidance}`}
+                  onPress={() => onAiAdjust(guidance)}
+                />
+              ))}
+            </View>
+            <TextInput
+              testID="compose-ai-adjust-input"
+              value={adjustGuidance}
+              onChangeText={setAdjustGuidance}
+              placeholder="Tell Orbit what to change…"
+              placeholderTextColor={colors.textPlaceholder}
+              multiline
+              style={[
+                styles.adjustInput,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                  fontSize: TYPOGRAPHY.body.size,
+                  lineHeight: TYPOGRAPHY.body.lineHeight,
+                  fontFamily: "Inter-Regular",
+                },
+              ]}
             />
-            <Button
-              testID="compose-ai-adjust-apply"
-              role="primary"
-              label="Generate alternatives"
-              accessibilityLabel="Generate adjusted alternatives"
-              disabled={adjustGuidance.trim().length === 0}
-              onPress={() => onAiAdjust(adjustGuidance)}
-            />
+            <View style={styles.panelActions}>
+              <Button
+                testID="compose-ai-adjust-cancel"
+                role="secondary"
+                label="Cancel"
+                accessibilityLabel="Cancel adjustment"
+                onPress={() => setAdjustOpen(false)}
+              />
+              <Button
+                testID="compose-ai-adjust-apply"
+                role="primary"
+                label="Generate alternatives"
+                accessibilityLabel="Generate adjusted alternatives"
+                disabled={adjustGuidance.trim().length === 0}
+                onPress={() => onAiAdjust(adjustGuidance)}
+              />
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* AI Needs Attention (COMP-09 / D-07 / D-12) — a restrained repair notice
+        {/* AI Needs Attention (COMP-09 / D-07 / D-12) — a restrained repair notice
           that REPLACES the AI actions (never silently hides them, never restores
           Draft/Rewrite). Caption/label tone on `surface`, no accent CTA styling;
           routes to the EXISTING AI settings surface as an interim. Manual
           composition + Research stay fully usable (rendered unconditionally). */}
-      {aiState.status === "idle" && aiPosture.repairNotice ? (
-        <View
-          testID="compose-ai-needs-attention"
-          style={[
-            styles.panel,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText role="label">AI needs attention</AppText>
-          <AppText role="caption">
-            Your AI provider needs attention before Draft or Rewrite can run.
-            Open AI settings to sort it out.
-          </AppText>
-          <View style={styles.affordance}>
-            <Button
-              testID="compose-ai-open-settings"
-              role="tertiary"
-              label="Open AI settings"
-              accessibilityLabel="Open AI settings"
-              onPress={onOpenAiSettings}
-            />
+        {aiState.status === "idle" && aiPosture.repairNotice ? (
+          <View
+            testID="compose-ai-needs-attention"
+            style={[
+              styles.panel,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <AppText role="label">AI needs attention</AppText>
+            <AppText role="caption">
+              Your AI provider needs attention before Draft or Rewrite can run.
+              Open AI settings to sort it out.
+            </AppText>
+            <View style={styles.affordance}>
+              <Button
+                testID="compose-ai-open-settings"
+                role="tertiary"
+                label="Open AI settings"
+                accessibilityLabel="Open AI settings"
+                onPress={onOpenAiSettings}
+              />
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* Non-destructive pending placeholder (COMP-13) — while the three
+        {/* Non-destructive pending placeholder (COMP-13) — while the three
           suggestions generate, the editor is UNTOUCHED and Cancel is available.
           Exact skeleton styling is device-tuning (backstop); this is the failure-
           safe backstop that never mutates the manual draft. */}
-      {aiState.status === "resolving" || aiState.status === "loading" ? (
-        <View
-          testID="compose-ai-pending"
-          style={[
-            styles.panel,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText role="body">Drafting a few options…</AppText>
-          <View style={styles.panelActions}>
-            <Button
-              testID="compose-ai-pending-cancel"
-              role="secondary"
-              label="Cancel"
-              accessibilityLabel="Cancel"
-              onPress={onAiCancel}
-            />
+        {aiState.status === "resolving" || aiState.status === "loading" ? (
+          <View
+            testID="compose-ai-pending"
+            style={[
+              styles.panel,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <AppText role="body">Drafting a few options…</AppText>
+            <View style={styles.panelActions}>
+              <Button
+                testID="compose-ai-pending-cancel"
+                role="secondary"
+                label="Cancel"
+                accessibilityLabel="Cancel"
+                onPress={onAiCancel}
+              />
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* Non-destructive three-suggestion review surface (ADR-079 / COMP-12).
+        {/* Non-destructive three-suggestion review surface (ADR-079 / COMP-12).
           Exactly three unlabeled suggestions at body size (16/24, no shrink); each
           has a 'Choose this' primary — the ONLY editor mutation. 'Try Again'
           replaces the whole set; 'Cancel' dismisses without mutating. For a
           Rewrite (the editor held text at invocation, still untouched here) the
           original is shown with a clear keep-the-original path. */}
-      {aiState.status === "review" ? (
-        <View
-          testID="compose-ai-review"
-          style={[
-            styles.panel,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText role="heading">
-            {aiIsRewrite ? "Rewrite suggestions" : "Draft suggestions"}
-          </AppText>
+        {aiState.status === "review" ? (
+          <View
+            testID="compose-ai-review"
+            style={[
+              styles.panel,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <AppText role="heading">
+              {aiIsRewrite ? "Rewrite suggestions" : "Draft suggestions"}
+            </AppText>
 
-          {aiIsRewrite ? (
-            <View testID="compose-ai-original" style={styles.section}>
-              <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
-                <AppText role="label">Your original</AppText>
-              </ChromeScrim>
-              <ScrollView
-                style={[styles.aiSuggestionBox, { borderColor: colors.border }]}
-                nestedScrollEnabled
-              >
-                <AppText role="body">{body}</AppText>
-              </ScrollView>
-              <View style={styles.affordance}>
-                <Button
-                  testID="compose-ai-keep-original"
-                  role="secondary"
-                  label="Keep the original"
-                  accessibilityLabel="Keep the original"
-                  onPress={onAiCancel}
-                />
+            {aiIsRewrite ? (
+              <View testID="compose-ai-original" style={styles.section}>
+                <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+                  <AppText role="label">Your original</AppText>
+                </ChromeScrim>
+                <ScrollView
+                  style={[
+                    styles.aiSuggestionBox,
+                    { borderColor: colors.border },
+                  ]}
+                  nestedScrollEnabled
+                >
+                  <AppText role="body">{body}</AppText>
+                </ScrollView>
+                <View style={styles.affordance}>
+                  <Button
+                    testID="compose-ai-keep-original"
+                    role="secondary"
+                    label="Keep the original"
+                    accessibilityLabel="Keep the original"
+                    onPress={onAiCancel}
+                  />
+                </View>
               </View>
-            </View>
-          ) : null}
+            ) : null}
 
-          {aiState.suggestions.map((suggestion, index) => (
-            <View
-              // Suggestions are unlabeled and may repeat text; index is the stable
-              // identity within this immutable set (replaced wholesale on retry).
-              // biome-ignore lint/suspicious/noArrayIndexKey: stable within the set
-              key={index}
-              testID={`compose-ai-suggestion-${index}`}
-              style={styles.section}
-            >
-              <ScrollView
-                style={[styles.aiSuggestionBox, { borderColor: colors.border }]}
-                nestedScrollEnabled
+            {aiState.suggestions.map((suggestion, index) => (
+              <View
+                // Suggestions are unlabeled and may repeat text; index is the stable
+                // identity within this immutable set (replaced wholesale on retry).
+                // biome-ignore lint/suspicious/noArrayIndexKey: stable within the set
+                key={index}
+                testID={`compose-ai-suggestion-${index}`}
+                style={styles.section}
               >
-                <AppText role="body">{suggestion}</AppText>
-              </ScrollView>
-              <View style={styles.affordance}>
-                <Button
-                  testID={`compose-ai-choose-${index}`}
-                  role="primary"
-                  label="Choose this"
-                  accessibilityLabel="Choose this suggestion"
-                  onPress={() => onAiChoose(index)}
-                />
+                <ScrollView
+                  style={[
+                    styles.aiSuggestionBox,
+                    { borderColor: colors.border },
+                  ]}
+                  nestedScrollEnabled
+                >
+                  <AppText role="body">{suggestion}</AppText>
+                </ScrollView>
+                <View style={styles.affordance}>
+                  <Button
+                    testID={`compose-ai-choose-${index}`}
+                    role="primary"
+                    label="Choose this"
+                    accessibilityLabel="Choose this suggestion"
+                    onPress={() => onAiChoose(index)}
+                  />
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
 
-          <View style={styles.panelActions}>
-            <Button
-              testID="compose-ai-cancel"
-              role="secondary"
-              label="Cancel"
-              accessibilityLabel="Cancel"
-              onPress={onAiCancel}
-            />
-            <Button
-              testID="compose-ai-try-again"
-              role="tertiary"
-              label="Try Again"
-              accessibilityLabel="Try Again"
-              onPress={onAiRetry}
-            />
+            <View style={styles.panelActions}>
+              <Button
+                testID="compose-ai-cancel"
+                role="secondary"
+                label="Cancel"
+                accessibilityLabel="Cancel"
+                onPress={onAiCancel}
+              />
+              <Button
+                testID="compose-ai-try-again"
+                role="tertiary"
+                label="Try Again"
+                accessibilityLabel="Try Again"
+                onPress={onAiRetry}
+              />
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* Failure-safe AI error surface (COMP-13) — the manual draft is preserved
+        {/* Failure-safe AI error surface (COMP-13) — the manual draft is preserved
           (this never touches the editor); a SANITIZED code maps to a short line
           (never raw provider text), with Try Again / Cancel. Never a provider-
           troubleshooting screen. */}
-      {aiState.status === "error" ? (
-        <View
-          testID="compose-ai-error"
-          style={[
-            styles.panel,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText testID="compose-ai-error-text" role="body">
-            {aiState.message ?? aiErrorText(aiState.code)}
-          </AppText>
-          {aiState.diagnostic ? (
-            <View style={styles.affordance}>
+        {aiState.status === "error" ? (
+          <View
+            testID="compose-ai-error"
+            style={[
+              styles.panel,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <AppText testID="compose-ai-error-text" role="body">
+              {aiState.message ?? aiErrorText(aiState.code)}
+            </AppText>
+            {aiState.diagnostic ? (
+              <View style={styles.affordance}>
+                <Button
+                  testID="compose-ai-error-details-toggle"
+                  role="tertiary"
+                  label={aiDetailsOpen ? "Hide details" : "Details"}
+                  accessibilityLabel={
+                    aiDetailsOpen
+                      ? "Hide AI failure details"
+                      : "Show AI failure details"
+                  }
+                  onPress={() => setAiDetailsOpen((open) => !open)}
+                />
+              </View>
+            ) : null}
+            {aiDetailsOpen && aiState.diagnostic ? (
+              <View testID="compose-ai-error-details" style={styles.section}>
+                <AppText role="caption">
+                  {[
+                    `Operation: ${aiState.diagnostic.operation}`,
+                    `Lane: ${aiState.diagnostic.lane}`,
+                    `Model: ${aiState.diagnostic.modelId}`,
+                    `Status: ${String(aiState.diagnostic.status)}`,
+                    `Category: ${aiState.diagnostic.category}`,
+                    `Correlation: ${aiState.diagnostic.correlationId}`,
+                    `Build: ${aiState.diagnostic.appBuildVersion}`,
+                    `OS: ${aiState.diagnostic.osVersion}`,
+                    `Approx. tokens: ${aiState.diagnostic.approxTokenCount}`,
+                    `Shared items: ${aiState.diagnostic.itemCount}`,
+                    `Elapsed: ${aiState.diagnostic.elapsedMs} ms`,
+                  ].join("\n")}
+                </AppText>
+              </View>
+            ) : null}
+            <View style={styles.panelActions}>
               <Button
-                testID="compose-ai-error-details-toggle"
+                testID="compose-ai-error-cancel"
+                role="secondary"
+                label="Cancel"
+                accessibilityLabel="Cancel"
+                onPress={onAiCancel}
+              />
+              <Button
+                testID="compose-ai-error-try-again"
                 role="tertiary"
-                label={aiDetailsOpen ? "Hide details" : "Details"}
-                accessibilityLabel={
-                  aiDetailsOpen
-                    ? "Hide AI failure details"
-                    : "Show AI failure details"
-                }
-                onPress={() => setAiDetailsOpen((open) => !open)}
+                label="Try Again"
+                accessibilityLabel="Try Again"
+                onPress={onAiRetry}
               />
             </View>
-          ) : null}
-          {aiDetailsOpen && aiState.diagnostic ? (
-            <View testID="compose-ai-error-details" style={styles.section}>
-              <AppText role="caption">
-                {[
-                  `Operation: ${aiState.diagnostic.operation}`,
-                  `Lane: ${aiState.diagnostic.lane}`,
-                  `Model: ${aiState.diagnostic.modelId}`,
-                  `Status: ${String(aiState.diagnostic.status)}`,
-                  `Category: ${aiState.diagnostic.category}`,
-                  `Correlation: ${aiState.diagnostic.correlationId}`,
-                  `Build: ${aiState.diagnostic.appBuildVersion}`,
-                  `OS: ${aiState.diagnostic.osVersion}`,
-                  `Approx. tokens: ${aiState.diagnostic.approxTokenCount}`,
-                  `Shared items: ${aiState.diagnostic.itemCount}`,
-                  `Elapsed: ${aiState.diagnostic.elapsedMs} ms`,
-                ].join("\n")}
-              </AppText>
-            </View>
-          ) : null}
-          <View style={styles.panelActions}>
+          </View>
+        ) : null}
+
+        {aiState.status !== "idle" &&
+        resolvedForReview !== null &&
+        promptContextRef.current !== null ? (
+          <View style={styles.affordance}>
             <Button
-              testID="compose-ai-error-cancel"
-              role="secondary"
-              label="Cancel"
-              accessibilityLabel="Cancel"
-              onPress={onAiCancel}
-            />
-            <Button
-              testID="compose-ai-error-try-again"
+              testID="compose-ai-context-review-open"
               role="tertiary"
-              label="Try Again"
-              accessibilityLabel="Try Again"
-              onPress={onAiRetry}
+              label="Review what is shared"
+              accessibilityLabel="Review contact information shared with AI"
+              onPress={() => setAiContextReviewOpen(true)}
+            />
+            <AIComposeContextReview
+              visible={aiContextReviewOpen}
+              resolved={resolvedForReview}
+              context={promptContextRef.current}
+              onDismiss={() => setAiContextReviewOpen(false)}
             />
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {aiState.status !== "idle" &&
-      resolvedForReview !== null &&
-      promptContextRef.current !== null ? (
-        <View style={styles.affordance}>
-          <Button
-            testID="compose-ai-context-review-open"
-            role="tertiary"
-            label="Review what is shared"
-            accessibilityLabel="Review contact information shared with AI"
-            onPress={() => setAiContextReviewOpen(true)}
-          />
-          <AIComposeContextReview
-            visible={aiContextReviewOpen}
-            resolved={resolvedForReview}
-            context={promptContextRef.current}
-            onDismiss={() => setAiContextReviewOpen(false)}
-          />
-        </View>
-      ) : null}
+        {/* SMS-unavailable helper (phone present, device can't text). */}
+        {controls.smsUnavailableHelper ? (
+          <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+            <AppText testID="compose-sms-helper" role="caption">
+              This device can't send texts — copy your message instead.
+            </AppText>
+          </ChromeScrim>
+        ) : null}
 
-      {/* SMS-unavailable helper (phone present, device can't text). */}
-      {controls.smsUnavailableHelper ? (
-        <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
-          <AppText testID="compose-sms-helper" role="caption">
-            This device can't send texts — copy your message instead.
-          </AppText>
-        </ChromeScrim>
-      ) : null}
-
-      {/* No-destination state (COMP-03): NEITHER phone nor email actionable.
+        {/* No-destination state (COMP-03): NEITHER phone nor email actionable.
           Transmit is unavailable but this is a usable degraded state — Copy stays
           the sole primary and an accessible explanation + establish-a-primary
           route are offered. Never a blocking error (T-35-11). */}
-      {controls.addNumber ? (
-        <>
-          <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
-            <AppText testID="compose-no-destination" role="caption">
-              No phone number or email — copy your message instead.
-            </AppText>
-          </ChromeScrim>
-          <View style={styles.affordance}>
-            <Button
-              testID="compose-add-number"
-              role="tertiary"
-              label="Add a phone number or email"
-              accessibilityLabel="Add a phone number or email"
-              onPress={() => navigation.navigate("Edit", { contactId })}
-            />
-          </View>
-        </>
-      ) : null}
+        {controls.addNumber ? (
+          <>
+            <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+              <AppText testID="compose-no-destination" role="caption">
+                No phone number or email — copy your message instead.
+              </AppText>
+            </ChromeScrim>
+            <View style={styles.affordance}>
+              <Button
+                testID="compose-add-number"
+                role="tertiary"
+                label="Add a phone number or email"
+                accessibilityLabel="Add a phone number or email"
+                onPress={() => navigation.navigate("Edit", { contactId })}
+              />
+            </View>
+          </>
+        ) : null}
 
-      {/* Establish-primary picker (COMP-03): multiple actionable destinations for
+        {/* Establish-primary picker (COMP-03): multiple actionable destinations for
           the active mode with no explicit stored primary — ask which becomes the
           canonical one. The pick calls setContactMethodPrimary. Long values
           truncate in the row; the FULL value is applied on selection. */}
-      {showPicker && pickerType !== null ? (
-        <View testID="compose-primary-picker" style={styles.section}>
-          <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
-            <AppText role="label">
-              {pickerType === "email"
-                ? "Which email should Orbit use?"
-                : "Which number should Orbit use?"}
-            </AppText>
-          </ChromeScrim>
-          {pickerCandidates.map((method) => (
-            <View key={method.id} style={styles.affordance}>
-              <Button
-                testID={`compose-primary-option-${method.id}`}
-                role="tertiary"
-                label={truncateMethodValue(method.display_value)}
-                accessibilityLabel={`Use ${method.display_value}`}
-                onPress={() => void onChoosePrimary(pickerType, method)}
-              />
-            </View>
-          ))}
-        </View>
-      ) : null}
+        {showPicker && pickerType !== null ? (
+          <View testID="compose-primary-picker" style={styles.section}>
+            <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
+              <AppText role="label">
+                {pickerType === "email"
+                  ? "Which email should Orbit use?"
+                  : "Which number should Orbit use?"}
+              </AppText>
+            </ChromeScrim>
+            {pickerCandidates.map((method) => (
+              <View key={method.id} style={styles.affordance}>
+                <Button
+                  testID={`compose-primary-option-${method.id}`}
+                  role="tertiary"
+                  label={truncateMethodValue(method.display_value)}
+                  accessibilityLabel={`Use ${method.display_value}`}
+                  onPress={() => void onChoosePrimary(pickerType, method)}
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
 
-      {/* Additive "Did you send it?" panel — shown ONLY for a started handoff that
+        {/* Additive "Did you send it?" panel — shown ONLY for a started handoff that
           created an assist. Yes logs THIS assist at handoff_at; Not yet closes the
           panel and leaves the assist PENDING (the app-global banner keeps it). */}
-      {confirm !== null ? (
-        <View
-          testID="compose-confirm"
-          style={[
-            styles.panel,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText role="heading">Did you send it?</AppText>
-          <View style={styles.panelActions}>
-            <Button
-              testID="compose-confirm-not-yet"
-              role="secondary"
-              label="Not yet"
-              accessibilityLabel="Not yet"
-              onPress={onConfirmNotYet}
-            />
-            <Button
-              testID="compose-confirm-yes"
-              role="primary"
-              label="Yes, log interaction"
-              accessibilityLabel="Yes, log interaction"
-              disabled={logging}
-              onPress={() => void onConfirmYes()}
-            />
+        {confirm !== null ? (
+          <View
+            testID="compose-confirm"
+            style={[
+              styles.panel,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <AppText role="heading">Did you send it?</AppText>
+            <View style={styles.panelActions}>
+              <Button
+                testID="compose-confirm-not-yet"
+                role="secondary"
+                label="Not yet"
+                accessibilityLabel="Not yet"
+                onPress={onConfirmNotYet}
+              />
+              <Button
+                testID="compose-confirm-yes"
+                role="primary"
+                label="Yes, log interaction"
+                accessibilityLabel="Yes, log interaction"
+                disabled={logging}
+                onPress={() => void onConfirmYes()}
+              />
+            </View>
           </View>
-        </View>
-      ) : null}
-
-      {/* Action row. */}
-      <View style={styles.actions}>
-        {copyFeedback !== null ? (
-          <AppText testID="compose-copied" role="caption">
-            {copyFeedback}
-          </AppText>
         ) : null}
 
-        {/* Copy — always present; primary (accent fill) when it is the sole
+        {/* Action row. */}
+        <View style={styles.actions}>
+          {copyFeedback !== null ? (
+            <AppText testID="compose-copied" role="caption">
+              {copyFeedback}
+            </AppText>
+          ) : null}
+
+          {/* Copy — always present; primary (accent fill) when it is the sole
             primary, else secondary. NEVER gated by `sending`. */}
-        <Button
-          testID="compose-copy"
-          role={copyPrimary ? "primary" : "secondary"}
-          label="Copy"
-          accessibilityLabel="Copy"
-          onPress={() => void onCopy()}
-        />
-
-        {/* Transmit — only when a phone + SMS capability exist. In-flight latched. */}
-        {controls.send === "shown" ? (
           <Button
-            testID="compose-transmit"
-            role="primary"
-            label="Transmit"
-            accessibilityLabel="Transmit"
-            disabled={sending}
-            onPress={() => void onTransmit()}
+            testID="compose-copy"
+            role={copyPrimary ? "primary" : "secondary"}
+            label="Copy"
+            accessibilityLabel="Copy"
+            onPress={() => void onCopy()}
           />
-        ) : null}
-      </View>
-    </ScrollView>
+
+          {/* Transmit — only when a phone + SMS capability exist. In-flight latched. */}
+          {controls.send === "shown" ? (
+            <Button
+              testID="compose-transmit"
+              role="primary"
+              label="Transmit"
+              accessibilityLabel="Transmit"
+              disabled={sending}
+              onPress={() => void onTransmit()}
+            />
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: {
     padding: 16,
     gap: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backScrim: {
-    alignSelf: "flex-start",
-    overflow: "hidden",
-  },
-  nameScrim: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    overflow: "hidden",
   },
   section: {
     gap: 8,

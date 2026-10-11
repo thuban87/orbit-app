@@ -20,12 +20,11 @@
  *     blocking network call, all colours via theme tokens, all text in AppText
  *     roles, every control padded to the 44px touch-target floor.
  */
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Avatar } from "@/components/Avatar";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui";
-import { Button } from "@/components/ui/Button";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import {
   type ResearchItem,
@@ -47,7 +46,7 @@ export interface ComposeResearchScreenProps {
   contactId: number;
 }
 
-/** The minimal contact identity the Research header renders for orientation. */
+/** The minimal contact identity the Research person line renders (D-45). */
 interface ResearchHeader {
   name: string;
   photo: string | null;
@@ -90,7 +89,6 @@ export function ComposeResearchScreen({
   contactId,
 }: ComposeResearchScreenProps) {
   const { colors } = useTheme();
-  const navigation = useNavigation();
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [header, setHeader] = useState<ResearchHeader | null>(null);
   const messageFocus = useComposeSession((state) => state.messageFocus);
@@ -139,37 +137,27 @@ export function ComposeResearchScreen({
     [messageFocus],
   );
 
+  // No opaque screen fill: the theme art shows (38.9 D-17).
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={styles.screen}>
+      {/* House header titled "Research" (38.9 D-16, D-58) with the same person
+          line Compose shows, so the two sibling sides stay oriented (D-45,
+          D-14-010). Back pops to Compose with the session (draft + Message
+          Focus) preserved (COMP-07). */}
+      <ShellAppBar
+        variant="child"
+        title="Research"
+        person={
+          header !== null
+            ? { name: header.name, photo: header.photo, contactId }
+            : null
+        }
+      />
       <ScrollView
         // A focused route (D-18): no tab bar or + is drawn here, so the content
         // keeps only its own padding, like Compose.
         contentContainerStyle={styles.content}
       >
-        {/* Contact-identity header — the SAME Back + Avatar + name heading Compose
-            shows, so the two sibling sides stay oriented (D-14-010). Back pops to
-            Compose with the session (draft + Message Focus) preserved (COMP-07). */}
-        <View style={styles.header}>
-          <Button
-            role="tertiary"
-            label="Back"
-            accessibilityLabel="Back to compose"
-            onPress={() => navigation.goBack()}
-          />
-          {header !== null ? (
-            <>
-              <Avatar
-                photo={header.photo}
-                name={header.name}
-                contactId={contactId}
-                size={48}
-              />
-              <AppText role="heading" accessibilityRole="header">
-                {header.name}
-              </AppText>
-            </>
-          ) : null}
-        </View>
         {items.length === 0 ? (
           <AppText role="caption">nothing to remember yet</AppText>
         ) : (
@@ -252,11 +240,6 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.base,
     gap: SPACING.lg,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
   },
   group: {
     gap: SPACING.sm,

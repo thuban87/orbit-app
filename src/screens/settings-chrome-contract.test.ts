@@ -59,19 +59,10 @@ type PendingChrome = "in-body-back" | "header-less";
 
 /**
  * Screens still waiting for the shared header (D-16), with their chrome today.
- * Plans 09 and 10 empty this map; each converting commit removes its entry.
+ * Plan 09 converted its 16; Plan 10 empties the rest. Each converting commit
+ * removes its entry.
  */
 const PENDING_HEADER_CONVERSION: Record<string, PendingChrome> = {
-  // Plan 09
-  "src/screens/ThingsToRememberScreen.tsx": "in-body-back",
-  "src/screens/MemoryHistoryScreen.tsx": "in-body-back",
-  "src/screens/RecentlyDeletedScreen.tsx": "in-body-back",
-  "src/screens/ComposeResearchScreen.tsx": "in-body-back",
-  "src/screens/ComposeScreen.tsx": "in-body-back",
-  "src/screens/CropPhotoScreen.tsx": "header-less",
-  "src/screens/MergeConflictsScreen.tsx": "header-less",
-  "src/screens/SurvivorSelectScreen.tsx": "header-less",
-  "src/components/MergeImpactSummary.tsx": "header-less",
   // Plan 10
   "src/screens/CustomFieldsScreen.tsx": "in-body-back",
   "src/screens/ImportReviewScreen.tsx": "in-body-back",

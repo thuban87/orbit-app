@@ -130,6 +130,7 @@ vi.mock("react-native-reanimated", () => ({
   },
   useDerivedValue: (fn: () => unknown) => ({ value: fn() }),
 }));
+vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
@@ -174,7 +175,10 @@ const STATUS_BAR = 24;
 /** The banner at its measured sizes (review WR5-01/WR5-02). */
 const BANNER = 184;
 const BANNER_WITH_NOTE = BANNER + 98;
-/** Crop Photo's fixed rows: the title header and the button footer. */
+/**
+ * Crop Photo's fixed rows: the title header and the button footer. The house
+ * header (38.9 D-16) is 52 dp plus a hairline, so 61 stays an upper bound.
+ */
 const HEADER = 61;
 const FOOTER = 76;
 
@@ -290,10 +294,17 @@ describe("CropPhotoScreen sizing (38.6 review WR5-02)", () => {
       (child) => child && typeof child === "object",
     ) as TestElement[];
     expect(children.map((child) => child.props.testID ?? child.type)).toEqual([
-      "View",
+      "ShellAppBar",
       "crop-photo-canvas-slot",
       "View",
     ]);
+    // One exit (38.9 D-07, D-59): the header's ✕ Cancel; no footer Cancel.
+    expect(children[0]?.props).toMatchObject({
+      variant: "child",
+      title: "Position photo",
+      backKind: "cancel",
+    });
+    expect(byTestId(tree, "crop-photo-cancel")).toBeUndefined();
     expect(
       byTestId(nodes(children[2]), "crop-photo-use")?.props.accessibilityLabel,
     ).toBe("Use photo");

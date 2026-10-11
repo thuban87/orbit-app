@@ -672,3 +672,69 @@ describe("Update Contact / Custom fields sub-editor (E-09, G-04; D-14, D-61)", (
     expect(fire({ type: "GO_BACK" }).preventDefault).not.toHaveBeenCalled();
   });
 });
+
+describe("Survivor select step two (D-14, C5-M7; review C6-H1)", () => {
+  // SurvivorSelectScreen's options: no route dirt, a never-set bypass ref, and
+  // step two as a clean sub-editor that is open only when reached from the
+  // picker (`second != null && !enteredAtStepTwo`). What the close clears is
+  // covered by the makeCloseStepTwo test (survivor-select-logic.test.ts,
+  // review C7-L4); here the guard gets its own close and the test asserts only
+  // the call.
+  const survivorGuard = ({
+    secondContactId,
+    enteredAtStepTwo,
+  }: {
+    secondContactId: number | undefined;
+    enteredAtStepTwo: boolean;
+  }) => {
+    const closeStepTwo = vi.fn();
+    const mounted = mountGuard(false, false, {
+      open: secondContactId != null && !enteredAtStepTwo,
+      dirty: false,
+      close: closeStepTwo,
+    });
+    return { ...mounted, closeStepTwo };
+  };
+
+  it("entered at step one: Back on step two returns to the picker; a further Back leaves", () => {
+    const stepTwo = survivorGuard({
+      secondContactId: 2,
+      enteredAtStepTwo: false,
+    });
+    const back = stepTwo.fire({ type: "GO_BACK" });
+    expect(back.preventDefault).toHaveBeenCalledOnce();
+    expect(stepTwo.closeStepTwo).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+    expect(nav.dispatch).not.toHaveBeenCalled();
+
+    // The close cleared secondContactId: the picker step's next Back leaves.
+    const picker = survivorGuard({
+      secondContactId: undefined,
+      enteredAtStepTwo: false,
+    });
+    const leave = picker.fire({ type: "GO_BACK" });
+    expect(leave.preventDefault).not.toHaveBeenCalled();
+    expect(picker.closeStepTwo).not.toHaveBeenCalled();
+  });
+
+  it("a RESET during step two (the merge-completion path) is not prevented and closes nothing", () => {
+    const { fire, closeStepTwo } = survivorGuard({
+      secondContactId: 2,
+      enteredAtStepTwo: false,
+    });
+    const event = fire({ type: "RESET", payload: {} });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(closeStepTwo).not.toHaveBeenCalled();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+  });
+
+  it("entered with both ids (from Reconcile): the first Back leaves", () => {
+    const { fire, closeStepTwo } = survivorGuard({
+      secondContactId: 2,
+      enteredAtStepTwo: true,
+    });
+    const event = fire({ type: "GO_BACK" });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(closeStepTwo).not.toHaveBeenCalled();
+  });
+});

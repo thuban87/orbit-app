@@ -32,7 +32,7 @@
  * contract `crop-geometry.ts` documents (addresses [codex/HIGH 05-04+05-05]).
  *
  * MEASURED SPACE (38.6 review WR5-02): the canvas sits in a shrinkable slot
- * whose measured height caps it, so the Cancel / Use photo footer stays on
+ * whose measured height caps it, so the Use photo footer stays on
  * screen when the in-flow assist banner (D-38) or a short phone takes height
  * away. If the square's side changes after init (the banner came or went), the
  * pan is scaled by the same ratio: every screen-space quantity scales with the
@@ -65,6 +65,7 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useDerivedValue, useSharedValue } from "react-native-reanimated";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   getContactPhotoIdentity,
   setContactPhotoForUid,
@@ -299,10 +300,6 @@ export function CropPhotoScreen({
   const drawW = drawGeom ? drawGeom.srcW * drawScale : 0;
   const drawH = drawGeom ? drawGeom.srcH * drawScale : 0;
 
-  const onCancel = useCallback(() => {
-    navigation.goBack();
-  }, [navigation]);
-
   const onUse = useCallback(async () => {
     const geom = geomRef.current;
     if (!ready || !geom || busy) {
@@ -393,14 +390,10 @@ export function CropPhotoScreen({
 
   return (
     <View testID="crop-photo-screen" style={styles.root}>
-      <View style={styles.header}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Position photo
-        </Text>
-      </View>
+      {/* House header with the ✕ Cancel (38.9 D-16, D-59): the screen's one
+          exit, so the footer Cancel is gone (D-07). It goes back without
+          saving, as the footer Cancel did. */}
+      <ShellAppBar variant="child" title="Position photo" backKind="cancel" />
 
       {/* Shrinkable slot (review WR5-02): its natural size is the original
           fixed canvas, and it gives up height before the footer does. */}
@@ -500,18 +493,6 @@ export function CropPhotoScreen({
 
       <View style={styles.footer}>
         <Pressable
-          testID="crop-photo-cancel"
-          accessibilityRole="button"
-          accessibilityLabel="Cancel"
-          onPress={onCancel}
-          style={styles.cancelBtn}
-        >
-          <Text style={[styles.cancelText, { color: colors.textSecondary }]}>
-            Cancel
-          </Text>
-        </Pressable>
-
-        <Pressable
           testID="crop-photo-use"
           accessibilityRole="button"
           accessibilityLabel="Use photo"
@@ -552,13 +533,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
     overflow: "hidden",
   },
-  header: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
   undecodable: {
     fontSize: 16,
     textAlign: "center",
@@ -567,18 +541,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     padding: 16,
     gap: 12,
-  },
-  cancelBtn: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: "600",
   },
   useBtn: {
     minHeight: 44,

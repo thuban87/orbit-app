@@ -9,6 +9,7 @@ import {
   type FieldChoiceOption,
 } from "@/components/FieldChoiceGroup";
 import { type KEEP_ORBIT_PHOTO, PhotoChoice } from "@/components/PhotoChoice";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getExecutor } from "@/db/database";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
@@ -248,20 +249,32 @@ export function MergeConflictsScreen({
     });
   };
 
+  // House header with Back (38.9 D-16, D-44); the failed and loading states
+  // render it too, so every state has the same way out.
+  const header = (
+    <ShellAppBar variant="child" title="Resolve merge conflicts" />
+  );
+
   if (failed)
     return (
-      <View style={styles.root}>
-        <Text style={{ color: colors.danger }}>
-          Couldn&apos;t load merge conflicts. Nothing was changed.
-        </Text>
+      <View style={styles.screen}>
+        {header}
+        <View style={styles.root}>
+          <Text style={{ color: colors.danger }}>
+            Couldn&apos;t load merge conflicts. Nothing was changed.
+          </Text>
+        </View>
       </View>
     );
   if (!data)
     return (
-      <View style={styles.root}>
-        <Text style={{ color: colors.textSecondary }}>
-          Loading merge conflicts…
-        </Text>
+      <View style={styles.screen}>
+        {header}
+        <View style={styles.root}>
+          <Text style={{ color: colors.textSecondary }}>
+            Loading merge conflicts…
+          </Text>
+        </View>
       </View>
     );
 
@@ -282,161 +295,166 @@ export function MergeConflictsScreen({
   ];
 
   return (
-    <ScrollView contentContainerStyle={styles.root}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>
-        Resolve merge conflicts
-      </Text>
-      <Text style={[styles.body, { color: colors.textSecondary }]}>
-        Choose the value to keep for every difference.
-      </Text>
-      {scalarConflicts.map((conflict) => (
-        <FieldChoiceGroup
-          key={conflict.key}
-          label={conflict.label}
-          options={choiceOptions(conflict.survivor, conflict.absorbed)}
-          mode="conflict"
-          selectedId={scalarChoices[conflict.key] ?? null}
-          onChange={(option) =>
-            setScalarChoices((current) => ({
-              ...current,
-              [conflict.key]: option.id,
-            }))
-          }
-        />
-      ))}
-      {data.customFields.map((field) => (
-        <FieldChoiceGroup
-          key={field.field_def_id}
-          label={field.label}
-          options={choiceOptions(field.survivor_value!, field.absorbed_value!)}
-          mode="conflict"
-          selectedId={customFieldChoices[field.field_def_id] ?? null}
-          onChange={(option) =>
-            setCustomFieldChoices((current) => ({
-              ...current,
-              [field.field_def_id]: option.id,
-            }))
-          }
-        />
-      ))}
-      {photoConflict ? (
-        <PhotoChoice
-          label="Photo"
-          mode="conflict"
-          options={[
-            {
-              id: "survivor",
-              photo: data.survivor.photo,
-              uri: null,
-              name: data.survivor.name,
-              provenance: provenance(data.survivor.name),
-            },
-            {
-              id: "absorbed",
-              photo: data.absorbed.photo,
-              uri: null,
-              name: data.absorbed.name,
-              provenance: provenance(data.absorbed.name),
-            },
-          ]}
-          selectedId={photoChoice}
-          onChange={(selection) => setPhotoChoice(selection)}
-        />
-      ) : null}
-      {primaryTypes.map((type) => {
-        const conflict = data.primaryByType[type]!;
-        return (
-          <FieldChoiceGroup
-            key={type}
-            label={`Primary ${type}`}
-            mode="conflict"
-            options={choiceOptions(
-              conflict.survivor.display_value,
-              conflict.absorbed.display_value,
-            )}
-            selectedId={primaryChoices[type] ?? null}
-            onChange={(option) => {
-              const groups: MethodGroups = {
-                phone:
-                  type === "phone"
-                    ? [
-                        {
-                          uid: conflict.survivor.uid,
-                          type,
-                          value: conflict.survivor.raw_value,
-                          extension: "",
-                          label: "Main",
-                          isPrimary: true,
-                        },
-                        {
-                          uid: conflict.absorbed.uid,
-                          type,
-                          value: conflict.absorbed.raw_value,
-                          extension: "",
-                          label: "Main",
-                          isPrimary: true,
-                        },
-                      ]
-                    : [],
-                email:
-                  type === "email"
-                    ? [
-                        {
-                          uid: conflict.survivor.uid,
-                          type,
-                          value: conflict.survivor.raw_value,
-                          extension: "",
-                          label: "Main",
-                          isPrimary: true,
-                        },
-                        {
-                          uid: conflict.absorbed.uid,
-                          type,
-                          value: conflict.absorbed.raw_value,
-                          extension: "",
-                          label: "Main",
-                          isPrimary: true,
-                        },
-                      ]
-                    : [],
-              };
-              const chosen = choosePrimary(
-                groups,
-                option.id === "survivor"
-                  ? conflict.survivor.uid
-                  : conflict.absorbed.uid,
-              )[type].find((method) => method.isPrimary);
-              if (!chosen) return;
-              setPrimaryChoices((current) => ({
-                ...current,
-                [type]:
-                  chosen.uid === conflict.survivor.uid
-                    ? "survivor"
-                    : "absorbed",
-              }));
-            }}
-          />
-        );
-      })}
-      <Pressable
-        disabled={!ready}
-        onPress={continueToSummary}
-        style={[
-          styles.cta,
-          { backgroundColor: ready ? colors.accent : colors.surfaceElevated },
-        ]}
-      >
-        <Text style={{ color: ready ? colors.onAccent : colors.textSecondary }}>
-          Continue
+    <View style={styles.screen}>
+      {header}
+      <ScrollView contentContainerStyle={styles.root}>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>
+          Choose the value to keep for every difference.
         </Text>
-      </Pressable>
-    </ScrollView>
+        {scalarConflicts.map((conflict) => (
+          <FieldChoiceGroup
+            key={conflict.key}
+            label={conflict.label}
+            options={choiceOptions(conflict.survivor, conflict.absorbed)}
+            mode="conflict"
+            selectedId={scalarChoices[conflict.key] ?? null}
+            onChange={(option) =>
+              setScalarChoices((current) => ({
+                ...current,
+                [conflict.key]: option.id,
+              }))
+            }
+          />
+        ))}
+        {data.customFields.map((field) => (
+          <FieldChoiceGroup
+            key={field.field_def_id}
+            label={field.label}
+            options={choiceOptions(
+              field.survivor_value!,
+              field.absorbed_value!,
+            )}
+            mode="conflict"
+            selectedId={customFieldChoices[field.field_def_id] ?? null}
+            onChange={(option) =>
+              setCustomFieldChoices((current) => ({
+                ...current,
+                [field.field_def_id]: option.id,
+              }))
+            }
+          />
+        ))}
+        {photoConflict ? (
+          <PhotoChoice
+            label="Photo"
+            mode="conflict"
+            options={[
+              {
+                id: "survivor",
+                photo: data.survivor.photo,
+                uri: null,
+                name: data.survivor.name,
+                provenance: provenance(data.survivor.name),
+              },
+              {
+                id: "absorbed",
+                photo: data.absorbed.photo,
+                uri: null,
+                name: data.absorbed.name,
+                provenance: provenance(data.absorbed.name),
+              },
+            ]}
+            selectedId={photoChoice}
+            onChange={(selection) => setPhotoChoice(selection)}
+          />
+        ) : null}
+        {primaryTypes.map((type) => {
+          const conflict = data.primaryByType[type]!;
+          return (
+            <FieldChoiceGroup
+              key={type}
+              label={`Primary ${type}`}
+              mode="conflict"
+              options={choiceOptions(
+                conflict.survivor.display_value,
+                conflict.absorbed.display_value,
+              )}
+              selectedId={primaryChoices[type] ?? null}
+              onChange={(option) => {
+                const groups: MethodGroups = {
+                  phone:
+                    type === "phone"
+                      ? [
+                          {
+                            uid: conflict.survivor.uid,
+                            type,
+                            value: conflict.survivor.raw_value,
+                            extension: "",
+                            label: "Main",
+                            isPrimary: true,
+                          },
+                          {
+                            uid: conflict.absorbed.uid,
+                            type,
+                            value: conflict.absorbed.raw_value,
+                            extension: "",
+                            label: "Main",
+                            isPrimary: true,
+                          },
+                        ]
+                      : [],
+                  email:
+                    type === "email"
+                      ? [
+                          {
+                            uid: conflict.survivor.uid,
+                            type,
+                            value: conflict.survivor.raw_value,
+                            extension: "",
+                            label: "Main",
+                            isPrimary: true,
+                          },
+                          {
+                            uid: conflict.absorbed.uid,
+                            type,
+                            value: conflict.absorbed.raw_value,
+                            extension: "",
+                            label: "Main",
+                            isPrimary: true,
+                          },
+                        ]
+                      : [],
+                };
+                const chosen = choosePrimary(
+                  groups,
+                  option.id === "survivor"
+                    ? conflict.survivor.uid
+                    : conflict.absorbed.uid,
+                )[type].find((method) => method.isPrimary);
+                if (!chosen) return;
+                setPrimaryChoices((current) => ({
+                  ...current,
+                  [type]:
+                    chosen.uid === conflict.survivor.uid
+                      ? "survivor"
+                      : "absorbed",
+                }));
+              }}
+            />
+          );
+        })}
+        <Pressable
+          disabled={!ready}
+          onPress={continueToSummary}
+          style={[
+            styles.cta,
+            { backgroundColor: ready ? colors.accent : colors.surfaceElevated },
+          ]}
+        >
+          <Text
+            style={{ color: ready ? colors.onAccent : colors.textSecondary }}
+          >
+            Continue
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   root: { flexGrow: 1, padding: 20, gap: 16 },
-  title: { fontSize: 24, fontWeight: "600" },
   body: { fontSize: 15, lineHeight: 22 },
   cta: {
     minHeight: 48,

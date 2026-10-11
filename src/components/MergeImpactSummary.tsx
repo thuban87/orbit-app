@@ -13,6 +13,7 @@ import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-r
 import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
+import { ShellAppBar } from "./ShellAppBar";
 
 type Counts = {
   interactions: number;
@@ -110,50 +111,56 @@ export function MergeImpactSummary({
       ]
     : [];
   return (
-    <View style={styles.root}>
-      <Text
-        style={[styles.title, { color: colors.textPrimary }]}
-      >{`Merge ${names.absorbed} into ${names.survivor}`}</Text>
-      {rows.map((row) => (
+    <View style={styles.screen}>
+      {/* House header with the ✕ Cancel (38.9 D-16, D-59): it abandons the
+          merge and goes back; nothing is written until the Merge confirm. */}
+      <ShellAppBar
+        variant="child"
+        title={`Merge ${names.absorbed} into ${names.survivor}`}
+        backKind="cancel"
+      />
+      <View style={styles.root}>
+        {rows.map((row) => (
+          <View
+            key={row}
+            style={[
+              styles.row,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={{ color: colors.textPrimary }}>{row}</Text>
+          </View>
+        ))}
         <View
-          key={row}
           style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+            styles.warning,
+            { borderColor: colors.danger },
+            persistentDangerScrim(theme),
           ]}
         >
-          <Text style={{ color: colors.textPrimary }}>{row}</Text>
+          <Text
+            style={{ color: colors.danger }}
+          >{`${names.absorbed} will be retired.`}</Text>
+          <Text style={{ color: colors.textSecondary }}>
+            This can&apos;t be simply undone.
+          </Text>
         </View>
-      ))}
-      <View
-        style={[
-          styles.warning,
-          { borderColor: colors.danger },
-          persistentDangerScrim(theme),
-        ]}
-      >
-        <Text
-          style={{ color: colors.danger }}
-        >{`${names.absorbed} will be retired.`}</Text>
-        <Text style={{ color: colors.textSecondary }}>
-          This can&apos;t be simply undone.
-        </Text>
+        {failureMessage ? (
+          <Text style={{ color: colors.danger }}>{failureMessage}</Text>
+        ) : null}
+        <Pressable
+          onPress={confirmMerge}
+          style={[styles.cta, { backgroundColor: colors.accent }]}
+        >
+          <Text style={{ color: colors.onAccent }}>Merge contacts</Text>
+        </Pressable>
       </View>
-      {failureMessage ? (
-        <Text style={{ color: colors.danger }}>{failureMessage}</Text>
-      ) : null}
-      <Pressable
-        onPress={confirmMerge}
-        style={[styles.cta, { backgroundColor: colors.accent }]}
-      >
-        <Text style={{ color: colors.onAccent }}>Merge contacts</Text>
-      </Pressable>
     </View>
   );
 }
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   root: { flex: 1, padding: 20, gap: 12 },
-  title: { fontSize: 24, fontWeight: "600" },
   row: { padding: 14, borderRadius: 12, borderWidth: 1 },
   warning: { padding: 14, borderLeftWidth: 3, gap: 4 },
   cta: { padding: 16, borderRadius: 12, alignItems: "center" },

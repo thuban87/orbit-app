@@ -1,6 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button, ConfirmDialog } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import { purgeMemoryPermanently, restoreMemory } from "@/db/memories-dao";
@@ -19,7 +20,6 @@ function memoryLabel(memory: MemoryRow): string {
 }
 
 export function RecentlyDeletedScreen({
-  navigation,
   route,
 }: RootStackScreenProps<"RecentlyDeleted">) {
   const { colors } = useTheme();
@@ -81,19 +81,8 @@ export function RecentlyDeletedScreen({
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <AppText role="caption">Back</AppText>
-        </Pressable>
-        <AppText accessibilityRole="header" role="display">
-          Recently Deleted
-        </AppText>
-      </View>
+      {/* House header (38.9 D-16, D-44). */}
+      <ShellAppBar variant="child" title="Recently Deleted" />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -155,21 +144,9 @@ export function RecentlyDeletedScreen({
 
 const styles = StyleSheet.create({
   actions: { gap: SPACING.sm },
-  back: {
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
   content: { gap: SPACING.md, padding: SPACING.base },
   copy: { flex: 1, gap: SPACING.xs },
   empty: { gap: SPACING.sm, paddingTop: SPACING.xl },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.md,
-    padding: SPACING.base,
-  },
   root: { flex: 1 },
   row: {
     borderRadius: 12,

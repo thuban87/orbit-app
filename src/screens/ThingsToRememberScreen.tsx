@@ -14,6 +14,7 @@ import {
   type RelationshipDraft,
   RelationshipEditor,
 } from "@/components/RelationshipEditor";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
@@ -436,269 +437,291 @@ export function ThingsToRememberScreen({
       );
 
   return (
-    <ScrollView
-      testID="things-to-remember-screen"
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: bottomClearance },
-      ]}
-    >
-      <ChromeScrim style={styles.header} radius={RADII.lg}>
-        <ScopedPalette>
-          {(scoped) => (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Back"
-                onPress={() => navigation.goBack()}
-                style={[styles.back, { borderColor: colors.border }]}
-              >
-                <AppText role="caption">Back</AppText>
-              </Pressable>
-              <AppText accessibilityRole="header" role="display">
-                Things to Remember
-              </AppText>
+    <View style={styles.root}>
+      {/* House header (38.9 D-16, D-44). The Recently Deleted entry sits in its
+          trailing slot: it is the only way into the 30-day holding zone
+          (ADR-089, D-31; review C8-M3). Its colours are read INSIDE the slot,
+          which ShellAppBar glass-scopes, through ScopedPalette. */}
+      <ShellAppBar
+        variant="child"
+        title="Things to Remember"
+        trailing={
+          <ScopedPalette>
+            {(scoped) => (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Recently Deleted"
                 onPress={() =>
                   navigation.navigate("RecentlyDeleted", { contactId })
                 }
-                style={[styles.back, { borderColor: colors.border }]}
+                style={[styles.trailingAction, { borderColor: scoped.border }]}
               >
                 <AppText role="caption" style={{ color: scoped.textSecondary }}>
                   Recently Deleted
                 </AppText>
               </Pressable>
-            </>
-          )}
-        </ScopedPalette>
-      </ChromeScrim>
-      <View
-        testID={`knowledge-group-${CURRENT_STATE_GROUP}`}
-        style={[styles.group, { borderColor: colors.border }]}
-      >
-        <View style={styles.switchRow}>
-          <View style={styles.visibilityCopy}>
-            <AppText role="heading">Show hidden items</AppText>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Hidden items are still stored on this device.
-            </AppText>
-          </View>
-          <Switch
-            value={includeHidden}
-            onValueChange={setIncludeHidden}
-            accessibilityLabel="Show hidden items"
-            trackColor={{ false: colors.border, true: colors.accent }}
-            thumbColor={colors.surfaceElevated}
-          />
-        </View>
-      </View>
-      {isEmpty ? (
-        <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
-          <ScopedPalette>
-            {(scoped) => (
-              <>
-                <View testID="things-to-remember-empty" style={styles.empty}>
-                  <AppText role="heading">Nothing to remember yet</AppText>
-                  <AppText role="body" style={{ color: scoped.textSecondary }}>
-                    Add birthdays, gift ideas, key people, and anything worth
-                    bringing up next time.
-                  </AppText>
-                </View>
-              </>
             )}
           </ScopedPalette>
-        </ChromeScrim>
-      ) : null}
-      <View style={[styles.group, { borderColor: colors.border }]}>
-        <AppText role="heading">Featured &amp; current</AppText>
-        {firstClass.map((row) => (
-          <View key={row.label} style={styles.readOnlyRow}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              {row.label}
-            </AppText>
-            <AppText role="body">{row.value}</AppText>
-          </View>
-        ))}
-        {CURRENT_STATE_FIELD_KEYS.map((fieldKey) => {
-          const current = knowledge.currentValues[fieldKey];
-          const editing = editingField === fieldKey;
-          return (
-            <View key={fieldKey} style={styles.currentStateRow}>
-              <AppText role="label">
-                {CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName}
-              </AppText>
-              <AppText role="body">{current?.value ?? "Not set"}</AppText>
+        }
+      />
+      <ScrollView
+        testID="things-to-remember-screen"
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
+        <View
+          testID={`knowledge-group-${CURRENT_STATE_GROUP}`}
+          style={[styles.group, { borderColor: colors.border }]}
+        >
+          <View style={styles.switchRow}>
+            <View style={styles.visibilityCopy}>
+              <AppText role="heading">Show hidden items</AppText>
               <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {current ? "Most recent" : "Not set"}
+                Hidden items are still stored on this device.
               </AppText>
-              <View style={styles.actions}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Set new ${CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName} value`}
-                  onPress={() => {
-                    setEditingField(fieldKey);
-                    setCurrentDraft("");
-                  }}
-                  style={[styles.action, { borderColor: colors.border }]}
-                >
-                  <AppText role="caption" style={{ color: colors.accentText }}>
-                    Set new value
-                  </AppText>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`View ${CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName} history`}
-                  onPress={() =>
-                    navigation.navigate("MemoryHistory", {
-                      contactId,
-                      fieldKey,
-                    })
-                  }
-                  style={[styles.action, { borderColor: colors.border }]}
-                >
-                  <AppText role="caption" style={{ color: colors.accentText }}>
-                    History
-                  </AppText>
-                </Pressable>
-              </View>
-              {editing ? (
-                <View style={styles.inlineDraft}>
-                  <TextInput
-                    accessibilityLabel={`New ${CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName} value`}
-                    value={currentDraft}
-                    onChangeText={setCurrentDraft}
-                    placeholder="Set a new value"
-                    placeholderTextColor={colors.textPlaceholder}
-                    style={[
-                      styles.input,
-                      {
-                        color: colors.textPrimary,
-                        backgroundColor: colors.surface,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  />
+            </View>
+            <Switch
+              value={includeHidden}
+              onValueChange={setIncludeHidden}
+              accessibilityLabel="Show hidden items"
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
+            />
+          </View>
+        </View>
+        {isEmpty ? (
+          <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
+            <ScopedPalette>
+              {(scoped) => (
+                <>
+                  <View testID="things-to-remember-empty" style={styles.empty}>
+                    <AppText role="heading">Nothing to remember yet</AppText>
+                    <AppText
+                      role="body"
+                      style={{ color: scoped.textSecondary }}
+                    >
+                      Add birthdays, gift ideas, key people, and anything worth
+                      bringing up next time.
+                    </AppText>
+                  </View>
+                </>
+              )}
+            </ScopedPalette>
+          </ChromeScrim>
+        ) : null}
+        <View style={[styles.group, { borderColor: colors.border }]}>
+          <AppText role="heading">Featured &amp; current</AppText>
+          {firstClass.map((row) => (
+            <View key={row.label} style={styles.readOnlyRow}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                {row.label}
+              </AppText>
+              <AppText role="body">{row.value}</AppText>
+            </View>
+          ))}
+          {CURRENT_STATE_FIELD_KEYS.map((fieldKey) => {
+            const current = knowledge.currentValues[fieldKey];
+            const editing = editingField === fieldKey;
+            return (
+              <View key={fieldKey} style={styles.currentStateRow}>
+                <AppText role="label">
+                  {CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName}
+                </AppText>
+                <AppText role="body">{current?.value ?? "Not set"}</AppText>
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  {current ? "Most recent" : "Not set"}
+                </AppText>
+                <View style={styles.actions}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Save current value"
-                    onPress={() => void saveCurrentValue(fieldKey)}
+                    accessibilityLabel={`Set new ${CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName} value`}
+                    onPress={() => {
+                      setEditingField(fieldKey);
+                      setCurrentDraft("");
+                    }}
                     style={[styles.action, { borderColor: colors.border }]}
                   >
                     <AppText
                       role="caption"
                       style={{ color: colors.accentText }}
                     >
-                      Save
+                      Set new value
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName} history`}
+                    onPress={() =>
+                      navigation.navigate("MemoryHistory", {
+                        contactId,
+                        fieldKey,
+                      })
+                    }
+                    style={[styles.action, { borderColor: colors.border }]}
+                  >
+                    <AppText
+                      role="caption"
+                      style={{ color: colors.accentText }}
+                    >
+                      History
                     </AppText>
                   </Pressable>
                 </View>
+                {editing ? (
+                  <View style={styles.inlineDraft}>
+                    <TextInput
+                      accessibilityLabel={`New ${CURRENT_STATE_FIELD_REGISTRY[fieldKey].displayName} value`}
+                      value={currentDraft}
+                      onChangeText={setCurrentDraft}
+                      placeholder="Set a new value"
+                      placeholderTextColor={colors.textPlaceholder}
+                      style={[
+                        styles.input,
+                        {
+                          color: colors.textPrimary,
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Save current value"
+                      onPress={() => void saveCurrentValue(fieldKey)}
+                      style={[styles.action, { borderColor: colors.border }]}
+                    >
+                      <AppText
+                        role="caption"
+                        style={{ color: colors.accentText }}
+                      >
+                        Save
+                      </AppText>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+        {knowledge.customValues.length > 0 ? (
+          <View
+            testID={`knowledge-group-${RELATIONSHIPS_GROUP_KEY}`}
+            style={[styles.group, { borderColor: colors.border }]}
+          >
+            <AppText role="heading">Custom fields</AppText>
+            {knowledge.customValues.map((item) => (
+              <View key={item.id} style={styles.readOnlyRow}>
+                <AppText role="label" style={{ color: colors.textSecondary }}>
+                  {item.label}
+                </AppText>
+                {item.value ? (
+                  <AppText role="body">{item.value}</AppText>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+        <View style={[styles.group, { borderColor: colors.border }]}>
+          <AppText role="heading">{RELATIONSHIPS_GROUP.displayName}</AppText>
+          <RelationshipEditor
+            contactId={contactId}
+            items={relationships}
+            onAdd={addKeyPerson}
+            onEdit={editKeyPerson}
+            onDelete={removeKeyPerson}
+            onRestore={restoreKeyPerson}
+          />
+        </View>
+        {groupedMemories.map((group, index) => {
+          const shown = expanded[group.key]
+            ? group.items
+            : group.items.slice(0, GROUP_PREVIEW_LIMIT);
+          return (
+            <View
+              key={group.key}
+              testID={`knowledge-group-${MEMORIES_GROUP_KEY}-${group.key}`}
+              style={[styles.group, { borderColor: colors.border }]}
+            >
+              <AppText role="heading">{group.label}</AppText>
+              <MemoryEditor
+                items={shown}
+                showAdd={index === groupedMemories.length - 1}
+                onAdd={add}
+                onEdit={edit}
+                onDelete={remove}
+                onRestore={restore}
+                onSetAllowAi={setAllowAi}
+                globalAiEnabled={globalAiEnabled}
+              />
+              {shown
+                .filter(
+                  (memory) =>
+                    resolveVisibility(memory.type, memory.hidden) === "hide",
+                )
+                .map((memory) => (
+                  <Pressable
+                    key={`unhide-${memory.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Show ${memoryGroupLabel(memory)} memory on Profile`}
+                    onPress={() => unhideMemory(memory)}
+                    style={[styles.action, { borderColor: colors.border }]}
+                  >
+                    <AppText
+                      role="caption"
+                      style={{ color: colors.accentText }}
+                    >
+                      Show on Profile
+                    </AppText>
+                  </Pressable>
+                ))}
+              {group.items.length > GROUP_PREVIEW_LIMIT &&
+              !expanded[group.key] ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`View all ${group.label} memories`}
+                  onPress={() =>
+                    setExpanded((current) => ({
+                      ...current,
+                      [group.key]: true,
+                    }))
+                  }
+                  style={styles.tertiary}
+                >
+                  <AppText role="body" style={{ color: colors.accentText }}>
+                    View all
+                  </AppText>
+                </Pressable>
               ) : null}
             </View>
           );
         })}
-      </View>
-      {knowledge.customValues.length > 0 ? (
-        <View
-          testID={`knowledge-group-${RELATIONSHIPS_GROUP_KEY}`}
-          style={[styles.group, { borderColor: colors.border }]}
-        >
-          <AppText role="heading">Custom fields</AppText>
-          {knowledge.customValues.map((item) => (
-            <View key={item.id} style={styles.readOnlyRow}>
-              <AppText role="label" style={{ color: colors.textSecondary }}>
-                {item.label}
-              </AppText>
-              {item.value ? <AppText role="body">{item.value}</AppText> : null}
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <View style={[styles.group, { borderColor: colors.border }]}>
-        <AppText role="heading">{RELATIONSHIPS_GROUP.displayName}</AppText>
-        <RelationshipEditor
-          contactId={contactId}
-          items={relationships}
-          onAdd={addKeyPerson}
-          onEdit={editKeyPerson}
-          onDelete={removeKeyPerson}
-          onRestore={restoreKeyPerson}
-        />
-      </View>
-      {groupedMemories.map((group, index) => {
-        const shown = expanded[group.key]
-          ? group.items
-          : group.items.slice(0, GROUP_PREVIEW_LIMIT);
-        return (
-          <View
-            key={group.key}
-            testID={`knowledge-group-${MEMORIES_GROUP_KEY}-${group.key}`}
-            style={[styles.group, { borderColor: colors.border }]}
-          >
-            <AppText role="heading">{group.label}</AppText>
-            <MemoryEditor
-              items={shown}
-              showAdd={index === groupedMemories.length - 1}
-              onAdd={add}
-              onEdit={edit}
-              onDelete={remove}
-              onRestore={restore}
-              onSetAllowAi={setAllowAi}
-              globalAiEnabled={globalAiEnabled}
-            />
-            {shown
-              .filter(
-                (memory) =>
-                  resolveVisibility(memory.type, memory.hidden) === "hide",
-              )
-              .map((memory) => (
-                <Pressable
-                  key={`unhide-${memory.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Show ${memoryGroupLabel(memory)} memory on Profile`}
-                  onPress={() => unhideMemory(memory)}
-                  style={[styles.action, { borderColor: colors.border }]}
-                >
-                  <AppText role="caption" style={{ color: colors.accentText }}>
-                    Show on Profile
-                  </AppText>
-                </Pressable>
-              ))}
-            {group.items.length > GROUP_PREVIEW_LIMIT &&
-            !expanded[group.key] ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`View all ${group.label} memories`}
-                onPress={() =>
-                  setExpanded((current) => ({ ...current, [group.key]: true }))
-                }
-                style={styles.tertiary}
-              >
-                <AppText role="body" style={{ color: colors.accentText }}>
-                  View all
-                </AppText>
-              </Pressable>
-            ) : null}
-          </View>
-        );
-      })}
-      {groupedMemories.length === 0 ? (
-        <MemoryEditor
-          items={[]}
-          onAdd={add}
-          onEdit={edit}
-          onDelete={remove}
-          onRestore={restore}
-          onSetAllowAi={setAllowAi}
-          globalAiEnabled={globalAiEnabled}
-        />
-      ) : null}
-    </ScrollView>
+        {groupedMemories.length === 0 ? (
+          <MemoryEditor
+            items={[]}
+            onAdd={add}
+            onEdit={edit}
+            onDelete={remove}
+            onRestore={restore}
+            onSetAllowAi={setAllowAi}
+            globalAiEnabled={globalAiEnabled}
+          />
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
+  trailingAction: {
+    borderRadius: SPACING.sm,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: SPACING.md,
+  },
   action: {
     alignItems: "center",
     borderRadius: SPACING.sm,
@@ -708,14 +731,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
   },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
-  back: {
-    alignSelf: "flex-start",
-    borderRadius: SPACING.sm,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: SPACING.md,
-  },
   content: { gap: SPACING.lg, padding: SPACING.base },
   currentStateRow: { gap: SPACING.xs },
   empty: { gap: SPACING.sm },
@@ -726,7 +741,6 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     padding: SPACING.base,
   },
-  header: { gap: SPACING.base, overflow: "hidden", padding: SPACING.md },
   inlineDraft: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   input: {
     borderRadius: SPACING.sm,
