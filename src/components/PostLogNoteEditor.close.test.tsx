@@ -6,15 +6,22 @@
  * not.
  *
  * Render-free: the component runs as a plain function over mocked hooks, and
- * the returned element tree is searched for the controls.
+ * the returned element tree is searched for the controls. `useState` slots are
+ * seeded BY NAME through `SLOT` (the SystemBuilderScreen.test.tsx harness), and
+ * a self-check pins both the slot count and what each slot drives, so adding
+ * or reordering a `useState` in PostLogNoteEditor fails loudly instead of
+ * silently shifting every seeded value (verification IN-03).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemoryRow } from "@/db/memories-read";
 
 const state = vi.hoisted(() => ({
-  /** useState values in call order; undefined → the initial value. */
-  values: [] as unknown[],
+  /** The next useState slot; reset by every render. */
   index: 0,
+  /** Seeded values by slot; an unseeded slot gets its initial value. */
+  seed: new Map<number, unknown>(),
+  /** Each slot's initial value from the last render (the self-check). */
+  initial: [] as unknown[],
   savingRef: { current: false },
   discardAnswer: true,
   confirmDiscard: vi.fn(),
@@ -27,9 +34,10 @@ vi.mock("react", () => ({
   useEffect: () => undefined,
   useRef: () => state.savingRef,
   useState: <T,>(initial: T) => {
-    const value = state.values[state.index];
+    const slot = state.index;
     state.index += 1;
-    return [value === undefined ? initial : value, vi.fn()];
+    state.initial[slot] = initial;
+    return [state.seed.has(slot) ? state.seed.get(slot) : initial, vi.fn()];
   },
 }));
 vi.mock("react-native", () => ({
@@ -113,22 +121,24 @@ function cancelRequestOf(tree: unknown): (close: () => void) => void {
   return handler as (close: () => void) => void;
 }
 
-/** useState order: text, error, createdMemory, editingMemory, globalAi, memoryDraftDirty. */
-function render(view: {
-  text?: string;
-  createdMemory?: MemoryRow | null;
-  editingMemory?: boolean;
-  memoryDraftDirty?: boolean;
-}) {
+/** PostLogNoteEditor's `useState` call order. Pinned by the slot self-check. */
+const SLOT = {
+  text: 0,
+  error: 1,
+  createdMemory: 2,
+  editingMemory: 3,
+  globalAiEnabled: 4,
+  memoryDraftDirty: 5,
+} as const;
+type SlotName = keyof typeof SLOT;
+
+function render(view: Partial<Record<SlotName, unknown>>) {
   state.index = 0;
-  state.values = [
-    view.text,
-    undefined,
-    view.createdMemory,
-    view.editingMemory,
-    undefined,
-    view.memoryDraftDirty,
-  ];
+  state.seed = new Map(
+    Object.entries(view)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [SLOT[key as SlotName], value]),
+  );
   const onClose = vi.fn();
   const tree = PostLogNoteEditor({
     target: { interactionId: 11, contactId: 3 },
@@ -138,6 +148,73 @@ function render(view: {
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** The string children of every AppText in the tree. */
+function texts(tree: unknown): string[] {
+  return find(tree, "AppText").flatMap((node) => {
+    const children = node.props?.children;
+    return typeof children === "string" ? [children] : [];
+  });
+}
+
+describe("the useState slot map the seeding relies on (verification IN-03)", () => {
+  beforeEach(() => {
+    state.savingRef.current = false;
+    state.discardAnswer = true;
+    state.confirmDiscard.mockClear();
+  });
+
+  it("pins the slot count and each slot's initial value", () => {
+    render({});
+    expect(state.index).toBe(Object.keys(SLOT).length);
+    expect(state.initial[SLOT.text]).toBe("");
+    expect(state.initial[SLOT.error]).toBeNull();
+    expect(state.initial[SLOT.createdMemory]).toBeNull();
+    expect(state.initial[SLOT.editingMemory]).toBe(false);
+    expect(state.initial[SLOT.globalAiEnabled]).toBe(false);
+    expect(state.initial[SLOT.memoryDraftDirty]).toBe(false);
+  });
+
+  it("each slot drives what its name says", async () => {
+    // text → the note field's value.
+    const typed = render({ text: "Coffee" });
+    expect(find(typed.tree, "TextInput")[0]?.props?.value).toBe("Coffee");
+    // error → the error caption and the Retry label.
+    const failed = render({ error: "boom" });
+    expect(texts(failed.tree)).toContain("boom");
+    button(failed.tree, "Retry");
+    // createdMemory → the "Memory saved" view.
+    expect(texts(render({ createdMemory: MEMORY }).tree)).toContain(
+      "Memory saved",
+    );
+    // editingMemory (with a created memory) → the Edit Memory view.
+    const editing = render({ createdMemory: MEMORY, editingMemory: true });
+    expect(texts(editing.tree)).toContain("Edit Memory");
+    expect(find(editing.tree, "MemoryEditor")[0]?.props?.globalAiEnabled).toBe(
+      false,
+    );
+    // globalAiEnabled → the editor's AI availability.
+    const aiOn = render({
+      createdMemory: MEMORY,
+      editingMemory: true,
+      globalAiEnabled: true,
+    });
+    expect(find(aiOn.tree, "MemoryEditor")[0]?.props?.globalAiEnabled).toBe(
+      true,
+    );
+    // memoryDraftDirty → Done asks first (clean Done closes at once).
+    press(button(editing.tree, "Done"));
+    expect(state.confirmDiscard).not.toHaveBeenCalled();
+    const dirty = render({
+      createdMemory: MEMORY,
+      editingMemory: true,
+      memoryDraftDirty: true,
+    });
+    press(button(dirty.tree, "Done"));
+    await flush();
+    expect(state.confirmDiscard).toHaveBeenCalledOnce();
+  });
+});
 
 describe("Add Note's Cancel follows the Back rule (D-61; verification WR-01)", () => {
   beforeEach(() => {
