@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getExecutor } from "@/db/database";
 import {
   type ReconcileCompletionCounts,
@@ -75,94 +76,97 @@ export function ReconcileCompleteScreen({
     return () => authority.invalidate();
   }, [authority, load]);
 
+  // Every state carries the shared header with its Back (38.9 D-16); Done
+  // below is unchanged.
+  const header = <ShellAppBar variant="child" title="Check complete" />;
   if (phase.phase === "loading")
     return (
       <View style={styles.root}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Check complete
-        </Text>
-        <View
-          testID="reconcile-complete-loading"
-          accessibilityLabel="Loading check summary"
-          style={styles.center}
-        >
-          <ActivityIndicator color={colors.accentText} />
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Loading check summary…
-          </Text>
+        {header}
+        <View style={styles.frame}>
+          <View
+            testID="reconcile-complete-loading"
+            accessibilityLabel="Loading check summary"
+            style={styles.center}
+          >
+            <ActivityIndicator color={colors.accentText} />
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              Loading check summary…
+            </Text>
+          </View>
         </View>
       </View>
     );
   if (phase.phase === "error")
     return (
       <View testID="reconcile-complete-read-error" style={styles.root}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Check complete
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Couldn&apos;t load the check summary.
-        </Text>
-        <Pressable
-          testID="reconcile-complete-retry"
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading the check summary"
-          onPress={() => void load()}
-          style={[
-            styles.secondaryButton,
-            { borderColor: colors.border, backgroundColor: colors.surface },
-          ]}
-        >
-          <Text style={{ color: colors.textPrimary }}>Retry</Text>
-        </Pressable>
-      </View>
-    );
-  const counts = phase.data;
-  return (
-    <View testID="reconcile-complete-screen" style={styles.root}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>
-        Check complete
-      </Text>
-      <View style={styles.counts}>
-        {footerEntry("Checked", counts.checked, colors)}
-        {footerEntry("Changed", counts.changed, colors)}
-        {footerEntry("Updated", counts.updated, colors)}
-        {footerEntry("Kept Orbit values", counts.keptOrbitValues, colors)}
-        {footerEntry("Source missing", counts.sourceMissing, colors)}
-      </View>
-      <View style={styles.actions}>
-        {counts.unresolved > 0 ? (
+        {header}
+        <View style={styles.frame}>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Couldn&apos;t load the check summary.
+          </Text>
           <Pressable
+            testID="reconcile-complete-retry"
             accessibilityRole="button"
-            accessibilityLabel="View unresolved"
-            onPress={() =>
-              navigation.navigate("ReconcileGrid", {
-                sessionId: route.params.sessionId,
-              })
-            }
+            accessibilityLabel="Retry loading the check summary"
+            onPress={() => void load()}
             style={[
               styles.secondaryButton,
               { borderColor: colors.border, backgroundColor: colors.surface },
             ]}
           >
-            <Text style={{ color: colors.textPrimary }}>View unresolved</Text>
+            <Text style={{ color: colors.textPrimary }}>Retry</Text>
           </Pressable>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Done"
-          onPress={() => navigationRef.current?.reset(resetToDashboardRoot())}
-          style={[styles.doneButton, { backgroundColor: colors.accent }]}
-        >
-          <Text style={{ color: colors.onAccent }}>Done</Text>
-        </Pressable>
+        </View>
+      </View>
+    );
+  const counts = phase.data;
+  return (
+    <View testID="reconcile-complete-screen" style={styles.root}>
+      {header}
+      <View style={styles.frame}>
+        <View style={styles.counts}>
+          {footerEntry("Checked", counts.checked, colors)}
+          {footerEntry("Changed", counts.changed, colors)}
+          {footerEntry("Updated", counts.updated, colors)}
+          {footerEntry("Kept Orbit values", counts.keptOrbitValues, colors)}
+          {footerEntry("Source missing", counts.sourceMissing, colors)}
+        </View>
+        <View style={styles.actions}>
+          {counts.unresolved > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View unresolved"
+              onPress={() =>
+                navigation.navigate("ReconcileGrid", {
+                  sessionId: route.params.sessionId,
+                })
+              }
+              style={[
+                styles.secondaryButton,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
+              <Text style={{ color: colors.textPrimary }}>View unresolved</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+            onPress={() => navigationRef.current?.reset(resetToDashboardRoot())}
+            style={[styles.doneButton, { backgroundColor: colors.accent }]}
+          >
+            <Text style={{ color: colors.onAccent }}>Done</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 16, gap: 16 },
-  title: { fontSize: 24, fontWeight: "700" },
+  root: { flex: 1 },
+  frame: { flex: 1, padding: 16, gap: 16 },
   body: { fontSize: 15, lineHeight: 21 },
   center: { alignItems: "center", justifyContent: "center", gap: 12 },
   counts: { gap: 10 },

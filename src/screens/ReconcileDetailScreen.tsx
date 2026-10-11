@@ -13,6 +13,7 @@ import {
   type FieldChoiceOption,
 } from "@/components/FieldChoiceGroup";
 import { KEEP_ORBIT_PHOTO, PhotoChoice } from "@/components/PhotoChoice";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { listContactMethods } from "@/db/contact-methods-dao";
 import { setContactPhoto } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -409,180 +410,176 @@ export function ReconcileDetailScreen({
   const unresolved = scan?.diff.fields.some(
     (field) => field.outcome === "conflict" && !choices[field.fieldFamily],
   );
+  // Every branch (loading / permission, missing source, main) carries the
+  // shared header and its one Back (38.9 D-16, D-07).
   if (!scan)
     return (
       <View style={styles.root}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Update from Contacts
-        </Text>
-        {message ? (
-          <Text style={{ color: colors.textSecondary }}>{message}</Text>
-        ) : (
-          <ActivityIndicator color={colors.accentText} />
-        )}
-        {needsContactsAccess ? (
-          <Pressable
-            onPress={() => {
-              void openContactsSettings();
-            }}
-            style={[styles.action, { borderColor: colors.border }]}
-          >
-            <Text style={{ color: colors.textPrimary }}>Open Settings</Text>
-          </Pressable>
-        ) : null}
+        <ShellAppBar variant="child" title="Update from Contacts" />
+        <View style={styles.body}>
+          {message ? (
+            <Text style={{ color: colors.textSecondary }}>{message}</Text>
+          ) : (
+            <ActivityIndicator color={colors.accentText} />
+          )}
+          {needsContactsAccess ? (
+            <Pressable
+              onPress={() => {
+                void openContactsSettings();
+              }}
+              style={[styles.action, { borderColor: colors.border }]}
+            >
+              <Text style={{ color: colors.textPrimary }}>Open Settings</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     );
   if (scan.diff.missingSource)
     return (
       <View style={styles.root}>
-        <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()}>
-            <Text style={{ color: colors.textSecondary }}>Back</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            Update from Contacts
-          </Text>
+        <ShellAppBar variant="child" title="Update from Contacts" />
+        <View style={styles.body}>
           <Text style={[styles.subject, { color: colors.textSecondary }]}>
             {scan.contactName}
           </Text>
-        </View>
-        <View style={styles.missingSource}>
-          <View
-            style={[styles.chip, { backgroundColor: colors.surfaceElevated }]}
-          >
-            <Text style={[styles.chipLabel, { color: colors.textSecondary }]}>
-              Source missing
+          <View style={styles.missingSource}>
+            <View
+              style={[styles.chip, { backgroundColor: colors.surfaceElevated }]}
+            >
+              <Text style={[styles.chipLabel, { color: colors.textSecondary }]}>
+                Source missing
+              </Text>
+            </View>
+            <Text style={[styles.missingBody, { color: colors.textSecondary }]}>
+              This linked phone contact is no longer available. Your Orbit
+              contact and relationship history stay unchanged.
             </Text>
+            <Pressable
+              disabled={applying}
+              onPress={() => void keepMissingSource()}
+              style={[styles.action, { borderColor: colors.border }]}
+            >
+              <Text style={{ color: colors.textPrimary }}>Keep as is</Text>
+            </Pressable>
+            <Pressable
+              disabled={applying}
+              onPress={() => void relinkMissingSource()}
+              style={[styles.action, { borderColor: colors.border }]}
+            >
+              <Text style={{ color: colors.textPrimary }}>
+                Relink to another contact
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={applying}
+              onPress={() => void unlinkMissingSource()}
+              style={[
+                styles.action,
+                { borderColor: colors.danger },
+                persistentDangerScrim(theme),
+              ]}
+            >
+              <Text style={{ color: colors.danger }}>Unlink source</Text>
+            </Pressable>
+            {message ? (
+              <Text style={{ color: colors.textSecondary }}>{message}</Text>
+            ) : null}
           </View>
-          <Text style={[styles.missingBody, { color: colors.textSecondary }]}>
-            This linked phone contact is no longer available. Your Orbit contact
-            and relationship history stay unchanged.
-          </Text>
-          <Pressable
-            disabled={applying}
-            onPress={() => void keepMissingSource()}
-            style={[styles.action, { borderColor: colors.border }]}
-          >
-            <Text style={{ color: colors.textPrimary }}>Keep as is</Text>
-          </Pressable>
-          <Pressable
-            disabled={applying}
-            onPress={() => void relinkMissingSource()}
-            style={[styles.action, { borderColor: colors.border }]}
-          >
-            <Text style={{ color: colors.textPrimary }}>
-              Relink to another contact
-            </Text>
-          </Pressable>
-          <Pressable
-            disabled={applying}
-            onPress={() => void unlinkMissingSource()}
-            style={[
-              styles.action,
-              { borderColor: colors.danger },
-              persistentDangerScrim(theme),
-            ]}
-          >
-            <Text style={{ color: colors.danger }}>Unlink source</Text>
-          </Pressable>
-          {message ? (
-            <Text style={{ color: colors.textSecondary }}>{message}</Text>
-          ) : null}
         </View>
       </View>
     );
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}>
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Update from Contacts
-        </Text>
-        <Text style={[styles.subject, { color: colors.textSecondary }]}>
-          {scan.contactName}
-        </Text>
-        <Pressable
-          onPress={() =>
-            navigation.navigate("SurvivorSelect", { firstContactId: contactId })
-          }
-        >
-          <Text style={{ color: colors.textSecondary }}>
-            Merge with another contact
+      <ShellAppBar variant="child" title="Update from Contacts" />
+      <View style={styles.body}>
+        <View style={styles.header}>
+          <Text style={[styles.subject, { color: colors.textSecondary }]}>
+            {scan.contactName}
           </Text>
-        </Pressable>
+          <Pressable
+            onPress={() =>
+              navigation.navigate("SurvivorSelect", {
+                firstContactId: contactId,
+              })
+            }
+          >
+            <Text style={{ color: colors.textSecondary }}>
+              Merge with another contact
+            </Text>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.content}>
+          {scan.diff.fields.map((field) =>
+            field.fieldFamily === "photo" ? (
+              <PhotoChoice
+                key="photo"
+                options={[
+                  {
+                    id: "source",
+                    uri: scan.sourcePhotoUri,
+                    name: "Contacts photo",
+                    // Name the linked phone contact the photo came from (RG-031).
+                    provenance:
+                      field.sourceOptions[0]?.provenanceLabels.join(", ") ||
+                      "Phone contact",
+                  },
+                ]}
+                mode={field.outcome === "conflict" ? "conflict" : "additive"}
+                keepPhoto={{
+                  photo: scan.orbitPhoto,
+                  name: scan.contactName,
+                  contactId,
+                }}
+                selectedId={
+                  choices.photo?.startsWith("source:")
+                    ? "source"
+                    : KEEP_ORBIT_PHOTO
+                }
+                onChange={(value) =>
+                  setChoices((current) => ({
+                    ...current,
+                    photo:
+                      value === "source"
+                        ? `source:${field.sourceOptions[0]?.optionId ?? ""}`
+                        : "orbit",
+                  }))
+                }
+              />
+            ) : (
+              <ChoiceRow
+                key={field.fieldFamily}
+                field={field}
+                choice={choices[field.fieldFamily]}
+                onChoice={(choice) =>
+                  setChoices((current) => ({
+                    ...current,
+                    [field.fieldFamily]: choice,
+                  }))
+                }
+              />
+            ),
+          )}
+          {message ? (
+            <Text style={{ color: colors.textSecondary }}>{message}</Text>
+          ) : null}
+          <Pressable
+            disabled={unresolved || applying}
+            onPress={() => void apply()}
+            style={[
+              styles.apply,
+              {
+                backgroundColor: colors.accent,
+                opacity: unresolved || applying ? 0.5 : 1,
+              },
+            ]}
+          >
+            <Text style={{ color: colors.onAccent }}>
+              {applying ? "Applying…" : "Apply"}
+            </Text>
+          </Pressable>
+        </ScrollView>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {scan.diff.fields.map((field) =>
-          field.fieldFamily === "photo" ? (
-            <PhotoChoice
-              key="photo"
-              options={[
-                {
-                  id: "source",
-                  uri: scan.sourcePhotoUri,
-                  name: "Contacts photo",
-                  // Name the linked phone contact the photo came from (RG-031).
-                  provenance:
-                    field.sourceOptions[0]?.provenanceLabels.join(", ") ||
-                    "Phone contact",
-                },
-              ]}
-              mode={field.outcome === "conflict" ? "conflict" : "additive"}
-              keepPhoto={{
-                photo: scan.orbitPhoto,
-                name: scan.contactName,
-                contactId,
-              }}
-              selectedId={
-                choices.photo?.startsWith("source:")
-                  ? "source"
-                  : KEEP_ORBIT_PHOTO
-              }
-              onChange={(value) =>
-                setChoices((current) => ({
-                  ...current,
-                  photo:
-                    value === "source"
-                      ? `source:${field.sourceOptions[0]?.optionId ?? ""}`
-                      : "orbit",
-                }))
-              }
-            />
-          ) : (
-            <ChoiceRow
-              key={field.fieldFamily}
-              field={field}
-              choice={choices[field.fieldFamily]}
-              onChoice={(choice) =>
-                setChoices((current) => ({
-                  ...current,
-                  [field.fieldFamily]: choice,
-                }))
-              }
-            />
-          ),
-        )}
-        {message ? (
-          <Text style={{ color: colors.textSecondary }}>{message}</Text>
-        ) : null}
-        <Pressable
-          disabled={unresolved || applying}
-          onPress={() => void apply()}
-          style={[
-            styles.apply,
-            {
-              backgroundColor: colors.accent,
-              opacity: unresolved || applying ? 0.5 : 1,
-            },
-          ]}
-        >
-          <Text style={{ color: colors.onAccent }}>
-            {applying ? "Applying…" : "Apply"}
-          </Text>
-        </Pressable>
-      </ScrollView>
     </View>
   );
 }
@@ -634,9 +631,9 @@ function ChoiceRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 16, gap: 16 },
+  root: { flex: 1 },
+  body: { flex: 1, padding: 16, gap: 16 },
   header: { gap: 10 },
-  title: { fontSize: 24, fontWeight: "600" },
   subject: { fontSize: 18 },
   content: { gap: 16, paddingBottom: 24 },
   apply: {

@@ -86,6 +86,7 @@ vi.mock("@/components/orrery/OrreryObstacle", () => ({
 vi.mock("@/components/orrery/SystemRuleAccordion", () => ({
   SystemRuleAccordion: "SystemRuleAccordion",
 }));
+vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("@/components/ui/FieldError", () => ({ FieldError: "FieldError" }));
@@ -132,8 +133,19 @@ vi.mock("@/logic/orrery-system-logic", () => ({
   BUILTIN_SYSTEM_LABELS: {},
   parseSystemRef: vi.fn(),
 }));
+// The guard is mocked; its options are captured so the sub-editor step-back
+// (38.9 D-14, D-69) can be fed to the real `decideGuardOnRemove`.
+const guard = vi.hoisted(() => ({
+  options: null as null | {
+    hasUnsavedChanges: boolean;
+    subEditor?: { open: boolean; dirty: boolean; close: () => void };
+  },
+}));
 vi.mock("@/navigation/discard-keep-guard", () => ({
-  useDiscardKeepGuard: vi.fn(),
+  useDiscardKeepGuard: vi.fn((options: typeof guard.options) => {
+    guard.options = options;
+    return { requestClose: vi.fn() };
+  }),
 }));
 vi.mock("@/stores/confirm-store", () => ({
   confirm: vi.fn(async () => false),
@@ -158,6 +170,10 @@ const { emptyRuleDraft } = await import(
 const { focusPreviewBody } = await import(
   "@/components/orrery/system-preview-logic"
 );
+// The real guard decision (Plan 02), fed the options the screen passes.
+const { decideGuardOnRemove } = await vi.importActual<
+  typeof import("@/navigation/discard-keep-guard")
+>("@/navigation/discard-keep-guard");
 const { buildCategoryRuleView } = await vi.importActual<
   typeof import("@/components/orrery/SystemRuleAccordion")
 >("@/components/orrery/SystemRuleAccordion");
@@ -465,6 +481,15 @@ describe("SystemBuilder name error vs operation error (38.9 D-19, K-08)", () => 
     });
     expect(operationErrorCaptions(members, SAVE_ERROR)).toHaveLength(1);
     expect(byTestId(members, "system-builder-name")).toBeUndefined();
+    // On the Members page it is the first thing in the content, under the
+    // shared header (cycle-5 C5-M4).
+    const membersScroll = members.find(
+      (element) => element.type === "ScrollView",
+    ) as TestElement;
+    const firstContent = (
+      membersScroll.props.children as unknown[]
+    ).flat()[0] as TestElement;
+    expect(firstContent).toBe(operationErrorCaptions(members, SAVE_ERROR)[0]);
 
     const preview = renderBuilder({
       ready: true,
@@ -542,5 +567,200 @@ describe("SystemBuilder name error vs operation error (38.9 D-19, K-08)", () => 
       nameRevealRequest: 1,
     });
     expect(reveal).not.toHaveBeenCalled();
+  });
+});
+
+describe("SystemBuilder shared header and in-builder Back (38.9 D-16, D-14, D-69; review C7-M1)", () => {
+  const PREVIEW_SCENE = { contacts: [] };
+
+  beforeEach(() => {
+    hooks.runEffects = false;
+    for (const spy of hooks.setters) spy?.mockClear();
+    navigation.goBack.mockReset();
+    guard.options = null;
+  });
+
+  function headers(tree: TestElement[]) {
+    return tree.filter(
+      (element) =>
+        element.type === "ShellAppBar" && element.props.variant === "child",
+    );
+  }
+
+  function previewState() {
+    return renderBuilder({
+      ready: true,
+      previewing: true,
+      previewScene: PREVIEW_SCENE,
+    });
+  }
+
+  it("renders exactly one child header on the Definition page, labelled Cancel, titled by the builder", () => {
+    const tree = renderBuilder({ ready: true });
+    const found = headers(tree);
+    expect(found).toHaveLength(1);
+    expect(found[0].props.backKind).toBe("cancel");
+    expect(found[0].props.title).toBe("New System");
+    expect(found[0].props.onBack).toBeUndefined();
+    expect(byTestId(tree, "system-builder-name")).toBeDefined();
+  });
+
+  it("renders exactly one child header on the Members page, labelled Back, and no in-body Back", () => {
+    const tree = renderBuilder({ ready: true, page: "members" });
+    const found = headers(tree);
+    expect(found).toHaveLength(1);
+    expect(found[0].props.backKind).toBe("back");
+    expect(
+      tree.filter(
+        (element) =>
+          element.type === "Button" &&
+          /^(Back|Cancel|Back to Definition)$/.test(
+            String(element.props.label),
+          ),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("renders exactly one child header in Preview, titled Preview, labelled Back", () => {
+    const tree = previewState();
+    const found = headers(tree);
+    expect(found).toHaveLength(1);
+    expect(found[0].props.title).toBe("Preview");
+    expect(found[0].props.backKind).toBe("back");
+    // Preview keeps its labelled Edit / Save System actions.
+    expect(
+      tree
+        .filter((element) => element.type === "Button")
+        .map((element) => element.props.label),
+    ).toEqual(["Edit", "Save System"]);
+  });
+
+  it("in Preview the guard's sub-editor is open and clean, and GO_BACK closes it back to editing", () => {
+    previewState();
+    const subEditor = guard.options?.subEditor;
+    expect(subEditor).toMatchObject({ open: true, dirty: false });
+    expect(
+      decideGuardOnRemove({
+        bypass: false,
+        hasUnsavedChanges: guard.options?.hasUnsavedChanges ?? false,
+        subEditorOpen: subEditor?.open,
+        subEditorDirty: subEditor?.dirty,
+        actionType: "GO_BACK",
+      }),
+    ).toBe("close-sub-editor");
+    subEditor?.close();
+    expect(setter("previewing")).toHaveBeenCalledWith(false);
+    expect(setter("page")).not.toHaveBeenCalled();
+    // The resulting state is the Definition HUD (page still "definition").
+    const editing = renderBuilder({ ready: true });
+    expect(byTestId(editing, "system-builder-name")).toBeDefined();
+    expect(headers(editing)[0].props.backKind).toBe("cancel");
+  });
+
+  it("in Preview, GO_BACK with unsaved changes still only steps back (no leave prompt)", () => {
+    previewState();
+    const subEditor = guard.options?.subEditor;
+    expect(
+      decideGuardOnRemove({
+        bypass: false,
+        hasUnsavedChanges: true,
+        subEditorOpen: subEditor?.open,
+        subEditorDirty: subEditor?.dirty,
+        actionType: "GO_BACK",
+      }),
+    ).toBe("close-sub-editor");
+  });
+
+  it("in Preview with no unsaved changes, a RESET is allowed and never turned into the close (C6-H1)", () => {
+    previewState();
+    const subEditor = guard.options?.subEditor;
+    expect(guard.options?.hasUnsavedChanges).toBe(false);
+    expect(
+      decideGuardOnRemove({
+        bypass: false,
+        hasUnsavedChanges: false,
+        subEditorOpen: subEditor?.open,
+        subEditorDirty: subEditor?.dirty,
+        actionType: "RESET",
+      }),
+    ).toBe("allow");
+    expect(setter("previewing")).not.toHaveBeenCalled();
+    expect(setter("page")).not.toHaveBeenCalled();
+  });
+
+  it("on the Members page Back returns to the Definition page; on the Definition page Back leaves", () => {
+    renderBuilder({ ready: true, page: "members" });
+    expect(guard.options?.subEditor).toMatchObject({
+      open: true,
+      dirty: false,
+    });
+    guard.options?.subEditor?.close();
+    expect(setter("page")).toHaveBeenCalledWith("definition");
+    expect(setter("previewing")).not.toHaveBeenCalled();
+
+    renderBuilder({ ready: true });
+    expect(guard.options?.subEditor?.open).toBe(false);
+    expect(
+      decideGuardOnRemove({
+        bypass: false,
+        hasUnsavedChanges: false,
+        subEditorOpen: guard.options?.subEditor?.open,
+        subEditorDirty: guard.options?.subEditor?.dirty,
+        actionType: "GO_BACK",
+      }),
+    ).toBe("allow");
+  });
+
+  it("in Preview the header sits outside the bottom previewBar, after the preview canvas (C8-M1, C9-L3)", () => {
+    const tree = previewState();
+    const root = tree[0];
+    expect(root.type).toBe("View");
+    const header = headers(tree)[0];
+    const hud = tree.find(
+      (element) =>
+        element.type === "OrreryObstacle" &&
+        element.props.obstacleId === "system-builder-hud",
+    ) as TestElement;
+    expect(hud).toBeDefined();
+    expect(nodes(hud).includes(header)).toBe(false);
+    const rootChildren = (root.props.children as unknown[])
+      .flat()
+      .filter(Boolean) as TestElement[];
+    const canvasIndex = rootChildren.findIndex(
+      (child) => child.type === "SystemPreviewCanvas",
+    );
+    const headerIndex = rootChildren.findIndex((child) =>
+      nodes(child).includes(header),
+    );
+    expect(canvasIndex).toBeGreaterThan(-1);
+    expect(headerIndex).toBeGreaterThan(canvasIndex);
+    expect(headerIndex).toBeLessThan(rootChildren.indexOf(hud));
+    // Top-anchored, not bottom-anchored like the previewBar.
+    const top = rootChildren[headerIndex];
+    expect(top.props.style).toMatchObject({ position: "absolute", top: 0 });
+  });
+
+  it("in Preview a save failure shows under the header, once (C8-M2)", () => {
+    const tree = renderBuilder({
+      ready: true,
+      previewing: true,
+      previewScene: PREVIEW_SCENE,
+      error: SAVE_ERROR,
+    });
+    const captions = operationErrorCaptions(tree, SAVE_ERROR);
+    expect(captions).toHaveLength(1);
+    // Re-walk the top-anchored element (render-prop children render afresh,
+    // so match the caption by content, not identity).
+    const top = byTestId(tree, "system-builder-preview-header") as TestElement;
+    const inTop = nodes(top);
+    const topCaptions = operationErrorCaptions(inTop, SAVE_ERROR);
+    expect(topCaptions).toHaveLength(1);
+    const order = inTop.filter(
+      (element) => element.type === "ShellAppBar" || element === topCaptions[0],
+    );
+    expect(order.map((element) => element.type)).toEqual([
+      "ShellAppBar",
+      "AppText",
+    ]);
   });
 });

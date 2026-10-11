@@ -12,15 +12,10 @@ import { backupAppBarVariant } from "./backup-dualhome-logic";
  * shell transient is dismissed first — SHELL-03). It never also renders an
  * in-body Back.
  *
- * Exceptions, each explicit:
- *   - `KEEP_OWN_CHROME`: the Profile keeps its own top bar (ADR-109); Capture
- *     keeps its own chrome (S11, Phase 40).
- *   - `PENDING_HEADER_CONVERSION`: screens Plans 09 and 10 convert, each pinned
- *     to its CURRENT chrome so the list cannot rot: an `"in-body-back"` entry has
- *     no ShellAppBar and still has its in-body Back (removing it before the
- *     header lands would strand the user, research Pitfall 6); a `"header-less"`
- *     entry has no ShellAppBar and is not required to have a Back. The commit
- *     that converts a screen removes its entry (D-07).
+ * The only exception list is `KEEP_OWN_CHROME`: the Profile keeps its own top
+ * bar (ADR-109); Capture keeps its own chrome (S11, Phase 40). The transitional
+ * pending-conversion list of Plans 08-10 is gone: every other pushed screen is
+ * converted (38.9 Plan 10, D-07).
  *
  * Source contract: reads the five stack files `RootNavigator` mounts, resolves
  * every `@/screens/*` and `@/components/*` module they import (the
@@ -53,23 +48,6 @@ const KEEP_OWN_CHROME: Record<string, string> = {
     "ADR-109: the Profile keeps its own top bar",
   "src/screens/CaptureScreen.tsx":
     "S11: Capture keeps its own chrome (Phase 40)",
-};
-
-type PendingChrome = "in-body-back" | "header-less";
-
-/**
- * Screens still waiting for the shared header (D-16), with their chrome today.
- * Plan 09 converted its 16; Plan 10 empties the rest. Each converting commit
- * removes its entry.
- */
-const PENDING_HEADER_CONVERSION: Record<string, PendingChrome> = {
-  // Plan 10
-  "src/screens/ReconcileDetailScreen.tsx": "in-body-back",
-  "src/screens/SystemBuilderScreen.tsx": "in-body-back",
-  "src/screens/ImportCompleteScreen.tsx": "header-less",
-  "src/screens/ReconcileGridScreen.tsx": "header-less",
-  "src/screens/ReconcileCompleteScreen.tsx": "header-less",
-  "src/screens/RestoreResultScreen.tsx": "header-less",
 };
 
 /**
@@ -172,12 +150,6 @@ function hasInBodyBack(source: string): boolean {
   );
 }
 
-/** The pending-entry rule for one source (true = still in its category). */
-function keepsPendingCategory(source: string, chrome: PendingChrome): boolean {
-  if (rendersShellAppBar(source)) return false;
-  return chrome === "header-less" ? true : hasInBodyBack(source);
-}
-
 describe("detector self-tests", () => {
   it("finds the in-body Back shapes", () => {
     expect(
@@ -203,38 +175,6 @@ describe("detector self-tests", () => {
       hasInBodyBack('<ShellAppBar variant="child" title="Things" />'),
     ).toBe(false);
     expect(hasInBodyBack("// Back closes the draft first")).toBe(false);
-  });
-
-  it("an in-body-back pending entry holds only while it has no header and keeps its Back", () => {
-    const today =
-      '<View><Pressable accessibilityLabel="Back" /><Text>Title</Text></View>';
-    expect(keepsPendingCategory(today, "in-body-back")).toBe(true);
-    // Back removed before the header landed: the user is stranded.
-    expect(
-      keepsPendingCategory("<View><Text>Title</Text></View>", "in-body-back"),
-    ).toBe(false);
-    // Converted: the entry must be removed in the converting commit.
-    expect(
-      keepsPendingCategory(
-        '<View><ShellAppBar variant="child" title="T" /></View>',
-        "in-body-back",
-      ),
-    ).toBe(false);
-  });
-
-  it("a header-less pending entry holds while it has no header, Back or not", () => {
-    expect(
-      keepsPendingCategory(
-        '<View><Button label="Cancel" /></View>',
-        "header-less",
-      ),
-    ).toBe(true);
-    expect(
-      keepsPendingCategory(
-        '<View><ShellAppBar variant="child" title="Crop" backKind="cancel" /></View>',
-        "header-less",
-      ),
-    ).toBe(false);
   });
 
   it("recognises a literal child header and a proven computed one", () => {
@@ -286,22 +226,19 @@ describe("single header Back across every tab stack (D-07, D-16)", () => {
   it("every exception entry is a registered pushed screen", () => {
     for (const path of [
       ...Object.keys(KEEP_OWN_CHROME),
-      ...Object.keys(PENDING_HEADER_CONVERSION),
       ...Object.keys(COMPUTED_CHILD_VARIANTS),
     ]) {
       expect(pushed, path).toContain(path);
     }
-    for (const path of Object.keys(KEEP_OWN_CHROME)) {
-      expect(PENDING_HEADER_CONVERSION[path], path).toBeUndefined();
-    }
   });
 
-  it("every pushed screen renders the child ShellAppBar and no in-body Back, outside the exceptions", () => {
+  it("every pushed screen renders the child ShellAppBar and no in-body Back, except Profile and Capture", () => {
+    expect(Object.keys(KEEP_OWN_CHROME).sort()).toEqual([
+      "src/screens/CaptureScreen.tsx",
+      "src/screens/ContactProfileScreen.tsx",
+    ]);
     const offenders = pushed
-      .filter(
-        (path) =>
-          !(path in KEEP_OWN_CHROME) && !(path in PENDING_HEADER_CONVERSION),
-      )
+      .filter((path) => !(path in KEEP_OWN_CHROME))
       .flatMap((path) => {
         const source = read(path);
         const problems: string[] = [];
@@ -318,13 +255,6 @@ describe("single header Back across every tab stack (D-07, D-16)", () => {
     (path) => {
       expect(KEEP_OWN_CHROME[path].trim().length).toBeGreaterThan(0);
       expect(rendersShellAppBar(read(path))).toBe(false);
-    },
-  );
-
-  it.each(Object.entries(PENDING_HEADER_CONVERSION))(
-    "pending %s is still %s (remove it in the converting commit)",
-    (path, chrome) => {
-      expect(keepsPendingCategory(read(path), chrome)).toBe(true);
     },
   );
 });

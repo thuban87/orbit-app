@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
@@ -47,75 +48,74 @@ export function RestoreResultScreen({
     .filter(Boolean)
     .join(", ");
   const returnLabel = restoreReturnLabel(host);
+  // The shared header and its Back (38.9 D-16). The success reset leaves
+  // [hub, RestoreResult], so Back lands on the return hub, like the button.
   return (
-    <ScrollView
-      testID="restore-result-screen"
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: bottomClearance },
-      ]}
-    >
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
+    <View style={styles.root}>
+      <ShellAppBar variant="child" title="Backup restored" />
+      <ScrollView
+        testID="restore-result-screen"
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
         ]}
       >
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
         >
-          Backup restored
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Added: {added} · Updated: {updated} · Newer local kept:{" "}
-          {newerLocalKept} · Deletions applied: {deletionsApplied}
-        </Text>
-        {restoredMissing ? (
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {restoredMissing}
+            Added: {added} · Updated: {updated} · Newer local kept:{" "}
+            {newerLocalKept} · Deletions applied: {deletionsApplied}
           </Text>
-        ) : null}
-        {pending ? (
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Your data is restored. {pending} will be retried the next time Orbit
-            opens.
-          </Text>
-        ) : null}
-        {replaceSafetySnapshot === "verified" ? (
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            A verified backup of this device was created first.
-            {safetySkipped ? ` ${safetySkipped}` : ""}
-          </Text>
-        ) : null}
-        {replaceSafetySnapshot === "not-configured" ? (
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            No automatic backup destination was configured.
-          </Text>
-        ) : null}
-        <Pressable
-          testID="restore-return-to-backup"
-          accessibilityRole="button"
-          accessibilityLabel={returnLabel}
-          onPress={() =>
-            navigation.reset({
-              index: 0,
-              routes: [{ name: restoreReturnRouteName(host) }],
-            })
-          }
-          style={[styles.primaryButton, { backgroundColor: colors.accent }]}
-        >
-          <Text style={{ color: colors.onAccent }}>{returnLabel}</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+          {restoredMissing ? (
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              {restoredMissing}
+            </Text>
+          ) : null}
+          {pending ? (
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              Your data is restored. {pending} will be retried the next time
+              Orbit opens.
+            </Text>
+          ) : null}
+          {replaceSafetySnapshot === "verified" ? (
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              A verified backup of this device was created first.
+              {safetySkipped ? ` ${safetySkipped}` : ""}
+            </Text>
+          ) : null}
+          {replaceSafetySnapshot === "not-configured" ? (
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              No automatic backup destination was configured.
+            </Text>
+          ) : null}
+          <Pressable
+            testID="restore-return-to-backup"
+            accessibilityRole="button"
+            accessibilityLabel={returnLabel}
+            onPress={() =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: restoreReturnRouteName(host) }],
+              })
+            }
+            style={[styles.primaryButton, { backgroundColor: colors.accent }]}
+          >
+            <Text style={{ color: colors.onAccent }}>{returnLabel}</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingTop: 48 },
+  root: { flex: 1 },
+  content: { padding: 16 },
   card: { borderWidth: 1, borderRadius: 10, padding: 16, gap: 16 },
-  title: { fontSize: 24, fontWeight: "600", lineHeight: 29 },
   body: { fontSize: 16, lineHeight: 24 },
   primaryButton: {
     minHeight: 44,

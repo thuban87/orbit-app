@@ -18,6 +18,7 @@ vi.mock("react-native", () => ({
 vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
+vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/navigation/use-bottom-clearance", () => ({
   useBottomClearance: () => 0,
 }));

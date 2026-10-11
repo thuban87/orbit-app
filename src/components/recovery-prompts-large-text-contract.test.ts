@@ -186,7 +186,7 @@ describe("Import Complete keeps Done and Review reachable at large text (D-67)",
     expect(screenStart).toBeGreaterThan(-1);
   });
 
-  it("scrolls the title, counts, notice and retry block inside one ScrollView", () => {
+  it("scrolls the counts, notice and retry block inside one ScrollView; the title is the shared header above it (38.9 D-16)", () => {
     const opens = [...loaded.matchAll(/<ScrollView\b/g)];
     expect(opens).toHaveLength(1);
     const open = opens[0].index ?? -1;
@@ -197,8 +197,14 @@ describe("Import Complete keeps Done and Review reachable at large text (D-67)",
     expect(styleName, "ScrollView style binding").toBeDefined();
     expect(styleBody(text, styleName ?? "")).toMatch(/flexShrink:\s*1\b/);
     const inside = loaded.slice(open, close);
+    // The title moved into the shared header, which does not scroll.
+    expect(text).toContain(
+      '<ShellAppBar variant="child" title="Import complete" />',
+    );
+    const headerAt = loaded.indexOf("{header}");
+    expect(headerAt).toBeGreaterThan(-1);
+    expect(headerAt).toBeLessThan(open);
     for (const fragment of [
-      "Import complete",
       "Imported (",
       "birthdays couldn't be read",
       'testID="import-complete-action-notice"',

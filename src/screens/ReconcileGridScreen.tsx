@@ -5,6 +5,7 @@ import {
   CandidateCardGrid,
   type CandidateItem,
 } from "@/components/CandidateCardGrid";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { listContactMethods } from "@/db/contact-methods-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -429,9 +430,8 @@ export function ReconcileGridScreen({
 
   return (
     <View style={styles.root}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>
-        Check linked contacts
-      </Text>
+      {/* The shared header and its Back (38.9 D-16). */}
+      <ShellAppBar variant="child" title="Check linked contacts" />
       {message ? (
         <Text style={[styles.message, { color: colors.textSecondary }]}>
           {message}
@@ -491,12 +491,6 @@ export function ReconcileGridScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
   message: { fontSize: 14, paddingHorizontal: 16, paddingTop: 8 },
   settingsButton: {
     marginHorizontal: 16,

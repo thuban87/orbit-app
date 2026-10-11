@@ -27,6 +27,7 @@ import {
   previewMemberOptions,
   previewMembershipSummary,
 } from "@/components/orrery/system-preview-logic";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
@@ -238,9 +239,10 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const [previewFocusedId, setPreviewFocusedId] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Load, save and reset failures (the operation error). Rendered in the
-  // header area, never under the name input, and not cleared by typing (38.9
-  // D-19, D-27; cycle-5 C5-M4).
+  // Load, save and reset failures (the operation error). Rendered as a
+  // caption at the top of the content under the shared header (on both pages,
+  // and under the Preview header), never under the name input, and not
+  // cleared by typing (38.9 D-19, D-27; cycle-5 C5-M4, review C8-M2).
   const [error, setError] = useState<string | null>(null);
   // The name validation error, rendered under Name and cleared when the name
   // changes (38.9 D-19; K-08).
@@ -291,7 +293,23 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     ...draft,
     overrideIntent,
   });
-  useDiscardKeepGuard({ hasUnsavedChanges: meaningful, bypassRef });
+  // Back (header, system key, gesture) steps back inside the builder first:
+  // Preview -> editing, Members -> Definition (38.9 D-14, D-69). Only on the
+  // Definition page does Back leave, guarded as before. A RESET or any other
+  // non-Back removal never runs this close (Plan 02 `actionType` contract).
+  const stepBack = () => {
+    if (previewing) setPreviewing(false);
+    else setPage("definition");
+  };
+  useDiscardKeepGuard({
+    hasUnsavedChanges: meaningful,
+    bypassRef,
+    subEditor: {
+      open: page === "members" || previewing,
+      dirty: false,
+      close: stepBack,
+    },
+  });
 
   const load = useCallback(async () => {
     const exec = getExecutor();
@@ -527,6 +545,12 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const focusedPreviewMember = previewMembers.find(
     (member) => member.id === previewFocusedId,
   );
+  // The shared child header (38.9 D-16): Back on the Members page and in
+  // Preview (both step back, via the guard above), Cancel on the Definition
+  // page (leaves, guarded). Its default goBack() fires beforeRemove.
+  const builderTitle =
+    overrideOnly || customRef ? `Edit ${draft.name}` : "New System";
+  const backKind = page === "members" || previewing ? "back" : "cancel";
 
   return (
     <View style={styles.root}>
@@ -537,6 +561,28 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
           focusedId={previewFocusedId}
           onFocusBody={setPreviewFocusedId}
         />
+      ) : null}
+      {previewing ? (
+        // Top-anchored, after the full-screen preview canvas so it paints
+        // above it and takes touches; outside the bottom previewBar (D-69;
+        // reviews C8-M1, C9-L3).
+        <View testID="system-builder-preview-header" style={styles.previewTop}>
+          <ShellAppBar variant="child" title="Preview" backKind={backKind} />
+          {error ? (
+            <GlassSurface density="dense" style={styles.previewError}>
+              <ScopedPalette>
+                {(scoped) => (
+                  <AppText
+                    accessibilityLiveRegion="polite"
+                    style={{ color: scoped.danger }}
+                  >
+                    {error}
+                  </AppText>
+                )}
+              </ScopedPalette>
+            </GlassSurface>
+          ) : null}
+        </View>
       ) : null}
       <OrreryObstacle
         obstacleId="system-builder-hud"
@@ -549,15 +595,6 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
               <>
                 {previewing ? (
                   <View style={styles.previewContent}>
-                    <AppText role="heading">Preview</AppText>
-                    {error ? (
-                      <AppText
-                        accessibilityLiveRegion="polite"
-                        style={{ color: scoped.danger }}
-                      >
-                        {error}
-                      </AppText>
-                    ) : null}
                     <AppText role="label" accessibilityLiveRegion="polite">
                       {previewMembershipSummary(
                         membership.memberIds.map((id) => ({ id })),
@@ -634,157 +671,144 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                     </View>
                   </View>
                 ) : (
-                  <ScrollView
-                    ref={scrollRef}
-                    innerViewRef={contentRef}
-                    contentContainerStyle={styles.content}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    <View style={styles.header}>
-                      <Button
-                        role="secondary"
-                        label={page === "members" ? "Back" : "Cancel"}
-                        onPress={() =>
-                          page === "members"
-                            ? setPage("definition")
-                            : navigation.goBack()
-                        }
-                      />
-                      <AppText role="heading">
-                        {overrideOnly
-                          ? `Edit ${draft.name}`
-                          : customRef
-                            ? `Edit ${draft.name}`
-                            : "New System"}
-                      </AppText>
-                    </View>
-                    {error ? (
-                      <AppText
-                        accessibilityLiveRegion="polite"
-                        style={{ color: scoped.danger }}
-                      >
-                        {error}
-                      </AppText>
-                    ) : null}
-                    {!ready ? (
-                      <AppText>Loading System…</AppText>
-                    ) : page === "members" ? (
-                      <>
-                        <AppText role="heading">Manage Members</AppText>
-                        <ManageMembersGrid
-                          candidateIds={membership.candidateIds}
-                          includeIds={includeIds}
-                          excludeIds={excludeIds}
-                          rows={[
-                            ...rows,
-                            ...activeRows.filter(
-                              (row) =>
-                                !rows.some(
-                                  (candidate) => candidate.id === row.id,
-                                ),
-                            ),
-                          ]}
-                          onChange={onOverrideChange}
-                        />
-                        <Button
-                          role="secondary"
-                          label="Back to Definition"
-                          onPress={() => setPage("definition")}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <TextInput
-                          ref={nameInputRef}
-                          testID="system-builder-name"
-                          accessibilityLabel="System name"
-                          editable={!overrideOnly}
-                          placeholder="Name this System"
-                          placeholderTextColor={colors.textPlaceholder}
-                          value={draft.name}
-                          onChangeText={(name) => {
-                            setDraft((current) => ({ ...current, name }));
-                            setNameError(null);
-                          }}
-                          style={[
-                            styles.name,
-                            {
-                              color: colors.textPrimary,
-                              borderColor: colors.border,
-                              backgroundColor: colors.surface,
-                            },
-                          ]}
-                        />
-                        <FieldError
-                          testID="system-builder-name-error"
-                          message={nameError}
-                        />
-                        {!overrideOnly ? (
-                          <SystemRuleAccordion
-                            rules={draft.rules}
-                            categories={categories.map((category) => ({
-                              value: category.uid,
-                              label: category.name,
-                            }))}
-                            onChange={(rules) =>
-                              setDraft((current) => ({ ...current, rules }))
-                            }
+                  <>
+                    <ShellAppBar
+                      variant="child"
+                      title={builderTitle}
+                      backKind={backKind}
+                    />
+                    <ScrollView
+                      ref={scrollRef}
+                      innerViewRef={contentRef}
+                      contentContainerStyle={styles.content}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {error ? (
+                        <AppText
+                          accessibilityLiveRegion="polite"
+                          style={{ color: scoped.danger }}
+                        >
+                          {error}
+                        </AppText>
+                      ) : null}
+                      {!ready ? (
+                        <AppText>Loading System…</AppText>
+                      ) : page === "members" ? (
+                        <>
+                          <AppText role="heading">Manage Members</AppText>
+                          <ManageMembersGrid
+                            candidateIds={membership.candidateIds}
+                            includeIds={includeIds}
+                            excludeIds={excludeIds}
+                            rows={[
+                              ...rows,
+                              ...activeRows.filter(
+                                (row) =>
+                                  !rows.some(
+                                    (candidate) => candidate.id === row.id,
+                                  ),
+                              ),
+                            ]}
+                            onChange={onOverrideChange}
                           />
-                        ) : (
-                          <>
+                        </>
+                      ) : (
+                        <>
+                          <TextInput
+                            ref={nameInputRef}
+                            testID="system-builder-name"
+                            accessibilityLabel="System name"
+                            editable={!overrideOnly}
+                            placeholder="Name this System"
+                            placeholderTextColor={colors.textPlaceholder}
+                            value={draft.name}
+                            onChangeText={(name) => {
+                              setDraft((current) => ({ ...current, name }));
+                              setNameError(null);
+                            }}
+                            style={[
+                              styles.name,
+                              {
+                                color: colors.textPrimary,
+                                borderColor: colors.border,
+                                backgroundColor: colors.surface,
+                              },
+                            ]}
+                          />
+                          <FieldError
+                            testID="system-builder-name-error"
+                            message={nameError}
+                          />
+                          {!overrideOnly ? (
                             <SystemRuleAccordion
                               rules={draft.rules}
                               categories={categories.map((category) => ({
                                 value: category.uid,
                                 label: category.name,
                               }))}
-                              disabled
-                              onChange={() => {}}
+                              onChange={(rules) =>
+                                setDraft((current) => ({ ...current, rules }))
+                              }
                             />
-                            <AppText
-                              role="caption"
-                              style={{ color: scoped.textSecondary }}
-                            >
-                              This System's base rules are fixed.
-                            </AppText>
-                          </>
-                        )}
-                        <AppText role="label" accessibilityLiveRegion="polite">
-                          {membership.memberIds.length}{" "}
-                          {membership.memberIds.length === 1
-                            ? "member"
-                            : "members"}
-                        </AppText>
-                        <Button
-                          role="secondary"
-                          label="Manage Members"
-                          onPress={() => setPage("members")}
-                        />
-                        <Button
-                          role="secondary"
-                          label="Preview"
-                          disabled={!previewScene}
-                          onPress={() => {
-                            setPreviewFocusedId(null);
-                            setPreviewing(true);
-                          }}
-                        />
-                        {customRef || systemRef ? (
+                          ) : (
+                            <>
+                              <SystemRuleAccordion
+                                rules={draft.rules}
+                                categories={categories.map((category) => ({
+                                  value: category.uid,
+                                  label: category.name,
+                                }))}
+                                disabled
+                                onChange={() => {}}
+                              />
+                              <AppText
+                                role="caption"
+                                style={{ color: scoped.textSecondary }}
+                              >
+                                This System's base rules are fixed.
+                              </AppText>
+                            </>
+                          )}
+                          <AppText
+                            role="label"
+                            accessibilityLiveRegion="polite"
+                          >
+                            {membership.memberIds.length}{" "}
+                            {membership.memberIds.length === 1
+                              ? "member"
+                              : "members"}
+                          </AppText>
                           <Button
                             role="secondary"
-                            label="Reset Membership Overrides"
-                            onPress={resetOverrides}
+                            label="Manage Members"
+                            onPress={() => setPage("members")}
                           />
-                        ) : null}
-                        <Button
-                          role="primary"
-                          label="Save System"
-                          disabled={saving}
-                          onPress={() => void previewSaveAction(save)}
-                        />
-                      </>
-                    )}
-                  </ScrollView>
+                          <Button
+                            role="secondary"
+                            label="Preview"
+                            disabled={!previewScene}
+                            onPress={() => {
+                              setPreviewFocusedId(null);
+                              setPreviewing(true);
+                            }}
+                          />
+                          {customRef || systemRef ? (
+                            <Button
+                              role="secondary"
+                              label="Reset Membership Overrides"
+                              onPress={resetOverrides}
+                            />
+                          ) : null}
+                          <Button
+                            role="primary"
+                            label="Save System"
+                            disabled={saving}
+                            onPress={() => void previewSaveAction(save)}
+                          />
+                        </>
+                      )}
+                    </ScrollView>
+                  </>
                 )}
               </>
             )}
@@ -813,6 +837,12 @@ const styles = StyleSheet.create({
     bottom: SPACING.base,
     left: SPACING.base,
   },
+  previewTop: { position: "absolute", top: 0, right: 0, left: 0 },
+  previewError: {
+    marginHorizontal: SPACING.base,
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
+  },
   previewContent: { padding: SPACING.base, gap: SPACING.sm },
   previewMembers: { gap: SPACING.sm, paddingVertical: SPACING.xs },
   previewMember: {
@@ -823,12 +853,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   previewActions: { flexDirection: "row", gap: SPACING.sm, flexWrap: "wrap" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-    flexWrap: "wrap",
-  },
   name: {
     minHeight: 44,
     borderWidth: 1,
