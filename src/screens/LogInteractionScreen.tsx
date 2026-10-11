@@ -200,6 +200,8 @@ export function LogInteractionScreen({
       current: JSON.stringify(value),
     }),
     bypassRef,
+    // A save in flight holds every exit, with no prompt (fix-pass WR-02).
+    busyRef: savingRef,
   });
 
   async function handleSave() {
@@ -305,9 +307,15 @@ export function LogInteractionScreen({
     "allowAi",
   ];
 
+  // While a save runs the guard holds Back, so it draws disabled (D-26; WR-02).
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Log Interaction" person={person} />
+      <ShellAppBar
+        variant="child"
+        title="Log Interaction"
+        person={person}
+        backDisabled={saving}
+      />
       <ScrollView
         testID="log-interaction-screen"
         contentContainerStyle={styles.content}
