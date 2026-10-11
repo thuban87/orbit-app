@@ -45,7 +45,7 @@ interface TimelineRowProps {
    * only for touchpoint rows — events stay read-only.
    */
   onEdit?: () => void;
-  /** Confirm + delete THIS touchpoint (screen owns the Alert + DAO call). */
+  /** Confirm + delete THIS touchpoint (screen owns the confirm + DAO call). */
   onDelete?: () => void;
 }
 

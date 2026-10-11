@@ -42,7 +42,10 @@ export interface AssistFailureCopy {
   body: string;
 }
 
-/** Content-free Alert copy (no names, notes or ids). Wording per D-24. */
+/**
+ * Content-free failure copy (no names, notes or ids), shown as a themed notice
+ * (wrong-device-clock) or a snackbar (38.9 D-27). Wording per D-24.
+ */
 export const ASSIST_FAILURE_COPY: {
   log: Record<AssistFailureKind, AssistFailureCopy>;
   dismiss: { generic: AssistFailureCopy };

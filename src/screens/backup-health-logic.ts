@@ -157,13 +157,14 @@ export function resolveBackupNudge(
   };
 }
 
-/** 38.6 D-39: the manual export's over-cap message (Alert body). */
+/** 38.6 D-39: the manual export's over-cap message (the themed notice's body). */
 export const MANUAL_EXPORT_TOO_LARGE_COPY =
   "Your backup is too large to create. Nothing was shared.";
 
 /**
- * The body of the "Couldn't create export" Alert, or null when the export was
- * shared. An over-cap encrypted export says it is too large (38.6 D-39).
+ * The "Couldn't create export" message, or null when the export was shared. An
+ * over-cap encrypted export says it is too large (38.6 D-39) and shows as a
+ * themed notice; any other failure shows as an error snackbar (38.9 D-27).
  */
 export function manualExportFailureCopy(
   result: ManualExportResult,

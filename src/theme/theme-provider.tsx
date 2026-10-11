@@ -45,7 +45,9 @@ interface ThemeProviderProps {
  * that could drop the `"unspecified"` path or invert the dark default.
  *
  * The active package's mode SETTING also drives the native night mode (D-50),
- * so RN `Alert` and the date/time pickers match Orbit. "system" maps to
+ * so the native surfaces Orbit still uses match it: the snooze dialog (D-10)
+ * and the native date/time pickers (D-29); every other dialog is themed
+ * (38.9 D-27). "system" maps to
  * `"unspecified"`, so `useColorScheme()` keeps reporting the device scheme
  * (see `native-color-scheme.ts`).
  *

@@ -7,7 +7,7 @@ import {
 import { resolveMode } from "./theme-presets";
 import type { SystemScheme, ThemeMode } from "./theme-types";
 
-// D-50 (OA-D4): native dialogs (RN Alert, the date/time pickers) follow Orbit's
+// D-50 (OA-D4): native dialogs (the snooze Alert, the date/time pickers) follow Orbit's
 // mode SETTING. Render-free: `react`'s useEffect is replaced by a recorder so
 // the hook's effect body and dependency list are observable without a DOM.
 const mocks = vi.hoisted(() => ({

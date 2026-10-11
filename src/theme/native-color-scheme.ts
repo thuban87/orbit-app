@@ -7,10 +7,11 @@ import type { ThemeMode } from "./theme-types";
  *
  * Orbit's light/dark/system mode is its OWN store (per package, ADR-087), not the
  * app.json `userInterfaceStyle` flag, which is inert on Android here. Native
- * surfaces that Orbit does not paint (RN `Alert`, the date/time picker dialogs)
- * take their look from the activity's night configuration, which by default is
- * the device's. Driving that configuration from Orbit's mode SETTING makes them
- * match the app.
+ * surfaces that Orbit does not paint take their look from the activity's night
+ * configuration. Since 38.9 D-27 themed every other dialog, that is only the
+ * snooze dialog (`HomeScreen.tsx`, D-10) and the native date/time pickers
+ * (D-29). By default the night configuration is the device's; driving it
+ * from Orbit's mode SETTING makes them match the app.
  *
  * On Android, RN core maps `Appearance.setColorScheme` to
  * `AppCompatDelegate.setDefaultNightMode` (light → MODE_NIGHT_NO, dark →

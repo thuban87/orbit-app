@@ -95,9 +95,9 @@ export interface ThemePalette {
    * 2026-08-14; the other three palettes author their own AA-passing hue). Used
    * as the destructive-control FILL (with `onDanger` as its label/glyph
    * foreground) AND as validation/warning-emphasis TEXT (invalid interval,
-   * future date, duplicate-name). The native `Alert.alert` `style:
-   * "destructive"` needs no token (OS-rendered). Consumed via
-   * `useTheme().colors.danger`.
+   * future date, duplicate-name). Destructive dialogs are themed (38.9 D-27):
+   * their confirm button uses this token through Button role "destructive".
+   * Consumed via `useTheme().colors.danger`.
    */
   danger: string;
   /**
