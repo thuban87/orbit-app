@@ -15,6 +15,8 @@
  * except `dayTag`, which parses a STORED local wall-clock value.
  */
 
+import { WEEKDAY_SHORT } from "@/utils/dates";
+
 // ---------------------------------------------------------------------------
 // Owner-tunable thresholds (single-number edits — CLAUDE.md; mirrors
 // status.ts:40-42). Design steer for the gentle line: "err toward NOT showing,
@@ -47,16 +49,12 @@ export const GROUP_CAP = 6;
 export const EFFORTFUL_MIN_HARD = 3;
 export const EFFORTFUL_MIN_FRACTION = 0.5;
 
-/** Sun..Sat, aligned to JavaScript `Date.getDay()` (0 = Sunday). */
-export const WEEKDAY_LABELS = [
-  "Sun",
-  "Mon",
-  "Tue",
-  "Wed",
-  "Thu",
-  "Fri",
-  "Sat",
-] as const;
+/**
+ * Sun..Sat, aligned to JavaScript `Date.getDay()` (0 = Sunday). The shared
+ * weekday table from `src/utils/dates.ts` (38.9 D-23 one set of tables;
+ * review IN-04), re-exported under its digest name.
+ */
+export const WEEKDAY_LABELS = WEEKDAY_SHORT;
 
 // ---------------------------------------------------------------------------
 // Transforms
