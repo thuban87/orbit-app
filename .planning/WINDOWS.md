@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 65
+open_count: 61
 waived_count: 0
-fixed_count: 13
+fixed_count: 17
 total_count: 78
-last_updated: 2026-09-27T22:20:09.774Z
+last_updated: 2026-10-11T12:38:59.382Z
 ---
 
 # Broken Windows Ledger
@@ -27,10 +27,10 @@ last_updated: 2026-09-27T22:20:09.774Z
 | 10 | 22 | stub | src/screens/GroupEventsScreen.tsx | 14 | Intentional Coming soon placeholder; Phase 33 replaces it with Group Events data and workflow UI. | open |  | 2026-09-02T22:06:32.115Z |  |
 | 11 | 22 | unrun-verify | src/components/ShellAppBar.tsx |  | Pixel visual, TalkBack focus, and gesture/three-button clearance UAT require the desktop-build-to-Pixel workflow. | open |  | 2026-09-02T22:06:32.315Z |  |
 | 12 | 22 | stub | src/components/UniversalFab.tsx | 186 | Quick Log and global contact-specific actions retain their explicit Plan-06 picker/transaction seam. | fixed |  | 2026-09-02T22:19:36.941Z | 2026-09-02T22:33:22.858Z |
-| 13 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Log Contact remains a themed placeholder until Phase 34 Rapid Capture. | open |  | 2026-09-02T22:19:37.126Z |  |
-| 14 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Group Log remains a themed placeholder until Phase 33 Group Events. | open |  | 2026-09-02T22:19:37.319Z |  |
-| 15 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Update Contact remains a themed placeholder until Phase 34 Rapid Capture. | open |  | 2026-09-02T22:19:37.507Z |  |
-| 16 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Memory remains a themed placeholder until Phase 24 Contact Knowledge. | open |  | 2026-09-02T22:19:37.725Z |  |
+| 13 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Log Contact remains a themed placeholder until Phase 34 Rapid Capture. | fixed |  | 2026-09-02T22:19:37.126Z | 2026-10-11T12:38:58.774Z |
+| 14 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Group Log remains a themed placeholder until Phase 33 Group Events. | fixed |  | 2026-09-02T22:19:37.319Z | 2026-10-11T12:38:58.976Z |
+| 15 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Update Contact remains a themed placeholder until Phase 34 Rapid Capture. | fixed |  | 2026-09-02T22:19:37.507Z | 2026-10-11T12:38:59.185Z |
+| 16 | 22 | stub | src/screens/placeholders/FabActionPlaceholders.tsx | 22 | Memory remains a themed placeholder until Phase 24 Contact Knowledge. | fixed |  | 2026-09-02T22:19:37.725Z | 2026-10-11T12:38:59.382Z |
 | 17 | 22 | unrun-verify | src/components/ContactPicker.tsx |  | Pixel UAT remains: picker search/archived/snoozed markers, TalkBack modal focus, Quick Log commit truth, Undo/Retry, haptics, widget refresh, and shell refresh without refocus. | open |  | 2026-09-02T22:33:27.282Z |  |
 | 18 | 23 | stub | src/theme/theme-presets.ts |  | standard package palette is a placeholder; finished four-palette authoring is Plan 03 (accents.ts) | open |  | 2026-09-03T16:10:52.068Z |  |
 | 19 | 23 | stub | src/stores/theme-store.ts |  | setPackage/setModeForActivePackage have no runtime caller yet; Settings UI (later plan) wires them | open |  | 2026-09-03T16:10:52.253Z |  |
@@ -247,10 +247,10 @@ last_updated: 2026-09-27T22:20:09.774Z
     "file": "src/screens/placeholders/FabActionPlaceholders.tsx",
     "line": 22,
     "description": "Log Contact remains a themed placeholder until Phase 34 Rapid Capture.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-02T22:19:37.126Z",
-    "resolved_at": null
+    "resolved_at": "2026-10-11T12:38:58.774Z"
   },
   {
     "id": 14,
@@ -259,10 +259,10 @@ last_updated: 2026-09-27T22:20:09.774Z
     "file": "src/screens/placeholders/FabActionPlaceholders.tsx",
     "line": 22,
     "description": "Group Log remains a themed placeholder until Phase 33 Group Events.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-02T22:19:37.319Z",
-    "resolved_at": null
+    "resolved_at": "2026-10-11T12:38:58.976Z"
   },
   {
     "id": 15,
@@ -271,10 +271,10 @@ last_updated: 2026-09-27T22:20:09.774Z
     "file": "src/screens/placeholders/FabActionPlaceholders.tsx",
     "line": 22,
     "description": "Update Contact remains a themed placeholder until Phase 34 Rapid Capture.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-02T22:19:37.507Z",
-    "resolved_at": null
+    "resolved_at": "2026-10-11T12:38:59.185Z"
   },
   {
     "id": 16,
@@ -283,10 +283,10 @@ last_updated: 2026-09-27T22:20:09.774Z
     "file": "src/screens/placeholders/FabActionPlaceholders.tsx",
     "line": 22,
     "description": "Memory remains a themed placeholder until Phase 24 Contact Knowledge.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-02T22:19:37.725Z",
-    "resolved_at": null
+    "resolved_at": "2026-10-11T12:38:59.382Z"
   },
   {
     "id": 17,
