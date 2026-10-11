@@ -44,12 +44,13 @@ import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 
 const LOG_SCOPE = "archived-contacts";
 
-/** "1 archived contact" / "N archived contacts". */
+/** "1 archived contact" / "N archived contacts" (the shared helper, D-21). */
 function countLabel(n: number): string {
-  return `${n} archived contact${n === 1 ? "" : "s"}`;
+  return plural(n, "archived contact");
 }
 
 /**
