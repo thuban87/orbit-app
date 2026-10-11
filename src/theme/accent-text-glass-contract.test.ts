@@ -113,7 +113,7 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
     for (const row of rows) {
       expect(
         row.status === "done" ||
-          /^obsolete — removed by Plan \d+ \([0-9a-f]{7,}\)$/.test(
+          /^obsolete — removed by (?:Plan \d+|38\.9 review IN-\d+) \([0-9a-f]{7,}\)$/.test(
             row.status,
           ) ||
           row.status.startsWith("kept — not a text/glyph foreground") ||
@@ -124,8 +124,10 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
     }
   });
 
-  it("covers the 62 swapped sites (64 less the two D-69 supersessions)", () => {
-    expect(done.length).toBe(62);
+  // 64 less the two D-69 supersessions, less M50 (its unrendered TimelineRow
+  // was deleted in the 38.9 code review, IN-05).
+  it("covers the 61 swapped sites still in the tree", () => {
+    expect(done.length).toBe(61);
   });
 
   const superseded = rows.filter((row) => SUPERSEDED_STATUS.test(row.status));
