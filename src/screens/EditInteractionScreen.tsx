@@ -44,6 +44,7 @@ import { notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import {
   buildEditInput,
   canSave,
@@ -65,6 +66,9 @@ export function EditInteractionScreen({
   const [value, setValue] = useState<TouchpointRefineValue | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Synchronous in-flight flag: `saving` state lags a render, so the guard
+  // reads this ref to hold Back while the save runs (fix-pass WR-02).
+  const savingRef = useRef(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   // The seeded snapshot — the dirty-check baseline for the discard-keep guard.
   const seedRef = useRef<string | null>(null);
@@ -112,12 +116,14 @@ export function EditInteractionScreen({
 
   const hasUnsavedChanges =
     value !== null && seedRef.current !== JSON.stringify(value);
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef });
+  // A save in flight holds every exit, with no prompt (fix-pass WR-02).
+  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef, busyRef: savingRef });
 
   async function handleSave() {
     if (!value || !canSave(value, localDateTime(), saving)) {
       return;
     }
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -139,11 +145,18 @@ export function EditInteractionScreen({
       setSaveError(resolveSave(value, false).error);
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   }
 
+  // While a save runs the guard holds Back, so it draws disabled (D-26; WR-02).
   const header = (
-    <ShellAppBar variant="child" title="Edit interaction" person={person} />
+    <ShellAppBar
+      variant="child"
+      title="Edit interaction"
+      person={person}
+      backDisabled={saving}
+    />
   );
 
   if (notFound) {
