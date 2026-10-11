@@ -53,6 +53,7 @@ import {
   setMemoryAllowAi,
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
+import { useContactHeader } from "@/hooks/use-contact-header";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
@@ -72,6 +73,8 @@ export function MemoryScreen({
 }: RootStackScreenProps<"Memory">) {
   const { colors } = useTheme();
   const contactId = route.params?.contactId ?? null;
+  // D-45: the person line under the fixed title.
+  const person = useContactHeader(contactId);
   const [memoriesPhase, setMemoriesPhase] =
     useState<ReadPhase<MemoryRow[]>>(readLoading);
   // Only the latest load may publish; blur invalidates outstanding reads (D-23).
@@ -279,7 +282,7 @@ export function MemoryScreen({
 
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Memory" />
+      <ShellAppBar variant="child" title="Memory" person={person} />
       <ScrollView contentContainerStyle={styles.content}>
         {contactId === null ? (
           <AppText role="body" style={{ color: colors.textSecondary }}>

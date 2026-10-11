@@ -30,6 +30,7 @@ import {
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import { editTouchpointFull } from "@/db/recency-dao";
+import { useContactHeader } from "@/hooks/use-contact-header";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import {
   commitThenReReadMemory,
@@ -45,6 +46,7 @@ import {
   MemoryEditor,
   type MemoryEditPatch,
 } from "./MemoryEditor";
+import { PersonLine } from "./PersonLine";
 import { AppText, Button, Sheet } from "./ui";
 
 const LOG_SCOPE = "post-log-note-editor";
@@ -77,6 +79,8 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
 
   const contactId = target?.contactId ?? null;
   const interactionId = target?.interactionId ?? null;
+  // D-45: who the note is for, under each heading of this sheet.
+  const person = useContactHeader(contactId);
 
   // Reset every time the editor opens for a new interaction.
   useEffect(() => {
@@ -301,6 +305,13 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   // body switch on this one value, so the expanded branch alone owns the
   // ScrollView (sheet-consumers-contract, D-32).
   const memoryBeingEdited = editingMemory ? createdMemory : null;
+  const personLine = person ? (
+    <PersonLine
+      name={person.name}
+      photo={person.photo}
+      contactId={person.contactId}
+    />
+  ) : null;
 
   return (
     <Sheet
@@ -319,6 +330,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
           showsVerticalScrollIndicator
         >
           <AppText role="heading">Edit Memory</AppText>
+          {personLine}
           <MemoryEditor
             items={[memoryBeingEdited]}
             // Only this one memory is shown, so its options open by default
@@ -339,6 +351,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
           {createdMemory ? (
             <>
               <AppText role="heading">Memory saved</AppText>
+              {personLine}
               <AppText role="caption" style={{ color: colors.textSecondary }}>
                 Saved as a Memory, not a note on this interaction.
               </AppText>
@@ -354,6 +367,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
           ) : (
             <>
               <AppText role="heading">Add Note</AppText>
+              {personLine}
               <TextInput
                 accessibilityLabel="Note for the logged interaction"
                 value={text}

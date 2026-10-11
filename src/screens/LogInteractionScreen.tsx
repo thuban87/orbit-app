@@ -55,6 +55,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
+import { useContactHeader } from "@/hooks/use-contact-header";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -113,6 +114,9 @@ export function LogInteractionScreen({
   // only a change made after seed() resolved holds Back.
   const seedSnapshotRef = useRef<string | null>(null);
   const bypassRef = useRef(false);
+  // D-45: the person line under the fixed title, once a contact is chosen (the
+  // picker branch shows no header).
+  const person = useContactHeader(contactId);
 
   // Seed the form Channel from the Default Interaction Channel preference. Pure
   // on-device SQLite read — no network on this read path (local-first). Renders
@@ -280,7 +284,7 @@ export function LogInteractionScreen({
   if (!value) {
     return (
       <View style={styles.root}>
-        <ShellAppBar variant="child" title="Log Interaction" />
+        <ShellAppBar variant="child" title="Log Interaction" person={person} />
         <View style={styles.loading}>
           <AppText role="caption">Loading…</AppText>
         </View>
@@ -303,7 +307,7 @@ export function LogInteractionScreen({
 
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Log Interaction" />
+      <ShellAppBar variant="child" title="Log Interaction" person={person} />
       <ScrollView
         testID="log-interaction-screen"
         contentContainerStyle={styles.content}
