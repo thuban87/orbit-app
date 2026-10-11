@@ -94,6 +94,15 @@ export function DigestDayDetail({
   );
 }
 
+/**
+ * The TalkBack label of an event row: "Event, {title}, {time}", or "Event,
+ * {time}" when the event is untitled, so the noun is never read twice (the
+ * visible fallback is "Event"; 38.9 review WR-05). PURE.
+ */
+export function groupEventRowLabel(title: string | null, time: string): string {
+  return title ? `Event, ${title}, ${time}` : `Event, ${time}`;
+}
+
 function renderDayRows(
   rows: readonly YourWeekDayRow[],
   testID: string,
@@ -106,7 +115,10 @@ function renderDayRows(
           <View
             key={`group-event-${row.id}`}
             testID={`${testID}-group-event-${row.id}`}
-            accessibilityLabel={`Event, ${row.title ?? "Event"}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
+            accessibilityLabel={groupEventRowLabel(
+              row.title,
+              formatTimeMinuteOrFallback(row.occurredAt),
+            )}
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Icon name="group-events" tone="textPrimary" size="sm" />

@@ -16,7 +16,9 @@ vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 
-const { DigestDayDetail } = await import("./DigestDayDetail");
+const { DigestDayDetail, groupEventRowLabel } = await import(
+  "./DigestDayDetail"
+);
 
 type TestElement = ReactElement<Record<string, unknown>>;
 function nodes(node: ReactNode): TestElement[] {
@@ -245,5 +247,18 @@ describe("DigestDayDetail", () => {
     }
     expect(body).not.toMatch(/\b(00|23|09):\d{2}\b/);
     expect(body).not.toContain("garbage");
+  });
+});
+
+describe("event row TalkBack label (38.9 review WR-05)", () => {
+  it("names a titled event once with its title", () => {
+    expect(groupEventRowLabel("Book club", "7:30 PM")).toBe(
+      "Event, Book club, 7:30 PM",
+    );
+  });
+
+  it("never repeats the noun for an untitled event", () => {
+    expect(groupEventRowLabel(null, "7:30 PM")).toBe("Event, 7:30 PM");
+    expect(groupEventRowLabel("", "7:30 PM")).toBe("Event, 7:30 PM");
   });
 });
