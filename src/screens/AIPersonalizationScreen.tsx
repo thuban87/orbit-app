@@ -7,7 +7,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   View,
 } from "react-native";
@@ -33,6 +32,7 @@ import {
   ConfirmDialog,
   GlassSurface,
   MIN_TOUCH_TARGET,
+  OrbitSwitch,
 } from "@/components/ui";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
@@ -633,14 +633,12 @@ export function AIPersonalizationScreen({
                       )}
                     </ScopedPalette>
                   </View>
-                  <Switch
+                  <OrbitSwitch
                     accessibilityLabel={`Send ${section.title} to AI`}
                     value={section.enabled}
                     onValueChange={(value) =>
                       void toggleSection(section, value)
                     }
-                    trackColor={{ false: colors.border, true: colors.accent }}
-                    thumbColor={colors.surfaceElevated}
                   />
                   <Button
                     role="iconOnly"

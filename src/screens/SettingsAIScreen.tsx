@@ -2,17 +2,11 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { File, Paths } from "expo-file-system";
 import { useCallback, useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { loadCachedOpenRouterCatalog } from "@/ai/openrouter-catalog";
 import { AIFirstUseDisclosure } from "@/components/AIFirstUseDisclosure";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { OrbitSwitch } from "@/components/ui";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import { updateAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -164,19 +158,12 @@ export function SettingsAIScreen() {
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                 AI Enabled
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-ai-enabled"
-                accessibilityRole="switch"
                 accessibilityLabel="AI Enabled"
-                accessibilityState={{
-                  checked: aiEnabled,
-                  disabled: !aiHydrated,
-                }}
                 disabled={!aiHydrated}
                 value={aiEnabled}
                 onValueChange={(enabled) => void onToggleAi(enabled)}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
           </View>

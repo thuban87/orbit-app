@@ -1,15 +1,9 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { OrbitSwitch } from "@/components/ui";
 import { ORRERY_DENSITIES, type OrreryDensity } from "@/db/app-settings-dao";
 import { getExecutor } from "@/db/database";
 import type { RootStackParamList } from "@/navigation/types";
@@ -142,24 +136,17 @@ export function SettingsOrreryScreen() {
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                 Relationship Satellites
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-orrery-satellites"
-                accessibilityRole="switch"
                 accessibilityLabel="Relationship Satellites"
-                accessibilityState={{
-                  checked: preferences.committed.satellitesEnabled === 1,
-                  disabled,
-                  busy,
-                }}
                 disabled={disabled}
+                busy={busy}
                 value={preferences.committed.satellitesEnabled === 1}
                 onValueChange={(enabled) =>
                   void preferences.save(getExecutor(), {
                     satellitesEnabled: enabled ? 1 : 0,
                   })
                 }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>

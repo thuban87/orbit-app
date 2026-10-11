@@ -20,7 +20,6 @@ vi.mock("react", async (original) => ({
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
   StyleSheet: { create: <T,>(styles: T) => styles },
-  Switch: "Switch",
   View: "View",
   useWindowDimensions: () => ({ width: windowWidth, fontScale: 1 }),
 }));
@@ -36,6 +35,7 @@ vi.mock("@/components/ui/GlassSurface", () => ({
   GlassSurface: "GlassSurface",
 }));
 vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
+vi.mock("@/components/ui/OrbitSwitch", () => ({ OrbitSwitch: "OrbitSwitch" }));
 vi.mock("@/db/database", () => ({
   getExecutor: vi.fn(),
   localDateTime: vi.fn(),
@@ -160,11 +160,10 @@ describe("ProfileLayoutEditor source contract", () => {
     expect(source).not.toContain("flexBasis");
   });
 
-  it("themes the layout switch and keeps its accessible name (ui-accessibility/AUD-UIA-003)", () => {
-    expect(source).toContain(
-      "trackColor={{ false: colors.border, true: colors.accent }}",
-    );
-    expect(source).toContain("thumbColor={colors.surfaceElevated}");
+  it("draws the layout switch as the Orbit switch and keeps its accessible name (ui-accessibility/AUD-UIA-003, 38.9 D-47)", () => {
+    // OrbitSwitch draws its own themed track and thumb (D-47).
+    expect(source).toContain("<OrbitSwitch");
+    expect(source).not.toMatch(/<Switch[\s>]/);
     // biome-ignore lint/suspicious/noTemplateCurlyInString: asserts literal source text.
     expect(source).toContain("accessibilityLabel={`Show ${definition.label}`}");
   });

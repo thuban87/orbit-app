@@ -28,18 +28,16 @@ function elementRegions(src: string, tag: string): string[] {
 
 describe("RelationshipEditor switches (AUD-UIA-003, D-20)", () => {
   const editor = source("src/components/RelationshipEditor.tsx");
-  const switches = elementRegions(editor, "Switch");
+  // 38.9 D-47: both are the Orbit switch, which draws its own themed track and
+  // thumb, so the old trackColor/thumbColor assertions retired with RN Switch.
+  const switches = elementRegions(editor, "OrbitSwitch");
 
   it("has both switches", () => {
     expect(switches.length).toBe(2);
   });
 
-  it("themes and names every switch", () => {
+  it("names every switch", () => {
     for (const region of switches) {
-      expect(region).toContain(
-        "trackColor={{ false: colors.border, true: colors.accent }}",
-      );
-      expect(region).toContain("thumbColor={colors.surfaceElevated}");
       expect(region).toContain("accessibilityLabel=");
     }
   });

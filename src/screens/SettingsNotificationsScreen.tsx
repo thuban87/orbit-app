@@ -8,11 +8,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { OrbitSwitch } from "@/components/ui";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -252,15 +252,11 @@ export function SettingsNotificationsScreen() {
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                 Allow notifications
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-notifications-master"
-                accessibilityRole="switch"
                 accessibilityLabel="Allow notifications"
-                accessibilityState={{ checked: masterOn }}
                 value={masterOn}
                 onValueChange={(v) => void onToggleMaster(v)}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             {!masterOn ? (
@@ -376,19 +372,12 @@ export function SettingsNotificationsScreen() {
               >
                 Decay reminders
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-notifications-decay"
-                accessibilityRole="switch"
                 accessibilityLabel="Decay reminders"
-                accessibilityState={{
-                  disabled: !masterOn,
-                  checked: settings?.decayEnabled === 1,
-                }}
                 disabled={!masterOn}
                 value={settings?.decayEnabled === 1}
                 onValueChange={(v) => void persist({ decayEnabled: v ? 1 : 0 })}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>
@@ -424,21 +413,14 @@ export function SettingsNotificationsScreen() {
               >
                 Birthday alerts
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-notifications-birthday"
-                accessibilityRole="switch"
                 accessibilityLabel="Birthday alerts"
-                accessibilityState={{
-                  disabled: !masterOn,
-                  checked: settings?.birthdayEnabled === 1,
-                }}
                 disabled={!masterOn}
                 value={settings?.birthdayEnabled === 1}
                 onValueChange={(v) =>
                   void persist({ birthdayEnabled: v ? 1 : 0 })
                 }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>
@@ -466,21 +448,14 @@ export function SettingsNotificationsScreen() {
               >
                 Birthday alerts for unbound contacts
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-notifications-birthday-unbound"
-                accessibilityRole="switch"
                 accessibilityLabel="Birthday alerts for unbound contacts"
-                accessibilityState={{
-                  disabled: !masterOn,
-                  checked: settings?.birthdayUnboundEnabled === 1,
-                }}
                 disabled={!masterOn}
                 value={settings?.birthdayUnboundEnabled === 1}
                 onValueChange={(value) =>
                   void persist({ birthdayUnboundEnabled: value ? 1 : 0 })
                 }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>
@@ -517,21 +492,14 @@ export function SettingsNotificationsScreen() {
               >
                 Weekly digest
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-notifications-digest"
-                accessibilityRole="switch"
                 accessibilityLabel="Weekly digest"
-                accessibilityState={{
-                  disabled: !masterOn,
-                  checked: settings?.digestEnabled === 1,
-                }}
                 disabled={!masterOn}
                 value={settings?.digestEnabled === 1}
                 onValueChange={(v) =>
                   void persist({ digestEnabled: v ? 1 : 0 })
                 }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>
@@ -703,21 +671,14 @@ export function SettingsNotificationsScreen() {
               >
                 Show names on lock screen
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID="settings-notifications-lockscreen"
-                accessibilityRole="switch"
                 accessibilityLabel="Show names on lock screen"
-                accessibilityState={{
-                  disabled: !masterOn,
-                  checked: settings?.lockscreenPublic === 1,
-                }}
                 disabled={!masterOn}
                 value={settings?.lockscreenPublic === 1}
                 onValueChange={(v) =>
                   void persist({ lockscreenPublic: v ? 1 : 0 })
                 }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>

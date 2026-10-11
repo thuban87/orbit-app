@@ -5,14 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Switch,
-  TextInput,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { MemoryRow } from "@/db/memories-read";
 import {
@@ -25,7 +18,7 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Icon } from "./icons/Icon";
 import { MemoryCard } from "./MemoryCard";
-import { AppText } from "./ui";
+import { AppText, OrbitSwitch } from "./ui";
 
 const PROVENANCE_LABELS = {
   user: "Added by you",
@@ -489,22 +482,18 @@ export function MemoryEditor({
           />
           <View style={styles.toggleRow}>
             <AppText role="body">Pin memory</AppText>
-            <Switch
+            <OrbitSwitch
               accessibilityLabel="Pin memory"
               value={draft.pinned}
               onValueChange={(value) => update("pinned", value)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
           <View style={styles.toggleRow}>
             <AppText role="body">Mark outdated</AppText>
-            <Switch
+            <OrbitSwitch
               accessibilityLabel="Mark outdated"
               value={draft.outdated}
               onValueChange={(value) => update("outdated", value)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
           <View style={styles.toggleRow}>
@@ -514,12 +503,10 @@ export function MemoryEditor({
                 This is presentation only.
               </AppText>
             </View>
-            <Switch
+            <OrbitSwitch
               accessibilityLabel="Hide from Profile"
               value={draft.hidden === true}
               onValueChange={(value) => update("hidden", value)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
           {editing ? (
@@ -535,9 +522,8 @@ export function MemoryEditor({
                   </AppText>
                 ) : null}
               </View>
-              <Switch
+              <OrbitSwitch
                 accessibilityLabel="Allow AI to use this"
-                accessibilityState={{ disabled: !globalAiEnabled }}
                 disabled={!globalAiEnabled}
                 value={editing.allow_ai === 1}
                 onValueChange={(allow) => {
@@ -546,8 +532,6 @@ export function MemoryEditor({
                   );
                   onSetAllowAi(editing.id, allow);
                 }}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
           ) : null}

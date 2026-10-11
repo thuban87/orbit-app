@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   View,
 } from "react-native";
@@ -15,7 +14,7 @@ import {
   RelationshipEditor,
 } from "@/components/RelationshipEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText } from "@/components/ui";
+import { AppText, OrbitSwitch } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { getAppSettings } from "@/db/app-settings-dao";
@@ -482,12 +481,10 @@ export function ThingsToRememberScreen({
                 Hidden items are still stored on this device.
               </AppText>
             </View>
-            <Switch
+            <OrbitSwitch
               value={includeHidden}
               onValueChange={setIncludeHidden}
               accessibilityLabel="Show hidden items"
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
         </View>

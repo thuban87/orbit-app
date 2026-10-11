@@ -49,7 +49,6 @@ vi.mock("react-native", () => ({
   ScrollView: "ScrollView",
   Pressable: "Pressable",
   Modal: "Modal",
-  Switch: "Switch",
   AppState: { addEventListener: () => ({ remove: () => {} }) },
   StyleSheet: {
     create: (styles: unknown) => styles,
@@ -142,6 +141,7 @@ vi.mock("@/theme", () => ({
 // evaluating the hook module's DEV-only `__DEV__` guard under node.
 vi.mock("@/theme/use-art-treatment", () => ({ useArtTreatment: () => null }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
+vi.mock("@/components/ui/OrbitSwitch", () => ({ OrbitSwitch: "OrbitSwitch" }));
 vi.mock("@/navigation/use-window-measurement", () => ({
   useWindowObstacle: (key: string) => {
     native.obstacles.push(key);

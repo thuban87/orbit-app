@@ -14,14 +14,13 @@ vi.mock("react-native", () => ({
     create: <T>(styles: T) => styles,
     hairlineWidth: 1,
   },
-  Switch: "Switch",
   TextInput: "TextInput",
   View: "View",
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 vi.mock("./icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("./MemoryCard", () => ({ MemoryCard: "MemoryCard" }));
-vi.mock("./ui", () => ({ AppText: "AppText" }));
+vi.mock("./ui", () => ({ AppText: "AppText", OrbitSwitch: "OrbitSwitch" }));
 
 import type { MemoryRow } from "@/db/memories-read";
 import {

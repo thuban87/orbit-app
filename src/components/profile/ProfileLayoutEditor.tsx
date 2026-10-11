@@ -1,12 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography prop.
 import { useEffect, useReducer, useRef, useState } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Switch,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import {
   NestedReorderableList,
   ScrollViewContainer,
@@ -22,6 +16,7 @@ import {
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { OrbitSwitch } from "@/components/ui/OrbitSwitch";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -44,7 +39,6 @@ import type {
   ProfileLayoutDocument,
   ProfileModulePlacement,
 } from "@/profile/types";
-import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -98,7 +92,6 @@ function EditorRow({
   placement: ProfileModulePlacement;
   dispatch: React.Dispatch<ProfileLayoutEditorAction>;
 }) {
-  const { colors } = useTheme();
   const definition = PROFILE_MODULE_REGISTRY[placement.id];
   const supportsSize = definition.supportedSizes.length > 1;
   const move = (direction: "up" | "down") =>
@@ -116,14 +109,12 @@ function EditorRow({
               : "Child module"}
           </AppText>
         </View>
-        <Switch
+        <OrbitSwitch
           value={placement.visible}
           onValueChange={(visible) =>
             dispatch({ type: "set-visible", id: placement.id, visible })
           }
           accessibilityLabel={`Show ${definition.label}`}
-          trackColor={{ false: colors.border, true: colors.accent }}
-          thumbColor={colors.surfaceElevated}
         />
       </View>
       <View style={styles.rowControls}>

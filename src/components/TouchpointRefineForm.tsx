@@ -30,14 +30,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { Fragment, useState } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   coerceAllowAi,
   combineDateAndTime,
@@ -49,6 +42,7 @@ import {
   parseCustomDurationMinutes,
   parseLocalDateTime,
 } from "@/components/touchpoint-refine-logic";
+import { OrbitSwitch } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { useTheme } from "@/theme";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
@@ -348,13 +342,11 @@ export function TouchpointRefineForm({
             <Text style={[styles.label, { color: colors.textPrimary }]}>
               Connected
             </Text>
-            <Switch
+            <OrbitSwitch
               testID={`${testID}-connected`}
               accessibilityLabel="Connected"
               value={value.connected === 1}
               onValueChange={(v) => set("connected", v ? 1 : 0)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
         );
@@ -512,13 +504,11 @@ export function TouchpointRefineForm({
               <Text style={[styles.label, { color: colors.textPrimary }]}>
                 Allow AI
               </Text>
-              <Switch
+              <OrbitSwitch
                 testID={`${testID}-allow-ai`}
                 accessibilityLabel="Allow AI"
                 value={value.allowAi === 1}
                 onValueChange={(v) => set("allowAi", coerceAllowAi(v))}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             {allowAiCaption ? (

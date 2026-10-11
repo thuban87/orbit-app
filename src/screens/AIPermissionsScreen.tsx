@@ -4,13 +4,18 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   View,
 } from "react-native";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, Button, ConfirmDialog, GlassSurface } from "@/components/ui";
+import {
+  AppText,
+  Button,
+  ConfirmDialog,
+  GlassSurface,
+  OrbitSwitch,
+} from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import {
@@ -284,14 +289,12 @@ export function AIPermissionsScreen() {
                     <ReviewExistingLinkLabel />
                   </Pressable>
                 </View>
-                <Switch
+                <OrbitSwitch
                   accessibilityLabel={`Allow AI for new ${row.label}`}
                   value={defaults[row.key] === 1}
                   onValueChange={(value) =>
                     void toggleDefault(row.category, row.key, value)
                   }
-                  trackColor={{ false: colors.border, true: colors.accent }}
-                  thumbColor={colors.surfaceElevated}
                 />
               </View>
             </GlassSurface>
@@ -323,12 +326,10 @@ export function AIPermissionsScreen() {
           />
           <View style={styles.enabledRow}>
             <AppText role="body">Enabled only</AppText>
-            <Switch
+            <OrbitSwitch
               accessibilityLabel="Show enabled information only"
               value={enabledOnly}
               onValueChange={setEnabledOnly}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
           {summaryCopy.accessLine !== null ? (

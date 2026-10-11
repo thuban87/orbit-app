@@ -2,14 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("react-native", () => ({
   StyleSheet: { create: <T>(styles: T) => styles },
-  Switch: "Switch",
   TextInput: "TextInput",
   View: "View",
 }));
 vi.mock("@/components/ContactPicker", () => ({
   ContactPicker: "ContactPicker",
 }));
-vi.mock("@/components/ui", () => ({ AppText: "AppText", Button: "Button" }));
+vi.mock("@/components/ui", () => ({
+  AppText: "AppText",
+  Button: "Button",
+  OrbitSwitch: "OrbitSwitch",
+}));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 
 import type { RelationshipRow } from "@/db/relationships-read";

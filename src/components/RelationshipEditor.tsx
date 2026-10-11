@@ -5,9 +5,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { StyleSheet, Switch, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
-import { AppText, Button } from "@/components/ui";
+import { AppText, Button, OrbitSwitch } from "@/components/ui";
 import type { RelationshipRow } from "@/db/relationships-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -307,12 +307,10 @@ export function RelationshipEditor({
           />
           <View style={styles.switchRow}>
             <AppText role="body">Pin</AppText>
-            <Switch
+            <OrbitSwitch
               value={draft.pinned}
               onValueChange={(value) => update("pinned", value)}
               accessibilityLabel="Pin relationship"
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
           <View style={styles.switchRow}>
@@ -322,12 +320,10 @@ export function RelationshipEditor({
                 Presentation only — this doesn't hide it from search or AH.
               </AppText>
             </View>
-            <Switch
+            <OrbitSwitch
               value={draft.hidden === 1}
               onValueChange={(value) => update("hidden", value ? 1 : 0)}
               accessibilityLabel="Hide from Profile"
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
           <Button

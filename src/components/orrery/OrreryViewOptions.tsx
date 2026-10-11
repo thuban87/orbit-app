@@ -8,12 +8,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   View,
 } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { OrbitSwitch } from "@/components/ui/OrbitSwitch";
 import { ORRERY_DENSITIES } from "@/db/app-settings-dao";
 import { getExecutor } from "@/db/database";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
@@ -188,13 +188,11 @@ export function OrreryViewOptions({
                 <AppText>
                   {preferences.committed.satellitesEnabled ? "On" : "Off"}
                 </AppText>
-                <Switch
+                <OrbitSwitch
                   accessibilityLabel="Relationship Satellites"
-                  accessibilityState={{ busy, disabled }}
                   disabled={disabled}
+                  busy={busy}
                   value={preferences.committed.satellitesEnabled === 1}
-                  trackColor={{ false: colors.border, true: colors.accent }}
-                  thumbColor={colors.textPrimary}
                   onValueChange={(enabled) =>
                     void preferences.save(getExecutor(), {
                       satellitesEnabled: enabled ? 1 : 0,

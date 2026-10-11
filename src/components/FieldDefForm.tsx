@@ -29,7 +29,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -41,6 +40,7 @@ import {
   hydrateFieldDefDraft,
   isFieldDefDraftDirty,
 } from "@/components/field-def-form-logic";
+import { OrbitSwitch } from "@/components/ui";
 import { makeColName } from "@/db/col-name";
 import { localDateTime } from "@/db/database";
 import type { CustomFieldDef, NewFieldDef, SqliteBool } from "@/db/field-types";
@@ -357,26 +357,22 @@ export function FieldDefForm(props: FieldDefFormProps) {
         <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>
           Show on new-contact form
         </Text>
-        <Switch
+        <OrbitSwitch
           testID="field-def-show-on-new"
           accessibilityLabel="Show on new-contact form"
           value={showOnNew}
           onValueChange={setShowOnNew}
-          trackColor={{ false: colors.border, true: colors.accent }}
-          thumbColor={colors.surfaceElevated}
         />
       </View>
       <View style={styles.switchRow}>
         <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>
           Always show on profile
         </Text>
-        <Switch
+        <OrbitSwitch
           testID="field-def-always-show"
           accessibilityLabel="Always show on profile"
           value={alwaysShow}
           onValueChange={setAlwaysShow}
-          trackColor={{ false: colors.border, true: colors.accent }}
-          thumbColor={colors.surfaceElevated}
         />
       </View>
 
@@ -386,13 +382,11 @@ export function FieldDefForm(props: FieldDefFormProps) {
         <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>
           Share with AI suggestions
         </Text>
-        <Switch
+        <OrbitSwitch
           testID="field-def-share-with-ai"
           accessibilityLabel="Share with AI suggestions"
           value={shareWithAi}
           onValueChange={setShareWithAi}
-          trackColor={{ false: colors.border, true: colors.accent }}
-          thumbColor={colors.surfaceElevated}
         />
       </View>
       <Text style={[styles.helper, { color: colors.textSecondary }]}>

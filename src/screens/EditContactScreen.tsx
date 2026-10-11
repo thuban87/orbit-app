@@ -51,7 +51,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   View,
 } from "react-native";
@@ -92,7 +91,12 @@ import {
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
-import { AccordionSection, AppText, FieldError } from "@/components/ui";
+import {
+  AccordionSection,
+  AppText,
+  FieldError,
+  OrbitSwitch,
+} from "@/components/ui";
 import {
   clearFieldError,
   type FieldErrors,
@@ -1375,13 +1379,11 @@ export function EditContactScreen({
               <AppText role="label" style={{ color: colors.textPrimary }}>
                 Year unknown
               </AppText>
-              <Switch
+              <OrbitSwitch
                 testID="edit-contact-birthday-year-unknown"
                 accessibilityLabel="Year unknown"
                 value={form.birthdayYearUnknown}
                 onValueChange={(v) => setField("birthdayYearUnknown", v)}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             {showBirthdayPicker ? (
@@ -1428,13 +1430,11 @@ export function EditContactScreen({
               <AppText role="label" style={{ color: colors.textPrimary }}>
                 Rarely responds
               </AppText>
-              <Switch
+              <OrbitSwitch
                 testID="edit-contact-rarely-responds"
                 accessibilityLabel="Rarely responds"
                 value={form.rarelyResponds === 1}
                 onValueChange={(v) => setField("rarelyResponds", v ? 1 : 0)}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <AppText role="caption" style={{ color: colors.textSecondary }}>
@@ -1447,13 +1447,11 @@ export function EditContactScreen({
               <AppText role="label" style={{ color: colors.textPrimary }}>
                 Mute reminders
               </AppText>
-              <Switch
+              <OrbitSwitch
                 testID="edit-contact-reminders-off"
                 accessibilityLabel="Mute reminders"
                 value={form.remindersOff === 1}
                 onValueChange={(v) => setField("remindersOff", v ? 1 : 0)}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surfaceElevated}
               />
             </View>
             <AppText role="caption" style={{ color: colors.textSecondary }}>
