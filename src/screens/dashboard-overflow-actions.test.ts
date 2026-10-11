@@ -19,7 +19,7 @@ describe("buildDashboardOverflowActions", () => {
       "Unbound Contacts",
       "Archived Contacts",
       "Select Contacts",
-      "Reset Dashboard View",
+      "Reset Contacts View",
     ]);
     expect(actions.map(({ testID }) => testID)).toEqual([
       "dashboard-group-events-overflow-entry",

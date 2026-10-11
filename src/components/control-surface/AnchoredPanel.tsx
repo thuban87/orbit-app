@@ -125,7 +125,7 @@ export function AnchoredPanel({
     <View pointerEvents="box-none" style={styles.root}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Dismiss dashboard controls"
+        accessibilityLabel="Dismiss Contacts controls"
         onPress={onDismiss}
         style={styles.scrim}
       >

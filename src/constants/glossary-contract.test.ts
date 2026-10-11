@@ -77,36 +77,6 @@ const DEVELOPER_ONLY: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/**
- * Sites not yet converted, by file and exact text (whitespace collapsed).
- * Tasks 2–3 of 38.9-14 empty this list; it must be empty when the plan
- * completes.
- */
-const PENDING: Readonly<Record<string, readonly string[]>> = {
-  // Task 3: Dashboard → Contacts, Log Interaction (D-22).
-  "src/screens/HomeScreen.tsx": [
-    "Couldn't reset dashboard",
-    "Retry resetting the dashboard view",
-    "Archived contacts leave the Dashboard. You can restore them from Archived Contacts.",
-  ],
-  "src/components/control-surface/AnchoredPanel.tsx": [
-    "Dismiss dashboard controls",
-  ],
-  "src/screens/SettingsInteractionsScreen.tsx": [
-    "Dashboard right swipe",
-    "What a right swipe on a dashboard card does.",
-  ],
-  "src/screens/SettingsNotificationsScreen.tsx": [
-    "Orbit's dashboard still shows who's due. To get reminders, turn notifications on in your phone's settings.",
-  ],
-  "src/screens/dashboard-overflow-actions.ts": ["Reset Dashboard View"],
-  "src/screens/settings-hub-model.ts": [
-    "Message defaults, dashboard swipe, and Interaction Assist",
-  ],
-  "src/screens/settings-interactions-logic.ts": ["Log Contact"],
-  "src/screens/placeholders/FabActionPlaceholders.tsx": ["Log Contact"],
-};
-
 /** Collapse whitespace so JSX text compares by its words. */
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 
@@ -428,9 +398,7 @@ describe("glossary contract — production copy (D-22, D-42, D-49)", () => {
     const key = (file: string, text: string) => `${file}\u0000${squash(text)}`;
     for (const path of SCANNED) {
       const rel = relative(ROOT, path).split("\\").join("/");
-      const allowed = new Set(
-        [...(DEVELOPER_ONLY[rel] ?? []), ...(PENDING[rel] ?? [])].map(squash),
-      );
+      const allowed = new Set((DEVELOPER_ONLY[rel] ?? []).map(squash));
       for (const hit of scanSource(rel, readFileSync(path, "utf8"))) {
         if (allowed.has(squash(hit.text))) {
           seen.add(key(rel, hit.text));
@@ -443,10 +411,7 @@ describe("glossary contract — production copy (D-22, D-42, D-49)", () => {
     }
     expect(offenders).toEqual([]);
     // An allowlist entry that no longer matches is stale: remove it.
-    const stale = [
-      ...Object.entries(DEVELOPER_ONLY),
-      ...Object.entries(PENDING),
-    ].flatMap(([file, texts]) =>
+    const stale = Object.entries(DEVELOPER_ONLY).flatMap(([file, texts]) =>
       texts
         .filter((t) => !seen.has(key(file, t)))
         .map((t) => `${file} ${JSON.stringify(t)}`),

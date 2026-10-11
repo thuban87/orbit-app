@@ -45,7 +45,7 @@ export function buildDashboardOverflowActions({
       testID: "dashboard-select-contacts-entry",
     },
     {
-      label: "Reset Dashboard View",
+      label: "Reset Contacts View",
       onPress: onReset,
       testID: "dashboard-reset-view-entry",
     },

@@ -491,10 +491,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       Logger.error(LOG_SCOPE, "failed to reset dashboard view", error);
       showSnackbar({
         kind: "error",
-        label: "Couldn't reset dashboard",
+        label: "Couldn't reset Contacts",
         action: {
           label: "Retry",
-          accessibilityLabel: "Retry resetting the dashboard view",
+          accessibilityLabel: "Retry resetting the Contacts view",
           onPress: () => {
             void resetDashboard();
           },
@@ -2256,7 +2256,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         }
         message={
           bulkConfirm?.kind === "archive"
-            ? "Archived contacts leave the Dashboard. You can restore them from Archived Contacts."
+            ? "Archived contacts leave Contacts. You can restore them from Archived Contacts."
             : bulkConfirm?.kind === "frequency"
               ? `Set all ${bulkConfirm.ids.length} contacts to every ${bulkConfirm.intervalDays} days?`
               : undefined

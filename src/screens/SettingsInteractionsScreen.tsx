@@ -177,8 +177,8 @@ export function SettingsInteractionsScreen() {
 
         {renderChipSection(
           "settings-right-swipe-section",
-          "Dashboard right swipe",
-          "What a right swipe on a dashboard card does.",
+          "Contacts right swipe",
+          "What a right swipe on a contact card does.",
           RIGHT_SWIPE_OPTIONS,
           settings?.dashboardRightSwipeAction,
         )}

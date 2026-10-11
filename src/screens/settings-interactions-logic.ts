@@ -1,3 +1,4 @@
+import { LOG_INTERACTION } from "@/constants/glossary";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -49,7 +50,7 @@ export const MESSAGE_MODE_OPTIONS: ReadonlyArray<
 
 const RIGHT_SWIPE_LABELS: Record<RightSwipeAction, string> = {
   "quick-log": "Quick Log",
-  "log-contact": "Log Contact",
+  "log-contact": LOG_INTERACTION,
 };
 
 /**

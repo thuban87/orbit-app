@@ -181,7 +181,7 @@ describe("Settings hub row anatomy (RG-037 AUD-UIA-017, D-15)", () => {
       ],
       [
         "Interactions",
-        "Message defaults, dashboard swipe, and Interaction Assist",
+        "Message defaults, Contacts swipe, and Interaction Assist",
       ],
       [
         "Notifications",

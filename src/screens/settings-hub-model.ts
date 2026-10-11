@@ -102,7 +102,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     kind: "route",
     key: "interactions",
     title: "Interactions",
-    subtitle: "Message defaults, dashboard swipe, and Interaction Assist",
+    subtitle: "Message defaults, Contacts swipe, and Interaction Assist",
     icon: "message",
     route: "SettingsInteractions",
   },

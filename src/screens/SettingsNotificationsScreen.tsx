@@ -328,7 +328,7 @@ export function SettingsNotificationsScreen() {
                 Notifications are off
               </Text>
               <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                Orbit's dashboard still shows who's due. To get reminders, turn
+                Contacts still shows who's due. To get reminders, turn
                 notifications on in your phone's settings.
               </Text>
             </View>
