@@ -106,10 +106,15 @@ describe("timestamp consumer contract (RG-038)", () => {
     const labels = (
       source.match(/accessibilityLabel=\{`[^`]*`\}/g) ?? []
     ).filter((label) => label.includes("row."));
-    expect(labels.length).toBe(2);
+    // The interaction row's template label, plus the event row's label built
+    // by groupEventRowLabel (38.9 review WR-05: no repeated "Event").
+    expect(labels.length).toBe(1);
     for (const label of labels) {
       expect(label).toContain("formatTimeMinuteOrFallback(row.occurredAt)");
     }
+    expect(source).toMatch(
+      /accessibilityLabel=\{groupEventRowLabel\(\s*row\.title,\s*formatTimeMinuteOrFallback\(row\.occurredAt\),?\s*\)\}/,
+    );
   });
 
   it("GroupEventDetailScreen renders When through the date-time formatter, never raw", () => {
