@@ -73,6 +73,7 @@ import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 
 type Props = RootStackScreenProps<"SystemBuilder">;
 type BuilderPage = "definition" | "members";
@@ -239,6 +240,9 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const [previewFocusedId, setPreviewFocusedId] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Synchronous in-flight flag: `saving` state lags a render, so the guard
+  // reads this ref to hold Back while the save runs (fix-pass WR-02).
+  const savingRef = useRef(false);
   // Load, save and reset failures (the operation error). Rendered as a
   // caption at the top of the content under the shared header (on both pages,
   // and under the Preview header), never under the name input, and not
@@ -304,6 +308,9 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   useDiscardKeepGuard({
     hasUnsavedChanges: meaningful,
     bypassRef,
+    // A save in flight holds every exit, with no prompt and no step-back
+    // (fix-pass WR-02).
+    busyRef: savingRef,
     subEditor: {
       open: page === "members" || previewing,
       dirty: false,
@@ -482,6 +489,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
       return;
     }
     setNameError(null);
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     try {
       if (overrideOnly && systemRef) {
@@ -507,6 +515,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
       setError(saveErrorMessage(cause, draft.name));
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
   const resetOverrides = () => {
@@ -567,7 +576,13 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
         // above it and takes touches; outside the bottom previewBar (D-69;
         // reviews C8-M1, C9-L3).
         <View testID="system-builder-preview-header" style={styles.previewTop}>
-          <ShellAppBar variant="child" title="Preview" backKind={backKind} />
+          {/* While a save runs the guard holds Back (D-26; WR-02). */}
+          <ShellAppBar
+            variant="child"
+            title="Preview"
+            backKind={backKind}
+            backDisabled={saving}
+          />
           {error ? (
             <GlassSurface density="dense" style={styles.previewError}>
               <ScopedPalette>
@@ -676,6 +691,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                       variant="child"
                       title={builderTitle}
                       backKind={backKind}
+                      backDisabled={saving}
                     />
                     <ScrollView
                       ref={scrollRef}
