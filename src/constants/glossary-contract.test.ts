@@ -70,6 +70,8 @@ const RETIRED_FORMS: readonly RetiredForm[] = [
   // D-22: "Event(s)" is the user-facing noun for a group event (38.9-15).
   { form: "Group Event", case: "capitalised" },
   { form: "group event", case: "lowercase" },
+  // D-22: the conversion entry and its prompt say "event" (verification IN-02).
+  { form: "group interaction", case: "lowercase" },
 ];
 
 /**
@@ -686,6 +688,30 @@ describe("glossary contract — leftover event sites use the event noun (D-22, D
     it(`${file}: "${approved.trim()}"`, () => {
       const source = read(file).replace(/\r\n/g, "\n");
       expect(source).not.toContain(retired);
+      expect(source).toContain(approved);
+    });
+  }
+});
+
+describe("glossary contract — the conversion entry uses the event noun (D-22; verification IN-02)", () => {
+  // D-22 makes "Event(s)" the user-facing noun. This wording was chosen by
+  // the 38.9 orchestrator, not approved under D-74; the owner may still veto
+  // the exact text.
+  const SITES: readonly { file: string; approved: string }[] = [
+    {
+      file: "src/components/history/InteractionDetail.tsx",
+      approved: 'label: "Make this an event"',
+    },
+    {
+      file: "src/components/group/GroupTitlePromptSheet.tsx",
+      approved: '<AppText role="heading">Make this an event</AppText>',
+    },
+  ];
+
+  for (const { file, approved } of SITES) {
+    it(`${file}: "${approved}"`, () => {
+      const source = read(file).replace(/\r\n/g, "\n");
+      expect(source).not.toContain("group interaction");
       expect(source).toContain(approved);
     });
   }

@@ -1,5 +1,5 @@
 /**
- * "Make this a group interaction" title prompt at large text (38.4 D-72,
+ * "Make this an event" title prompt at large text (38.4 D-72,
  * Plan 17 G1-f). At font_scale 2.0 on the Pixel 3a the Cancel / Create row
  * did not wrap, pushing Cancel off the left edge as an unlabelled sliver, and
  * the field had no keyboard submit. The prompt now uses the shared

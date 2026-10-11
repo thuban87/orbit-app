@@ -160,7 +160,7 @@ export function InteractionDetail({
           <OverflowMenu
             actions={[
               {
-                label: "Make this a group interaction",
+                label: "Make this an event",
                 onPress: onConvertToGroup,
               },
             ]}

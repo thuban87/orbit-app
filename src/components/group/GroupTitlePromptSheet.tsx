@@ -75,7 +75,7 @@ export function GroupTitlePromptSheet({
       variant="compact"
     >
       <View style={styles.content}>
-        <AppText role="heading">Make this a group interaction</AppText>
+        <AppText role="heading">Make this an event</AppText>
         <AppText role="body" style={{ color: colors.textSecondary }}>
           Give this event a title.
         </AppText>
