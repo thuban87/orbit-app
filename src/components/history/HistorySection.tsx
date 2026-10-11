@@ -124,6 +124,7 @@ import {
   persistedPrefOnWriteFailed,
   resolveActiveWindow,
   resolveEffectiveLens,
+  settleEventConversion,
 } from "@/components/history/history-section-logic";
 import {
   buildStreamModel,
@@ -1273,23 +1274,37 @@ export function HistorySection({
         // until it settles (38.9 verification IN-01).
         onConfirm={(title) => {
           if (!detailInteraction) return;
-          return convertInteractionToGroupEvent(getExecutor(), {
-            interactionId: detailInteraction.id,
-            contactId,
-            title,
-            uid: newUid(),
-            now: localDateTime(),
-          })
-            .then(({ groupEventId }) => {
-              setConverting(false);
-              setDetailId(null);
-              navigation.navigate("GroupEventDetail", { groupEventId });
-            })
-            .catch(() =>
-              setConversionError(
-                "Couldn't create this event. Please try again.",
-              ),
-            );
+          // Only a rejected write is a failed create; a throw while opening
+          // the created event is logged apart (fix-pass IN-02). The DAO's
+          // reasons carry ids only, never the title or other contact data.
+          return settleEventConversion(
+            convertInteractionToGroupEvent(getExecutor(), {
+              interactionId: detailInteraction.id,
+              contactId,
+              title,
+              uid: newUid(),
+              now: localDateTime(),
+            }),
+            {
+              onCreated: ({ groupEventId }) => {
+                setConverting(false);
+                setDetailId(null);
+                navigation.navigate("GroupEventDetail", { groupEventId });
+              },
+              onFailed: (error) => {
+                Logger.error(LOG_SCOPE, "convert to event failed", error);
+                setConversionError(
+                  "Couldn't create this event. Please try again.",
+                );
+              },
+              onOpenFailed: (error) =>
+                Logger.error(
+                  LOG_SCOPE,
+                  "opening the created event failed",
+                  error,
+                ),
+            },
+          );
         }}
       />
     </View>

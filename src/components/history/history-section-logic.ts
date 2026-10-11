@@ -469,3 +469,33 @@ export function lensTapIntent(input: {
     resetDay: true,
   };
 }
+
+/**
+ * Settles the "Make this an event" write (38.9 fix-pass IN-02). Only a
+ * rejected write is a failed create: `onFailed` gets the reason (the caller
+ * logs it and shows the error). Once the write resolves the event exists, so a
+ * throw while opening it goes to `onOpenFailed`, never to `onFailed`; a
+ * created event is never reported as "Couldn't create this event". The
+ * returned promise resolves either way, so the title sheet's hold releases.
+ */
+export function settleEventConversion<T>(
+  write: Promise<T>,
+  handlers: {
+    onCreated: (result: T) => void;
+    onFailed: (error: unknown) => void;
+    onOpenFailed: (error: unknown) => void;
+  },
+): Promise<void> {
+  return write.then(
+    (result) => {
+      try {
+        handlers.onCreated(result);
+      } catch (error) {
+        handlers.onOpenFailed(error);
+      }
+    },
+    (error: unknown) => {
+      handlers.onFailed(error);
+    },
+  );
+}

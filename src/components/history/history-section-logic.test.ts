@@ -11,7 +11,7 @@
  *     contract (contact preselected + date prefilled), never a quick-log payload.
  *   • countByCycle: per-cycle interaction counts, index-aligned to the blocks.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   advanceHistoryDay,
   buildLogRoute,
@@ -39,6 +39,7 @@ import {
   persistedPrefOnWriteFailed,
   resolveActiveWindow,
   resolveEffectiveLens,
+  settleEventConversion,
 } from "@/components/history/history-section-logic";
 import type { HistoryLens } from "@/db/app-settings-dao";
 import { type CycleBlock, cycles } from "@/services/history/cycles";
@@ -856,5 +857,58 @@ describe("the no-cadence Month fallback (38.8 D-27, D-66, D-67)", () => {
       expect(result.writes).toEqual([]);
       expect(result.day.followingToday).toBe(false);
     });
+  });
+});
+
+describe("settleEventConversion (38.9 fix-pass IN-02)", () => {
+  const handlers = () => ({
+    onCreated: vi.fn(),
+    onFailed: vi.fn(),
+    onOpenFailed: vi.fn(),
+  });
+
+  it("a created event opens, with no error", async () => {
+    const h = handlers();
+    await settleEventConversion(Promise.resolve({ groupEventId: 9 }), h);
+    expect(h.onCreated).toHaveBeenCalledWith({ groupEventId: 9 });
+    expect(h.onFailed).not.toHaveBeenCalled();
+    expect(h.onOpenFailed).not.toHaveBeenCalled();
+  });
+
+  it("a rejected write hands its reason to onFailed and resolves", async () => {
+    const h = handlers();
+    const reason = new Error("interaction id=4 is no longer standalone");
+    await expect(
+      settleEventConversion(Promise.reject(reason), h),
+    ).resolves.toBeUndefined();
+    expect(h.onFailed).toHaveBeenCalledWith(reason);
+    expect(h.onCreated).not.toHaveBeenCalled();
+    expect(h.onOpenFailed).not.toHaveBeenCalled();
+  });
+
+  it("is what HistorySection's Make this an event prompt returns, with no blanket catch", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      "src/components/history/HistorySection.tsx",
+      "utf8",
+    );
+    const start = source.indexOf("<GroupTitlePromptSheet");
+    const block = source.slice(start, source.indexOf("/>\n", start));
+    expect(block).toContain("return settleEventConversion(");
+    expect(block).not.toContain(".catch(");
+    expect(block).toMatch(/onFailed: \(error\) => \{\s*Logger\.error\(/);
+  });
+
+  it("a throw while opening the created event is not a failed create", async () => {
+    const h = handlers();
+    const thrown = new Error("navigate failed");
+    h.onCreated.mockImplementation(() => {
+      throw thrown;
+    });
+    await expect(
+      settleEventConversion(Promise.resolve({ groupEventId: 9 }), h),
+    ).resolves.toBeUndefined();
+    expect(h.onOpenFailed).toHaveBeenCalledWith(thrown);
+    expect(h.onFailed).not.toHaveBeenCalled();
   });
 });
