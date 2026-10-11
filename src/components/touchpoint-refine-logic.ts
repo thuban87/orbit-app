@@ -22,6 +22,7 @@
  * Pure and react-native-free — imports only `formatLocalDate` (local Y-M-D) and
  * `rejectFutureOccurredAt` (the shared LOG-06 future compare).
  */
+import { chipTone, type PrimaryChipTone } from "@/components/ui/chip-tone";
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import { formatLocalDate } from "@/utils/dates";
 
@@ -128,25 +129,23 @@ export const DURATION_PRESETS: readonly DurationPreset[] = [
   { label: "2h", seconds: 2 * 60 * 60 },
 ];
 
-/** Palette KEYS (token-only, like `surface.ts`) for one duration chip's state. */
-export interface DurationChipTone {
-  readonly fill: "accent" | "surface";
-  readonly border: "accent" | "border";
-  readonly label: "onAccent" | "textPrimary";
-}
+/**
+ * Palette KEYS (token-only, like `surface.ts`) for one duration chip's state:
+ * the top-level chip tier (38.9 D-05).
+ */
+export type DurationChipTone = PrimaryChipTone;
 
 /**
  * The duration chip's fill, border and label keys (owner ruling D-30). The
- * selected chip (a preset or None) is filled with the accent and labelled
- * `onAccent`, the ADR-084 pair `accents.test.ts` validates for every curated
- * accent; unselected chips keep the surface fill, the border and `textPrimary`.
- * None of these tokens is glass-overridden, so the form's own palette is right
- * wherever it renders.
+ * duration chips are top-level choices, so they use the D-05 primary tier
+ * (`chipTone("primary", …)`): the selected chip (a preset or None) is filled
+ * with the accent and labelled `onAccent`, the ADR-084 pair `accents.test.ts`
+ * validates for every curated accent; unselected chips keep the surface fill,
+ * the border and `textPrimary`. None of these tokens is glass-overridden, so
+ * the form's own palette is right wherever it renders.
  */
 export function durationChipTone(selected: boolean): DurationChipTone {
-  return selected
-    ? { fill: "accent", border: "accent", label: "onAccent" }
-    : { fill: "surface", border: "border", label: "textPrimary" };
+  return chipTone("primary", selected);
 }
 
 /** Upper bound on a custom duration entry (24 hours) — a guard against fat-finger entry. */

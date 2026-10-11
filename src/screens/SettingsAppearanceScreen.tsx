@@ -12,6 +12,8 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { Icon } from "@/components/icons/Icon";
+import type { IconTone } from "@/components/icons/icon-registry";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { RegisteredModal } from "@/components/ui/RegisteredModal";
@@ -56,6 +58,12 @@ import {
   thumbnailImageStyle,
 } from "./settings-appearance-background";
 import { persistAppearanceSetting } from "./settings-appearance-persist";
+import {
+  SWATCH_GAP_TOKEN,
+  SWATCH_IDLE_RING_TOKEN,
+  SWATCH_RING_TOKEN,
+  starSwatchCheckTone,
+} from "./settings-appearance-swatch";
 
 const LOG_SCOPE = "settings-appearance-screen";
 
@@ -137,6 +145,73 @@ function BackgroundThumbnail({
       >
         {label}
       </Text>
+    </Pressable>
+  );
+}
+
+type ColourSwatchProps = {
+  colors: ThemePalette;
+  /** The swatch colour: a curated accent fill or a starPalette token. */
+  fill: string;
+  selected: boolean;
+  /** The check mark's tone on the fill (D-60; see settings-appearance-swatch). */
+  checkTone: IconTone;
+  testID: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+};
+
+/**
+ * One selectable colour swatch (D-60, K-28). Selected: an outer `textPrimary`
+ * ring, a `surface` gap, then the fill with a check mark. Unselected: the fill
+ * inside the `border` ring. Same 44dp target either way.
+ */
+function ColourSwatch({
+  colors,
+  fill,
+  selected,
+  checkTone,
+  testID,
+  accessibilityLabel,
+  onPress,
+}: ColourSwatchProps) {
+  if (!selected) {
+    return (
+      <Pressable
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ selected }}
+        onPress={onPress}
+        style={[
+          styles.swatch,
+          {
+            backgroundColor: fill,
+            borderColor: colors[SWATCH_IDLE_RING_TOKEN],
+          },
+        ]}
+      />
+    );
+  }
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[
+        styles.swatch,
+        styles.swatchSelected,
+        {
+          backgroundColor: colors[SWATCH_GAP_TOKEN],
+          borderColor: colors[SWATCH_RING_TOKEN],
+        },
+      ]}
+    >
+      <View style={[styles.swatchFill, { backgroundColor: fill }]}>
+        <Icon name="check" size="md" tone={checkTone} />
+      </View>
     </Pressable>
   );
 }
@@ -726,12 +801,17 @@ export function SettingsAppearanceScreen() {
                       const selected = activeAccent === id;
                       const fill = ACCENTS[id][mode].fill;
                       return (
-                        <Pressable
+                        <ColourSwatch
                           key={id}
+                          colors={colors}
+                          fill={fill}
+                          selected={selected}
+                          // The selected accent is the active accent, so the
+                          // palette's onAccent is ACCENTS[id][mode].onAccent
+                          // (AA-tested on every fill; D-60, C5-L9).
+                          checkTone="onAccent"
                           testID={`settings-theme-accent-${index}`}
-                          accessibilityRole="button"
                           accessibilityLabel={`Accent ${id.replace(/-/g, " ")}`}
-                          accessibilityState={{ selected }}
                           onPress={() => {
                             setAccentForActivePackage(id);
                             void persist(
@@ -740,15 +820,6 @@ export function SettingsAppearanceScreen() {
                                 : { standardAccent: id },
                             );
                           }}
-                          style={[
-                            styles.swatch,
-                            {
-                              backgroundColor: fill,
-                              borderColor: selected
-                                ? colors.accent
-                                : colors.border,
-                            },
-                          ]}
                         />
                       );
                     })}
@@ -899,7 +970,8 @@ export function SettingsAppearanceScreen() {
               starPalette. The selected swatch = selfSunColour, or starPalette[0]
               (gold) when unset (NULL resolves to gold at RENDER — no stored hex
               default). Swatch fills ARE starPalette TOKENS (legitimate token
-              use, not hardcoded hex); the accent ring marks the selection. */}
+              use, not hardcoded hex); a textPrimary ring with a surface gap and a
+              check marks the selection (D-60). */}
           <View
             testID="settings-your-star-row"
             style={[
@@ -915,20 +987,15 @@ export function SettingsAppearanceScreen() {
                 const isSelected =
                   token === (selfSunColour ?? colors.starPalette[0]);
                 return (
-                  <Pressable
+                  <ColourSwatch
                     key={token}
+                    colors={colors}
+                    fill={token}
+                    selected={isSelected}
+                    checkTone={starSwatchCheckTone(token, colors)}
                     testID={`settings-star-swatch-${index}`}
-                    accessibilityRole="button"
                     accessibilityLabel={`Star colour ${index + 1}`}
-                    accessibilityState={{ selected: isSelected }}
                     onPress={() => void onPickStarColour(token)}
-                    style={[
-                      styles.swatch,
-                      {
-                        backgroundColor: token,
-                        borderColor: isSelected ? colors.accent : colors.border,
-                      },
-                    ]}
                   />
                 );
               })}
@@ -1286,6 +1353,17 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 3,
+  },
+  // D-60: a 2dp ring, then a 3dp surface gap, then the fill (34dp).
+  swatchSelected: {
+    borderWidth: 2,
+    padding: 3,
+  },
+  swatchFill: {
+    flex: 1,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
   },
   toggleRow: {
     flexDirection: "row",

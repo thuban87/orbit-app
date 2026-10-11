@@ -18,6 +18,12 @@ export {
   ConfirmDialog,
   type ConfirmDialogProps,
 } from "./ConfirmDialog";
+export {
+  type ChipTier,
+  chipTone,
+  type PrimaryChipTone,
+  type SubChipTone,
+} from "./chip-tone";
 export { FieldError, type FieldErrorProps } from "./FieldError";
 export { GlassSurface, type GlassSurfaceProps } from "./GlassSurface";
 export { OrbitSwitch, type OrbitSwitchProps } from "./OrbitSwitch";

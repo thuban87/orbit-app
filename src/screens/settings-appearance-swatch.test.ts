@@ -40,9 +40,14 @@ describe("selected swatch ring (D-60)", () => {
 
 describe("starSwatchCheckTone (C5-L9)", () => {
   it("picks the higher-contrast candidate", () => {
-    const palette = { textPrimary: "#FFFFFF", background: "#000000" };
-    expect(starSwatchCheckTone("#F2C14E", palette)).toBe("background");
-    expect(starSwatchCheckTone("#1A1F33", palette)).toBe("textPrimary");
+    // Galaxy Dark: light textPrimary, dark background.
+    const palette = resolvePalette("galaxy", "dark");
+    // A light star colour takes the dark candidate…
+    expect(starSwatchCheckTone(palette.starPalette[0], palette)).toBe(
+      "background",
+    );
+    // …and a dark fill takes the light one.
+    expect(starSwatchCheckTone(palette.surface, palette)).toBe("textPrimary");
   });
 
   for (const pkg of PACKAGES) {
@@ -85,10 +90,17 @@ describe("SettingsAppearanceScreen swatch source (K-28)", () => {
     "utf8",
   );
 
-  it("no swatch ring paints the accent", () => {
-    expect(source).not.toMatch(
-      /borderColor: (selected|isSelected)\s*\?\s*colors\.accent/,
-    );
+  it("no swatch ring paints the accent; only ColourSwatch draws a swatch", () => {
+    const begin = source.indexOf("function ColourSwatch(");
+    expect(begin).toBeGreaterThan(-1);
+    const body = source.slice(begin, source.indexOf("\n}\n", begin));
+    expect(body).not.toContain("colors.accent");
+    expect(body).toContain("colors[SWATCH_RING_TOKEN]");
+    expect(body).toContain("colors[SWATCH_GAP_TOKEN]");
+    expect(body).toContain('<Icon name="check"');
+    // Every `styles.swatch` use sits inside ColourSwatch.
+    const outside = source.slice(0, begin) + source.slice(begin + body.length);
+    expect(outside).not.toMatch(/styles\.swatch\b/);
   });
 
   it("both swatch rows render the shared selectable swatch with a check tone", () => {
