@@ -30,7 +30,6 @@ vi.mock("@react-navigation/native", () => ({
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
   ScrollView: "ScrollView",
-  Switch: "Switch",
   View: "View",
   StyleSheet: { create: (styles: unknown) => styles },
 }));
@@ -38,7 +37,10 @@ vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
 vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
-vi.mock("@/components/ui", () => ({ AppText: "AppText" }));
+vi.mock("@/components/ui", () => ({
+  AppText: "AppText",
+  OrbitSwitch: "OrbitSwitch",
+}));
 vi.mock("@/navigation/use-bottom-clearance", () => ({
   useBottomClearance: () => 0,
 }));

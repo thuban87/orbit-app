@@ -20,6 +20,7 @@ export {
 } from "./ConfirmDialog";
 export { FieldError, type FieldErrorProps } from "./FieldError";
 export { GlassSurface, type GlassSurfaceProps } from "./GlassSurface";
+export { OrbitSwitch, type OrbitSwitchProps } from "./OrbitSwitch";
 export {
   type OverlayLifecycle,
   SCRIM_OPACITY,

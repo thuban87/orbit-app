@@ -1,8 +1,8 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText } from "@/components/ui";
+import { AppText, OrbitSwitch } from "@/components/ui";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -211,19 +211,12 @@ export function SettingsInteractionsScreen() {
             >
               Interaction Assist
             </AppText>
-            <Switch
+            <OrbitSwitch
               testID="settings-interaction-assist"
-              accessibilityRole="switch"
               accessibilityLabel="Interaction Assist"
-              accessibilityState={{
-                checked: settings?.interactionAssistEnabled === 1,
-                disabled: settings === null,
-              }}
               disabled={settings === null}
               value={settings?.interactionAssistEnabled === 1}
               onValueChange={(value) => void onToggleInteractionAssist(value)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
             />
           </View>
           <AppText role="caption" style={{ color: colors.textSecondary }}>

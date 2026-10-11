@@ -38,6 +38,8 @@ export const ICON_REGISTRY = {
   search: { outline: "search-outline", filled: "search" },
   back: { outline: "chevron-back", filled: "chevron-back" },
   forward: { outline: "chevron-forward", filled: "chevron-forward" },
+  // 38.9 D-47 / D-60: the check on the Orbit switch thumb and a selected swatch.
+  check: { outline: "checkmark", filled: "checkmark" },
   add: { outline: "add", filled: "add" },
   message: { outline: "chatbubble-outline", filled: "chatbubble" },
   call: { outline: "call-outline", filled: "call" },
