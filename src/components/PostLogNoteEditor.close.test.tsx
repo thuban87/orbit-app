@@ -92,6 +92,7 @@ vi.mock("@/navigation/discard-keep-guard", () => ({
 }));
 
 const { PostLogNoteEditor } = await import("./PostLogNoteEditor");
+const memoriesDao = await import("@/db/memories-dao");
 
 interface Element {
   type?: unknown;
@@ -413,6 +414,46 @@ describe("a save in flight owns the close (verification IN-01)", () => {
     expect(state.confirmDiscard).not.toHaveBeenCalled();
     expect(view.onClose).not.toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("Delete, Restore and Allow AI wait for an in-flight save (fix-pass IN-01)", () => {
+    vi.mocked(memoriesDao.deleteMemory).mockClear();
+    vi.mocked(memoriesDao.restoreMemory).mockClear();
+    vi.mocked(memoriesDao.setMemoryAllowAi).mockClear();
+    const handlers = () => {
+      const editor = find(
+        render({ createdMemory: MEMORY, editingMemory: true }).tree,
+        "MemoryEditor",
+      )[0];
+      return editor?.props as {
+        onDelete: (id: number) => void;
+        onRestore: (id: number) => void;
+        onSetAllowAi: (id: number, allow: boolean) => void;
+      };
+    };
+    state.savingRef.current = true;
+    const held = handlers();
+    held.onDelete(7);
+    held.onRestore(7);
+    held.onSetAllowAi(7, true);
+    expect(memoriesDao.deleteMemory).not.toHaveBeenCalled();
+    expect(memoriesDao.restoreMemory).not.toHaveBeenCalled();
+    expect(memoriesDao.setMemoryAllowAi).not.toHaveBeenCalled();
+
+    // Idle, each one writes.
+    state.savingRef.current = false;
+    vi.mocked(memoriesDao.deleteMemory).mockResolvedValue(undefined as never);
+    vi.mocked(memoriesDao.restoreMemory).mockResolvedValue(undefined as never);
+    vi.mocked(memoriesDao.setMemoryAllowAi).mockResolvedValue(
+      undefined as never,
+    );
+    const idle = handlers();
+    idle.onDelete(7);
+    idle.onRestore(7);
+    idle.onSetAllowAi(7, true);
+    expect(memoriesDao.deleteMemory).toHaveBeenCalledOnce();
+    expect(memoriesDao.restoreMemory).toHaveBeenCalledOnce();
+    expect(memoriesDao.setMemoryAllowAi).toHaveBeenCalledOnce();
   });
 
   it("the memory edit save claims the same slot, so a second Save is dropped", async () => {

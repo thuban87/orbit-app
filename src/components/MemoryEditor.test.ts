@@ -365,6 +365,73 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
       expect(dimmed(control(tree, label))).toBe(true);
     }
   });
+
+  const renderDeleted = (busy: boolean, onSetAllowAi = vi.fn()) => {
+    const onDelete = vi.fn();
+    const onRestore = vi.fn();
+    const tree = nodes(
+      MemoryEditor({
+        items: [{ ...memory, deleted_at: "2026-10-01 09:00:00" }],
+        initiallyEditingId: 5,
+        onAdd: vi.fn(),
+        onEdit: vi.fn(),
+        onDelete,
+        onRestore,
+        onSetAllowAi,
+        globalAiEnabled: true,
+        busy,
+      }),
+    );
+    return { tree, onDelete, onRestore, onSetAllowAi };
+  };
+  const labels = ["Move memory to Recently Deleted", "Restore memory"];
+  /** Calls a handler prop, failing loudly when the control or prop is missing. */
+  const invoke = (
+    element: TestElement | undefined,
+    prop: string,
+    ...args: unknown[]
+  ) => {
+    const handler = element?.props[prop];
+    if (typeof handler !== "function") throw new Error(`missing ${prop}`);
+    handler(...args);
+  };
+
+  it("leaves Move to Recently Deleted, Restore and Allow AI live when idle (IN-01)", () => {
+    const { tree, onDelete, onRestore, onSetAllowAi } = renderDeleted(false);
+    for (const label of labels) {
+      expect(control(tree, label)?.props.disabled).toBe(false);
+      invoke(control(tree, label), "onPress");
+    }
+    expect(onDelete).toHaveBeenCalledWith(5);
+    expect(onRestore).toHaveBeenCalledWith(5);
+    const allowAi = tree.find(
+      (n) => n.props.accessibilityLabel === "Allow AI to use this",
+    );
+    expect(allowAi?.props.busy).toBe(false);
+    invoke(allowAi, "onValueChange", true);
+    expect(onSetAllowAi).toHaveBeenCalledWith(5, true);
+  });
+
+  it("holds Move to Recently Deleted, Restore and Allow AI while busy (IN-01)", () => {
+    const { tree, onDelete, onRestore, onSetAllowAi } = renderDeleted(true);
+    for (const label of labels) {
+      expect(control(tree, label)?.props.disabled).toBe(true);
+      expect(dimmed(control(tree, label))).toBe(true);
+      invoke(control(tree, label), "onPress");
+    }
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(onRestore).not.toHaveBeenCalled();
+    // Allow AI is announced busy, never drawn disabled (which would show Off
+    // over a stored On, D-26), and ignores the tap: no optimistic flip.
+    const allowAi = tree.find(
+      (n) => n.props.accessibilityLabel === "Allow AI to use this",
+    );
+    expect(allowAi?.props.busy).toBe(true);
+    expect(allowAi?.props.disabled).toBe(false);
+    invoke(allowAi, "onValueChange", true);
+    expect(onSetAllowAi).not.toHaveBeenCalled();
+    expect(hooks.setters).toHaveLength(0);
+  });
 });
 
 describe("normalizeMemoryDraft (D-65)", () => {

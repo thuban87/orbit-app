@@ -98,8 +98,11 @@ export interface MemoryEditorProps {
    */
   onCancelRequest?: (close: () => void) => void;
   /**
-   * The host's save is in flight (38.9 fix-pass WR-01): the form's Cancel and
-   * Save are held, and drawn disabled (D-26), until it settles. Absent → false.
+   * The host's save is in flight (38.9 fix-pass WR-01, IN-01): the form's
+   * Cancel, Save, Move to Recently Deleted and Restore are held and drawn
+   * disabled (D-26) until it settles. Allow AI ignores taps and is announced
+   * busy, not drawn disabled, so it never shows Off over a stored On (the
+   * OrbitSwitch `busy` rule, C5-M2). Absent → false.
    */
   busy?: boolean;
   /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
@@ -614,8 +617,10 @@ export function MemoryEditor({
               <OrbitSwitch
                 accessibilityLabel="Allow AI to use this"
                 disabled={!globalAiEnabled}
+                busy={busy}
                 value={editing.allow_ai === 1}
                 onValueChange={(allow) => {
+                  if (busy) return; // held while the host saves (IN-01)
                   setEditing((current) =>
                     current ? { ...current, allow_ai: allow ? 1 : 0 } : current,
                   );
@@ -634,11 +639,18 @@ export function MemoryEditor({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Move memory to Recently Deleted"
+                accessibilityState={{ disabled: busy }}
+                disabled={busy}
                 onPress={() => {
+                  if (busy) return; // held while the host saves (IN-01)
                   onDelete(editing.id);
                   close();
                 }}
-                style={[styles.action, { borderColor: colors.border }]}
+                style={[
+                  styles.action,
+                  { borderColor: colors.border },
+                  busy ? styles.disabled : null,
+                ]}
               >
                 <AppText role="body" style={{ color: colors.textSecondary }}>
                   Move to Recently Deleted
@@ -649,8 +661,17 @@ export function MemoryEditor({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Restore memory"
-                onPress={() => onRestore(editing.id)}
-                style={[styles.action, { borderColor: colors.border }]}
+                accessibilityState={{ disabled: busy }}
+                disabled={busy}
+                onPress={() => {
+                  if (busy) return; // held while the host saves (IN-01)
+                  onRestore(editing.id);
+                }}
+                style={[
+                  styles.action,
+                  { borderColor: colors.border },
+                  busy ? styles.disabled : null,
+                ]}
               >
                 <AppText role="body" style={{ color: colors.accentText }}>
                   Restore

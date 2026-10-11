@@ -279,9 +279,12 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     async (_draft: MemoryDraft): Promise<boolean> => false,
     [],
   );
+  // Delete, Restore and Allow AI wait for an in-flight save (verification
+  // IN-01, fix-pass IN-01): the shared savingRef holds them, as it holds every
+  // exit, so no second write races the edit.
   const onDeleteMemory = useCallback(
     (id: number) => {
-      if (contactId === null) return;
+      if (contactId === null || savingRef.current) return;
       void deleteMemory(getExecutor(), { id, contactId, now: localDateTime() })
         .then(() => {
           bumpShellRefresh();
@@ -295,7 +298,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   );
   const onRestoreMemory = useCallback(
     (id: number) => {
-      if (contactId === null) return;
+      if (contactId === null || savingRef.current) return;
       void restoreMemory(getExecutor(), {
         id,
         contactId,
@@ -310,7 +313,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   );
   const onSetMemoryAllowAi = useCallback(
     (id: number, allow: boolean) => {
-      if (contactId === null) return;
+      if (contactId === null || savingRef.current) return;
       void setMemoryAllowAi(getExecutor(), {
         id,
         contactId,
