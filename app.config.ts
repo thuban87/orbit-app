@@ -98,8 +98,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // prebuild covers them. Deduped: `expo install` already added expo-sqlite to
   // app.json's plugins, and a duplicate plugin entry is a prebuild error.
   // `@react-native-community/datetimepicker` ships a config plugin (Plan 04-03)
-  // and `expo install` instructs registering it here; `@react-native-picker/picker`
-  // ships none, so it needs no plugins entry.
+  // and `expo install` instructs registering it here. (`@react-native-picker/picker`
+  // was removed in Phase 38.9, D-28; the themed OptionSheet replaced it.)
   //
   // Phase-5 photo pipeline (Plan 05-01) adds two native config plugins:
   //   - `expo-image` — `expo install` explicitly instructed registering it; a
