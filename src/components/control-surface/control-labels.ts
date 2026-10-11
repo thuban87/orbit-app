@@ -1,3 +1,4 @@
+import { FAVORITES, NEVER_CONTACTED } from "@/constants/glossary";
 import type {
   DashboardFilterFamily,
   DashboardPopulation,
@@ -7,9 +8,9 @@ import type {
 /** The single source of dashboard control copy. */
 export const POPULATION_LABELS: Record<DashboardPopulation, string> = {
   "all-contacts": "All Contacts",
-  favourites: "Favourites",
+  favourites: FAVORITES,
   birthdays: "Birthdays",
-  "not-contacted": "Not Contacted",
+  "not-contacted": NEVER_CONTACTED,
   snoozed: "Snoozed",
 };
 

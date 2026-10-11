@@ -7,14 +7,14 @@ describe("collapseSummary", () => {
   });
 
   it("keeps every name at the exact display boundary", () => {
-    expect(collapseSummary(["Favourites", "Birthdays"], 2)).toBe(
-      "Favourites, Birthdays",
+    expect(collapseSummary(["Favorites", "Birthdays"], 2)).toBe(
+      "Favorites, Birthdays",
     );
   });
 
   it("preserves input order and collapses additional elements", () => {
-    expect(collapseSummary(["Birthdays", "Favourites", "Snoozed"], 2)).toBe(
-      "Birthdays, Favourites +1",
+    expect(collapseSummary(["Birthdays", "Favorites", "Snoozed"], 2)).toBe(
+      "Birthdays, Favorites +1",
     );
   });
 
