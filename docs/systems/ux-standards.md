@@ -138,8 +138,31 @@ which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces t
   stored On.
 - On a guarded screen, a save in flight holds every removal with no prompt (`busyRef` on
   `useDiscardKeepGuard`): "Discard changes?" is never offered for a save that will still commit.
-  The save's own navigation sets the bypass first, so it still leaves (D-13, D-14). Create and
-  Edit Contact use it.
+  The save's own navigation sets the bypass first, so it still leaves (D-13, D-14). All 12
+  guarded screens with a save use it: Create and Edit Contact, Update Contact (one row-save slot
+  shared by its row editors), Memory, Custom fields, AI Personalization (one slot shared by the
+  Writing Style and section saves), System builder, Log interaction, Group log, Edit
+  interaction, Edit group event and Edit participant. The hold also covers a confirm inside the
+  save (Duplicate name, Change field type / options).
+- A held Back is dropped. A held non-Back removal (a widget or notification link `RESET`, a
+  `NAVIGATE`) is **parked, not dropped**: the save's `finally` calls `settleHold()` after it
+  releases the ref, and the latest parked action is dispatched again on the next render. It then
+  meets the normal rule (review C6-H1): it proceeds when nothing typed would be lost, otherwise
+  one "Discard changes?" whose Discard completes it. It is not dispatched when the save's own
+  navigation left (bypass set; Memory, whose return is deferred, settles only on a failed save),
+  and an unmounted guard dispatches nothing. `requestClose` also does nothing while the ref is
+  held, so a Cancel in the same frame as Save neither closes nor prompts.
+- In-form holds: while the host's save runs, the open form's own Cancel and submit are held and
+  drawn disabled (D-26): MemoryEditor (`busy`, also Delete, Restore, the memory cards and Add
+  memory; Allow AI is announced busy, never drawn Off), Update Contact's `EditorFrame`
+  (`cancelDisabled`), RelationshipEditor (`busy`, also Edit, Delete, Show on Profile and Add key
+  person), FieldDefForm (`busy`), and AI Personalization's section editors plus each section's
+  options (Rename / edit, Replace from file, Delete section) and Save Writing Style. A list
+  control that would swap the draft being saved is held too, so a failed save never loses the
+  typed edit. A host that drops an action during its save (MemoryEditor's `onDelete` /
+  `onSetAllowAi` returning `false`) gets no local close or flip.
+- A re-read after a committed write sits outside that write's error path: a failed re-read
+  shows the load error, never "Couldn't save", so the user is not invited to write it twice.
 - Folding a section that holds a typed, not-yet-added draft prompts first; an untouched draft
   folds at once (D-68).
 - Capture: Back first closes an open New-contact sheet, and with a typed note shows the prompt
@@ -279,3 +302,7 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-11 | 38.9 | Code-review fixes: error snackbar look (D-72), duplicate confirm resolves false (WR-01), `backDisabled` header Back (WR-04), completion-screen Back acts like Done (D-73). |
 | 2026-10-11 | 38.9 | Fix-pass verification: every non-save sheet exit is dirty-aware and holds while a save is in flight (WR-01, IN-01). |
 | 2026-10-11 | 38.9 | Second fix pass: held sheet controls draw disabled (WR-01); a guarded screen holds every removal while its save runs, with Back drawn disabled (WR-02). |
+| 2026-10-11 | 38.9 | Second fix-pass follow-up: the `busyRef` hold on the other 10 guarded screens with a save (12 in all), with header Back drawn disabled (D-26). |
+| 2026-10-11 | 38.9 | Second fix-pass part 2: the in-form Cancel and submit hold on Memory, Update Contact (`EditorFrame`, RelationshipEditor), Custom fields (FieldDefForm) and AI Personalization (section editors). |
+| 2026-10-11 | 38.9 | Save Writing Style drawn disabled during a section save (115dfa83). |
+| 2026-10-11 | 38.9 | Third fix pass: a held non-Back removal is parked and re-dispatched by `settleHold()` (WR-01, C6-H1); list controls that swap or race the saving draft are held (WR-02); host-accepted Delete / Allow AI and a busy-held `requestClose` (IN-01); post-commit re-reads kept apart from write errors (IN-02). |
