@@ -180,9 +180,23 @@ export function SurvivorSelectScreen({
           disabled={!canContinue}
           accessibilityState={{ disabled: !canContinue }}
           onPress={continueToImpact}
-          style={[styles.cta, { backgroundColor: colors.accent }]}
+          style={[
+            styles.cta,
+            // The disabled look (D-26), as Merge conflicts' Continue.
+            {
+              backgroundColor: canContinue
+                ? colors.accent
+                : colors.surfaceElevated,
+            },
+          ]}
         >
-          <Text style={{ color: colors.onAccent }}>Continue</Text>
+          <Text
+            style={{
+              color: canContinue ? colors.onAccent : colors.textSecondary,
+            }}
+          >
+            Continue
+          </Text>
         </Pressable>
       </View>
     </View>

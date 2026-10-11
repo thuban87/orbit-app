@@ -62,7 +62,7 @@ describe("ShellAppBar child Back (D-44)", () => {
 
   it("keeps the 44dp target and the hit slop", () => {
     expect(BACK_PRESSABLE).toContain("hitSlop={8}");
-    expect(BACK_PRESSABLE).toContain("style={styles.back}");
+    expect(BACK_PRESSABLE).toMatch(/style=\{\[styles\.back,/);
     expect(CODE).toMatch(/const BACK_TARGET = 44;/);
     expect(CODE).toMatch(
       /back: \{\s*minWidth: BACK_TARGET,\s*minHeight: BACK_TARGET,/,
@@ -81,6 +81,50 @@ describe("ShellAppBar child Back (D-44)", () => {
   it("wraps the glyph in GlassForegroundScope under the scoped branch, like the title", () => {
     expect(BACK_PRESSABLE).toMatch(
       /\{scrim\.scoped \? \(\s*<GlassForegroundScope>\{backGlyph\}<\/GlassForegroundScope>\s*\) : \(\s*backGlyph\s*\)\}/,
+    );
+  });
+});
+
+describe("ShellAppBar backDisabled (D-26; review WR-04)", () => {
+  it("dims the Back/Cancel, marks it disabled and ignores its press", () => {
+    expect(CODE).toMatch(/backDisabled\?: boolean;/);
+    expect(CODE).toMatch(/backDisabled = false/);
+    expect(BACK_PRESSABLE).toContain("disabled={backDisabled}");
+    expect(BACK_PRESSABLE).toContain(
+      "accessibilityState={backDisabled ? { disabled: true } : undefined}",
+    );
+    expect(BACK_PRESSABLE).toContain(
+      "backDisabled ? styles.backDisabled : null",
+    );
+    expect(CODE).toMatch(/backDisabled: \{ opacity: 0\.5 \}/);
+  });
+
+  it("Restore preview draws its header Back disabled while a restore applies", () => {
+    const preview = readFileSync(
+      "src/screens/RestorePreviewScreen.tsx",
+      "utf8",
+    );
+    expect(preview).toMatch(
+      /<ShellAppBar\s+variant="child"\s+title="Restore preview"\s+backDisabled=\{applying\}/,
+    );
+    // The beforeRemove hold that keeps system Back on the screen is unchanged.
+    expect(preview).toContain(
+      "if (applying && !allowNavigationRef.current) event.preventDefault();",
+    );
+  });
+});
+
+describe("Survivor select Continue has the disabled look (D-26; review WR-04)", () => {
+  it("swaps the fill and label tokens when it cannot continue", () => {
+    const survivor = readFileSync(
+      "src/screens/SurvivorSelectScreen.tsx",
+      "utf8",
+    );
+    expect(survivor).toMatch(
+      /canContinue\s*\?\s*colors\.accent\s*:\s*colors\.surfaceElevated/,
+    );
+    expect(survivor).toMatch(
+      /canContinue \? colors\.onAccent : colors\.textSecondary/,
     );
   });
 });

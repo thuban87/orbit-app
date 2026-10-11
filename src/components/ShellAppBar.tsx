@@ -51,6 +51,14 @@ interface ShellAppBarProps {
    */
   backKind?: "back" | "cancel";
   /**
+   * Draws the child Back/Cancel disabled (D-26 dimmed, `accessibilityState`
+   * disabled) and ignores its press, for a route that holds Back while work
+   * runs (38.9 review WR-04: Restore preview while a restore applies). It only
+   * changes the header control; the screen's own `beforeRemove` hold still
+   * decides whether a system Back may leave.
+   */
+  backDisabled?: boolean;
+  /**
    * The person a person-scoped form is for (38.9 D-45): a line with their
    * avatar and name under the fixed title. Null or omitted renders no line.
    */
@@ -99,6 +107,7 @@ export function ShellAppBar({
   artComponent,
   onBack: onBackOverride,
   backKind = "back",
+  backDisabled = false,
   person,
 }: ShellAppBarProps) {
   const { colors, mode, package: themePackage } = useTheme();
@@ -203,9 +212,11 @@ export function ShellAppBar({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={cancel ? "Cancel" : "Back"}
+            accessibilityState={backDisabled ? { disabled: true } : undefined}
+            disabled={backDisabled}
             hitSlop={8}
             onPress={onBack}
-            style={styles.back}
+            style={[styles.back, backDisabled ? styles.backDisabled : null]}
           >
             {scrim.scoped ? (
               <GlassForegroundScope>{backGlyph}</GlassForegroundScope>
@@ -342,6 +353,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "center",
   },
+  /** The disabled look (D-26): Button's disabled opacity. */
+  backDisabled: { opacity: 0.5 },
   person: {
     paddingBottom: SPACING.sm,
     paddingHorizontal: ROOT_HORIZONTAL_PADDING,

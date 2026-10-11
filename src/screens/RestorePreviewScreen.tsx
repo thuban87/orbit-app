@@ -315,10 +315,15 @@ export function RestorePreviewScreen({
 
   const { preview } = route.params;
   // Header Back is goBack(); the beforeRemove hold above keeps the user on this
-  // screen while a restore applies (38.9 D-16).
+  // screen while a restore applies (38.9 D-16), and the header Back is drawn
+  // disabled for that time so it never looks live (D-26; review WR-04).
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Restore preview" />
+      <ShellAppBar
+        variant="child"
+        title="Restore preview"
+        backDisabled={applying}
+      />
       <ScrollView
         testID="restore-preview-screen"
         contentContainerStyle={[
