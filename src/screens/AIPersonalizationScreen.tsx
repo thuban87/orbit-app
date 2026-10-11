@@ -188,7 +188,8 @@ export function AIPersonalizationScreen({
   const savingRef = useRef(false);
   // Any of those saves in flight drops a section Save (the shared ref) and
   // holds the section forms' Cancel, so both draw disabled (D-26; WR-02
-  // follow-up).
+  // follow-up). It also holds each section's options (Rename / edit,
+  // Replace from file, Delete section; third fix pass WR-02).
   const sectionFormBusy = savingStyle || savingSection;
   const [adding, setAdding] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -673,10 +674,16 @@ export function AIPersonalizationScreen({
                       void toggleSection(section, value)
                     }
                   />
+                  {/* The options a save holds, and the button that opens
+                      them, draw disabled while one runs (third fix pass
+                      WR-02, D-26): Rename / edit would unmount the saving
+                      editor and lose its text; Replace and Delete would
+                      race the update. */}
                   <Button
                     role="iconOnly"
                     icon="overflow"
                     accessibilityLabel={`Section options for ${section.title}`}
+                    disabled={sectionFormBusy}
                     onPress={() =>
                       setOptionsUid((current) =>
                         current === section.uid ? null : section.uid,
@@ -703,7 +710,9 @@ export function AIPersonalizationScreen({
                     <Button
                       role="tertiary"
                       label="Rename / edit"
+                      disabled={sectionFormBusy}
                       onPress={() => {
+                        if (savingRef.current) return;
                         setEditingUid(section.uid);
                         setOptionsUid(null);
                       }}
@@ -711,12 +720,20 @@ export function AIPersonalizationScreen({
                     <Button
                       role="tertiary"
                       label="Replace from file"
-                      onPress={() => void importFile(section.uid)}
+                      disabled={sectionFormBusy}
+                      onPress={() => {
+                        if (savingRef.current) return;
+                        void importFile(section.uid);
+                      }}
                     />
                     <Button
                       role="destructive"
                       label="Delete section"
-                      onPress={() => setDeleteUid(section.uid)}
+                      disabled={sectionFormBusy}
+                      onPress={() => {
+                        if (savingRef.current) return;
+                        setDeleteUid(section.uid);
+                      }}
                     />
                   </View>
                 ) : null}

@@ -409,6 +409,29 @@ describe("AIPersonalizationScreen holds the section editors while a save runs", 
     }
   });
 
+  it("holds each section's options and the button that opens them (third fix pass WR-02)", () => {
+    const buttons = source.match(/<Button[\s\S]*?\/>/g) ?? [];
+    for (const label of [
+      "accessibilityLabel={`Section options for ",
+      'label="Rename / edit"',
+      'label="Replace from file"',
+      'label="Delete section"',
+    ]) {
+      const held = buttons.filter((b) => b.includes(label));
+      expect(held, label).toHaveLength(1);
+      expect(held[0]).toContain("disabled={sectionFormBusy}");
+    }
+    // A press in the frame before the re-render reads the ref.
+    for (const label of [
+      "Rename / edit",
+      "Replace from file",
+      "Delete section",
+    ]) {
+      const element = buttons.find((b) => b.includes(`label="${label}"`)) ?? "";
+      expect(element, label).toContain("if (savingRef.current) return;");
+    }
+  });
+
   it("SectionEditor passes busy through to the form it renders", () => {
     const body = componentBody("SectionEditor");
     expect(body).toMatch(/<NewSectionEditor[\s\S]*?busy=\{busy\}[\s\S]*?\/>/);

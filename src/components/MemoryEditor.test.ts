@@ -436,6 +436,49 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
     expect(onSetAllowAi).not.toHaveBeenCalled();
     expect(hooks.setters).toHaveLength(0);
   });
+  it("leaves the memory cards live when idle", () => {
+    const tree = render(false);
+    const cards = tree.filter((n) => n.type === "MemoryCard");
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.props.disabled).toBe(false);
+    invoke(cards[0], "onPress");
+    // openExisting: setEditing + setDraft.
+    expect(hooks.setters).toHaveLength(2);
+  });
+
+  it("holds the memory cards while busy: drawn disabled, a tap keeps the draft (third fix pass WR-02)", () => {
+    const tree = render(true);
+    const cards = tree.filter((n) => n.type === "MemoryCard");
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.props.disabled).toBe(true);
+    invoke(cards[0], "onPress");
+    expect(hooks.setters).toHaveLength(0);
+  });
+
+  it("holds Add memory while busy (third fix pass WR-02)", () => {
+    const renderClosed = (busy: boolean) =>
+      nodes(
+        MemoryEditor({
+          items: [memory],
+          onAdd: vi.fn(),
+          onEdit: vi.fn(),
+          onDelete: vi.fn(),
+          onRestore: vi.fn(),
+          onSetAllowAi: vi.fn(),
+          globalAiEnabled: true,
+          busy,
+        }),
+      );
+    expect(control(renderClosed(false), "Add memory")?.props.disabled).toBe(
+      false,
+    );
+    const held = control(renderClosed(true), "Add memory");
+    expect(held?.props.disabled).toBe(true);
+    expect(held?.props.accessibilityState).toEqual({ disabled: true });
+    expect(dimmed(held)).toBe(true);
+    invoke(held, "onPress");
+    expect(hooks.setters).toHaveLength(0);
+  });
 });
 
 describe("normalizeMemoryDraft (D-65)", () => {

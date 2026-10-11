@@ -102,7 +102,10 @@ export interface MemoryEditorProps {
    * Cancel, Save, Move to Recently Deleted and Restore are held and drawn
    * disabled (D-26) until it settles. Allow AI ignores taps and is announced
    * busy, not drawn disabled, so it never shows Off over a stored On (the
-   * OrbitSwitch `busy` rule, C5-M2). Absent → false.
+   * OrbitSwitch `busy` rule, C5-M2). The memory cards are held too (third
+   * fix pass WR-02): a card tap would swap the draft being saved for that
+   * memory's stored values, so a failed save would lose the typed edit.
+   * Absent → false.
    */
   busy?: boolean;
   /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
@@ -339,10 +342,13 @@ export function MemoryEditor({
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const openNew = () => {
+    if (busy) return; // held while the host saves (third fix pass WR-02)
     setEditing(null);
     setDraft(initialDraft());
   };
   const openExisting = (item: MemoryRow) => {
+    // Held while the host saves the open draft (third fix pass WR-02).
+    if (busy) return;
     setEditing(item);
     setDraft(initialDraft(item));
   };
@@ -421,6 +427,8 @@ export function MemoryEditor({
         <MemoryCard
           key={item.id}
           memory={item}
+          // A card tap replaces the open draft, so the save holds it (WR-02).
+          disabled={busy}
           onPress={() => openExisting(item)}
         />
       ))}
@@ -429,8 +437,10 @@ export function MemoryEditor({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add memory"
+            accessibilityState={{ disabled: busy }}
+            disabled={busy}
             onPress={openNew}
-            style={[styles.action, { borderColor: colors.border }]}
+            style={heldActionStyle}
           >
             <AppText role="body" style={{ color: colors.accentText }}>
               Add memory

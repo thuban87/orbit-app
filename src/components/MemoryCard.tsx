@@ -28,14 +28,24 @@ export function openMemoryLink(url: string): void {
 export interface MemoryCardProps {
   memory: MemoryRow;
   onPress?: () => void;
+  /**
+   * Holds the card's press and draws it disabled (D-26: the Button.tsx
+   * dimmed look), e.g. while the host's save is in flight (38.9 third fix
+   * pass WR-02). The Open link stays live. Absent → false.
+   */
+  disabled?: boolean;
   subdued?: boolean;
   testID?: string;
 }
+
+/** The Button.tsx disabled look (D-26 "dimmed"). */
+const DISABLED_OPACITY = 0.5;
 
 /** Compact, presentational Memory summary; detailed metadata belongs in MemoryEditor. */
 export function MemoryCard({
   memory,
   onPress,
+  disabled = false,
   subdued = false,
   testID,
 }: MemoryCardProps) {
@@ -142,7 +152,10 @@ export function MemoryCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Edit ${memoryTypeLabel(memory)} memory`}
-      onPress={onPress}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={disabled ? undefined : onPress}
+      style={disabled ? styles.disabled : null}
     >
       {content}
     </Pressable>
@@ -150,6 +163,7 @@ export function MemoryCard({
 }
 
 const styles = StyleSheet.create({
+  disabled: { opacity: DISABLED_OPACITY },
   card: {
     borderRadius: SPACING.md,
     borderWidth: 1,

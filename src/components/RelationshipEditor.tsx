@@ -43,7 +43,11 @@ export interface RelationshipEditorProps {
   /**
    * The host's save is in flight (38.9 WR-02 follow-up; D-13, D-14): the
    * form's Cancel and Save are held and drawn disabled (D-26) until it
-   * settles. Absent → false.
+   * settles. So are the list's Edit, Delete, Show on Profile and Add key
+   * person (third fix pass WR-02): Edit and Add would swap the draft being
+   * saved (a failed save would then lose the typed edit), and Show on
+   * Profile and Delete would race it (the host's slot drops Show on Profile
+   * silently). Absent → false.
    */
   busy?: boolean;
   /** Exposes `closeDraft()` so the host's Back can close the open form (D-14). */
@@ -151,10 +155,12 @@ export function RelationshipEditor({
   );
   useImperativeHandle(ref, () => ({ closeDraft: close }));
   const openNew = () => {
+    if (busy) return; // held while the host saves (WR-02)
     setEditing(null);
     setDraft(initialDraft());
   };
   const openEdit = (item: RelationshipRow) => {
+    if (busy) return; // held while the host saves (WR-02)
     setEditing(item);
     setDraft(initialDraft(item));
   };
@@ -215,30 +221,43 @@ export function RelationshipEditor({
             </AppText>
           ) : null}
           <View style={styles.actions}>
+            {/* Held while the host saves (third fix pass WR-02, D-26). */}
             <Button
               role="secondary"
               label="Edit"
+              disabled={busy}
               onPress={() => openEdit(item)}
             />
             <Button
               role="tertiary"
               label="Delete"
-              onPress={() => onDelete(item.id)}
+              disabled={busy}
+              onPress={() => {
+                if (busy) return;
+                onDelete(item.id);
+              }}
             />
             {item.hidden === 1 ? (
               <Button
                 role="tertiary"
                 label="Show on Profile"
-                onPress={() =>
-                  void onEdit(item.id, { ...initialDraft(item), hidden: 0 })
-                }
+                disabled={busy}
+                onPress={() => {
+                  if (busy) return;
+                  void onEdit(item.id, { ...initialDraft(item), hidden: 0 });
+                }}
               />
             ) : null}
           </View>
         </View>
       ))}
       {!draft ? (
-        <Button role="primary" label="Add key person" onPress={openNew} />
+        <Button
+          role="primary"
+          label="Add key person"
+          disabled={busy}
+          onPress={openNew}
+        />
       ) : (
         <View
           style={[

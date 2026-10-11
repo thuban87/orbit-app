@@ -15,6 +15,8 @@ const DRAFT_SLOT = 1;
 const hooks = vi.hoisted(() => ({
   seeds: {} as Record<number, unknown>,
   index: 0,
+  /** How many state setters ran. */
+  setters: 0,
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
@@ -23,7 +25,12 @@ vi.mock("react", async (original) => ({
   useRef: (value: unknown) => ({ current: value }),
   useState: (value: unknown) => {
     const slot = hooks.index++;
-    return [slot in hooks.seeds ? hooks.seeds[slot] : value, () => {}];
+    return [
+      slot in hooks.seeds ? hooks.seeds[slot] : value,
+      () => {
+        hooks.setters += 1;
+      },
+    ];
   },
 }));
 vi.mock("react-native", () => ({
@@ -41,6 +48,7 @@ vi.mock("@/components/ui", () => ({
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 
+import type { RelationshipRow } from "@/db/relationships-read";
 import { initialDraft, RelationshipEditor } from "./RelationshipEditor";
 
 type TestElement = ReactElement<Record<string, unknown>>;
@@ -51,15 +59,19 @@ function nodes(node: ReactNode): TestElement[] {
   return [element, ...nodes(element.props.children as ReactNode)];
 }
 
-const render = (busy?: boolean) => {
+const handlers = { onEdit: vi.fn(), onDelete: vi.fn() };
+const render = (busy?: boolean, items: RelationshipRow[] = []) => {
   hooks.index = 0;
+  hooks.setters = 0;
+  handlers.onEdit = vi.fn();
+  handlers.onDelete = vi.fn();
   return nodes(
     RelationshipEditor({
       contactId: 1,
-      items: [],
+      items,
       onAdd: vi.fn(),
-      onEdit: vi.fn(),
-      onDelete: vi.fn(),
+      onEdit: handlers.onEdit,
+      onDelete: handlers.onDelete,
       onRestore: vi.fn(),
       busy,
     }),
@@ -88,5 +100,54 @@ describe("RelationshipEditor busy holds the form's Cancel and Save (WR-02 follow
   it("Save stays disabled without a name, busy or not", () => {
     hooks.seeds = { [DRAFT_SLOT]: initialDraft() };
     expect(button(render(false), "Save")?.props.disabled).toBe(true);
+  });
+});
+
+describe("RelationshipEditor busy holds the list's controls (third fix pass WR-02)", () => {
+  const hiddenRow = {
+    id: 7,
+    person_name: "Alex",
+    relation_type: "Sister",
+    linked_contact_id: null,
+    linked_contact_name: null,
+    note: null,
+    pinned: 0,
+    hidden: 1,
+  } as unknown as RelationshipRow;
+  const listLabels = ["Edit", "Delete", "Show on Profile"];
+  const press = (tree: TestElement[], label: string) => {
+    const handler = button(tree, label)?.props.onPress;
+    if (typeof handler !== "function") throw new Error(`missing ${label}`);
+    handler();
+  };
+
+  beforeEach(() => {
+    hooks.seeds = {};
+  });
+
+  it("leaves Edit, Delete, Show on Profile and Add key person live when idle", () => {
+    const tree = render(false, [hiddenRow]);
+    for (const label of [...listLabels, "Add key person"]) {
+      expect(button(tree, label)?.props.disabled, label).toBe(false);
+    }
+    press(tree, "Delete");
+    expect(handlers.onDelete).toHaveBeenCalledWith(7);
+    press(tree, "Show on Profile");
+    expect(handlers.onEdit).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ hidden: 0 }),
+    );
+  });
+
+  it("draws them disabled while busy, and a press changes nothing", () => {
+    const tree = render(true, [hiddenRow]);
+    for (const label of [...listLabels, "Add key person"]) {
+      expect(button(tree, label)?.props.disabled, label).toBe(true);
+      press(tree, label);
+    }
+    expect(handlers.onDelete).not.toHaveBeenCalled();
+    expect(handlers.onEdit).not.toHaveBeenCalled();
+    // Edit and Add key person would swap the open draft.
+    expect(hooks.setters).toBe(0);
   });
 });
