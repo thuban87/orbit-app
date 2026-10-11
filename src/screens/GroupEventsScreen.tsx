@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -11,9 +11,8 @@ import {
 } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, Button } from "@/components/ui";
+import { AppText, Button, EmptyState } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
-import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { EVENTS } from "@/constants/product-labels";
 import { getExecutor } from "@/db/database";
 import {
@@ -61,9 +60,39 @@ export function GroupEventsScreen({
       void load(term);
     }, [load, term]),
   );
-  const emptyCopy = useMemo(
-    () => (term.trim() ? `No events match "${term.trim()}".` : null),
-    [term],
+  // The one empty-state component (38.9 D-20), each state with its one action
+  // (D-71): failed → "Try again", a search that found nothing → "Clear
+  // search", none yet → "Log an event" (opens Group Log, no params; D-22 noun).
+  const searchTerm = term.trim();
+  const emptyState = failed ? (
+    <EmptyState
+      testID="events-empty-failed"
+      icon="warning"
+      heading="Couldn't load events"
+      // A tab root has no Back (D-22); the list also rereads on focus.
+      body="Try opening it again in a moment."
+      action={{ label: "Try again", onPress: () => void load(term) }}
+    />
+  ) : searchTerm ? (
+    <EmptyState
+      testID="events-empty-search"
+      icon="search"
+      heading="No events match"
+      term={searchTerm}
+      body="Try a different title or participant."
+      action={{ label: "Clear search", onPress: () => setTerm("") }}
+    />
+  ) : (
+    <EmptyState
+      testID="events-empty"
+      icon="group-events"
+      heading="No events yet"
+      body="Log a get-together with several people at once from the + button, or from Group Log on any contact."
+      action={{
+        label: "Log an event",
+        onPress: () => navigation.navigate("GroupLog"),
+      }}
+    />
   );
 
   return (
@@ -145,22 +174,7 @@ export function GroupEventsScreen({
           )}
           ListEmptyComponent={
             <ChromeScrim style={styles.emptyPanel} radius={RADII.lg}>
-              <AppText role="heading">
-                {failed
-                  ? "Couldn't load events"
-                  : (emptyCopy ?? "No events yet")}
-              </AppText>
-              <ScopedPalette>
-                {(scoped) => (
-                  <AppText role="body" style={{ color: scoped.textSecondary }}>
-                    {failed
-                      ? // A tab root has no Back (D-22); the list rereads on focus.
-                        "Try opening it again in a moment."
-                      : (emptyCopy ??
-                        "Log a get-together with several people at once from the + button, or from Group Log on any contact.")}
-                  </AppText>
-                )}
-              </ScopedPalette>
+              {emptyState}
             </ChromeScrim>
           }
         />

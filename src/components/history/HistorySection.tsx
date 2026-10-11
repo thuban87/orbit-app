@@ -165,6 +165,7 @@ import { InteractionDetail } from "@/components/history/InteractionDetail";
 import { JumpToDateSheet } from "@/components/history/JumpToDateSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   getAppSettings,
   type HistoryCycleCount,
@@ -1091,22 +1092,19 @@ export function HistorySection({
 
   if (isEmptyHistory(history)) {
     return (
-      <View
+      // The one empty-state component (38.9 D-20); History keeps its
+      // "Log interaction" action (D-71), testID, layout signal and notice.
+      <EmptyState
         testID={`${testID}-empty`}
-        style={styles.empty}
+        icon="your-week"
+        heading="No history yet"
+        body="Log an interaction to start seeing activity here."
+        action={{ label: "Log interaction", onPress: () => log(today) }}
         onLayout={onContentLayout}
+        style={styles.empty}
       >
         {refreshNotice}
-        <AppText role="heading">No history yet</AppText>
-        <AppText role="caption">
-          Log an interaction to start seeing activity here.
-        </AppText>
-        <Button
-          role="primary"
-          label="Log interaction"
-          onPress={() => log(today)}
-        />
-      </View>
+      </EmptyState>
     );
   }
 

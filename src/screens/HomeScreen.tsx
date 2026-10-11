@@ -93,6 +93,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { FieldError } from "@/components/ui/FieldError";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
@@ -1696,11 +1697,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         </Text>
       </View>
     ) : emptyState === "search-empty" ? (
-      <View testID="dashboard-empty-search" style={styles.emptyState}>
-        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-          {`No matches for "${term}"`}
-        </Text>
-      </View>
+      // The one empty-state component (38.9 D-20), with its one action:
+      // "Clear search" (D-71). EmptyState reads the scoped palette itself.
+      <EmptyState
+        testID="dashboard-empty-search"
+        icon="search"
+        heading="No matches for"
+        term={term}
+        body="Try a different name or word."
+        action={{ label: "Clear search", onPress: onClearSearch }}
+      />
     ) : emptyState === "birthdays-empty" ? (
       <View testID="dashboard-empty-birthdays" style={styles.emptyState}>
         <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
