@@ -98,3 +98,56 @@ describe("CaptureScreen inline create lifecycle contract", () => {
     expect(interactions?.n).toBe(0);
   });
 });
+
+/** Slice of the focused hardwareBackPress handler body. */
+function backHandlerSource(): string {
+  const start = CAPTURE_SOURCE.indexOf('addEventListener("hardwareBackPress"');
+  expect(start).toBeGreaterThan(-1);
+  const end = CAPTURE_SOURCE.indexOf("return () => sub.remove();", start);
+  expect(end).toBeGreaterThan(start);
+  return CAPTURE_SOURCE.slice(start, end);
+}
+
+describe("CaptureScreen Back closes the innermost surface first (38.9 D-33, D-14)", () => {
+  it("routes Back through resolveCaptureBack with the typed name and note", () => {
+    expect(CAPTURE_SOURCE).toMatch(
+      /import \{[^}]*\bresolveCaptureBack\b[^}]*\} from "@\/screens\/capture-back-logic"/,
+    );
+    expect(CAPTURE_SOURCE).toMatch(
+      /import \{[^}]*\bconfirmDiscard\b[^}]*\} from "@\/navigation\/discard-keep-guard"/,
+    );
+    const handler = backHandlerSource();
+    expect(handler).toContain("resolveCaptureBack({");
+    for (const field of [
+      "inlineOpen",
+      "inlineName",
+      "searchOpen",
+      "multiSelect",
+      "noteOpen",
+      "noteText",
+    ]) {
+      expect(handler).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+  });
+
+  it("handles every outcome and prompts only for typed text", () => {
+    const handler = backHandlerSource();
+    for (const outcome of [
+      "close-inline",
+      "prompt-discard-inline",
+      "close-search",
+      "exit-multi-select",
+      "prompt-discard-note",
+      "cancel-capture",
+    ]) {
+      expect(handler).toContain(`"${outcome}"`);
+    }
+    expect(handler.split("confirmDiscard()").length - 1).toBe(2);
+  });
+
+  it("always consumes Back (never lets native-stack pop or finish)", () => {
+    const handler = backHandlerSource();
+    expect(handler).not.toMatch(/return false/);
+    expect(handler).toMatch(/return true;/);
+  });
+});
