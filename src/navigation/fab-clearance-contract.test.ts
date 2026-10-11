@@ -301,6 +301,10 @@ describe("FAB clearance: focused-only screens reserve none (D-68)", () => {
     expect(FOCUSED_ONLY).toContain("src/screens/EditInteractionScreen.tsx");
   });
 
+  it("includes the D-18 Compose Research screen", () => {
+    expect(FOCUSED_ONLY).toContain("src/screens/ComposeResearchScreen.tsx");
+  });
+
   it.each(FOCUSED_ONLY.sort())(
     "%s does not pad for a FAB that never shows",
     (file) => {

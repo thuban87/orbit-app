@@ -34,6 +34,9 @@ const FOCUSED_WORKFLOW_ROUTES = new Set<string>([
   // tab bar hide here too.
   "SystemBuilder",
   "EditInteraction",
+  // D-18: Compose's read-only Research side hides the tab bar and the + like
+  // Compose does.
+  "ComposeResearch",
 ]);
 
 export function isFocusedWorkflow(routeName: string): boolean {

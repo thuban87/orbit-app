@@ -173,9 +173,18 @@ function RestoreResultSettingsRoute(
 // Profile reached through a group event). The wrapper threads an explicit host,
 // mirroring the Backup wrappers above, so the hero disables Message: Compose and
 // ComposeResearch are deliberately never registered under Settings (D-09, D-25,
-// RG-021 — archived messaging stays prohibited; no cross-tab jump).
+// RG-021 — archived messaging stays prohibited; no cross-tab jump to message).
 function SettingsProfileHostRoute(props: RootStackScreenProps<"Profile">) {
   return <ContactProfileScreen {...props} host="settings" />;
+}
+
+// The + Add Contact form opens over Settings (D-38). D-50 (owner, 2026-10-10)
+// adds the one completion jump out of this stack: on Save the form pops back to
+// where the user started and the new person opens on a live Profile in the
+// Contacts tab (a Settings-hosted Profile would disable Message, D-25). Compose
+// and ComposeResearch stay unregistered here.
+function SettingsCreateHostRoute(props: RootStackScreenProps<"Create">) {
+  return <CreateContactScreen {...props} host="settings" />;
 }
 
 export function SettingsStack() {
@@ -245,7 +254,7 @@ export function SettingsStack() {
           empty-date "Log interaction" must resolve here. */}
       <Stack.Screen name="LogContact" component={LogInteractionScreen} />
       {/* The universal + forms open over this tab (D-38, FAB_ROUTES). */}
-      <Stack.Screen name="Create" component={CreateContactScreen} />
+      <Stack.Screen name="Create" component={SettingsCreateHostRoute} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
       <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
       <Stack.Screen name="Memory" component={MemoryScreen} />

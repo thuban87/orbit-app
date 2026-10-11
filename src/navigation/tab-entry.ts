@@ -65,3 +65,82 @@ export function navigateIntoTab<
 ): void {
   nav?.navigate(tab as never, { screen, params, initial: false } as never);
 }
+
+/**
+ * Focus a tab without a nested payload. Private to this file so the RG-021
+ * guard (tab-entry.test.ts) keeps every cross-tab entry here.
+ */
+function focusTab(nav: TabEntryNavigator, tab: keyof TabParamList): void {
+  nav?.navigate(tab as never);
+}
+
+/** The slice of the root (tab) state `planContactsProfileOpen` reads. */
+export type ContactsProfileRootState =
+  | {
+      routes: readonly {
+        name: string;
+        state?:
+          | { key?: string; stale?: boolean; routes?: readonly unknown[] }
+          | undefined;
+      }[];
+    }
+  | null
+  | undefined;
+
+export type ContactsProfileOpenPlan =
+  | { kind: "navigate-into" }
+  | { kind: "push"; stackKey: string };
+
+/**
+ * How to open a Profile in the Contacts tab (D-50). A mounted Contacts stack
+ * (a live state: a key and `stale: false`) gets a push onto it, because a
+ * nested navigate to "Profile" would rewrite the params of a Profile already
+ * on top of that stack in place (no `getId`), showing the wrong person
+ * (T-38.9-18). An unmounted stack is entered with `navigateIntoTab`, so Home
+ * stays under the Profile.
+ */
+export function planContactsProfileOpen(
+  rootState: ContactsProfileRootState,
+): ContactsProfileOpenPlan {
+  const stack = rootState?.routes.find(
+    (route) => route.name === "DashboardTab",
+  )?.state;
+  return stack != null && typeof stack.key === "string" && stack.stale === false
+    ? { kind: "push", stackKey: stack.key }
+    : { kind: "navigate-into" };
+}
+
+/** The container ref, structurally: root state, navigate and dispatch. */
+export type ContactsProfileNavigator =
+  | {
+      getRootState(): ContactsProfileRootState;
+      navigate(...args: never[]): void;
+      dispatch(action: never): void;
+    }
+  | null
+  | undefined;
+
+/**
+ * Open the person's Profile in the Contacts tab (D-50, owner 2026-10-10): the
+ * one completion jump out of Settings, used when an Add Contact started from
+ * the Settings tab saves. The push action is a plain object with the shape of
+ * `StackActions.push` so this module stays importable from node tests.
+ */
+export function openProfileInContactsTab(
+  nav: ContactsProfileNavigator,
+  contactId: number,
+): void {
+  if (nav == null) return;
+  const plan = planContactsProfileOpen(nav.getRootState());
+  if (plan.kind === "navigate-into") {
+    navigateIntoTab(nav, "DashboardTab", "Profile", { contactId });
+    return;
+  }
+  focusTab(nav, "DashboardTab");
+  const push = {
+    type: "PUSH",
+    payload: { name: "Profile", params: { contactId } },
+    target: plan.stackKey,
+  };
+  nav.dispatch(push as never);
+}

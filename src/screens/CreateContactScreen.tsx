@@ -4,7 +4,9 @@
  * custom block AFTER it, never interleaved (06-crud Cluster A). Save assembles a
  * single `createContactFull` call (one transaction), warns on a duplicate live
  * name, and `navigation.replace`s to the new contact's Profile so Back does not
- * return to the form.
+ * return to the form. Started from the Settings tab (`host="settings"`), Save
+ * instead pops the Settings stack back to where the user started and opens the
+ * new Profile in the Contacts tab (D-50), where its Message action is live.
  *
  * The screen builds NO SQL and re-implements NO widget: the custom block maps
  * `defsForCreateForm` through `FieldValueInput` verbatim, and every value crosses
@@ -86,6 +88,8 @@ import {
 } from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import { navigationRef } from "@/navigation/linking";
+import { openProfileInContactsTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
 import { confirm, notice } from "@/stores/confirm-store";
@@ -203,9 +207,19 @@ function fuelDraftToItem(
   };
 }
 
+export type CreateContactScreenProps = RootStackScreenProps<"Create"> & {
+  /**
+   * Set by the Settings stack's wrapper (SettingsCreateHostRoute). A Settings-
+   * hosted Profile disables Message (ADR-166 / 38.3 D-25), so a contact created
+   * from Settings finishes on its Profile in the Contacts tab instead (D-50).
+   */
+  host?: "settings";
+};
+
 export function CreateContactScreen({
   navigation,
-}: RootStackScreenProps<"Create">) {
+  host,
+}: CreateContactScreenProps) {
   const { colors } = useTheme();
   // Every seeded field starts from the same seed the guard's baseline uses.
   const [seed] = useState(createFormSeedState);
@@ -473,7 +487,14 @@ export function CreateContactScreen({
       const { contactId } = await createContactFull(exec, input);
       // Saved: leave for the new Profile without a prompt (D-08, Pitfall 6).
       bypassRef.current = true;
-      navigation.replace("Profile", { contactId });
+      if (host === "settings") {
+        // D-50: the Settings stack returns to where the user started, and the
+        // new person opens in the Contacts tab.
+        navigation.goBack();
+        openProfileInContactsTab(navigationRef.current, contactId);
+      } else {
+        navigation.replace("Profile", { contactId });
+      }
     } catch (err) {
       bypassRef.current = false;
       Logger.error(LOG_SCOPE, "failed to save contact", err);
