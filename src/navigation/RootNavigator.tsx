@@ -35,7 +35,12 @@ import {
   isFocusedWorkflow,
   systemBackgroundSlotOverride,
 } from "./focused-route-classification";
+import { navigationRef } from "./linking";
 import { INITIAL_TAB } from "./shell-contract";
+import {
+  shouldFallbackToLaunchTab,
+  switchTabWithoutHistory,
+} from "./tab-history";
 import type { TabParamList } from "./types";
 import { useWindowObstacle } from "./use-window-measurement";
 
@@ -49,7 +54,8 @@ import { useWindowObstacle } from "./use-window-measurement";
  * there is also no colour literal needed on `screenOptions` — each screen's
  * themed root supplies its background via `useTheme().colors.*` (check:colors).
  * Predictive back remains disabled in app.config.ts. Android system Back walks
- * the current tab stack rather than a swipe gesture.
+ * the current tab stack rather than a swipe gesture, then the visited tabs
+ * (`backBehavior="history"`, D-35), and exits from the launch tab (D-54).
  */
 const Tab = createBottomTabs<TabParamList>();
 
@@ -177,6 +183,17 @@ export function RootNavigator() {
           return true;
         }
 
+        // D-54: history is exhausted on a non-launch tab root, so the container
+        // would exit from here. Go to the launch tab first, in place (a plain
+        // navigate would append history and loop Back), so the app always
+        // exits from Digest. Screen listeners registered later (Home bulk
+        // select, Compose, Capture) still run before this one.
+        const navigation = navigationRef.current;
+        if (shouldFallbackToLaunchTab(navigation?.getRootState())) {
+          switchTabWithoutHistory(navigation, INITIAL_TAB);
+          return true;
+        }
+
         return false;
       });
     }, 0);
@@ -237,8 +254,11 @@ export function RootNavigator() {
             is pending instead of covering its app bar. The container hides it
             from accessibility with the rest of the shell while the dial is open. */}
         <AssistBanner />
+        {/* D-35: Back on a tab root returns to the previously visited tab;
+            the hardwareBackPress listener above adds the D-54 launch-tab exit. */}
         <Tab.Navigator
           initialRouteName={INITIAL_TAB}
+          backBehavior="history"
           tabBar={(props) => <MeasuredTabBar {...props} />}
           screenOptions={({ route }) => ({
             headerShown: false,

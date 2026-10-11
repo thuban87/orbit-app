@@ -228,7 +228,10 @@ describe("switchTabWithoutHistory", () => {
   it("is a no-op without a navigator or a state", () => {
     expect(() => switchTabWithoutHistory(null, "DigestTab")).not.toThrow();
     const dispatch = vi.fn();
-    switchTabWithoutHistory({ getState: () => undefined, dispatch }, "DigestTab");
+    switchTabWithoutHistory(
+      { getState: () => undefined, dispatch },
+      "DigestTab",
+    );
     expect(dispatch).not.toHaveBeenCalled();
   });
 });
