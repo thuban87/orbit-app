@@ -20,6 +20,12 @@
  * `UnscopedTheme`, so an overlay opened from a Standard-Light glass card or the
  * app bar does not inherit the glass foreground palette.
  *
+ * Open-overlay registry + in-window snackbar (38.9 D-24, D-40, D-51): the
+ * window is a `RegisteredModal`, so it registers as a "sheet" or "dialog"
+ * while visible, and a `<Snackbar host={hostId} />` renders as the LAST child
+ * of the root View inside the GestureHandlerRootView. A snackbar fired while
+ * this overlay is the topmost window shows inside it, above the nav bar.
+ *
  * No colour literal here (check:colors); this file is `.tsx` because it renders.
  */
 import { type ReactNode, useEffect, useRef } from "react";
@@ -27,14 +33,18 @@ import {
   AccessibilityInfo,
   findNodeHandle,
   Pressable,
-  Modal as RNModal,
   type StyleProp,
   StyleSheet,
   View,
   type ViewStyle,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { Snackbar } from "@/components/Snackbar";
 import { UnscopedTheme, useTheme } from "@/theme";
+// 38.9 D-24/D-40: the window registers in the open-overlay registry while
+// visible and carries its own snackbar host. Imported under the historical
+// local name so the gesture-root contract reads unchanged.
+import { RegisteredModal as RNModal } from "./RegisteredModal";
 
 /** Scrim opacity applied to `colors.background` (the DropdownFieldWidget idiom). */
 export const SCRIM_OPACITY = 0.85;
@@ -64,6 +74,11 @@ export interface BaseOverlayProps extends OverlayLifecycle {
   contentStyle?: StyleProp<ViewStyle>;
   /** Accessible label for the dismiss-scrim (dismissable overlays). */
   scrimAccessibilityLabel?: string;
+  /**
+   * How this window reports in the open-overlay registry (38.9 D-24).
+   * Defaults to "sheet"; ConfirmDialog passes "dialog".
+   */
+  overlayKind?: "sheet" | "dialog";
 }
 
 const noop = () => {};
@@ -76,6 +91,7 @@ export function BaseOverlay({
   justify = "center",
   contentStyle,
   scrimAccessibilityLabel,
+  overlayKind = "sheet",
 }: BaseOverlayProps) {
   const { colors } = useTheme();
   const contentRef = useRef<View>(null);
@@ -96,18 +112,33 @@ export function BaseOverlay({
       // Declared on EVERY variant so Back is never trapped; a no-op only for a
       // non-dismissable (destructive) overlay, which requires an explicit choice.
       onRequestClose={dismissable ? onRequestClose : noop}
+      overlayKind={overlayKind}
+      // The in-window snackbar host is placed below, inside the gesture root.
+      renderSnackbarHost={false}
     >
       {/* Android RN Modal content is a separate native root; RNGH's installed
           and official Modal guidance requires its own full-height root. */}
-      <GestureHandlerRootView style={styles.root}>
-        <View style={[styles.root, { justifyContent: justify }]}>
-          {dismissable ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={scrimAccessibilityLabel ?? "Dismiss"}
-              style={StyleSheet.absoluteFill}
-              onPress={onRequestClose}
-            >
+      {(hostId) => (
+        <GestureHandlerRootView style={styles.root}>
+          <View style={[styles.root, { justifyContent: justify }]}>
+            {dismissable ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={scrimAccessibilityLabel ?? "Dismiss"}
+                style={StyleSheet.absoluteFill}
+                onPress={onRequestClose}
+              >
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    styles.scrim,
+                    { backgroundColor: colors.background },
+                  ]}
+                />
+              </Pressable>
+            ) : (
+              // Inert scrim (no onPress): a scrim-tap cannot dismiss a destructive
+              // confirmation.
               <View
                 style={[
                   StyleSheet.absoluteFill,
@@ -115,27 +146,20 @@ export function BaseOverlay({
                   { backgroundColor: colors.background },
                 ]}
               />
-            </Pressable>
-          ) : (
-            // Inert scrim (no onPress): a scrim-tap cannot dismiss a destructive
-            // confirmation.
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                styles.scrim,
-                { backgroundColor: colors.background },
-              ]}
-            />
-          )}
-          <View ref={contentRef} collapsable={false} style={contentStyle}>
-            {/* Overlays are opaque surfaces: reset any glass foreground scope
-                they were opened from so sheets/dialogs keep the normal text
-                hierarchy (RG-029 / D-24). A GlassSurface card inside an overlay
-                re-enters its own scope. */}
-            <UnscopedTheme>{children}</UnscopedTheme>
+            )}
+            <View ref={contentRef} collapsable={false} style={contentStyle}>
+              {/* Overlays are opaque surfaces: reset any glass foreground scope
+                  they were opened from so sheets/dialogs keep the normal text
+                  hierarchy (RG-029 / D-24). A GlassSurface card inside an overlay
+                  re-enters its own scope. */}
+              <UnscopedTheme>{children}</UnscopedTheme>
+            </View>
+            {/* Last child: renders only while this window is the topmost
+                registered overlay (D-40). */}
+            <Snackbar host={hostId} />
           </View>
-        </View>
-      </GestureHandlerRootView>
+        </GestureHandlerRootView>
+      )}
     </RNModal>
   );
 }

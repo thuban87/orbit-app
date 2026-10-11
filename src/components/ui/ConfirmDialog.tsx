@@ -92,6 +92,7 @@ export function ConfirmDialog({
       // Destructive confirmations require an explicit choice: inert scrim + Back
       // no-op. Non-destructive dialogs may dismiss.
       dismissable={!destructive}
+      overlayKind="dialog"
       justify="center"
       contentStyle={[
         styles.contentWrap,

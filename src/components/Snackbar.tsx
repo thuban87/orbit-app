@@ -1,25 +1,54 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography variant.
 import { Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  ROOT_SNACKBAR_HOST,
+  resolveSnackbarHostVisible,
+  snackbarBottomPadding,
+} from "@/components/snackbar-host";
 import { AppText } from "@/components/ui/AppText";
 import {
   fabDialBackgroundA11y,
   selectFabDialOpen,
 } from "@/components/universal-fab-logic";
+import {
+  overlayRegistryStore,
+  selectTopOverlayId,
+} from "@/stores/overlay-registry-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 
-/** A single host for commit-truthful feedback above every shell browse surface. */
-export function Snackbar() {
+export interface SnackbarProps {
+  /**
+   * Which window this host lives in (38.9 D-40): "root" (default) for the
+   * App.tsx host, or the overlay registry id of the overlay window rendering
+   * it. Only the topmost window's host renders (`snackbar-host.ts`).
+   */
+  host?: string;
+}
+
+/**
+ * Commit-truthful feedback. One snackbar message (snackbar-store), many hosts:
+ * the App.tsx root host above every shell browse surface, plus one inside every
+ * overlay window, so a snackbar fired while a sheet or dialog is open renders
+ * inside that topmost window instead of under it (D-40). Inside an overlay it
+ * sits just above the system navigation bar, without the tab-bar/+ clearance
+ * (D-51).
+ */
+export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const snackbar = snackbarStore((state) => state.snackbar);
   const dismiss = snackbarStore((state) => state.dismiss);
+  const topOverlayId = overlayRegistryStore(selectTopOverlayId);
   // Hidden from accessibility while the FAB dial is open (D-31, D-42 A).
   const fabDialOpen = shellTransientStore(selectFabDialOpen);
+  const hostVisible = resolveSnackbarHostVisible(host, topOverlayId);
 
-  if (!snackbar) return null;
+  if (!snackbar || !hostVisible) return null;
 
   return (
     <View
@@ -28,7 +57,10 @@ export function Snackbar() {
       // its `box-none` (a re-created view defaults to `auto` = touch sink).
       collapsable={false}
       pointerEvents="box-none"
-      style={styles.overlay}
+      style={[
+        styles.overlay,
+        { paddingBottom: snackbarBottomPadding(host, insets.bottom) },
+      ]}
       {...fabDialBackgroundA11y(fabDialOpen)}
     >
       <View
@@ -82,7 +114,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "flex-end",
-    paddingBottom: 112,
     paddingHorizontal: SPACING.base,
   },
   surface: {

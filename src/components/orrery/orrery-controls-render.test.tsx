@@ -36,6 +36,8 @@ vi.mock("react", async (original) => ({
   useMemo: (factory: () => unknown) => factory(),
   useEffect: () => {},
   useCallback: (callback: unknown) => callback,
+  // RegisteredModal (38.9 D-24) ids its window for the overlay registry.
+  useId: () => "test-overlay",
   useState: (value: unknown) => [
     native.open && value === false ? true : value,
     () => {},
@@ -90,6 +92,21 @@ vi.mock("@/stores/shell-transient-store", () => ({
       selector({ entries: [] }),
     { getState: () => ({ entries: [] }) },
   ),
+}));
+// Every overlay window renders an in-window Snackbar host (38.9 D-40); the
+// host reads the overlay registry and snackbar stores through Zustand hooks.
+vi.mock("@/stores/overlay-registry-store", async (original) => ({
+  ...(await original<typeof import("@/stores/overlay-registry-store")>()),
+  overlayRegistryStore: Object.assign(
+    (selector: (s: { entries: unknown[] }) => unknown) =>
+      selector({ entries: [] }),
+    { getState: () => ({ entries: [] }) },
+  ),
+}));
+vi.mock("@/stores/snackbar-store", () => ({
+  snackbarStore: (
+    selector: (s: { snackbar: null; dismiss: () => void }) => unknown,
+  ) => selector({ snackbar: null, dismiss: () => {} }),
 }));
 vi.mock("@/db/database", () => ({ getExecutor: () => ({}) }));
 vi.mock("@/stores/orrery-preferences-store", () => ({
