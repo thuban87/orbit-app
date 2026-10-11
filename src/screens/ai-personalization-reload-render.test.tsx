@@ -266,7 +266,8 @@ describe("reorder and delete keep the same split (third fix pass IN-02)", () => 
     const moveDown = tree.find(
       (node) => node.type === "Button" && node.props.label === "Move down",
     );
-    (moveDown?.props.onPress as () => void)();
+    if (!moveDown) throw new Error("Move down not rendered");
+    (moveDown.props.onPress as () => void)();
     await flush();
     expect(dao.reorderPersonalizationSections).toHaveBeenCalledOnce();
     expect(messages()).toEqual([LOAD_ERROR]);
@@ -277,7 +278,8 @@ describe("reorder and delete keep the same split (third fix pass IN-02)", () => 
     dao.listPersonalizationSections.mockRejectedValue(new Error("read"));
     const tree = render({ sections: [SECTION], deleteUid: SECTION.uid });
     const dialog = tree.find((node) => node.type === "ConfirmDialog");
-    (dialog?.props.onConfirm as () => void)();
+    if (!dialog) throw new Error("ConfirmDialog not rendered");
+    (dialog.props.onConfirm as () => void)();
     await flush();
     expect(dao.deletePersonalizationSection).toHaveBeenCalledWith(
       undefined,
