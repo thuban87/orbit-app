@@ -38,6 +38,11 @@ import {
 
 const require = createRequire(import.meta.url);
 const babel = require("@babel/core");
+
+// These tests run the Reanimated Babel plugin over production sources; under
+// full-suite machine load one test can exceed the 5 s default. A wider
+// per-file budget only, no logic change (38.9 code-review fix pass).
+vi.setConfig({ testTimeout: 20_000 });
 const traverse = require("@babel/traverse").default;
 function cell<T>(initial: T) {
   let value = initial;
