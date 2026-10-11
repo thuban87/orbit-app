@@ -19,13 +19,16 @@
  * recency on their next focused read, and the widget is nudged. A failed save
  * preserves the full form state and never navigates away (the CAPT/refine idiom).
  *
- * Modeled on `EditContactScreen`: headerShown:false + own Back chrome, a primary
- * `Save changes` action, and a discard-keep guard for unsaved edits.
+ * Modeled on `EditContactScreen`: headerShown:false + the shared house header
+ * (`ShellAppBar`, 38.9 D-16) with the person line (D-45), a primary
+ * `Save changes` action, and a discard-keep guard for unsaved edits (the header
+ * Back calls goBack, which the guard intercepts).
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   TouchpointRefineForm,
   type TouchpointRefineValue,
@@ -33,6 +36,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { readInteractionForEdit } from "@/db/interaction-edit-read";
 import { editTouchpointFull } from "@/db/recency-dao";
+import { useContactHeader } from "@/hooks/use-contact-header";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -55,6 +59,8 @@ export function EditInteractionScreen({
 }: RootStackScreenProps<"EditInteraction">) {
   const { colors } = useTheme();
   const { contactId, interactionId } = route.params;
+  // Person-scoped form: the person line under the fixed title (38.9 D-45).
+  const person = useContactHeader(contactId);
 
   const [value, setValue] = useState<TouchpointRefineValue | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -136,93 +142,89 @@ export function EditInteractionScreen({
     }
   }
 
+  const header = (
+    <ShellAppBar variant="child" title="Edit interaction" person={person} />
+  );
+
   if (notFound) {
     return (
-      <View testID="edit-interaction-missing" style={styles.loading}>
-        <Text style={{ color: colors.textSecondary }}>
-          This interaction is no longer available.
-        </Text>
+      <View style={styles.root}>
+        {header}
+        <View testID="edit-interaction-missing" style={styles.loading}>
+          <Text style={{ color: colors.textSecondary }}>
+            This interaction is no longer available.
+          </Text>
+        </View>
       </View>
     );
   }
 
   if (!value) {
     return (
-      <View testID="edit-interaction-loading" style={styles.loading}>
-        <Text style={{ color: colors.textSecondary }}>Loading…</Text>
+      <View style={styles.root}>
+        {header}
+        <View testID="edit-interaction-loading" style={styles.loading}>
+          <Text style={{ color: colors.textSecondary }}>Loading…</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      testID="edit-interaction-screen"
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        <Pressable
-          testID="edit-interaction-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.backBtn, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Edit interaction
-        </Text>
-      </View>
-
-      <TouchpointRefineForm
-        testID="edit-interaction-form"
-        value={value}
-        onChange={setValue}
-        now={now}
-      />
-
-      {saveError ? (
-        <Text
-          testID="edit-interaction-save-error"
-          accessibilityLabel={saveError}
-          style={[styles.error, { color: colors.danger }]}
-        >
-          {saveError}
-        </Text>
-      ) : null}
-
-      <Pressable
-        testID="edit-interaction-save"
-        accessibilityRole="button"
-        accessibilityLabel="Save changes"
-        accessibilityState={{ disabled: !savable }}
-        disabled={!savable}
-        onPress={() => void handleSave()}
-        style={[
-          styles.saveBtn,
-          {
-            backgroundColor: savable ? colors.accent : colors.surface,
-            borderColor: savable ? colors.accent : colors.border,
-          },
-        ]}
+    <View style={styles.root}>
+      {header}
+      <ScrollView
+        testID="edit-interaction-screen"
+        contentContainerStyle={styles.content}
       >
-        <Text
-          style={{
-            color: savable ? colors.onAccent : colors.textSecondary,
-            fontWeight: "600",
-          }}
+        <TouchpointRefineForm
+          testID="edit-interaction-form"
+          value={value}
+          onChange={setValue}
+          now={now}
+        />
+
+        {saveError ? (
+          <Text
+            testID="edit-interaction-save-error"
+            accessibilityLabel={saveError}
+            style={[styles.error, { color: colors.danger }]}
+          >
+            {saveError}
+          </Text>
+        ) : null}
+
+        <Pressable
+          testID="edit-interaction-save"
+          accessibilityRole="button"
+          accessibilityLabel="Save changes"
+          accessibilityState={{ disabled: !savable }}
+          disabled={!savable}
+          onPress={() => void handleSave()}
+          style={[
+            styles.saveBtn,
+            {
+              backgroundColor: savable ? colors.accent : colors.surface,
+              borderColor: savable ? colors.accent : colors.border,
+            },
+          ]}
         >
-          Save changes
-        </Text>
-      </Pressable>
-    </ScrollView>
+          <Text
+            style={{
+              color: savable ? colors.onAccent : colors.textSecondary,
+              fontWeight: "600",
+            }}
+          >
+            Save changes
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: {
     padding: 16,
     gap: 16,
@@ -232,21 +234,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
   },
   error: {
     fontSize: 13,

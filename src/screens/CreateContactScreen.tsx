@@ -60,6 +60,7 @@ import {
   RelationshipEditor,
   type RelationshipEditorHandle,
 } from "@/components/RelationshipEditor";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import { AccordionSection, AppText, Button, FieldError } from "@/components/ui";
@@ -508,483 +509,473 @@ export function CreateContactScreen({
   }
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      innerViewRef={contentRef}
-      testID="create-contact-screen"
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        <Pressable
-          testID="create-contact-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.backBtn, { borderColor: colors.border }]}
+    <View style={styles.root}>
+      {/* House header (38.9 D-16, D-44): its Back calls goBack, which the
+          unsaved-work guard above intercepts (D-13). */}
+      <ShellAppBar variant="child" title="New contact" />
+      <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
+        testID="create-contact-screen"
+        contentContainerStyle={styles.content}
+      >
+        {/* -- Identity section (Name + Category) — open by default (CAPT-01). -- */}
+        <AccordionSection
+          sectionId="identity"
+          title="Identity"
+          expanded={expandedSections.identity}
+          onExpandedChange={(next) => setSectionExpanded("identity", next)}
+          containerRef={registerSectionRef("identity")}
         >
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Back
-          </AppText>
-        </Pressable>
-        <AppText role="display" accessibilityRole="header">
-          New contact
-        </AppText>
-      </View>
-
-      {/* -- Identity section (Name + Category) — open by default (CAPT-01). -- */}
-      <AccordionSection
-        sectionId="identity"
-        title="Identity"
-        expanded={expandedSections.identity}
-        onExpandedChange={(next) => setSectionExpanded("identity", next)}
-        containerRef={registerSectionRef("identity")}
-      >
-        <View ref={nameFieldRef} style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Name
-          </AppText>
-          <TextInput
-            ref={nameInputRef}
-            testID="create-contact-name"
-            accessibilityLabel="Name"
-            value={name}
-            onChangeText={(next) => {
-              setName(next);
-              clearError("name");
-            }}
-            placeholder="Their name"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.input,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-          <FieldError
-            testID="create-contact-name-error"
-            message={fieldErrors.name}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Category
-          </AppText>
-          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Category"
-              onPress={() => setCategorySheetOpen(true)}
+          <View ref={nameFieldRef} style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Name
+            </AppText>
+            <TextInput
+              ref={nameInputRef}
+              testID="create-contact-name"
+              accessibilityLabel="Name"
+              value={name}
+              onChangeText={(next) => {
+                setName(next);
+                clearError("name");
+              }}
+              placeholder="Their name"
+              placeholderTextColor={colors.textPlaceholder}
               style={[
-                styles.pickerShell,
-                styles.categoryChoice,
-                { backgroundColor: colors.surface, borderColor: colors.border },
+                styles.input,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
               ]}
-            >
-              <AppText>
-                {categories.find((row) => row.id === categoryId)?.name ??
-                  "Uncategorized"}
-              </AppText>
-            </Pressable>
-          ) : (
-            <View
-              style={[
-                styles.pickerShell,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                testID="create-contact-category"
-                accessibilityLabel="Category"
-                selectedValue={categoryId ?? -1}
-                onValueChange={(v) =>
-                  setCategoryId(v === -1 ? null : Number(v))
-                }
-                dropdownIconColor={colors.textSecondary}
-                style={{ color: colors.textPrimary }}
-              >
-                <Picker.Item label="Uncategorized" value={-1} />
-                {categories.map((c) => (
-                  <Picker.Item key={c.id} label={c.name} value={c.id} />
-                ))}
-              </Picker>
-            </View>
-          )}
-          <CategoryChoiceSheet
-            visible={categorySheetOpen}
-            categories={categories}
-            selectedId={categoryId}
-            onSelect={setCategoryId}
-            onRequestClose={() => setCategorySheetOpen(false)}
-          />
-        </View>
-      </AccordionSection>
-
-      {/* -- Relationship Basics: last-spoke + cadence/Bound coordination. -- */}
-      <AccordionSection
-        sectionId="relationship"
-        title="Relationship Basics"
-        expanded={expandedSections.relationship}
-        onExpandedChange={(next) => setSectionExpanded("relationship", next)}
-        containerRef={registerSectionRef("relationship")}
-      >
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Last spoke
-          </AppText>
-          <TriStateLastSpoke
-            testID="create-contact-last-spoke"
-            value={lastSpoke}
-            onChange={setLastSpoke}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Orbit participation
-          </AppText>
-          <View style={styles.lifecycleChoices}>
-            {([true, false] as const).map((enabled) => {
-              const selected = trackingEnabled === enabled;
-              const label = enabled ? "Bound" : "Unbound";
-              return (
-                <Pressable
-                  key={label}
-                  testID={`create-contact-${label.toLowerCase()}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={label}
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    // Coordinate cadence + Bound as one unit (CAPT-03): binding
-                    // with no cadence gates Save until a valid interval is picked;
-                    // unbinding retains any interval as dormant.
-                    const next = coordinateBoundToggle(
-                      { intervalDays },
-                      enabled,
-                    );
-                    setTrackingEnabled(next.trackingEnabled);
-                    setIntervalDays(next.intervalDays);
-                    setIntervalValid(next.intervalValid);
-                    clearError("frequency");
-                  }}
-                  style={[
-                    styles.lifecycleChoice,
-                    {
-                      borderColor: selected ? colors.accent : colors.border,
-                      backgroundColor: selected
-                        ? colors.accent
-                        : colors.surface,
-                    },
-                  ]}
-                >
-                  <AppText
-                    role="label"
-                    style={{
-                      color: selected ? colors.onAccent : colors.textPrimary,
-                    }}
-                  >
-                    {label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
+            />
+            <FieldError
+              testID="create-contact-name-error"
+              message={fieldErrors.name}
+            />
           </View>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            {trackingEnabled
-              ? "Bound contacts appear in your active orbit and receive cadence reminders."
-              : "Unbound contacts keep their details and history without active cadence reminders."}
-          </AppText>
-        </View>
 
-        {trackingEnabled ? (
           <View style={styles.field}>
             <AppText role="label" style={{ color: colors.textSecondary }}>
-              Frequency
+              Category
             </AppText>
-            <FrequencyPicker
-              testID="create-contact-frequency"
-              value={intervalDays ?? 0}
-              onChange={(v) => {
-                // Selecting a cadence turns Bound on (CAPT-03).
-                const next = coordinateCadenceSelection(v);
-                setTrackingEnabled(next.trackingEnabled);
-                setIntervalDays(next.intervalDays);
-                clearError("frequency");
-              }}
-              onValidityChange={setIntervalValid}
+            {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Category"
+                onPress={() => setCategorySheetOpen(true)}
+                style={[
+                  styles.pickerShell,
+                  styles.categoryChoice,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <AppText>
+                  {categories.find((row) => row.id === categoryId)?.name ??
+                    "Uncategorized"}
+                </AppText>
+              </Pressable>
+            ) : (
+              <View
+                style={[
+                  styles.pickerShell,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Picker
+                  testID="create-contact-category"
+                  accessibilityLabel="Category"
+                  selectedValue={categoryId ?? -1}
+                  onValueChange={(v) =>
+                    setCategoryId(v === -1 ? null : Number(v))
+                  }
+                  dropdownIconColor={colors.textSecondary}
+                  style={{ color: colors.textPrimary }}
+                >
+                  <Picker.Item label="Uncategorized" value={-1} />
+                  {categories.map((c) => (
+                    <Picker.Item key={c.id} label={c.name} value={c.id} />
+                  ))}
+                </Picker>
+              </View>
+            )}
+            <CategoryChoiceSheet
+              visible={categorySheetOpen}
+              categories={categories}
+              selectedId={categoryId}
+              onSelect={setCategoryId}
+              onRequestClose={() => setCategorySheetOpen(false)}
             />
           </View>
-        ) : null}
-      </AccordionSection>
+        </AccordionSection>
 
-      {/* -- Contact Methods section. -- */}
-      <AccordionSection
-        sectionId="methods"
-        title="Contact Methods"
-        expanded={expandedSections.methods}
-        onExpandedChange={(next) => setSectionExpanded("methods", next)}
-        containerRef={registerSectionRef("methods")}
-      >
-        <ContactMethodsEditor
-          testID="create-contact-methods"
-          methods={methods}
-          onAdd={(type: ContactMethodType) =>
-            setMethods((current) => addMethodDraft(current, type, newUid()))
-          }
-          onUpdate={(uid, patch) =>
-            setMethods((current) => updateMethodDraft(current, uid, patch))
-          }
-          onRemove={(uid) =>
-            setMethods((current) => removeMethodDraft(current, uid))
-          }
-          onChoosePrimary={(uid) =>
-            setMethods((current) => choosePrimary(current, uid))
-          }
-        />
-      </AccordionSection>
-
-      {/* -- Show More: reveals the advanced enrichment sections (dossier §D). -- */}
-      {showMore ? (
-        <>
-          <AccordionSection
-            sectionId="lastTalked"
-            title="Last Talked About"
-            expanded={expandedSections.lastTalked}
-            onExpandedChange={(next) => setSectionExpanded("lastTalked", next)}
-          >
-            <TextInput
-              testID="create-contact-last-talked"
-              accessibilityLabel="Last talked about"
-              value={lastTalkedAbout}
-              onChangeText={setLastTalkedAbout}
-              placeholder="What did you last talk about?"
-              placeholderTextColor={colors.textPlaceholder}
-              style={[
-                styles.input,
-                {
-                  color: colors.textPrimary,
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
+        {/* -- Relationship Basics: last-spoke + cadence/Bound coordination. -- */}
+        <AccordionSection
+          sectionId="relationship"
+          title="Relationship Basics"
+          expanded={expandedSections.relationship}
+          onExpandedChange={(next) => setSectionExpanded("relationship", next)}
+          containerRef={registerSectionRef("relationship")}
+        >
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Last spoke
+            </AppText>
+            <TriStateLastSpoke
+              testID="create-contact-last-spoke"
+              value={lastSpoke}
+              onChange={setLastSpoke}
             />
-          </AccordionSection>
+          </View>
 
-          <AccordionSection
-            sectionId="keyPeople"
-            title="Key People"
-            expanded={expandedSections.keyPeople}
-            onExpandedChange={(next) =>
-              next
-                ? setSectionExpanded("keyPeople", true)
-                : requestClose(() => {
-                    relationshipEditorRef.current?.closeDraft();
-                    setSectionExpanded("keyPeople", false);
-                  }, relationshipDraft.dirty)
-            }
-          >
-            <RelationshipEditor
-              contactId={0}
-              ref={relationshipEditorRef}
-              onDraftStateChange={setRelationshipDraft}
-              items={relationshipDrafts.map(relationshipDraftToRow)}
-              onAdd={async (draft: RelationshipDraft) => {
-                setRelationshipDrafts((prev) => [...prev, draft]);
-                return true;
-              }}
-              onEdit={async (id: number, draft: RelationshipDraft) => {
-                setRelationshipDrafts((prev) =>
-                  prev.map((d, i) => (i === id ? draft : d)),
-                );
-                return true;
-              }}
-              onDelete={(id: number) =>
-                setRelationshipDrafts((prev) => prev.filter((_, i) => i !== id))
-              }
-              onRestore={() => {}}
-            />
-          </AccordionSection>
-
-          <AccordionSection
-            sectionId="currentLocation"
-            title="Current Location"
-            expanded={expandedSections.currentLocation}
-            onExpandedChange={(next) =>
-              setSectionExpanded("currentLocation", next)
-            }
-          >
-            <TextInput
-              testID="create-contact-current-location"
-              accessibilityLabel="Current location"
-              value={currentLocation}
-              onChangeText={setCurrentLocation}
-              placeholder="Where are they now?"
-              placeholderTextColor={colors.textPlaceholder}
-              style={[
-                styles.input,
-                {
-                  color: colors.textPrimary,
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-          </AccordionSection>
-
-          <AccordionSection
-            sectionId="memories"
-            title="Memories"
-            expanded={expandedSections.memories}
-            onExpandedChange={(next) =>
-              next
-                ? setSectionExpanded("memories", true)
-                : requestClose(() => {
-                    memoryEditorRef.current?.closeDraft();
-                    setSectionExpanded("memories", false);
-                  }, memoryDraft.dirty)
-            }
-          >
-            <MemoryEditor
-              testID="create-contact-memories"
-              ref={memoryEditorRef}
-              onDraftStateChange={setMemoryDraft}
-              items={memoryDrafts.map(memoryDraftToRow)}
-              globalAiEnabled={false}
-              onAdd={async (draft: MemoryDraft) => {
-                setMemoryDrafts((prev) => [...prev, draft]);
-                return true;
-              }}
-              onEdit={async (id: number, patch: MemoryEditPatch) => {
-                setMemoryDrafts((prev) =>
-                  prev.map((d, i) => (i === id ? patch : d)),
-                );
-                return true;
-              }}
-              onDelete={(id: number) =>
-                setMemoryDrafts((prev) => prev.filter((_, i) => i !== id))
-              }
-              onRestore={() => {}}
-              onSetAllowAi={() => {}}
-            />
-          </AccordionSection>
-
-          {createDefs.length > 0 ? (
-            <AccordionSection
-              sectionId="custom"
-              title="Custom Fields"
-              expanded={expandedSections.custom}
-              onExpandedChange={(next) => setSectionExpanded("custom", next)}
-            >
-              <View
-                testID="create-contact-custom-block"
-                style={styles.customBlock}
-              >
-                {createDefs.map((def) => (
-                  <View key={def.id} style={styles.field}>
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Orbit participation
+            </AppText>
+            <View style={styles.lifecycleChoices}>
+              {([true, false] as const).map((enabled) => {
+                const selected = trackingEnabled === enabled;
+                const label = enabled ? "Bound" : "Unbound";
+                return (
+                  <Pressable
+                    key={label}
+                    testID={`create-contact-${label.toLowerCase()}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      // Coordinate cadence + Bound as one unit (CAPT-03): binding
+                      // with no cadence gates Save until a valid interval is picked;
+                      // unbinding retains any interval as dormant.
+                      const next = coordinateBoundToggle(
+                        { intervalDays },
+                        enabled,
+                      );
+                      setTrackingEnabled(next.trackingEnabled);
+                      setIntervalDays(next.intervalDays);
+                      setIntervalValid(next.intervalValid);
+                      clearError("frequency");
+                    }}
+                    style={[
+                      styles.lifecycleChoice,
+                      {
+                        borderColor: selected ? colors.accent : colors.border,
+                        backgroundColor: selected
+                          ? colors.accent
+                          : colors.surface,
+                      },
+                    ]}
+                  >
                     <AppText
                       role="label"
-                      style={{ color: colors.textSecondary }}
+                      style={{
+                        color: selected ? colors.onAccent : colors.textPrimary,
+                      }}
                     >
-                      {def.label}
+                      {label}
                     </AppText>
-                    <FieldValueInput
-                      testID={`create-contact-custom-${def.col_name}`}
-                      field={def}
-                      value={values[def.col_name] ?? null}
-                      onChange={(v) =>
-                        setValues((prev) => ({ ...prev, [def.col_name]: v }))
-                      }
-                    />
-                  </View>
-                ))}
-              </View>
-            </AccordionSection>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              {trackingEnabled
+                ? "Bound contacts appear in your active orbit and receive cadence reminders."
+                : "Unbound contacts keep their details and history without active cadence reminders."}
+            </AppText>
+          </View>
+
+          {trackingEnabled ? (
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Frequency
+              </AppText>
+              <FrequencyPicker
+                testID="create-contact-frequency"
+                value={intervalDays ?? 0}
+                onChange={(v) => {
+                  // Selecting a cadence turns Bound on (CAPT-03).
+                  const next = coordinateCadenceSelection(v);
+                  setTrackingEnabled(next.trackingEnabled);
+                  setIntervalDays(next.intervalDays);
+                  clearError("frequency");
+                }}
+                onValidityChange={setIntervalValid}
+              />
+            </View>
           ) : null}
+        </AccordionSection>
 
-          <AccordionSection
-            sectionId="offLimits"
-            title="Off Limits"
-            expanded={expandedSections.offLimits}
-            onExpandedChange={(next) => setSectionExpanded("offLimits", next)}
-          >
-            <FuelEditor
-              testID="create-contact-off-limits"
-              items={fuelDrafts.map((d, i) => fuelDraftToItem(d, i, draftNow))}
-              now={draftNow}
-              onAdd={async (draft: FuelDraft) => {
-                setFuelDrafts((prev) => [...prev, draft]);
-                return true;
-              }}
-              onEdit={(id: number, patch: FuelEditPatch) =>
-                setFuelDrafts((prev) =>
-                  prev.map((d, i) => (i === id ? { ...d, ...patch } : d)),
-                )
-              }
-              onDelete={(id: number) =>
-                setFuelDrafts((prev) => prev.filter((_, i) => i !== id))
-              }
-            />
-          </AccordionSection>
-        </>
-      ) : (
-        <Button
-          testID="create-contact-show-more"
-          role="tertiary"
-          label="Show More"
-          onPress={() => setShowMore(true)}
-        />
-      )}
+        {/* -- Contact Methods section. -- */}
+        <AccordionSection
+          sectionId="methods"
+          title="Contact Methods"
+          expanded={expandedSections.methods}
+          onExpandedChange={(next) => setSectionExpanded("methods", next)}
+          containerRef={registerSectionRef("methods")}
+        >
+          <ContactMethodsEditor
+            testID="create-contact-methods"
+            methods={methods}
+            onAdd={(type: ContactMethodType) =>
+              setMethods((current) => addMethodDraft(current, type, newUid()))
+            }
+            onUpdate={(uid, patch) =>
+              setMethods((current) => updateMethodDraft(current, uid, patch))
+            }
+            onRemove={(uid) =>
+              setMethods((current) => removeMethodDraft(current, uid))
+            }
+            onChoosePrimary={(uid) =>
+              setMethods((current) => choosePrimary(current, uid))
+            }
+          />
+        </AccordionSection>
 
-      {/* Save stays PRESSABLE when the form is incomplete so a blocked press
+        {/* -- Show More: reveals the advanced enrichment sections (dossier §D). -- */}
+        {showMore ? (
+          <>
+            <AccordionSection
+              sectionId="lastTalked"
+              title="Last Talked About"
+              expanded={expandedSections.lastTalked}
+              onExpandedChange={(next) =>
+                setSectionExpanded("lastTalked", next)
+              }
+            >
+              <TextInput
+                testID="create-contact-last-talked"
+                accessibilityLabel="Last talked about"
+                value={lastTalkedAbout}
+                onChangeText={setLastTalkedAbout}
+                placeholder="What did you last talk about?"
+                placeholderTextColor={colors.textPlaceholder}
+                style={[
+                  styles.input,
+                  {
+                    color: colors.textPrimary,
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            </AccordionSection>
+
+            <AccordionSection
+              sectionId="keyPeople"
+              title="Key People"
+              expanded={expandedSections.keyPeople}
+              onExpandedChange={(next) =>
+                next
+                  ? setSectionExpanded("keyPeople", true)
+                  : requestClose(() => {
+                      relationshipEditorRef.current?.closeDraft();
+                      setSectionExpanded("keyPeople", false);
+                    }, relationshipDraft.dirty)
+              }
+            >
+              <RelationshipEditor
+                contactId={0}
+                ref={relationshipEditorRef}
+                onDraftStateChange={setRelationshipDraft}
+                items={relationshipDrafts.map(relationshipDraftToRow)}
+                onAdd={async (draft: RelationshipDraft) => {
+                  setRelationshipDrafts((prev) => [...prev, draft]);
+                  return true;
+                }}
+                onEdit={async (id: number, draft: RelationshipDraft) => {
+                  setRelationshipDrafts((prev) =>
+                    prev.map((d, i) => (i === id ? draft : d)),
+                  );
+                  return true;
+                }}
+                onDelete={(id: number) =>
+                  setRelationshipDrafts((prev) =>
+                    prev.filter((_, i) => i !== id),
+                  )
+                }
+                onRestore={() => {}}
+              />
+            </AccordionSection>
+
+            <AccordionSection
+              sectionId="currentLocation"
+              title="Current Location"
+              expanded={expandedSections.currentLocation}
+              onExpandedChange={(next) =>
+                setSectionExpanded("currentLocation", next)
+              }
+            >
+              <TextInput
+                testID="create-contact-current-location"
+                accessibilityLabel="Current location"
+                value={currentLocation}
+                onChangeText={setCurrentLocation}
+                placeholder="Where are they now?"
+                placeholderTextColor={colors.textPlaceholder}
+                style={[
+                  styles.input,
+                  {
+                    color: colors.textPrimary,
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            </AccordionSection>
+
+            <AccordionSection
+              sectionId="memories"
+              title="Memories"
+              expanded={expandedSections.memories}
+              onExpandedChange={(next) =>
+                next
+                  ? setSectionExpanded("memories", true)
+                  : requestClose(() => {
+                      memoryEditorRef.current?.closeDraft();
+                      setSectionExpanded("memories", false);
+                    }, memoryDraft.dirty)
+              }
+            >
+              <MemoryEditor
+                testID="create-contact-memories"
+                ref={memoryEditorRef}
+                onDraftStateChange={setMemoryDraft}
+                items={memoryDrafts.map(memoryDraftToRow)}
+                globalAiEnabled={false}
+                onAdd={async (draft: MemoryDraft) => {
+                  setMemoryDrafts((prev) => [...prev, draft]);
+                  return true;
+                }}
+                onEdit={async (id: number, patch: MemoryEditPatch) => {
+                  setMemoryDrafts((prev) =>
+                    prev.map((d, i) => (i === id ? patch : d)),
+                  );
+                  return true;
+                }}
+                onDelete={(id: number) =>
+                  setMemoryDrafts((prev) => prev.filter((_, i) => i !== id))
+                }
+                onRestore={() => {}}
+                onSetAllowAi={() => {}}
+              />
+            </AccordionSection>
+
+            {createDefs.length > 0 ? (
+              <AccordionSection
+                sectionId="custom"
+                title="Custom Fields"
+                expanded={expandedSections.custom}
+                onExpandedChange={(next) => setSectionExpanded("custom", next)}
+              >
+                <View
+                  testID="create-contact-custom-block"
+                  style={styles.customBlock}
+                >
+                  {createDefs.map((def) => (
+                    <View key={def.id} style={styles.field}>
+                      <AppText
+                        role="label"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {def.label}
+                      </AppText>
+                      <FieldValueInput
+                        testID={`create-contact-custom-${def.col_name}`}
+                        field={def}
+                        value={values[def.col_name] ?? null}
+                        onChange={(v) =>
+                          setValues((prev) => ({ ...prev, [def.col_name]: v }))
+                        }
+                      />
+                    </View>
+                  ))}
+                </View>
+              </AccordionSection>
+            ) : null}
+
+            <AccordionSection
+              sectionId="offLimits"
+              title="Off Limits"
+              expanded={expandedSections.offLimits}
+              onExpandedChange={(next) => setSectionExpanded("offLimits", next)}
+            >
+              <FuelEditor
+                testID="create-contact-off-limits"
+                items={fuelDrafts.map((d, i) =>
+                  fuelDraftToItem(d, i, draftNow),
+                )}
+                now={draftNow}
+                onAdd={async (draft: FuelDraft) => {
+                  setFuelDrafts((prev) => [...prev, draft]);
+                  return true;
+                }}
+                onEdit={(id: number, patch: FuelEditPatch) =>
+                  setFuelDrafts((prev) =>
+                    prev.map((d, i) => (i === id ? { ...d, ...patch } : d)),
+                  )
+                }
+                onDelete={(id: number) =>
+                  setFuelDrafts((prev) => prev.filter((_, i) => i !== id))
+                }
+              />
+            </AccordionSection>
+          </>
+        ) : (
+          <Button
+            testID="create-contact-show-more"
+            role="tertiary"
+            label="Show More"
+            onPress={() => setShowMore(true)}
+          />
+        )}
+
+        {/* Save stays PRESSABLE when the form is incomplete so a blocked press
           reveals + focuses the erroring section (CAPT-14) rather than being an
           inert disabled button; it is only truly disabled while a save is in
           flight. Visual emphasis still follows `savable`. */}
-      <Pressable
-        testID="create-contact-save"
-        accessibilityRole="button"
-        accessibilityLabel="Save contact"
-        accessibilityState={{ disabled: saving }}
-        disabled={saving}
-        onPress={() => void handleSave()}
-        style={[
-          styles.saveBtn,
-          {
-            backgroundColor: savable ? colors.accent : colors.surface,
-            borderColor: savable ? colors.accent : colors.border,
-          },
-        ]}
-      >
-        <AppText
-          role="label"
-          style={{
-            color: savable ? colors.onAccent : colors.textSecondary,
-          }}
+        <Pressable
+          testID="create-contact-save"
+          accessibilityRole="button"
+          accessibilityLabel="Save contact"
+          accessibilityState={{ disabled: saving }}
+          disabled={saving}
+          onPress={() => void handleSave()}
+          style={[
+            styles.saveBtn,
+            {
+              backgroundColor: savable ? colors.accent : colors.surface,
+              borderColor: savable ? colors.accent : colors.border,
+            },
+          ]}
         >
-          Save contact
-        </AppText>
-      </Pressable>
-    </ScrollView>
+          <AppText
+            role="label"
+            style={{
+              color: savable ? colors.onAccent : colors.textSecondary,
+            }}
+          >
+            Save contact
+          </AppText>
+        </Pressable>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: {
     padding: 16,
     gap: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
   },
   title: {
     fontSize: 24,

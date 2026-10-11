@@ -66,6 +66,7 @@ vi.mock("react-native", () => ({
 vi.mock("@/components/ContactPicker", () => ({
   ContactPicker: "ContactPicker",
 }));
+vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/components/TouchpointRefineForm", () => ({
   TouchpointRefineForm: "TouchpointRefineForm",
 }));
@@ -213,6 +214,14 @@ describe("GroupLogScreen Save (38.9 D-19; F-12)", () => {
           element.props.children === "Save problem",
       ),
     ).toBe(true);
+  });
+
+  it("renders the house header titled Group Log (38.9 D-16)", () => {
+    const tree = render();
+    const headers = tree.filter((element) => element.type === "ShellAppBar");
+    expect(headers).toHaveLength(1);
+    expect(headers[0].props.variant).toBe("child");
+    expect(headers[0].props.title).toBe("Group Log");
   });
 
   it("typing in Title clears only titleError", () => {

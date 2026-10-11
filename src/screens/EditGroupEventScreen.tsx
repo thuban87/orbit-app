@@ -16,6 +16,7 @@ import {
   participantDraft,
 } from "@/components/group/ParticipantOverrideEditor";
 import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantSheet";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { TouchpointRefineForm } from "@/components/TouchpointRefineForm";
 import { AppText, Button, Sheet } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -240,31 +241,32 @@ export function EditGroupEventScreen({
     }
   }
 
+  // House header (38.9 D-16, D-44): its Back calls goBack, which the
+  // unsaved-work guard above intercepts (D-13).
+  const header = <ShellAppBar variant="child" title="Edit Group Event" />;
+
   if (!event || !draft) {
     return (
-      <View style={styles.loading}>
-        {state.loadError ? (
-          <AppText role="body" style={{ color: colors.danger }}>
-            Couldn't load this group event. Please go back and retry.
-          </AppText>
-        ) : (
-          <ActivityIndicator color={colors.accentText} />
-        )}
+      <View style={styles.screen}>
+        {header}
+        <View style={styles.loading}>
+          {state.loadError ? (
+            <AppText role="body" style={{ color: colors.danger }}>
+              Couldn't load this group event. Please go back and retry.
+            </AppText>
+          ) : (
+            <ActivityIndicator color={colors.accentText} />
+          )}
+        </View>
       </View>
     );
   }
 
+  // No opaque screen fill: pushed screens show the theme art (38.9 D-17).
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={styles.screen}>
+      {header}
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Button
-            role="secondary"
-            label="Back"
-            onPress={() => navigation.goBack()}
-          />
-          <AppText role="heading">Edit Group Event</AppText>
-        </View>
         <AppText role="body">{event.title}</AppText>
         <TouchpointRefineForm
           testID="edit-group-event-form"
@@ -406,7 +408,6 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
   },
   content: { padding: SPACING.base, gap: SPACING.base },
-  header: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
   field: { gap: SPACING.sm },
   note: {
     minHeight: 88,

@@ -7,6 +7,7 @@ import {
   ParticipantOverrideEditor,
   participantDraft,
 } from "@/components/group/ParticipantOverrideEditor";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import { saveParticipantEdits } from "@/db/group-events-dao";
@@ -97,53 +98,60 @@ export function EditParticipantScreen({
 
   if (!loaded || !draft) {
     return (
-      <View style={styles.loading}>
-        {error ? (
-          <AppText role="body" style={{ color: colors.danger }}>
-            {error}
-          </AppText>
-        ) : (
-          <ActivityIndicator color={colors.accentText} />
-        )}
+      <View style={styles.root}>
+        <ShellAppBar variant="child" title="Edit participant" />
+        <View style={styles.loading}>
+          {error ? (
+            <AppText role="body" style={{ color: colors.danger }}>
+              {error}
+            </AppText>
+          ) : (
+            <ActivityIndicator color={colors.accentText} />
+          )}
+        </View>
       </View>
     );
   }
 
+  // House header (38.9 D-16, D-44) with the person line from the loaded
+  // participant (D-45); its Back calls goBack, which the guard above intercepts
+  // (D-13). No opaque screen fill: the theme art shows (D-17).
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.background }}
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        <Button
-          role="secondary"
-          label="Back"
-          onPress={() => navigation.goBack()}
+    <View style={styles.root}>
+      <ShellAppBar
+        variant="child"
+        title="Edit participant"
+        person={{
+          name: loaded.participant.contactName,
+          photo: loaded.participant.contactPhoto,
+          contactId: loaded.participant.contactId,
+        }}
+      />
+      <ScrollView contentContainerStyle={styles.content}>
+        <ParticipantOverrideEditor
+          event={loaded.event}
+          participant={loaded.participant}
+          draft={draft}
+          onChange={setDraft}
         />
-        <AppText role="heading">Edit participant</AppText>
-      </View>
-      <ParticipantOverrideEditor
-        event={loaded.event}
-        participant={loaded.participant}
-        draft={draft}
-        onChange={setDraft}
-      />
-      {error ? (
-        <AppText role="caption" style={{ color: colors.danger }}>
-          {error}
-        </AppText>
-      ) : null}
-      <Button
-        role="primary"
-        label="Save changes"
-        disabled={saving}
-        onPress={() => void save()}
-      />
-    </ScrollView>
+        {error ? (
+          <AppText role="caption" style={{ color: colors.danger }}>
+            {error}
+          </AppText>
+        ) : null}
+        <Button
+          role="primary"
+          label="Save changes"
+          disabled={saving}
+          onPress={() => void save()}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   loading: {
     flex: 1,
     alignItems: "center",
@@ -151,5 +159,4 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
   },
   content: { padding: SPACING.base, gap: SPACING.base },
-  header: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
 });

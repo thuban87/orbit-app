@@ -89,6 +89,7 @@ import {
   RelationshipEditor,
   type RelationshipEditorHandle,
 } from "@/components/RelationshipEditor";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import { AccordionSection, AppText, FieldError } from "@/components/ui";
@@ -1184,10 +1185,13 @@ export function EditContactScreen({
 
   if (!form) {
     return (
-      <View testID="edit-contact-loading" style={styles.loading}>
-        <AppText role="body" style={{ color: colors.textSecondary }}>
-          Loading…
-        </AppText>
+      <View style={styles.root}>
+        <ShellAppBar variant="child" title="Edit contact" />
+        <View testID="edit-contact-loading" style={styles.loading}>
+          <AppText role="body" style={{ color: colors.textSecondary }}>
+            Loading…
+          </AppText>
+        </View>
       </View>
     );
   }
@@ -1221,97 +1225,179 @@ export function EditContactScreen({
   );
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      innerViewRef={contentRef}
-      testID="edit-contact-screen"
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        <Pressable
-          testID="edit-contact-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.backBtn, { borderColor: colors.border }]}
-        >
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Back
-          </AppText>
-        </Pressable>
-        <AppText role="display" accessibilityRole="header">
-          Edit contact
-        </AppText>
-      </View>
-
-      {/* -- Identity: photo + name/category + birthday/social battery + the two
-          reminder toggles — the exhaustive identity/admin section. -- */}
-      <AccordionSection
-        sectionId="identity"
-        title="Identity"
-        expanded={expandedSections.identity}
-        onExpandedChange={(next) => setSectionExpanded("identity", next)}
-        containerRef={registerSectionRef("identity")}
+    <View style={styles.root}>
+      {/* House header (38.9 D-16, D-44). Title only: this is where the name and
+          photo are edited, so no person line (D-64). Its Back calls goBack,
+          which the unsaved-work guard above intercepts (D-13). */}
+      <ShellAppBar variant="child" title="Edit contact" />
+      <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
+        testID="edit-contact-screen"
+        contentContainerStyle={styles.content}
       >
-        {/* Photo (edit-only — contactId always exists here). Held as SEPARATE state,
+        {/* -- Identity: photo + name/category + birthday/social battery + the two
+          reminder toggles — the exhaustive identity/admin section. -- */}
+        <AccordionSection
+          sectionId="identity"
+          title="Identity"
+          expanded={expandedSections.identity}
+          onExpandedChange={(next) => setSectionExpanded("identity", next)}
+          containerRef={registerSectionRef("identity")}
+        >
+          {/* Photo (edit-only — contactId always exists here). Held as SEPARATE state,
             written through its own DAO by PhotoSourcePicker/CropPhotoScreen, refreshed
             via the photo-only useFocusEffect above — never through the metadata Save. */}
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Photo
-          </AppText>
-          <PhotoSourcePicker
-            target={{ kind: "contact", contactId }}
-            photo={photo}
-            name={form.name}
-            onChanged={refreshPhoto}
-          />
-        </View>
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Photo
+            </AppText>
+            <PhotoSourcePicker
+              target={{ kind: "contact", contactId }}
+              photo={photo}
+              name={form.name}
+              onChanged={refreshPhoto}
+            />
+          </View>
 
-        <View ref={nameFieldRef} style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Name
-          </AppText>
-          <TextInput
-            ref={nameInputRef}
-            testID="edit-contact-name"
-            accessibilityLabel="Name"
-            value={form.name}
-            onChangeText={(v) => {
-              setField("name", v);
-              clearError("name");
-            }}
-            placeholder="Their name"
-            placeholderTextColor={colors.textPlaceholder}
-            style={inputStyle}
-          />
-          <FieldError
-            testID="edit-contact-name-error"
-            message={fieldErrors.name}
-          />
-        </View>
+          <View ref={nameFieldRef} style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Name
+            </AppText>
+            <TextInput
+              ref={nameInputRef}
+              testID="edit-contact-name"
+              accessibilityLabel="Name"
+              value={form.name}
+              onChangeText={(v) => {
+                setField("name", v);
+                clearError("name");
+              }}
+              placeholder="Their name"
+              placeholderTextColor={colors.textPlaceholder}
+              style={inputStyle}
+            />
+            <FieldError
+              testID="edit-contact-name-error"
+              message={fieldErrors.name}
+            />
+          </View>
 
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Category
-          </AppText>
-          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Category
+            </AppText>
+            {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Category"
+                onPress={() => setCategorySheetOpen(true)}
+                style={[
+                  styles.pickerShell,
+                  styles.categoryChoice,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <AppText>
+                  {categories.find((row) => row.id === form.categoryId)?.name ??
+                    "Uncategorized"}
+                </AppText>
+              </Pressable>
+            ) : (
+              <View
+                style={[
+                  styles.pickerShell,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Picker
+                  testID="edit-contact-category"
+                  accessibilityLabel="Category"
+                  selectedValue={form.categoryId ?? -1}
+                  onValueChange={(v) =>
+                    setField("categoryId", v === -1 ? null : Number(v))
+                  }
+                  dropdownIconColor={colors.textSecondary}
+                  style={{ color: colors.textPrimary }}
+                >
+                  <Picker.Item label="Uncategorized" value={-1} />
+                  {categories.map((c) => (
+                    <Picker.Item key={c.id} label={c.name} value={c.id} />
+                  ))}
+                </Picker>
+              </View>
+            )}
+            <CategoryChoiceSheet
+              visible={categorySheetOpen}
+              categories={categories}
+              selectedId={form.categoryId}
+              onSelect={(value) => setField("categoryId", value)}
+              onRequestClose={() => setCategorySheetOpen(false)}
+            />
+          </View>
+
+          {/* Birthday: native date picker + a "Year unknown" toggle (the native
+            picker has no month/day-only mode, so year-optional is app logic —
+            MM-DD when unknown, YYYY-MM-DD when known; Pitfall 7). */}
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Birthday
+            </AppText>
             <Pressable
+              testID="edit-contact-birthday"
               accessibilityRole="button"
-              accessibilityLabel="Category"
-              onPress={() => setCategorySheetOpen(true)}
+              accessibilityLabel="Birthday"
+              onPress={() => setShowBirthdayPicker(true)}
               style={[
-                styles.pickerShell,
-                styles.categoryChoice,
+                styles.input,
+                styles.birthdayTrigger,
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <AppText>
-                {categories.find((row) => row.id === form.categoryId)?.name ??
-                  "Uncategorized"}
+              <AppText
+                role="body"
+                style={{
+                  color: form.birthdayInput
+                    ? colors.textPrimary
+                    : colors.textSecondary,
+                }}
+              >
+                {birthdayLabel}
               </AppText>
             </Pressable>
-          ) : (
+            <View style={styles.toggleRow}>
+              <AppText role="label" style={{ color: colors.textPrimary }}>
+                Year unknown
+              </AppText>
+              <Switch
+                testID="edit-contact-birthday-year-unknown"
+                accessibilityLabel="Year unknown"
+                value={form.birthdayYearUnknown}
+                onValueChange={(v) => setField("birthdayYearUnknown", v)}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.surfaceElevated}
+              />
+            </View>
+            {showBirthdayPicker ? (
+              <DateTimePicker
+                testID="edit-contact-birthday-picker"
+                value={birthdaySeed}
+                mode="date"
+                onChange={onBirthdayChange}
+              />
+            ) : null}
+          </View>
+
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Social battery
+            </AppText>
             <View
               style={[
                 styles.pickerShell,
@@ -1319,483 +1405,400 @@ export function EditContactScreen({
               ]}
             >
               <Picker
-                testID="edit-contact-category"
-                accessibilityLabel="Category"
-                selectedValue={form.categoryId ?? -1}
+                testID="edit-contact-social-battery"
+                accessibilityLabel="Social battery"
+                selectedValue={form.socialBattery ?? ""}
                 onValueChange={(v) =>
-                  setField("categoryId", v === -1 ? null : Number(v))
+                  setField("socialBattery", v === "" ? null : String(v))
                 }
                 dropdownIconColor={colors.textSecondary}
                 style={{ color: colors.textPrimary }}
               >
-                <Picker.Item label="Uncategorized" value={-1} />
-                {categories.map((c) => (
-                  <Picker.Item key={c.id} label={c.name} value={c.id} />
+                <Picker.Item label="No selection" value="" />
+                {SOCIAL_BATTERY_OPTIONS.map((o) => (
+                  <Picker.Item key={o} label={o} value={o} />
                 ))}
               </Picker>
             </View>
-          )}
-          <CategoryChoiceSheet
-            visible={categorySheetOpen}
-            categories={categories}
-            selectedId={form.categoryId}
-            onSelect={(value) => setField("categoryId", value)}
-            onRequestClose={() => setCategorySheetOpen(false)}
-          />
-        </View>
-
-        {/* Birthday: native date picker + a "Year unknown" toggle (the native
-            picker has no month/day-only mode, so year-optional is app logic —
-            MM-DD when unknown, YYYY-MM-DD when known; Pitfall 7). */}
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Birthday
-          </AppText>
-          <Pressable
-            testID="edit-contact-birthday"
-            accessibilityRole="button"
-            accessibilityLabel="Birthday"
-            onPress={() => setShowBirthdayPicker(true)}
-            style={[
-              styles.input,
-              styles.birthdayTrigger,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <AppText
-              role="body"
-              style={{
-                color: form.birthdayInput
-                  ? colors.textPrimary
-                  : colors.textSecondary,
-              }}
-            >
-              {birthdayLabel}
-            </AppText>
-          </Pressable>
-          <View style={styles.toggleRow}>
-            <AppText role="label" style={{ color: colors.textPrimary }}>
-              Year unknown
-            </AppText>
-            <Switch
-              testID="edit-contact-birthday-year-unknown"
-              accessibilityLabel="Year unknown"
-              value={form.birthdayYearUnknown}
-              onValueChange={(v) => setField("birthdayYearUnknown", v)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
           </View>
-          {showBirthdayPicker ? (
-            <DateTimePicker
-              testID="edit-contact-birthday-picker"
-              value={birthdaySeed}
-              mode="date"
-              onChange={onBirthdayChange}
-            />
-          ) : null}
-        </View>
 
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Social battery
-          </AppText>
-          <View
-            style={[
-              styles.pickerShell,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              testID="edit-contact-social-battery"
-              accessibilityLabel="Social battery"
-              selectedValue={form.socialBattery ?? ""}
-              onValueChange={(v) =>
-                setField("socialBattery", v === "" ? null : String(v))
-              }
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
-            >
-              <Picker.Item label="No selection" value="" />
-              {SOCIAL_BATTERY_OPTIONS.map((o) => (
-                <Picker.Item key={o} label={o} value={o} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-
-        {/* Behaviour toggles — the ToggleFieldWidget on/off "1"/"0" convention. */}
-        <View style={styles.field}>
-          <View style={styles.toggleRow}>
-            <AppText role="label" style={{ color: colors.textPrimary }}>
-              Rarely responds
+          {/* Behaviour toggles — the ToggleFieldWidget on/off "1"/"0" convention. */}
+          <View style={styles.field}>
+            <View style={styles.toggleRow}>
+              <AppText role="label" style={{ color: colors.textPrimary }}>
+                Rarely responds
+              </AppText>
+              <Switch
+                testID="edit-contact-rarely-responds"
+                accessibilityLabel="Rarely responds"
+                value={form.rarelyResponds === 1}
+                onValueChange={(v) => setField("rarelyResponds", v ? 1 : 0)}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.surfaceElevated}
+              />
+            </View>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              Attempts to reach out won't reset their orbit
             </AppText>
-            <Switch
-              testID="edit-contact-rarely-responds"
-              accessibilityLabel="Rarely responds"
-              value={form.rarelyResponds === 1}
-              onValueChange={(v) => setField("rarelyResponds", v ? 1 : 0)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
           </View>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Attempts to reach out won't reset their orbit
-          </AppText>
-        </View>
 
-        <View style={styles.field}>
-          <View style={styles.toggleRow}>
-            <AppText role="label" style={{ color: colors.textPrimary }}>
-              Mute reminders
+          <View style={styles.field}>
+            <View style={styles.toggleRow}>
+              <AppText role="label" style={{ color: colors.textPrimary }}>
+                Mute reminders
+              </AppText>
+              <Switch
+                testID="edit-contact-reminders-off"
+                accessibilityLabel="Mute reminders"
+                value={form.remindersOff === 1}
+                onValueChange={(v) => setField("remindersOff", v ? 1 : 0)}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.surfaceElevated}
+              />
+            </View>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              Keep them in Orbit, but never get reminders about them.
             </AppText>
-            <Switch
-              testID="edit-contact-reminders-off"
-              accessibilityLabel="Mute reminders"
-              value={form.remindersOff === 1}
-              onValueChange={(v) => setField("remindersOff", v ? 1 : 0)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
           </View>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Keep them in Orbit, but never get reminders about them.
-          </AppText>
-        </View>
-      </AccordionSection>
+        </AccordionSection>
 
-      {/* -- Relationship Basics: Bound/Unbound + Frequency + (never-contacted)
+        {/* -- Relationship Basics: Bound/Unbound + Frequency + (never-contacted)
           last-spoke. -- */}
-      <AccordionSection
-        sectionId="relationship"
-        title="Relationship Basics"
-        expanded={expandedSections.relationship}
-        onExpandedChange={(next) => setSectionExpanded("relationship", next)}
-        containerRef={registerSectionRef("relationship")}
-      >
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Orbit participation
-          </AppText>
-          <View style={styles.lifecycleChoices}>
-            {([true, false] as const).map((enabled) => {
-              const selected = form.trackingEnabled === enabled;
-              const label = enabled ? "Bound" : "Unbound";
-              return (
-                <Pressable
-                  key={label}
-                  testID={`edit-contact-${label.toLowerCase()}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={label}
-                  accessibilityState={{ selected }}
-                  onPress={() =>
-                    setForm((current) =>
-                      current
-                        ? {
-                            ...current,
-                            trackingEnabled: enabled,
-                            intervalDays: enabled
-                              ? (current.intervalDays ?? FREQUENCY_DAYS.Monthly)
-                              : current.intervalDays,
-                            intervalValid: true,
-                          }
-                        : current,
-                    )
-                  }
-                  style={[
-                    styles.lifecycleChoice,
-                    {
-                      borderColor: selected ? colors.accent : colors.border,
-                      backgroundColor: selected
-                        ? colors.accent
-                        : colors.surface,
-                    },
-                  ]}
-                >
-                  <AppText
-                    role="label"
-                    style={{
-                      color: selected ? colors.onAccent : colors.textPrimary,
-                    }}
-                  >
-                    {label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            {form.trackingEnabled
-              ? "Bound contacts appear in your active orbit and receive cadence reminders."
-              : "Unbound contacts keep their details and history without active cadence reminders."}
-          </AppText>
-        </View>
-
-        {form.trackingEnabled ? (
+        <AccordionSection
+          sectionId="relationship"
+          title="Relationship Basics"
+          expanded={expandedSections.relationship}
+          onExpandedChange={(next) => setSectionExpanded("relationship", next)}
+          containerRef={registerSectionRef("relationship")}
+        >
           <View style={styles.field}>
             <AppText role="label" style={{ color: colors.textSecondary }}>
-              Frequency
+              Orbit participation
             </AppText>
-            <FrequencyPicker
-              testID="edit-contact-frequency"
-              value={form.intervalDays ?? FREQUENCY_DAYS.Monthly}
-              onChange={(v) => setField("intervalDays", v)}
-              onValidityChange={setIntervalValid}
-            />
+            <View style={styles.lifecycleChoices}>
+              {([true, false] as const).map((enabled) => {
+                const selected = form.trackingEnabled === enabled;
+                const label = enabled ? "Bound" : "Unbound";
+                return (
+                  <Pressable
+                    key={label}
+                    testID={`edit-contact-${label.toLowerCase()}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected }}
+                    onPress={() =>
+                      setForm((current) =>
+                        current
+                          ? {
+                              ...current,
+                              trackingEnabled: enabled,
+                              intervalDays: enabled
+                                ? (current.intervalDays ??
+                                  FREQUENCY_DAYS.Monthly)
+                                : current.intervalDays,
+                              intervalValid: true,
+                            }
+                          : current,
+                      )
+                    }
+                    style={[
+                      styles.lifecycleChoice,
+                      {
+                        borderColor: selected ? colors.accent : colors.border,
+                        backgroundColor: selected
+                          ? colors.accent
+                          : colors.surface,
+                      },
+                    ]}
+                  >
+                    <AppText
+                      role="label"
+                      style={{
+                        color: selected ? colors.onAccent : colors.textPrimary,
+                      }}
+                    >
+                      {label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              {form.trackingEnabled
+                ? "Bound contacts appear in your active orbit and receive cadence reminders."
+                : "Unbound contacts keep their details and history without active cadence reminders."}
+            </AppText>
           </View>
-        ) : null}
-        {/* LAST-SPOKE (owner ruling / CONTEXT Area 3): rendered ONLY when the
+
+          {form.trackingEnabled ? (
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Frequency
+              </AppText>
+              <FrequencyPicker
+                testID="edit-contact-frequency"
+                value={form.intervalDays ?? FREQUENCY_DAYS.Monthly}
+                onChange={(v) => setField("intervalDays", v)}
+                onValidityChange={setIntervalValid}
+              />
+            </View>
+          ) : null}
+          {/* LAST-SPOKE (owner ruling / CONTEXT Area 3): rendered ONLY when the
             seeded contact is never-contacted (last_contact IS NULL). Its Today/Pick
             date choice routes a FIRST interaction through updateContactFull's
             single-writer path — never a direct last_contact write. A contact that
             already has last_contact set has NO control here; timeline correction is
             Phase 6. Default "Not yet" so an untouched save logs nothing. */}
-        {neverContacted ? (
+          {neverContacted ? (
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Last spoke
+              </AppText>
+              <TriStateLastSpoke
+                testID="edit-contact-last-spoke"
+                value={form.lastSpoke}
+                onChange={(v: LastSpokeValue) => setField("lastSpoke", v)}
+              />
+            </View>
+          ) : null}
+        </AccordionSection>
+
+        {/* -- Contact Methods: phone/email + links (the reach fields). -- */}
+        <AccordionSection
+          sectionId="methods"
+          title="Contact Methods"
+          expanded={expandedSections.methods}
+          onExpandedChange={(next) => setSectionExpanded("methods", next)}
+          containerRef={registerSectionRef("methods")}
+        >
+          <ContactMethodsEditor
+            testID="edit-contact-methods"
+            methods={form.methods}
+            duplicateHelper={duplicateHelper}
+            onAdd={(type) =>
+              setField("methods", addMethodDraft(form.methods, type, newUid()))
+            }
+            onUpdate={(uid, patch) =>
+              setField("methods", updateMethodDraft(form.methods, uid, patch))
+            }
+            onRemove={(uid) =>
+              setField("methods", removeMethodDraft(form.methods, uid))
+            }
+            onChoosePrimary={(uid) =>
+              setField("methods", choosePrimary(form.methods, uid))
+            }
+          />
+          {/* Links (CRUD-04): grouped with the reach fields; edited as draft state,
+            persisted once on Save via applyLinkDiff (the second transaction). */}
           <View style={styles.field}>
             <AppText role="label" style={{ color: colors.textSecondary }}>
-              Last spoke
+              Links
             </AppText>
-            <TriStateLastSpoke
-              testID="edit-contact-last-spoke"
-              value={form.lastSpoke}
-              onChange={(v: LastSpokeValue) => setField("lastSpoke", v)}
+            <LinksEditor
+              testID="edit-contact-links"
+              links={linksDraft}
+              onAdd={addLinkRow}
+              onUpdate={updateLinkRow}
+              onRemove={removeLinkRow}
             />
           </View>
-        ) : null}
-      </AccordionSection>
+        </AccordionSection>
 
-      {/* -- Contact Methods: phone/email + links (the reach fields). -- */}
-      <AccordionSection
-        sectionId="methods"
-        title="Contact Methods"
-        expanded={expandedSections.methods}
-        onExpandedChange={(next) => setSectionExpanded("methods", next)}
-        containerRef={registerSectionRef("methods")}
-      >
-        <ContactMethodsEditor
-          testID="edit-contact-methods"
-          methods={form.methods}
-          duplicateHelper={duplicateHelper}
-          onAdd={(type) =>
-            setField("methods", addMethodDraft(form.methods, type, newUid()))
-          }
-          onUpdate={(uid, patch) =>
-            setField("methods", updateMethodDraft(form.methods, uid, patch))
-          }
-          onRemove={(uid) =>
-            setField("methods", removeMethodDraft(form.methods, uid))
-          }
-          onChoosePrimary={(uid) =>
-            setField("methods", choosePrimary(form.methods, uid))
-          }
-        />
-        {/* Links (CRUD-04): grouped with the reach fields; edited as draft state,
-            persisted once on Save via applyLinkDiff (the second transaction). */}
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Links
-          </AppText>
-          <LinksEditor
-            testID="edit-contact-links"
-            links={linksDraft}
-            onAdd={addLinkRow}
-            onUpdate={updateLinkRow}
-            onRemove={removeLinkRow}
+        {/* -- Last Talked About (current-state value). -- */}
+        <AccordionSection
+          sectionId="lastTalked"
+          title="Last Talked About"
+          expanded={expandedSections.lastTalked}
+          onExpandedChange={(next) => setSectionExpanded("lastTalked", next)}
+          containerRef={registerSectionRef("lastTalked")}
+        >
+          <TextInput
+            testID="edit-contact-last-talked"
+            accessibilityLabel={
+              CURRENT_STATE_FIELD_REGISTRY.last_talked_about.displayName
+            }
+            value={form.lastTalkedAbout ?? ""}
+            onChangeText={(v) => setField("lastTalkedAbout", v)}
+            placeholder="What did you last talk about?"
+            placeholderTextColor={colors.textPlaceholder}
+            style={inputStyle}
           />
-        </View>
-      </AccordionSection>
+        </AccordionSection>
 
-      {/* -- Last Talked About (current-state value). -- */}
-      <AccordionSection
-        sectionId="lastTalked"
-        title="Last Talked About"
-        expanded={expandedSections.lastTalked}
-        onExpandedChange={(next) => setSectionExpanded("lastTalked", next)}
-        containerRef={registerSectionRef("lastTalked")}
-      >
-        <TextInput
-          testID="edit-contact-last-talked"
-          accessibilityLabel={
-            CURRENT_STATE_FIELD_REGISTRY.last_talked_about.displayName
+        {/* -- Key People / Relationships. -- */}
+        <AccordionSection
+          sectionId="keyPeople"
+          title="Key People"
+          expanded={expandedSections.keyPeople}
+          onExpandedChange={(next) =>
+            next
+              ? setSectionExpanded("keyPeople", true)
+              : requestClose(() => {
+                  relationshipEditorRef.current?.closeDraft();
+                  setSectionExpanded("keyPeople", false);
+                }, relationshipDraft.dirty)
           }
-          value={form.lastTalkedAbout ?? ""}
-          onChangeText={(v) => setField("lastTalkedAbout", v)}
-          placeholder="What did you last talk about?"
-          placeholderTextColor={colors.textPlaceholder}
-          style={inputStyle}
-        />
-      </AccordionSection>
+          containerRef={registerSectionRef("keyPeople")}
+        >
+          <RelationshipEditor
+            contactId={contactId}
+            ref={relationshipEditorRef}
+            onDraftStateChange={setRelationshipDraft}
+            items={relationshipItems}
+            onAdd={addRelationshipRow}
+            onEdit={editRelationshipRow}
+            onDelete={deleteRelationshipRow}
+            onRestore={() => {}}
+          />
+        </AccordionSection>
 
-      {/* -- Key People / Relationships. -- */}
-      <AccordionSection
-        sectionId="keyPeople"
-        title="Key People"
-        expanded={expandedSections.keyPeople}
-        onExpandedChange={(next) =>
-          next
-            ? setSectionExpanded("keyPeople", true)
-            : requestClose(() => {
-                relationshipEditorRef.current?.closeDraft();
-                setSectionExpanded("keyPeople", false);
-              }, relationshipDraft.dirty)
-        }
-        containerRef={registerSectionRef("keyPeople")}
-      >
-        <RelationshipEditor
-          contactId={contactId}
-          ref={relationshipEditorRef}
-          onDraftStateChange={setRelationshipDraft}
-          items={relationshipItems}
-          onAdd={addRelationshipRow}
-          onEdit={editRelationshipRow}
-          onDelete={deleteRelationshipRow}
-          onRestore={() => {}}
-        />
-      </AccordionSection>
-
-      {/* -- Current Location (current-state value). -- */}
-      <AccordionSection
-        sectionId="currentLocation"
-        title="Current Location"
-        expanded={expandedSections.currentLocation}
-        onExpandedChange={(next) => setSectionExpanded("currentLocation", next)}
-        containerRef={registerSectionRef("currentLocation")}
-      >
-        <TextInput
-          testID="edit-contact-current-location"
-          accessibilityLabel={
-            CURRENT_STATE_FIELD_REGISTRY.current_location.displayName
+        {/* -- Current Location (current-state value). -- */}
+        <AccordionSection
+          sectionId="currentLocation"
+          title="Current Location"
+          expanded={expandedSections.currentLocation}
+          onExpandedChange={(next) =>
+            setSectionExpanded("currentLocation", next)
           }
-          value={form.currentLocation ?? ""}
-          onChangeText={(v) => setField("currentLocation", v)}
-          placeholder="Where are they now?"
-          placeholderTextColor={colors.textPlaceholder}
-          style={inputStyle}
-        />
-      </AccordionSection>
+          containerRef={registerSectionRef("currentLocation")}
+        >
+          <TextInput
+            testID="edit-contact-current-location"
+            accessibilityLabel={
+              CURRENT_STATE_FIELD_REGISTRY.current_location.displayName
+            }
+            value={form.currentLocation ?? ""}
+            onChangeText={(v) => setField("currentLocation", v)}
+            placeholder="Where are they now?"
+            placeholderTextColor={colors.textPlaceholder}
+            style={inputStyle}
+          />
+        </AccordionSection>
 
-      {/* -- Memories (§E). Seeded by its OWN read (listMemoriesForContact); the
+        {/* -- Memories (§E). Seeded by its OWN read (listMemoriesForContact); the
           Allow-AI control reflects the canonical AI master (isAiMasterEnabled,
           ADR-135 / 38.4 RG-008), never a hardcoded false or the retired
           aiProvider field (Review cycle-4 LOW #4 / D-04). -- */}
-      <AccordionSection
-        sectionId="memories"
-        title="Memories"
-        expanded={expandedSections.memories}
-        onExpandedChange={(next) =>
-          next
-            ? setSectionExpanded("memories", true)
-            : requestClose(() => {
-                memoryEditorRef.current?.closeDraft();
-                setSectionExpanded("memories", false);
-              }, memoryDraft.dirty)
-        }
-        containerRef={registerSectionRef("memories")}
-      >
-        <MemoryEditor
-          testID="edit-contact-memories"
-          ref={memoryEditorRef}
-          onDraftStateChange={setMemoryDraft}
-          items={memoryItems}
-          globalAiEnabled={globalAiEnabled}
-          onAdd={addMemoryRow}
-          onEdit={editMemoryRow}
-          onDelete={deleteMemoryRow}
-          onRestore={() => {}}
-          onSetAllowAi={(id, allow) => void setMemoryAllowAiFor(id, allow)}
-        />
-      </AccordionSection>
-
-      {/* -- Custom block: EVERY non-quarantined field, as a top-level section. -- */}
-      {editDefs.length > 0 ? (
         <AccordionSection
-          sectionId="custom"
-          title="Custom Fields"
-          expanded={expandedSections.custom}
-          onExpandedChange={(next) => setSectionExpanded("custom", next)}
-          containerRef={registerSectionRef("custom")}
+          sectionId="memories"
+          title="Memories"
+          expanded={expandedSections.memories}
+          onExpandedChange={(next) =>
+            next
+              ? setSectionExpanded("memories", true)
+              : requestClose(() => {
+                  memoryEditorRef.current?.closeDraft();
+                  setSectionExpanded("memories", false);
+                }, memoryDraft.dirty)
+          }
+          containerRef={registerSectionRef("memories")}
         >
-          <View testID="edit-contact-custom-block" style={styles.customBlock}>
-            {editDefs.map((def) => (
-              <View key={def.id} style={styles.field}>
-                <AppText role="label" style={{ color: colors.textSecondary }}>
-                  {def.label}
-                </AppText>
-                <FieldValueInput
-                  testID={`edit-contact-custom-${def.col_name}`}
-                  field={def}
-                  contactId={contactId}
-                  value={form.values[def.col_name] ?? null}
-                  onChange={(v) =>
-                    setForm((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            values: { ...prev.values, [def.col_name]: v },
-                          }
-                        : prev,
-                    )
-                  }
-                />
-              </View>
-            ))}
-          </View>
+          <MemoryEditor
+            testID="edit-contact-memories"
+            ref={memoryEditorRef}
+            onDraftStateChange={setMemoryDraft}
+            items={memoryItems}
+            globalAiEnabled={globalAiEnabled}
+            onAdd={addMemoryRow}
+            onEdit={editMemoryRow}
+            onDelete={deleteMemoryRow}
+            onRestore={() => {}}
+            onSetAllowAi={(id, allow) => void setMemoryAllowAiFor(id, allow)}
+          />
         </AccordionSection>
-      ) : null}
 
-      {/* -- Off Limits (§E). KIND-SCOPED to off_limits — seeded ONLY from off_limits
+        {/* -- Custom block: EVERY non-quarantined field, as a top-level section. -- */}
+        {editDefs.length > 0 ? (
+          <AccordionSection
+            sectionId="custom"
+            title="Custom Fields"
+            expanded={expandedSections.custom}
+            onExpandedChange={(next) => setSectionExpanded("custom", next)}
+            containerRef={registerSectionRef("custom")}
+          >
+            <View testID="edit-contact-custom-block" style={styles.customBlock}>
+              {editDefs.map((def) => (
+                <View key={def.id} style={styles.field}>
+                  <AppText role="label" style={{ color: colors.textSecondary }}>
+                    {def.label}
+                  </AppText>
+                  <FieldValueInput
+                    testID={`edit-contact-custom-${def.col_name}`}
+                    field={def}
+                    contactId={contactId}
+                    value={form.values[def.col_name] ?? null}
+                    onChange={(v) =>
+                      setForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              values: { ...prev.values, [def.col_name]: v },
+                            }
+                          : prev,
+                      )
+                    }
+                  />
+                </View>
+              ))}
+            </View>
+          </AccordionSection>
+        ) : null}
+
+        {/* -- Off Limits (§E). KIND-SCOPED to off_limits — seeded ONLY from off_limits
           fuel, every add/edit forced to kind:"off_limits" so the contact's other
           fuel kinds can never enter this diff (Review cycle-4 MEDIUM #3). -- */}
-      <AccordionSection
-        sectionId="offLimits"
-        title="Off Limits"
-        expanded={expandedSections.offLimits}
-        onExpandedChange={(next) => setSectionExpanded("offLimits", next)}
-        containerRef={registerSectionRef("offLimits")}
-      >
-        <FuelEditor
-          testID="edit-contact-off-limits"
-          items={offLimitsItems}
-          now={draftNow}
-          onAdd={addOffLimitsRow}
-          onEdit={editOffLimitsRow}
-          onDelete={deleteOffLimitsRow}
-        />
-      </AccordionSection>
+        <AccordionSection
+          sectionId="offLimits"
+          title="Off Limits"
+          expanded={expandedSections.offLimits}
+          onExpandedChange={(next) => setSectionExpanded("offLimits", next)}
+          containerRef={registerSectionRef("offLimits")}
+        >
+          <FuelEditor
+            testID="edit-contact-off-limits"
+            items={offLimitsItems}
+            now={draftNow}
+            onAdd={addOffLimitsRow}
+            onEdit={editOffLimitsRow}
+            onDelete={deleteOffLimitsRow}
+          />
+        </AccordionSection>
 
-      {/* Save stays PRESSABLE when the form is incomplete so a blocked press
+        {/* Save stays PRESSABLE when the form is incomplete so a blocked press
           reveals + focuses the erroring section (CAPT-14) rather than being an
           inert disabled button; it is only truly disabled while a save is in
           flight. Visual emphasis still follows `savable`. */}
-      <Pressable
-        testID="edit-contact-save"
-        accessibilityRole="button"
-        accessibilityLabel="Save changes"
-        accessibilityState={{ disabled: saving }}
-        disabled={saving}
-        onPress={() => void handleSave()}
-        style={[
-          styles.saveBtn,
-          {
-            backgroundColor: savable ? colors.accent : colors.surface,
-            borderColor: savable ? colors.accent : colors.border,
-          },
-        ]}
-      >
-        <AppText
-          role="label"
-          style={{
-            color: savable ? colors.onAccent : colors.textSecondary,
-          }}
+        <Pressable
+          testID="edit-contact-save"
+          accessibilityRole="button"
+          accessibilityLabel="Save changes"
+          accessibilityState={{ disabled: saving }}
+          disabled={saving}
+          onPress={() => void handleSave()}
+          style={[
+            styles.saveBtn,
+            {
+              backgroundColor: savable ? colors.accent : colors.surface,
+              borderColor: savable ? colors.accent : colors.border,
+            },
+          ]}
         >
-          Save changes
-        </AppText>
-      </Pressable>
-    </ScrollView>
+          <AppText
+            role="label"
+            style={{
+              color: savable ? colors.onAccent : colors.textSecondary,
+            }}
+          >
+            Save changes
+          </AppText>
+        </Pressable>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: {
     padding: 16,
     gap: 16,
@@ -1804,17 +1807,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
   },
   field: {
     gap: 8,

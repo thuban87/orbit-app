@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   TouchpointRefineForm,
   type TouchpointRefineValue,
@@ -118,21 +119,16 @@ export function GroupLogScreen({
     }
   }
 
+  // House header (38.9 D-16, D-44): its Back calls goBack, which the guard
+  // above intercepts (D-13). No opaque screen fill: the theme art shows (D-17).
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={styles.screen}>
+      <ShellAppBar variant="child" title="Group Log" />
       <ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.header}>
-          <Button
-            role="secondary"
-            label="Back"
-            onPress={() => navigation.goBack()}
-          />
-          <AppText role="heading">Group Log</AppText>
-        </View>
         <View
           ref={titleFieldRef}
           testID="group-log-title-field"
@@ -249,7 +245,6 @@ export function GroupLogScreen({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { padding: SPACING.base, gap: SPACING.base },
-  header: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
   field: { gap: SPACING.sm },
   input: {
     minHeight: 44,

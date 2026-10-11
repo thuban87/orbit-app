@@ -63,12 +63,6 @@ type PendingChrome = "in-body-back" | "header-less";
  */
 const PENDING_HEADER_CONVERSION: Record<string, PendingChrome> = {
   // Plan 09
-  "src/screens/CreateContactScreen.tsx": "in-body-back",
-  "src/screens/EditContactScreen.tsx": "in-body-back",
-  "src/screens/EditInteractionScreen.tsx": "in-body-back",
-  "src/screens/EditGroupEventScreen.tsx": "in-body-back",
-  "src/screens/EditParticipantScreen.tsx": "in-body-back",
-  "src/screens/GroupLogScreen.tsx": "in-body-back",
   "src/screens/ThingsToRememberScreen.tsx": "in-body-back",
   "src/screens/MemoryHistoryScreen.tsx": "in-body-back",
   "src/screens/RecentlyDeletedScreen.tsx": "in-body-back",
