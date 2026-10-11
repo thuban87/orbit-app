@@ -1,10 +1,12 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography variant.
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Icon } from "@/components/icons/Icon";
 import {
   ROOT_SNACKBAR_HOST,
   resolveSnackbarHostVisible,
   snackbarBottomPadding,
+  snackbarPresentation,
 } from "@/components/snackbar-host";
 import { AppText } from "@/components/ui/AppText";
 import {
@@ -49,6 +51,9 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   const hostVisible = resolveSnackbarHostVisible(host, topOverlayId);
 
   if (!snackbar || !hostVisible) return null;
+  // D-72: an error has a danger outline, a warning glyph and an assertive
+  // announcement; success keeps the neutral pill.
+  const look = snackbarPresentation(snackbar.kind);
 
   return (
     <View
@@ -64,12 +69,26 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
       {...fabDialBackgroundA11y(fabDialOpen)}
     >
       <View
-        accessibilityLiveRegion="polite"
+        accessibilityLiveRegion={look.liveRegion}
+        accessibilityRole={look.accessibilityRole}
         style={[
           styles.surface,
-          { backgroundColor: colors.surface, borderColor: colors.border },
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors[look.borderTone],
+          },
         ]}
       >
+        {look.warningGlyph ? (
+          // Decorative: the label and the alert role carry the meaning.
+          <View
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+            style={styles.glyph}
+          >
+            <Icon name="warning" tone="danger" size="sm" />
+          </View>
+        ) : null}
         <AppText role="caption" style={styles.label}>
           {snackbar.label}
         </AppText>
@@ -124,6 +143,9 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     minHeight: 48,
     paddingLeft: SPACING.base,
+  },
+  glyph: {
+    marginRight: SPACING.sm,
   },
   label: {
     flexShrink: 1,

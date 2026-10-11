@@ -41,3 +41,39 @@ export function snackbarBottomPadding(
   if (host === ROOT_SNACKBAR_HOST) return ROOT_SNACKBAR_BOTTOM_PADDING;
   return insetBottom + SPACING.base;
 }
+
+/** How a snackbar of a given kind is drawn and announced (38.9 D-72). */
+export interface SnackbarPresentation {
+  /** Theme token for the pill's outline. */
+  borderTone: "danger" | "border";
+  /** A leading warning glyph in the `danger` tone (error only). */
+  warningGlyph: boolean;
+  /** Android live-region urgency for TalkBack. */
+  liveRegion: "assertive" | "polite";
+  /** `alert` marks an error for assistive tech; success has no role. */
+  accessibilityRole: "alert" | undefined;
+}
+
+/**
+ * Error snackbars look and sound distinct from success ones (owner ruling
+ * D-72; review WR-06): a `danger` outline and a warning glyph, announced
+ * assertively. Success / neutral keeps the `border` outline and a polite
+ * announcement. Timing is unchanged for both (D-04). PURE.
+ */
+export function snackbarPresentation(
+  kind: "success" | "error",
+): SnackbarPresentation {
+  return kind === "error"
+    ? {
+        borderTone: "danger",
+        warningGlyph: true,
+        liveRegion: "assertive",
+        accessibilityRole: "alert",
+      }
+    : {
+        borderTone: "border",
+        warningGlyph: false,
+        liveRegion: "polite",
+        accessibilityRole: undefined,
+      };
+}
