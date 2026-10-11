@@ -89,6 +89,7 @@ import {
   type RelationshipRow,
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
+import { useContactHeader } from "@/hooks/use-contact-header";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
@@ -958,6 +959,8 @@ export function UpdateContactScreen({
   const [liveDefs, setLiveDefs] = useState<CustomFieldDef[]>([]);
 
   const contactId = session.contactId;
+  // D-45: the person line under the fixed title (none until a contact is chosen).
+  const person = useContactHeader(contactId);
 
   const load = useCallback(
     async (id: number, cancelled: () => boolean = () => false) => {
@@ -1080,7 +1083,7 @@ export function UpdateContactScreen({
   if (contactId === null) {
     return (
       <View style={styles.root}>
-        <ShellAppBar variant="child" title="Update Contact" />
+        <ShellAppBar variant="child" title="Update Contact" person={person} />
         <ContactPicker
           visible
           mode="single"
@@ -1180,7 +1183,7 @@ export function UpdateContactScreen({
 
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Update Contact" />
+      <ShellAppBar variant="child" title="Update Contact" person={person} />
       <ScrollView contentContainerStyle={styles.content}>
         {session.activeRowKey !== null ? (
           renderActiveEditor()

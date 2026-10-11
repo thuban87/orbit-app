@@ -249,6 +249,73 @@ export function WrappedScreen() {
     );
     expect(s.classification).toBe("backed");
   });
+
+  it("the person line (38.9 D-45) is backed: glass under a ShellAppBar, opaque in a Sheet", () => {
+    // Mirrors the real shapes: ShellAppBar renders PersonLine from its `person`
+    // prop under the title row, beside its own chrome scrim; the Add Note sheet
+    // renders it under its heading.
+    const bar = `import { Text, View } from "react-native";
+import { PersonLine } from "./PersonLine";
+export function ShellAppBar({ variant, title, person }) {
+  return (
+    <View>
+      <View />
+      <View>
+        <Text style={{ color: colors.textPrimary }}>{title}</Text>
+      </View>
+      {person ? <PersonLine name={person.name} photo={person.photo} /> : null}
+    </View>
+  );
+}
+`;
+    const line = `import { View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+export function PersonLine({ name, photo }) {
+  return (
+    <View>
+      <AppText role="caption">{name}</AppText>
+    </View>
+  );
+}
+`;
+    const form = `import { ShellAppBar } from "@/components/ShellAppBar";
+export function FormScreen() {
+  return <ShellAppBar variant="child" title="Update Contact" person={person} />;
+}
+`;
+    const sheet = `import { Sheet } from "@/components/ui/Sheet";
+import { PersonLine } from "@/components/PersonLine";
+export function NoteSheet() {
+  return (
+    <Sheet visible>
+      <PersonLine name={name} photo={null} />
+    </Sheet>
+  );
+}
+`;
+    const host = `import { NoteSheet } from "@/components/NoteSheet";
+export function HostScreen() {
+  return <NoteSheet />;
+}
+`;
+    const lineFile = "src/components/PersonLine.tsx";
+    const a = classifyBareTextSites([
+      { file: "src/components/ShellAppBar.tsx", source: bar },
+      { file: lineFile, source: line },
+      { file: "src/screens/FormScreen.tsx", source: form },
+      { file: "src/components/NoteSheet.tsx", source: sheet },
+      { file: "src/screens/HostScreen.tsx", source: host },
+      stack({
+        Form: { name: "FormScreen", from: "@/screens/FormScreen" },
+        Host: { name: "HostScreen", from: "@/screens/HostScreen" },
+      }),
+    ]);
+    const s = site(a, lineFile, lineOf(line, "{name}"));
+    expect(s.classification).toBe("backed");
+    expect([...s.backingKinds].sort()).toEqual(["glass", "opaque"]);
+    expect(s.bareRoutes).toEqual([]);
+    expect(a.rows).toEqual([]);
+  });
 });
 
 describe("classifyBareTextSites — table-driven art backings (38.5 WR-03)", () => {
