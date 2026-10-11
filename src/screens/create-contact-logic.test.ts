@@ -5,6 +5,10 @@ import {
   removeMethodDraft,
 } from "@/components/contact-methods-editor-model";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import {
+  firstBlockingField,
+  toFieldErrors,
+} from "@/components/ui/field-error-logic";
 import { resolveCategorySelection } from "@/logic/category-logic";
 import {
   type BuildCreateInputDeps,
@@ -12,6 +16,7 @@ import {
   CREATE_SECTION_FIELD_MAP,
   type CreateFormState,
   canSave,
+  CREATE_FIELD_REVEAL_ORDER,
   collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
@@ -357,6 +362,36 @@ describe("collectBlockingErrors (Add Contact)", () => {
         state({ trackingEnabled: false, intervalValid: false }),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("Add Contact inline name error (38.9 D-19, E-02)", () => {
+  it("an empty name yields the rendered message and is revealed first", () => {
+    const errors = toFieldErrors(
+      collectBlockingErrors(
+        state({ name: " ", trackingEnabled: true, intervalValid: false }),
+      ),
+    );
+    expect(errors.name).toBe("Enter a name to save.");
+    expect(firstBlockingField(CREATE_FIELD_REVEAL_ORDER, errors)).toBe("name");
+  });
+
+  it("with a name, the invalid cadence is the first blocking field", () => {
+    const errors = toFieldErrors(
+      collectBlockingErrors(
+        state({ trackingEnabled: true, intervalValid: false }),
+      ),
+    );
+    expect(errors.name).toBeUndefined();
+    expect(firstBlockingField(CREATE_FIELD_REVEAL_ORDER, errors)).toBe(
+      "frequency",
+    );
+  });
+
+  it("every field in the reveal order maps to a section", () => {
+    for (const field of CREATE_FIELD_REVEAL_ORDER) {
+      expect(CREATE_SECTION_FIELD_MAP[field]).toBeDefined();
+    }
   });
 });
 
