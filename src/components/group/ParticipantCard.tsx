@@ -75,7 +75,7 @@ export function ParticipantCard({
       <OverflowMenu
         actions={[
           { label: "Edit for this person", onPress: onEdit },
-          { label: "Remove from group", onPress: onRemove },
+          { label: "Remove from event", onPress: onRemove },
         ]}
       />
     </Pressable>

@@ -646,3 +646,47 @@ describe("glossary contract — persisted identifiers stay (D-49, D-12)", () => 
     );
   });
 });
+
+describe("glossary contract — leftover event sites use the event noun (D-22, D-74; review WR-03)", () => {
+  // Owner-approved wording (D-74). "Group Log" (the action's name) and
+  // "Group Note" stay; only these leftover "group" nouns are retired.
+  const SITES: readonly {
+    file: string;
+    retired: string;
+    approved: string;
+  }[] = [
+    {
+      file: "src/screens/GroupEventDetailScreen.tsx",
+      retired: "Delete group & interactions",
+      approved: 'confirm: "Delete Event & Interactions"',
+    },
+    {
+      file: "src/screens/GroupEventDetailScreen.tsx",
+      retired: "The group and its shared note are removed.",
+      approved: "The event and its shared note are removed.",
+    },
+    {
+      file: "src/components/group/ParticipantCard.tsx",
+      retired: "Remove from group",
+      approved: '{ label: "Remove from event"',
+    },
+    {
+      file: "src/screens/GroupLogScreen.tsx",
+      retired: 'accessibilityLabel="Log group"',
+      approved: 'accessibilityLabel="Log event"',
+    },
+    {
+      file: "src/screens/GroupLogScreen.tsx",
+      retired: "            Log group\n",
+      approved: "            Log event\n",
+    },
+  ];
+
+  for (const { file, retired, approved } of SITES) {
+    it(`${file}: "${approved.trim()}"`, () => {
+      const source = read(file).replace(/\r\n/g, "\n");
+      expect(source).not.toContain(retired);
+      expect(source).toContain(approved);
+    });
+  }
+});

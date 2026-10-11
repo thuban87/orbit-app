@@ -58,7 +58,7 @@ export function GroupLogScreen({
   );
   const [pickerVisible, setPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
-  // The operation (save) failure; rendered above Log group, never under a
+  // The operation (save) failure; rendered above Log event, never under a
   // field, and not cleared by typing (38.9 D-19, D-27; cycle-5 C5-M4).
   const [error, setError] = useState<string | null>(null);
   // The title validation error, rendered under the Title field and cleared
@@ -217,7 +217,7 @@ export function GroupLogScreen({
         <Pressable
           testID="group-log-save"
           accessibilityRole="button"
-          accessibilityLabel="Log group"
+          accessibilityLabel="Log event"
           accessibilityState={{ disabled: saving }}
           disabled={saving}
           onPress={() => void save()}
@@ -227,7 +227,7 @@ export function GroupLogScreen({
           ]}
         >
           <AppText role="label" style={{ color: colors.onAccent }}>
-            Log group
+            Log event
           </AppText>
         </Pressable>
       </ScrollView>
