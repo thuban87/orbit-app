@@ -512,10 +512,10 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const resetOverrides = () => {
     const ref = systemRef ?? customRef;
     if (!ref) return;
-    // D-06 / ADR-086: destructive and non-dismissable. Copy unchanged here;
-    // Plan 15 rewrites the "overrides" wording (D-41, D-63).
+    // D-06 / ADR-086: destructive and non-dismissable. Plain-word labels
+    // (D-41, D-63); the reset operation itself is unchanged.
     void confirm({
-      title: "Reset overrides?",
+      title: "Reset manual changes?",
       message:
         "Manual includes and excludes will be removed. The System's rules stay.",
       confirmLabel: "Reset",
@@ -529,7 +529,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
           setBaseOverrides([]);
           setOverrideIntent([]);
         })
-        .catch(() => setError("Couldn't reset membership overrides."));
+        .catch(() => setError("Couldn't reset membership changes."));
     });
   };
   const includeIds = currentOverrides
@@ -795,7 +795,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                           {customRef || systemRef ? (
                             <Button
                               role="secondary"
-                              label="Reset Membership Overrides"
+                              label="Reset Membership Changes"
                               onPress={resetOverrides}
                             />
                           ) : null}

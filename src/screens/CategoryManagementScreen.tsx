@@ -184,8 +184,8 @@ export function deletionImpactRows(counts: CategoryDeletionCounts): string[] {
     rows.push(
       plural(
         categorySettings,
-        "category-System setting or override",
-        "category-System settings or overrides",
+        "setting or manual change on this category's System",
+        "settings or manual changes on this category's System",
       ),
     );
   if (counts.profilePresentations)

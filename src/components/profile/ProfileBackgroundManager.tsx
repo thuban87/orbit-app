@@ -1099,7 +1099,7 @@ export function ProfileBackgroundManager({
                 label="Set as global default"
                 onPress={() => void assign("global")}
               />
-              <AppText role="label">Category override</AppText>
+              <AppText role="label">Set for this category</AppText>
               {categories.length === 0 ? (
                 <AppText role="body">No categories available</AppText>
               ) : (

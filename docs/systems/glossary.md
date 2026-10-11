@@ -62,6 +62,24 @@ The contract fails if any of these returns to a user-visible literal in `src/` o
 | "Wobbling" | Wobbly | D-22 |
 | "Log Contact" | Log Interaction | D-22, ADR-132 |
 | "Dashboard(s)", "dashboard(s)" | Contacts | D-22 |
+| "Group Event(s)", "group event(s)", "Group event(s)" | Event(s) ("Edit Event", "Dissolve this event?") | D-22 |
+
+### Developer wording (D-41)
+
+Plain words replace developer wording in the screens Phase 38.9 converted. The contract checks
+these forms only in that list of files (`DEVELOPER_WORDING_FILES`), so it does not reach
+unconverted screens.
+
+| Retired | Now reads |
+|---------|-----------|
+| "Follows event", "overridden", "Participant overrides", "participant record" | "Same as event", "changed for this person", "Changes for this person", "Edit for this person" |
+| "Sensitive Operations" | "Careful actions" |
+| "Format version", "Related rows", "Tombstones" (restore preview) | "Backup version", "Linked items", "Deleted items kept" |
+| "cadence" in captions | "reach-out reminders", "reminder schedule", "Days between backups" |
+| "Reset Overrides", "Overrides" badge, "Reset Membership Overrides" (Systems) | "Reset Manual Changes", "Edited", "Reset Membership Changes" |
+| "Contact override", "Category override", "Batch category override" | "Set for this contact", "Set for this category", "Category for all imported contacts" |
+
+Decided metric names (Gravity) and the canonical terms above are not changed (D-41).
 
 ## How It Works
 
@@ -81,8 +99,9 @@ The contract fails if any of these returns to a user-visible literal in `src/` o
 - Literals inside a type (`"dashboard" | "x"`).
 - Arguments of `Logger.*(…)` and `Error(…)` / `new Error(…)` (developer-only text).
   `super(…)` in an Error subclass is still checked, because that text can reach the screen.
-- Two developer-only literals allowlisted by file and exact text: the backup validator's
-  `fail("appSettings has invalid Dashboard filters")` and a `console.warn` in
+- Three developer-only literals allowlisted by file and exact text: the backup validator's
+  `fail("appSettings has invalid Dashboard filters")` and
+  `fail("interactions has an invalid Group Event UID")`, and a `console.warn` in
   `dashboard-query-store.ts`.
 
 ### Matching rule
@@ -102,7 +121,7 @@ None. The constants are the configuration.
 
 - **ADR-132:** Focused Rapid-Capture Workflows — names the visible action "Log Interaction".
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — the Rogue band.
-- **Phase 38.9 D-21, D-22, D-41, D-42, D-49, D-56** (`.planning/phases/38.9-ux-standards/38.9-CONTEXT.md`)
+- **Phase 38.9 D-21, D-22, D-41, D-42, D-49, D-56, D-63** (`.planning/phases/38.9-ux-standards/38.9-CONTEXT.md`)
   — the canonical terms, the enforcements and the rule that decided terms are not renamed.
   These are extracted to ADRs at milestone close.
 
@@ -118,7 +137,11 @@ None. The constants are the configuration.
    `pushWidgetUpdate()`.
 3. **A new retired form goes in the contract, not in a grep.** Add it to `RETIRED_FORMS` in
    `glossary-contract.test.ts`; the self-tests there show the caught and skipped cases.
-4. **Other system docs still use old names in prose** (for example "Not Contacted" in
+4. **A renamed label that code dispatches on must come from one constant.** The Systems
+   screen dispatches row actions by label, so "Reset Manual Changes" is
+   `RESET_MANUAL_CHANGES_ACTION`, used by both the button list and the handler (D-63). The
+   `systems-dao` function keeps its name `resetSystemOverrides`; identifiers are not copy.
+5. **Other system docs still use old names in prose** (for example "Not Contacted" in
    `dashboard.md`). They describe internals; the KB extraction for 38.9 brings them in line.
 
 ## Related Systems
@@ -132,3 +155,4 @@ None. The constants are the configuration.
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-10-11 | 38.9 | Created: canonical constants (D-21, D-41), Never Contacted / Favorite / Wobbly / Log Interaction / Contacts enforced app-wide (D-22, D-42, D-49, D-56), retired-form contract. |
+| 2026-10-11 | 38.9 | "Event(s)" as the user-facing noun (D-22); developer wording rewritten in plain words in the converted screens (D-41, D-63); contract extended with both. |

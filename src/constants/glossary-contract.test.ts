@@ -145,74 +145,6 @@ const DEVELOPER_ONLY: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/**
- * Not-yet-converted D-41 sites, by file and exact text. 38.9-15 Task 3 empties
- * this list; an entry that no longer matches fails as stale.
- */
-const PENDING_DEVELOPER_WORDING: Readonly<Record<string, readonly string[]>> = {
-  "src/components/group/ParticipantCard.tsx": [
-    "Follows event:",
-    "Participant overrides",
-    "Edit participant record",
-  ],
-  "src/components/group/ParticipantOverrideEditor.tsx": [
-    "Follows event",
-    ": overridden",
-  ],
-  "src/components/BulkActionSurface.tsx": [
-    "More sensitive operations",
-    "Sensitive Operations",
-  ],
-  "src/screens/RestorePreviewScreen.tsx": [
-    "Format version:",
-    "· Related rows:",
-    "· Tombstones:",
-  ],
-  "src/screens/EditContactScreen.tsx": [
-    "Bound contacts appear in your active orbit and receive cadence reminders.",
-    "Unbound contacts keep their details and history without active cadence reminders.",
-  ],
-  "src/screens/CreateContactScreen.tsx": [
-    "Bound contacts appear in your active orbit and receive cadence reminders.",
-    "Unbound contacts keep their details and history without active cadence reminders.",
-  ],
-  "src/screens/contact-profile-logic.ts": [
-    "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved cadence stay.",
-  ],
-  "src/screens/BackupSettingsScreen.tsx": ["Backup cadence in days"],
-  "src/screens/SystemBuilderScreen.tsx": [
-    "Reset overrides?",
-    "Couldn't reset membership overrides.",
-    "Reset Membership Overrides",
-  ],
-  "src/screens/SystemsManagementScreen.tsx": [
-    "Reset Overrides",
-    "Overrides",
-    "Reset overrides?",
-    "Couldn't reset membership overrides.",
-  ],
-  "src/screens/CategoryManagementScreen.tsx": [
-    "category-System setting or override",
-    "category-System settings or overrides",
-  ],
-  "src/profile/template-manager-model.ts": [
-    "Contact override:",
-    "Contact override: freeform layout",
-  ],
-  "src/components/profile/ProfileBackgroundManager.tsx": ["Category override"],
-  "src/components/profile/ProfileTemplateManager.tsx": [
-    "Category override",
-    "Choose any active local contact to give it this template as a direct layout override. Applying or removing a contact selection clears only that contact's collapsed-section overrides after the write commits.",
-  ],
-  "src/screens/BulkImportSetupScreen.tsx": [
-    "Category override",
-    "Batch category override",
-  ],
-  "src/screens/ContactProfileScreen.tsx": [
-    "This clears only this contact’s layout, collapse, and background overrides. Contact data stays unchanged.",
-  ],
-};
-
 /** Collapse whitespace so JSX text compares by its words. */
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 
@@ -633,13 +565,8 @@ describe("glossary contract — production copy (D-22, D-42, D-49)", () => {
   it("the D-41 developer wording is gone from the files 38.9-15 converts", () => {
     const paths = DEVELOPER_WORDING_FILES.map((f) => join(ROOT, f));
     for (const path of paths) expect(statSync(path).isFile()).toBe(true);
-    const { offenders, stale } = audit(
-      paths,
-      DEVELOPER_WORDING_PATTERNS,
-      PENDING_DEVELOPER_WORDING,
-    );
+    const { offenders } = audit(paths, DEVELOPER_WORDING_PATTERNS, {});
     expect(offenders).toEqual([]);
-    expect(stale).toEqual([]);
   }, 30_000);
 
   it("scans app.config.ts (the widget picker label)", () => {

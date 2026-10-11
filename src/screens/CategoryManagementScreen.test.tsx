@@ -175,7 +175,7 @@ describe("CategoryManagementScreen tracer contracts", () => {
       "3 completed import sessions",
       "4 discarded import sessions",
       "5 rules across 2 Systems",
-      "2 category-System settings or overrides",
+      "2 settings or manual changes on this category's System",
       "6 Profile presentation assignments",
       "2 saved views or active selections",
     ]);

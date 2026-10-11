@@ -358,7 +358,7 @@ export function unbindConfirmation(name: string): {
   return {
     title: `Unbind ${name}?`,
     message:
-      "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved cadence stay.",
+      "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved reminder schedule stay.",
   };
 }
 

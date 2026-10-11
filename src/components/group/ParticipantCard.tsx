@@ -34,8 +34,8 @@ function summary(
     .filter((field) => field.following)
     .map((field) => field.label);
   return follows.length > 0
-    ? `Follows event: ${follows.join(", ")}`
-    : "Participant overrides";
+    ? `Same as event: ${follows.join(", ")}`
+    : "Changes for this person";
 }
 
 /** Compact read row; persistence and the shared remove Sheet remain Detail-owned. */
@@ -74,7 +74,7 @@ export function ParticipantCard({
       </View>
       <OverflowMenu
         actions={[
-          { label: "Edit participant record", onPress: onEdit },
+          { label: "Edit for this person", onPress: onEdit },
           { label: "Remove from group", onPress: onRemove },
         ]}
       />

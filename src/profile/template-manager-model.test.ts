@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { profileLayoutEditorReducer } from "./layout-editor-reducer";
 import { createLayoutTemplateIntent } from "./layout-editor-session";
@@ -7,6 +8,7 @@ import {
   beginTemplateOperation,
   createTemplateManagerListLoadState,
   createTemplateManagerState,
+  describeAssignmentKind,
   describeTemplateAssignment,
   finishTemplateManagerListLoad,
   managerBackIntent,
@@ -103,7 +105,7 @@ describe("Profile template manager model", () => {
         source: "contact-template",
         templateName: "Weekend",
       }),
-    ).toEqual({ kind: "override", text: "Contact override: Weekend" });
+    ).toEqual({ kind: "override", text: "Set for this contact: Weekend" });
     expect(
       describeTemplateAssignment({
         source: "contact-freeform",
@@ -111,8 +113,33 @@ describe("Profile template manager model", () => {
       }),
     ).toEqual({
       kind: "override",
-      text: "Contact override: freeform layout",
+      text: "Set for this contact: freeform layout",
     });
+  });
+
+  it("maps the assignment kind to display words; the caption never shows the raw kind (C5-L10)", () => {
+    for (const kind of ["inherited", "override"] as const) {
+      const caption = describeAssignmentKind(kind);
+      expect(caption).not.toMatch(/\b(inherited|override)\b\.?$/);
+      expect(caption).not.toMatch(/\boverride\b/i);
+    }
+    expect(describeAssignmentKind("override")).toBe(
+      "This contact currently has its own layout.",
+    );
+    expect(describeAssignmentKind("inherited")).toBe(
+      "This contact currently uses an inherited layout.",
+    );
+    const manager = readFileSync(
+      new URL(
+        "../components/profile/ProfileTemplateManager.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    expect(manager).toContain(
+      "{describeAssignmentKind(assignmentDescription.kind)}",
+    );
+    expect(manager).not.toContain("currently {assignmentDescription.kind}");
   });
 
   it("carries an edited unsaved layout into template creation without a freeform fallback", () => {

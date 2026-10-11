@@ -339,7 +339,7 @@ export function RestorePreviewScreen({
             Source date: {formatDateTimeMinuteOrFallback(preview.exportedAt)}
           </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Format version: {preview.backupFormatVersion}
+            Backup version: {preview.backupFormatVersion}
           </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
             Encryption:{" "}
@@ -348,9 +348,9 @@ export function RestorePreviewScreen({
               : "Readable JSON"}
           </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Contacts: {preview.contactCount} · Related rows:{" "}
-            {preview.relatedRowCount} · Photos: {preview.photoCount} ·
-            Tombstones: {preview.tombstoneCount}
+            Contacts: {preview.contactCount} · Linked items:{" "}
+            {preview.relatedRowCount} · Photos: {preview.photoCount} · Deleted
+            items kept: {preview.tombstoneCount}
           </Text>
         </View>
         {unavailableBackground ? (

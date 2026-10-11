@@ -80,7 +80,7 @@ describe("BulkImportSetupScreen stopped view (D-73c)", () => {
       "CategoryChoiceSheet",
       "BULK_BOUND_BLURB",
       "Orbit participation",
-      "Category override",
+      "Category for all imported contacts",
       "selected",
     ]) {
       expect(branch, control).not.toContain(control);

@@ -77,7 +77,10 @@ const {
   deleteManagedSystem,
   managementActions,
   pinAllContacts,
+  RESET_MANUAL_CHANGES_ACTION,
+  runResetManualChangesAction,
 } = await import("./SystemsManagementScreen");
+const confirmStore = await import("@/stores/confirm-store");
 const dao = await import("@/db/systems-dao");
 const snackbar = await import("@/stores/snackbar-store");
 
@@ -119,8 +122,9 @@ describe("SystemsManagementScreen contracts", () => {
       "Duplicate",
       "Manage Members",
       "Hide",
-      "Reset Overrides",
+      RESET_MANUAL_CHANGES_ACTION,
     ]);
+    expect(RESET_MANUAL_CHANGES_ACTION).toBe("Reset Manual Changes");
     expect(
       managementActions({
         ...allContacts,
@@ -129,6 +133,73 @@ describe("SystemsManagementScreen contracts", () => {
         ref: { kind: "custom" as const, uid: "family" },
       }),
     ).toEqual(["Edit", "Rename", "Duplicate", "Delete"]);
+  });
+
+  it("pressing the renamed reset action reaches the reset confirm and resets the System's manual changes (D-63, C5-M5)", async () => {
+    const builtin: SystemManagementRow = {
+      ...allContacts,
+      id: "builtin:favorites",
+      name: "Favorites",
+      ref: { kind: "builtin" as const, id: "favorites" as const },
+      hasOverrides: true,
+    };
+    // The label the row shows is the label the dispatch accepts.
+    const shown = managementActions(builtin).at(-1) as string;
+    vi.mocked(confirmStore.confirm).mockResolvedValueOnce(true);
+    vi.mocked(dao.resetSystemOverrides).mockResolvedValueOnce(undefined);
+    const onChanged = vi.fn(async () => {});
+    const onError = vi.fn();
+
+    expect(
+      runResetManualChangesAction(shown, {
+        systemRef: builtin.id as never,
+        onChanged,
+        onError,
+      }),
+    ).toBe(true);
+
+    expect(confirmStore.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Reset manual changes?",
+        confirmLabel: "Reset",
+        destructive: true,
+      }),
+    );
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
+    expect(dao.resetSystemOverrides).toHaveBeenCalledWith("exec", {
+      systemRef: "builtin:favorites",
+    });
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("the screen's row dispatch routes through the shared reset handler", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      new URL("./SystemsManagementScreen.tsx", import.meta.url),
+      "utf8",
+    );
+    const onAction = source.slice(source.indexOf("const onAction = ("));
+    expect(onAction).toContain("runResetManualChangesAction(action, {");
+    expect(source).not.toContain('"Reset Overrides"');
+  });
+
+  it("the reset dispatch ignores other actions and a declined confirm resets nothing", async () => {
+    const input = {
+      systemRef: "builtin:favorites" as never,
+      onChanged: vi.fn(),
+      onError: vi.fn(),
+    };
+    expect(runResetManualChangesAction("Hide", input)).toBe(false);
+    expect(runResetManualChangesAction("Reset Overrides", input)).toBe(false);
+    expect(confirmStore.confirm).not.toHaveBeenCalled();
+
+    vi.mocked(confirmStore.confirm).mockResolvedValueOnce(false);
+    expect(
+      runResetManualChangesAction(RESET_MANUAL_CHANGES_ACTION, input),
+    ).toBe(true);
+    await vi.waitFor(() => expect(confirmStore.confirm).toHaveBeenCalledOnce());
+    await Promise.resolve();
+    expect(dao.resetSystemOverrides).not.toHaveBeenCalled();
   });
 
   it("only lets the latest deferred management load publish or report an error", async () => {

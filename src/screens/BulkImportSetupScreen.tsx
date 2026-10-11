@@ -557,10 +557,10 @@ export function BulkImportSetupScreen({
 
         <View style={styles.field}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Category override
+            Category for all imported contacts
           </Text>
           <OptionSelectRow
-            label="Batch category override"
+            label="Category for all imported contacts"
             currentLabel={
               categories.find((row) => row.id === categoryId)?.name ??
               "Uncategorized"

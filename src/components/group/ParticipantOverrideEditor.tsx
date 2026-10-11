@@ -129,7 +129,9 @@ export function ParticipantOverrideEditor({
                   size="sm"
                 />
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  {following ? "Follows event" : `${label}: overridden`}
+                  {following
+                    ? "Same as event"
+                    : `${label}: changed for this person`}
                 </AppText>
               </View>
               {!following ? (

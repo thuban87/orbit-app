@@ -35,6 +35,7 @@ import {
   clearTemplateDraft,
   createTemplateManagerListLoadState,
   createTemplateManagerState,
+  describeAssignmentKind,
   describeTemplateAssignment,
   finishTemplateManagerListLoad,
   managerBackIntent,
@@ -592,14 +593,14 @@ export function ProfileTemplateManager({
               <AppText role="heading">Assign {activeTemplate.name}</AppText>
               <AppText role="body">{assignmentDescription.text}</AppText>
               <AppText role="caption">
-                This contact is currently {assignmentDescription.kind}.
+                {describeAssignmentKind(assignmentDescription.kind)}
               </AppText>
               <Button
                 role="secondary"
                 label="Set as global default"
                 onPress={() => assign("global")}
               />
-              <AppText role="label">Category override</AppText>
+              <AppText role="label">Set for this category</AppText>
               {categories.length === 0 ? (
                 <AppText role="body">No categories available</AppText>
               ) : (
@@ -627,10 +628,9 @@ export function ProfileTemplateManager({
                 onPress={() => setContactPickerVisible(true)}
               />
               <AppText role="caption">
-                Choose any active local contact to give it this template as a
-                direct layout override. Applying or removing a contact selection
-                clears only that contact's collapsed-section overrides after the
-                write commits.
+                Choose any active local contact to give it this template as its
+                own layout. Applying or removing a contact selection clears only
+                that contact's collapsed-section choices once it's saved.
               </AppText>
             </View>
           ) : null}

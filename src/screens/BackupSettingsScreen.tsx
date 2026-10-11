@@ -554,7 +554,7 @@ export function BackupSettingsScreen({
                   </Text>
                   <TextInput
                     testID="backup-settings-interval"
-                    accessibilityLabel="Backup cadence in days"
+                    accessibilityLabel="Days between backups"
                     value={intervalDays}
                     onChangeText={(value) =>
                       dayController.changeText("interval", value)

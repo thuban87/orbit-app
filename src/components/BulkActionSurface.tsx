@@ -125,7 +125,7 @@ export function BulkActionSurface({
         <Pressable
           testID="bulk-action-sensitive-operations"
           accessibilityRole="button"
-          accessibilityLabel="More sensitive operations"
+          accessibilityLabel="More careful actions"
           accessibilityState={{ disabled, busy: pending }}
           disabled={disabled}
           onPress={() => setSensitiveVisible(true)}
@@ -162,7 +162,7 @@ export function BulkActionSurface({
         variant="compact"
       >
         <Text style={[styles.sheetTitle, { color: colors.textSecondary }]}>
-          Sensitive Operations
+          Careful actions
         </Text>
         <Pressable
           testID="bulk-sensitive-frequency"

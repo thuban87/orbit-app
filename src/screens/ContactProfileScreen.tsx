@@ -775,7 +775,7 @@ export function ContactProfileScreen({
                         void confirm({
                           title: "Reset Profile presentation?",
                           message:
-                            "This clears only this contact’s layout, collapse, and background overrides. Contact data stays unchanged.",
+                            "This clears only this contact’s layout, collapse, and custom backgrounds. Contact data stays unchanged.",
                           confirmLabel: "Reset",
                           destructive: true,
                         }).then((ok) => {

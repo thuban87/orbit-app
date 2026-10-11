@@ -69,13 +69,50 @@ export function pinAllContacts<T extends { id: string }>(
     : [...rows];
 }
 
+/**
+ * The action that clears a System's manual includes/excludes. One constant is
+ * both the label shown and the label `onAction` dispatches on, so renaming it
+ * can never leave the button doing nothing (D-41, D-63; review C5-M5).
+ */
+export const RESET_MANUAL_CHANGES_ACTION = "Reset Manual Changes";
+
 /** Management has a readable, deterministic action contract per System kind. */
 export function managementActions(row: SystemManagementRow): string[] {
   if (isCustom(row)) return ["Edit", "Rename", "Duplicate", "Delete"];
   const actions = ["Duplicate", "Manage Members"];
   if (!isAllContacts(row)) actions.push(row.hidden ? "Show" : "Hide");
-  if (row.hasOverrides) actions.push("Reset Overrides");
+  if (row.hasOverrides) actions.push(RESET_MANUAL_CHANGES_ACTION);
   return actions;
+}
+
+/**
+ * Handles the reset action: a destructive, non-dismissable confirm (D-06 /
+ * ADR-086), then `resetSystemOverrides`. Returns false for any other action.
+ * Only the labels are plain words (D-41, D-63); the reset operation is
+ * unchanged.
+ */
+export function runResetManualChangesAction(
+  action: string,
+  input: {
+    systemRef: OrrerySystemId;
+    onChanged: () => Promise<void> | void;
+    onError: (message: string) => void;
+  },
+): boolean {
+  if (action !== RESET_MANUAL_CHANGES_ACTION) return false;
+  void confirm({
+    title: "Reset manual changes?",
+    message:
+      "Manual includes and excludes will be removed. The System's rules stay.",
+    confirmLabel: "Reset",
+    destructive: true,
+  }).then((confirmed) => {
+    if (!confirmed) return;
+    void resetSystemOverrides(getExecutor(), { systemRef: input.systemRef })
+      .then(() => input.onChanged())
+      .catch(() => input.onError("Couldn't reset membership changes."));
+  });
+  return true;
 }
 
 /** A newer request owns publication; mutation callbacks can add their own guard. */
@@ -229,7 +266,7 @@ function SystemRow({
         ? {
             icon: "status-neutral" as const,
             tone: "textSecondary" as const,
-            label: "Overrides",
+            label: "Edited",
           }
         : null;
 
@@ -494,22 +531,11 @@ export function SystemsManagementScreen() {
       })();
       return;
     }
-    if (action === "Reset Overrides") {
-      // D-06 / ADR-086: destructive and non-dismissable. Copy unchanged here;
-      // Plan 15 rewrites the "overrides" wording (D-41, D-63).
-      void confirm({
-        title: "Reset overrides?",
-        message:
-          "Manual includes and excludes will be removed. The System's rules stay.",
-        confirmLabel: "Reset",
-        destructive: true,
-      }).then((confirmed) => {
-        if (!confirmed) return;
-        void resetSystemOverrides(getExecutor(), { systemRef })
-          .then(() => load())
-          .catch(() => setError("Couldn't reset membership overrides."));
-      });
-    }
+    runResetManualChangesAction(action, {
+      systemRef,
+      onChanged: () => load(),
+      onError: setError,
+    });
   };
   const onReorder = ({ from, to }: ReorderableListReorderEvent) => {
     const next = pinAllContacts(reorderItems(rows, from, to));

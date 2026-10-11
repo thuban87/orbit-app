@@ -1490,8 +1490,8 @@ export function EditContactScreen({
             </View>
             <AppText role="caption" style={{ color: colors.textSecondary }}>
               {form.trackingEnabled
-                ? "Bound contacts appear in your active orbit and receive cadence reminders."
-                : "Unbound contacts keep their details and history without active cadence reminders."}
+                ? "Bound contacts appear in your active orbit and get reach-out reminders."
+                : "Unbound contacts keep their details and history without reach-out reminders."}
             </AppText>
           </View>
 
