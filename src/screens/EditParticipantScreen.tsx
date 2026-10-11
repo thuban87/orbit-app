@@ -24,6 +24,7 @@ import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 
 interface LoadedParticipant {
   event: GroupEventDetail;
@@ -41,6 +42,9 @@ export function EditParticipantScreen({
   const [draft, setDraft] = useState<ParticipantEditDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Synchronous in-flight flag: `saving` state lags a render, so the guard
+  // reads this ref to hold Back while the save runs (fix-pass WR-02).
+  const savingRef = useRef(false);
   const baselineRef = useRef<string | null>(null);
   const bypassRef = useRef(false);
 
@@ -69,10 +73,11 @@ export function EditParticipantScreen({
   }, [load]);
   const hasUnsavedChanges =
     draft !== null && JSON.stringify(draft) !== baselineRef.current;
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef });
+  // A save in flight holds every exit, with no prompt (fix-pass WR-02).
+  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef, busyRef: savingRef });
 
   async function save() {
-    if (!loaded || !draft || saving) return;
+    if (!loaded || !draft || !beginInFlight(savingRef)) return;
     setSaving(true);
     setError(null);
     const initial = loaded.draft;
@@ -93,6 +98,7 @@ export function EditParticipantScreen({
       setError("Couldn't save this participant. Please try again.");
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   }
 
@@ -115,12 +121,14 @@ export function EditParticipantScreen({
 
   // House header (38.9 D-16, D-44) with the person line from the loaded
   // participant (D-45); its Back calls goBack, which the guard above intercepts
-  // (D-13). No opaque screen fill: the theme art shows (D-17).
+  // (D-13). While a save runs the guard holds Back, so it draws disabled
+  // (D-26; WR-02). No opaque screen fill: the theme art shows (D-17).
   return (
     <View style={styles.root}>
       <ShellAppBar
         variant="child"
         title="Edit participant"
+        backDisabled={saving}
         person={{
           name: loaded.participant.contactName,
           photo: loaded.participant.contactPhoto,
