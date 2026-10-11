@@ -15,7 +15,7 @@ describe("buildDashboardOverflowActions", () => {
 
     expect(actions).toHaveLength(5);
     expect(actions.map(({ label }) => label)).toEqual([
-      "Group Events",
+      "Events",
       "Unbound Contacts",
       "Archived Contacts",
       "Select Contacts",

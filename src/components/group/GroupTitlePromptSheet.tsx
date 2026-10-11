@@ -38,10 +38,10 @@ export function GroupTitlePromptSheet({
       <View style={styles.content}>
         <AppText role="heading">Make this a group interaction</AppText>
         <AppText role="body" style={{ color: colors.textSecondary }}>
-          Give this group event a title.
+          Give this event a title.
         </AppText>
         <TextInput
-          accessibilityLabel="Group event title"
+          accessibilityLabel="Event title"
           autoFocus
           value={title}
           onChangeText={setTitle}
@@ -49,7 +49,7 @@ export function GroupTitlePromptSheet({
           // sit below the fold of the lifted sheet while typing.
           returnKeyType="done"
           onSubmitEditing={confirm}
-          placeholder="Group event title"
+          placeholder="Event title"
           placeholderTextColor={colors.textPlaceholder}
           style={[
             styles.input,
@@ -69,7 +69,7 @@ export function GroupTitlePromptSheet({
             never pushed off the sheet (D-72; the ConfirmDialog treatment). */}
         <ConfirmActions
           cancelLabel="Cancel"
-          confirmLabel="Create group event"
+          confirmLabel="Create event"
           destructive={false}
           confirmDisabled={!trimmed}
           onCancel={onRequestClose}

@@ -243,7 +243,7 @@ describe("HistoryRecordRow", () => {
     expect(all(tree).filter((n) => n.type === "Pressable")).toHaveLength(1);
     expect(textOf(root)).toContain("Synthetic group dinner");
     expect(root.props.accessibilityLabel).toBe(
-      "Interaction, Call, 7:30 PM, Outbound, Great, group event Synthetic group dinner. A long note that should wrap onto at most two lines in the row.",
+      "Interaction, Call, 7:30 PM, Outbound, Great, event Synthetic group dinner. A long note that should wrap onto at most two lines in the row.",
     );
     (root.props.onPress as () => void)();
     expect(onOpenInteraction).toHaveBeenCalledWith(8, "2026-10-06");

@@ -106,14 +106,14 @@ function renderDayRows(
           <View
             key={`group-event-${row.id}`}
             testID={`${testID}-group-event-${row.id}`}
-            accessibilityLabel={`Event, ${row.title ?? "Group Event"}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
+            accessibilityLabel={`Event, ${row.title ?? "Event"}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Icon name="group-events" tone="textPrimary" size="sm" />
             <View style={styles.body}>
               {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
               <AppText role="body" numberOfLines={1}>
-                {row.title ?? "Group Event"}
+                {row.title ?? "Event"}
               </AppText>
               <AppText role="caption" style={{ color: colors.textSecondary }}>
                 {formatTimeMinuteOrFallback(row.occurredAt)}

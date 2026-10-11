@@ -1285,7 +1285,7 @@ export function HistorySection({
             })
             .catch(() =>
               setConversionError(
-                "Couldn't create this group event. Please try again.",
+                "Couldn't create this event. Please try again.",
               ),
             );
         }}

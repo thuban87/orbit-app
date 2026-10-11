@@ -54,7 +54,7 @@ import {
   visibleParticipants,
 } from "./group-event-refresh";
 
-const GROUP_FUTURE_DATE_MESSAGE = "Group events can't be in the future.";
+const GROUP_FUTURE_DATE_MESSAGE = "Events can't be in the future.";
 
 export function EditGroupEventScreen({
   navigation,
@@ -153,7 +153,7 @@ export function EditGroupEventScreen({
       bypassRef.current = true;
       navigation.goBack();
     } catch {
-      setError("Couldn't update the group event. Your changes weren't saved.");
+      setError("Couldn't update the event. Your changes weren't saved.");
     } finally {
       setSaving(false);
     }
@@ -211,9 +211,7 @@ export function EditGroupEventScreen({
         setRemoving(null);
       },
       onWriteFailed: () =>
-        setError(
-          "Couldn't update the group event. Your changes weren't saved.",
-        ),
+        setError("Couldn't update the event. Your changes weren't saved."),
       refresh: refreshEvent,
     });
     if (result !== "busy") setRemovePending(false);
@@ -243,7 +241,7 @@ export function EditGroupEventScreen({
 
   // House header (38.9 D-16, D-44): its Back calls goBack, which the
   // unsaved-work guard above intercepts (D-13).
-  const header = <ShellAppBar variant="child" title="Edit Group Event" />;
+  const header = <ShellAppBar variant="child" title="Edit Event" />;
 
   if (!event || !draft) {
     return (
@@ -252,7 +250,7 @@ export function EditGroupEventScreen({
         <View style={styles.loading}>
           {state.loadError ? (
             <AppText role="body" style={{ color: colors.danger }}>
-              Couldn't load this group event. Please go back and retry.
+              Couldn't load this event. Please go back and retry.
             </AppText>
           ) : (
             <ActivityIndicator color={colors.accentText} />

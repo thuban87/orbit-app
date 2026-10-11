@@ -74,7 +74,7 @@ describe("GroupTitlePromptSheet (D-72)", () => {
     const [actions] = find(tree, "ConfirmActions");
     expect(actions?.props).toMatchObject({
       cancelLabel: "Cancel",
-      confirmLabel: "Create group event",
+      confirmLabel: "Create event",
       destructive: false,
       confirmDisabled: false,
     });

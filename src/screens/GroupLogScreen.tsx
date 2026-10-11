@@ -26,7 +26,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
-const GROUP_FUTURE_DATE_MESSAGE = "Group events can't be in the future.";
+const GROUP_FUTURE_DATE_MESSAGE = "Events can't be in the future.";
 
 function newGroupValue(): TouchpointRefineValue {
   return {
@@ -90,7 +90,7 @@ export function GroupLogScreen({
     if (title.trim().length === 0) {
       // Save stays pressable (CAPT-14): the error shows under Title, which is
       // scrolled into view and focused once the error has laid out (D-19).
-      setTitleError("A group event needs a title.");
+      setTitleError("An event needs a title.");
       reveal(titleFieldRef, titleInputRef);
       return;
     }
@@ -113,7 +113,7 @@ export function GroupLogScreen({
       bypassRef.current = true;
       navigation.goBack();
     } catch {
-      setError("Couldn't save this group event. Please try again.");
+      setError("Couldn't save this event. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -140,7 +140,7 @@ export function GroupLogScreen({
           <TextInput
             ref={titleInputRef}
             testID="group-log-title"
-            accessibilityLabel="Group event title"
+            accessibilityLabel="Event title"
             value={title}
             onChangeText={(next) => {
               setTitle(next);

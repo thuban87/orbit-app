@@ -1,4 +1,5 @@
 import type { OverflowAction } from "@/components/OverflowMenu";
+import { EVENTS } from "@/constants/glossary";
 
 /** The navigation surface used by Dashboard's fixed overflow destinations. */
 export interface DashboardOverflowNavigation {
@@ -25,7 +26,7 @@ export function buildDashboardOverflowActions({
 }: BuildDashboardOverflowActionsInput): OverflowAction[] {
   return [
     {
-      label: "Group Events",
+      label: EVENTS,
       onPress: navigation.openEvents,
       testID: "dashboard-group-events-overflow-entry",
     },

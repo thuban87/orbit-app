@@ -107,7 +107,7 @@ export function HistoryRecordRow({
     // The spoken label carries what the row shows (review WR-01): the meta,
     // the group label and the whole note (the visible note is cut at two lines).
     const metaSuffix = metaParts.length > 0 ? `, ${metaParts.join(", ")}` : "";
-    const groupSuffix = groupTitle ? `, group event ${groupTitle}` : "";
+    const groupSuffix = groupTitle ? `, event ${groupTitle}` : "";
     const noteSuffix = r.note ? `. ${r.note}` : "";
     return (
       <Pressable

@@ -146,43 +146,9 @@ const DEVELOPER_ONLY: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * Not-yet-converted sites, by file and exact text. 38.9-15 Tasks 2 and 3 empty
- * these lists; an entry that no longer matches fails as stale.
+ * Not-yet-converted D-41 sites, by file and exact text. 38.9-15 Task 3 empties
+ * this list; an entry that no longer matches fails as stale.
  */
-const PENDING_EVENT_NOUN: Readonly<Record<string, readonly string[]>> = {
-  "src/components/digest/DigestDayDetail.tsx": ["Group Event"],
-  "src/components/group/GroupTitlePromptSheet.tsx": [
-    "Give this group event a title.",
-    "Group event title",
-    "Create group event",
-  ],
-  "src/components/history/GroupScopePrompt.tsx": ["Edit Group Event"],
-  "src/components/history/HistorySection.tsx": [
-    "Couldn't create this group event. Please try again.",
-  ],
-  "src/components/history/HistoryStreamRows.tsx": [", group event"],
-  "src/components/history/InteractionDetail.tsx": ["View Group Event"],
-  "src/components/history/interaction-detail-logic.ts": ["Group event"],
-  "src/db/merge-dao.ts": [
-    "These contacts share a Group Event. Remove one from that Group Event before merging them.",
-  ],
-  "src/screens/EditGroupEventScreen.tsx": [
-    "Group events can't be in the future.",
-    "Couldn't update the group event. Your changes weren't saved.",
-    "Edit Group Event",
-    "Couldn't load this group event. Please go back and retry.",
-  ],
-  "src/screens/EditParticipantScreen.tsx": [
-    "This participant is no longer part of the group event.",
-  ],
-  "src/screens/GroupLogScreen.tsx": [
-    "Group events can't be in the future.",
-    "A group event needs a title.",
-    "Couldn't save this group event. Please try again.",
-    "Group event title",
-  ],
-  "src/screens/dashboard-overflow-actions.ts": ["Group Events"],
-};
 const PENDING_DEVELOPER_WORDING: Readonly<Record<string, readonly string[]>> = {
   "src/components/group/ParticipantCard.tsx": [
     "Follows event:",
@@ -657,23 +623,9 @@ function audit(
   return { offenders, stale };
 }
 
-const mergeAllowlists = (...lists: Allowlist[]): Allowlist => {
-  const out: Record<string, string[]> = {};
-  for (const list of lists) {
-    for (const [file, texts] of Object.entries(list)) {
-      out[file] = [...(out[file] ?? []), ...texts];
-    }
-  }
-  return out;
-};
-
 describe("glossary contract — production copy (D-22, D-42, D-49)", () => {
   it("no production literal carries a retired form outside the allowlists", () => {
-    const { offenders, stale } = audit(
-      SCANNED,
-      PATTERNS,
-      mergeAllowlists(DEVELOPER_ONLY, PENDING_EVENT_NOUN),
-    );
+    const { offenders, stale } = audit(SCANNED, PATTERNS, DEVELOPER_ONLY);
     expect(offenders).toEqual([]);
     expect(stale).toEqual([]);
   }, 30_000);

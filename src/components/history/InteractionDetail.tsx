@@ -205,7 +205,7 @@ export function InteractionDetail({
           {groupEventId != null && onViewGroupEvent ? (
             <Button
               role="tertiary"
-              label="View Group Event"
+              label="View Event"
               onPress={() => onViewGroupEvent(groupEventId)}
             />
           ) : null}

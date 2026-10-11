@@ -29,7 +29,7 @@ export class GroupMergeCollisionError extends Error {
 
   constructor() {
     super(
-      "These contacts share a Group Event. Remove one from that Group Event before merging them.",
+      "These contacts share an event. Remove one from that event before merging them.",
     );
     this.name = "GroupMergeCollisionError";
   }

@@ -41,11 +41,7 @@ export function GroupScopePrompt({
           label="Edit individual interaction"
           onPress={onEditIndividual}
         />
-        <Button
-          role="secondary"
-          label="Edit Group Event"
-          onPress={onEditGroup}
-        />
+        <Button role="secondary" label="Edit Event" onPress={onEditGroup} />
       </View>
     </Sheet>
   );

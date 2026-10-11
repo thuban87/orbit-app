@@ -158,7 +158,7 @@ export function buildGroupContext(
     return null;
   }
   return {
-    badge: "Group event",
+    badge: "Event",
     groupTitle: interaction.groupTitle ?? "",
     groupNote: hasText(interaction.groupNote) ? interaction.groupNote : null,
     participantNote: hasText(interaction.note) ? interaction.note : null,

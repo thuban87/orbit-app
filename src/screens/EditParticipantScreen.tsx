@@ -52,7 +52,7 @@ export function EditParticipantScreen({
           row.interactionId === interactionId && row.contactId === contactId,
       );
       if (!event || !participant) {
-        setError("This participant is no longer part of the group event.");
+        setError("This participant is no longer part of the event.");
         return;
       }
       const nextDraft = participantDraft(participant, event);
