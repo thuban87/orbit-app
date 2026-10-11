@@ -590,7 +590,7 @@ export function AIPersonalizationScreen({
           <Button
             role="primary"
             label={savingStyle ? "Saving…" : "Save Writing Style"}
-            disabled={savingStyle}
+            disabled={savingStyle || savingSection}
             onPress={() => void saveStyle()}
           />
         </View>
