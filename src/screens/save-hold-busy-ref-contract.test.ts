@@ -248,3 +248,34 @@ describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", ()
     ).toHaveLength(1);
   });
 });
+
+/**
+ * The in-form exits are held too (WR-02 follow-up, "Not fixed, needs a
+ * decision" list; D-13, D-14, D-26): a sub-editor's own Cancel during a save
+ * would otherwise close it (after a Discard prompt if dirty) while the save
+ * committed anyway.
+ */
+describe("MemoryScreen holds MemoryEditor's in-form controls while saving", () => {
+  const source = read("src/screens/MemoryScreen.tsx");
+
+  it("passes the save mirror to MemoryEditor as busy", () => {
+    const tags = source.match(/<MemoryEditor\s[\s\S]*?\/>/g) ?? [];
+    expect(tags).toHaveLength(1);
+    expect(tags[0]).toContain("busy={saving}");
+  });
+
+  it("the mirror is set beside the ref in both saves", () => {
+    for (const marker of ["const add = async (", "const edit = async ("]) {
+      const body = saveBody(source, marker);
+      expect(body.indexOf("setSaving(true)")).toBeGreaterThan(
+        body.indexOf("beginInFlight(savingRef)"),
+      );
+      expect(body.indexOf("setSaving(true)")).toBeLessThan(
+        body.indexOf("await "),
+      );
+      expect(body.indexOf("setSaving(false)")).toBeGreaterThan(
+        body.lastIndexOf("} finally {"),
+      );
+    }
+  });
+});

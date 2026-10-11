@@ -87,7 +87,8 @@ export function MemoryScreen({
   // React state is async and cannot close the double-tap window (review
   // WR-03); `savingRef` flips synchronously and is the guard.
   const savingRef = useRef(false);
-  // Mirrors `savingRef` for the header's disabled Back only (D-26; WR-02).
+  // Mirrors `savingRef` for the header's disabled Back and the editor's held
+  // controls (D-26; WR-02).
   const [saving, setSaving] = useState(false);
   // A successful inner Save returns to the Update Contact chooser (dossier §AA).
   // Navigating is deferred to an effect (not fired inside the async save
@@ -331,6 +332,9 @@ export function MemoryScreen({
             ref={memoryEditorRef}
             onDraftStateChange={setMemoryDraft}
             onCancelRequest={(close) => requestClose(close, memoryDraft.dirty)}
+            // An add or edit in flight also holds the form's own Cancel,
+            // Delete, Restore and Allow AI (WR-02 follow-up; IN-01, D-26).
+            busy={saving}
           />
         )}
       </ScrollView>
