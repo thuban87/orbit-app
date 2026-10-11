@@ -101,6 +101,7 @@ import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import {
   buildCreateInput,
   CREATE_FIELD_REVEAL_ORDER,
@@ -257,6 +258,10 @@ export function CreateContactScreen({
     seed.values,
   );
   const [saving, setSaving] = useState(false);
+  // The synchronous save guard (verification IN-04): `saving` is render state
+  // for the disabled look; this ref is what makes Save single-flight, so a
+  // second tap can neither run its own save nor re-enable Save early.
+  const savingRef = useRef(false);
 
   // CONTROLLED accordion disclosure. Identity opens by default (the fewest-taps
   // create path); the parent owns which sections are open so a blocked Save can
@@ -453,9 +458,7 @@ export function CreateContactScreen({
   const draftNow = localDateTime();
 
   async function handleSave() {
-    if (saving) {
-      return;
-    }
+    if (savingRef.current) return;
     // Blocking validation reveals + focuses the erroring accordion rather than
     // silently no-op'ing a disabled button; the form state is preserved and no
     // completion is shown (CAPT-14, dossier §AD).
@@ -473,6 +476,8 @@ export function CreateContactScreen({
       return;
     }
     const trimmed = name.trim();
+    // Claimed before the first await, so it covers the duplicate-name confirm.
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     try {
       const exec = getExecutor();
@@ -518,6 +523,7 @@ export function CreateContactScreen({
         label: "Couldn't save contact. Please try again.",
       });
     } finally {
+      endInFlight(savingRef);
       setSaving(false);
     }
   }

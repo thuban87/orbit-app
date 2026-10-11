@@ -152,6 +152,7 @@ import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS, parseDate } from "@/types";
 import { formatLocalDate, formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import { pickCreateSubEditor } from "./create-contact-logic";
 import {
   buildEditInput,
@@ -447,6 +448,10 @@ export function EditContactScreen({
   const [initialTrackingEnabled, setInitialTrackingEnabled] = useState(true);
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The synchronous save guard (verification IN-04): `saving` is render state
+  // for the disabled look; this ref is what makes Save single-flight, so a
+  // second tap can neither run its own save nor re-enable Save early.
+  const savingRef = useRef(false);
   const [stale, setStale] = useState(false);
   const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<
     string | null
@@ -970,7 +975,7 @@ export function EditContactScreen({
   }
 
   async function handleSave() {
-    if (!form || saving || stale) return;
+    if (!form || savingRef.current || stale) return;
     const blocking = collectEditBlockingErrors(form);
     const errors = toFieldErrors(blocking);
     setFieldErrors(errors);
@@ -984,6 +989,8 @@ export function EditContactScreen({
       if (sectionId) revealAndFocus(field, sectionId);
       return;
     }
+    // Claimed before the first await, so it covers the duplicate-name confirm.
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     try {
       const exec = getExecutor();
@@ -1129,6 +1136,7 @@ export function EditContactScreen({
         label: "Couldn't save contact. Please try again.",
       });
     } finally {
+      endInFlight(savingRef);
       setSaving(false);
     }
   }
