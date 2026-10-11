@@ -1604,7 +1604,7 @@ Plans:
 **Depends on**: Phase 38.13
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half is 38.15). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half, B-24 and the Events tab header/empty-state copy are 38.15's). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–9 plans — rough estimate; recurring-problem sweeps not counted.
 **Plans**: TBD
 
@@ -1614,7 +1614,7 @@ Plans:
 **Depends on**: Phase 38.14
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Origin: audit B-23 (report :700). Reverses recorded decisions: phase-12 dossier :196/:388 `[DECIDED]` "Future Group Events are not supported as planned social events in this phase" (deferred :484) and phase-38 dossier :154/:160 — to be named in its dossier. Needs a Phase 39 tutorial journey (owner, 2026-10-10).
+**Scope source**: TBD — dossier via the phase-dossier skill. Origin: audit B-23 (report :700). Reverses recorded decisions: phase-12 dossier :196/:388 `[DECIDED]` "Future Group Events are not supported as planned social events in this phase" (deferred :484) and phase-38 dossier :154/:160 — to be named in its dossier. Also owns B-24 and the Events tab header/empty-state copy (owner, 2026-10-10: not designed in 38.14 only to change here). Needs a Phase 39 tutorial journey (owner, 2026-10-10).
 **Starting size**: set at its dossier (new feature; not estimated).
 **Plans**: TBD
 

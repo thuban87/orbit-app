@@ -33,7 +33,8 @@ Note: ROADMAP 38.11's provisional scope lists areas A, B, C, D, F and J (no E). 
 | 38.10 Fuel retirement, TTR & sharing | 48 | 3 | 1 | 49 |
 | 38.11 Profile & contact forms | 28 | 0 | — | 28 |
 | 38.13 Contacts list, search & Digest | 37 | 1 | — | 37 |
-| 38.14 Logging, History, Events & Compose | 51 | 2 | — | 51 |
+| 38.14 Logging, History, Events & Compose | 50 | 2 | — | 50 |
+| 38.15 Events — plan, create & remind | 1 | 0 | — | 1 |
 | (38.11–38.14 non-UX items, split by area at the dossiers) | | | 5 | 5 |
 | 38.12 Lifecycle, import & Settings | 71 | 3 | 0 | 71 |
 | 39 Onboarding (copy notes only) | 0 | 0 | 0 | 0 |
@@ -234,7 +235,7 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | C-13 | L | HID | "Overlooked" vs "Up Next" is unexplained; Overlooked rows give no reason | X-37 | NI | C D-12 (frame 04) | 38.9 (std X-37); **39 copy note** | 847 |
 | K-33 | L | COPY | Your Week period and Weekly digest (agrees with C-10, adds detail) | X-36 | NI | — | 38.12 (Settings page); fixed with C-10 (§4.1 merge); 38.9 (std X-36) | 3514 |
 
-### 38.14 Logging, History, Events & Compose — 51 findings
+### 38.14 Logging, History, Events & Compose — 50 findings
 
 | id | sev | code | short title | theme | fix | 39 link | touches | report line |
 |---|---|---|---|---|---|---|---|---:|
@@ -254,7 +255,6 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | B-20 | L | VIS | Duration control: a saved custom duration isn't shown on reopening, and… | — | NI | — | — | 679 |
 | B-21 | L | HID | Participant cards don't show what's different for a person | — | NI | — | — | 686 |
 | B-23 | M | HID | The Events tab can't create, plan or remind: no add button, no future events,… | X-13 | NI | — | maximumDate half with E-12 | 700 |
-| B-24 | L | COPY | The Events empty state points to "Group Log on any contact", which doesn't… | X-41 | QW | — | 38.9 (std X-41) | 710 |
 | F-02 | M | HID | Saving a full log, group log, edit or delete gives no confirmation and no… | X-05 | QW | C D-16 ("close the loop"), Discretion item 6 | 38.9 (std X-05); **39 copy note** | 1579 |
 | F-03 | M | HID | Quick Log silently switches channel to whatever was last picked in Log… | X-05, X-24 | QW | C D-16, D-53, D-34, frame A | with A-35; 39 copy note; 38.9 (std X-05) | 1595 |
 | F-04 | M | INC | Bulk Quick Log records channel "unspecified" and has no Add Note, unlike… | X-05, X-24, X-36 | QW | C D-53, D-16, frame A | 38.9 (std X-05, X-36); **39 copy note** | 1606 |
@@ -289,6 +289,14 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | J-14 | L | VIS | "Subject copied" appears far from "Copy subject", often off-screen | X-05 | NI | — | 38.9 (std X-05) | 3095 |
 | J-15 | L | HID | No-destination Compose offers an email switch for a person with no email, and… | X-18 | NI | — | — | 3102 |
 | J-16 | L | VIS | A long message makes the whole screen scroll: header gone, actions pushed… | X-31 | NI | — | — | 3109 |
+
+### 38.15 Events — plan, create & remind — 1 finding (plus B-23's planning half)
+
+> Owner, 2026-10-10: the Events tab header and empty-state copy are not designed in 38.14 only to change in 38.15; B-24 lives here with the B-23 feature.
+
+| id | sev | code | short title | theme | fix | 39 link | touches | report line |
+|---|---|---|---|---|---|---|---|---:|
+| B-24 | L | COPY | The Events empty state points to "Group Log on any contact", which doesn't… | X-41 | QW | — | 38.9 (std X-41) | 710 |
 
 ### 38.12 Lifecycle, import & Settings — 71 findings
 
