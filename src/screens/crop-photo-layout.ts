@@ -4,11 +4,11 @@
  *
  * The crop square is as wide as the screen allows (minus padding) with a dim
  * band above and below that shows the rest of the photo. The canvas never
- * takes more height than the screen has left after the title and the
- * Cancel / Use photo footer: when the in-flow assist banner (38.6 D-38) or a
- * short screen takes height away, the bands shrink first (down to
- * `CROP_MIN_BAND`), then the square shrinks, so the footer always stays on
- * screen. With room to spare the layout is exactly the original fixed one.
+ * takes more height than the screen has left after the header and the Use
+ * photo footer (the header ✕ is the exit, 38.9 D-59): when the in-flow assist
+ * banner (38.6 D-38) or a short screen takes height away, the bands shrink
+ * first (down to `CROP_MIN_BAND`), then the square shrinks, so the footer
+ * always stays on screen. With room to spare the layout is exactly the original fixed one.
  */
 
 /** Horizontal screen padding either side of the square viewport. */
