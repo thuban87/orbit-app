@@ -101,7 +101,7 @@
   },
   "review": {
     "models": {
-      "claude": "sonnet"
+      "claude": "claude-opus-5-5"
     }
   }
 }
