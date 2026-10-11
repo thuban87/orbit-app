@@ -149,7 +149,17 @@ export function BaseOverlay({
                 ]}
               />
             )}
-            <View ref={contentRef} collapsable={false} style={contentStyle}>
+            {/* box-none: a full-height content frame (the Sheet's flex: 1
+                wrapper) must not swallow taps on the empty area above the
+                surface, or the scrim beneath it never receives them (ADR-174 /
+                D-06: a non-destructive overlay dismisses on scrim tap). The
+                surface's own Views still take touches. */}
+            <View
+              ref={contentRef}
+              collapsable={false}
+              pointerEvents="box-none"
+              style={contentStyle}
+            >
               {/* Overlays are opaque surfaces: reset any glass foreground scope
                   they were opened from so sheets/dialogs keep the normal text
                   hierarchy (RG-029 / D-24). A GlassSurface card inside an overlay

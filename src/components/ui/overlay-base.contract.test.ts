@@ -40,3 +40,11 @@ describe("BaseOverlay registered window + in-window snackbar (38.9 D-24, D-40)",
     );
   });
 });
+
+describe("BaseOverlay scrim reachability (ADR-174, D-06; 38.9-17 device pass)", () => {
+  it("lets taps outside the surface fall through the content frame to the scrim", () => {
+    expect(code).toMatch(
+      /<View\s+ref=\{contentRef\}\s+collapsable=\{false\}\s+pointerEvents="box-none"/,
+    );
+  });
+});
