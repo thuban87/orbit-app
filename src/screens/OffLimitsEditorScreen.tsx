@@ -1,7 +1,7 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { FuelEditor } from "@/components/FuelEditor";
 import { AppText, Button } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -9,6 +9,8 @@ import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { confirm, notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
@@ -39,7 +41,10 @@ export function OffLimitsEditorScreen({
         onItems: setItems,
         onError: (error) => {
           Logger.error(LOG_SCOPE, "failed to update Off Limits", error);
-          Alert.alert("Couldn't update Off Limits", "Please try again.");
+          showSnackbar({
+            kind: "error",
+            label: "Couldn't update Off Limits. Please try again.",
+          });
         },
       }),
     [contactId],
@@ -49,21 +54,25 @@ export function OffLimitsEditorScreen({
     useCallback(() => {
       void controller.reload().catch((error) => {
         Logger.error(LOG_SCOPE, "failed to load Off Limits", error);
-        Alert.alert("Couldn't load Off Limits", "Please go back and retry.");
+        void notice({
+          title: "Couldn't load Off Limits",
+          message: "Please go back and retry.",
+        });
       });
     }, [controller]),
   );
 
   const confirmDelete = useCallback(
     (id: number) => {
-      Alert.alert("Delete off-limits item?", "This can't be undone.", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => void controller.onDelete(id),
-        },
-      ]);
+      // Irreversible: themed destructive confirm, not dismissable (D-30, ADR-086).
+      void confirm({
+        title: "Delete off-limits item?",
+        message: "This can't be undone.",
+        confirmLabel: "Delete",
+        destructive: true,
+      }).then((ok) => {
+        if (ok) void controller.onDelete(id);
+      });
     },
     [controller],
   );
