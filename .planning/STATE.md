@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.9
 current_phase_name: UX Standards
 status: executing
-stopped_at: Completed 38.9-02-PLAN.md
-last_updated: "2026-10-11T08:17:57.650Z"
+stopped_at: Completed 38.9-03-PLAN.md
+last_updated: "2026-10-11T08:35:31.947Z"
 last_activity: 2026-10-11
-last_activity_desc: 38.9-02 complete (unsaved-work guards)
-state_head: 1f982f6c1f744cb8df2ad34a69ba5f144086bc64
+last_activity_desc: 38.9-03 complete (overlay, Capture and backup-schedule guards)
+state_head: 879966961c4ecd3677a751460e5237f17c52c1c5
 progress:
   total_phases: 37
   completed_phases: 22
   total_plans: 299
-  completed_plans: 282
+  completed_plans: 283
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -47,8 +47,8 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.9 (UX Standards) — EXECUTING
-Plan: 3 of 17
-Status: Executing Phase 38.9 — Plans 01-02 complete (overlay/dialog foundation; unsaved-work guards incl. sub-editor variant, requestClose for Cancel/fold); 17 plans sequential; run the phase code review before Plan 17 (device plan)
+Plan: 4 of 17
+Status: Executing Phase 38.9 — Plans 01-03 complete (overlay/dialog foundation; unsaved-work guards incl. sub-editor variant, requestClose for Cancel/fold; overlay guard on the pending-confirmation note, Capture Back order, Backup schedule save-on-leave); 17 plans sequential; run the phase code review before Plan 17 (device plan)
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
@@ -433,6 +433,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.8 P07 | 2h 12min (incl. G1 debug + 2 device re-checks) | 3 tasks | 11 files |
 | Phase 38.9 P01 | 21 min | 3 tasks | 48 files |
 | Phase 38.9 P02 | 29 min | 3 tasks | 27 files |
+| Phase 38.9 P03 | 15min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -1056,8 +1057,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-11T08:17:53.897Z
-**Stopped at:** Completed 38.9-02-PLAN.md
+**Last session:** 2026-10-11T08:35:28.564Z
+**Stopped at:** Completed 38.9-03-PLAN.md
 _Prior stop:_ Phase 39 context gathered (dossier accepted; UX audit next, then plan-phase 39)
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
