@@ -1,15 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, TextInput, View } from "react-native";
-import { AppText, Sheet } from "@/components/ui";
+/**
+ * CategoryChoiceSheet — the category chooser. Since 38.9 D-28 it is a thin
+ * wrapper over the shared `OptionSheet`: it owns only the category policy
+ * (eligible rows, the optional Uncategorized row, exclusions, search above
+ * `CATEGORY_SEARCH_THRESHOLD` real categories, the category copy) and hands
+ * the rows to the one themed option sheet. `categoryChoiceSheetModel` stays
+ * the tested policy seam.
+ */
+import { useMemo } from "react";
+import { OptionSheet } from "@/components/ui/OptionSheet";
 import {
   buildCategoryChoices,
   type CategoryChoice,
   type CategoryChoiceRow,
   filterCategoryChoices,
 } from "@/logic/category-logic";
-import { useTheme } from "@/theme";
-import { RADII } from "@/theme/tokens/radii";
-import { SPACING } from "@/theme/tokens/spacing";
+
+/** The no-match copy for a category search (one definition). */
+export function categoryNoMatchCopy(query: string): string {
+  return `No categories match \u201c${query.trim()}\u201d.`;
+}
 
 interface CategoryChoiceSheetModelInput {
   categories: readonly CategoryChoice[];
@@ -41,7 +50,7 @@ export function categoryChoiceSheetModel({
     selectedId,
     searchable: choices.searchable,
     rows: filterCategoryChoices(choices.rows, effectiveQuery),
-    emptyCopy: `No categories match \u201c${effectiveQuery.trim()}\u201d.`,
+    emptyCopy: categoryNoMatchCopy(effectiveQuery),
   };
 }
 
@@ -70,14 +79,14 @@ export function CategoryChoiceSheet({
   onSelect,
   onRequestClose,
 }: CategoryChoiceSheetProps) {
-  const { colors } = useTheme();
-  const [query, setQuery] = useState("");
+  // The unfiltered policy rows; OptionSheet applies the search query with the
+  // same trimmed, NFC, case-insensitive rule as filterCategoryChoices.
   const model = useMemo(
     () =>
       categoryChoiceSheetModel({
         categories,
         selectedId,
-        query,
+        query: "",
         allowUncategorized,
         excludeCategoryId,
         excludeCategoryUid,
@@ -85,99 +94,32 @@ export function CategoryChoiceSheet({
     [
       categories,
       selectedId,
-      query,
       allowUncategorized,
       excludeCategoryId,
       excludeCategoryUid,
     ],
   );
-  useEffect(() => {
-    if ((!visible || !model.searchable) && query) setQuery("");
-  }, [model.searchable, query, visible]);
+  const options = useMemo(
+    () =>
+      model.rows.map((row) => ({
+        value: row.id,
+        label: row.name,
+        accessibilityLabel: getAccessibilityLabel?.(row),
+      })),
+    [model.rows, getAccessibilityLabel],
+  );
 
   return (
-    <Sheet visible={visible} onRequestClose={onRequestClose} variant="expanded">
-      <View style={styles.root}>
-        <AppText role="heading" accessibilityRole="header">
-          {title}
-        </AppText>
-        {model.searchable ? (
-          <TextInput
-            accessibilityLabel="Search categories"
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search categories"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.search,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-        ) : null}
-        <FlatList
-          data={model.rows}
-          keyExtractor={(row) =>
-            row.id === null ? "uncategorized" : String(row.id)
-          }
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <AppText style={{ color: colors.textSecondary }}>
-              {model.emptyCopy}
-            </AppText>
-          }
-          renderItem={({ item }) => {
-            const selected = item.id === model.selectedId;
-            return (
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityLabel={getAccessibilityLabel?.(item) ?? item.name}
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  onSelect(item.id);
-                  onRequestClose();
-                }}
-                style={[
-                  styles.row,
-                  {
-                    backgroundColor: selected ? colors.accent : colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}
-              >
-                <AppText
-                  style={{
-                    color: selected ? colors.onAccent : colors.textPrimary,
-                  }}
-                >
-                  {item.name}
-                </AppText>
-              </Pressable>
-            );
-          }}
-        />
-      </View>
-    </Sheet>
+    <OptionSheet
+      visible={visible}
+      title={title}
+      options={options}
+      selected={selectedId}
+      searchable={model.searchable}
+      searchLabel="Search categories"
+      emptyText={categoryNoMatchCopy}
+      onSelect={onSelect}
+      onRequestClose={onRequestClose}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, gap: SPACING.md },
-  search: {
-    minHeight: 44,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: RADII.md,
-    paddingHorizontal: SPACING.md,
-  },
-  row: {
-    minHeight: 44,
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: RADII.md,
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-});

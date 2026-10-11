@@ -18,12 +18,40 @@ vi.mock("react-native", () => ({
   TextInput: "TextInput",
   View: "View",
 }));
-vi.mock("@/components/ui", () => ({ AppText: "AppText", Sheet: "Sheet" }));
-vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
+// 38.9 D-28: CategoryChoiceSheet wraps the shared OptionSheet, which renders
+// the Sheet, search field and list; its leaf primitives are mocked here.
+vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
+vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
+vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
+vi.mock("@/theme", () => ({
+  useTheme: () => ({ colors: {} }),
+  useUnscopedTheme: () => ({ colors: {} }),
+}));
 
-const { CategoryChoiceSheet, categoryChoiceSheetModel } = await import(
-  "./CategoryChoiceSheet"
-);
+const {
+  CategoryChoiceSheet: renderCategoryChoiceSheet,
+  categoryChoiceSheetModel,
+} = await import("./CategoryChoiceSheet");
+
+type Element = { type?: unknown; props?: Record<string, unknown> };
+
+/** Shallow-render function components (the wrapped OptionSheet) in place. */
+function expand(node: unknown): unknown {
+  if (!node || typeof node !== "object") return node;
+  const element = node as Element;
+  if (typeof element.type === "function") {
+    return expand(
+      (element.type as (props: unknown) => unknown)(element.props ?? {}),
+    );
+  }
+  return node;
+}
+
+function CategoryChoiceSheet(
+  props: Parameters<typeof renderCategoryChoiceSheet>[0],
+): unknown {
+  return expand(renderCategoryChoiceSheet(props));
+}
 
 function findElements(node: unknown, type: unknown): unknown[] {
   if (!node || typeof node !== "object") return [];
@@ -184,13 +212,15 @@ describe("CategoryChoiceSheet", () => {
     });
     const list = findElements(tree, "FlatList")[0] as {
       props: {
-        data: { id: number | null; name: string }[];
-        renderItem: (info: { item: { id: number | null; name: string } }) => {
+        data: { value: number | null; label: string; selected: boolean }[];
+        renderItem: (info: {
+          item: { value: number | null; label: string; selected: boolean };
+        }) => {
           props: { onPress: () => void };
         };
       };
     };
-    expect(list.props.data.map((row) => row.name)).toEqual([
+    expect(list.props.data.map((row) => row.label)).toEqual([
       "Family",
       "Friends",
       "Uncategorized",

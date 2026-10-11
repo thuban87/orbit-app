@@ -6,7 +6,10 @@ import {
   collapseCanonicalDuplicate,
   discardBlankMethodDrafts,
   emptyMethodDraft,
+  METHOD_LABELS,
   type MethodGroups,
+  methodLabelChoice,
+  nextMethodLabel,
   removeMethodDraft,
   resolveEffectivePhoneRegion,
   toMethodDrafts,
@@ -127,5 +130,26 @@ describe("contact method editor model", () => {
     expect(
       collapseCanonicalDuplicate(withDuplicate, "phone", "missing"),
     ).toEqual(withDuplicate);
+  });
+});
+
+describe("method label option sheet rule (38.9 D-28)", () => {
+  it("shows a custom or empty label as Other", () => {
+    expect(methodLabelChoice("Mobile")).toBe("Mobile");
+    expect(methodLabelChoice("Pager")).toBe("Other");
+    expect(methodLabelChoice("")).toBe("Other");
+    expect(methodLabelChoice(null)).toBe("Other");
+    expect(METHOD_LABELS).toEqual(["Mobile", "Home", "Work", "Main", "Other"]);
+  });
+
+  it("never clears a typed custom label when Other is picked again", () => {
+    expect(nextMethodLabel("Pager", "Other")).toBeNull();
+    expect(nextMethodLabel("", "Other")).toBeNull();
+    expect(nextMethodLabel("Work", "Work")).toBeNull();
+  });
+
+  it("stores the picked standard label, and an empty label for Other", () => {
+    expect(nextMethodLabel("Pager", "Home")).toBe("Home");
+    expect(nextMethodLabel("Mobile", "Other")).toBe("");
   });
 });

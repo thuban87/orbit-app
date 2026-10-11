@@ -1,14 +1,18 @@
-import { Picker } from "@react-native-picker/picker";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { OptionSelectRow, OptionSheet } from "@/components/ui";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { useTheme } from "@/theme";
-import type {
-  ContactMethodEditorDraft,
-  MethodGroups,
+import {
+  type ContactMethodEditorDraft,
+  METHOD_LABELS,
+  type MethodGroups,
+  methodLabelChoice,
+  nextMethodLabel,
 } from "./contact-methods-editor-model";
 
-const LABELS = ["Mobile", "Home", "Work", "Main", "Other"] as const;
 const STANDARD_LABELS = ["Mobile", "Home", "Work", "Main"] as const;
+const LABEL_OPTIONS = METHOD_LABELS.map((label) => ({ value: label, label }));
 
 export interface ContactMethodsEditorProps {
   methods: MethodGroups;
@@ -27,11 +31,13 @@ function typeCopy(type: ContactMethodType) {
   return type === "phone"
     ? {
         heading: "Phone numbers",
+        singular: "Phone number",
         empty: "No phone numbers yet",
         add: "+ Add phone number",
       }
     : {
         heading: "Email addresses",
+        singular: "Email address",
         empty: "No email addresses yet",
         add: "+ Add email address",
       };
@@ -47,6 +53,15 @@ export function ContactMethodsEditor({
   testID,
 }: ContactMethodsEditorProps) {
   const { colors } = useTheme();
+  // 38.9 D-28: one themed option sheet for the method label, opened for the
+  // row whose uid is held here (null = closed).
+  const [labelSheetUid, setLabelSheetUid] = useState<string | null>(null);
+  const labelSheetRow =
+    labelSheetUid === null
+      ? undefined
+      : [...methods.phone, ...methods.email].find(
+          (row) => row.uid === labelSheetUid,
+        );
   const inputStyle = [
     styles.input,
     {
@@ -78,27 +93,12 @@ export function ContactMethodsEditor({
             ]}
           >
             <View style={styles.labelRow}>
-              <View
-                style={[styles.labelPicker, { borderColor: colors.border }]}
-              >
-                <Picker
-                  selectedValue={
-                    LABELS.includes(row.label as (typeof LABELS)[number])
-                      ? row.label
-                      : "Other"
-                  }
-                  onValueChange={(label) =>
-                    onUpdate(row.uid, {
-                      label: label === "Other" ? "" : String(label),
-                    })
-                  }
-                  accessibilityLabel={`${copy.heading} label`}
-                  style={{ color: colors.textPrimary }}
-                >
-                  {LABELS.map((label) => (
-                    <Picker.Item key={label} label={label} value={label} />
-                  ))}
-                </Picker>
+              <View style={styles.labelPicker}>
+                <OptionSelectRow
+                  label={`${copy.heading} label`}
+                  currentLabel={methodLabelChoice(row.label)}
+                  onPress={() => setLabelSheetUid(row.uid)}
+                />
               </View>
               <Pressable
                 testID={`${testID ?? "contact-methods-editor"}-${type}-remove-${index}`}
@@ -202,6 +202,18 @@ export function ContactMethodsEditor({
     <View testID={testID} style={styles.container}>
       {group("phone")}
       {group("email")}
+      <OptionSheet
+        visible={labelSheetRow !== undefined}
+        title={`${typeCopy(labelSheetRow?.type ?? "phone").singular} label`}
+        options={LABEL_OPTIONS}
+        selected={methodLabelChoice(labelSheetRow?.label)}
+        onSelect={(picked) => {
+          if (!labelSheetRow) return;
+          const label = nextMethodLabel(labelSheetRow.label, picked);
+          if (label !== null) onUpdate(labelSheetRow.uid, { label });
+        }}
+        onRequestClose={() => setLabelSheetUid(null)}
+      />
     </View>
   );
 }
@@ -213,7 +225,7 @@ const styles = StyleSheet.create({
   empty: { fontSize: 13, lineHeight: 18 },
   card: { borderWidth: 1, borderRadius: 10, padding: 12, gap: 8 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  labelPicker: { flex: 1, borderWidth: 1, borderRadius: 8 },
+  labelPicker: { flex: 1 },
   input: {
     borderWidth: 1,
     borderRadius: 8,

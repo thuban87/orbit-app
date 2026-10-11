@@ -26,7 +26,18 @@ export {
 } from "./chip-tone";
 export { FieldError, type FieldErrorProps } from "./FieldError";
 export { GlassSurface, type GlassSurfaceProps } from "./GlassSurface";
+export {
+  OptionSelectRow,
+  type OptionSelectRowProps,
+} from "./OptionSelectRow";
+export { OptionSheet, type OptionSheetProps } from "./OptionSheet";
 export { OrbitSwitch, type OrbitSwitchProps } from "./OrbitSwitch";
+export {
+  type OptionSheetOption,
+  type OptionValue,
+  optionSheetModel,
+  shouldSearch,
+} from "./option-sheet-logic";
 export {
   type OverlayLifecycle,
   SCRIM_OPACITY,

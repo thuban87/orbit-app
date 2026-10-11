@@ -6,6 +6,38 @@ import type { ContactMethodType } from "@/logic/contact-method-normalization";
 
 export type MethodLabel = "Mobile" | "Home" | "Work" | "Main" | "Other";
 
+/** The label choices the option sheet lists, in order. */
+export const METHOD_LABELS: readonly MethodLabel[] = [
+  "Mobile",
+  "Home",
+  "Work",
+  "Main",
+  "Other",
+];
+
+/** The choice a stored label shows: a custom or empty label reads as "Other". */
+export function methodLabelChoice(
+  label: string | null | undefined,
+): MethodLabel {
+  return METHOD_LABELS.includes(label as MethodLabel)
+    ? (label as MethodLabel)
+    : "Other";
+}
+
+/**
+ * The label to store after a pick, or null when the pick changes nothing.
+ * Re-picking the current choice is not a change, so re-picking "Other" keeps
+ * a typed custom label (the native spinner never fired for it). Picking
+ * "Other" from a standard label clears it for the custom-label field.
+ */
+export function nextMethodLabel(
+  current: string | null | undefined,
+  picked: MethodLabel,
+): string | null {
+  if (picked === methodLabelChoice(current)) return null;
+  return picked === "Other" ? "" : picked;
+}
+
 /** The controlled UI shape. Persisted IDs seed rows; uid never changes in a draft. */
 export interface ContactMethodEditorDraft extends ContactMethodDraft {
   extension: string;
