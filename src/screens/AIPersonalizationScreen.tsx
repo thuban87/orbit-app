@@ -53,17 +53,25 @@ import {
   type WritingStyle,
   type WritingTone,
 } from "@/db/personalization-dao";
+import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import type { AiCloudProviderId } from "@/services/ai-types";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
+  applyStyleLoad,
+  applyStyleSave,
   createEstimateDebouncer,
   formatEstimateCaption,
+  hasSectionDraftChanges,
+  initialStyleSync,
+  isWritingStyleDirty,
   moveSectionUid,
   personalizationEstimateSource,
+  type StyleSyncState,
 } from "./ai-personalization-logic";
 
 const LOG_SCOPE = "ai-personalization";
@@ -142,6 +150,17 @@ export function AIPersonalizationScreen({
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
   const [style, setStyle] = useState<WritingStyle>(DEFAULT_STYLE);
+  // Unsaved-work guard (D-13, D-34). The saved baseline starts as the initial
+  // style; `load()` and `saveStyle()` move it through the pure
+  // applyStyleLoad / applyStyleSave rules (reviews C4-M4, C5-L1, C6-L5).
+  const [savedStyle, setSavedStyle] = useState<WritingStyle>(DEFAULT_STYLE);
+  const styleSyncRef = useRef<StyleSyncState>(initialStyleSync(DEFAULT_STYLE));
+  // The shown style, read synchronously by an async load or save.
+  const styleRef = useRef(style);
+  styleRef.current = style;
+  // Each load() takes a style-read token; a successful Save invalidates every
+  // token taken before it completed (review C6-L5).
+  const styleReadSeqRef = useRef(0);
   const [sections, setSections] = useState<PersonalizationSection[]>([]);
   const [activeModel, setActiveModel] = useState<ActiveEstimateModel | null>(
     null,
@@ -161,6 +180,8 @@ export function AIPersonalizationScreen({
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
   const [editingUid, setEditingUid] = useState<string | null>(null);
+  // Whether the open inline section edit differs from its section (C5-L7).
+  const [sectionEditDirty, setSectionEditDirty] = useState(false);
   const [optionsUid, setOptionsUid] = useState<string | null>(null);
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const storage = useMemo(createOpenRouterStorage, []);
@@ -183,12 +204,26 @@ export function AIPersonalizationScreen({
 
   const load = useCallback(async () => {
     const exec = getExecutor();
+    styleReadSeqRef.current += 1;
+    const readToken = styleReadSeqRef.current;
     const [nextStyle, nextSections, connection] = await Promise.all([
       getWritingStyle(exec),
       listPersonalizationSections(exec),
       resolveActiveAiConnection(exec),
     ]);
-    setStyle(nextStyle);
+    // Publish the read style only for a still-valid token and a style that is
+    // clean against its baseline; an edit is never replaced by a refresh.
+    const synced = applyStyleLoad(
+      { ...styleSyncRef.current, current: styleRef.current },
+      nextStyle,
+      readToken,
+    );
+    styleSyncRef.current = synced;
+    if (synced.current !== styleRef.current) {
+      styleRef.current = synced.current;
+      setStyle(synced.current);
+    }
+    setSavedStyle(synced.saved);
     setSections(nextSections);
     if (!connection) {
       setActiveModel(null);
@@ -264,9 +299,20 @@ export function AIPersonalizationScreen({
   async function saveStyle() {
     if (savingStyle) return;
     setSavingStyle(true);
+    const submitted = style;
     try {
-      await updateWritingStyle(getExecutor(), style, localDateTime());
-      setMessage("Writing Style saved.");
+      await updateWritingStyle(getExecutor(), submitted, localDateTime());
+      // The baseline is exactly what was written; an edit typed while the
+      // write was pending stays dirty, and earlier reads go stale.
+      const synced = applyStyleSave(
+        { ...styleSyncRef.current, current: styleRef.current },
+        submitted,
+        styleReadSeqRef.current,
+      );
+      styleSyncRef.current = synced;
+      setSavedStyle(synced.saved);
+      setMessage(null);
+      showSnackbar({ kind: "success", label: "Saved" });
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to save Writing Style", caught);
       setMessage("Couldn't save Writing Style. Please try again.");
@@ -274,6 +320,28 @@ export function AIPersonalizationScreen({
       setSavingStyle(false);
     }
   }
+
+  useEffect(() => {
+    // A newly opened (or closed) inline edit starts clean.
+    void editingUid;
+    setSectionEditDirty(false);
+  }, [editingUid]);
+
+  // Back with unsaved Writing Style edits or a typed section draft prompts
+  // (D-13, D-34; C5-L7). Save does not navigate, so the bypass stays false.
+  const bypassRef = useRef(false);
+  useDiscardKeepGuard({
+    hasUnsavedChanges:
+      isWritingStyleDirty(savedStyle, style) ||
+      hasSectionDraftChanges({
+        adding,
+        draftTitle,
+        draftBody,
+        editingOpen: editingUid !== null,
+        editDirty: sectionEditDirty,
+      }),
+    bypassRef,
+  });
 
   async function addSection() {
     if (!draftTitle.trim()) return;
@@ -628,6 +696,7 @@ export function AIPersonalizationScreen({
                     section={section}
                     onCancel={() => setEditingUid(null)}
                     onSave={saveEditedSection}
+                    onDirtyChange={setSectionEditDirty}
                   />
                 ) : null}
               </GlassSurface>
@@ -804,13 +873,23 @@ function SectionEditor({
   section,
   onCancel,
   onSave,
+  onDirtyChange,
 }: {
   section: PersonalizationSection;
   onCancel: () => void;
   onSave: (section: PersonalizationSection) => Promise<void>;
+  /** Reports whether the edit differs from its section (D-13; C5-L7). */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [title, setTitle] = useState(section.title);
   const [body, setBody] = useState(section.body);
+  const dirty = title !== section.title || body !== section.body;
+  const onDirtyChangeRef = useRef(onDirtyChange);
+  onDirtyChangeRef.current = onDirtyChange;
+  useEffect(() => {
+    onDirtyChangeRef.current?.(dirty);
+  }, [dirty]);
+  useEffect(() => () => onDirtyChangeRef.current?.(false), []);
   return (
     <NewSectionEditor
       title={title}

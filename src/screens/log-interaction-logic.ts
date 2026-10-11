@@ -184,3 +184,21 @@ export function buildLogInteractionInput(
     source: "manual",
   };
 }
+
+/**
+ * Whether Log Interaction holds unsaved work (F-01; D-13, D-15). Off while the
+ * contact picker shows (no contact yet) and until `seed()` has resolved; then
+ * dirty only when the form differs from the snapshot taken when it seeded.
+ */
+export function isLogInteractionDirty({
+  contactId,
+  seedSnapshot,
+  current,
+}: {
+  contactId: number | null;
+  seedSnapshot: string | null;
+  current: string;
+}): boolean {
+  if (contactId === null || seedSnapshot === null) return false;
+  return seedSnapshot !== current;
+}

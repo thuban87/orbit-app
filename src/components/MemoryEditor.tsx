@@ -1,4 +1,10 @@
-import { useState } from "react";
+import {
+  type Ref,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import {
   FlatList,
   Pressable,
@@ -74,7 +80,31 @@ export interface MemoryEditorProps {
    * Used where the editor shows one known memory (post-log Edit Memory, D-73).
    */
   initiallyEditingId?: number;
+  /**
+   * Reports whether a draft form is open and holds typed changes (38.9 D-14),
+   * on every change and `{ open: false, dirty: false }` on unmount. Optional:
+   * consumers that do not guard the draft omit it.
+   */
+  onDraftStateChange?: (state: MemoryDraftState) => void;
+  /**
+   * When given, the form's Cancel calls this with the editor's own close
+   * instead of closing at once, so the host can route it through the shared
+   * dirty-aware `requestClose` (D-61). Absent → Cancel closes at once.
+   */
+  onCancelRequest?: (close: () => void) => void;
+  /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
+  ref?: Ref<MemoryEditorHandle>;
   testID?: string;
+}
+
+export interface MemoryDraftState {
+  open: boolean;
+  dirty: boolean;
+}
+
+export interface MemoryEditorHandle {
+  /** Closes the open draft form without saving (no prompt). */
+  closeDraft: () => void;
 }
 
 function TypePicker({
@@ -197,6 +227,44 @@ export function initialDraft(item?: MemoryRow): MemoryDraft {
   };
 }
 
+/** Text fields compare blank-equivalent: typed-then-erased reads as untouched. */
+function sameText(a: string | null, b: string | null): boolean {
+  return (a ?? "") === (b ?? "");
+}
+
+/**
+ * Whether an open draft differs from what it opened with (38.9 D-14, D-61):
+ * `initial` is `initialDraft(editing ?? undefined)`. PURE.
+ */
+export function isMemoryDraftDirty(
+  initial: MemoryDraft,
+  draft: MemoryDraft,
+): boolean {
+  return !(
+    initial.type === draft.type &&
+    sameText(initial.customLabel, draft.customLabel) &&
+    sameText(initial.value, draft.value) &&
+    sameText(initial.note, draft.note) &&
+    sameText(initial.url, draft.url) &&
+    sameText(initial.meaningfulDate, draft.meaningfulDate) &&
+    initial.pinned === draft.pinned &&
+    initial.outdated === draft.outdated &&
+    initial.hidden === draft.hidden
+  );
+}
+
+/** The draft state a host's guard reads (D-14). PURE. */
+export function memoryDraftState(
+  editing: MemoryRow | null,
+  draft: MemoryDraft | null,
+): MemoryDraftState {
+  if (draft === null) return { open: false, dirty: false };
+  return {
+    open: true,
+    dirty: isMemoryDraftDirty(initialDraft(editing ?? undefined), draft),
+  };
+}
+
 /**
  * The editor's opening state: the form for `initiallyEditingId` when that item
  * is in `items`, otherwise closed (the cards alone). PURE (D-73).
@@ -225,6 +293,9 @@ export function MemoryEditor({
   onSetAllowAi,
   globalAiEnabled,
   initiallyEditingId,
+  onDraftStateChange,
+  onCancelRequest,
+  ref,
   testID,
 }: MemoryEditorProps) {
   const { colors } = useTheme();
@@ -247,6 +318,23 @@ export function MemoryEditor({
     setEditing(null);
     setDraft(null);
   };
+
+  // Draft state for the host's guard (D-14). The callback is read through a
+  // ref so a fresh closure each render never re-fires the report.
+  const { open: draftOpen, dirty: draftDirty } = memoryDraftState(
+    editing,
+    draft,
+  );
+  const onDraftStateChangeRef = useRef(onDraftStateChange);
+  onDraftStateChangeRef.current = onDraftStateChange;
+  useEffect(() => {
+    onDraftStateChangeRef.current?.({ open: draftOpen, dirty: draftDirty });
+  }, [draftOpen, draftDirty]);
+  useEffect(
+    () => () => onDraftStateChangeRef.current?.({ open: false, dirty: false }),
+    [],
+  );
+  useImperativeHandle(ref, () => ({ closeDraft: close }));
   const update = <K extends keyof MemoryDraft>(
     key: K,
     value: MemoryDraft[K],
@@ -499,7 +587,9 @@ export function MemoryEditor({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Cancel"
-              onPress={close}
+              onPress={() =>
+                onCancelRequest ? onCancelRequest(close) : close()
+              }
               style={[styles.action, { borderColor: colors.border }]}
             >
               <AppText role="body" style={{ color: colors.textSecondary }}>

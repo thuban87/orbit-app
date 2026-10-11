@@ -55,6 +55,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
+import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
@@ -64,6 +65,7 @@ import {
   applyChannelChange,
   buildLogInteractionInput,
   defaultsForChannel,
+  isLogInteractionDirty,
   ORDINARY_LOG_CHANNEL_OPTIONS,
   resolveInitialAllowAi,
   resolveInitialChannel,
@@ -107,6 +109,10 @@ export function LogInteractionScreen({
   // ref flips in the same tick and is the real write-once guarantee; `saving`
   // stays for the disabled/UI affordance.
   const savingRef = useRef(false);
+  // Unsaved-work guard (F-01; D-13, D-15): the snapshot of the seeded form, so
+  // only a change made after seed() resolved holds Back.
+  const seedSnapshotRef = useRef<string | null>(null);
+  const bypassRef = useRef(false);
 
   // Seed the form Channel from the Default Interaction Channel preference. Pure
   // on-device SQLite read — no network on this read path (local-first). Renders
@@ -124,7 +130,7 @@ export function LogInteractionScreen({
         settings.rememberedInteractionChannel,
       );
       const defaults = defaultsForChannel(channel);
-      setValue({
+      const seeded: TouchpointRefineValue = {
         occurredAt: seedOccurredAt(prefillDate, now),
         channel,
         direction: defaults.direction,
@@ -133,14 +139,16 @@ export function LogInteractionScreen({
         note: null,
         duration: null,
         allowAi: resolveInitialAllowAi(allowAiDefault),
-      });
+      };
+      seedSnapshotRef.current = JSON.stringify(seeded);
+      setValue(seeded);
     } catch (err) {
       // A settings read failure falls back to the Message default so the form is
       // never left blank (CAPT-08 empty edge); the channel chooser still offers
       // exactly the three canonical options.
       Logger.error(LOG_SCOPE, "failed to read channel preference", err);
       const defaults = defaultsForChannel("Message");
-      setValue({
+      const seeded: TouchpointRefineValue = {
         occurredAt: seedOccurredAt(prefillDate, now),
         channel: "Message",
         direction: defaults.direction,
@@ -149,7 +157,9 @@ export function LogInteractionScreen({
         note: null,
         duration: null,
         allowAi: resolveInitialAllowAi(),
-      });
+      };
+      seedSnapshotRef.current = JSON.stringify(seeded);
+      setValue(seeded);
     }
   }, [prefillDate]);
 
@@ -177,6 +187,16 @@ export function LogInteractionScreen({
       return next;
     });
   }, []);
+
+  // Off while the contact picker shows (contactId null; D-15).
+  useDiscardKeepGuard({
+    hasUnsavedChanges: isLogInteractionDirty({
+      contactId,
+      seedSnapshot: seedSnapshotRef.current,
+      current: JSON.stringify(value),
+    }),
+    bypassRef,
+  });
 
   async function handleSave() {
     if (!value || contactId === null) return;
@@ -239,6 +259,7 @@ export function LogInteractionScreen({
       // Committed: nudge the widget; derived consumers recompute on their next
       // focused read. Return to the origin-aware caller (Profile).
       notifyWidgetDataChanged();
+      bypassRef.current = true;
       navigation.goBack();
     } finally {
       endInFlight(savingRef);

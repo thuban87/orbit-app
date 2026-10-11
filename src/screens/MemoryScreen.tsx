@@ -36,7 +36,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import {
   type MemoryDraft,
+  type MemoryDraftState,
   MemoryEditor,
+  type MemoryEditorHandle,
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
@@ -53,6 +55,7 @@ import {
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
+import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -87,6 +90,25 @@ export function MemoryScreen({
   // handler) so MemoryEditor finishes its own close() before this screen
   // unmounts — avoiding a setState-on-unmounted warning mid-commit.
   const [savedTick, setSavedTick] = useState(0);
+
+  // In-screen sub-editor guard (G-12; D-14, D-61): Back with a draft open
+  // closes the draft first and stays (asking only when it holds typed text);
+  // with no draft open Back leaves. The editor's Cancel follows the same rule.
+  const memoryEditorRef = useRef<MemoryEditorHandle>(null);
+  const [memoryDraft, setMemoryDraft] = useState<MemoryDraftState>({
+    open: false,
+    dirty: false,
+  });
+  const bypassRef = useRef(false);
+  const { requestClose } = useDiscardKeepGuard({
+    hasUnsavedChanges: false,
+    bypassRef,
+    subEditor: {
+      open: memoryDraft.open,
+      dirty: memoryDraft.dirty,
+      close: () => memoryEditorRef.current?.closeDraft(),
+    },
+  });
 
   /**
    * Load AI availability, then the memories. NEVER rejects. The AI-availability
@@ -123,8 +145,12 @@ export function MemoryScreen({
   );
 
   // Return to the Update Contact chooser after a committed save (deferred).
+  // A committed save leaves without a prompt (bypass set right before goBack).
   useEffect(() => {
-    if (savedTick > 0) navigation.goBack();
+    if (savedTick > 0) {
+      bypassRef.current = true;
+      navigation.goBack();
+    }
   }, [savedTick, navigation]);
 
   const returnToChooser = () => setSavedTick((tick) => tick + 1);
@@ -289,6 +315,9 @@ export function MemoryScreen({
             onRestore={restore}
             onSetAllowAi={setAllowAi}
             globalAiEnabled={globalAiEnabled}
+            ref={memoryEditorRef}
+            onDraftStateChange={setMemoryDraft}
+            onCancelRequest={(close) => requestClose(close, memoryDraft.dirty)}
           />
         )}
       </ScrollView>
