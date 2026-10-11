@@ -59,6 +59,7 @@ import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 
 const LOG_SCOPE = "custom-fields";
 
@@ -113,6 +114,10 @@ export function CustomFieldsScreen() {
   // changes); its Cancel follows the same rule. A successful create/edit
   // closes directly through setEditor(null), with no prompt.
   const [editorDirty, setEditorDirty] = useState(false);
+  // A create or edit is in flight (fix-pass WR-02). The ref is what the guard
+  // reads at removal time; the state draws the header Back disabled (D-26).
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const bypassRef = useRef(false);
   const closeEditor = () => {
     setEditor(null);
@@ -121,6 +126,9 @@ export function CustomFieldsScreen() {
   const { requestClose } = useDiscardKeepGuard({
     hasUnsavedChanges: false,
     bypassRef,
+    // A create or edit in flight (its pre-flight summary included) holds every
+    // exit, with no prompt and no editor close (fix-pass WR-02).
+    busyRef: savingRef,
     subEditor: {
       open: editor !== null,
       dirty: editorDirty,
@@ -186,16 +194,23 @@ export function CustomFieldsScreen() {
   }
 
   async function handleCreate(def: NewFieldDef) {
+    if (!beginInFlight(savingRef)) return;
+    setSaving(true);
     try {
       await createField(getExecutor(), def);
       setEditor(null);
       await load();
     } catch (err) {
       reportError(err);
+    } finally {
+      setSaving(false);
+      endInFlight(savingRef);
     }
   }
 
   async function handleEdit(field: CustomFieldDef, draft: FieldDefDraft) {
+    if (!beginInFlight(savingRef)) return;
+    setSaving(true);
     const exec = getExecutor();
     try {
       const labelChanged = draft.label !== field.label;
@@ -283,6 +298,9 @@ export function CustomFieldsScreen() {
       await load();
     } catch (err) {
       reportError(err);
+    } finally {
+      setSaving(false);
+      endInFlight(savingRef);
     }
   }
 
@@ -554,7 +572,12 @@ export function CustomFieldsScreen() {
 
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Custom Fields" />
+      {/* While a create or edit runs the guard holds Back (D-26; WR-02). */}
+      <ShellAppBar
+        variant="child"
+        title="Custom Fields"
+        backDisabled={saving}
+      />
       {body}
     </View>
   );
