@@ -408,6 +408,12 @@ export function MemoryEditor({
       blankToNull(draft.value ?? "") &&
       (!isCustom || blankToNull(draft.customLabel ?? "")),
   );
+  // An outlined action the host's save holds: dimmed while busy (D-26).
+  const heldActionStyle = [
+    styles.action,
+    { borderColor: colors.border },
+    busy ? styles.disabled : null,
+  ];
 
   return (
     <View testID={testID} style={styles.container}>
@@ -646,11 +652,7 @@ export function MemoryEditor({
                   onDelete(editing.id);
                   close();
                 }}
-                style={[
-                  styles.action,
-                  { borderColor: colors.border },
-                  busy ? styles.disabled : null,
-                ]}
+                style={heldActionStyle}
               >
                 <AppText role="body" style={{ color: colors.textSecondary }}>
                   Move to Recently Deleted
@@ -662,16 +664,11 @@ export function MemoryEditor({
                 accessibilityRole="button"
                 accessibilityLabel="Restore memory"
                 accessibilityState={{ disabled: busy }}
+                // Held while busy by `disabled`; it has no local side effect
+                // and the host also ignores it during a save (IN-01).
                 disabled={busy}
-                onPress={() => {
-                  if (busy) return; // held while the host saves (IN-01)
-                  onRestore(editing.id);
-                }}
-                style={[
-                  styles.action,
-                  { borderColor: colors.border },
-                  busy ? styles.disabled : null,
-                ]}
+                onPress={() => onRestore(editing.id)}
+                style={heldActionStyle}
               >
                 <AppText role="body" style={{ color: colors.accentText }}>
                   Restore
@@ -686,11 +683,7 @@ export function MemoryEditor({
               onPress={() =>
                 onCancelRequest ? onCancelRequest(close) : close()
               }
-              style={[
-                styles.action,
-                { borderColor: colors.border },
-                busy ? styles.disabled : null,
-              ]}
+              style={heldActionStyle}
             >
               <AppText role="body" style={{ color: colors.textSecondary }}>
                 Cancel

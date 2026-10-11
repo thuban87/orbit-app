@@ -413,14 +413,18 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
   });
 
   it("holds Move to Recently Deleted, Restore and Allow AI while busy (IN-01)", () => {
-    const { tree, onDelete, onRestore, onSetAllowAi } = renderDeleted(true);
+    const { tree, onDelete, onSetAllowAi } = renderDeleted(true);
+    // Both are disabled Pressables (RN never calls onPress on them).
     for (const label of labels) {
       expect(control(tree, label)?.props.disabled).toBe(true);
+      expect(control(tree, label)?.props.accessibilityState).toEqual({
+        disabled: true,
+      });
       expect(dimmed(control(tree, label))).toBe(true);
-      invoke(control(tree, label), "onPress");
     }
+    // Delete also closes the form locally, so it guards its own handler too.
+    invoke(control(tree, labels[0]), "onPress");
     expect(onDelete).not.toHaveBeenCalled();
-    expect(onRestore).not.toHaveBeenCalled();
     // Allow AI is announced busy, never drawn disabled (which would show Off
     // over a stored On, D-26), and ignores the tap: no optimistic flip.
     const allowAi = tree.find(
