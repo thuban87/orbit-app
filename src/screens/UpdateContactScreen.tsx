@@ -98,7 +98,11 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
-import { beginInFlight, endInFlight } from "@/utils/single-flight";
+import {
+  beginInFlight,
+  endInFlight,
+  type InFlightRef,
+} from "@/utils/single-flight";
 import {
   buildChooserRows,
   type ChooserRow,
@@ -134,6 +138,27 @@ function useReportDirty(
     callbackRef.current?.(dirty);
   }, [dirty]);
   useEffect(() => () => callbackRef.current?.(false), []);
+}
+
+/**
+ * The open row editor's save slot, owned by the screen (fix-pass WR-02). The
+ * screen's guard reads `ref` at removal time to hold Back while a row save
+ * runs; `onSavingChange` draws the header Back disabled (D-26). One row editor
+ * is open at a time, so one slot serves them all.
+ */
+type RowSave = {
+  ref: InFlightRef;
+  onSavingChange: (saving: boolean) => void;
+};
+
+/** A row editor's `saving` state, mirrored to the screen's `RowSave`. */
+function useRowSave(rowSave: RowSave) {
+  const [saving, setSavingState] = useState(false);
+  const setSaving = (next: boolean) => {
+    setSavingState(next);
+    rowSave.onSavingChange(next);
+  };
+  return { saving, setSaving, savingRef: rowSave.ref };
 }
 
 /** Shared focused-editor frame: locked failure copy + Cancel affordance. */
@@ -217,6 +242,7 @@ function CurrentStateFocusedEditor({
   onSaved,
   onCancel,
   onDirtyChange,
+  rowSave,
 }: {
   contactId: number;
   fieldKey: CurrentStateFieldKey;
@@ -224,6 +250,7 @@ function CurrentStateFocusedEditor({
   onSaved: () => void;
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  rowSave: RowSave;
 }) {
   const { colors } = useTheme();
   const [value, setValue] = useState("");
@@ -233,8 +260,7 @@ function CurrentStateFocusedEditor({
   );
   const [current, setCurrent] = useState<string | null>(null);
   const [error, setError] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
+  const { saving, setSaving, savingRef } = useRowSave(rowSave);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,6 +337,7 @@ function KeyPeopleFocusedEditor({
   relationshipRef,
   onDraftStateChange,
   onCancelRequest,
+  rowSave,
 }: {
   contactId: number;
   onSaved: () => void;
@@ -319,12 +346,14 @@ function KeyPeopleFocusedEditor({
   relationshipRef: Ref<RelationshipEditorHandle>;
   onDraftStateChange: (state: RelationshipDraftState) => void;
   onCancelRequest: (close: () => void) => void;
+  rowSave: RowSave;
 }) {
   const [items, setItems] = useState<RelationshipRow[]>([]);
   const [savedTick, setSavedTick] = useState(0);
   // Synchronous single-flight guard so a double-tap cannot INSERT a duplicate
-  // relationship (WR-03); shared with edit for consistency.
-  const savingRef = useRef(false);
+  // relationship (WR-03); shared with edit for consistency. The screen's slot,
+  // so its guard holds Back while a save runs (fix-pass WR-02).
+  const { setSaving, savingRef } = useRowSave(rowSave);
 
   const load = useCallback(async () => {
     const rows = await listRelationshipsForContact(getExecutor(), contactId);
@@ -344,6 +373,7 @@ function KeyPeopleFocusedEditor({
 
   const add = async (draft: RelationshipDraft): Promise<boolean> => {
     if (!beginInFlight(savingRef)) return false;
+    setSaving(true);
     try {
       const now = localDateTime();
       await addRelationship(getExecutor(), {
@@ -358,6 +388,7 @@ function KeyPeopleFocusedEditor({
       Logger.error(LOG_SCOPE, "failed to add relationship", cause);
       return false;
     } finally {
+      setSaving(false);
       endInFlight(savingRef);
     }
   };
@@ -366,6 +397,7 @@ function KeyPeopleFocusedEditor({
     draft: RelationshipDraft,
   ): Promise<boolean> => {
     if (!beginInFlight(savingRef)) return false;
+    setSaving(true);
     try {
       await editRelationship(getExecutor(), {
         id,
@@ -379,6 +411,7 @@ function KeyPeopleFocusedEditor({
       Logger.error(LOG_SCOPE, "failed to edit relationship", cause);
       return false;
     } finally {
+      setSaving(false);
       endInFlight(savingRef);
     }
   };
@@ -437,11 +470,13 @@ function OffLimitsFocusedEditor({
   onSaved,
   onCancel,
   onDirtyChange,
+  rowSave,
 }: {
   contactId: number;
   onSaved: () => void;
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  rowSave: RowSave;
 }) {
   const { colors } = useTheme();
   const [items, setItems] = useState<FuelItem[]>([]);
@@ -455,8 +490,7 @@ function OffLimitsFocusedEditor({
   );
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
+  const { saving, setSaving, savingRef } = useRowSave(rowSave);
 
   const load = useCallback(async () => {
     const rows = await listFuelForEditor(getExecutor(), contactId);
@@ -578,11 +612,13 @@ function ContactMethodFocusedEditor({
   onSaved,
   onCancel,
   onDirtyChange,
+  rowSave,
 }: {
   contactId: number;
   onSaved: () => void;
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  rowSave: RowSave;
 }) {
   const [groups, setGroups] = useState<MethodGroups>({ phone: [], email: [] });
   const [seeded, setSeeded] = useState<
@@ -602,8 +638,7 @@ function ContactMethodFocusedEditor({
   );
   const [region, setRegion] = useState<string | null>(null);
   const [error, setError] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
+  const { saving, setSaving, savingRef } = useRowSave(rowSave);
 
   useEffect(() => {
     let cancelled = false;
@@ -683,17 +718,18 @@ function ContactFrequencyFocusedEditor({
   onSaved,
   onCancel,
   onDirtyChange,
+  rowSave,
 }: {
   contactId: number;
   onSaved: () => void;
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  rowSave: RowSave;
 }) {
   const [intervalDays, setIntervalDays] = useState(DEFAULT_INTERVAL_DAYS);
   const [valid, setValid] = useState(true);
   const [error, setError] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
+  const { saving, setSaving, savingRef } = useRowSave(rowSave);
   // Dirty seed (C5-L6): the interval once the header read settles
   // (DEFAULT_INTERVAL_DAYS when the stored interval is null or the read
   // fails) and the picker's custom-entry draft at that point. Until the read
@@ -800,19 +836,20 @@ function CustomFieldFocusedEditor({
   onSaved,
   onCancel,
   onDirtyChange,
+  rowSave,
 }: {
   contactId: number;
   def: CustomFieldDef;
   onSaved: () => void;
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  rowSave: RowSave;
 }) {
   const [value, setValue] = useState<string | null>(null);
   const [seedValue, setSeedValue] = useState<string | null>(null);
   const [error, setError] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const { saving, setSaving, savingRef } = useRowSave(rowSave);
   const [seedReady, setSeedReady] = useState(false);
-  const savingRef = useRef(false);
   useReportDirty(
     isRowDraftDirty({
       kind: "custom_field",
@@ -896,6 +933,7 @@ function GenericCustomFieldsFocusedEditor({
   onCancel,
   onInnerCancel,
   onDirtyChange,
+  rowSave,
 }: {
   contactId: number;
   defs: CustomFieldDef[];
@@ -908,6 +946,7 @@ function GenericCustomFieldsFocusedEditor({
   /** The opened field's Cancel (closes back to this chooser). */
   onInnerCancel: () => void;
   onDirtyChange: (dirty: boolean) => void;
+  rowSave: RowSave;
 }) {
   const { colors } = useTheme();
   const selected = defs.find((def) => def.id === selectedDefId) ?? null;
@@ -920,6 +959,7 @@ function GenericCustomFieldsFocusedEditor({
         onSaved={onSaved}
         onCancel={onInnerCancel}
         onDirtyChange={onDirtyChange}
+        rowSave={rowSave}
       />
     );
   }
@@ -1004,6 +1044,14 @@ export function UpdateContactScreen({
   const [relationshipDraftOpen, setRelationshipDraftOpen] = useState(false);
   const relationshipRef = useRef<RelationshipEditorHandle>(null);
   const bypassRef = useRef(false);
+  // The open row editor's save slot (fix-pass WR-02): the guard reads the ref,
+  // the state draws the header Back disabled (D-26).
+  const rowSavingRef = useRef(false);
+  const [rowSaving, setRowSaving] = useState(false);
+  const rowSave: RowSave = {
+    ref: rowSavingRef,
+    onSavingChange: setRowSaving,
+  };
   const rowOpen = session.activeRowKey != null;
   const innerOpen = genericSelectedDefId !== null || relationshipDraftOpen;
 
@@ -1026,6 +1074,9 @@ export function UpdateContactScreen({
   const { requestClose } = useDiscardKeepGuard({
     hasUnsavedChanges: false,
     bypassRef,
+    // A row save in flight holds every exit, with no prompt and no row close
+    // (fix-pass WR-02).
+    busyRef: rowSavingRef,
     subEditor: {
       open: session.activeRowKey != null,
       dirty: activeRowDirty,
@@ -1109,6 +1160,7 @@ export function UpdateContactScreen({
             title={activeRow.label}
             onSaved={onSaved}
             onCancel={requestRowCancel}
+            rowSave={rowSave}
             onDirtyChange={setActiveRowDirty}
           />
         );
@@ -1118,6 +1170,7 @@ export function UpdateContactScreen({
             contactId={contactId}
             onSaved={onSaved}
             onCancel={requestRowCancel}
+            rowSave={rowSave}
             relationshipRef={relationshipRef}
             onDraftStateChange={onRelationshipDraftState}
             onCancelRequest={() => requestInnerCancel()}
@@ -1129,6 +1182,7 @@ export function UpdateContactScreen({
             contactId={contactId}
             onSaved={onSaved}
             onCancel={requestRowCancel}
+            rowSave={rowSave}
             onDirtyChange={setActiveRowDirty}
           />
         );
@@ -1138,6 +1192,7 @@ export function UpdateContactScreen({
             contactId={contactId}
             onSaved={onSaved}
             onCancel={requestRowCancel}
+            rowSave={rowSave}
             onDirtyChange={setActiveRowDirty}
           />
         );
@@ -1147,6 +1202,7 @@ export function UpdateContactScreen({
             contactId={contactId}
             onSaved={onSaved}
             onCancel={requestRowCancel}
+            rowSave={rowSave}
             onDirtyChange={setActiveRowDirty}
           />
         );
@@ -1159,6 +1215,7 @@ export function UpdateContactScreen({
             def={def}
             onSaved={onSaved}
             onCancel={requestRowCancel}
+            rowSave={rowSave}
             onDirtyChange={setActiveRowDirty}
           />
         );
@@ -1172,6 +1229,7 @@ export function UpdateContactScreen({
             onSelect={setGenericSelectedDefId}
             onSaved={onSaved}
             onCancel={requestRowCancel}
+            rowSave={rowSave}
             onInnerCancel={requestInnerCancel}
             onDirtyChange={setActiveRowDirty}
           />
@@ -1181,9 +1239,16 @@ export function UpdateContactScreen({
     }
   };
 
+  // While a row save runs the guard holds Back, so it draws disabled (D-26;
+  // WR-02).
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Update Contact" person={person} />
+      <ShellAppBar
+        variant="child"
+        title="Update Contact"
+        person={person}
+        backDisabled={rowSaving}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         {session.activeRowKey !== null ? (
           renderActiveEditor()
