@@ -161,16 +161,26 @@ function useRowSave(rowSave: RowSave) {
   return { saving, setSaving, savingRef: rowSave.ref };
 }
 
+/** The Button.tsx disabled look (D-26 "dimmed") for this file's Pressables. */
+const DISABLED_OPACITY = 0.5;
+
 /** Shared focused-editor frame: locked failure copy + Cancel affordance. */
 function EditorFrame({
   title,
   error,
   onCancel,
+  cancelDisabled = false,
   children,
 }: {
   title: string;
   error: boolean;
   onCancel: () => void;
+  /**
+   * The row's save is in flight (WR-02 follow-up; D-13, D-14): Cancel is held
+   * and drawn disabled (D-26) so it cannot close the row while the save
+   * commits. Absent → false.
+   */
+  cancelDisabled?: boolean;
   children: ReactNode;
 }) {
   const { colors } = useTheme();
@@ -188,8 +198,14 @@ function EditorFrame({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Cancel"
+        accessibilityState={{ disabled: cancelDisabled }}
+        disabled={cancelDisabled}
         onPress={onCancel}
-        style={[styles.secondary, { borderColor: colors.border }]}
+        style={[
+          styles.secondary,
+          { borderColor: colors.border },
+          cancelDisabled ? styles.disabled : null,
+        ]}
       >
         <AppText role="body" style={{ color: colors.textSecondary }}>
           Cancel
@@ -301,7 +317,12 @@ function CurrentStateFocusedEditor({
   };
 
   return (
-    <EditorFrame title={title} error={error} onCancel={onCancel}>
+    <EditorFrame
+      title={title}
+      error={error}
+      onCancel={onCancel}
+      cancelDisabled={saving}
+    >
       <AppText role="caption" style={{ color: colors.textSecondary }}>
         {current ? `Most recent: ${current}` : "Not set"}
       </AppText>
@@ -353,7 +374,7 @@ function KeyPeopleFocusedEditor({
   // Synchronous single-flight guard so a double-tap cannot INSERT a duplicate
   // relationship (WR-03); shared with edit for consistency. The screen's slot,
   // so its guard holds Back while a save runs (fix-pass WR-02).
-  const { setSaving, savingRef } = useRowSave(rowSave);
+  const { saving, setSaving, savingRef } = useRowSave(rowSave);
 
   const load = useCallback(async () => {
     const rows = await listRelationshipsForContact(getExecutor(), contactId);
@@ -448,7 +469,12 @@ function KeyPeopleFocusedEditor({
       );
 
   return (
-    <EditorFrame title="Key people" error={false} onCancel={onCancel}>
+    <EditorFrame
+      title="Key people"
+      error={false}
+      onCancel={onCancel}
+      cancelDisabled={saving}
+    >
       <RelationshipEditor
         contactId={contactId}
         items={items}
@@ -459,6 +485,7 @@ function KeyPeopleFocusedEditor({
         ref={relationshipRef}
         onDraftStateChange={onDraftStateChange}
         onCancelRequest={onCancelRequest}
+        busy={saving}
       />
     </EditorFrame>
   );
@@ -550,7 +577,12 @@ function OffLimitsFocusedEditor({
       );
 
   return (
-    <EditorFrame title="Off Limits" error={error} onCancel={onCancel}>
+    <EditorFrame
+      title="Off Limits"
+      error={error}
+      onCancel={onCancel}
+      cancelDisabled={saving}
+    >
       {items.map((item) => (
         <View
           key={item.id}
@@ -693,7 +725,12 @@ function ContactMethodFocusedEditor({
   };
 
   return (
-    <EditorFrame title="Contact Method" error={error} onCancel={onCancel}>
+    <EditorFrame
+      title="Contact Method"
+      error={error}
+      onCancel={onCancel}
+      cancelDisabled={saving}
+    >
       <ContactMethodsEditor
         methods={groups}
         onAdd={(type) => setGroups((g) => addMethodDraft(g, type, newUid()))}
@@ -813,7 +850,12 @@ function ContactFrequencyFocusedEditor({
   };
 
   return (
-    <EditorFrame title="Contact Frequency" error={error} onCancel={onCancel}>
+    <EditorFrame
+      title="Contact Frequency"
+      error={error}
+      onCancel={onCancel}
+      cancelDisabled={saving}
+    >
       <FrequencyPicker
         value={intervalDays}
         onChange={setIntervalDays}
@@ -902,7 +944,12 @@ function CustomFieldFocusedEditor({
   };
 
   return (
-    <EditorFrame title={def.label} error={error} onCancel={onCancel}>
+    <EditorFrame
+      title={def.label}
+      error={error}
+      onCancel={onCancel}
+      cancelDisabled={saving}
+    >
       <FieldValueInput
         field={{
           type: def.type,
@@ -1357,6 +1404,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
   },
   listRowMain: { flex: 1, justifyContent: "center", minHeight: 44 },
+  disabled: { opacity: DISABLED_OPACITY },
   smallAction: {
     alignItems: "center",
     borderRadius: RADII.sm,

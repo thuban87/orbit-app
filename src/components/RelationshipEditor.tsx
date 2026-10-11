@@ -40,6 +40,12 @@ export interface RelationshipEditorProps {
    * Absent → Cancel closes at once.
    */
   onCancelRequest?: (close: () => void) => void;
+  /**
+   * The host's save is in flight (38.9 WR-02 follow-up; D-13, D-14): the
+   * form's Cancel and Save are held and drawn disabled (D-26) until it
+   * settles. Absent → false.
+   */
+  busy?: boolean;
   /** Exposes `closeDraft()` so the host's Back can close the open form (D-14). */
   ref?: Ref<RelationshipEditorHandle>;
 }
@@ -114,6 +120,7 @@ export function RelationshipEditor({
   onDelete,
   onDraftStateChange,
   onCancelRequest,
+  busy = false,
   ref,
 }: RelationshipEditorProps) {
   const { colors } = useTheme();
@@ -335,6 +342,7 @@ export function RelationshipEditor({
             <Button
               role="secondary"
               label="Cancel"
+              disabled={busy}
               onPress={() =>
                 onCancelRequest ? onCancelRequest(close) : close()
               }
@@ -342,7 +350,7 @@ export function RelationshipEditor({
             <Button
               role="primary"
               label="Save"
-              disabled={!blankToNull(draft.personName)}
+              disabled={!blankToNull(draft.personName) || busy}
               onPress={() => void commit()}
             />
           </View>

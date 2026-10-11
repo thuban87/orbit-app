@@ -279,3 +279,44 @@ describe("MemoryScreen holds MemoryEditor's in-form controls while saving", () =
     }
   });
 });
+
+describe("UpdateContactScreen holds the row editors' Cancel while a row saves", () => {
+  const source = read("src/screens/UpdateContactScreen.tsx");
+  const frame = blockFrom(
+    source,
+    source.indexOf("}) {", source.indexOf("function EditorFrame(")) + 2,
+    "EditorFrame",
+  );
+
+  it("EditorFrame's Cancel is disabled, announced and dimmed by cancelDisabled", () => {
+    const cancel = frame.match(/<Pressable[\s\S]*?>/)?.[0] ?? "";
+    expect(cancel).toContain('accessibilityLabel="Cancel"');
+    expect(cancel).toContain(
+      "accessibilityState={{ disabled: cancelDisabled }}",
+    );
+    expect(cancel).toContain("disabled={cancelDisabled}");
+    expect(cancel).toContain("cancelDisabled ? styles.disabled : null");
+    expect(source).toMatch(/disabled: \{ opacity: DISABLED_OPACITY \}/);
+  });
+
+  it("every saving row editor holds its frame's Cancel with its save state", () => {
+    const tags = source.match(/<EditorFrame[\s\S]*?>/g) ?? [];
+    // CurrentState, KeyPeople, OffLimits, ContactMethod, Frequency,
+    // CustomField; the Generic chooser has no save of its own (its opened
+    // field renders CustomFieldFocusedEditor in its place).
+    const held = tags.filter((tag) => tag.includes("cancelDisabled={saving}"));
+    expect(held).toHaveLength(6);
+    expect(tags).toHaveLength(7);
+    expect(
+      source.match(
+        /const \{ saving, setSaving, savingRef \} = useRowSave\(rowSave\);/g,
+      ),
+    ).toHaveLength(6);
+  });
+
+  it("Key people holds the relationship form's Cancel through busy", () => {
+    const tags = source.match(/<RelationshipEditor\s[\s\S]*?\/>/g) ?? [];
+    expect(tags).toHaveLength(1);
+    expect(tags[0]).toContain("busy={saving}");
+  });
+});
