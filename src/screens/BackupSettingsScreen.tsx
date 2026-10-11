@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui";
 import {
   type AppSettings,
@@ -434,475 +435,463 @@ export function BackupSettingsScreen({
   const setupFlow = !encryptionEnabled || encryptionFlow === "forgotten";
 
   return (
-    <ScrollView
-      testID="backup-settings-screen"
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: bottomClearance },
-      ]}
-    >
-      <View style={styles.header}>
-        <Pressable
-          testID="backup-settings-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Backup settings
-        </Text>
-      </View>
-      {settingsPhase.phase === "loading" ? (
-        <View
-          testID="backup-settings-loading"
-          accessibilityLabel="Loading backup settings"
-          style={styles.readState}
-        >
-          <ActivityIndicator color={colors.accentText} />
-        </View>
-      ) : null}
-      {settingsPhase.phase === "error" ? (
-        <View
-          testID="backup-settings-read-error"
-          style={[
-            styles.group,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
-            {"Couldn't read backup settings"}
-          </Text>
-          <Text style={[styles.help, { color: colors.textSecondary }]}>
-            Orbit can&apos;t show your backup folder or encryption status right
-            now.
-          </Text>
-          <Pressable
-            testID="backup-settings-retry"
-            accessibilityRole="button"
-            accessibilityLabel="Retry reading backup settings"
-            onPress={() => void readSettings()}
-            style={[styles.outlineButton, { borderColor: colors.accent }]}
-          >
-            <Text style={{ color: colors.accentText }}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {presentation.showGroups ? (
-        <>
+    <View style={styles.root}>
+      <ShellAppBar variant="child" title="Backup settings" />
+      <ScrollView
+        testID="backup-settings-screen"
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
+        {settingsPhase.phase === "loading" ? (
           <View
+            testID="backup-settings-loading"
+            accessibilityLabel="Loading backup settings"
+            style={styles.readState}
+          >
+            <ActivityIndicator color={colors.accentText} />
+          </View>
+        ) : null}
+        {settingsPhase.phase === "error" ? (
+          <View
+            testID="backup-settings-read-error"
             style={[
               styles.group,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
-            <Text style={[styles.groupTitle, { color: colors.textPrimary }]}>
-              Automatic backups
-            </Text>
-            <Text style={[styles.help, { color: colors.textSecondary }]}>
-              Orbit writes a new backup after you open the app when your
-              schedule is due and your data has changed.
-            </Text>
-            {folderConfigured && !folderAccessible ? (
-              <Text
-                testID="backup-settings-lost-folder"
-                style={[styles.error, { color: colors.statusWobble }]}
-              >
-                Backup folder needs reconnecting. Pick it again to resume
-                automatic backups.
-              </Text>
-            ) : null}
             <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
-              {folderConfigured ? "Backup folder" : "Choose backup folder"}
+              {"Couldn't read backup settings"}
             </Text>
             <Text style={[styles.help, { color: colors.textSecondary }]}>
-              {settings?.backupFolderName ??
-                "Choose a folder to start protecting your data."}
+              Orbit can&apos;t show your backup folder or encryption status
+              right now.
             </Text>
             <Pressable
-              testID="backup-settings-choose-folder"
+              testID="backup-settings-retry"
               accessibilityRole="button"
-              accessibilityLabel={
-                folderConfigured
-                  ? "Change backup folder"
-                  : "Choose backup folder"
-              }
-              onPress={() => void chooseFolder()}
+              accessibilityLabel="Retry reading backup settings"
+              onPress={() => void readSettings()}
               style={[styles.outlineButton, { borderColor: colors.accent }]}
             >
-              <Text style={{ color: colors.accentText }}>
-                {folderConfigured ? "Change folder" : "Choose backup folder"}
-              </Text>
+              <Text style={{ color: colors.accentText }}>Retry</Text>
             </Pressable>
-            {folderConfigured ? (
+          </View>
+        ) : null}
+        {presentation.showGroups ? (
+          <>
+            <View
+              style={[
+                styles.group,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.groupTitle, { color: colors.textPrimary }]}>
+                Automatic backups
+              </Text>
+              <Text style={[styles.help, { color: colors.textSecondary }]}>
+                Orbit writes a new backup after you open the app when your
+                schedule is due and your data has changed.
+              </Text>
+              {folderConfigured && !folderAccessible ? (
+                <Text
+                  testID="backup-settings-lost-folder"
+                  style={[styles.error, { color: colors.statusWobble }]}
+                >
+                  Backup folder needs reconnecting. Pick it again to resume
+                  automatic backups.
+                </Text>
+              ) : null}
+              <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
+                {folderConfigured ? "Backup folder" : "Choose backup folder"}
+              </Text>
+              <Text style={[styles.help, { color: colors.textSecondary }]}>
+                {settings?.backupFolderName ??
+                  "Choose a folder to start protecting your data."}
+              </Text>
               <Pressable
-                testID="backup-settings-open-folder"
+                testID="backup-settings-choose-folder"
                 accessibilityRole="button"
-                accessibilityLabel={`Open backup folder: ${settings?.backupFolderName ?? "selected folder"}`}
-                accessibilityState={{
-                  disabled: openingFolder || !folderAccessible,
-                }}
-                disabled={openingFolder || !folderAccessible}
-                onPress={() => void openFolder()}
-                style={[
-                  styles.linkButton,
-                  { opacity: openingFolder || !folderAccessible ? 0.6 : 1 },
-                ]}
+                accessibilityLabel={
+                  folderConfigured
+                    ? "Change backup folder"
+                    : "Choose backup folder"
+                }
+                onPress={() => void chooseFolder()}
+                style={[styles.outlineButton, { borderColor: colors.accent }]}
               >
                 <Text style={{ color: colors.accentText }}>
-                  Open backup folder
+                  {folderConfigured ? "Change folder" : "Choose backup folder"}
                 </Text>
               </Pressable>
-            ) : null}
-            {folderConfigured ? (
-              <>
-                <Text
-                  style={[styles.fieldLabel, { color: colors.textPrimary }]}
-                >
-                  Back up every (days)
-                </Text>
-                <TextInput
-                  testID="backup-settings-interval"
-                  accessibilityLabel="Backup cadence in days"
-                  value={intervalDays}
-                  onChangeText={(value) =>
-                    dayController.changeText("interval", value)
-                  }
-                  onBlur={() => dayController.commitField("interval")}
-                  onSubmitEditing={() => dayController.commitField("interval")}
-                  keyboardType="number-pad"
-                  style={[
-                    styles.input,
-                    {
-                      color: colors.textPrimary,
-                      borderColor: intervalError
-                        ? colors.danger
-                        : colors.border,
-                    },
-                  ]}
-                />
-                {intervalError ? (
-                  <Text style={[styles.error, { color: colors.danger }]}>
-                    {intervalError}
-                  </Text>
-                ) : null}
-                <Text
-                  style={[styles.fieldLabel, { color: colors.textPrimary }]}
-                >
-                  Keep backups for (days)
-                </Text>
-                <TextInput
-                  testID="backup-settings-retention"
-                  accessibilityLabel="Backup retention in days"
-                  value={retentionDays}
-                  onChangeText={(value) =>
-                    dayController.changeText("retention", value)
-                  }
-                  onBlur={() => dayController.commitField("retention")}
-                  onSubmitEditing={() => dayController.commitField("retention")}
-                  keyboardType="number-pad"
-                  style={[
-                    styles.input,
-                    {
-                      color: colors.textPrimary,
-                      borderColor: retentionError
-                        ? colors.danger
-                        : colors.border,
-                    },
-                  ]}
-                />
-                {retentionError ? (
-                  <Text style={[styles.error, { color: colors.danger }]}>
-                    {retentionError}
-                  </Text>
-                ) : null}
-              </>
-            ) : null}
-          </View>
-          <View
-            style={[
-              styles.group,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.groupTitle, { color: colors.textPrimary }]}>
-              Encryption
-            </Text>
-            <Text style={[styles.help, { color: colors.textSecondary }]}>
-              {encryptionEnabled
-                ? "On — new backups are protected with your passphrase"
-                : "Off — backups are readable JSON"}
-            </Text>
-            {setupFlow ? (
-              <>
-                <Text style={[styles.help, { color: colors.textSecondary }]}>
-                  If you forget this passphrase, Orbit can't recover encrypted
-                  backups.
-                </Text>
-                <Text style={[styles.help, { color: colors.textSecondary }]}>
-                  Use a long, unique passphrase you can keep safely.
-                </Text>
-                <AppText role="label" importantForAccessibility="no">
-                  Passphrase
-                </AppText>
-                <TextInput
-                  testID="backup-settings-passphrase"
-                  accessibilityLabel="Passphrase"
-                  secureTextEntry
-                  value={passphrase}
-                  onChangeText={(value) => {
-                    setPassphrase(value);
-                    setEncryptionError(null);
-                  }}
-                  style={[
-                    styles.input,
-                    { color: colors.textPrimary, borderColor: colors.border },
-                  ]}
-                />
-                <AppText role="label" importantForAccessibility="no">
-                  Confirm passphrase
-                </AppText>
-                <TextInput
-                  testID="backup-settings-confirm-passphrase"
-                  accessibilityLabel="Confirm passphrase"
-                  secureTextEntry
-                  value={confirmation}
-                  onChangeText={(value) => {
-                    setConfirmation(value);
-                    setEncryptionError(null);
-                  }}
-                  style={[
-                    styles.input,
-                    { color: colors.textPrimary, borderColor: colors.border },
-                  ]}
-                />
-                {encryptionError ? (
-                  <Text style={[styles.error, { color: colors.danger }]}>
-                    {encryptionError}
-                  </Text>
-                ) : null}
+              {folderConfigured ? (
                 <Pressable
-                  testID="backup-settings-enable-encryption"
+                  testID="backup-settings-open-folder"
                   accessibilityRole="button"
-                  accessibilityLabel={
-                    encryptionFlow === "forgotten"
-                      ? "Set a new passphrase for future backups"
-                      : "Turn on encryption"
-                  }
-                  accessibilityState={{ disabled: savingEncryption }}
-                  disabled={savingEncryption}
-                  onPress={() =>
-                    void (encryptionFlow === "forgotten"
-                      ? saveFuturePassphrase()
-                      : enableEncryption())
-                  }
+                  accessibilityLabel={`Open backup folder: ${settings?.backupFolderName ?? "selected folder"}`}
+                  accessibilityState={{
+                    disabled: openingFolder || !folderAccessible,
+                  }}
+                  disabled={openingFolder || !folderAccessible}
+                  onPress={() => void openFolder()}
                   style={[
-                    styles.primaryButton,
-                    {
-                      backgroundColor: colors.accent,
-                      opacity: savingEncryption ? 0.6 : 1,
-                    },
+                    styles.linkButton,
+                    { opacity: openingFolder || !folderAccessible ? 0.6 : 1 },
                   ]}
                 >
-                  <Text style={{ color: colors.onAccent }}>
-                    {encryptionFlow === "forgotten"
-                      ? "Set a new passphrase for future backups"
-                      : "Turn on encryption"}
+                  <Text style={{ color: colors.accentText }}>
+                    Open backup folder
                   </Text>
                 </Pressable>
-              </>
-            ) : encryptionFlow === "change" ? (
-              <>
-                <AppText role="label" importantForAccessibility="no">
-                  Current passphrase
-                </AppText>
-                <TextInput
-                  testID="backup-settings-current-passphrase"
-                  accessibilityLabel="Current passphrase"
-                  secureTextEntry
-                  value={currentPassphrase}
-                  onChangeText={(value) => {
-                    setCurrentPassphrase(value);
-                    setEncryptionError(null);
-                  }}
-                  style={[
-                    styles.input,
-                    { color: colors.textPrimary, borderColor: colors.border },
-                  ]}
-                />
-                <AppText role="label" importantForAccessibility="no">
-                  New passphrase
-                </AppText>
-                <TextInput
-                  testID="backup-settings-new-passphrase"
-                  accessibilityLabel="New passphrase"
-                  secureTextEntry
-                  value={passphrase}
-                  onChangeText={(value) => {
-                    setPassphrase(value);
-                    setEncryptionError(null);
-                  }}
-                  style={[
-                    styles.input,
-                    { color: colors.textPrimary, borderColor: colors.border },
-                  ]}
-                />
-                <AppText role="label" importantForAccessibility="no">
-                  Confirm new passphrase
-                </AppText>
-                <TextInput
-                  testID="backup-settings-confirm-new-passphrase"
-                  accessibilityLabel="Confirm new passphrase"
-                  secureTextEntry
-                  value={confirmation}
-                  onChangeText={(value) => {
-                    setConfirmation(value);
-                    setEncryptionError(null);
-                  }}
-                  style={[
-                    styles.input,
-                    { color: colors.textPrimary, borderColor: colors.border },
-                  ]}
-                />
-                <Pressable
-                  testID="backup-settings-reencrypt-choice"
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: changeMode === "reencrypt" }}
-                  accessibilityLabel="Re-encrypt accessible automatic backups"
-                  onPress={() => setChangeMode("reencrypt")}
-                  style={[
-                    styles.choice,
-                    {
-                      borderColor:
-                        changeMode === "reencrypt"
-                          ? colors.borderStrong
+              ) : null}
+              {folderConfigured ? (
+                <>
+                  <Text
+                    style={[styles.fieldLabel, { color: colors.textPrimary }]}
+                  >
+                    Back up every (days)
+                  </Text>
+                  <TextInput
+                    testID="backup-settings-interval"
+                    accessibilityLabel="Backup cadence in days"
+                    value={intervalDays}
+                    onChangeText={(value) =>
+                      dayController.changeText("interval", value)
+                    }
+                    onBlur={() => dayController.commitField("interval")}
+                    onSubmitEditing={() =>
+                      dayController.commitField("interval")
+                    }
+                    keyboardType="number-pad"
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.textPrimary,
+                        borderColor: intervalError
+                          ? colors.danger
                           : colors.border,
-                      backgroundColor:
-                        changeMode === "reencrypt"
-                          ? colors.surfaceElevated
-                          : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: colors.textPrimary }}>
-                    Re-encrypt accessible automatic backups
+                      },
+                    ]}
+                  />
+                  {intervalError ? (
+                    <Text style={[styles.error, { color: colors.danger }]}>
+                      {intervalError}
+                    </Text>
+                  ) : null}
+                  <Text
+                    style={[styles.fieldLabel, { color: colors.textPrimary }]}
+                  >
+                    Keep backups for (days)
+                  </Text>
+                  <TextInput
+                    testID="backup-settings-retention"
+                    accessibilityLabel="Backup retention in days"
+                    value={retentionDays}
+                    onChangeText={(value) =>
+                      dayController.changeText("retention", value)
+                    }
+                    onBlur={() => dayController.commitField("retention")}
+                    onSubmitEditing={() =>
+                      dayController.commitField("retention")
+                    }
+                    keyboardType="number-pad"
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.textPrimary,
+                        borderColor: retentionError
+                          ? colors.danger
+                          : colors.border,
+                      },
+                    ]}
+                  />
+                  {retentionError ? (
+                    <Text style={[styles.error, { color: colors.danger }]}>
+                      {retentionError}
+                    </Text>
+                  ) : null}
+                </>
+              ) : null}
+            </View>
+            <View
+              style={[
+                styles.group,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.groupTitle, { color: colors.textPrimary }]}>
+                Encryption
+              </Text>
+              <Text style={[styles.help, { color: colors.textSecondary }]}>
+                {encryptionEnabled
+                  ? "On — new backups are protected with your passphrase"
+                  : "Off — backups are readable JSON"}
+              </Text>
+              {setupFlow ? (
+                <>
+                  <Text style={[styles.help, { color: colors.textSecondary }]}>
+                    If you forget this passphrase, Orbit can't recover encrypted
+                    backups.
                   </Text>
                   <Text style={[styles.help, { color: colors.textSecondary }]}>
-                    Manually shared files retain their old passphrase.
+                    Use a long, unique passphrase you can keep safely.
                   </Text>
-                </Pressable>
-                <Pressable
-                  testID="backup-settings-future-choice"
-                  accessibilityRole="radio"
-                  accessibilityState={{
-                    selected: changeMode === "future-only",
-                  }}
-                  accessibilityLabel="Use the new passphrase for future backups only"
-                  onPress={() => setChangeMode("future-only")}
-                  style={[
-                    styles.choice,
-                    {
-                      borderColor:
-                        changeMode === "future-only"
-                          ? colors.borderStrong
-                          : colors.border,
-                      backgroundColor:
-                        changeMode === "future-only"
-                          ? colors.surfaceElevated
-                          : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: colors.textPrimary }}>
-                    Use the new passphrase for future backups only
-                  </Text>
-                </Pressable>
-                {encryptionError ? (
-                  <Text style={[styles.error, { color: colors.danger }]}>
-                    {encryptionError}
-                  </Text>
-                ) : null}
-                <Pressable
-                  testID="backup-settings-save-change"
-                  accessibilityRole="button"
-                  accessibilityLabel="Save encryption change"
-                  accessibilityState={{ disabled: savingEncryption }}
-                  disabled={savingEncryption}
-                  onPress={() => void changeEncryption()}
-                  style={[
-                    styles.primaryButton,
-                    {
-                      backgroundColor: colors.accent,
-                      opacity: savingEncryption ? 0.6 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: colors.onAccent }}>
-                    Save encryption change
-                  </Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Pressable
-                  testID="backup-settings-change-encryption"
-                  accessibilityRole="button"
-                  accessibilityLabel="Change encryption"
-                  onPress={startChange}
-                  style={styles.linkButton}
-                >
-                  <Text style={{ color: colors.accentText }}>
-                    Change encryption
-                  </Text>
-                </Pressable>
-                <Pressable
-                  testID="backup-settings-forgot-passphrase"
-                  accessibilityRole="button"
-                  accessibilityLabel="I forgot my passphrase"
-                  onPress={startForgotten}
-                  style={styles.linkButton}
-                >
-                  <Text style={{ color: colors.accentText }}>
-                    I forgot my passphrase
-                  </Text>
-                </Pressable>
-                <Pressable
-                  testID="backup-settings-disable-encryption"
-                  accessibilityRole="button"
-                  accessibilityLabel="Turn off encryption"
-                  onPress={disableEncryption}
-                  style={[styles.outlineButton, { borderColor: colors.danger }]}
-                >
-                  <Text style={{ color: colors.danger }}>
-                    Turn off encryption
-                  </Text>
-                </Pressable>
-              </>
-            )}
-          </View>
-        </>
-      ) : null}
-    </ScrollView>
+                  <AppText role="label" importantForAccessibility="no">
+                    Passphrase
+                  </AppText>
+                  <TextInput
+                    testID="backup-settings-passphrase"
+                    accessibilityLabel="Passphrase"
+                    secureTextEntry
+                    value={passphrase}
+                    onChangeText={(value) => {
+                      setPassphrase(value);
+                      setEncryptionError(null);
+                    }}
+                    style={[
+                      styles.input,
+                      { color: colors.textPrimary, borderColor: colors.border },
+                    ]}
+                  />
+                  <AppText role="label" importantForAccessibility="no">
+                    Confirm passphrase
+                  </AppText>
+                  <TextInput
+                    testID="backup-settings-confirm-passphrase"
+                    accessibilityLabel="Confirm passphrase"
+                    secureTextEntry
+                    value={confirmation}
+                    onChangeText={(value) => {
+                      setConfirmation(value);
+                      setEncryptionError(null);
+                    }}
+                    style={[
+                      styles.input,
+                      { color: colors.textPrimary, borderColor: colors.border },
+                    ]}
+                  />
+                  {encryptionError ? (
+                    <Text style={[styles.error, { color: colors.danger }]}>
+                      {encryptionError}
+                    </Text>
+                  ) : null}
+                  <Pressable
+                    testID="backup-settings-enable-encryption"
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      encryptionFlow === "forgotten"
+                        ? "Set a new passphrase for future backups"
+                        : "Turn on encryption"
+                    }
+                    accessibilityState={{ disabled: savingEncryption }}
+                    disabled={savingEncryption}
+                    onPress={() =>
+                      void (encryptionFlow === "forgotten"
+                        ? saveFuturePassphrase()
+                        : enableEncryption())
+                    }
+                    style={[
+                      styles.primaryButton,
+                      {
+                        backgroundColor: colors.accent,
+                        opacity: savingEncryption ? 0.6 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.onAccent }}>
+                      {encryptionFlow === "forgotten"
+                        ? "Set a new passphrase for future backups"
+                        : "Turn on encryption"}
+                    </Text>
+                  </Pressable>
+                </>
+              ) : encryptionFlow === "change" ? (
+                <>
+                  <AppText role="label" importantForAccessibility="no">
+                    Current passphrase
+                  </AppText>
+                  <TextInput
+                    testID="backup-settings-current-passphrase"
+                    accessibilityLabel="Current passphrase"
+                    secureTextEntry
+                    value={currentPassphrase}
+                    onChangeText={(value) => {
+                      setCurrentPassphrase(value);
+                      setEncryptionError(null);
+                    }}
+                    style={[
+                      styles.input,
+                      { color: colors.textPrimary, borderColor: colors.border },
+                    ]}
+                  />
+                  <AppText role="label" importantForAccessibility="no">
+                    New passphrase
+                  </AppText>
+                  <TextInput
+                    testID="backup-settings-new-passphrase"
+                    accessibilityLabel="New passphrase"
+                    secureTextEntry
+                    value={passphrase}
+                    onChangeText={(value) => {
+                      setPassphrase(value);
+                      setEncryptionError(null);
+                    }}
+                    style={[
+                      styles.input,
+                      { color: colors.textPrimary, borderColor: colors.border },
+                    ]}
+                  />
+                  <AppText role="label" importantForAccessibility="no">
+                    Confirm new passphrase
+                  </AppText>
+                  <TextInput
+                    testID="backup-settings-confirm-new-passphrase"
+                    accessibilityLabel="Confirm new passphrase"
+                    secureTextEntry
+                    value={confirmation}
+                    onChangeText={(value) => {
+                      setConfirmation(value);
+                      setEncryptionError(null);
+                    }}
+                    style={[
+                      styles.input,
+                      { color: colors.textPrimary, borderColor: colors.border },
+                    ]}
+                  />
+                  <Pressable
+                    testID="backup-settings-reencrypt-choice"
+                    accessibilityRole="radio"
+                    accessibilityState={{
+                      selected: changeMode === "reencrypt",
+                    }}
+                    accessibilityLabel="Re-encrypt accessible automatic backups"
+                    onPress={() => setChangeMode("reencrypt")}
+                    style={[
+                      styles.choice,
+                      {
+                        borderColor:
+                          changeMode === "reencrypt"
+                            ? colors.borderStrong
+                            : colors.border,
+                        backgroundColor:
+                          changeMode === "reencrypt"
+                            ? colors.surfaceElevated
+                            : colors.surface,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.textPrimary }}>
+                      Re-encrypt accessible automatic backups
+                    </Text>
+                    <Text
+                      style={[styles.help, { color: colors.textSecondary }]}
+                    >
+                      Manually shared files retain their old passphrase.
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    testID="backup-settings-future-choice"
+                    accessibilityRole="radio"
+                    accessibilityState={{
+                      selected: changeMode === "future-only",
+                    }}
+                    accessibilityLabel="Use the new passphrase for future backups only"
+                    onPress={() => setChangeMode("future-only")}
+                    style={[
+                      styles.choice,
+                      {
+                        borderColor:
+                          changeMode === "future-only"
+                            ? colors.borderStrong
+                            : colors.border,
+                        backgroundColor:
+                          changeMode === "future-only"
+                            ? colors.surfaceElevated
+                            : colors.surface,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.textPrimary }}>
+                      Use the new passphrase for future backups only
+                    </Text>
+                  </Pressable>
+                  {encryptionError ? (
+                    <Text style={[styles.error, { color: colors.danger }]}>
+                      {encryptionError}
+                    </Text>
+                  ) : null}
+                  <Pressable
+                    testID="backup-settings-save-change"
+                    accessibilityRole="button"
+                    accessibilityLabel="Save encryption change"
+                    accessibilityState={{ disabled: savingEncryption }}
+                    disabled={savingEncryption}
+                    onPress={() => void changeEncryption()}
+                    style={[
+                      styles.primaryButton,
+                      {
+                        backgroundColor: colors.accent,
+                        opacity: savingEncryption ? 0.6 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.onAccent }}>
+                      Save encryption change
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Pressable
+                    testID="backup-settings-change-encryption"
+                    accessibilityRole="button"
+                    accessibilityLabel="Change encryption"
+                    onPress={startChange}
+                    style={styles.linkButton}
+                  >
+                    <Text style={{ color: colors.accentText }}>
+                      Change encryption
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    testID="backup-settings-forgot-passphrase"
+                    accessibilityRole="button"
+                    accessibilityLabel="I forgot my passphrase"
+                    onPress={startForgotten}
+                    style={styles.linkButton}
+                  >
+                    <Text style={{ color: colors.accentText }}>
+                      I forgot my passphrase
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    testID="backup-settings-disable-encryption"
+                    accessibilityRole="button"
+                    accessibilityLabel="Turn off encryption"
+                    onPress={disableEncryption}
+                    style={[
+                      styles.outlineButton,
+                      { borderColor: colors.danger },
+                    ]}
+                  >
+                    <Text style={{ color: colors.danger }}>
+                      Turn off encryption
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: { padding: 16, gap: 24 },
-  header: { gap: 16, paddingTop: 8 },
-  back: {
-    minHeight: 44,
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderRadius: 10,
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  title: { fontSize: 24, fontWeight: "600", lineHeight: 29 },
   group: { borderWidth: 1, borderRadius: 10, padding: 16, gap: 12 },
   readState: { minHeight: 88, alignItems: "center", justifyContent: "center" },
   groupTitle: { fontSize: 20, fontWeight: "600", lineHeight: 24 },

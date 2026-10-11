@@ -66,7 +66,6 @@ const PENDING_HEADER_CONVERSION: Record<string, PendingChrome> = {
   // Plan 10
   "src/screens/CustomFieldsScreen.tsx": "in-body-back",
   "src/screens/ImportReviewScreen.tsx": "in-body-back",
-  "src/screens/BackupSettingsScreen.tsx": "in-body-back",
   "src/screens/RestorePreviewScreen.tsx": "in-body-back",
   "src/screens/BulkReviewScreen.tsx": "in-body-back",
   "src/screens/DuplicateReviewScreen.tsx": "in-body-back",
