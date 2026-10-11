@@ -69,7 +69,6 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | `src/services/intensity-logic.ts` | Computes outbound/mutual neutral rate and trailing cadence. |
 | `src/services/quick-log-command.ts` | Runs the shared commit-truthful Quick Log command, including single-flight Retry and Undo feedback. |
 | `src/db/bulk-actions-dao.ts` | Composes atomic multi-contact Quick Log, Undo, and archive paths from transaction-owned cores. |
-| `src/components/TimelineRow.tsx` | Renders touchpoints as editable and events as read-only. |
 | `src/components/TouchpointRefineForm.tsx` | Controls optional touchpoint-detail refinement. |
 | `src/components/GravityBar.tsx` | Displays a named gravity tier without a raw score. |
 | `src/components/IntensityLine.tsx` | Displays neutral intensity and trailing cadence. |
@@ -129,7 +128,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 2. The same transaction records an immutable event through `recordEventCore()`.
 3. `bindContact`/`unbindContact` (Contacts subsystem) likewise compose one insert-only `recordEventCore()` inside their already-open transaction — never a nested transaction, since the write mutex is non-reentrant — emitting a `bind` or `unbind` event at the moment of the cadence change.
 4. `listTimeline()` returns touchpoints and events newest first, ordering ties by id and kind.
-5. `TimelineRow` permits touchpoint refinement/deletion but keeps events read-only. The History & Insights Detail Sheet is now the profile's live lifecycle-event surface and consumes the shared `EVENT_LABELS` (with the new Bound/Unbound labels) exported from `TimelineRow`; see `interaction-history.md`.
+5. The History stream is the profile's live lifecycle-event surface: events stay read-only and render the shared `EVENT_LABELS` (with the Bound/Unbound labels), now exported from `src/components/history/history-stream-logic.ts`; see `interaction-history.md`. The unrendered `TimelineRow` component was deleted in 38.9.
 
 ### Restoring interaction history
 
@@ -272,3 +271,4 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-25 | 38.3 | Post-Log Note editor publishes the shell refresh tick after its committed note and Memory writes (D-21); `log-guards.ts` gained the typed `FutureOccurredAtError` for the future branch (message unchanged, guard logic unchanged). |
 | 2026-09-26 | 38.3 | Post-Log "Create Memory Instead" and Memory edit treat a resolved write as terminal: a failed post-commit re-read no longer reports "Couldn't save" or invites a duplicate Memory (review B-CR-01, D-04). |
 | 2026-09-23 | 38.4 | Touchpoint refine form: the selected duration chip is filled with the accent and labelled with `onAccent` (`durationChipTone`, D-30; ADR-169), chips meet `MIN_TOUCH_TARGET`, and the date/time value renders through the shared minute formatter (RG-030, RG-038). The post-log note editor scrolls at large text (D-72; ADR-174). |
+| 2026-10-11 | 38.9 | Deleted the unrendered `TimelineRow` component; its `EVENT_LABELS` map moved unchanged to `history-stream-logic.ts` (review IN-05). |

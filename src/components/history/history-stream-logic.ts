@@ -42,6 +42,21 @@ import {
   WEEKDAY_LONG,
 } from "@/utils/dates";
 
+/**
+ * Human-readable label for each lifecycle event type: the single shared label
+ * map the History stream's lifecycle row (`HistoryStreamRows`) renders. Moved
+ * here from the retired, unrendered `TimelineRow` component (38.9 review
+ * IN-05); the labels are unchanged.
+ */
+export const EVENT_LABELS: Record<string, string> = {
+  archive: "Archived",
+  restore: "Restored",
+  snooze: "Snoozed",
+  unsnooze: "Unsnoozed",
+  bind: "Bound",
+  unbind: "Unbound",
+};
+
 // --- Tunables (D-39) ---------------------------------------------------------
 
 /** Records an open year shows before Show older (extended to a day's end). */

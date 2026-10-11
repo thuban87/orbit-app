@@ -33,7 +33,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
-import { EVENT_LABELS } from "@/components/TimelineRow";
 import { AppText } from "@/components/ui/AppText";
 import {
   CURRENT_STATE_FIELD_REGISTRY,
@@ -43,7 +42,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatTimeMinuteOrFallback } from "@/utils/dates";
-import type { StreamRecord } from "./history-stream-logic";
+import { EVENT_LABELS, type StreamRecord } from "./history-stream-logic";
 
 /** Channel/type → semantic icon (families read by silhouette, never colour). */
 const CHANNEL_ICON: Record<string, IconName> = {
