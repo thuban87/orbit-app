@@ -1,9 +1,14 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { StackActions } from "@react-navigation/routers";
 import { describe, expect, it, vi } from "vitest";
 import { TAB_ORDER } from "./shell-contract";
-import { navigateIntoTab } from "./tab-entry";
+import {
+  navigateIntoTab,
+  openProfileInContactsTab,
+  planContactsProfileOpen,
+} from "./tab-entry";
 
 function spyNavigator() {
   const navigate = vi.fn();
@@ -50,6 +55,117 @@ describe("navigateIntoTab (RG-021, react-native/AUD-RN-002)", () => {
       params: undefined,
       initial: false,
     });
+  });
+});
+
+/**
+ * D-50: an Add Contact started from the Settings tab finishes on the new
+ * person's Profile in the Contacts tab. When the Contacts stack is mounted the
+ * Profile is pushed onto it, because a nested navigate to "Profile" would
+ * rewrite an existing top Profile's params in place (wrong person shown,
+ * T-38.9-18).
+ */
+describe("planContactsProfileOpen (D-50)", () => {
+  it("navigates into the tab when the Contacts stack has not mounted", () => {
+    expect(
+      planContactsProfileOpen({
+        routes: [{ name: "DigestTab" }, { name: "DashboardTab" }],
+      }),
+    ).toEqual({ kind: "navigate-into" });
+  });
+
+  it("pushes onto a mounted Contacts stack", () => {
+    expect(
+      planContactsProfileOpen({
+        routes: [
+          { name: "SettingsTab" },
+          {
+            name: "DashboardTab",
+            state: { key: "k", stale: false, routes: [{ name: "Home" }] },
+          },
+        ],
+      }),
+    ).toEqual({ kind: "push", stackKey: "k" });
+  });
+
+  it("treats a partial (not yet mounted) Contacts state as unmounted", () => {
+    expect(
+      planContactsProfileOpen({
+        routes: [
+          {
+            name: "DashboardTab",
+            state: { routes: [{ name: "Home" }, { name: "Profile" }] },
+          },
+        ],
+      }),
+    ).toEqual({ kind: "navigate-into" });
+    expect(
+      planContactsProfileOpen({
+        routes: [{ name: "DashboardTab", state: { key: "k", routes: [] } }],
+      }),
+    ).toEqual({ kind: "navigate-into" });
+  });
+
+  it("navigates into the tab without a root state", () => {
+    expect(planContactsProfileOpen(undefined)).toEqual({
+      kind: "navigate-into",
+    });
+  });
+});
+
+describe("openProfileInContactsTab (D-50)", () => {
+  function containerSpy(rootState: unknown) {
+    return {
+      getRootState: vi.fn(() => rootState),
+      navigate: vi.fn(),
+      dispatch: vi.fn(),
+    };
+  }
+
+  it("enters an unmounted Contacts tab with its root under the Profile", () => {
+    const nav = containerSpy({ routes: [{ name: "SettingsTab" }] });
+    openProfileInContactsTab(nav as never, 41);
+    expect(nav.navigate).toHaveBeenCalledWith("DashboardTab", {
+      screen: "Profile",
+      params: { contactId: 41 },
+      initial: false,
+    });
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("focuses a mounted Contacts tab, then pushes the Profile onto its stack", () => {
+    const nav = containerSpy({
+      routes: [
+        { name: "SettingsTab" },
+        {
+          name: "DashboardTab",
+          state: {
+            key: "dash-stack",
+            stale: false,
+            index: 1,
+            routes: [
+              { name: "Home" },
+              { name: "Profile", params: { contactId: 3 } },
+            ],
+          },
+        },
+      ],
+    });
+    openProfileInContactsTab(nav as never, 41);
+    expect(nav.navigate).toHaveBeenCalledTimes(1);
+    expect(nav.navigate).toHaveBeenCalledWith("DashboardTab");
+    expect(nav.dispatch).toHaveBeenCalledTimes(1);
+    expect(nav.dispatch).toHaveBeenCalledWith({
+      ...StackActions.push("Profile", { contactId: 41 }),
+      target: "dash-stack",
+    });
+    expect(nav.navigate.mock.invocationCallOrder[0]).toBeLessThan(
+      nav.dispatch.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("is a no-op without a navigator", () => {
+    expect(() => openProfileInContactsTab(null, 41)).not.toThrow();
   });
 });
 

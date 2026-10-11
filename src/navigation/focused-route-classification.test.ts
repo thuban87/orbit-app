@@ -35,6 +35,8 @@ const focusedRoutes = [
   // FAB and tab bar like the other focused workflows.
   "SystemBuilder",
   "EditInteraction",
+  // D-18: Compose's Research side hides the tab bar and the + like Compose.
+  "ComposeResearch",
 ];
 
 const browseRoutes = [
