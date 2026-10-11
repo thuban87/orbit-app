@@ -1,9 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  bulkResolveFailureLabel,
   duplicateReviewView,
   runBulkResolveThenRecover,
   runResolveThenRecover,
 } from "./duplicate-review-logic";
+
+describe("bulkResolveFailureLabel (38.9 D-27: one snackbar per bulk resolve)", () => {
+  it("is null when nothing failed", () => {
+    expect(bulkResolveFailureLabel([])).toBeNull();
+  });
+
+  it("keeps a single failure's own words", () => {
+    expect(
+      bulkResolveFailureLabel([
+        "Couldn't import — no name. Add a name before importing.",
+      ]),
+    ).toBe("Couldn't import — no name. Add a name before importing.");
+  });
+
+  it("summarises two or more failures in one line", () => {
+    expect(bulkResolveFailureLabel(["a", "b", "c"])).toBe(
+      "3 contacts couldn't be resolved. They're still listed.",
+    );
+  });
+});
 
 describe("duplicateReviewView (RG-035, D-24)", () => {
   it("is loading while the read runs", () => {

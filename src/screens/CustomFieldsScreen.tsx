@@ -24,14 +24,7 @@
  * (CLAUDE.md). The executor comes from `getExecutor()` (Plan 07).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { type FieldDefDraft, FieldDefForm } from "@/components/FieldDefForm";
 import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -54,6 +47,8 @@ import {
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { confirm, notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -86,19 +81,12 @@ function optionsSummary(pf: { total: number; keep: number[]; flag: number[] }) {
   );
 }
 
-/** Promise wrapper over Alert so a pre-flight summary reads as ONE gate. */
+/**
+ * A pre-flight summary as ONE themed gate (38.9 D-27). Non-destructive and
+ * dismissable: Back or the scrim cancel, exactly like Cancel.
+ */
 function confirmSummary(title: string, message: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        { text: "Apply", onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
-  });
+  return confirm({ title, message, confirmLabel: "Apply", dismissable: true });
 }
 
 export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
@@ -147,7 +135,10 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
       setEmptyById(empties);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load custom fields", err);
-      Alert.alert("Couldn't load custom fields", "Please reopen this screen.");
+      void notice({
+        title: "Couldn't load custom fields",
+        message: "Please reopen this screen.",
+      });
     }
   }, []);
 
@@ -178,7 +169,10 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
 
   function reportError(err: unknown) {
     Logger.error(LOG_SCOPE, "field mutation failed", err);
-    Alert.alert("Couldn't update field", "Please try again.");
+    showSnackbar({
+      kind: "error",
+      label: "Couldn't update field. Please try again.",
+    });
   }
 
   async function handleCreate(def: NewFieldDef) {
@@ -303,20 +297,23 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
     }
   }
 
-  function onDeletePress(field: CustomFieldDef) {
+  async function onDeletePress(field: CustomFieldDef) {
     const empty = emptyById[field.id] === true;
     const verb = empty ? "Delete" : "Quarantine";
     const message = empty
       ? `"${field.label}" is empty and will be deleted permanently.`
       : `"${field.label}" has values and will be quarantined for 30 days — you can restore it before then.`;
-    Alert.alert(`${verb} field`, message, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: verb,
-        style: empty ? "destructive" : "default",
-        onPress: () => void doDelete(field),
-      },
-    ]);
+    // An empty field is deleted permanently: a destructive, non-dismissable
+    // confirm (D-06, ADR-086). A field with values is quarantined, which is
+    // recoverable for 30 days (HANDOFF §14.5; "Quarantine" stays, D-41), so it
+    // stays a plain dismissable confirm, as before.
+    const confirmed = await confirm({
+      title: `${verb} field`,
+      message,
+      confirmLabel: verb,
+      destructive: empty,
+    });
+    if (confirmed) await doDelete(field);
   }
 
   async function doDelete(field: CustomFieldDef) {
@@ -492,7 +489,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
                   accessibilityLabel={`${empty ? "Delete" : "Quarantine"} ${
                     field.label
                   }`}
-                  onPress={() => onDeletePress(field)}
+                  onPress={() => void onDeletePress(field)}
                   style={[styles.iconBtn, { borderColor: colors.borderStrong }]}
                 >
                   <Text style={{ color: colors.textPrimary }}>

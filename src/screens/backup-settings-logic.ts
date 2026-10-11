@@ -163,7 +163,7 @@ export interface BackupDayController {
   commitField(field: BackupDayField): void;
   /** The screen gained focus (C7-L1): reset idle fields before its read. */
   focus(): void;
-  /** A leave site: focus-effect cleanup, `beforeRemove`, unmount. */
+  /** A leave site: focus-effect cleanup, `beforeRemove`, unmount, app background. */
   leave(): void;
   /** A settings read is starting; pass the result to `loaded`. */
   beginRead(): number;
@@ -513,7 +513,7 @@ export interface CommitThenRefreshSteps {
   readonly commit: () => Promise<boolean>;
   /** The post-write re-read; MUST never reject (use `runGatedRead`). */
   readonly refresh: () => Promise<void>;
-  /** Report a failed WRITE (Alert / inline error). Never sees a re-read failure. */
+  /** Report a failed WRITE (error snackbar / inline error). Never sees a re-read failure. */
   readonly onCommitFailed: (error: unknown) => void;
 }
 
@@ -536,4 +536,30 @@ export async function commitThenRefresh(
   if (!wrote) return "nothing-committed";
   await steps.refresh();
   return "committed";
+}
+
+/** The slice of React Native's `AppState` the background flush needs. */
+export interface AppStateLike {
+  addEventListener(
+    type: "change",
+    listener: (state: string) => void,
+  ): { remove(): void };
+}
+
+/**
+ * D-34 leave-flush on backgrounding (38.9-06, folding 38.9-03's out-of-scope
+ * finding #1): pressing Home with a day field still focused fires no blur,
+ * focus loss, Back or unmount, so a typed value would be lost if Android then
+ * kills the app. Going to `background` is one more leave site and runs the
+ * controller's own `leave()` (same gate and validation, same error path, no
+ * write for invalid text). Returns the unsubscribe, for the screen's unmount.
+ */
+export function subscribeBackgroundLeaveFlush(
+  appState: AppStateLike,
+  controller: Pick<BackupDayController, "leave">,
+): () => void {
+  const subscription = appState.addEventListener("change", (state) => {
+    if (state === "background") controller.leave();
+  });
+  return () => subscription.remove();
 }

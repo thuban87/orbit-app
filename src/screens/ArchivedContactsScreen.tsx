@@ -18,14 +18,7 @@
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
@@ -46,6 +39,8 @@ import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-no
 import { deleteImportStaging } from "@/services/photos/photo-storage";
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { confirm, notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { Logger } from "@/utils/logger";
@@ -58,26 +53,18 @@ function countLabel(n: number): string {
 }
 
 /**
- * Promise wrapper over the native Alert so the impact-summary reads as ONE gate
- * (mirrors CustomFieldsScreen.confirmSummary). The confirm keeps RN's built-in
- * `style: "destructive"` (OS-rendered red — no theme token needed for the native
- * Alert; the in-app trigger button carries the `danger` token instead).
+ * The impact-summary purge gate as ONE themed destructive confirm (mirrors
+ * CustomFieldsScreen.confirmSummary; 38.9 D-27, D-09). Destructive, so Back and
+ * the scrim cannot dismiss it (D-06, ADR-086): only Cancel or "Delete
+ * permanently" resolve it. The confirm button reads the theme's destructive
+ * token through ConfirmDialog's Button role "destructive".
  */
 function confirmPurge(message: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      "Delete permanently",
-      message,
-      [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        {
-          text: "Delete permanently",
-          style: "destructive",
-          onPress: () => resolve(true),
-        },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+  return confirm({
+    title: "Delete permanently",
+    message,
+    confirmLabel: "Delete permanently",
+    destructive: true,
   });
 }
 
@@ -111,10 +98,10 @@ export function ArchivedContactsScreen() {
       setRows(await listArchived(getExecutor()));
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load archived contacts", err);
-      Alert.alert(
-        "Couldn't load archived contacts",
-        "Please go back and retry.",
-      );
+      void notice({
+        title: "Couldn't load archived contacts",
+        message: "Please go back and retry.",
+      });
     }
   }, []);
 
@@ -133,7 +120,10 @@ export function ArchivedContactsScreen() {
         notifyWidgetDataChanged();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to restore contact", err);
-        Alert.alert("Couldn't restore", "Please try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't restore. Please try again.",
+        });
       }
     },
     [load],
@@ -188,7 +178,10 @@ export function ArchivedContactsScreen() {
         await load();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to delete contact permanently", err);
-        Alert.alert("Couldn't delete", "Please try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't delete. Please try again.",
+        });
       }
     },
     [load],

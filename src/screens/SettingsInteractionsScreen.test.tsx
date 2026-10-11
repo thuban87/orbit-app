@@ -28,7 +28,6 @@ vi.mock("@react-navigation/native", () => ({
   },
 }));
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   Switch: "Switch",

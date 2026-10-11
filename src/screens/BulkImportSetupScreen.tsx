@@ -1,14 +1,7 @@
 import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ConsolidationPrompt } from "@/components/ConsolidationPrompt";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
@@ -36,6 +29,8 @@ import {
   combineCluster,
   detectSourceClusters,
 } from "@/services/import/source-consolidation";
+import { notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
 import { Logger } from "@/utils/logger";
@@ -182,7 +177,10 @@ export function BulkImportSetupScreen({
       setCategories(nextCategories);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to load bulk import setup", error);
-      Alert.alert("Couldn't load import setup", "Please reopen this import.");
+      void notice({
+        title: "Couldn't load import setup",
+        message: "Please reopen this import.",
+      });
     }
   }, [route.params.sessionId]);
 
@@ -253,7 +251,10 @@ export function BulkImportSetupScreen({
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to start bulk import", error);
       starting.current = false;
-      Alert.alert("Couldn't start import", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't start import. Please try again.",
+      });
       setSaving(false);
     }
   }
@@ -282,7 +283,10 @@ export function BulkImportSetupScreen({
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to prepare consolidation", error);
       starting.current = false;
-      Alert.alert("Couldn't prepare import", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't prepare import. Please try again.",
+      });
     }
   }
 
@@ -350,10 +354,11 @@ export function BulkImportSetupScreen({
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to combine source records", error);
       starting.current = false;
-      Alert.alert(
-        "Couldn't combine contacts",
-        "Please keep them separate and try again.",
-      );
+      showSnackbar({
+        kind: "error",
+        label:
+          "Couldn't combine contacts. Please keep them separate and try again.",
+      });
       setSaving(false);
     }
   }
@@ -389,10 +394,10 @@ export function BulkImportSetupScreen({
     if (saving) return;
     // D-74: never discard rows a running pass is still working through.
     if (isImportRunActive(route.params.sessionId)) {
-      Alert.alert(
-        BULK_IMPORT_STILL_RUNNING_TITLE,
-        BULK_IMPORT_STILL_RUNNING_BODY,
-      );
+      showSnackbar({
+        kind: "error",
+        label: `${BULK_IMPORT_STILL_RUNNING_TITLE}. ${BULK_IMPORT_STILL_RUNNING_BODY}`,
+      });
       return;
     }
     setSaving(true);
@@ -402,7 +407,10 @@ export function BulkImportSetupScreen({
       navigation.goBack();
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to discard stopped import", error);
-      Alert.alert("Couldn't discard import", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't discard import. Please try again.",
+      });
       setSaving(false);
     }
   }

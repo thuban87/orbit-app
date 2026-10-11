@@ -21,6 +21,7 @@ import {
   REENCRYPTION_TOO_LARGE_COPY,
   shouldFlushOnLeave,
   shouldReseedDayField,
+  subscribeBackgroundLeaveFlush,
   validateEncryptionSetup,
   validateWholeBackupDays,
 } from "@/screens/backup-settings-logic";
@@ -485,6 +486,109 @@ describe("createBackupDayController — deferred-write sequences (D-34)", () => 
   });
 });
 
+describe("subscribeBackgroundLeaveFlush — Home with a field focused still saves (D-34, 38.9-06)", () => {
+  function fakeAppState() {
+    const listeners = new Set<(state: string) => void>();
+    let removed = 0;
+    return {
+      appState: {
+        addEventListener: (_type: "change", listener: (s: string) => void) => {
+          listeners.add(listener);
+          return {
+            remove: () => {
+              removed += 1;
+              listeners.delete(listener);
+            },
+          };
+        },
+      },
+      emit: (state: string) => {
+        for (const listener of [...listeners]) listener(state);
+      },
+      listenerCount: () => listeners.size,
+      removedCount: () => removed,
+    };
+  }
+
+  function controllerWithWrites() {
+    const writes: BackupDaysFieldPatch[] = [];
+    const onWriteFailed = vi.fn<(error: unknown) => void>();
+    let fail = false;
+    const controller = createBackupDayController({
+      write: async (patch) => {
+        writes.push(patch);
+        if (fail) throw new Error("disk full");
+      },
+      onWriteFailed,
+    });
+    controller.attach(() => {});
+    controller.focus();
+    const started = controller.beginRead();
+    controller.loaded(started, {
+      backupIntervalDays: 7,
+      backupRetentionDays: 30,
+    });
+    return {
+      controller,
+      writes,
+      onWriteFailed,
+      failWrites: () => {
+        fail = true;
+      },
+    };
+  }
+
+  const flush = () => new Promise<void>((settle) => setTimeout(settle, 0));
+
+  it("going to the background writes the typed, valid, changed value through leave()", async () => {
+    const { appState, emit } = fakeAppState();
+    const { controller, writes } = controllerWithWrites();
+    subscribeBackgroundLeaveFlush(appState, controller);
+    controller.changeText("interval", "14");
+    emit("background");
+    await flush();
+    expect(writes).toEqual([{ backupIntervalDays: 14 }]);
+  });
+
+  it("does not save invalid text, and other AppState changes do nothing", async () => {
+    const { appState, emit } = fakeAppState();
+    const { controller, writes } = controllerWithWrites();
+    subscribeBackgroundLeaveFlush(appState, controller);
+    controller.changeText("interval", "0");
+    emit("background");
+    controller.changeText("retention", "45");
+    emit("inactive");
+    emit("active");
+    await flush();
+    expect(writes).toEqual([]);
+  });
+
+  it("a failed background write reports through the controller's error path", async () => {
+    const { appState, emit } = fakeAppState();
+    const { controller, onWriteFailed, failWrites } = controllerWithWrites();
+    failWrites();
+    subscribeBackgroundLeaveFlush(appState, controller);
+    controller.changeText("retention", "60");
+    emit("background");
+    await flush();
+    expect(onWriteFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("the returned unsubscribe removes the listener", async () => {
+    const { appState, emit, listenerCount, removedCount } = fakeAppState();
+    const { controller, writes } = controllerWithWrites();
+    const unsubscribe = subscribeBackgroundLeaveFlush(appState, controller);
+    expect(listenerCount()).toBe(1);
+    unsubscribe();
+    expect(removedCount()).toBe(1);
+    expect(listenerCount()).toBe(0);
+    controller.changeText("interval", "21");
+    emit("background");
+    await flush();
+    expect(writes).toEqual([]);
+  });
+});
+
 describe("BackupSettingsScreen saves the schedule on leave (D-34 source contract)", () => {
   const screen = readFileSync(
     fileURLToPath(new URL("./BackupSettingsScreen.tsx", import.meta.url)),
@@ -524,6 +628,12 @@ describe("BackupSettingsScreen saves the schedule on leave (D-34 source contract
 
   it("uses one module-scoped controller", () => {
     expect(screen.match(/createBackupDayController\(/g)).toHaveLength(1);
+  });
+
+  it("flushes on app background from an effect whose cleanup unsubscribes (38.9-06)", () => {
+    expect(screen).toMatch(
+      /useEffect\(\s*\(\)\s*=>\s*subscribeBackgroundLeaveFlush\(AppState, dayController\)/,
+    );
   });
 });
 

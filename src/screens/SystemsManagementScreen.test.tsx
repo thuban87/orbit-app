@@ -16,7 +16,6 @@ vi.mock("react", () => ({
   useState: <T,>(value: T) => [value, () => {}],
 }));
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   Pressable: "Pressable",
   StyleSheet: { create: (styles: unknown) => styles },
   TextInput: "TextInput",
@@ -54,6 +53,10 @@ vi.mock("@/db/systems-dao", () => ({
   resetSystemOverrides: vi.fn(),
   restoreDeletedSystemAndActiveSelection: vi.fn(),
   setSystemHidden: vi.fn(),
+}));
+vi.mock("@/stores/confirm-store", () => ({
+  confirm: vi.fn(async () => false),
+  notice: vi.fn(async () => undefined),
 }));
 vi.mock("@/stores/snackbar-store", () => ({
   showSnackbar: vi.fn(),

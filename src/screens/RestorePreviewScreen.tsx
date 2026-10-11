@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { applyRestore, type RestoreMode } from "@/backup/restore-apply";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -39,6 +32,7 @@ import { backupPassphraseStore } from "@/services/backup/passphrase-store";
 import { publishCommittedRestore } from "@/services/backup/restore-completion";
 import { createSafStorage } from "@/services/backup/saf-storage";
 import { readStoredPhotoBase64 } from "@/services/backup/share-export";
+import { confirm } from "@/stores/confirm-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
@@ -48,29 +42,20 @@ const LOG_SCOPE = "restore-preview";
 
 /**
  * The apply's one confirmation dialog (Replace-all, and/or the 38.5 D-47
- * unavailable-background question). Dismissing it cancels.
+ * unavailable-background question), themed (38.9 D-27). A destructive
+ * Replace-all cannot be dismissed by Back or the scrim (D-06, ADR-086); the
+ * non-destructive question can, and dismissing it cancels.
  */
 function confirmApply(
   confirmation: RestoreApplyConfirmation,
 ): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      confirmation.title,
-      confirmation.message,
-      [
-        {
-          text: confirmation.cancelLabel,
-          style: "cancel",
-          onPress: () => resolve(false),
-        },
-        {
-          text: confirmation.confirmLabel,
-          style: confirmation.destructive ? "destructive" : "default",
-          onPress: () => resolve(true),
-        },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+  return confirm({
+    title: confirmation.title,
+    message: confirmation.message,
+    cancelLabel: confirmation.cancelLabel,
+    confirmLabel: confirmation.confirmLabel,
+    destructive: confirmation.destructive,
+    dismissable: !confirmation.destructive,
   });
 }
 

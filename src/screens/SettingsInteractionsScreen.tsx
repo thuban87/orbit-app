@@ -1,13 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui";
 import {
@@ -22,6 +15,7 @@ import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { useAssistBanner } from "@/stores/assist-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
@@ -102,7 +96,10 @@ export function SettingsInteractionsScreen() {
       setSettings(next);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to update Interaction Assist", error);
-      Alert.alert("Couldn't update Interaction Assist", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't update Interaction Assist. Please try again.",
+      });
     }
   }, []);
 

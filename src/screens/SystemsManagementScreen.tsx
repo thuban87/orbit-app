@@ -2,7 +2,7 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import ReorderableList, {
   type ReorderableListRenderItemInfo,
   type ReorderableListReorderEvent,
@@ -35,6 +35,7 @@ import {
 import type { SystemDescriptor } from "@/logic/orrery-system-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { confirm } from "@/stores/confirm-store";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -431,29 +432,25 @@ export function SystemsManagementScreen() {
     }
   };
   const deleteRow = (row: SystemManagementRow) => {
-    Alert.alert(
-      `Delete ${row.name}?`,
-      "This only removes the System. Your contacts are not affected.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              try {
-                await deleteManagedSystem({
-                  systemRef: row.id,
-                  onChanged: load,
-                });
-              } catch {
-                setError("Couldn't delete this System. Please try again.");
-              }
-            })();
-          },
-        },
-      ],
-    );
+    // D-06 / ADR-086: destructive, so only Cancel or Delete resolve it.
+    void (async () => {
+      const confirmed = await confirm({
+        title: `Delete ${row.name}?`,
+        message:
+          "This only removes the System. Your contacts are not affected.",
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!confirmed) return;
+      try {
+        await deleteManagedSystem({
+          systemRef: row.id,
+          onChanged: load,
+        });
+      } catch {
+        setError("Couldn't delete this System. Please try again.");
+      }
+    })();
   };
   const onAction = (row: SystemManagementRow, action: string) => {
     const systemRef = row.id as OrrerySystemId;
@@ -498,22 +495,20 @@ export function SystemsManagementScreen() {
       return;
     }
     if (action === "Reset Overrides") {
-      Alert.alert(
-        "Reset overrides?",
-        "Manual includes and excludes will be removed. The System's rules stay.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Reset",
-            style: "destructive",
-            onPress: () => {
-              void resetSystemOverrides(getExecutor(), { systemRef })
-                .then(() => load())
-                .catch(() => setError("Couldn't reset membership overrides."));
-            },
-          },
-        ],
-      );
+      // D-06 / ADR-086: destructive and non-dismissable. Copy unchanged here;
+      // Plan 15 rewrites the "overrides" wording (D-41, D-63).
+      void confirm({
+        title: "Reset overrides?",
+        message:
+          "Manual includes and excludes will be removed. The System's rules stay.",
+        confirmLabel: "Reset",
+        destructive: true,
+      }).then((confirmed) => {
+        if (!confirmed) return;
+        void resetSystemOverrides(getExecutor(), { systemRef })
+          .then(() => load())
+          .catch(() => setError("Couldn't reset membership overrides."));
+      });
     }
   };
   const onReorder = ({ from, to }: ReorderableListReorderEvent) => {

@@ -2,7 +2,6 @@ import { Picker } from "@react-native-picker/picker";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -53,6 +52,8 @@ import {
 } from "@/services/import/duplicate-evidence";
 import { commitSingleImport } from "@/services/import/import-acquire";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
+import { notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
@@ -149,10 +150,11 @@ export function ImportReviewScreen({
       if (!session) throw new Error("import session is unavailable");
       const row = rows.find((candidate) => candidate.contactId === null);
       if (!row) {
-        Alert.alert(
-          "Import unavailable",
-          "This contact has already been handled.",
-        );
+        // Neutral info, then leave (38.9 D-27; success kind = neutral).
+        showSnackbar({
+          kind: "success",
+          label: "Import unavailable. This contact has already been handled.",
+        });
         navigation.goBack();
         return;
       }
@@ -189,7 +191,10 @@ export function ImportReviewScreen({
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to load import review", error);
-      Alert.alert("Couldn't load this import", "Please try again.");
+      void notice({
+        title: "Couldn't load this import",
+        message: "Please try again.",
+      });
     } finally {
       setLoading(false);
     }
@@ -299,10 +304,10 @@ export function ImportReviewScreen({
       setDuplicateOutcome(result.outcome);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to commit import", error);
-      Alert.alert(
-        "Couldn't import contact",
-        "Please check the name and try again.",
-      );
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't import contact. Please check the name and try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -337,7 +342,10 @@ export function ImportReviewScreen({
       );
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to link duplicate", error);
-      Alert.alert("Couldn't link contact", "Please choose again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't link contact. Please choose again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -361,7 +369,10 @@ export function ImportReviewScreen({
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to skip duplicate", error);
-      Alert.alert("Couldn't skip contact", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't skip contact. Please try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -373,7 +384,10 @@ export function ImportReviewScreen({
       await importAsNew();
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to import duplicate as new", error);
-      Alert.alert("Couldn't import contact", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't import contact. Please try again.",
+      });
     } finally {
       setSaving(false);
     }

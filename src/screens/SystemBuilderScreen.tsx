@@ -3,7 +3,6 @@ import { useIsFocused } from "@react-navigation/native";
 import { Canvas, Circle, Fill } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   AppState,
   Pressable,
   ScrollView,
@@ -68,6 +67,7 @@ import {
   type ProvisionalOrreryScene,
   readProvisionalOrreryScene,
 } from "@/services/orrery-scene";
+import { confirm } from "@/stores/confirm-store";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -494,27 +494,25 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const resetOverrides = () => {
     const ref = systemRef ?? customRef;
     if (!ref) return;
-    Alert.alert(
-      "Reset overrides?",
-      "Manual includes and excludes will be removed. The System's rules stay.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reset",
-          style: "destructive",
-          onPress: () => {
-            void resetSystemOverrides(getExecutor(), {
-              systemRef: ref as OrrerySystemId,
-            })
-              .then(() => {
-                setBaseOverrides([]);
-                setOverrideIntent([]);
-              })
-              .catch(() => setError("Couldn't reset membership overrides."));
-          },
-        },
-      ],
-    );
+    // D-06 / ADR-086: destructive and non-dismissable. Copy unchanged here;
+    // Plan 15 rewrites the "overrides" wording (D-41, D-63).
+    void confirm({
+      title: "Reset overrides?",
+      message:
+        "Manual includes and excludes will be removed. The System's rules stay.",
+      confirmLabel: "Reset",
+      destructive: true,
+    }).then((confirmed) => {
+      if (!confirmed) return;
+      void resetSystemOverrides(getExecutor(), {
+        systemRef: ref as OrrerySystemId,
+      })
+        .then(() => {
+          setBaseOverrides([]);
+          setOverrideIntent([]);
+        })
+        .catch(() => setError("Couldn't reset membership overrides."));
+    });
   };
   const includeIds = currentOverrides
     .filter((entry) => entry.mode === "include")

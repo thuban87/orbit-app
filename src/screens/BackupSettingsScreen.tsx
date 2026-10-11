@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -38,6 +38,7 @@ import {
 } from "@/services/backup/encryption";
 import { backupPassphraseStore } from "@/services/backup/passphrase-store";
 import { createSafStorage } from "@/services/backup/saf-storage";
+import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
@@ -48,6 +49,7 @@ import {
   commitThenRefresh,
   createBackupDayController,
   encryptionErrorCopy,
+  subscribeBackgroundLeaveFlush,
   validateEncryptionSetup,
 } from "./backup-settings-logic";
 
@@ -143,6 +145,15 @@ export function BackupSettingsScreen({
     };
   }, [dayController]);
 
+  // D-34 leave-flush backstop: the app going to the background (Home with a
+  // day field still focused) saves what is typed, through the same leave path
+  // (same validation, same error snackbar), in case Android then kills the app
+  // (38.9-03 out-of-scope finding #1, folded into 38.9-06).
+  useEffect(
+    () => subscribeBackgroundLeaveFlush(AppState, dayController),
+    [dayController],
+  );
+
   // D-34 leave-flush backstop: removal by header or system Back. Saving on
   // leave is not a prompt, so this never calls preventDefault (on Android a
   // focused TextInput is not reliably blurred before the screen goes; H3).
@@ -212,7 +223,10 @@ export function BackupSettingsScreen({
       refresh: readSettings,
       onCommitFailed: (error) => {
         Logger.error(LOG_SCOPE, "folder selection failed", error);
-        Alert.alert("Couldn't choose folder", "Please try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't choose folder. Please try again.",
+        });
       },
     });
   }, [readSettings, safStorage]);
@@ -227,19 +241,19 @@ export function BackupSettingsScreen({
     setOpeningFolder(true);
     try {
       if (!(await safStorage.canOpen(settings.backupFolderUri))) {
-        Alert.alert(
-          "Open backup folder",
-          "This folder can be opened from the Files app.",
-        );
+        void notice({
+          title: "Open backup folder",
+          message: "This folder can be opened from the Files app.",
+        });
         return;
       }
       await safStorage.open(settings.backupFolderUri);
     } catch (error) {
       Logger.warn(LOG_SCOPE, "native folder launch rejected", error);
-      Alert.alert(
-        "Open backup folder",
-        "This folder can be opened from the Files app.",
-      );
+      void notice({
+        title: "Open backup folder",
+        message: "This folder can be opened from the Files app.",
+      });
     } finally {
       setOpeningFolder(false);
     }
@@ -371,31 +385,27 @@ export function BackupSettingsScreen({
     validateNewPassphrase,
   ]);
 
-  const disableEncryption = useCallback(() => {
-    Alert.alert(
-      "Turn off encryption?",
-      "New backups will be readable JSON. Existing encrypted files will keep their passphrase.",
-      [
-        { text: "Keep encryption on", style: "cancel" },
-        {
-          text: "Turn off encryption",
-          style: "destructive",
-          onPress: () =>
-            void (async () => {
-              const result = await encryptionLifecycle.disable(true);
-              if (result.status !== "disabled") {
-                Alert.alert(
-                  "Couldn't turn off encryption",
-                  "Please try again.",
-                );
-                return;
-              }
-              clearEncryptionFields();
-              await readSettings();
-            })(),
-        },
-      ],
-    );
+  const disableEncryption = useCallback(async () => {
+    // D-06 / ADR-086: destructive, so Back and the scrim cannot dismiss it.
+    const confirmed = await confirm({
+      title: "Turn off encryption?",
+      message:
+        "New backups will be readable JSON. Existing encrypted files will keep their passphrase.",
+      cancelLabel: "Keep encryption on",
+      confirmLabel: "Turn off encryption",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const result = await encryptionLifecycle.disable(true);
+    if (result.status !== "disabled") {
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't turn off encryption. Please try again.",
+      });
+      return;
+    }
+    clearEncryptionFields();
+    await readSettings();
   }, [clearEncryptionFields, encryptionLifecycle, readSettings]);
 
   const startChange = useCallback(() => {
@@ -404,21 +414,16 @@ export function BackupSettingsScreen({
     setChangeMode("reencrypt");
   }, [clearEncryptionFields]);
 
-  const startForgotten = useCallback(() => {
-    Alert.alert(
-      "I forgot my passphrase",
-      "Old encrypted backups can't be opened or re-encrypted without their passphrase.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Set a new passphrase for future backups",
-          onPress: () => {
-            clearEncryptionFields();
-            setEncryptionFlow("forgotten");
-          },
-        },
-      ],
-    );
+  const startForgotten = useCallback(async () => {
+    const confirmed = await confirm({
+      title: "I forgot my passphrase",
+      message:
+        "Old encrypted backups can't be opened or re-encrypted without their passphrase.",
+      confirmLabel: "Set a new passphrase for future backups",
+    });
+    if (!confirmed) return;
+    clearEncryptionFields();
+    setEncryptionFlow("forgotten");
   }, [clearEncryptionFields]);
 
   // Every known-state flag derives from the gated presentation: unknown

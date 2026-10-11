@@ -41,7 +41,6 @@ vi.mock("react", async (original) => ({
   },
 }));
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   AppState: { addEventListener: () => ({ remove: () => {} }) },
   Pressable: "Pressable",
   ScrollView: "ScrollView",
@@ -135,6 +134,10 @@ vi.mock("@/logic/orrery-system-logic", () => ({
 }));
 vi.mock("@/navigation/discard-keep-guard", () => ({
   useDiscardKeepGuard: vi.fn(),
+}));
+vi.mock("@/stores/confirm-store", () => ({
+  confirm: vi.fn(async () => false),
+  notice: vi.fn(async () => undefined),
 }));
 vi.mock("@/stores/orrery-preferences-store", () => ({
   useOrreryPreferencesStore: {

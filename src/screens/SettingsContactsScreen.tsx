@@ -3,7 +3,6 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getCountries } from "libphonenumber-js";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -35,6 +34,7 @@ import { getDeviceRegion } from "@/services/device-region";
 import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
 import { startContactImport } from "@/services/import/start-contact-import";
 import { discardDerivative } from "@/services/photos/derivative-cache";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
@@ -138,7 +138,10 @@ export function SettingsContactsScreen() {
         navigate: navigation.navigate,
       });
     } catch {
-      Alert.alert("Couldn't import contacts", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't import contacts. Please try again.",
+      });
     }
   }, [navigation]);
 
@@ -151,7 +154,10 @@ export function SettingsContactsScreen() {
       }
       navigation.navigate("ReconcileGrid");
     } catch {
-      Alert.alert("Couldn't check linked contacts", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't check linked contacts. Please try again.",
+      });
     }
   }, [navigation]);
 

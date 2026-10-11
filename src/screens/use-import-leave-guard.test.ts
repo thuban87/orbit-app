@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  alert: vi.fn(),
+  confirm: vi.fn<(request: { title: string }) => Promise<boolean>>(),
   discardSession: vi.fn(),
   listSessionRows: vi.fn(),
 }));
@@ -15,7 +15,7 @@ vi.mock("react", () => ({
   useRef: <T>(value: T) => ({ current: value }),
   useCallback: <T>(callback: T) => callback,
 }));
-vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
+vi.mock("@/stores/confirm-store", () => ({ confirm: mocks.confirm }));
 vi.mock("@/db/database", () => ({
   getExecutor: () => ({}),
   localDateTime: () => "2026-09-27 12:00:00",
@@ -62,22 +62,42 @@ function mountGuard(hasMeaningfulEdits: boolean, isBusy?: () => boolean) {
   return { markComplete, fire, navigation };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+const flush = () => new Promise<void>((settle) => setTimeout(settle, 0));
+
 describe("useImportLeaveGuard (D-72)", () => {
   beforeEach(() => {
-    mocks.alert.mockReset();
+    mocks.confirm.mockReset().mockResolvedValue(false);
     mocks.listSessionRows.mockReset().mockResolvedValue([]);
     mocks.discardSession.mockReset().mockResolvedValue([]);
   });
 
-  it("still prompts Leave import? when an edited review is left uncommitted", () => {
+  it("still prompts Leave import? (themed destructive confirm) when an edited review is left uncommitted", () => {
     const { fire } = mountGuard(true);
     const event = fire();
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(mocks.alert).toHaveBeenCalledWith(
-      "Leave import?",
-      expect.any(String),
-      expect.any(Array),
+    expect(mocks.confirm).toHaveBeenCalledTimes(1);
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Leave import?",
+        cancelLabel: "Stay",
+        confirmLabel: "Leave",
+        destructive: true,
+      }),
     );
+  });
+
+  it("does not ask when the review has no edits", () => {
+    const { fire } = mountGuard(false);
+    fire();
+    expect(mocks.confirm).not.toHaveBeenCalled();
   });
 
   it("lets the post-import navigation through once the import is marked complete", () => {
@@ -86,14 +106,51 @@ describe("useImportLeaveGuard (D-72)", () => {
     markComplete();
     const event = fire();
     expect(event.preventDefault).not.toHaveBeenCalled();
-    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.confirm).not.toHaveBeenCalled();
     expect(mocks.discardSession).not.toHaveBeenCalled();
+  });
+
+  it("Leave discards the unresolved rows, then re-dispatches the original action", async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.listSessionRows.mockResolvedValue([{ rowStatus: "pending" }]);
+    const { fire, navigation } = mountGuard(true);
+    fire();
+    await flush();
+    expect(mocks.discardSession).toHaveBeenCalledTimes(1);
+    expect(navigation.dispatch).toHaveBeenCalledWith("RESET");
+  });
+
+  it("Stay discards nothing and keeps the screen", async () => {
+    const { fire, navigation } = mountGuard(true);
+    fire();
+    await flush();
+    expect(mocks.listSessionRows).not.toHaveBeenCalled();
+    expect(mocks.discardSession).not.toHaveBeenCalled();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("a second Back while the prompt is pending is prevented and opens no second prompt (C5-L4)", async () => {
+    const answer = deferred<boolean>();
+    mocks.confirm.mockReturnValueOnce(answer.promise);
+    const { fire, navigation } = mountGuard(true);
+    const first = fire();
+    const second = fire();
+    expect(first.preventDefault).toHaveBeenCalled();
+    expect(second.preventDefault).toHaveBeenCalled();
+    expect(mocks.confirm).toHaveBeenCalledTimes(1);
+    answer.resolve(false);
+    await flush();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+    // After Stay, a further Back asks again.
+    const third = fire();
+    expect(third.preventDefault).toHaveBeenCalled();
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("useImportLeaveGuard while the import is starting (D-74)", () => {
   beforeEach(() => {
-    mocks.alert.mockReset();
+    mocks.confirm.mockReset().mockResolvedValue(false);
     mocks.listSessionRows.mockReset().mockResolvedValue([]);
     mocks.discardSession.mockReset().mockResolvedValue([]);
   });
@@ -106,7 +163,7 @@ describe("useImportLeaveGuard while the import is starting (D-74)", () => {
     expect(event.preventDefault).toHaveBeenCalled();
     expect(mocks.listSessionRows).not.toHaveBeenCalled();
     expect(mocks.discardSession).not.toHaveBeenCalled();
-    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.confirm).not.toHaveBeenCalled();
     expect(navigation.dispatch).not.toHaveBeenCalled();
   });
 

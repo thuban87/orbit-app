@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   type BulkAction,
   CandidateCardGrid,
@@ -26,10 +26,12 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { importRowAsNew } from "@/services/import/import-driver";
 import { applyBoundImportEffects } from "@/services/import/import-lifecycle-effects";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { runSingleFlight } from "@/utils/single-flight";
 import {
+  bulkResolveFailureLabel,
   duplicateReviewView,
   runBulkResolveThenRecover,
   runResolveThenRecover,
@@ -201,6 +203,9 @@ export function DuplicateReviewScreen({
     }
     if (!session) return;
     let importedAny = false;
+    // Per-row failures are collected and shown as ONE snackbar after the
+    // loop (38.9 D-27), never one dialog per failing row.
+    const failures: string[] = [];
     // Only a row's own write can fail its resolve; the trailing finalize and
     // re-read go to the read error + read-only Retry (D-04).
     await runLatchedWrite(() =>
@@ -218,9 +223,8 @@ export function DuplicateReviewScreen({
             });
             if (result.contactId !== null) importedAny = true;
             if (result.skipped === "name-required") {
-              Alert.alert(
-                "Couldn't import — no name",
-                "Add a name before importing.",
+              failures.push(
+                "Couldn't import — no name. Add a name before importing.",
               );
             }
           } else if (action === "skip") {
@@ -239,9 +243,8 @@ export function DuplicateReviewScreen({
             `could not resolve row ${entry.row.id}`,
             error,
           );
-          Alert.alert(
-            "Couldn't resolve this contact",
-            "The other selected contacts are still available.",
+          failures.push(
+            "Couldn't resolve this contact. The other selected contacts are still available.",
           );
         },
         finalize: finalizeSession,
@@ -249,6 +252,8 @@ export function DuplicateReviewScreen({
         onRecoveryError: onReadError,
       }),
     );
+    const failureLabel = bulkResolveFailureLabel(failures);
+    if (failureLabel) showSnackbar({ kind: "error", label: failureLabel });
     // D-57: a Bound batch's Import as new refreshes reminders and the widget
     // once, post-commit and best-effort (the helper never rejects).
     if (
@@ -280,7 +285,10 @@ export function DuplicateReviewScreen({
           }),
         onWriteError: (error) => {
           Logger.error(LOG_SCOPE, "could not link candidate", error);
-          Alert.alert("Couldn't link this contact", "Please choose again.");
+          showSnackbar({
+            kind: "error",
+            label: "Couldn't link this contact. Please choose again.",
+          });
         },
         onWritten: () => {
           setCurrentLink(next);

@@ -91,3 +91,18 @@ export async function runBulkResolveThenRecover<T>(
   }
   return { failed, recoveryError: await recoverAfterWrite(steps) };
 }
+
+/**
+ * One snackbar for a whole bulk resolve (38.9 D-27, D-40): the per-row
+ * failures are collected through the loop and reported once after it, so
+ * resolving many contacts never stacks one message per failing row. One
+ * failure keeps its own words; two or more are summarised (this plan's
+ * wording). Null when nothing failed.
+ */
+export function bulkResolveFailureLabel(
+  failures: readonly string[],
+): string | null {
+  if (failures.length === 0) return null;
+  if (failures.length === 1) return failures[0];
+  return `${failures.length} contacts couldn't be resolved. They're still listed.`;
+}

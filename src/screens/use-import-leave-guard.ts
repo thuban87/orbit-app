@@ -1,10 +1,10 @@
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
 import { useCallback, useEffect, useRef } from "react";
-import { Alert } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/import-session-dao";
 import { listSessionRows } from "@/db/import-session-read";
 import { deleteImportStaging } from "@/services/photos/photo-storage";
+import { confirm } from "@/stores/confirm-store";
 import { Logger } from "@/utils/logger";
 import { hasUnresolvedRows } from "./import-leave-guard-logic";
 
@@ -31,6 +31,12 @@ export async function discardUnresolvedSession(
  * import (its writes are in flight and it is about to navigate on), so a
  * removal is held: nothing is discarded and nothing is asked. Discarding then
  * would pull the session out from under the run that is about to start.
+ *
+ * The "Leave import?" prompt is the themed destructive confirm (38.9 D-27; non-
+ * dismissable, D-06/ADR-086). One prompt at a time (D-13, review C5-L4): while
+ * it is pending, a further removal is prevented and asks nothing. Stay clears
+ * the hold, so a later Back asks again; Leave keeps it until the leave has
+ * dispatched.
  */
 export function useImportLeaveGuard(
   navigation: NavigationProp<ParamListBase>,
@@ -39,6 +45,7 @@ export function useImportLeaveGuard(
   isBusy?: () => boolean,
 ): () => void {
   const leaving = useRef(false);
+  const promptPendingRef = useRef(false);
   // Read at event time, so the listener never needs re-subscribing for it.
   const busy = useRef(isBusy);
   busy.current = isBusy;
@@ -50,6 +57,7 @@ export function useImportLeaveGuard(
       navigation.addListener("beforeRemove", (event) => {
         if (leaving.current) return;
         event.preventDefault();
+        if (promptPendingRef.current) return;
         if (busy.current?.()) return;
         const leave = async () => {
           try {
@@ -69,18 +77,25 @@ export function useImportLeaveGuard(
           void leave();
           return;
         }
-        Alert.alert(
-          "Leave import?",
-          "You've made changes. Leaving keeps anything already imported and discards the rest.",
-          [
-            { text: "Stay", style: "cancel" },
-            {
-              text: "Leave",
-              style: "destructive",
-              onPress: () => void leave(),
-            },
-          ],
-        );
+        promptPendingRef.current = true;
+        void confirm({
+          title: "Leave import?",
+          message:
+            "You've made changes. Leaving keeps anything already imported and discards the rest.",
+          cancelLabel: "Stay",
+          confirmLabel: "Leave",
+          destructive: true,
+        }).then(async (confirmed) => {
+          if (!confirmed) {
+            promptPendingRef.current = false;
+            return;
+          }
+          try {
+            await leave();
+          } finally {
+            promptPendingRef.current = false;
+          }
+        });
       }),
     [hasMeaningfulEdits, navigation, sessionId],
   );

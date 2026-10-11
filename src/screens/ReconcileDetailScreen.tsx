@@ -2,7 +2,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -61,6 +60,7 @@ import {
   reconcilePhotoFs,
   stageReconcileSourcePhoto,
 } from "@/services/photos/reconcile-photo";
+import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
 import {
@@ -311,21 +311,21 @@ export function ReconcileDetailScreen({
         now: localDateTime(),
       });
       if (result.kind === "duplicate-active-link") {
-        Alert.alert(
-          "Source already linked",
-          "That phone contact is already linked to another Orbit contact. Review a merge or explicitly unlink it there first.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Review merge",
-              onPress: () =>
-                navigation.navigate("SurvivorSelect", {
-                  firstContactId: contactId,
-                  secondContactId: result.otherContactId,
-                }),
-            },
-          ],
-        );
+        // Themed, dismissable (38.9 D-27): Cancel and Back both do nothing.
+        // Not awaited, so the picked photo is still discarded right away.
+        void confirm({
+          title: "Source already linked",
+          message:
+            "That phone contact is already linked to another Orbit contact. Review a merge or explicitly unlink it there first.",
+          confirmLabel: "Review merge",
+          dismissable: true,
+        }).then((review) => {
+          if (!review) return;
+          navigation.navigate("SurvivorSelect", {
+            firstContactId: contactId,
+            secondContactId: result.otherContactId,
+          });
+        });
         return;
       }
       await load();

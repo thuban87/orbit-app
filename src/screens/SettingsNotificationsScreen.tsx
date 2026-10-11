@@ -4,7 +4,6 @@ import DateTimePicker, {
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import {
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -29,6 +28,7 @@ import {
   type NotificationPermissionResult,
   requestNotificationPermission,
 } from "@/services/notifications/permission";
+import { notice } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
@@ -162,10 +162,10 @@ export function SettingsNotificationsScreen() {
     try {
       await Linking.openSettings();
     } catch {
-      Alert.alert(
-        "Open Settings manually",
-        "Open Orbit's app settings and allow notifications.",
-      );
+      void notice({
+        title: "Open Settings manually",
+        message: "Open Orbit's app settings and allow notifications.",
+      });
     }
   }, []);
 
