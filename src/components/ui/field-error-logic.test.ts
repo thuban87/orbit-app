@@ -93,5 +93,22 @@ describe("no numeric node handle reaches measureLayout (E-X01)", () => {
     expect(source).toMatch(/innerViewRef=\{contentRef\}/);
   });
 
-  it.todo("Edit Contact measures against the ScrollView content view");
+  it("Edit Contact measures against the ScrollView content view", () => {
+    const source = read("src/screens/EditContactScreen.tsx");
+    expect(source).not.toMatch(/findNodeHandle/);
+    expect(source).toMatch(/innerViewRef=\{contentRef\}/);
+  });
+});
+
+describe("bulk-frequency sheet validation is inline (D-40, A-13)", () => {
+  it("renders a FieldError under the field instead of an error snackbar", () => {
+    const source = read("src/screens/HomeScreen.tsx");
+    const sheet = source.slice(
+      source.indexOf('testID="bulk-frequency-input"'),
+      source.indexOf('testID="bulk-frequency-continue"') + 2000,
+    );
+    expect(sheet).toMatch(/<FieldError[\s\S]*?message=\{frequencyError\}/);
+    expect(sheet).toMatch(/setFrequencyError\(/);
+    expect(sheet).not.toMatch(/showSnackbar\(/);
+  });
 });

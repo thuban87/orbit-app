@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactElement, ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const saveSystemDefinition = vi.fn();
 const saveMembershipOverrides = vi.fn();
@@ -6,12 +7,38 @@ const prefsSave = vi.fn();
 const prefsHydrate = vi.fn();
 let hydrated = false;
 
-vi.mock("react", () => ({
+/**
+ * The React mock renders the screen as a plain function call (38.9 Plan 04,
+ * review C8-L1; Plan 10 reuses it). `useState` slots are seeded by call order
+ * (`SLOT` below, pinned by a test) and every setter is a spy; effects run only
+ * when a test sets `hooks.runEffects`.
+ */
+const hooks = vi.hoisted(() => ({
+  index: 0,
+  seed: new Map<number, unknown>(),
+  initial: [] as unknown[],
+  setters: [] as ReturnType<typeof vi.fn>[],
+  runEffects: false,
+}));
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
   useCallback: <T,>(callback: T) => callback,
-  useEffect: () => {},
+  useEffect: (effect: () => void) => {
+    if (hooks.runEffects) effect();
+  },
   useMemo: <T,>(factory: () => T) => factory(),
   useRef: <T,>(value: T) => ({ current: value }),
-  useState: <T,>(value: T) => [value, () => {}],
+  useState: (value: unknown) => {
+    const slot = hooks.index++;
+    const initial =
+      typeof value === "function" ? (value as () => unknown)() : value;
+    hooks.initial[slot] = initial;
+    if (!hooks.setters[slot]) hooks.setters[slot] = vi.fn();
+    return [
+      hooks.seed.has(slot) ? hooks.seed.get(slot) : initial,
+      hooks.setters[slot],
+    ];
+  },
 }));
 vi.mock("react-native", () => ({
   Alert: { alert: vi.fn() },
@@ -62,6 +89,15 @@ vi.mock("@/components/orrery/SystemRuleAccordion", () => ({
 }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
+vi.mock("@/components/ui/FieldError", () => ({ FieldError: "FieldError" }));
+const { reveal } = vi.hoisted(() => ({ reveal: vi.fn() }));
+vi.mock("@/components/ui/use-first-error-reveal", () => ({
+  useFirstErrorReveal: () => ({
+    scrollRef: { current: null },
+    contentRef: { current: null },
+    reveal,
+  }),
+}));
 vi.mock("@/components/ui/GlassSurface", () => ({
   GlassSurface: "GlassSurface",
 }));
@@ -110,7 +146,12 @@ vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 const { saveCustomBuilderDraft, saveOverrideBuilderDraft } = await import(
   "./SystemBuilderScreen"
 );
-const { previewSaveAction } = await import("./SystemBuilderScreen");
+const { previewSaveAction, SystemBuilderScreen } = await import(
+  "./SystemBuilderScreen"
+);
+const { emptyRuleDraft } = await import(
+  "@/components/orrery/system-builder-logic"
+);
 const { focusPreviewBody } = await import(
   "@/components/orrery/system-preview-logic"
 );
@@ -253,5 +294,250 @@ describe("SystemBuilder category rule catalog", () => {
       visibleOptions: [],
       emptyCopy: "No categories available",
     });
+  });
+});
+
+/** SystemBuilderScreen's `useState` call order. Pinned by the slot test. */
+const SLOT = {
+  page: 0,
+  previewing: 1,
+  previewScene: 2,
+  previewFocusedId: 3,
+  ready: 4,
+  saving: 5,
+  error: 6,
+  nameError: 7,
+  nameRevealRequest: 8,
+  categories: 9,
+  baseOverrides: 10,
+  overrideIntent: 11,
+  baseCandidateIds: 12,
+  passthroughRules: 13,
+  activeRows: 14,
+  rows: 15,
+  membership: 16,
+  draft: 17,
+} as const;
+type SlotName = keyof typeof SLOT;
+
+type TestElement = ReactElement<Record<string, unknown>>;
+const SCOPED = { danger: "scoped-danger", textSecondary: "scoped-secondary" };
+
+/** Every element in the tree; render-prop children get a scoped palette. */
+function nodes(node: ReactNode): TestElement[] {
+  if (!node || typeof node !== "object") return [];
+  if (Array.isArray(node)) return node.flatMap(nodes);
+  const element = node as TestElement;
+  const children = element.props.children;
+  const resolved =
+    typeof children === "function"
+      ? (children as (scoped: typeof SCOPED) => ReactNode)(SCOPED)
+      : (children as ReactNode);
+  return [element, ...nodes(resolved)];
+}
+
+const navigation = { goBack: vi.fn() };
+
+function renderBuilder(seed: Partial<Record<SlotName, unknown>> = {}) {
+  hooks.index = 0;
+  hooks.seed = new Map(
+    Object.entries(seed).map(([key, value]) => [SLOT[key as SlotName], value]),
+  );
+  const tree = SystemBuilderScreen({
+    navigation,
+    route: { params: {} },
+  } as unknown as Parameters<typeof SystemBuilderScreen>[0]);
+  return nodes(tree as ReactNode);
+}
+
+function setter(slot: SlotName) {
+  return hooks.setters[SLOT[slot]];
+}
+
+function byTestId(tree: TestElement[], testID: string) {
+  return tree.find((element) => element.props.testID === testID);
+}
+
+function saveButton(tree: TestElement[]): TestElement {
+  const found = tree.filter(
+    (element) =>
+      element.type === "Button" && element.props.label === "Save System",
+  );
+  expect(found).toHaveLength(1);
+  return found[0];
+}
+
+/** The children array that holds `target`, flattened. */
+function siblingsOf(tree: TestElement[], target: TestElement): unknown[] {
+  for (const element of tree) {
+    const children = element.props.children;
+    if (Array.isArray(children)) {
+      const flat = children.flat(Number.POSITIVE_INFINITY);
+      if (flat.includes(target)) return flat;
+    }
+  }
+  return [];
+}
+
+function operationErrorCaptions(tree: TestElement[], message: string) {
+  return tree.filter(
+    (element) =>
+      element.type === "AppText" &&
+      element.props.children === message &&
+      (element.props.style as { color?: string } | undefined)?.color ===
+        SCOPED.danger,
+  );
+}
+
+async function flush() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+const NAME_ERROR = "Give this System a name.";
+const SAVE_ERROR = "Couldn't save this System.";
+
+describe("SystemBuilder name error vs operation error (38.9 D-19, K-08)", () => {
+  beforeEach(() => {
+    hooks.runEffects = false;
+    for (const spy of hooks.setters) spy?.mockClear();
+    reveal.mockReset();
+    navigation.goBack.mockReset();
+  });
+  afterEach(() => {
+    hooks.runEffects = false;
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("pins the useState call order the seeding relies on", () => {
+    renderBuilder();
+    expect(hooks.index).toBe(Object.keys(SLOT).length);
+    expect(hooks.initial[SLOT.page]).toBe("definition");
+    expect(hooks.initial[SLOT.previewing]).toBe(false);
+    expect(hooks.initial[SLOT.ready]).toBe(false);
+    expect(hooks.initial[SLOT.saving]).toBe(false);
+    expect(hooks.initial[SLOT.error]).toBeNull();
+    expect(hooks.initial[SLOT.nameError]).toBeNull();
+    expect(hooks.initial[SLOT.nameRevealRequest]).toBe(0);
+    expect(hooks.initial[SLOT.membership]).toMatchObject({ memberIds: [] });
+    expect(hooks.initial[SLOT.draft]).toMatchObject({ name: "" });
+  });
+
+  it("shows the name error under Name and the save failure in the header; typing clears only the name error", () => {
+    const tree = renderBuilder({
+      ready: true,
+      nameError: NAME_ERROR,
+      error: SAVE_ERROR,
+    });
+    const nameInput = byTestId(tree, "system-builder-name") as TestElement;
+    expect(nameInput).toBeDefined();
+    const fieldError = byTestId(
+      tree,
+      "system-builder-name-error",
+    ) as TestElement;
+    expect(fieldError.type).toBe("FieldError");
+    expect(fieldError.props.message).toBe(NAME_ERROR);
+    const siblings = siblingsOf(tree, nameInput);
+    expect(siblings[siblings.indexOf(nameInput) + 1]).toBe(fieldError);
+    // The operation error is never a FieldError; it renders in the header.
+    expect(
+      tree.filter(
+        (element) =>
+          element.type === "FieldError" && element.props.message === SAVE_ERROR,
+      ),
+    ).toHaveLength(0);
+    expect(operationErrorCaptions(tree, SAVE_ERROR)).toHaveLength(1);
+
+    (nameInput.props.onChangeText as (name: string) => void)("F");
+    expect(setter("nameError")).toHaveBeenCalledWith(null);
+    expect(setter("draft")).toHaveBeenCalledTimes(1);
+    expect(setter("error")).not.toHaveBeenCalled();
+  });
+
+  it("keeps the operation error visible on the Members page and in Preview", () => {
+    const members = renderBuilder({
+      ready: true,
+      page: "members",
+      error: SAVE_ERROR,
+    });
+    expect(operationErrorCaptions(members, SAVE_ERROR)).toHaveLength(1);
+    expect(byTestId(members, "system-builder-name")).toBeUndefined();
+
+    const preview = renderBuilder({
+      ready: true,
+      previewing: true,
+      error: SAVE_ERROR,
+    });
+    expect(operationErrorCaptions(preview, SAVE_ERROR)).toHaveLength(1);
+  });
+
+  it("a failed save with a name sets the operation error, not the name error", async () => {
+    saveSystemDefinition.mockRejectedValueOnce(new Error(SAVE_ERROR));
+    const tree = renderBuilder({
+      ready: true,
+      draft: { name: "Friends", rules: emptyRuleDraft(), overrideIntent: [] },
+    });
+    (saveButton(tree).props.onPress as () => void)();
+    await flush();
+    expect(saveSystemDefinition).toHaveBeenCalledTimes(1);
+    expect(setter("error")).toHaveBeenCalledWith(SAVE_ERROR);
+    for (const [value] of setter("nameError").mock.calls) {
+      expect(value).toBeNull();
+    }
+  });
+
+  it("Save System in Preview with an empty name returns to Definition, shows the name error and reveals Name; nothing is saved (D-69, C8-M2)", async () => {
+    const preview = renderBuilder({
+      ready: true,
+      previewing: true,
+      page: "members",
+    });
+    // Preview has no name input to reveal.
+    expect(byTestId(preview, "system-builder-name")).toBeUndefined();
+    (saveButton(preview).props.onPress as () => void)();
+    await flush();
+
+    expect(setter("previewing")).toHaveBeenCalledWith(false);
+    expect(setter("page")).toHaveBeenCalledWith("definition");
+    expect(setter("nameError")).toHaveBeenCalledWith(NAME_ERROR);
+    expect(setter("nameRevealRequest")).toHaveBeenCalledTimes(1);
+    expect(setter("error")).not.toHaveBeenCalledWith(expect.any(String));
+    expect(saveSystemDefinition).not.toHaveBeenCalled();
+    expect(saveMembershipOverrides).not.toHaveBeenCalled();
+    expect(reveal).not.toHaveBeenCalled();
+
+    // The resulting state: Definition, the error set, one reveal requested.
+    vi.useFakeTimers();
+    hooks.runEffects = true;
+    const definition = renderBuilder({
+      ready: true,
+      nameError: NAME_ERROR,
+      nameRevealRequest: 1,
+    });
+    const nameInput = byTestId(
+      definition,
+      "system-builder-name",
+    ) as TestElement;
+    expect(nameInput).toBeDefined();
+    expect(
+      (byTestId(definition, "system-builder-name-error") as TestElement).props
+        .message,
+    ).toBe(NAME_ERROR);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(reveal.mock.calls[0][0]).toBe(nameInput.props.ref);
+    expect(reveal.mock.calls[0][1]).toBe(nameInput.props.ref);
+    expect(saveSystemDefinition).not.toHaveBeenCalled();
+  });
+
+  it("does not run the name reveal while Preview is still showing", () => {
+    vi.useFakeTimers();
+    hooks.runEffects = true;
+    renderBuilder({
+      ready: true,
+      previewing: true,
+      nameError: NAME_ERROR,
+      nameRevealRequest: 1,
+    });
+    expect(reveal).not.toHaveBeenCalled();
   });
 });

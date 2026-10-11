@@ -254,6 +254,12 @@ export const EDIT_SECTION_FIELD_MAP: SectionFieldMap = {
 };
 
 /**
+ * Edit Contact's top-to-bottom reveal order for the inline field errors (38.9
+ * D-19): Save scrolls to and focuses the first of these with an error.
+ */
+export const EDIT_FIELD_REVEAL_ORDER: readonly string[] = ["name", "frequency"];
+
+/**
  * The blocking validation errors for the Edit-Contact form, in reveal order: name
  * first (Identity), then an invalid cadence WHILE Bound (Relationship Basics).
  * Mirrors `canSave`; empty = savable. Yields the per-field detail

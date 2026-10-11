@@ -93,6 +93,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FieldError } from "@/components/ui/FieldError";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
@@ -558,6 +559,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     ids: number[];
   } | null>(null);
   const [frequencyDraft, setFrequencyDraft] = useState("");
+  // The bulk-frequency sheet's validation error renders inline under its
+  // field, inside the sheet (38.9 D-40, D-19; A-13).
+  const [frequencyError, setFrequencyError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectionMode) return;
@@ -1345,6 +1349,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       return;
     }
     setFrequencyDraft("");
+    setFrequencyError(null);
     setFrequencyPicker({ claim, ids });
   }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
@@ -2184,7 +2189,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           accessibilityLabel="Frequency in days"
           keyboardType="number-pad"
           value={frequencyDraft}
-          onChangeText={setFrequencyDraft}
+          onChangeText={(next) => {
+            setFrequencyDraft(next);
+            setFrequencyError(null);
+          }}
           placeholder="Days"
           placeholderTextColor={colors.textPlaceholder}
           style={[
@@ -2196,6 +2204,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             },
           ]}
         />
+        <FieldError testID="bulk-frequency-error" message={frequencyError} />
         <Pressable
           testID="bulk-frequency-continue"
           accessibilityRole="button"
@@ -2203,23 +2212,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           onPress={() => {
             const intervalDays = Number(frequencyDraft);
             const picker = frequencyPicker;
-            if (
-              !picker ||
-              !Number.isInteger(intervalDays) ||
-              intervalDays <= 0
-            ) {
+            if (!picker) return;
+            if (!Number.isInteger(intervalDays) || intervalDays <= 0) {
               AccessibilityInfo.announceForAccessibility(
                 "Frequency must be a positive whole number",
               );
-              showSnackbar({
-                kind: "error",
-                label: "Frequency must be a positive whole number.",
-                action: {
-                  label: "Dismiss",
-                  accessibilityLabel: "Dismiss notification",
-                  onPress: dismissSnackbar,
-                },
-              });
+              setFrequencyError("Frequency must be a positive whole number.");
               return;
             }
             setFrequencyPicker(null);

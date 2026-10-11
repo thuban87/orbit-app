@@ -30,8 +30,10 @@ import {
 } from "@/components/orrery/system-preview-logic";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { FieldError } from "@/components/ui/FieldError";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import type { OrrerySystemId } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -236,7 +238,17 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const [previewFocusedId, setPreviewFocusedId] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Load, save and reset failures (the operation error). Rendered in the
+  // header area, never under the name input, and not cleared by typing (38.9
+  // D-19, D-27; cycle-5 C5-M4).
   const [error, setError] = useState<string | null>(null);
+  // The name validation error, rendered under Name and cleared when the name
+  // changes (38.9 D-19; K-08).
+  const [nameError, setNameError] = useState<string | null>(null);
+  // Bumped by an invalid-name Save; consumed once the Definition page, with
+  // the name input and the ScrollView refs, is rendered (D-19, D-69; review
+  // C8-M2). Preview has no name input, so the reveal cannot run from there.
+  const [nameRevealRequest, setNameRevealRequest] = useState(0);
   const [categories, setCategories] = useState<
     Array<{ uid: string; name: string }>
   >([]);
@@ -268,6 +280,9 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   });
   const initialDraft = useRef<SystemBuilderDraft>(draft);
   const bypassRef = useRef(false);
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
+  const nameInputRef = useRef<TextInput>(null);
+  const consumedNameRevealRef = useRef(0);
   const currentOverrides = useMemo(
     () => applyIntents(baseOverrides, overrideIntent),
     [baseOverrides, overrideIntent],
@@ -359,6 +374,13 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   }, []);
 
   useEffect(() => {
+    if (nameRevealRequest === consumedNameRevealRef.current) return;
+    if (!ready || previewing || page !== "definition") return;
+    consumedNameRevealRef.current = nameRevealRequest;
+    reveal(nameInputRef, nameInputRef);
+  }, [nameRevealRequest, page, previewing, ready, reveal]);
+
+  useEffect(() => {
     if (!ready) return;
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -432,9 +454,16 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const save = async () => {
     setError(null);
     if (!overrideOnly && !draft.name.trim()) {
-      setError("Give this System a name.");
+      // Wherever Save was pressed (Definition or Preview), go to the
+      // Definition page, show the error under Name and reveal it there
+      // (D-19, D-69). Nothing is saved.
+      setNameError("Give this System a name.");
+      setPreviewing(false);
+      setPage("definition");
+      setNameRevealRequest((current) => current + 1);
       return;
     }
+    setNameError(null);
     setSaving(true);
     try {
       if (overrideOnly && systemRef) {
@@ -523,6 +552,14 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                 {previewing ? (
                   <View style={styles.previewContent}>
                     <AppText role="heading">Preview</AppText>
+                    {error ? (
+                      <AppText
+                        accessibilityLiveRegion="polite"
+                        style={{ color: scoped.danger }}
+                      >
+                        {error}
+                      </AppText>
+                    ) : null}
                     <AppText role="label" accessibilityLiveRegion="polite">
                       {previewMembershipSummary(
                         membership.memberIds.map((id) => ({ id })),
@@ -600,6 +637,8 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                   </View>
                 ) : (
                   <ScrollView
+                    ref={scrollRef}
+                    innerViewRef={contentRef}
                     contentContainerStyle={styles.content}
                     keyboardShouldPersistTaps="handled"
                   >
@@ -658,14 +697,17 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                     ) : (
                       <>
                         <TextInput
+                          ref={nameInputRef}
+                          testID="system-builder-name"
                           accessibilityLabel="System name"
                           editable={!overrideOnly}
                           placeholder="Name this System"
                           placeholderTextColor={colors.textPlaceholder}
                           value={draft.name}
-                          onChangeText={(name) =>
-                            setDraft((current) => ({ ...current, name }))
-                          }
+                          onChangeText={(name) => {
+                            setDraft((current) => ({ ...current, name }));
+                            setNameError(null);
+                          }}
                           style={[
                             styles.name,
                             {
@@ -674,6 +716,10 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                               backgroundColor: colors.surface,
                             },
                           ]}
+                        />
+                        <FieldError
+                          testID="system-builder-name-error"
+                          message={nameError}
                         />
                         {!overrideOnly ? (
                           <SystemRuleAccordion

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import {
+  firstBlockingField,
+  toFieldErrors,
+} from "@/components/ui/field-error-logic";
 import type { ContactEditRow, ContactForEdit } from "@/db/contact-read";
 import {
   type BuildEditInputDeps,
@@ -7,6 +11,7 @@ import {
   buildEditInput,
   canSave,
   collectEditBlockingErrors,
+  EDIT_FIELD_REVEAL_ORDER,
   EDIT_SECTION_FIELD_MAP,
   type EditFormState,
   type FuelDraftRow,
@@ -477,5 +482,35 @@ describe("resolveErrorSection + collectEditBlockingErrors (reveal-and-focus)", (
     const errors = collectEditBlockingErrors(state());
     expect(errors).toEqual([]);
     expect(resolveErrorSection(errors, EDIT_SECTION_FIELD_MAP)).toBeNull();
+  });
+});
+
+describe("Edit Contact inline name error (38.9 D-19, E-02)", () => {
+  it("an empty name yields the rendered message and is revealed first", () => {
+    const errors = toFieldErrors(
+      collectEditBlockingErrors(
+        state({ name: "", trackingEnabled: true, intervalValid: false }),
+      ),
+    );
+    expect(errors.name).toBe("Enter a name to save.");
+    expect(firstBlockingField(EDIT_FIELD_REVEAL_ORDER, errors)).toBe("name");
+  });
+
+  it("with a name, the invalid cadence is the first blocking field", () => {
+    const errors = toFieldErrors(
+      collectEditBlockingErrors(
+        state({ name: "OK", trackingEnabled: true, intervalValid: false }),
+      ),
+    );
+    expect(errors.name).toBeUndefined();
+    expect(firstBlockingField(EDIT_FIELD_REVEAL_ORDER, errors)).toBe(
+      "frequency",
+    );
+  });
+
+  it("every field in the reveal order maps to a section", () => {
+    for (const field of EDIT_FIELD_REVEAL_ORDER) {
+      expect(EDIT_SECTION_FIELD_MAP[field]).toBeDefined();
+    }
   });
 });

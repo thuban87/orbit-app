@@ -14,6 +14,8 @@ import {
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
 import { AppText, Button } from "@/components/ui";
+import { FieldError } from "@/components/ui/FieldError";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { getExecutor, localDateTime } from "@/db/database";
 import { createGroupEvent } from "@/db/group-events-dao";
 import { newUid } from "@/db/uid";
@@ -55,7 +57,15 @@ export function GroupLogScreen({
   );
   const [pickerVisible, setPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The operation (save) failure; rendered above Log group, never under a
+  // field, and not cleared by typing (38.9 D-19, D-27; cycle-5 C5-M4).
   const [error, setError] = useState<string | null>(null);
+  // The title validation error, rendered under the Title field and cleared
+  // when the title changes (38.9 D-19; F-12).
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
+  const titleFieldRef = useRef<View>(null);
+  const titleInputRef = useRef<TextInput>(null);
   const seedRef = useRef(
     JSON.stringify({
       title: "",
@@ -77,10 +87,14 @@ export function GroupLogScreen({
   async function save() {
     if (saving) return;
     if (title.trim().length === 0) {
-      setError("A group event needs a title.");
+      // Save stays pressable (CAPT-14): the error shows under Title, which is
+      // scrolled into view and focused once the error has laid out (D-19).
+      setTitleError("A group event needs a title.");
+      reveal(titleFieldRef, titleInputRef);
       return;
     }
     setSaving(true);
+    setTitleError(null);
     setError(null);
     try {
       const now = localDateTime();
@@ -106,7 +120,11 @@ export function GroupLogScreen({
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.header}>
           <Button
             role="secondary"
@@ -115,14 +133,23 @@ export function GroupLogScreen({
           />
           <AppText role="heading">Group Log</AppText>
         </View>
-        <View style={styles.field}>
+        <View
+          ref={titleFieldRef}
+          testID="group-log-title-field"
+          style={styles.field}
+        >
           <AppText role="label" style={{ color: colors.textSecondary }}>
             Title
           </AppText>
           <TextInput
+            ref={titleInputRef}
+            testID="group-log-title"
             accessibilityLabel="Group event title"
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(next) => {
+              setTitle(next);
+              setTitleError(null);
+            }}
             placeholder="What happened?"
             placeholderTextColor={colors.textPlaceholder}
             style={[
@@ -134,6 +161,7 @@ export function GroupLogScreen({
               },
             ]}
           />
+          <FieldError testID="group-log-title-error" message={titleError} />
         </View>
         <TouchpointRefineForm
           testID="group-log-form"
@@ -191,6 +219,7 @@ export function GroupLogScreen({
           </AppText>
         ) : null}
         <Pressable
+          testID="group-log-save"
           accessibilityRole="button"
           accessibilityLabel="Log group"
           accessibilityState={{ disabled: saving }}

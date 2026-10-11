@@ -49,7 +49,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -93,7 +92,14 @@ import {
 } from "@/components/RelationshipEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
-import { AccordionSection, AppText } from "@/components/ui";
+import { AccordionSection, AppText, FieldError } from "@/components/ui";
+import {
+  clearFieldError,
+  type FieldErrors,
+  firstBlockingField,
+  toFieldErrors,
+} from "@/components/ui/field-error-logic";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { getAppSettings } from "@/db/app-settings-dao";
 import {
   applyLinkDiff,
@@ -150,6 +156,7 @@ import {
   type CurrentStateSeed,
   canSave,
   collectEditBlockingErrors,
+  EDIT_FIELD_REVEAL_ORDER,
   EDIT_SECTION_FIELD_MAP,
   type EditFormState,
   type FuelDraftRow,
@@ -481,10 +488,18 @@ export function EditContactScreen({
     setExpandedSections((prev) => ({ ...prev, [sectionId]: next }));
   }, []);
 
-  // Reveal-and-focus targets (CAPT-14): the scroll container + each section's root
-  // View, so a blocked Save can expand the erroring section and scroll it (its
-  // first invalid field) into view via the AccordionSection interface.
-  const scrollRef = useRef<ScrollView>(null);
+  // Inline field errors (38.9 D-19, E-02): the message renders under its
+  // field and clears when that field changes; Save stays pressable.
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const clearError = useCallback((field: string) => {
+    setFieldErrors((current) => clearFieldError(current, field));
+  }, []);
+
+  // Reveal-and-focus targets (CAPT-14, D-19): the ScrollView + its inner
+  // content view (the measure reference, E-X01), each section's root View, and
+  // the Name field, so a blocked Save can expand the erroring section, scroll
+  // its first invalid field into view and focus it.
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
   const sectionRefs = useRef<Record<string, View | null>>({});
   const registerSectionRef = useCallback(
     (sectionId: string) => (node: View | null) => {
@@ -492,27 +507,28 @@ export function EditContactScreen({
     },
     [],
   );
+  const nameFieldRef = useRef<View>(null);
+  const nameInputRef = useRef<TextInput>(null);
   const revealAndFocus = useCallback(
-    (sectionId: string) => {
+    (field: string, sectionId: string) => {
       setSectionExpanded(sectionId, true);
-      // Scroll after the expand re-render so the section's laid-out position is
-      // final. Best-effort: the expand is the load-bearing reveal; a measure
-      // failure leaves the section open, just not auto-scrolled.
-      requestAnimationFrame(() => {
-        const node = sectionRefs.current[sectionId];
-        const scroll = scrollRef.current;
-        const scrollHandle = scroll ? findNodeHandle(scroll) : null;
-        if (node && scroll && scrollHandle != null) {
-          node.measureLayout(
-            scrollHandle,
-            (_x, y) =>
-              scroll.scrollTo({ y: Math.max(0, y - 16), animated: true }),
-            () => {},
-          );
-        }
-      });
+      // The reveal runs a frame later, after the expand and the error text
+      // have laid out. Best-effort: the expand is the load-bearing reveal; a
+      // measure failure leaves the section open, just not auto-scrolled.
+      const isName = field === "name";
+      reveal(
+        {
+          get current() {
+            return (
+              (isName ? nameFieldRef.current : null) ??
+              sectionRefs.current[sectionId]
+            );
+          },
+        },
+        isName ? nameInputRef : null,
+      );
     },
-    [setSectionExpanded],
+    [reveal, setSectionExpanded],
   );
 
   // Read every knowledge subdomain seed for the contact (§E). `getContactForEdit`
@@ -708,8 +724,11 @@ export function EditContactScreen({
     [],
   );
   const setIntervalValid = useCallback(
-    (valid: boolean) => setField("intervalValid", valid),
-    [setField],
+    (valid: boolean) => {
+      setField("intervalValid", valid);
+      if (valid) clearError("frequency");
+    },
+    [setField, clearError],
   );
 
   // Links draft mutators — all local state; nothing persists until Save.
@@ -939,9 +958,16 @@ export function EditContactScreen({
   async function handleSave() {
     if (!form || saving || stale) return;
     const blocking = collectEditBlockingErrors(form);
+    const errors = toFieldErrors(blocking);
+    setFieldErrors(errors);
     if (blocking.length > 0) {
-      const sectionId = resolveErrorSection(blocking, EDIT_SECTION_FIELD_MAP);
-      if (sectionId) revealAndFocus(sectionId);
+      const field =
+        firstBlockingField(EDIT_FIELD_REVEAL_ORDER, errors) ??
+        blocking[0].field;
+      const sectionId =
+        EDIT_SECTION_FIELD_MAP[field] ??
+        resolveErrorSection(blocking, EDIT_SECTION_FIELD_MAP);
+      if (sectionId) revealAndFocus(field, sectionId);
       return;
     }
     setSaving(true);
@@ -1185,6 +1211,7 @@ export function EditContactScreen({
   return (
     <ScrollView
       ref={scrollRef}
+      innerViewRef={contentRef}
       testID="edit-contact-screen"
       contentContainerStyle={styles.content}
     >
@@ -1229,18 +1256,26 @@ export function EditContactScreen({
           />
         </View>
 
-        <View style={styles.field}>
+        <View ref={nameFieldRef} style={styles.field}>
           <AppText role="label" style={{ color: colors.textSecondary }}>
             Name
           </AppText>
           <TextInput
+            ref={nameInputRef}
             testID="edit-contact-name"
             accessibilityLabel="Name"
             value={form.name}
-            onChangeText={(v) => setField("name", v)}
+            onChangeText={(v) => {
+              setField("name", v);
+              clearError("name");
+            }}
             placeholder="Their name"
             placeholderTextColor={colors.textPlaceholder}
             style={inputStyle}
+          />
+          <FieldError
+            testID="edit-contact-name-error"
+            message={fieldErrors.name}
           />
         </View>
 
