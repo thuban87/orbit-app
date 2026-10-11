@@ -5,14 +5,17 @@ import { MergeImpactSummary } from "@/components/MergeImpactSummary";
 import { ComposeResearchRoute } from "@/screens/ComposeResearchScreen";
 import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
+import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
+import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
+import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
@@ -21,6 +24,7 @@ import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
+import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import { useOrrerySessionStore } from "@/stores/orrery-session-store";
 import type { OrreryStackParamList } from "../types";
 
@@ -58,6 +62,11 @@ export function OrreryStack() {
       {/* Detailed-log route (HIST-15): an Orrery-originated empty-date "Log
           interaction" must resolve here, not throw on an unregistered route. */}
       <Stack.Screen name="LogContact" component={LogInteractionScreen} />
+      {/* The universal + forms open over this tab (D-38, FAB_ROUTES). */}
+      <Stack.Screen name="Create" component={CreateContactScreen} />
+      <Stack.Screen name="GroupLog" component={GroupLogScreen} />
+      <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
+      <Stack.Screen name="Memory" component={MemoryScreen} />
       <Stack.Screen
         name="ThingsToRemember"
         component={ThingsToRememberScreen}

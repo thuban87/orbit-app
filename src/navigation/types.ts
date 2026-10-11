@@ -164,6 +164,14 @@ export type OrreryStackParamList = {
    * must resolve rather than throw on an unregistered route name.
    */
   LogContact: { contactId?: number; prefillDate?: string } | undefined;
+  /**
+   * The universal + forms (D-38): registered in every tab stack so the + opens
+   * them over the current tab (`FAB_ROUTES`, shell-contract.ts).
+   */
+  Create: undefined;
+  GroupLog: { participantIds?: number[] } | undefined;
+  UpdateContact: { contactId?: number } | undefined;
+  Memory: { contactId?: number } | undefined;
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
@@ -239,6 +247,14 @@ export type DigestStackParamList = {
   Compose: { contactId: number; origin?: ComposeOrigin };
   ComposeResearch: { contactId: number };
   LogContact: { contactId?: number; prefillDate?: string } | undefined;
+  /**
+   * The universal + forms (D-38): registered in every tab stack so the + opens
+   * them over the current tab (`FAB_ROUTES`, shell-contract.ts).
+   */
+  Create: undefined;
+  GroupLog: { participantIds?: number[] } | undefined;
+  UpdateContact: { contactId?: number } | undefined;
+  Memory: { contactId?: number } | undefined;
   Edit: { contactId: number };
   EditInteraction: { contactId: number; interactionId: number };
   ThingsToRemember: { contactId: number };
@@ -273,6 +289,14 @@ export type EventsStackParamList = {
   Compose: { contactId: number; origin?: ComposeOrigin };
   ComposeResearch: { contactId: number };
   LogContact: { contactId?: number; prefillDate?: string } | undefined;
+  /**
+   * The universal + forms (D-38): registered in every tab stack so the + opens
+   * them over the current tab (`FAB_ROUTES`, shell-contract.ts).
+   */
+  Create: undefined;
+  GroupLog: { participantIds?: number[] } | undefined;
+  UpdateContact: { contactId?: number } | undefined;
+  Memory: { contactId?: number } | undefined;
   Edit: { contactId: number };
   EditInteraction: { contactId: number; interactionId: number };
   ThingsToRemember: { contactId: number };
@@ -364,6 +388,14 @@ export type SettingsStackParamList = {
    * interaction" must resolve rather than throw on an unregistered route name.
    */
   LogContact: { contactId?: number; prefillDate?: string } | undefined;
+  /**
+   * The universal + forms (D-38): registered in every tab stack so the + opens
+   * them over the current tab (`FAB_ROUTES`, shell-contract.ts).
+   */
+  Create: undefined;
+  GroupLog: { participantIds?: number[] } | undefined;
+  UpdateContact: { contactId?: number } | undefined;
+  Memory: { contactId?: number } | undefined;
   /**
    * Knowledge-change edit routes. The History section's `onOpenKnowledgeChange`
    * reuses ContactProfileScreen's existing knowledge nav to `ThingsToRemember`

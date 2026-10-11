@@ -3,6 +3,7 @@
  * Shell-level navigation always targets a tab plus its nested screen: a bare
  * screen name cannot be resolved reliably from the navigation container.
  */
+import type { TabParamList } from "@/navigation/types";
 import type { ThemePalette } from "@/theme/theme-types";
 
 /**
@@ -127,9 +128,12 @@ export function dialFocusCycle(
   };
 }
 
+/** The tab a + form opens over (D-38): the tab the user is on. */
+export type FabTab = keyof TabParamList;
+
 export type FabNavigateIntent = {
   kind: "navigate";
-  tab: "DashboardTab";
+  tab: FabTab;
   screen: "Create" | "GroupLog" | "LogContact" | "UpdateContact" | "Memory";
   params?: { contactId: number };
 };
@@ -151,6 +155,8 @@ export type FabTargetIntent =
 
 export interface FabContext {
   originContactId: number | null;
+  /** The focused tab; + forms open over it (D-38). */
+  tab: FabTab;
 }
 
 export interface QuickLogUndoRequest {
@@ -183,16 +189,18 @@ export function createQuickLogUndoController(
 /** Maps a fixed FAB action to an internal, serializable shell intent. */
 export function resolveFabTarget(
   actionId: UniversalFabActionId,
-  { originContactId }: FabContext,
+  { originContactId, tab }: FabContext,
 ): FabTargetIntent {
+  // D-38: every navigate intent opens over the current tab; completion
+  // destinations stay with the screens (D-08).
   switch (actionId) {
     case "AddContact":
-      return { kind: "navigate", tab: "DashboardTab", screen: "Create" };
+      return { kind: "navigate", tab, screen: "Create" };
     case "QuickLog":
       return { kind: "quick-log", contactId: originContactId };
     case "GroupLog":
       // Group Log owns its own participant workflow; it never preselects here.
-      return { kind: "navigate", tab: "DashboardTab", screen: "GroupLog" };
+      return { kind: "navigate", tab, screen: "GroupLog" };
     case "LogContact":
     case "UpdateContact":
     case "Memory":
@@ -200,7 +208,7 @@ export function resolveFabTarget(
         ? { kind: "pick-then", screen: actionId }
         : {
             kind: "navigate",
-            tab: "DashboardTab",
+            tab,
             screen: actionId,
             params: { contactId: originContactId },
           };
@@ -216,8 +224,24 @@ export interface NavigationStateNode {
   }>;
 }
 
-export interface FocusedContactContext {
-  originContactId: number | null;
+export type FocusedContactContext = FabContext;
+
+/**
+ * Where the + opens when no known tab is focused (state not ready or
+ * malformed): the Contacts tab, today's destination (this plan only).
+ */
+const NO_KNOWN_TAB: FabTab = "DashboardTab";
+
+const KNOWN_TABS: readonly FabTab[] = [
+  "DashboardTab",
+  "EventsTab",
+  "DigestTab",
+  "OrreryTab",
+  "SettingsTab",
+];
+
+function isKnownTab(name: string): name is FabTab {
+  return (KNOWN_TABS as readonly string[]).includes(name);
 }
 
 function focusedRoute(state: unknown) {
@@ -235,7 +259,8 @@ function focusedRoute(state: unknown) {
 }
 
 /**
- * Returns profile context from any focused relationship-browsing tab stack,
+ * Returns the focused tab (D-38: the + opens its forms over it) and the
+ * profile context from any focused relationship-browsing tab stack,
  * including the Settings-hosted Profile (Settings → Archived → Profile — RG-021,
  * react-native/AUD-RN-004). A tab root or a non-Profile child yields no contact.
  * Navigation state may be incomplete before the container is ready, so malformed
@@ -245,18 +270,10 @@ export function getFocusedContactContext(
   navigationState: NavigationStateNode | undefined,
 ): FocusedContactContext {
   const tabRoute = focusedRoute(navigationState);
-  if (
-    !tabRoute ||
-    ![
-      "DashboardTab",
-      "EventsTab",
-      "DigestTab",
-      "OrreryTab",
-      "SettingsTab",
-    ].includes(tabRoute.name)
-  ) {
-    return { originContactId: null };
+  if (!tabRoute || !isKnownTab(tabRoute.name)) {
+    return { originContactId: null, tab: NO_KNOWN_TAB };
   }
+  const tab = tabRoute.name;
 
   const profileRoute = focusedRoute(tabRoute.state);
   const params = profileRoute?.params;
@@ -266,8 +283,8 @@ export function getFocusedContactContext(
       : undefined;
 
   return profileRoute?.name === "Profile" && typeof contactId === "number"
-    ? { originContactId: contactId }
-    : { originContactId: null };
+    ? { originContactId: contactId, tab }
+    : { originContactId: null, tab };
 }
 
 /** The focused contact's lifecycle as the FAB needs it; `null` when gone. */
@@ -281,7 +298,9 @@ export type FabContactState = { archived: boolean } | null;
  * contacts. A contact that no longer exists, or whose lifecycle read fails,
  * is dropped the same way (fail safe: never preselect a contact whose state is
  * unknown). A live contact's context — including the non-archived Settings-
- * hosted Profile from 38.3-10 — is unchanged.
+ * hosted Profile from 38.3-10 — is unchanged. Both fallbacks keep the focused
+ * `tab`, so + from an archived Settings-hosted Profile still opens over
+ * Settings (D-38; review C10-L2).
  */
 export async function resolveFabContactContext(
   context: FabContext,
@@ -292,8 +311,8 @@ export async function resolveFabContactContext(
     const state = await readContactState(context.originContactId);
     return state !== null && !state.archived
       ? context
-      : { originContactId: null };
+      : { ...context, originContactId: null };
   } catch {
-    return { originContactId: null };
+    return { ...context, originContactId: null };
   }
 }

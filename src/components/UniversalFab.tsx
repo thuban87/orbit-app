@@ -35,6 +35,7 @@ import {
   FAB_BORDER_WIDTH,
   FAB_DIAL_TRANSIENT_ID,
   type FabContext,
+  type FabTab,
   getFocusedContactContext,
   resolveFabContactContext,
   resolveFabTarget,
@@ -79,7 +80,12 @@ const ACTION_ACCESSIBILITY_LABELS: Record<
 
 type PickerFlow =
   | { kind: "quick-log" }
-  | { kind: "navigate"; screen: "LogContact" | "UpdateContact" | "Memory" };
+  | {
+      kind: "navigate";
+      screen: "LogContact" | "UpdateContact" | "Memory";
+      /** The tab the + was opened on; the form opens over it (D-38). */
+      tab: FabTab;
+    };
 
 type DialRowInstance = ComponentRef<typeof AnimatedPressable>;
 
@@ -308,7 +314,7 @@ export function UniversalFab() {
         logContact(contactId);
         return;
       }
-      navigateIntoTab(navigationRef.current, "DashboardTab", flow.screen, {
+      navigateIntoTab(navigationRef.current, flow.tab, flow.screen, {
         contactId,
       });
     },
@@ -357,7 +363,11 @@ export function UniversalFab() {
           logContact(intent.contactId);
         }
       } else {
-        setPickerFlow({ kind: "navigate", screen: intent.screen });
+        setPickerFlow({
+          kind: "navigate",
+          screen: intent.screen,
+          tab: context.tab,
+        });
       }
     },
     [closeDial, logContact],

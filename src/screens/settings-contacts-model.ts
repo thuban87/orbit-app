@@ -1,3 +1,4 @@
+import type { FAB_ROUTES } from "@/navigation/shell-contract";
 import type { SettingsStackParamList } from "@/navigation/types";
 
 /**
@@ -32,12 +33,21 @@ export type SettingsContactsAction =
  * navigates to param-less managers (CustomFields, Archived, BulkReview) and holds
  * the param-less `CategoryManagement` reservation, so constraining to this subset
  * lets `navigation.navigate(row.route)` type-check without a per-row param.
+ *
+ * The universal + forms (`FAB_ROUTES`, D-38) are excluded: they are registered
+ * in every stack but only the + opens them, never a Contacts row. Excluding
+ * them also keeps this union small enough for TypeScript to match it against
+ * `navigate`'s per-route overloads (it stops decomposing unions past 25
+ * members).
  */
-type SettingsStackRoute = {
-  [K in keyof SettingsStackParamList]: undefined extends SettingsStackParamList[K]
-    ? K
-    : never;
-}[keyof SettingsStackParamList];
+type SettingsStackRoute = Exclude<
+  {
+    [K in keyof SettingsStackParamList]: undefined extends SettingsStackParamList[K]
+      ? K
+      : never;
+  }[keyof SettingsStackParamList],
+  (typeof FAB_ROUTES)[number]
+>;
 
 /**
  * A row that navigates to a registered Settings-stack route (a canonical manager

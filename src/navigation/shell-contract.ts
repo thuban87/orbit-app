@@ -18,6 +18,10 @@ export const DIGEST_STACK_ROUTES = [
   "Compose",
   "ComposeResearch",
   "LogContact",
+  "Create",
+  "GroupLog",
+  "UpdateContact",
+  "Memory",
   "Edit",
   "EditInteraction",
   "ThingsToRemember",
@@ -39,6 +43,10 @@ export const EVENTS_STACK_ROUTES = [
   "Compose",
   "ComposeResearch",
   "LogContact",
+  "Create",
+  "GroupLog",
+  "UpdateContact",
+  "Memory",
   "Edit",
   "EditInteraction",
   "ThingsToRemember",
@@ -87,4 +95,20 @@ export const PROFILE_REACHABLE_ROUTES = [
 export const SETTINGS_HOST_EXCLUDED_PROFILE_ROUTES = [
   "Compose",
   "ComposeResearch",
+] as const;
+
+/**
+ * The routes the universal + opens (D-38, owner 2026-10-10): + forms open over
+ * the tab the user is on, so every tab stack registers all of them (the ADR-166
+ * per-stack registration pattern, as with PROFILE_REACHABLE_ROUTES). Back
+ * before saving returns to that tab's screen; completion destinations are
+ * unchanged (D-08). `shell-contract.test.ts` asserts every stack registers each
+ * entry and that this list covers every + navigate target at the type level.
+ */
+export const FAB_ROUTES = [
+  "Create",
+  "GroupLog",
+  "LogContact",
+  "UpdateContact",
+  "Memory",
 ] as const;

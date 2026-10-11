@@ -90,7 +90,7 @@ import {
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
-import type { DashboardScreenProps } from "@/navigation/types";
+import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -949,7 +949,7 @@ function GenericCustomFieldsFocusedEditor({
 export function UpdateContactScreen({
   navigation,
   route,
-}: DashboardScreenProps<"UpdateContact">) {
+}: RootStackScreenProps<"UpdateContact">) {
   const { colors } = useTheme();
   const [session, setSession] = useState(() =>
     startSession(route.params?.contactId ?? null),

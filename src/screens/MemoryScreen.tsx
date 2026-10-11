@@ -56,7 +56,7 @@ import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
-import type { DashboardScreenProps } from "@/navigation/types";
+import type { RootStackScreenProps } from "@/navigation/types";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -69,7 +69,7 @@ const LOG_SCOPE = "memory-screen";
 export function MemoryScreen({
   navigation,
   route,
-}: DashboardScreenProps<"Memory">) {
+}: RootStackScreenProps<"Memory">) {
   const { colors } = useTheme();
   const contactId = route.params?.contactId ?? null;
   const [memoriesPhase, setMemoriesPhase] =

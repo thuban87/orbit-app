@@ -12,6 +12,7 @@ import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
 import { BulkReviewScreen } from "@/screens/BulkReviewScreen";
 import { CategoryManagementScreen } from "@/screens/CategoryManagementScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
+import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { DuplicateReviewScreen } from "@/screens/DuplicateReviewScreen";
@@ -20,12 +21,14 @@ import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
+import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
 import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
 import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
+import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
@@ -46,6 +49,7 @@ import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
+import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import type {
   RootStackScreenProps,
   SettingsScreenProps,
@@ -240,6 +244,11 @@ export function SettingsStack() {
       {/* Detailed-log route (HIST-15): a Settings-originated (Archived -> Profile)
           empty-date "Log interaction" must resolve here. */}
       <Stack.Screen name="LogContact" component={LogInteractionScreen} />
+      {/* The universal + forms open over this tab (D-38, FAB_ROUTES). */}
+      <Stack.Screen name="Create" component={CreateContactScreen} />
+      <Stack.Screen name="GroupLog" component={GroupLogScreen} />
+      <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
+      <Stack.Screen name="Memory" component={MemoryScreen} />
       {/* Knowledge-change edit routes (review cycle-2 HIGH): the History
           detail-sheet's knowledge-change edit reuses ContactProfileScreen's nav
           to ThingsToRemember; register both here (parallel to Dashboard/Orrery)
