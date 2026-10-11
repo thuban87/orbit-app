@@ -62,6 +62,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import {
   applyStyleLoad,
   applyStyleSave,
@@ -179,6 +180,12 @@ export function AIPersonalizationScreen({
   const [recomputing, setRecomputing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [savingStyle, setSavingStyle] = useState(false);
+  // A section add or edit is saving (the header's disabled Back; WR-02).
+  const [savingSection, setSavingSection] = useState(false);
+  // Synchronous in-flight flag shared by the three saves the guard covers
+  // (Writing Style, new section, section edit): the guard reads it to hold
+  // Back while one runs (fix-pass WR-02); one save at a time.
+  const savingRef = useRef(false);
   const [adding, setAdding] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
@@ -300,7 +307,7 @@ export function AIPersonalizationScreen({
         : null;
 
   async function saveStyle() {
-    if (savingStyle) return;
+    if (!beginInFlight(savingRef)) return;
     setSavingStyle(true);
     const submitted = style;
     try {
@@ -321,6 +328,7 @@ export function AIPersonalizationScreen({
       setMessage("Couldn't save Writing Style. Please try again.");
     } finally {
       setSavingStyle(false);
+      endInFlight(savingRef);
     }
   }
 
@@ -344,10 +352,15 @@ export function AIPersonalizationScreen({
         editDirty: sectionEditDirty,
       }),
     bypassRef,
+    // A Writing Style or section save in flight holds every exit, with no
+    // prompt (fix-pass WR-02).
+    busyRef: savingRef,
   });
 
   async function addSection() {
     if (!draftTitle.trim()) return;
+    if (!beginInFlight(savingRef)) return;
+    setSavingSection(true);
     try {
       await createPersonalizationSection(getExecutor(), {
         title: draftTitle,
@@ -361,6 +374,9 @@ export function AIPersonalizationScreen({
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to add personalization section", caught);
       setMessage("Couldn't add that section. Please try again.");
+    } finally {
+      setSavingSection(false);
+      endInFlight(savingRef);
     }
   }
 
@@ -397,6 +413,8 @@ export function AIPersonalizationScreen({
   }
 
   async function saveEditedSection(section: PersonalizationSection) {
+    if (!beginInFlight(savingRef)) return;
+    setSavingSection(true);
     try {
       await updatePersonalizationSection(getExecutor(), {
         uid: section.uid,
@@ -409,6 +427,9 @@ export function AIPersonalizationScreen({
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to edit personalization section", caught);
       setMessage("Couldn't save that section. Please try again.");
+    } finally {
+      setSavingSection(false);
+      endInFlight(savingRef);
     }
   }
 
@@ -478,7 +499,12 @@ export function AIPersonalizationScreen({
 
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="AI Personalization" />
+      {/* While a save runs the guard holds Back (D-26; WR-02). */}
+      <ShellAppBar
+        variant="child"
+        title="AI Personalization"
+        backDisabled={savingStyle || savingSection}
+      />
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[
