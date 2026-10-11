@@ -32,9 +32,11 @@
  *     optional note can editFuel the exact row(s) by id + contactId — there is NO
  *     uid-based fuel lookup (A1/A2). The note recompose applies to ALL N rows
  *     ATOMICALLY via the `captureMultiNote` DAO (never an inline transaction, B1).
- *   - A focused `useFocusEffect` hardware-Back handler owns Back (A6/C1): Back EXITS
- *     multi-select whenever the mode is active (any count) WITHOUT writing, else
- *     cancels via the shared `cancelCapture()`. The Close pill ALWAYS calls
+ *   - A focused `useFocusEffect` hardware-Back handler owns Back (A6/C1; 38.9
+ *     D-33 via `resolveCaptureBack`): Back first closes the open New-contact
+ *     surface, then an open search, then EXITS multi-select (any count) WITHOUT
+ *     writing, else cancels via the shared `cancelCapture()`. A typed name or
+ *     note shows the "Discard changes?" prompt first (D-13/D-14). The Close pill ALWAYS calls
  *     `cancelCapture()` (resetShareIntent → finishActivity); it never merely exits
  *     the mode.
  *   - Confirmation ("Saved to …") + auto-return use setState + a `useRef`
@@ -70,7 +72,9 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { addFuel, editFuel, type NewFuelItem } from "@/db/fuel-dao";
 import { newUid } from "@/db/uid";
 import { resolveCapturePayload } from "@/logic/capture-logic";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { resolveCaptureBack } from "@/screens/capture-back-logic";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -206,23 +210,77 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     }, []),
   );
 
+  // Close the inline New-contact surface and drop its typed name.
+  const closeInlineCreate = useCallback(() => {
+    setInlineOpen(false);
+    setInlineName("");
+  }, []);
+
+  // Close the revealed search and restore the full grid.
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchText("");
+  }, []);
+
   // Focused hardware/system-Back handler (A6/C1, mirrors the ComposeScreen idiom —
   // useFocusEffect + BackHandler, return true to consume so native-stack does not
-  // pop/finish). SPLIT by semantics: Back EXITS multi-select whenever the mode is
-  // active (any selection count, even zero) WITHOUT writing; otherwise it cancels
-  // capture. The Close pill is Back-independent and ALWAYS cancels.
+  // pop/finish). 38.9 D-33: Back first closes the innermost open surface
+  // (New-contact, then search, then multi-select WITHOUT writing), and a typed
+  // name or note shows the shared "Discard changes?" prompt (D-13, D-14) instead
+  // of being dropped. Discarding a note cancels as before: the rows are already
+  // written, only the note is lost. A second Back while the prompt is pending gets
+  // false from the single-flight confirmDiscard() and is consumed with no second
+  // prompt (review C2-L3). The Close pill is Back-independent and ALWAYS cancels.
   useFocusEffect(
     useCallback(() => {
       const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-        if (multiSelect) {
-          exitMultiSelect();
-          return true;
+        const outcome = resolveCaptureBack({
+          inlineOpen,
+          inlineName,
+          searchOpen,
+          multiSelect,
+          noteOpen,
+          noteText,
+        });
+        switch (outcome) {
+          case "close-inline":
+            closeInlineCreate();
+            break;
+          case "prompt-discard-inline":
+            void confirmDiscard().then((discard) => {
+              if (discard) closeInlineCreate();
+            });
+            break;
+          case "close-search":
+            closeSearch();
+            break;
+          case "exit-multi-select":
+            exitMultiSelect();
+            break;
+          case "prompt-discard-note":
+            void confirmDiscard().then((discard) => {
+              if (discard) cancelCapture();
+            });
+            break;
+          case "cancel-capture":
+            cancelCapture();
+            break;
         }
-        cancelCapture();
         return true;
       });
       return () => sub.remove();
-    }, [multiSelect, exitMultiSelect, cancelCapture]),
+    }, [
+      inlineOpen,
+      inlineName,
+      searchOpen,
+      multiSelect,
+      noteOpen,
+      noteText,
+      closeInlineCreate,
+      closeSearch,
+      exitMultiSelect,
+      cancelCapture,
+    ]),
   );
 
   // Clear a pending auto-return timer on unmount (no finish/setState after teardown).
