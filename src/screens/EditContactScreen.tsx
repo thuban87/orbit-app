@@ -44,7 +44,6 @@
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -95,6 +94,8 @@ import {
   AccordionSection,
   AppText,
   FieldError,
+  OptionSelectRow,
+  OptionSheet,
   OrbitSwitch,
 } from "@/components/ui";
 import {
@@ -130,10 +131,7 @@ import {
 import { newUid } from "@/db/uid";
 import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
-import {
-  CATEGORY_SEARCH_THRESHOLD,
-  resolveCategorySelection,
-} from "@/logic/category-logic";
+import { resolveCategorySelection } from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -178,8 +176,15 @@ const LOG_SCOPE = "edit-contact";
 /** An editor with no open draft (D-14). */
 const CLOSED_DRAFT = { open: false, dirty: false } as const;
 
-/** The social-battery options (native picker). "" = No selection → stored NULL. */
+/** The social-battery options (D-28 option sheet). "No selection" = null → stored NULL. */
 const SOCIAL_BATTERY_OPTIONS = ["Charger", "Neutral", "Drain"] as const;
+const SOCIAL_BATTERY_SHEET_OPTIONS: ReadonlyArray<{
+  value: string | null;
+  label: string;
+}> = [
+  { value: null, label: "No selection" },
+  ...SOCIAL_BATTERY_OPTIONS.map((o) => ({ value: o, label: o })),
+];
 
 /**
  * Themed confirm so the duplicate-name warning reads as ONE gate; Back/scrim
@@ -403,6 +408,7 @@ export function EditContactScreen({
     [],
   );
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  const [socialBatterySheetOpen, setSocialBatterySheetOpen] = useState(false);
   const [editDefs, setEditDefs] = useState<CustomFieldDef[]>([]);
   const [form, setForm] = useState<EditFormState | null>(null);
   // Links: the seeded snapshot (the diff baseline) + the editable draft. Add/edit/
@@ -1291,52 +1297,15 @@ export function EditContactScreen({
             <AppText role="label" style={{ color: colors.textSecondary }}>
               Category
             </AppText>
-            {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Category"
-                onPress={() => setCategorySheetOpen(true)}
-                style={[
-                  styles.pickerShell,
-                  styles.categoryChoice,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <AppText>
-                  {categories.find((row) => row.id === form.categoryId)?.name ??
-                    "Uncategorized"}
-                </AppText>
-              </Pressable>
-            ) : (
-              <View
-                style={[
-                  styles.pickerShell,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Picker
-                  testID="edit-contact-category"
-                  accessibilityLabel="Category"
-                  selectedValue={form.categoryId ?? -1}
-                  onValueChange={(v) =>
-                    setField("categoryId", v === -1 ? null : Number(v))
-                  }
-                  dropdownIconColor={colors.textSecondary}
-                  style={{ color: colors.textPrimary }}
-                >
-                  <Picker.Item label="Uncategorized" value={-1} />
-                  {categories.map((c) => (
-                    <Picker.Item key={c.id} label={c.name} value={c.id} />
-                  ))}
-                </Picker>
-              </View>
-            )}
+            <OptionSelectRow
+              testID="edit-contact-category"
+              label="Category"
+              currentLabel={
+                categories.find((row) => row.id === form.categoryId)?.name ??
+                "Uncategorized"
+              }
+              onPress={() => setCategorySheetOpen(true)}
+            />
             <CategoryChoiceSheet
               visible={categorySheetOpen}
               categories={categories}
@@ -1400,28 +1369,21 @@ export function EditContactScreen({
             <AppText role="label" style={{ color: colors.textSecondary }}>
               Social battery
             </AppText>
-            <View
-              style={[
-                styles.pickerShell,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                testID="edit-contact-social-battery"
-                accessibilityLabel="Social battery"
-                selectedValue={form.socialBattery ?? ""}
-                onValueChange={(v) =>
-                  setField("socialBattery", v === "" ? null : String(v))
-                }
-                dropdownIconColor={colors.textSecondary}
-                style={{ color: colors.textPrimary }}
-              >
-                <Picker.Item label="No selection" value="" />
-                {SOCIAL_BATTERY_OPTIONS.map((o) => (
-                  <Picker.Item key={o} label={o} value={o} />
-                ))}
-              </Picker>
-            </View>
+            {/* A stored value outside the options shows raw and is kept. */}
+            <OptionSelectRow
+              testID="edit-contact-social-battery"
+              label="Social battery"
+              currentLabel={form.socialBattery ?? "No selection"}
+              onPress={() => setSocialBatterySheetOpen(true)}
+            />
+            <OptionSheet
+              visible={socialBatterySheetOpen}
+              title="Social battery"
+              options={SOCIAL_BATTERY_SHEET_OPTIONS}
+              selected={form.socialBattery}
+              onSelect={(value) => setField("socialBattery", value)}
+              onRequestClose={() => setSocialBatterySheetOpen(false)}
+            />
           </View>
 
           {/* Behaviour toggles — the ToggleFieldWidget on/off "1"/"0" convention. */}
@@ -1819,15 +1781,6 @@ const styles = StyleSheet.create({
   birthdayTrigger: {
     minHeight: 44,
     justifyContent: "center",
-  },
-  pickerShell: {
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  categoryChoice: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 12,
   },
   toggleRow: {
     flexDirection: "row",

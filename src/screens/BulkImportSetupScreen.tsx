@@ -1,4 +1,3 @@
-import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -6,6 +5,7 @@ import { ConsolidationPrompt } from "@/components/ConsolidationPrompt";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { OptionSelectRow } from "@/components/ui";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -19,10 +19,7 @@ import {
   sessionBatchLifecycle,
   sessionRowCounts,
 } from "@/db/import-session-read";
-import {
-  CATEGORY_SEARCH_THRESHOLD,
-  resolveCategorySelection,
-} from "@/logic/category-logic";
+import { resolveCategorySelection } from "@/logic/category-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { importedPhotoFs } from "@/services/import/import-photo";
 import { isImportRunActive } from "@/services/import/import-run-guard";
@@ -562,50 +559,14 @@ export function BulkImportSetupScreen({
           <Text style={[styles.label, { color: colors.textSecondary }]}>
             Category override
           </Text>
-          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Batch category override"
-              onPress={() => setCategorySheetOpen(true)}
-              style={[
-                styles.picker,
-                styles.categoryChoice,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={{ color: colors.textPrimary }}>
-                {categories.find((row) => row.id === categoryId)?.name ??
-                  "Uncategorized"}
-              </Text>
-            </Pressable>
-          ) : (
-            <View
-              style={[
-                styles.picker,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                accessibilityLabel="Batch category override"
-                selectedValue={categoryId ?? -1}
-                onValueChange={(value) => {
-                  markEdited();
-                  setCategoryId(value === -1 ? null : Number(value));
-                }}
-                dropdownIconColor={colors.textSecondary}
-                style={{ color: colors.textPrimary }}
-              >
-                <Picker.Item label="Uncategorized" value={-1} />
-                {categories.map((category) => (
-                  <Picker.Item
-                    key={category.id}
-                    label={category.name}
-                    value={category.id}
-                  />
-                ))}
-              </Picker>
-            </View>
-          )}
+          <OptionSelectRow
+            label="Batch category override"
+            currentLabel={
+              categories.find((row) => row.id === categoryId)?.name ??
+              "Uncategorized"
+            }
+            onPress={() => setCategorySheetOpen(true)}
+          />
           <CategoryChoiceSheet
             visible={categorySheetOpen}
             categories={categories}
@@ -664,12 +625,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderWidth: 1,
     borderRadius: 10,
-  },
-  picker: { borderWidth: 1, borderRadius: 10, overflow: "hidden" },
-  categoryChoice: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 12,
   },
   import: {
     minHeight: 48,

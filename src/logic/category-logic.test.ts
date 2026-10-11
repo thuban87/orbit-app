@@ -82,7 +82,7 @@ describe("category choice contract", () => {
     name: index === 12 ? "Caf\u00e9 Friends" : `Category ${index + 1}`,
   }));
 
-  it("uses the expanded searchable surface only above twelve real categories", () => {
+  it("shows the search field only above twelve real categories (38.9 D-28: the threshold no longer picks native vs themed)", () => {
     expect(CATEGORY_SEARCH_THRESHOLD).toBe(12);
     expect(buildCategoryChoices(categories.slice(0, 12), true).searchable).toBe(
       false,

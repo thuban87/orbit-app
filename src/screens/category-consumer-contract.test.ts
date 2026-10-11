@@ -14,10 +14,17 @@ describe("category consumer integration contract", () => {
   ];
 
   it.each(consumers)(
-    "%s uses shared threshold, sheet, canonical copy, and focus refresh",
+    "%s uses the themed category sheet at every length, canonical copy, and focus refresh",
     (name) => {
       const source = read(name);
-      expect(source).toContain("CATEGORY_SEARCH_THRESHOLD");
+      // 38.9 D-28: the category sheet opens from a themed trigger at every list
+      // length; CATEGORY_SEARCH_THRESHOLD now only decides the sheet's search
+      // field (inside CategoryChoiceSheet), so screens no longer branch on it.
+      expect(source).not.toContain("CATEGORY_SEARCH_THRESHOLD");
+      expect(source).not.toContain("@react-native-picker/picker");
+      expect(source).not.toMatch(/<Picker\b/);
+      expect(source).toContain("<OptionSelectRow");
+      expect(source).toContain("onPress={() => setCategorySheetOpen(true)}");
       expect(source).toContain("CategoryChoiceSheet");
       expect(source).toContain("Uncategorized");
       expect(source).not.toContain('label="No category"');

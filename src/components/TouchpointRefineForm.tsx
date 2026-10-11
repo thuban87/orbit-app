@@ -23,12 +23,17 @@
  * the MIN_TOUCH_TARGET floor with no hitSlop, so the 8dp row gap keeps
  * neighbouring hit regions apart (RG-030, AUD-UIA-006).
  *
+ * CHOICES (38.9 D-28): Channel, Direction and Tone open the one themed
+ * `OptionSheet` from an `OptionSelectRow` trigger (no native spinner). "No
+ * selection" is the null option. A stored value outside the option set (e.g. a
+ * legacy channel with a scoped `channelOptions`) is shown raw on the trigger
+ * and is never rewritten unless the user picks another option.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
 import { Fragment, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
@@ -42,7 +47,7 @@ import {
   parseCustomDurationMinutes,
   parseLocalDateTime,
 } from "@/components/touchpoint-refine-logic";
-import { OrbitSwitch } from "@/components/ui";
+import { OptionSelectRow, OptionSheet, OrbitSwitch } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { useTheme } from "@/theme";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
@@ -91,6 +96,35 @@ const DIRECTION_OPTIONS = ["outbound", "inbound", "mutual"] as const;
 
 /** The Tone enum (D-06); null = unset ("No selection"), never treated as Neutral. */
 const TONE_OPTIONS = ["Positive", "Neutral", "Negative"] as const;
+
+/** Direction and Tone sheet options: "No selection" is the null value. */
+const DIRECTION_SHEET_OPTIONS: ReadonlyArray<{
+  value: string | null;
+  label: string;
+}> = [
+  { value: null, label: "No selection" },
+  ...DIRECTION_OPTIONS.map((o) => ({ value: o, label: o })),
+];
+const TONE_SHEET_OPTIONS: ReadonlyArray<{
+  value: string | null;
+  label: string;
+}> = [
+  { value: null, label: "No selection" },
+  ...TONE_OPTIONS.map((o) => ({ value: o, label: o })),
+];
+
+/** The sheet that is open, if any (one at a time). */
+type ChoiceSheet = "channel" | "direction" | "tone";
+
+/** The trigger label for a stored value: its option label, else the raw value. */
+function choiceLabel(
+  options: ReadonlyArray<{ value: string | null; label: string }>,
+  current: string | null,
+): string {
+  return (
+    options.find((o) => o.value === current)?.label ?? current ?? "No selection"
+  );
+}
 
 interface TouchpointRefineFormProps {
   /** The controlled value — the parent seeds and owns it. */
@@ -185,6 +219,7 @@ export function TouchpointRefineForm({
   // Raw text of the Custom-duration entry (minutes). The persisted seconds live on
   // `value.duration`; this only backs the free-text field while the user types.
   const [customMinutes, setCustomMinutes] = useState("");
+  const [openSheet, setOpenSheet] = useState<ChoiceSheet | null>(null);
   const fields = visibleFields ? new Set(visibleFields) : ALL_FIELDS;
   // Channel options default to the internal five entries (legacy representable).
   const channels = channelOptions ?? CHANNEL_OPTIONS;
@@ -285,25 +320,12 @@ export function TouchpointRefineForm({
             <Text style={[styles.label, { color: colors.textSecondary }]}>
               Channel
             </Text>
-            <View
-              style={[
-                styles.control,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                testID={`${testID}-channel`}
-                accessibilityLabel="Channel"
-                selectedValue={value.channel}
-                onValueChange={(v) => set("channel", String(v))}
-                dropdownIconColor={colors.textSecondary}
-                style={{ color: colors.textPrimary }}
-              >
-                {channels.map((o) => (
-                  <Picker.Item key={o.value} label={o.label} value={o.value} />
-                ))}
-              </Picker>
-            </View>
+            <OptionSelectRow
+              testID={`${testID}-channel`}
+              label="Channel"
+              currentLabel={choiceLabel(channels, value.channel)}
+              onPress={() => setOpenSheet("channel")}
+            />
           </View>
         );
       case "direction":
@@ -312,28 +334,15 @@ export function TouchpointRefineForm({
             <Text style={[styles.label, { color: colors.textSecondary }]}>
               Direction
             </Text>
-            <View
-              style={[
-                styles.control,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                testID={`${testID}-direction`}
-                accessibilityLabel="Direction"
-                selectedValue={value.direction ?? ""}
-                onValueChange={(v) =>
-                  set("direction", v === "" ? null : String(v))
-                }
-                dropdownIconColor={colors.textSecondary}
-                style={{ color: colors.textPrimary }}
-              >
-                <Picker.Item label="No selection" value="" />
-                {DIRECTION_OPTIONS.map((o) => (
-                  <Picker.Item key={o} label={o} value={o} />
-                ))}
-              </Picker>
-            </View>
+            <OptionSelectRow
+              testID={`${testID}-direction`}
+              label="Direction"
+              currentLabel={choiceLabel(
+                DIRECTION_SHEET_OPTIONS,
+                value.direction,
+              )}
+              onPress={() => setOpenSheet("direction")}
+            />
           </View>
         );
       case "connected":
@@ -356,28 +365,12 @@ export function TouchpointRefineForm({
             <Text style={[styles.label, { color: colors.textSecondary }]}>
               Tone
             </Text>
-            <View
-              style={[
-                styles.control,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                testID={`${testID}-tone`}
-                accessibilityLabel="Tone"
-                selectedValue={value.quality ?? ""}
-                onValueChange={(v) =>
-                  set("quality", v === "" ? null : String(v))
-                }
-                dropdownIconColor={colors.textSecondary}
-                style={{ color: colors.textPrimary }}
-              >
-                <Picker.Item label="No selection" value="" />
-                {TONE_OPTIONS.map((o) => (
-                  <Picker.Item key={o} label={o} value={o} />
-                ))}
-              </Picker>
-            </View>
+            <OptionSelectRow
+              testID={`${testID}-tone`}
+              label="Tone"
+              currentLabel={choiceLabel(TONE_SHEET_OPTIONS, value.quality)}
+              onPress={() => setOpenSheet("tone")}
+            />
           </View>
         );
       case "note":
@@ -555,6 +548,31 @@ export function TouchpointRefineForm({
             : null}
         </View>
       ) : null}
+
+      <OptionSheet
+        visible={openSheet === "channel"}
+        title="Channel"
+        options={channels}
+        selected={value.channel}
+        onSelect={(v) => set("channel", v)}
+        onRequestClose={() => setOpenSheet(null)}
+      />
+      <OptionSheet
+        visible={openSheet === "direction"}
+        title="Direction"
+        options={DIRECTION_SHEET_OPTIONS}
+        selected={value.direction}
+        onSelect={(v) => set("direction", v)}
+        onRequestClose={() => setOpenSheet(null)}
+      />
+      <OptionSheet
+        visible={openSheet === "tone"}
+        title="Tone"
+        options={TONE_SHEET_OPTIONS}
+        selected={value.quality}
+        onSelect={(v) => set("quality", v)}
+        onRequestClose={() => setOpenSheet(null)}
+      />
 
       {showDatePicker ? (
         <DateTimePicker

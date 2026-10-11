@@ -76,6 +76,7 @@ describe("BulkImportSetupScreen stopped view (D-73c)", () => {
       "LIFECYCLE_OPTIONS",
       "FrequencyPicker",
       "<Picker",
+      "<OptionSelectRow",
       "CategoryChoiceSheet",
       "BULK_BOUND_BLURB",
       "Orbit participation",

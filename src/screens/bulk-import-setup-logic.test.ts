@@ -176,7 +176,11 @@ describe("BulkImportSetupScreen lifecycle source contract (D-57)", () => {
   });
 
   it("keeps the category behaviour", () => {
-    expect(screen).toContain("CATEGORY_SEARCH_THRESHOLD");
+    // 38.9 D-28: the themed sheet at every length; the threshold only decides
+    // search inside CategoryChoiceSheet, so the screen no longer branches on it.
+    expect(screen).not.toContain("CATEGORY_SEARCH_THRESHOLD");
+    expect(screen).not.toMatch(/<Picker\b/);
+    expect(screen).toContain("<OptionSelectRow");
     expect(screen).toContain("CategoryChoiceSheet");
     expect(screen).toContain("resolveCategorySelection");
     expect(screen).toContain("await listCategories(exec)");

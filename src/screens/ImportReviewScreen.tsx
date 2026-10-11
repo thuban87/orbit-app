@@ -1,4 +1,3 @@
-import { Picker } from "@react-native-picker/picker";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -23,6 +22,7 @@ import {
 import { LinkExistingChoiceButton } from "@/components/ExistingContactChoice";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { OptionSelectRow } from "@/components/ui";
 import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader, listCategories } from "@/db/contact-read";
@@ -37,10 +37,7 @@ import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import { newUid } from "@/db/uid";
 import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
 import { normalizeEditedBirthday } from "@/logic/birthday-logic";
-import {
-  CATEGORY_SEARCH_THRESHOLD,
-  resolveCategorySelection,
-} from "@/logic/category-logic";
+import { resolveCategorySelection } from "@/logic/category-logic";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardWith } from "@/navigation/reset-intents";
@@ -485,49 +482,14 @@ export function ImportReviewScreen({
           <Text style={[styles.label, { color: colors.textSecondary }]}>
             Category
           </Text>
-          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Category"
-              onPress={() => setCategorySheetOpen(true)}
-              style={[
-                styles.picker,
-                styles.categoryChoice,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={{ color: colors.textPrimary }}>
-                {categories.find((row) => row.id === categoryId)?.name ??
-                  "Uncategorized"}
-              </Text>
-            </Pressable>
-          ) : (
-            <View
-              style={[
-                styles.picker,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                selectedValue={categoryId ?? -1}
-                onValueChange={(value) => {
-                  setEdited(true);
-                  setCategoryId(value === -1 ? null : Number(value));
-                }}
-                dropdownIconColor={colors.textSecondary}
-                style={{ color: colors.textPrimary }}
-              >
-                <Picker.Item label="Uncategorized" value={-1} />
-                {categories.map((category) => (
-                  <Picker.Item
-                    key={category.id}
-                    label={category.name}
-                    value={category.id}
-                  />
-                ))}
-              </Picker>
-            </View>
-          )}
+          <OptionSelectRow
+            label="Category"
+            currentLabel={
+              categories.find((row) => row.id === categoryId)?.name ??
+              "Uncategorized"
+            }
+            onPress={() => setCategorySheetOpen(true)}
+          />
           <CategoryChoiceSheet
             visible={categorySheetOpen}
             categories={categories}
@@ -708,12 +670,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderRadius: 10,
-  },
-  picker: { borderWidth: 1, borderRadius: 10, overflow: "hidden" },
-  categoryChoice: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 12,
   },
   import: {
     minHeight: 48,

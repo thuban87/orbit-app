@@ -21,7 +21,6 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import { Picker } from "@react-native-picker/picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
@@ -63,7 +62,13 @@ import {
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
-import { AccordionSection, AppText, Button, FieldError } from "@/components/ui";
+import {
+  AccordionSection,
+  AppText,
+  Button,
+  FieldError,
+  OptionSelectRow,
+} from "@/components/ui";
 import {
   clearFieldError,
   type FieldErrors,
@@ -83,10 +88,7 @@ import type { MemoryRow } from "@/db/memories-read";
 import type { RelationshipRow } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
 import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
-import {
-  CATEGORY_SEARCH_THRESHOLD,
-  resolveCategorySelection,
-} from "@/logic/category-logic";
+import { resolveCategorySelection } from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { navigationRef } from "@/navigation/linking";
@@ -561,52 +563,15 @@ export function CreateContactScreen({
             <AppText role="label" style={{ color: colors.textSecondary }}>
               Category
             </AppText>
-            {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Category"
-                onPress={() => setCategorySheetOpen(true)}
-                style={[
-                  styles.pickerShell,
-                  styles.categoryChoice,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <AppText>
-                  {categories.find((row) => row.id === categoryId)?.name ??
-                    "Uncategorized"}
-                </AppText>
-              </Pressable>
-            ) : (
-              <View
-                style={[
-                  styles.pickerShell,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Picker
-                  testID="create-contact-category"
-                  accessibilityLabel="Category"
-                  selectedValue={categoryId ?? -1}
-                  onValueChange={(v) =>
-                    setCategoryId(v === -1 ? null : Number(v))
-                  }
-                  dropdownIconColor={colors.textSecondary}
-                  style={{ color: colors.textPrimary }}
-                >
-                  <Picker.Item label="Uncategorized" value={-1} />
-                  {categories.map((c) => (
-                    <Picker.Item key={c.id} label={c.name} value={c.id} />
-                  ))}
-                </Picker>
-              </View>
-            )}
+            <OptionSelectRow
+              testID="create-contact-category"
+              label="Category"
+              currentLabel={
+                categories.find((row) => row.id === categoryId)?.name ??
+                "Uncategorized"
+              }
+              onPress={() => setCategorySheetOpen(true)}
+            />
             <CategoryChoiceSheet
               visible={categorySheetOpen}
               categories={categories}
@@ -1004,15 +969,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
-  },
-  pickerShell: {
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  categoryChoice: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 12,
   },
   customBlock: {
     gap: 16,
