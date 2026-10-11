@@ -65,6 +65,7 @@ import type { CycleBlock, CyclesResult } from "@/services/history/cycles";
 import type { HistoryWindow, WindowCell } from "@/services/history/window";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { MONTH_SHORT } from "@/utils/dates";
 
 // --- Tunable geometry (top-of-file single-edit, CLAUDE.md) -------------------
 // The Year dense grid is deliberately small (a11y-compensated), with two whole
@@ -128,25 +129,15 @@ function rowWidth(edge: number, columns: number): number {
   return columns * edge + (columns - 1) * CELL_GAP;
 }
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
-
-/** "Mar 4" from a local `YYYY-MM-DD` — local parts only (never UTC ISO slicing). */
-function formatMonthDay(ymd: string): string {
+/**
+ * "Mar 4" from a local `YYYY-MM-DD` — local parts only (never UTC ISO
+ * slicing). Kept private under its own name (it takes a string, unlike the
+ * shared `formatMonthDay(month, day)`); the month names are the shared table
+ * (38.9 D-23).
+ */
+function monthDayOf(ymd: string): string {
   const [, m, d] = ymd.split("-");
-  return `${MONTHS[Number(m) - 1]} ${Number(d)}`;
+  return `${MONTH_SHORT[Number(m) - 1]} ${Number(d)}`;
 }
 
 /** The lens segments in shipped order — Cycles is the default lens. */
@@ -260,10 +251,10 @@ function windowTitle(
   }
   if (!window) return "";
   if (lens === "7days") {
-    return `${formatMonthDay(window.start)} – ${formatMonthDay(window.end)}`;
+    return `${monthDayOf(window.start)} – ${monthDayOf(window.end)}`;
   }
   const [y, m] = window.start.split("-");
-  if (lens === "month") return `${MONTHS[Number(m) - 1]} ${y}`;
+  if (lens === "month") return `${MONTH_SHORT[Number(m) - 1]} ${y}`;
   return y;
 }
 

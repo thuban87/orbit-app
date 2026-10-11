@@ -160,8 +160,12 @@ describe("Last-spoke tri-state date segment (AUD-UIA-005)", () => {
     expect(dateSegment).toBeDefined();
     expect(dateSegment).toContain('accessibilityLabel="Pick date"');
     expect(dateSegment).toContain("accessibilityValue={dateValue}");
+    // 38.9 D-48: the value is the formatted date the segment displays.
     expect(tri).toMatch(
-      /const dateValue =\s*value\.kind === "date" \? \{ text: value\.date \} : undefined;/,
+      /const dateText =\s*value\.kind === "date"\s*\?\s*formatDisplayDateOrFallback\(value\.date, value\.date\)\s*:\s*null;/,
+    );
+    expect(tri).toMatch(
+      /const dateValue = dateText !== null \? \{ text: dateText \} : undefined;/,
     );
   });
 

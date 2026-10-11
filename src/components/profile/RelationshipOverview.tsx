@@ -15,6 +15,7 @@ import type { ProfileLayoutDocument } from "@/profile/types";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 
 export type RelationshipSheetId =
   | "status"
@@ -94,7 +95,11 @@ export function RelationshipOverview({
     snooze: {
       label: "Snooze",
       value: snapshot.identity.snoozeUntil
-        ? `Snoozed until ${snapshot.identity.snoozeUntil}`
+        ? // Display only (38.9 D-48): the stored YYYY-MM-DD stays raw.
+          `Snoozed until ${formatDisplayDateOrFallback(
+            snapshot.identity.snoozeUntil,
+            snapshot.identity.snoozeUntil,
+          )}`
         : "Not snoozed",
     },
   };

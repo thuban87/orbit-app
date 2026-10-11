@@ -11,6 +11,7 @@ import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { MEMORY_TRASH_WINDOW_DAYS } from "@/services/memory-trash-sweep";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "recently-deleted";
@@ -109,7 +110,14 @@ export function RecentlyDeletedScreen({
               <View style={styles.copy}>
                 <AppText role="body">{memoryLabel(memory)}</AppText>
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  Deleted {memory.deleted_at}
+                  {/* 38.9 D-48: the date part of deleted_at, display only. */}
+                  Deleted{" "}
+                  {memory.deleted_at
+                    ? formatDisplayDateOrFallback(
+                        memory.deleted_at,
+                        memory.deleted_at,
+                      )
+                    : ""}
                 </AppText>
               </View>
               <View style={styles.actions}>

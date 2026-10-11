@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { formatMonthDay } from "@/utils/dates";
 import {
   buildKnowledgePresentation,
+  customValueDisplayText,
   formatCustomFieldValue,
   type KnowledgePresentationInput,
 } from "./knowledge-presentation";
+
+const THIS_YEAR = new Date().getFullYear();
 
 const input: KnowledgePresentationInput = {
   contactId: 7,
@@ -260,7 +264,9 @@ describe("knowledge presentation", () => {
     expect(formatCustomFieldValue("text", "Apartment 3B")).toBe("Apartment 3B");
     expect(formatCustomFieldValue("textarea", "Long note")).toBe("Long note");
     expect(formatCustomFieldValue("dropdown", "Friend")).toBe("Friend");
-    expect(formatCustomFieldValue("date", "2026-09-09")).toBe("2026-09-09");
+    // 38.9 D-48: a date shows in the display form; the year follows the
+    // current year, so the case builds a current-year value (C6-L1).
+    expect(formatCustomFieldValue("date", `${THIS_YEAR}-09-09`)).toBe("Sep 9");
     expect(formatCustomFieldValue("toggle", "1")).toBe("Yes");
     expect(formatCustomFieldValue("number", "3")).toBe("3");
     expect(formatCustomFieldValue("photo", "avatars/cv-7-pet.jpg")).toBe(
@@ -273,6 +279,45 @@ describe("knowledge presentation", () => {
       "me@example.test",
     );
     expect(formatCustomFieldValue("phone", "+1 555 0100")).toBe("+1 555 0100");
+  });
+
+  it("keeps an impossible date raw so the stored value stays visible", () => {
+    expect(formatCustomFieldValue("date", "2026-02-31")).toBe("2026-02-31");
+  });
+
+  describe("customValueDisplayText (D-23, D-66; C9-M1, C10-L1)", () => {
+    it("formats a valid date in the current year without the year", () => {
+      expect(customValueDisplayText("date", `${THIS_YEAR}-10-20`)).toBe(
+        formatMonthDay(10, 20),
+      );
+    });
+
+    it("formats a date in another year with the year", () => {
+      expect(customValueDisplayText("date", `${THIS_YEAR - 1}-06-02`)).toBe(
+        `Jun 2, ${THIS_YEAR - 1}`,
+      );
+    });
+
+    it("formats parser-valid padded and trailing-text values as on the Profile", () => {
+      expect(customValueDisplayText("date", ` ${THIS_YEAR}-10-20`)).toBe(
+        "Oct 20",
+      );
+      expect(customValueDisplayText("date", `${THIS_YEAR}-10-20 trip`)).toBe(
+        "Oct 20",
+      );
+    });
+
+    it("returns an unparseable date raw", () => {
+      expect(customValueDisplayText("date", "next spring")).toBe("next spring");
+      expect(customValueDisplayText("date", "2026-02-31")).toBe("2026-02-31");
+    });
+
+    it("leaves a date-shaped value of another type unchanged", () => {
+      expect(customValueDisplayText("text", `${THIS_YEAR}-10-20`)).toBe(
+        `${THIS_YEAR}-10-20`,
+      );
+      expect(customValueDisplayText("number", "42")).toBe("42");
+    });
   });
 
   it("never claims 'Photo added' for a photo value that is not a stored photo path (38.6 D-34)", () => {

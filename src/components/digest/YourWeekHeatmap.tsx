@@ -10,6 +10,7 @@ import { classifyHeatmapCell } from "@/components/history/heatmap-cell";
 import type { HistoryWindow, WindowCell } from "@/services/history/window";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
 // ─── Tunables (RG-033 ui-accessibility/AUD-UIA-010, D-13) ─────────────────────
@@ -50,9 +51,13 @@ function fitWeekCell(availableWidth: number): number | null {
   });
 }
 
+/**
+ * Accessibility text for a day cell: the shared weekday display form ("Tue,
+ * Oct 13"; 38.9 D-23, D-48). Display only: the testID and `onSelectDay(date)`
+ * keep the raw YYYY-MM-DD.
+ */
 function dateLabel(date: string): string {
-  const [year, month, day] = date.split("-");
-  return `${month}/${day}/${year}`;
+  return formatDisplayDateOrFallback(date, date, { weekday: true });
 }
 
 export function YourWeekHeatmap({

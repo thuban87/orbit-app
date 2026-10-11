@@ -33,7 +33,14 @@ import type {
   HistoryKnowledgeRecord,
   HistoryLifecycleRecord,
 } from "@/db/history-read";
-import { formatLocalDate } from "@/utils/dates";
+import {
+  formatDisplayDateOrFallback,
+  formatLocalDate,
+  formatMonthDay,
+  MONTH_LONG,
+  MONTH_SHORT,
+  WEEKDAY_LONG,
+} from "@/utils/dates";
 
 // --- Tunables (D-39) ---------------------------------------------------------
 
@@ -1029,52 +1036,8 @@ function monthLongLabel(monthKey: string): string {
 
 // --- Labels (D-33) -----------------------------------------------------------
 
-const WEEKDAY_SHORT = [
-  "Sun",
-  "Mon",
-  "Tue",
-  "Wed",
-  "Thu",
-  "Fri",
-  "Sat",
-] as const;
-const WEEKDAY_LONG = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-] as const;
-const MONTH_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
-const MONTH_LONG = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
+// Month and weekday names come from the shared tables in `src/utils/dates.ts`
+// (38.9 D-23); this module keeps no private copy.
 
 /** A local Date from a `YYYY-MM-DD` string's components (never UTC parsing). */
 function localDateFromParts(date: string): Date {
@@ -1098,12 +1061,26 @@ function relativeDay(
   return null;
 }
 
-/** "Today", "Yesterday", else weekday + month + day ("Fri Oct 2"). No count (D-47). */
+/**
+ * The weekday display form of a stream day (38.9 D-23, D-48): "Fri, Oct 2",
+ * with the year outside `today`'s year ("Mon, Jun 2, 2025"). The current-year
+ * rule follows the `today` argument, not the wall clock.
+ */
+function weekdayDateLabel(date: string, today: string): string {
+  return formatDisplayDateOrFallback(localDateFromParts(date), date, {
+    now: localDateFromParts(today),
+    weekday: true,
+  });
+}
+
+/**
+ * "Today", "Yesterday", else the weekday display form ("Fri, Oct 2"; 38.9
+ * D-57, D-48), with the year for a day in another year. No count (D-47).
+ */
 export function dayLabel(date: string, today: string): string {
   const relative = relativeDay(date, today);
   if (relative) return relative;
-  const local = localDateFromParts(date);
-  return `${WEEKDAY_SHORT[local.getDay()]} ${MONTH_SHORT[local.getMonth()]} ${local.getDate()}`;
+  return weekdayDateLabel(date, today);
 }
 
 /** The full date with its year, prefixed "Today, " / "Yesterday, " (D-33). */
@@ -1132,7 +1109,7 @@ export function yearRowLabel(year: number, interactionCount: number): string {
 /** "Sep 1" from a local `YYYY-MM-DD` (local components only). */
 function monthDayLabel(date: string): string {
   const local = localDateFromParts(date);
-  return `${MONTH_SHORT[local.getMonth()]} ${local.getDate()}`;
+  return formatMonthDay(local.getMonth() + 1, local.getDate());
 }
 
 /** "Sep 1, 2025" from a local `YYYY-MM-DD` (local components only). */
@@ -1152,13 +1129,12 @@ export function dayDateLabel(date: string, today: string): string {
 }
 
 /**
- * The empty-day note: "Nothing logged on Tue Oct 5" (D-21), with the year when
- * the day is not in the current year: "Nothing logged on Tue Apr 21, 2025"
- * (D-74).
+ * The empty-day note: "Nothing logged on Tue, Oct 5" (38.8 D-21 with the
+ * 38.9 D-53 comma), with the year when the day is not in the current year:
+ * "Nothing logged on Tue, Apr 21, 2025" (D-74, D-48).
  */
 export function emptyDayNoteText(date: string, today: string): string {
-  const local = localDateFromParts(date);
-  return `Nothing logged on ${WEEKDAY_SHORT[local.getDay()]} ${dayDateLabel(date, today)}`;
+  return `Nothing logged on ${weekdayDateLabel(date, today)}`;
 }
 
 /**

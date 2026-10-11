@@ -141,3 +141,52 @@ describe("Digest day detail uses the weekday display form (D-48)", () => {
     expect(src).not.toMatch(/`Loading activity for \$\{date\}`/);
   });
 });
+
+// D-70 / D-23 (reviews C6-L4, C7-L2): the five stored-birthday displays use the
+// birthday formatter, render only; the values behind them stay raw.
+describe("stored-birthday display sites (D-70)", () => {
+  const BIRTHDAY_SITES = [
+    "src/screens/EditContactScreen.tsx",
+    "src/screens/ThingsToRememberScreen.tsx",
+    "src/screens/MergeConflictsScreen.tsx",
+    "src/screens/ComposeResearchScreen.tsx",
+    "src/screens/ReconcileDetailScreen.tsx",
+  ];
+
+  it.each(BIRTHDAY_SITES)("%s calls formatStoredBirthdayForDisplay", (path) => {
+    expect(codeOnly(source(path))).toMatch(/formatStoredBirthdayForDisplay\(/);
+  });
+
+  it.each(BIRTHDAY_SITES)(
+    "%s never passes a birthday to the general D-48 formatter",
+    (path) => {
+      const code = codeOnly(source(path));
+      expect(code).not.toMatch(
+        /formatDisplayDate(?:OrFallback)?\([^)]*birthday/i,
+      );
+    },
+  );
+
+  it("Research formats only the firstclass:birthday caption", () => {
+    const code = codeOnly(source("src/screens/ComposeResearchScreen.tsx"));
+    expect(code).toMatch(
+      /item\.id === "firstclass:birthday"\s*\?\s*formatStoredBirthdayForDisplay\(item\.value\)\s*:\s*item\.value/,
+    );
+    // Add to AI carries the raw item.
+    expect(code).toContain("addToFocus(item)");
+  });
+
+  it("Reconcile formats only the birthday field and still chooses by option id", () => {
+    const code = codeOnly(source("src/screens/ReconcileDetailScreen.tsx"));
+    expect(code).toMatch(
+      /field\.fieldFamily === "birthday"\s*\?\s*formatStoredBirthdayForDisplay\(value\)/,
+    );
+    expect(code).toContain("onChange={(option) => onChoice(option.id)}");
+  });
+
+  it("Merge conflicts keep differs() on the raw values", () => {
+    const code = codeOnly(source("src/screens/MergeConflictsScreen.tsx"));
+    expect(code).toMatch(/differs\(value\.survivor, value\.absorbed\)/);
+    expect(code).toMatch(/\[conflict\.key\]: option\.id/);
+  });
+});

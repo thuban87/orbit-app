@@ -148,7 +148,7 @@ import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS, parseDate } from "@/types";
-import { formatLocalDate } from "@/utils/dates";
+import { formatLocalDate, formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { pickCreateSubEditor } from "./create-contact-logic";
 import {
@@ -1206,10 +1206,15 @@ export function EditContactScreen({
     );
   }
 
+  // Display only (38.9 D-70, D-23): the same string the label always used,
+  // shown as "Jun 2, 2026" (year always shown when known) or "Jun 2" when the
+  // year is unknown. The stored input and `buildBirthdayForStorage` are unchanged.
   const birthdayLabel = form.birthdayInput
-    ? form.birthdayYearUnknown
-      ? form.birthdayInput.slice(5) // MM-DD (year hidden)
-      : form.birthdayInput
+    ? formatStoredBirthdayForDisplay(
+        form.birthdayYearUnknown
+          ? form.birthdayInput.slice(5) // MM-DD (year hidden)
+          : form.birthdayInput,
+      )
     : "Set birthday";
   const birthdaySeed =
     (form.birthdayInput ? parseDate(form.birthdayInput) : null) ?? new Date();

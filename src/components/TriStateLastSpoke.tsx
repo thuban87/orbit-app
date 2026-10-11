@@ -28,6 +28,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { useTheme } from "@/theme";
 import { parseDate } from "@/types";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import {
   type LastSpokeValue,
   resolvePickedDate,
@@ -125,8 +126,14 @@ export function TriStateLastSpoke({
   const todayC = segmentColors("today", selectedKind === "today");
   const dateC = segmentColors("date", selectedKind === "date");
   const notYetC = segmentColors("not-yet", selectedKind === "not-yet");
-  const dateLabel = value.kind === "date" ? value.date : "Pick date";
-  const dateValue = value.kind === "date" ? { text: value.date } : undefined;
+  // Display only (38.9 D-23, D-48): the segment shows and announces "Oct 13";
+  // `value.date` stays the stored YYYY-MM-DD passed to `onChange`.
+  const dateText =
+    value.kind === "date"
+      ? formatDisplayDateOrFallback(value.date, value.date)
+      : null;
+  const dateLabel = dateText ?? "Pick date";
+  const dateValue = dateText !== null ? { text: dateText } : undefined;
 
   return (
     <View testID={testID} accessibilityLabel={label} style={styles.group}>

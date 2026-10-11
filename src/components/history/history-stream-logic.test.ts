@@ -6,7 +6,8 @@
  *   • buildStreamModel: years newest first with the current year always
  *     present; interaction-only year counts; an all-family day index.
  *   • dayLabel / dayAccessibilityLabel: Today / Yesterday from local dates,
- *     otherwise "Fri Oct 2"; accessible labels carry the full date and year.
+ *     otherwise "Fri, Oct 2" (38.9 D-57, D-48; the year off today's year);
+ *     accessible labels carry the full date and year.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -281,19 +282,25 @@ describe("dayLabel / dayAccessibilityLabel (D-33)", () => {
   });
 
   it("labels other days with weekday, month and day", () => {
-    expect(dayLabel("2026-10-02", TODAY)).toBe("Fri Oct 2");
-    expect(dayLabel("2026-10-05", TODAY)).toBe("Mon Oct 5");
+    expect(dayLabel("2026-10-02", TODAY)).toBe("Fri, Oct 2");
+    expect(dayLabel("2026-10-05", TODAY)).toBe("Mon, Oct 5");
   });
 
   it("finds yesterday across a month boundary", () => {
     expect(dayLabel("2026-09-30", "2026-10-01")).toBe("Yesterday");
-    expect(dayLabel("2026-09-29", "2026-10-01")).toBe("Tue Sep 29");
+    expect(dayLabel("2026-09-29", "2026-10-01")).toBe("Tue, Sep 29");
   });
 
   it("finds yesterday across a year boundary", () => {
     expect(dayLabel("2026-12-31", "2027-01-01")).toBe("Yesterday");
     expect(dayLabel("2027-01-01", "2027-01-01")).toBe("Today");
-    expect(dayLabel("2026-12-30", "2027-01-01")).toBe("Wed Dec 30");
+    // D-48 / D-57: a day in another year than `today` carries its year.
+    expect(dayLabel("2026-12-30", "2027-01-01")).toBe("Wed, Dec 30, 2026");
+  });
+
+  it("shows the year for a day in another year, judged from today (D-57)", () => {
+    expect(dayLabel("2025-06-02", TODAY)).toBe("Mon, Jun 2, 2025");
+    expect(dayLabel("2026-06-02", TODAY)).toBe("Tue, Jun 2");
   });
 
   it("finds yesterday across a leap day", () => {
@@ -489,7 +496,7 @@ describe("visibleYear chunking (D-39, D-18)", () => {
       ["2026-10", "October", "October 2026"],
       ["2026-09", "September", "September 2026"],
     ]);
-    expect(view.months[0].days[0].label).toBe("Fri Oct 2");
+    expect(view.months[0].days[0].label).toBe("Fri, Oct 2");
     expect(view.months[0].days[0].accessibilityLabel).toBe(
       "Friday, October 2, 2026",
     );
@@ -1321,25 +1328,29 @@ describe("dayDateLabel (D-74)", () => {
 describe("empty-target note text (D-21)", () => {
   it("names an empty day by weekday, month and day", () => {
     expect(emptyDayNoteText("2026-10-05", "2026-10-08")).toBe(
-      "Nothing logged on Mon Oct 5",
+      "Nothing logged on Mon, Oct 5",
+    );
+    // 38.9 D-53's own example wording (Oct 5, 2027 is a Tuesday).
+    expect(emptyDayNoteText("2027-10-05", "2027-10-08")).toBe(
+      "Nothing logged on Tue, Oct 5",
     );
   });
 
   it("carries the year when the empty day is not in the current year (D-74)", () => {
     expect(emptyDayNoteText("2025-10-05", "2026-10-08")).toBe(
-      "Nothing logged on Sun Oct 5, 2025",
+      "Nothing logged on Sun, Oct 5, 2025",
     );
     expect(emptyDayNoteText("2021-04-21", "2026-10-08")).toBe(
-      "Nothing logged on Wed Apr 21, 2021",
+      "Nothing logged on Wed, Apr 21, 2021",
     );
   });
 
   it("decides the current year from today (D-74)", () => {
     expect(emptyDayNoteText("2025-12-31", "2025-12-31")).toBe(
-      "Nothing logged on Wed Dec 31",
+      "Nothing logged on Wed, Dec 31",
     );
     expect(emptyDayNoteText("2025-12-31", "2026-01-01")).toBe(
-      "Nothing logged on Wed Dec 31, 2025",
+      "Nothing logged on Wed, Dec 31, 2025",
     );
   });
 

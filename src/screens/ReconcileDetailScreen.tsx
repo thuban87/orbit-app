@@ -64,6 +64,7 @@ import {
 import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
+import { formatStoredBirthdayForDisplay } from "@/utils/dates";
 import {
   type PickedContact,
   pickContacts,
@@ -593,16 +594,26 @@ function ChoiceRow({
   choice?: Choice;
   onChoice: (choice: Choice) => void;
 }) {
+  // Render only (38.9 D-70, D-23; review C7-L2): birthday values show their
+  // display form; the diff, every option id and `onChoice(option.id)` stay raw.
+  // A phone shape the strict gate rejects ("--06-02") stays raw.
+  const shown = (value: string): string =>
+    field.fieldFamily === "birthday"
+      ? formatStoredBirthdayForDisplay(value)
+      : value;
   const options: FieldChoiceOption<Choice>[] = [
     {
       id: "orbit",
-      value: field.orbitBaseline ?? "Keep Orbit value",
+      value:
+        field.orbitBaseline != null
+          ? shown(field.orbitBaseline)
+          : "Keep Orbit value",
       provenance: "Orbit",
       recommended: field.outcome === "removed-from-source",
     },
     ...field.sourceOptions.map((option) => ({
       id: `source:${option.optionId}` as const,
-      value: option.value ?? "Use Contacts value",
+      value: option.value != null ? shown(option.value) : "Use Contacts value",
       provenance: option.provenanceLabels.join(", ") || "Contacts",
       recommended: field.outcome === "additive",
     })),

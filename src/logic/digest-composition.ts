@@ -1,6 +1,6 @@
 /** Pure composition for Digest's Up Next and Horizon modules. */
 import { daysUntilBirthday } from "@/logic/birthday-logic";
-import { formatLocalDate } from "@/utils/dates";
+import { formatDisplayDate, formatLocalDate } from "@/utils/dates";
 
 interface HasId {
   id: number;
@@ -17,7 +17,13 @@ export interface UpcomingBirthday<T extends BirthdayInput> {
   name: string;
   birthday: string | null;
   daysUntil: number;
+  /**
+   * Display text only ("Today", "Tomorrow", or the D-48 form "Sep 25"). Never
+   * a key: use `dateKey` for the storage-format day (38.9 D-23).
+   */
   tag: string;
+  /** The occurrence day in storage format (`formatLocalDate`, YYYY-MM-DD). */
+  dateKey: string;
 }
 
 /** Candidates arrive in canonical attention order; Digest shows at most three. */
@@ -54,12 +60,14 @@ export function filterUpcomingBirthdays<T extends BirthdayInput>(
         name: contact.name,
         birthday: contact.birthday,
         daysUntil,
+        // The year rule follows the injected `today`, not the wall clock.
         tag:
           daysUntil === 0
             ? "Today"
             : daysUntil === 1
               ? "Tomorrow"
-              : formatLocalDate(occurrence),
+              : formatDisplayDate(occurrence, { now: today }),
+        dateKey: formatLocalDate(occurrence),
       };
     })
     .filter((row): row is UpcomingBirthday<T> => row !== null)

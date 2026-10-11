@@ -6,6 +6,7 @@ import {
   pickUpNext,
   previewWithOverflow,
 } from "@/logic/digest-composition";
+import { formatLocalDate } from "@/utils/dates";
 
 describe("digest composition", () => {
   it("caps Up Next at three and gives those ids first claim over Overlooked", () => {
@@ -36,11 +37,38 @@ describe("digest composition", () => {
     );
 
     expect(rows.map((row) => row.id)).toEqual([1, 2, 6]);
-    expect(rows.map((row) => row.tag)).toEqual([
-      "Today",
-      "Tomorrow",
-      "2026-09-25",
+    expect(rows.map((row) => row.tag)).toEqual(["Today", "Tomorrow", "Sep 25"]);
+  });
+
+  // 38.9 D-23 (review L6): the display tag and the storage-format day are
+  // separate fields, so display output can never become the key.
+  it("keeps a storage-format dateKey beside the display tag", () => {
+    const rows = filterUpcomingBirthdays(
+      [
+        { id: 1, name: "Today", birthday: "1990-09-19" },
+        { id: 6, name: "Six", birthday: "1990-09-25" },
+      ],
+      new Date(2026, 8, 19),
+    );
+    expect(rows.map((row) => row.dateKey)).toEqual([
+      formatLocalDate(new Date(2026, 8, 19)),
+      formatLocalDate(new Date(2026, 8, 25)),
     ]);
+    expect(rows[1]?.dateKey).toBe("2026-09-25");
+    expect(rows[1]?.dateKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(rows[1]?.tag).toBe("Sep 25");
+    expect(rows[1]?.tag).not.toBe(rows[1]?.dateKey);
+  });
+
+  // C6-L1: the year rule follows the injected day, not the wall clock. A
+  // birthday six days after Dec 28 lands in the next year and shows it.
+  it("shows the year when the occurrence falls in the next year of the injected day", () => {
+    const rows = filterUpcomingBirthdays(
+      [{ id: 1, name: "Jan", birthday: "1990-01-02" }],
+      new Date(2026, 11, 28),
+    );
+    expect(rows[0]?.tag).toBe("Jan 2, 2027");
+    expect(rows[0]?.dateKey).toBe("2027-01-02");
   });
 
   it("sorts equal-day birthdays case-insensitively by name then id", () => {

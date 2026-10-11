@@ -1,4 +1,5 @@
 import { PHOTO_UNAVAILABLE_LABEL } from "@/constants/photo-copy";
+import { parsers } from "@/db/field-parsers";
 import type { MemoryRow } from "@/db/memories-read";
 import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import type {
@@ -8,7 +9,10 @@ import type {
 } from "@/db/profile-knowledge-read";
 import type { RelationshipRow } from "@/db/relationships-read";
 import type { FieldType } from "@/schemas/types";
-import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
+import {
+  formatDateTimeMinuteOrFallback,
+  formatDisplayDateOrFallback,
+} from "@/utils/dates";
 import type { ProfileModuleId } from "./persisted-contract";
 
 export type KnowledgeChildId = Extract<
@@ -252,6 +256,23 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled field type: ${value}`);
 }
 
+/**
+ * Display text for a stored custom-field value (38.9 D-23, D-66; reviews
+ * C9-M1, C10-L1). A Date value goes through the one date parser
+ * (`parsers.date`, the same parse the Profile applies at read time) and then
+ * the D-48 display formatter, so " 2026-10-20" and "2026-10-20 trip" read
+ * "Oct 20" everywhere. A value the parser rejects, or an impossible date such
+ * as "2026-02-31", stays raw so invalid data stays visible as stored. Every
+ * other type is returned unchanged. Display only: it never writes and adds no
+ * converter (ADR-001, CLAUDE.md custom-field invariants).
+ */
+export function customValueDisplayText(type: FieldType, value: string): string {
+  if (type !== "date") return value;
+  const parsed = parsers.date(value);
+  if (!parsed.ok || parsed.value == null) return value;
+  return formatDisplayDateOrFallback(parsed.value, value);
+}
+
 /** Format only successful raw-TEXT projections; invalid values render as an error affordance. */
 export function formatCustomFieldValue(
   type: FieldType,
@@ -259,10 +280,11 @@ export function formatCustomFieldValue(
 ): string {
   if (value == null || value === "") return "Not available yet";
   switch (type) {
+    case "date":
+      return customValueDisplayText(type, value);
     case "text":
     case "textarea":
     case "dropdown":
-    case "date":
     case "number":
     case "url":
     case "email":

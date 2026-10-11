@@ -70,10 +70,13 @@ import {
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { customValueDisplayText } from "@/profile/knowledge-presentation";
+import type { FieldType } from "@/schemas/types";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { rowsForKnowledgeDisplay } from "./things-to-remember-ordering";
 
@@ -93,6 +96,9 @@ const FIRST_CLASS_LABELS = {
 interface CustomValue {
   id: number;
   label: string;
+  /** The definition's type: drives display only (38.9 D-66, C9-M1). */
+  type: FieldType;
+  /** Raw stored TEXT, never rewritten here (ADR-001). */
   value: string | null;
 }
 interface KnowledgeState {
@@ -125,7 +131,14 @@ function firstClassRows(
   derived: FirstClassDerived | null,
 ) {
   const rows: { label: string; value: string | null }[] = [
-    { label: FIRST_CLASS_LABELS.birthday, value: firstClass?.birthday ?? null },
+    // Display only (38.9 D-70; C6-L4): the stored birthday stays raw.
+    {
+      label: FIRST_CLASS_LABELS.birthday,
+      value:
+        firstClass?.birthday != null
+          ? formatStoredBirthdayForDisplay(firstClass.birthday)
+          : null,
+    },
     {
       label: FIRST_CLASS_LABELS.socialBattery,
       value: firstClass?.socialBattery ?? null,
@@ -214,6 +227,7 @@ export function ThingsToRememberScreen({
         customValues: visibleDefs.map((definition) => ({
           id: definition.id,
           label: definition.label,
+          type: definition.type,
           value: values[definition.col_name] ?? null,
         })),
       });
@@ -614,7 +628,9 @@ export function ThingsToRememberScreen({
                   {item.label}
                 </AppText>
                 {item.value ? (
-                  <AppText role="body">{item.value}</AppText>
+                  <AppText role="body">
+                    {customValueDisplayText(item.type, item.value)}
+                  </AppText>
                 ) : null}
               </View>
             ))}

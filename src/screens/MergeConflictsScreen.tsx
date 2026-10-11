@@ -19,6 +19,7 @@ import {
   type MergeConflictChoice,
 } from "@/screens/merge-conflict-logic";
 import { useTheme } from "@/theme";
+import { formatStoredBirthdayForDisplay } from "@/utils/dates";
 
 type ContactConflictRow = {
   id: number;
@@ -294,6 +295,25 @@ export function MergeConflictsScreen({
     },
   ];
 
+  // Render only (38.9 D-70, D-23; review C6-L4): a birthday choice shows its
+  // display form. `scalarConflicts` keeps the raw values for `differs()`, and
+  // the resolution stores only the option id. If two different raw values
+  // would read the same, the raw values are shown instead (this plan only).
+  const conflictDisplayValues = (conflict: {
+    key: "name" | "birthday" | "categoryId";
+    survivor: string;
+    absorbed: string;
+  }): [string, string] => {
+    if (conflict.key !== "birthday") {
+      return [conflict.survivor, conflict.absorbed];
+    }
+    const survivor = formatStoredBirthdayForDisplay(conflict.survivor);
+    const absorbed = formatStoredBirthdayForDisplay(conflict.absorbed);
+    return survivor === absorbed
+      ? [conflict.survivor, conflict.absorbed]
+      : [survivor, absorbed];
+  };
+
   return (
     <View style={styles.screen}>
       {header}
@@ -305,7 +325,7 @@ export function MergeConflictsScreen({
           <FieldChoiceGroup
             key={conflict.key}
             label={conflict.label}
-            options={choiceOptions(conflict.survivor, conflict.absorbed)}
+            options={choiceOptions(...conflictDisplayValues(conflict))}
             mode="conflict"
             selectedId={scalarChoices[conflict.key] ?? null}
             onChange={(option) =>
