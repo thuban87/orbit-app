@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TAB_ORDER } from "@/navigation/shell-contract";
 import { resolvePalette } from "@/theme/theme-presets";
 import {
   createQuickLogUndoController,
@@ -54,9 +55,12 @@ describe("FAB border tunables (D-56, OA-C2; supersedes D-45)", () => {
 });
 
 describe("resolveFabTarget", () => {
-  it("uses nested Dashboard tab targets instead of bare screen navigation", () => {
+  it("uses nested tab targets instead of bare screen navigation", () => {
     expect(
-      resolveFabTarget("AddContact", { originContactId: null }),
+      resolveFabTarget("AddContact", {
+        originContactId: null,
+        tab: "DashboardTab",
+      }),
     ).toMatchObject({
       kind: "navigate",
       tab: "DashboardTab",
@@ -64,13 +68,44 @@ describe("resolveFabTarget", () => {
     });
   });
 
+  // D-38: + forms open over the tab the user is on.
+  it("opens Add Contact over the current tab", () => {
+    expect(
+      resolveFabTarget("AddContact", {
+        originContactId: null,
+        tab: "DigestTab",
+      }),
+    ).toEqual({ kind: "navigate", tab: "DigestTab", screen: "Create" });
+  });
+
+  it.each(TAB_ORDER)("opens every + form over %s", (tab) => {
+    expect(
+      resolveFabTarget("AddContact", { originContactId: null, tab }),
+    ).toMatchObject({ kind: "navigate", tab });
+    expect(
+      resolveFabTarget("GroupLog", { originContactId: null, tab }),
+    ).toMatchObject({ kind: "navigate", tab });
+    for (const actionId of ["LogContact", "UpdateContact", "Memory"] as const) {
+      expect(
+        resolveFabTarget(actionId, { originContactId: 3, tab }),
+      ).toMatchObject({ kind: "navigate", tab });
+    }
+  });
+
   it("always routes Group Log directly, regardless of profile origin", () => {
-    expect(resolveFabTarget("GroupLog", { originContactId: 7 })).toEqual({
+    expect(
+      resolveFabTarget("GroupLog", { originContactId: 7, tab: "SettingsTab" }),
+    ).toEqual({
       kind: "navigate",
-      tab: "DashboardTab",
+      tab: "SettingsTab",
       screen: "GroupLog",
     });
-    expect(resolveFabTarget("GroupLog", { originContactId: null })).toEqual({
+    expect(
+      resolveFabTarget("GroupLog", {
+        originContactId: null,
+        tab: "DashboardTab",
+      }),
+    ).toEqual({
       kind: "navigate",
       tab: "DashboardTab",
       screen: "GroupLog",
@@ -79,13 +114,20 @@ describe("resolveFabTarget", () => {
 
   it("preselects contact-specific actions from Profile and otherwise requests the picker", () => {
     for (const actionId of ["LogContact", "UpdateContact", "Memory"] as const) {
-      expect(resolveFabTarget(actionId, { originContactId: 19 })).toEqual({
+      expect(
+        resolveFabTarget(actionId, { originContactId: 19, tab: "SettingsTab" }),
+      ).toEqual({
         kind: "navigate",
-        tab: "DashboardTab",
+        tab: "SettingsTab",
         screen: actionId,
         params: { contactId: 19 },
       });
-      expect(resolveFabTarget(actionId, { originContactId: null })).toEqual({
+      expect(
+        resolveFabTarget(actionId, {
+          originContactId: null,
+          tab: "SettingsTab",
+        }),
+      ).toEqual({
         kind: "pick-then",
         screen: actionId,
       });
@@ -93,11 +135,15 @@ describe("resolveFabTarget", () => {
   });
 
   it("keeps Quick Log's contact context for its picker/write seam", () => {
-    expect(resolveFabTarget("QuickLog", { originContactId: 19 })).toEqual({
+    expect(
+      resolveFabTarget("QuickLog", { originContactId: 19, tab: "SettingsTab" }),
+    ).toEqual({
       kind: "quick-log",
       contactId: 19,
     });
-    expect(resolveFabTarget("QuickLog", { originContactId: null })).toEqual({
+    expect(
+      resolveFabTarget("QuickLog", { originContactId: null, tab: "DigestTab" }),
+    ).toEqual({
       kind: "quick-log",
       contactId: null,
     });
@@ -151,7 +197,7 @@ describe("getFocusedContactContext", () => {
           },
         ],
       }),
-    ).toEqual({ originContactId: 4 });
+    ).toEqual({ originContactId: 4, tab: "DashboardTab" });
   });
 
   it("finds an Orrery Profile contact", () => {
@@ -171,7 +217,7 @@ describe("getFocusedContactContext", () => {
           },
         ],
       }),
-    ).toEqual({ originContactId: 8 });
+    ).toEqual({ originContactId: 8, tab: "OrreryTab" });
   });
 
   it("returns no contact from root-tab browse surfaces", () => {
@@ -184,7 +230,7 @@ describe("getFocusedContactContext", () => {
     ]) {
       expect(
         getFocusedContactContext({ index: 0, routes: [{ name }] }),
-      ).toEqual({ originContactId: null });
+      ).toEqual({ originContactId: null, tab: name });
     }
   });
 
@@ -207,7 +253,7 @@ describe("getFocusedContactContext", () => {
             },
           ],
         }),
-      ).toEqual({ originContactId: 12 });
+      ).toEqual({ originContactId: 12, tab: name });
     },
   );
 
@@ -231,7 +277,7 @@ describe("getFocusedContactContext", () => {
           },
         ],
       }),
-    ).toEqual({ originContactId: 12 });
+    ).toEqual({ originContactId: 12, tab: "SettingsTab" });
   });
 
   it("returns no contact from the Settings hub or a non-Profile Settings child", () => {
@@ -245,7 +291,7 @@ describe("getFocusedContactContext", () => {
           },
         ],
       }),
-    ).toEqual({ originContactId: null });
+    ).toEqual({ originContactId: null, tab: "SettingsTab" });
     expect(
       getFocusedContactContext({
         index: 0,
@@ -259,16 +305,23 @@ describe("getFocusedContactContext", () => {
           },
         ],
       }),
-    ).toEqual({ originContactId: null });
+    ).toEqual({ originContactId: null, tab: "SettingsTab" });
   });
 
   it("is defensive around stale or malformed state", () => {
+    // No known tab focused: today's + destination, the Contacts tab (this
+    // plan only).
     expect(getFocusedContactContext(undefined)).toEqual({
       originContactId: null,
+      tab: "DashboardTab",
     });
     expect(getFocusedContactContext({ routes: [] })).toEqual({
       originContactId: null,
+      tab: "DashboardTab",
     });
+    expect(
+      getFocusedContactContext({ index: 0, routes: [{ name: "NopeTab" }] }),
+    ).toEqual({ originContactId: null, tab: "DashboardTab" });
     expect(
       getFocusedContactContext({
         index: 0,
@@ -279,17 +332,17 @@ describe("getFocusedContactContext", () => {
           },
         ],
       }),
-    ).toEqual({ originContactId: null });
+    ).toEqual({ originContactId: null, tab: "DashboardTab" });
   });
 });
 
 describe("resolveFabContactContext — an archived contact is never FAB context (38.3 review A-WR-07, owner ruling D-29)", () => {
   it("drops an archived focused Profile so every action falls back to the picker flows", async () => {
     const context = await resolveFabContactContext(
-      { originContactId: 7 },
+      { originContactId: 7, tab: "DashboardTab" },
       async () => ({ archived: true }),
     );
-    expect(context).toEqual({ originContactId: null });
+    expect(context).toEqual({ originContactId: null, tab: "DashboardTab" });
     expect(resolveFabTarget("QuickLog", context)).toEqual({
       kind: "quick-log",
       contactId: null,
@@ -302,32 +355,61 @@ describe("resolveFabContactContext — an archived contact is never FAB context 
 
   it("keeps a live contact's context (including a Settings-hosted Profile)", async () => {
     await expect(
-      resolveFabContactContext({ originContactId: 7 }, async () => ({
-        archived: false,
-      })),
-    ).resolves.toEqual({ originContactId: 7 });
+      resolveFabContactContext(
+        { originContactId: 7, tab: "DashboardTab" },
+        async () => ({
+          archived: false,
+        }),
+      ),
+    ).resolves.toEqual({ originContactId: 7, tab: "DashboardTab" });
   });
 
   it("drops a contact that no longer exists", async () => {
     await expect(
-      resolveFabContactContext({ originContactId: 7 }, async () => null),
-    ).resolves.toEqual({ originContactId: null });
+      resolveFabContactContext(
+        { originContactId: 7, tab: "DashboardTab" },
+        async () => null,
+      ),
+    ).resolves.toEqual({ originContactId: null, tab: "DashboardTab" });
   });
 
   it("fails safe to no context when the archive read fails", async () => {
     await expect(
-      resolveFabContactContext({ originContactId: 7 }, () =>
-        Promise.reject(new Error("read")),
+      resolveFabContactContext(
+        { originContactId: 7, tab: "DashboardTab" },
+        () => Promise.reject(new Error("read")),
       ),
-    ).resolves.toEqual({ originContactId: null });
+    ).resolves.toEqual({ originContactId: null, tab: "DashboardTab" });
   });
 
   it("does not read when there is no focused contact", async () => {
     const read = vi.fn();
     await expect(
-      resolveFabContactContext({ originContactId: null }, read),
-    ).resolves.toEqual({ originContactId: null });
+      resolveFabContactContext(
+        { originContactId: null, tab: "DashboardTab" },
+        read,
+      ),
+    ).resolves.toEqual({ originContactId: null, tab: "DashboardTab" });
     expect(read).not.toHaveBeenCalled();
+  });
+
+  // D-38 + 38.3 D-29 (review C10-L2): the archived fallback keeps the focused
+  // tab, so + from an archived Settings-hosted Profile still opens over Settings.
+  it("keeps the focused tab when it drops an archived contact", async () => {
+    await expect(
+      resolveFabContactContext(
+        { originContactId: 7, tab: "SettingsTab" },
+        async () => ({ archived: true }),
+      ),
+    ).resolves.toEqual({ originContactId: null, tab: "SettingsTab" });
+  });
+
+  it("keeps the focused tab when the archive read fails", async () => {
+    await expect(
+      resolveFabContactContext({ originContactId: 7, tab: "OrreryTab" }, () =>
+        Promise.reject(new Error("read")),
+      ),
+    ).resolves.toEqual({ originContactId: null, tab: "OrreryTab" });
   });
 });
 
