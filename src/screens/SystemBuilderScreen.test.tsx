@@ -144,7 +144,7 @@ const guard = vi.hoisted(() => ({
 vi.mock("@/navigation/discard-keep-guard", () => ({
   useDiscardKeepGuard: vi.fn((options: typeof guard.options) => {
     guard.options = options;
-    return { requestClose: vi.fn() };
+    return { requestClose: vi.fn(), settleHold: vi.fn() };
   }),
 }));
 vi.mock("@/stores/confirm-store", () => ({

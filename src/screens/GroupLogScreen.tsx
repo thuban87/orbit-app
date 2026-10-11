@@ -84,7 +84,7 @@ export function GroupLogScreen({
     () => JSON.stringify({ title, value, groupNote, participantIds }),
     [groupNote, participantIds, title, value],
   );
-  useDiscardKeepGuard({
+  const { settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges: snapshot !== seedRef.current,
     bypassRef,
     // A save in flight holds every exit, with no prompt (fix-pass WR-02).
@@ -124,6 +124,7 @@ export function GroupLogScreen({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 

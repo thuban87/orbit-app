@@ -99,7 +99,7 @@ const guard = vi.hoisted(() => ({
 vi.mock("@/navigation/discard-keep-guard", () => ({
   useDiscardKeepGuard: (options: typeof guard.options) => {
     guard.options = options;
-    return { requestClose: guard.requestClose };
+    return { requestClose: guard.requestClose, settleHold: vi.fn() };
   },
 }));
 vi.mock("@/navigation/use-bottom-clearance", () => ({

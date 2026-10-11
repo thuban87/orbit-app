@@ -1137,6 +1137,7 @@ export function EditContactScreen({
       });
     } finally {
       endInFlight(savingRef);
+      settleHold();
       setSaving(false);
     }
   }
@@ -1186,7 +1187,7 @@ export function EditContactScreen({
     relationship: relationshipDraft,
     offLimits: offLimitsDraft,
   });
-  const { requestClose } = useDiscardKeepGuard({
+  const { requestClose, settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges,
     bypassRef,
     // A save in flight holds every exit, with no prompt (fix-pass WR-02).

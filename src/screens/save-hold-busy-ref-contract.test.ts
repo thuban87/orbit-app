@@ -165,6 +165,22 @@ describe.each(CASES)(
       },
     );
 
+    it("takes settleHold from the guard (third fix pass WR-01)", () => {
+      const call = source.indexOf("useDiscardKeepGuard({");
+      const head = source.slice(source.lastIndexOf("\n", call), call);
+      expect(head).toMatch(/const \{ (?:requestClose, )?settleHold \} = $/);
+    });
+
+    it.each(saves)(
+      "%s settles the hold after releasing the ref, so a parked RESET is re-dispatched (WR-01)",
+      (marker) => {
+        const body = saveBody(source, marker);
+        const finallyAt = body.lastIndexOf("} finally {");
+        const release = body.indexOf(`endInFlight(${ref})`, finallyAt);
+        expect(body.indexOf("settleHold();", release)).toBeGreaterThan(release);
+      },
+    );
+
     it("draws the header Back disabled while saving (D-26)", () => {
       const tags = source.match(/<ShellAppBar[\s\S]*?\/>/g) ?? [];
       const held = tags.filter((tag) =>
@@ -174,6 +190,22 @@ describe.each(CASES)(
     });
   },
 );
+
+describe("MemoryScreen lets a parked removal through only when a save fails (WR-01)", () => {
+  const source = read("src/screens/MemoryScreen.tsx");
+
+  it.each(["const add = async (", "const edit = async ("])(
+    "%s skips the settle after a commit: its deferred goBack wins",
+    (marker) => {
+      const body = saveBody(source, marker);
+      expect(body).toContain("let committed = false;");
+      expect(body.indexOf("committed = true;")).toBeLessThan(
+        body.indexOf("returnToChooser();"),
+      );
+      expect(body).toContain("if (!committed) settleHold();");
+    },
+  );
+});
 
 describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", () => {
   const source = read("src/screens/UpdateContactScreen.tsx");
@@ -237,6 +269,27 @@ describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", ()
       );
       expect(body.indexOf("endInFlight(savingRef)", finallyAt)).toBeGreaterThan(
         finallyAt,
+      );
+    }
+  });
+
+  it("every row save settles the guard's hold after the release (WR-01)", () => {
+    expect(source).toMatch(
+      /const \{ requestClose, settleHold \} = useDiscardKeepGuard\(\{/,
+    );
+    expect(source).toMatch(
+      /const rowSave: RowSave = \{\s*ref: rowSavingRef,\s*onSavingChange: setRowSaving,\s*settleHold,\s*\};/,
+    );
+    const markers = [
+      ...source.matchAll(/const (?:save|add|edit) = async \(/g),
+    ].map((match) => match.index ?? -1);
+    expect(markers).toHaveLength(7);
+    for (const at of markers) {
+      const body = blockFrom(source, source.indexOf(")", at), "row save");
+      const finallyAt = body.lastIndexOf("} finally {");
+      const release = body.indexOf("endInFlight(savingRef)", finallyAt);
+      expect(body.indexOf("rowSave.settleHold();", release)).toBeGreaterThan(
+        release,
       );
     }
   });

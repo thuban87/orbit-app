@@ -105,7 +105,7 @@ export function MemoryScreen({
     dirty: false,
   });
   const bypassRef = useRef(false);
-  const { requestClose } = useDiscardKeepGuard({
+  const { requestClose, settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges: false,
     bypassRef,
     // An add or edit in flight holds every exit, with no prompt and no draft
@@ -178,6 +178,7 @@ export function MemoryScreen({
     // Claim the slot synchronously — a double-tap must not INSERT twice (WR-03).
     if (!beginInFlight(savingRef)) return false;
     setSaving(true);
+    let committed = false;
     try {
       const now = localDateTime();
       await addMemory(getExecutor(), {
@@ -186,6 +187,7 @@ export function MemoryScreen({
         createdAt: now,
         now,
       });
+      committed = true;
       returnToChooser();
       return true;
     } catch (error) {
@@ -195,6 +197,10 @@ export function MemoryScreen({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      // A committed save leaves through the deferred goBack below, which wins
+      // over a parked removal (dropped on unmount). Only a failed save, which
+      // keeps the user here, lets a parked removal through (WR-01).
+      if (!committed) settleHold();
     }
   };
 
@@ -202,6 +208,7 @@ export function MemoryScreen({
     if (contactId === null) return false;
     if (!beginInFlight(savingRef)) return false;
     setSaving(true);
+    let committed = false;
     try {
       await editMemory(getExecutor(), {
         id,
@@ -209,6 +216,7 @@ export function MemoryScreen({
         ...patch,
         now: localDateTime(),
       });
+      committed = true;
       returnToChooser();
       return true;
     } catch (error) {
@@ -218,6 +226,10 @@ export function MemoryScreen({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      // A committed save leaves through the deferred goBack below, which wins
+      // over a parked removal (dropped on unmount). Only a failed save, which
+      // keeps the user here, lets a parked removal through (WR-01).
+      if (!committed) settleHold();
     }
   };
 

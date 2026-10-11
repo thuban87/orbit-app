@@ -305,7 +305,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     if (previewing) setPreviewing(false);
     else setPage("definition");
   };
-  useDiscardKeepGuard({
+  const { settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges: meaningful,
     bypassRef,
     // A save in flight holds every exit, with no prompt and no step-back
@@ -516,6 +516,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      settleHold();
     }
   };
   const resetOverrides = () => {

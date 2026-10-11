@@ -60,6 +60,11 @@ describe.each([
     expect(release).toBeGreaterThan(body.lastIndexOf("} finally {"));
     expect(body.split("endInFlight(savingRef)")).toHaveLength(2);
   });
+
+  it("settles the guard's hold after the release, so a parked RESET is not lost (third fix pass WR-01)", () => {
+    const release = body.indexOf("endInFlight(savingRef)");
+    expect(body.indexOf("settleHold();", release)).toBeGreaterThan(release);
+  });
 });
 
 describe.each([
@@ -71,6 +76,12 @@ describe.each([
   it("passes the save ref to the guard, so Back cannot offer Discard mid-save", () => {
     expect(source).toMatch(
       /useDiscardKeepGuard\(\{[\s\S]*?busyRef: savingRef,[\s\S]*?\}\);/,
+    );
+  });
+
+  it("takes settleHold from the guard (third fix pass WR-01)", () => {
+    expect(source).toMatch(
+      /const \{ requestClose, settleHold \} = useDiscardKeepGuard\(\{/,
     );
   });
 

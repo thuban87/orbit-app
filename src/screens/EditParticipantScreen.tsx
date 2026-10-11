@@ -74,7 +74,11 @@ export function EditParticipantScreen({
   const hasUnsavedChanges =
     draft !== null && JSON.stringify(draft) !== baselineRef.current;
   // A save in flight holds every exit, with no prompt (fix-pass WR-02).
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef, busyRef: savingRef });
+  const { settleHold } = useDiscardKeepGuard({
+    hasUnsavedChanges,
+    bypassRef,
+    busyRef: savingRef,
+  });
 
   async function save() {
     if (!loaded || !draft || !beginInFlight(savingRef)) return;
@@ -99,6 +103,7 @@ export function EditParticipantScreen({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 

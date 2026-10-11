@@ -93,7 +93,10 @@ vi.mock("@/logic/group-log-participant-inputs", () => ({
 // The guard is mocked; its options are captured so the busy hold (fix-pass
 // WR-02) can be fed to the real `decideGuardOnRemove`.
 const { useDiscardKeepGuard } = vi.hoisted(() => ({
-  useDiscardKeepGuard: vi.fn(),
+  useDiscardKeepGuard: vi.fn((_options?: unknown) => ({
+    requestClose: vi.fn(),
+    settleHold: vi.fn(),
+  })),
 }));
 vi.mock("@/navigation/discard-keep-guard", () => ({ useDiscardKeepGuard }));
 // The real guard module (imported below for its pure decision) imports

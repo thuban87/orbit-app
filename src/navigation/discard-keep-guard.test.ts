@@ -7,26 +7,73 @@ type BeforeRemoveEvent = {
 };
 type BeforeRemove = (event: BeforeRemoveEvent) => void;
 
-const nav = vi.hoisted(() => ({
-  listener: null as ((event: unknown) => void) | null,
-  dispatch: vi.fn(),
+const nav = vi.hoisted(() => {
+  const state = {
+    listener: null as ((event: unknown) => void) | null,
+    dispatch: vi.fn(),
+    // One stable navigation object, as `useNavigation` returns in a screen.
+    navigation: {
+      addListener: (_name: string, callback: (event: unknown) => void) => {
+        state.listener = callback;
+        return () => {};
+      },
+      dispatch: (action: unknown) => state.dispatch(action),
+    },
+  };
+  return state;
+});
+
+/**
+ * A minimal hook runtime for calling the guard as a plain function: hooks
+ * keep their slot (by call order) across re-renders, a setter re-renders
+ * synchronously, and an effect runs when its deps change. Effects run in
+ * declaration order, as React runs one component's effects.
+ */
+const runtime = vi.hoisted(() => ({
+  slots: [] as unknown[],
+  index: 0,
+  render: null as null | (() => void),
 }));
 
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
-  useEffect: (effect: () => undefined | (() => void)) => {
+  useRef: <T>(value: T) => {
+    const slot = runtime.index++;
+    if (!(slot in runtime.slots)) runtime.slots[slot] = { current: value };
+    return runtime.slots[slot];
+  },
+  useState: <T>(value: T) => {
+    const slot = runtime.index++;
+    if (!(slot in runtime.slots)) runtime.slots[slot] = value;
+    const set = (next: T | ((previous: T) => T)) => {
+      runtime.slots[slot] =
+        typeof next === "function"
+          ? (next as (previous: T) => T)(runtime.slots[slot] as T)
+          : next;
+      runtime.render?.();
+    };
+    return [runtime.slots[slot], set];
+  },
+  useEffect: (
+    effect: () => undefined | (() => void),
+    deps?: readonly unknown[],
+  ) => {
+    const slot = runtime.index++;
+    const previous = runtime.slots[slot] as
+      | { deps?: readonly unknown[] }
+      | undefined;
+    const changed =
+      previous === undefined ||
+      deps === undefined ||
+      previous.deps === undefined ||
+      deps.some((dep, at) => !Object.is(dep, previous.deps?.[at]));
+    if (!changed) return;
+    runtime.slots[slot] = { deps };
     effect();
   },
-  useRef: <T>(value: T) => ({ current: value }),
 }));
 vi.mock("@react-navigation/native", () => ({
-  useNavigation: () => ({
-    addListener: (_name: string, callback: (event: unknown) => void) => {
-      nav.listener = callback;
-      return () => {};
-    },
-    dispatch: nav.dispatch,
-  }),
+  useNavigation: () => nav.navigation,
 }));
 
 const { confirmDiscard, decideGuardOnRemove, useDiscardKeepGuard } =
@@ -41,14 +88,26 @@ function mountGuard(
   busyRef?: { current: boolean },
 ) {
   nav.listener = null;
+  runtime.slots = [];
   const bypassRef = { current: bypass };
-  // biome-ignore lint/correctness/useHookAtTopLevel: react is mocked; the hook runs as a plain function here.
-  const { requestClose } = useDiscardKeepGuard({
-    hasUnsavedChanges,
-    bypassRef,
-    subEditor,
-    busyRef,
-  });
+  let guard: ReturnType<typeof useDiscardKeepGuard> | null = null;
+  runtime.render = () => {
+    runtime.index = 0;
+    guard = useDiscardKeepGuard({
+      hasUnsavedChanges,
+      bypassRef,
+      subEditor,
+      busyRef,
+    });
+  };
+  runtime.render();
+  const current = () =>
+    guard as unknown as ReturnType<typeof useDiscardKeepGuard>;
+  const requestClose: ReturnType<typeof useDiscardKeepGuard>["requestClose"] = (
+    close,
+    dirty,
+  ) => current().requestClose(close, dirty);
+  const settleHold = () => current().settleHold();
   const fire = (action: unknown = { type: "GO_BACK" }) => {
     const event: BeforeRemoveEvent = {
       preventDefault: vi.fn(),
@@ -57,7 +116,7 @@ function mountGuard(
     (nav.listener as BeforeRemove | null)?.(event);
     return event;
   };
-  return { fire, bypassRef, requestClose };
+  return { fire, bypassRef, requestClose, settleHold };
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -360,6 +419,120 @@ describe("useDiscardKeepGuard busyRef (fix-pass WR-02)", () => {
     const { fire } = mountGuard(true);
     fire();
     expect(confirmStore.getState().queue).toHaveLength(1);
+  });
+});
+
+/**
+ * A held non-Back removal is parked, not dropped (third fix pass WR-01;
+ * 38.9-02 review C6-H1): a widget or notification RESET during a save runs
+ * once the save settles, unless the save's own navigation left.
+ */
+describe("useDiscardKeepGuard parks a held non-Back removal (WR-01)", () => {
+  const widgetReset = { type: "RESET", payload: { index: 1, routes: [] } };
+
+  it("a RESET during the hold is prevented quietly, then dispatched once after the save settles", () => {
+    const busyRef = { current: true };
+    const { fire, settleHold } = mountGuard(false, false, undefined, busyRef);
+    const held = fire(widgetReset);
+    expect(held.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+    expect(nav.dispatch).not.toHaveBeenCalled();
+
+    // The save's finally: release the ref, then settle.
+    busyRef.current = false;
+    settleHold();
+    expect(nav.dispatch).toHaveBeenCalledOnce();
+    expect(nav.dispatch).toHaveBeenCalledWith(widgetReset);
+
+    // Settled once: a second settle dispatches nothing more.
+    settleHold();
+    expect(nav.dispatch).toHaveBeenCalledOnce();
+  });
+
+  it("NAVIGATE is parked the same way", () => {
+    const busyRef = { current: true };
+    const { fire, settleHold } = mountGuard(false, false, undefined, busyRef);
+    const navigate = { type: "NAVIGATE", payload: { name: "Profile" } };
+    fire(navigate);
+    busyRef.current = false;
+    settleHold();
+    expect(nav.dispatch).toHaveBeenCalledWith(navigate);
+  });
+
+  it("is not dispatched when the save's own navigation left (bypass set)", () => {
+    const busyRef = { current: true };
+    const { fire, settleHold, bypassRef } = mountGuard(
+      true,
+      false,
+      undefined,
+      busyRef,
+    );
+    fire(widgetReset);
+    // The save committed and navigated: bypass, then the finally.
+    bypassRef.current = true;
+    busyRef.current = false;
+    settleHold();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("Back (GO_BACK / POP) during the hold is still held and never re-dispatched", () => {
+    for (const type of ["GO_BACK", "POP"]) {
+      nav.dispatch.mockReset();
+      const busyRef = { current: true };
+      const { fire, settleHold } = mountGuard(true, false, undefined, busyRef);
+      const held = fire({ type });
+      expect(held.preventDefault).toHaveBeenCalledOnce();
+      busyRef.current = false;
+      settleHold();
+      expect(nav.dispatch).not.toHaveBeenCalled();
+      expect(confirmStore.getState().queue).toHaveLength(0);
+    }
+  });
+
+  it("a settle while the ref is still held waits for the next settle", () => {
+    const busyRef = { current: true };
+    const { fire, settleHold } = mountGuard(false, false, undefined, busyRef);
+    fire(widgetReset);
+    settleHold(); // released out of order, or a second save claimed the ref
+    expect(nav.dispatch).not.toHaveBeenCalled();
+    busyRef.current = false;
+    settleHold();
+    expect(nav.dispatch).toHaveBeenCalledOnce();
+  });
+
+  it("only the latest held removal is dispatched", () => {
+    const busyRef = { current: true };
+    const { fire, settleHold } = mountGuard(false, false, undefined, busyRef);
+    const first = { type: "RESET", payload: { index: 0, routes: [] } };
+    fire(first);
+    fire(widgetReset);
+    busyRef.current = false;
+    settleHold();
+    expect(nav.dispatch).toHaveBeenCalledOnce();
+    expect(nav.dispatch).toHaveBeenCalledWith(widgetReset);
+  });
+
+  it("the re-dispatched RESET meets the normal rule: dirty work prompts once, Discard completes it", async () => {
+    const busyRef = { current: true };
+    const { fire, settleHold } = mountGuard(true, false, undefined, busyRef);
+    fire(widgetReset);
+    busyRef.current = false;
+    settleHold();
+    // The navigator emits beforeRemove again for the dispatched RESET.
+    const again = fire(nav.dispatch.mock.calls[0]?.[0]);
+    expect(again.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(nav.dispatch).toHaveBeenCalledTimes(2);
+    expect(nav.dispatch).toHaveBeenLastCalledWith(widgetReset);
+  });
+
+  it("a settle with nothing parked dispatches nothing", () => {
+    const busyRef = { current: false };
+    const { settleHold } = mountGuard(false, false, undefined, busyRef);
+    settleHold();
+    expect(nav.dispatch).not.toHaveBeenCalled();
   });
 });
 

@@ -117,7 +117,11 @@ export function EditInteractionScreen({
   const hasUnsavedChanges =
     value !== null && seedRef.current !== JSON.stringify(value);
   // A save in flight holds every exit, with no prompt (fix-pass WR-02).
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef, busyRef: savingRef });
+  const { settleHold } = useDiscardKeepGuard({
+    hasUnsavedChanges,
+    bypassRef,
+    busyRef: savingRef,
+  });
 
   async function handleSave() {
     if (!value || !canSave(value, localDateTime(), saving)) {
@@ -146,6 +150,7 @@ export function EditInteractionScreen({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 

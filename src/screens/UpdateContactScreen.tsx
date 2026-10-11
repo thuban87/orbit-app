@@ -149,6 +149,12 @@ function useReportDirty(
 type RowSave = {
   ref: InFlightRef;
   onSavingChange: (saving: boolean) => void;
+  /**
+   * The guard's `settleHold` (third fix pass WR-01): called in each row
+   * save's `finally` after the slot is released, so a widget or notification
+   * RESET held during the save is dispatched again, not lost.
+   */
+  settleHold: () => void;
 };
 
 /** A row editor's `saving` state, mirrored to the screen's `RowSave`. */
@@ -313,6 +319,7 @@ function CurrentStateFocusedEditor({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      rowSave.settleHold();
     }
   };
 
@@ -411,6 +418,7 @@ function KeyPeopleFocusedEditor({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      rowSave.settleHold();
     }
   };
   const edit = async (
@@ -434,6 +442,7 @@ function KeyPeopleFocusedEditor({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      rowSave.settleHold();
     }
   };
   const restore = (id: number) =>
@@ -566,6 +575,7 @@ function OffLimitsFocusedEditor({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      rowSave.settleHold();
     }
   };
 
@@ -721,6 +731,7 @@ function ContactMethodFocusedEditor({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      rowSave.settleHold();
     }
   };
 
@@ -846,6 +857,7 @@ function ContactFrequencyFocusedEditor({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      rowSave.settleHold();
     }
   };
 
@@ -940,6 +952,7 @@ function CustomFieldFocusedEditor({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      rowSave.settleHold();
     }
   };
 
@@ -1095,10 +1108,6 @@ export function UpdateContactScreen({
   // the state draws the header Back disabled (D-26).
   const rowSavingRef = useRef(false);
   const [rowSaving, setRowSaving] = useState(false);
-  const rowSave: RowSave = {
-    ref: rowSavingRef,
-    onSavingChange: setRowSaving,
-  };
   const rowOpen = session.activeRowKey != null;
   const innerOpen = genericSelectedDefId !== null || relationshipDraftOpen;
 
@@ -1118,7 +1127,7 @@ export function UpdateContactScreen({
 
   // Back (header, system key, system gesture) closes the innermost open level
   // and keeps the route, prompting only when it holds typed text.
-  const { requestClose } = useDiscardKeepGuard({
+  const { requestClose, settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges: false,
     bypassRef,
     // A row save in flight holds every exit, with no prompt and no row close
@@ -1133,6 +1142,11 @@ export function UpdateContactScreen({
         ),
     },
   });
+  const rowSave: RowSave = {
+    ref: rowSavingRef,
+    onSavingChange: setRowSaving,
+    settleHold,
+  };
 
   /** A row editor's own Cancel (EditorFrame): closes the row (D-61). */
   function requestRowCancel() {

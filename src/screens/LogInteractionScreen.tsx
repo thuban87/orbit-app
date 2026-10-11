@@ -193,7 +193,7 @@ export function LogInteractionScreen({
   }, []);
 
   // Off while the contact picker shows (contactId null; D-15).
-  useDiscardKeepGuard({
+  const { settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges: isLogInteractionDirty({
       contactId,
       seedSnapshot: seedSnapshotRef.current,
@@ -269,6 +269,7 @@ export function LogInteractionScreen({
       navigation.goBack();
     } finally {
       endInFlight(savingRef);
+      settleHold();
     }
   }
 

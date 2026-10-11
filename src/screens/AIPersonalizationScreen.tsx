@@ -333,6 +333,7 @@ export function AIPersonalizationScreen({
     } finally {
       setSavingStyle(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 
@@ -345,7 +346,7 @@ export function AIPersonalizationScreen({
   // Back with unsaved Writing Style edits or a typed section draft prompts
   // (D-13, D-34; C5-L7). Save does not navigate, so the bypass stays false.
   const bypassRef = useRef(false);
-  useDiscardKeepGuard({
+  const { settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges:
       isWritingStyleDirty(savedStyle, style) ||
       hasSectionDraftChanges({
@@ -381,6 +382,7 @@ export function AIPersonalizationScreen({
     } finally {
       setSavingSection(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 
@@ -434,6 +436,7 @@ export function AIPersonalizationScreen({
     } finally {
       setSavingSection(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 

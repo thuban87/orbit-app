@@ -124,7 +124,7 @@ export function CustomFieldsScreen() {
     setEditor(null);
     setEditorDirty(false);
   };
-  const { requestClose } = useDiscardKeepGuard({
+  const { requestClose, settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges: false,
     bypassRef,
     // A create or edit in flight (its pre-flight summary included) holds every
@@ -206,6 +206,7 @@ export function CustomFieldsScreen() {
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 
@@ -302,6 +303,7 @@ export function CustomFieldsScreen() {
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 

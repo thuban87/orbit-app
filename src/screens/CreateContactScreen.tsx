@@ -432,7 +432,7 @@ export function CreateContactScreen({
     relationship: relationshipDraft,
     offLimits: offLimitsDraft,
   });
-  const { requestClose } = useDiscardKeepGuard({
+  const { requestClose, settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges: isCreateFormDirty(
       CREATE_FORM_SEED_SIGNATURE,
       createFormSeedSignature(formState),
@@ -526,6 +526,7 @@ export function CreateContactScreen({
       });
     } finally {
       endInFlight(savingRef);
+      settleHold();
       setSaving(false);
     }
   }

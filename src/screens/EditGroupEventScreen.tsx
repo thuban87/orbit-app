@@ -124,7 +124,11 @@ export function EditGroupEventScreen({
 
   const hasUnsavedChanges = isGroupEventDraftDirty(state);
   // The event save in flight holds every exit, with no prompt (fix-pass WR-02).
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef, busyRef: savingRef });
+  const { settleHold } = useDiscardKeepGuard({
+    hasUnsavedChanges,
+    bypassRef,
+    busyRef: savingRef,
+  });
   const excludedIds = useMemo(
     () => excludedParticipantIds(event, state.committedPendingIds),
     [event, state.committedPendingIds],
@@ -165,6 +169,7 @@ export function EditGroupEventScreen({
     } finally {
       setSaving(false);
       endInFlight(savingRef);
+      settleHold();
     }
   }
 
