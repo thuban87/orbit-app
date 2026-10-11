@@ -468,3 +468,54 @@ describe("a save in flight owns the close (verification IN-01)", () => {
     await expect(onEdit(7, {})).resolves.toBe(false);
   });
 });
+
+describe("a failed memory edit shows its error (fix-pass IN-04)", () => {
+  beforeEach(() => {
+    state.savingRef.current = false;
+    state.discardAnswer = true;
+    state.confirmDiscard.mockClear();
+    for (const setter of state.setters) setter?.mockClear();
+  });
+
+  const editView = (view: Partial<Record<SlotName, unknown>> = {}) =>
+    render({ createdMemory: MEMORY, editingMemory: true, ...view });
+
+  it("a rejected edit sets the save-failed error and keeps the form open", async () => {
+    vi.mocked(memoriesDao.editMemory).mockRejectedValueOnce(new Error("disk"));
+    const onEdit = find(editView().tree, "MemoryEditor")[0]?.props?.onEdit;
+    if (typeof onEdit !== "function") throw new Error("no onEdit");
+    await expect(onEdit(7, {})).resolves.toBe(false);
+    expect(state.setters[SLOT.error]).toHaveBeenLastCalledWith(
+      "Couldn't save. Please try again.",
+    );
+    expect(state.savingRef.current).toBe(false);
+  });
+
+  it("renders the error under the Edit Memory heading in the danger colour", () => {
+    const { tree } = editView({ error: "Couldn't save. Please try again." });
+    const captions = find(tree, "AppText");
+    const heading = captions.findIndex(
+      (n) => n.props?.children === "Edit Memory",
+    );
+    const message = captions.findIndex(
+      (n) => n.props?.children === "Couldn't save. Please try again.",
+    );
+    expect(heading).toBeGreaterThan(-1);
+    expect(message).toBeGreaterThan(heading);
+    expect(captions[message]?.props?.role).toBe("caption");
+    expect(captions[message]?.props?.style).toHaveProperty("color");
+    // No error, no caption.
+    expect(texts(editView().tree)).not.toContain(
+      "Couldn't save. Please try again.",
+    );
+  });
+
+  it("closing the form clears the error with the draft it belonged to", () => {
+    const close = vi.fn();
+    cancelRequestOf(
+      editView({ error: "Couldn't save. Please try again." }).tree,
+    )(close);
+    expect(close).toHaveBeenCalledOnce();
+    expect(state.setters[SLOT.error]).toHaveBeenLastCalledWith(null);
+  });
+});

@@ -238,6 +238,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       if (savingRef.current) return false;
       savingRef.current = true;
       setBusy(true);
+      setError(null);
       try {
         // 38.3 review B-CR-01: a resolved editMemory is a successful save even
         // if the re-read fails. A missing re-read row closes the editor rather
@@ -257,6 +258,9 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         });
         if (outcome.kind === "write-failed") {
           Logger.error(LOG_SCOPE, "failed to edit memory", outcome.error);
+          // Shown under the Edit Memory heading; the form stays open with the
+          // draft so Save can be retried (fix-pass IN-04).
+          setError(SAVE_FAILED_MESSAGE);
           return false;
         }
         if (outcome.row === null) {
@@ -369,12 +373,17 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   // untouched one closes the form at once. The sheet stays open either way.
   const requestMemoryFormCancel = (close: () => void) => {
     if (savingRef.current) return; // the edit save closes the form (IN-01)
-    if (!memoryDraftDirty) {
+    // A failed edit's error belongs to the draft being left (IN-04).
+    const closeForm = () => {
+      setError(null);
       close();
+    };
+    if (!memoryDraftDirty) {
+      closeForm();
       return;
     }
     void confirmDiscard().then((discard) => {
-      if (discard) close();
+      if (discard) closeForm();
     });
   };
 
@@ -396,6 +405,11 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         >
           <AppText role="heading">Edit Memory</AppText>
           {personLine}
+          {error ? (
+            <AppText role="caption" style={{ color: colors.danger }}>
+              {error}
+            </AppText>
+          ) : null}
           <MemoryEditor
             items={[memoryBeingEdited]}
             // Only this one memory is shown, so its options open by default
