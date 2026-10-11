@@ -48,6 +48,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
+import { plural } from "@/utils/plural";
 
 const LOAD_ERROR = "Couldn't load categories. Try again.";
 export const CATEGORY_MANAGER_COPY = {
@@ -160,10 +161,6 @@ export function isUnusedCategoryPreview(
   counts: CategoryDeletionCounts,
 ): boolean {
   return Object.values(counts).every((count) => count === 0);
-}
-
-function plural(count: number, one: string, many = `${one}s`): string {
-  return `${count} ${count === 1 ? one : many}`;
 }
 
 export function deletionImpactRows(counts: CategoryDeletionCounts): string[] {

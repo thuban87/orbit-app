@@ -52,6 +52,7 @@ import {
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 
 const LOG_SCOPE = "purge-dao";
 
@@ -216,11 +217,6 @@ export interface PurgeOptions {
     contactId: number,
     retired: { importStagingPaths: string[] },
   ) => Promise<void> | void;
-}
-
-/** `"1 thing"` / `"N things"`. */
-function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 async function countRows(

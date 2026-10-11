@@ -13,6 +13,7 @@ import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-r
 import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
+import { plural } from "@/utils/plural";
 import { ShellAppBar } from "./ShellAppBar";
 
 type Counts = {
@@ -22,8 +23,6 @@ type Counts = {
   methods: number;
   links: number;
 };
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`;
 
 export function MergeImpactSummary({
   navigation,

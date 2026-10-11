@@ -4,6 +4,7 @@ import type {
   AiPermissionItem,
   AiPermissionRef,
 } from "@/db/ai-permissions-dao";
+import { plural } from "@/utils/plural";
 
 export type AiPermissionTypeFilter = "all" | AiPermissionCategory;
 
@@ -98,10 +99,6 @@ export interface PermissionSummaryCopy {
 export const PERMISSION_EMPTY_COPY =
   "AI can't access any contact information yet.";
 export const PERMISSION_NO_MATCH_COPY = "No information matches these filters.";
-
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
 
 /** Items AI can access, from a list that may include disabled ones. */
 function enabledItems(

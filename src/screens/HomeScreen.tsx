@@ -186,6 +186,7 @@ import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { isSnoozed, parseLocalMs } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
+import { plural, pluralWord } from "@/utils/plural";
 
 /** The debounce interval (ms) that collapses a keystroke burst to one read. */
 const SEARCH_DEBOUNCE_MS = 220;
@@ -1062,7 +1063,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       if (!claim || (!claimed && !consumeBulkAction(claim))) return;
       void bulkQuickLog(getExecutor(), ids, localDateTime())
         .then((receipt) => {
-          const label = `Logged ${ids.length} interactions`;
+          const label = `Logged ${plural(ids.length, "interaction")}`;
           notifyWidgetDataChanged();
           bumpShellRefresh();
           AccessibilityInfo.announceForAccessibility(label);
@@ -1071,12 +1072,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             label,
             action: {
               label: "Undo",
-              accessibilityLabel: `Undo logging ${ids.length} interactions`,
+              accessibilityLabel: `Undo logging ${plural(ids.length, "interaction")}`,
               onPress: () => {
                 void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
                   .then(() => {
                     commitBulkOutcome(
-                      `Undid ${ids.length} logged interactions`,
+                      `Undid ${ids.length} logged ${pluralWord(ids.length, "interaction")}`,
                     );
                   })
                   .catch((undoError: unknown) =>
@@ -1111,7 +1112,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         .then(() => {
           // Archive is reversible, but it must disappear from this frozen universe.
           removeFromUniverse(ids);
-          commitBulkOutcome(`Archived ${ids.length} contacts`);
+          commitBulkOutcome(`Archived ${plural(ids.length, "contact")}`);
         })
         .catch((writeError: unknown) => {
           releaseBulkAction(claim);
@@ -1138,7 +1139,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       void bulkSetFrequency(getExecutor(), ids, intervalDays, localDateTime())
         .then(() => {
           commitBulkOutcome(
-            `Changed contact frequency to every ${intervalDays} days for ${ids.length} contacts`,
+            `Changed contact frequency to every ${plural(intervalDays, "day")} for ${plural(ids.length, "contact")}`,
           );
         })
         .catch((writeError: unknown) => {
@@ -1203,7 +1204,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     if (!consumeBulkAction(claim)) return;
     void bulkAddFavourites(getExecutor(), ids, localDateTime())
       .then(() =>
-        commitBulkOutcome(`Added ${ids.length} contacts to Favorites`),
+        commitBulkOutcome(
+          `Added ${plural(ids.length, "contact")} to Favorites`,
+        ),
       )
       .catch((writeError: unknown) => {
         releaseBulkAction(claim);
@@ -1234,7 +1237,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     if (!consumeBulkAction(claim)) return;
     void bulkRemoveFavourites(getExecutor(), ids, localDateTime())
       .then(() =>
-        commitBulkOutcome(`Removed ${ids.length} contacts from Favorites`),
+        commitBulkOutcome(
+          `Removed ${plural(ids.length, "contact")} from Favorites`,
+        ),
       )
       .catch((writeError: unknown) => {
         releaseBulkAction(claim);
@@ -1276,7 +1281,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     if (!consumeBulkAction(claim)) return;
     void bulkUnsnooze(getExecutor(), ids, localDateTime())
       .then(async () => {
-        commitBulkOutcome(`Unsnoozed ${ids.length} contacts`);
+        commitBulkOutcome(`Unsnoozed ${plural(ids.length, "contact")}`);
         await reconcileSchedule(getExecutor()).catch((scheduleError) =>
           Logger.error(
             LOG_SCOPE,
@@ -2085,7 +2090,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             key={preset}
             testID={`bulk-snooze-preset-${preset}`}
             accessibilityRole="button"
-            accessibilityLabel={`Snooze ${snoozePicker?.ids.length ?? 0} contacts for ${label}`}
+            accessibilityLabel={`Snooze ${plural(snoozePicker?.ids.length ?? 0, "contact")} for ${label}`}
             onPress={() => {
               const picker = snoozePicker;
               if (!picker || !consumeBulkAction(picker.claim)) return;
@@ -2093,7 +2098,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               setSnoozePicker(null);
               void bulkSnooze(getExecutor(), ids, preset, localDateTime())
                 .then(async () => {
-                  commitBulkOutcome(`Snoozed ${ids.length} contacts`);
+                  commitBulkOutcome(`Snoozed ${plural(ids.length, "contact")}`);
                   await reconcileSchedule(getExecutor()).catch(
                     (scheduleError) =>
                       Logger.error(
@@ -2165,7 +2170,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             })
             .then(() =>
               commitBulkOutcome(
-                `Set category to ${categoryId === null ? "Uncategorized" : (picker.categories.find((category) => category.id === categoryId)?.name ?? "category")} for ${ids.length} contacts`,
+                `Set category to ${categoryId === null ? "Uncategorized" : (picker.categories.find((category) => category.id === categoryId)?.name ?? "category")} for ${plural(ids.length, "contact")}`,
               ),
             )
             .catch((writeError: unknown) => {
@@ -2249,16 +2254,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         onRequestClose={dismissBulkConfirm}
         title={
           bulkConfirm?.kind === "quick-log"
-            ? `Log ${bulkConfirm.ids.length} interactions?`
+            ? `Log ${plural(bulkConfirm.ids.length, "interaction")}?`
             : bulkConfirm?.kind === "archive"
-              ? `Archive ${bulkConfirm.ids.length} contacts?`
+              ? `Archive ${plural(bulkConfirm.ids.length, "contact")}?`
               : "Change Contact Frequency?"
         }
         message={
           bulkConfirm?.kind === "archive"
             ? "Archived contacts leave Contacts. You can restore them from Archived Contacts."
             : bulkConfirm?.kind === "frequency"
-              ? `Set all ${bulkConfirm.ids.length} contacts to every ${bulkConfirm.intervalDays} days?`
+              ? `Set ${bulkConfirm.ids.length === 1 ? "" : "all "}${plural(bulkConfirm.ids.length, "contact")} to every ${plural(bulkConfirm.intervalDays, "day")}?`
               : undefined
         }
         confirmLabel={
