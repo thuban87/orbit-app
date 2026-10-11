@@ -31,8 +31,10 @@ Decisions split into two buckets. Make the ones in your bucket and report them a
 - **Flag big questions.** When a question to the owner, or a decision an agent makes on its own, would grow the scope of the work considerably, mark it as such in the question and estimate the growth it would bring (e.g. "about 36 screens, roughly +3 plans"). Ordinary questions carry no size note.
 - **Watch the total quietly.** Keep track of how much a phase has grown as decisions accumulate. Alert the owner when it is clearly bigger than expected: many small decisions adding up, or big ones that may have gone unnoticed. As a rough trigger, more than about 50% growth over the phase's initial scope (owner's suggested figure). This is a watch-and-alert duty, not a per-batch report.
 - A rule that moves a block of work into a phase is a scope question. If it is big, flag it as above.
+- **An estimate says what it counted and what it didn't.** Give the basis (e.g. "counting the 52 findings") and name any known part left out (e.g. "per-site conversions across the app not counted; could be large"). Never present a partial count as the whole.
+- **Count theme-level work before estimating it.** When a finding or theme says a problem recurs across the app, count its sites (a quick grep) before it goes into an estimate.
 
-*Why this exists:* Phase 38.9 was triaged at about 4 plans and grew to 17 through an assignment rule presented with two small examples, plus item-level questions and agent-made decisions with no size given. No alert was raised. (Owner, 2026-10-10.)
+*Why this exists:* Phase 38.9 was triaged at about 4 plans and grew to 17 through an assignment rule presented with two small examples, plus item-level questions and agent-made decisions with no size given. No alert was raised. The triage estimate had counted findings and silently left out the app-wide conversion work, its largest part. (Owner, 2026-10-10.)
 
 ## Never push (non-negotiable)
 
