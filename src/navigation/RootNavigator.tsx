@@ -254,10 +254,10 @@ export function RootNavigator() {
             is pending instead of covering its app bar. The container hides it
             from accessibility with the rest of the shell while the dial is open. */}
         <AssistBanner />
-        {/* D-35: Back on a tab root returns to the previously visited tab;
-            the hardwareBackPress listener above adds the D-54 launch-tab exit. */}
         <Tab.Navigator
           initialRouteName={INITIAL_TAB}
+          // D-35: Back on a tab root returns to the previously visited tab; the
+          // hardwareBackPress listener above adds the D-54 launch-tab exit.
           backBehavior="history"
           tabBar={(props) => <MeasuredTabBar {...props} />}
           screenOptions={({ route }) => ({
