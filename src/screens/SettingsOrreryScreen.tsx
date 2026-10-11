@@ -61,6 +61,11 @@ export function SettingsOrreryScreen() {
 
   const busy = preferences.hydration === "loading" || preferences.saving;
   const disabled = busy || !preferences.hydrated;
+  // The switch is disabled (and so drawn Off, D-26) only while the store has
+  // never hydrated. While a read or a save is in flight it keeps showing the
+  // stored value and is announced busy (D-47 `busy`); presses are ignored
+  // (38.9 review WR-02).
+  const switchDisabled = !preferences.hydrated;
   const showError = preferences.hydration === "error" || preferences.saveError;
 
   return (
@@ -139,14 +144,15 @@ export function SettingsOrreryScreen() {
               <OrbitSwitch
                 testID="settings-orrery-satellites"
                 accessibilityLabel="Relationship Satellites"
-                disabled={disabled}
+                disabled={switchDisabled}
                 busy={busy}
                 value={preferences.committed.satellitesEnabled === 1}
-                onValueChange={(enabled) =>
+                onValueChange={(enabled) => {
+                  if (busy) return;
                   void preferences.save(getExecutor(), {
                     satellitesEnabled: enabled ? 1 : 0,
-                  })
-                }
+                  });
+                }}
               />
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>

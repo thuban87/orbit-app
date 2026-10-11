@@ -247,5 +247,17 @@ describe("the Orrery satellites switches keep announcing busy (C5-M2)", () => {
       expect(region).toContain('accessibilityLabel="Relationship Satellites"');
       expect(region).toContain("busy={busy}");
     });
+
+    it(`${file} keeps the stored value drawn while busy; presses are ignored (review WR-02)`, () => {
+      const text = readFileSync(join(ROOT, file), "utf8");
+      const start = text.indexOf("<OrbitSwitch");
+      const region = text.slice(start, text.indexOf("/>", start));
+      // Disabled draws Off (D-26), so busy never feeds `disabled`.
+      expect(region).toContain("disabled={switchDisabled}");
+      expect(text).toMatch(/const switchDisabled = !preferences\.hydrated;/);
+      expect(region).toMatch(
+        /onValueChange=\{\(enabled\) => \{\s*if \(busy\) return;/,
+      );
+    });
   }
 });
