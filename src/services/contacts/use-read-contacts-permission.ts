@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Alert, Linking, PermissionsAndroid } from "react-native";
+import { Linking, PermissionsAndroid } from "react-native";
+import { notice } from "@/stores/confirm-store";
 import {
   type ContactsPermissionVerdict,
   classifyPermissionResult,
@@ -154,10 +155,11 @@ export async function openContactsSettings(): Promise<boolean> {
     await Linking.openSettings();
     return true;
   } catch {
-    Alert.alert(
-      "Open Settings manually",
-      "Open Orbit's app settings and allow Contacts access.",
-    );
+    // Blocking: the user has to go to system Settings themselves (D-27).
+    void notice({
+      title: "Open Settings manually",
+      message: "Open Orbit's app settings and allow Contacts access.",
+    });
     return false;
   }
 }

@@ -1,12 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
 import { Avatar } from "@/components/Avatar";
 import {
@@ -29,7 +22,9 @@ import {
 } from "@/services/assist-commit";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAssistBanner } from "@/stores/assist-store";
+import { notice } from "@/stores/confirm-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
@@ -129,7 +124,7 @@ export function PendingConfirmationsSheet({
   };
 
   // Same contract as AssistBanner (src/services/assist-commit.ts): handlers
-  // always resolve; a write failure shows an Alert and leaves the assist
+  // always resolve; a write failure shows a snackbar or notice and leaves the assist
   // pending; a post-commit publication failure is logged only (D-04).
   const confirm = async (uid: string, connected: 0 | 1, note?: string) => {
     markPending(uid, true);
@@ -152,15 +147,22 @@ export function PendingConfirmationsSheet({
       onError: (kind, error) => {
         logFailure("assist confirm failed", error);
         const copy = ASSIST_FAILURE_COPY.log[kind];
-        Alert.alert(copy.title, copy.body);
+        // A wrong device clock blocks logging until fixed (notice); otherwise
+        // the user can retry (error snackbar). D-27.
+        if (kind === "future-date") {
+          void notice({ title: copy.title, message: copy.body });
+        } else {
+          showSnackbar({ kind: "error", label: `${copy.title}. ${copy.body}` });
+        }
       },
       // 38.3 review B-WR-05: dismissed/expired before this confirm — nothing
       // was logged, so say so and only refresh the queue.
+      // Informational, not an error: neutral (success-kind) snackbar.
       onClosed: () =>
-        Alert.alert(
-          ASSIST_FAILURE_COPY.closed.title,
-          ASSIST_FAILURE_COPY.closed.body,
-        ),
+        showSnackbar({
+          kind: "success",
+          label: `${ASSIST_FAILURE_COPY.closed.title}. ${ASSIST_FAILURE_COPY.closed.body}`,
+        }),
       publishClosed: () =>
         publishAssistDismissal({ refreshQueue: refresh, logFailure }),
       logFailure,
@@ -182,7 +184,7 @@ export function PendingConfirmationsSheet({
       onError: (_kind, error) => {
         logFailure("assist dismiss failed", error);
         const copy = ASSIST_FAILURE_COPY.dismiss.generic;
-        Alert.alert(copy.title, copy.body);
+        showSnackbar({ kind: "error", label: `${copy.title}. ${copy.body}` });
       },
       logFailure,
     });

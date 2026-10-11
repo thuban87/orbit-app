@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import ts from "typescript";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SqlExecutor } from "@/db/types";
 
@@ -6,13 +9,15 @@ const mocks = vi.hoisted(() => ({
   markAssistFailed: vi.fn(),
   sendSMSAsync: vi.fn(),
   openURL: vi.fn(),
-  alert: vi.fn(),
+  showSnackbar: vi.fn(),
 }));
 
 vi.mock("expo-sms", () => ({ sendSMSAsync: mocks.sendSMSAsync }));
 vi.mock("react-native", () => ({
-  Alert: { alert: mocks.alert },
   Linking: { openURL: mocks.openURL },
+}));
+vi.mock("@/stores/snackbar-store", () => ({
+  showSnackbar: mocks.showSnackbar,
 }));
 vi.mock("@/db/interaction-assist-dao", () => ({
   createPendingAssist: mocks.createPendingAssist,
@@ -61,7 +66,7 @@ describe("performReachOut", () => {
       "Thinking of you",
     );
     expect(mocks.markAssistFailed).not.toHaveBeenCalled();
-    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.showSnackbar).not.toHaveBeenCalled();
     // HIGH-1: the created assist UID is EXPOSED so the Compose confirmation panel
     // can log THIS assist rather than re-querying the table by contact+timestamp.
     expect(outcome).toEqual({ handoffStarted: true, assistUid: "assist-1" });
@@ -94,10 +99,14 @@ describe("performReachOut", () => {
       assistUid: "assist-1",
       now: input.now,
     });
-    expect(mocks.alert).toHaveBeenCalledWith(
-      "Couldn't open your email app",
-      "No app on this device can send email.",
-    );
+    // 38.9 D-27: the one-button native error is now an error snackbar with the
+    // same words; it renders above the reach-out router window (D-40).
+    expect(mocks.showSnackbar).toHaveBeenCalledTimes(1);
+    expect(mocks.showSnackbar).toHaveBeenCalledWith({
+      kind: "error",
+      label:
+        "Couldn't open your email app. No app on this device can send email.",
+    });
     // A failed native launch never surfaces the confirmation panel — the panel
     // gates on handoffStarted (T-35-21). assistUid is null so no fragile re-query.
     expect(outcome).toEqual({ handoffStarted: false, assistUid: null });
@@ -130,7 +139,7 @@ describe("performReachOut", () => {
       "mailto:person@example.com?subject=Hi%20%26%20bye&body=line1%0Aline2",
     );
     expect(mocks.markAssistFailed).not.toHaveBeenCalled();
-    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.showSnackbar).not.toHaveBeenCalled();
     // The plan-35-01 return contract is preserved on the email arm.
     expect(outcome).toEqual({ handoffStarted: true, assistUid: "assist-1" });
   });
@@ -188,5 +197,65 @@ describe("performReachOut", () => {
     // Assists opted out: handoff still started, but there is no UID to log, so
     // the Compose confirmation panel does not appear.
     expect(outcome).toEqual({ handoffStarted: true, assistUid: null });
+  });
+});
+
+/**
+ * 38.9-05 D-27 (this plan only; Plan 06 adds the app-wide no-native-Alert
+ * contract): none of the everyday-surface production files converted in plan
+ * 38.9-05 still reaches React Native's Alert API. Parsed with the TypeScript
+ * compiler so comments and strings never count; any `Alert` identifier (named
+ * import, destructure of a dynamic `import("react-native")`, `Alert.alert`)
+ * is a hit.
+ */
+const PLAN_05_FILES = [
+  "src/screens/OffLimitsEditorScreen.tsx",
+  "src/screens/ContactProfileScreen.tsx",
+  "src/screens/EditContactScreen.tsx",
+  "src/screens/EditInteractionScreen.tsx",
+  "src/components/MergeImpactSummary.tsx",
+  "src/components/profile/ProfileLayoutEditor.tsx",
+  "src/components/profile/ProfileTemplateManager.tsx",
+  "src/components/profile/ProfileBackgroundManager.tsx",
+  "src/screens/CropPhotoScreen.tsx",
+  "src/components/LinksEditor.tsx",
+  "src/screens/CaptureScreen.tsx",
+  "src/screens/ComposeScreen.tsx",
+  "src/components/AssistBanner.tsx",
+  "src/components/PendingConfirmationsSheet.tsx",
+  "src/services/reach-out/handoff.ts",
+  "src/services/contacts/use-read-contacts-permission.ts",
+  "src/navigation/widget-linking.ts",
+] as const;
+
+function alertIdentifierLines(file: string): number[] {
+  const text = readFileSync(join(__dirname, "..", "..", "..", file), "utf8");
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.ES2022,
+    true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const lines: number[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node) && node.text === "Alert") {
+      lines.push(
+        source.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+      );
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return lines;
+}
+
+describe("38.9-05 everyday surfaces use no native Alert (D-27)", () => {
+  it("covers the 17 production files of the plan", () => {
+    expect(PLAN_05_FILES).toHaveLength(17);
+  });
+
+  it.each(PLAN_05_FILES)("%s has no Alert identifier", (file) => {
+    expect(alertIdentifierLines(file)).toEqual([]);
   });
 });

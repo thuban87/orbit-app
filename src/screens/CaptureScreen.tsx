@@ -52,7 +52,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useShareIntentContext } from "expo-share-intent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   BackHandler,
   FlatList,
   Pressable,
@@ -76,6 +75,7 @@ import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { resolveCaptureBack } from "@/screens/capture-back-logic";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { finishActivity } from "../../modules/orbit-share-finish";
@@ -350,7 +350,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to write capture fuel", err);
         // Leave the payload intact (still live until background) for a retry.
-        Alert.alert("Couldn't save", "Please try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't save. Please try again.",
+        });
       } finally {
         isCommittingRef.current = false;
         setCommitting(false);
@@ -420,7 +423,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       armAutoReturn();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to write multi-attach fuel", err);
-      Alert.alert("Couldn't save", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't save. Please try again.",
+      });
     } finally {
       isCommittingRef.current = false;
       setCommitting(false);
@@ -496,7 +502,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       armAutoReturn();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to apply capture note", err);
-      Alert.alert("Couldn't save", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't save. Please try again.",
+      });
     } finally {
       isCommittingRef.current = false;
       setCommitting(false);
@@ -567,7 +576,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       armAutoReturn();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed inline-create capture", err);
-      Alert.alert("Couldn't save", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't save. Please try again.",
+      });
     } finally {
       isCommittingRef.current = false;
       setCommitting(false);

@@ -48,7 +48,6 @@ import { File, Paths } from "expo-file-system";
 import * as SMS from "expo-sms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   BackHandler,
   Platform,
   ScrollView,
@@ -154,7 +153,9 @@ import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useAssistBanner } from "@/stores/assist-store";
 import { useComposeSession } from "@/stores/compose-session-store";
+import { notice } from "@/stores/confirm-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
@@ -744,10 +745,10 @@ export function ComposeScreen({
         } catch (err) {
           Logger.error(LOG_SCOPE, "failed to load contact", err);
           if (!cancelled) {
-            Alert.alert(
-              "Couldn't load this contact",
-              "Please go back and retry.",
-            );
+            void notice({
+              title: "Couldn't load this contact",
+              message: "Please go back and retry.",
+            });
             setScreenState("error");
           }
         }
@@ -869,7 +870,10 @@ export function ComposeScreen({
         await refreshMethods();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to set primary method", err);
-        Alert.alert("Couldn't set that", "Please try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't set that. Please try again.",
+        });
       }
     },
     [contactId, setDestination, refreshMethods],
@@ -1020,7 +1024,10 @@ export function ComposeScreen({
       // Surface it like the sibling onCopy/launchMethod handlers rather than
       // swallowing it; the finally still releases the sending latch.
       Logger.error(LOG_SCOPE, "failed to transmit draft", err);
-      Alert.alert("Couldn't send", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't send. Please try again.",
+      });
     } finally {
       setSending(false);
     }
@@ -1047,7 +1054,10 @@ export function ComposeScreen({
       await persistRememberedMode();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to copy draft", err);
-      Alert.alert("Couldn't copy", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't copy. Please try again.",
+      });
     }
   }, [mode, body, subject, flashCopyFeedback, persistRememberedMode]);
 
@@ -1065,7 +1075,10 @@ export function ComposeScreen({
       flashCopyFeedback("Subject copied");
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to copy subject", err);
-      Alert.alert("Couldn't copy", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't copy. Please try again.",
+      });
     }
   }, [mode, body, subject, flashCopyFeedback]);
 
@@ -1111,22 +1124,25 @@ export function ComposeScreen({
         Logger.error(LOG_SCOPE, "failed to log interaction", err);
         if (kind === "future-date") {
           const copy = ASSIST_FAILURE_COPY.log["future-date"];
-          Alert.alert(copy.title, copy.body);
+          // Blocking: the user must fix the device clock (notice, D-27).
+          void notice({ title: copy.title, message: copy.body });
           return;
         }
-        Alert.alert(
-          "Couldn't log that yet",
-          "The reminder is saved — you can log it from the banner.",
-        );
+        showSnackbar({
+          kind: "error",
+          label:
+            "Couldn't log that yet. The reminder is saved — you can log it from the banner.",
+        });
       },
       // 38.3 review B-WR-05: the assist was dismissed or expired before this
       // confirm, so no interaction was written. Close the panel without the
       // "logged" exit — the session stays as it is.
+      // Informational, not an error: neutral (success-kind) snackbar.
       onClosed: () =>
-        Alert.alert(
-          ASSIST_FAILURE_COPY.closed.title,
-          ASSIST_FAILURE_COPY.closed.body,
-        ),
+        showSnackbar({
+          kind: "success",
+          label: `${ASSIST_FAILURE_COPY.closed.title}. ${ASSIST_FAILURE_COPY.closed.body}`,
+        }),
       publishClosed: () =>
         publishAssistDismissal({
           refreshQueue: () => useAssistBanner.getState().refresh(),
@@ -1170,7 +1186,7 @@ export function ComposeScreen({
     </ChromeScrim>
   );
 
-  // "loading" shows minimal chrome + Back; "error" shows Back after its Alert;
+  // "loading" shows minimal chrome + Back; "error" shows Back after its notice;
   // "missing" has already navigated home (render nothing meaningful).
   if (screenState !== "ready" || header === null) {
     return (

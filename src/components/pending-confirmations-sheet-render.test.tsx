@@ -73,7 +73,6 @@ vi.mock("@/components/ui/RegisteredModal", () => ({
   RegisteredModal: "Modal",
 }));
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   Modal: "Modal",
   Pressable: "Pressable",
   ScrollView: "ScrollView",
@@ -109,7 +108,9 @@ vi.mock("@/services/assist-commit", () => ({
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: vi.fn(),
 }));
+vi.mock("@/stores/confirm-store", () => ({ notice: vi.fn() }));
 vi.mock("@/stores/shell-refresh-store", () => ({ bumpShellRefresh: vi.fn() }));
+vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
 const live = vi.hoisted(() => ({ queue: [] as unknown[] }));
 vi.mock("@/stores/assist-store", () => ({
   useAssistBanner: (

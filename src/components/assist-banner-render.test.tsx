@@ -31,7 +31,6 @@ vi.mock("react", async (original) => ({
   ],
 }));
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   Pressable: "Pressable",
   Text: "Text",
   View: "View",
@@ -79,7 +78,9 @@ vi.mock("@/services/assist-commit", () => ({
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: vi.fn(),
 }));
+vi.mock("@/stores/confirm-store", () => ({ notice: vi.fn() }));
 vi.mock("@/stores/shell-refresh-store", () => ({ bumpShellRefresh: vi.fn() }));
+vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
 
 const { AssistBanner } = await import("./AssistBanner");

@@ -305,15 +305,19 @@ export function WidgetLinkingGate({ isReady }: { isReady: boolean }) {
           "openReachOut" in target.params &&
           target.params.openReachOut === true;
         if (isReachIntent && guarded.reason === "missing") {
-          const [{ Alert }, { navigationRef }] = await Promise.all([
-            import("react-native"),
+          const [{ showSnackbar }, { navigationRef }] = await Promise.all([
+            import("@/stores/snackbar-store"),
             import("./linking"),
           ]);
           if (cancelled) {
             return;
           }
           navigationRef.current?.reset(resetToDashboardRoot());
-          Alert.alert("This contact is no longer available.");
+          // 38.9 D-27: the dashboard is usable, so an error snackbar.
+          showSnackbar({
+            kind: "error",
+            label: "This contact is no longer available.",
+          });
         }
         setPending(null);
         return;

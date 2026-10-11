@@ -1,11 +1,12 @@
 import * as SMS from "expo-sms";
-import { Alert, Linking } from "react-native";
+import { Linking } from "react-native";
 import {
   createPendingAssist,
   type InteractionAssistChannel,
   markAssistFailed,
 } from "@/db/interaction-assist-dao";
 import type { SqlExecutor } from "@/db/types";
+import { showSnackbar } from "@/stores/snackbar-store";
 
 type ReachOutInput = {
   contactId: number;
@@ -98,8 +99,9 @@ export type ReachOutOutcome = {
  * successful launch request; it is never evidence that communication happened.
  *
  * Returns the handoff outcome so the caller (the Compose confirmation panel) can
- * log the EXACT created assist. A thrown native launch keeps the existing Alert +
- * markAssistFailed and reports `handoffStarted: false`, so a failed launch never
+ * log the EXACT created assist. A thrown native launch shows the existing error
+ * copy as an error snackbar (38.9 D-27; it renders above the reach-out router
+ * window, D-40) + markAssistFailed and reports `handoffStarted: false`, so a failed launch never
  * surfaces the confirmation panel (T-35-21).
  */
 export async function performReachOut(
@@ -137,7 +139,8 @@ export async function performReachOut(
     if (assistUid) {
       await markAssistFailed(exec, { assistUid, now });
     }
-    Alert.alert(...HANDOFF_ERROR_COPY[channel]);
+    const [title, message] = HANDOFF_ERROR_COPY[channel];
+    showSnackbar({ kind: "error", label: `${title}. ${message}` });
     return { handoffStarted: false, assistUid: null };
   }
 
