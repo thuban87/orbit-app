@@ -513,4 +513,28 @@ describe("pickCreateSubEditor (C5-M1; D-13, D-14)", () => {
       },
     );
   });
+
+  it("a typed Off Limits draft holds Back, after memory and relationship (review CR-01)", () => {
+    expect(
+      pickCreateSubEditor({
+        memory: closed,
+        relationship: closed,
+        offLimits: typed,
+      }),
+    ).toEqual({ open: true, dirty: true, which: "offLimits" });
+    expect(
+      pickCreateSubEditor({
+        memory: empty,
+        relationship: typed,
+        offLimits: typed,
+      }),
+    ).toEqual({ open: true, dirty: true, which: "relationship" });
+    expect(
+      pickCreateSubEditor({
+        memory: closed,
+        relationship: closed,
+        offLimits: empty,
+      }),
+    ).toEqual({ open: false, dirty: false, which: null });
+  });
 });

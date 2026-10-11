@@ -576,6 +576,34 @@ describe("Add Contact / Edit Contact open drafts on Back (C5-M1; D-13, D-14)", (
   }
 });
 
+describe("Add Contact / Edit Contact Off Limits draft on Back (review CR-01; D-14)", () => {
+  it("a typed Off Limits draft prompts on Back; Discard closes the draft and stays", async () => {
+    const { pickCreateSubEditor } = await import(
+      "@/screens/create-contact-logic"
+    );
+    const closed = { open: false, dirty: false };
+    const picked = pickCreateSubEditor({
+      memory: closed,
+      relationship: closed,
+      offLimits: { open: true, dirty: true },
+    });
+    expect(picked.which).toBe("offLimits");
+    const closeFuelDraft = vi.fn();
+    const { fire } = mountGuard(false, false, {
+      open: picked.open,
+      dirty: picked.dirty,
+      close: closeFuelDraft,
+    });
+    const event = fire({ type: "GO_BACK" });
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(closeFuelDraft).toHaveBeenCalledOnce();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+});
+
 describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)", () => {
   // The Memories / Key People fold handler: expanding never prompts; folding
   // calls requestClose(foldClose, draft.dirty) where foldClose closes the

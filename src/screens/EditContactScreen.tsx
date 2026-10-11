@@ -68,7 +68,9 @@ import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import {
   type FuelDraft,
+  type FuelDraftState,
   FuelEditor,
+  type FuelEditorHandle,
   type FuelEditPatch,
 } from "@/components/FuelEditor";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
@@ -1167,9 +1169,14 @@ export function EditContactScreen({
     useState<MemoryDraftState>(CLOSED_DRAFT);
   const [relationshipDraft, setRelationshipDraft] =
     useState<RelationshipDraftState>(CLOSED_DRAFT);
+  // The Off Limits FuelEditor's new-item draft row (38.9 review CR-01).
+  const fuelEditorRef = useRef<FuelEditorHandle>(null);
+  const [offLimitsDraft, setOffLimitsDraft] =
+    useState<FuelDraftState>(CLOSED_DRAFT);
   const pickedDraft = pickCreateSubEditor({
     memory: memoryDraft,
     relationship: relationshipDraft,
+    offLimits: offLimitsDraft,
   });
   const { requestClose } = useDiscardKeepGuard({
     hasUnsavedChanges,
@@ -1177,10 +1184,15 @@ export function EditContactScreen({
     subEditor: {
       open: pickedDraft.open,
       dirty: pickedDraft.dirty,
-      close: () =>
-        pickedDraft.which === "memory"
-          ? memoryEditorRef.current?.closeDraft()
-          : relationshipEditorRef.current?.closeDraft(),
+      close: () => {
+        if (pickedDraft.which === "memory") {
+          memoryEditorRef.current?.closeDraft();
+        } else if (pickedDraft.which === "relationship") {
+          relationshipEditorRef.current?.closeDraft();
+        } else if (pickedDraft.which === "offLimits") {
+          fuelEditorRef.current?.closeDraft();
+        }
+      },
     },
   });
 
@@ -1716,10 +1728,19 @@ export function EditContactScreen({
           sectionId="offLimits"
           title="Off Limits"
           expanded={expandedSections.offLimits}
-          onExpandedChange={(next) => setSectionExpanded("offLimits", next)}
+          onExpandedChange={(next) =>
+            next
+              ? setSectionExpanded("offLimits", true)
+              : requestClose(() => {
+                  fuelEditorRef.current?.closeDraft();
+                  setSectionExpanded("offLimits", false);
+                }, offLimitsDraft.dirty)
+          }
           containerRef={registerSectionRef("offLimits")}
         >
           <FuelEditor
+            ref={fuelEditorRef}
+            onDraftStateChange={setOffLimitsDraft}
             testID="edit-contact-off-limits"
             items={offLimitsItems}
             now={draftNow}

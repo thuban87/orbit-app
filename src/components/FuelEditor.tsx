@@ -39,7 +39,13 @@
  * Historical `source` values do not create a separate editor state. AI drafting
  * lives in Compose, so every persisted row uses the same add/edit/delete surface.
  */
-import { useState } from "react";
+import {
+  type Ref,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import {
   FlatList,
   Linking,
@@ -108,7 +114,52 @@ export interface FuelEditorProps {
   onAdd: (draft: FuelDraft) => Promise<boolean>;
   onEdit: (id: number, patch: FuelEditPatch) => void;
   onDelete: (id: number) => void;
+  /**
+   * Reports whether the new-item draft row is open and holds typed text
+   * (38.9 D-14), on every change and `{ open: false, dirty: false }` on
+   * unmount. Optional: consumers that do not guard the draft omit it.
+   */
+  onDraftStateChange?: (state: FuelDraftState) => void;
+  /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
+  ref?: Ref<FuelEditorHandle>;
   testID?: string;
+}
+
+export interface FuelDraftState {
+  open: boolean;
+  dirty: boolean;
+}
+
+export interface FuelEditorHandle {
+  /** Closes the open draft row without adding it (no prompt). */
+  closeDraft: () => void;
+}
+
+/**
+ * Whether the new-item draft holds typed text (38.9 D-14): any non-blank text,
+ * label or url. Typed-then-erased reads as untouched; the kind alone is not
+ * typed text. PURE.
+ */
+export function isFuelDraftDirty(draft: {
+  text: string;
+  label: string;
+  url: string;
+}): boolean {
+  return (
+    draft.text.trim() !== "" ||
+    draft.label.trim() !== "" ||
+    draft.url.trim() !== ""
+  );
+}
+
+/** The draft state a host's guard reads (D-14). PURE. */
+export function fuelDraftState(
+  drafting: boolean,
+  draftDirty: boolean,
+): FuelDraftState {
+  return drafting
+    ? { open: true, dirty: draftDirty }
+    : { open: false, dirty: false };
 }
 
 /** Open a fuel link behind LinksEditor's http/https allowlist. */
@@ -376,15 +427,28 @@ function FuelRow({
 function DraftRow({
   onCommit,
   onCancel,
+  onDirtyChange,
 }: {
   onCommit: (draft: FuelDraft) => void;
   onCancel: () => void;
+  /** Reports whether the row holds typed text (D-14); false on unmount. */
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const { colors } = useTheme();
   const [kind, setKind] = useState<FuelKind>(DEFAULT_KIND);
   const [text, setText] = useState("");
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
+
+  // Report typed text to the editor (D-14). The callback is read through a
+  // ref so a fresh closure each render never re-fires the report.
+  const dirty = isFuelDraftDirty({ text, label, url });
+  const onDirtyChangeRef = useRef(onDirtyChange);
+  onDirtyChangeRef.current = onDirtyChange;
+  useEffect(() => {
+    onDirtyChangeRef.current(dirty);
+  }, [dirty]);
+  useEffect(() => () => onDirtyChangeRef.current(false), []);
 
   const canAdd = text.trim().length > 0;
   const isOffLimits = kind === "off_limits";
@@ -511,10 +575,30 @@ export function FuelEditor({
   onAdd,
   onEdit,
   onDelete,
+  onDraftStateChange,
+  ref,
   testID,
 }: FuelEditorProps) {
   const { colors } = useTheme();
   const [drafting, setDrafting] = useState(false);
+  const [draftDirty, setDraftDirty] = useState(false);
+
+  // Draft state for the host's guard (D-14), read through a ref so a fresh
+  // closure each render never re-fires the report.
+  const { open: draftOpen, dirty: reportedDirty } = fuelDraftState(
+    drafting,
+    draftDirty,
+  );
+  const onDraftStateChangeRef = useRef(onDraftStateChange);
+  onDraftStateChangeRef.current = onDraftStateChange;
+  useEffect(() => {
+    onDraftStateChangeRef.current?.({ open: draftOpen, dirty: reportedDirty });
+  }, [draftOpen, reportedDirty]);
+  useEffect(
+    () => () => onDraftStateChangeRef.current?.({ open: false, dirty: false }),
+    [],
+  );
+  useImperativeHandle(ref, () => ({ closeDraft: () => setDrafting(false) }));
 
   // Close the draft ONLY after the parent's write resolves true (review MEDIUM-3).
   // On a failed insert the DraftRow stays mounted with its typed text intact so
@@ -549,7 +633,11 @@ export function FuelEditor({
       )}
 
       {drafting ? (
-        <DraftRow onCommit={commitDraft} onCancel={() => setDrafting(false)} />
+        <DraftRow
+          onCommit={commitDraft}
+          onCancel={() => setDrafting(false)}
+          onDirtyChange={setDraftDirty}
+        />
       ) : (
         <Pressable
           testID="fuel-editor-add"

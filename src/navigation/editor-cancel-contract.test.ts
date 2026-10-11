@@ -188,8 +188,8 @@ describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)",
       throw new Error(`unterminated onExpandedChange for ${id}`);
     };
 
-    it(`${path}: Memories and Key People fold through requestClose + closeDraft`, () => {
-      for (const id of ["memories", "keyPeople"]) {
+    it(`${path}: Memories, Key People and Off Limits fold through requestClose + closeDraft`, () => {
+      for (const id of ["memories", "keyPeople", "offLimits"]) {
         const handler = foldHandler(id);
         expect(handler).toContain("requestClose(");
         expect(handler).toContain("closeDraft()");
@@ -207,13 +207,18 @@ describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)",
       }
     });
 
-    it(`${path}: passes draft state and closeDraft refs to both editors`, () => {
+    it(`${path}: passes draft state and closeDraft refs to every draft editor`, () => {
       expect(screen).toMatch(
         /<MemoryEditor[\s\S]*?ref=\{memoryEditorRef\}[\s\S]*?onDraftStateChange=/,
       );
       expect(screen).toMatch(
         /<RelationshipEditor[\s\S]*?ref=\{relationshipEditorRef\}[\s\S]*?onDraftStateChange=/,
       );
+      // The Off Limits draft row (review CR-01).
+      expect(screen).toMatch(
+        /<FuelEditor[\s\S]*?ref=\{fuelEditorRef\}[\s\S]*?onDraftStateChange=/,
+      );
+      expect(screen).toMatch(/offLimits:\s*offLimitsDraft/);
       expect(screen).toMatch(/subEditor:\s*\{[\s\S]*?pickedDraft/);
     });
   }

@@ -406,7 +406,7 @@ export function isCreateFormDirty(
   return seedSignature !== currentSignature;
 }
 
-/** An in-section editor's reported draft state (MemoryEditor / RelationshipEditor). */
+/** An in-section editor's reported draft state (MemoryEditor / RelationshipEditor / FuelEditor). */
 export interface DraftState {
   open: boolean;
   dirty: boolean;
@@ -414,26 +414,38 @@ export interface DraftState {
 
 export type PickedSubEditor =
   | { open: false; dirty: false; which: null }
-  | { open: true; dirty: true; which: "memory" | "relationship" };
+  | {
+      open: true;
+      dirty: true;
+      which: "memory" | "relationship" | "offLimits";
+    };
+
+const CLOSED_DRAFT_STATE: DraftState = { open: false, dirty: false };
 
 /**
  * The open draft that holds Back on Add Contact and Edit Contact (C5-M1;
  * D-13, D-14): only a draft that is both open and typed into counts, so an
  * empty open draft never holds the user. The first such draft in the fixed
- * order memory, relationship (this plan only) is closed first.
+ * order memory, relationship, Off Limits (this plan only) is closed first.
  */
 export function pickCreateSubEditor({
   memory,
   relationship,
+  offLimits = CLOSED_DRAFT_STATE,
 }: {
   memory: DraftState;
   relationship: DraftState;
+  /** The Off Limits FuelEditor's new-item draft (38.9 review CR-01). */
+  offLimits?: DraftState;
 }): PickedSubEditor {
   if (memory.open && memory.dirty) {
     return { open: true, dirty: true, which: "memory" };
   }
   if (relationship.open && relationship.dirty) {
     return { open: true, dirty: true, which: "relationship" };
+  }
+  if (offLimits.open && offLimits.dirty) {
+    return { open: true, dirty: true, which: "offLimits" };
   }
   return { open: false, dirty: false, which: null };
 }
