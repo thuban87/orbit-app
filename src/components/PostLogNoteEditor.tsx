@@ -318,10 +318,12 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     />
   ) : null;
 
-  // Back and the scrim (D-14; review CR-02): typed text asks "Discard
-  // changes?" first; untouched closes at once. confirmDiscard() is
-  // single-flight, so a second Back while the prompt is up never closes twice.
-  // A successful save still closes directly through onClose (D-61).
+  // The one dirty-aware close for every exit that is not a save (D-14, D-61;
+  // review CR-02, verification WR-01): Back, the scrim, Add Note's Cancel and
+  // Edit Memory's Done. Typed text asks "Discard changes?" first; untouched
+  // closes at once. confirmDiscard() is single-flight, so a second exit while
+  // the prompt is up never closes twice. A successful save still closes
+  // directly through onClose (D-61).
   const requestSheetClose = () => {
     if (
       !shouldPromptOnNoteClose({
@@ -335,6 +337,17 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     }
     void confirmDiscard().then((discard) => {
       if (discard) onClose();
+    });
+  };
+  // The Edit Memory form's own Cancel (D-61): an edited draft asks first; an
+  // untouched one closes the form at once. The sheet stays open either way.
+  const requestMemoryFormCancel = (close: () => void) => {
+    if (!memoryDraftDirty) {
+      close();
+      return;
+    }
+    void confirmDiscard().then((discard) => {
+      if (discard) close();
     });
   };
 
@@ -362,6 +375,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
             // (no tap on the card needed; owner ruling D-73).
             initiallyEditingId={memoryBeingEdited.id}
             onDraftStateChange={(state) => setMemoryDraftDirty(state.dirty)}
+            onCancelRequest={requestMemoryFormCancel}
             showAdd={false}
             onAdd={onAddMemory}
             onEdit={onEditMemory}
@@ -370,7 +384,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
             onSetAllowAi={onSetMemoryAllowAi}
             globalAiEnabled={globalAiEnabled}
           />
-          <Button role="tertiary" label="Done" onPress={onClose} />
+          <Button role="tertiary" label="Done" onPress={requestSheetClose} />
         </ScrollView>
       ) : (
         <View style={styles.body}>
@@ -417,7 +431,11 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
                 </AppText>
               ) : null}
               <View style={styles.actions}>
-                <Button role="tertiary" label="Cancel" onPress={onClose} />
+                <Button
+                  role="tertiary"
+                  label="Cancel"
+                  onPress={requestSheetClose}
+                />
                 <Button
                   role="tertiary"
                   label="Create Memory Instead"

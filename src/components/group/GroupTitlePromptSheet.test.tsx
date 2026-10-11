@@ -90,10 +90,32 @@ describe("GroupTitlePromptSheet (D-72)", () => {
       destructive: false,
       confirmDisabled: false,
     });
-    call(actions, "onCancel");
-    expect(onRequestClose).toHaveBeenCalled();
     call(actions, "onConfirm");
     expect(onConfirm).toHaveBeenCalledWith("Trip");
+    expect(onRequestClose).not.toHaveBeenCalled();
+  });
+
+  it("Cancel with an empty title closes at once (D-61; verification WR-01)", () => {
+    const { tree, onRequestClose } = render();
+    call(find(tree, "ConfirmActions")[0], "onCancel");
+    expect(state.confirmDiscard).not.toHaveBeenCalled();
+    expect(onRequestClose).toHaveBeenCalledOnce();
+  });
+
+  it("Cancel with a typed title asks first, like Back (D-61; verification WR-01)", async () => {
+    state.title = "Trip";
+    state.discardAnswer = false;
+    const kept = render();
+    call(find(kept.tree, "ConfirmActions")[0], "onCancel");
+    await Promise.resolve();
+    expect(state.confirmDiscard).toHaveBeenCalledOnce();
+    expect(kept.onRequestClose).not.toHaveBeenCalled();
+
+    state.discardAnswer = true;
+    const discarded = render();
+    call(find(discarded.tree, "ConfirmActions")[0], "onCancel");
+    await Promise.resolve();
+    expect(discarded.onRequestClose).toHaveBeenCalledOnce();
   });
 
   it("keeps Create disabled for a blank title", () => {

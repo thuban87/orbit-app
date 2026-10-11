@@ -34,9 +34,10 @@ export function GroupTitlePromptSheet({
   const confirm = () => {
     if (trimmed) onConfirm(trimmed);
   };
-  // Back and the scrim (D-14; review CR-02): a typed title asks "Discard
-  // changes?" first; an empty field closes at once. confirmDiscard() is
-  // single-flight, so a second Back never closes twice.
+  // Back, the scrim and Cancel (D-14, D-61; review CR-02, verification
+  // WR-01): a typed title asks "Discard changes?" first; an empty field
+  // closes at once. confirmDiscard() is single-flight, so a second exit never
+  // closes twice.
   const requestSheetClose = () => {
     if (!trimmed) {
       onRequestClose();
@@ -89,7 +90,7 @@ export function GroupTitlePromptSheet({
           confirmLabel="Create event"
           destructive={false}
           confirmDisabled={!trimmed}
-          onCancel={onRequestClose}
+          onCancel={requestSheetClose}
           onConfirm={confirm}
         />
       </View>
