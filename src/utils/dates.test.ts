@@ -1,17 +1,25 @@
 /**
  * Unit tests for src/utils/dates.ts
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   calendarDaysBetween,
   formatDateTimeMinute,
   formatDateTimeMinuteOrFallback,
+  formatDisplayDate,
+  formatDisplayDateOrFallback,
   formatLocalDate,
   formatMinuteClock,
+  formatMonthDay,
+  formatStoredBirthdayForDisplay,
   formatTimeMinute,
   formatTimeMinuteOrFallback,
   isSnoozed,
+  MONTH_LONG,
+  MONTH_SHORT,
   parseLocalMs,
+  WEEKDAY_LONG,
+  WEEKDAY_SHORT,
 } from "@/utils/dates";
 
 describe("formatLocalDate", () => {
@@ -188,5 +196,148 @@ describe("calendar day helpers", () => {
     expect(isSnoozed("2026-13-01", now)).toBe(false);
     expect(isSnoozed("2026-08-16 12:60:00", now)).toBe(false);
     expect(isSnoozed("2026-08-16 12:00:60", now)).toBe(false);
+  });
+});
+
+// 38.9 D-23 / D-48: the one date-only display formatter. Display only: storage
+// keys stay on formatLocalDate.
+describe("formatDisplayDate (D-23, D-48)", () => {
+  const now = new Date(2026, 9, 10, 9, 30);
+
+  it("omits the year in the current year", () => {
+    expect(formatDisplayDate("2026-10-13", { now })).toBe("Oct 13");
+  });
+
+  it("shows the year in any other year", () => {
+    expect(formatDisplayDate("2025-06-02", { now })).toBe("Jun 2, 2025");
+    expect(formatDisplayDate("2027-01-05", { now })).toBe("Jan 5, 2027");
+  });
+
+  it("prefixes the weekday where the day matters", () => {
+    expect(formatDisplayDate("2026-10-13", { now, weekday: true })).toBe(
+      "Tue, Oct 13",
+    );
+    expect(formatDisplayDate("2025-06-02", { now, weekday: true })).toBe(
+      "Mon, Jun 2, 2025",
+    );
+  });
+
+  it("shows only the date part of a stored datetime", () => {
+    expect(formatDisplayDate("2026-10-13 14:05", { now })).toBe("Oct 13");
+    expect(formatDisplayDate("2026-10-13 14:05:09", { now })).toBe("Oct 13");
+  });
+
+  it("accepts a Date", () => {
+    expect(formatDisplayDate(new Date(2026, 9, 13, 23, 59), { now })).toBe(
+      "Oct 13",
+    );
+  });
+
+  it("defaults now to the wall clock", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 10, 12, 0));
+    try {
+      expect(formatDisplayDate("2026-10-13")).toBe("Oct 13");
+      expect(formatDisplayDate("2025-10-13")).toBe("Oct 13, 2025");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["2026-02-31", "next spring", "", "2026-13-01"])(
+    "throws on an unparseable value %s",
+    (stored) => {
+      expect(() => formatDisplayDate(stored, { now })).toThrow();
+    },
+  );
+
+  it("throws on an invalid Date", () => {
+    expect(() => formatDisplayDate(new Date(Number.NaN), { now })).toThrow();
+  });
+});
+
+describe("formatDisplayDateOrFallback (D-23)", () => {
+  const now = new Date(2026, 9, 10);
+
+  it("formats a parseable value", () => {
+    expect(formatDisplayDateOrFallback("2026-10-13", undefined, { now })).toBe(
+      "Oct 13",
+    );
+  });
+
+  it("returns the default fallback on failure", () => {
+    expect(formatDisplayDateOrFallback("2026-02-31")).toBe("Unknown date");
+  });
+
+  it("returns the given fallback on failure (raw value pass-through)", () => {
+    expect(formatDisplayDateOrFallback("next spring", "next spring")).toBe(
+      "next spring",
+    );
+  });
+});
+
+describe("formatMonthDay", () => {
+  it("formats a 1-based month and day", () => {
+    expect(formatMonthDay(2, 29)).toBe("Feb 29");
+    expect(formatMonthDay(10, 5)).toBe("Oct 5");
+  });
+});
+
+describe("shared month and weekday tables", () => {
+  it("exports the four tables", () => {
+    expect(MONTH_SHORT).toHaveLength(12);
+    expect(MONTH_SHORT[9]).toBe("Oct");
+    expect(MONTH_LONG[9]).toBe("October");
+    expect(WEEKDAY_SHORT).toEqual([
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+    ]);
+    expect(WEEKDAY_LONG[2]).toBe("Tuesday");
+  });
+});
+
+// D-70: a known-year birthday always shows its year; a year-unknown one shows
+// month-day; anything the strict birthday gate rejects shows raw (C6-L4, C7-L3).
+describe("formatStoredBirthdayForDisplay (D-70)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows a known year", () => {
+    expect(formatStoredBirthdayForDisplay("1990-06-02")).toBe("Jun 2, 1990");
+  });
+
+  it("keeps the year for a current-year known birthday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 10));
+    expect(formatStoredBirthdayForDisplay("2026-06-02")).toBe("Jun 2, 2026");
+  });
+
+  it("shows month-day when the year is unknown", () => {
+    expect(formatStoredBirthdayForDisplay("06-02")).toBe("Jun 2");
+    expect(formatStoredBirthdayForDisplay("02-29")).toBe("Feb 29");
+  });
+
+  it("validates a known-year leap day against its year", () => {
+    expect(formatStoredBirthdayForDisplay("2020-02-29")).toBe("Feb 29, 2020");
+  });
+
+  it.each([
+    "02-30",
+    "1990-02-31",
+    "2021-02-29",
+    "13-40",
+    "--06-02",
+    " 06-02",
+    "1990-06-02 ",
+    "spring",
+    "",
+  ])("returns %j raw and never throws", (stored) => {
+    expect(formatStoredBirthdayForDisplay(stored)).toBe(stored);
   });
 });
