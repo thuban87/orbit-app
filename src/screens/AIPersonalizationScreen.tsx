@@ -186,6 +186,10 @@ export function AIPersonalizationScreen({
   // (Writing Style, new section, section edit): the guard reads it to hold
   // Back while one runs (fix-pass WR-02); one save at a time.
   const savingRef = useRef(false);
+  // Any of those saves in flight drops a section Save (the shared ref) and
+  // holds the section forms' Cancel, so both draw disabled (D-26; WR-02
+  // follow-up).
+  const sectionFormBusy = savingStyle || savingSection;
   const [adding, setAdding] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
@@ -719,6 +723,7 @@ export function AIPersonalizationScreen({
                     onCancel={() => setEditingUid(null)}
                     onSave={saveEditedSection}
                     onDirtyChange={setSectionEditDirty}
+                    busy={sectionFormBusy}
                   />
                 ) : null}
               </GlassSurface>
@@ -733,6 +738,7 @@ export function AIPersonalizationScreen({
               onBodyChange={setDraftBody}
               onCancel={() => setAdding(false)}
               onSave={() => void addSection()}
+              busy={sectionFormBusy}
             />
           ) : (
             <Button
@@ -840,6 +846,7 @@ function NewSectionEditor({
   onBodyChange,
   onCancel,
   onSave,
+  busy = false,
 }: {
   title: string;
   body: string;
@@ -847,6 +854,11 @@ function NewSectionEditor({
   onBodyChange: (value: string) => void;
   onCancel: () => void;
   onSave: () => void;
+  /**
+   * A save is in flight (WR-02 follow-up; D-13, D-14): Cancel and Save
+   * section are held and drawn disabled (D-26). Absent → false.
+   */
+  busy?: boolean;
 }) {
   const { colors } = useTheme();
   return (
@@ -884,8 +896,18 @@ function NewSectionEditor({
         ]}
       />
       <View style={styles.options}>
-        <Button role="secondary" label="Cancel" onPress={onCancel} />
-        <Button role="primary" label="Save section" onPress={onSave} />
+        <Button
+          role="secondary"
+          label="Cancel"
+          disabled={busy}
+          onPress={onCancel}
+        />
+        <Button
+          role="primary"
+          label="Save section"
+          disabled={busy}
+          onPress={onSave}
+        />
       </View>
     </GlassSurface>
   );
@@ -896,12 +918,15 @@ function SectionEditor({
   onCancel,
   onSave,
   onDirtyChange,
+  busy = false,
 }: {
   section: PersonalizationSection;
   onCancel: () => void;
   onSave: (section: PersonalizationSection) => Promise<void>;
   /** Reports whether the edit differs from its section (D-13; C5-L7). */
   onDirtyChange?: (dirty: boolean) => void;
+  /** A save is in flight: Cancel and Save section are held (WR-02 follow-up). */
+  busy?: boolean;
 }) {
   const [title, setTitle] = useState(section.title);
   const [body, setBody] = useState(section.body);
@@ -920,6 +945,7 @@ function SectionEditor({
       onBodyChange={setBody}
       onCancel={onCancel}
       onSave={() => void onSave({ ...section, title, body })}
+      busy={busy}
     />
   );
 }

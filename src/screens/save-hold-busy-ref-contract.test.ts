@@ -320,3 +320,44 @@ describe("UpdateContactScreen holds the row editors' Cancel while a row saves", 
     expect(tags[0]).toContain("busy={saving}");
   });
 });
+
+describe("AIPersonalizationScreen holds the section editors while a save runs", () => {
+  const source = read("src/screens/AIPersonalizationScreen.tsx");
+  /** The body of a local component, past its typed parameter list. */
+  const componentBody = (name: string) =>
+    blockFrom(
+      source,
+      source.indexOf("}) {", source.indexOf(`function ${name}(`)) + 2,
+      name,
+    );
+
+  it("the busy flag covers every save the shared ref serializes", () => {
+    expect(source).toContain(
+      "const sectionFormBusy = savingStyle || savingSection;",
+    );
+  });
+
+  it("both section editors are given it", () => {
+    for (const tag of ["<SectionEditor", "<NewSectionEditor"]) {
+      const at = source.indexOf(`${tag}\n`);
+      expect(at, tag).toBeGreaterThan(-1);
+      const element = source.slice(at, source.indexOf("/>", at));
+      expect(element).toContain("busy={sectionFormBusy}");
+    }
+  });
+
+  it("NewSectionEditor draws Cancel and Save section disabled while busy", () => {
+    const body = componentBody("NewSectionEditor");
+    const buttons = body.match(/<Button[\s\S]*?\/>/g) ?? [];
+    for (const label of ["Cancel", "Save section"]) {
+      const button = buttons.find((b) => b.includes(`label="${label}"`));
+      expect(button, label).toBeDefined();
+      expect(button).toContain("disabled={busy}");
+    }
+  });
+
+  it("SectionEditor passes busy through to the form it renders", () => {
+    const body = componentBody("SectionEditor");
+    expect(body).toMatch(/<NewSectionEditor[\s\S]*?busy=\{busy\}[\s\S]*?\/>/);
+  });
+});
