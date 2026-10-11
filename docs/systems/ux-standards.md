@@ -133,7 +133,13 @@ which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces t
   untouched, it closes at once; a successful save closes without a prompt (D-61).
 - In a sheet, every exit that is not a save (Back, the scrim, Cancel, Done) goes through that
   one dirty-aware close. While a save is in flight the exits do nothing, so the prompt never
-  outlives a sheet the save has closed (D-14, D-61).
+  outlives a sheet the save has closed (D-14, D-61). The controls the save holds draw disabled
+  for that time (D-26); a held switch is announced busy instead, so it never shows Off over a
+  stored On.
+- On a guarded screen, a save in flight holds every removal with no prompt (`busyRef` on
+  `useDiscardKeepGuard`): "Discard changes?" is never offered for a save that will still commit.
+  The save's own navigation sets the bypass first, so it still leaves (D-13, D-14). Create and
+  Edit Contact use it.
 - Folding a section that holds a typed, not-yet-added draft prompts first; an untouched draft
   folds at once (D-68).
 - Capture: Back first closes an open New-contact sheet, and with a typed note shows the prompt
@@ -272,3 +278,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-11 | 38.9 | Created: destructive-action rule (D-30, D-32), feedback rule (D-39) and snackbar copy (D-46), themed dialogs and the overlay registry (D-24, D-27), unsaved-work guard (D-13, D-14, D-61, D-68), header and Back (D-16, D-44, D-45, D-35, D-54, D-38), states (D-05, D-47, D-26), option sheet (D-28), validation (D-19), empty state (D-20, D-71), dates (D-23, D-48, D-65 to D-67, D-70), plural helper (D-21). |
 | 2026-10-11 | 38.9 | Code-review fixes: error snackbar look (D-72), duplicate confirm resolves false (WR-01), `backDisabled` header Back (WR-04), completion-screen Back acts like Done (D-73). |
 | 2026-10-11 | 38.9 | Fix-pass verification: every non-save sheet exit is dirty-aware and holds while a save is in flight (WR-01, IN-01). |
+| 2026-10-11 | 38.9 | Second fix pass: held sheet controls draw disabled (WR-01); a guarded screen holds every removal while its save runs, with Back drawn disabled (WR-02). |
