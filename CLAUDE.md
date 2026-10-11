@@ -26,15 +26,13 @@ Decisions split into two buckets. Make the ones in your bucket and report them a
 
 *Why this exists:* on the owner's other project, two plans deleted an ADR's anti-tamper price floor to close a quote-vs-charge bug. A floor-preserving fix existed and had been proposed by the phase's own code review. A cross-AI reviewer flagged the removal by name. It shipped anyway, unasked, because the work was labeled "a bug fix" — and the ADR had that exact removal sitting in its rejected-alternatives list.
 
-## Scope impact goes in the question (non-negotiable)
+## Scope growth (non-negotiable)
 
-- **Any question to the owner, or any decision an agent makes on its own, that adds work states its size in the question itself:** the concrete count (sites, screens, files), a rough plan count, and how it changes the phase compared with its prior estimate. "Every pushed screen gets the shared header" is not enough; "about 36 screens, roughly +3 plans" is.
-- **Watch the total, not just the items.** Keep a running tally of what each decision adds, whether the owner's or your own. Show the running total at every batch and at draft or plan review. If it grows materially past the phase's prior estimate, stop and put the growth to the owner as its own decision before anything is accepted.
-- A rule or assignment that moves work into a phase (e.g. "this phase does the app-wide conversions") is a scope decision. Present it with its full size, not with two small examples.
+- **Flag big questions.** When a question to the owner, or a decision an agent makes on its own, would grow the scope of the work considerably, mark it as such in the question and estimate the growth it would bring (e.g. "about 36 screens, roughly +3 plans"). Ordinary questions carry no size note.
+- **Watch the total quietly.** Keep track of how much a phase has grown as decisions accumulate. Alert the owner when it is clearly bigger than expected: many small decisions adding up, or big ones that may have gone unnoticed. As a rough trigger, more than about 50% growth over the phase's initial scope (owner's suggested figure). This is a watch-and-alert duty, not a per-batch report.
+- A rule that moves a block of work into a phase is a scope question. If it is big, flag it as above.
 
-*Why this exists:* Phase 38.9 was triaged at about 4 plans and 35–45 files. An assignment rule presented with two small examples, then a series of item-level questions and one-line agent decisions with no counts, grew it to 17 plans and about 250 files. The owner never saw the total as a decision. Owner, 2026-10-10: "If you're asking me about something that has a major impact or will grow the scope of what we're talking about considerably, you fucking tell me that with the question. Then on the whole, you should be watching to make sure the scope isn't ballooning with the collection of vague decisions you're giving me."
-
-**Orchestrators:** include this section verbatim in every interrogation, dossier, planner and replanner prompt.
+*Why this exists:* Phase 38.9 was triaged at about 4 plans and grew to 17 through an assignment rule presented with two small examples, plus item-level questions and agent-made decisions with no size given. No alert was raised. (Owner, 2026-10-10.)
 
 ## Never push (non-negotiable)
 
