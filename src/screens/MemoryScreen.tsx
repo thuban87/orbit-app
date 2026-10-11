@@ -87,6 +87,8 @@ export function MemoryScreen({
   // React state is async and cannot close the double-tap window (review
   // WR-03); `savingRef` flips synchronously and is the guard.
   const savingRef = useRef(false);
+  // Mirrors `savingRef` for the header's disabled Back only (D-26; WR-02).
+  const [saving, setSaving] = useState(false);
   // A successful inner Save returns to the Update Contact chooser (dossier §AA).
   // Navigating is deferred to an effect (not fired inside the async save
   // handler) so MemoryEditor finishes its own close() before this screen
@@ -105,6 +107,9 @@ export function MemoryScreen({
   const { requestClose } = useDiscardKeepGuard({
     hasUnsavedChanges: false,
     bypassRef,
+    // An add or edit in flight holds every exit, with no prompt and no draft
+    // close (fix-pass WR-02).
+    busyRef: savingRef,
     subEditor: {
       open: memoryDraft.open,
       dirty: memoryDraft.dirty,
@@ -171,6 +176,7 @@ export function MemoryScreen({
     if (contactId === null) return false;
     // Claim the slot synchronously — a double-tap must not INSERT twice (WR-03).
     if (!beginInFlight(savingRef)) return false;
+    setSaving(true);
     try {
       const now = localDateTime();
       await addMemory(getExecutor(), {
@@ -186,6 +192,7 @@ export function MemoryScreen({
       failureNotice();
       return false;
     } finally {
+      setSaving(false);
       endInFlight(savingRef);
     }
   };
@@ -193,6 +200,7 @@ export function MemoryScreen({
   const edit = async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
     if (contactId === null) return false;
     if (!beginInFlight(savingRef)) return false;
+    setSaving(true);
     try {
       await editMemory(getExecutor(), {
         id,
@@ -207,6 +215,7 @@ export function MemoryScreen({
       failureNotice();
       return false;
     } finally {
+      setSaving(false);
       endInFlight(savingRef);
     }
   };
@@ -277,7 +286,13 @@ export function MemoryScreen({
 
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Memory" person={person} />
+      {/* While an add or edit runs the guard holds Back (D-26; WR-02). */}
+      <ShellAppBar
+        variant="child"
+        title="Memory"
+        person={person}
+        backDisabled={saving}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         {contactId === null ? (
           <AppText role="body" style={{ color: colors.textSecondary }}>
