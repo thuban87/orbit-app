@@ -15,13 +15,16 @@ import { create } from "zustand";
  * dismissable — `effectiveDismissable` makes `destructive` win over an explicit
  * `dismissable: true` — so only its buttons can resolve it.
  *
- * Identical requests share one dialog (38.9-06): a `confirm()` / `notice()`
- * identical to one already showing or queued (same kind, title, message,
- * labels and destructive/dismissable/glyph behaviour) adds no second entry and
- * returns the pending request's promise, so a fast double-tap on e.g. Merge
- * shows one dialog and both callers get the same answer. Once that dialog
- * settles, the same request opens a new one. The shared "Discard changes?"
- * prompt (`discard` marker) is never matched; it is single-flight on its own.
+ * Identical requests show one dialog (38.9-06; 38.9 review WR-01): a
+ * `confirm()` / `notice()` identical to one already showing or queued (same
+ * kind, title, message, labels and destructive/dismissable/glyph behaviour)
+ * adds no second entry. Only the FIRST caller gets the user's answer; the
+ * duplicate resolves at once — `false` for a confirm (stay, do nothing), as
+ * `confirmDiscard()` does, and acknowledged for a notice. So a fast double-tap
+ * on e.g. Merge shows one dialog and runs the confirmed action once, never
+ * twice. Once that dialog settles, the same request opens a new one. The
+ * shared "Discard changes?" prompt (`discard` marker) is never matched; it is
+ * single-flight on its own.
  */
 
 export interface ConfirmRequest {
@@ -141,9 +144,6 @@ export const confirmStore = create<ConfirmStoreState>()((set, get) => ({
   },
 }));
 
-/** The promise handed out for each queued `confirm()` / `notice()`, by id. */
-const pendingPromises = new Map<number, Promise<boolean> | Promise<void>>();
-
 /** A confirm request with its defaults applied, for identity comparison. */
 function confirmIdentity(request: ConfirmRequest) {
   const destructive = request.destructive ?? false;
@@ -169,67 +169,54 @@ function noticeIdentity(request: NoticeRequest) {
 const sameIdentity = (a: unknown[], b: unknown[]) =>
   a.length === b.length && a.every((value, index) => value === b[index]);
 
-/** The pending promise of a queued request identical to `entry`, if any. */
-function findPending(
+/** Whether a request identical to `entry` is already showing or queued. */
+function hasPending(
   entry:
     | { kind: "confirm"; request: ConfirmRequest }
     | { kind: "notice"; request: NoticeRequest },
-): Promise<boolean> | Promise<void> | undefined {
-  for (const queued of confirmStore.getState().queue) {
-    if (queued.kind !== entry.kind) continue;
-    const same =
-      queued.kind === "confirm" && entry.kind === "confirm"
-        ? queued.discard !== true &&
-          sameIdentity(
-            confirmIdentity(queued.request),
-            confirmIdentity(entry.request),
-          )
-        : queued.kind === "notice" && entry.kind === "notice"
-          ? sameIdentity(
-              noticeIdentity(queued.request),
-              noticeIdentity(entry.request),
-            )
-          : false;
-    const promise = same ? pendingPromises.get(queued.id) : undefined;
-    if (promise) return promise;
-  }
-  return undefined;
-}
-
-/** Themed two-button confirm; resolves true on confirm, false on cancel/dismiss. */
-export function confirm(request: ConfirmRequest): Promise<boolean> {
-  const existing = findPending({ kind: "confirm", request });
-  if (existing) return existing as Promise<boolean>;
-  let id = 0;
-  const promise = new Promise<boolean>((resolve) => {
-    id = confirmStore.getState().enqueue({
-      kind: "confirm",
-      request,
-      resolve: (value) => {
-        pendingPromises.delete(id);
-        resolve(value);
-      },
-    });
+): boolean {
+  return confirmStore.getState().queue.some((queued) => {
+    if (queued.kind === "confirm" && entry.kind === "confirm") {
+      return (
+        queued.discard !== true &&
+        sameIdentity(
+          confirmIdentity(queued.request),
+          confirmIdentity(entry.request),
+        )
+      );
+    }
+    if (queued.kind === "notice" && entry.kind === "notice") {
+      return sameIdentity(
+        noticeIdentity(queued.request),
+        noticeIdentity(entry.request),
+      );
+    }
+    return false;
   });
-  pendingPromises.set(id, promise);
-  return promise;
 }
 
-/** Themed one-button notice; resolves when acknowledged (button or Back). */
+/**
+ * Themed two-button confirm; resolves true on confirm, false on cancel/dismiss.
+ * A duplicate of a pending identical confirm resolves false at once (WR-01).
+ */
+export function confirm(request: ConfirmRequest): Promise<boolean> {
+  if (hasPending({ kind: "confirm", request })) return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    confirmStore.getState().enqueue({ kind: "confirm", request, resolve });
+  });
+}
+
+/**
+ * Themed one-button notice; resolves when acknowledged (button or Back). A
+ * duplicate of a pending identical notice adds no dialog and resolves at once.
+ */
 export function notice(request: NoticeRequest): Promise<void> {
-  const existing = findPending({ kind: "notice", request });
-  if (existing) return existing as Promise<void>;
-  let id = 0;
-  const promise = new Promise<void>((resolve) => {
-    id = confirmStore.getState().enqueue({
+  if (hasPending({ kind: "notice", request })) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    confirmStore.getState().enqueue({
       kind: "notice",
       request,
-      resolve: () => {
-        pendingPromises.delete(id);
-        resolve();
-      },
+      resolve: () => resolve(),
     });
   });
-  pendingPromises.set(id, promise);
-  return promise;
 }

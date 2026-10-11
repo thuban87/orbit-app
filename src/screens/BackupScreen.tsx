@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -95,6 +95,12 @@ export function BackupScreen({
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
   const [showNudge, setShowNudge] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Synchronous single-flight for Export (38.9 review WR-01): set from the
+  // first tap — before the readable-JSON prompt — until the export settles.
+  // `exporting` state alone is read from a stale closure, and a duplicate
+  // identical confirm resolves false at once, which here would mean "run an
+  // encrypted export" while the first prompt is still open.
+  const exportInFlightRef = useRef(false);
   const [restoreStage, setRestoreStage] = useState<
     "idle" | "loading" | "passphrase"
   >("idle");
@@ -198,63 +204,62 @@ export function BackupScreen({
     }
   }, []);
 
-  const runExport = useCallback(
-    async (readableOverride: boolean) => {
-      if (exporting) return;
-      setExporting(true);
-      try {
-        const settings = await getAppSettings(getExecutor());
-        const result = await createManualExportService({
-          exec: getExecutor(),
-          exportedAt: localDateTime(),
-          readPhotoBase64: readStoredPhotoBase64,
-          files: createLocalExportFiles(),
-          share: createExpoShareAdapter(),
-          encryption: {
-            enabled: settings.encryptionEnabled === 1,
-            passphrase: await backupPassphraseStore.getPassphrase(),
-            crypto: createBackupEnvelopeCrypto({
-              profiles: [APPROVED_BACKUP_ENCRYPTION_PROFILE],
-            }),
-            profile: APPROVED_BACKUP_ENCRYPTION_PROFILE,
-          },
-        }).shareExport({ readableOverride });
-        const message = manualExportFailureCopy(result);
-        if (message) {
-          // 38.9 D-27: an over-cap export cannot be retried, so it is a
-          // blocking notice; any other failure is a retryable error snackbar.
-          if (result.status === "too-large") {
-            void notice({ title: "Couldn't create export", message });
-          } else {
-            showSnackbar({
-              kind: "error",
-              label: `Couldn't create export. ${message}`,
-            });
-          }
+  const runExport = useCallback(async (readableOverride: boolean) => {
+    exportInFlightRef.current = true;
+    setExporting(true);
+    try {
+      const settings = await getAppSettings(getExecutor());
+      const result = await createManualExportService({
+        exec: getExecutor(),
+        exportedAt: localDateTime(),
+        readPhotoBase64: readStoredPhotoBase64,
+        files: createLocalExportFiles(),
+        share: createExpoShareAdapter(),
+        encryption: {
+          enabled: settings.encryptionEnabled === 1,
+          passphrase: await backupPassphraseStore.getPassphrase(),
+          crypto: createBackupEnvelopeCrypto({
+            profiles: [APPROVED_BACKUP_ENCRYPTION_PROFILE],
+          }),
+          profile: APPROVED_BACKUP_ENCRYPTION_PROFILE,
+        },
+      }).shareExport({ readableOverride });
+      const message = manualExportFailureCopy(result);
+      if (message) {
+        // 38.9 D-27: an over-cap export cannot be retried, so it is a
+        // blocking notice; any other failure is a retryable error snackbar.
+        if (result.status === "too-large") {
+          void notice({ title: "Couldn't create export", message });
+        } else {
+          showSnackbar({
+            kind: "error",
+            label: `Couldn't create export. ${message}`,
+          });
         }
-        // D-24: the export completed without some unreadable photos.
-        const skipped =
-          result.status === "shared"
-            ? skippedPhotosCopy(result.skippedPhotos)
-            : null;
-        if (skipped) {
-          showSnackbar({ kind: "success", label: `Export shared. ${skipped}` });
-        }
-      } catch (error) {
-        Logger.error(LOG_SCOPE, "manual export failed", error);
-        showSnackbar({
-          kind: "error",
-          label:
-            "Couldn't create export. Nothing was shared. Please try again.",
-        });
-      } finally {
-        setExporting(false);
       }
-    },
-    [exporting],
-  );
+      // D-24: the export completed without some unreadable photos.
+      const skipped =
+        result.status === "shared"
+          ? skippedPhotosCopy(result.skippedPhotos)
+          : null;
+      if (skipped) {
+        showSnackbar({ kind: "success", label: `Export shared. ${skipped}` });
+      }
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "manual export failed", error);
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't create export. Nothing was shared. Please try again.",
+      });
+    } finally {
+      exportInFlightRef.current = false;
+      setExporting(false);
+    }
+  }, []);
 
   const onExport = useCallback(async () => {
+    if (exportInFlightRef.current) return;
+    exportInFlightRef.current = true;
     if (!encryptionEnabled) {
       void runExport(false);
       return;

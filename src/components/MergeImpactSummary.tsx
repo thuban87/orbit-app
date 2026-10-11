@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -69,15 +69,30 @@ export function MergeImpactSummary({
     });
   }, [absorbedId, survivorId]);
   const typedResolutions: MergeResolutions = resolutions;
+  // In flight from the confirm until the merge settles (38.9 review WR-01):
+  // the ref blocks a second press synchronously; the state dims and disables
+  // "Merge contacts" (D-26) so it never looks live while a merge runs.
+  const mergingRef = useRef(false);
+  const [merging, setMerging] = useState(false);
+  const settleMerge = () => {
+    mergingRef.current = false;
+    setMerging(false);
+  };
   // Irreversible: themed destructive confirm, not dismissable (D-30, ADR-086).
-  const confirmMerge = () =>
+  const confirmMerge = () => {
+    if (mergingRef.current) return;
+    mergingRef.current = true;
+    setMerging(true);
     void confirm({
       title: "Merge contacts?",
       message: "This cannot be undone.",
       confirmLabel: "Merge",
       destructive: true,
     }).then((ok) => {
-      if (!ok) return;
+      if (!ok) {
+        settleMerge();
+        return;
+      }
       void mergeContactsWithPhotoOwnership(getExecutor(), {
         survivorId,
         absorbedId,
@@ -92,14 +107,16 @@ export function MergeImpactSummary({
             }),
           ),
         )
-        .catch((error: unknown) =>
+        .catch((error: unknown) => {
+          settleMerge();
           setFailureMessage(
             error instanceof GroupMergeCollisionError
               ? error.message
               : "Couldn't merge these contacts. Nothing was changed. Try again.",
-          ),
-        );
+          );
+        });
     });
+  };
   const rows = counts
     ? [
         plural(counts.interactions, "interaction", "interactions"),
@@ -148,10 +165,22 @@ export function MergeImpactSummary({
           <Text style={{ color: colors.danger }}>{failureMessage}</Text>
         ) : null}
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: merging }}
+          disabled={merging}
           onPress={confirmMerge}
-          style={[styles.cta, { backgroundColor: colors.accent }]}
+          style={[
+            styles.cta,
+            {
+              backgroundColor: merging ? colors.surfaceElevated : colors.accent,
+            },
+          ]}
         >
-          <Text style={{ color: colors.onAccent }}>Merge contacts</Text>
+          <Text
+            style={{ color: merging ? colors.textSecondary : colors.onAccent }}
+          >
+            Merge contacts
+          </Text>
         </Pressable>
       </View>
     </View>

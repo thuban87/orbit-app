@@ -129,7 +129,7 @@ describe("notice() (D-24, D-27)", () => {
   });
 });
 
-describe("identical requests share one dialog (38.9-06; 38.9-05 finding)", () => {
+describe("identical requests show one dialog; only the first caller gets the answer (38.9-06; review WR-01)", () => {
   const merge = {
     title: "Merge contacts?",
     message: "Ann will absorb Bea.",
@@ -137,15 +137,28 @@ describe("identical requests share one dialog (38.9-06; 38.9-05 finding)", () =>
     destructive: true,
   };
 
-  it("an identical confirm while one is pending adds no queue entry and gets the same answer", async () => {
+  it("an identical confirm while one is pending adds no queue entry and resolves false at once", async () => {
     const first = confirm(merge);
     const second = confirm({ ...merge });
     expect(confirmStore.getState().queue).toHaveLength(1);
-    expect(second).toBe(first);
+    expect(second).not.toBe(first);
+    // The duplicate never waits for, or receives, the user's answer.
+    await expect(second).resolves.toBe(false);
     confirmStore.getState().resolveCurrent(true);
     await expect(first).resolves.toBe(true);
-    await expect(second).resolves.toBe(true);
     expect(confirmStore.getState().queue).toEqual([]);
+  });
+
+  it("a double-tapped confirmed action runs once (review WR-01)", async () => {
+    const run = vi.fn();
+    const handler = async () => {
+      if (await confirm(merge)) run();
+    };
+    const taps = [handler(), handler()];
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await Promise.all(taps);
+    expect(run).toHaveBeenCalledOnce();
   });
 
   it("matches an identical request queued behind another one", async () => {
@@ -153,11 +166,11 @@ describe("identical requests share one dialog (38.9-06; 38.9-05 finding)", () =>
     const first = confirm(merge);
     const second = confirm(merge);
     expect(confirmStore.getState().queue).toHaveLength(2);
-    confirmStore.getState().resolveCurrent(false);
-    confirmStore.getState().resolveCurrent(false);
-    await expect(other).resolves.toBe(false);
-    await expect(first).resolves.toBe(false);
     await expect(second).resolves.toBe(false);
+    confirmStore.getState().resolveCurrent(false);
+    confirmStore.getState().resolveCurrent(true);
+    await expect(other).resolves.toBe(false);
+    await expect(first).resolves.toBe(true);
   });
 
   it("treats spelled-out defaults as identical (Cancel label, dismissable)", () => {
@@ -205,10 +218,11 @@ describe("identical requests share one dialog (38.9-06; 38.9-05 finding)", () =>
     await expect(again).resolves.toBe(true);
   });
 
-  it("an identical notice shares the pending one; a confirm with the same title does not", async () => {
+  it("an identical notice adds no dialog and resolves at once; a confirm with the same title does not match", async () => {
     const first = notice({ title: "Couldn't load", message: "Go back." });
     const second = notice({ title: "Couldn't load", message: "Go back." });
-    expect(second).toBe(first);
+    expect(second).not.toBe(first);
+    await expect(second).resolves.toBeUndefined();
     void confirm({
       title: "Couldn't load",
       message: "Go back.",
@@ -217,7 +231,6 @@ describe("identical requests share one dialog (38.9-06; 38.9-05 finding)", () =>
     expect(confirmStore.getState().queue).toHaveLength(2);
     confirmStore.getState().dismissCurrent();
     await expect(first).resolves.toBeUndefined();
-    await expect(second).resolves.toBeUndefined();
   });
 
   it("never piggybacks on the shared Discard changes? prompt", () => {
