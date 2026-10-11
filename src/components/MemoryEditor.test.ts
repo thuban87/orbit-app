@@ -294,6 +294,79 @@ describe("meaningful date (D-65, D-67)", () => {
   });
 });
 
+describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", () => {
+  type TestElement = ReactElement<Record<string, unknown>>;
+  function nodes(node: ReactNode): TestElement[] {
+    if (!node || typeof node !== "object") return [];
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    const element = node as TestElement;
+    return [element, ...nodes(element.props.children as ReactNode)];
+  }
+  const memory = {
+    id: 5,
+    type: "general",
+    value: "Trip",
+    note: null,
+    url: null,
+    meaningful_date: null,
+    pinned: 0,
+    outdated: 0,
+    hidden: null,
+    allow_ai: 0,
+    provenance: "user",
+    deleted_at: null,
+  } as unknown as MemoryRow;
+  const render = (busy?: boolean) =>
+    nodes(
+      MemoryEditor({
+        items: [memory],
+        initiallyEditingId: 5,
+        onAdd: vi.fn(),
+        onEdit: vi.fn(),
+        onDelete: vi.fn(),
+        onRestore: vi.fn(),
+        onSetAllowAi: vi.fn(),
+        globalAiEnabled: true,
+        busy,
+      }),
+    );
+  const control = (tree: TestElement[], label: string) =>
+    tree.find(
+      (n) => n.type === "Pressable" && n.props.accessibilityLabel === label,
+    );
+  const dimmed = (element: TestElement | undefined) =>
+    ((element?.props.style ?? []) as unknown[]).some(
+      (style) =>
+        typeof style === "object" &&
+        style !== null &&
+        (style as { opacity?: number }).opacity === 0.5,
+    );
+
+  beforeEach(() => {
+    hooks.forceOpenPickers = false;
+    hooks.setters = [];
+  });
+
+  it("leaves Cancel and Save live by default", () => {
+    const tree = render();
+    for (const label of ["Cancel", "Save memory"]) {
+      expect(control(tree, label)?.props.disabled).toBe(false);
+      expect(dimmed(control(tree, label))).toBe(false);
+    }
+  });
+
+  it("disables and dims Cancel and Save while busy", () => {
+    const tree = render(true);
+    for (const label of ["Cancel", "Save memory"]) {
+      expect(control(tree, label)?.props.disabled).toBe(true);
+      expect(control(tree, label)?.props.accessibilityState).toEqual({
+        disabled: true,
+      });
+      expect(dimmed(control(tree, label))).toBe(true);
+    }
+  });
+});
+
 describe("normalizeMemoryDraft (D-65)", () => {
   const draft: MemoryDraft = {
     ...initialDraft(),

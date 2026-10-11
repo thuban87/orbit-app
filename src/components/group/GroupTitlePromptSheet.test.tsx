@@ -10,15 +10,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   title: "",
+  busy: false,
   discardAnswer: true,
   confirmDiscard: vi.fn(),
   savingRef: { current: false },
+  /** The next useState slot; reset by every render. */
+  index: 0,
+  initial: [] as unknown[],
+  setters: [] as ReturnType<typeof vi.fn>[],
 }));
+
+/** GroupTitlePromptSheet's `useState` call order, pinned by the slot test. */
+const SLOT = { title: 0, busy: 1 } as const;
 
 vi.mock("react", () => ({
   useEffect: () => undefined,
   useRef: () => state.savingRef,
-  useState: <T,>(_initial: T) => [state.title, vi.fn()],
+  useState: <T,>(initial: T) => {
+    const slot = state.index;
+    state.index += 1;
+    state.initial[slot] = initial;
+    if (!state.setters[slot]) state.setters[slot] = vi.fn();
+    const value = [state.title, state.busy][slot];
+    return [value === undefined ? initial : value, state.setters[slot]];
+  },
 }));
 vi.mock("react-native", () => ({
   StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
@@ -66,6 +81,7 @@ function call(element: Element | undefined, prop: string): void {
 }
 
 function render(onConfirm = vi.fn(), onRequestClose = vi.fn()) {
+  state.index = 0;
   const tree = GroupTitlePromptSheet({
     visible: true,
     onRequestClose,
@@ -77,9 +93,18 @@ function render(onConfirm = vi.fn(), onRequestClose = vi.fn()) {
 describe("GroupTitlePromptSheet (D-72)", () => {
   beforeEach(() => {
     state.title = "";
+    state.busy = false;
     state.discardAnswer = true;
     state.confirmDiscard.mockClear();
     state.savingRef.current = false;
+    for (const setter of state.setters) setter?.mockClear();
+  });
+
+  it("pins the useState call order the seeding relies on", () => {
+    render();
+    expect(state.index).toBe(Object.keys(SLOT).length);
+    expect(state.initial[SLOT.title]).toBe("");
+    expect(state.initial[SLOT.busy]).toBe(false);
   });
 
   it("uses the shared stacking actions, never a fixed row", () => {
@@ -92,6 +117,7 @@ describe("GroupTitlePromptSheet (D-72)", () => {
       confirmLabel: "Create event",
       destructive: false,
       confirmDisabled: false,
+      cancelDisabled: false,
     });
     call(actions, "onConfirm");
     expect(onConfirm).toHaveBeenCalledWith("Trip");
@@ -188,6 +214,39 @@ describe("GroupTitlePromptSheet (D-72)", () => {
     const after = render(onConfirm, onRequestClose);
     call(find(after.tree, "ConfirmActions")[0], "onCancel");
     expect(onRequestClose).toHaveBeenCalledOnce();
+  });
+
+  it("draws the held Cancel and Create event disabled while the create runs (D-26; fix-pass WR-01)", async () => {
+    state.title = "Trip";
+    let finish: () => void = () => undefined;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    call(find(render(onConfirm).tree, "ConfirmActions")[0], "onConfirm");
+    expect(state.setters[SLOT.busy]).toHaveBeenLastCalledWith(true);
+
+    // The next render reads busy: both choices draw disabled.
+    state.busy = true;
+    const [held] = find(render(onConfirm).tree, "ConfirmActions");
+    expect(held?.props).toMatchObject({
+      confirmDisabled: true,
+      cancelDisabled: true,
+    });
+
+    finish();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.setters[SLOT.busy]).toHaveBeenLastCalledWith(false);
+  });
+
+  it("clears the disabled look when the host's create rejects", async () => {
+    state.title = "Trip";
+    const onConfirm = vi.fn(() => Promise.reject(new Error("boom")));
+    call(find(render(onConfirm).tree, "ConfirmActions")[0], "onConfirm");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.setters[SLOT.busy]).toHaveBeenLastCalledWith(false);
   });
 
   it("releases the hold when the host's create rejects", async () => {

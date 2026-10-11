@@ -78,6 +78,10 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
   // Whether the Edit Memory view's draft holds typed changes (D-14).
   const [memoryDraftDirty, setMemoryDraftDirty] = useState(false);
+  // Set beside savingRef: the ref is the guard, `busy` is render state for the
+  // disabled look, so every control the save holds reads as disabled (D-26;
+  // fix-pass WR-01).
+  const [busy, setBusy] = useState(false);
   // Own single-flight guard, distinct from runQuickLog's pendingRef.
   const savingRef = useRef(false);
 
@@ -95,6 +99,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     setEditingMemory(false);
     setMemoryDraftDirty(false);
     savingRef.current = false;
+    setBusy(false);
     let cancelled = false;
     void (async () => {
       try {
@@ -119,6 +124,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     if (contactId === null || interactionId === null) return;
     if (savingRef.current) return;
     savingRef.current = true;
+    setBusy(true);
     setError(null);
     try {
       const seed = await readInteractionForEdit(
@@ -170,6 +176,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       setError(SAVE_FAILED_MESSAGE);
     } finally {
       savingRef.current = false;
+      setBusy(false);
     }
   }, [contactId, interactionId, onClose, text]);
 
@@ -177,6 +184,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     if (contactId === null) return;
     if (savingRef.current) return;
     savingRef.current = true;
+    setBusy(true);
     setError(null);
     try {
       const result = resolvePostLogSave({ kind: "memory", text });
@@ -218,6 +226,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       setCreatedMemory(next.row);
     } finally {
       savingRef.current = false;
+      setBusy(false);
     }
   }, [contactId, onClose, reReadCreatedMemory, text]);
 
@@ -228,6 +237,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       // in flight (verification IN-01) and a double-tapped Save edits once.
       if (savingRef.current) return false;
       savingRef.current = true;
+      setBusy(true);
       try {
         // 38.3 review B-CR-01: a resolved editMemory is a successful save even
         // if the re-read fails. A missing re-read row closes the editor rather
@@ -257,6 +267,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         return true;
       } finally {
         savingRef.current = false;
+        setBusy(false);
       }
     },
     [contactId, onClose, reReadCreatedMemory],
@@ -389,6 +400,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
             initiallyEditingId={memoryBeingEdited.id}
             onDraftStateChange={(state) => setMemoryDraftDirty(state.dirty)}
             onCancelRequest={requestMemoryFormCancel}
+            busy={busy}
             showAdd={false}
             onAdd={onAddMemory}
             onEdit={onEditMemory}
@@ -397,7 +409,12 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
             onSetAllowAi={onSetMemoryAllowAi}
             globalAiEnabled={globalAiEnabled}
           />
-          <Button role="tertiary" label="Done" onPress={requestSheetClose} />
+          <Button
+            role="tertiary"
+            label="Done"
+            disabled={busy}
+            onPress={requestSheetClose}
+          />
         </ScrollView>
       ) : (
         <View style={styles.body}>
@@ -447,16 +464,19 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
                 <Button
                   role="tertiary"
                   label="Cancel"
+                  disabled={busy}
                   onPress={requestSheetClose}
                 />
                 <Button
                   role="tertiary"
                   label="Create Memory Instead"
+                  disabled={busy}
                   onPress={() => void createMemory()}
                 />
                 <Button
                   role="primary"
                   label={error ? "Retry" : "Save"}
+                  disabled={busy}
                   onPress={() => void saveNote()}
                 />
               </View>

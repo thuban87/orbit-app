@@ -35,6 +35,9 @@ const PROVENANCE_LABELS = {
   share: "From a shared capture",
 } as const;
 
+/** The Button.tsx disabled look (D-26 "dimmed") for this file's Pressables. */
+const DISABLED_OPACITY = 0.5;
+
 const MEMORY_TYPE_OPTIONS = (
   Object.keys(MEMORY_TYPE_REGISTRY) as MemoryTypeKey[]
 ).map((type) => ({ type, label: MEMORY_TYPE_REGISTRY[type].displayName }));
@@ -94,6 +97,11 @@ export interface MemoryEditorProps {
    * dirty-aware `requestClose` (D-61). Absent → Cancel closes at once.
    */
   onCancelRequest?: (close: () => void) => void;
+  /**
+   * The host's save is in flight (38.9 fix-pass WR-01): the form's Cancel and
+   * Save are held, and drawn disabled (D-26), until it settles. Absent → false.
+   */
+  busy?: boolean;
   /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
   ref?: Ref<MemoryEditorHandle>;
   testID?: string;
@@ -313,6 +321,7 @@ export function MemoryEditor({
   initiallyEditingId,
   onDraftStateChange,
   onCancelRequest,
+  busy = false,
   ref,
   testID,
 }: MemoryEditorProps) {
@@ -651,10 +660,16 @@ export function MemoryEditor({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Cancel"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
               onPress={() =>
                 onCancelRequest ? onCancelRequest(close) : close()
               }
-              style={[styles.action, { borderColor: colors.border }]}
+              style={[
+                styles.action,
+                { borderColor: colors.border },
+                busy ? styles.disabled : null,
+              ]}
             >
               <AppText role="body" style={{ color: colors.textSecondary }}>
                 Cancel
@@ -663,8 +678,8 @@ export function MemoryEditor({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={editing ? "Save memory" : "Add memory"}
-              accessibilityState={{ disabled: !canSave }}
-              disabled={!canSave}
+              accessibilityState={{ disabled: !canSave || busy }}
+              disabled={!canSave || busy}
               onPress={() => void commit()}
               style={[
                 styles.action,
@@ -672,6 +687,7 @@ export function MemoryEditor({
                   backgroundColor: canSave ? colors.accent : colors.surface,
                   borderColor: canSave ? colors.accent : colors.border,
                 },
+                busy ? styles.disabled : null,
               ]}
             >
               <AppText
@@ -704,6 +720,7 @@ const styles = StyleSheet.create({
   dateField: { gap: SPACING.xs },
   dateRow: { alignItems: "center", flexDirection: "row", gap: SPACING.sm },
   dateTrigger: { flex: 1, justifyContent: "center" },
+  disabled: { opacity: DISABLED_OPACITY },
   form: {
     borderRadius: SPACING.md,
     borderWidth: 1,

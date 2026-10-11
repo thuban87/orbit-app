@@ -22,6 +22,8 @@ const state = vi.hoisted(() => ({
   seed: new Map<number, unknown>(),
   /** Each slot's initial value from the last render (the self-check). */
   initial: [] as unknown[],
+  /** One setter spy per slot, kept across renders. */
+  setters: [] as ReturnType<typeof vi.fn>[],
   savingRef: { current: false },
   discardAnswer: true,
   confirmDiscard: vi.fn(),
@@ -37,7 +39,11 @@ vi.mock("react", () => ({
     const slot = state.index;
     state.index += 1;
     state.initial[slot] = initial;
-    return [state.seed.has(slot) ? state.seed.get(slot) : initial, vi.fn()];
+    if (!state.setters[slot]) state.setters[slot] = vi.fn();
+    return [
+      state.seed.has(slot) ? state.seed.get(slot) : initial,
+      state.setters[slot],
+    ];
   },
 }));
 vi.mock("react-native", () => ({
@@ -129,6 +135,7 @@ const SLOT = {
   editingMemory: 3,
   globalAiEnabled: 4,
   memoryDraftDirty: 5,
+  busy: 6,
 } as const;
 type SlotName = keyof typeof SLOT;
 
@@ -173,6 +180,7 @@ describe("the useState slot map the seeding relies on (verification IN-03)", () 
     expect(state.initial[SLOT.editingMemory]).toBe(false);
     expect(state.initial[SLOT.globalAiEnabled]).toBe(false);
     expect(state.initial[SLOT.memoryDraftDirty]).toBe(false);
+    expect(state.initial[SLOT.busy]).toBe(false);
   });
 
   it("each slot drives what its name says", async () => {
@@ -213,6 +221,52 @@ describe("the useState slot map the seeding relies on (verification IN-03)", () 
     press(button(dirty.tree, "Done"));
     await flush();
     expect(state.confirmDiscard).toHaveBeenCalledOnce();
+    // busy → the held controls draw disabled.
+    expect(button(render({}).tree, "Save").props?.disabled).toBe(false);
+    expect(button(render({ busy: true }).tree, "Save").props?.disabled).toBe(
+      true,
+    );
+  });
+});
+
+describe("a held control looks disabled while a save runs (D-26; fix-pass WR-01)", () => {
+  beforeEach(() => {
+    state.savingRef.current = false;
+    state.discardAnswer = true;
+    state.confirmDiscard.mockClear();
+    for (const setter of state.setters) setter?.mockClear();
+  });
+
+  it("Add Note's Cancel, Create Memory Instead and Save are enabled when idle and disabled while busy", () => {
+    const labels = ["Cancel", "Create Memory Instead", "Save"];
+    const idle = render({ text: "Coffee" });
+    for (const label of labels) {
+      expect(button(idle.tree, label).props?.disabled).toBe(false);
+    }
+    const held = render({ text: "Coffee", busy: true });
+    for (const label of labels) {
+      expect(button(held.tree, label).props?.disabled).toBe(true);
+    }
+  });
+
+  it("Edit Memory's Done and the form's Cancel and Save are held while busy", () => {
+    const edit = (busy: boolean) =>
+      render({ createdMemory: MEMORY, editingMemory: true, busy });
+    expect(button(edit(false).tree, "Done").props?.disabled).toBe(false);
+    expect(find(edit(false).tree, "MemoryEditor")[0]?.props?.busy).toBe(false);
+    expect(button(edit(true).tree, "Done").props?.disabled).toBe(true);
+    expect(find(edit(true).tree, "MemoryEditor")[0]?.props?.busy).toBe(true);
+  });
+
+  it("a note save sets busy beside the ref and clears it when it settles", async () => {
+    const { tree } = render({ text: "Coffee" });
+    press(button(tree, "Save"));
+    expect(state.savingRef.current).toBe(true);
+    expect(state.setters[SLOT.busy]).toHaveBeenLastCalledWith(true);
+    state.finishRead(null);
+    await flush();
+    expect(state.savingRef.current).toBe(false);
+    expect(state.setters[SLOT.busy]).toHaveBeenLastCalledWith(false);
   });
 });
 

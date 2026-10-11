@@ -31,8 +31,11 @@ export function GroupTitlePromptSheet({
   // from a glass card (38.4 review Lane B2 WR-01; RG-029 / D-24).
   const { colors } = useUnscopedTheme();
   const [title, setTitle] = useState("");
-  // Set while the host's create is in flight (verification IN-01).
+  // Set while the host's create is in flight (verification IN-01). The ref is
+  // the guard; `busy` is render state for the disabled look, so the held
+  // Cancel and Create event read as disabled (D-26; fix-pass WR-01).
   const savingRef = useRef(false);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!visible) setTitle("");
   }, [visible]);
@@ -40,8 +43,10 @@ export function GroupTitlePromptSheet({
   const confirm = () => {
     if (!trimmed || savingRef.current) return;
     savingRef.current = true;
+    setBusy(true);
     const release = () => {
       savingRef.current = false;
+      setBusy(false);
     };
     let pending: Promise<unknown>;
     try {
@@ -110,7 +115,8 @@ export function GroupTitlePromptSheet({
           cancelLabel="Cancel"
           confirmLabel="Create event"
           destructive={false}
-          confirmDisabled={!trimmed}
+          confirmDisabled={!trimmed || busy}
+          cancelDisabled={busy}
           onCancel={requestSheetClose}
           onConfirm={confirm}
         />

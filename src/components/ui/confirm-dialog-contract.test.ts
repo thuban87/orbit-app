@@ -55,6 +55,14 @@ describe("ConfirmDialog themed card and variants (38.9 D-43, D-52, D-24)", () =>
     const actions = code.slice(code.indexOf("export function ConfirmActions("));
     expect(actions).toMatch(/if \(notice\)[\s\S]*?role="primary"/);
   });
+
+  it("can draw Cancel disabled for a host holding its exits, off by default (D-26; fix-pass WR-01)", () => {
+    const actions = code.slice(code.indexOf("export function ConfirmActions("));
+    expect(actions).toContain("cancelDisabled = false,");
+    expect(actions).toMatch(
+      /role="secondary"\s+label=\{cancelLabel\}\s+disabled=\{cancelDisabled\}/,
+    );
+  });
 });
 
 describe("ConfirmDialog large-text reachability (RG-034 ui-accessibility/AUD-UIA-011, CONFIRMED on device)", () => {

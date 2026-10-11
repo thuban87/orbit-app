@@ -175,6 +175,8 @@ type ActionsLayout = "measuring" | "row" | "stacked";
  * Cancel + confirm pair that must stack at large text (38.4 D-72:
  * GroupTitlePromptSheet). `notice` renders the one-button notice: a single
  * Primary `confirmLabel` button, right-aligned like the row layout.
+ * `cancelDisabled` draws Cancel with the Button disabled look (D-26) for a
+ * host that holds its exits while work runs (38.9 fix-pass WR-01).
  */
 export function ConfirmActions({
   notice = false,
@@ -182,6 +184,7 @@ export function ConfirmActions({
   confirmLabel,
   destructive,
   confirmDisabled,
+  cancelDisabled = false,
   onCancel,
   onConfirm,
 }: {
@@ -190,6 +193,7 @@ export function ConfirmActions({
   confirmLabel: string;
   destructive: boolean;
   confirmDisabled: boolean;
+  cancelDisabled?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -233,7 +237,12 @@ export function ConfirmActions({
       onLayout={measure("row")}
     >
       <View style={actionStyle} onLayout={measure("cancel")}>
-        <Button role="secondary" label={cancelLabel} onPress={onCancel} />
+        <Button
+          role="secondary"
+          label={cancelLabel}
+          disabled={cancelDisabled}
+          onPress={onCancel}
+        />
       </View>
       <View style={actionStyle} onLayout={measure("confirm")}>
         <Button
