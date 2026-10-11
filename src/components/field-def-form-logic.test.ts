@@ -15,6 +15,7 @@ import {
   draftToFieldFields,
   type FieldDefDraft,
   hydrateFieldDefDraft,
+  isFieldDefDraftDirty,
 } from "@/components/field-def-form-logic";
 import type { CustomFieldDef } from "@/db/field-types";
 
@@ -121,5 +122,32 @@ describe("draftToFieldFields — draft-derived payload subset (C3-L1)", () => {
       share_with_ai: 0,
     };
     expect(draftToFieldFields(draft).share_with_ai).toBe(0);
+  });
+});
+
+describe("isFieldDefDraftDirty (G-04; D-14, D-61)", () => {
+  it("an untouched new or edit form is clean", () => {
+    const fresh = hydrateFieldDefDraft();
+    expect(isFieldDefDraftDirty(fresh, { ...fresh })).toBe(false);
+    const stored = hydrateFieldDefDraft(
+      storedDef({ label: "Tier", type: "dropdown", options: '["a"]' }),
+    );
+    expect(isFieldDefDraftDirty(stored, { ...stored })).toBe(false);
+  });
+
+  it("changing the label, type, an option or a toggle is dirty", () => {
+    const seed = hydrateFieldDefDraft(
+      storedDef({ label: "Tier", type: "dropdown", options: '["a"]' }),
+    );
+    expect(isFieldDefDraftDirty(seed, { ...seed, label: "Tiers" })).toBe(true);
+    expect(isFieldDefDraftDirty(seed, { ...seed, type: "text" })).toBe(true);
+    expect(isFieldDefDraftDirty(seed, { ...seed, options: '["a","b"]' })).toBe(
+      true,
+    );
+    expect(isFieldDefDraftDirty(seed, { ...seed, show_on_new: 1 })).toBe(true);
+    expect(isFieldDefDraftDirty(seed, { ...seed, always_show: 1 })).toBe(true);
+    expect(isFieldDefDraftDirty(seed, { ...seed, share_with_ai: 1 })).toBe(
+      true,
+    );
   });
 });

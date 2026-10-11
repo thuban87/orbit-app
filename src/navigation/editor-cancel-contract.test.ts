@@ -76,3 +76,143 @@ describe("+ → Memory: Back and Cancel close the draft first (G-12; D-14, D-61)
     );
   });
 });
+
+describe("Update Contact: every editor Cancel follows the Back rule (E-09; D-14, D-61)", () => {
+  const screen = read("src/screens/UpdateContactScreen.tsx");
+  const relationship = read("src/components/RelationshipEditor.tsx");
+
+  it("guards with a sub-editor over the open row", () => {
+    expect(screen).toMatch(
+      /useDiscardKeepGuard\(\{[\s\S]*?hasUnsavedChanges:\s*false[\s\S]*?subEditor:\s*\{[\s\S]*?open:\s*session\.activeRowKey\s*!=\s*null/,
+    );
+    expect(screen).toMatch(/target:\s*"innermost"/);
+  });
+
+  it("no editor Cancel is a bare close", () => {
+    expect(screen).not.toMatch(/onCancel=\{onCancel\}/);
+    expect(screen).not.toMatch(/\(\) => setSelected\(null\)/);
+    expect(screen).not.toMatch(/onCancel=\{\(\) => setSession/);
+    // cancelRow is reached only through closeLevel.
+    const cancelRowCalls = screen.match(/cancelRow\(/g) ?? [];
+    expect(cancelRowCalls).toHaveLength(1);
+    expect(functionBody(screen, "closeLevel")).toContain("cancelRow(");
+  });
+
+  it("row and inner Cancels route through requestClose", () => {
+    expect(functionBody(screen, "requestRowCancel")).toMatch(
+      /requestClose\([\s\S]*?target:\s*"row"/,
+    );
+    expect(functionBody(screen, "requestInnerCancel")).toMatch(
+      /requestClose\([\s\S]*?target:\s*"innermost"/,
+    );
+    expect(screen).toMatch(/onCancelRequest=\{onCancelRequest\}/);
+  });
+
+  it("successful saves close directly with no prompt", () => {
+    expect(screen).toMatch(
+      /const onSaved = \(\) => \{[\s\S]*?completeSave[\s\S]*?\};/,
+    );
+    const onSaved = screen.slice(
+      screen.indexOf("const onSaved = () =>"),
+      screen.indexOf("};", screen.indexOf("const onSaved = () =>")),
+    );
+    expect(onSaved).not.toMatch(/requestClose|confirmDiscard/);
+  });
+
+  it("RelationshipEditor's form Cancel calls onCancelRequest when given; commit closes directly", () => {
+    expect(relationship).not.toMatch(/onPress=\{close\}/);
+    expect(relationship).toMatch(
+      /onCancelRequest\s*\?\s*onCancelRequest\(close\)\s*:\s*close\(\)/,
+    );
+    const commit = functionBody(relationship, "commit");
+    expect(commit).toContain("if (saved) close()");
+    expect(commit).not.toMatch(/confirmDiscard|requestClose|onCancelRequest/);
+  });
+});
+
+describe("Custom fields editor Cancel (G-04; D-14, D-61)", () => {
+  const screen = read("src/screens/CustomFieldsScreen.tsx");
+
+  it("guards the in-screen editor as a sub-editor", () => {
+    expect(screen).toMatch(
+      /useDiscardKeepGuard\(\{[\s\S]*?hasUnsavedChanges:\s*false[\s\S]*?subEditor:\s*\{[\s\S]*?open:\s*editor\s*!==\s*null/,
+    );
+  });
+
+  it("neither FieldDefForm Cancel is a bare close; both use requestClose", () => {
+    expect(screen).not.toMatch(/onCancel=\{\(\) => setEditor\(null\)\}/);
+    const cancels =
+      screen.match(
+        /onCancel=\{\(\) => requestClose\(closeEditor, editorDirty\)\}/g,
+      ) ?? [];
+    expect(cancels).toHaveLength(2);
+  });
+
+  it("a successful create or edit closes directly", () => {
+    for (const name of ["handleCreate", "handleEdit"]) {
+      const body = functionBody(screen, name);
+      expect(body).toContain("setEditor(null)");
+      expect(body).not.toMatch(/requestClose|confirmDiscard/);
+    }
+  });
+});
+
+describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)", () => {
+  for (const path of [
+    "src/screens/EditContactScreen.tsx",
+    "src/screens/CreateContactScreen.tsx",
+  ]) {
+    const screen = read(path);
+
+    /** The JSX of the AccordionSection with this sectionId. */
+    const section = (id: string) => {
+      const start = screen.indexOf(`sectionId="${id}"`);
+      expect(start, `${path} ${id}`).toBeGreaterThan(-1);
+      return screen.slice(
+        start,
+        screen.indexOf(">", screen.indexOf("onExpandedChange", start)) + 400,
+      );
+    };
+
+    it(`${path}: Memories and Key People fold through requestClose + closeDraft`, () => {
+      for (const id of ["memories", "keyPeople"]) {
+        const region = section(id);
+        const handler = region.slice(
+          region.indexOf("onExpandedChange"),
+          region.indexOf("containerRef") > -1
+            ? region.indexOf("containerRef")
+            : region.indexOf(">") + 1,
+        );
+        expect(handler).toContain("requestClose(");
+        expect(handler).toContain("closeDraft()");
+      }
+    });
+
+    it(`${path}: other sections fold directly`, () => {
+      for (const id of ["identity", "methods", "currentLocation"]) {
+        const region = section(id);
+        expect(region).toMatch(
+          new RegExp(
+            `onExpandedChange=\\{\\(next\\) => setSectionExpanded\\("${id}", next\\)\\}`,
+          ),
+        );
+      }
+    });
+
+    it(`${path}: passes draft state and closeDraft refs to both editors`, () => {
+      expect(screen).toMatch(
+        /<MemoryEditor[\s\S]*?ref=\{memoryEditorRef\}[\s\S]*?onDraftStateChange=/,
+      );
+      expect(screen).toMatch(
+        /<RelationshipEditor[\s\S]*?ref=\{relationshipEditorRef\}[\s\S]*?onDraftStateChange=/,
+      );
+      expect(screen).toMatch(/subEditor:\s*\{[\s\S]*?pickedDraft/);
+    });
+  }
+
+  it("AccordionSection does not import the guard", () => {
+    expect(read("src/components/ui/AccordionSection.tsx")).not.toContain(
+      "discard-keep-guard",
+    );
+  });
+});

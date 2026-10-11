@@ -504,3 +504,171 @@ describe("+ → Memory Back sequence (G-12; D-14, review C2-M1)", () => {
     expect(clean).toHaveBeenCalledOnce();
   });
 });
+
+describe("Add Contact / Edit Contact open drafts on Back (C5-M1; D-13, D-14)", () => {
+  // The screens pass `subEditor` from pickCreateSubEditor: only an open draft
+  // holding typed text is `open`; its close calls that editor's closeDraft().
+  const draftGuard = (
+    routeDirty: boolean,
+    draftOpenAndTyped: boolean,
+    bypass = false,
+  ) => {
+    const closeDraft = vi.fn();
+    const mounted = mountGuard(routeDirty, bypass, {
+      open: draftOpenAndTyped,
+      dirty: draftOpenAndTyped,
+      close: closeDraft,
+    });
+    return { ...mounted, closeDraft };
+  };
+
+  for (const screen of ["Add Contact", "Edit Contact"]) {
+    describe(screen, () => {
+      it("an untouched form with a typed draft prompts; Discard closes the draft and stays", async () => {
+        const { fire, closeDraft } = draftGuard(false, true);
+        const event = fire({ type: "GO_BACK" });
+        expect(event.preventDefault).toHaveBeenCalledOnce();
+        expect(confirmStore.getState().queue).toHaveLength(1);
+        confirmStore.getState().resolveCurrent(true);
+        await flush();
+        expect(closeDraft).toHaveBeenCalledOnce();
+        expect(nav.dispatch).not.toHaveBeenCalled();
+      });
+
+      it("then a further Back on the otherwise untouched form leaves", () => {
+        const { fire } = draftGuard(false, false);
+        const event = fire({ type: "GO_BACK" });
+        expect(event.preventDefault).not.toHaveBeenCalled();
+      });
+
+      it("an open but empty draft on an untouched form leaves at once", () => {
+        // pickCreateSubEditor reports an empty open draft as not open.
+        const { fire, closeDraft } = draftGuard(false, false);
+        const event = fire({ type: "GO_BACK" });
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(closeDraft).not.toHaveBeenCalled();
+      });
+
+      it("a changed form with a typed draft closes the draft first; the next Back asks to leave", async () => {
+        const first = draftGuard(true, true);
+        first.fire({ type: "GO_BACK" });
+        confirmStore.getState().resolveCurrent(true);
+        await flush();
+        expect(first.closeDraft).toHaveBeenCalledOnce();
+        expect(nav.dispatch).not.toHaveBeenCalled();
+        const next = draftGuard(true, false);
+        const action = { type: "GO_BACK" };
+        const event = next.fire(action);
+        expect(event.preventDefault).toHaveBeenCalledOnce();
+        expect(confirmStore.getState().queue).toHaveLength(1);
+        confirmStore.getState().resolveCurrent(true);
+        await flush();
+        expect(nav.dispatch).toHaveBeenCalledWith(action);
+      });
+
+      it("a save (bypass set) leaves with a draft still open", () => {
+        const { fire, closeDraft } = draftGuard(true, true, true);
+        const event = fire({ type: "GO_BACK" });
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(closeDraft).not.toHaveBeenCalled();
+      });
+    });
+  }
+});
+
+describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)", () => {
+  // The Memories / Key People fold handler: expanding never prompts; folding
+  // calls requestClose(foldClose, draft.dirty) where foldClose closes the
+  // draft and then folds the section.
+  for (const screen of ["Edit Contact", "Add Contact"]) {
+    describe(screen, () => {
+      const setup = () => {
+        const { requestClose } = mountGuard(false);
+        const closeDraft = vi.fn();
+        const fold = vi.fn();
+        const foldClose = () => {
+          closeDraft();
+          fold();
+        };
+        return { requestClose, closeDraft, fold, foldClose };
+      };
+
+      it("folding with a typed draft prompts; Keep editing leaves it open", async () => {
+        const { requestClose, foldClose, closeDraft, fold } = setup();
+        requestClose(foldClose, true);
+        expect(confirmStore.getState().queue).toHaveLength(1);
+        confirmStore.getState().resolveCurrent(false);
+        await flush();
+        expect(closeDraft).not.toHaveBeenCalled();
+        expect(fold).not.toHaveBeenCalled();
+      });
+
+      it("fold again, Discard: the draft closes and the section folds", async () => {
+        const { requestClose, foldClose, closeDraft, fold } = setup();
+        requestClose(foldClose, true);
+        confirmStore.getState().resolveCurrent(true);
+        await flush();
+        expect(closeDraft).toHaveBeenCalledOnce();
+        expect(fold).toHaveBeenCalledOnce();
+      });
+
+      it("an untouched draft or no draft folds at once", () => {
+        const { requestClose, foldClose, fold } = setup();
+        requestClose(foldClose, false);
+        expect(fold).toHaveBeenCalledOnce();
+        expect(confirmStore.getState().queue).toHaveLength(0);
+      });
+
+      it("a fold while a discard prompt is pending queues no second prompt", async () => {
+        const { requestClose, foldClose, fold } = setup();
+        requestClose(foldClose, true);
+        requestClose(foldClose, true);
+        expect(confirmStore.getState().queue).toHaveLength(1);
+        confirmStore.getState().resolveCurrent(true);
+        await flush();
+        expect(fold).toHaveBeenCalledOnce();
+      });
+    });
+  }
+});
+
+describe("Update Contact / Custom fields sub-editor (E-09, G-04; D-14, D-61)", () => {
+  it("key-person form with a typed name: Back prompts once; Discard closes the form only", async () => {
+    // Options: no route dirt; the sub-editor is the open row, dirty describes
+    // the innermost level; close() resolves innermost → "inner".
+    const closeInner = vi.fn();
+    const { fire } = mountGuard(false, false, {
+      open: true,
+      dirty: true,
+      close: closeInner,
+    });
+    fire({ type: "GO_BACK" });
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(closeInner).toHaveBeenCalledOnce();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("Keep editing keeps the typed draft", async () => {
+    const closeInner = vi.fn();
+    const { fire } = mountGuard(false, false, {
+      open: true,
+      dirty: true,
+      close: closeInner,
+    });
+    fire({ type: "GO_BACK" });
+    confirmStore.getState().resolveCurrent(false);
+    await flush();
+    expect(closeInner).not.toHaveBeenCalled();
+  });
+
+  it("with no editor open Back leaves as before", () => {
+    const { fire } = mountGuard(false, false, {
+      open: false,
+      dirty: false,
+      close: vi.fn(),
+    });
+    expect(fire({ type: "GO_BACK" }).preventDefault).not.toHaveBeenCalled();
+  });
+});

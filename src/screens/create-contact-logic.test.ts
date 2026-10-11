@@ -19,6 +19,7 @@ import {
   createFormSeedState,
   firstInteractionOccurredAt,
   isCreateFormDirty,
+  pickCreateSubEditor,
   resolveErrorSection,
 } from "./create-contact-logic";
 
@@ -433,5 +434,48 @@ describe("Add Contact dirty check against the seed (D-15, E-01)", () => {
     ).toBe(true);
     const back = coordinateBoundToggle({ intervalDays: null }, false);
     expect(dirty({ ...seed, ...back })).toBe(false);
+  });
+});
+
+describe("pickCreateSubEditor (C5-M1; D-13, D-14)", () => {
+  const closed = { open: false, dirty: false };
+  const empty = { open: true, dirty: false };
+  const typed = { open: true, dirty: true };
+
+  it("no draft both open and typed into → nothing holds Back", () => {
+    expect(
+      pickCreateSubEditor({ memory: closed, relationship: closed }),
+    ).toEqual({ open: false, dirty: false, which: null });
+    expect(pickCreateSubEditor({ memory: empty, relationship: empty })).toEqual(
+      {
+        open: false,
+        dirty: false,
+        which: null,
+      },
+    );
+  });
+
+  it("picks the first open-and-dirty draft, memory before relationship", () => {
+    expect(
+      pickCreateSubEditor({ memory: typed, relationship: closed }),
+    ).toEqual({
+      open: true,
+      dirty: true,
+      which: "memory",
+    });
+    expect(pickCreateSubEditor({ memory: empty, relationship: typed })).toEqual(
+      {
+        open: true,
+        dirty: true,
+        which: "relationship",
+      },
+    );
+    expect(pickCreateSubEditor({ memory: typed, relationship: typed })).toEqual(
+      {
+        open: true,
+        dirty: true,
+        which: "memory",
+      },
+    );
   });
 });

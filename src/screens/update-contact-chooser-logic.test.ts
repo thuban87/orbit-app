@@ -8,7 +8,9 @@ import {
   finishSession,
   GENERIC_CUSTOM_FIELDS_LABEL,
   isChooserVisible,
+  isRowDraftDirty,
   openRow,
+  resolveUpdateEditorClose,
   selectApplicableDefs,
   startSession,
   targetContact,
@@ -188,5 +190,231 @@ describe("chooser session (repeated-update loop)", () => {
     const done = finishSession(startSession(3));
     expect(done.done).toBe(true);
     expect(isChooserVisible(done)).toBe(false);
+  });
+});
+
+describe("resolveUpdateEditorClose (D-14 innermost first; review H1)", () => {
+  it("nothing open → null", () => {
+    expect(
+      resolveUpdateEditorClose({
+        rowOpen: false,
+        innerOpen: false,
+        target: "innermost",
+      }),
+    ).toBeNull();
+  });
+
+  it("custom field path: a field from the chooser closes back to the chooser, then the row", () => {
+    // Field selected in the Custom Fields chooser.
+    expect(
+      resolveUpdateEditorClose({
+        rowOpen: true,
+        innerOpen: true,
+        target: "innermost",
+      }),
+    ).toBe("inner");
+    // Back at the chooser: the second Back closes the row (cancelRow).
+    expect(
+      resolveUpdateEditorClose({
+        rowOpen: true,
+        innerOpen: false,
+        target: "innermost",
+      }),
+    ).toBe("row");
+  });
+
+  it("key-person path: an open form closes before the Key people row", () => {
+    expect(
+      resolveUpdateEditorClose({
+        rowOpen: true,
+        innerOpen: true,
+        target: "innermost",
+      }),
+    ).toBe("inner");
+  });
+
+  it("the row's own Cancel always closes the row", () => {
+    expect(
+      resolveUpdateEditorClose({
+        rowOpen: true,
+        innerOpen: true,
+        target: "row",
+      }),
+    ).toBe("row");
+    expect(
+      resolveUpdateEditorClose({
+        rowOpen: true,
+        innerOpen: false,
+        target: "row",
+      }),
+    ).toBe("row");
+  });
+});
+
+describe("isRowDraftDirty (D-14, D-61; E-09)", () => {
+  it("current-state text: dirty only after typing", () => {
+    expect(isRowDraftDirty({ kind: "text", seed: "", current: "" })).toBe(
+      false,
+    );
+    expect(isRowDraftDirty({ kind: "text", seed: "", current: "Paris" })).toBe(
+      true,
+    );
+  });
+
+  it("Off Limits per-edit seed (review C4-M3)", () => {
+    // Untouched new item; new item with text.
+    expect(isRowDraftDirty({ kind: "text", seed: "", current: "" })).toBe(
+      false,
+    );
+    expect(isRowDraftDirty({ kind: "text", seed: "", current: "work" })).toBe(
+      true,
+    );
+    // Existing item selected: its text is the seed.
+    expect(
+      isRowDraftDirty({ kind: "text", seed: "politics", current: "politics" }),
+    ).toBe(false);
+    expect(
+      isRowDraftDirty({ kind: "text", seed: "politics", current: "" }),
+    ).toBe(true);
+    expect(
+      isRowDraftDirty({ kind: "text", seed: "politics", current: "polit" }),
+    ).toBe(true);
+    // Restored to its original text.
+    expect(
+      isRowDraftDirty({ kind: "text", seed: "politics", current: "politics" }),
+    ).toBe(false);
+  });
+
+  it("contact methods: compared against the seeded groups, ignoring generated uids", () => {
+    const seed = {
+      phone: [{ uid: "a", type: "phone", value: "555", label: "Main" }],
+      email: [],
+    };
+    expect(isRowDraftDirty({ kind: "methods", seed, current: seed })).toBe(
+      false,
+    );
+    expect(
+      isRowDraftDirty({
+        kind: "methods",
+        seed,
+        current: {
+          phone: [{ uid: "a", type: "phone", value: "5556", label: "Main" }],
+          email: [],
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isRowDraftDirty({
+        kind: "methods",
+        seed: { phone: [], email: [] },
+        current: { phone: [], email: [] },
+      }),
+    ).toBe(false);
+  });
+
+  describe("frequency (reviews C4-M2, C5-L6)", () => {
+    const presetDraft = { customMode: false, raw: "", unit: "days" as const };
+    const settled = { intervalDays: 30, draft: presetDraft };
+
+    it("is clean until the header read settles", () => {
+      expect(
+        isRowDraftDirty({
+          kind: "frequency",
+          seed: null,
+          current: { intervalDays: 7, draft: presetDraft },
+        }),
+      ).toBe(false);
+    });
+
+    it("a null-interval contact opened and left untouched is clean", () => {
+      // Seed = DEFAULT_INTERVAL_DAYS when the stored interval is null.
+      expect(
+        isRowDraftDirty({ kind: "frequency", seed: settled, current: settled }),
+      ).toBe(false);
+    });
+
+    it("picking a different preset is dirty", () => {
+      expect(
+        isRowDraftDirty({
+          kind: "frequency",
+          seed: settled,
+          current: { intervalDays: 7, draft: presetDraft },
+        }),
+      ).toBe(true);
+    });
+
+    it("opening Custom without typing is clean", () => {
+      expect(
+        isRowDraftDirty({
+          kind: "frequency",
+          seed: settled,
+          current: {
+            intervalDays: 30,
+            draft: { customMode: true, raw: "", unit: "days" },
+          },
+        }),
+      ).toBe(false);
+    });
+
+    it("invalid custom text such as 0 emits no interval but is dirty", () => {
+      expect(
+        isRowDraftDirty({
+          kind: "frequency",
+          seed: settled,
+          current: {
+            intervalDays: 30,
+            draft: { customMode: true, raw: "0", unit: "days" },
+          },
+        }),
+      ).toBe(true);
+    });
+
+    it("a changed unit while Custom is open is dirty", () => {
+      expect(
+        isRowDraftDirty({
+          kind: "frequency",
+          seed: settled,
+          current: {
+            intervalDays: 30,
+            draft: { customMode: true, raw: "", unit: "weeks" },
+          },
+        }),
+      ).toBe(true);
+    });
+  });
+
+  it("custom field: clean until read, then dirty once the value differs", () => {
+    expect(
+      isRowDraftDirty({
+        kind: "custom_field",
+        ready: false,
+        seed: null,
+        current: "x",
+      }),
+    ).toBe(false);
+    expect(
+      isRowDraftDirty({
+        kind: "custom_field",
+        ready: true,
+        seed: "a",
+        current: "a",
+      }),
+    ).toBe(false);
+    expect(
+      isRowDraftDirty({
+        kind: "custom_field",
+        ready: true,
+        seed: null,
+        current: "",
+      }),
+    ).toBe(false);
+    expect(
+      isRowDraftDirty({
+        kind: "custom_field",
+        ready: true,
+        seed: "a",
+        current: "b",
+      }),
+    ).toBe(true);
   });
 });

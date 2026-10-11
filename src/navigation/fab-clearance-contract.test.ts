@@ -357,6 +357,21 @@ describe("FAB clearance: delegated scroll components (D-52)", () => {
   );
 });
 
+describe("FAB clearance: custom-field editor end-of-scroll (38.9 D-55, G-21)", () => {
+  it("CustomFieldsScreen passes its useBottomClearance() to every FieldDefForm, applied as paddingBottom", () => {
+    const host = stripComments(read("src/screens/CustomFieldsScreen.tsx"));
+    expect(host).toMatch(/const bottomClearance = useBottomClearance\(\);/);
+    const forms = host.split("<FieldDefForm").slice(1);
+    expect(forms.length).toBeGreaterThanOrEqual(2);
+    for (const form of forms) {
+      const props = form.slice(0, form.indexOf("/>"));
+      expect(props).toMatch(/bottomClearance=\{bottomClearance\}/);
+    }
+    const form = stripComments(read("src/components/FieldDefForm.tsx"));
+    expect(form).toMatch(/paddingBottom:\s*props\.bottomClearance/);
+  });
+});
+
 describe("FAB clearance: geometry tokens (D-52)", () => {
   it("keeps FAB_SIZE 56 and FAB_EDGE_GAP on SPACING.base (16)", () => {
     expect(FAB_SIZE).toBe(56);
