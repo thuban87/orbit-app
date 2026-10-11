@@ -3,7 +3,7 @@
  * heights: `compact` (short pickers / small option lists) and `detail` (detail
  * views / medium forms, ~half height). Both share the `radius.xl` top corners,
  * the themed drag handle, the scrim, spacing and safe-area conventions with
- * `Modal` via `overlay-base`. Non-destructive: dismisses on scrim-tap and
+ * `ConfirmDialog` via `overlay-base`. Non-destructive: dismisses on scrim-tap and
  * Android Back.
  *
  * Body (38.4 D-32, RG-034 follow-on, device-found): `compact` and `detail`

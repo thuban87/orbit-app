@@ -32,7 +32,7 @@
  * card that shrinks to the window between the system bars, so both explicit
  * choices always stay on-screen.
  *
- * Shares radius/scrim/spacing/typography with `Modal`/`Sheet` via `overlay-base`.
+ * Shares radius/scrim/spacing/typography with `Sheet` via `overlay-base`.
  * No colour literal (check:colors).
  */
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` on AppText (semantic
