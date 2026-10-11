@@ -96,3 +96,22 @@ export function draftToFieldFields(draft: FieldDefDraft): FieldDraftFields {
     share_with_ai: draft.share_with_ai,
   };
 }
+
+/**
+ * Whether the custom-field editor holds typed changes (38.9 D-14, D-61; G-04):
+ * the live draft vs its seed, all six editor-owned fields. The caller passes
+ * both with `options` normalised the same way (FieldDefForm's buildOptions).
+ */
+export function isFieldDefDraftDirty(
+  seed: FieldDefDraft,
+  draft: FieldDefDraft,
+): boolean {
+  return (
+    seed.label !== draft.label ||
+    seed.type !== draft.type ||
+    seed.options !== draft.options ||
+    seed.show_on_new !== draft.show_on_new ||
+    seed.always_show !== draft.always_show ||
+    seed.share_with_ai !== draft.share_with_ai
+  );
+}

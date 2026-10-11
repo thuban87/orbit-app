@@ -1,4 +1,10 @@
-import { useState } from "react";
+import {
+  type Ref,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { StyleSheet, Switch, TextInput, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
 import { AppText, Button } from "@/components/ui";
@@ -22,6 +28,30 @@ export interface RelationshipEditorProps {
   onEdit: (id: number, draft: RelationshipDraft) => Promise<boolean>;
   onDelete: (id: number) => void;
   onRestore: (id: number) => void;
+  /**
+   * Reports whether the add/edit form is open and holds typed changes (38.9
+   * D-14), on every change and `{ open: false, dirty: false }` on unmount.
+   * Optional: hosts that do not guard the draft omit it.
+   */
+  onDraftStateChange?: (state: RelationshipDraftState) => void;
+  /**
+   * When given, the form's Cancel calls this with the editor's own close so
+   * the host can route it through the dirty-aware `requestClose` (D-61).
+   * Absent → Cancel closes at once.
+   */
+  onCancelRequest?: (close: () => void) => void;
+  /** Exposes `closeDraft()` so the host's Back can close the open form (D-14). */
+  ref?: Ref<RelationshipEditorHandle>;
+}
+
+export interface RelationshipDraftState {
+  open: boolean;
+  dirty: boolean;
+}
+
+export interface RelationshipEditorHandle {
+  /** Closes the open add/edit form without saving (no prompt). */
+  closeDraft: () => void;
 }
 
 function blankToNull(value: string): string | null {
@@ -29,7 +59,7 @@ function blankToNull(value: string): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
-function initialDraft(item?: RelationshipRow): RelationshipDraft {
+export function initialDraft(item?: RelationshipRow): RelationshipDraft {
   return {
     personName: item?.person_name ?? "",
     relationType: item?.relation_type ?? null,
@@ -40,6 +70,41 @@ function initialDraft(item?: RelationshipRow): RelationshipDraft {
   };
 }
 
+/** Optional text compares blank-equivalent: typed-then-erased is untouched. */
+function sameText(a: string | null, b: string | null): boolean {
+  return (a ?? "") === (b ?? "");
+}
+
+/**
+ * Whether an open form differs from what it opened with (38.9 D-14, D-61):
+ * `seed` is `initialDraft(editing ?? undefined)`. PURE.
+ */
+export function isRelationshipDraftDirty(
+  seed: RelationshipDraft,
+  draft: RelationshipDraft,
+): boolean {
+  return !(
+    seed.personName === draft.personName &&
+    sameText(seed.relationType, draft.relationType) &&
+    seed.linkedContactId === draft.linkedContactId &&
+    sameText(seed.note, draft.note) &&
+    seed.pinned === draft.pinned &&
+    seed.hidden === draft.hidden
+  );
+}
+
+/** The draft state a host's guard reads (D-14). PURE. */
+export function relationshipDraftState(
+  editing: RelationshipRow | null,
+  draft: RelationshipDraft | null,
+): RelationshipDraftState {
+  if (draft === null) return { open: false, dirty: false };
+  return {
+    open: true,
+    dirty: isRelationshipDraftDirty(initialDraft(editing ?? undefined), draft),
+  };
+}
+
 /** Parent-owned relationship editor; callbacks provide the only persistence seam. */
 export function RelationshipEditor({
   contactId,
@@ -47,6 +112,9 @@ export function RelationshipEditor({
   onAdd,
   onEdit,
   onDelete,
+  onDraftStateChange,
+  onCancelRequest,
+  ref,
 }: RelationshipEditorProps) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState<RelationshipRow | null>(null);
@@ -58,6 +126,23 @@ export function RelationshipEditor({
     setDraft(null);
     setPickerOpen(false);
   };
+
+  // Draft state for the host's guard (D-14); the callback is read through a
+  // ref so a fresh closure each render never re-fires the report.
+  const { open: draftOpen, dirty: draftDirty } = relationshipDraftState(
+    editing,
+    draft,
+  );
+  const onDraftStateChangeRef = useRef(onDraftStateChange);
+  onDraftStateChangeRef.current = onDraftStateChange;
+  useEffect(() => {
+    onDraftStateChangeRef.current?.({ open: draftOpen, dirty: draftDirty });
+  }, [draftOpen, draftDirty]);
+  useEffect(
+    () => () => onDraftStateChangeRef.current?.({ open: false, dirty: false }),
+    [],
+  );
+  useImperativeHandle(ref, () => ({ closeDraft: close }));
   const openNew = () => {
     setEditing(null);
     setDraft(initialDraft());
@@ -251,7 +336,13 @@ export function RelationshipEditor({
             onPress={() => update("hidden", null)}
           />
           <View style={styles.actions}>
-            <Button role="secondary" label="Cancel" onPress={close} />
+            <Button
+              role="secondary"
+              label="Cancel"
+              onPress={() =>
+                onCancelRequest ? onCancelRequest(close) : close()
+              }
+            />
             <Button
               role="primary"
               label="Save"

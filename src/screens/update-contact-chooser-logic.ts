@@ -220,3 +220,131 @@ export function isChooserVisible(session: ChooserSession): boolean {
     session.contactId !== null && session.activeRowKey === null && !session.done
   );
 }
+
+// =============================================================================
+// UNSAVED-WORK GUARD (38.9 D-14, D-61; E-09). Each focused editor reports
+// whether its typed value differs from its own seed; Back and Cancel close the
+// innermost open level first, prompting only when it holds typed text.
+// =============================================================================
+
+/** The custom-entry state FrequencyPicker reports through `onDraftChange`. */
+export interface FrequencyDraft {
+  customMode: boolean;
+  raw: string;
+  unit: "days" | "weeks" | "months";
+}
+
+/** A contact-method editor draft row, compared without its generated uid. */
+interface MethodDraftLike {
+  uid: string;
+}
+
+interface MethodGroupsLike {
+  phone: readonly MethodDraftLike[];
+  email: readonly MethodDraftLike[];
+}
+
+/** One comparison per editor kind (seed vs current). */
+export type RowDraftComparison =
+  | { kind: "text"; seed: string; current: string }
+  | { kind: "methods"; seed: MethodGroupsLike; current: MethodGroupsLike }
+  | {
+      kind: "frequency";
+      /** Null until the header read settles: the editor reports clean. */
+      seed: { intervalDays: number; draft: FrequencyDraft | null } | null;
+      current: { intervalDays: number; draft: FrequencyDraft | null };
+    }
+  | {
+      kind: "custom_field";
+      /** False until the stored value is read: the editor reports clean. */
+      ready: boolean;
+      seed: string | null;
+      current: string | null;
+    };
+
+/** JSON with object keys sorted, so key order never reads as a change. */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) => {
+    if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+      const record = inner as Record<string, unknown>;
+      return Object.fromEntries(
+        Object.keys(record)
+          .sort()
+          .map((key) => [key, record[key]]),
+      );
+    }
+    return inner;
+  });
+}
+
+function methodsSignature(groups: MethodGroupsLike): string {
+  const strip = (rows: readonly MethodDraftLike[]) =>
+    rows.map(({ uid: _uid, ...rest }) => rest);
+  return stableStringify({
+    phone: strip(groups.phone),
+    email: strip(groups.email),
+  });
+}
+
+/**
+ * Whether a focused row editor holds typed changes (D-14, D-61).
+ *
+ * - text (Last Talked About / Current Location vs "", Off Limits vs its
+ *   per-edit seed): exact comparison.
+ * - methods: the groups vs `seedMethodGroups(seeded)`, ignoring generated uids.
+ * - frequency (reviews C4-M2, C5-L6): dirty when the emitted interval differs
+ *   from the header seed or, while Custom is open, the typed text or unit
+ *   differs from the picker's seed draft, so invalid text such as "0" (which
+ *   emits no interval) still counts. Clean until the header read settles.
+ * - custom_field: the value vs the stored value, blank-equivalent; clean until
+ *   the stored value is read.
+ */
+export function isRowDraftDirty(comparison: RowDraftComparison): boolean {
+  switch (comparison.kind) {
+    case "text":
+      return comparison.seed !== comparison.current;
+    case "methods":
+      return (
+        methodsSignature(comparison.seed) !==
+        methodsSignature(comparison.current)
+      );
+    case "frequency": {
+      const { seed, current } = comparison;
+      if (seed === null) return false;
+      if (current.intervalDays !== seed.intervalDays) return true;
+      const draft = current.draft;
+      if (!draft?.customMode) return false;
+      const seedDraft = seed.draft;
+      return (
+        draft.raw !== (seedDraft?.raw ?? "") ||
+        draft.unit !== (seedDraft?.unit ?? "days")
+      );
+    }
+    case "custom_field":
+      return (
+        comparison.ready &&
+        (comparison.seed ?? "") !== (comparison.current ?? "")
+      );
+  }
+}
+
+/**
+ * Which Update Contact level a close acts on (D-14 innermost first; review H1).
+ * `innermost` (Back, an inner editor's own Cancel) closes the inner level (a
+ * field opened from the Custom Fields chooser, an open key-person form) when
+ * one is open, else the row; `row` (the row's own Cancel) closes the row.
+ * `null` = nothing open.
+ */
+export function resolveUpdateEditorClose({
+  rowOpen,
+  innerOpen,
+  target,
+}: {
+  rowOpen: boolean;
+  innerOpen: boolean;
+  target: "innermost" | "row";
+}): "inner" | "row" | null {
+  if (!rowOpen) return null;
+  if (target === "innermost" && innerOpen) return "inner";
+  return "row";
+}

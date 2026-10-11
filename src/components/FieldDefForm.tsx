@@ -24,7 +24,7 @@
  * Every colour resolves through `useTheme().colors.*` — there is no colour
  * literal here (CLAUDE.md).
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -39,6 +39,7 @@ import {
   draftToFieldFields,
   type FieldDefDraft,
   hydrateFieldDefDraft,
+  isFieldDefDraftDirty,
 } from "@/components/field-def-form-logic";
 import { makeColName } from "@/db/col-name";
 import { localDateTime } from "@/db/database";
@@ -72,6 +73,11 @@ interface SharedProps {
    * fully above it (38.4 D-52, OA-E3).
    */
   bottomClearance: number;
+  /**
+   * Reports whether the form differs from its seed (38.9 G-04; D-14, D-61) on
+   * every change, and false on unmount. Optional.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 interface CreateProps extends SharedProps {
@@ -163,6 +169,31 @@ export function FieldDefForm(props: FieldDefFormProps) {
   );
 
   const canSubmit = label.trim().length > 0;
+
+  // Unsaved-work state for the host's guard: the live draft vs the seed, both
+  // with options normalised by buildOptions so an untouched stored dropdown
+  // never reads as changed.
+  const seedComparable = useMemo<FieldDefDraft>(
+    () => ({
+      ...seed,
+      options: buildOptions(seed.type, parseOptions(seed.options)),
+    }),
+    [seed],
+  );
+  const dirty = isFieldDefDraftDirty(seedComparable, {
+    label,
+    type,
+    options,
+    show_on_new: toBool(showOnNew),
+    always_show: toBool(alwaysShow),
+    share_with_ai: toBool(shareWithAi),
+  });
+  const onDirtyChangeRef = useRef(props.onDirtyChange);
+  onDirtyChangeRef.current = props.onDirtyChange;
+  useEffect(() => {
+    onDirtyChangeRef.current?.(dirty);
+  }, [dirty]);
+  useEffect(() => () => onDirtyChangeRef.current?.(false), []);
 
   function setOptionAt(index: number, value: string) {
     setOptionRows((rows) => rows.map((r, i) => (i === index ? value : r)));

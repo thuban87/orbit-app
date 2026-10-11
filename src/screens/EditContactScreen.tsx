@@ -79,13 +79,17 @@ import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import {
   initialDraft as initialMemoryDraft,
   type MemoryDraft,
+  type MemoryDraftState,
   MemoryEditor,
+  type MemoryEditorHandle,
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import {
   type RelationshipDraft,
+  type RelationshipDraftState,
   RelationshipEditor,
+  type RelationshipEditorHandle,
 } from "@/components/RelationshipEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
@@ -140,6 +144,7 @@ import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS, parseDate } from "@/types";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
+import { pickCreateSubEditor } from "./create-contact-logic";
 import {
   buildEditInput,
   type CurrentStateSeed,
@@ -160,6 +165,9 @@ import {
 } from "./edit-contact-save-coordinator";
 
 const LOG_SCOPE = "edit-contact";
+
+/** An editor with no open draft (D-14). */
+const CLOSED_DRAFT = { open: false, dirty: false } as const;
 
 /** The social-battery options (native picker). "" = No selection → stored NULL. */
 const SOCIAL_BATTERY_OPTIONS = ["Charger", "Neutral", "Drain"] as const;
@@ -1100,7 +1108,32 @@ export function EditContactScreen({
       JSON.stringify(buildLinksForDiff(linksDraft)) !==
         JSON.stringify(buildLinksForDiff(toLinkDrafts(seededLinks))));
 
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef });
+  // The in-section Memory and Key People editors keep an open draft's typing
+  // privately until it is added (D-13, same class as C5-M1; D-14): an open
+  // draft with typed text holds Back (closing it first) and holds a fold of
+  // its section (D-68). The route check and the save bypass are unchanged.
+  const memoryEditorRef = useRef<MemoryEditorHandle>(null);
+  const relationshipEditorRef = useRef<RelationshipEditorHandle>(null);
+  const [memoryDraft, setMemoryDraft] =
+    useState<MemoryDraftState>(CLOSED_DRAFT);
+  const [relationshipDraft, setRelationshipDraft] =
+    useState<RelationshipDraftState>(CLOSED_DRAFT);
+  const pickedDraft = pickCreateSubEditor({
+    memory: memoryDraft,
+    relationship: relationshipDraft,
+  });
+  const { requestClose } = useDiscardKeepGuard({
+    hasUnsavedChanges,
+    bypassRef,
+    subEditor: {
+      open: pickedDraft.open,
+      dirty: pickedDraft.dirty,
+      close: () =>
+        pickedDraft.which === "memory"
+          ? memoryEditorRef.current?.closeDraft()
+          : relationshipEditorRef.current?.closeDraft(),
+    },
+  });
 
   const inputStyle = [
     styles.input,
@@ -1551,11 +1584,20 @@ export function EditContactScreen({
         sectionId="keyPeople"
         title="Key People"
         expanded={expandedSections.keyPeople}
-        onExpandedChange={(next) => setSectionExpanded("keyPeople", next)}
+        onExpandedChange={(next) =>
+          next
+            ? setSectionExpanded("keyPeople", true)
+            : requestClose(() => {
+                relationshipEditorRef.current?.closeDraft();
+                setSectionExpanded("keyPeople", false);
+              }, relationshipDraft.dirty)
+        }
         containerRef={registerSectionRef("keyPeople")}
       >
         <RelationshipEditor
           contactId={contactId}
+          ref={relationshipEditorRef}
+          onDraftStateChange={setRelationshipDraft}
           items={relationshipItems}
           onAdd={addRelationshipRow}
           onEdit={editRelationshipRow}
@@ -1593,11 +1635,20 @@ export function EditContactScreen({
         sectionId="memories"
         title="Memories"
         expanded={expandedSections.memories}
-        onExpandedChange={(next) => setSectionExpanded("memories", next)}
+        onExpandedChange={(next) =>
+          next
+            ? setSectionExpanded("memories", true)
+            : requestClose(() => {
+                memoryEditorRef.current?.closeDraft();
+                setSectionExpanded("memories", false);
+              }, memoryDraft.dirty)
+        }
         containerRef={registerSectionRef("memories")}
       >
         <MemoryEditor
           testID="edit-contact-memories"
+          ref={memoryEditorRef}
+          onDraftStateChange={setMemoryDraft}
           items={memoryItems}
           globalAiEnabled={globalAiEnabled}
           onAdd={addMemoryRow}

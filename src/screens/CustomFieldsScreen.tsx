@@ -23,7 +23,7 @@
  * Every colour resolves through `useTheme().colors.*` — no colour literal
  * (CLAUDE.md). The executor comes from `getExecutor()` (Plan 07).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -52,6 +52,7 @@ import {
   preflightTypeChange,
 } from "@/db/field-type-change";
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
+import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -108,6 +109,26 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
   const [emptyById, setEmptyById] = useState<Record<number, boolean>>({});
   const [editor, setEditor] = useState<Editor>(null);
   const [newFieldShareDefault, setNewFieldShareDefault] = useState<0 | 1>(0);
+
+  // In-screen sub-editor guard (G-04; D-14, D-61; RESEARCH DC-08): Back with
+  // the field editor open closes it and stays (asking only when it holds typed
+  // changes); its Cancel follows the same rule. A successful create/edit
+  // closes directly through setEditor(null), with no prompt.
+  const [editorDirty, setEditorDirty] = useState(false);
+  const bypassRef = useRef(false);
+  const closeEditor = () => {
+    setEditor(null);
+    setEditorDirty(false);
+  };
+  const { requestClose } = useDiscardKeepGuard({
+    hasUnsavedChanges: false,
+    bypassRef,
+    subEditor: {
+      open: editor !== null,
+      dirty: editorDirty,
+      close: closeEditor,
+    },
+  });
 
   /** Load all defs (incl. quarantined) and each field's emptiness. */
   const load = useCallback(async () => {
@@ -330,8 +351,9 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
           nextDisplayOrder={nextDisplayOrder}
           initialShareWithAi={newFieldShareDefault}
           bottomClearance={bottomClearance}
+          onDirtyChange={setEditorDirty}
           onSubmit={(def) => void handleCreate(def)}
-          onCancel={() => setEditor(null)}
+          onCancel={() => requestClose(closeEditor, editorDirty)}
         />
       );
     }
@@ -341,8 +363,9 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
         mode="edit"
         field={editing}
         bottomClearance={bottomClearance}
+        onDirtyChange={setEditorDirty}
         onSubmit={(draft) => void handleEdit(editing, draft)}
-        onCancel={() => setEditor(null)}
+        onCancel={() => requestClose(closeEditor, editorDirty)}
       />
     );
   }

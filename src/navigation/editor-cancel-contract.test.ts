@@ -89,7 +89,14 @@ describe("Update Contact: every editor Cancel follows the Back rule (E-09; D-14,
   });
 
   it("no editor Cancel is a bare close", () => {
-    expect(screen).not.toMatch(/onCancel=\{onCancel\}/);
+    // The screen no longer has a raw row-cancel handler.
+    expect(screen).not.toMatch(/const onCancel = /);
+    const render = functionBody(screen, "renderActiveEditor");
+    const editorCancels = render.match(/onCancel=\{[^}]*\}/g) ?? [];
+    expect(editorCancels.length).toBeGreaterThanOrEqual(7);
+    for (const cancel of editorCancels) {
+      expect(cancel).toBe("onCancel={requestRowCancel}");
+    }
     expect(screen).not.toMatch(/\(\) => setSelected\(null\)/);
     expect(screen).not.toMatch(/onCancel=\{\(\) => setSession/);
     // cancelRow is reached only through closeLevel.
@@ -164,36 +171,37 @@ describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)",
   ]) {
     const screen = read(path);
 
-    /** The JSX of the AccordionSection with this sectionId. */
-    const section = (id: string) => {
+    /** The `onExpandedChange={...}` expression of the section with this id. */
+    const foldHandler = (id: string) => {
       const start = screen.indexOf(`sectionId="${id}"`);
       expect(start, `${path} ${id}`).toBeGreaterThan(-1);
-      return screen.slice(
-        start,
-        screen.indexOf(">", screen.indexOf("onExpandedChange", start)) + 400,
-      );
+      const attr = screen.indexOf("onExpandedChange={", start);
+      const open = attr + "onExpandedChange=".length;
+      let depth = 0;
+      for (let index = open; index < screen.length; index += 1) {
+        if (screen[index] === "{") depth += 1;
+        if (screen[index] === "}") {
+          depth -= 1;
+          if (depth === 0) return screen.slice(open, index + 1);
+        }
+      }
+      throw new Error(`unterminated onExpandedChange for ${id}`);
     };
 
     it(`${path}: Memories and Key People fold through requestClose + closeDraft`, () => {
       for (const id of ["memories", "keyPeople"]) {
-        const region = section(id);
-        const handler = region.slice(
-          region.indexOf("onExpandedChange"),
-          region.indexOf("containerRef") > -1
-            ? region.indexOf("containerRef")
-            : region.indexOf(">") + 1,
-        );
+        const handler = foldHandler(id);
         expect(handler).toContain("requestClose(");
         expect(handler).toContain("closeDraft()");
+        expect(handler).toMatch(/next\s*\?\s*setSectionExpanded\(/);
       }
     });
 
     it(`${path}: other sections fold directly`, () => {
       for (const id of ["identity", "methods", "currentLocation"]) {
-        const region = section(id);
-        expect(region).toMatch(
+        expect(foldHandler(id)).toMatch(
           new RegExp(
-            `onExpandedChange=\\{\\(next\\) => setSectionExpanded\\("${id}", next\\)\\}`,
+            `^\\{\\(next\\)\\s*=>\\s*setSectionExpanded\\("${id}",\\s*next\\)\\s*\\}$`,
           ),
         );
       }

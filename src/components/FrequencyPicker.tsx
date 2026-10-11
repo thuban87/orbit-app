@@ -14,7 +14,7 @@
  * in the tested pure module `frequency-picker-logic.ts`. Every colour resolves
  * through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS, type Frequency } from "@/types";
@@ -31,6 +31,17 @@ interface FrequencyPickerProps {
   onChange: (intervalDays: number) => void;
   /** Reports custom-entry validity so the parent can block Save (Plan 04). */
   onValidityChange?: (valid: boolean) => void;
+  /**
+   * Reports the transient custom-entry state on mount and whenever Custom
+   * opens/closes or its text or unit changes (38.9 D-14, review C4-M2): the
+   * only way typed-but-invalid text (which never fires `onChange`) reaches an
+   * unsaved-work guard. Optional; absent for hosts that do not guard it.
+   */
+  onDraftChange?: (draft: {
+    customMode: boolean;
+    raw: string;
+    unit: IntervalUnit;
+  }) => void;
   /** Accessibility label for the control group. */
   label?: string;
   /** Stable testID root; children derive from it. */
@@ -55,6 +66,7 @@ export function FrequencyPicker({
   value,
   onChange,
   onValidityChange,
+  onDraftChange,
   label = "Contact frequency",
   testID = "frequency-picker",
   disabled = false,
@@ -78,6 +90,14 @@ export function FrequencyPicker({
   useEffect(() => {
     onValidityChange?.(valid);
   }, [valid, onValidityChange]);
+
+  // The custom-entry draft for a host's guard; the callback is read through a
+  // ref so a fresh closure each render never re-fires the report.
+  const onDraftChangeRef = useRef(onDraftChange);
+  onDraftChangeRef.current = onDraftChange;
+  useEffect(() => {
+    onDraftChangeRef.current?.({ customMode, raw: customRaw, unit });
+  }, [customMode, customRaw, unit]);
 
   function selectPreset(days: number) {
     setCustomMode(false);

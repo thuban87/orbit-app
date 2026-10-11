@@ -286,23 +286,20 @@ describe("isRowDraftDirty (D-14, D-61; E-09)", () => {
   });
 
   it("contact methods: compared against the seeded groups, ignoring generated uids", () => {
-    const seed = {
-      phone: [{ uid: "a", type: "phone", value: "555", label: "Main" }],
+    const groups = (uid: string, value: string) => ({
+      phone: [{ uid, type: "phone", value, label: "Main" }],
       email: [],
-    };
+    });
+    const seed = groups("a", "555");
     expect(isRowDraftDirty({ kind: "methods", seed, current: seed })).toBe(
       false,
     );
     expect(
-      isRowDraftDirty({
-        kind: "methods",
-        seed,
-        current: {
-          phone: [{ uid: "a", type: "phone", value: "5556", label: "Main" }],
-          email: [],
-        },
-      }),
+      isRowDraftDirty({ kind: "methods", seed, current: groups("a", "5556") }),
     ).toBe(true);
+    expect(
+      isRowDraftDirty({ kind: "methods", seed, current: groups("b", "555") }),
+    ).toBe(false);
     expect(
       isRowDraftDirty({
         kind: "methods",

@@ -25,8 +25,10 @@
 import { useFocusEffect } from "@react-navigation/native";
 import {
   type ReactNode,
+  type Ref,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -53,7 +55,9 @@ import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import {
   type RelationshipDraft,
+  type RelationshipDraftState,
   RelationshipEditor,
+  type RelationshipEditorHandle,
 } from "@/components/RelationshipEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui";
@@ -85,6 +89,7 @@ import {
   type RelationshipRow,
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
+import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -98,8 +103,11 @@ import {
   type ChooserRow,
   cancelRow,
   completeSave,
+  type FrequencyDraft,
   finishSession,
+  isRowDraftDirty,
   openRow,
+  resolveUpdateEditorClose,
   selectApplicableDefs,
   startSession,
   targetContact,
@@ -108,6 +116,24 @@ import {
 const LOG_SCOPE = "update-contact-screen";
 const FAILURE_COPY = "Couldn't save. Please try again.";
 const DEFAULT_INTERVAL_DAYS = 30;
+
+/**
+ * Reports an editor's typed-changes state to the screen's guard (38.9 D-14,
+ * D-61): on every change, and `false` on unmount so a closed editor never
+ * holds Back. The callback is read through a ref so a fresh closure each
+ * render never re-fires the report.
+ */
+function useReportDirty(
+  dirty: boolean,
+  onDirtyChange: ((dirty: boolean) => void) | undefined,
+): void {
+  const callbackRef = useRef(onDirtyChange);
+  callbackRef.current = onDirtyChange;
+  useEffect(() => {
+    callbackRef.current?.(dirty);
+  }, [dirty]);
+  useEffect(() => () => callbackRef.current?.(false), []);
+}
 
 /** Shared focused-editor frame: locked failure copy + Cancel affordance. */
 function EditorFrame({
@@ -189,15 +215,21 @@ function CurrentStateFocusedEditor({
   title,
   onSaved,
   onCancel,
+  onDirtyChange,
 }: {
   contactId: number;
   fieldKey: CurrentStateFieldKey;
   title: string;
   onSaved: () => void;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { colors } = useTheme();
   const [value, setValue] = useState("");
+  useReportDirty(
+    isRowDraftDirty({ kind: "text", seed: "", current: value }),
+    onDirtyChange,
+  );
   const [current, setCurrent] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -275,10 +307,17 @@ function KeyPeopleFocusedEditor({
   contactId,
   onSaved,
   onCancel,
+  relationshipRef,
+  onDraftStateChange,
+  onCancelRequest,
 }: {
   contactId: number;
   onSaved: () => void;
   onCancel: () => void;
+  /** The open key-person form is the inner level (D-14). */
+  relationshipRef: Ref<RelationshipEditorHandle>;
+  onDraftStateChange: (state: RelationshipDraftState) => void;
+  onCancelRequest: (close: () => void) => void;
 }) {
   const [items, setItems] = useState<RelationshipRow[]>([]);
   const [savedTick, setSavedTick] = useState(0);
@@ -383,6 +422,9 @@ function KeyPeopleFocusedEditor({
         onEdit={edit}
         onDelete={remove}
         onRestore={restore}
+        ref={relationshipRef}
+        onDraftStateChange={onDraftStateChange}
+        onCancelRequest={onCancelRequest}
       />
     </EditorFrame>
   );
@@ -393,14 +435,23 @@ function OffLimitsFocusedEditor({
   contactId,
   onSaved,
   onCancel,
+  onDirtyChange,
 }: {
   contactId: number;
   onSaved: () => void;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { colors } = useTheme();
   const [items, setItems] = useState<FuelItem[]>([]);
   const [draft, setDraft] = useState("");
+  // Per-edit seed (review C4-M3): "" for a new item, the item's text once an
+  // existing item is selected, re-seeded whenever the selection changes.
+  const [draftSeed, setDraftSeed] = useState("");
+  useReportDirty(
+    isRowDraftDirty({ kind: "text", seed: draftSeed, current: draft }),
+    onDirtyChange,
+  );
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -476,6 +527,7 @@ function OffLimitsFocusedEditor({
             onPress={() => {
               setEditingId(item.id);
               setDraft(item.text ?? "");
+              setDraftSeed(item.text ?? "");
             }}
             style={styles.listRowMain}
           >
@@ -524,15 +576,29 @@ function ContactMethodFocusedEditor({
   contactId,
   onSaved,
   onCancel,
+  onDirtyChange,
 }: {
   contactId: number;
   onSaved: () => void;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [groups, setGroups] = useState<MethodGroups>({ phone: [], email: [] });
   const [seeded, setSeeded] = useState<
     Awaited<ReturnType<typeof listContactMethods>>
   >([]);
+  const seedGroups = useMemo(
+    () =>
+      seedMethodGroups({
+        phone: seeded.filter((row) => row.method_type === "phone"),
+        email: seeded.filter((row) => row.method_type === "email"),
+      }),
+    [seeded],
+  );
+  useReportDirty(
+    isRowDraftDirty({ kind: "methods", seed: seedGroups, current: groups }),
+    onDirtyChange,
+  );
   const [region, setRegion] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -615,31 +681,78 @@ function ContactFrequencyFocusedEditor({
   contactId,
   onSaved,
   onCancel,
+  onDirtyChange,
 }: {
   contactId: number;
   onSaved: () => void;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [intervalDays, setIntervalDays] = useState(DEFAULT_INTERVAL_DAYS);
   const [valid, setValid] = useState(true);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  // Dirty seed (C5-L6): the interval once the header read settles
+  // (DEFAULT_INTERVAL_DAYS when the stored interval is null or the read
+  // fails) and the picker's custom-entry draft at that point. Until the read
+  // settles the editor reports clean.
+  const [headerSeed, setHeaderSeed] = useState<number | null>(null);
+  const [draft, setDraft] = useState<FrequencyDraft | null>(null);
+  const [seedDraft, setSeedDraft] = useState<FrequencyDraft | null>(null);
+  const latestDraftRef = useRef<FrequencyDraft | null>(null);
+  const seedDraftTakenRef = useRef(false);
+  const settledRef = useRef(false);
+
+  const onDraftChange = useCallback((next: FrequencyDraft) => {
+    latestDraftRef.current = next;
+    setDraft(next);
+    if (settledRef.current && !seedDraftTakenRef.current) {
+      seedDraftTakenRef.current = true;
+      setSeedDraft(next);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const settle = (seed: number) => {
+      settledRef.current = true;
+      setHeaderSeed(seed);
+      if (latestDraftRef.current !== null) {
+        seedDraftTakenRef.current = true;
+        setSeedDraft(latestDraftRef.current);
+      }
+    };
     void getContactHeader(getExecutor(), contactId)
       .then((header) => {
-        if (!cancelled && header?.intervalDays != null)
+        if (cancelled) return;
+        if (header?.intervalDays != null) {
           setIntervalDays(header.intervalDays);
+          settle(header.intervalDays);
+        } else {
+          settle(DEFAULT_INTERVAL_DAYS);
+        }
       })
-      .catch((cause) =>
-        Logger.error(LOG_SCOPE, "failed to seed contact frequency", cause),
-      );
+      .catch((cause) => {
+        Logger.error(LOG_SCOPE, "failed to seed contact frequency", cause);
+        if (!cancelled) settle(DEFAULT_INTERVAL_DAYS);
+      });
     return () => {
       cancelled = true;
     };
   }, [contactId]);
+
+  useReportDirty(
+    isRowDraftDirty({
+      kind: "frequency",
+      seed:
+        headerSeed === null
+          ? null
+          : { intervalDays: headerSeed, draft: seedDraft },
+      current: { intervalDays, draft },
+    }),
+    onDirtyChange,
+  );
 
   const save = async () => {
     if (!valid) return;
@@ -668,6 +781,7 @@ function ContactFrequencyFocusedEditor({
         value={intervalDays}
         onChange={setIntervalDays}
         onValidityChange={setValid}
+        onDraftChange={onDraftChange}
       />
       <PrimaryButton
         label="Save"
@@ -684,17 +798,29 @@ function CustomFieldFocusedEditor({
   def,
   onSaved,
   onCancel,
+  onDirtyChange,
 }: {
   contactId: number;
   def: CustomFieldDef;
   onSaved: () => void;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [value, setValue] = useState<string | null>(null);
+  const [seedValue, setSeedValue] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [seedReady, setSeedReady] = useState(false);
   const savingRef = useRef(false);
+  useReportDirty(
+    isRowDraftDirty({
+      kind: "custom_field",
+      ready: seedReady,
+      seed: seedValue,
+      current: value,
+    }),
+    onDirtyChange,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -703,6 +829,7 @@ function CustomFieldFocusedEditor({
       .then((values) => {
         if (!cancelled) {
           setValue(values[def.col_name] ?? null);
+          setSeedValue(values[def.col_name] ?? null);
           setSeedReady(true);
         }
       })
@@ -762,16 +889,27 @@ function CustomFieldFocusedEditor({
 function GenericCustomFieldsFocusedEditor({
   contactId,
   defs,
+  selectedDefId,
+  onSelect,
   onSaved,
   onCancel,
+  onInnerCancel,
+  onDirtyChange,
 }: {
   contactId: number;
   defs: CustomFieldDef[];
+  /** The field opened from this chooser: the inner level (D-14; review H1). */
+  selectedDefId: number | null;
+  onSelect: (defId: number) => void;
   onSaved: () => void;
+  /** The chooser's own Cancel (closes the row). */
   onCancel: () => void;
+  /** The opened field's Cancel (closes back to this chooser). */
+  onInnerCancel: () => void;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const { colors } = useTheme();
-  const [selected, setSelected] = useState<CustomFieldDef | null>(null);
+  const selected = defs.find((def) => def.id === selectedDefId) ?? null;
 
   if (selected) {
     return (
@@ -779,7 +917,8 @@ function GenericCustomFieldsFocusedEditor({
         contactId={contactId}
         def={selected}
         onSaved={onSaved}
-        onCancel={() => setSelected(null)}
+        onCancel={onInnerCancel}
+        onDirtyChange={onDirtyChange}
       />
     );
   }
@@ -796,7 +935,7 @@ function GenericCustomFieldsFocusedEditor({
             key={def.id}
             accessibilityRole="button"
             accessibilityLabel={def.label}
-            onPress={() => setSelected(def)}
+            onPress={() => onSelect(def.id)}
             style={[styles.listRow, { borderColor: colors.border }]}
           >
             <AppText role="body">{def.label}</AppText>
@@ -851,8 +990,83 @@ export function UpdateContactScreen({
     setSession((s) => finishSession(s));
     navigation.goBack();
   };
-  const onSaved = () => setSession((s) => completeSave(s));
-  const onCancel = () => setSession((s) => cancelRow(s));
+  // In-screen sub-editor guard (E-09; D-14, D-61). `activeRowDirty` always
+  // describes the innermost open level (the Custom Fields chooser and the Key
+  // people list hold no typed text of their own); each editor reports it and
+  // reports false when it unmounts.
+  const [activeRowDirty, setActiveRowDirty] = useState(false);
+  const [genericSelectedDefId, setGenericSelectedDefId] = useState<
+    number | null
+  >(null);
+  const [relationshipDraftOpen, setRelationshipDraftOpen] = useState(false);
+  const relationshipRef = useRef<RelationshipEditorHandle>(null);
+  const bypassRef = useRef(false);
+  const rowOpen = session.activeRowKey != null;
+  const innerOpen = genericSelectedDefId !== null || relationshipDraftOpen;
+
+  /** Closes one level: the inner editor, or the whole row. */
+  function closeLevel(level: "inner" | "row" | null) {
+    if (level === null) return;
+    if (level === "inner") {
+      if (genericSelectedDefId !== null) setGenericSelectedDefId(null);
+      else relationshipRef.current?.closeDraft();
+    } else {
+      setSession((s) => cancelRow(s));
+      setGenericSelectedDefId(null);
+      setRelationshipDraftOpen(false);
+    }
+    setActiveRowDirty(false);
+  }
+
+  // Back (header, system key, system gesture) closes the innermost open level
+  // and keeps the route, prompting only when it holds typed text.
+  const { requestClose } = useDiscardKeepGuard({
+    hasUnsavedChanges: false,
+    bypassRef,
+    subEditor: {
+      open: session.activeRowKey != null,
+      dirty: activeRowDirty,
+      close: () =>
+        closeLevel(
+          resolveUpdateEditorClose({ rowOpen, innerOpen, target: "innermost" }),
+        ),
+    },
+  });
+
+  /** A row editor's own Cancel (EditorFrame): closes the row (D-61). */
+  function requestRowCancel() {
+    requestClose(
+      () =>
+        closeLevel(
+          resolveUpdateEditorClose({ rowOpen, innerOpen, target: "row" }),
+        ),
+      activeRowDirty,
+    );
+  }
+
+  /** An inner editor's own Cancel: closes back to its row (D-61). */
+  function requestInnerCancel() {
+    requestClose(
+      () =>
+        closeLevel(
+          resolveUpdateEditorClose({ rowOpen, innerOpen, target: "innermost" }),
+        ),
+      activeRowDirty,
+    );
+  }
+
+  const onRelationshipDraftState = (state: RelationshipDraftState) => {
+    setRelationshipDraftOpen(state.open);
+    setActiveRowDirty(state.dirty);
+  };
+
+  // A successful inner save closes directly, with no prompt.
+  const onSaved = () => {
+    setSession((s) => completeSave(s));
+    setGenericSelectedDefId(null);
+    setRelationshipDraftOpen(false);
+    setActiveRowDirty(false);
+  };
 
   const onSelectRow = (row: ChooserRow) => {
     if (contactId === null) return;
@@ -891,7 +1105,8 @@ export function UpdateContactScreen({
             fieldKey={activeRow.kind}
             title={activeRow.label}
             onSaved={onSaved}
-            onCancel={onCancel}
+            onCancel={requestRowCancel}
+            onDirtyChange={setActiveRowDirty}
           />
         );
       case "key_people":
@@ -899,7 +1114,10 @@ export function UpdateContactScreen({
           <KeyPeopleFocusedEditor
             contactId={contactId}
             onSaved={onSaved}
-            onCancel={onCancel}
+            onCancel={requestRowCancel}
+            relationshipRef={relationshipRef}
+            onDraftStateChange={onRelationshipDraftState}
+            onCancelRequest={() => requestInnerCancel()}
           />
         );
       case "off_limits":
@@ -907,7 +1125,8 @@ export function UpdateContactScreen({
           <OffLimitsFocusedEditor
             contactId={contactId}
             onSaved={onSaved}
-            onCancel={onCancel}
+            onCancel={requestRowCancel}
+            onDirtyChange={setActiveRowDirty}
           />
         );
       case "contact_method":
@@ -915,7 +1134,8 @@ export function UpdateContactScreen({
           <ContactMethodFocusedEditor
             contactId={contactId}
             onSaved={onSaved}
-            onCancel={onCancel}
+            onCancel={requestRowCancel}
+            onDirtyChange={setActiveRowDirty}
           />
         );
       case "contact_frequency":
@@ -923,7 +1143,8 @@ export function UpdateContactScreen({
           <ContactFrequencyFocusedEditor
             contactId={contactId}
             onSaved={onSaved}
-            onCancel={onCancel}
+            onCancel={requestRowCancel}
+            onDirtyChange={setActiveRowDirty}
           />
         );
       case "custom_field": {
@@ -934,7 +1155,8 @@ export function UpdateContactScreen({
             contactId={contactId}
             def={def}
             onSaved={onSaved}
-            onCancel={onCancel}
+            onCancel={requestRowCancel}
+            onDirtyChange={setActiveRowDirty}
           />
         );
       }
@@ -943,8 +1165,12 @@ export function UpdateContactScreen({
           <GenericCustomFieldsFocusedEditor
             contactId={contactId}
             defs={liveDefs}
+            selectedDefId={genericSelectedDefId}
+            onSelect={setGenericSelectedDefId}
             onSaved={onSaved}
-            onCancel={onCancel}
+            onCancel={requestRowCancel}
+            onInnerCancel={requestInnerCancel}
+            onDirtyChange={setActiveRowDirty}
           />
         );
       default:
