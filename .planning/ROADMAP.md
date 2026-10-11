@@ -1530,7 +1530,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (orchestrator's reading of owner ruling R1, 39-LEDGER Batch 14; not owner wording): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 9/17 plans executed (sequential, waves 1–17; `parallelization: false`)
+**Plans**: 10/17 plans executed (sequential, waves 1–17; `parallelization: false`)
 - [x] 38.9-01 — Overlay and dialog foundation: overlay registry, RegisteredModal + in-window snackbar, confirm/notice host, ConfirmDialog D-43/D-52
 - [x] 38.9-02 — Form guards: Add Contact, Log Interaction, Memory, AI Writing Style; sub-editor guard on Update Contact and Custom fields
 - [x] 38.9-03 — Guard on the pending-confirmation note overlay; Capture Back order (D-33); per-field Backup schedule save (D-34)
@@ -1540,7 +1540,7 @@ Plans:
 - [x] 38.9-07 — Shell navigation: history Back + Digest exit, + forms over current tab, D-50, ComposeResearch focused
 - [x] 38.9-08 — Shared header: chevron Back, onBack, Cancel kind, person line (D-44, D-45)
 - [x] 38.9-09 — Header conversions: screens shared across stacks (D-16, D-17, D-58, D-59)
-- [ ] 38.9-10 — Header conversions: Settings stack (D-16)
+- [x] 38.9-10 — Header conversions: Settings stack (D-16)
 - [ ] 38.9-11 — Orbit switch sweep (D-47), K-28 swatch (D-60), chip tiers (D-05)
 - [ ] 38.9-12 — Option sheet replaces every native picker (D-28)
 - [ ] 38.9-13 — Date-only display formatter (D-48, D-53, D-57) + EmptyState (D-20)
@@ -1676,7 +1676,7 @@ Plans:
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
-| 38.9 UX Standards | 9/17 | In Progress|  |
+| 38.9 UX Standards | 10/17 | In Progress|  |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 0/TBD | Not started | - |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
