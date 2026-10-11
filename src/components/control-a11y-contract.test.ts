@@ -63,28 +63,48 @@ function optionRegion(src: string): string {
 }
 
 describe("Custom-field dropdown (AUD-UIA-005, out-of-list preserved)", () => {
+  // 38.9 D-28: the dropdown opens the shared OptionSheet from an
+  // OptionSelectRow trigger, so the trigger and option-row assertions read
+  // those sources; every RG-030 assertion is kept.
   const dropdown = source(
     "src/components/field-widgets/DropdownFieldWidget.tsx",
   );
+  const trigger = source("src/components/ui/OptionSelectRow.tsx");
+  const sheet = source("src/components/ui/OptionSheet.tsx");
 
   it("builds its list through the shared out-of-list-preserving helper", () => {
     expect(dropdown).toContain("selectorItems(selected, options)");
+    expect(dropdown).toContain("<OptionSheet");
+    expect(dropdown).toContain("options={sheetOptions}");
+    expect(dropdown).toContain("selected={selected}");
   });
 
   it("exposes the field name and current value on the trigger", () => {
-    const trigger = elementRegions(dropdown, "Pressable")[0] ?? "";
-    expect(trigger).toContain("accessibilityLabel={label}");
-    expect(trigger).toContain(
-      "accessibilityValue={selectorAccessibilityValue(selected)}",
+    const row = elementRegions(dropdown, "OptionSelectRow")[0] ?? "";
+    expect(row).toContain("label={label}");
+    expect(row).toContain("currentLabel={selected}");
+    const pressable = elementRegions(trigger, "Pressable")[0] ?? "";
+    expect(pressable).toContain("accessibilityLabel={label}");
+    expect(pressable).toContain(
+      "accessibilityValue={selectorAccessibilityValue(currentLabel)}",
     );
   });
 
-  it("marks the selected option with state, a non-colour glyph and the link-text role", () => {
-    const option = optionRegion(dropdown);
+  it("marks the selected option with state, a non-colour glyph and the D-05 top tier", () => {
+    const option = optionRegion(sheet);
     expect(option).toContain("accessibilityState={{ selected: isSelected }}");
     expect(option).toMatch(/<Icon name="select" state="active"/);
-    expect(option).toContain("colors.accentText");
-    expect(option).not.toContain("colors.accent :");
+    // D-05 top tier: accent fill with an onAccent label and glyph.
+    expect(option).toMatch(
+      /isSelected\s*\?\s*colors\.accent\s*:\s*colors\.surface/,
+    );
+    expect(option).toMatch(
+      /isSelected \? colors\.onAccent : colors\.textPrimary/,
+    );
+    expect(option).toContain(
+      '<Icon name="select" state="active" tone="onAccent" />',
+    );
+    expect(option).not.toContain("colors.accentText");
   });
 });
 
