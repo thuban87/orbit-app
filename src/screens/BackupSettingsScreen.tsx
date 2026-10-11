@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -38,18 +38,41 @@ import {
 } from "@/services/backup/encryption";
 import { backupPassphraseStore } from "@/services/backup/passphrase-store";
 import { createSafStorage } from "@/services/backup/saf-storage";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
 import {
+  type BackupDayController,
   backupSettingsPresentation,
-  buildBackupSettingsPatch,
   commitThenRefresh,
+  createBackupDayController,
   encryptionErrorCopy,
   validateEncryptionSetup,
 } from "./backup-settings-logic";
 
 const LOG_SCOPE = "backup-settings";
+
+/**
+ * The backup schedule's save-on-leave controller (38.9 D-34). ONE instance for
+ * the app process (review C4-L1), created lazily so the factory stays pure: a
+ * remounted screen attaches to the same per-field state, so its newer edits
+ * supersede an older mount's pending drain, and writes started by a leave
+ * settle after unmount. The snackbar store is global, so a failure after
+ * unmount still shows (D-27).
+ */
+let sharedDayController: BackupDayController | null = null;
+function backupDayController(): BackupDayController {
+  sharedDayController ??= createBackupDayController({
+    write: (patch) => updateAppSettings(getExecutor(), patch, localDateTime()),
+    onWriteFailed: (error) => {
+      Logger.error(LOG_SCOPE, "failed to save backup cadence", error);
+      showSnackbar({ kind: "error", label: "Couldn't save backup settings" });
+    },
+  });
+  return sharedDayController;
+}
+
 type EncryptionFlow = "setup" | "change" | "forgotten";
 type ChangeMode = "reencrypt" | "future-only";
 
@@ -65,10 +88,14 @@ export function BackupSettingsScreen({
   const [settingsPhase, setSettingsPhase] =
     useState<ReadPhase<AppSettings>>(readLoading);
   const settings = loadedData(settingsPhase);
-  const [intervalDays, setIntervalDays] = useState("");
-  const [retentionDays, setRetentionDays] = useState("");
-  const [intervalError, setIntervalError] = useState<string | null>(null);
-  const [retentionError, setRetentionError] = useState<string | null>(null);
+  // D-34: the day fields' text and errors come from the shared controller;
+  // this screen only forwards events to it and renders what it reports.
+  const dayController = backupDayController();
+  const [days, setDays] = useState(() => dayController.getSnapshot());
+  const intervalDays = days.interval.text;
+  const retentionDays = days.retention.text;
+  const intervalError = days.interval.error;
+  const retentionError = days.retention.error;
   const [currentPassphrase, setCurrentPassphrase] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -86,29 +113,59 @@ export function BackupSettingsScreen({
    * the loaded view until it settles, and any failure — including a re-read
    * after a committed write — lands in the read-error state rather than a
    * stale known view or the write's own failure path (D-04, D-24). Form
-   * fields are seeded only from a successful current read.
+   * fields are seeded only from a successful current read, and the day fields
+   * only where the controller allows it (D-34: a refresh never overwrites
+   * newer or still-saving typing, nor reverts a commit made after it began).
    */
   const readSettings = useCallback(async (): Promise<void> => {
+    const readStartedSeq = dayController.beginRead();
     await runGatedRead({
       gate: readAuthority,
       read: () => getAppSettings(getExecutor()),
       publish: setSettingsPhase,
-      onLoaded: (next) => {
-        setIntervalDays(String(next.backupIntervalDays));
-        setRetentionDays(String(next.backupRetentionDays));
-        setIntervalError(null);
-        setRetentionError(null);
-      },
+      onLoaded: (next) => dayController.loaded(readStartedSeq, next),
       onError: (error) =>
         Logger.error(LOG_SCOPE, "failed to load backup settings", error),
     });
-  }, [readAuthority]);
+  }, [dayController, readAuthority]);
+
+  // Attach before the focus effect below runs, so the attach-time reset of
+  // idle fields precedes this mount's first read (review C5-M3). Unmount is
+  // the last leave-flush backstop; the controller finishes any write itself.
+  useEffect(() => {
+    const detach = dayController.attach(() =>
+      setDays(dayController.getSnapshot()),
+    );
+    setDays(dayController.getSnapshot());
+    return () => {
+      dayController.leave();
+      detach();
+    };
+  }, [dayController]);
+
+  // D-34 leave-flush backstop: removal by header or system Back. Saving on
+  // leave is not a prompt, so this never calls preventDefault (on Android a
+  // focused TextInput is not reliably blurred before the screen goes; H3).
+  useEffect(
+    () =>
+      navigation.addListener("beforeRemove", () => {
+        dayController.leave();
+      }),
+    [dayController, navigation],
+  );
 
   useFocusEffect(
     useCallback(() => {
+      // Regaining focus (e.g. a tab switch back; the Settings stack stays
+      // mounted) resets idle day fields before this read (review C7-L1).
+      dayController.focus();
       void readSettings();
-      return () => readAuthority.invalidate();
-    }, [readAuthority, readSettings]),
+      return () => {
+        // Losing focus is leaving the fields (D-34): save what is typed.
+        dayController.leave();
+        readAuthority.invalidate();
+      };
+    }, [dayController, readAuthority, readSettings]),
   );
 
   const encryptionLifecycle = useMemo(
@@ -192,27 +249,6 @@ export function BackupSettingsScreen({
     settings?.backupFolderAccessible,
     settings?.backupFolderUri,
   ]);
-
-  const saveDays = useCallback(async () => {
-    const result = buildBackupSettingsPatch({ intervalDays, retentionDays });
-    if (result.patch === null) {
-      setIntervalError(result.errors.intervalDays ?? null);
-      setRetentionError(result.errors.retentionDays ?? null);
-      return;
-    }
-    const patch = result.patch;
-    await commitThenRefresh({
-      commit: async () => {
-        await updateAppSettings(getExecutor(), patch, localDateTime());
-        return true;
-      },
-      refresh: readSettings,
-      onCommitFailed: (error) => {
-        Logger.error(LOG_SCOPE, "failed to save backup cadence", error);
-        Alert.alert("Couldn't save backup settings", "Please try again.");
-      },
-    });
-  }, [intervalDays, readSettings, retentionDays]);
 
   const validateNewPassphrase = useCallback(() => {
     const validation = validateEncryptionSetup(passphrase, confirmation);
@@ -529,10 +565,11 @@ export function BackupSettingsScreen({
                   testID="backup-settings-interval"
                   accessibilityLabel="Backup cadence in days"
                   value={intervalDays}
-                  onChangeText={(value) => {
-                    setIntervalDays(value);
-                    setIntervalError(null);
-                  }}
+                  onChangeText={(value) =>
+                    dayController.changeText("interval", value)
+                  }
+                  onBlur={() => dayController.commitField("interval")}
+                  onSubmitEditing={() => dayController.commitField("interval")}
                   keyboardType="number-pad"
                   style={[
                     styles.input,
@@ -558,10 +595,11 @@ export function BackupSettingsScreen({
                   testID="backup-settings-retention"
                   accessibilityLabel="Backup retention in days"
                   value={retentionDays}
-                  onChangeText={(value) => {
-                    setRetentionDays(value);
-                    setRetentionError(null);
-                  }}
+                  onChangeText={(value) =>
+                    dayController.changeText("retention", value)
+                  }
+                  onBlur={() => dayController.commitField("retention")}
+                  onSubmitEditing={() => dayController.commitField("retention")}
                   keyboardType="number-pad"
                   style={[
                     styles.input,
@@ -578,18 +616,6 @@ export function BackupSettingsScreen({
                     {retentionError}
                   </Text>
                 ) : null}
-                <Pressable
-                  testID="backup-settings-save-days"
-                  accessibilityRole="button"
-                  accessibilityLabel="Save backup schedule"
-                  onPress={() => void saveDays()}
-                  style={[
-                    styles.primaryButton,
-                    { backgroundColor: colors.accent },
-                  ]}
-                >
-                  <Text style={{ color: colors.onAccent }}>Save schedule</Text>
-                </Pressable>
               </>
             ) : null}
           </View>

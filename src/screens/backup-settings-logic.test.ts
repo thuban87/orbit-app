@@ -60,7 +60,6 @@ describe("validateWholeBackupDays — one DAO-owned 1..3650 boundary", () => {
       });
     }
   });
-
 });
 
 describe("buildBackupDaysFieldPatch — one field, one key (D-34, Pitfall 8)", () => {
@@ -191,10 +190,10 @@ describe("shouldReseedDayField — a refresh never overwrites newer or pending t
 describe("createBackupDayController — deferred-write sequences (D-34)", () => {
   type WriteCall = {
     patch: BackupDaysFieldPatch;
-    settle: { resolve: (value: void) => void; reject: (err: Error) => void };
+    settle: { resolve: () => void; reject: (err: Error) => void };
   };
   let calls: WriteCall[];
-  let onWriteFailed: ReturnType<typeof vi.fn>;
+  let onWriteFailed: ReturnType<typeof vi.fn<(error: unknown) => void>>;
   let controller: BackupDayController;
 
   const flush = () => new Promise<void>((settle) => setTimeout(settle, 0));
@@ -218,7 +217,7 @@ describe("createBackupDayController — deferred-write sequences (D-34)", () => 
 
   beforeEach(() => {
     calls = [];
-    onWriteFailed = vi.fn();
+    onWriteFailed = vi.fn<(error: unknown) => void>();
     controller = createBackupDayController({
       write: (patch) => {
         const settle = deferred<void>();
@@ -516,11 +515,9 @@ describe("BackupSettingsScreen saves the schedule on leave (D-34 source contract
 
   it("flushes from the focus-effect cleanup and a beforeRemove listener that never prevents removal", () => {
     expect(screen).toMatch(/addListener\(\s*"beforeRemove"/);
-    expect(screen).not.toContain("preventDefault");
-    const focusEffect = screen.slice(
-      screen.indexOf("useFocusEffect("),
-      screen.indexOf("useFocusEffect(") + 600,
-    );
+    expect(screen).not.toMatch(/\.preventDefault\(/);
+    const start = screen.indexOf("useFocusEffect(");
+    const focusEffect = screen.slice(start, screen.indexOf("\n  );\n", start));
     expect(focusEffect).toMatch(/\.leave\(\)/);
     expect(focusEffect).toMatch(/\.focus\(\)/);
   });
