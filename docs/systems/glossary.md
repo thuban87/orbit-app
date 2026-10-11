@@ -63,6 +63,7 @@ The contract fails if any of these returns to a user-visible literal in `src/` o
 | "Log Contact" | Log Interaction | D-22, ADR-132 |
 | "Dashboard(s)", "dashboard(s)" | Contacts | D-22 |
 | "Group Event(s)", "group event(s)", "Group event(s)" | Event(s) ("Edit Event", "Dissolve this event?") | D-22 |
+| "group interaction(s)", "Group interaction(s)" | event ("Make this an event") | D-22 |
 
 ### Developer wording (D-41)
 
@@ -156,3 +157,4 @@ None. The constants are the configuration.
 |------|-------|--------------|
 | 2026-10-11 | 38.9 | Created: canonical constants (D-21, D-41), Never Contacted / Favorite / Wobbly / Log Interaction / Contacts enforced app-wide (D-22, D-42, D-49, D-56), retired-form contract. |
 | 2026-10-11 | 38.9 | "Event(s)" as the user-facing noun (D-22); developer wording rewritten in plain words in the converted screens (D-41, D-63); contract extended with both. |
+| 2026-10-11 | 38.9 | "group interaction" retired: the conversion entry and its prompt read "Make this an event" (D-22; fix-pass verification IN-02). |
