@@ -8,6 +8,11 @@
  *    TypeScript compiler and visits only string literals, template pieces
  *    (`TemplateHead` / `TemplateMiddle` / `TemplateTail`, no-substitution
  *    templates) and `JsxText`. Comments and identifiers are never visited.
+ *    38.9-15 adds "Group Event(s)" / "group event(s)" (D-22: "Event(s)" is
+ *    the user-facing noun) and, in the files it converts only, the D-41
+ *    developer wording ("Follows event", "overridden", "participant record",
+ *    "Sensitive Operations", "Tombstones", "Related rows", "Format version",
+ *    "cadence", "override(s)").
  * 2. Every decided term keeps its value (D-41 rename guard).
  * 3. Persisted / OS-registered identifiers keep their spelling (D-49, D-12):
  *    population id `favourites`, widget provider `OrbitFavourites`, deep link
@@ -62,6 +67,65 @@ const RETIRED_FORMS: readonly RetiredForm[] = [
   { form: "not yet contacted", case: "lowercase" },
   { form: "favourite", case: "lowercase" },
   { form: "dashboard", case: "lowercase" },
+  // D-22: "Event(s)" is the user-facing noun for a group event (38.9-15).
+  { form: "Group Event", case: "capitalised" },
+  { form: "group event", case: "lowercase" },
+];
+
+/**
+ * D-41 developer wording, rewritten in plain words by 38.9-15. Checked only in
+ * the files that plan converts (`DEVELOPER_WORDING_FILES`), so the contract
+ * does not pull unlisted screens into scope.
+ */
+const DEVELOPER_WORDING_FORMS: readonly RetiredForm[] = [
+  { form: "Follows event", case: "capitalised" },
+  { form: "follows event", case: "lowercase" },
+  { form: "Overridden", case: "capitalised" },
+  { form: "overridden", case: "lowercase" },
+  { form: "Participant record", case: "capitalised" },
+  { form: "participant record", case: "lowercase" },
+  { form: "Sensitive Operation", case: "capitalised" },
+  { form: "sensitive operation", case: "lowercase" },
+  { form: "Tombstone", case: "capitalised" },
+  { form: "Related rows", case: "capitalised" },
+  { form: "Format version", case: "capitalised" },
+  { form: "Cadence", case: "capitalised" },
+  { form: "cadence", case: "lowercase" },
+  { form: "Override", case: "capitalised" },
+  { form: "override", case: "lowercase" },
+];
+
+/** The production files 38.9-15 converts (D-22, D-41). */
+const DEVELOPER_WORDING_FILES: readonly string[] = [
+  "src/screens/GroupEventDetailScreen.tsx",
+  "src/screens/GroupLogScreen.tsx",
+  "src/screens/EditGroupEventScreen.tsx",
+  "src/screens/EditParticipantScreen.tsx",
+  "src/components/group/GroupTitlePromptSheet.tsx",
+  "src/components/digest/DigestDayDetail.tsx",
+  "src/components/history/HistorySection.tsx",
+  "src/components/history/HistoryStreamRows.tsx",
+  "src/components/history/interaction-detail-logic.ts",
+  "src/components/history/InteractionDetail.tsx",
+  "src/components/history/GroupScopePrompt.tsx",
+  "src/db/merge-dao.ts",
+  "src/screens/dashboard-overflow-actions.ts",
+  "src/components/group/ParticipantCard.tsx",
+  "src/components/group/ParticipantOverrideEditor.tsx",
+  "src/components/BulkActionSurface.tsx",
+  "src/screens/RestorePreviewScreen.tsx",
+  "src/screens/EditContactScreen.tsx",
+  "src/screens/CreateContactScreen.tsx",
+  "src/screens/contact-profile-logic.ts",
+  "src/screens/BackupSettingsScreen.tsx",
+  "src/screens/SystemBuilderScreen.tsx",
+  "src/screens/SystemsManagementScreen.tsx",
+  "src/screens/CategoryManagementScreen.tsx",
+  "src/profile/template-manager-model.ts",
+  "src/components/profile/ProfileBackgroundManager.tsx",
+  "src/components/profile/ProfileTemplateManager.tsx",
+  "src/screens/BulkImportSetupScreen.tsx",
+  "src/screens/ContactProfileScreen.tsx",
 ];
 
 /**
@@ -71,9 +135,115 @@ const RETIRED_FORMS: readonly RetiredForm[] = [
  * warning.
  */
 const DEVELOPER_ONLY: Readonly<Record<string, readonly string[]>> = {
-  "src/backup/backup-schema.ts": ["appSettings has invalid Dashboard filters"],
+  "src/backup/backup-schema.ts": [
+    "appSettings has invalid Dashboard filters",
+    // 38.9-15: `fail(…)` text, never shown (found by the C3-M2 re-grep).
+    "interactions has an invalid Group Event UID",
+  ],
   "src/stores/dashboard-query-store.ts": [
     "Dashboard preferences were malformed; using empty query axes.",
+  ],
+};
+
+/**
+ * Not-yet-converted sites, by file and exact text. 38.9-15 Tasks 2 and 3 empty
+ * these lists; an entry that no longer matches fails as stale.
+ */
+const PENDING_EVENT_NOUN: Readonly<Record<string, readonly string[]>> = {
+  "src/components/digest/DigestDayDetail.tsx": ["Group Event"],
+  "src/components/group/GroupTitlePromptSheet.tsx": [
+    "Give this group event a title.",
+    "Group event title",
+    "Create group event",
+  ],
+  "src/components/history/GroupScopePrompt.tsx": ["Edit Group Event"],
+  "src/components/history/HistorySection.tsx": [
+    "Couldn't create this group event. Please try again.",
+  ],
+  "src/components/history/HistoryStreamRows.tsx": [", group event"],
+  "src/components/history/InteractionDetail.tsx": ["View Group Event"],
+  "src/components/history/interaction-detail-logic.ts": ["Group event"],
+  "src/db/merge-dao.ts": [
+    "These contacts share a Group Event. Remove one from that Group Event before merging them.",
+  ],
+  "src/screens/EditGroupEventScreen.tsx": [
+    "Group events can't be in the future.",
+    "Couldn't update the group event. Your changes weren't saved.",
+    "Edit Group Event",
+    "Couldn't load this group event. Please go back and retry.",
+  ],
+  "src/screens/EditParticipantScreen.tsx": [
+    "This participant is no longer part of the group event.",
+  ],
+  "src/screens/GroupLogScreen.tsx": [
+    "Group events can't be in the future.",
+    "A group event needs a title.",
+    "Couldn't save this group event. Please try again.",
+    "Group event title",
+  ],
+  "src/screens/dashboard-overflow-actions.ts": ["Group Events"],
+};
+const PENDING_DEVELOPER_WORDING: Readonly<Record<string, readonly string[]>> = {
+  "src/components/group/ParticipantCard.tsx": [
+    "Follows event:",
+    "Participant overrides",
+    "Edit participant record",
+  ],
+  "src/components/group/ParticipantOverrideEditor.tsx": [
+    "Follows event",
+    ": overridden",
+  ],
+  "src/components/BulkActionSurface.tsx": [
+    "More sensitive operations",
+    "Sensitive Operations",
+  ],
+  "src/screens/RestorePreviewScreen.tsx": [
+    "Format version:",
+    "· Related rows:",
+    "· Tombstones:",
+  ],
+  "src/screens/EditContactScreen.tsx": [
+    "Bound contacts appear in your active orbit and receive cadence reminders.",
+    "Unbound contacts keep their details and history without active cadence reminders.",
+  ],
+  "src/screens/CreateContactScreen.tsx": [
+    "Bound contacts appear in your active orbit and receive cadence reminders.",
+    "Unbound contacts keep their details and history without active cadence reminders.",
+  ],
+  "src/screens/contact-profile-logic.ts": [
+    "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved cadence stay.",
+  ],
+  "src/screens/BackupSettingsScreen.tsx": ["Backup cadence in days"],
+  "src/screens/SystemBuilderScreen.tsx": [
+    "Reset overrides?",
+    "Couldn't reset membership overrides.",
+    "Reset Membership Overrides",
+  ],
+  "src/screens/SystemsManagementScreen.tsx": [
+    "Reset Overrides",
+    "Overrides",
+    "Reset overrides?",
+    "Couldn't reset membership overrides.",
+  ],
+  "src/screens/CategoryManagementScreen.tsx": [
+    "category-System setting or override",
+    "category-System settings or overrides",
+  ],
+  "src/profile/template-manager-model.ts": [
+    "Contact override:",
+    "Contact override: freeform layout",
+  ],
+  "src/components/profile/ProfileBackgroundManager.tsx": ["Category override"],
+  "src/components/profile/ProfileTemplateManager.tsx": [
+    "Category override",
+    "Choose any active local contact to give it this template as a direct layout override. Applying or removing a contact selection clears only that contact's collapsed-section overrides after the write commits.",
+  ],
+  "src/screens/BulkImportSetupScreen.tsx": [
+    "Category override",
+    "Batch category override",
+  ],
+  "src/screens/ContactProfileScreen.tsx": [
+    "This clears only this contact’s layout, collapse, and background overrides. Contact data stays unchanged.",
   ],
 };
 
@@ -92,15 +262,26 @@ function formPattern({ form, case: kind }: RetiredForm): RegExp {
   return new RegExp(`(?<!${JOINER})${body}s?(?!${JOINER})`);
 }
 
-const PATTERNS = RETIRED_FORMS.map((f) => ({ ...f, re: formPattern(f) }));
+interface FormPattern extends RetiredForm {
+  re: RegExp;
+}
+
+const compile = (forms: readonly RetiredForm[]): FormPattern[] =>
+  forms.map((f) => ({ ...f, re: formPattern(f) }));
+
+const PATTERNS = compile(RETIRED_FORMS);
+const DEVELOPER_WORDING_PATTERNS = compile(DEVELOPER_WORDING_FORMS);
 
 /** The retired forms `text` contains, under the matching rule. */
-function retiredFormsIn(text: string): string[] {
+function retiredFormsIn(
+  text: string,
+  patterns: readonly FormPattern[] = PATTERNS,
+): string[] {
   if (text.includes("://")) return [];
   const spaced = /\s/.test(text);
-  return PATTERNS.filter(
-    (p) => (p.case === "capitalised" || spaced) && p.re.test(text),
-  ).map((p) => p.form);
+  return patterns
+    .filter((p) => (p.case === "capitalised" || spaced) && p.re.test(text))
+    .map((p) => p.form);
 }
 
 type CopyNode =
@@ -227,7 +408,11 @@ interface RetiredHit {
 }
 
 /** Every user-visible literal in `source` that carries a retired form. */
-function scanSource(file: string, source: string): RetiredHit[] {
+function scanSource(
+  file: string,
+  source: string,
+  patterns: readonly FormPattern[] = PATTERNS,
+): RetiredHit[] {
   const sf = ts.createSourceFile(
     file,
     source,
@@ -238,7 +423,7 @@ function scanSource(file: string, source: string): RetiredHit[] {
   const hits: RetiredHit[] = [];
   const visit = (node: ts.Node) => {
     if (isCopyNode(node) && !isSkipped(node)) {
-      const forms = retiredFormsIn(node.text);
+      const forms = retiredFormsIn(node.text, patterns);
       if (forms.length > 0) {
         hits.push({
           line: sf.getLineAndCharacterOfPosition(node.getStart()).line + 1,
@@ -370,6 +555,10 @@ describe("glossary contract — the scanner", () => {
     "Not contacted yet",
     "Favourites",
     "Log Contact",
+    // 38.9-15 (D-22; review C3-M2).
+    "Couldn't save this group event. Please try again.",
+    "Group events can't be in the future.",
+    "Group Events",
   ])("catches %j", (text) => {
     expect(retiredFormsIn(text).length).toBeGreaterThan(0);
   });
@@ -386,36 +575,118 @@ describe("glossary contract — the scanner", () => {
     "Never Contacted",
     "Favorites",
     "Wobbly",
+    // 38.9-15 (D-22; review C3-M2).
+    "group_event",
+    "group-event",
+    "./group-event-refresh",
+    "Edit Event",
   ])("skips %j", (text) => {
     expect(retiredFormsIn(text)).toEqual([]);
   });
+
+  it("skips a group event in Error(…) and catches it in super(…) (38.9-15)", () => {
+    expect(
+      scan(
+        [
+          'throw new Error("Couldn\'t find this group event");',
+          'class G extends Error { constructor() { super("These contacts share a Group Event"); } }',
+        ].join("\n"),
+      ),
+    ).toEqual(["These contacts share a Group Event"]);
+  });
+
+  it.each([
+    "Follows event: Phone",
+    "Phone: overridden",
+    "Edit participant record",
+    "More sensitive operations",
+    "Sensitive Operations",
+    "Tombstones:",
+    "Related rows:",
+    "Format version:",
+    "These contacts receive cadence reminders.",
+    "Reset Overrides",
+    "Overrides",
+    "Category override",
+  ])("catches D-41 developer wording %j", (text) => {
+    expect(
+      retiredFormsIn(text, DEVELOPER_WORDING_PATTERNS).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it.each(["override", "overrides", "inherited", "Same as event: Phone"])(
+    "skips %j as D-41 developer wording (a bare discriminator has no space)",
+    (text) => {
+      expect(retiredFormsIn(text, DEVELOPER_WORDING_PATTERNS)).toEqual([]);
+    },
+  );
 });
+
+type Allowlist = Readonly<Record<string, readonly string[]>>;
+
+/**
+ * Scan `paths` for `patterns`; return the hits outside `allowlist` and the
+ * allowlist entries that no longer match anything (stale: remove them).
+ */
+function audit(
+  paths: readonly string[],
+  patterns: readonly FormPattern[],
+  allowlist: Allowlist,
+): { offenders: string[]; stale: string[] } {
+  const offenders: string[] = [];
+  const seen = new Set<string>();
+  const key = (file: string, text: string) => `${file}\u0000${squash(text)}`;
+  for (const path of paths) {
+    const rel = relative(ROOT, path).split("\\").join("/");
+    const allowed = new Set((allowlist[rel] ?? []).map(squash));
+    for (const hit of scanSource(rel, readFileSync(path, "utf8"), patterns)) {
+      if (allowed.has(squash(hit.text))) {
+        seen.add(key(rel, hit.text));
+        continue;
+      }
+      offenders.push(
+        `${rel}:${hit.line} [${hit.forms.join(", ")}] ${JSON.stringify(squash(hit.text))}`,
+      );
+    }
+  }
+  const stale = Object.entries(allowlist).flatMap(([file, texts]) =>
+    texts
+      .filter((t) => !seen.has(key(file, t)))
+      .map((t) => `${file} ${JSON.stringify(t)}`),
+  );
+  return { offenders, stale };
+}
+
+const mergeAllowlists = (...lists: Allowlist[]): Allowlist => {
+  const out: Record<string, string[]> = {};
+  for (const list of lists) {
+    for (const [file, texts] of Object.entries(list)) {
+      out[file] = [...(out[file] ?? []), ...texts];
+    }
+  }
+  return out;
+};
 
 describe("glossary contract — production copy (D-22, D-42, D-49)", () => {
   it("no production literal carries a retired form outside the allowlists", () => {
-    const offenders: string[] = [];
-    const seen = new Set<string>();
-    const key = (file: string, text: string) => `${file}\u0000${squash(text)}`;
-    for (const path of SCANNED) {
-      const rel = relative(ROOT, path).split("\\").join("/");
-      const allowed = new Set((DEVELOPER_ONLY[rel] ?? []).map(squash));
-      for (const hit of scanSource(rel, readFileSync(path, "utf8"))) {
-        if (allowed.has(squash(hit.text))) {
-          seen.add(key(rel, hit.text));
-          continue;
-        }
-        offenders.push(
-          `${rel}:${hit.line} [${hit.forms.join(", ")}] ${JSON.stringify(squash(hit.text))}`,
-        );
-      }
-    }
-    expect(offenders).toEqual([]);
-    // An allowlist entry that no longer matches is stale: remove it.
-    const stale = Object.entries(DEVELOPER_ONLY).flatMap(([file, texts]) =>
-      texts
-        .filter((t) => !seen.has(key(file, t)))
-        .map((t) => `${file} ${JSON.stringify(t)}`),
+    const { offenders, stale } = audit(
+      SCANNED,
+      PATTERNS,
+      mergeAllowlists(DEVELOPER_ONLY, PENDING_EVENT_NOUN),
     );
+    expect(offenders).toEqual([]);
+    expect(stale).toEqual([]);
+  }, 30_000);
+
+  it("the D-41 developer wording is gone from the files 38.9-15 converts", () => {
+    const paths = DEVELOPER_WORDING_FILES.map((f) => join(ROOT, f));
+    for (const path of paths) expect(statSync(path).isFile()).toBe(true);
+    const { offenders, stale } = audit(
+      paths,
+      DEVELOPER_WORDING_PATTERNS,
+      PENDING_DEVELOPER_WORDING,
+    );
+    expect(offenders).toEqual([]);
     expect(stale).toEqual([]);
   }, 30_000);
 

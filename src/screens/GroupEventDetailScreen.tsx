@@ -43,15 +43,15 @@ import {
 } from "./group-event-refresh";
 
 const DISSOLVE = {
-  title: "Dissolve this group event?",
+  title: "Dissolve this event?",
   message:
     "Each participant's interaction is kept as an individual interaction. The group and its shared note are removed. The Group Note is not copied into anyone's note.",
-  confirm: "Dissolve group event",
+  confirm: "Dissolve event",
 };
 const DELETE = {
-  title: "Delete this group event and all its interactions?",
+  title: "Delete this event and all its interactions?",
   message:
-    "This permanently deletes the group event and every participant's interaction. This can't be undone and may change each contact's Status, Gravity, and Intensity.",
+    "This permanently deletes the event and every participant's interaction. This can't be undone and may change each contact's Status, Gravity, and Intensity.",
   confirm: "Delete group & interactions",
 };
 
@@ -203,7 +203,7 @@ export function GroupEventDetailScreen({
       <View style={styles.center}>
         {loadFailed ? (
           <AppText role="body" style={{ color: colors.danger }}>
-            Couldn't load this group event.
+            Couldn't load this event.
           </AppText>
         ) : (
           <ActivityIndicator color={colors.accentText} />
@@ -217,17 +217,17 @@ export function GroupEventDetailScreen({
     <View style={styles.root}>
       <ShellAppBar
         variant="child"
-        title="Group Event"
+        title="Event"
         overflow={[
           {
-            label: "Edit Group Event",
+            label: "Edit Event",
             onPress: () =>
               navigation.navigate("EditGroupEvent", { groupEventId }),
           },
           { label: "Add Participant", onPress: () => setPickerVisible(true) },
           { label: "Dissolve", onPress: () => setConfirm("dissolve") },
           {
-            label: "Delete Group Event & Interactions",
+            label: "Delete Event & Interactions",
             onPress: () => setConfirm("delete"),
           },
         ]}
@@ -258,7 +258,7 @@ export function GroupEventDetailScreen({
               ) : null}
               {writeError ? (
                 <AppText role="caption" style={{ color: colors.danger }}>
-                  Couldn't update this group event. Please try again.
+                  Couldn't update this event. Please try again.
                 </AppText>
               ) : null}
               {/* RG-038 (ui-accessibility/AUD-UIA-018, D-07): display-only minute
