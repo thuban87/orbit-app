@@ -84,9 +84,8 @@ export function MemoryScreen({
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
   // Single-flight guard: block a second concurrent write while one is in flight
   // so a double-tap cannot create a duplicate Memory (CAPT-06 idempotency). The
-  // React `saving` state is async and cannot close the double-tap window on its
-  // own (review WR-03); `savingRef` flips synchronously and is the real guard.
-  const [saving, setSaving] = useState(false);
+  // React state is async and cannot close the double-tap window (review
+  // WR-03); `savingRef` flips synchronously and is the guard.
   const savingRef = useRef(false);
   // A successful inner Save returns to the Update Contact chooser (dossier §AA).
   // Navigating is deferred to an effect (not fired inside the async save
@@ -172,7 +171,6 @@ export function MemoryScreen({
     if (contactId === null) return false;
     // Claim the slot synchronously — a double-tap must not INSERT twice (WR-03).
     if (!beginInFlight(savingRef)) return false;
-    setSaving(true);
     try {
       const now = localDateTime();
       await addMemory(getExecutor(), {
@@ -188,7 +186,6 @@ export function MemoryScreen({
       failureNotice();
       return false;
     } finally {
-      setSaving(false);
       endInFlight(savingRef);
     }
   };
@@ -196,7 +193,6 @@ export function MemoryScreen({
   const edit = async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
     if (contactId === null) return false;
     if (!beginInFlight(savingRef)) return false;
-    setSaving(true);
     try {
       await editMemory(getExecutor(), {
         id,
@@ -211,7 +207,6 @@ export function MemoryScreen({
       failureNotice();
       return false;
     } finally {
-      setSaving(false);
       endInFlight(savingRef);
     }
   };
