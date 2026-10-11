@@ -262,9 +262,9 @@ describe("PendingConfirmationsSheet close guard (38.9 D-13, D-14; J-07)", () => 
   it("prompts with a typed note and closes only on Discard", async () => {
     const onClose = vi.fn();
     let tree = render({ visible: true, onClose });
-    (
-      confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void
-    )(true);
+    (confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void)(
+      true,
+    );
     tree = render({ visible: true, onClose });
 
     const keep = deferred<boolean>();
@@ -288,9 +288,9 @@ describe("PendingConfirmationsSheet close guard (38.9 D-13, D-14; J-07)", () => 
   it("a note whose item left the queue no longer prompts", () => {
     const onClose = vi.fn();
     let tree = render({ visible: true, onClose });
-    (
-      confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void
-    )(true);
+    (confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void)(
+      true,
+    );
     live.queue = [QUEUE[1]];
     tree = render({ visible: true, onClose });
     (scrimOf(tree).props.onPress as () => void)();
@@ -301,9 +301,9 @@ describe("PendingConfirmationsSheet close guard (38.9 D-13, D-14; J-07)", () => 
   it("starts clean after the sheet closes (Discard, or hidden by its owner)", async () => {
     const onClose = vi.fn();
     let tree = render({ visible: true, onClose });
-    (
-      confirmationFor(tree, 1).props.onNoteDirtyChange as (d: boolean) => void
-    )(true);
+    (confirmationFor(tree, 1).props.onNoteDirtyChange as (d: boolean) => void)(
+      true,
+    );
     tree = render({ visible: true, onClose });
     confirmDiscard.mockResolvedValueOnce(true);
     (scrimOf(tree).props.onPress as () => void)();
@@ -317,9 +317,9 @@ describe("PendingConfirmationsSheet close guard (38.9 D-13, D-14; J-07)", () => 
     expect(onClose).toHaveBeenCalledTimes(2);
 
     // Hidden while dirty (visible → false), then reopened: clean again.
-    (
-      confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void
-    )(true);
+    (confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void)(
+      true,
+    );
     render({ visible: false, onClose });
     tree = render({ visible: true, onClose });
     (scrimOf(tree).props.onPress as () => void)();

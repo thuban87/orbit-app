@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { InteractionAssistChannel } from "@/db/interaction-assist-dao";
 import { useTheme } from "@/theme";
@@ -14,6 +14,12 @@ type AssistConfirmationProps = {
    * guarantees write-once; this is the visible state.
    */
   pending?: boolean;
+  /**
+   * Overlay guard (38.9 D-13, D-14; J-07): reports whether the note holds typed
+   * text (`note.trim() !== ""`), on mount and whenever that changes. Optional;
+   * the inline banner passes nothing.
+   */
+  onNoteDirtyChange?: (dirty: boolean) => void;
 };
 
 /** Presentational confirmation controls; persistence stays with the banner owner. */
@@ -22,10 +28,20 @@ export function AssistConfirmation({
   onConfirm,
   onDismiss,
   pending = false,
+  onNoteDirtyChange,
 }: AssistConfirmationProps) {
   const { colors } = useTheme();
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
+
+  // Report through a ref so a fresh parent closure never re-fires the report;
+  // the effect runs only when the typed/untyped state flips.
+  const noteDirty = note.trim() !== "";
+  const onNoteDirtyChangeRef = useRef(onNoteDirtyChange);
+  onNoteDirtyChangeRef.current = onNoteDirtyChange;
+  useEffect(() => {
+    onNoteDirtyChangeRef.current?.(noteDirty);
+  }, [noteDirty]);
 
   // Owners are expected never to reject (they surface failures themselves via
   // the shared assist runner); awaiting + logging here is defense in depth so a

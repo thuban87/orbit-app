@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -9,12 +9,18 @@ import {
 } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
 import { Avatar } from "@/components/Avatar";
+import {
+  markNoteDirty,
+  pruneDirtyNotes,
+  shouldPromptOnSheetClose,
+} from "@/components/pending-confirmations-sheet-logic";
 import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   markAssistDismissed,
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
   ASSIST_FAILURE_COPY,
   publishAssistCommit,
@@ -33,6 +39,8 @@ import type { InFlightRef } from "@/utils/single-flight";
 const PENDING_AVATAR_SIZE = SPACING["2xl"] - SPACING.sm;
 
 const LOG_SCOPE = "pending-confirmations";
+
+const NO_DIRTY_NOTES: ReadonlySet<string> = new Set();
 
 function logFailure(message: string, error: unknown): void {
   Logger.error(LOG_SCOPE, message, error);
@@ -68,6 +76,38 @@ export function PendingConfirmationsSheet({
   const [pendingUids, setPendingUids] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+
+  // 38.9 D-13 / D-14 (J-07): uids whose confirmation note holds typed text.
+  // Pruned against the live queue at close time (review M6), and cleared when
+  // the sheet actually closes: the Modal unmounts the notes while hidden.
+  const [dirtyNotes, setDirtyNotes] =
+    useState<ReadonlySet<string>>(NO_DIRTY_NOTES);
+
+  useEffect(() => {
+    if (!visible) setDirtyNotes(NO_DIRTY_NOTES);
+  }, [visible]);
+
+  const closeSheet = () => {
+    setDirtyNotes(NO_DIRTY_NOTES);
+    onClose();
+  };
+
+  // The one close for Back (onRequestClose) and the scrim tap. A second close
+  // request while the prompt is pending gets false from the single-flight
+  // confirmDiscard(), so onClose runs at most once (review C2-L3).
+  const requestSheetClose = () => {
+    const live = pruneDirtyNotes(
+      dirtyNotes,
+      queue.map((assist) => assist.uid),
+    );
+    if (!shouldPromptOnSheetClose(live)) {
+      closeSheet();
+      return;
+    }
+    void confirmDiscard().then((discard) => {
+      if (discard) closeSheet();
+    });
+  };
 
   const latchFor = (uid: string): InFlightRef => {
     let latch = latchesRef.current.get(uid);
@@ -154,13 +194,13 @@ export function PendingConfirmationsSheet({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={requestSheetClose}
     >
       <View style={styles.modalRoot}>
         <Pressable
           accessibilityLabel="Dismiss pending confirmations"
           style={StyleSheet.absoluteFill}
-          onPress={onClose}
+          onPress={requestSheetClose}
         >
           <View
             style={[
@@ -231,6 +271,11 @@ export function PendingConfirmationsSheet({
                     }
                     onDismiss={() => dismiss(assist.uid)}
                     pending={pendingUids.has(assist.uid)}
+                    onNoteDirtyChange={(dirty) =>
+                      setDirtyNotes((previous) =>
+                        markNoteDirty(previous, assist.uid, dirty),
+                      )
+                    }
                   />
                 </View>
               ))}
