@@ -13,7 +13,6 @@ import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   AppState: { currentState: "active" },
   Pressable: "Pressable",
   ScrollView: "ScrollView",
@@ -52,7 +51,9 @@ vi.mock("@/services/contact-lifecycle-effects", () => ({}));
 vi.mock("@/services/notifications/notification-schedule", () => ({}));
 vi.mock("@/services/photos/background-storage", () => ({}));
 vi.mock("@/services/reach-out/handoff", () => ({}));
+vi.mock("@/stores/confirm-store", () => ({ confirm: vi.fn() }));
 vi.mock("@/stores/shell-refresh-store", () => ({}));
+vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
 vi.mock("@/theme/use-reduced-motion", () => ({}));
 vi.mock("@/utils/logger", () => ({ Logger: {} }));
 vi.mock("@/theme", () => ({

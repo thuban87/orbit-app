@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button semantic roles are domain props.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { AppText } from "@/components/ui/AppText";
@@ -26,6 +26,7 @@ import {
   readCategoryProfilePresentation,
 } from "@/db/profile-presentation-read";
 import { newUid } from "@/db/uid";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import { parseAndCanonicalizeProfileLayout } from "@/profile/presentation-schema";
 import {
   activeTemplateManagerPage,
@@ -202,21 +203,12 @@ export function ProfileTemplateManager({
       onRequestClose();
       return;
     }
-    Alert.alert(
-      "Discard changes?",
-      "Your template changes have not been saved.",
-      [
-        { text: "Keep editing", style: "cancel" },
-        {
-          text: "Discard changes",
-          style: "destructive",
-          onPress: () => {
-            setState(clearTemplateDraft(state));
-            onRequestClose();
-          },
-        },
-      ],
-    );
+    // The shared themed discard prompt (D-13, D-52).
+    void confirmDiscard().then((discard) => {
+      if (!discard) return;
+      setState(clearTemplateDraft(state));
+      onRequestClose();
+    });
   };
 
   const runTemplateOperation = async (

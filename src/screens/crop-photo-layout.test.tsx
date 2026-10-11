@@ -94,7 +94,6 @@ vi.mock("react", async (original) => ({
   },
 }));
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   Pressable: "Pressable",
   Text: "Text",
   View: "View",
@@ -163,6 +162,7 @@ vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: vi.fn(),
 }));
 vi.mock("@/stores/photo-result-store", () => ({ publishCropResult: vi.fn() }));
+vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
 
 const { CropPhotoScreen } = await import("./CropPhotoScreen");

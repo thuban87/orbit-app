@@ -18,7 +18,6 @@ vi.mock("react", async (original) => ({
   useState: () => [measuredWidth, vi.fn()],
 }));
 vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
   Pressable: "Pressable",
   StyleSheet: { create: <T,>(styles: T) => styles },
   Switch: "Switch",
@@ -40,6 +39,9 @@ vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
 vi.mock("@/db/database", () => ({
   getExecutor: vi.fn(),
   localDateTime: vi.fn(),
+}));
+vi.mock("@/navigation/discard-keep-guard", () => ({
+  confirmDiscard: vi.fn(),
 }));
 vi.mock("@/db/profile-presentation-dao", () => ({
   setContactFreeformLayout: vi.fn(),

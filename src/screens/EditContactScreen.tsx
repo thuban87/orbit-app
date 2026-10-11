@@ -48,7 +48,6 @@ import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -101,11 +100,7 @@ import {
 } from "@/components/ui/field-error-logic";
 import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { getAppSettings } from "@/db/app-settings-dao";
-import {
-  applyLinkDiff,
-  type ContactLinkRow,
-  type DraftLink,
-} from "@/db/contact-links-dao";
+import type { ContactLinkRow, DraftLink } from "@/db/contact-links-dao";
 import {
   getContactForEdit,
   getContactHeader,
@@ -145,7 +140,9 @@ import {
   executeDeleteIntentOwned,
 } from "@/services/photos/owned-master";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { confirm, notice } from "@/stores/confirm-store";
 import { takeStagedPhotos } from "@/stores/photo-result-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS, parseDate } from "@/types";
 import { formatLocalDate } from "@/utils/dates";
@@ -179,18 +176,16 @@ const CLOSED_DRAFT = { open: false, dirty: false } as const;
 /** The social-battery options (native picker). "" = No selection → stored NULL. */
 const SOCIAL_BATTERY_OPTIONS = ["Charger", "Neutral", "Drain"] as const;
 
-/** Promise wrapper over Alert so the duplicate-name warning reads as ONE gate. */
+/**
+ * Themed confirm so the duplicate-name warning reads as ONE gate; Back/scrim
+ * resolves false, as Cancel does (D-27).
+ */
 function confirmDuplicate(name: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      "Duplicate name",
-      `You already have a ${name} — save anyway?`,
-      [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        { text: "Save anyway", onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+  return confirm({
+    title: "Duplicate name",
+    message: `You already have a ${name} — save anyway?`,
+    confirmLabel: "Save anyway",
+    dismissable: true,
   });
 }
 
@@ -596,7 +591,10 @@ export function EditContactScreen({
         readKnowledgeSeeds(),
       ]);
       if (!result) {
-        Alert.alert("Couldn't load this contact", "Please go back and retry.");
+        void notice({
+          title: "Couldn't load this contact",
+          message: "Please go back and retry.",
+        });
         return;
       }
       const nextEditDefs = defsForEditForm(defs);
@@ -643,7 +641,10 @@ export function EditContactScreen({
       setLinksDraft(toLinkDrafts(result.links));
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load edit-form data", err);
-      Alert.alert("Couldn't load the form", "Please reopen this screen.");
+      void notice({
+        title: "Couldn't load the form",
+        message: "Please reopen this screen.",
+      });
     }
   }, [contactId, readKnowledgeSeeds]);
 
@@ -1051,7 +1052,10 @@ export function EditContactScreen({
           "failed to save contact metadata",
           outcome.error,
         );
-        Alert.alert("Couldn't save contact. Please try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't save contact. Please try again.",
+        });
         return;
       }
       applyCommittedBaseline(
@@ -1065,15 +1069,20 @@ export function EditContactScreen({
           "links save failed (metadata committed)",
           outcome.error,
         );
-        Alert.alert("Contact saved — some links couldn't be saved. Try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Contact saved — some links couldn't be saved. Try again.",
+        });
         return;
       }
       if (outcome.status === "refreshFailed") {
         setStale(true);
         Logger.error(LOG_SCOPE, "saved contact refresh failed", outcome.error);
-        Alert.alert(
-          "Contact saved, but the form couldn't refresh. Reopen it before saving again.",
-        );
+        // Blocking: the stale form must not be saved again (notice, D-27).
+        void notice({
+          title: "Contact saved, but the form couldn't refresh.",
+          message: "Reopen it before saving again.",
+        });
         return;
       }
       if (outcome.status === "canonicalDuplicate") {
@@ -1102,7 +1111,10 @@ export function EditContactScreen({
       navigation.navigate("Profile", { contactId });
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save contact", err);
-      Alert.alert("Couldn't save contact. Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't save contact. Please try again.",
+      });
     } finally {
       setSaving(false);
     }

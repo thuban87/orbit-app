@@ -3,7 +3,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -38,6 +37,7 @@ import {
   readCategoryProfilePresentation,
 } from "@/db/profile-presentation-read";
 import { newUid } from "@/db/uid";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
   type BackgroundManagerState,
   beginBackgroundPreparation,
@@ -65,6 +65,7 @@ import {
 } from "@/services/photos/background-storage";
 import { renderBackgroundDerivative } from "@/services/photos/manipulator-derivatives";
 import { profileBackgroundTarget } from "@/services/photos/profile-background-target";
+import { confirm } from "@/stores/confirm-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -135,6 +136,10 @@ export function ProfileBackgroundManager({
   >(null);
   const tokenCounter = useRef(0);
   const activeTokenRef = useRef<string | null>(null);
+  // Latest state for the async discard prompt: a crop that finishes while the
+  // prompt is open must still have its pending file deleted on Discard.
+  const managerStateRef = useRef(managerState);
+  managerStateRef.current = managerState;
   const wasVisibleRef = useRef(false);
 
   const displayScale = useSharedValue(1);
@@ -549,26 +554,17 @@ export function ProfileBackgroundManager({
       onRequestClose();
       return;
     }
-    Alert.alert(
-      "Discard changes?",
-      "Your background changes have not been saved.",
-      [
-        { text: "Keep editing", style: "cancel" },
-        {
-          text: "Discard changes",
-          style: "destructive",
-          onPress: () => {
-            if (managerState.pendingPath)
-              deleteBackgroundDerivative(managerState.pendingPath);
-            activeTokenRef.current = null;
-            setManagerState(cancelBackgroundPreparation(managerState));
-            setSource(null);
-            setPage("list");
-            onRequestClose();
-          },
-        },
-      ],
-    );
+    // The shared themed discard prompt (D-13, D-52).
+    void confirmDiscard().then((discard) => {
+      if (!discard) return;
+      const latest = managerStateRef.current;
+      if (latest.pendingPath) deleteBackgroundDerivative(latest.pendingPath);
+      activeTokenRef.current = null;
+      setManagerState(cancelBackgroundPreparation(latest));
+      setSource(null);
+      setPage("list");
+      onRequestClose();
+    });
   };
 
   const selected =
@@ -678,45 +674,40 @@ export function ProfileBackgroundManager({
                           role="tertiary"
                           label="Delete"
                           onPress={() =>
-                            Alert.alert(
-                              "Delete background template?",
-                              "Profiles using it will fall back to their Category or default background. Contact information will not change.",
-                              [
-                                { text: "Cancel", style: "cancel" },
-                                {
-                                  text: "Delete template",
-                                  style: "destructive",
-                                  onPress: () =>
-                                    void (async () => {
-                                      try {
-                                        await deleteBackgroundTemplateAndRefresh(
-                                          {
-                                            removeTemplate: () =>
-                                              deleteProfileBackgroundTemplate(
-                                                getExecutor(),
-                                                template.uid,
-                                                localDateTime(),
-                                              ),
-                                            removeDerivative:
-                                              deleteBackgroundDerivative,
-                                            refresh,
-                                            onCommitted,
-                                          },
-                                        );
-                                      } catch (error) {
-                                        Logger.error(
-                                          LOG_SCOPE,
-                                          "failed to delete background template",
-                                          error,
-                                        );
-                                        setListError(
-                                          "Couldn't delete that background. Try again.",
-                                        );
-                                      }
-                                    })(),
-                                },
-                              ],
-                            )
+                            void confirm({
+                              title: "Delete background template?",
+                              message:
+                                "Profiles using it will fall back to their Category or default background. Contact information will not change.",
+                              confirmLabel: "Delete template",
+                              destructive: true,
+                            }).then((ok) => {
+                              if (!ok) return;
+                              void (async () => {
+                                try {
+                                  await deleteBackgroundTemplateAndRefresh({
+                                    removeTemplate: () =>
+                                      deleteProfileBackgroundTemplate(
+                                        getExecutor(),
+                                        template.uid,
+                                        localDateTime(),
+                                      ),
+                                    removeDerivative:
+                                      deleteBackgroundDerivative,
+                                    refresh,
+                                    onCommitted,
+                                  });
+                                } catch (error) {
+                                  Logger.error(
+                                    LOG_SCOPE,
+                                    "failed to delete background template",
+                                    error,
+                                  );
+                                  setListError(
+                                    "Couldn't delete that background. Try again.",
+                                  );
+                                }
+                              })();
+                            })
                           }
                         />
                       </View>

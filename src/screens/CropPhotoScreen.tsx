@@ -57,7 +57,6 @@ import {
 } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -84,6 +83,7 @@ import {
 import { relPathForTarget } from "@/services/photos/photo-storage";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { publishCropResult } from "@/stores/photo-result-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { cropLayout, cropNaturalHeight } from "./crop-photo-layout";
@@ -374,7 +374,7 @@ export function CropPhotoScreen({
         err instanceof PhotoPipelineError
           ? "That image couldn't be used. Try a JPEG or PNG."
           : "Couldn't save the photo. Please try again.";
-      Alert.alert(message);
+      showSnackbar({ kind: "error", label: message });
     } finally {
       setBusy(false);
     }

@@ -25,14 +25,7 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   TouchpointRefineForm,
   type TouchpointRefineValue,
@@ -43,6 +36,8 @@ import { editTouchpointFull } from "@/db/recency-dao";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
@@ -78,10 +73,11 @@ export function EditInteractionScreen({
       );
       if (!loaded) {
         setNotFound(true);
-        Alert.alert(
-          "Couldn't load this interaction",
-          "Please go back and retry.",
-        );
+        // The screen itself renders the missing state; a snackbar suffices.
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't load this interaction. Please go back and retry.",
+        });
         return;
       }
       const seeded = seedRefineValue(loaded);
@@ -89,7 +85,10 @@ export function EditInteractionScreen({
       setValue(seeded);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load interaction for edit", err);
-      Alert.alert("Couldn't load the form", "Please reopen this screen.");
+      void notice({
+        title: "Couldn't load the form",
+        message: "Please reopen this screen.",
+      });
     }
   }, [contactId, interactionId]);
 

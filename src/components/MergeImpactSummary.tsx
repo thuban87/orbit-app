@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -10,6 +10,7 @@ import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardWith } from "@/navigation/reset-intents";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-rehome";
+import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
 
@@ -68,37 +69,37 @@ export function MergeImpactSummary({
     });
   }, [absorbedId, survivorId]);
   const typedResolutions: MergeResolutions = resolutions;
-  const confirm = () =>
-    Alert.alert("Merge contacts?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Merge",
-        style: "destructive",
-        onPress: () => {
-          void mergeContactsWithPhotoOwnership(getExecutor(), {
-            survivorId,
-            absorbedId,
-            resolutions: typedResolutions,
-            now: localDateTime(),
-          })
-            .then(() =>
-              navigationRef.current?.reset(
-                resetToDashboardWith({
-                  name: "Profile",
-                  params: { contactId: survivorId },
-                }),
-              ),
-            )
-            .catch((error: unknown) =>
-              setFailureMessage(
-                error instanceof GroupMergeCollisionError
-                  ? error.message
-                  : "Couldn't merge these contacts. Nothing was changed. Try again.",
-              ),
-            );
-        },
-      },
-    ]);
+  // Irreversible: themed destructive confirm, not dismissable (D-30, ADR-086).
+  const confirmMerge = () =>
+    void confirm({
+      title: "Merge contacts?",
+      message: "This cannot be undone.",
+      confirmLabel: "Merge",
+      destructive: true,
+    }).then((ok) => {
+      if (!ok) return;
+      void mergeContactsWithPhotoOwnership(getExecutor(), {
+        survivorId,
+        absorbedId,
+        resolutions: typedResolutions,
+        now: localDateTime(),
+      })
+        .then(() =>
+          navigationRef.current?.reset(
+            resetToDashboardWith({
+              name: "Profile",
+              params: { contactId: survivorId },
+            }),
+          ),
+        )
+        .catch((error: unknown) =>
+          setFailureMessage(
+            error instanceof GroupMergeCollisionError
+              ? error.message
+              : "Couldn't merge these contacts. Nothing was changed. Try again.",
+          ),
+        );
+    });
   const rows = counts
     ? [
         plural(counts.interactions, "interaction", "interactions"),
@@ -142,7 +143,7 @@ export function MergeImpactSummary({
         <Text style={{ color: colors.danger }}>{failureMessage}</Text>
       ) : null}
       <Pressable
-        onPress={confirm}
+        onPress={confirmMerge}
         style={[styles.cta, { backgroundColor: colors.accent }]}
       >
         <Text style={{ color: colors.onAccent }}>Merge contacts</Text>

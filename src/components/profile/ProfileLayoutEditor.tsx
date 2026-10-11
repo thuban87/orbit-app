@@ -1,7 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography prop.
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Switch,
@@ -27,6 +26,7 @@ import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { getExecutor, localDateTime } from "@/db/database";
 import { setContactFreeformLayout } from "@/db/profile-presentation-dao";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
   createAllSectionsPreview,
   createProfileLayoutEditorDraft,
@@ -334,18 +334,10 @@ export function ProfileLayoutEditor({
       case "keep-editing":
         return;
       case "confirm-discard":
-        Alert.alert(
-          "Discard changes?",
-          "Your layout changes have not been saved.",
-          [
-            { text: "Keep editing", style: "cancel" },
-            {
-              text: "Discard changes",
-              style: "destructive",
-              onPress: onRequestClose,
-            },
-          ],
-        );
+        // The shared themed discard prompt (D-13, D-52).
+        void confirmDiscard().then((discard) => {
+          if (discard) onRequestClose();
+        });
     }
   };
 

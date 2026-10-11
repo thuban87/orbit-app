@@ -3,7 +3,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   AppState,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -73,10 +72,12 @@ import {
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
 import { performReachOut } from "@/services/reach-out/handoff";
+import { confirm } from "@/stores/confirm-store";
 import {
   useForegroundRefresh,
   useShellRefresh,
 } from "@/stores/shell-refresh-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
@@ -407,7 +408,10 @@ export function ContactProfileScreen({
       await load();
     } catch (cause) {
       Logger.error(LOG_SCOPE, "failed to update favourite", cause);
-      Alert.alert("Couldn't update favorite", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't update favorite. Please try again.",
+      });
     } finally {
       setPendingFavourite(false);
     }
@@ -444,7 +448,10 @@ export function ContactProfileScreen({
       navigation.goBack();
     } catch (cause) {
       Logger.error(LOG_SCOPE, "failed to archive Profile contact", cause);
-      Alert.alert("Couldn't archive", "Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't archive. Please try again.",
+      });
     }
   }, [closeOverlay, contactId, navigation]);
 
@@ -509,7 +516,10 @@ export function ContactProfileScreen({
           `failed to ${direction} Profile contact`,
           cause,
         );
-        Alert.alert("Couldn't update contact", "Please try again.");
+        showSnackbar({
+          kind: "error",
+          label: "Couldn't update contact. Please try again.",
+        });
       } finally {
         setTransitioning(false);
       }
@@ -736,14 +746,17 @@ export function ContactProfileScreen({
                         const confirmation = unbindConfirmation(
                           snapshot.identity.name,
                         );
-                        Alert.alert(confirmation.title, confirmation.message, [
-                          { text: "Keep contact bound", style: "cancel" },
-                          {
-                            text: "Unbind contact",
-                            style: "destructive",
-                            onPress: () => void transitionLifecycle("unbind"),
-                          },
-                        ]);
+                        // Unbind stays confirmed (D-09, D-32, ADR-150);
+                        // destructive → not dismissable (D-06, ADR-086).
+                        void confirm({
+                          title: confirmation.title,
+                          message: confirmation.message,
+                          cancelLabel: "Keep contact bound",
+                          confirmLabel: "Unbind contact",
+                          destructive: true,
+                        }).then((ok) => {
+                          if (ok) void transitionLifecycle("unbind");
+                        });
                         return;
                       }
                       case "archive":
@@ -759,25 +772,22 @@ export function ContactProfileScreen({
                         setOverlay("templates");
                         return;
                       case "reset":
-                        Alert.alert(
-                          "Reset Profile presentation?",
-                          "This clears only this contact’s layout, collapse, and background overrides. Contact data stays unchanged.",
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: "Reset",
-                              style: "destructive",
-                              onPress: () =>
-                                void commitAndReload(() =>
-                                  resetProfilePresentation(
-                                    getExecutor(),
-                                    contactId,
-                                    localDateTime(),
-                                  ),
-                                ).then(closeOverlay),
-                            },
-                          ],
-                        );
+                        void confirm({
+                          title: "Reset Profile presentation?",
+                          message:
+                            "This clears only this contact’s layout, collapse, and background overrides. Contact data stays unchanged.",
+                          confirmLabel: "Reset",
+                          destructive: true,
+                        }).then((ok) => {
+                          if (!ok) return;
+                          void commitAndReload(() =>
+                            resetProfilePresentation(
+                              getExecutor(),
+                              contactId,
+                              localDateTime(),
+                            ),
+                          ).then(closeOverlay);
+                        });
                     }
                   };
                   return (

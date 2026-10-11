@@ -24,7 +24,6 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import {
-  Alert,
   Linking,
   Pressable,
   StyleSheet,
@@ -32,6 +31,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -79,7 +79,7 @@ async function openLinkUrl(rawUrl: string): Promise<void> {
     await Linking.openURL(normaliseLinkUrl(rawUrl));
   } catch (err) {
     Logger.error(LOG_SCOPE, "failed to open link", err);
-    Alert.alert("Couldn't open this link.");
+    showSnackbar({ kind: "error", label: "Couldn't open this link." });
   }
 }
 
