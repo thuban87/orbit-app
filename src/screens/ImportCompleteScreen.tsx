@@ -17,6 +17,7 @@ import {
   readLoading,
   runGatedRead,
 } from "@/logic/read-phase";
+import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import { navigateIntoTab } from "@/navigation/tab-entry";
@@ -195,9 +196,17 @@ export function ImportCompleteScreen({
     [route.params.sessionId, runAction],
   );
 
-  // Every state carries the shared header with its Back (38.9 D-16); Done
-  // below is unchanged.
-  const header = <ShellAppBar variant="child" title="Import complete" />;
+  // Done leaves the finished flow for Contacts. Header Back and system Back
+  // act like Done (owner ruling 38.9 D-73; review WR-07), never returning to
+  // the flow's setup screen. Every state carries the shared header (D-16).
+  const done = useCallback(
+    () => navigationRef.current?.reset(resetToDashboardRoot()),
+    [],
+  );
+  useBackActsAsDone(done);
+  const header = (
+    <ShellAppBar variant="child" title="Import complete" onBack={done} />
+  );
 
   if (phase.phase === "loading") {
     return (
@@ -445,7 +454,7 @@ export function ImportCompleteScreen({
             testID="import-complete-done"
             accessibilityRole="button"
             accessibilityLabel="Done"
-            onPress={() => navigationRef.current?.reset(resetToDashboardRoot())}
+            onPress={done}
             style={[styles.doneButton, { backgroundColor: colors.accent }]}
           >
             <Text style={{ color: colors.onAccent }}>Done</Text>

@@ -13,6 +13,7 @@ import {
   reconcileCompletionCounts,
 } from "@/db/reconcile-session-read";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
+import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -76,9 +77,17 @@ export function ReconcileCompleteScreen({
     return () => authority.invalidate();
   }, [authority, load]);
 
-  // Every state carries the shared header with its Back (38.9 D-16); Done
-  // below is unchanged.
-  const header = <ShellAppBar variant="child" title="Check complete" />;
+  // Done leaves the finished flow for Contacts. Header Back and system Back
+  // act like Done (owner ruling 38.9 D-73; review WR-07), never returning to
+  // the flow's setup screen. Every state carries the shared header (D-16).
+  const done = useCallback(
+    () => navigationRef.current?.reset(resetToDashboardRoot()),
+    [],
+  );
+  useBackActsAsDone(done);
+  const header = (
+    <ShellAppBar variant="child" title="Check complete" onBack={done} />
+  );
   if (phase.phase === "loading")
     return (
       <View style={styles.root}>
@@ -153,7 +162,7 @@ export function ReconcileCompleteScreen({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Done"
-            onPress={() => navigationRef.current?.reset(resetToDashboardRoot())}
+            onPress={done}
             style={[styles.doneButton, { backgroundColor: colors.accent }]}
           >
             <Text style={{ color: colors.onAccent }}>Done</Text>

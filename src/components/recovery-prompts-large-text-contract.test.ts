@@ -199,7 +199,7 @@ describe("Import Complete keeps Done and Review reachable at large text (D-67)",
     const inside = loaded.slice(open, close);
     // The title moved into the shared header, which does not scroll.
     expect(text).toContain(
-      '<ShellAppBar variant="child" title="Import complete" />',
+      '<ShellAppBar variant="child" title="Import complete" onBack={done} />',
     );
     const headerAt = loaded.indexOf("{header}");
     expect(headerAt).toBeGreaterThan(-1);
