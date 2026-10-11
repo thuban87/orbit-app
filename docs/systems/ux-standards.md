@@ -86,6 +86,10 @@ Behaviour:
   navigation bar, without the tab-bar and + clearance the root snackbar keeps, and may briefly
   cover a sheet's bottom buttons (D-51). `RegisteredModal` provides the in-window host.
 - Validation errors inside a sheet render inline under the field, not as a snackbar (D-40, D-19).
+- An **error** snackbar (`kind: "error"`) looks distinct from a success one: a `danger` outline
+  and a warning glyph, announced assertively to TalkBack (`accessibilityRole="alert"`). Success
+  keeps the neutral `border` outline and a polite announcement (D-72;
+  `snackbarPresentation()` in `src/components/snackbar-host.ts`).
 
 **Snackbar or notice** (D-27): an error or info message where the user can carry on is an error
 snackbar; one where the user is blocked is a themed one-button **notice**. Every decision is a
@@ -98,6 +102,11 @@ which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces t
   resolves `true` / `false`; `await notice({ title, message })` resolves when acknowledged. One
   `DialogHost` serves the whole app. The declarative `ConfirmDialog` stays for its existing
   consumers (D-24).
+- A `confirm()` / `notice()` identical to one already showing or queued opens no second dialog.
+  Only the first caller gets the answer; the duplicate resolves at once, `false` for a confirm
+  and acknowledged for a notice, so a double tap never runs a confirmed action twice. A handler
+  whose `false` branch still does something (Backup's readable-or-encrypted export) keeps its
+  own synchronous in-flight guard (38.9 code review WR-01).
 - Layout: one action row when both labels fit, otherwise stacked full-width with Cancel first
   (D-06, ADR-174).
 - Look: the elevated card with a 2dp `borderStrong` border, matching Phase 39's lesson cards
@@ -136,6 +145,10 @@ which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces t
   target (D-44). Confirm-or-abandon screens use an icon-only ✕ labelled "Cancel"
   (`backKind="cancel"`) and have that one exit (D-59).
 - A screen has exactly **one Back**, the header's (D-07, ADR-175).
+- A screen that holds Back while work runs draws its header Back disabled for that time
+  (`backDisabled`, e.g. Restore preview while a restore applies; D-26).
+- On a flow's completion screen ("Import complete", "Check complete"), header Back and system
+  Back act like **Done** and leave the finished flow (D-73; `useBackActsAsDone`).
   `src/screens/settings-chrome-contract.test.ts` changes in the same commit as any header change.
 - Person-scoped forms keep a fixed title and show the person's avatar and name under it
   (`person` prop, `PersonLine`), with clear space between title and name (D-45). Edit Contact
@@ -254,3 +267,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-10-11 | 38.9 | Created: destructive-action rule (D-30, D-32), feedback rule (D-39) and snackbar copy (D-46), themed dialogs and the overlay registry (D-24, D-27), unsaved-work guard (D-13, D-14, D-61, D-68), header and Back (D-16, D-44, D-45, D-35, D-54, D-38), states (D-05, D-47, D-26), option sheet (D-28), validation (D-19), empty state (D-20, D-71), dates (D-23, D-48, D-65 to D-67, D-70), plural helper (D-21). |
+| 2026-10-11 | 38.9 | Code-review fixes: error snackbar look (D-72), duplicate confirm resolves false (WR-01), `backDisabled` header Back (WR-04), completion-screen Back acts like Done (D-73). |
