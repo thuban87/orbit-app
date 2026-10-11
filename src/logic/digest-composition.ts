@@ -60,13 +60,15 @@ export function filterUpcomingBirthdays<T extends BirthdayInput>(
         name: contact.name,
         birthday: contact.birthday,
         daysUntil,
-        // The year rule follows the injected `today`, not the wall clock.
+        // The year rule follows the injected `today`, not the wall clock. An
+        // upcoming day is where the weekday matters (D-48; mockup DT-A draws
+        // the Digest birthday as "Tue, Oct 13").
         tag:
           daysUntil === 0
             ? "Today"
             : daysUntil === 1
               ? "Tomorrow"
-              : formatDisplayDate(occurrence, { now: today }),
+              : formatDisplayDate(occurrence, { now: today, weekday: true }),
         dateKey: formatLocalDate(occurrence),
       };
     })

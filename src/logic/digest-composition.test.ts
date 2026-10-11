@@ -37,7 +37,7 @@ describe("digest composition", () => {
     );
 
     expect(rows.map((row) => row.id)).toEqual([1, 2, 6]);
-    expect(rows.map((row) => row.tag)).toEqual(["Today", "Tomorrow", "Sep 25"]);
+    expect(rows.map((row) => row.tag)).toEqual(["Today", "Tomorrow", "Fri, Sep 25"]);
   });
 
   // 38.9 D-23 (review L6): the display tag and the storage-format day are
@@ -56,7 +56,7 @@ describe("digest composition", () => {
     ]);
     expect(rows[1]?.dateKey).toBe("2026-09-25");
     expect(rows[1]?.dateKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(rows[1]?.tag).toBe("Sep 25");
+    expect(rows[1]?.tag).toBe("Fri, Sep 25");
     expect(rows[1]?.tag).not.toBe(rows[1]?.dateKey);
   });
 
@@ -67,7 +67,7 @@ describe("digest composition", () => {
       [{ id: 1, name: "Jan", birthday: "1990-01-02" }],
       new Date(2026, 11, 28),
     );
-    expect(rows[0]?.tag).toBe("Jan 2, 2027");
+    expect(rows[0]?.tag).toBe("Sat, Jan 2, 2027");
     expect(rows[0]?.dateKey).toBe("2027-01-02");
   });
 
