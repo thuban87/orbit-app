@@ -281,6 +281,54 @@ describe("knowledge presentation", () => {
     expect(formatCustomFieldValue("phone", "+1 555 0100")).toBe("+1 555 0100");
   });
 
+  describe("memory meaningful date display (D-65, D-48)", () => {
+    const withDate = (
+      meaningfulDate: string | null,
+    ): KnowledgePresentationInput => {
+      const featured = input.knowledge.featured;
+      const [first] = featured.items;
+      if (first?.owner !== "memory") throw new Error("fixture changed");
+      return {
+        ...input,
+        knowledge: {
+          ...input.knowledge,
+          featured: {
+            ...featured,
+            items: [
+              {
+                ...first,
+                row: { ...first.row, meaningful_date: meaningfulDate },
+              },
+            ],
+          },
+        },
+      };
+    };
+    const metadataOf = (presentation: KnowledgePresentationInput) =>
+      buildKnowledgePresentation(presentation)
+        .children.flatMap((child) => child.items)
+        .find((item) => item.id === "memory:10")?.metadata;
+
+    it("shows a current-year date without the year", () => {
+      expect(metadataOf(withDate(`${THIS_YEAR}-09-05`))?.[0]).toBe("Sep 5");
+    });
+
+    it("shows another year's date with the year", () => {
+      expect(metadataOf(withDate(`${THIS_YEAR - 1}-06-02`))?.[0]).toBe(
+        `Jun 2, ${THIS_YEAR - 1}`,
+      );
+    });
+
+    it("shows a legacy free-text or impossible value raw", () => {
+      expect(metadataOf(withDate("next spring"))?.[0]).toBe("next spring");
+      expect(metadataOf(withDate("2026-02-31"))?.[0]).toBe("2026-02-31");
+    });
+
+    it("omits a missing date", () => {
+      expect(metadataOf(withDate(null))?.[0]).toBe("Link");
+    });
+  });
+
   it("keeps an impossible date raw so the stored value stays visible", () => {
     expect(formatCustomFieldValue("date", "2026-02-31")).toBe("2026-02-31");
   });

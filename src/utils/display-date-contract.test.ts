@@ -190,3 +190,65 @@ describe("stored-birthday display sites (D-70)", () => {
     expect(code).toMatch(/\[conflict\.key\]: option\.id/);
   });
 });
+
+// D-65 / D-66 / D-67: the two native date pickers store formatLocalDate output
+// only, never a display string, and set no date range.
+describe("native date pickers (D-65, D-66, D-67)", () => {
+  const editor = () => codeOnly(source("src/components/MemoryEditor.tsx"));
+  const widget = () =>
+    codeOnly(source("src/components/field-widgets/DateFieldWidget.tsx"));
+
+  it("MemoryCard and the Profile memory line format meaningful_date with a raw fallback", () => {
+    for (const path of [
+      "src/components/MemoryCard.tsx",
+      "src/profile/knowledge-presentation.ts",
+    ]) {
+      const code = codeOnly(source(path));
+      const uses = code.match(/meaningful_date/g) ?? [];
+      const formatted =
+        code.match(
+          /formatDisplayDateOrFallback\(\s*memory\.meaningful_date,\s*memory\.meaningful_date,?\s*\)/g,
+        ) ?? [];
+      expect(formatted.length).toBeGreaterThanOrEqual(1);
+      // Every read of meaningful_date is the guard, the formatter call or its fallback.
+      expect(uses.length).toBeLessThanOrEqual(formatted.length * 2 + 1);
+    }
+  });
+
+  it("MemoryEditor has no free-text meaningful date and stores picker output", () => {
+    const code = editor();
+    expect(code).not.toContain('accessibilityLabel="Meaningful date optional"');
+    expect(code).toMatch(/<DateTimePicker/);
+    expect(code).toMatch(/storedFromPickerEvent\(/);
+    expect(code).toMatch(/update\("meaningfulDate", stored\)/);
+    expect(code).toMatch(/update\("meaningfulDate", null\)/);
+    expect(code).not.toMatch(/update\([^)]*formatDisplayDate/);
+  });
+
+  it("DateFieldWidget has no TextInput and emits only picker output or Clear", () => {
+    const code = widget();
+    expect(code).not.toMatch(/<TextInput/);
+    expect(code).toMatch(/<DateTimePicker/);
+    expect(code).toMatch(/storedFromPickerEvent\(/);
+    const emits = code.match(/onChange\(([^)]*)\)/g) ?? [];
+    expect(emits.sort()).toEqual(['onChange("")', "onChange(stored)"].sort());
+    expect(code).not.toMatch(/onChange\([^)]*formatDisplayDate/);
+  });
+
+  it.each([
+    "src/components/MemoryEditor.tsx",
+    "src/components/field-widgets/DateFieldWidget.tsx",
+  ])("%s sets no minimumDate or maximumDate (D-67)", (path) => {
+    const code = codeOnly(source(path));
+    expect(code).not.toMatch(/minimumDate|maximumDate/);
+  });
+
+  it("date-pick-logic imports no display formatter and no React", () => {
+    const code = source("src/components/date-pick-logic.ts");
+    for (const name of DISPLAY_FORMATTERS) {
+      expect(importedFromDates(code)).not.toContain(name);
+    }
+    expect(code).toContain("formatLocalDate");
+    expect(code).not.toMatch(/from ["']react(-native)?["']/);
+  });
+});

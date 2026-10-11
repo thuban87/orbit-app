@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { storedFromPickerEvent } from "@/components/date-pick-logic";
 import type { Line3Candidate } from "@/db/dashboard-knowledge-read";
 import { CARD_PROMPTS, selectCardLine3 } from "@/logic/card-line3-selection";
 
@@ -128,5 +129,35 @@ describe("selectCardLine3", () => {
         NOW,
       ),
     ).toMatchObject({ kind: "candidate", text: "\ud83d\udc15 Luna" });
+  });
+});
+
+// 38.9 D-65: a meaningful date picked natively is stored as YYYY-MM-DD, which
+// is exactly what the imminence window compares (IMMINENT_DAYS 30).
+describe("picked meaningful dates and imminence (D-65)", () => {
+  const picked = (days: number) =>
+    storedFromPickerEvent(
+      "set",
+      new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() + days, 20, 0),
+    );
+
+  it.each([
+    [5, true],
+    [-1, false],
+    [31, false],
+  ])("today %+d days imminent: %s", (days, imminent) => {
+    const selected = selectCardLine3(
+      [
+        candidate({ id: 1, value: "Pinned context", pinned: true }),
+        candidate({ id: 2, value: "Dated", meaningfulDate: picked(days) }),
+      ],
+      7,
+      "Alex",
+      NOW,
+    );
+    expect(selected).toMatchObject({
+      kind: "candidate",
+      text: imminent ? "Dated" : "Pinned context",
+    });
   });
 });
