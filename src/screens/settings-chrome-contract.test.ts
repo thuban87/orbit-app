@@ -64,19 +64,6 @@ type PendingChrome = "in-body-back" | "header-less";
  */
 const PENDING_HEADER_CONVERSION: Record<string, PendingChrome> = {
   // Plan 10
-  "src/screens/CustomFieldsScreen.tsx": "in-body-back",
-  "src/screens/ImportReviewScreen.tsx": "in-body-back",
-  "src/screens/RestorePreviewScreen.tsx": "in-body-back",
-  "src/screens/BulkReviewScreen.tsx": "in-body-back",
-  "src/screens/DuplicateReviewScreen.tsx": "in-body-back",
-  "src/screens/BulkImportSetupScreen.tsx": "in-body-back",
-  "src/screens/LegacyContactPickerScreen.tsx": "in-body-back",
-  "src/screens/ImportProgressScreen.tsx": "in-body-back",
-  "src/screens/AIConnectionScreen.tsx": "in-body-back",
-  "src/screens/AIPersonalizationScreen.tsx": "in-body-back",
-  "src/screens/AIPermissionsScreen.tsx": "in-body-back",
-  "src/screens/AIModelPickerScreen.tsx": "in-body-back",
-  "src/screens/AIPreviewScreen.tsx": "in-body-back",
   "src/screens/ReconcileDetailScreen.tsx": "in-body-back",
   "src/screens/SystemBuilderScreen.tsx": "in-body-back",
   "src/screens/ImportCompleteScreen.tsx": "header-less",

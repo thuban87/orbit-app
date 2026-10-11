@@ -26,6 +26,7 @@ import {
   refreshOpenRouterCatalog,
   refreshOpenRouterCatalogIfStale,
 } from "@/ai/openrouter-catalog";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button, GlassSurface } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
@@ -76,6 +77,10 @@ function createOpenRouterStorage(): OpenRouterCatalogStorage {
 
 export interface AIModelPickerScreenProps {
   lane: AiCloudProviderId;
+  /**
+   * Returns to the connection after a model is saved. The header Back is the
+   * shared header's own goBack() (38.9 D-16), not this prop.
+   */
   onBack: () => void;
   onSelected?: (model: string) => void;
 }
@@ -221,12 +226,7 @@ export function AIModelPickerScreen({
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Button role="tertiary" label="Back" onPress={onBack} />
-        <AppText accessibilityRole="header" role="display">
-          Choose a model
-        </AppText>
-      </View>
+      <ShellAppBar variant="child" title="Choose a model" />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -453,12 +453,6 @@ export function AIModelPickerScreen({
 const styles = StyleSheet.create({
   card: { gap: SPACING.md, padding: SPACING.base },
   content: { gap: SPACING.md, padding: SPACING.base },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.md,
-    padding: SPACING.base,
-  },
   input: {
     borderRadius: RADII.md,
     borderWidth: StyleSheet.hairlineWidth,

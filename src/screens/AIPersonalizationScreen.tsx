@@ -26,6 +26,7 @@ import {
 } from "@/ai/openrouter-catalog";
 import { Icon } from "@/components/icons/Icon";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   AppText,
   Button,
@@ -138,12 +139,14 @@ function importedTitle(name: string): string {
 }
 
 export interface AIPersonalizationScreenProps {
-  onBack: () => void;
   focus?: "writing-style" | "personalization";
 }
 
+/**
+ * Back is the shared header's only (38.9 D-16, D-07). Its goBack() fires
+ * beforeRemove, so the Writing Style guard below still prompts.
+ */
 export function AIPersonalizationScreen({
-  onBack,
   focus,
 }: AIPersonalizationScreenProps) {
   const { colors } = useTheme();
@@ -475,12 +478,7 @@ export function AIPersonalizationScreen({
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Button role="tertiary" label="Back" onPress={onBack} />
-        <AppText accessibilityRole="header" role="display">
-          AI Personalization
-        </AppText>
-      </View>
+      <ShellAppBar variant="child" title="AI Personalization" />
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[
@@ -904,11 +902,6 @@ function SectionEditor({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    paddingHorizontal: SPACING.base,
-    paddingTop: SPACING.base,
-    gap: SPACING.sm,
-  },
   content: {
     padding: SPACING.base,
     paddingBottom: SPACING["2xl"],

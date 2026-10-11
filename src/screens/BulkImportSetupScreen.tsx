@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ConsolidationPrompt } from "@/components/ConsolidationPrompt";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -426,250 +427,232 @@ export function BulkImportSetupScreen({
 
   const importLabel = `Import ${contactLabel(count)}`;
 
-  const header = (
-    <View style={styles.header}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-        onPress={() => navigation.goBack()}
-        style={[styles.back, { borderColor: colors.border }]}
-      >
-        <Text style={{ color: colors.textSecondary }}>Back</Text>
-      </Pressable>
-      <Text
-        accessibilityRole="header"
-        style={[styles.title, { color: colors.textPrimary }]}
-      >
-        Import contacts
-      </Text>
-    </View>
-  );
+  // The shared header (38.9 D-16). Its Back is goBack(), which the import
+  // leave guard intercepts (beforeRemove) as before.
+  const header = <ShellAppBar variant="child" title="Import contacts" />;
 
   if (stopped) {
     return (
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.root}>
         {header}
-        <Text
-          testID="bulk-import-stopped"
-          style={[styles.count, { color: colors.textPrimary }]}
-        >
-          {bulkImportStoppedMessage(count)}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Continue import"
-          disabled={saving}
-          onPress={onContinueStopped}
-          style={[
-            styles.import,
-            { backgroundColor: colors.accent, borderColor: colors.accent },
-          ]}
-        >
-          <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
-            {BULK_IMPORT_STOPPED_CONTINUE}
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text
+            testID="bulk-import-stopped"
+            style={[styles.count, { color: colors.textPrimary }]}
+          >
+            {bulkImportStoppedMessage(count)}
           </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Discard import"
-          disabled={saving}
-          onPress={() => void onDiscardStopped()}
-          style={[
-            styles.import,
-            { borderColor: colors.danger },
-            persistentDangerScrim(theme),
-          ]}
-        >
-          <Text style={{ color: colors.danger, fontWeight: "600" }}>
-            {BULK_IMPORT_STOPPED_DISCARD}
-          </Text>
-        </Pressable>
-      </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continue import"
+            disabled={saving}
+            onPress={onContinueStopped}
+            style={[
+              styles.import,
+              { backgroundColor: colors.accent, borderColor: colors.accent },
+            ]}
+          >
+            <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+              {BULK_IMPORT_STOPPED_CONTINUE}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Discard import"
+            disabled={saving}
+            onPress={() => void onDiscardStopped()}
+            style={[
+              styles.import,
+              { borderColor: colors.danger },
+              persistentDangerScrim(theme),
+            ]}
+          >
+            <Text style={{ color: colors.danger, fontWeight: "600" }}>
+              {BULK_IMPORT_STOPPED_DISCARD}
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <View style={styles.root}>
       {header}
-
-      <Text style={[styles.count, { color: colors.textPrimary }]}>
-        {contactLabel(count)} selected
-      </Text>
-
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Orbit participation
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={[styles.count, { color: colors.textPrimary }]}>
+          {contactLabel(count)} selected
         </Text>
-        {/* D-57: one lifecycle for the whole batch, Unbound by default. The
+
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Orbit participation
+          </Text>
+          {/* D-57: one lifecycle for the whole batch, Unbound by default. The
             selected option is accent-filled with an onAccent label (ADR-084,
             as D-30). D-64: disabled once any row of the batch is resolved;
             D-73c: a stopped batch never reaches this form (stopped view). */}
-        <View
-          accessibilityRole="radiogroup"
-          accessibilityLabel="Orbit participation"
-          style={styles.defaults}
-        >
-          {LIFECYCLE_OPTIONS.map(({ bound, label }) => {
-            const selected = trackingEnabled === bound;
-            return (
-              <Pressable
-                key={label}
-                accessibilityRole="radio"
-                accessibilityState={{
-                  selected,
-                  checked: selected,
-                  disabled: lifecycleLocked,
-                }}
-                accessibilityLabel={label}
-                disabled={lifecycleLocked}
-                onPress={() => {
-                  markEdited();
-                  setTrackingEnabled(bound);
-                  // Unbound hides the picker; its last validity no longer applies.
-                  if (!bound) setIntervalValid(true);
-                }}
-                style={[
-                  styles.default,
-                  {
-                    backgroundColor: selected ? colors.accent : colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: selected ? colors.onAccent : colors.textPrimary,
-                  }}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        {trackingEnabled ? (
-          <>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>
-              Frequency
-            </Text>
-            <FrequencyPicker
-              value={intervalDays ?? BULK_IMPORT_DEFAULT_FREQUENCY}
-              onChange={(value) => {
-                markEdited();
-                setIntervalDays(value);
-              }}
-              onValidityChange={setIntervalValid}
-              disabled={lifecycleLocked}
-            />
-            <Text style={[styles.blurb, { color: colors.textSecondary }]}>
-              {BULK_BOUND_BLURB}
-            </Text>
-          </>
-        ) : null}
-      </View>
-
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Category override
-        </Text>
-        {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Batch category override"
-            onPress={() => setCategorySheetOpen(true)}
-            style={[
-              styles.picker,
-              styles.categoryChoice,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={{ color: colors.textPrimary }}>
-              {categories.find((row) => row.id === categoryId)?.name ??
-                "Uncategorized"}
-            </Text>
-          </Pressable>
-        ) : (
           <View
-            style={[
-              styles.picker,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Orbit participation"
+            style={styles.defaults}
           >
-            <Picker
-              accessibilityLabel="Batch category override"
-              selectedValue={categoryId ?? -1}
-              onValueChange={(value) => {
-                markEdited();
-                setCategoryId(value === -1 ? null : Number(value));
-              }}
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
-            >
-              <Picker.Item label="Uncategorized" value={-1} />
-              {categories.map((category) => (
-                <Picker.Item
-                  key={category.id}
-                  label={category.name}
-                  value={category.id}
-                />
-              ))}
-            </Picker>
+            {LIFECYCLE_OPTIONS.map(({ bound, label }) => {
+              const selected = trackingEnabled === bound;
+              return (
+                <Pressable
+                  key={label}
+                  accessibilityRole="radio"
+                  accessibilityState={{
+                    selected,
+                    checked: selected,
+                    disabled: lifecycleLocked,
+                  }}
+                  accessibilityLabel={label}
+                  disabled={lifecycleLocked}
+                  onPress={() => {
+                    markEdited();
+                    setTrackingEnabled(bound);
+                    // Unbound hides the picker; its last validity no longer applies.
+                    if (!bound) setIntervalValid(true);
+                  }}
+                  style={[
+                    styles.default,
+                    {
+                      backgroundColor: selected
+                        ? colors.accent
+                        : colors.surface,
+                      borderColor: selected ? colors.accent : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: selected ? colors.onAccent : colors.textPrimary,
+                    }}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-        )}
-        <CategoryChoiceSheet
-          visible={categorySheetOpen}
-          categories={categories}
-          selectedId={categoryId}
-          onSelect={(value) => {
-            markEdited();
-            setCategoryId(value);
-          }}
-          onRequestClose={() => setCategorySheetOpen(false)}
-        />
-      </View>
+          {trackingEnabled ? (
+            <>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Frequency
+              </Text>
+              <FrequencyPicker
+                value={intervalDays ?? BULK_IMPORT_DEFAULT_FREQUENCY}
+                onChange={(value) => {
+                  markEdited();
+                  setIntervalDays(value);
+                }}
+                onValidityChange={setIntervalValid}
+                disabled={lifecycleLocked}
+              />
+              <Text style={[styles.blurb, { color: colors.textSecondary }]}>
+                {BULK_BOUND_BLURB}
+              </Text>
+            </>
+          ) : null}
+        </View>
 
-      <Pressable
-        accessibilityRole="button"
-        disabled={importBlocked}
-        onPress={() => void onImport()}
-        style={[
-          styles.import,
-          {
-            backgroundColor: importBlocked ? colors.surface : colors.accent,
-            borderColor: importBlocked ? colors.border : colors.accent,
-          },
-        ]}
-      >
-        <Text
-          style={{
-            color: importBlocked ? colors.textSecondary : colors.onAccent,
-            fontWeight: "600",
-          }}
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Category override
+          </Text>
+          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Batch category override"
+              onPress={() => setCategorySheetOpen(true)}
+              style={[
+                styles.picker,
+                styles.categoryChoice,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={{ color: colors.textPrimary }}>
+                {categories.find((row) => row.id === categoryId)?.name ??
+                  "Uncategorized"}
+              </Text>
+            </Pressable>
+          ) : (
+            <View
+              style={[
+                styles.picker,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Picker
+                accessibilityLabel="Batch category override"
+                selectedValue={categoryId ?? -1}
+                onValueChange={(value) => {
+                  markEdited();
+                  setCategoryId(value === -1 ? null : Number(value));
+                }}
+                dropdownIconColor={colors.textSecondary}
+                style={{ color: colors.textPrimary }}
+              >
+                <Picker.Item label="Uncategorized" value={-1} />
+                {categories.map((category) => (
+                  <Picker.Item
+                    key={category.id}
+                    label={category.name}
+                    value={category.id}
+                  />
+                ))}
+              </Picker>
+            </View>
+          )}
+          <CategoryChoiceSheet
+            visible={categorySheetOpen}
+            categories={categories}
+            selectedId={categoryId}
+            onSelect={(value) => {
+              markEdited();
+              setCategoryId(value);
+            }}
+            onRequestClose={() => setCategorySheetOpen(false)}
+          />
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={importBlocked}
+          onPress={() => void onImport()}
+          style={[
+            styles.import,
+            {
+              backgroundColor: importBlocked ? colors.surface : colors.accent,
+              borderColor: importBlocked ? colors.border : colors.accent,
+            },
+          ]}
         >
-          {importLabel}
-        </Text>
-      </Pressable>
-      <ConsolidationPrompt
-        visible={consolidationRows !== null}
-        rows={consolidationRows ?? []}
-        onCombine={() => void onCombine()}
-        onKeepSeparate={onKeepSeparate}
-      />
-    </ScrollView>
+          <Text
+            style={{
+              color: importBlocked ? colors.textSecondary : colors.onAccent,
+              fontWeight: "600",
+            }}
+          >
+            {importLabel}
+          </Text>
+        </Pressable>
+        <ConsolidationPrompt
+          visible={consolidationRows !== null}
+          rows={consolidationRows ?? []}
+          onCombine={() => void onCombine()}
+          onKeepSeparate={onKeepSeparate}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: { padding: 16, gap: 16 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  back: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderRadius: 10,
-  },
-  title: { fontSize: 22, fontWeight: "700" },
   count: { fontSize: 18, fontWeight: "600" },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: "600" },

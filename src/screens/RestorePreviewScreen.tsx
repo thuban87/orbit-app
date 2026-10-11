@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { applyRestore, type RestoreMode } from "@/backup/restore-apply";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -267,242 +268,225 @@ export function RestorePreviewScreen({
   }, [applyRun, mode]);
 
   if (expired) {
+    // The expired preview's Back returns to Backup to choose the file again,
+    // the same reset as "Choose file again" (38.9 D-16 onBack override).
     return (
+      <View style={styles.root}>
+        <ShellAppBar
+          variant="child"
+          title="Restore preview"
+          onBack={returnToSelection}
+        />
+        <ScrollView
+          testID="restore-preview-expired"
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: bottomClearance },
+          ]}
+        >
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text
+              accessibilityRole="header"
+              style={[styles.title, { color: colors.textPrimary }]}
+            >
+              Preview expired
+            </Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              Choose the backup file again to preview it safely.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose file again"
+              onPress={returnToSelection}
+              style={[styles.primaryButton, { backgroundColor: colors.accent }]}
+            >
+              <Text style={{ color: colors.onAccent }}>Choose file again</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  const { preview } = route.params;
+  // Header Back is goBack(); the beforeRemove hold above keeps the user on this
+  // screen while a restore applies (38.9 D-16).
+  return (
+    <View style={styles.root}>
+      <ShellAppBar variant="child" title="Restore preview" />
       <ScrollView
-        testID="restore-preview-expired"
+        testID="restore-preview-screen"
         contentContainerStyle={[
           styles.content,
           { paddingBottom: bottomClearance },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to backup and restore"
-          onPress={returnToSelection}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
         <View
           style={[
             styles.card,
             { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+            Backup details
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Source date: {formatDateTimeMinuteOrFallback(preview.exportedAt)}
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Format version: {preview.backupFormatVersion}
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Encryption:{" "}
+            {preview.encrypted
+              ? "Protected with a passphrase"
+              : "Readable JSON"}
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Contacts: {preview.contactCount} · Related rows:{" "}
+            {preview.relatedRowCount} · Photos: {preview.photoCount} ·
+            Tombstones: {preview.tombstoneCount}
+          </Text>
+        </View>
+        {unavailableBackground ? (
+          <View
+            testID="restore-background-unavailable"
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+              Background not available
+            </Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              A background selected in this backup is no longer available. Orbit
+              will ask before switching to the default background instead.
+            </Text>
+          </View>
+        ) : null}
+        <Pressable
+          testID="restore-mode-merge"
+          accessibilityRole="radio"
+          accessibilityLabel="Merge backup"
+          accessibilityState={{
+            selected: mode === "merge",
+            disabled: applying || modeLocked,
+          }}
+          disabled={applying || modeLocked}
+          onPress={() => selectMode("merge")}
+          style={[
+            styles.card,
+            {
+              backgroundColor:
+                mode === "merge" ? colors.surfaceElevated : colors.surface,
+              borderColor: mode === "merge" ? colors.accent : colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+            Merge
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Add backup changes while keeping newer local data.
+          </Text>
+        </Pressable>
+        <Pressable
+          testID="restore-mode-replace"
+          accessibilityRole="radio"
+          accessibilityLabel="Replace all local data"
+          accessibilityState={{
+            selected: mode === "replace-all",
+            disabled: applying || modeLocked,
+          }}
+          disabled={applying || modeLocked}
+          onPress={() => selectMode("replace-all")}
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              borderColor:
+                mode === "replace-all" ? colors.danger : colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.danger }]}>
+            Replace all
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Replace local data with this backup. This is destructive.
+          </Text>
+        </Pressable>
+        {applyError ? (
+          <View
+            testID="restore-apply-error"
+            accessibilityLiveRegion="polite"
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              {applyError}
+            </Text>
+          </View>
+        ) : null}
+        {applying ? (
+          <View
+            testID="restore-applying"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Restoring backup"
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+              Restoring backup…
+            </Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              This can take a moment. Orbit will only change local data after
+              this backup is ready to apply.
+            </Text>
+          </View>
+        ) : null}
+        <Pressable
+          testID="restore-apply"
+          accessibilityRole="button"
+          accessibilityLabel={restoreApplyLabel(mode)}
+          accessibilityState={{ disabled: applying || modeLocked }}
+          disabled={applying || modeLocked}
+          onPress={() => void beginApply()}
+          style={[
+            styles.primaryButton,
+            {
+              backgroundColor:
+                mode === "replace-all" ? colors.danger : colors.accent,
+              opacity: applying || modeLocked ? 0.6 : 1,
+            },
           ]}
         >
           <Text
-            accessibilityRole="header"
-            style={[styles.title, { color: colors.textPrimary }]}
+            style={{
+              color: mode === "replace-all" ? colors.onDanger : colors.onAccent,
+            }}
           >
-            Preview expired
+            {restoreApplyLabel(mode)}
           </Text>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Choose the backup file again to preview it safely.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Choose file again"
-            onPress={returnToSelection}
-            style={[styles.primaryButton, { backgroundColor: colors.accent }]}
-          >
-            <Text style={{ color: colors.onAccent }}>Choose file again</Text>
-          </Pressable>
-        </View>
+        </Pressable>
       </ScrollView>
-    );
-  }
-
-  const { preview } = route.params;
-  return (
-    <ScrollView
-      testID="restore-preview-screen"
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: bottomClearance },
-      ]}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-        accessibilityState={{ disabled: applying }}
-        disabled={applying}
-        onPress={() => navigation.goBack()}
-        style={[
-          styles.back,
-          { borderColor: colors.border, opacity: applying ? 0.6 : 1 },
-        ]}
-      >
-        <Text style={{ color: colors.textSecondary }}>Back</Text>
-      </Pressable>
-      <Text
-        accessibilityRole="header"
-        style={[styles.title, { color: colors.textPrimary }]}
-      >
-        Restore preview
-      </Text>
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-          Backup details
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Source date: {formatDateTimeMinuteOrFallback(preview.exportedAt)}
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Format version: {preview.backupFormatVersion}
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Encryption:{" "}
-          {preview.encrypted ? "Protected with a passphrase" : "Readable JSON"}
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Contacts: {preview.contactCount} · Related rows:{" "}
-          {preview.relatedRowCount} · Photos: {preview.photoCount} · Tombstones:{" "}
-          {preview.tombstoneCount}
-        </Text>
-      </View>
-      {unavailableBackground ? (
-        <View
-          testID="restore-background-unavailable"
-          style={[
-            styles.card,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-            Background not available
-          </Text>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            A background selected in this backup is no longer available. Orbit
-            will ask before switching to the default background instead.
-          </Text>
-        </View>
-      ) : null}
-      <Pressable
-        testID="restore-mode-merge"
-        accessibilityRole="radio"
-        accessibilityLabel="Merge backup"
-        accessibilityState={{
-          selected: mode === "merge",
-          disabled: applying || modeLocked,
-        }}
-        disabled={applying || modeLocked}
-        onPress={() => selectMode("merge")}
-        style={[
-          styles.card,
-          {
-            backgroundColor:
-              mode === "merge" ? colors.surfaceElevated : colors.surface,
-            borderColor: mode === "merge" ? colors.accent : colors.border,
-          },
-        ]}
-      >
-        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-          Merge
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Add backup changes while keeping newer local data.
-        </Text>
-      </Pressable>
-      <Pressable
-        testID="restore-mode-replace"
-        accessibilityRole="radio"
-        accessibilityLabel="Replace all local data"
-        accessibilityState={{
-          selected: mode === "replace-all",
-          disabled: applying || modeLocked,
-        }}
-        disabled={applying || modeLocked}
-        onPress={() => selectMode("replace-all")}
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.surface,
-            borderColor: mode === "replace-all" ? colors.danger : colors.border,
-          },
-        ]}
-      >
-        <Text style={[styles.cardTitle, { color: colors.danger }]}>
-          Replace all
-        </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Replace local data with this backup. This is destructive.
-        </Text>
-      </Pressable>
-      {applyError ? (
-        <View
-          testID="restore-apply-error"
-          accessibilityLiveRegion="polite"
-          style={[
-            styles.card,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {applyError}
-          </Text>
-        </View>
-      ) : null}
-      {applying ? (
-        <View
-          testID="restore-applying"
-          accessibilityLiveRegion="polite"
-          accessibilityLabel="Restoring backup"
-          style={[
-            styles.card,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-            Restoring backup…
-          </Text>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            This can take a moment. Orbit will only change local data after this
-            backup is ready to apply.
-          </Text>
-        </View>
-      ) : null}
-      <Pressable
-        testID="restore-apply"
-        accessibilityRole="button"
-        accessibilityLabel={restoreApplyLabel(mode)}
-        accessibilityState={{ disabled: applying || modeLocked }}
-        disabled={applying || modeLocked}
-        onPress={() => void beginApply()}
-        style={[
-          styles.primaryButton,
-          {
-            backgroundColor:
-              mode === "replace-all" ? colors.danger : colors.accent,
-            opacity: applying || modeLocked ? 0.6 : 1,
-          },
-        ]}
-      >
-        <Text
-          style={{
-            color: mode === "replace-all" ? colors.onDanger : colors.onAccent,
-          }}
-        >
-          {restoreApplyLabel(mode)}
-        </Text>
-      </Pressable>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: { padding: 16, gap: 16 },
-  back: {
-    minHeight: 44,
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderRadius: 10,
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
   title: { fontSize: 24, fontWeight: "600", lineHeight: 29 },
   card: { borderWidth: 1, borderRadius: 10, padding: 16, gap: 8 },
   cardTitle: { fontSize: 20, fontWeight: "600", lineHeight: 24 },

@@ -64,10 +64,9 @@ const ThemePreviewScreen = __DEV__
 
 const Stack = createNativeStackNavigator<SettingsStackParamList>();
 
-function CustomFieldsRoute({
-  navigation,
-}: SettingsScreenProps<"CustomFields">) {
-  return <CustomFieldsScreen onBack={() => navigation.goBack()} />;
+// Custom Fields owns its single Back: the shared header (38.9 D-16).
+function CustomFieldsRoute() {
+  return <CustomFieldsScreen />;
 }
 
 function AIConnectionRoute({
@@ -75,7 +74,6 @@ function AIConnectionRoute({
 }: SettingsScreenProps<"AIConnection">) {
   return (
     <AIConnectionScreen
-      onBack={() => navigation.goBack()}
       onChooseModel={(lane) => navigation.navigate("AIModelPicker", { lane })}
     />
   );
@@ -94,30 +92,24 @@ function AIModelPickerRoute({
 }
 
 function AIPersonalizationRoute({
-  navigation,
   route,
 }: SettingsScreenProps<"AIPersonalization">) {
-  return (
-    <AIPersonalizationScreen
-      focus={route.params?.focus}
-      onBack={() => navigation.goBack()}
-    />
-  );
+  return <AIPersonalizationScreen focus={route.params?.focus} />;
 }
 
-function AIPermissionsRoute({
-  navigation,
-}: SettingsScreenProps<"AIPermissions">) {
-  return <AIPermissionsScreen onBack={() => navigation.goBack()} />;
+function AIPermissionsRoute() {
+  return <AIPermissionsScreen />;
 }
 
-function AIPreviewRoute({ navigation }: SettingsScreenProps<"AIPreview">) {
-  return <AIPreviewScreen onBack={() => navigation.goBack()} />;
+function AIPreviewRoute() {
+  return <AIPreviewScreen />;
 }
 
 // Header-chrome Settings children own a single Back: the ShellAppBar header
-// Back (RG-037 ui-accessibility/AUD-UIA-016, D-15). Their wrappers pass no
-// `onBack`; the header routes through `resolveBackIntent` (SHELL-03).
+// Back (RG-037 ui-accessibility/AUD-UIA-016, D-15; 38.9 D-16 for the Custom
+// Fields and AI wrappers above). Their wrappers pass no Back `onBack`; the
+// header routes through `resolveBackIntent` (SHELL-03). AIModelPicker's
+// `onBack` is its after-save return only.
 function SettingsInteractionsRoute() {
   return <SettingsInteractionsScreen />;
 }

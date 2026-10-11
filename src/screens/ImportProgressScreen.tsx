@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getSessionById, sessionRowCounts } from "@/db/import-session-read";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -30,7 +31,12 @@ import {
 
 const LOG_SCOPE = "import-progress";
 
-/** One calm, determinate surface for a chunked logical batch import. */
+/**
+ * One calm, determinate surface for a chunked logical batch import.
+ *
+ * Back is the shared header's only (38.9 D-16, D-07). It calls goBack(), so
+ * the beforeRemove hold below keeps the user here while a pass runs.
+ */
 export function ImportProgressScreen({
   navigation,
   route,
@@ -135,42 +141,37 @@ export function ImportProgressScreen({
     const readable = state.outcome === "summary-available";
     return (
       <View testID="import-progress-stopped" style={styles.root}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Import stopped
-        </Text>
-        <Text style={[styles.status, { color: colors.textSecondary }]}>
-          {readable
-            ? "Contacts already saved are kept. Nothing else will import until you continue."
-            : "Couldn't read this import. Contacts already saved are kept."}
-        </Text>
-        {readable ? (
-          <Pressable
-            testID="import-progress-view-summary"
-            accessibilityRole="button"
-            accessibilityLabel="View import summary"
-            onPress={() =>
-              navigation.replace("ImportComplete", {
-                sessionId: route.params.sessionId,
-              })
-            }
-            style={[styles.button, { backgroundColor: colors.accent }]}
+        <ShellAppBar variant="child" title="Import contacts" />
+        <View style={styles.body}>
+          <Text
+            accessibilityRole="header"
+            style={[styles.title, { color: colors.textPrimary }]}
           >
-            <Text style={{ color: colors.onAccent }}>View import summary</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            testID="import-progress-back"
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={() => navigation.goBack()}
-            style={[styles.button, { backgroundColor: colors.accent }]}
-          >
-            <Text style={{ color: colors.onAccent }}>Back</Text>
-          </Pressable>
-        )}
+            Import stopped
+          </Text>
+          <Text style={[styles.status, { color: colors.textSecondary }]}>
+            {readable
+              ? "Contacts already saved are kept. Nothing else will import until you continue."
+              : "Couldn't read this import. Contacts already saved are kept."}
+          </Text>
+          {readable ? (
+            <Pressable
+              testID="import-progress-view-summary"
+              accessibilityRole="button"
+              accessibilityLabel="View import summary"
+              onPress={() =>
+                navigation.replace("ImportComplete", {
+                  sessionId: route.params.sessionId,
+                })
+              }
+              style={[styles.button, { backgroundColor: colors.accent }]}
+            >
+              <Text style={{ color: colors.onAccent }}>
+                View import summary
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     );
   }
@@ -179,38 +180,42 @@ export function ImportProgressScreen({
   const progress = total === 0 ? 0 : Math.min(done / total, 1);
   return (
     <View style={styles.root}>
-      <Text
-        accessibilityRole="header"
-        style={[styles.title, { color: colors.textPrimary }]}
-      >
-        Importing… {done} of {total}
-      </Text>
-      <View style={[styles.track, { backgroundColor: colors.surface }]}>
-        <View
-          style={[
-            styles.bar,
-            { backgroundColor: colors.accent, width: `${progress * 100}%` },
-          ]}
-        />
-      </View>
-      <Text style={[styles.status, { color: colors.textSecondary }]}>
-        Photos may finish after contacts
-      </Text>
-      {backNotice ? (
+      <ShellAppBar variant="child" title="Import contacts" />
+      <View style={styles.body}>
         <Text
-          testID="import-progress-back-notice"
-          accessibilityLiveRegion="polite"
-          style={[styles.status, { color: colors.textPrimary }]}
+          accessibilityRole="header"
+          style={[styles.title, { color: colors.textPrimary }]}
         >
-          {IMPORT_PROGRESS_BACK_NOTICE}
+          Importing… {done} of {total}
         </Text>
-      ) : null}
+        <View style={[styles.track, { backgroundColor: colors.surface }]}>
+          <View
+            style={[
+              styles.bar,
+              { backgroundColor: colors.accent, width: `${progress * 100}%` },
+            ]}
+          />
+        </View>
+        <Text style={[styles.status, { color: colors.textSecondary }]}>
+          Photos may finish after contacts
+        </Text>
+        {backNotice ? (
+          <Text
+            testID="import-progress-back-notice"
+            accessibilityLiveRegion="polite"
+            style={[styles.status, { color: colors.textPrimary }]}
+          >
+            {IMPORT_PROGRESS_BACK_NOTICE}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
+  root: { flex: 1 },
+  body: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
   title: { fontSize: 22, fontWeight: "700", textAlign: "center" },
   track: { height: 8, borderRadius: 4, overflow: "hidden" },
   bar: { height: "100%", borderRadius: 4 },

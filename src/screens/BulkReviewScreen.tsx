@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   ignoreBulkReviewFlag,
   resolveBulkReviewFlag,
@@ -25,9 +26,7 @@ import { Logger } from "@/utils/logger";
 const LOG_SCOPE = "bulk-review-screen";
 
 /** Durable resolver for the import pipeline's previously count-only birthday flags. */
-export function BulkReviewScreen({
-  navigation,
-}: RootStackScreenProps<"BulkReview">) {
+export function BulkReviewScreen(_props: RootStackScreenProps<"BulkReview">) {
   const { colors } = useTheme();
   const [flags, setFlags] = useState<BulkReviewFlag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,179 +104,156 @@ export function BulkReviewScreen({
   };
 
   return (
-    <ScrollView
-      testID="bulk-review-screen"
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Review flagged items
-        </Text>
-      </View>
-
-      {loading ? (
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Loading flagged items…
-        </Text>
-      ) : null}
-      {failed ? (
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Couldn&apos;t load flagged items. Please try again.
-        </Text>
-      ) : null}
-      {!loading && !failed && flags.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-            Nothing to review
-          </Text>
+    <View style={styles.root}>
+      <ShellAppBar variant="child" title="Review flagged items" />
+      <ScrollView
+        testID="bulk-review-screen"
+        contentContainerStyle={styles.content}
+      >
+        {loading ? (
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            No flagged items right now.
+            Loading flagged items…
           </Text>
-        </View>
-      ) : null}
-      {flags.map((flag) => {
-        const isEditing = editingId === flag.importSessionRowId;
-        const saving = savingId === flag.importSessionRowId;
-        return (
-          <View
-            key={flag.importSessionRowId}
-            style={[
-              styles.card,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text
-              numberOfLines={1}
-              style={[styles.name, { color: colors.textPrimary }]}
+        ) : null}
+        {failed ? (
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Couldn&apos;t load flagged items. Please try again.
+          </Text>
+        ) : null}
+        {!loading && !failed && flags.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+              Nothing to review
+            </Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              No flagged items right now.
+            </Text>
+          </View>
+        ) : null}
+        {flags.map((flag) => {
+          const isEditing = editingId === flag.importSessionRowId;
+          const saving = savingId === flag.importSessionRowId;
+          return (
+            <View
+              key={flag.importSessionRowId}
+              style={[
+                styles.card,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
             >
-              {flag.contactName}
-            </Text>
-            <Text style={[styles.raw, { color: colors.textSecondary }]}>
-              Birthday: &quot;{flag.rawValue}&quot; — couldn&apos;t be read
-            </Text>
-            {isEditing ? (
-              <View style={styles.editor}>
-                <TextInput
-                  autoFocus
-                  value={birthdayInput}
-                  onChangeText={setBirthdayInput}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textPlaceholder}
-                  style={[
-                    styles.input,
-                    {
-                      color: colors.textPrimary,
-                      backgroundColor: colors.background,
-                      borderColor: birthdayInvalid
-                        ? colors.borderStrong
-                        : colors.border,
-                    },
-                  ]}
-                />
-                {birthdayInvalid ? (
-                  <Text style={[styles.error, { color: colors.danger }]}>
-                    Enter a real date (YYYY-MM-DD or MM-DD).
-                  </Text>
-                ) : null}
+              <Text
+                numberOfLines={1}
+                style={[styles.name, { color: colors.textPrimary }]}
+              >
+                {flag.contactName}
+              </Text>
+              <Text style={[styles.raw, { color: colors.textSecondary }]}>
+                Birthday: &quot;{flag.rawValue}&quot; — couldn&apos;t be read
+              </Text>
+              {isEditing ? (
+                <View style={styles.editor}>
+                  <TextInput
+                    autoFocus
+                    value={birthdayInput}
+                    onChangeText={setBirthdayInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.textPlaceholder}
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.textPrimary,
+                        backgroundColor: colors.background,
+                        borderColor: birthdayInvalid
+                          ? colors.borderStrong
+                          : colors.border,
+                      },
+                    ]}
+                  />
+                  {birthdayInvalid ? (
+                    <Text style={[styles.error, { color: colors.danger }]}>
+                      Enter a real date (YYYY-MM-DD or MM-DD).
+                    </Text>
+                  ) : null}
+                  <Pressable
+                    disabled={
+                      saving ||
+                      birthdayInvalid ||
+                      normalizedBirthday.stored === null
+                    }
+                    onPress={() => void onFix(flag)}
+                    style={[
+                      styles.primary,
+                      {
+                        backgroundColor:
+                          saving ||
+                          birthdayInvalid ||
+                          normalizedBirthday.stored === null
+                            ? colors.surfaceElevated
+                            : colors.accent,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          saving ||
+                          birthdayInvalid ||
+                          normalizedBirthday.stored === null
+                            ? colors.textSecondary
+                            : colors.onAccent,
+                      }}
+                    >
+                      Save birthday
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              <View style={styles.actions}>
                 <Pressable
-                  disabled={
-                    saving ||
-                    birthdayInvalid ||
-                    normalizedBirthday.stored === null
-                  }
-                  onPress={() => void onFix(flag)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Fix birthday for ${flag.contactName}`}
+                  disabled={saving}
+                  onPress={() => {
+                    setEditingId(flag.importSessionRowId);
+                    setBirthdayInput("");
+                  }}
                   style={[
-                    styles.primary,
+                    styles.secondary,
                     {
-                      backgroundColor:
-                        saving ||
-                        birthdayInvalid ||
-                        normalizedBirthday.stored === null
-                          ? colors.surfaceElevated
-                          : colors.accent,
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
                     },
                   ]}
                 >
-                  <Text
-                    style={{
-                      color:
-                        saving ||
-                        birthdayInvalid ||
-                        normalizedBirthday.stored === null
-                          ? colors.textSecondary
-                          : colors.onAccent,
-                    }}
-                  >
-                    Save birthday
-                  </Text>
+                  <Text style={{ color: colors.textPrimary }}>Fix</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ignore birthday for ${flag.contactName}`}
+                  disabled={saving}
+                  onPress={() => void onIgnore(flag)}
+                  style={[
+                    styles.secondary,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: colors.textPrimary }}>Ignore</Text>
                 </Pressable>
               </View>
-            ) : null}
-            <View style={styles.actions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Fix birthday for ${flag.contactName}`}
-                disabled={saving}
-                onPress={() => {
-                  setEditingId(flag.importSessionRowId);
-                  setBirthdayInput("");
-                }}
-                style={[
-                  styles.secondary,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Text style={{ color: colors.textPrimary }}>Fix</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Ignore birthday for ${flag.contactName}`}
-                disabled={saving}
-                onPress={() => void onIgnore(flag)}
-                style={[
-                  styles.secondary,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Text style={{ color: colors.textPrimary }}>Ignore</Text>
-              </Pressable>
             </View>
-          </View>
-        );
-      })}
-    </ScrollView>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: { padding: 16, gap: 14 },
-  header: { gap: 12, marginBottom: 4 },
-  back: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 40,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  title: { fontSize: 24, fontWeight: "700" },
   body: { fontSize: 15, lineHeight: 21 },
   empty: { paddingVertical: 28, gap: 4 },
   emptyTitle: { fontSize: 18, fontWeight: "600" },

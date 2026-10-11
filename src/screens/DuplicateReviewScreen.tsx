@@ -7,6 +7,7 @@ import {
   type CandidateItem,
 } from "@/components/CandidateCardGrid";
 import { ExistingContactChoiceSheet } from "@/components/ExistingContactChoice";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -310,19 +311,7 @@ export function DuplicateReviewScreen({
   const currentChoices = currentLink?.item.candidates ?? [];
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Review matches
-        </Text>
-      </View>
+      <ShellAppBar variant="child" title="Review matches" />
       {view === "loading" ? (
         <CandidateCardGrid
           items={[]}
@@ -381,15 +370,6 @@ export function DuplicateReviewScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { alignItems: "center", flexDirection: "row", gap: 12, padding: 16 },
-  back: {
-    borderRadius: 10,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 12,
-  },
-  title: { fontSize: 24, fontWeight: "600" },
   empty: { alignItems: "center", gap: 8, marginTop: 24, padding: 16 },
   emptyTitle: { fontSize: 18, fontWeight: "700" },
   retry: {

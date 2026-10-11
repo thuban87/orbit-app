@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -178,176 +179,162 @@ export function LegacyContactPickerScreen({
 
   return (
     <View testID="legacy-contact-picker-screen" style={styles.root}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Import contacts
-        </Text>
-      </View>
-
-      {loadState === "loading" ? (
-        <PickerMessage>Checking contact access…</PickerMessage>
-      ) : loadState === "priming" ? (
-        <PermissionMessage
-          actionLabel="Continue"
-          copy="Orbit reads your contacts on this device so you can choose which to import. Nothing leaves your device."
-          onAction={() => void requestAccess()}
-        />
-      ) : loadState === "denied" ? (
-        <PermissionMessage
-          actionLabel="Grant access"
-          copy="Contact access is needed to choose contacts to import."
-          onAction={() => void requestAccess()}
-          secondaryAction={
-            denialCount >= SETTINGS_ESCAPE_DENIAL_COUNT
-              ? {
-                  label: "Open Settings",
-                  copy: "If the dialog stopped appearing, open Settings.",
-                  onPress: () => void openContactsSettings(),
-                }
-              : undefined
-          }
-        />
-      ) : loadState === "permanent" ? (
-        <PermissionMessage
-          actionLabel="Open Settings"
-          copy="Contact access is off for Orbit. Allow it in Settings to choose contacts to import."
-          onAction={() => void openContactsSettings()}
-        />
-      ) : loadState === "error" ? (
-        <PickerMessage>
-          Couldn&apos;t read contacts. Please go back and try again.
-        </PickerMessage>
-      ) : (
-        <>
-          <TextInput
-            accessibilityLabel="Search contacts"
-            autoCapitalize="none"
-            onChangeText={setQuery}
-            placeholder="Search contacts"
-            placeholderTextColor={colors.textPlaceholder}
-            value={query}
-            style={[
-              styles.search,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
+      <ShellAppBar variant="child" title="Import contacts" />
+      <View style={styles.body}>
+        {loadState === "loading" ? (
+          <PickerMessage>Checking contact access…</PickerMessage>
+        ) : loadState === "priming" ? (
+          <PermissionMessage
+            actionLabel="Continue"
+            copy="Orbit reads your contacts on this device so you can choose which to import. Nothing leaves your device."
+            onAction={() => void requestAccess()}
           />
-          {omittedCount > 0 ? (
-            <Text style={[styles.notice, { color: colors.textSecondary }]}>
-              {omittedCount} selected contact
-              {omittedCount === 1 ? " is" : "s are"} no longer available.
-            </Text>
-          ) : null}
-          <FlatList
-            data={filteredRows}
-            keyExtractor={(row) => row.lookupKey}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <PickerMessage>No contacts on this device</PickerMessage>
+        ) : loadState === "denied" ? (
+          <PermissionMessage
+            actionLabel="Grant access"
+            copy="Contact access is needed to choose contacts to import."
+            onAction={() => void requestAccess()}
+            secondaryAction={
+              denialCount >= SETTINGS_ESCAPE_DENIAL_COUNT
+                ? {
+                    label: "Open Settings",
+                    copy: "If the dialog stopped appearing, open Settings.",
+                    onPress: () => void openContactsSettings(),
+                  }
+                : undefined
             }
-            renderItem={({ item }) => {
-              const selected = selectedLookupKeys.has(item.lookupKey);
-              return (
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityLabel={item.displayName}
-                  onPress={() => onToggleSelection(item.lookupKey)}
-                  style={[
-                    styles.row,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: selected ? colors.accent : colors.border,
-                    },
-                  ]}
-                >
-                  {item.photoThumbUri ? (
-                    <Image
-                      accessibilityLabel={`Photo of ${item.displayName}`}
-                      contentFit="cover"
-                      recyclingKey={item.lookupKey}
-                      source={{ uri: item.photoThumbUri }}
-                      style={styles.thumbnail}
-                    />
-                  ) : (
-                    <Avatar photo={null} name={item.displayName} size={40} />
-                  )}
-                  <View style={styles.rowCopy}>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.rowName, { color: colors.textPrimary }]}
-                    >
-                      {item.displayName}
-                    </Text>
-                    {item.primaryMethod ? (
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.subtitle,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {item.primaryMethod}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <View
+          />
+        ) : loadState === "permanent" ? (
+          <PermissionMessage
+            actionLabel="Open Settings"
+            copy="Contact access is off for Orbit. Allow it in Settings to choose contacts to import."
+            onAction={() => void openContactsSettings()}
+          />
+        ) : loadState === "error" ? (
+          <PickerMessage>
+            Couldn&apos;t read contacts. Please go back and try again.
+          </PickerMessage>
+        ) : (
+          <>
+            <TextInput
+              accessibilityLabel="Search contacts"
+              autoCapitalize="none"
+              onChangeText={setQuery}
+              placeholder="Search contacts"
+              placeholderTextColor={colors.textPlaceholder}
+              value={query}
+              style={[
+                styles.search,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+            />
+            {omittedCount > 0 ? (
+              <Text style={[styles.notice, { color: colors.textSecondary }]}>
+                {omittedCount} selected contact
+                {omittedCount === 1 ? " is" : "s are"} no longer available.
+              </Text>
+            ) : null}
+            <FlatList
+              data={filteredRows}
+              keyExtractor={(row) => row.lookupKey}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <PickerMessage>No contacts on this device</PickerMessage>
+              }
+              renderItem={({ item }) => {
+                const selected = selectedLookupKeys.has(item.lookupKey);
+                return (
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={item.displayName}
+                    onPress={() => onToggleSelection(item.lookupKey)}
                     style={[
-                      styles.checkbox,
+                      styles.row,
                       {
-                        borderColor: selected
-                          ? colors.accent
-                          : colors.borderStrong,
-                        backgroundColor: selected
-                          ? colors.accent
-                          : colors.surface,
+                        backgroundColor: colors.surface,
+                        borderColor: selected ? colors.accent : colors.border,
                       },
                     ]}
                   >
-                    <Text style={{ color: colors.onAccent }}>
-                      {selected ? "✓" : ""}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            }}
-          />
-        </>
-      )}
+                    {item.photoThumbUri ? (
+                      <Image
+                        accessibilityLabel={`Photo of ${item.displayName}`}
+                        contentFit="cover"
+                        recyclingKey={item.lookupKey}
+                        source={{ uri: item.photoThumbUri }}
+                        style={styles.thumbnail}
+                      />
+                    ) : (
+                      <Avatar photo={null} name={item.displayName} size={40} />
+                    )}
+                    <View style={styles.rowCopy}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.rowName, { color: colors.textPrimary }]}
+                      >
+                        {item.displayName}
+                      </Text>
+                      {item.primaryMethod ? (
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.subtitle,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {item.primaryMethod}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        {
+                          borderColor: selected
+                            ? colors.accent
+                            : colors.borderStrong,
+                          backgroundColor: selected
+                            ? colors.accent
+                            : colors.surface,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: colors.onAccent }}>
+                        {selected ? "✓" : ""}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+          </>
+        )}
 
-      {loadState === "ready" ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Import ${selectedCount} contacts`}
-          disabled={importing || selectedCount === 0}
-          onPress={() => void importSelected()}
-          style={[
-            styles.importButton,
-            {
-              backgroundColor: colors.accent,
-              opacity: importing || selectedCount === 0 ? 0.5 : 1,
-            },
-          ]}
-        >
-          <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
-            Import ({selectedCount})
-          </Text>
-        </Pressable>
-      ) : null}
+        {loadState === "ready" ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Import ${selectedCount} contacts`}
+            disabled={importing || selectedCount === 0}
+            onPress={() => void importSelected()}
+            style={[
+              styles.importButton,
+              {
+                backgroundColor: colors.accent,
+                opacity: importing || selectedCount === 0 ? 0.5 : 1,
+              },
+            ]}
+          >
+            <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+              Import ({selectedCount})
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -415,16 +402,8 @@ function PermissionMessage({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 16, gap: 16 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  back: {
-    minHeight: 44,
-    justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
-  title: { fontSize: 22, fontWeight: "700" },
+  root: { flex: 1 },
+  body: { flex: 1, padding: 16, gap: 16 },
   message: { flex: 1, justifyContent: "center", alignItems: "center" },
   permissionMessage: { flex: 1, justifyContent: "center", gap: 16 },
   permissionCopy: { fontSize: 16, lineHeight: 24, textAlign: "center" },

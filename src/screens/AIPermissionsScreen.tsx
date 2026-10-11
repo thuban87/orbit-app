@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button, ConfirmDialog, GlassSurface } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
@@ -66,10 +67,6 @@ const DEFAULT_ROWS: ReadonlyArray<{
   { category: "custom-field", key: "customField", label: "Custom fields" },
 ];
 
-interface AIPermissionsScreenProps {
-  onBack: () => void;
-}
-
 type PendingAction =
   | { kind: "disable" }
   | { kind: "enable"; impact: AiPermissionImpact }
@@ -91,7 +88,8 @@ function ReviewExistingLinkLabel() {
   );
 }
 
-export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
+/** Back is the shared header's only (38.9 D-16, D-07). */
+export function AIPermissionsScreen() {
   const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
@@ -253,12 +251,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Button role="tertiary" label="Back" onPress={onBack} />
-        <AppText accessibilityRole="header" role="display">
-          AI Data Permissions
-        </AppText>
-      </View>
+      <ShellAppBar variant="child" title="AI Data Permissions" />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -504,12 +497,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.md,
-    padding: SPACING.base,
   },
   // The "Review existing…" link meets the 44dp floor with its own box — no
   // overlapping hitSlop (38.4 RG-030; ui-accessibility/AUD-UIA-006).

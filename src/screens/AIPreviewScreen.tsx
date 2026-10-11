@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { resolvePrompt } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { ContactPicker } from "@/components/ContactPicker";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button, GlassSurface } from "@/components/ui";
 import { readPromptContext } from "@/db/ai-context-read";
 import { getAppSettings } from "@/db/app-settings-dao";
@@ -17,7 +18,6 @@ import {
   buildContactPromptReview,
   buildWholePromptPreview,
 } from "@/screens/settings-ai-logic";
-import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 
@@ -47,13 +47,14 @@ interface PreviewState {
   context: PromptContext;
 }
 
-export interface AIPreviewScreenProps {
-  onBack: () => void;
-}
-
-/** Local-only whole-prompt preview with an optional real-contact example. */
-export function AIPreviewScreen({ onBack }: AIPreviewScreenProps) {
-  const { colors } = useTheme();
+/**
+ * Local-only whole-prompt preview with an optional real-contact example.
+ *
+ * Back is the shared header's only (38.9 D-16, D-07). No opaque screen fill:
+ * the theme art shows behind the content, as on the other Settings screens
+ * (D-17).
+ */
+export function AIPreviewScreen() {
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
   const [preview, setPreview] = useState<PreviewState | null>(null);
@@ -122,26 +123,15 @@ export function AIPreviewScreen({ onBack }: AIPreviewScreenProps) {
     : null;
 
   return (
-    <>
+    <View style={styles.root}>
+      <ShellAppBar variant="child" title="Preview What Orbit Sends" />
       <ScrollView
         testID="ai-preview-screen"
         contentContainerStyle={[
           styles.content,
-          {
-            backgroundColor: colors.background,
-            paddingBottom: bottomClearance,
-          },
+          { paddingBottom: bottomClearance },
         ]}
       >
-        <View style={styles.header}>
-          <Button
-            role="tertiary"
-            label="Back"
-            accessibilityLabel="Back"
-            onPress={onBack}
-          />
-          <AppText role="heading">Preview What Orbit Sends</AppText>
-        </View>
         <AppText role="body">
           This is the complete resolved prompt. API keys and credentials are
           never part of it.
@@ -201,18 +191,16 @@ export function AIPreviewScreen({ onBack }: AIPreviewScreenProps) {
         onSelect={(contactId) => void chooseContact(contactId)}
         allowArchivedSearch={false}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: {
     flexGrow: 1,
     padding: SPACING.lg,
     gap: SPACING.lg,
-  },
-  header: {
-    gap: SPACING.md,
   },
   actions: {
     alignItems: "flex-start",

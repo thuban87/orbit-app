@@ -23,9 +23,17 @@
  * Every colour resolves through `useTheme().colors.*` — no colour literal
  * (CLAUDE.md). The executor comes from `getExecutor()` (Plan 07).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { type FieldDefDraft, FieldDefForm } from "@/components/FieldDefForm";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { createField, deleteOrQuarantineField } from "@/db/field-ddl";
@@ -53,11 +61,6 @@ import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "custom-fields";
-
-interface CustomFieldsScreenProps {
-  /** Return to the home shell (wired by HomeScreen's dependency-free route). */
-  onBack: () => void;
-}
 
 /** The active editor: creating a new def, or editing an existing one. */
 type Editor =
@@ -89,7 +92,14 @@ function confirmSummary(title: string, message: string): Promise<boolean> {
   return confirm({ title, message, confirmLabel: "Apply", dismissable: true });
 }
 
-export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
+/**
+ * Back is the shared header's (38.9 D-16, D-44), rendered once above the
+ * list/editor switch so every branch has it (review M4). With the field editor
+ * open, the header's `goBack()` fires `beforeRemove`, which the sub-editor
+ * guard below turns into the same dirty-aware close as the hardware Back
+ * (D-14); the editor's own Cancel keeps `requestClose` (D-61).
+ */
+export function CustomFieldsScreen() {
   const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
@@ -338,24 +348,24 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
     }
   }
 
-  // -- The create/edit form takes over the whole screen when open. -----------
-  if (editor !== null) {
-    if (editor.mode === "create") {
-      return (
-        <FieldDefForm
-          mode="create"
-          existingColNames={existingColNames}
-          nextDisplayOrder={nextDisplayOrder}
-          initialShareWithAi={newFieldShareDefault}
-          bottomClearance={bottomClearance}
-          onDirtyChange={setEditorDirty}
-          onSubmit={(def) => void handleCreate(def)}
-          onCancel={() => requestClose(closeEditor, editorDirty)}
-        />
-      );
-    }
+  // -- The create/edit form takes over the body when open; the header stays. --
+  let body: ReactNode;
+  if (editor !== null && editor.mode === "create") {
+    body = (
+      <FieldDefForm
+        mode="create"
+        existingColNames={existingColNames}
+        nextDisplayOrder={nextDisplayOrder}
+        initialShareWithAi={newFieldShareDefault}
+        bottomClearance={bottomClearance}
+        onDirtyChange={setEditorDirty}
+        onSubmit={(def) => void handleCreate(def)}
+        onCancel={() => requestClose(closeEditor, editorDirty)}
+      />
+    );
+  } else if (editor !== null) {
     const editing = editor.field;
-    return (
+    body = (
       <FieldDefForm
         mode="edit"
         field={editing}
@@ -365,209 +375,196 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
         onCancel={() => requestClose(closeEditor, editorDirty)}
       />
     );
+  } else {
+    body = (
+      <ScrollView
+        testID="custom-fields-screen"
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
+        <Pressable
+          testID="custom-fields-new"
+          accessibilityRole="button"
+          accessibilityLabel="New field"
+          onPress={() => setEditor({ mode: "create" })}
+          style={[
+            styles.newBtn,
+            { backgroundColor: colors.accent, borderColor: colors.accent },
+          ]}
+        >
+          <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+            New field
+          </Text>
+        </Pressable>
+
+        {active.length === 0 ? (
+          <Text
+            testID="custom-fields-empty"
+            style={[styles.emptyNote, { color: colors.textSecondary }]}
+          >
+            No custom fields yet. Add one to start describing your people.
+          </Text>
+        ) : (
+          active.map((field, index) => {
+            const empty = emptyById[field.id] === true;
+            return (
+              <View
+                key={field.id}
+                testID={`field-row-${field.id}`}
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.rowMain}>
+                  <Text
+                    style={[styles.rowLabel, { color: colors.textPrimary }]}
+                  >
+                    {field.label}
+                  </Text>
+                  <Text
+                    style={[styles.rowType, { color: colors.textSecondary }]}
+                  >
+                    {field.type}
+                  </Text>
+                </View>
+                <View style={styles.rowActions}>
+                  <Pressable
+                    testID={`field-move-up-${field.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move ${field.label} up`}
+                    disabled={index === 0}
+                    onPress={() => void moveField(index, -1)}
+                    style={[styles.iconBtn, { borderColor: colors.border }]}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          index === 0 ? colors.border : colors.textSecondary,
+                      }}
+                    >
+                      Up
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    testID={`field-move-down-${field.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move ${field.label} down`}
+                    disabled={index === active.length - 1}
+                    onPress={() => void moveField(index, 1)}
+                    style={[styles.iconBtn, { borderColor: colors.border }]}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          index === active.length - 1
+                            ? colors.border
+                            : colors.textSecondary,
+                      }}
+                    >
+                      Down
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    testID={`field-edit-${field.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit ${field.label}`}
+                    onPress={() => setEditor({ mode: "edit", field })}
+                    style={[styles.iconBtn, { borderColor: colors.border }]}
+                  >
+                    <Text style={{ color: colors.accentText }}>Edit</Text>
+                  </Pressable>
+                  <Pressable
+                    testID={`field-delete-${field.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${empty ? "Delete" : "Quarantine"} ${
+                      field.label
+                    }`}
+                    onPress={() => void onDeletePress(field)}
+                    style={[
+                      styles.iconBtn,
+                      { borderColor: colors.borderStrong },
+                    ]}
+                  >
+                    <Text style={{ color: colors.textPrimary }}>
+                      {empty ? "Delete" : "Quarantine"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })
+        )}
+
+        {quarantined.length > 0 ? (
+          <View
+            testID="custom-fields-quarantined"
+            style={styles.quarantineSection}
+          >
+            <Text
+              style={[styles.sectionHeading, { color: colors.textSecondary }]}
+            >
+              Quarantined
+            </Text>
+            {quarantined.map((field) => (
+              <View
+                key={field.id}
+                testID={`quarantined-row-${field.id}`}
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.borderStrong,
+                  },
+                ]}
+              >
+                <View style={styles.rowMain}>
+                  <Text
+                    style={[styles.rowLabel, { color: colors.textPrimary }]}
+                  >
+                    {field.label}
+                  </Text>
+                  <Text
+                    style={[styles.rowType, { color: colors.textSecondary }]}
+                  >
+                    quarantined · {field.type}
+                  </Text>
+                </View>
+                <Pressable
+                  testID={`field-restore-${field.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Restore ${field.label}`}
+                  onPress={() => void doRestore(field)}
+                  style={[styles.iconBtn, { borderColor: colors.accent }]}
+                >
+                  <Text style={{ color: colors.accentText }}>Restore</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </ScrollView>
+    );
   }
 
   return (
-    <ScrollView
-      testID="custom-fields-screen"
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: bottomClearance },
-      ]}
-    >
-      <View style={styles.header}>
-        <Pressable
-          testID="custom-fields-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack}
-          style={[styles.backBtn, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Custom Fields
-        </Text>
-      </View>
-
-      <Pressable
-        testID="custom-fields-new"
-        accessibilityRole="button"
-        accessibilityLabel="New field"
-        onPress={() => setEditor({ mode: "create" })}
-        style={[
-          styles.newBtn,
-          { backgroundColor: colors.accent, borderColor: colors.accent },
-        ]}
-      >
-        <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
-          New field
-        </Text>
-      </Pressable>
-
-      {active.length === 0 ? (
-        <Text
-          testID="custom-fields-empty"
-          style={[styles.emptyNote, { color: colors.textSecondary }]}
-        >
-          No custom fields yet. Add one to start describing your people.
-        </Text>
-      ) : (
-        active.map((field, index) => {
-          const empty = emptyById[field.id] === true;
-          return (
-            <View
-              key={field.id}
-              testID={`field-row-${field.id}`}
-              style={[
-                styles.row,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                  {field.label}
-                </Text>
-                <Text style={[styles.rowType, { color: colors.textSecondary }]}>
-                  {field.type}
-                </Text>
-              </View>
-              <View style={styles.rowActions}>
-                <Pressable
-                  testID={`field-move-up-${field.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Move ${field.label} up`}
-                  disabled={index === 0}
-                  onPress={() => void moveField(index, -1)}
-                  style={[styles.iconBtn, { borderColor: colors.border }]}
-                >
-                  <Text
-                    style={{
-                      color: index === 0 ? colors.border : colors.textSecondary,
-                    }}
-                  >
-                    Up
-                  </Text>
-                </Pressable>
-                <Pressable
-                  testID={`field-move-down-${field.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Move ${field.label} down`}
-                  disabled={index === active.length - 1}
-                  onPress={() => void moveField(index, 1)}
-                  style={[styles.iconBtn, { borderColor: colors.border }]}
-                >
-                  <Text
-                    style={{
-                      color:
-                        index === active.length - 1
-                          ? colors.border
-                          : colors.textSecondary,
-                    }}
-                  >
-                    Down
-                  </Text>
-                </Pressable>
-                <Pressable
-                  testID={`field-edit-${field.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit ${field.label}`}
-                  onPress={() => setEditor({ mode: "edit", field })}
-                  style={[styles.iconBtn, { borderColor: colors.border }]}
-                >
-                  <Text style={{ color: colors.accentText }}>Edit</Text>
-                </Pressable>
-                <Pressable
-                  testID={`field-delete-${field.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${empty ? "Delete" : "Quarantine"} ${
-                    field.label
-                  }`}
-                  onPress={() => void onDeletePress(field)}
-                  style={[styles.iconBtn, { borderColor: colors.borderStrong }]}
-                >
-                  <Text style={{ color: colors.textPrimary }}>
-                    {empty ? "Delete" : "Quarantine"}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          );
-        })
-      )}
-
-      {quarantined.length > 0 ? (
-        <View
-          testID="custom-fields-quarantined"
-          style={styles.quarantineSection}
-        >
-          <Text
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Quarantined
-          </Text>
-          {quarantined.map((field) => (
-            <View
-              key={field.id}
-              testID={`quarantined-row-${field.id}`}
-              style={[
-                styles.row,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.borderStrong,
-                },
-              ]}
-            >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                  {field.label}
-                </Text>
-                <Text style={[styles.rowType, { color: colors.textSecondary }]}>
-                  quarantined · {field.type}
-                </Text>
-              </View>
-              <Pressable
-                testID={`field-restore-${field.id}`}
-                accessibilityRole="button"
-                accessibilityLabel={`Restore ${field.label}`}
-                onPress={() => void doRestore(field)}
-                style={[styles.iconBtn, { borderColor: colors.accent }]}
-              >
-                <Text style={{ color: colors.accentText }}>Restore</Text>
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </ScrollView>
+    <View style={styles.root}>
+      <ShellAppBar variant="child" title="Custom Fields" />
+      {body}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: {
     padding: 16,
     gap: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
   },
   newBtn: {
     borderWidth: 1,

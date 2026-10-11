@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { connectOpenRouter } from "@/ai/openrouter-oauth";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button, ConfirmDialog, GlassSurface } from "@/components/ui";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import {
@@ -49,14 +50,11 @@ const LANE_NAMES: Record<AiCloudProviderId, string> = {
 };
 
 export interface AIConnectionScreenProps {
-  onBack: () => void;
   onChooseModel: (lane: AiCloudProviderId) => void;
 }
 
-export function AIConnectionScreen({
-  onBack,
-  onChooseModel,
-}: AIConnectionScreenProps) {
+/** Back is the shared header's only (38.9 D-16, D-07). */
+export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
   const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
@@ -340,12 +338,7 @@ export function AIConnectionScreen({
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Button role="tertiary" label="Back" onPress={onBack} />
-        <AppText accessibilityRole="header" role="display">
-          AI Connections
-        </AppText>
-      </View>
+      <ShellAppBar variant="child" title="AI Connections" />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -533,12 +526,6 @@ const styles = StyleSheet.create({
   },
   content: { gap: SPACING.xl, padding: SPACING.base },
   copy: { flex: 1, gap: SPACING.xs },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.md,
-    padding: SPACING.base,
-  },
   input: {
     borderRadius: RADII.md,
     borderWidth: StyleSheet.hairlineWidth,

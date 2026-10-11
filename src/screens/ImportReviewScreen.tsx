@@ -22,6 +22,7 @@ import {
 } from "@/components/contact-methods-editor-model";
 import { LinkExistingChoiceButton } from "@/components/ExistingContactChoice";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader, listCategories } from "@/db/contact-read";
@@ -393,311 +394,302 @@ export function ImportReviewScreen({
     }
   }
 
+  // The shared header's Back calls goBack(), which the import leave guard
+  // intercepts (beforeRemove) exactly as before (38.9 D-16).
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Review import
-        </Text>
-      </View>
-      {previewUri ? (
-        <Image
-          source={{ uri: previewUri }}
-          contentFit="cover"
-          style={styles.photo}
-          onError={() => setPhotoRelPath(null)}
-        />
-      ) : (
-        <Avatar photo={null} name={name} size={96} />
-      )}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Name
-        </Text>
-        <TextInput
-          value={name}
-          onChangeText={(value) => {
-            setEdited(true);
-            setName(value);
-          }}
-          placeholder="Their name"
-          placeholderTextColor={colors.textPlaceholder}
-          style={[
-            styles.input,
-            {
-              color: colors.textPrimary,
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        />
-      </View>
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Orbit participation
-        </Text>
-        {/* 38.4 review Lane C WR-03: D-57 made this choice decide reminders,
-            so TalkBack hears it as a radio group with the selected option, as
-            on bulk setup (Plan 21). */}
-        <View
-          accessibilityRole="radiogroup"
-          accessibilityLabel="Orbit participation"
-          style={styles.lifecycle}
-        >
-          {([true, false] as const).map((enabled) => {
-            const selected = trackingEnabled === enabled;
-            const label = enabled ? "Bound" : "Unbound";
-            return (
-              <Pressable
-                key={String(enabled)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected, checked: selected }}
-                accessibilityLabel={label}
-                onPress={() => {
-                  setEdited(true);
-                  setTrackingEnabled(enabled);
-                  // Unbound hides the picker; its last validity no longer applies.
-                  if (!enabled) setIntervalValid(true);
-                }}
-                style={[
-                  styles.choice,
-                  {
-                    backgroundColor: selected ? colors.accent : colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: selected ? colors.onAccent : colors.textPrimary,
-                  }}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Category
-        </Text>
-        {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Category"
-            onPress={() => setCategorySheetOpen(true)}
-            style={[
-              styles.picker,
-              styles.categoryChoice,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={{ color: colors.textPrimary }}>
-              {categories.find((row) => row.id === categoryId)?.name ??
-                "Uncategorized"}
-            </Text>
-          </Pressable>
+    <View style={styles.root}>
+      <ShellAppBar variant="child" title="Review import" />
+      <ScrollView contentContainerStyle={styles.content}>
+        {previewUri ? (
+          <Image
+            source={{ uri: previewUri }}
+            contentFit="cover"
+            style={styles.photo}
+            onError={() => setPhotoRelPath(null)}
+          />
         ) : (
-          <View
-            style={[
-              styles.picker,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              selectedValue={categoryId ?? -1}
-              onValueChange={(value) => {
-                setEdited(true);
-                setCategoryId(value === -1 ? null : Number(value));
-              }}
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
-            >
-              <Picker.Item label="Uncategorized" value={-1} />
-              {categories.map((category) => (
-                <Picker.Item
-                  key={category.id}
-                  label={category.name}
-                  value={category.id}
-                />
-              ))}
-            </Picker>
-          </View>
+          <Avatar photo={null} name={name} size={96} />
         )}
-        <CategoryChoiceSheet
-          visible={categorySheetOpen}
-          categories={categories}
-          selectedId={categoryId}
-          onSelect={(value) => {
-            setEdited(true);
-            setCategoryId(value);
-          }}
-          onRequestClose={() => setCategorySheetOpen(false)}
-        />
-      </View>
-      {trackingEnabled ? (
         <View style={styles.field}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Frequency
+            Name
           </Text>
-          <FrequencyPicker
-            value={intervalDays ?? FREQUENCY_DAYS.Monthly}
-            onChange={(value) => {
+          <TextInput
+            value={name}
+            onChangeText={(value) => {
               setEdited(true);
-              setIntervalDays(value);
+              setName(value);
             }}
-            onValidityChange={setIntervalValid}
-          />
-        </View>
-      ) : null}
-      <View style={styles.field}>
-        <ContactMethodsEditor
-          methods={methods}
-          onAdd={(type) => {
-            setEdited(true);
-            setMethods((current) => addMethodDraft(current, type, newUid()));
-          }}
-          onUpdate={(uid, patch) => {
-            setEdited(true);
-            setMethods((current) => updateMethodDraft(current, uid, patch));
-          }}
-          onRemove={(uid) => {
-            setEdited(true);
-            setMethods((current) => removeMethodDraft(current, uid));
-          }}
-          onChoosePrimary={(uid) => {
-            setEdited(true);
-            setMethods((current) => choosePrimary(current, uid));
-          }}
-        />
-      </View>
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Birthday
-        </Text>
-        <TextInput
-          value={birthdayInput}
-          onChangeText={(value) => {
-            setEdited(true);
-            setBirthdayInput(value);
-          }}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.textPlaceholder}
-          style={[
-            styles.input,
-            {
-              color: colors.textPrimary,
-              backgroundColor: colors.surface,
-              borderColor: birthdayInvalid
-                ? colors.borderStrong
-                : colors.border,
-            },
-          ]}
-        />
-        {birthdayInvalid ? (
-          <Text style={[styles.birthdayError, { color: colors.danger }]}>
-            Enter a real date (YYYY-MM-DD or MM-DD).
-          </Text>
-        ) : null}
-      </View>
-      <Pressable
-        disabled={!canImport}
-        onPress={() => void onImport()}
-        style={[
-          styles.import,
-          {
-            backgroundColor: canImport ? colors.accent : colors.surface,
-            borderColor: canImport ? colors.accent : colors.border,
-          },
-        ]}
-      >
-        <Text
-          style={{
-            color: canImport ? colors.onAccent : colors.textSecondary,
-            fontWeight: "600",
-          }}
-        >
-          Import
-        </Text>
-      </Pressable>
-      <RegisteredModal
-        visible={duplicateOutcome !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDuplicateOutcome(null)}
-      >
-        <View style={styles.modalRoot}>
-          <View
+            placeholder="Their name"
+            placeholderTextColor={colors.textPlaceholder}
             style={[
-              styles.duplicateSheet,
+              styles.input,
               {
-                backgroundColor: colors.surfaceElevated,
+                color: colors.textPrimary,
+                backgroundColor: colors.surface,
                 borderColor: colors.border,
               },
             ]}
+          />
+        </View>
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Orbit participation
+          </Text>
+          {/* 38.4 review Lane C WR-03: D-57 made this choice decide reminders,
+            so TalkBack hears it as a radio group with the selected option, as
+            on bulk setup (Plan 21). */}
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Orbit participation"
+            style={styles.lifecycle}
           >
-            <Text
-              style={[styles.duplicateTitle, { color: colors.textPrimary }]}
-            >
-              We found someone who might already be in Orbit.
-            </Text>
-            {duplicateChoices.map((choice) => (
-              <LinkExistingChoiceButton
-                key={choice.contactId}
-                choice={choice}
-                single={duplicateChoices.length === 1}
-                disabled={saving}
-                onPress={() => void linkToExisting(choice)}
-              />
-            ))}
-            <Pressable
-              disabled={saving}
-              onPress={() => void onImportAsNewFromInterrupt()}
-              style={[
-                styles.duplicateChoice,
-                { borderColor: colors.border, backgroundColor: colors.surface },
-              ]}
-            >
-              <Text style={{ color: colors.textPrimary }}>Import as New</Text>
-            </Pressable>
-            {duplicateChoices.length > 1 ? (
-              <Pressable
-                disabled={saving}
-                onPress={() => void skipDuplicate()}
-                style={[styles.duplicateChoice, { borderColor: colors.border }]}
-              >
-                <Text style={{ color: colors.textSecondary }}>Skip</Text>
-              </Pressable>
-            ) : null}
+            {([true, false] as const).map((enabled) => {
+              const selected = trackingEnabled === enabled;
+              const label = enabled ? "Bound" : "Unbound";
+              return (
+                <Pressable
+                  key={String(enabled)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected, checked: selected }}
+                  accessibilityLabel={label}
+                  onPress={() => {
+                    setEdited(true);
+                    setTrackingEnabled(enabled);
+                    // Unbound hides the picker; its last validity no longer applies.
+                    if (!enabled) setIntervalValid(true);
+                  }}
+                  style={[
+                    styles.choice,
+                    {
+                      backgroundColor: selected
+                        ? colors.accent
+                        : colors.surface,
+                      borderColor: selected ? colors.accent : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: selected ? colors.onAccent : colors.textPrimary,
+                    }}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
-      </RegisteredModal>
-    </ScrollView>
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Category
+          </Text>
+          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Category"
+              onPress={() => setCategorySheetOpen(true)}
+              style={[
+                styles.picker,
+                styles.categoryChoice,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={{ color: colors.textPrimary }}>
+                {categories.find((row) => row.id === categoryId)?.name ??
+                  "Uncategorized"}
+              </Text>
+            </Pressable>
+          ) : (
+            <View
+              style={[
+                styles.picker,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Picker
+                selectedValue={categoryId ?? -1}
+                onValueChange={(value) => {
+                  setEdited(true);
+                  setCategoryId(value === -1 ? null : Number(value));
+                }}
+                dropdownIconColor={colors.textSecondary}
+                style={{ color: colors.textPrimary }}
+              >
+                <Picker.Item label="Uncategorized" value={-1} />
+                {categories.map((category) => (
+                  <Picker.Item
+                    key={category.id}
+                    label={category.name}
+                    value={category.id}
+                  />
+                ))}
+              </Picker>
+            </View>
+          )}
+          <CategoryChoiceSheet
+            visible={categorySheetOpen}
+            categories={categories}
+            selectedId={categoryId}
+            onSelect={(value) => {
+              setEdited(true);
+              setCategoryId(value);
+            }}
+            onRequestClose={() => setCategorySheetOpen(false)}
+          />
+        </View>
+        {trackingEnabled ? (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Frequency
+            </Text>
+            <FrequencyPicker
+              value={intervalDays ?? FREQUENCY_DAYS.Monthly}
+              onChange={(value) => {
+                setEdited(true);
+                setIntervalDays(value);
+              }}
+              onValidityChange={setIntervalValid}
+            />
+          </View>
+        ) : null}
+        <View style={styles.field}>
+          <ContactMethodsEditor
+            methods={methods}
+            onAdd={(type) => {
+              setEdited(true);
+              setMethods((current) => addMethodDraft(current, type, newUid()));
+            }}
+            onUpdate={(uid, patch) => {
+              setEdited(true);
+              setMethods((current) => updateMethodDraft(current, uid, patch));
+            }}
+            onRemove={(uid) => {
+              setEdited(true);
+              setMethods((current) => removeMethodDraft(current, uid));
+            }}
+            onChoosePrimary={(uid) => {
+              setEdited(true);
+              setMethods((current) => choosePrimary(current, uid));
+            }}
+          />
+        </View>
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Birthday
+          </Text>
+          <TextInput
+            value={birthdayInput}
+            onChangeText={(value) => {
+              setEdited(true);
+              setBirthdayInput(value);
+            }}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.textPlaceholder}
+            style={[
+              styles.input,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.surface,
+                borderColor: birthdayInvalid
+                  ? colors.borderStrong
+                  : colors.border,
+              },
+            ]}
+          />
+          {birthdayInvalid ? (
+            <Text style={[styles.birthdayError, { color: colors.danger }]}>
+              Enter a real date (YYYY-MM-DD or MM-DD).
+            </Text>
+          ) : null}
+        </View>
+        <Pressable
+          disabled={!canImport}
+          onPress={() => void onImport()}
+          style={[
+            styles.import,
+            {
+              backgroundColor: canImport ? colors.accent : colors.surface,
+              borderColor: canImport ? colors.accent : colors.border,
+            },
+          ]}
+        >
+          <Text
+            style={{
+              color: canImport ? colors.onAccent : colors.textSecondary,
+              fontWeight: "600",
+            }}
+          >
+            Import
+          </Text>
+        </Pressable>
+        <RegisteredModal
+          visible={duplicateOutcome !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDuplicateOutcome(null)}
+        >
+          <View style={styles.modalRoot}>
+            <View
+              style={[
+                styles.duplicateSheet,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.duplicateTitle, { color: colors.textPrimary }]}
+              >
+                We found someone who might already be in Orbit.
+              </Text>
+              {duplicateChoices.map((choice) => (
+                <LinkExistingChoiceButton
+                  key={choice.contactId}
+                  choice={choice}
+                  single={duplicateChoices.length === 1}
+                  disabled={saving}
+                  onPress={() => void linkToExisting(choice)}
+                />
+              ))}
+              <Pressable
+                disabled={saving}
+                onPress={() => void onImportAsNewFromInterrupt()}
+                style={[
+                  styles.duplicateChoice,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: colors.surface,
+                  },
+                ]}
+              >
+                <Text style={{ color: colors.textPrimary }}>Import as New</Text>
+              </Pressable>
+              {duplicateChoices.length > 1 ? (
+                <Pressable
+                  disabled={saving}
+                  onPress={() => void skipDuplicate()}
+                  style={[
+                    styles.duplicateChoice,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <Text style={{ color: colors.textSecondary }}>Skip</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        </RegisteredModal>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   content: { padding: 16, gap: 16 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  back: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderRadius: 10,
-  },
-  title: { fontSize: 22, fontWeight: "700" },
   photo: { width: 96, height: 96, borderRadius: 48 },
   field: { gap: 8 },
   birthdayError: { fontSize: 13, fontWeight: "600" },
