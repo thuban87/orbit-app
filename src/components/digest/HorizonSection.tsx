@@ -7,6 +7,7 @@ import {
   DigestListItem,
 } from "@/components/digest/DigestListTransition";
 import { AppText } from "@/components/ui/AppText";
+import { NEVER_CONTACTED } from "@/constants/glossary";
 import type { DashboardRow } from "@/db/dashboard-read";
 import type { OverlookedRow } from "@/db/digest-read";
 import type { UpcomingBirthday } from "@/logic/digest-composition";
@@ -137,7 +138,7 @@ export function HorizonSection({
 
       {never.present ? (
         <View testID="digest-horizon-never-contacted" style={styles.group}>
-          <AppText role="label">Never Contacted</AppText>
+          <AppText role="label">{NEVER_CONTACTED}</AppText>
           <AppText role="caption" style={{ color: colors.textSecondary }}>
             {never.count === 1
               ? "1 person has never been contacted"
@@ -203,7 +204,7 @@ function CompactContactRow({
       style={styles.row}
     >
       <View
-        accessibilityLabel={status ? `${status} status` : "Not yet contacted"}
+        accessibilityLabel={status ? `${status} status` : NEVER_CONTACTED}
         style={[
           styles.avatarRing,
           {

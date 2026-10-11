@@ -1,3 +1,4 @@
+import { FAVORITE, FAVORITES, NEVER_CONTACTED } from "@/constants/glossary";
 import {
   isSystemRuleDraftValid,
   type SystemOverrideIntent,
@@ -45,12 +46,12 @@ export type SystemBuilderDraft = {
 
 const FAMILY_LABELS: Record<SystemRuleFamily, string> = {
   category: "Category",
-  favorite: "Favorite",
+  favorite: FAVORITE,
   "needs-attention": "Needs Attention",
   gravity: "Gravity",
   "social-battery": "Social Battery",
   "contact-frequency": "Contact Frequency",
-  "not-contacted": "Not Contacted",
+  "not-contacted": NEVER_CONTACTED,
   snoozed: "Snoozed",
 };
 
@@ -58,7 +59,7 @@ export const RULE_FAMILY_OPTIONS: Record<
   Exclude<SystemRuleFamily, "category">,
   readonly { value: string; label: string }[]
 > = {
-  favorite: [{ value: FAVORITE_RULE_VALUE, label: "Favorites" }],
+  favorite: [{ value: FAVORITE_RULE_VALUE, label: FAVORITES }],
   "needs-attention": [{ value: "on", label: "Needs attention" }],
   gravity: GRAVITY_TIERS.map((tier) => ({
     value: tier.name,
@@ -78,7 +79,7 @@ export const RULE_FAMILY_OPTIONS: Record<
     label: value[0].toLocaleUpperCase() + value.slice(1),
   })),
   "not-contacted": [
-    { value: NOT_CONTACTED_RULE_VALUE, label: "Not contacted" },
+    { value: NOT_CONTACTED_RULE_VALUE, label: NEVER_CONTACTED },
   ],
   snoozed: [{ value: SNOOZED_RULE_VALUE, label: "Snoozed" }],
 };

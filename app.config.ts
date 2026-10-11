@@ -40,8 +40,8 @@ const widgetConfig: WithAndroidWidgetsParams = {
   widgets: [
     {
       name: "OrbitFavourites",
-      label: "Orbit — Favourites",
-      description: "Your favourite people, at a glance.",
+      label: "Orbit — Favorites",
+      description: "Your favorite people, at a glance.",
       minWidth: "250dp",
       minHeight: "110dp",
       targetCellWidth: 4,

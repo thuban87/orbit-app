@@ -182,7 +182,7 @@ describe("profile lifecycle actions", () => {
     expect(unbindConfirmation("Ada")).toEqual({
       title: "Unbind Ada?",
       message:
-        "This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.",
+        "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved cadence stay.",
     });
   });
 

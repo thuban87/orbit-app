@@ -1,5 +1,6 @@
 import type { StatusDisplayState } from "@/components/contact-card-ring";
 import { statusDisplayLabel } from "@/components/icons/status-display-label";
+import { FAVORITE } from "@/constants/glossary";
 import type { DashboardSearchSourceKind } from "@/logic/dashboard-search-match";
 import {
   calendarDaysBetween,
@@ -104,7 +105,7 @@ export function buildRowAccessibilityDescription({
     name,
     category ?? "No category",
     recency,
-    isFavourite ? "Favourite" : "Not favourite",
+    isFavourite ? FAVORITE : "Not favorite",
     statusDisplayLabel(displayState),
   ]
     .map((part) => `${part}.`)

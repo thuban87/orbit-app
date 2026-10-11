@@ -1,4 +1,5 @@
 /** Closed System identities; independent of Dashboard selection/search/sort state. */
+import { FAVORITES, NEVER_CONTACTED } from "@/constants/glossary";
 import {
   assertOrreryLastSystem,
   ORRERY_BUILTIN_SYSTEM_IDS,
@@ -36,9 +37,9 @@ export const ALL_CONTACTS_SYSTEM: OrrerySystemRef = {
 };
 export const BUILTIN_SYSTEM_LABELS: Record<OrreryBuiltinId, string> = {
   "all-contacts": "All Contacts",
-  favorites: "Favorites",
+  favorites: FAVORITES,
   "needs-attention": "Needs Attention",
-  "not-contacted": "Not Contacted",
+  "not-contacted": NEVER_CONTACTED,
   snoozed: "Snoozed",
   chargers: "Chargers",
 };

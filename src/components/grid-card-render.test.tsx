@@ -179,7 +179,7 @@ describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
       },
     ],
   };
-  const summary = "Alex. No category. Yesterday. Not favourite. Stable.";
+  const summary = "Alex. No category. Yesterday. Not favorite. Stable.";
 
   function rootLabel(nodes: readonly Node[]): unknown {
     return nodes[0]?.props.accessibilityLabel;

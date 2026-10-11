@@ -1429,10 +1429,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           ) {
             showSnackbar({
               kind: "error",
-              label: "Couldn't update favourite. Try again.",
+              label: "Couldn't update favorite. Try again.",
               action: {
                 label: "Retry",
-                accessibilityLabel: "Retry updating favourite",
+                accessibilityLabel: "Retry updating favorite",
                 onPress: () => toggleFavourite(contactId, nextMembership),
               },
             });
@@ -1749,7 +1749,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         </Text>
         {counts.neverContacted > 0 ? (
           <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-            {`${counts.neverContacted} not yet contacted →`}
+            {`${counts.neverContacted} never contacted →`}
           </Text>
         ) : null}
         {counts.snoozed > 0 ? (
@@ -1772,7 +1772,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           // favourites, so it falls through to the neutral filtered-empty copy (WR-03).
           <>
             <Text style={[styles.emptyHeading, { color: palette.textPrimary }]}>
-              No favourites yet
+              No favorites yet
             </Text>
             <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
               Tap the star on a contact's profile to add them here.

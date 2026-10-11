@@ -386,7 +386,7 @@ export function ListRow({
                 testID={`dashboard-list-row-favourite-${contactId}`}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  isFavourite ? "Remove favourite" : "Add favourite"
+                  isFavourite ? "Remove favorite" : "Add favorite"
                 }
                 accessibilityState={{ selected: isFavourite }}
                 hitSlop={SPACING.sm}

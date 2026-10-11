@@ -291,7 +291,7 @@ export function GridCard({
                     testID={`dashboard-grid-card-favourite-${contactId}`}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      isFavourite ? "Remove favourite" : "Add favourite"
+                      isFavourite ? "Remove favorite" : "Add favorite"
                     }
                     accessibilityState={{ selected: isFavourite }}
                     onPress={onToggleFavourite}

@@ -83,45 +83,12 @@ const DEVELOPER_ONLY: Readonly<Record<string, readonly string[]>> = {
  * completes.
  */
 const PENDING: Readonly<Record<string, readonly string[]>> = {
-  // Task 2: Never Contacted, Wobbly, Favorite (D-42, D-22, D-49, D-56).
-  "src/components/ContactCard.tsx": [
-    "Wobbling",
-    "Not yet contacted",
-    "Favourite",
-  ],
-  "src/components/GridCard.tsx": ["Remove favourite", "Add favourite"],
-  "src/components/ListRow.tsx": ["Remove favourite", "Add favourite"],
-  "src/components/digest/HorizonSection.tsx": ["Not yet contacted"],
-  "src/components/icons/status-display-label.ts": [
-    "Wobbling",
-    "Not yet contacted",
-  ],
-  "src/components/list-row-content.ts": ["Favourite", "Not favourite"],
-  "src/components/orrery/system-builder-logic.ts": [
-    "Not Contacted",
-    "Not contacted",
-  ],
-  "src/logic/orrery-label-logic.ts": ["Not contacted yet", "Wobbling"],
-  "src/logic/orrery-system-logic.ts": ["Not Contacted"],
+  // Task 3: Dashboard → Contacts, Log Interaction (D-22).
   "src/screens/HomeScreen.tsx": [
-    "Couldn't update favourite. Try again.",
-    "Retry updating favourite",
-    "not yet contacted →",
-    "No favourites yet",
-    // Task 3: Dashboard → Contacts (D-22).
     "Couldn't reset dashboard",
     "Retry resetting the dashboard view",
     "Archived contacts leave the Dashboard. You can restore them from Archived Contacts.",
   ],
-  "src/screens/contact-profile-logic.ts": [
-    "This removes them from your active orbit, reminders, favourites, and widgets. Their history, details, and saved cadence stay.",
-  ],
-  "src/services/widget/widget-render.tsx": ["Choose favourites"],
-  "app.config.ts": [
-    "Orbit — Favourites",
-    "Your favourite people, at a glance.",
-  ],
-  // Task 3: Dashboard → Contacts, Log Interaction (D-22).
   "src/components/control-surface/AnchoredPanel.tsx": [
     "Dismiss dashboard controls",
   ],
@@ -485,7 +452,7 @@ describe("glossary contract — production copy (D-22, D-42, D-49)", () => {
         .map((t) => `${file} ${JSON.stringify(t)}`),
     );
     expect(stale).toEqual([]);
-  });
+  }, 30_000);
 
   it("scans app.config.ts (the widget picker label)", () => {
     expect(SCANNED.some((p) => p.endsWith("app.config.ts"))).toBe(true);

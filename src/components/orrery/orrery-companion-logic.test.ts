@@ -22,7 +22,7 @@ it("preserves exact zero/one/many successful member identities and never appends
   for (const ids of [[], [1], [3, 2, 1]]) {
     const rows = companionRows(scene(ids));
     expect(rows.map((row) => row.member.id)).toEqual(ids);
-    expect(rows.every((row) => row.context === "Not contacted yet")).toBe(true);
+    expect(rows.every((row) => row.context === "Never Contacted")).toBe(true);
   }
   expect(companionRows(null)).toEqual([]);
 });

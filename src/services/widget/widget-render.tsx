@@ -552,7 +552,7 @@ function EmptyTile({ palette }: { palette: WidgetPalette }): React.JSX.Element {
         }}
       />
       <TextWidget
-        text="Choose favourites"
+        text="Choose favorites"
         maxLines={1}
         style={{
           color: asColor(palette.textPrimary),

@@ -147,7 +147,7 @@ describe("semantic labels", () => {
     expect(scaled.rect.height).toBe(40);
   });
   it("omits missing context and suppresses detail before sacrificing another name", () => {
-    expect(labelContext(null, undefined)).toBe("Not contacted yet");
+    expect(labelContext(null, undefined)).toBe("Never Contacted");
     expect(labelContext(undefined, undefined)).toBeUndefined();
     const item = candidate("name", {
       context: "Deep gravity",

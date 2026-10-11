@@ -41,6 +41,14 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { RankedFuelLine } from "@/components/RankedFuelLine";
+import {
+  DECAYING,
+  FAVORITE,
+  NEVER_CONTACTED,
+  ROGUE,
+  STABLE,
+  WOBBLY,
+} from "@/constants/glossary";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import { useTheme } from "@/theme";
 import { ringVisual } from "./contact-card-ring";
@@ -79,15 +87,15 @@ export interface ContactCardProps {
 function statusLabel(status: ProfileStatus | null): string {
   switch (status) {
     case "stable":
-      return "Stable";
+      return STABLE;
     case "wobble":
-      return "Wobbling";
+      return WOBBLY;
     case "decay":
-      return "Decaying";
+      return DECAYING;
     case "rogue":
-      return "Rogue";
+      return ROGUE;
     default:
-      return "Not yet contacted";
+      return NEVER_CONTACTED;
   }
 }
 
@@ -175,7 +183,7 @@ export function ContactCard({
           // OD-2 provisional accent star.
           <Text
             testID={`dashboard-card-favourite-${contactId}`}
-            accessibilityLabel="Favourite"
+            accessibilityLabel={FAVORITE}
             style={[styles.favourite, { color: colors.accentText }]}
           >
             {"★"}

@@ -1,4 +1,11 @@
 /** Screen-space semantic labels. Only native paragraph measurement handles text. */
+import {
+  DECAYING,
+  NEVER_CONTACTED,
+  ROGUE,
+  STABLE,
+  WOBBLY,
+} from "@/constants/glossary";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { GravityResult } from "@/services/gravity-logic";
 import {
@@ -409,12 +416,12 @@ export function labelContext(
     status === undefined
       ? undefined
       : status === null
-        ? "Not contacted yet"
+        ? NEVER_CONTACTED
         : {
-            stable: "Stable",
-            wobble: "Wobbling",
-            decay: "Decaying",
-            rogue: "Rogue",
+            stable: STABLE,
+            wobble: WOBBLY,
+            decay: DECAYING,
+            rogue: ROGUE,
           }[status];
   const values = [
     health,

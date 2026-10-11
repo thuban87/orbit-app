@@ -53,11 +53,11 @@ describe("ListRow content", () => {
 
   it.each([
     ["stable", "Stable"],
-    ["wobble", "Wobbling"],
+    ["wobble", "Wobbly"],
     ["decay", "Decaying"],
     ["rogue", "Rogue"],
     ["snoozed", "Snoozed"],
-    [null, "Not yet contacted"],
+    [null, "Never Contacted"],
   ] as const)(
     "describes %s status without relying on colour",
     (displayState, label) => {
@@ -69,7 +69,7 @@ describe("ListRow content", () => {
           isFavourite: true,
           displayState,
         }),
-      ).toBe(`Ada Lovelace. Friend. Yesterday. Favourite. ${label}.`);
+      ).toBe(`Ada Lovelace. Friend. Yesterday. Favorite. ${label}.`);
     },
   );
 
@@ -83,7 +83,7 @@ describe("ListRow content", () => {
         displayState: null,
       }),
     ).toBe(
-      "Grace Hopper. No category. No interactions yet. Not favourite. Not yet contacted.",
+      "Grace Hopper. No category. No interactions yet. Not favorite. Never Contacted.",
     );
   });
 
@@ -95,7 +95,7 @@ describe("ListRow content", () => {
       isFavourite: true,
       displayState: "stable",
     } as const;
-    const summary = "Ada Lovelace. Friend. Yesterday. Favourite. Stable.";
+    const summary = "Ada Lovelace. Friend. Yesterday. Favorite. Stable.";
 
     it("is byte-identical to the identity summary when no context is given", () => {
       expect(buildRowAccessibilityDescription(identity)).toBe(summary);

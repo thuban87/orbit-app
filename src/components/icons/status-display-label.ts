@@ -1,19 +1,26 @@
 import type { StatusDisplayState } from "@/components/contact-card-ring";
+import {
+  DECAYING,
+  NEVER_CONTACTED,
+  ROGUE,
+  STABLE,
+  WOBBLY,
+} from "@/constants/glossary";
 
 /** The shared, non-colour human-readable label for a display status. */
 export function statusDisplayLabel(state: StatusDisplayState): string {
   switch (state) {
     case "stable":
-      return "Stable";
+      return STABLE;
     case "wobble":
-      return "Wobbling";
+      return WOBBLY;
     case "decay":
-      return "Decaying";
+      return DECAYING;
     case "rogue":
-      return "Rogue";
+      return ROGUE;
     case "snoozed":
       return "Snoozed";
     default:
-      return "Not yet contacted";
+      return NEVER_CONTACTED;
   }
 }
