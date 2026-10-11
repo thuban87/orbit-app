@@ -22,6 +22,7 @@
  */
 
 import {
+  emptyMethodDraft,
   type MethodGroups,
   toMethodDrafts,
 } from "@/components/contact-methods-editor-model";
@@ -33,6 +34,7 @@ import type {
   CreateMemoryInput,
   CreateRelationshipInput,
 } from "@/db/contacts-dao";
+import { newUid } from "@/db/uid";
 
 /** The create form's controlled state (the screen owns the React state). */
 export interface CreateFormState {
@@ -296,4 +298,101 @@ export function buildCreateInput(
   if (offLimits.length > 0) input.offLimits = offLimits;
 
   return input;
+}
+
+// =============================================================================
+// UNSAVED-WORK GUARD (38.9 D-13, D-15, E-01).
+//
+// Add Contact is dirty only when the form differs from its SEED values. The
+// baseline is built from `createFormSeedState()`, never from live form state,
+// so the guard is on from the first render: a name typed before categories or
+// the form data load is dirty, a failed load leaves the guard on, and a
+// category-catalog refresh (which can only clear a pick that no longer exists,
+// moving `categoryId` toward its null seed) never makes the form dirty. A later
+// phase that adds an asynchronously resolved default (38.11 D-50/D-51) must
+// update this seed and the field together, touching the field only while it is
+// untouched.
+// =============================================================================
+
+/** The seed form state: what an untouched Add Contact holds. */
+export type CreateFormSeedState = CreateFormState &
+  Required<
+    Pick<
+      CreateFormState,
+      | "trackingEnabled"
+      | "memories"
+      | "relationships"
+      | "lastTalkedAbout"
+      | "currentLocation"
+      | "offLimits"
+    >
+  >;
+
+/**
+ * The Add Contact seeds. Unbound with no cadence (CAPT-03), last spoke today,
+ * one empty phone row (its uid is generated; the signature ignores it), no
+ * email, no custom values, no enrichment drafts.
+ */
+export function createFormSeedState(): CreateFormSeedState {
+  return {
+    name: "",
+    categoryId: null,
+    intervalDays: null,
+    intervalValid: true,
+    trackingEnabled: false,
+    lastSpoke: { kind: "today" },
+    methods: { phone: [emptyMethodDraft("phone", newUid())], email: [] },
+    values: {},
+    memories: [],
+    relationships: [],
+    lastTalkedAbout: "",
+    currentLocation: "",
+    offLimits: [],
+  };
+}
+
+/** JSON with object keys sorted, so key order never reads as a change. */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) => {
+    if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+      const record = inner as Record<string, unknown>;
+      return Object.fromEntries(
+        Object.keys(record)
+          .sort()
+          .map((key) => [key, record[key]]),
+      );
+    }
+    return inner;
+  });
+}
+
+/**
+ * A stable signature of the form for the dirty check: method-draft uids are
+ * stripped (generated row ids are not user changes) and the asynchronously
+ * resolved phone region is not part of `CreateFormState`, so it never counts.
+ */
+export function createFormSeedSignature(state: CreateFormState): string {
+  const stripUid = (drafts: MethodGroups["phone"]) =>
+    drafts.map(({ uid: _uid, ...rest }) => rest);
+  return stableStringify({
+    ...state,
+    trackingEnabled: state.trackingEnabled ?? true,
+    memories: state.memories ?? [],
+    relationships: state.relationships ?? [],
+    lastTalkedAbout: state.lastTalkedAbout ?? "",
+    currentLocation: state.currentLocation ?? "",
+    offLimits: state.offLimits ?? [],
+    methods: {
+      phone: stripUid(state.methods.phone),
+      email: stripUid(state.methods.email),
+    },
+  });
+}
+
+/** Add Contact holds unsaved work when its signature differs from the seed's. */
+export function isCreateFormDirty(
+  seedSignature: string,
+  currentSignature: string,
+): boolean {
+  return seedSignature !== currentSignature;
 }

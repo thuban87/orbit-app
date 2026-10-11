@@ -22,7 +22,6 @@
 import { Picker } from "@react-native-picker/picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   findNodeHandle,
   Pressable,
   ScrollView,
@@ -35,7 +34,6 @@ import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
   addMethodDraft,
   choosePrimary,
-  emptyMethodDraft,
   type MethodGroups,
   removeMethodDraft,
   resolveEffectivePhoneRegion,
@@ -77,8 +75,11 @@ import {
   resolveCategorySelection,
 } from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
+import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
+import { confirm, notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
@@ -89,25 +90,34 @@ import {
   collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
+  createFormSeedSignature,
+  createFormSeedState,
+  isCreateFormDirty,
   resolveErrorSection,
 } from "./create-contact-logic";
 
 const LOG_SCOPE = "create-contact";
 
-/** Promise wrapper over Alert so the duplicate-name warning reads as ONE gate. */
+/**
+ * The duplicate-name warning as ONE themed gate (D-27): Cancel, Back or a scrim
+ * tap resolve false (nothing is written); "Save anyway" resolves true.
+ */
 function confirmDuplicate(name: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      "Duplicate name",
-      `You already have a ${name} — save anyway?`,
-      [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        { text: "Save anyway", onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+  return confirm({
+    title: "Duplicate name",
+    message: `You already have a ${name} — save anyway?`,
+    confirmLabel: "Save anyway",
+    dismissable: true,
   });
 }
+
+/**
+ * The clean baseline for the unsaved-work guard (D-15): built from the seed
+ * function, never from live form state, so it exists from the first render.
+ */
+const CREATE_FORM_SEED_SIGNATURE = createFormSeedSignature(
+  createFormSeedState(),
+);
 
 // -- Draft → display-row adapters ---------------------------------------------
 // The Show-More sections reuse the profile enrichment editors (same vocabulary as
@@ -183,6 +193,8 @@ export function CreateContactScreen({
   navigation,
 }: RootStackScreenProps<"Create">) {
   const { colors } = useTheme();
+  // Every seeded field starts from the same seed the guard's baseline uses.
+  const [seed] = useState(createFormSeedState);
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
     [],
@@ -190,26 +202,27 @@ export function CreateContactScreen({
   const [createDefs, setCreateDefs] = useState<CustomFieldDef[]>([]);
 
   // Fixed-block state.
-  const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [name, setName] = useState(seed.name);
+  const [categoryId, setCategoryId] = useState<number | null>(seed.categoryId);
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   // A contact created without touching cadence is Unbound (trackingEnabled=false)
   // with no cadence (intervalDays=null) — NOT the prior Monthly + Bound default
   // (CAPT-03, dossier §F). Unbound never gates Save on cadence, so intervalValid
   // starts true. Binding turns the gate on via coordinateBoundToggle.
-  const [intervalDays, setIntervalDays] = useState<number | null>(null);
-  const [intervalValid, setIntervalValid] = useState(true);
-  const [trackingEnabled, setTrackingEnabled] = useState(false);
-  const [lastSpoke, setLastSpoke] = useState<LastSpokeValue>({ kind: "today" });
-  const [methods, setMethods] = useState<MethodGroups>(() => ({
-    phone: [emptyMethodDraft("phone", newUid())],
-    email: [],
-  }));
+  const [intervalDays, setIntervalDays] = useState<number | null>(
+    seed.intervalDays,
+  );
+  const [intervalValid, setIntervalValid] = useState(seed.intervalValid);
+  const [trackingEnabled, setTrackingEnabled] = useState(seed.trackingEnabled);
+  const [lastSpoke, setLastSpoke] = useState<LastSpokeValue>(seed.lastSpoke);
+  const [methods, setMethods] = useState<MethodGroups>(seed.methods);
   const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<
     string | null
   >(getDeviceRegion());
   // Custom-block value map, keyed by col_name.
-  const [values, setValues] = useState<Record<string, string | null>>({});
+  const [values, setValues] = useState<Record<string, string | null>>(
+    seed.values,
+  );
   const [saving, setSaving] = useState(false);
 
   // CONTROLLED accordion disclosure. Identity opens by default (the fewest-taps
@@ -275,8 +288,8 @@ export function CreateContactScreen({
   const [relationshipDrafts, setRelationshipDrafts] = useState<
     RelationshipDraft[]
   >([]);
-  const [lastTalkedAbout, setLastTalkedAbout] = useState("");
-  const [currentLocation, setCurrentLocation] = useState("");
+  const [lastTalkedAbout, setLastTalkedAbout] = useState(seed.lastTalkedAbout);
+  const [currentLocation, setCurrentLocation] = useState(seed.currentLocation);
   const [fuelDrafts, setFuelDrafts] = useState<FuelDraft[]>([]);
 
   const commitCategories = useCallback(
@@ -304,7 +317,11 @@ export function CreateContactScreen({
       );
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load create-form data", err);
-      Alert.alert("Couldn't load the form", "Please reopen this screen.");
+      // Blocking (D-27): the form cannot be used as loaded.
+      void notice({
+        title: "Couldn't load the form",
+        message: "Please reopen this screen.",
+      });
     }
   }, []);
 
@@ -345,6 +362,17 @@ export function CreateContactScreen({
       fuelDrafts,
     ],
   );
+
+  // Unsaved-work guard (E-01; D-13, D-15): on from the first render, compared
+  // against the seed, never waiting for a loaded baseline.
+  const bypassRef = useRef(false);
+  useDiscardKeepGuard({
+    hasUnsavedChanges: isCreateFormDirty(
+      CREATE_FORM_SEED_SIGNATURE,
+      createFormSeedSignature(formState),
+    ),
+    bypassRef,
+  });
 
   const savable = canSave(formState) && !saving;
   // A single per-render local stamp so fuel drafts show a stable "today" age.
@@ -391,10 +419,16 @@ export function CreateContactScreen({
         },
       );
       const { contactId } = await createContactFull(exec, input);
+      // Saved: leave for the new Profile without a prompt (D-08, Pitfall 6).
+      bypassRef.current = true;
       navigation.replace("Profile", { contactId });
     } catch (err) {
+      bypassRef.current = false;
       Logger.error(LOG_SCOPE, "failed to save contact", err);
-      Alert.alert("Couldn't save contact. Please try again.");
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't save contact. Please try again.",
+      });
     } finally {
       setSaving(false);
     }

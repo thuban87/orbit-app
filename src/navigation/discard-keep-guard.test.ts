@@ -285,7 +285,11 @@ describe("useDiscardKeepGuard (D-13, D-14)", () => {
 describe("useDiscardKeepGuard sub-editor variant (D-14)", () => {
   it("Back with a clean open sub-editor closes it and stays", () => {
     const close = vi.fn();
-    const { fire } = mountGuard(true, false, { open: true, dirty: false, close });
+    const { fire } = mountGuard(true, false, {
+      open: true,
+      dirty: false,
+      close,
+    });
     const event = fire({ type: "GO_BACK" });
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(close).toHaveBeenCalledOnce();
@@ -295,7 +299,11 @@ describe("useDiscardKeepGuard sub-editor variant (D-14)", () => {
 
   it("Back with a dirty open sub-editor prompts; Discard closes it and stays", async () => {
     const close = vi.fn();
-    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    const { fire } = mountGuard(false, false, {
+      open: true,
+      dirty: true,
+      close,
+    });
     const event = fire({ type: "POP" });
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(confirmStore.getState().queue).toHaveLength(1);
@@ -308,7 +316,11 @@ describe("useDiscardKeepGuard sub-editor variant (D-14)", () => {
 
   it("Keep editing leaves the dirty sub-editor open", async () => {
     const close = vi.fn();
-    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    const { fire } = mountGuard(false, false, {
+      open: true,
+      dirty: true,
+      close,
+    });
     fire();
     confirmStore.getState().resolveCurrent(false);
     await flush();
@@ -320,7 +332,11 @@ describe("useDiscardKeepGuard sub-editor variant (D-14)", () => {
 describe("useDiscardKeepGuard non-Back removals (review C6-H1)", () => {
   it("a RESET with a clean open sub-editor proceeds at once and closes nothing", () => {
     const close = vi.fn();
-    const { fire } = mountGuard(false, false, { open: true, dirty: false, close });
+    const { fire } = mountGuard(false, false, {
+      open: true,
+      dirty: false,
+      close,
+    });
     const event = fire({ type: "RESET" });
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
@@ -329,7 +345,11 @@ describe("useDiscardKeepGuard non-Back removals (review C6-H1)", () => {
 
   it("a RESET with a dirty open sub-editor shows one prompt; Discard dispatches that RESET", async () => {
     const close = vi.fn();
-    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    const { fire } = mountGuard(false, false, {
+      open: true,
+      dirty: true,
+      close,
+    });
     const action = { type: "RESET", payload: { routes: [] } };
     const event = fire(action);
     expect(event.preventDefault).toHaveBeenCalledOnce();
@@ -343,7 +363,11 @@ describe("useDiscardKeepGuard non-Back removals (review C6-H1)", () => {
 
   it("a RESET with a dirty open sub-editor and Keep editing dispatches nothing", async () => {
     const close = vi.fn();
-    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    const { fire } = mountGuard(false, false, {
+      open: true,
+      dirty: true,
+      close,
+    });
     fire({ type: "RESET" });
     confirmStore.getState().resolveCurrent(false);
     await flush();

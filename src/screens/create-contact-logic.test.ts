@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { MethodGroups } from "@/components/contact-methods-editor-model";
+import {
+  addMethodDraft,
+  removeMethodDraft,
+} from "@/components/contact-methods-editor-model";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import { resolveCategorySelection } from "@/logic/category-logic";
 import {
   type BuildCreateInputDeps,
   buildCreateInput,
@@ -16,11 +21,6 @@ import {
   isCreateFormDirty,
   resolveErrorSection,
 } from "./create-contact-logic";
-import {
-  addMethodDraft,
-  removeMethodDraft,
-} from "@/components/contact-methods-editor-model";
-import { resolveCategorySelection } from "@/logic/category-logic";
 
 const NOW = "2026-08-15 14:30:00";
 
@@ -428,9 +428,9 @@ describe("Add Contact dirty check against the seed (D-15, E-01)", () => {
 
   it("binding then unbinding with no cadence returns to clean", () => {
     const seed = createFormSeedState();
-    expect(dirty({ ...seed, trackingEnabled: true, intervalValid: false })).toBe(
-      true,
-    );
+    expect(
+      dirty({ ...seed, trackingEnabled: true, intervalValid: false }),
+    ).toBe(true);
     const back = coordinateBoundToggle({ intervalDays: null }, false);
     expect(dirty({ ...seed, ...back })).toBe(false);
   });
