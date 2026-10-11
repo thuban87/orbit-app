@@ -29,7 +29,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -42,6 +41,7 @@ import {
   usePhotoLoadFailure,
 } from "@/components/PhotoUnavailableNotice";
 import { runUrlSubmit } from "@/components/photo-url-submit";
+import { FieldError } from "@/components/ui/FieldError";
 import {
   clearContactPhotoCore,
   getContactPhotoIdentity,
@@ -62,7 +62,9 @@ import {
 } from "@/services/photos/photo-storage";
 import { isImageUrl } from "@/services/photos/url-image";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { confirm } from "@/stores/confirm-store";
 import { markPhotoStaged } from "@/stores/photo-result-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
 import { Logger } from "@/utils/logger";
@@ -85,23 +87,27 @@ interface PhotoSourcePickerProps {
   onValueChange?: (value: string | null) => void;
 }
 
-/** Promise wrapper over the SPEC destructive confirm so Remove reads as ONE gate. */
+/** The URL field's validation message (D-40: inline under the field). */
+const INVALID_URL_MESSAGE =
+  "That doesn't look like an image URL. Check the link and try again.";
+
+/**
+ * Remove photo as ONE themed destructive gate (38.9 D-27, D-30): Cancel
+ * resolves false, Remove resolves true. Destructive, so it is not dismissable
+ * by Back or a scrim tap (ADR-086); the native dialog it replaces was.
+ */
 function confirmRemovePhoto(): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      "Remove photo?",
-      "This deletes the photo from this device and can't be undone.",
-      [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => resolve(true),
-        },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+  return confirm({
+    title: "Remove photo?",
+    message: "This deletes the photo from this device and can't be undone.",
+    confirmLabel: "Remove",
+    destructive: true,
   });
+}
+
+/** A failure the user can carry on from: an error snackbar (D-27). */
+function showPhotoError(label: string) {
+  showSnackbar({ kind: "error", label });
 }
 
 export function PhotoSourcePicker({
@@ -122,6 +128,8 @@ export function PhotoSourcePicker({
   const [urlEntryOpen, setUrlEntryOpen] = useState(false);
   const [urlText, setUrlText] = useState("");
   const [submittingUrl, setSubmittingUrl] = useState(false);
+  // URL validation error, under the URL field; cleared when it changes (D-40).
+  const [urlError, setUrlError] = useState<string | null>(null);
   const urlController = useRef<AbortController | null>(null);
   // D-23: a kept reference whose file will not load shows "Photo unavailable";
   // Change and Remove stay available (Remove still clears it, by the user).
@@ -175,7 +183,7 @@ export function PhotoSourcePicker({
       });
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to launch photo library", err);
-      Alert.alert("Couldn't open your photos. Please try again.");
+      showPhotoError("Couldn't open your photos. Please try again.");
     }
   }, [navigation, target]);
 
@@ -219,7 +227,7 @@ export function PhotoSourcePicker({
       }
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to remove photo", err);
-      Alert.alert("Couldn't remove the photo. Please try again.");
+      showPhotoError("Couldn't remove the photo. Please try again.");
     }
   }, [target, onChanged, onValueChange]);
 
@@ -233,12 +241,10 @@ export function PhotoSourcePicker({
     }
     const url = urlText.trim();
     if (!isImageUrl(url)) {
-      Alert.alert(
-        "That doesn't look like an image URL.",
-        "Check the link and try again.",
-      );
+      setUrlError(INVALID_URL_MESSAGE);
       return;
     }
+    setUrlError(null);
     setSubmittingUrl(true);
     abortUrl();
     const controller = new AbortController();
@@ -281,9 +287,8 @@ export function PhotoSourcePicker({
         "kind" in err &&
         err.kind === "network"
       ) {
-        Alert.alert(
-          "Couldn't fetch that image.",
-          "Check your connection or try a different link.",
+        showPhotoError(
+          "Couldn't fetch that image. Check your connection or try a different link.",
         );
       } else if (
         err &&
@@ -291,13 +296,10 @@ export function PhotoSourcePicker({
         "kind" in err &&
         err.kind === "invalid"
       ) {
-        Alert.alert(
-          "That doesn't look like an image URL.",
-          "Check the link and try again.",
-        );
+        setUrlError(INVALID_URL_MESSAGE);
       } else {
         // content-type / decode / write failures (and any non-typed error).
-        Alert.alert("That image couldn't be used.", "Try a JPEG or PNG.");
+        showPhotoError("That image couldn't be used. Try a JPEG or PNG.");
       }
     } finally {
       if (urlController.current === controller) urlController.current = null;
@@ -358,7 +360,10 @@ export function PhotoSourcePicker({
             <TextInput
               testID="photo-source-url-input"
               value={urlText}
-              onChangeText={setUrlText}
+              onChangeText={(next) => {
+                setUrlText(next);
+                setUrlError(null);
+              }}
               editable={!submittingUrl}
               placeholder="https://…"
               placeholderTextColor={colors.textPlaceholder}
@@ -375,6 +380,7 @@ export function PhotoSourcePicker({
                 },
               ]}
             />
+            <FieldError testID="photo-source-url-error" message={urlError} />
             <Pressable
               testID="photo-source-url-submit"
               accessibilityRole="button"

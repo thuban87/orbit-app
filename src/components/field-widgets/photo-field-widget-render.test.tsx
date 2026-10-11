@@ -28,7 +28,6 @@ vi.mock("react", async (original) => ({
 }));
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
-  Alert: { alert: vi.fn() },
   Pressable: "Pressable",
   StyleSheet: { create: (styles: unknown) => styles },
   Text: "Text",
