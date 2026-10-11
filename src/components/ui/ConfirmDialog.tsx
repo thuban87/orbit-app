@@ -12,7 +12,16 @@
  *     requires an explicit button choice) — `dismissable=false` on the shared
  *     `BaseOverlay` (REVIEWS 23-07 MEDIUM).
  * A non-destructive dialog uses a Primary confirm and MAY dismiss on scrim-tap /
- * Back.
+ * Back, unless the caller passes `dismissable={false}` (a Cancel with a side
+ * effect). The effective policy is `effectiveDismissable` (confirm-store):
+ * `!destructive && (dismissable ?? true)`, so a destructive confirm can never
+ * be made dismissable (D-06, ADR-086; 38.9 D-24).
+ *
+ * Look (38.9 D-43, DLG-B): the elevated card with a 2dp `borderStrong` border.
+ * `headingGlyph` (default `destructive`) controls the warning glyph above the
+ * title; the "Discard changes?" prompt turns it off and keeps the ⚠ on its
+ * button only (D-52). `variant="notice"` is the one-button notice: a single
+ * Primary acknowledge button in the same actions container (D-24, D-27).
  *
  * Large text (RG-034 / ui-accessibility/AUD-UIA-011, confirmed on device at
  * font_scale 2.0 on ≈320dp and ≈349dp): the choices are first laid out in a
@@ -39,6 +48,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
+import { effectiveDismissable } from "@/stores/confirm-store";
 import { useUnscopedTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -65,6 +75,18 @@ export interface ConfirmDialogProps extends OverlayLifecycle {
    */
   destructive?: boolean;
   confirmDisabled?: boolean;
+  /**
+   * Back/scrim dismissal (default true). Never applies to a destructive
+   * dialog: `effectiveDismissable` keeps it non-dismissable (ADR-086).
+   */
+  dismissable?: boolean;
+  /** Warning glyph above the title; defaults to `destructive` (D-52). */
+  headingGlyph?: boolean;
+  /**
+   * "confirm" (default): Cancel + confirm. "notice": one Primary button
+   * labelled `confirmLabel` (the acknowledge label); `onCancel` is unused.
+   */
+  variant?: "confirm" | "notice";
 }
 
 export function ConfirmDialog({
@@ -78,6 +100,9 @@ export function ConfirmDialog({
   onCancel,
   destructive = false,
   confirmDisabled = false,
+  dismissable,
+  headingGlyph = destructive,
+  variant = "confirm",
 }: ConfirmDialogProps) {
   // The dialog is an opaque surface: read the ROOT palette so its body text
   // keeps the secondary role even when opened from a glass scope (RG-029).
@@ -90,8 +115,8 @@ export function ConfirmDialog({
       visible={visible}
       onRequestClose={onRequestClose}
       // Destructive confirmations require an explicit choice: inert scrim + Back
-      // no-op. Non-destructive dialogs may dismiss.
-      dismissable={!destructive}
+      // no-op. Non-destructive dialogs may dismiss unless the caller opts out.
+      dismissable={effectiveDismissable({ destructive, dismissable })}
       overlayKind="dialog"
       justify="center"
       contentStyle={[
@@ -108,7 +133,7 @@ export function ConfirmDialog({
           styles.card,
           {
             backgroundColor: colors.surfaceElevated,
-            borderColor: colors.border,
+            borderColor: colors.borderStrong,
           },
         ]}
       >
@@ -116,7 +141,7 @@ export function ConfirmDialog({
           style={styles.body}
           contentContainerStyle={styles.bodyContent}
         >
-          {destructive ? (
+          {headingGlyph ? (
             <View style={styles.header}>
               <Icon name="warning" tone="danger" size="md" />
             </View>
@@ -129,6 +154,7 @@ export function ConfirmDialog({
           ) : null}
         </ScrollView>
         <ConfirmActions
+          notice={variant === "notice"}
           cancelLabel={cancelLabel}
           confirmLabel={confirmLabel}
           destructive={destructive}
@@ -147,9 +173,11 @@ type ActionsLayout = "measuring" | "row" | "stacked";
  * The two explicit choices. Rendered inside the overlay, so it remounts (and
  * re-measures) every time the dialog opens. Exported for other overlays with a
  * Cancel + confirm pair that must stack at large text (38.4 D-72:
- * GroupTitlePromptSheet).
+ * GroupTitlePromptSheet). `notice` renders the one-button notice: a single
+ * Primary `confirmLabel` button, right-aligned like the row layout.
  */
 export function ConfirmActions({
+  notice = false,
   cancelLabel,
   confirmLabel,
   destructive,
@@ -157,6 +185,7 @@ export function ConfirmActions({
   onCancel,
   onConfirm,
 }: {
+  notice?: boolean;
   cancelLabel: string;
   confirmLabel: string;
   destructive: boolean;
@@ -175,6 +204,22 @@ export function ConfirmActions({
     };
   const stacked = layout === "stacked";
   const actionStyle = stacked ? styles.actionStacked : styles.action;
+
+  if (notice) {
+    // One choice: nothing to fit, so no measuring pass.
+    return (
+      <View style={styles.actionsRow}>
+        <View style={styles.action}>
+          <Button
+            role="primary"
+            label={confirmLabel}
+            disabled={confirmDisabled}
+            onPress={onConfirm}
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -215,7 +260,8 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     flexShrink: 1,
     borderRadius: RADII.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    // D-43 (DLG-B): the stronger themed-dialog border, colour borderStrong.
+    borderWidth: 2,
     padding: SPACING.lg,
     gap: SPACING.md,
   },

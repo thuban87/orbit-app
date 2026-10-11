@@ -18,6 +18,7 @@ import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { Snackbar } from "@/components/Snackbar";
 import { UniversalFab } from "@/components/UniversalFab";
+import { DialogHost } from "@/components/ui/DialogHost";
 import { getAppSettings, updateAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { isMigration006IntegrityError } from "@/db/migrations/006-normalize-custom-field-values";
@@ -439,6 +440,8 @@ function AppShell() {
       <RootNavigator />
       <UniversalFab />
       <Snackbar />
+      {/* 38.9 D-24: the single host for imperative confirm()/notice() dialogs. */}
+      <DialogHost />
       {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
       "import" ? (
         <ResumeImportPrompt

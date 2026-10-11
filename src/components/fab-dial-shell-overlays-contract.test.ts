@@ -34,6 +34,17 @@ const SEPARATE_WINDOW_MODALS = {
   ResumeReconcilePrompt: "src/components/ResumeReconcilePrompt.tsx",
 } as const;
 
+/**
+ * 38.9 D-24: BaseOverlay window hosts. They render nothing in the app window;
+ * their UI is a BaseOverlay (an RN Modal through RegisteredModal), a separate
+ * native window that a parent's accessibility flag cannot reach. Exempt for
+ * the same reason as the resume prompts, asserted to render a BaseOverlay
+ * component.
+ */
+const BASEOVERLAY_WINDOW_HOSTS = {
+  DialogHost: "src/components/ui/DialogHost.tsx",
+} as const;
+
 /** Render-null gates: own no UI. */
 const RENDER_NULL_GATES = [
   "ShareIntentGate",
@@ -73,6 +84,7 @@ describe("App.tsx shell overlays outside the tab navigator (D-42 A)", () => {
     const known = [
       ...Object.keys(HIDDEN_WHILE_DIAL_OPEN),
       ...Object.keys(SEPARATE_WINDOW_MODALS),
+      ...Object.keys(BASEOVERLAY_WINDOW_HOSTS),
       ...RENDER_NULL_GATES,
       ...DIAL_AND_NAVIGATOR,
     ];
@@ -109,6 +121,30 @@ describe("App.tsx shell overlays outside the tab navigator (D-42 A)", () => {
       const start = source.indexOf(`export function ${name}(`);
       expect(source.slice(start)).toMatch(/return \(\s*<Modal\b/);
     }
+  });
+
+  it("exempts the dialog host only because it renders a BaseOverlay window (38.9 D-24)", () => {
+    for (const [name, path] of Object.entries(BASEOVERLAY_WINDOW_HOSTS)) {
+      const source = read(path);
+      expect(source, `${name} renders the shared ConfirmDialog`).toMatch(
+        /import \{ ConfirmDialog \} from "\.\/ConfirmDialog"/,
+      );
+      const start = source.indexOf(`export function ${name}(`);
+      const body = source.slice(start);
+      expect(body).toMatch(/return null;/);
+      // Every UI branch is the BaseOverlay-backed ConfirmDialog, nothing in the app window.
+      const branches = [...body.matchAll(/return \(\s*<([A-Z][A-Za-z]*)\b/g)];
+      expect(branches.length).toBeGreaterThan(0);
+      for (const branch of branches) expect(branch[1]).toBe("ConfirmDialog");
+    }
+    const dialog = read("src/components/ui/ConfirmDialog.tsx");
+    expect(dialog).toMatch(/<BaseOverlay\b/);
+  });
+
+  it("mounts the dialog host right after the root Snackbar (38.9 D-24)", () => {
+    expect(container).toMatch(
+      /<Snackbar \/>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<DialogHost \/>/,
+    );
   });
 
   it("mounts the assist banner in flow inside the navigator, not over it (38.6 D-38)", () => {

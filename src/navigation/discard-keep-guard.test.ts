@@ -57,18 +57,18 @@ beforeEach(() => {
 
 describe("decideGuardOnRemove (D-13)", () => {
   it("allows when bypassed or clean, prompts when dirty", () => {
-    expect(decideGuardOnRemove({ hasUnsavedChanges: false, bypass: false })).toBe(
-      "allow",
-    );
+    expect(
+      decideGuardOnRemove({ hasUnsavedChanges: false, bypass: false }),
+    ).toBe("allow");
     expect(decideGuardOnRemove({ hasUnsavedChanges: true, bypass: true })).toBe(
       "allow",
     );
-    expect(decideGuardOnRemove({ hasUnsavedChanges: false, bypass: true })).toBe(
-      "allow",
-    );
-    expect(decideGuardOnRemove({ hasUnsavedChanges: true, bypass: false })).toBe(
-      "prompt",
-    );
+    expect(
+      decideGuardOnRemove({ hasUnsavedChanges: false, bypass: true }),
+    ).toBe("allow");
+    expect(
+      decideGuardOnRemove({ hasUnsavedChanges: true, bypass: false }),
+    ).toBe("prompt");
   });
 });
 
