@@ -17,9 +17,43 @@ function styleEntry(name: string): string {
   return dialog.slice(start, dialog.indexOf("},", start) + 2);
 }
 
-describe("ConfirmDialog dismissal policy (ADR-086)", () => {
-  it("passes dismissable={!destructive} so a destructive confirmation ignores Back and scrim", () => {
-    expect(dialog).toContain("dismissable={!destructive}");
+/** Source without block or line comments. */
+const code = dialog
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+describe("ConfirmDialog dismissal policy (ADR-086, D-06, 38.9 D-24)", () => {
+  it("passes effectiveDismissable so a destructive confirmation ignores Back and scrim even when dismissable is also passed", () => {
+    expect(code).toContain(
+      "dismissable={effectiveDismissable({ destructive, dismissable })}",
+    );
+    expect(code).toMatch(
+      /import \{[^}]*\beffectiveDismissable\b[^}]*\} from "@\/stores\/confirm-store"/,
+    );
+  });
+
+  it("passes no other dismissable= to BaseOverlay (never the raw prop)", () => {
+    expect(code.match(/\bdismissable=/g)).toHaveLength(1);
+  });
+});
+
+describe("ConfirmDialog themed card and variants (38.9 D-43, D-52, D-24)", () => {
+  it("draws the card with a 2dp borderStrong border (D-43)", () => {
+    expect(styleEntry("card")).toContain("borderWidth: 2");
+    expect(code).toContain("borderColor: colors.borderStrong");
+    expect(styleEntry("card")).not.toContain("hairlineWidth");
+  });
+
+  it("controls the warning glyph above the title with headingGlyph, defaulting to destructive (D-52)", () => {
+    expect(code).toContain("headingGlyph = destructive");
+    expect(code).toMatch(/\{headingGlyph \? \(/);
+  });
+
+  it("renders a notice as a single primary button inside the same actions container", () => {
+    expect(code).toContain('variant?: "confirm" | "notice"');
+    expect(code).toMatch(/notice=\{variant === "notice"\}/);
+    const actions = code.slice(code.indexOf("export function ConfirmActions("));
+    expect(actions).toMatch(/if \(notice\)[\s\S]*?role="primary"/);
   });
 });
 
