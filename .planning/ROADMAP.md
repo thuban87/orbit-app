@@ -164,10 +164,13 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.6: Photo Handling — Sync, Sizes & Lightbox** (INSERTED) - Completed 2026-09-30: 9/9 plans + 6 code-review passes (all blocker/warning findings fixed); verification passed 19/19 + owner UAT (pinch, TalkBack, sizes) on the release build. Display-revision fix (no file renames), WebP ≤1024 masters, bigger Profile/List/Grid photos, lightbox, missing-photo + backup-skip integrity (D-23..D-35), banner in flow (D-38), "too large" backups (D-39), on-disk Orrery derivatives (D-41; D-11 memory +2.9 %/+4.2 %). Owner rulings D-01..D-42. No migration (head 032), backup format 7. Release orbit-phase38.6-release-2026-09-30-c2dc1cb.apk.
 - [x] **Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language** (INSERTED) - A Skia 2.5D Orrery V2 from the Orrery renderer R&D labs: a tilted strategy-map Home, a new imperative renderer, a painted sky, thin sun-lit orbits with subtle pulses, rim-lit status bodies, Lab A's star sun, moon bumps, reticle focus with a docked card, a star-warp System switch, plus five production Orrery defect fixes. Dossier accepted after codex review (D-01..D-58); complete (2026-10-05).
 - [x] **Phase 38.8: History Navigation UX** (INSERTED) - Completed 2026-10-09: 7/7 plans (incl. gap plan 07: G1/G2/YEARS) + deep code review (1 blocker, 3 warnings, fixed); verification passed 76/76; owner look-and-feel sign-off on the Pixel and his Moto; final release orbit-38.8-release-2026-10-09.apk (arm64). Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
-- [ ] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; dossier pending
+- [ ] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; planned (17 plans)
 - [ ] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6; dossier pending
-- [ ] **Phase 38.11: Everyday Screens UX** (INSERTED) - Contacts, Digest, Profile, logging and History, Events, Compose audit fixes; dossier pending
+- [ ] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile, Add/Edit/Update Contact audit fixes + new-contact defaults and not-contacted status; dossier pending (split 2026-10-10)
 - [ ] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes; dossier pending
+- [ ] **Phase 38.13: Contacts List, Search & Digest UX** (INSERTED) - Contacts tab, search and Digest audit fixes + list perf investigation, D-95, D-98; dossier pending
+- [ ] **Phase 38.14: Logging, History, Events & Compose UX** (INSERTED) - Logging forms, History, Group Events and Compose audit fixes + one "Did you send it?" (D-76); dossier pending
+- [ ] **Phase 38.15: Events — Plan, Create & Remind** (INSERTED) - New feature: future group events, an Events-tab create entry and reminders (audit B-23); dossier pending
 - [ ] **Phase 39: Onboarding** - A short guided first run (Welcome → add a first person → a four-step Orient tour) and contextual, skippable lessons for the core loop and a few unusual features, through one accessible lesson system, after the prerequisite product fixes they depend on. Dossier accepted (D-01..D-93); UX audit before planning.
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1560,15 +1563,18 @@ Plans:
 
 > **Inserted 2026-10-10 (owner).** Schema-bearing (new homes for fuel data). Verify the migration head on disk at plan time (milestone migration rule 2). Any new durable entity raises the backup format question, which is an owner decision. Phase 39's sharing lesson waits on this phase (D-99).
 
-### Phase 38.11: Everyday Screens UX — Contacts, Digest, Profile, Logging, Events & Compose (INSERTED)
+### Phase 38.11: Profile & Contact Forms UX (INSERTED)
 
-**Goal**: The screens a user touches daily follow the 38.9 standards and stop contradicting what the user just did: the Contacts tab and search, Digest, the Profile, logging and History, Events, and Compose.
+**Goal**: The Profile and the contact forms (Add, Edit and Update Contact) follow the 38.9 standards and stop contradicting what the user just did; new contacts get the Phase 39 defaults and never-contacted people a clear status.
 **Depends on**: Phase 38.10
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A, B, C, D, E, F and J, minus items owned by 38.9 or 38.10; plus Phase 39's prerequisite fixes D-50/D-51/D-87/D-94, D-76, D-77, D-95, D-98 (39-CONTEXT D-101, D-102) and the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
-**Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas D and E (plus H-23), minus items owned by 38.9 or 38.10; plus Phase 39's prerequisite fixes D-50/D-51/D-87/D-94 and D-77 (39-CONTEXT D-102). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.11-WORKPAPER-audit-intake.md`.
+**Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–10 plans — rough estimate from finding titles plus the triage's per-area ranges; recurring-problem sweeps and recorded-decision reversals are not counted.
+**Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13).
 **Plans**: TBD
+
+> **Split 2026-10-10 (owner).** The original 38.11 "Everyday Screens" (areas A–F, J; estimated about 16–22 plans) was split by seam: Profile and contact forms stay here; Contacts list/search/Digest → 38.13; logging/History/Events/Compose → 38.14. The B-23 Events planning feature was never part of the remediation and is its own phase, 38.15.
 
 ### Phase 38.12: People Lifecycle, Import & Settings UX (INSERTED)
 
@@ -1577,13 +1583,47 @@ Plans:
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas H and K, the custom-field and category management findings, and Phase 39's possible-match fix D-75 (39-CONTEXT D-102), minus items owned by earlier phases. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
+**Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 11–16 plans — rough estimate from finding titles plus the triage's per-area range; includes a possible Settings page-layout sweep (K-05) and the favourites-in-backups format bump (K-22); site counts not taken.
+**Coordination**: shares Profile files with 38.11 (not-contacted status code, ⋯ menu, merge entry) and the snooze sheets with 38.14 (X-20); none blocks this phase.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: TBD
+
+### Phase 38.13: Contacts List, Search & Digest UX (INSERTED)
+
+**Goal**: The Contacts tab, search and Digest follow the 38.9 standards, keep the user's view, and show what is going on.
+**Depends on**: Phase 38.12
+**Requirements**: None formal. Owner decisions to come from this phase's dossier.
+**Success Criteria**: Defined at planning from this phase's CONTEXT.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`.
+**Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 6–9 plans — rough estimate; the perf fix depends on what the investigation finds.
+**Plans**: TBD
+
+### Phase 38.14: Logging, History, Events & Compose UX (INSERTED)
+
+**Goal**: Logging, History, Group Events and Compose follow the 38.9 standards, confirm what they did, and agree with each other; one coherent "Did you send it?" outcome.
+**Depends on**: Phase 38.13
+**Requirements**: None formal. Owner decisions to come from this phase's dossier.
+**Success Criteria**: Defined at planning from this phase's CONTEXT.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half is 38.15). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
+**Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–9 plans — rough estimate; recurring-problem sweeps not counted.
+**Plans**: TBD
+
+### Phase 38.15: Events — Plan, Create & Remind (INSERTED)
+
+**Goal**: The Events tab becomes a place to plan get-togethers: create an event from the tab, schedule future events, and get reminders.
+**Depends on**: Phase 38.14
+**Requirements**: None formal. Owner decisions to come from this phase's dossier.
+**Success Criteria**: Defined at planning from this phase's CONTEXT.
+**Scope source**: TBD — dossier via the phase-dossier skill. Origin: audit B-23 (report :700). Reverses recorded decisions: phase-12 dossier :196/:388 `[DECIDED]` "Future Group Events are not supported as planned social events in this phase" (deferred :484) and phase-38 dossier :154/:160 — to be named in its dossier. Needs a Phase 39 tutorial journey (owner, 2026-10-10).
+**Starting size**: set at its dossier (new feature; not estimated).
+**Plans**: TBD
+
+> **Inserted 2026-10-10 (owner).** New feature, not remediation; placed before 39 so onboarding can teach it.
 
 ### Phase 39: Onboarding
 
 **Goal**: A new user gets a short guided start (Welcome → add a first person → a four-step tour of Digest, Contacts, Orrery and the + button), then learns the core loop (Orient → Prepare → Reach Out → Record) and a few unusual features at the moment they first meet them, through one small, accessible, skippable lesson system. The product behaviours those lessons would otherwise have to explain away are fixed first, in Phases 38.9–38.12 (39-CONTEXT D-100..D-102).
-**Depends on**: Phase 38.12
+**Depends on**: Phase 38.15
 **Requirements**: None formal. Owner decisions in `39-CONTEXT.md` (2026-10-09 interrogation; provenance in `39-LEDGER.md`, migrated from the codex/ChatGPT legacy ledger).
 **Success Criteria**: Defined at planning from `39-CONTEXT.md` (D-01..D-102).
 **Scope source**: .planning/phases/39-onboarding/39-CONTEXT.md (the dossier; authoritative)

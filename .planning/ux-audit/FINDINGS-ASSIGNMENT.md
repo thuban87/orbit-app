@@ -16,7 +16,7 @@
 
 - **38.9 UX standards** — builds the shared rules and components and does the mechanical app-wide conversions (Batch 14 R1). Home for findings whose fix *is* a shared standard or mechanical app-wide change: grey Android dialogs → themed dialog (X-04), the warn-before-Back-discards guard (X-01, incl. E-01, F-01 per D-100), header/Back chrome (X-26), the destructive-action rule and dialog swaps (X-03; area semantics stay with the area), feedback/snackbar and validation primitives (X-05, X-29; E-02 per D-100), selected/disabled styling (X-34), glossary and mechanical wording sweeps (X-36, X-37, spelling, plurals), date formatting (X-14), shared empty state, FAB/shell visibility rules.
 - **38.10 Fuel retirement, Things to Remember & sharing** — fuel removed; each former fuel kind gets its own Profile place; shares go to a person and a chosen section; new shares get a per-item Allow AI switch, off by default (Batch 13 P1/Q3 → D-99). Home for areas G and I and any memory/fuel/Off Limits/TTR finding elsewhere (X-15, X-17, D-01, H-10, H-25), and backlog 999.3/999.5/999.6. Class-A G-11, I-01, I-04 (D-100).
-- **38.11 Everyday screens** — areas A, B, C, D, E, F, J not owned by 38.9/38.10. Class-A A-02, A-23, F-05, J-01 and the list-row TalkBack label (D-100); D-95 + A-04 and D-98 (Batch 15); D-50/D-51/D-87/D-94 + E-05, E-13, D-76 + J-02, J-05, J-08, D-77 + D-09 (D-102). The A-X01/A-X02 investigation at its start (Batch 14 R4 a) and the other non-UX items in these areas.
+- **38.11 Everyday screens** — *(split 2026-10-10, owner: D/E → 38.11 Profile & contact forms; A/C → 38.13; B/F/J → 38.14; B-23 planning → new feature phase 38.15)* — areas A, B, C, D, E, F, J not owned by 38.9/38.10. Class-A A-02, A-23, F-05, J-01 and the list-row TalkBack label (D-100); D-95 + A-04 and D-98 (Batch 15); D-50/D-51/D-87/D-94 + E-05, E-13, D-76 + J-02, J-05, J-08, D-77 + D-09 (D-102). The A-X01/A-X02 investigation at its start (Batch 14 R4 a) and the other non-UX items in these areas.
 - **38.12 Lifecycle, import & Settings** — areas H and K except items owned elsewhere. Class-A K-36 (D-100); D-75 + H-02, H-03 (D-102).
 - **39 Onboarding** — after Batches 15–16 it holds **no fix findings**. It consumes the fixes (D-03, D-100). Class-C items whose effect on 39 is lesson copy/mockup carry a **39 copy note** flag on their real home.
 - **40** — accessibility-label sweep (X-39) and large-text/reflow items (Batch 14 R3), plus work 40-CONTEXT D-01 names.
@@ -31,14 +31,17 @@ Note: ROADMAP 38.11's provisional scope lists areas A, B, C, D, F and J (no E). 
 |---|---:|---:|---:|---:|
 | 38.9 UX standards | 52 | 2 | 1 | 53 |
 | 38.10 Fuel retirement, TTR & sharing | 48 | 3 | 1 | 49 |
-| 38.11 Everyday screens | 116 | 3 | 5 | 121 |
+| 38.11 Profile & contact forms | 28 | 0 | — | 28 |
+| 38.13 Contacts list, search & Digest | 37 | 1 | — | 37 |
+| 38.14 Logging, History, Events & Compose | 51 | 2 | — | 51 |
+| (38.11–38.14 non-UX items, split by area at the dossiers) | | | 5 | 5 |
 | 38.12 Lifecycle, import & Settings | 71 | 3 | 0 | 71 |
 | 39 Onboarding (copy notes only) | 0 | 0 | 0 | 0 |
 | 40 Responsive & release hardening | 9 | 0 | 0 | 9 |
 | No action | 1 | 0 | 0 | 1 |
 | **Total** | **297** | **11** | **7** | **304** |
 
-High findings by home: 38.9: E-01, F-01; 38.10: D-01, G-01, I-01; 38.11: A-02, B-01, J-01; 38.12: H-01, H-02, K-22.
+High findings by home: 38.9: E-01, F-01; 38.10: D-01, G-01, I-01; 38.13: A-02; 38.14: B-01, J-01; 38.12: H-01, H-02, K-22.
 
 Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN` section in report §4.3 that cites the finding. "39 link" = triage class (A–E) and the 39-CONTEXT D-IDs from `triage/slice1-4`; class E shows "—". **39 copy note** = class C: Phase 39 lesson copy or mockup must follow whatever this fix ships (the fix itself still lives in the home shown).
 
@@ -154,7 +157,42 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | J-09 | M | INC | Compose's "Things to Remember" is a different, read-only rendition with… | X-15, X-17, X-36 | QW | — | with J-X01 (same groupItems fix); 38.9 (std X-36) | 3059 |
 | J-10 | L | COPY | Compose's Things to Remember shows raw values | X-11, X-14, X-19, X-41 | NI | — | 38.9 (X-14) | 3067 |
 
-### 38.11 Everyday screens — 116 findings
+> **Split 2026-10-10 (owner).** The original 38.11 "Everyday screens" (116 findings) is split by seam into 38.11, 38.13 and 38.14 below. B-23's planning/reminders half is a separate new-feature phase, 38.15; only its future-date picker cap stays with 38.14. "38.11" in the *touches* columns elsewhere in this file predates the split: read it by area — A/C → 38.13, B/F/J → 38.14, D/E → 38.11.
+
+### 38.11 Profile & contact forms — 28 findings
+
+| id | sev | code | short title | theme | fix | 39 link | touches | report line |
+|---|---|---|---|---|---|---|---|---:|
+| D-02 | M | DEAD | After Save on Edit Contact, Back shows the stale Edit form again | X-08, X-10 | QW | — | fixes H-23 too (same cause, §4.1); 39 (D-14 trigger) | 919 |
+| D-05 | M | INC | Two different Snooze sheets on the same Profile | X-05, X-20, X-32, X-36 | QW | — | 38.9 | 942 |
+| D-08 | M | COPY | "Call unavailable. Add a phone number" on a contact that has a phone number | X-18 | QW | — | — | 964 |
+| D-09 | M | COPY | Unbound Profile says "Not tracked. Set a contact frequency" while showing a… | X-23, X-36 | NI | D D-77 | D-77 built here (D-102); 39 consumer; 38.9 (std X-36) | 971 |
+| D-10 | M | INC | Three different contact-frequency choosers, and the card and sheet use… | X-02, X-11, X-36 | NI | — | 38.9 (std X-02, X-36) | 978 |
+| D-11 | M | HID | Saving a profile layout collapses every section, and the editor's "Collapsed… | — | NI | — | with D-X01 | 985 |
+| D-13 | M | HID | The Background sheet, opened from one person, puts app-wide actions first and… | X-03, X-26 | NI | — | 38.9 (std X-03, X-26) | 999 |
+| D-14 | M | VIS | A photo background makes Profile text hard to read | X-40 | NI | — | — | 1006 |
+| D-16 | L | HID | Section chevrons point down whether the section is open or closed | X-34 | NI | C D-14 (frame B), D-67 (frame D) | 39 copy note; 38.9 (std X-34) | 1019 |
+| D-17 | L | VIS | Content scrolls visibly behind the translucent header, and the header never… | X-26, X-40 | NI | — | 38.9 (std X-26) | 1026 |
+| D-19 | L | COPY | Relationship Overview repeats itself and uses unexplained numbers | X-37 | NI | — | 38.9 (std X-37) | 1039 |
+| D-24 | M | HID | Birthday appears nowhere on the Profile | — | NI | — | — | 1070 |
+| D-29 | M | HID | The Profile has no Log button, and + → Log Interaction from a Profile doesn't… | X-07, X-25 | NI | — | 39 (would add a D-53 entry); 38.9 (std X-07) | 1101 |
+| D-33 | L | COPY | The custom snooze date flow uses an unthemed picker and leaves an ambiguous… | X-02, X-04, X-13, X-20, X-31 | none | — | 38.9 (X-04) | 1124 |
+| E-03 | M | DEAD | A birthday can never be removed, and Add Contact can't set one (moved from… | X-13 | QW | — | — | 1230 |
+| E-04 | M | INC | Add Contact lacks many of the fields Edit Contact has, and Show More can't be… | X-21, X-22 | NI | — | 39 (frame 03 redraw if Add changes) | 1247 |
+| E-05 | M | HID | Choosing "Bound" on Add Contact pre-selects "Custom…" with 0 days and shows a… | X-11, X-22, X-29 | QW | D D-51 | D-51 built here (D-102); 39 consumer; 38.9 (std X-29) | 1259 |
+| E-06 | M | HID | Bad phone numbers and emails are accepted silently on Add; Profile then says… | X-18, X-29 | NI | — | 38.9 (std X-29) | 1275 |
+| E-11 | M | INC | Contact frequency: Add, Edit and Update agree, but the rest of the app uses… | X-11, X-36 | NI | C D-51, D-14 | 38.9 (std X-36); **39 copy note** | 1326 |
+| E-12 | M | HID | "Pick date" for Last spoke lets you choose a future date, then rejects it… | X-13, X-14 | QW | — | with F-13, B-23 picker half (§4.1 maximumDate); same control as D-50/D-94 work in this phase; 38.9 (std X-14) | 1339 |
+| E-13 | M | VIS | "Not yet" never looks selected, and selected chips use two different styles… | X-22, X-34 | QW | B → D-94 | D-94 built here (D-102); 39 consumer; 38.9 (std X-34) | 1346 |
+| E-17 | L | INC | Custom date fields are free-text boxes that accept anything; Birthday uses a… | X-13, X-19, X-29 | NI | — | 38.9 (std X-29) | 1390 |
+| E-18 | L | LEFT | Update Contact lists every custom field and then a "Custom Fields" row with… | X-19 | NI | — | — | 1397 |
+| E-19 | L | INC | Links can be edited only in Edit Contact | X-18 | NI | — | — | 1403 |
+| E-21 | L | INC | Update Contact's "Updated" badge shows only on the most recently edited row | X-10 | QW | — | — | 1417 |
+| E-27 | L | HID | Add Contact's duplicate-name warning offers no way to open the existing… | X-22 | NI | — | — | 1468 |
+| E-28 | L | VIS | The empty "Pet photo" custom field shows a person-style initials avatar "PP" | X-19, X-21 | NI | — | — | 1478 |
+| H-23 | M | DEAD | Archiving from a Profile you've just edited lands on the stale Edit form for… | X-08, X-10 | QW | — | 38.12 (archive flow); fixed by D-02 change | 2610 |
+
+### 38.13 Contacts list, search & Digest — 37 findings
 
 | id | sev | code | short title | theme | fix | 39 link | touches | report line |
 |---|---|---|---|---|---|---|---|---:|
@@ -186,6 +224,20 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | A-35 | L | HID | Quick Log from long-press or swipe says only "Logged", with no name or channel | X-05 | QW | — | fixed with F-03 (same snackbar line, §4.1); 38.9 (std X-05) | 464 |
 | A-36 | L | HID | Row swipe gestures are undiscoverable and absent in card view | X-42 | NI | C D-71, D-48 | **39 copy note** | 471 |
 | A-37 | L | VIS | A single search result in card view becomes one full-width card | X-35 | NI | — | — | 478 |
+| C-03 | M | HID | Digest links silently replace the user's saved Contacts view and land on a… | X-07, X-09 | NI | — | 39 (Orient Contacts step state); 38.9 (std X-07) | 768 |
+| C-04 | M | HID | Your Week day detail can't be closed; a busy day becomes a very long list | X-43 | QW | — | — | 779 |
+| C-05 | M | INC | Day-detail entries can't be tapped and show only name and time | X-35, X-43 | QW | — | — | 789 |
+| C-07 | L | HID | Heatmap squares have no day labels; the selected square is barely marked | X-34, X-43 | QW | — | 38.9 (std X-34) | 806 |
+| C-08 | L | INC | Birthday rows have no avatar, unlike every other Digest row | X-35 | QW | — | — | 813 |
+| C-09 | L | VIS | Switching Rolling 7 Days / Calendar Week makes the page jump | — | NI | — | — | 820 |
+| C-10 | L | INC | The Your Week period is set in two places, and one is labelled with jargon | X-36, X-37 | NI | — | with K-33; 38.9 (std X-36, X-37) | 827 |
+| C-13 | L | HID | "Overlooked" vs "Up Next" is unexplained; Overlooked rows give no reason | X-37 | NI | C D-12 (frame 04) | 38.9 (std X-37); **39 copy note** | 847 |
+| K-33 | L | COPY | Your Week period and Weekly digest (agrees with C-10, adds detail) | X-36 | NI | — | 38.12 (Settings page); fixed with C-10 (§4.1 merge); 38.9 (std X-36) | 3514 |
+
+### 38.14 Logging, History, Events & Compose — 51 findings
+
+| id | sev | code | short title | theme | fix | 39 link | touches | report line |
+|---|---|---|---|---|---|---|---|---:|
 | B-01 | H | DEAD | The participant editor inside Edit Group Event can't be saved: "Save… | X-08, X-30, X-32 | QW | — | — | 534 |
 | B-02 | M | INC | The same participant record has two different editors under three different… | X-24, X-28 | QW | — | 38.9 (std X-28) | 541 |
 | B-04 | M | HID | An event's title can't be changed anywhere | — | NI | — | — | 561 |
@@ -203,41 +255,6 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | B-21 | L | HID | Participant cards don't show what's different for a person | — | NI | — | — | 686 |
 | B-23 | M | HID | The Events tab can't create, plan or remind: no add button, no future events,… | X-13 | NI | — | maximumDate half with E-12 | 700 |
 | B-24 | L | COPY | The Events empty state points to "Group Log on any contact", which doesn't… | X-41 | QW | — | 38.9 (std X-41) | 710 |
-| C-03 | M | HID | Digest links silently replace the user's saved Contacts view and land on a… | X-07, X-09 | NI | — | 39 (Orient Contacts step state); 38.9 (std X-07) | 768 |
-| C-04 | M | HID | Your Week day detail can't be closed; a busy day becomes a very long list | X-43 | QW | — | — | 779 |
-| C-05 | M | INC | Day-detail entries can't be tapped and show only name and time | X-35, X-43 | QW | — | — | 789 |
-| C-07 | L | HID | Heatmap squares have no day labels; the selected square is barely marked | X-34, X-43 | QW | — | 38.9 (std X-34) | 806 |
-| C-08 | L | INC | Birthday rows have no avatar, unlike every other Digest row | X-35 | QW | — | — | 813 |
-| C-09 | L | VIS | Switching Rolling 7 Days / Calendar Week makes the page jump | — | NI | — | — | 820 |
-| C-10 | L | INC | The Your Week period is set in two places, and one is labelled with jargon | X-36, X-37 | NI | — | with K-33; 38.9 (std X-36, X-37) | 827 |
-| C-13 | L | HID | "Overlooked" vs "Up Next" is unexplained; Overlooked rows give no reason | X-37 | NI | C D-12 (frame 04) | 38.9 (std X-37); **39 copy note** | 847 |
-| D-02 | M | DEAD | After Save on Edit Contact, Back shows the stale Edit form again | X-08, X-10 | QW | — | fixes H-23 too (same cause, §4.1); 39 (D-14 trigger) | 919 |
-| D-05 | M | INC | Two different Snooze sheets on the same Profile | X-05, X-20, X-32, X-36 | QW | — | 38.9 | 942 |
-| D-08 | M | COPY | "Call unavailable. Add a phone number" on a contact that has a phone number | X-18 | QW | — | — | 964 |
-| D-09 | M | COPY | Unbound Profile says "Not tracked. Set a contact frequency" while showing a… | X-23, X-36 | NI | D D-77 | D-77 built here (D-102); 39 consumer; 38.9 (std X-36) | 971 |
-| D-10 | M | INC | Three different contact-frequency choosers, and the card and sheet use… | X-02, X-11, X-36 | NI | — | 38.9 (std X-02, X-36) | 978 |
-| D-11 | M | HID | Saving a profile layout collapses every section, and the editor's "Collapsed… | — | NI | — | with D-X01 | 985 |
-| D-13 | M | HID | The Background sheet, opened from one person, puts app-wide actions first and… | X-03, X-26 | NI | — | 38.9 (std X-03, X-26) | 999 |
-| D-14 | M | VIS | A photo background makes Profile text hard to read | X-40 | NI | — | — | 1006 |
-| D-16 | L | HID | Section chevrons point down whether the section is open or closed | X-34 | NI | C D-14 (frame B), D-67 (frame D) | 39 copy note; 38.9 (std X-34) | 1019 |
-| D-17 | L | VIS | Content scrolls visibly behind the translucent header, and the header never… | X-26, X-40 | NI | — | 38.9 (std X-26) | 1026 |
-| D-19 | L | COPY | Relationship Overview repeats itself and uses unexplained numbers | X-37 | NI | — | 38.9 (std X-37) | 1039 |
-| D-24 | M | HID | Birthday appears nowhere on the Profile | — | NI | — | — | 1070 |
-| D-29 | M | HID | The Profile has no Log button, and + → Log Interaction from a Profile doesn't… | X-07, X-25 | NI | — | 39 (would add a D-53 entry); 38.9 (std X-07) | 1101 |
-| D-33 | L | COPY | The custom snooze date flow uses an unthemed picker and leaves an ambiguous… | X-02, X-04, X-13, X-20, X-31 | none | — | 38.9 (X-04) | 1124 |
-| E-03 | M | DEAD | A birthday can never be removed, and Add Contact can't set one (moved from… | X-13 | QW | — | — | 1230 |
-| E-04 | M | INC | Add Contact lacks many of the fields Edit Contact has, and Show More can't be… | X-21, X-22 | NI | — | 39 (frame 03 redraw if Add changes) | 1247 |
-| E-05 | M | HID | Choosing "Bound" on Add Contact pre-selects "Custom…" with 0 days and shows a… | X-11, X-22, X-29 | QW | D D-51 | D-51 built here (D-102); 39 consumer; 38.9 (std X-29) | 1259 |
-| E-06 | M | HID | Bad phone numbers and emails are accepted silently on Add; Profile then says… | X-18, X-29 | NI | — | 38.9 (std X-29) | 1275 |
-| E-11 | M | INC | Contact frequency: Add, Edit and Update agree, but the rest of the app uses… | X-11, X-36 | NI | C D-51, D-14 | 38.9 (std X-36); **39 copy note** | 1326 |
-| E-12 | M | HID | "Pick date" for Last spoke lets you choose a future date, then rejects it… | X-13, X-14 | QW | — | with F-13, B-23 picker half (§4.1 maximumDate); same control as D-50/D-94 work in this phase; 38.9 (std X-14) | 1339 |
-| E-13 | M | VIS | "Not yet" never looks selected, and selected chips use two different styles… | X-22, X-34 | QW | B → D-94 | D-94 built here (D-102); 39 consumer; 38.9 (std X-34) | 1346 |
-| E-17 | L | INC | Custom date fields are free-text boxes that accept anything; Birthday uses a… | X-13, X-19, X-29 | NI | — | 38.9 (std X-29) | 1390 |
-| E-18 | L | LEFT | Update Contact lists every custom field and then a "Custom Fields" row with… | X-19 | NI | — | — | 1397 |
-| E-19 | L | INC | Links can be edited only in Edit Contact | X-18 | NI | — | — | 1403 |
-| E-21 | L | INC | Update Contact's "Updated" badge shows only on the most recently edited row | X-10 | QW | — | — | 1417 |
-| E-27 | L | HID | Add Contact's duplicate-name warning offers no way to open the existing… | X-22 | NI | — | — | 1468 |
-| E-28 | L | VIS | The empty "Pet photo" custom field shows a person-style initials avatar "PP" | X-19, X-21 | NI | — | — | 1478 |
 | F-02 | M | HID | Saving a full log, group log, edit or delete gives no confirmation and no… | X-05 | QW | C D-16 ("close the loop"), Discretion item 6 | 38.9 (std X-05); **39 copy note** | 1579 |
 | F-03 | M | HID | Quick Log silently switches channel to whatever was last picked in Log… | X-05, X-24 | QW | C D-16, D-53, D-34, frame A | with A-35; 39 copy note; 38.9 (std X-05) | 1595 |
 | F-04 | M | INC | Bulk Quick Log records channel "unspecified" and has no Add Note, unlike… | X-05, X-24, X-36 | QW | C D-53, D-16, frame A | 38.9 (std X-05, X-36); **39 copy note** | 1606 |
@@ -260,7 +277,6 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | F-25 | L | HID | The Quick Log contact picker keeps the previous search between opens | X-09 | QW | — | — | 1821 |
 | F-26 | L | VIS | After a bulk Quick Log, selected cards change position while selection mode… | X-06 | NI | — | 38.9 (std X-06) | 1829 |
 | F-27 | L | HID | In a long history the History controls are a long scroll away, and History… | — | NI | — | — | 1843 |
-| H-23 | M | DEAD | Archiving from a Profile you've just edited lands on the stale Edit form for… | X-08, X-10 | QW | — | 38.12 (archive flow); fixed by D-02 change | 2610 |
 | J-01 | H | HID | A message Compose presents as a text is sent as an email, and Compose never… | X-18 | QW | A D-15 | 39 consumer (D-100) | 3002 |
 | J-02 | M | HID | After "Yes, log interaction" Compose closes silently, and the banner still… | X-05 | NI | D D-76 | D-76 built here (D-102); 39 consumer; 38.9 (std X-05) | 3010 |
 | J-03 | M | HID | After "Not yet", the reminder disappears until the app is closed and reopened | X-10 | NI | D D-76 | with D-76 "Later" (D-102); 40 (40-CONTEXT D-01 lifecycle heuristics) | 3017 |
@@ -273,7 +289,6 @@ Severity: H/M/L. Fix tag from report §5 (QW) and §6 (NI). Theme = every `X-NN`
 | J-14 | L | VIS | "Subject copied" appears far from "Copy subject", often off-screen | X-05 | NI | — | 38.9 (std X-05) | 3095 |
 | J-15 | L | HID | No-destination Compose offers an email switch for a person with no email, and… | X-18 | NI | — | — | 3102 |
 | J-16 | L | VIS | A long message makes the whole screen scroll: header gone, actions pushed… | X-31 | NI | — | — | 3109 |
-| K-33 | L | COPY | Your Week period and Weekly digest (agrees with C-10, adds detail) | X-36 | NI | — | 38.12 (Settings page); fixed with C-10 (§4.1 merge); 38.9 (std X-36) | 3514 |
 
 ### 38.12 Lifecycle, import & Settings — 71 findings
 

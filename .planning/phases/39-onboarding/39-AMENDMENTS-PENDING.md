@@ -1,4 +1,4 @@
-# Phase 39 — Pending amendments from Phases 38.9–38.12
+# Phase 39 — Pending amendments from Phases 38.9–38.15
 
 > **What this is.** A running list of decisions made in the UX-fix phases 38.9, 38.10, 38.11 and
 > 38.12 that affect Phase 39's current docs (`39-CONTEXT.md`, `39-LEDGER.md`, the mockup in
@@ -40,10 +40,34 @@
 
 _(none yet)_
 
-## 38.11 — Everyday Screens UX
+## Roadmap split — 2026-10-10 (owner)
+
+The original 38.11 "Everyday Screens" was split by seam, and a new feature phase was added before 39. Source: owner, 2026-10-10 plan-phase 38.9 session ("Fucking fine, go ahead" approving the split; "B-23 should be done before phase 39, it will need a tutorial journey I'm sure"). ROADMAP entries 38.11, 38.13–38.15.
+
+| # | Change | Touches in 39 | What would change | Status |
+|---|---|---|---|---|
+| R-1 | D-95 (Active Contacts) and D-98 (empty-state button + Unbound line) are built in **38.13**, not 38.11 | D-101 ("built in 38.11"); D-100 table if it names 38.11 | Phase number in the record | Verify |
+| R-2 | D-76 (one "Did you send it?") and J-02/J-05/J-08 are built in **38.14**, not 38.11 | D-102 (D-76 → 38.11); D-15 Reach Out lesson prerequisites | Phase number in the record | Verify |
+| R-3 | D-50/D-51/D-87/D-94 and D-77 stay in **38.11** (now "Profile & Contact Forms") | D-102 | None (number unchanged) | Verify |
+| R-4 | Phase 39 now depends on **38.15**, and the fix phases are 38.9–38.14 | 39 roadmap "Before planning" note and goal text ("Phases 38.9–38.12") | Wording of the range | Verify |
+| R-5 | New feature phase **38.15 Events — Plan, Create & Remind** (audit B-23): future group events, an Events-tab create entry, reminders; owner wants a tutorial journey for it | D-26 (Group Events small moment, "no advanced management"); **D-29 ("no event-reminder tutorial")**; D-12 Orient copy if Events changes meaning | 39 gains an Events journey; D-29's "no event-reminder tutorial" would be reversed (owner said a journey is needed — confirm scope at 39) | Verify |
+
+## 38.11 — Profile & Contact Forms UX
 
 _(none yet)_
 
 ## 38.12 — Lifecycle, Import & Settings UX
+
+_(none yet)_
+
+## 38.13 — Contacts List, Search & Digest UX
+
+_(none yet)_
+
+## 38.14 — Logging, History, Events & Compose UX
+
+_(none yet)_
+
+## 38.15 — Events: Plan, Create & Remind
 
 _(none yet)_
