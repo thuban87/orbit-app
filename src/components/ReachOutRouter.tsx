@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { EndpointSelector } from "@/components/EndpointSelector";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { ReachRoutes } from "@/db/interaction-assist-read";
@@ -93,7 +94,7 @@ export function ReachOutRouter({
   };
 
   return (
-    <Modal
+    <RegisteredModal
       visible={visible}
       transparent
       animationType="fade"
@@ -143,7 +144,7 @@ export function ReachOutRouter({
           )}
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

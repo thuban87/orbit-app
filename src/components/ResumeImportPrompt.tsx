@@ -1,13 +1,7 @@
 import { type NavigationProp, useNavigation } from "@react-navigation/native";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/import-session-dao";
 import { navigateIntoTab } from "@/navigation/tab-entry";
@@ -103,7 +97,7 @@ export function ResumeImportPrompt({
   };
 
   return (
-    <Modal
+    <RegisteredModal
       visible
       transparent
       animationType="fade"
@@ -186,7 +180,7 @@ export function ResumeImportPrompt({
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

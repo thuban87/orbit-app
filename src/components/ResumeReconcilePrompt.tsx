@@ -1,13 +1,7 @@
 import { type NavigationProp, useNavigation } from "@react-navigation/native";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/reconcile-session-dao";
 import { navigateIntoTab } from "@/navigation/tab-entry";
@@ -58,7 +52,7 @@ export function ResumeReconcilePrompt({
     }
   };
   return (
-    <Modal
+    <RegisteredModal
       visible
       transparent
       animationType="fade"
@@ -137,7 +131,7 @@ export function ResumeReconcilePrompt({
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

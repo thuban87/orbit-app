@@ -78,8 +78,8 @@ describe("recovery prompts keep their buttons reachable at large text (D-49)", (
     describe(prompt.name, () => {
       const text = source(prompt.path);
 
-      it("stays an RN Modal with an explicit-action-only exit", () => {
-        expect(text).toMatch(/<Modal\b/);
+      it("stays an RN Modal window (through RegisteredModal, 38.9 D-24) with an explicit-action-only exit", () => {
+        expect(text).toMatch(/<RegisteredModal\b/);
         expect(text).toContain("onRequestClose={() => undefined}");
       });
 

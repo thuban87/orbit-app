@@ -4,7 +4,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import {
   type AppSettingsPatch,
   getAppSettings,
@@ -965,7 +965,7 @@ export function SettingsAppearanceScreen() {
             </Text>
           </Pressable>
 
-          <Modal
+          <RegisteredModal
             visible={sunPickerOpen}
             transparent
             animationType="fade"
@@ -1045,7 +1045,7 @@ export function SettingsAppearanceScreen() {
                 />
               </View>
             </View>
-          </Modal>
+          </RegisteredModal>
         </View>
 
         {/* Profile Defaults (D-05) — the GLOBAL default profile layout/background
@@ -1156,7 +1156,7 @@ export function SettingsAppearanceScreen() {
 
           {/* Shared picker: "Default / None" (writes null) first, then every
               template for the open axis. */}
-          <Modal
+          <RegisteredModal
             visible={openTemplatePicker !== null}
             transparent
             animationType="fade"
@@ -1239,7 +1239,7 @@ export function SettingsAppearanceScreen() {
                 />
               </View>
             </View>
-          </Modal>
+          </RegisteredModal>
         </View>
       </ScrollView>
     </View>

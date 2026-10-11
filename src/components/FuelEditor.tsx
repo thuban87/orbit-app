@@ -43,13 +43,13 @@ import { useState } from "react";
 import {
   FlatList,
   Linking,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { FuelKind } from "@/db/fuel-dao";
 import type { FuelItem } from "@/db/fuel-read";
 import { formatFuelAge } from "@/services/fuel-age";
@@ -152,7 +152,7 @@ function KindPicker({
         <Text style={{ color: colors.textPrimary }}>{kindLabel(value)}</Text>
       </Pressable>
 
-      <Modal
+      <RegisteredModal
         visible={open}
         transparent
         animationType="fade"
@@ -219,7 +219,7 @@ function KindPicker({
             />
           </View>
         </View>
-      </Modal>
+      </RegisteredModal>
     </>
   );
 }

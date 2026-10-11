@@ -5,7 +5,6 @@ import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import {
   type AppSettings,
   getAppSettings,
@@ -397,7 +397,7 @@ export function SettingsContactsScreen() {
         onDiscarded={() => navigation.navigate("ReconcileGrid")}
       />
 
-      <Modal
+      <RegisteredModal
         visible={phoneRegionPickerOpen}
         transparent
         animationType="slide"
@@ -470,7 +470,7 @@ export function SettingsContactsScreen() {
             />
           </View>
         </View>
-      </Modal>
+      </RegisteredModal>
     </View>
   );
 }

@@ -1,7 +1,8 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
 import { useEffect, useState } from "react";
-import { Modal, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { AppText, Button, GlassSurface } from "@/components/ui";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import { getAppSettings, markAiFirstUseDisclosed } from "@/db/app-settings-dao";
@@ -86,7 +87,7 @@ export function AIFirstUseDisclosure() {
   }
 
   return (
-    <Modal
+    <RegisteredModal
       transparent
       animationType="fade"
       visible={visible}
@@ -124,7 +125,7 @@ export function AIFirstUseDisclosure() {
           </View>
         </GlassSurface>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

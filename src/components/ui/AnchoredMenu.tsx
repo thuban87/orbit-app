@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,7 @@ import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { RegisteredModal } from "./RegisteredModal";
 
 const MENU_EDGE = SPACING.base;
 const DEFAULT_WIDTH = 224;
@@ -146,7 +146,7 @@ export function AnchoredMenu({
   });
 
   return (
-    <Modal
+    <RegisteredModal
       visible
       transparent
       animationType="fade"
@@ -219,7 +219,7 @@ export function AnchoredMenu({
           </GlassSurface>
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

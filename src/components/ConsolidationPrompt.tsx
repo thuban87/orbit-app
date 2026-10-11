@@ -1,7 +1,8 @@
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { ImportSessionRow } from "@/db/import-session-read";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
@@ -69,7 +70,7 @@ export function ConsolidationPrompt({
   const { colors } = useTheme();
 
   return (
-    <Modal
+    <RegisteredModal
       visible={visible}
       transparent
       animationType="fade"
@@ -132,7 +133,7 @@ export function ConsolidationPrompt({
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Switch,
   TextInput,
   View,
 } from "react-native";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { MemoryRow } from "@/db/memories-read";
 import {
   DEFAULT_MEMORY_TYPE_KEY,
@@ -107,7 +107,7 @@ function TypePicker({
       >
         <AppText role="body">{selected}</AppText>
       </Pressable>
-      <Modal
+      <RegisteredModal
         transparent
         visible={open}
         animationType="fade"
@@ -176,7 +176,7 @@ function TypePicker({
             />
           </View>
         </View>
-      </Modal>
+      </RegisteredModal>
     </>
   );
 }

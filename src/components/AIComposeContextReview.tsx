@@ -1,7 +1,8 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
-import { Modal, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { AppText, Button, GlassSurface } from "@/components/ui";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { buildContactPromptReview } from "@/screens/settings-ai-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -24,7 +25,11 @@ export function AIComposeContextReview({
   const review = buildContactPromptReview(resolved, context);
 
   return (
-    <Modal animationType="slide" visible={visible} onRequestClose={onDismiss}>
+    <RegisteredModal
+      animationType="slide"
+      visible={visible}
+      onRequestClose={onDismiss}
+    >
       <ScrollView
         testID="ai-compose-context-review"
         contentContainerStyle={[
@@ -54,7 +59,7 @@ export function AIComposeContextReview({
           />
         </View>
       </ScrollView>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

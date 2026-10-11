@@ -19,7 +19,6 @@ export {
   type ConfirmDialogProps,
 } from "./ConfirmDialog";
 export { GlassSurface, type GlassSurfaceProps } from "./GlassSurface";
-export { Modal, type ModalProps } from "./Modal";
 export {
   type OverlayLifecycle,
   SCRIM_OPACITY,

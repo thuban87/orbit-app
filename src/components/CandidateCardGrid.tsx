@@ -1,13 +1,6 @@
 import { Image } from "expo-image";
 import { useState } from "react";
-import {
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import {
   ConfidenceChip,
@@ -21,6 +14,7 @@ import {
 } from "@/components/candidate-card-a11y";
 import { isBulkActionAvailable } from "@/components/candidate-card-grid-actions";
 import { Icon } from "@/components/icons/Icon";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { useTheme } from "@/theme";
 
 export type BulkAction =
@@ -315,7 +309,7 @@ export function CandidateCardGrid({
         </Pressable>
       ) : null}
 
-      <Modal
+      <RegisteredModal
         visible={actionsOpen}
         transparent
         animationType="fade"
@@ -357,7 +351,7 @@ export function CandidateCardGrid({
               ))}
           </View>
         </View>
-      </Modal>
+      </RegisteredModal>
     </View>
   );
 }

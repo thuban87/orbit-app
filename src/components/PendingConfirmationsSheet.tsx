@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import {
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
 } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
 import { Avatar } from "@/components/Avatar";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   markAssistDismissed,
@@ -150,7 +150,7 @@ export function PendingConfirmationsSheet({
   };
 
   return (
-    <Modal
+    <RegisteredModal
       visible={visible}
       transparent
       animationType="fade"
@@ -238,7 +238,7 @@ export function PendingConfirmationsSheet({
           )}
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

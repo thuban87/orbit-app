@@ -19,12 +19,12 @@ import { useRef, useState } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { UnscopedTheme, useTheme, useUnscopedTheme } from "@/theme";
 
 /** One row in the overflow sheet. */
@@ -72,7 +72,7 @@ export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
         <Text style={[styles.glyph, { color: colors.textSecondary }]}>⋯</Text>
       </Pressable>
 
-      <Modal
+      <RegisteredModal
         visible={open}
         transparent
         animationType="fade"
@@ -132,7 +132,7 @@ export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
             </View>
           </View>
         </UnscopedTheme>
-      </Modal>
+      </RegisteredModal>
     </>
   );
 }

@@ -52,6 +52,11 @@ vi.mock("react", async (original) => ({
     ];
   },
 }));
+// 38.9 D-24: raw RN Modal sites render through RegisteredModal; the window
+// itself is unchanged, so the wrapper is the mocked RN Modal here.
+vi.mock("@/components/ui/RegisteredModal", () => ({
+  RegisteredModal: "Modal",
+}));
 vi.mock("react-native", () => ({
   View: "View",
   Pressable: "Pressable",

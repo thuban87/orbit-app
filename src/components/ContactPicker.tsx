@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getExecutor } from "@/db/database";
 import { listPickerContacts, type PickerContactRow } from "@/db/picker-read";
 import { filterPicker, pickerRowMarkers } from "@/logic/contact-picker-order";
@@ -167,7 +167,7 @@ export function ContactPicker(props: ContactPickerProps) {
   }, [confirming, dismiss, props, selectedContactIds]);
 
   return (
-    <Modal
+    <RegisteredModal
       transparent
       animationType="fade"
       visible={visible}
@@ -348,7 +348,7 @@ export function ContactPicker(props: ContactPickerProps) {
           ) : null}
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 

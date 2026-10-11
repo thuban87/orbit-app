@@ -28,7 +28,10 @@ const HIDDEN_INSIDE_NAVIGATOR = {
   AssistBanner: "src/components/AssistBanner.tsx",
 } as const;
 
-/** Separate-window RN Modals: exempt, asserted to render `<Modal`. */
+/**
+ * Separate-window RN Modals: exempt, asserted to render `<RegisteredModal`
+ * (the app's only RN Modal wrapper, 38.9 D-24).
+ */
 const SEPARATE_WINDOW_MODALS = {
   ResumeImportPrompt: "src/components/ResumeImportPrompt.tsx",
   ResumeReconcilePrompt: "src/components/ResumeReconcilePrompt.tsx",
@@ -115,11 +118,11 @@ describe("App.tsx shell overlays outside the tab navigator (D-42 A)", () => {
   it("exempts the resume prompts only because they are separate-window RN Modals", () => {
     for (const [name, path] of Object.entries(SEPARATE_WINDOW_MODALS)) {
       const source = read(path);
-      expect(source, `${name} renders an RN Modal`).toMatch(
-        /import \{[^}]*\bModal\b[^}]*\} from "react-native"/,
+      expect(source, `${name} renders an RN Modal window`).toMatch(
+        /import \{ RegisteredModal \} from "@\/components\/ui\/RegisteredModal"/,
       );
       const start = source.indexOf(`export function ${name}(`);
-      expect(source.slice(start)).toMatch(/return \(\s*<Modal\b/);
+      expect(source.slice(start)).toMatch(/return \(\s*<RegisteredModal\b/);
     }
   });
 

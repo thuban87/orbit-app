@@ -3,7 +3,6 @@ import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +23,7 @@ import {
 } from "@/components/contact-methods-editor-model";
 import { LinkExistingChoiceButton } from "@/components/ExistingContactChoice";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader, listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -617,7 +617,7 @@ export function ImportReviewScreen({
           Import
         </Text>
       </Pressable>
-      <Modal
+      <RegisteredModal
         visible={duplicateOutcome !== null}
         transparent
         animationType="fade"
@@ -668,7 +668,7 @@ export function ImportReviewScreen({
             ) : null}
           </View>
         </View>
-      </Modal>
+      </RegisteredModal>
     </ScrollView>
   );
 }

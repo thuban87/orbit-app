@@ -28,7 +28,6 @@ import {
   findNodeHandle,
   type LayoutChangeEvent,
   Pressable,
-  Modal as RNModal,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -60,6 +59,7 @@ import {
   lightboxScrimOpacity,
   shouldDismiss,
 } from "@/components/photo-lightbox-logic";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { UnscopedTheme, useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
@@ -267,7 +267,7 @@ export function PhotoLightbox({
   if (photo == null || display == null) return null;
 
   return (
-    <RNModal
+    <RegisteredModal
       visible={visible}
       transparent
       animationType="fade"
@@ -333,7 +333,7 @@ export function PhotoLightbox({
           </View>
         </UnscopedTheme>
       </GestureHandlerRootView>
-    </RNModal>
+    </RegisteredModal>
   );
 }
 

@@ -15,19 +15,13 @@
  * lives in the shared `selectorItems` helper (behavior unchanged).
  */
 import { useState } from "react";
-import {
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import {
   selectorAccessibilityValue,
   selectorItems,
 } from "@/components/selector-a11y";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { useTheme } from "@/theme";
 import type { FieldWidgetProps } from "./types";
 
@@ -66,7 +60,7 @@ export function DropdownFieldWidget({
         </Text>
       </Pressable>
 
-      <Modal
+      <RegisteredModal
         visible={open}
         transparent
         animationType="fade"
@@ -133,7 +127,7 @@ export function DropdownFieldWidget({
             />
           </View>
         </View>
-      </Modal>
+      </RegisteredModal>
     </>
   );
 }

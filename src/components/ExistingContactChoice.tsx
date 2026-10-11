@@ -13,9 +13,10 @@
  * photo refreshes here too (display revision, D-01). All colours resolve
  * through `useTheme()`.
  */
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import type { CandidateChoice } from "@/components/CandidateCardGrid";
+import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -38,7 +39,7 @@ export function ExistingContactChoiceSheet({
 }) {
   const { colors } = useTheme();
   return (
-    <Modal
+    <RegisteredModal
       visible={visible}
       transparent
       animationType="fade"
@@ -90,7 +91,7 @@ export function ExistingContactChoiceSheet({
           ) : null}
         </View>
       </View>
-    </Modal>
+    </RegisteredModal>
   );
 }
 
