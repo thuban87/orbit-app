@@ -90,12 +90,22 @@ vi.mock("@/db/uid", () => ({ newUid: () => "uid" }));
 vi.mock("@/logic/group-log-participant-inputs", () => ({
   toGroupParticipantInputs: () => [],
 }));
-vi.mock("@/navigation/discard-keep-guard", () => ({
+// The guard is mocked; its options are captured so the busy hold (fix-pass
+// WR-02) can be fed to the real `decideGuardOnRemove`.
+const { useDiscardKeepGuard } = vi.hoisted(() => ({
   useDiscardKeepGuard: vi.fn(),
 }));
+vi.mock("@/navigation/discard-keep-guard", () => ({ useDiscardKeepGuard }));
+// The real guard module (imported below for its pure decision) imports
+// react-navigation; stub it so its react-native chain never loads.
+vi.mock("@react-navigation/native", () => ({ useNavigation: vi.fn() }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 
 const { GroupLogScreen } = await import("./GroupLogScreen");
+// The real guard decision, fed the busy flag the screen passes (WR-02).
+const { decideGuardOnRemove } = await vi.importActual<
+  typeof import("@/navigation/discard-keep-guard")
+>("@/navigation/discard-keep-guard");
 
 type TestElement = ReactElement<Record<string, unknown>>;
 function nodes(node: ReactNode): TestElement[] {
@@ -222,6 +232,49 @@ describe("GroupLogScreen Save (38.9 D-19; F-12)", () => {
     expect(headers).toHaveLength(1);
     expect(headers[0].props.variant).toBe("child");
     expect(headers[0].props.title).toBe("Group Log");
+  });
+
+  it("holds Back with no prompt while the save is in flight (fix-pass WR-02)", async () => {
+    const write = { resolve: () => {} };
+    createGroupEvent.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          write.resolve = resolve;
+        }),
+    );
+    useDiscardKeepGuard.mockClear();
+    const tree = render({ title: "Dinner", participantIds: [1] });
+    const options = useDiscardKeepGuard.mock.calls.at(-1)?.[0] as
+      | { busyRef?: { current: boolean } }
+      | undefined;
+    const busyRef = options?.busyRef;
+    expect(busyRef?.current).toBe(false);
+
+    (byTestId(tree, "group-log-save").props.onPress as () => void)();
+    // Claimed in the same tick as the tap, before the write resolves.
+    expect(busyRef?.current).toBe(true);
+    expect(
+      decideGuardOnRemove({
+        bypass: false,
+        busy: busyRef?.current,
+        hasUnsavedChanges: true,
+        actionType: "GO_BACK",
+      }),
+    ).toBe("hold");
+
+    write.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(busyRef?.current).toBe(false);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws the header Back disabled only while saving (D-26; WR-02)", () => {
+    const idle = render().find((element) => element.type === "ShellAppBar");
+    expect(idle?.props.backDisabled).toBe(false);
+    const saving = render({ saving: true }).find(
+      (element) => element.type === "ShellAppBar",
+    );
+    expect(saving?.props.backDisabled).toBe(true);
   });
 
   it("typing in Title clears only titleError", () => {

@@ -25,6 +25,7 @@ import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 
 const GROUP_FUTURE_DATE_MESSAGE = "Events can't be in the future.";
 
@@ -58,6 +59,9 @@ export function GroupLogScreen({
   );
   const [pickerVisible, setPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Synchronous in-flight flag: `saving` state lags a render, so the guard
+  // reads this ref to hold Back while the save runs (fix-pass WR-02).
+  const savingRef = useRef(false);
   // The operation (save) failure; rendered above Log event, never under a
   // field, and not cleared by typing (38.9 D-19, D-27; cycle-5 C5-M4).
   const [error, setError] = useState<string | null>(null);
@@ -83,10 +87,12 @@ export function GroupLogScreen({
   useDiscardKeepGuard({
     hasUnsavedChanges: snapshot !== seedRef.current,
     bypassRef,
+    // A save in flight holds every exit, with no prompt (fix-pass WR-02).
+    busyRef: savingRef,
   });
 
   async function save() {
-    if (saving) return;
+    if (savingRef.current) return;
     if (title.trim().length === 0) {
       // Save stays pressable (CAPT-14): the error shows under Title, which is
       // scrolled into view and focused once the error has laid out (D-19).
@@ -94,6 +100,7 @@ export function GroupLogScreen({
       reveal(titleFieldRef, titleInputRef);
       return;
     }
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setTitleError(null);
     setError(null);
@@ -116,14 +123,17 @@ export function GroupLogScreen({
       setError("Couldn't save this event. Please try again.");
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   }
 
   // House header (38.9 D-16, D-44): its Back calls goBack, which the guard
-  // above intercepts (D-13). No opaque screen fill: the theme art shows (D-17).
+  // above intercepts (D-13). While a save runs the guard holds Back, so it
+  // draws disabled (D-26; WR-02). No opaque screen fill: the theme art shows
+  // (D-17).
   return (
     <View style={styles.screen}>
-      <ShellAppBar variant="child" title="Group Log" />
+      <ShellAppBar variant="child" title="Group Log" backDisabled={saving} />
       <ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}
