@@ -41,6 +41,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Contact reconciliation | `contact-reconciliation.md` | merge/dedupe logic + `screens/DuplicateReviewScreen.tsx` (exact DAOs to confirm when authored) | 20 |
 | Interaction assist / Reach Out | `interaction-assist.md` | `db/interaction-assist-dao.ts`, `db/interaction-assist-read.ts`, `logic/assist-eligibility.ts`, `services/reach-out/handoff.ts`, `services/interaction-assist-sweep.ts`, `stores/assist-store.ts`; assist/reach components (`components/ReachOutRouter.tsx`, `EndpointSelector.tsx`, `AssistBanner.tsx`, `AssistConfirmation.tsx`, `PendingConfirmationsSheet.tsx`) | 21 |
 | Glossary | `glossary.md` | `constants/glossary.ts`, `constants/product-labels.ts`, `constants/glossary-contract.test.ts` (user-visible labels only; owns no table) | 38.9 |
+| UX standards | `ux-standards.md` | `stores/confirm-store.ts`, `components/ui/DialogHost.tsx`, `stores/overlay-registry-store.ts`, `components/ui/RegisteredModal.tsx`, `navigation/discard-keep-guard.ts`, `navigation/tab-history.ts`, `components/ui/` shared primitives (OrbitSwitch, OptionSheet, FieldError, EmptyState, chip-tone), `utils/plural.ts` (app-wide interaction rules; owns no table) | 38.9 |
 
 **Assist / "reach out" (phase 21) — resolved to its own doc `interaction-assist.md`.** It is a
 standalone subsystem (own `interaction_assists` table, DAOs, and handoff/sweep services), not a

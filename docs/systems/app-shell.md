@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-10-08
-**Updated by phase:** 38.8-history-navigation-ux
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -206,9 +206,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Applying destructive emphasis
 
-1. Screens obtain colors through `useTheme().colors`.
-2. The Archived contacts purge action uses `colors.danger`; native confirmation alerts use the platform destructive style.
-3. No screen contains a raw hex color because palette literals belong only in `theme-presets.ts`.
+Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.md#destructive-actions) (38.9 D-30, D-32): reversible actions act at once with Undo, irreversible ones use the themed, non-dismissable destructive confirm (`confirm({ destructive: true })`, D-06, D-24). Native `Alert.alert` is no longer used for them (D-27). Colours still come from theme tokens (`colors.danger`); palette literals belong only in `theme-presets.ts`.
 
 ### Applying the visual system
 
@@ -522,3 +520,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-30 | 38.6 | The assist banner renders in flow at the top of the navigator's safe-area column (mounted by `RootNavigator`, no longer an absolute overlay from `App.tsx`), so a pending "Did you reach …?" question pushes every screen down instead of covering its app bar (D-38). |
 | 2026-09-30 | 38.6 | Review WR5-01: the in-flow assist banner publishes its height to `shell-offset-store`; `useWindowMeasurement` treats it as a re-measure trigger, so window obstacles (the Orrery System selector and view-options triggers, the camera controls) re-measure when the banner appears, grows or leaves. |
 | 2026-10-08 | 38.8 | The `Sheet` `scrollBody={false}` opt-out list no longer includes History's retired `DateDetailSheet` (now OrreryContactsSheet and ProfileRelationshipSheets); History knowledge-row edits still need `MemoryHistory` in every Profile-hosting stack. |
+| 2026-10-11 | 38.9 | "Applying destructive emphasis" now points to the app-wide UX standards (`ux-standards.md`: destructive-action, feedback, dialog, guard, header/Back, states, dates and count rules). |
