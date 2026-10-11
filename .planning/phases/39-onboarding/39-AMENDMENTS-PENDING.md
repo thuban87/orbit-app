@@ -35,6 +35,7 @@
 | 13 | D-30 / D-39 / D-46 — destructive-action and feedback rules; snackbar copy "Logged Message with Ann" | D-57, D-92 (Restart tutorials); intercept copy ("the usual Logged snackbar follows") | Restart tutorials follows the rule (39 planner's call); any quoted snackbar copy uses the verb-first pattern | Verify |
 | 14 | D-02 — A-30 (+ announced "Add", tab labels) stays in Phase 40 | Frame 07 TalkBack line expects "Add, button" | 39 cannot assume the + label until 40 (or 39 adds it as a prerequisite) | Verify |
 | 15 | D-36 / D-37 — the + stays where it is (no hiding mid-scroll or over the Contacts panel) | Lesson pointers whose targets the + may cover (slice4 K-30 note) | Lesson placement must avoid the + corner | Verify |
+| 16 | D-38 (38.9-07 execution finding, 2026-10-11) — the Orrery empty-state "Add Contact" button still jumps to the Contacts tab; it is not a + form, so 38.9 left it | D-70, D-86 (first-run Acquire → Create hosting); any frame where the empty Orrery offers Add Contact | Product question: should that button also open Create over the current tab like D-38? Owner call when 39 plans first run | Verify |
 
 ## 38.10 — Fuel Retirement, Things to Remember & Sharing
 
