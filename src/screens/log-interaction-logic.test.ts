@@ -4,6 +4,7 @@ import {
   applyChannelChange,
   buildLogInteractionInput,
   defaultsForChannel,
+  isLogInteractionDirty,
   ORDINARY_LOG_CHANNEL_OPTIONS,
   resolveInitialAllowAi,
   resolveInitialChannel,
@@ -211,5 +212,32 @@ describe("log-interaction-logic — ordinary-log channel options + Allow-AI seam
     expect(resolveInitialAllowAi()).toBe(0);
     expect(resolveInitialAllowAi(0)).toBe(0);
     expect(resolveInitialAllowAi(1)).toBe(1);
+  });
+});
+
+describe("isLogInteractionDirty (F-01; D-13, D-15)", () => {
+  it("is off while the contact picker shows (no contact yet)", () => {
+    expect(
+      isLogInteractionDirty({
+        contactId: null,
+        seedSnapshot: "x",
+        current: "y",
+      }),
+    ).toBe(false);
+  });
+
+  it("is off until seed() has resolved", () => {
+    expect(
+      isLogInteractionDirty({ contactId: 5, seedSnapshot: null, current: "y" }),
+    ).toBe(false);
+  });
+
+  it("is dirty only when the form differs from its seeded snapshot", () => {
+    expect(
+      isLogInteractionDirty({ contactId: 5, seedSnapshot: "x", current: "x" }),
+    ).toBe(false);
+    expect(
+      isLogInteractionDirty({ contactId: 5, seedSnapshot: "x", current: "y" }),
+    ).toBe(true);
   });
 });

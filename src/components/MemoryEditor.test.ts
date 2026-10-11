@@ -24,7 +24,12 @@ vi.mock("./MemoryCard", () => ({ MemoryCard: "MemoryCard" }));
 vi.mock("./ui", () => ({ AppText: "AppText" }));
 
 import type { MemoryRow } from "@/db/memories-read";
-import { initialDraft, initialEditorState } from "./MemoryEditor";
+import {
+  initialDraft,
+  initialEditorState,
+  isMemoryDraftDirty,
+  memoryDraftState,
+} from "./MemoryEditor";
 
 describe("initialDraft", () => {
   it("keeps a new Memory's visibility inherited", () => {
@@ -56,5 +61,60 @@ describe("initialEditorState (D-73: post-log Edit Memory opens its form)", () =>
       editing: null,
       draft: null,
     });
+  });
+});
+
+describe("memory draft dirty state (D-14, D-61; review C2-M1)", () => {
+  const memory = {
+    id: 3,
+    type: "general",
+    value: "Likes tea",
+    note: null,
+    pinned: 0,
+    outdated: 0,
+    hidden: null,
+  } as unknown as MemoryRow;
+
+  it("an unopened or untouched draft is clean", () => {
+    expect(isMemoryDraftDirty(initialDraft(), initialDraft())).toBe(false);
+    expect(isMemoryDraftDirty(initialDraft(memory), initialDraft(memory))).toBe(
+      false,
+    );
+  });
+
+  it("typing makes the draft dirty", () => {
+    expect(
+      isMemoryDraftDirty(initialDraft(), { ...initialDraft(), value: "a" }),
+    ).toBe(true);
+    expect(
+      isMemoryDraftDirty(initialDraft(memory), {
+        ...initialDraft(memory),
+        note: "x",
+      }),
+    ).toBe(true);
+    expect(
+      isMemoryDraftDirty(initialDraft(), { ...initialDraft(), pinned: true }),
+    ).toBe(true);
+  });
+
+  it("text typed and then erased reads as untouched", () => {
+    expect(
+      isMemoryDraftDirty(initialDraft(), { ...initialDraft(), value: "" }),
+    ).toBe(false);
+  });
+
+  it("memoryDraftState reports open and dirty", () => {
+    expect(memoryDraftState(null, null)).toEqual({ open: false, dirty: false });
+    expect(memoryDraftState(null, initialDraft())).toEqual({
+      open: true,
+      dirty: false,
+    });
+    expect(memoryDraftState(memory, initialDraft(memory))).toEqual({
+      open: true,
+      dirty: false,
+    });
+    expect(
+      memoryDraftState(null, { ...initialDraft(), value: "Birthday" }),
+    ).toEqual({ open: true, dirty: true });
   });
 });

@@ -435,3 +435,72 @@ describe("useDiscardKeepGuard requestClose (D-61)", () => {
     expect(nav.dispatch).not.toHaveBeenCalled();
   });
 });
+
+describe("+ → Memory Back sequence (G-12; D-14, review C2-M1)", () => {
+  // MemoryScreen's options: no route-level dirt, the open draft is the
+  // sub-editor, close = memoryEditorRef.current?.closeDraft().
+  const memoryGuard = (open: boolean, dirty: boolean, bypass = false) => {
+    const closeDraft = vi.fn();
+    const mounted = mountGuard(false, bypass, {
+      open,
+      dirty,
+      close: closeDraft,
+    });
+    return { ...mounted, closeDraft };
+  };
+
+  it("a clean open draft closes on Back and the user stays", () => {
+    const { fire, closeDraft } = memoryGuard(true, false);
+    const event = fire({ type: "GO_BACK" });
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(closeDraft).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("a dirty open draft prompts; Discard closes the draft and stays", async () => {
+    const { fire, closeDraft } = memoryGuard(true, true);
+    fire({ type: "GO_BACK" });
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(closeDraft).toHaveBeenCalledOnce();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("Keep editing closes nothing", async () => {
+    const { fire, closeDraft } = memoryGuard(true, true);
+    fire({ type: "GO_BACK" });
+    confirmStore.getState().resolveCurrent(false);
+    await flush();
+    expect(closeDraft).not.toHaveBeenCalled();
+  });
+
+  it("with no draft open, a further Back leaves", () => {
+    const { fire, closeDraft } = memoryGuard(false, false);
+    const event = fire({ type: "GO_BACK" });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(closeDraft).not.toHaveBeenCalled();
+  });
+
+  it("a save (bypass set) leaves even with the draft still open", () => {
+    const { fire, closeDraft } = memoryGuard(true, true, true);
+    const event = fire({ type: "GO_BACK" });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(closeDraft).not.toHaveBeenCalled();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+  });
+
+  it("the editor's Cancel: dirty prompts and closes on Discard; clean closes at once (D-61)", async () => {
+    const { requestClose } = memoryGuard(true, true);
+    const close = vi.fn();
+    requestClose(close, true);
+    expect(close).not.toHaveBeenCalled();
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(close).toHaveBeenCalledOnce();
+    const clean = vi.fn();
+    requestClose(clean, false);
+    expect(clean).toHaveBeenCalledOnce();
+  });
+});

@@ -6,11 +6,18 @@ import type {
   WritingStyle,
 } from "@/db/personalization-dao";
 import {
+  applyStyleLoad,
+  applyStyleSave,
   createEstimateDebouncer,
   formatEstimateCaption,
+  hasSectionDraftChanges,
+  initialStyleSync,
+  isWritingStyleDirty,
   moveSectionUid,
   PERSONALIZATION_ESTIMATE_DEBOUNCE_MS,
   personalizationEstimateSource,
+  type StyleSyncState,
+  shouldReplaceStyleOnLoad,
 } from "@/screens/ai-personalization-logic";
 
 const STYLE: WritingStyle = {
@@ -102,5 +109,194 @@ describe("ai-personalization-logic", () => {
         "model",
       ).overflow,
     ).toBe("Context overflow");
+  });
+});
+
+describe("isWritingStyleDirty (D-34)", () => {
+  it("compares all four fields", () => {
+    expect(isWritingStyleDirty(STYLE, { ...STYLE })).toBe(false);
+    expect(isWritingStyleDirty(STYLE, { ...STYLE, tone: "casual" })).toBe(true);
+    expect(isWritingStyleDirty(STYLE, { ...STYLE, length: "concise" })).toBe(
+      true,
+    );
+    expect(isWritingStyleDirty(STYLE, { ...STYLE, directness: "direct" })).toBe(
+      true,
+    );
+    expect(isWritingStyleDirty(STYLE, { ...STYLE, freeform: "x" })).toBe(true);
+  });
+
+  it("compares freeform exactly, untrimmed", () => {
+    expect(isWritingStyleDirty(STYLE, { ...STYLE, freeform: " " })).toBe(true);
+  });
+});
+
+describe("Writing Style load / save baseline (D-13, D-34; reviews C4-M4, C5-L1, C6-L5)", () => {
+  const STORED: WritingStyle = { ...STYLE, tone: "polished" };
+  const A: WritingStyle = { ...STYLE, freeform: "A" };
+  const B: WritingStyle = { ...STYLE, freeform: "B" };
+  const C: WritingStyle = { ...STYLE, freeform: "C" };
+  const dirty = (state: StyleSyncState) =>
+    isWritingStyleDirty(state.saved, state.current);
+
+  it("shouldReplaceStyleOnLoad: only a valid token and a clean style", () => {
+    expect(
+      shouldReplaceStyleOnLoad({
+        saved: STYLE,
+        current: STYLE,
+        readToken: 2,
+        invalidBefore: 1,
+      }),
+    ).toBe(true);
+    expect(
+      shouldReplaceStyleOnLoad({
+        saved: STYLE,
+        current: STYLE,
+        readToken: 1,
+        invalidBefore: 1,
+      }),
+    ).toBe(false);
+    expect(
+      shouldReplaceStyleOnLoad({
+        saved: STYLE,
+        current: A,
+        readToken: 2,
+        invalidBefore: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("first load with an untouched style replaces it and is clean", () => {
+    const state = applyStyleLoad(initialStyleSync(STYLE), STORED, 1);
+    expect(state.current).toEqual(STORED);
+    expect(state.saved).toEqual(STORED);
+    expect(dirty(state)).toBe(false);
+  });
+
+  it("an edit made before the first load resolves is kept and dirty against the stored style (C5-L1)", () => {
+    const edited = { ...initialStyleSync(STYLE), current: A };
+    const state = applyStyleLoad(edited, STORED, 1);
+    expect(state.current).toEqual(A);
+    expect(state.saved).toEqual(STORED);
+    expect(dirty(state)).toBe(true);
+  });
+
+  it("after a failed first load, the next successful load still sets the baseline", () => {
+    // The first load (token 1) failed: nothing applied. The user edits.
+    const edited = { ...initialStyleSync(STYLE), current: A };
+    const state = applyStyleLoad(edited, STORED, 2);
+    expect(state.current).toEqual(A);
+    expect(state.saved).toEqual(STORED);
+    expect(state.loadedOnce).toBe(true);
+  });
+
+  it("a section action's refresh keeps an edited style dirty (C4-M4)", () => {
+    let state = applyStyleLoad(initialStyleSync(STYLE), STORED, 1);
+    state = { ...state, current: A };
+    state = applyStyleLoad(state, STORED, 2);
+    expect(state.current).toEqual(A);
+    expect(state.saved).toEqual(STORED);
+    expect(dirty(state)).toBe(true);
+  });
+
+  it("a clean refresh replaces the style and re-baselines to the loaded value", () => {
+    let state = applyStyleLoad(initialStyleSync(STYLE), STORED, 1);
+    state = applyStyleLoad(state, B, 2);
+    expect(state.current).toEqual(B);
+    expect(state.saved).toEqual(B);
+    expect(dirty(state)).toBe(false);
+  });
+
+  it("save re-baselines to the submitted snapshot; an edit made while saving stays dirty", () => {
+    let state = applyStyleLoad(initialStyleSync(STYLE), STORED, 1);
+    state = { ...state, current: B };
+    // Save of B submitted; the user types C before it completes.
+    state = { ...state, current: C };
+    state = applyStyleSave(state, B, 1);
+    expect(state.saved).toEqual(B);
+    expect(dirty(state)).toBe(true);
+    const clean = applyStyleSave(
+      { ...applyStyleLoad(initialStyleSync(STYLE), STORED, 1), current: B },
+      B,
+      1,
+    );
+    expect(dirty(clean)).toBe(false);
+  });
+
+  it("a stale refresh started before a Save never replaces the saved style (C6-L5)", () => {
+    // Load token 2 starts (reads A), Save of B completes at seq 2, then the
+    // load resolves.
+    let state = applyStyleLoad(initialStyleSync(STYLE), STORED, 1);
+    state = { ...state, current: B };
+    state = applyStyleSave(state, B, 2);
+    state = applyStyleLoad(state, A, 2);
+    expect(state.current).toEqual(B);
+    expect(state.saved).toEqual(B);
+    expect(dirty(state)).toBe(false);
+  });
+
+  it("a stale refresh with an edit typed while the Save was pending keeps that edit dirty (C6-L5)", () => {
+    let state = applyStyleLoad(initialStyleSync(STYLE), STORED, 1);
+    state = { ...state, current: C };
+    state = applyStyleSave(state, B, 2);
+    state = applyStyleLoad(state, A, 2);
+    expect(state.current).toEqual(C);
+    expect(state.saved).toEqual(B);
+    expect(dirty(state)).toBe(true);
+  });
+
+  it("a refresh started after the Save, with a clean style, still replaces and re-baselines", () => {
+    let state = applyStyleLoad(initialStyleSync(STYLE), STORED, 1);
+    state = { ...state, current: B };
+    state = applyStyleSave(state, B, 1);
+    state = applyStyleLoad(state, A, 2);
+    expect(state.current).toEqual(A);
+    expect(state.saved).toEqual(A);
+    expect(dirty(state)).toBe(false);
+  });
+
+  it("an invalidated first load does not set the baseline", () => {
+    let state = { ...initialStyleSync(STYLE), current: B };
+    state = applyStyleSave(state, B, 1);
+    state = applyStyleLoad(state, A, 1);
+    expect(state.loadedOnce).toBe(false);
+    expect(state.saved).toEqual(B);
+    expect(state.current).toEqual(B);
+  });
+});
+
+describe("hasSectionDraftChanges (D-13; review C5-L7)", () => {
+  const none = {
+    adding: false,
+    draftTitle: "",
+    draftBody: "",
+    editingOpen: false,
+    editDirty: false,
+  };
+
+  it("is false with no draft open, even with stale text left after Cancel", () => {
+    expect(hasSectionDraftChanges(none)).toBe(false);
+    expect(
+      hasSectionDraftChanges({ ...none, draftTitle: "old", draftBody: "x" }),
+    ).toBe(false);
+  });
+
+  it("is true while adding with a non-blank title or body", () => {
+    expect(hasSectionDraftChanges({ ...none, adding: true })).toBe(false);
+    expect(
+      hasSectionDraftChanges({ ...none, adding: true, draftTitle: "T" }),
+    ).toBe(true);
+    expect(
+      hasSectionDraftChanges({ ...none, adding: true, draftBody: "B" }),
+    ).toBe(true);
+    expect(
+      hasSectionDraftChanges({ ...none, adding: true, draftTitle: "   " }),
+    ).toBe(false);
+  });
+
+  it("is true when an inline edit is open and differs from its section", () => {
+    expect(hasSectionDraftChanges({ ...none, editingOpen: true })).toBe(false);
+    expect(
+      hasSectionDraftChanges({ ...none, editingOpen: true, editDirty: true }),
+    ).toBe(true);
   });
 });
