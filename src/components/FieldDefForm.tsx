@@ -78,6 +78,13 @@ interface SharedProps {
    * every change, and false on unmount. Optional.
    */
   onDirtyChange?: (dirty: boolean) => void;
+  /**
+   * The host's create / edit is in flight (38.9 WR-02 follow-up; D-13, D-14):
+   * Cancel and the submit are held and drawn disabled (D-26) until it
+   * settles, so Cancel cannot close the form while the write commits.
+   * Optional; absent → false.
+   */
+  busy?: boolean;
 }
 
 interface CreateProps extends SharedProps {
@@ -132,6 +139,9 @@ function buildOptions(type: FieldType, rows: string[]): string | null {
 
 const toBool = (b: boolean): SqliteBool => (b ? 1 : 0);
 
+/** The Button.tsx disabled look (D-26 "dimmed") for this file's Pressables. */
+const DISABLED_OPACITY = 0.5;
+
 export function FieldDefForm(props: FieldDefFormProps) {
   const { colors } = useTheme();
 
@@ -169,6 +179,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
   );
 
   const canSubmit = label.trim().length > 0;
+  const busy = props.busy === true;
 
   // Unsaved-work state for the host's guard: the live draft vs the seed, both
   // with options normalised by buildOptions so an untouched stored dropdown
@@ -206,7 +217,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
   }
 
   function handleSubmit() {
-    if (!canSubmit) return;
+    if (!canSubmit || busy) return;
     // Assemble the live draft, then project it to the draft-derived fields via the
     // node-tested builder — carrying the toggled share_with_ai into BOTH paths so
     // the edit path can no longer silently drop it (H7).
@@ -418,17 +429,23 @@ export function FieldDefForm(props: FieldDefFormProps) {
           testID="field-def-cancel"
           accessibilityRole="button"
           accessibilityLabel="Cancel"
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
           onPress={props.onCancel}
-          style={[styles.actionBtn, { borderColor: colors.border }]}
+          style={[
+            styles.actionBtn,
+            { borderColor: colors.border },
+            busy ? styles.disabled : null,
+          ]}
         >
           <Text style={{ color: colors.textSecondary }}>Cancel</Text>
         </Pressable>
         <Pressable
           testID="field-def-submit"
           accessibilityRole="button"
-          accessibilityState={{ disabled: !canSubmit }}
+          accessibilityState={{ disabled: !canSubmit || busy }}
           accessibilityLabel={props.mode === "create" ? "Create field" : "Save"}
-          disabled={!canSubmit}
+          disabled={!canSubmit || busy}
           onPress={handleSubmit}
           style={[
             styles.actionBtn,
@@ -437,6 +454,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
               backgroundColor: canSubmit ? colors.accent : colors.surface,
               borderColor: canSubmit ? colors.accent : colors.border,
             },
+            busy ? styles.disabled : null,
           ]}
         >
           <Text
@@ -545,5 +563,8 @@ const styles = StyleSheet.create({
   submitBtn: {
     minWidth: 120,
     alignItems: "center",
+  },
+  disabled: {
+    opacity: DISABLED_OPACITY,
   },
 });

@@ -12,11 +12,12 @@ import { THEME_PRESETS } from "@/theme/theme-presets";
  *
  * `useState` is replaced by a call-order slot harness so the `editor` state can
  * be seeded. Slot order in CustomFieldsScreen: defs, emptyById, editor,
- * newFieldShareDefault, editorDirty. A drift in that order makes the seeded
- * editor cases render the list instead, which fails them.
+ * newFieldShareDefault, editorDirty, saving. A drift in that order makes the
+ * seeded editor cases render the list instead, which fails them.
  */
 
 const EDITOR_SLOT = 2;
+const SAVING_SLOT = 5;
 
 const hooks = vi.hoisted(() => ({
   states: [] as unknown[],
@@ -127,10 +128,11 @@ const FIELD = {
   type: "date",
 } as unknown as CustomFieldDef;
 
-function render(editor: unknown) {
+function render(editor: unknown, saving = false) {
   hooks.states = [];
   hooks.setters = [];
   hooks.states[EDITOR_SLOT] = editor;
+  hooks.states[SAVING_SLOT] = saving;
   hooks.index = 0;
   return nodes(CustomFieldsScreen());
 }
@@ -211,4 +213,20 @@ describe("Custom Fields shared header on every branch (38.9 D-16, review M4)", (
     render(null);
     expect(guard.options?.subEditor?.open).toBe(false);
   });
+});
+
+describe("Custom Fields holds the field form while a create / edit runs (WR-02 follow-up)", () => {
+  for (const [label, editor] of [
+    ["create", { mode: "create" }],
+    ["edit", { mode: "edit", field: FIELD }],
+  ] as const) {
+    it(`the ${label} form is busy exactly while saving, beside the header's disabled Back`, () => {
+      for (const saving of [false, true]) {
+        const tree = render(editor, saving);
+        const form = tree.find((node) => node.type === "FieldDefForm");
+        expect(form?.props.busy).toBe(saving);
+        expect(headersOf(tree)[0].props.backDisabled).toBe(saving);
+      }
+    });
+  }
 });

@@ -115,7 +115,8 @@ export function CustomFieldsScreen() {
   // closes directly through setEditor(null), with no prompt.
   const [editorDirty, setEditorDirty] = useState(false);
   // A create or edit is in flight (fix-pass WR-02). The ref is what the guard
-  // reads at removal time; the state draws the header Back disabled (D-26).
+  // reads at removal time; the state draws the header Back and the form's
+  // Cancel and submit disabled (D-26; WR-02 follow-up).
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const bypassRef = useRef(false);
@@ -379,6 +380,7 @@ export function CustomFieldsScreen() {
         onDirtyChange={setEditorDirty}
         onSubmit={(def) => void handleCreate(def)}
         onCancel={() => requestClose(closeEditor, editorDirty)}
+        busy={saving}
       />
     );
   } else if (editor !== null) {
@@ -391,6 +393,7 @@ export function CustomFieldsScreen() {
         onDirtyChange={setEditorDirty}
         onSubmit={(draft) => void handleEdit(editing, draft)}
         onCancel={() => requestClose(closeEditor, editorDirty)}
+        busy={saving}
       />
     );
   } else {
