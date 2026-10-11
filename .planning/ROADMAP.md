@@ -1527,7 +1527,24 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (orchestrator's reading of owner ruling R1, 39-LEDGER Batch 14; not owner wording): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: TBD
+**Plans**: 17 plans (sequential, waves 1–17; `parallelization: false`)
+- [ ] 38.9-01 — Overlay and dialog foundation: overlay registry, RegisteredModal + in-window snackbar, confirm/notice host, ConfirmDialog D-43/D-52
+- [ ] 38.9-02 — Form guards: Add Contact, Log Interaction, Memory, AI Writing Style; sub-editor guard on Update Contact and Custom fields
+- [ ] 38.9-03 — Guard on the pending-confirmation note overlay; Capture Back order (D-33); per-field Backup schedule save (D-34)
+- [ ] 38.9-04 — Inline validation primitive + scroll-to-first-error (D-19, A-13)
+- [ ] 38.9-05 — Alert sweep A: everyday surfaces (D-27)
+- [ ] 38.9-06 — Alert sweep B: backup/restore/import/Settings + no-native-Alert contract (D-27)
+- [ ] 38.9-07 — Shell navigation: history Back + Digest exit, + forms over current tab, D-50, ComposeResearch focused
+- [ ] 38.9-08 — Shared header: chevron Back, onBack, Cancel kind, person line (D-44, D-45)
+- [ ] 38.9-09 — Header conversions: screens shared across stacks (D-16, D-17, D-58, D-59)
+- [ ] 38.9-10 — Header conversions: Settings stack (D-16)
+- [ ] 38.9-11 — Orbit switch sweep (D-47), K-28 swatch (D-60), chip tiers (D-05)
+- [ ] 38.9-12 — Option sheet replaces every native picker (D-28)
+- [ ] 38.9-13 — Date-only display formatter (D-48, D-53, D-57) + EmptyState (D-20)
+- [ ] 38.9-14 — Glossary constants + label enforcement (D-22, D-42, D-49, D-56)
+- [ ] 38.9-15 — "Event(s)" noun + plain-word rewrites (D-22, D-41)
+- [ ] 38.9-16 — plural() helper, UX standards doc, 39 amendments (D-21, D-30, D-39, D-46)
+- [ ] 38.9-17 — Device plan: debug iteration, mockup match, one release build, owner look-and-feel check (run phase code review first)
 
 > **Inserted 2026-10-10 (owner).** First of four UX-audit fix phases (38.9–38.12) placed before Phase 39, because 39's lessons must teach stable behaviour (39-CONTEXT D-02, D-03). Numbered as decimals so the tooling's numeric next-phase order runs them before 39. Recorded-decision reversals are handled in each phase's own dossier session (owner, 2026-10-10).
 
