@@ -427,6 +427,29 @@ describe("useDiscardKeepGuard busyRef (fix-pass WR-02)", () => {
  * 38.9-02 review C6-H1): a widget or notification RESET during a save runs
  * once the save settles, unless the save's own navigation left.
  */
+describe("useDiscardKeepGuard requestClose while busy (third fix pass IN-01)", () => {
+  it("a Cancel in the same frame as Save neither closes nor prompts, clean or dirty", () => {
+    const busyRef = { current: true };
+    const { requestClose } = mountGuard(false, false, undefined, busyRef);
+    const close = vi.fn();
+    requestClose(close, false);
+    requestClose(close, true);
+    expect(close).not.toHaveBeenCalled();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+  });
+
+  it("once the save settles, requestClose follows the rule again", () => {
+    const busyRef = { current: true };
+    const { requestClose } = mountGuard(false, false, undefined, busyRef);
+    busyRef.current = false;
+    const close = vi.fn();
+    requestClose(close, false);
+    expect(close).toHaveBeenCalledOnce();
+    requestClose(close, true);
+    expect(confirmStore.getState().queue).toHaveLength(1);
+  });
+});
+
 describe("useDiscardKeepGuard parks a held non-Back removal (WR-01)", () => {
   const widgetReset = { type: "RESET", payload: { index: 1, routes: [] } };
 

@@ -253,8 +253,11 @@ export function MemoryScreen({
     })();
   };
 
-  const remove = (id: number) => {
-    if (contactId === null) return;
+  // Delete and Allow AI wait for an in-flight add or edit and report whether
+  // they took the action, so MemoryEditor closes or flips only then (third
+  // fix pass IN-01: a tap in the frame before `busy` re-renders).
+  const remove = (id: number): boolean => {
+    if (contactId === null || savingRef.current) return false;
     void (async () => {
       try {
         await deleteMemory(getExecutor(), {
@@ -277,10 +280,11 @@ export function MemoryScreen({
         },
       });
     })();
+    return true;
   };
 
-  const setAllowAi = (id: number, allow: boolean) => {
-    if (contactId === null) return;
+  const setAllowAi = (id: number, allow: boolean): boolean => {
+    if (contactId === null || savingRef.current) return false;
     void (async () => {
       try {
         await setMemoryAllowAi(getExecutor(), {
@@ -295,6 +299,7 @@ export function MemoryScreen({
       }
       await load();
     })();
+    return true;
   };
 
   return (

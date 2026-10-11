@@ -191,6 +191,26 @@ describe.each(CASES)(
   },
 );
 
+describe("MemoryScreen's Delete and Allow AI wait for an add or edit (third fix pass IN-01)", () => {
+  const source = read("src/screens/MemoryScreen.tsx");
+
+  it.each([
+    "const remove = (id: number): boolean =>",
+    "const setAllowAi = (id: number, allow: boolean): boolean =>",
+  ])(
+    "%s reports a drop while the ref is held, and acceptance otherwise",
+    (marker) => {
+      const start = source.indexOf(marker);
+      expect(start, marker).toBeGreaterThan(-1);
+      const body = blockFrom(source, start + marker.length, marker);
+      expect(body).toContain(
+        "if (contactId === null || savingRef.current) return false;",
+      );
+      expect(body.trimEnd().endsWith("return true;\n  }")).toBe(true);
+    },
+  );
+});
+
 describe("MemoryScreen lets a parked removal through only when a save fails (WR-01)", () => {
   const source = read("src/screens/MemoryScreen.tsx");
 

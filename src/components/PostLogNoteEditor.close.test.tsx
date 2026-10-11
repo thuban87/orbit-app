@@ -426,16 +426,18 @@ describe("a save in flight owns the close (verification IN-01)", () => {
         "MemoryEditor",
       )[0];
       return editor?.props as {
-        onDelete: (id: number) => void;
+        onDelete: (id: number) => boolean;
         onRestore: (id: number) => void;
-        onSetAllowAi: (id: number, allow: boolean) => void;
+        onSetAllowAi: (id: number, allow: boolean) => boolean;
       };
     };
     state.savingRef.current = true;
     const held = handlers();
-    held.onDelete(7);
+    // Reported as dropped, so MemoryEditor neither closes nor flips (third
+    // fix pass IN-01).
+    expect(held.onDelete(7)).toBe(false);
     held.onRestore(7);
-    held.onSetAllowAi(7, true);
+    expect(held.onSetAllowAi(7, true)).toBe(false);
     expect(memoriesDao.deleteMemory).not.toHaveBeenCalled();
     expect(memoriesDao.restoreMemory).not.toHaveBeenCalled();
     expect(memoriesDao.setMemoryAllowAi).not.toHaveBeenCalled();
@@ -448,9 +450,9 @@ describe("a save in flight owns the close (verification IN-01)", () => {
       undefined as never,
     );
     const idle = handlers();
-    idle.onDelete(7);
+    expect(idle.onDelete(7)).toBe(true);
     idle.onRestore(7);
-    idle.onSetAllowAi(7, true);
+    expect(idle.onSetAllowAi(7, true)).toBe(true);
     expect(memoriesDao.deleteMemory).toHaveBeenCalledOnce();
     expect(memoriesDao.restoreMemory).toHaveBeenCalledOnce();
     expect(memoriesDao.setMemoryAllowAi).toHaveBeenCalledOnce();

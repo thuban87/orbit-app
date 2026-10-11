@@ -75,9 +75,20 @@ export interface MemoryEditorProps {
   showAdd?: boolean;
   onAdd: (draft: MemoryDraft) => Promise<boolean>;
   onEdit: (id: number, patch: MemoryEditPatch) => Promise<boolean>;
-  onDelete: (id: number) => void;
+  /**
+   * Returns `false` (synchronously) when the host drops the delete because
+   * its save is in flight; the form then stays open (38.9 third fix pass
+   * IN-01). Any other return (nothing, `true`, a promise from an async host)
+   * counts as accepted, so hosts that ignore this contract are unchanged.
+   */
+  onDelete: (id: number) => unknown;
   onRestore: (id: number) => void;
-  onSetAllowAi: (id: number, allow: boolean) => void;
+  /**
+   * Returns `false` (synchronously) when the host drops the write; the
+   * switch then keeps the stored value instead of flipping (third fix pass
+   * IN-01). Any other return counts as accepted, as for `onDelete`.
+   */
+  onSetAllowAi: (id: number, allow: boolean) => unknown;
   globalAiEnabled: boolean;
   /**
    * Opens this item's edit form on first render, so its options (Allow AI,
@@ -637,10 +648,14 @@ export function MemoryEditor({
                 value={editing.allow_ai === 1}
                 onValueChange={(allow) => {
                   if (busy) return; // held while the host saves (IN-01)
+                  // Flip only when the host takes the write: a tap in the
+                  // frame before `busy` re-renders is dropped by the host's
+                  // ref, and must not show a permission never stored
+                  // (third fix pass IN-01).
+                  if (onSetAllowAi(editing.id, allow) === false) return;
                   setEditing((current) =>
                     current ? { ...current, allow_ai: allow ? 1 : 0 } : current,
                   );
-                  onSetAllowAi(editing.id, allow);
                 }}
               />
             </View>
@@ -659,7 +674,9 @@ export function MemoryEditor({
                 disabled={busy}
                 onPress={() => {
                   if (busy) return; // held while the host saves (IN-01)
-                  onDelete(editing.id);
+                  // Close only when the host takes the delete (third fix
+                  // pass IN-01).
+                  if (onDelete(editing.id) === false) return;
                   close();
                 }}
                 style={heldActionStyle}

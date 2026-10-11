@@ -436,6 +436,63 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
     expect(onSetAllowAi).not.toHaveBeenCalled();
     expect(hooks.setters).toHaveLength(0);
   });
+  it("applies Delete and Allow AI locally only when the host accepts (third fix pass IN-01)", () => {
+    // The host dropped both (its ref was claimed a frame before busy).
+    const refuse = vi.fn(() => false);
+    const refused = nodes(
+      MemoryEditor({
+        items: [memory],
+        initiallyEditingId: 5,
+        onAdd: vi.fn(),
+        onEdit: vi.fn(),
+        onDelete: refuse,
+        onRestore: vi.fn(),
+        onSetAllowAi: refuse,
+        globalAiEnabled: true,
+        busy: false,
+      }),
+    );
+    invoke(control(refused, labels[0]), "onPress");
+    invoke(
+      refused.find(
+        (n) => n.props.accessibilityLabel === "Allow AI to use this",
+      ),
+      "onValueChange",
+      true,
+    );
+    expect(refuse).toHaveBeenCalledTimes(2);
+    // No local close, no optimistic flip.
+    expect(hooks.setters).toHaveLength(0);
+
+    // A host that accepts (true), or returns nothing, gets both applied.
+    for (const accept of [vi.fn(() => true), vi.fn(() => undefined)]) {
+      hooks.setters = [];
+      const tree = nodes(
+        MemoryEditor({
+          items: [memory],
+          initiallyEditingId: 5,
+          onAdd: vi.fn(),
+          onEdit: vi.fn(),
+          onDelete: accept,
+          onRestore: vi.fn(),
+          onSetAllowAi: accept,
+          globalAiEnabled: true,
+          busy: false,
+        }),
+      );
+      invoke(
+        tree.find((n) => n.props.accessibilityLabel === "Allow AI to use this"),
+        "onValueChange",
+        true,
+      );
+      // setEditing with the flip.
+      expect(hooks.setters).toHaveLength(1);
+      invoke(control(tree, labels[0]), "onPress");
+      // close(): setEditing + setDraft.
+      expect(hooks.setters).toHaveLength(3);
+    }
+  });
+
   it("leaves the memory cards live when idle", () => {
     const tree = render(false);
     const cards = tree.filter((n) => n.type === "MemoryCard");

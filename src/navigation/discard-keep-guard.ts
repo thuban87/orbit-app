@@ -35,7 +35,8 @@ export type DiscardKeepGuard = {
   /**
    * The one dirty-aware close (D-61): clean → `close()` at once; dirty → the
    * "Discard changes?" prompt, then `close()` only on "Discard changes". Shares
-   * the guard's pending-prompt ref, so no second prompt is queued.
+   * the guard's pending-prompt ref, so no second prompt is queued. Does
+   * nothing while `busyRef` is held (third fix pass IN-01).
    */
   requestClose: (close: () => void, dirty: boolean) => void;
   /**
@@ -214,6 +215,10 @@ export function useDiscardKeepGuard({
 
   const requestClose = (close: () => void, dirty: boolean): void => {
     if (promptPendingRef.current) return;
+    // A save in flight owns the exit: a Cancel in the same frame as Save,
+    // before the held control re-renders disabled, neither closes nor
+    // prompts (third fix pass IN-01).
+    if (busyRef?.current === true) return;
     if (!dirty) {
       close();
       return;

@@ -285,10 +285,12 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   );
   // Delete, Restore and Allow AI wait for an in-flight save (verification
   // IN-01, fix-pass IN-01): the shared savingRef holds them, as it holds every
-  // exit, so no second write races the edit.
+  // exit, so no second write races the edit. Delete and Allow AI report
+  // whether they took the action, so MemoryEditor closes or flips only then
+  // (third fix pass IN-01).
   const onDeleteMemory = useCallback(
-    (id: number) => {
-      if (contactId === null || savingRef.current) return;
+    (id: number): boolean => {
+      if (contactId === null || savingRef.current) return false;
       void deleteMemory(getExecutor(), { id, contactId, now: localDateTime() })
         .then(() => {
           bumpShellRefresh();
@@ -297,6 +299,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         .catch((err) =>
           Logger.error(LOG_SCOPE, "failed to delete memory", err),
         );
+      return true;
     },
     [contactId, onClose],
   );
@@ -316,8 +319,8 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     [contactId],
   );
   const onSetMemoryAllowAi = useCallback(
-    (id: number, allow: boolean) => {
-      if (contactId === null || savingRef.current) return;
+    (id: number, allow: boolean): boolean => {
+      if (contactId === null || savingRef.current) return false;
       void setMemoryAllowAi(getExecutor(), {
         id,
         contactId,
@@ -328,6 +331,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         .catch((err) =>
           Logger.error(LOG_SCOPE, "failed to set memory AI permission", err),
         );
+      return true;
     },
     [contactId],
   );
