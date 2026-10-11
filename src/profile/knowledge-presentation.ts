@@ -13,6 +13,7 @@ import {
   formatDateTimeMinuteOrFallback,
   formatDisplayDateOrFallback,
 } from "@/utils/dates";
+import { plural } from "@/utils/plural";
 import type { ProfileModuleId } from "./persisted-contract";
 
 export type KnowledgeChildId = Extract<
@@ -350,7 +351,7 @@ function customFieldsChild(
     id: "custom-fields",
     title: "Custom Fields",
     bodySummary:
-      items.length === 0 ? "Nothing added yet" : `${items.length} fields`,
+      items.length === 0 ? "Nothing added yet" : plural(items.length, "field"),
     items,
     groups,
     viewAllLabel: null,

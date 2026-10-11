@@ -14,7 +14,9 @@ import { getExecutor } from "@/db/database";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
+import type { FieldType } from "@/schemas/types";
 import {
+  customConflictDisplayValues,
   hasResolvedMergeConflicts,
   type MergeConflictChoice,
 } from "@/screens/merge-conflict-logic";
@@ -33,6 +35,8 @@ type ContactConflictRow = {
 type CustomConflictRow = {
   field_def_id: number;
   label: string;
+  /** The field's type; drives the display form only (38.9 D-66). */
+  type: FieldType;
   survivor_value: string | null;
   absorbed_value: string | null;
 };
@@ -126,7 +130,7 @@ export function MergeConflictsScreen({
           throw new Error("merge contacts are unavailable");
         const [customFields, methods] = await Promise.all([
           exec.getAllAsync<CustomConflictRow>(
-            `SELECT defs.id AS field_def_id, defs.label,
+            `SELECT defs.id AS field_def_id, defs.label, defs.type,
                     survivor_values.value AS survivor_value, absorbed_values.value AS absorbed_value
                FROM custom_field_defs AS defs
                JOIN custom_field_values AS survivor_values
@@ -340,9 +344,14 @@ export function MergeConflictsScreen({
           <FieldChoiceGroup
             key={field.field_def_id}
             label={field.label}
+            // Render only (38.9 D-66): a Date field's choices show the
+            // display form; the stored values and the choice id stay raw.
             options={choiceOptions(
-              field.survivor_value!,
-              field.absorbed_value!,
+              ...customConflictDisplayValues(
+                field.type,
+                field.survivor_value!,
+                field.absorbed_value!,
+              ),
             )}
             mode="conflict"
             selectedId={customFieldChoices[field.field_def_id] ?? null}

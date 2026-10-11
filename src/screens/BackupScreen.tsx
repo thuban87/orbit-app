@@ -40,6 +40,7 @@ import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 import {
   consumeSharedBackup,
   pickBackupDocument,
@@ -73,11 +74,11 @@ function relativeTime(value: string): string {
     Math.round((Date.now() - milliseconds) / 60_000),
   );
   if (elapsedMinutes < 2) return "just now";
-  if (elapsedMinutes < 60) return `${elapsedMinutes} minutes ago`;
+  if (elapsedMinutes < 60) return `${plural(elapsedMinutes, "minute")} ago`;
   const hours = Math.round(elapsedMinutes / 60);
-  if (hours < 48) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (hours < 48) return `${plural(hours, "hour")} ago`;
   const days = Math.round(hours / 24);
-  return `${days} days ago`;
+  return `${plural(days, "day")} ago`;
 }
 
 export function BackupScreen({

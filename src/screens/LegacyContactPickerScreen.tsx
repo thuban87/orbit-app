@@ -30,6 +30,7 @@ import {
 import { getDeviceRegion } from "@/services/device-region";
 import { routePickedImport } from "@/services/import/import-acquire";
 import { useTheme } from "@/theme";
+import { plural } from "@/utils/plural";
 import {
   listContactsSummary,
   readAllContacts,
@@ -318,7 +319,7 @@ export function LegacyContactPickerScreen({
         {loadState === "ready" ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Import ${selectedCount} contacts`}
+            accessibilityLabel={`Import ${plural(selectedCount, "contact")}`}
             disabled={importing || selectedCount === 0}
             onPress={() => void importSelected()}
             style={[

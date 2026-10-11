@@ -36,6 +36,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 import {
   type AiPermissionTypeFilter,
   buildPermissionSummaryCopy,
@@ -251,7 +252,7 @@ export function AIPermissionsScreen() {
 
   const confirmMessage =
     pendingAction?.kind === "enable"
-      ? `This will make ${pendingAction.impact.items} items across ${pendingAction.impact.contacts} contacts available to AI. Enable?`
+      ? `This will make ${plural(pendingAction.impact.items, "item")} across ${plural(pendingAction.impact.contacts, "contact")} available to AI. Enable?`
       : "Remove AI access from the selected information?";
 
   return (

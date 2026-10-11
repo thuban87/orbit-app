@@ -14,6 +14,7 @@
  * contact would misreport "Weekly intended". No colour, no react-native import.
  */
 import { FREQUENCY_DAYS, type Frequency } from "@/types";
+import { plural } from "@/utils/plural";
 
 /** Reverse of FREQUENCY_DAYS (days → label) for exact-interval phrasing. */
 const DAYS_TO_FREQUENCY: Record<number, Frequency> = Object.fromEntries(
@@ -29,7 +30,7 @@ const DAYS_TO_FREQUENCY: Record<number, Frequency> = Object.fromEntries(
  */
 export function intendedLabel(cadenceDays: number): string {
   const named = DAYS_TO_FREQUENCY[cadenceDays];
-  return named ? named : `every ${cadenceDays} days`;
+  return named ? named : `every ${plural(cadenceDays, "day")}`;
 }
 
 /**

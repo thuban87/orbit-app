@@ -78,6 +78,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 import { rowsForKnowledgeDisplay } from "./things-to-remember-ordering";
 
 const LOG_SCOPE = "things-to-remember";
@@ -148,7 +149,7 @@ function firstClassRows(
       value:
         firstClass?.intervalDays == null
           ? null
-          : `${firstClass.intervalDays} days`,
+          : plural(firstClass.intervalDays, "day"),
     },
     {
       label: FIRST_CLASS_LABELS.categoryName,

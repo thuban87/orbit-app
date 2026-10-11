@@ -57,6 +57,8 @@ import {
   resolveRelationshipVisibility,
 } from "@/db/relationships-read";
 import type { SqlExecutor } from "@/db/types";
+import type { FieldType } from "@/schemas/types";
+import { plural } from "@/utils/plural";
 
 /**
  * One normalized, display-ready knowledge item for the Research side.
@@ -74,6 +76,12 @@ export interface ResearchItem {
   value: string;
   aiEligible: boolean;
   isOffLimits: boolean;
+  /**
+   * Custom-field items only: the field's type, so the screen can show a Date
+   * value in its display form (38.9 D-66; render only). `value` stays the raw
+   * stored text, and Message Focus projects only `label` and `value`.
+   */
+  fieldType?: FieldType;
 }
 
 /** Display group names for sources without a registry group of their own. */
@@ -116,7 +124,7 @@ function firstClassResearchItems(
     out.push({
       key: "interval",
       label: "Contact frequency",
-      value: `${fc.intervalDays} days`,
+      value: plural(fc.intervalDays, "day"),
     });
   }
   if (fc.categoryName != null) {
@@ -220,6 +228,7 @@ export async function readComposeResearch(
         value: field.rawValue ?? "",
         aiEligible: field.shareWithAi === 1,
         isOffLimits: false,
+        fieldType: field.type,
       });
     }
   }

@@ -21,6 +21,7 @@ import {
   formatLocalDate,
   parseLocalMs,
 } from "@/utils/dates";
+import { plural } from "@/utils/plural";
 
 export type ProfileIntensityWindow =
   | { readonly kind: "cadence"; readonly days: number; readonly label: string }
@@ -172,7 +173,7 @@ export function resolveProfileStatus(
     available: true,
     label: STATUS_LABEL[input.status],
     visualValue: input.progress,
-    context: `${elapsedDays} of ${input.intervalDays} days since the last interaction.`,
+    context: `${elapsedDays} of ${plural(input.intervalDays, "day")} since the last interaction.`,
     factors: {
       lastContact: input.lastContact,
       intervalDays: input.intervalDays,

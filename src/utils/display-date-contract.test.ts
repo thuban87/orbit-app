@@ -149,7 +149,8 @@ describe("stored-birthday display sites (D-70)", () => {
     "src/screens/EditContactScreen.tsx",
     "src/screens/ThingsToRememberScreen.tsx",
     "src/screens/MergeConflictsScreen.tsx",
-    "src/screens/ComposeResearchScreen.tsx",
+    // Research's caption logic moved into a node-testable helper (38.9-16).
+    "src/screens/compose-research-logic.ts",
     "src/screens/ReconcileDetailScreen.tsx",
   ];
 
@@ -168,12 +169,14 @@ describe("stored-birthday display sites (D-70)", () => {
   );
 
   it("Research formats only the firstclass:birthday caption", () => {
-    const code = codeOnly(source("src/screens/ComposeResearchScreen.tsx"));
-    expect(code).toMatch(
-      /item\.id === "firstclass:birthday"\s*\?\s*formatStoredBirthdayForDisplay\(item\.value\)\s*:\s*item\.value/,
+    const helper = codeOnly(source("src/screens/compose-research-logic.ts"));
+    expect(helper).toMatch(
+      /item\.id === "firstclass:birthday"\)\s*\{\s*return formatStoredBirthdayForDisplay\(item\.value\);/,
     );
+    const screen = codeOnly(source("src/screens/ComposeResearchScreen.tsx"));
+    expect(screen).toContain("researchItemDisplayValue(item)");
     // Add to AI carries the raw item.
-    expect(code).toContain("addToFocus(item)");
+    expect(screen).toContain("addToFocus(item)");
   });
 
   it("Reconcile formats only the birthday field and still chooses by option id", () => {
@@ -188,6 +191,43 @@ describe("stored-birthday display sites (D-70)", () => {
     const code = codeOnly(source("src/screens/MergeConflictsScreen.tsx"));
     expect(code).toMatch(/differs\(value\.survivor, value\.absorbed\)/);
     expect(code).toMatch(/\[conflict\.key\]: option\.id/);
+  });
+});
+
+// 38.9-16 fold (38.9-13 out-of-scope findings #1-#2; D-23, D-48, D-66): the
+// last raw date-only displays format at render only; the stored values, keys
+// and choices stay raw.
+describe("remaining date-only display sites (38.9-16)", () => {
+  it("the AI model picker shows the catalog date in display form, raw fallback", () => {
+    const code = codeOnly(source("src/screens/AIModelPickerScreen.tsx"));
+    expect(code).toMatch(
+      /formatDisplayDateOrFallback\(\s*openRouterCatalog\.updatedLocalDate,\s*openRouterCatalog\.updatedLocalDate,?\s*\)/,
+    );
+    expect(code).not.toMatch(/Updated \{openRouterCatalog\.updatedLocalDate\}/);
+    // The freshness check still compares the stored local date key.
+    expect(source("src/ai/openrouter-catalog.ts")).toMatch(
+      /catalog\.updatedLocalDate !== formatLocalDate\(now\)/,
+    );
+  });
+
+  it("Research custom items carry the field type; the read module formats nothing", () => {
+    const read = codeOnly(source("src/db/compose-research-read.ts"));
+    expect(read).toContain("fieldType: field.type");
+    expect(read).toContain('value: field.rawValue ?? ""');
+    const helper = codeOnly(source("src/screens/compose-research-logic.ts"));
+    expect(helper).toMatch(
+      /customValueDisplayText\(item\.fieldType, item\.value\)/,
+    );
+  });
+
+  it("Merge conflicts read the field type and format custom choices at render only", () => {
+    const code = codeOnly(source("src/screens/MergeConflictsScreen.tsx"));
+    expect(code).toMatch(/defs\.label, defs\.type,/);
+    expect(code).toMatch(
+      /customConflictDisplayValues\(\s*field\.type,\s*field\.survivor_value!,\s*field\.absorbed_value!,?\s*\)/,
+    );
+    // The resolution stores only the option id.
+    expect(code).toMatch(/\[field\.field_def_id\]: option\.id/);
   });
 });
 

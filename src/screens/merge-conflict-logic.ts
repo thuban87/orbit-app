@@ -1,4 +1,6 @@
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
+import { customValueDisplayText } from "@/profile/knowledge-presentation";
+import type { FieldType } from "@/schemas/types";
 
 export type MergeConflictChoice = "survivor" | "absorbed";
 
@@ -32,4 +34,25 @@ export function hasResolvedMergeConflicts({
     primaryTypes.every((type) => primaryChoices[type] != null) &&
     (!hasPhotoConflict || photoChoice != null)
   );
+}
+
+/**
+ * The two custom-field choices as shown (38.9 D-23, D-48, D-66; 38.9-13
+ * out-of-scope finding #2). Render only: a Date field's values show the
+ * date-only display form, every other type shows its raw value, and a value
+ * the date parser rejects stays raw. The stored values, `differs()` and the
+ * resolution (an option id) never see the display text. If two different raw
+ * values would read the same, both raw values are shown so the choice stays
+ * visible (same rule as the birthday choice).
+ */
+export function customConflictDisplayValues(
+  type: FieldType,
+  survivor: string,
+  absorbed: string,
+): [string, string] {
+  const shownSurvivor = customValueDisplayText(type, survivor);
+  const shownAbsorbed = customValueDisplayText(type, absorbed);
+  return shownSurvivor === shownAbsorbed
+    ? [survivor, absorbed]
+    : [shownSurvivor, shownAbsorbed];
 }

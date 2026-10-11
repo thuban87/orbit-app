@@ -42,6 +42,7 @@ import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import {
   currentModelRowId,
@@ -270,7 +271,13 @@ export function AIModelPickerScreen({
             ) : null}
             {lane === "openrouter" && openRouterCatalog ? (
               <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Updated {openRouterCatalog.updatedLocalDate}
+                {/* Display only (38.9 D-23, D-48): the stored local date
+                    stays the catalog's freshness key. */}
+                Updated{" "}
+                {formatDisplayDateOrFallback(
+                  openRouterCatalog.updatedLocalDate,
+                  openRouterCatalog.updatedLocalDate,
+                )}
               </AppText>
             ) : null}
           </>

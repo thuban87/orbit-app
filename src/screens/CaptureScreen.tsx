@@ -78,6 +78,7 @@ import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 import { finishActivity } from "../../modules/orbit-share-finish";
 
 const LOG_SCOPE = "capture";
@@ -840,7 +841,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           <Pressable
             testID="capture-multiselect-done"
             accessibilityRole="button"
-            accessibilityLabel={`Save to ${selected.size} contacts`}
+            accessibilityLabel={`Save to ${plural(selected.size, "contact")}`}
             accessibilityState={{ disabled: doneDisabled }}
             disabled={doneDisabled}
             onPress={() => void onDoneMulti()}

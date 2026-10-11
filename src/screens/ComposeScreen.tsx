@@ -160,6 +160,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 import type { InFlightRef } from "@/utils/single-flight";
 
 const LOG_SCOPE = "compose";
@@ -1363,7 +1364,7 @@ export function ComposeScreen({
               testID="compose-research-entry"
               role="tertiary"
               label={`Things to Remember · ${researchCount}`}
-              accessibilityLabel={`Things to Remember, ${researchCount} items`}
+              accessibilityLabel={`Things to Remember, ${plural(researchCount, "item")}`}
               onPress={() =>
                 navigation.navigate("ComposeResearch", { contactId })
               }

@@ -37,8 +37,8 @@ import { useComposeSession } from "@/stores/compose-session-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
+import { researchItemDisplayValue } from "./compose-research-logic";
 
 const LOG_SCOPE = "compose-research";
 
@@ -175,11 +175,9 @@ export function ComposeResearchScreen({
                       <AppText role="label">{item.label}</AppText>
                       {item.value ? (
                         <AppText role="caption">
-                          {/* Render only (38.9 D-70; C7-L2): the item value
-                              and what Add to AI carries stay raw. */}
-                          {item.id === "firstclass:birthday"
-                            ? formatStoredBirthdayForDisplay(item.value)
-                            : item.value}
+                          {/* Render only (38.9 D-66, D-70; C7-L2): the item
+                              value and what Add to AI carries stay raw. */}
+                          {researchItemDisplayValue(item)}
                         </AppText>
                       ) : null}
                     </View>

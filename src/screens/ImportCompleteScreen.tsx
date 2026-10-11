@@ -30,6 +30,7 @@ import {
 import { useTheme } from "@/theme";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 import {
   importCompleteRetryState,
   runImportCompleteAction,
@@ -39,7 +40,7 @@ import { useOpenImportSession } from "./use-open-import-session";
 const LOG_SCOPE = "import-complete";
 
 function contactLabel(count: number): string {
-  return `${count} contact${count === 1 ? "" : "s"}`;
+  return plural(count, "contact");
 }
 
 interface ImportCompleteSummary {
@@ -338,7 +339,7 @@ export function ImportCompleteScreen({
               ]}
             >
               <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-                {`${counts.birthdayUnreadable} birthdays couldn't be read`}
+                {`${plural(counts.birthdayUnreadable, "birthday")} couldn't be read`}
               </Text>
               <Text
                 style={[styles.countDetail, { color: colors.textSecondary }]}

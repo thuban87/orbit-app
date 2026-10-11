@@ -206,7 +206,8 @@ describe("Import Complete keeps Done and Review reachable at large text (D-67)",
     expect(headerAt).toBeLessThan(open);
     for (const fragment of [
       "Imported (",
-      "birthdays couldn't be read",
+      // The count goes through the shared plural helper (38.9 D-21).
+      'plural(counts.birthdayUnreadable, "birthday")} couldn\'t be read',
       'testID="import-complete-action-notice"',
       'testID="import-complete-retry"',
       'testID="import-complete-skip-photos"',

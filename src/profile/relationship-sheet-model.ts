@@ -6,6 +6,7 @@ import type {
 } from "@/services/profile-metrics";
 import { FREQUENCY_DAYS } from "@/types";
 import { formatDateTimeMinuteOrFallback, formatLocalDate } from "@/utils/dates";
+import { plural } from "@/utils/plural";
 
 export type RelationshipExplanation = {
   title: string;
@@ -43,7 +44,7 @@ export function relationshipExplanation(
     }
     const details = [
       `Last interaction: ${formatDateTimeMinuteOrFallback(input.metric.factors.lastContact)}`,
-      `Contact frequency: every ${input.metric.factors.intervalDays} days`,
+      `Contact frequency: every ${plural(input.metric.factors.intervalDays, "day")}`,
       `Elapsed progress: ${Math.round(input.metric.factors.progress * 100)}%`,
     ];
     if (input.metric.factors.rarelyResponds) {
@@ -64,7 +65,7 @@ export function relationshipExplanation(
           title: "Gravity",
           summary: input.metric.label,
           details: [
-            `${input.metric.factors.interactionCount} interactions`,
+            plural(input.metric.factors.interactionCount, "interaction"),
             "Weighted by recency",
             `Tier ${input.metric.factors.tierIndex + 1} of ${input.metric.factors.tierCount}`,
           ],
