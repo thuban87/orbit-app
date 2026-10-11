@@ -32,11 +32,21 @@ vi.mock("@react-navigation/native", () => ({
 const { confirmDiscard, decideGuardOnRemove, useDiscardKeepGuard } =
   await import("./discard-keep-guard");
 
-function mountGuard(hasUnsavedChanges: boolean, bypass = false) {
+type SubEditor = { open: boolean; dirty: boolean; close: () => void };
+
+function mountGuard(
+  hasUnsavedChanges: boolean,
+  bypass = false,
+  subEditor?: SubEditor,
+) {
   nav.listener = null;
   const bypassRef = { current: bypass };
   // biome-ignore lint/correctness/useHookAtTopLevel: react is mocked; the hook runs as a plain function here.
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef });
+  const { requestClose } = useDiscardKeepGuard({
+    hasUnsavedChanges,
+    bypassRef,
+    subEditor,
+  });
   const fire = (action: unknown = { type: "GO_BACK" }) => {
     const event: BeforeRemoveEvent = {
       preventDefault: vi.fn(),
@@ -45,7 +55,7 @@ function mountGuard(hasUnsavedChanges: boolean, bypass = false) {
     (nav.listener as BeforeRemove | null)?.(event);
     return event;
   };
-  return { fire, bypassRef };
+  return { fire, bypassRef, requestClose };
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -55,20 +65,115 @@ beforeEach(() => {
   nav.dispatch.mockReset();
 });
 
-describe("decideGuardOnRemove (D-13)", () => {
-  it("allows when bypassed or clean, prompts when dirty", () => {
+describe("decideGuardOnRemove (D-13, D-14)", () => {
+  const back = { actionType: "GO_BACK" };
+
+  it("allows when bypassed or clean, prompts to leave when dirty", () => {
     expect(
-      decideGuardOnRemove({ hasUnsavedChanges: false, bypass: false }),
-    ).toBe("allow");
-    expect(decideGuardOnRemove({ hasUnsavedChanges: true, bypass: true })).toBe(
-      "allow",
-    );
-    expect(
-      decideGuardOnRemove({ hasUnsavedChanges: false, bypass: true }),
+      decideGuardOnRemove({ ...back, hasUnsavedChanges: false, bypass: false }),
     ).toBe("allow");
     expect(
-      decideGuardOnRemove({ hasUnsavedChanges: true, bypass: false }),
-    ).toBe("prompt");
+      decideGuardOnRemove({ ...back, hasUnsavedChanges: true, bypass: true }),
+    ).toBe("allow");
+    expect(
+      decideGuardOnRemove({ ...back, hasUnsavedChanges: false, bypass: true }),
+    ).toBe("allow");
+    expect(
+      decideGuardOnRemove({ ...back, hasUnsavedChanges: true, bypass: false }),
+    ).toBe("prompt-leave");
+  });
+
+  it("bypass wins for every action type, even with a dirty open sub-editor", () => {
+    for (const actionType of ["GO_BACK", "POP", "RESET", "NAVIGATE"]) {
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: true,
+          hasUnsavedChanges: true,
+          subEditorOpen: true,
+          subEditorDirty: true,
+        }),
+      ).toBe("allow");
+    }
+  });
+
+  it("Back (GO_BACK / POP) closes an open sub-editor first (D-14)", () => {
+    for (const actionType of ["GO_BACK", "POP"]) {
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: true,
+          subEditorOpen: true,
+          subEditorDirty: false,
+        }),
+      ).toBe("close-sub-editor");
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: false,
+          subEditorOpen: true,
+          subEditorDirty: true,
+        }),
+      ).toBe("prompt-close-sub-editor");
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: true,
+          subEditorOpen: false,
+          subEditorDirty: false,
+        }),
+      ).toBe("prompt-leave");
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: false,
+          subEditorOpen: false,
+          subEditorDirty: false,
+        }),
+      ).toBe("allow");
+    }
+  });
+
+  it("any other removal never closes a sub-editor (review C6-H1)", () => {
+    for (const actionType of ["RESET", "NAVIGATE", "POP_TO_TOP", "REPLACE"]) {
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: false,
+          subEditorOpen: true,
+          subEditorDirty: false,
+        }),
+      ).toBe("allow");
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: false,
+          subEditorOpen: true,
+          subEditorDirty: true,
+        }),
+      ).toBe("prompt-leave");
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: true,
+          subEditorOpen: false,
+        }),
+      ).toBe("prompt-leave");
+      expect(
+        decideGuardOnRemove({
+          actionType,
+          bypass: false,
+          hasUnsavedChanges: false,
+        }),
+      ).toBe("allow");
+    }
   });
 });
 
@@ -174,5 +279,135 @@ describe("useDiscardKeepGuard (D-13, D-14)", () => {
     confirmStore.getState().resolveCurrent(true);
     await flush();
     expect(nav.dispatch).toHaveBeenCalledOnce();
+  });
+});
+
+describe("useDiscardKeepGuard sub-editor variant (D-14)", () => {
+  it("Back with a clean open sub-editor closes it and stays", () => {
+    const close = vi.fn();
+    const { fire } = mountGuard(true, false, { open: true, dirty: false, close });
+    const event = fire({ type: "GO_BACK" });
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("Back with a dirty open sub-editor prompts; Discard closes it and stays", async () => {
+    const close = vi.fn();
+    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    const event = fire({ type: "POP" });
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    expect(close).not.toHaveBeenCalled();
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(close).toHaveBeenCalledOnce();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("Keep editing leaves the dirty sub-editor open", async () => {
+    const close = vi.fn();
+    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    fire();
+    confirmStore.getState().resolveCurrent(false);
+    await flush();
+    expect(close).not.toHaveBeenCalled();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("useDiscardKeepGuard non-Back removals (review C6-H1)", () => {
+  it("a RESET with a clean open sub-editor proceeds at once and closes nothing", () => {
+    const close = vi.fn();
+    const { fire } = mountGuard(false, false, { open: true, dirty: false, close });
+    const event = fire({ type: "RESET" });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+  });
+
+  it("a RESET with a dirty open sub-editor shows one prompt; Discard dispatches that RESET", async () => {
+    const close = vi.fn();
+    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    const action = { type: "RESET", payload: { routes: [] } };
+    const event = fire(action);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(close).not.toHaveBeenCalled();
+    expect(nav.dispatch).toHaveBeenCalledOnce();
+    expect(nav.dispatch).toHaveBeenCalledWith(action);
+  });
+
+  it("a RESET with a dirty open sub-editor and Keep editing dispatches nothing", async () => {
+    const close = vi.fn();
+    const { fire } = mountGuard(false, false, { open: true, dirty: true, close });
+    fire({ type: "RESET" });
+    confirmStore.getState().resolveCurrent(false);
+    await flush();
+    expect(nav.dispatch).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it("a bypassed RESET is not prevented", () => {
+    const close = vi.fn();
+    const { fire } = mountGuard(true, true, { open: true, dirty: true, close });
+    const event = fire({ type: "RESET" });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+  });
+});
+
+describe("useDiscardKeepGuard requestClose (D-61)", () => {
+  it("a clean close runs at once with no prompt", () => {
+    const { requestClose } = mountGuard(false);
+    const close = vi.fn();
+    requestClose(close, false);
+    expect(close).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(0);
+  });
+
+  it("a dirty close prompts and closes only on Discard changes", async () => {
+    const { requestClose } = mountGuard(false);
+    const close = vi.fn();
+    requestClose(close, true);
+    expect(close).not.toHaveBeenCalled();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("Keep editing does not close", async () => {
+    const { requestClose } = mountGuard(false);
+    const close = vi.fn();
+    requestClose(close, true);
+    confirmStore.getState().resolveCurrent(false);
+    await flush();
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it("while a prompt is pending, a second requestClose or Back queues nothing and closes nothing", async () => {
+    const subClose = vi.fn();
+    const { requestClose, fire } = mountGuard(true, false, {
+      open: true,
+      dirty: true,
+      close: subClose,
+    });
+    const first = vi.fn();
+    const second = vi.fn();
+    requestClose(first, true);
+    requestClose(second, true);
+    const event = fire({ type: "GO_BACK" });
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    confirmStore.getState().resolveCurrent(true);
+    await flush();
+    expect(first).toHaveBeenCalledOnce();
+    expect(second).not.toHaveBeenCalled();
+    expect(subClose).not.toHaveBeenCalled();
+    expect(nav.dispatch).not.toHaveBeenCalled();
   });
 });

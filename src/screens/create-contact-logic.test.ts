@@ -10,9 +10,17 @@ import {
   collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
+  createFormSeedSignature,
+  createFormSeedState,
   firstInteractionOccurredAt,
+  isCreateFormDirty,
   resolveErrorSection,
 } from "./create-contact-logic";
+import {
+  addMethodDraft,
+  removeMethodDraft,
+} from "@/components/contact-methods-editor-model";
+import { resolveCategorySelection } from "@/logic/category-logic";
 
 const NOW = "2026-08-15 14:30:00";
 
@@ -348,5 +356,82 @@ describe("collectBlockingErrors (Add Contact)", () => {
         state({ trackingEnabled: false, intervalValid: false }),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("Add Contact dirty check against the seed (D-15, E-01)", () => {
+  const baseline = createFormSeedSignature(createFormSeedState());
+  const dirty = (state: CreateFormState) =>
+    isCreateFormDirty(baseline, createFormSeedSignature(state));
+
+  it("a fresh seed is clean, whatever uid its phone row carries", () => {
+    expect(isCreateFormDirty(baseline, baseline)).toBe(false);
+    expect(dirty(createFormSeedState())).toBe(false);
+  });
+
+  it("seeds the documented defaults", () => {
+    const seed = createFormSeedState();
+    expect(seed).toMatchObject({
+      name: "",
+      categoryId: null,
+      intervalDays: null,
+      intervalValid: true,
+      trackingEnabled: false,
+      lastSpoke: { kind: "today" },
+      values: {},
+      memories: [],
+      relationships: [],
+      lastTalkedAbout: "",
+      currentLocation: "",
+      offLimits: [],
+    });
+    expect(seed.methods.phone).toHaveLength(1);
+    expect(seed.methods.phone[0].value).toBe("");
+    expect(seed.methods.email).toEqual([]);
+  });
+
+  it("a typed name is dirty", () => {
+    expect(dirty({ ...createFormSeedState(), name: "A" })).toBe(true);
+  });
+
+  it("adding then removing a phone row leaves only uid differences: clean", () => {
+    const seed = createFormSeedState();
+    const added = addMethodDraft(seed.methods, "phone", "extra-uid");
+    expect(dirty({ ...seed, methods: added })).toBe(true);
+    const removed = removeMethodDraft(added, "extra-uid");
+    expect(dirty({ ...seed, methods: removed })).toBe(false);
+  });
+
+  it("a name typed before categories resolve is dirty (no baseline wait)", () => {
+    // Categories never committed: categoryId stays at its seed (null).
+    expect(dirty({ ...createFormSeedState(), name: "A" })).toBe(true);
+  });
+
+  it("a failed load (no categories, no create defs) keeps the guard on", () => {
+    const seed = createFormSeedState();
+    expect(dirty(seed)).toBe(false);
+    expect(dirty({ ...seed, name: "Sam" })).toBe(true);
+  });
+
+  it("a catalog refresh alone never makes an untouched form dirty", () => {
+    const seed = createFormSeedState();
+    // Refresh with no pick keeps null; a deleted pick resets to null.
+    const refreshed = resolveCategorySelection([{ id: 1, name: "A" }], null);
+    expect(dirty({ ...seed, categoryId: refreshed })).toBe(false);
+    const deletedPick = resolveCategorySelection([{ id: 2, name: "B" }], 9);
+    expect(dirty({ ...seed, categoryId: deletedPick })).toBe(false);
+  });
+
+  it("a user-chosen category is dirty", () => {
+    expect(dirty({ ...createFormSeedState(), categoryId: 3 })).toBe(true);
+  });
+
+  it("binding then unbinding with no cadence returns to clean", () => {
+    const seed = createFormSeedState();
+    expect(dirty({ ...seed, trackingEnabled: true, intervalValid: false })).toBe(
+      true,
+    );
+    const back = coordinateBoundToggle({ intervalDays: null }, false);
+    expect(dirty({ ...seed, ...back })).toBe(false);
   });
 });
