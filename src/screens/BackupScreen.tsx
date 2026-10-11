@@ -1,7 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,6 +36,8 @@ import {
   readAutomaticSkippedPhotos,
   skippedPhotosCopy,
 } from "@/services/backup/skipped-photos";
+import { confirm, notice } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
@@ -218,19 +219,33 @@ export function BackupScreen({
           },
         }).shareExport({ readableOverride });
         const message = manualExportFailureCopy(result);
-        if (message) Alert.alert("Couldn't create export", message);
+        if (message) {
+          // 38.9 D-27: an over-cap export cannot be retried, so it is a
+          // blocking notice; any other failure is a retryable error snackbar.
+          if (result.status === "too-large") {
+            void notice({ title: "Couldn't create export", message });
+          } else {
+            showSnackbar({
+              kind: "error",
+              label: `Couldn't create export. ${message}`,
+            });
+          }
+        }
         // D-24: the export completed without some unreadable photos.
         const skipped =
           result.status === "shared"
             ? skippedPhotosCopy(result.skippedPhotos)
             : null;
-        if (skipped) Alert.alert("Export shared", skipped);
+        if (skipped) {
+          showSnackbar({ kind: "success", label: `Export shared. ${skipped}` });
+        }
       } catch (error) {
         Logger.error(LOG_SCOPE, "manual export failed", error);
-        Alert.alert(
-          "Couldn't create export",
-          "Nothing was shared. Please try again.",
-        );
+        showSnackbar({
+          kind: "error",
+          label:
+            "Couldn't create export. Nothing was shared. Please try again.",
+        });
       } finally {
         setExporting(false);
       }
@@ -238,19 +253,23 @@ export function BackupScreen({
     [exporting],
   );
 
-  const onExport = useCallback(() => {
+  const onExport = useCallback(async () => {
     if (!encryptionEnabled) {
       void runExport(false);
       return;
     }
-    Alert.alert(
-      "Export readable JSON?",
-      "Anyone with this file can read its contents. Use this only when you need a portable JSON backup.",
-      [
-        { text: "Keep encrypted export", onPress: () => void runExport(false) },
-        { text: "Export readable JSON", onPress: () => void runExport(true) },
-      ],
-    );
+    // 38.9 D-24/D-27 (RESEARCH Pitfall 1): BOTH buttons run an export, so
+    // this confirm is never dismissable. Back and the scrim do nothing, and
+    // the readable export runs only from its own explicit button (V6).
+    const readable = await confirm({
+      title: "Export readable JSON?",
+      message:
+        "Anyone with this file can read its contents. Use this only when you need a portable JSON backup.",
+      cancelLabel: "Keep encrypted export",
+      confirmLabel: "Export readable JSON",
+      dismissable: false,
+    });
+    void runExport(readable);
   }, [encryptionEnabled, runExport]);
 
   const validateRestore = useCallback(
