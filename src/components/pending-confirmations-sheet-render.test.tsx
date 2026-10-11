@@ -1,11 +1,16 @@
 import type { ReactElement, ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EligiblePendingAssist } from "@/db/interaction-assist-read";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 
 /**
  * Shallow render of Pending confirmations (38.6 D-14): each queued assist shows
  * the contact's photo (or initials) through `Avatar` beside its question.
+ *
+ * 38.9 D-13 / D-14 (J-07): both close paths (Back via `onRequestClose`, the
+ * scrim tap) go through one dirty-aware close that prompts while a queued
+ * confirmation note holds typed text. A tiny hook harness keeps `useState`
+ * values across "renders" so the close lifecycle is observable.
  */
 
 const QUEUE: EligiblePendingAssist[] = [
@@ -33,13 +38,34 @@ const QUEUE: EligiblePendingAssist[] = [
   },
 ];
 
+const hooks = vi.hoisted(() => ({
+  states: [] as unknown[],
+  index: 0,
+  effects: [] as (() => void)[],
+}));
+
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useRef: (value: unknown) => ({ current: value }),
-  useState: (value: unknown) => [
-    typeof value === "function" ? (value as () => unknown)() : value,
-    () => {},
-  ],
+  useState: (value: unknown) => {
+    const slot = hooks.index++;
+    if (!(slot in hooks.states)) {
+      hooks.states[slot] =
+        typeof value === "function" ? (value as () => unknown)() : value;
+    }
+    return [
+      hooks.states[slot],
+      (next: unknown) => {
+        hooks.states[slot] =
+          typeof next === "function"
+            ? (next as (previous: unknown) => unknown)(hooks.states[slot])
+            : next;
+      },
+    ];
+  },
+  useEffect: (effect: () => void) => {
+    hooks.effects.push(effect);
+  },
 }));
 // 38.9 D-24: raw RN Modal sites render through RegisteredModal; the window
 // itself is unchanged, so the wrapper is the mocked RN Modal here.
@@ -84,14 +110,14 @@ vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: vi.fn(),
 }));
 vi.mock("@/stores/shell-refresh-store", () => ({ bumpShellRefresh: vi.fn() }));
+const live = vi.hoisted(() => ({ queue: [] as unknown[] }));
 vi.mock("@/stores/assist-store", () => ({
   useAssistBanner: (
-    select: (state: {
-      queue: EligiblePendingAssist[];
-      refresh: () => void;
-    }) => unknown,
-  ) => select({ queue: QUEUE, refresh: () => {} }),
+    select: (state: { queue: unknown[]; refresh: () => void }) => unknown,
+  ) => select({ queue: live.queue, refresh: () => {} }),
 }));
+const { confirmDiscard } = vi.hoisted(() => ({ confirmDiscard: vi.fn() }));
+vi.mock("@/navigation/discard-keep-guard", () => ({ confirmDiscard }));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
 
 const { PendingConfirmationsSheet } = await import(
@@ -113,10 +139,36 @@ function textOf(element: TestElement | undefined): string {
   return "";
 }
 
+/** One harness "render": hook slots persist, effects run after the render. */
+function render(props: { visible: boolean; onClose: () => void }) {
+  hooks.index = 0;
+  hooks.effects = [];
+  const tree = nodes(PendingConfirmationsSheet(props));
+  for (const effect of hooks.effects) effect();
+  return tree;
+}
+
+function resetHarness() {
+  hooks.states = [];
+  hooks.index = 0;
+  hooks.effects = [];
+  live.queue = QUEUE;
+  confirmDiscard.mockReset();
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+const flush = () => new Promise<void>((settle) => setTimeout(settle, 0));
+
 describe("PendingConfirmationsSheet photos (38.6 D-14)", () => {
-  const tree = nodes(
-    PendingConfirmationsSheet({ visible: true, onClose: () => {} }),
-  );
+  resetHarness();
+  const tree = render({ visible: true, onClose: () => {} });
 
   it("renders one Avatar per queued assist with the contact's photo, name and id", () => {
     const avatars = tree.filter((node) => node.type === "Avatar");
@@ -162,5 +214,116 @@ describe("PendingConfirmationsSheet photos (38.6 D-14)", () => {
       [true, "Did you text Grace Hopper?"],
       [true, "Did you reach Ada Lovelace?"],
     ]);
+  });
+});
+
+describe("PendingConfirmationsSheet close guard (38.9 D-13, D-14; J-07)", () => {
+  beforeEach(resetHarness);
+
+  const modalOf = (tree: TestElement[]) =>
+    tree.find((node) => node.type === "Modal") as TestElement;
+  const scrimOf = (tree: TestElement[]) =>
+    tree.find(
+      (node) =>
+        node.props.accessibilityLabel === "Dismiss pending confirmations",
+    ) as TestElement;
+  const confirmationFor = (tree: TestElement[], index: number) =>
+    tree.filter((node) => node.type === "AssistConfirmation")[index];
+
+  it("routes Back and the scrim through one close that is not the raw onClose", () => {
+    const onClose = vi.fn();
+    const tree = render({ visible: true, onClose });
+    const back = modalOf(tree).props.onRequestClose;
+    const scrim = scrimOf(tree).props.onPress;
+    expect(typeof back).toBe("function");
+    expect(back).not.toBe(onClose);
+    expect(scrim).not.toBe(onClose);
+  });
+
+  it("gives every queued confirmation a note-dirty reporter", () => {
+    const tree = render({ visible: true, onClose: () => {} });
+    const confirmations = tree.filter(
+      (node) => node.type === "AssistConfirmation",
+    );
+    expect(confirmations).toHaveLength(2);
+    for (const node of confirmations) {
+      expect(typeof node.props.onNoteDirtyChange).toBe("function");
+    }
+  });
+
+  it("closes at once, with no prompt, when no note is typed", () => {
+    const onClose = vi.fn();
+    const tree = render({ visible: true, onClose });
+    (scrimOf(tree).props.onPress as () => void)();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it("prompts with a typed note and closes only on Discard", async () => {
+    const onClose = vi.fn();
+    let tree = render({ visible: true, onClose });
+    (
+      confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void
+    )(true);
+    tree = render({ visible: true, onClose });
+
+    const keep = deferred<boolean>();
+    confirmDiscard.mockReturnValueOnce(keep.promise);
+    (modalOf(tree).props.onRequestClose as () => void)();
+    expect(confirmDiscard).toHaveBeenCalledTimes(1);
+    keep.resolve(false);
+    await flush();
+    expect(onClose).not.toHaveBeenCalled();
+
+    tree = render({ visible: true, onClose });
+    const discard = deferred<boolean>();
+    confirmDiscard.mockReturnValueOnce(discard.promise);
+    (scrimOf(tree).props.onPress as () => void)();
+    expect(onClose).not.toHaveBeenCalled();
+    discard.resolve(true);
+    await flush();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("a note whose item left the queue no longer prompts", () => {
+    const onClose = vi.fn();
+    let tree = render({ visible: true, onClose });
+    (
+      confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void
+    )(true);
+    live.queue = [QUEUE[1]];
+    tree = render({ visible: true, onClose });
+    (scrimOf(tree).props.onPress as () => void)();
+    expect(confirmDiscard).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts clean after the sheet closes (Discard, or hidden by its owner)", async () => {
+    const onClose = vi.fn();
+    let tree = render({ visible: true, onClose });
+    (
+      confirmationFor(tree, 1).props.onNoteDirtyChange as (d: boolean) => void
+    )(true);
+    tree = render({ visible: true, onClose });
+    confirmDiscard.mockResolvedValueOnce(true);
+    (scrimOf(tree).props.onPress as () => void)();
+    await flush();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    // Reopened: a clean close needs no prompt.
+    tree = render({ visible: true, onClose });
+    (scrimOf(tree).props.onPress as () => void)();
+    expect(confirmDiscard).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(2);
+
+    // Hidden while dirty (visible → false), then reopened: clean again.
+    (
+      confirmationFor(tree, 0).props.onNoteDirtyChange as (d: boolean) => void
+    )(true);
+    render({ visible: false, onClose });
+    tree = render({ visible: true, onClose });
+    (scrimOf(tree).props.onPress as () => void)();
+    expect(confirmDiscard).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(3);
   });
 });
