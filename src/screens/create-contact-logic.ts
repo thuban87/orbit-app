@@ -124,6 +124,15 @@ export const CREATE_SECTION_FIELD_MAP: SectionFieldMap = {
 };
 
 /**
+ * Add Contact's top-to-bottom reveal order for the inline field errors (38.9
+ * D-19): Save scrolls to and focuses the first of these with an error.
+ */
+export const CREATE_FIELD_REVEAL_ORDER: readonly string[] = [
+  "name",
+  "frequency",
+];
+
+/**
  * The `sectionId` owning the FIRST blocking validation error in the array's
  * deterministic order, or `null` when there are no (mapped) blocking errors. An
  * error whose field is not in the map is skipped (resolve the next mapped one).

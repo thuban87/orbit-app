@@ -13,10 +13,10 @@ import { resolveCategorySelection } from "@/logic/category-logic";
 import {
   type BuildCreateInputDeps,
   buildCreateInput,
+  CREATE_FIELD_REVEAL_ORDER,
   CREATE_SECTION_FIELD_MAP,
   type CreateFormState,
   canSave,
-  CREATE_FIELD_REVEAL_ORDER,
   collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,

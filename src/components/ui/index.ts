@@ -18,6 +18,7 @@ export {
   ConfirmDialog,
   type ConfirmDialogProps,
 } from "./ConfirmDialog";
+export { FieldError, type FieldErrorProps } from "./FieldError";
 export { GlassSurface, type GlassSurfaceProps } from "./GlassSurface";
 export {
   type OverlayLifecycle,
