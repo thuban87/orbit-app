@@ -41,7 +41,11 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
-import type { InFlightRef } from "@/utils/single-flight";
+import {
+  beginInFlight,
+  endInFlight,
+  type InFlightRef,
+} from "@/utils/single-flight";
 import {
   createGroupEventRefreshController,
   eventDraft,
@@ -75,6 +79,9 @@ export function EditGroupEventScreen({
   const [removePending, setRemovePending] = useState(false);
   const removeLatch = useRef<InFlightRef>({ current: false });
   const [saving, setSaving] = useState(false);
+  // Synchronous in-flight flag for the event Save: `saving` state lags a
+  // render, so the guard reads this ref to hold Back (fix-pass WR-02).
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const bypassRef = useRef(false);
 
@@ -116,14 +123,15 @@ export function EditGroupEventScreen({
   const refreshEvent = refreshController.refresh;
 
   const hasUnsavedChanges = isGroupEventDraftDirty(state);
-  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef });
+  // The event save in flight holds every exit, with no prompt (fix-pass WR-02).
+  useDiscardKeepGuard({ hasUnsavedChanges, bypassRef, busyRef: savingRef });
   const excludedIds = useMemo(
     () => excludedParticipantIds(event, state.committedPendingIds),
     [event, state.committedPendingIds],
   );
 
   async function saveEvent() {
-    if (!event || !draft || saving) return;
+    if (!event || !draft || !beginInFlight(savingRef)) return;
     setSaving(true);
     setError(null);
     const initial = eventDraft(event);
@@ -156,6 +164,7 @@ export function EditGroupEventScreen({
       setError("Couldn't update the event. Your changes weren't saved.");
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   }
 
@@ -240,8 +249,11 @@ export function EditGroupEventScreen({
   }
 
   // House header (38.9 D-16, D-44): its Back calls goBack, which the
-  // unsaved-work guard above intercepts (D-13).
-  const header = <ShellAppBar variant="child" title="Edit Event" />;
+  // unsaved-work guard above intercepts (D-13). While the event save runs the
+  // guard holds Back, so it draws disabled (D-26; WR-02).
+  const header = (
+    <ShellAppBar variant="child" title="Edit Event" backDisabled={saving} />
+  );
 
   if (!event || !draft) {
     return (
