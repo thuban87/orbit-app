@@ -8,7 +8,11 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ title: "" }));
+const state = vi.hoisted(() => ({
+  title: "",
+  discardAnswer: true,
+  confirmDiscard: vi.fn(),
+}));
 
 vi.mock("react", () => ({
   useEffect: () => undefined,
@@ -28,6 +32,12 @@ vi.mock("@/components/ui/ConfirmDialog", () => ({
   ConfirmActions: "ConfirmActions",
 }));
 vi.mock("@/theme", () => ({ useUnscopedTheme: () => ({ colors: {} }) }));
+vi.mock("@/navigation/discard-keep-guard", () => ({
+  confirmDiscard: () => {
+    state.confirmDiscard();
+    return Promise.resolve(state.discardAnswer);
+  },
+}));
 
 const { GroupTitlePromptSheet } = await import("./GroupTitlePromptSheet");
 
@@ -65,6 +75,8 @@ function render(onConfirm = vi.fn(), onRequestClose = vi.fn()) {
 describe("GroupTitlePromptSheet (D-72)", () => {
   beforeEach(() => {
     state.title = "";
+    state.discardAnswer = true;
+    state.confirmDiscard.mockClear();
   });
 
   it("uses the shared stacking actions, never a fixed row", () => {
@@ -96,6 +108,30 @@ describe("GroupTitlePromptSheet (D-72)", () => {
     expect(input?.props?.returnKeyType).toBe("done");
     call(input, "onSubmitEditing");
     expect(onConfirm).toHaveBeenCalledWith("Book club");
+  });
+
+  it("Back or the scrim with an empty title closes at once (D-14)", () => {
+    const { tree, onRequestClose } = render();
+    const [sheet] = find(tree, "Sheet");
+    call(sheet, "onRequestClose");
+    expect(state.confirmDiscard).not.toHaveBeenCalled();
+    expect(onRequestClose).toHaveBeenCalledOnce();
+  });
+
+  it("Back or the scrim with a typed title asks first (D-14; review CR-02)", async () => {
+    state.title = "Trip";
+    state.discardAnswer = false;
+    const kept = render();
+    call(find(kept.tree, "Sheet")[0], "onRequestClose");
+    await Promise.resolve();
+    expect(state.confirmDiscard).toHaveBeenCalledOnce();
+    expect(kept.onRequestClose).not.toHaveBeenCalled();
+
+    state.discardAnswer = true;
+    const discarded = render();
+    call(find(discarded.tree, "Sheet")[0], "onRequestClose");
+    await Promise.resolve();
+    expect(discarded.onRequestClose).toHaveBeenCalledOnce();
   });
 
   it("ignores the Done key for a blank title", () => {

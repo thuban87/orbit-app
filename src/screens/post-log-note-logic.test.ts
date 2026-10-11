@@ -5,6 +5,7 @@ import {
   type PostLogSaveResult,
   resolvePostCreateMemoryTarget,
   resolvePostLogSave,
+  shouldPromptOnNoteClose,
 } from "./post-log-note-logic";
 
 describe("resolvePostLogSave", () => {
@@ -183,5 +184,32 @@ describe("commitThenReReadMemory — a committed Memory is never reported as fai
     });
     expect(outcome).toEqual({ kind: "committed", row: { id: 3 } });
     expect(reRead).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("shouldPromptOnNoteClose (38.9 D-14; review CR-02)", () => {
+  const base = { text: "", memoryCreated: false, memoryDraftDirty: false };
+
+  it("an empty or whitespace-only note closes at once", () => {
+    expect(shouldPromptOnNoteClose(base)).toBe(false);
+    expect(shouldPromptOnNoteClose({ ...base, text: "  \n " })).toBe(false);
+  });
+
+  it("a typed note asks before Back or the scrim throws it away", () => {
+    expect(shouldPromptOnNoteClose({ ...base, text: "Coffee" })).toBe(true);
+  });
+
+  it("after the text became a Memory, only an edited memory draft asks", () => {
+    expect(
+      shouldPromptOnNoteClose({ ...base, text: "Coffee", memoryCreated: true }),
+    ).toBe(false);
+    expect(
+      shouldPromptOnNoteClose({
+        ...base,
+        text: "Coffee",
+        memoryCreated: true,
+        memoryDraftDirty: true,
+      }),
+    ).toBe(true);
   });
 });

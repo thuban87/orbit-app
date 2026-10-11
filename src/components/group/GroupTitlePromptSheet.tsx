@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { AppText, Sheet } from "@/components/ui";
 import { ConfirmActions } from "@/components/ui/ConfirmDialog";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import { useUnscopedTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -33,8 +34,24 @@ export function GroupTitlePromptSheet({
   const confirm = () => {
     if (trimmed) onConfirm(trimmed);
   };
+  // Back and the scrim (D-14; review CR-02): a typed title asks "Discard
+  // changes?" first; an empty field closes at once. confirmDiscard() is
+  // single-flight, so a second Back never closes twice.
+  const requestSheetClose = () => {
+    if (!trimmed) {
+      onRequestClose();
+      return;
+    }
+    void confirmDiscard().then((discard) => {
+      if (discard) onRequestClose();
+    });
+  };
   return (
-    <Sheet visible={visible} onRequestClose={onRequestClose} variant="compact">
+    <Sheet
+      visible={visible}
+      onRequestClose={requestSheetClose}
+      variant="compact"
+    >
       <View style={styles.content}>
         <AppText role="heading">Make this a group interaction</AppText>
         <AppText role="body" style={{ color: colors.textSecondary }}>

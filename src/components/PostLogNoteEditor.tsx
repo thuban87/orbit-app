@@ -32,10 +32,12 @@ import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import { editTouchpointFull } from "@/db/recency-dao";
 import { useContactHeader } from "@/hooks/use-contact-header";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
   commitThenReReadMemory,
   resolvePostCreateMemoryTarget,
   resolvePostLogSave,
+  shouldPromptOnNoteClose,
 } from "@/screens/post-log-note-logic";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
@@ -74,6 +76,8 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   const [createdMemory, setCreatedMemory] = useState<MemoryRow | null>(null);
   const [editingMemory, setEditingMemory] = useState(false);
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
+  // Whether the Edit Memory view's draft holds typed changes (D-14).
+  const [memoryDraftDirty, setMemoryDraftDirty] = useState(false);
   // Own single-flight guard, distinct from runQuickLog's pendingRef.
   const savingRef = useRef(false);
 
@@ -89,6 +93,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     setError(null);
     setCreatedMemory(null);
     setEditingMemory(false);
+    setMemoryDraftDirty(false);
     savingRef.current = false;
     let cancelled = false;
     void (async () => {
@@ -313,10 +318,30 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     />
   ) : null;
 
+  // Back and the scrim (D-14; review CR-02): typed text asks "Discard
+  // changes?" first; untouched closes at once. confirmDiscard() is
+  // single-flight, so a second Back while the prompt is up never closes twice.
+  // A successful save still closes directly through onClose (D-61).
+  const requestSheetClose = () => {
+    if (
+      !shouldPromptOnNoteClose({
+        text,
+        memoryCreated: createdMemory !== null,
+        memoryDraftDirty: memoryBeingEdited !== null && memoryDraftDirty,
+      })
+    ) {
+      onClose();
+      return;
+    }
+    void confirmDiscard().then((discard) => {
+      if (discard) onClose();
+    });
+  };
+
   return (
     <Sheet
       visible={target !== null}
-      onRequestClose={onClose}
+      onRequestClose={requestSheetClose}
       variant={memoryBeingEdited ? "expanded" : "compact"}
     >
       {memoryBeingEdited ? (
@@ -336,6 +361,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
             // Only this one memory is shown, so its options open by default
             // (no tap on the card needed; owner ruling D-73).
             initiallyEditingId={memoryBeingEdited.id}
+            onDraftStateChange={(state) => setMemoryDraftDirty(state.dirty)}
             showAdd={false}
             onAdd={onAddMemory}
             onEdit={onEditMemory}

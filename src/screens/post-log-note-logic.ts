@@ -149,3 +149,19 @@ export async function commitThenReReadMemory<Id, T>(steps: {
     return { kind: "committed", row: null, reReadFailed: true };
   }
 }
+
+/**
+ * Whether closing the Add Note sheet by Back or a scrim tap would throw away
+ * typed work, so it must ask "Discard changes?" first (38.9 D-14; review
+ * CR-02). Typed note text counts until it has been turned into a Memory; in
+ * the Edit Memory view, an edited memory draft counts. A successful save
+ * closes directly and never asks (D-61). PURE.
+ */
+export function shouldPromptOnNoteClose(state: {
+  text: string;
+  memoryCreated: boolean;
+  memoryDraftDirty: boolean;
+}): boolean {
+  if (state.memoryDraftDirty) return true;
+  return !state.memoryCreated && state.text.trim() !== "";
+}
