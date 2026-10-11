@@ -12,10 +12,12 @@ const state = vi.hoisted(() => ({
   title: "",
   discardAnswer: true,
   confirmDiscard: vi.fn(),
+  savingRef: { current: false },
 }));
 
 vi.mock("react", () => ({
   useEffect: () => undefined,
+  useRef: () => state.savingRef,
   useState: <T,>(_initial: T) => [state.title, vi.fn()],
 }));
 vi.mock("react-native", () => ({
@@ -77,6 +79,7 @@ describe("GroupTitlePromptSheet (D-72)", () => {
     state.title = "";
     state.discardAnswer = true;
     state.confirmDiscard.mockClear();
+    state.savingRef.current = false;
   });
 
   it("uses the shared stacking actions, never a fixed row", () => {
@@ -154,6 +157,46 @@ describe("GroupTitlePromptSheet (D-72)", () => {
     call(find(discarded.tree, "Sheet")[0], "onRequestClose");
     await Promise.resolve();
     expect(discarded.onRequestClose).toHaveBeenCalledOnce();
+  });
+
+  it("holds Back, the scrim and Cancel while the create is in flight (verification IN-01)", async () => {
+    state.title = "Trip";
+    let finish: () => void = () => undefined;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { tree, onRequestClose } = render(onConfirm);
+    const [actions] = find(tree, "ConfirmActions");
+    call(actions, "onConfirm");
+    call(find(tree, "Sheet")[0], "onRequestClose");
+    call(actions, "onCancel");
+    // A second Create while the first is pending is dropped, too.
+    call(actions, "onConfirm");
+    await Promise.resolve();
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(state.confirmDiscard).not.toHaveBeenCalled();
+    expect(onRequestClose).not.toHaveBeenCalled();
+
+    // Once the create settles (here: it failed and the sheet stayed open),
+    // the exits work again.
+    finish();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    state.title = "";
+    const after = render(onConfirm, onRequestClose);
+    call(find(after.tree, "ConfirmActions")[0], "onCancel");
+    expect(onRequestClose).toHaveBeenCalledOnce();
+  });
+
+  it("releases the hold when the host's create rejects", async () => {
+    state.title = "Trip";
+    const onConfirm = vi.fn(() => Promise.reject(new Error("boom")));
+    const { tree } = render(onConfirm);
+    call(find(tree, "ConfirmActions")[0], "onConfirm");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.savingRef.current).toBe(false);
   });
 
   it("ignores the Done key for a blank title", () => {

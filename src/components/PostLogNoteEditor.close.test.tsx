@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   savingRef: { current: false },
   discardAnswer: true,
   confirmDiscard: vi.fn(),
+  /** Settles the pending readInteractionForEdit of an in-flight Save. */
+  finishRead: (_seed: unknown): void => undefined,
 }));
 
 vi.mock("react", () => ({
@@ -51,7 +53,10 @@ vi.mock("@/db/database", () => ({
   localDateTime: () => "2026-10-11 12:00:00",
 }));
 vi.mock("@/db/interaction-edit-read", () => ({
-  readInteractionForEdit: vi.fn(),
+  readInteractionForEdit: () =>
+    new Promise((resolve) => {
+      state.finishRead = resolve;
+    }),
 }));
 vi.mock("@/db/memories-dao", () => ({
   addMemory: vi.fn(),
@@ -231,5 +236,63 @@ describe("Edit Memory's Done and form Cancel are dirty-aware (D-14, D-61; verifi
     expect(closeDiscarded).toHaveBeenCalledOnce();
     // The form closes; the sheet itself stays open.
     expect(dirty.onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("a save in flight owns the close (verification IN-01)", () => {
+  beforeEach(() => {
+    state.savingRef.current = false;
+    state.discardAnswer = true;
+    state.confirmDiscard.mockClear();
+  });
+
+  it("Back, the scrim and Cancel open no prompt while the note is saving", async () => {
+    const { tree, onClose } = render({ text: "Coffee" });
+    press(button(tree, "Save"));
+    expect(state.savingRef.current).toBe(true);
+    press(find(tree, "Sheet")[0] as Element, "onRequestClose");
+    press(button(tree, "Cancel"));
+    await flush();
+    expect(state.confirmDiscard).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The interaction was undone meanwhile: the save fails softly, the sheet
+    // stays open, and the exits ask again.
+    state.finishRead(null);
+    await flush();
+    expect(state.savingRef.current).toBe(false);
+    const after = render({ text: "Coffee" });
+    press(button(after.tree, "Cancel"));
+    await flush();
+    expect(state.confirmDiscard).toHaveBeenCalledOnce();
+  });
+
+  it("Edit Memory's Done and form Cancel hold while a save is in flight", async () => {
+    state.savingRef.current = true;
+    const view = render({
+      text: "Coffee",
+      createdMemory: MEMORY,
+      editingMemory: true,
+      memoryDraftDirty: true,
+    });
+    press(button(view.tree, "Done"));
+    const close = vi.fn();
+    cancelRequestOf(view.tree)(close);
+    await flush();
+    expect(state.confirmDiscard).not.toHaveBeenCalled();
+    expect(view.onClose).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it("the memory edit save claims the same slot, so a second Save is dropped", async () => {
+    state.savingRef.current = true;
+    const view = render({
+      text: "Coffee",
+      createdMemory: MEMORY,
+      editingMemory: true,
+    });
+    const onEdit = find(view.tree, "MemoryEditor")[0]?.props?.onEdit;
+    if (typeof onEdit !== "function") throw new Error("no onEdit");
+    await expect(onEdit(7, {})).resolves.toBe(false);
   });
 });

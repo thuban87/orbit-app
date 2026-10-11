@@ -1,5 +1,5 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit Button/AppText `role` is a domain prop, not ARIA.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { AppText, Sheet } from "@/components/ui";
 import { ConfirmActions } from "@/components/ui/ConfirmDialog";
@@ -10,7 +10,11 @@ import { SPACING } from "@/theme/tokens/spacing";
 interface GroupTitlePromptSheetProps {
   visible: boolean;
   onRequestClose: () => void;
-  onConfirm: (title: string) => void;
+  /**
+   * Creates the event. Return the write's promise so the sheet can hold its
+   * exits (and a second Create) until it settles (verification IN-01).
+   */
+  onConfirm: (title: string) => Promise<unknown> | undefined;
   error?: string | null;
 }
 
@@ -27,18 +31,35 @@ export function GroupTitlePromptSheet({
   // from a glass card (38.4 review Lane B2 WR-01; RG-029 / D-24).
   const { colors } = useUnscopedTheme();
   const [title, setTitle] = useState("");
+  // Set while the host's create is in flight (verification IN-01).
+  const savingRef = useRef(false);
   useEffect(() => {
     if (!visible) setTitle("");
   }, [visible]);
   const trimmed = title.trim();
   const confirm = () => {
-    if (trimmed) onConfirm(trimmed);
+    if (!trimmed || savingRef.current) return;
+    savingRef.current = true;
+    const release = () => {
+      savingRef.current = false;
+    };
+    let pending: Promise<unknown>;
+    try {
+      pending = Promise.resolve(onConfirm(trimmed));
+    } catch (thrown) {
+      release();
+      throw thrown;
+    }
+    void pending.then(release, release);
   };
   // Back, the scrim and Cancel (D-14, D-61; review CR-02, verification
   // WR-01): a typed title asks "Discard changes?" first; an empty field
   // closes at once. confirmDiscard() is single-flight, so a second exit never
   // closes twice.
   const requestSheetClose = () => {
+    // A create in flight owns the close (IN-01): success closes the sheet,
+    // failure shows the error. A prompt now would outlive the sheet.
+    if (savingRef.current) return;
     if (!trimmed) {
       onRequestClose();
       return;

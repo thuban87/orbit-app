@@ -224,32 +224,40 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   const onEditMemory = useCallback(
     async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
       if (contactId === null) return false;
-      // 38.3 review B-CR-01: a resolved editMemory is a successful save even if
-      // the re-read fails. A missing re-read row closes the editor rather than
-      // dropping back to the re-submittable Add-Note surface.
-      const outcome = await commitThenReReadMemory({
-        write: () =>
-          editMemory(getExecutor(), {
-            id,
-            contactId,
-            ...patch,
-            now: localDateTime(),
-          }),
-        publish: bumpShellRefresh,
-        reRead: () => reReadCreatedMemory(id, contactId),
-        onPostCommitError: (stage, err) =>
-          Logger.error(LOG_SCOPE, `memory ${stage} failed after edit`, err),
-      });
-      if (outcome.kind === "write-failed") {
-        Logger.error(LOG_SCOPE, "failed to edit memory", outcome.error);
-        return false;
-      }
-      if (outcome.row === null) {
-        onClose();
+      // The edit save shares savingRef, so the sheet's exits hold while it is
+      // in flight (verification IN-01) and a double-tapped Save edits once.
+      if (savingRef.current) return false;
+      savingRef.current = true;
+      try {
+        // 38.3 review B-CR-01: a resolved editMemory is a successful save even
+        // if the re-read fails. A missing re-read row closes the editor rather
+        // than dropping back to the re-submittable Add-Note surface.
+        const outcome = await commitThenReReadMemory({
+          write: () =>
+            editMemory(getExecutor(), {
+              id,
+              contactId,
+              ...patch,
+              now: localDateTime(),
+            }),
+          publish: bumpShellRefresh,
+          reRead: () => reReadCreatedMemory(id, contactId),
+          onPostCommitError: (stage, err) =>
+            Logger.error(LOG_SCOPE, `memory ${stage} failed after edit`, err),
+        });
+        if (outcome.kind === "write-failed") {
+          Logger.error(LOG_SCOPE, "failed to edit memory", outcome.error);
+          return false;
+        }
+        if (outcome.row === null) {
+          onClose();
+          return true;
+        }
+        setCreatedMemory(outcome.row);
         return true;
+      } finally {
+        savingRef.current = false;
       }
-      setCreatedMemory(outcome.row);
-      return true;
     },
     [contactId, onClose, reReadCreatedMemory],
   );
@@ -325,6 +333,10 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   // the prompt is up never closes twice. A successful save still closes
   // directly through onClose (D-61).
   const requestSheetClose = () => {
+    // A save in flight owns the close (verification IN-01): its success closes
+    // the sheet, its failure leaves it open with the error. Opening "Discard
+    // changes?" now would leave the prompt over a sheet that is already gone.
+    if (savingRef.current) return;
     if (
       !shouldPromptOnNoteClose({
         text,
@@ -342,6 +354,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   // The Edit Memory form's own Cancel (D-61): an edited draft asks first; an
   // untouched one closes the form at once. The sheet stays open either way.
   const requestMemoryFormCancel = (close: () => void) => {
+    if (savingRef.current) return; // the edit save closes the form (IN-01)
     if (!memoryDraftDirty) {
       close();
       return;

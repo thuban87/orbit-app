@@ -1269,9 +1269,11 @@ export function HistorySection({
         visible={converting && detailInteraction !== null}
         onRequestClose={() => setConverting(false)}
         error={conversionError}
+        // Returns the write so the prompt holds its exits and a second Create
+        // until it settles (38.9 verification IN-01).
         onConfirm={(title) => {
           if (!detailInteraction) return;
-          void convertInteractionToGroupEvent(getExecutor(), {
+          return convertInteractionToGroupEvent(getExecutor(), {
             interactionId: detailInteraction.id,
             contactId,
             title,
