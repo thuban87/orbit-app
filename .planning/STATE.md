@@ -5,7 +5,7 @@ milestone_name: Release Readiness
 current_phase: 38.9
 current_phase_name: UX Standards
 status: executing
-stopped_at: Completed 38.9-16-PLAN.md
+stopped_at: 38.9-17 executed; awaiting owner look check
 last_updated: "2026-10-11T13:15:25.228Z"
 last_activity: 2026-10-11
 last_activity_desc: "38.9-16 complete (shared plural() helper; Contacts bulk actions and listed counts read singular for one; last raw date-only displays formatted; docs/systems/ux-standards.md written; Phase 39 pending amendments updated)"
@@ -48,7 +48,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 Phase: 38.9 (UX Standards) — EXECUTING
 Plan: 17 of 17
-Status: Executing Phase 38.9 — Plans 01-16 complete; phase code review DONE (38.9-REVIEW.md + fix verifications REVIEW-FIXES/-2/-3/-4; all CR/WR fixed; owner rulings D-72..D-75 in 38.9-CONTEXT). Gate green at 7d540976+: tsc, check:colors, vitest 618 files/8018 tests. Owner: leave REVIEW-FIXES-4 CR-01 (widget tap during held save) as is → .planning/todos/pending/2026-10-11-widget-tap-during-held-save.md. NEXT: dispatch Plan 17 (device plan, autonomous:false) — see .continue-here.md for the device-check/look items collected during execution.
+Status: Executing Phase 38.9 — Plan 17 (device plan) executed: debug device pass done (2 fixes: Digest birthday weekday, sheet scrim taps), D-18 checked, release APK built + uploaded to Drive as orbit-phase38.9-release-2026-10-11.apk (owner yes 2026-10-11). AWAITING: owner look-and-feel check (38.9-DEVICE-PASS.md "Owner checklist") + owner rulings L1–L4 (look) and O1–O6 (out-of-scope routing). Then phase verification.
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
