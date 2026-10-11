@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
+import { formatDisplayDate } from "@/utils/dates";
 
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
@@ -39,6 +40,9 @@ function text(tree: TestElement[]): string {
 }
 
 const DATE = "2026-09-18";
+// 38.9 D-48: the day shows in the weekday display form ("Fri, Sep 18"; the
+// year appears only outside the current year, so it is computed here).
+const DAY_TEXT = formatDisplayDate(DATE, { weekday: true });
 
 describe("DigestDayDetail", () => {
   it("renders a multi-participant group event once and names interaction contacts", () => {
@@ -163,10 +167,12 @@ describe("DigestDayDetail", () => {
     );
     const indicator = tree.find((node) => node.type === "ActivityIndicator");
     expect(indicator?.props.accessibilityLabel).toBe(
-      `Loading activity for ${DATE}`,
+      `Loading activity for ${DAY_TEXT}`,
     );
     expect(indicator?.props.color).toBe(THEME_PRESETS.galaxy.dark.accentText);
-    expect(text(tree)).toContain(DATE);
+    expect(DAY_TEXT.startsWith("Fri, Sep 18")).toBe(true);
+    expect(text(tree)).toContain(DAY_TEXT);
+    expect(text(tree)).not.toContain(DATE);
     expect(text(tree)).not.toContain("No activity");
     expect(tree.some((node) => node.type === "Button")).toBe(false);
   });

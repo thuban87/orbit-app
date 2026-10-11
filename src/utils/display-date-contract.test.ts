@@ -41,17 +41,23 @@ const isTestFile = (path: string) => /\.test\.(ts|tsx)$/.test(path);
 
 /** Source with block and line comments removed, so prose cannot trip a rule. */
 function codeOnly(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 /** Names imported from `@/utils/dates` (any import form). */
 function importedFromDates(src: string): string[] {
   const names: string[] = [];
-  const re = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*["'](?:@\/utils\/dates|(?:\.\.?\/)+(?:utils\/)?dates)["']/g;
+  const re =
+    /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*["'](?:@\/utils\/dates|(?:\.\.?\/)+(?:utils\/)?dates)["']/g;
   let match = re.exec(src);
   while (match) {
     for (const part of match[1].split(",")) {
-      const name = part.trim().split(/\s+as\s+/)[0]?.trim();
+      const name = part
+        .trim()
+        .split(/\s+as\s+/)[0]
+        ?.trim();
       if (name) names.push(name);
     }
     match = re.exec(src);
@@ -126,7 +132,9 @@ describe("the birthday storage helper is unchanged (D-23, C5-H1)", () => {
 describe("Digest day detail uses the weekday display form (D-48)", () => {
   it("formats the day label and both accessibility strings", () => {
     const src = source("src/components/digest/DigestDayDetail.tsx");
-    const calls = src.match(/formatDisplayDate\([^)]*weekday:\s*true/g) ?? [];
+    const calls =
+      src.match(/formatDisplayDate(?:OrFallback)?\([^)]*weekday:\s*true/g) ??
+      [];
     expect(calls.length).toBeGreaterThanOrEqual(1);
     expect(src).not.toMatch(/<AppText role="label">\{date\}<\/AppText>/);
     expect(src).not.toMatch(/`Activity for \$\{date\}`/);

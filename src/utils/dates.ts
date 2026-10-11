@@ -5,6 +5,8 @@
  * to avoid UTC off-by-one bugs near midnight.
  */
 
+import { isValidStoredBirthday } from "@/logic/birthday-logic";
+
 /**
  * Returns local YYYY-MM-DD string.
  *
@@ -75,7 +77,11 @@ export function parseLocalMs(stored: string): number {
 
 const TIME_FORMAT: "12h" | "24h" = "12h";
 
-const MONTH_ABBREVIATIONS = [
+/**
+ * The shared month and weekday names (38.9 D-23). Every display formatter in
+ * the app reads these tables; no screen keeps a private copy.
+ */
+export const MONTH_SHORT = [
   "Jan",
   "Feb",
   "Mar",
@@ -88,6 +94,43 @@ const MONTH_ABBREVIATIONS = [
   "Oct",
   "Nov",
   "Dec",
+] as const;
+
+export const MONTH_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/** Indexed by `Date.getDay()` (0 = Sunday). */
+export const WEEKDAY_SHORT = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+] as const;
+
+/** Indexed by `Date.getDay()` (0 = Sunday). */
+export const WEEKDAY_LONG = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
 ] as const;
 
 /** Formats a minute-precision clock independently of device locale. */
@@ -113,7 +156,7 @@ export function formatMinuteClock(
  */
 export function formatDateTimeMinute(stored: string): string {
   const date = new Date(parseLocalMs(stored));
-  const month = MONTH_ABBREVIATIONS[date.getMonth()];
+  const month = MONTH_SHORT[date.getMonth()];
   return `${month} ${date.getDate()}, ${date.getFullYear()}, ${clockOf(date)}`;
 }
 
@@ -158,6 +201,86 @@ function clockOf(date: Date): string {
     { hour: date.getHours(), minute: date.getMinutes() },
     TIME_FORMAT,
   );
+}
+
+export interface DisplayDateOptions {
+  /** The day the current-year rule compares against (defaults to the wall clock). */
+  readonly now?: Date;
+  /** Prefix the short weekday ("Tue, Oct 13") where the day matters. */
+  readonly weekday?: boolean;
+}
+
+/**
+ * The one date-only display formatter (38.9 D-23, D-48): "Oct 13" in the
+ * current year, "Jun 2, 2025" in any other year, and "Tue, Oct 13" with
+ * `weekday`. A stored datetime shows its date part only.
+ *
+ * DISPLAY ONLY. Its output is never a storage key, query parameter, testID or
+ * persisted value; those stay on `formatLocalDate()` (CLAUDE.md conventions,
+ * D-23; `display-date-contract.test.ts`). Strings parse strictly through
+ * `parseLocalMs`, so an impossible date ("2026-02-31") throws; use
+ * `formatDisplayDateOrFallback` in UI.
+ */
+export function formatDisplayDate(
+  stored: string | Date,
+  opts: DisplayDateOptions = {},
+): string {
+  const date =
+    typeof stored === "string" ? new Date(parseLocalMs(stored)) : stored;
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("dates: invalid Date");
+  }
+  const now = opts.now ?? new Date();
+  const monthDay = formatMonthDay(date.getMonth() + 1, date.getDate());
+  const year =
+    date.getFullYear() === now.getFullYear() ? "" : `, ${date.getFullYear()}`;
+  const weekday = opts.weekday ? `${WEEKDAY_SHORT[date.getDay()]}, ` : "";
+  return `${weekday}${monthDay}${year}`;
+}
+
+/**
+ * `formatDisplayDate`, degrading to `fallback` when the value cannot be parsed.
+ * Pass the raw value as the fallback where an invalid value must stay visible
+ * as stored (custom-field error state, legacy free text).
+ */
+export function formatDisplayDateOrFallback(
+  stored: string | Date,
+  fallback = "Unknown date",
+  opts: DisplayDateOptions = {},
+): string {
+  try {
+    return formatDisplayDate(stored, opts);
+  } catch {
+    return fallback;
+  }
+}
+
+/** "Feb 29" from a 1-based month and a day of month. Display only. */
+export function formatMonthDay(month: number, day: number): string {
+  return `${MONTH_SHORT[month - 1]} ${day}`;
+}
+
+/**
+ * Display form of a stored `contacts.birthday` value (38.9 D-70, D-23).
+ *
+ * Only what the strict birthday gate (`isValidStoredBirthday`) accepts is
+ * formatted: an exact `YYYY-MM-DD` always shows its year ("Jun 2, 2026", even
+ * in the current year; D-70 narrows D-48 for birthdays only), an exact `MM-DD`
+ * shows month-day ("Feb 29"). Anything else ("02-30", "--06-02", padded or
+ * trailing text) is returned raw. Never throws.
+ *
+ * DISPLAY ONLY: never written back. The storage form is
+ * `buildBirthdayForStorage` (edit-contact-logic.ts), which this does not touch.
+ */
+export function formatStoredBirthdayForDisplay(stored: string): string {
+  if (!isValidStoredBirthday(stored)) return stored;
+  const full = /^(\d{4})-(\d{2})-(\d{2})$/.exec(stored);
+  if (full) {
+    const [, year, month, day] = full;
+    return `${formatMonthDay(Number(month), Number(day))}, ${Number(year)}`;
+  }
+  const [month, day] = stored.split("-");
+  return formatMonthDay(Number(month), Number(day));
 }
 
 const MS_PER_DAY = 86_400_000;

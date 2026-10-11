@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/Button";
 import type { YourWeekDayRow } from "@/db/your-week-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
-import { formatTimeMinuteOrFallback } from "@/utils/dates";
+import {
+  formatDisplayDateOrFallback,
+  formatTimeMinuteOrFallback,
+} from "@/utils/dates";
 
 const AVATAR_SIZE = 36;
 
@@ -16,6 +19,10 @@ const AVATAR_SIZE = 36;
 // minute formatter — the rows sit within the known selected day, so a clock is
 // enough; 12-hour AM/PM, no seconds, neutral fallback (RG-038
 // ui-accessibility/AUD-UIA-018, 38.4 D-07, ADR-152).
+//
+// The day itself (label and both accessibility strings) uses the shared
+// date-only display formatter with the weekday, because this is a day view
+// (38.9 D-23, D-48: "Tue, Oct 13"). `date` itself stays the raw YYYY-MM-DD.
 
 export interface DigestDayDetailProps {
   date: string;
@@ -36,6 +43,7 @@ export function DigestDayDetail({
   testID = "digest-day-detail",
 }: DigestDayDetailProps) {
   const { colors } = useTheme();
+  const dayText = formatDisplayDateOrFallback(date, date, { weekday: true });
 
   let body: ReactNode;
   if (state.status === "loading") {
@@ -43,7 +51,7 @@ export function DigestDayDetail({
       <ActivityIndicator
         testID={`${testID}-loading`}
         color={colors.accentText}
-        accessibilityLabel={`Loading activity for ${date}`}
+        accessibilityLabel={`Loading activity for ${dayText}`}
         style={styles.indicator}
       />
     );
@@ -76,11 +84,11 @@ export function DigestDayDetail({
   return (
     <View
       testID={testID}
-      accessibilityLabel={`Activity for ${date}`}
+      accessibilityLabel={`Activity for ${dayText}`}
       style={[styles.container, { backgroundColor: colors.surfaceElevated }]}
     >
       {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
-      <AppText role="label">{date}</AppText>
+      <AppText role="label">{dayText}</AppText>
       {body}
     </View>
   );
