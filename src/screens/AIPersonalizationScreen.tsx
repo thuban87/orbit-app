@@ -77,6 +77,9 @@ import {
 } from "./ai-personalization-logic";
 
 const LOG_SCOPE = "ai-personalization";
+/** The load error, also shown when a re-read after a committed write fails. */
+const LOAD_FAILED_MESSAGE =
+  "Couldn't load AI personalization. Please try again.";
 const EMPTY_COPY =
   "Add a section or paste text to tell Orbit how you write and what matters to you.";
 
@@ -268,8 +271,25 @@ export function AIPersonalizationScreen({
   useEffect(() => {
     void load().catch((caught) => {
       Logger.error(LOG_SCOPE, "failed to load personalization", caught);
-      setMessage("Couldn't load AI personalization. Please try again.");
+      setMessage(LOAD_FAILED_MESSAGE);
     });
+  }, [load]);
+
+  // A re-read after a committed write runs OUTSIDE that write's try, with
+  // its own catch (third fix pass IN-02): a failed re-read shows the load
+  // error and is never reported as a failed write. Reporting it as one
+  // invited a retry that wrote the section a second time.
+  const reloadAfterWrite = useCallback(async (): Promise<void> => {
+    try {
+      await load();
+    } catch (caught) {
+      Logger.error(
+        LOG_SCOPE,
+        "failed to reload personalization after a write",
+        caught,
+      );
+      setMessage(LOAD_FAILED_MESSAGE);
+    }
   }, [load]);
 
   const estimateInput = useMemo(
@@ -367,16 +387,17 @@ export function AIPersonalizationScreen({
     if (!draftTitle.trim()) return;
     if (!beginInFlight(savingRef)) return;
     setSavingSection(true);
+    let committed = false;
     try {
       await createPersonalizationSection(getExecutor(), {
         title: draftTitle,
         body: draftBody,
         now: localDateTime(),
       });
+      committed = true;
       setDraftTitle("");
       setDraftBody("");
       setAdding(false);
-      await load();
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to add personalization section", caught);
       setMessage("Couldn't add that section. Please try again.");
@@ -385,9 +406,11 @@ export function AIPersonalizationScreen({
       endInFlight(savingRef);
       settleHold();
     }
+    if (committed) await reloadAfterWrite();
   }
 
   async function importFile(replaceUid?: string) {
+    let committed = false;
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["text/plain", "text/markdown"],
@@ -411,17 +434,19 @@ export function AIPersonalizationScreen({
           now: localDateTime(),
         });
       }
+      committed = true;
       setOptionsUid(null);
-      await load();
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to import personalization", caught);
       setMessage("Couldn't import that text file. Please try again.");
     }
+    if (committed) await reloadAfterWrite();
   }
 
   async function saveEditedSection(section: PersonalizationSection) {
     if (!beginInFlight(savingRef)) return;
     setSavingSection(true);
+    let committed = false;
     try {
       await updatePersonalizationSection(getExecutor(), {
         uid: section.uid,
@@ -429,8 +454,8 @@ export function AIPersonalizationScreen({
         body: section.body,
         now: localDateTime(),
       });
+      committed = true;
       setEditingUid(null);
-      await load();
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to edit personalization section", caught);
       setMessage("Couldn't save that section. Please try again.");
@@ -439,6 +464,7 @@ export function AIPersonalizationScreen({
       endInFlight(savingRef);
       settleHold();
     }
+    if (committed) await reloadAfterWrite();
   }
 
   async function toggleSection(
@@ -485,11 +511,12 @@ export function AIPersonalizationScreen({
         next,
         localDateTime(),
       );
-      await load();
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to reorder personalization", caught);
       setMessage("Couldn't reorder those sections. Please try again.");
+      return;
     }
+    await reloadAfterWrite();
   }
 
   async function confirmDelete() {
@@ -498,11 +525,12 @@ export function AIPersonalizationScreen({
       await deletePersonalizationSection(getExecutor(), deleteUid);
       setDeleteUid(null);
       setOptionsUid(null);
-      await load();
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to delete personalization", caught);
       setMessage("Couldn't delete that section. Please try again.");
+      return;
     }
+    await reloadAfterWrite();
   }
 
   return (
