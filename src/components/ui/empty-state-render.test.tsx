@@ -47,7 +47,7 @@ describe("EmptyState (D-20)", () => {
     const buttons = tree.filter((n) => n.type === "Button");
     expect(buttons).toHaveLength(1);
     expect(buttons[0]?.props.label).toBe("Clear search");
-    (buttons[0]?.props.onPress as () => void)();
+    (buttons[0]?.props.onPress as (() => void) | undefined)?.();
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
@@ -121,7 +121,7 @@ describe("empty-state consumers (D-20, D-71)", () => {
       start,
       history.indexOf("</EmptyState>", start),
     );
-    expect(region).toContain("testID={`${testID}-empty`}");
+    expect(region).toMatch(/testID=\{`\$\{testID\}-empty`\}/);
     expect(region).toContain('label: "Log interaction"');
     expect(region).toContain("onLayout={onContentLayout}");
     expect(region).toContain("{refreshNotice}");

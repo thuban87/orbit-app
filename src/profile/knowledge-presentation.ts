@@ -149,7 +149,13 @@ function memoryItem(memory: MemoryRow): KnowledgePresentationItem {
     memory.custom_label ??
     (memory.type === "imported" ? "Imported note" : "Memory");
   const metadata = [
-    memory.meaningful_date,
+    // D-48 display, raw when not a date (38.9 D-65); storage unchanged.
+    memory.meaningful_date
+      ? formatDisplayDateOrFallback(
+          memory.meaningful_date,
+          memory.meaningful_date,
+        )
+      : null,
     memory.url ? "Link" : null,
     memory.pinned === 1 ? "Pinned" : null,
     memory.outdated === 1 ? "Outdated" : null,

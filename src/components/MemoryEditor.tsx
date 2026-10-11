@@ -1,3 +1,6 @@
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import {
   type Ref,
   useEffect,
@@ -16,6 +19,12 @@ import {
 } from "@/db/memory-registry";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
+import {
+  isPickableStoredDate,
+  pickerSeedFromStored,
+  storedFromPickerEvent,
+} from "./date-pick-logic";
 import { Icon } from "./icons/Icon";
 import { MemoryCard } from "./MemoryCard";
 import { AppText, OrbitSwitch } from "./ui";
@@ -246,6 +255,22 @@ export function isMemoryDraftDirty(
   );
 }
 
+/**
+ * The draft as it is handed to `onAdd` / `onEdit`: blank optional text becomes
+ * null and text is trimmed. A cleared (null) or blank meaningful date is null;
+ * a picked one is already the stored YYYY-MM-DD (D-65). PURE.
+ */
+export function normalizeMemoryDraft(draft: MemoryDraft): MemoryDraft {
+  return {
+    ...draft,
+    customLabel: blankToNull(draft.customLabel ?? ""),
+    value: blankToNull(draft.value ?? ""),
+    note: blankToNull(draft.note ?? ""),
+    url: blankToNull(draft.url ?? ""),
+    meaningfulDate: blankToNull(draft.meaningfulDate ?? ""),
+  };
+}
+
 /** The draft state a host's guard reads (D-14). PURE. */
 export function memoryDraftState(
   editing: MemoryRow | null,
@@ -298,6 +323,8 @@ export function MemoryEditor({
   const [draft, setDraft] = useState<MemoryDraft | null>(
     () => initialEditorState(items, initiallyEditingId).draft,
   );
+  // The meaningful date's native picker (38.9 D-65), as TriStateLastSpoke does.
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const openNew = () => {
     setEditing(null);
@@ -340,19 +367,29 @@ export function MemoryEditor({
       (draft.type === "custom" && !blankToNull(draft.customLabel ?? ""))
     )
       return;
-    const normalized: MemoryDraft = {
-      ...draft,
-      customLabel: blankToNull(draft.customLabel ?? ""),
-      value: blankToNull(draft.value ?? ""),
-      note: blankToNull(draft.note ?? ""),
-      url: blankToNull(draft.url ?? ""),
-      meaningfulDate: blankToNull(draft.meaningfulDate ?? ""),
-    };
+    const normalized = normalizeMemoryDraft(draft);
     const saved = editing
       ? await onEdit(editing.id, normalized)
       : await onAdd(normalized);
     if (saved) close();
   };
+  // A pick stores the local YYYY-MM-DD through `update`, so it is a draft
+  // change for the Plan 02 guard; a dismiss stores nothing (D-65, D-23).
+  const onMeaningfulDatePicked = (event: DateTimePickerEvent, date?: Date) => {
+    setShowDatePicker(false);
+    const stored = storedFromPickerEvent(event.type, date);
+    if (stored !== null) update("meaningfulDate", stored);
+  };
+  const meaningfulDate = draft?.meaningfulDate ?? null;
+  const hasMeaningfulDate =
+    meaningfulDate !== null && meaningfulDate.trim() !== "";
+  // D-48 display, raw when it is not a date (legacy free text is shown as
+  // stored, never migrated or repaired; D-65). "Pick a date" when empty (D-67).
+  const meaningfulDateText = hasMeaningfulDate
+    ? formatDisplayDateOrFallback(meaningfulDate, meaningfulDate)
+    : "Pick a date";
+  const meaningfulDateInvalid =
+    hasMeaningfulDate && !isPickableStoredDate(meaningfulDate);
   const isCustom = draft?.type === "custom";
   const canSave = Boolean(
     draft &&
@@ -465,21 +502,64 @@ export function MemoryEditor({
               },
             ]}
           />
-          <TextInput
-            accessibilityLabel="Meaningful date optional"
-            value={draft.meaningfulDate ?? ""}
-            onChangeText={(value) => update("meaningfulDate", value)}
-            placeholder="Meaningful date (optional)"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.input,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          />
+          {/* Meaningful date (38.9 D-65, D-67): a native date picker, full
+              date only, no range limit; optional, with Clear. */}
+          <View style={styles.dateField}>
+            <AppText role="label">Meaningful date (optional)</AppText>
+            <View style={styles.dateRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Meaningful date"
+                accessibilityValue={{ text: meaningfulDateText }}
+                accessibilityHint="Opens the date picker"
+                onPress={() => setShowDatePicker(true)}
+                style={[
+                  styles.input,
+                  styles.dateTrigger,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <AppText
+                  role="body"
+                  style={{
+                    color: hasMeaningfulDate
+                      ? colors.textPrimary
+                      : colors.textPlaceholder,
+                  }}
+                >
+                  {meaningfulDateText}
+                </AppText>
+              </Pressable>
+              {hasMeaningfulDate ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear meaningful date"
+                  onPress={() => update("meaningfulDate", null)}
+                  style={[styles.action, { borderColor: colors.border }]}
+                >
+                  <AppText role="body" style={{ color: colors.textSecondary }}>
+                    Clear
+                  </AppText>
+                </Pressable>
+              ) : null}
+            </View>
+            {meaningfulDateInvalid ? (
+              <AppText role="caption" style={{ color: colors.danger }}>
+                Not a date
+              </AppText>
+            ) : null}
+            {showDatePicker ? (
+              <DateTimePicker
+                testID="memory-meaningful-date-picker"
+                value={pickerSeedFromStored(meaningfulDate)}
+                mode="date"
+                onChange={onMeaningfulDatePicked}
+              />
+            ) : null}
+          </View>
           <View style={styles.toggleRow}>
             <AppText role="body">Pin memory</AppText>
             <OrbitSwitch
@@ -621,6 +701,9 @@ const styles = StyleSheet.create({
   },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   container: { gap: SPACING.sm },
+  dateField: { gap: SPACING.xs },
+  dateRow: { alignItems: "center", flexDirection: "row", gap: SPACING.sm },
+  dateTrigger: { flex: 1, justifyContent: "center" },
   form: {
     borderRadius: SPACING.md,
     borderWidth: 1,

@@ -245,7 +245,7 @@ describe("meaningful date (D-65, D-67)", () => {
       (n) => n.props.accessibilityLabel === "Clear meaningful date",
     );
     expect(clear).toBeDefined();
-    (clear?.props.onPress as () => void)();
+    (clear?.props.onPress as (() => void) | undefined)?.();
     const updater = hooks.setters.find((s) => typeof s === "function") as (
       d: MemoryDraft,
     ) => MemoryDraft;

@@ -6,6 +6,7 @@ import {
 } from "@/db/memory-registry";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { Icon } from "./icons/Icon";
 import { normaliseLinkUrl } from "./LinksEditor";
 import { AppText } from "./ui";
@@ -105,7 +106,11 @@ export function MemoryCard({
       ) : null}
       {memory.meaningful_date ? (
         <AppText role="caption" style={{ color: colors.textSecondary }}>
-          {memory.meaningful_date}
+          {/* D-48 display, raw when not a date (38.9 D-65); storage unchanged. */}
+          {formatDisplayDateOrFallback(
+            memory.meaningful_date,
+            memory.meaningful_date,
+          )}
         </AppText>
       ) : null}
       {memory.url ? (

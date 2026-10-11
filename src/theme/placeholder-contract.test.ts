@@ -104,7 +104,10 @@ describe("placeholder token contract (RG-029, D-24)", () => {
   );
 
   it("finds the app's placeholder props (the scan is not vacuous)", () => {
-    expect(sites.length).toBeGreaterThanOrEqual(79);
+    // 77 since 38.9-13: the Memory meaningful date (D-65) and the custom Date
+    // field (D-66) became native date pickers, so their two TextInputs and
+    // placeholder props are gone.
+    expect(sites.length).toBeGreaterThanOrEqual(77);
   });
 
   it("every placeholderTextColor uses colors.textPlaceholder", () => {

@@ -120,7 +120,7 @@ describe("DateFieldWidget (D-66, D-67)", () => {
     const clear = tree.find(
       (n) => n.props.accessibilityLabel === "Clear Anniversary",
     );
-    (clear?.props.onPress as () => void)();
+    (clear?.props.onPress as (() => void) | undefined)?.();
     expect(onChange).toHaveBeenCalledExactlyOnceWith("");
   });
 
