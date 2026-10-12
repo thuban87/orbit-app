@@ -42,9 +42,20 @@
 | 20 | D-20 / D-71 (shipped in 38.9-13) — one `EmptyState` (`src/components/ui/EmptyState.tsx`): icon, heading, one help line, one action ("Clear search", "Log an event", "Try again", "Log interaction") | D-98 (empty-state button, now built in 38.13 per R-1); any frame showing an empty list | Frames and lesson targets use this layout and these action labels | Verify |
 | 21 | D-01 / D-30 / D-39 / D-46 (38.9-16) — the 38.9 standards are written in `docs/systems/ux-standards.md` | Any 39 decision applying a destructive, feedback, dialog, guard, header or date rule (e.g. D-57, D-92) | 39 cites the standards doc and its D-IDs instead of restating the rules | Verify |
 
-## 38.10 — Fuel Retirement, Things to Remember & Sharing
+## 38.10 — Fuel Retirement, Things to Remember & Sharing (`38.10-CONTEXT.md`, accepted 2026-10-12)
 
-_(none yet)_
+| # | 38.10 decision | Touches in 39 | What would change | Status |
+|---|---|---|---|---|
+| 1 | D-63 — the Memory screen (+ → Memory) is retired; + → Memory opens the Add form directly; D-64 — after saving you return where you were with "Memory saved for <name>" | D-23 (Memory lesson at "first deliberate Memory creation"), D-17 / frame 07, trigger map (`39-CONTEXT.md:290` cites `MemoryScreen.tsx:149`) | Memory lesson trigger and frame 07 retarget to the Add form and its snackbar | Verify |
+| 2 | D-75 — the Things to Remember editor screen is retired; each Profile pencil opens that section's own editor | Trigger map (`ThingsToRememberScreen.tsx:297`), any frame drawing that screen | Triggers move to the section editors / Add form | Verify |
+| 3 | D-42 — the Add Note sheet loses "Create Memory Instead" and gets an "Also save to" section picker; D-37/D-38 — an interaction note can also be saved, linked, to Last Talked About / Gift Ideas / Thought of Them / Memories (History shows one tagged row) | D-97 (Memory lesson in "the Memory and post-log note editors"), D-16 ("Memory conversion" excluded), trigger map (`PostLogNoteEditor.tsx:187`), D-23 "distinct from an interaction note" | Lesson placement and copy; "Memory conversion" no longer exists; the Memory-vs-note distinction now includes linked notes | Verify |
+| 4 | D-34/D-43/D-44 — new sections Thought of Them and Gift Ideas (after Memories); D-68 empty sections show "Add …"; D-72 one heading action per section (Add or pencil); D-70 Pin works, "Hide from Profile" removed from the entry sheet | D-14 / frame B (Prepare), D-14's "does not teach … pin/hide" | Prepare copy and frame B use the final section list and heading actions; pin is now real | Verify |
+| 5 | D-77/D-78/D-79/D-80 — a share saves at once to Thought of Them, then a card offers section chips, Undo, Add note and Allow AI (off); multi-person shares move together; the picker is the list ContactPicker, not the face grid | D-93, D-99 (sharing lesson content), `39-CONTEXT.md:181` ("today shares are fuel", now stale) | Sharing lesson teaches save-first + chips + Undo + AI switch on the list picker | Verify |
+| 6 | D-77 — the confirmation card is an interactive surface | D-58 (no lesson over a sheet/dialog), D-97 (exceptions) | A sharing lesson would sit on the share screen or card; 39 decides whether D-97's exception covers it | Verify |
+| 7 | D-69 — every Things to Remember delete is at once + Undo, then permanent; Recently Deleted is removed | D-30 (Recently Deleted / memory Restore) | Moot; remove any reference | Verify |
+| 8 | D-55 — backup format 7 → 8; a new migration (head moves past 032) | D-62 ("`BACKUP_FORMAT_VERSION = 7`, no change"), Claude's Discretion :231 (migration head 032) | Update the version and re-read the head at 39 plan time | Verify |
+| 9 | D-76 / roadmap — new Phase 38.16 (share reminders + warm share) sits before 39; 39 now depends on 38.16 | D-93 (originally "with optional reminders"), roadmap "Depends on" | 39 decides whether the sharing lesson teaches reminders / warm-share return | Verify |
+| 10 | D-87 — wording: "Avoid" → "Off Limits"; entry sheet buttons "Edit" / "Pin" / "Unpin", "Close"; share confirmation "Saved to <name> · <section>" | Any lesson copy or frame quoting these strings | Copy matches | Verify |
 
 ## Roadmap split — 2026-10-10 (owner)
 

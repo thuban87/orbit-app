@@ -165,12 +165,13 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language** (INSERTED) - A Skia 2.5D Orrery V2 from the Orrery renderer R&D labs: a tilted strategy-map Home, a new imperative renderer, a painted sky, thin sun-lit orbits with subtle pulses, rim-lit status bodies, Lab A's star sun, moon bumps, reticle focus with a docked card, a star-warp System switch, plus five production Orrery defect fixes. Dossier accepted after codex review (D-01..D-58); complete (2026-10-05).
 - [x] **Phase 38.8: History Navigation UX** (INSERTED) - Completed 2026-10-09: 7/7 plans (incl. gap plan 07: G1/G2/YEARS) + deep code review (1 blocker, 3 warnings, fixed); verification passed 76/76; owner look-and-feel sign-off on the Pixel and his Moto; final release orbit-38.8-release-2026-10-09.apk (arm64). Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
 - [x] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; 17/17 plans (completed 2026-10-11)
-- [ ] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6; dossier pending
+- [ ] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6 (share reminders → 38.16); dossier accepted 2026-10-12
 - [ ] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile, Add/Edit/Update Contact audit fixes + new-contact defaults and not-contacted status; dossier pending (split 2026-10-10)
 - [ ] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes; dossier pending
 - [ ] **Phase 38.13: Contacts List, Search & Digest UX** (INSERTED) - Contacts tab, search and Digest audit fixes + list perf investigation, D-95, D-98; dossier pending
 - [ ] **Phase 38.14: Logging, History, Events & Compose UX** (INSERTED) - Logging forms, History, Group Events and Compose audit fixes + one "Did you send it?" (D-76); dossier pending
 - [ ] **Phase 38.15: Events — Plan, Create & Remind** (INSERTED) - New feature: future group events, an Events-tab create entry and reminders (audit B-23); dossier pending
+- [ ] **Phase 38.16: Share Reminders & Warm Share** (INSERTED) - Offer "Remind me about this" after a share, built on 38.15's reminders; sharing while Orbit is open returns you to Orbit; dossier pending
 - [ ] **Phase 39: Onboarding** - A short guided first run (Welcome → add a first person → a four-step Orient tour) and contextual, skippable lessons for the core loop and a few unusual features, through one accessible lesson system, after the prerequisite product fixes they depend on. Dossier accepted (D-01..D-93); UX audit before planning.
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1620,10 +1621,34 @@ Plans:
 
 > **Inserted 2026-10-10 (owner).** New feature, not remediation; placed before 39 so onboarding can teach it.
 
+### Phase 38.16: Share Reminders & Warm Share (INSERTED)
+
+**Goal**: After you share something into Orbit and pick the person, Orbit can remind you about it later (owner's example: an article found at 2 a.m., reminded two days later at 8 a.m. to send before her soccer game). And when Orbit is already open, sharing into it returns you to where you were in Orbit instead of closing the app.
+**Depends on**: Phase 38.15 (its reminder system is reused); Phase 38.10 (the share flow and confirmation card this builds on).
+**Requirements**: None formal. Owner decisions to come from this phase's dossier (phase-dossier skill).
+**Success Criteria**: Defined at planning from this phase's CONTEXT.
+**Scope source**: TBD — dossier via the phase-dossier skill. Origin: work cut from 38.10 to hold its size (owner, 2026-10-12; `38.10-CONTEXT.md` D-73, D-74, D-76; provenance in `38.10-LEDGER.md` Batch 15–16).
+- **Share reminders** (backlog 999.5, reminder half; owner wording in the 999.5 entry below): after a share, offer "Add a reminder about this?" leading into reminder setup.
+  - Builds on 38.10's share flow: a tap saves the share to Thought of Them at once, then a confirmation card offers section chips, Undo, Add note and an Allow AI switch (38.10 D-77, D-78). The reminder offer most likely joins that card; placement is this phase's decision.
+  - Reuse 38.15's reminder entity and scheduling rather than building a second system (38.10 D-73). 38.15's dossier is still pending, so this phase's design waits on it.
+  - Today: no per-item or one-off reminder entity exists; scheduled notifications are only `decay:`, `birthday:` and `digest:weekly` (`src/services/notifications/notification-ids.ts`). Notification permission is requested only from Settings → Notifications (38.10 workpaper §6 Q-D1, LIKELY — re-verify).
+  - **Recorded rule in play:** notification bodies carry only the contact name — "no fuel, no PII, no log-derived text" (`notification-ids.ts:15-19`, T-11-01; ADR-039 rejected frozen fuel in the body). A reminder that shows the shared item's text in the notification would reverse this; that is an owner decision, to be named in the dossier.
+  - Likely a new durable entity → a migration (verify head+1 on disk) and the backup-format question, which is an owner decision (38.10 is moving the format to v8, 38.10 D-55).
+  - Tapping the reminder must open something useful (the item, the person, or Compose); to be decided.
+- **Warm share** (audit I-03, `.planning/ux-audit/UX-AUDIT-REPORT.md`): sharing while Orbit is open currently closes Orbit, because Capture calls a plain `Activity.finish()` (`src/screens/CaptureScreen.tsx` cancel and auto-return paths; `modules/orbit-share-finish/android/src/main/java/expo/modules/orbitsharefinish/OrbitShareFinishModule.kt`) and MainActivity is `singleTask` (`android/app/src/main/AndroidManifest.xml:24`, injected by expo-share-intent).
+  - Candidate approaches from the 38.10 intake: `moveTaskToBack`, or a separate share activity. Native work → native build and device verification, a different verification path from the JS work (CLAUDE.md "Plan sizing").
+  - **Recorded decisions in play:** ADR-037 :18 decides plain `finish()` and rejected "`BackHandler.exitApp()` or task removal"; 10-capture dossier Cluster 2 (`docs/dossier/10-capture.md:98-108`) [DECIDED] return to the source app after a share, and [REJECTED] "Staying in Orbit on the profile". Returning to Orbit's own previous screen in the warm case partly revives that rejected option; cold shares keep returning to the source app unless the owner rules otherwise. Both are to be named in the dossier.
+  - 38.10 kept today's behaviour and preserves 38.9 D-33's Capture Back order (38.10 D-74, D-19).
+- **Phase 39:** placed before 39 (owner, 2026-10-12) so the sharing lesson (39-CONTEXT D-93, D-99) can teach the final behaviour; whether it teaches reminders is 39's call. Record effects in `39-AMENDMENTS-PENDING.md`.
+**Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 3–4 plans — rough estimate from 38.10's scoping (reminders ≈ 2–3, warm share ≈ 1). Basis: 38.10 N-14. Not counted: anything 38.15's reminder design forces, and a reminder-text-in-notification change if the owner wants it.
+**Plans**: TBD
+
+> **Inserted 2026-10-12 (owner).** Work cut from 38.10 to keep that phase near 17–19 plans; placed after 38.15 (reuses its reminders) and before 39 (owner).
+
 ### Phase 39: Onboarding
 
 **Goal**: A new user gets a short guided start (Welcome → add a first person → a four-step tour of Digest, Contacts, Orrery and the + button), then learns the core loop (Orient → Prepare → Reach Out → Record) and a few unusual features at the moment they first meet them, through one small, accessible, skippable lesson system. The product behaviours those lessons would otherwise have to explain away are fixed first, in Phases 38.9–38.12 (39-CONTEXT D-100..D-102).
-**Depends on**: Phase 38.15
+**Depends on**: Phase 38.16
 **Requirements**: None formal. Owner decisions in `39-CONTEXT.md` (2026-10-09 interrogation; provenance in `39-LEDGER.md`, migrated from the codex/ChatGPT legacy ledger).
 **Success Criteria**: Defined at planning from `39-CONTEXT.md` (D-01..D-102).
 **Scope source**: .planning/phases/39-onboarding/39-CONTEXT.md (the dossier; authoritative)
@@ -1717,7 +1742,7 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 
 ### Phase 999.5: Shared items get their own Things to Remember section, with optional reminders (BACKLOG)
 
-**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative.
+**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative. **The reminder half moved to Phase 38.16 (owner, 2026-10-12; 38.10 D-73).**
 
 **Goal:** Things shared into the app from other Android apps land somewhere visible and fitting. Owner, 2026-10-09: a text block that "made me think of my niece" was shared to her contact and "currently it doesn't show anywhere. I don't really want that to show in memories though, it's not a memory, it's just something that made me think of them."
 - A new Things to Remember section for these items (working name "Made Me Think of Them"; name to be decided).
