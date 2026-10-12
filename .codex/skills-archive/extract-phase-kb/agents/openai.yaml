@@ -1,0 +1,4 @@
+interface:
+  display_name: "Extract Phase KB"
+  short_description: "Extract ADRs, system docs, and runbooks from a completed phase"
+  default_prompt: "Use Extract Phase KB to turn a completed orbit-app phase's dossier and artifacts into ADRs, system docs, runbooks, and a KB manifest, in strict phase order."

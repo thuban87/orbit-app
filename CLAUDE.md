@@ -215,7 +215,7 @@ Useful reference targets in that repo:
 
 - **Templates** live in `.planning/knowledgebase/templates/` — read the matching template before generating any KB doc.
 - **Phase KB manifests** live alongside their phase artifacts at `.planning/phases/{phase-id}/{phase-id}-KB-MANIFEST.md`.
-- Extraction runs through the `extract-phase-kb` skill (installed for both Claude and codex); structural system-doc splits use `split-system-doc`. Both are dossier-aware and adapted to this repo, and the setup is live-tracked in `.planning/knowledgebase/KB-SETUP-PLAN.md`. Run extraction as a milestone-close backfill batch in strict phase order; do not let phase decisions rot in `.planning/`.
+- Extraction runs through the global `extract-phase-kb` skill (`~/.claude/skills/` and `~/.codex/skills/`), which reads this repo's `.planning/KB-CONVENTIONS.md` for every orbit-specific rule (dossier map, tiers, legacy-ADR reclaim, TS migrations). Structural system-doc splits use `split-system-doc`. The setup history is in `.planning/knowledgebase/KB-SETUP-PLAN.md`. Run extraction as a milestone-close backfill batch in strict phase order; do not let phase decisions rot in `.planning/`.
 
 ## Graphify and feature intelligence
 
