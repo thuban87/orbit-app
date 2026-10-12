@@ -113,7 +113,9 @@ npm run graph:build            # scripts/graph-build.sh: ADR registry + graph
 - **Milestone-close / backfill batch, in strict ascending phase order:** 01, 02 … 18, 18.1, 18.2, 19,
   19.1, 20, 21, then the milestone-2 phases. It is not run per phase during development. Each phase
   reads the committed outputs of the phases before it. Never forward-peek.
-- Ship-date rule: the skill default.
+- Ship-date rule: the skill default, the date final verification passed (owner ruling 2026-10-12).
+  ADRs extracted before that date carry the phase *start* date (e.g. ADR-178/179 say 2026-09-26);
+  leave them as they are.
 
 ## 7. Commits
 
