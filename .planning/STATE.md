@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.10
 current_phase_name: Fuel Retirement, Things to Remember & Sharing
-status: planning
-stopped_at: Phase 38.10 context gathered
-last_updated: "2026-10-12T08:17:17.127Z"
-last_activity: 2026-10-11
-last_activity_desc: Phase 38.9 complete, transitioned to Phase 38.10
-state_head: 281e8722471aa3443716037671ccec8c0e15fa52
+status: ready_to_execute
+stopped_at: Phase 38.10 planned (19 plans, 10 waves)
+last_updated: "2026-10-12T21:03:45.291Z"
+last_activity: 2026-10-12
+last_activity_desc: Phase 38.10 planned — 19 plans, plan-check cycles 1–7, owner rulings D-92–D-111
+state_head: 88998800f760d9a7d081426d0cf369d025fc5ec1
 progress:
   total_phases: 38
   completed_phases: 23
-  total_plans: 299
+  total_plans: 319
   completed_plans: 297
 carried_forward:
 
@@ -46,9 +46,9 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 ## Current Position
 
-Phase: 38.10 — Fuel Retirement, Things to Remember & Sharing
+Phase: 38.10 (Fuel Retirement, Things to Remember & Sharing) — READY TO EXECUTE
 Plan: Not started
-Status: Ready for phase-dossier (38.10 has only its audit intake workpaper, no CONTEXT yet). Phase 38.9 COMPLETE 2026-10-11: 17/17 plans, verification passed 75/75 (38.9-VERIFICATION.md); TalkBack device checks owner-deferred; owner look check on release passed; routed follow-ups in .planning/todos/pending/2026-10-11-*.
+Status: Phase 38.10 PLANNED 2026-10-12: 19 plans in 10 waves (owner-approved count), 7 plan-check cycles, owner rulings D-92–D-111 in 38.10-CONTEXT; test timing = per task own tests, per plan tsc + touched tests, per wave full gate (owner 2026-10-12, PLAN-MAP §5). Next: /gsd-execute-phase 38.10. Phase 38.9 COMPLETE 2026-10-11: 17/17 plans, verification passed 75/75 (38.9-VERIFICATION.md); TalkBack device checks owner-deferred; owner look check on release passed; routed follow-ups in .planning/todos/pending/2026-10-11-*.
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).

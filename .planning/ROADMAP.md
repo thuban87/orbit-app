@@ -1528,7 +1528,7 @@ Plans:
 **Goal**: One set of shared rules and components that the later fix phases and Phase 39 apply instead of inventing their own: one dialog system, one header and Back style, a guard before Back discards typed work, one rule for destructive actions, consistent feedback after actions, and one glossary of user-facing terms.
 **Depends on**: Phase 38.8
 **Requirements**: None formal. Owner decisions to come from this phase's dossier (phase-dossier skill).
-**Success Criteria**: Defined at planning from this phase's CONTEXT.
+**Success Criteria**: The must_haves of plans 38.10-01…19 (decisions D-01–D-111 in 38.10-CONTEXT, 94/94 covered).
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (orchestrator's reading of owner ruling R1, 39-LEDGER Batch 14; not owner wording): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: 17/17 plans complete (sequential, waves 1–17; `parallelization: false`) — verified 2026-10-11
@@ -1560,7 +1560,46 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: TBD
+**Plans**: 19 plans
+
+Wave 1
+- [ ] 38.10-01-PLAN.md — Migration 033 (knowledge homes), shared fuel mapping, registry and tombstone changes
+
+Wave 2 *(blocked on Wave 1 completion)*
+- [ ] 38.10-02-PLAN.md — Knowledge DAOs: Off Limits DAO, delete with Undo, per-type AI defaults, two new settings, fuel shims
+
+Wave 3 *(blocked on Wave 2 completion)*
+- [ ] 38.10-03-PLAN.md — Last Talked About / Current Location by date, Profile and Dashboard reads, move DAO
+
+Wave 4 *(blocked on Wave 3 completion)*
+- [ ] 38.10-04-PLAN.md — Backup v8, v7 conversion, export/restore, migration-vs-converter equivalence
+- [ ] 38.10-05-PLAN.md — Merge, purge, inline SQL moved into DAOs
+- [ ] 38.10-06-PLAN.md — AI context gated on both sides of a linked note, prompt clean-up, Compose Research
+- [ ] 38.10-07-PLAN.md — Search, widget, cards, dead fuel code, share recency
+- [ ] 38.10-08-PLAN.md — Sharing data layer and resume-prompt gate
+
+Wave 5 *(blocked on Wave 4 completion)*
+- [ ] 38.10-09-PLAN.md — Contact-form data layer and the shared entry field (D-66)
+- [ ] 38.10-10-PLAN.md — Linked notes data (Also save to, Group Log copies, History tags)
+- [ ] 38.10-11-PLAN.md — Share screen UI
+
+Wave 6 *(blocked on Wave 5 completion)*
+- [ ] 38.10-12-PLAN.md — Logging UI: Also save to on Log Interaction, Add Note and Group Log
+- [ ] 38.10-13-PLAN.md — Section editors for the memory types, memory editor rework, move UI, routes
+
+Wave 7 *(blocked on Wave 6 completion)*
+- [ ] 38.10-14-PLAN.md — Add/Edit Contact inline sections
+- [ ] 38.10-15-PLAN.md — Off Limits editor and Key People editor
+
+Wave 8 *(blocked on Wave 7 completion)*
+- [ ] 38.10-16-PLAN.md — Profile Things to Remember
+- [ ] 38.10-17-PLAN.md — History page, + → Memory Add form, Update Contact
+
+Wave 9 *(blocked on Wave 8 completion)*
+- [ ] 38.10-18-PLAN.md — Retirement sweep and permanent no-fuel test
+
+Wave 10 *(blocked on Wave 9 completion)*
+- [ ] 38.10-19-PLAN.md — Final device plan (owner look sign-off, one release build)
 
 > **Inserted 2026-10-10 (owner).** Schema-bearing (new homes for fuel data). Verify the migration head on disk at plan time (milestone migration rule 2). Any new durable entity raises the backup format question, which is an owner decision. Phase 39's sharing lesson waits on this phase (D-99).
 
