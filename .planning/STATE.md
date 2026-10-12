@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 38.9
-current_phase_name: UX Standards
-status: executing
-stopped_at: 38.9-17 executed; awaiting owner look check
-last_updated: "2026-10-11T13:15:25.228Z"
+current_phase: 38.10
+current_phase_name: Fuel Retirement, Things to Remember & Sharing
+status: planning
+stopped_at: Phase 38.9 complete, ready to plan Phase 38.10
+last_updated: "2026-10-12T02:24:01.087Z"
 last_activity: 2026-10-11
-last_activity_desc: "38.9-16 complete (shared plural() helper; Contacts bulk actions and listed counts read singular for one; last raw date-only displays formatted; docs/systems/ux-standards.md written; Phase 39 pending amendments updated)"
-state_head: de3bfaffa260635e85820f585009e3a408251977
+last_activity_desc: Phase 38.9 complete, transitioned to Phase 38.10
+state_head: 3ad8806fe1fb157ec81ad15fc9f36c269f152e57
 progress:
   total_phases: 37
-  completed_phases: 22
+  completed_phases: 23
   total_plans: 299
-  completed_plans: 296
+  completed_plans: 297
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -46,18 +46,18 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 ## Current Position
 
-Phase: 38.9 (UX Standards) — EXECUTING
-Plan: 17 of 17
-Status: Executing Phase 38.9 — Plan 17 (device plan) executed: debug device pass done (2 fixes: Digest birthday weekday, sheet scrim taps), D-18 checked, release APK built + uploaded to Drive as orbit-phase38.9-release-2026-10-11.apk (owner yes 2026-10-11). AWAITING: owner look-and-feel check (38.9-DEVICE-PASS.md "Owner checklist") + owner rulings L1–L4 (look) and O1–O6 (out-of-scope routing). Then phase verification.
+Phase: 38.10 — Fuel Retirement, Things to Remember & Sharing
+Plan: Not started
+Status: Ready for phase-dossier (38.10 has only its audit intake workpaper, no CONTEXT yet). Phase 38.9 COMPLETE 2026-10-11: 17/17 plans, verification passed 75/75 (38.9-VERIFICATION.md); TalkBack device checks owner-deferred; owner look check on release passed; routed follow-ups in .planning/todos/pending/2026-10-11-*.
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-11 — Phase 38.9 Plan 16 complete (plural helper, last date displays, UX standards doc, 39 amendments)
-Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 39, 40. (38.8 completed 2026-10-09.) (38.7 completed 2026-10-05.)
-Next: assign the UX-audit findings to Phases 38.9-38.12, then run phase-dossier for 38.9. Phase 39 is planned after 38.12. The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
+Last activity: 2026-10-11 — Phase 38.9 complete, transitioned to Phase 38.10
+Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 38.9. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 39, 40. (38.8 completed 2026-10-09.) (38.7 completed 2026-10-05.)
+Next: phase-dossier for 38.10 (then 38.11, 38.12). Phase 39 is planned after 38.12. The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -73,7 +73,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 
 **Velocity:**
 
-- Total plans completed: 212
+- Total plans completed: 229
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -103,6 +103,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | 38.6 | 9 | - | - |
 | 38.7 | 16 | - | - |
 | 38.8 | 7 | - | - |
+| 38.9 | 17 | - | - |
 
 **Recent Trend:**
 
@@ -1071,7 +1072,7 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-10-11T13:15:21.693Z
-**Stopped at:** Completed 38.9-16-PLAN.md
+**Stopped at:** Phase 38.9 complete, ready to plan Phase 38.10
 _Prior stop:_ Phase 39 context gathered (dossier accepted; UX audit next, then plan-phase 39)
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).

@@ -164,7 +164,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.6: Photo Handling — Sync, Sizes & Lightbox** (INSERTED) - Completed 2026-09-30: 9/9 plans + 6 code-review passes (all blocker/warning findings fixed); verification passed 19/19 + owner UAT (pinch, TalkBack, sizes) on the release build. Display-revision fix (no file renames), WebP ≤1024 masters, bigger Profile/List/Grid photos, lightbox, missing-photo + backup-skip integrity (D-23..D-35), banner in flow (D-38), "too large" backups (D-39), on-disk Orrery derivatives (D-41; D-11 memory +2.9 %/+4.2 %). Owner rulings D-01..D-42. No migration (head 032), backup format 7. Release orbit-phase38.6-release-2026-09-30-c2dc1cb.apk.
 - [x] **Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language** (INSERTED) - A Skia 2.5D Orrery V2 from the Orrery renderer R&D labs: a tilted strategy-map Home, a new imperative renderer, a painted sky, thin sun-lit orbits with subtle pulses, rim-lit status bodies, Lab A's star sun, moon bumps, reticle focus with a docked card, a star-warp System switch, plus five production Orrery defect fixes. Dossier accepted after codex review (D-01..D-58); complete (2026-10-05).
 - [x] **Phase 38.8: History Navigation UX** (INSERTED) - Completed 2026-10-09: 7/7 plans (incl. gap plan 07: G1/G2/YEARS) + deep code review (1 blocker, 3 warnings, fixed); verification passed 76/76; owner look-and-feel sign-off on the Pixel and his Moto; final release orbit-38.8-release-2026-10-09.apk (arm64). Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
-- [ ] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; planned (17 plans)
+- [x] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; 17/17 plans (completed 2026-10-11)
 - [ ] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6; dossier pending
 - [ ] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile, Add/Edit/Update Contact audit fixes + new-contact defaults and not-contacted status; dossier pending (split 2026-10-10)
 - [ ] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes; dossier pending
@@ -1530,7 +1530,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (orchestrator's reading of owner ruling R1, 39-LEDGER Batch 14; not owner wording): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 16/17 plans executed (sequential, waves 1–17; `parallelization: false`)
+**Plans**: 17/17 plans complete (sequential, waves 1–17; `parallelization: false`) — verified 2026-10-11
 - [x] 38.9-01 — Overlay and dialog foundation: overlay registry, RegisteredModal + in-window snackbar, confirm/notice host, ConfirmDialog D-43/D-52
 - [x] 38.9-02 — Form guards: Add Contact, Log Interaction, Memory, AI Writing Style; sub-editor guard on Update Contact and Custom fields
 - [x] 38.9-03 — Guard on the pending-confirmation note overlay; Capture Back order (D-33); per-field Backup schedule save (D-34)
@@ -1547,7 +1547,7 @@ Plans:
 - [x] 38.9-14 — Glossary constants + label enforcement (D-22, D-42, D-49, D-56)
 - [x] 38.9-15 — "Event(s)" noun + plain-word rewrites (D-22, D-41)
 - [x] 38.9-16 — plural() helper, UX standards doc, 39 amendments (D-21, D-30, D-39, D-46)
-- [ ] 38.9-17 — Device plan: debug iteration, mockup match, one release build, owner look-and-feel check (run phase code review first)
+- [x] 38.9-17 — Device plan: debug iteration, mockup match, one release build, owner look-and-feel check (run phase code review first)
 
 > **Inserted 2026-10-10 (owner).** First of four UX-audit fix phases (38.9–38.12) placed before Phase 39, because 39's lessons must teach stable behaviour (39-CONTEXT D-02, D-03). Numbered as decimals so the tooling's numeric next-phase order runs them before 39. Recorded-decision reversals are handled in each phase's own dossier session (owner, 2026-10-10).
 
@@ -1676,7 +1676,7 @@ Plans:
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
-| 38.9 UX Standards | 16/17 | In Progress|  |
+| 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 0/TBD | Not started | - |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
