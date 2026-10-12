@@ -10,7 +10,8 @@ over below. The setup history is in `.planning/knowledgebase/KB-SETUP-PLAN.md`.
 
 ## 1. Paths
 
-- **Phase folders:** `.planning/phases/{N}-{slug}/`. Orbit uses sub-phase IDs (`18.1`, `18.2`,
+- **Phase folders:** `.planning/phases/{N}-{slug}/`. Top-level numbers are zero-padded to two digits
+  (`02`, `18.1`); accept `2` and resolve it to `02-…`. Orbit uses sub-phase IDs (`18.1`, `18.2`,
   `19.1`, `38.10`); match the exact ID prefix, not just the integer. At milestone close,
   `gsd-cleanup` may move phase folders to `.planning/milestones/v{X}-phases/`.
 - **KB locations:** `docs/decisions/`, `docs/systems/`, `docs/runbooks/`.
@@ -71,6 +72,9 @@ status tokens (`[DECIDED · date]`, `[DERIVED]`, `[CARRIED · source]`, `[REJECT
 **Owner resolutions in review files are ADR-grade.** For example, phase 16's `D-06a` / `D-06b`
 "owner resolution, cycle-N review" entries settle decisions and must be captured.
 
+**Map backfill:** when a phase has no map row yet (milestone 2), add one as part of the run. List it
+under *Special cases* in the step-5 plan and commit it on its own.
+
 **Pre-repo decision record:** `HANDOFF.md` (repo root). Its `[DECIDED]` items are carried context.
 Cite it where a phase's ADR rests on it.
 
@@ -82,8 +86,9 @@ Cite it where a phase's ADR rests on it.
   - `Migration:` is the migration number(s) the phase ships, or "None".
 - **Migrations** are TypeScript under `src/db/migrations/`, run via `PRAGMA user_version`. There are
   no `.sql` files.
-- **Numbers:** 3-digit, global. **Supersession string:** `ADR-NNN (<title>)` on the new ADR. On the
-  old ADR, `ADR-NNN` for a full supersession or `ADR-NNN (partial)` when part of it stands.
+- **Numbers:** 3-digit, global. **Supersession string** on the new ADR: full, `ADR-NNN (<title>)`;
+  partial, `ADR-NNN (partial — what dies; what survives)` (the form ADR-177 uses). On the old ADR,
+  `ADR-NNN` for a full supersession or `ADR-NNN (partial)` when part of it stands.
 - **Key files:** full repo-relative paths in orbit's flat `src/` tree (`src/db/field-values-dao.ts`).
   No monorepo prefix.
 - **ADRs written in-phase by owner ruling** (e.g. ADR-177, written by 38.5 plan 08): check
