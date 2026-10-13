@@ -51,6 +51,12 @@
  */
 
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import {
+  insertLinkedEntryCore,
+  type LinkedEntryRef,
+  type LinkedSection,
+  propagateInteractionEditCore,
+} from "@/db/linked-entry-dao";
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
@@ -386,7 +392,98 @@ export async function editTouchpointFullCore(
       `editTouchpointFull: no interaction matched id=${input.interactionId} for contactId=${input.contactId} (changed ${result.changes})`,
     );
   }
+  // D-37 / D-41 / D-49: copy the edit onto the `note`-linked entry in the
+  // same transaction, with the STORED allow_ai (clamped above while
+  // note_ai_locked, D-103), never the caller's request. A blank note while
+  // linked throws LinkedNoteBlankError and rolls the whole edit back (Q4).
+  const stored = await exec.getFirstAsync<{ allow_ai: number }>(
+    "SELECT allow_ai FROM interactions WHERE id = ?",
+    [input.interactionId],
+  );
+  await propagateInteractionEditCore(exec, {
+    interactionId: input.interactionId,
+    note: input.note,
+    occurredAt: input.occurredAt,
+    allowAi: stored?.allow_ai === 1 ? 1 : 0,
+    now: input.now,
+  });
   await recomputeLastContact(exec, input.contactId, input.now);
+}
+
+/**
+ * Log Interaction with "Also save to" (D-37, D-38, D-95): the interaction and
+ * its linked entry in ONE transaction, then recency and one revision bump.
+ * `alsoSaveTo` null records a plain touchpoint. The entry's text is the note
+ * (must be non-blank) and its Allow AI follows the interaction (D-49).
+ */
+export function recordTouchpointWithLinkedEntry(
+  exec: SqlExecutor,
+  input: RecordTouchpointInput,
+  alsoSaveTo: LinkedSection | null,
+): Promise<{ interactionId: number; linkedEntry: LinkedEntryRef | null }> {
+  try {
+    rejectFutureOccurredAt(input.occurredAt, input.now);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+  return inWriteTransaction(exec, async () => {
+    const interactionId = await insertInteraction(
+      exec,
+      input.contactId,
+      input.now,
+      input,
+    );
+    const linkedEntry =
+      alsoSaveTo === null
+        ? null
+        : await insertLinkedEntryCore(exec, {
+            interactionId,
+            contactId: input.contactId,
+            section: alsoSaveTo,
+            text: input.note ?? "",
+            linkSource: "note",
+            occurredAt: input.occurredAt,
+            now: input.now,
+          });
+    await recomputeLastContact(exec, input.contactId, input.now);
+    await bumpDataRevisionCore(exec);
+    return { interactionId, linkedEntry };
+  });
+}
+
+/**
+ * The Add Note sheet with "Also save to" (D-42): the full interaction edit and
+ * the new linked entry in ONE transaction, one revision bump. `alsoSaveTo`
+ * null is a plain `editTouchpointFull`. A second link on the same note throws
+ * LinkedSectionTakenError and rolls the edit back (D-95).
+ */
+export function saveNoteWithLinkedEntry(
+  exec: SqlExecutor,
+  input: EditTouchpointFullInput,
+  alsoSaveTo: LinkedSection | null,
+): Promise<{ linkedEntry: LinkedEntryRef | null }> {
+  try {
+    rejectFutureOccurredAt(input.occurredAt, input.now);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+  return inWriteTransaction(exec, async () => {
+    await editTouchpointFullCore(exec, input);
+    const linkedEntry =
+      alsoSaveTo === null
+        ? null
+        : await insertLinkedEntryCore(exec, {
+            interactionId: input.interactionId,
+            contactId: input.contactId,
+            section: alsoSaveTo,
+            text: input.note ?? "",
+            linkSource: "note",
+            occurredAt: input.occurredAt,
+            now: input.now,
+          });
+    await bumpDataRevisionCore(exec);
+    return { linkedEntry };
+  });
 }
 
 /** Non-mutexed delete primitive for callers that already own a transaction. */

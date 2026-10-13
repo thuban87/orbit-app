@@ -19,6 +19,10 @@ import {
   setAiPermissionDefault,
 } from "@/db/ai-permissions-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import {
+  LinkedNoteBlankError,
+  LinkedSectionTakenError,
+} from "@/db/linked-entry-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -27,6 +31,8 @@ import {
   editTouchpointFull,
   editTouchpointFullCore,
   recordTouchpoint,
+  recordTouchpointWithLinkedEntry,
+  saveNoteWithLinkedEntry,
 } from "@/db/recency-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -1116,5 +1122,269 @@ describe("recency DAO — durable note AI lock (D-103)", () => {
     });
     await editFull(interactionId, contactId, NOW, { allowAi: 1 });
     expect((await lockState(interactionId))?.allow_ai).toBe(1);
+  });
+});
+
+describe("recency DAO — linked notes from the interaction side (D-37, D-41, D-48, D-49, D-95)", () => {
+  async function ltaEntry(interactionId: number) {
+    return exec.getFirstAsync<{
+      id: number;
+      value: string;
+      entry_date: string;
+      entry_time: string | null;
+      interaction_id: number | null;
+      link_source: string | null;
+      group_note_copy: number;
+    }>(
+      `SELECT id, value, entry_date, entry_time, interaction_id, link_source,
+              group_note_copy
+         FROM current_state_entries
+        WHERE field_key = 'last_talked_about' AND interaction_id = ?`,
+      [interactionId],
+    );
+  }
+
+  async function memoryFor(interactionId: number) {
+    return exec.getFirstAsync<{
+      id: number;
+      type: string;
+      value: string;
+      allow_ai: number;
+      link_source: string | null;
+      provenance: string;
+    }>(
+      `SELECT id, type, value, allow_ai, link_source, provenance
+         FROM memories WHERE interaction_id = ?`,
+      [interactionId],
+    );
+  }
+
+  async function logLinked(
+    section: "last_talked_about" | "memory" | "gift_idea" | "thought_of_them",
+    overrides: { allowAi?: number; note?: string } = {},
+  ) {
+    const contactId = await makeContact();
+    const { interactionId, linkedEntry } =
+      await recordTouchpointWithLinkedEntry(
+        exec,
+        {
+          contactId,
+          uid: uid(),
+          occurredAt: "2026-07-01 18:45:00",
+          now: NOW,
+          note: overrides.note ?? "Their new job",
+          allowAi: overrides.allowAi ?? 0,
+        },
+        section,
+      );
+    return { contactId, interactionId, linkedEntry };
+  }
+
+  it("creates a Last Talked About entry with the interaction's date and HH:MM:SS time", async () => {
+    const { contactId, interactionId, linkedEntry } =
+      await logLinked("last_talked_about");
+    expect(linkedEntry?.table).toBe("current_state_entries");
+    expect(await ltaEntry(interactionId)).toMatchObject({
+      value: "Their new job",
+      entry_date: "2026-07-01",
+      entry_time: "18:45:00",
+      interaction_id: interactionId,
+      link_source: "note",
+      group_note_copy: 0,
+    });
+    expect(await lastContact(contactId)).toBe("2026-07-01 18:45:00");
+  });
+
+  it("an edit to the note and the date updates the linked entry", async () => {
+    const { contactId, interactionId } = await logLinked("last_talked_about");
+    await editFull(interactionId, contactId, NOW, {
+      note: "Their promotion",
+      occurredAt: "2026-07-03 09:05:00",
+    });
+    expect(await ltaEntry(interactionId)).toMatchObject({
+      value: "Their promotion",
+      entry_date: "2026-07-03",
+      entry_time: "09:05:00",
+    });
+  });
+
+  it("deleting the interaction leaves a standalone entry with its text (FK SET NULL)", async () => {
+    const { contactId, interactionId } = await logLinked("last_talked_about");
+    await deleteTouchpoint(exec, { interactionId, contactId, now: NOW });
+    const row = await exec.getFirstAsync<{
+      value: string;
+      interaction_id: number | null;
+    }>(
+      "SELECT value, interaction_id FROM current_state_entries WHERE value = ?",
+      ["Their new job"],
+    );
+    expect(row).toEqual({ value: "Their new job", interaction_id: null });
+  });
+
+  it("rejects a second link on the same interaction (D-95), rolling the edit back", async () => {
+    const { contactId, interactionId } = await logLinked("memory");
+    const cur = await readInteraction(interactionId);
+    await expect(
+      saveNoteWithLinkedEntry(
+        exec,
+        {
+          interactionId,
+          contactId,
+          now: NOW,
+          occurredAt: cur.occurred_at,
+          channel: cur.channel,
+          direction: cur.direction,
+          connected: cur.connected,
+          quality: cur.quality,
+          note: "Changed in the same save",
+          duration: cur.duration,
+          allowAi: cur.allow_ai,
+        },
+        "last_talked_about",
+      ),
+    ).rejects.toBeInstanceOf(LinkedSectionTakenError);
+    expect((await readInteraction(interactionId)).note).toBe("Their new job");
+    expect(
+      await exec.getFirstAsync(
+        "SELECT 1 AS one FROM current_state_entries WHERE interaction_id = ?",
+        [interactionId],
+      ),
+    ).toBeNull();
+  });
+
+  it("the Add Note path links an existing interaction in one write", async () => {
+    const contactId = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+    });
+    const cur = await readInteraction(interactionId);
+    const { linkedEntry } = await saveNoteWithLinkedEntry(
+      exec,
+      {
+        interactionId,
+        contactId,
+        now: NOW,
+        occurredAt: cur.occurred_at,
+        channel: cur.channel,
+        direction: cur.direction,
+        connected: cur.connected,
+        quality: cur.quality,
+        note: "Wants a hiking book",
+        duration: cur.duration,
+        allowAi: 1,
+      },
+      "gift_idea",
+    );
+    expect(linkedEntry?.table).toBe("memories");
+    expect(await memoryFor(interactionId)).toMatchObject({
+      type: "gift_idea",
+      value: "Wants a hiking book",
+      allow_ai: 1,
+      link_source: "note",
+      provenance: "user",
+    });
+  });
+
+  it("a blank note while linked throws LinkedNoteBlankError and changes nothing", async () => {
+    const { contactId, interactionId } = await logLinked("memory");
+    await expect(
+      editFull(interactionId, contactId, NOW, { note: "   " }),
+    ).rejects.toBeInstanceOf(LinkedNoteBlankError);
+    expect((await readInteraction(interactionId)).note).toBe("Their new job");
+    expect((await memoryFor(interactionId))?.value).toBe("Their new job");
+  });
+
+  it("a linked memory follows the interaction's allow_ai both ways (D-49)", async () => {
+    const { contactId, interactionId } = await logLinked("thought_of_them", {
+      allowAi: 1,
+    });
+    expect((await memoryFor(interactionId))?.allow_ai).toBe(1);
+    await editFull(interactionId, contactId, NOW, { allowAi: 0 });
+    expect((await memoryFor(interactionId))?.allow_ai).toBe(0);
+    await editFull(interactionId, contactId, NOW, { allowAi: 1 });
+    expect((await memoryFor(interactionId))?.allow_ai).toBe(1);
+  });
+
+  it("a linked memory on a note_ai_locked interaction stays 0 when the edit asks for 1 (D-103)", async () => {
+    const { contactId, interactionId } = await logLinked("memory", {
+      allowAi: 1,
+    });
+    const cur = await readInteraction(interactionId);
+    await editTouchpointFull(exec, {
+      interactionId,
+      contactId,
+      now: NOW,
+      occurredAt: cur.occurred_at,
+      channel: cur.channel,
+      direction: cur.direction,
+      connected: cur.connected,
+      quality: cur.quality,
+      note: cur.note,
+      duration: cur.duration,
+      allowAi: 0,
+      lockNoteAi: true,
+    });
+    await editFull(interactionId, contactId, NOW, {
+      allowAi: 1,
+      note: "Edited after the lock",
+    });
+    expect(await memoryFor(interactionId)).toMatchObject({
+      value: "Edited after the lock",
+      allow_ai: 0,
+    });
+    expect((await readInteraction(interactionId)).allow_ai).toBe(0);
+  });
+
+  it("a plain note edit does not restamp an unchanged linked entry", async () => {
+    const { contactId, interactionId } = await logLinked("memory");
+    await exec.runAsync("UPDATE memories SET modified_at = ?", [
+      "2026-07-01 00:00:00",
+    ]);
+    await editFull(interactionId, contactId, "2026-08-14 13:00:00", {
+      channel: "Call",
+    });
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM memories WHERE interaction_id = ?",
+      [interactionId],
+    );
+    expect(row?.modified_at).toBe("2026-07-01 00:00:00");
+  });
+
+  it("a blank note cannot be logged with Also save to", async () => {
+    const contactId = await makeContact();
+    await expect(
+      recordTouchpointWithLinkedEntry(
+        exec,
+        {
+          contactId,
+          uid: uid(),
+          occurredAt: "2026-07-01 10:00:00",
+          now: NOW,
+          note: "  ",
+        },
+        "memory",
+      ),
+    ).rejects.toThrow(/non-blank/);
+    expect(await interactionCount(contactId)).toBe(0);
+  });
+
+  it("Also save to null records a plain touchpoint", async () => {
+    const contactId = await makeContact();
+    const { linkedEntry } = await recordTouchpointWithLinkedEntry(
+      exec,
+      {
+        contactId,
+        uid: uid(),
+        occurredAt: "2026-07-01 10:00:00",
+        now: NOW,
+        note: "Just a note",
+      },
+      null,
+    );
+    expect(linkedEntry).toBeNull();
+    expect(await interactionCount(contactId)).toBe(1);
   });
 });

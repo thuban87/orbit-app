@@ -18,6 +18,7 @@
  * DAO) passes false.
  */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { entryDateTimeOf, normalizeEntryTime } from "@/db/linked-entry-dao";
 import {
   type CurrentStateFieldKey,
   isCurrentStateFieldKey,
@@ -103,10 +104,6 @@ export interface CurrentStateSnapshot {
 }
 
 const ENTRY_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
-const ENTRY_TIME = /^[0-9]{2}:[0-9]{2}:[0-9]{2}$/;
-const ENTRY_TIME_MINUTE = /^[0-9]{2}:[0-9]{2}$/;
-const LOCAL_DATE_TIME =
-  /^([0-9]{4}-[0-9]{2}-[0-9]{2})(?:[ T]([0-9]{2}:[0-9]{2}(?::[0-9]{2})?))?/;
 
 function assertFieldKey(fieldKey: string): void {
   if (!isCurrentStateFieldKey(fieldKey)) {
@@ -148,42 +145,10 @@ function blankToNull(value: string | null | undefined): string | null {
     : value;
 }
 
-/**
- * `entry_time` is always the zero-padded `HH:MM:SS` shape of
- * `substr(created_at,12,8)`, so the order's COALESCE compares like with like
- * (checker cycle 2 I-4). A bare `HH:MM` is padded with `:00`; anything else
- * throws.
- */
-export function normalizeEntryTime(value: string): string {
-  const padded = ENTRY_TIME_MINUTE.test(value) ? `${value}:00` : value;
-  if (!ENTRY_TIME.test(padded)) {
-    throw new Error(
-      `current-state-history-dao: entry time must be HH:MM:SS (got ${value})`,
-    );
-  }
-  return padded;
-}
-
-/**
- * The entry date and time a linked entry takes from its interaction's local
- * `occurred_at` (D-37, D-41, D-48): the date part, and the time part in the
- * `HH:MM:SS` shape (NULL when the stamp has no time).
- */
-export function entryDateTimeOf(occurredAt: string): {
-  entryDate: string;
-  entryTime: string | null;
-} {
-  const match = LOCAL_DATE_TIME.exec(occurredAt.trim());
-  if (!match) {
-    throw new Error(
-      `current-state-history-dao: unparseable occurred_at ${occurredAt}`,
-    );
-  }
-  return {
-    entryDate: match[1],
-    entryTime: match[2] === undefined ? null : normalizeEntryTime(match[2]),
-  };
-}
+// `normalizeEntryTime` / `entryDateTimeOf` live in linked-entry-dao (the
+// linked copies need them and that module may import no DAO); re-exported
+// here so every existing caller keeps its import.
+export { entryDateTimeOf, normalizeEntryTime };
 
 /** Insert one dated entry while the caller owns the transaction. Never bumps. */
 export async function addCurrentStateEntryCore(
