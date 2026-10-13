@@ -161,22 +161,56 @@ describe("knowledge search corpus read", () => {
         ],
       );
       await exec.runAsync(
-        `INSERT INTO fuel (uid, contact_id, kind, text, created_at, source, modified_at)
+        `INSERT INTO off_limits (uid, contact_id, label, text, url, created_at, modified_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
-          "off-limits-fuel",
+          "off-limits-row",
           contactId,
-          "off_limits",
-          "Off-limits fuel marker",
+          "Divorce topic",
+          "Never ask about the custody case",
+          "https://example.com/off-limits-url-marker",
           NOW,
-          "manual",
           NOW,
         ],
       );
       await exec.runAsync(
-        `INSERT INTO fuel (uid, contact_id, kind, text, created_at, source, modified_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        ["ai-fuel", contactId, "topic", "AI fuel marker", NOW, "ai", NOW],
+        `INSERT INTO current_state_entries
+           (uid, contact_id, field_key, value, entry_date, url, created_at, modified_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          "talked-previous",
+          contactId,
+          "last_talked_about",
+          "Previous marathon training",
+          "2026-08-01",
+          null,
+          NOW,
+          NOW,
+          "talked-current",
+          contactId,
+          "last_talked_about",
+          "Current job interview",
+          "2026-09-01",
+          "https://example.com/current-state-url-marker",
+          NOW,
+          NOW,
+          "location-current",
+          contactId,
+          "current_location",
+          "Lisbon",
+          "2026-09-02",
+          null,
+          NOW,
+          NOW,
+          "unknown-field",
+          contactId,
+          "retired_field_key",
+          "Unregistered field marker",
+          "2026-09-02",
+          null,
+          NOW,
+          NOW,
+        ],
       );
 
       const corpus = await listKnowledgeSearchCandidates(exec, {
@@ -243,6 +277,34 @@ describe("knowledge search corpus read", () => {
             part: "memory-or-custom-field",
             text: "Lex",
           }),
+          expect.objectContaining({
+            source: "offLimits",
+            label: "Off Limits",
+            text: "Divorce topic",
+          }),
+          expect.objectContaining({
+            source: "offLimits",
+            label: "Off Limits",
+            text: "Never ask about the custody case",
+          }),
+          expect.objectContaining({
+            source: "currentState",
+            currentStateField: "last_talked_about",
+            label: "Last Talked About",
+            text: "Current job interview",
+          }),
+          expect.objectContaining({
+            source: "currentState",
+            currentStateField: "last_talked_about",
+            label: "Last Talked About",
+            text: "Previous marathon training",
+          }),
+          expect.objectContaining({
+            source: "currentState",
+            currentStateField: "current_location",
+            label: "Current Location",
+            text: "Lisbon",
+          }),
         ]),
       );
       expect(corpus.map((candidate) => candidate.contactId)).not.toContain(
@@ -252,8 +314,9 @@ describe("knowledge search corpus read", () => {
       const entryText = corpus[0].entries.map((entry) => entry.text).join(" ");
       expect(entryText).not.toContain("Non-searchable Memory marker");
       expect(entryText).not.toContain("Quarantined marker");
-      expect(entryText).not.toContain("Off-limits fuel marker");
-      expect(entryText).not.toContain("AI fuel marker");
+      expect(entryText).not.toContain("off-limits-url-marker");
+      expect(entryText).not.toContain("current-state-url-marker");
+      expect(entryText).not.toContain("Unregistered field marker");
       expect(entryText).not.toContain("internal-provenance-marker");
       expect(entryText).not.toContain("internal-uid-marker");
 
@@ -262,11 +325,60 @@ describe("knowledge search corpus read", () => {
       expect(rankCandidates("lex", corpus)).toEqual(corpus);
       expect(rankCandidates("555", corpus)).toEqual(corpus);
       expect(rankCandidates("friends", corpus)).toEqual(corpus);
+      expect(rankCandidates("custody", corpus)).toEqual(corpus);
+      expect(rankCandidates("marathon", corpus)).toEqual(corpus);
+      expect(rankCandidates("lisbon", corpus)).toEqual(corpus);
       expect(rankCandidates("internal-provenance-marker", corpus)).toEqual([]);
       expect(rankCandidates("internal-uid-marker", corpus)).toEqual([]);
     } finally {
       MEMORY_TYPE_REGISTRY.gift_idea.searchable = originalGiftIdeaSearchability;
     }
+  });
+
+  it("includes Gift Ideas and Thought of Them through the registry flag, and skips blank Off Limits parts", async () => {
+    const contactId = await seedContact();
+    await addMemory(exec, {
+      contactId,
+      type: "gift_idea",
+      value: "Pottery wheel",
+      createdAt: NOW,
+      now: NOW,
+    });
+    await addMemory(exec, {
+      contactId,
+      type: "thought_of_them",
+      value: "Article about tide pools",
+      createdAt: NOW,
+      now: NOW,
+    });
+    await exec.runAsync(
+      `INSERT INTO off_limits (uid, contact_id, label, text, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      ["blank-off-limits", contactId, "   ", "Only the text", NOW, NOW],
+    );
+
+    const corpus = await listKnowledgeSearchCandidates(exec, {
+      eligibleIds: [contactId],
+    });
+    expect(corpus[0].entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "memory",
+          memoryType: "gift_idea",
+          text: "Pottery wheel",
+        }),
+        expect.objectContaining({
+          source: "memory",
+          memoryType: "thought_of_them",
+          text: "Article about tide pools",
+        }),
+      ]),
+    );
+    expect(
+      corpus[0].entries.filter((entry) => entry.source === "offLimits"),
+    ).toEqual([
+      expect.objectContaining({ label: "Off Limits", text: "Only the text" }),
+    ]);
   });
 
   it("excludes blank custom-field values", async () => {

@@ -46,7 +46,26 @@ describe("ListRow content", () => {
     ).toBe("3 matches · Memory, Relationship · +2 more");
   });
 
-  it("formats singular and fuel-only match explanations without categories", () => {
+  it("labels the section kinds with their Things to Remember section names", () => {
+    expect(
+      formatMatchExplanation(1, formatMatchCategories(["off-limits"])),
+    ).toBe("1 match · Off Limits");
+    expect(
+      formatMatchCategories([
+        "last-talked-about",
+        "current-location",
+        "gift-idea",
+        "thought-of-them",
+      ]),
+    ).toEqual([
+      "Last Talked About",
+      "Current Location",
+      "Gift Ideas",
+      "Thought of Them",
+    ]);
+  });
+
+  it("formats singular and name-only match explanations without categories", () => {
     expect(formatMatchExplanation(1, [])).toBe("1 match");
     expect(formatMatchExplanation(1, [], "+1 more")).toBe("1 match · +1 more");
   });

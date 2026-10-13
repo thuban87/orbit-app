@@ -1,7 +1,9 @@
 /**
  * List-only Dashboard search composition. This module joins the already-built
- * local corpus scorer to the Dashboard eligibility and name/fuel reads without
- * duplicating SQL predicates or tokenizer behaviour.
+ * local corpus scorer to the Dashboard eligibility and name reads without
+ * duplicating SQL predicates or tokenizer behaviour. Every knowledge home the
+ * corpus covers (memories, Key People, custom fields, Last Talked About,
+ * Current Location, Off Limits) is matched there, never by a LIKE.
  */
 import {
   type DashboardRow,
@@ -16,16 +18,17 @@ import {
   searchDashboard,
 } from "@/logic/dashboard-search-match";
 
-/** A Dashboard row plus its corpus descriptor; null retains the fuel fallback. */
+/** A Dashboard row plus its corpus descriptor; null marks a name-LIKE-only row. */
 export interface DashboardSearchRow {
   readonly row: DashboardRow;
   readonly match: DashboardSearchResult | null;
 }
 
 /**
- * Compose corpus relevance results with the shipped Dashboard name/fuel search.
+ * Compose corpus relevance results with the shipped Dashboard name search.
  * Corpus matches always retain `searchDashboard`'s relevance-first ordering;
- * fuel-only rows are appended in the resolved eligible Dashboard order.
+ * name-only rows (a substring the corpus scorer did not match) are appended in
+ * the resolved eligible Dashboard order.
  */
 export async function composeDashboardSearch(
   exec: SqlExecutor,
@@ -37,7 +40,7 @@ export async function composeDashboardSearch(
 
   const eligibleRows = await listDashboardSearchEligible(exec, query, now);
   const orderedEligibleIds = eligibleRows.map((row) => row.id);
-  const [candidates, fuelRows] = await Promise.all([
+  const [candidates, nameRows] = await Promise.all([
     listKnowledgeSearchCandidates(exec, { eligibleIds: orderedEligibleIds }),
     listDashboardSearch(exec, query, term, now),
   ]);
@@ -48,12 +51,12 @@ export async function composeDashboardSearch(
     const row = eligibleById.get(match.contactId);
     return row ? [{ row, match }] : [];
   });
-  const fuelById = new Map(fuelRows.map((row) => [row.id, row]));
-  const fuelOnlyRows = orderedEligibleIds.flatMap((contactId) => {
+  const nameById = new Map(nameRows.map((row) => [row.id, row]));
+  const nameOnlyRows = orderedEligibleIds.flatMap((contactId) => {
     if (corpusIds.has(contactId)) return [];
-    const row = fuelById.get(contactId);
+    const row = nameById.get(contactId);
     return row ? [{ row, match: null }] : [];
   });
 
-  return [...corpusRows, ...fuelOnlyRows];
+  return [...corpusRows, ...nameOnlyRows];
 }

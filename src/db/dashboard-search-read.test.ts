@@ -5,7 +5,6 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { composeDashboardSearch } from "@/db/dashboard-search-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { addFuel } from "@/db/fuel-dao";
 import { addMemory } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -55,21 +54,11 @@ async function memory(contactId: number, value: string): Promise<void> {
 }
 
 describe("composeDashboardSearch", () => {
-  it("keeps relevance first, then appends fuel-only rows in Dashboard order", async () => {
+  it("keeps corpus relevance first", async () => {
     const lessRelevant = await contact("Alpha low relevance");
     const moreRelevant = await contact("Zulu high relevance");
-    const fuelOnly = await contact("Beta fuel only");
     await memory(lessRelevant, "lambda");
     await memory(moreRelevant, "lambda sigma");
-    await addFuel(exec, {
-      uid: `fuel-${++counter}`,
-      contactId: fuelOnly,
-      kind: "topic",
-      text: "lambda sigma",
-      source: "user",
-      createdAt: NOW,
-      now: NOW,
-    });
 
     const rows = await composeDashboardSearch(
       exec,
@@ -81,12 +70,116 @@ describe("composeDashboardSearch", () => {
     expect(rows.map((entry) => entry.row.id)).toEqual([
       moreRelevant,
       lessRelevant,
-      fuelOnly,
     ]);
-    expect(rows.slice(0, 2).every((entry) => entry.match !== null)).toBe(true);
-    expect(rows[2]).toMatchObject({
-      match: null,
-      row: { snippet: "lambda sigma" },
+    expect(rows.every((entry) => entry.match !== null)).toBe(true);
+  });
+
+  it("appends a name-LIKE-only row the corpus scorer cannot match, with no descriptor", async () => {
+    // Punctuation tokenizes to nothing, so only the name LIKE can match it.
+    const hyphenated = await contact("Mary-Kate");
+    await contact("Plain Name");
+
+    const rows = await composeDashboardSearch(exec, active, "-", NOW);
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        match: null,
+        row: expect.objectContaining({ id: hyphenated }),
+      }),
+    ]);
+  });
+
+  it("finds a share kept in Thought of Them through the corpus", async () => {
+    const shared = await contact("Shared target");
+    await contact("Bystander");
+    await addMemory(exec, {
+      contactId: shared,
+      type: "thought_of_them",
+      value: "Article about tide pools",
+      provenance: "share",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    const rows = await composeDashboardSearch(exec, active, "tide pools", NOW);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      row: { id: shared },
+      match: {
+        matches: [
+          expect.objectContaining({
+            sourceKind: "thought-of-them",
+            snippet: "Article about tide pools",
+          }),
+        ],
+      },
+    });
+  });
+
+  it("finds an Off Limits word and names the section in the match", async () => {
+    const guarded = await contact("Guarded");
+    await exec.runAsync(
+      `INSERT INTO off_limits (uid, contact_id, label, text, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      ["off-limits-1", guarded, null, "Custody hearing", NOW, NOW],
+    );
+
+    const rows = await composeDashboardSearch(exec, active, "custody", NOW);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      row: { id: guarded },
+      match: {
+        totalMatchCount: 1,
+        matches: [
+          expect.objectContaining({
+            sourceKind: "off-limits",
+            fieldLabel: "Off Limits",
+            snippet: "Custody hearing",
+          }),
+        ],
+      },
+    });
+  });
+
+  it("finds a previous Last Talked About value, not only the most recent", async () => {
+    const talker = await contact("Talker");
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        "talk-old",
+        talker,
+        "last_talked_about",
+        "Marathon training",
+        "2026-08-01",
+        NOW,
+        NOW,
+        "talk-new",
+        talker,
+        "last_talked_about",
+        "New puppy",
+        "2026-09-01",
+        NOW,
+        NOW,
+      ],
+    );
+
+    const rows = await composeDashboardSearch(exec, active, "marathon", NOW);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      row: { id: talker },
+      match: {
+        matches: [
+          expect.objectContaining({
+            sourceKind: "last-talked-about",
+            snippet: "Marathon training",
+          }),
+        ],
+      },
     });
   });
 

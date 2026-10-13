@@ -3,15 +3,28 @@
  *
  * This module never searches by term in SQL: it returns raw, user-facing source
  * entries only, then `knowledge-search.ts` applies the shared typo-tolerant
- * tokenizer and scorer. Fuel is deliberately not read here; it is not a
- * KNOW-10 source and remains owned by dashboard-read.ts.
+ * tokenizer and scorer.
+ *
+ * The corpus (KNOW-10, 38.10 D-58, D-62) covers names, phones, emails, the
+ * category, registry-searchable Memories (including Gift Ideas and Thought of
+ * Them), visible Key People, live custom values, every Last Talked About and
+ * Current Location entry (the Most Recent and every previous one), and Off
+ * Limits label and text. Off Limits reaches search only (D-10, D-58): it is
+ * never read by the widget, notification or card paths. Off Limits urls and
+ * current-state urls are not searched.
  */
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { resolveVisibility } from "@/db/memories-read";
-import { MEMORY_TYPE_REGISTRY, type MemoryTypeKey } from "@/db/memory-registry";
+import {
+  type CurrentStateFieldKey,
+  isCurrentStateFieldKey,
+  MEMORY_TYPE_REGISTRY,
+  type MemoryTypeKey,
+} from "@/db/memory-registry";
 import { resolveRelationshipVisibility } from "@/db/relationships-read";
 import type { SqlExecutor } from "@/db/types";
+import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
 
 export type KnowledgeSearchSource =
   | "name"
@@ -20,7 +33,9 @@ export type KnowledgeSearchSource =
   | "category"
   | "memory"
   | "relationship"
-  | "customField";
+  | "customField"
+  | "currentState"
+  | "offLimits";
 
 export type KnowledgeSearchPart =
   | "identity"
@@ -41,7 +56,26 @@ export interface KnowledgeSearchEntry {
   readonly memoryType?: MemoryTypeKey;
   /** User-facing relationship type, when the relationship has one. */
   readonly relationType?: string | null;
+  /** Current-state field key, present only for `source: "currentState"`. */
+  readonly currentStateField?: CurrentStateFieldKey;
 }
+
+/**
+ * The Things to Remember section name (D-44) for each current-state field, as
+ * the Profile shows it. The current-state registry's own display name is the
+ * sentence-case field name used by editors and history.
+ */
+export const CURRENT_STATE_SECTION_LABELS: Record<
+  CurrentStateFieldKey,
+  string
+> = {
+  last_talked_about: PROFILE_MODULE_REGISTRY["last-talked-about"].label,
+  current_location: PROFILE_MODULE_REGISTRY["current-location"].label,
+};
+
+/** The Off Limits section name (D-44), as the Profile shows it. */
+export const OFF_LIMITS_SECTION_LABEL =
+  PROFILE_MODULE_REGISTRY["off-limits"].label;
 
 /**
  * One complete, structured candidate for later Dashboard search consumption.
@@ -84,6 +118,18 @@ interface CustomValueRow {
   value: string | null;
 }
 
+interface CurrentStateRow {
+  contactId: number;
+  fieldKey: string;
+  value: string;
+}
+
+interface OffLimitsRow {
+  contactId: number;
+  label: string | null;
+  text: string | null;
+}
+
 interface ContactMethodRow {
   contactId: number;
   methodType: "phone" | "email";
@@ -120,6 +166,32 @@ SELECT contact_id AS contactId, method_type AS methodType, display_value AS disp
  WHERE contact_id IN (${placeholders(eligibleIds)})
    AND method_type IN (?, ?)
  ORDER BY contact_id, method_type, display_order, id`;
+}
+
+/**
+ * Every current-state entry, current and previous (D-62). There is no hidden or
+ * outdated flag on this table; a field key outside the registry is skipped in
+ * TypeScript (`isCurrentStateFieldKey`).
+ */
+function currentStateSql(eligibleIds: readonly number[]): string {
+  return `
+SELECT contact_id AS contactId, field_key AS fieldKey, value
+  FROM current_state_entries
+ WHERE contact_id IN (${placeholders(eligibleIds)})
+ ORDER BY contact_id, id`;
+}
+
+/** Off Limits label and text, search only (D-58). The url is not read. */
+function offLimitsSql(eligibleIds: readonly number[]): string {
+  return `
+SELECT contact_id AS contactId, label, text
+  FROM off_limits
+ WHERE contact_id IN (${placeholders(eligibleIds)})
+ ORDER BY contact_id, id`;
+}
+
+function hasText(text: string | null | undefined): text is string {
+  return typeof text === "string" && text.trim().length > 0;
 }
 
 function searchableMemoryTypes(): string[] {
@@ -211,7 +283,8 @@ function appendMemoryEntries(
 /**
  * Read every contact's KNOW-10 corpus. Eligibility is structural and term-free:
  * names, visible non-outdated registry-searchable Memories, visible relationship
- * names, and live non-blank custom values. The visibility contract is shared:
+ * names, live non-blank custom values, every non-blank current-state entry, and
+ * non-blank Off Limits label/text. The visibility contract is shared:
  * hidden/outdated snippets never reach any visible corpus consumer. There is no
  * transaction, no identifier interpolation, and every runtime SQL value (the
  * closed registry type list and every id) is `?`-bound.
@@ -224,7 +297,15 @@ export async function listKnowledgeSearchCandidates(
   if (eligibleIds.length === 0) return [];
 
   const memoryTypes = searchableMemoryTypes();
-  const [contacts, relationships, methods, defs, memories] = await Promise.all([
+  const [
+    contacts,
+    relationships,
+    methods,
+    defs,
+    memories,
+    currentState,
+    offLimits,
+  ] = await Promise.all([
     exec.getAllAsync<ContactRow>(contactsSql(eligibleIds), eligibleIds),
     exec.getAllAsync<RelationshipRow>(
       relationshipsSql(eligibleIds),
@@ -242,6 +323,11 @@ export async function listKnowledgeSearchCandidates(
           ...memoryTypes,
           ...eligibleIds,
         ]),
+    exec.getAllAsync<CurrentStateRow>(
+      currentStateSql(eligibleIds),
+      eligibleIds,
+    ),
+    exec.getAllAsync<OffLimitsRow>(offLimitsSql(eligibleIds), eligibleIds),
   ]);
   const definitionIds = defs.map((definition) => definition.id);
   const customValues =
@@ -270,6 +356,8 @@ export async function listKnowledgeSearchCandidates(
     rows.push(method);
     methodsByContact.set(method.contactId, rows);
   }
+  const currentStateByContact = groupByContact(currentState);
+  const offLimitsByContact = groupByContact(offLimits);
   const valuesByContact = new Map<number, Record<string, string | null>>();
   for (const value of customValues) {
     const values = valuesByContact.get(value.contactId) ?? {};
@@ -344,6 +432,44 @@ export async function listKnowledgeSearchCandidates(
       }
     }
 
+    for (const entry of currentStateByContact.get(contact.contactId) ?? []) {
+      if (!isCurrentStateFieldKey(entry.fieldKey) || !hasText(entry.value)) {
+        continue;
+      }
+      entries.push({
+        source: "currentState",
+        part: "memory-or-custom-field",
+        currentStateField: entry.fieldKey,
+        label: CURRENT_STATE_SECTION_LABELS[entry.fieldKey],
+        text: entry.value,
+      });
+    }
+
+    for (const row of offLimitsByContact.get(contact.contactId) ?? []) {
+      for (const text of [row.label, row.text]) {
+        if (hasText(text)) {
+          entries.push({
+            source: "offLimits",
+            part: "memory-or-custom-field",
+            label: OFF_LIMITS_SECTION_LABEL,
+            text,
+          });
+        }
+      }
+    }
+
     return { contactId: contact.contactId, entries };
   });
+}
+
+function groupByContact<T extends { contactId: number }>(
+  rows: readonly T[],
+): Map<number, T[]> {
+  const grouped = new Map<number, T[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.contactId) ?? [];
+    list.push(row);
+    grouped.set(row.contactId, list);
+  }
+  return grouped;
 }

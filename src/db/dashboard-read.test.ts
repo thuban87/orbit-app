@@ -28,9 +28,6 @@ import {
   listDashboardSearchEligible,
   listFavourites,
 } from "@/db/dashboard-read";
-import type { FuelKind } from "@/db/fuel-dao";
-import { addFuel } from "@/db/fuel-dao";
-import { getRankedFuel } from "@/db/fuel-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -125,21 +122,6 @@ async function seedContact(o: SeedOpts = {}): Promise<number> {
     ],
   );
   return result.lastInsertRowId;
-}
-
-async function addFuelRow(
-  c: number,
-  opts: { kind?: FuelKind; text: string | null; source?: string },
-): Promise<void> {
-  await addFuel(exec, {
-    uid: uid(),
-    contactId: c,
-    kind: opts.kind ?? "topic",
-    text: opts.text,
-    createdAt: NOW,
-    source: opts.source ?? "user",
-    now: NOW,
-  });
 }
 
 async function addInteractionRows(
@@ -580,54 +562,43 @@ describe("listDashboardSearch — population-aware search + A3 scope", () => {
     expect(ids(rows).sort((a, b) => a - b)).toEqual(
       [never, snoozed].sort((a, b) => a - b),
     );
-    expect(rows.every((row) => row.snippet === null)).toBe(true);
+    expect(rows.every((row) => !("snippet" in row))).toBe(true);
   });
 
-  it("keeps the name-and-fuel search projection golden after sharing its scope", async () => {
+  it("keeps the name-only search projection golden after sharing its scope", async () => {
     const nameMatch = await seedContact({
       name: "Golden Name",
       lastContact: STABLE(),
     });
-    const fuelMatch = await seedContact({
-      name: "Other",
-      lastContact: STABLE(),
-    });
-    await addFuelRow(fuelMatch, { text: "Golden fuel" });
+    await seedContact({ name: "Other", lastContact: STABLE() });
 
     const rows = await listDashboardSearch(exec, active, "golden", NOW);
 
-    expect(
-      rows.map(({ id, name, snippet, fuelText }) => ({
-        id,
-        name,
-        snippet,
-        fuelText,
-      })),
-    ).toEqual([
-      { id: nameMatch, name: "Golden Name", snippet: null, fuelText: null },
-      {
-        id: fuelMatch,
-        name: "Other",
-        snippet: "Golden fuel",
-        fuelText: "Golden fuel",
-      },
+    expect(rows.map(({ id, name }) => ({ id, name }))).toEqual([
+      { id: nameMatch, name: "Golden Name" },
     ]);
+    expect(Object.keys(rows[0] ?? {})).not.toContain("snippet");
   });
 
-  it("AND-composes explicit populations and filters with name/fuel matching and preserves snippets", async () => {
+  it("AND-composes explicit populations and filters with name matching", async () => {
     const favourite = await seedContact({
       name: "Sushi Favourite",
       lastContact: STABLE(),
       favouriteRank: 1,
       categoryId: 1,
     });
-    const fuelMatch = await seedContact({
-      name: "Different Name",
+    const second = await seedContact({
+      name: "Second Sushi Favourite",
       lastContact: STABLE(),
       favouriteRank: 2,
       categoryId: 1,
     });
-    await addFuelRow(fuelMatch, { text: "sushi rolls" });
+    await seedContact({
+      name: "Different Name",
+      lastContact: STABLE(),
+      favouriteRank: 4,
+      categoryId: 1,
+    });
     await seedContact({
       name: "Sushi Wrong Category",
       lastContact: STABLE(),
@@ -646,13 +617,10 @@ describe("listDashboardSearch — population-aware search + A3 scope", () => {
       "sushi",
       NOW,
     );
-    const byId = new Map(rows.map((row) => [row.id, row]));
 
     expect(ids(rows).sort((a, b) => a - b)).toEqual(
-      [favourite, fuelMatch].sort((a, b) => a - b),
+      [favourite, second].sort((a, b) => a - b),
     );
-    expect(byId.get(favourite)?.snippet).toBeNull();
-    expect(byId.get(fuelMatch)?.snippet).toBe("sushi rolls");
   });
 
   it("resolves birthday ids for a term and uses the soonest-birthday sort", async () => {
@@ -703,20 +671,6 @@ describe("listDashboardSearch — population-aware search + A3 scope", () => {
     await expect(
       listDashboardSearch(exec, active, "  \n\t", NOW),
     ).resolves.toEqual([]);
-  });
-
-  it("keeps fuelText parity with the ranked fuel projection", async () => {
-    const contact = await seedContact({
-      name: "Fuel Search",
-      lastContact: STABLE(),
-    });
-    await addFuelRow(contact, { kind: "fact", text: "an older fact" });
-    await addFuelRow(contact, { kind: "recent", text: "a current fuel line" });
-
-    const ranked = await getRankedFuel(exec, contact);
-    const rows = await listDashboardSearch(exec, active, "fuel search", NOW);
-
-    expect(rows[0]?.fuelText).toBe(ranked[0]?.text ?? null);
   });
 
   it("uses the shared deterministic name/id tiebreak for equal progress rows", async () => {

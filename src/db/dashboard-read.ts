@@ -9,12 +9,14 @@
  * IT RE-USES, NEVER RE-DERIVES:
  *   - status/progress: the CASE-wrapped `PROGRESS_SQL` / `STATUS_SQL` fragments
  *     from `status.ts` (the query-time engine — DERIVED-NEVER-STORED).
- *   - the ranked card fuel line: `RANKED_FUEL_EXCLUSIONS` + `RANK_CASE` from
- *     `fuel-read.ts` (Phase 8 Task 1 export), so the card's fuel line is the SAME
- *     row `getRankedFuel(contact)[0]` promotes — a parity test guards this.
- *   - the search escaper: `escapeLike` from `fuel-read.ts`.
- *   Thresholds, the fuel RANK_CASE, the exclusions, and the LIKE escaper are
- *   never re-typed here — importing them is what stops drift.
+ *   - the search escaper: `escapeLike` from `sql-like.ts`.
+ *   Thresholds and the LIKE escaper are never re-typed here — importing them is
+ *   what stops drift.
+ *
+ * CARDS CARRY NO KNOWLEDGE LINE (38.10 D-01, D-10, D-59): a card row is identity,
+ * status and population flags only. Knowledge text reaches a Dashboard row only
+ * through the search corpus (`knowledge-search-read.ts` + `dashboard-search-read.ts`),
+ * which renders the matched snippet in search mode.
  *
  * HIGH-1 (never-contacted status): STATUS_SQL has NO NULL branch — over a NULL
  * `last_contact` every comparison is false → its ELSE buckets the row as the
@@ -41,18 +43,15 @@
  * default (no-term) list keeps the full exclusion.
  *
  * INJECTION (T-08-01/02): every query is a static string; the ONLY interpolated
- * values are closed code-constants (the status/threshold fragments, the fuel
- * fragments, and the closed category/battery/filter identifiers). EVERY runtime
- * value — the category id, the battery value, the escaped search term — is
- * `?`-bound. off_limits / unconfirmed source='ai' / blank fuel are excluded
- * IN-QUERY (RANKED_FUEL_EXCLUSIONS) for the card line, the snippet, AND the
- * search EXISTS predicate — never a UI `.filter()`. Archived is excluded
- * structurally in every population.
+ * values are closed code-constants (the status/threshold fragments and the
+ * closed category/battery/filter identifiers). EVERY runtime value — the
+ * category id, the battery value, the escaped search term — is `?`-bound.
+ * Archived is excluded structurally in every population.
  * =============================================================================
  */
 import type { ProfileStatus } from "@/db/contact-status-read";
-import { escapeLike, RANK_CASE, RANKED_FUEL_EXCLUSIONS } from "@/db/fuel-read";
 import { getImpactInputs } from "@/db/impact-read";
+import { escapeLike } from "@/db/sql-like";
 import { PROGRESS_SQL, STATUS_SQL } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
 import { daysUntilBirthday } from "@/logic/birthday-logic";
@@ -104,10 +103,6 @@ export interface DashboardRow {
   snooze_until: string | null;
   status: ProfileStatus | null;
   progress: number | null;
-  /** The ranked top fuel line (== getRankedFuel[0].text), or null when none. */
-  fuelText: string | null;
-  /** A matching fuel snippet — non-null only when a term matched fuel text. */
-  snippet: string | null;
   /** Population-match flags only included for explicitly selected populations. */
   isFavourite?: number;
   isBirthday?: number;
@@ -131,18 +126,6 @@ export interface BirthdayCandidate {
   name: string;
   birthday: string;
 }
-
-/**
- * The ranked-fuel card-line subquery — reuses the fuel fragments verbatim so the
- * card line is the SAME row getRankedFuel promotes. Correlated on `c.id`; the
- * bare `text`/`kind`/`source`/`created_at`/`id` resolve to the inner `fuel` table.
- */
-const FUEL_LINE = `(SELECT text
-     FROM fuel
-    WHERE contact_id = c.id
-      AND ${RANKED_FUEL_EXCLUSIONS}
-    ORDER BY ${RANK_CASE}, created_at DESC, id DESC
-    LIMIT 1)`;
 
 /**
  * The CASE-wrapped status/progress projection shared by the population and
@@ -365,7 +348,7 @@ async function applyPopulationPostProcessing(
 
 /**
  * Search intentionally widens only the implicit Active scope (A3). Keeping the
- * construction here makes the term-bearing name/fuel read and the term-free
+ * construction here makes the term-bearing name read and the term-free
  * corpus eligibility read provably share the exact same population boundary.
  */
 function searchScope(
@@ -393,9 +376,7 @@ export async function listDashboardPopulation(
       c.last_contact AS last_contact,
       c.snooze_until AS snooze_until,
       ${CARD_FAVOURITE_RANK},
-      ${CARD_STATUS},
-      ${FUEL_LINE} AS fuelText,
-      NULL AS snippet${composition.matches.sql}
+      ${CARD_STATUS}${composition.matches.sql}
      ${CARD_FROM}
      WHERE ${composition.where.sql}${composition.filters.sql ? `\n       AND ${composition.filters.sql}` : ""}
      ORDER BY ${composition.orderBy}`,
@@ -430,11 +411,9 @@ export async function listDashboardSearch(
   const composition = await composePopulationRead(exec, query, now);
   const like = `%${escapeLike(trimmedTerm)}%`;
   const scope = searchScope(query, composition);
-  const termPredicate = `(
-       c.name LIKE ? ESCAPE '\\'
-       OR EXISTS (SELECT 1 FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\')
-     )`;
-  const snippet = `(SELECT text FROM fuel WHERE contact_id = c.id AND ${RANKED_FUEL_EXCLUSIONS} AND text LIKE ? ESCAPE '\\' LIMIT 1)`;
+  // Name-only: knowledge text is matched by the term-free corpus read
+  // (`knowledge-search-read.ts`), never by a LIKE here.
+  const termPredicate = `c.name LIKE ? ESCAPE '\\'`;
   const rows = await exec.getAllAsync<DashboardRow>(
     `SELECT c.id AS id,
       c.name AS name,
@@ -445,19 +424,15 @@ export async function listDashboardSearch(
       c.last_contact AS last_contact,
       c.snooze_until AS snooze_until,
       ${CARD_FAVOURITE_RANK},
-      ${CARD_STATUS},
-      ${FUEL_LINE} AS fuelText,
-      ${snippet} AS snippet${composition.matches.sql}
+      ${CARD_STATUS}${composition.matches.sql}
      ${CARD_FROM}
      WHERE ${scope}${composition.filters.sql ? `\n       AND ${composition.filters.sql}` : ""}
        AND ${termPredicate}
      ORDER BY ${composition.orderBy}`,
     [
-      like,
       ...composition.matches.params,
       ...composition.where.params,
       ...composition.filters.params,
-      like,
       like,
     ],
   );
@@ -487,9 +462,7 @@ export async function listDashboardSearchEligible(
       c.last_contact AS last_contact,
       c.snooze_until AS snooze_until,
       ${CARD_FAVOURITE_RANK},
-      ${CARD_STATUS},
-      ${FUEL_LINE} AS fuelText,
-      NULL AS snippet${composition.matches.sql}
+      ${CARD_STATUS}${composition.matches.sql}
      ${CARD_FROM}
      WHERE ${searchScope(query, composition)}${composition.filters.sql ? `\n       AND ${composition.filters.sql}` : ""}
      ORDER BY ${composition.orderBy}`,

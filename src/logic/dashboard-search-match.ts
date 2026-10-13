@@ -14,10 +14,20 @@ import {
   rankCandidatesWithCoverage,
 } from "@/services/knowledge-search";
 
+/**
+ * Closed descriptor kinds. The four 38.10 section kinds (D-58, D-62) name the
+ * Things to Remember section a hit came from (D-44), so the result line reads
+ * e.g. "1 match · Off Limits".
+ */
 export type DashboardSearchSourceKind =
   | "identity"
   | "relationship"
+  | "last-talked-about"
+  | "current-location"
   | "memory-or-custom-field"
+  | "thought-of-them"
+  | "gift-idea"
+  | "off-limits"
   | "note-or-body";
 
 export interface DashboardSearchMatch {
@@ -49,21 +59,49 @@ function sourceKind(entry: KnowledgeSearchEntry): DashboardSearchSourceKind {
   ) {
     return "identity";
   }
+  if (entry.source === "offLimits") return "off-limits";
+  if (entry.source === "currentState") {
+    return entry.currentStateField === "current_location"
+      ? "current-location"
+      : "last-talked-about";
+  }
+  // A Gift Ideas / Thought of Them hit names its own section, whichever part of
+  // the item matched.
+  if (entry.source === "memory" && entry.memoryType === "gift_idea") {
+    return "gift-idea";
+  }
+  if (entry.source === "memory" && entry.memoryType === "thought_of_them") {
+    return "thought-of-them";
+  }
   if (entry.part === "note-or-body") return "note-or-body";
   if (entry.source === "relationship") return "relationship";
   return "memory-or-custom-field";
 }
 
+/**
+ * Descriptor rank (lower shows first). Identity and Key People keep their lead;
+ * the section kinds sit between them and notes in the D-44 section order.
+ */
 function priority(kind: DashboardSearchSourceKind): number {
   switch (kind) {
     case "identity":
       return 1;
     case "relationship":
       return 2;
-    case "memory-or-custom-field":
+    case "last-talked-about":
       return 3;
-    case "note-or-body":
+    case "current-location":
       return 4;
+    case "memory-or-custom-field":
+      return 5;
+    case "thought-of-them":
+      return 6;
+    case "gift-idea":
+      return 7;
+    case "off-limits":
+      return 8;
+    case "note-or-body":
+      return 9;
   }
 }
 

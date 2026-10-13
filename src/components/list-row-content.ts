@@ -1,7 +1,9 @@
 import type { StatusDisplayState } from "@/components/contact-card-ring";
 import { statusDisplayLabel } from "@/components/icons/status-display-label";
 import { FAVORITE } from "@/constants/glossary";
+import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import type { DashboardSearchSourceKind } from "@/logic/dashboard-search-match";
+import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
 import {
   calendarDaysBetween,
   formatLocalDate,
@@ -38,14 +40,22 @@ export function formatLine2(recency: string, category: string | null): string {
   return category === null ? recency : `${recency} · ${category}`;
 }
 
-/** UI-SPEC names for the closed shared corpus descriptor kinds. */
+/**
+ * UI-SPEC names for the closed shared corpus descriptor kinds. The section kinds
+ * use their Things to Remember section names (D-44), read from the registries.
+ */
 export const DASHBOARD_SEARCH_CATEGORY_LABELS: Record<
   DashboardSearchSourceKind,
   string
 > = {
   identity: "Identity",
   relationship: "Relationship",
+  "last-talked-about": PROFILE_MODULE_REGISTRY["last-talked-about"].label,
+  "current-location": PROFILE_MODULE_REGISTRY["current-location"].label,
   "memory-or-custom-field": "Memory",
+  "thought-of-them": MEMORY_TYPE_REGISTRY.thought_of_them.displayName,
+  "gift-idea": MEMORY_TYPE_REGISTRY.gift_idea.displayName,
+  "off-limits": PROFILE_MODULE_REGISTRY["off-limits"].label,
   "note-or-body": "Note",
 };
 
@@ -58,7 +68,7 @@ export function formatMatchCategories(
   );
 }
 
-/** Compact, action-free search explanation shared by corpus and fuel fallback. */
+/** Compact, action-free search explanation shared by corpus and name-only rows. */
 export function formatMatchExplanation(
   matchCount: number,
   categories: readonly string[],

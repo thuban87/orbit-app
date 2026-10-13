@@ -142,6 +142,111 @@ describe("dashboard search match descriptors", () => {
     });
   });
 
+  it("names the section of an Off Limits, current-state, Gift Ideas or Thought of Them hit", () => {
+    const source = candidate(3, [
+      {
+        source: "offLimits",
+        part: "memory-or-custom-field",
+        label: "Off Limits",
+        text: "custody case",
+      },
+      {
+        source: "currentState",
+        part: "memory-or-custom-field",
+        label: "Last Talked About",
+        currentStateField: "last_talked_about",
+        text: "marathon training",
+      },
+      {
+        source: "currentState",
+        part: "memory-or-custom-field",
+        label: "Current Location",
+        currentStateField: "current_location",
+        text: "Lisbon",
+      },
+      {
+        source: "memory",
+        part: "note-or-body",
+        label: "ignored",
+        memoryType: "gift_idea",
+        text: "pottery note",
+      },
+      {
+        source: "memory",
+        part: "memory-or-custom-field",
+        label: "ignored",
+        memoryType: "thought_of_them",
+        text: "tide pools",
+      },
+    ]);
+
+    expect(buildDashboardSearchResult(source, "custody").matches).toMatchObject(
+      [{ sourceKind: "off-limits", fieldLabel: "Off Limits" }],
+    );
+    expect(
+      buildDashboardSearchResult(source, "marathon").matches,
+    ).toMatchObject([
+      { sourceKind: "last-talked-about", fieldLabel: "Last Talked About" },
+    ]);
+    expect(buildDashboardSearchResult(source, "lisbon").matches).toMatchObject([
+      { sourceKind: "current-location", fieldLabel: "Current Location" },
+    ]);
+    expect(buildDashboardSearchResult(source, "pottery").matches).toMatchObject(
+      [
+        {
+          sourceKind: "gift-idea",
+          fieldLabel: MEMORY_TYPE_REGISTRY.gift_idea.displayName,
+        },
+      ],
+    );
+    expect(buildDashboardSearchResult(source, "tide").matches).toMatchObject([
+      {
+        sourceKind: "thought-of-them",
+        fieldLabel: MEMORY_TYPE_REGISTRY.thought_of_them.displayName,
+      },
+    ]);
+  });
+
+  it("ranks section kinds after identity and Key People and before notes", () => {
+    const source = candidate(4, [
+      {
+        source: "memory",
+        part: "note-or-body",
+        label: "ignored",
+        memoryType: "general",
+        text: "kayak note",
+      },
+      {
+        source: "offLimits",
+        part: "memory-or-custom-field",
+        label: "Off Limits",
+        text: "kayak accident",
+      },
+      {
+        source: "currentState",
+        part: "memory-or-custom-field",
+        label: "Last Talked About",
+        currentStateField: "last_talked_about",
+        text: "kayak trip",
+      },
+      {
+        source: "relationship",
+        part: "relationship",
+        label: "Friend",
+        relationType: "Friend",
+        text: "Kayak Club",
+      },
+    ]);
+
+    const result = buildDashboardSearchResult(source, "kayak");
+    expect(result.matches.map((match) => match.sourceKind)).toEqual([
+      "relationship",
+      "last-talked-about",
+      "off-limits",
+    ]);
+    expect(result.moreMatchesLabel).toBe("+1 more");
+  });
+
   it("uses resolved dashboard order only to break equal-relevance ties", () => {
     const earlier = candidate(10, [
       { source: "name", part: "identity", label: "Name", text: "Alex" },
