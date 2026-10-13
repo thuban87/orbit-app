@@ -6,8 +6,9 @@
  * - The keyboard's action key (Done by default) fires `onSubmit` and inserts
  *   no newline: `multiline` with the submit `submitBehavior` (RESEARCH A3,
  *   confirmed in RN 0.86.2). The host keeps a visible Save button too.
- * - While typing, the value goes through `sanitizeEntryInput`: pasted
- *   newlines become a space and nothing is trimmed, so a typed trailing space
+ * - While typing, each change goes through `sanitizeEntryChange`: a newly
+ *   typed or pasted line break becomes a space, a line break already in the
+ *   value is kept (D-129), and nothing is trimmed, so a typed trailing space
  *   survives. Hosts trim with `normalizeEntryText` only at save
  *   (convergence c1 F-U2, Codex C-05).
  * - On focus and on blur it tells the nearest `KeyboardCenteringProvider`, if
@@ -27,7 +28,7 @@ import {
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
-import { sanitizeEntryInput } from "./entry-text-logic";
+import { sanitizeEntryChange } from "./entry-text-logic";
 import { useKeyboardCenteringContext } from "./KeyboardCenteringProvider";
 
 /** Lines shown before the field scrolls (D-66: "about 3 lines"). */
@@ -39,7 +40,10 @@ const MAX_HEIGHT = ENTRY_VISIBLE_LINES * BODY.lineHeight + 2 * VERTICAL_PADDING;
 
 export interface EntryTextFieldProps {
   value: string;
-  /** Receives the sanitized value: no newline, never trimmed. */
+  /**
+   * Receives the sanitized value: no newly typed or pasted line break (stored
+   * ones are kept, D-129), never trimmed.
+   */
   onChangeText: (value: string) => void;
   /** Fires on the keyboard's action key; the host saves. */
   onSubmit: () => void;
@@ -83,7 +87,7 @@ export function EntryTextField({
       testID={testID}
       accessibilityLabel={accessibilityLabel}
       value={value}
-      onChangeText={(text) => onChangeText(sanitizeEntryInput(text))}
+      onChangeText={(text) => onChangeText(sanitizeEntryChange(value, text))}
       onSubmitEditing={() => onSubmit()}
       onFocus={handleFocus}
       onBlur={handleBlur}

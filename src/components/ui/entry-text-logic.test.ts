@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isSavableEntry,
   normalizeEntryText,
+  sanitizeEntryChange,
   sanitizeEntryInput,
 } from "./entry-text-logic";
 
@@ -28,9 +29,70 @@ describe("sanitizeEntryInput (while typing; convergence c1 F-U2, Codex C-05)", (
   });
 });
 
+const newlines = (s: string) => (s.match(/\r\n|\r|\n/g) ?? []).length;
+
+describe("sanitizeEntryChange (D-129: only new line breaks are flattened)", () => {
+  it("keeps the line breaks of a stored multi-line value edited mid-line", () => {
+    const stored = "First paragraph\nSecond line\r\nThird";
+    // Fix a typo in the middle of the second line: "Second" -> "Secand".
+    const next = stored.replace("Second", "Secand");
+    expect(sanitizeEntryChange(stored, next)).toBe(next);
+    // Type one character at the end; every stored break survives.
+    expect(sanitizeEntryChange(stored, `${stored}!`)).toBe(`${stored}!`);
+  });
+
+  it("flattens a pasted multi-line chunk", () => {
+    expect(sanitizeEntryChange("Hello ", "Hello a\nb\r\nc")).toBe(
+      "Hello a b c",
+    );
+    // Pasted into a stored multi-line value: the stored break is kept.
+    expect(sanitizeEntryChange("x\ny", "x\nP\nQy")).toBe("x\nP Qy");
+  });
+
+  it("flattens a newline typed at the end", () => {
+    expect(sanitizeEntryChange("abc", "abc\n")).toBe("abc ");
+    expect(sanitizeEntryChange("a\n", "a\n\n")).toBe("a\n ");
+  });
+
+  it("flattens a newline typed next to a stored one", () => {
+    expect(sanitizeEntryChange("a\nb", "a\n\nb")).toBe("a\n b");
+  });
+
+  it("lets a stored line break be deleted", () => {
+    expect(sanitizeEntryChange("a\nb", "ab")).toBe("ab");
+  });
+
+  it("flattens a paste that replaces the whole value", () => {
+    expect(sanitizeEntryChange("x\ny", "p\nq")).toBe("p q");
+  });
+
+  it("round-trips typing one character at a time and never trims", () => {
+    let value = "";
+    for (const char of "hello world ") {
+      value = sanitizeEntryChange(value, value + char);
+    }
+    expect(value).toBe("hello world ");
+  });
+
+  it("never returns more line breaks than the previous value had", () => {
+    const cases: [string, string][] = [
+      ["", "\n\n"],
+      ["a\nb", "a\nb\n"],
+      ["a\nb", "\na\nb"],
+      ["a\r\nb", "a\r\n\r\nb"],
+      ["a\rb", "a\r\nb"],
+    ];
+    for (const [previous, next] of cases) {
+      expect(newlines(sanitizeEntryChange(previous, next))).toBeLessThanOrEqual(
+        newlines(previous),
+      );
+    }
+  });
+});
+
 describe("normalizeEntryText (at save only)", () => {
-  it("is sanitizeEntryInput plus trim", () => {
-    expect(normalizeEntryText("  a\nb  ")).toBe("a b");
+  it("trims and keeps line breaks already in the value (D-129)", () => {
+    expect(normalizeEntryText("  a\nb  ")).toBe("a\nb");
     expect(normalizeEntryText("hello ")).toBe("hello");
     expect(normalizeEntryText("\nx\n")).toBe("x");
   });
