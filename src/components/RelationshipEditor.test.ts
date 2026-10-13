@@ -11,14 +11,21 @@ vi.mock("@/components/ContactPicker", () => ({
 vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   Button: "Button",
+  EntryTextField: "EntryTextField",
   OrbitSwitch: "OrbitSwitch",
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
+// The G-16 live-name read pulls in expo-sqlite through the database module.
+vi.mock("@/db/database", () => ({ getExecutor: vi.fn() }));
+vi.mock("@/db/picker-read", () => ({ listPickerContacts: vi.fn() }));
 
 import type { RelationshipRow } from "@/db/relationships-read";
 import {
+  displayLinkedName,
   initialDraft,
+  initialEditorState,
   isRelationshipDraftDirty,
+  liveNameMap,
   relationshipDraftState,
 } from "./RelationshipEditor";
 
@@ -87,5 +94,83 @@ describe("isRelationshipDraftDirty (D-14, D-61; E-09)", () => {
     expect(
       relationshipDraftState(null, { ...initialDraft(), personName: "Jo" }),
     ).toEqual({ open: true, dirty: true });
+  });
+});
+
+describe("displayLinkedName (G-16, E-14; convergence c11, Claude C-12)", () => {
+  const live = liveNameMap([
+    { id: 9, name: "Jordan Lee" },
+    { id: 12, name: "Archived Pat" },
+  ]);
+
+  it("a draft-only linked contact (no stored name) shows its live name", () => {
+    expect(
+      displayLinkedName(
+        { linked_contact_id: 9, linked_contact_name: null },
+        live,
+      ),
+    ).toBe("Jordan Lee");
+  });
+
+  it("a stale stored name is replaced by the live one", () => {
+    expect(
+      displayLinkedName(
+        { linked_contact_id: 9, linked_contact_name: "Jordan" },
+        live,
+      ),
+    ).toBe("Jordan Lee");
+  });
+
+  it("an archived linked contact still resolves (the read includes archived)", () => {
+    expect(
+      displayLinkedName(
+        { linked_contact_id: 12, linked_contact_name: "Pat" },
+        live,
+      ),
+    ).toBe("Archived Pat");
+  });
+
+  it("a linked id absent from the live list keeps its stored name", () => {
+    expect(
+      displayLinkedName(
+        { linked_contact_id: 404, linked_contact_name: "Gone Person" },
+        live,
+      ),
+    ).toBe("Gone Person");
+    // Before the read finishes the live list is empty: nothing is blanked.
+    expect(
+      displayLinkedName(
+        { linked_contact_id: 9, linked_contact_name: "Jordan" },
+        liveNameMap([]),
+      ),
+    ).toBe("Jordan");
+  });
+
+  it("an unlinked row shows no linked name", () => {
+    expect(
+      displayLinkedName(
+        { linked_contact_id: null, linked_contact_name: null },
+        live,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("initialEditorState (D-107; convergence c6, Codex C-03)", () => {
+  it("an initiallyEditingId present in items opens that row's edit form", () => {
+    const state = initialEditorState([row], 4);
+    expect(state.editing).toBe(row);
+    expect(state.draft).toEqual(initialDraft(row));
+  });
+
+  it("an id absent from items, or none, opens on the rows with no form", () => {
+    expect(initialEditorState([row], 99)).toEqual({
+      editing: null,
+      draft: null,
+    });
+    expect(initialEditorState([row], undefined)).toEqual({
+      editing: null,
+      draft: null,
+    });
   });
 });

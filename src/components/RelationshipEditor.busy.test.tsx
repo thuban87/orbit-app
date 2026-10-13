@@ -8,7 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *
  * Hooks are stubbed so the editor renders as a plain function. `useState` is
  * a call-order slot harness; slot order in RelationshipEditor: editing, draft,
- * pickerOpen. The draft slot is seeded so the form is open.
+ * pickerOpen, liveNames. The draft slot is seeded so the form is open. A
+ * function initial value is called, as React calls a lazy initialiser.
  */
 const DRAFT_SLOT = 1;
 
@@ -26,7 +27,11 @@ vi.mock("react", async (original) => ({
   useState: (value: unknown) => {
     const slot = hooks.index++;
     return [
-      slot in hooks.seeds ? hooks.seeds[slot] : value,
+      slot in hooks.seeds
+        ? hooks.seeds[slot]
+        : typeof value === "function"
+          ? (value as () => unknown)()
+          : value,
       () => {
         hooks.setters += 1;
       },
@@ -44,9 +49,13 @@ vi.mock("@/components/ContactPicker", () => ({
 vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   Button: "Button",
+  EntryTextField: "EntryTextField",
   OrbitSwitch: "OrbitSwitch",
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
+// The G-16 live-name read pulls in expo-sqlite through the database module.
+vi.mock("@/db/database", () => ({ getExecutor: vi.fn() }));
+vi.mock("@/db/picker-read", () => ({ listPickerContacts: vi.fn() }));
 
 import type { RelationshipRow } from "@/db/relationships-read";
 import { initialDraft, RelationshipEditor } from "./RelationshipEditor";
@@ -59,21 +68,26 @@ function nodes(node: ReactNode): TestElement[] {
   return [element, ...nodes(element.props.children as ReactNode)];
 }
 
-const handlers = { onEdit: vi.fn(), onDelete: vi.fn() };
-const render = (busy?: boolean, items: RelationshipRow[] = []) => {
+const handlers = { onAdd: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn() };
+const render = (
+  busy?: boolean,
+  items: RelationshipRow[] = [],
+  initiallyEditingId?: number,
+) => {
   hooks.index = 0;
   hooks.setters = 0;
-  handlers.onEdit = vi.fn();
+  handlers.onAdd = vi.fn(async () => true);
+  handlers.onEdit = vi.fn(async () => true);
   handlers.onDelete = vi.fn();
   return nodes(
     RelationshipEditor({
       contactId: 1,
       items,
-      onAdd: vi.fn(),
+      onAdd: handlers.onAdd,
       onEdit: handlers.onEdit,
       onDelete: handlers.onDelete,
-      onRestore: vi.fn(),
       busy,
+      initiallyEditingId,
     }),
   );
 };
@@ -149,5 +163,88 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     expect(handlers.onEdit).not.toHaveBeenCalled();
     // Edit and Add key person would swap the open draft.
     expect(hooks.setters).toBe(0);
+  });
+});
+
+describe("RelationshipEditor note is the D-66 entry field (F-U1; D-114)", () => {
+  beforeEach(() => {
+    hooks.seeds = {
+      [DRAFT_SLOT]: {
+        ...initialDraft(),
+        personName: "Sam",
+        note: "Likes jazz",
+      },
+    };
+  });
+
+  it("renders the note as EntryTextField bound to draft.note, with its label and placeholder", () => {
+    const tree = render();
+    const note = tree.find((n) => n.type === "EntryTextField");
+    expect(note?.props.accessibilityLabel).toBe("Relationship note optional");
+    expect(note?.props.placeholder).toBe("Note (optional)");
+    expect(note?.props.value).toBe("Likes jazz");
+    expect(tree.some((n) => n.type === "TextInput" && n.props.multiline)).toBe(
+      false,
+    );
+  });
+
+  it("Enter (onSubmit) commits the form", async () => {
+    const tree = render();
+    const note = tree.find((n) => n.type === "EntryTextField");
+    const submit = note?.props.onSubmit;
+    if (typeof submit !== "function") throw new Error("missing onSubmit");
+    submit();
+    await Promise.resolve();
+    expect(handlers.onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ personName: "Sam", note: "Likes jazz" }),
+    );
+  });
+
+  it("Enter while the host saves commits nothing", async () => {
+    const tree = render(true);
+    const submit = tree.find((n) => n.type === "EntryTextField")?.props
+      .onSubmit;
+    if (typeof submit !== "function") throw new Error("missing onSubmit");
+    submit();
+    await Promise.resolve();
+    expect(handlers.onAdd).not.toHaveBeenCalled();
+  });
+});
+
+describe("RelationshipEditor initiallyEditingId (D-107; convergence c6, Codex C-03)", () => {
+  const item = {
+    id: 5,
+    person_name: "Ria",
+    relation_type: "Friend",
+    linked_contact_id: null,
+    linked_contact_name: null,
+    note: null,
+    pinned: 0,
+    hidden: null,
+  } as unknown as RelationshipRow;
+
+  beforeEach(() => {
+    hooks.seeds = {};
+  });
+
+  it("an id present in items opens that row's edit form", () => {
+    const tree = render(false, [item], 5);
+    expect(
+      tree.some(
+        (n) => n.type === "AppText" && n.props.children === "Edit key person",
+      ),
+    ).toBe(true);
+    const name = tree.find(
+      (n) =>
+        n.type === "TextInput" && n.props.accessibilityLabel === "Person name",
+    );
+    expect(name?.props.value).toBe("Ria");
+    expect(button(tree, "Add key person")).toBeUndefined();
+  });
+
+  it("an id absent from items shows the rows with no form", () => {
+    const tree = render(false, [item], 99);
+    expect(button(tree, "Add key person")).toBeDefined();
+    expect(tree.some((n) => n.type === "EntryTextField")).toBe(false);
   });
 });

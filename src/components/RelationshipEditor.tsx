@@ -7,10 +7,15 @@ import {
 } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
-import { AppText, Button, OrbitSwitch } from "@/components/ui";
+import { AppText, Button, EntryTextField, OrbitSwitch } from "@/components/ui";
+import { getExecutor } from "@/db/database";
+import { listPickerContacts } from "@/db/picker-read";
 import type { RelationshipRow } from "@/db/relationships-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { Logger } from "@/utils/logger";
+
+const LOG_SCOPE = "relationship-editor";
 
 export interface RelationshipDraft {
   personName: string;
@@ -27,7 +32,11 @@ export interface RelationshipEditorProps {
   onAdd: (draft: RelationshipDraft) => Promise<boolean>;
   onEdit: (id: number, draft: RelationshipDraft) => Promise<boolean>;
   onDelete: (id: number) => void;
-  onRestore: (id: number) => void;
+  /**
+   * Unused: deletes are immediate with the host's Undo (D-69, NEW-11). Kept
+   * optional only while hosts still pass the attribute; plan 18 removes it.
+   */
+  onRestore?: (id: number) => void;
   /**
    * Reports whether the add/edit form is open and holds typed changes (38.9
    * D-14), on every change and `{ open: false, dirty: false }` on unmount.
@@ -50,6 +59,12 @@ export interface RelationshipEditorProps {
    * silently). Absent → false.
    */
   busy?: boolean;
+  /**
+   * Opens that row's edit form at mount when it is in `items`; otherwise the
+   * editor opens on its rows (D-107; convergence c6, the MemoryEditor
+   * contract). Read at mount only.
+   */
+  initiallyEditingId?: number;
   /** Exposes `closeDraft()` so the host's Back can close the open form (D-14). */
   ref?: Ref<RelationshipEditorHandle>;
 }
@@ -78,6 +93,47 @@ export function initialDraft(item?: RelationshipRow): RelationshipDraft {
     pinned: item?.pinned === 1,
     hidden: item?.hidden === 1 ? 1 : item?.hidden === 0 ? 0 : null,
   };
+}
+
+/**
+ * The editor's state at mount: the row `initiallyEditingId` names, with its
+ * draft, when it is in `items`; otherwise no open form. PURE.
+ */
+export function initialEditorState(
+  items: readonly RelationshipRow[],
+  initiallyEditingId: number | undefined,
+): { editing: RelationshipRow | null; draft: RelationshipDraft | null } {
+  const item =
+    initiallyEditingId === undefined
+      ? undefined
+      : items.find((candidate) => candidate.id === initiallyEditingId);
+  return item
+    ? { editing: item, draft: initialDraft(item) }
+    : { editing: null, draft: null };
+}
+
+/** Live contact names by id, from the picker read. PURE. */
+export function liveNameMap(
+  rows: readonly { id: number; name: string }[],
+): ReadonlyMap<number, string> {
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+/**
+ * The name to show for a linked contact (G-16, E-14): the live name when the
+ * linked id is in the live list, else the stored name. A linked id the live
+ * list lacks (deleted meanwhile, or the read has not finished) keeps the
+ * stored name and is never blanked (convergence c11, Claude C-12). PURE.
+ */
+export function displayLinkedName(
+  row: {
+    linked_contact_id: number | null;
+    linked_contact_name: string | null;
+  },
+  liveNames: ReadonlyMap<number, string>,
+): string | null {
+  if (row.linked_contact_id === null) return row.linked_contact_name;
+  return liveNames.get(row.linked_contact_id) ?? row.linked_contact_name;
 }
 
 /** Optional text compares blank-equivalent: typed-then-erased is untouched. */
@@ -125,12 +181,48 @@ export function RelationshipEditor({
   onDraftStateChange,
   onCancelRequest,
   busy = false,
+  initiallyEditingId,
   ref,
 }: RelationshipEditorProps) {
   const { colors } = useTheme();
-  const [editing, setEditing] = useState<RelationshipRow | null>(null);
-  const [draft, setDraft] = useState<RelationshipDraft | null>(null);
+  const [editing, setEditing] = useState<RelationshipRow | null>(
+    () => initialEditorState(items, initiallyEditingId).editing,
+  );
+  const [draft, setDraft] = useState<RelationshipDraft | null>(
+    () => initialEditorState(items, initiallyEditingId).draft,
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
+  // G-16: live contact names for linked rows and the open form. The read
+  // includes archived contacts, so an archived link still shows its current
+  // name (convergence c11, Claude C-12).
+  const [liveNames, setLiveNames] = useState<ReadonlyMap<number, string>>(
+    () => new Map(),
+  );
+  // The linked ids in the rows, as a stable string: hosts rebuild `items`
+  // every render (Add / Edit Contact), so the array itself cannot key a read.
+  const linkedKey = items.map((item) => item.linked_contact_id ?? 0).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `linkedKey` is a re-read trigger (the rows' links changed), not a value the read uses.
+  useEffect(() => {
+    // Read at mount, again after the picker closes (a contact may have been
+    // picked or made) and when the rows' links change. Saved rows' stored
+    // names already come from a live join at the host's read.
+    if (pickerOpen) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await listPickerContacts(getExecutor(), {
+          includeArchived: true,
+        });
+        if (!cancelled) setLiveNames(liveNameMap(rows));
+      } catch (error) {
+        // Stored names stay on screen; nothing is blanked.
+        Logger.error(LOG_SCOPE, "failed to read live contact names", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerOpen, linkedKey]);
 
   const close = () => {
     setEditing(null);
@@ -170,7 +262,7 @@ export function RelationshipEditor({
   ) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
   const commit = async () => {
-    if (!draft || !blankToNull(draft.personName)) return;
+    if (busy || !draft || !blankToNull(draft.personName)) return;
     const normalized: RelationshipDraft = {
       ...draft,
       personName: draft.personName.trim(),
@@ -182,6 +274,23 @@ export function RelationshipEditor({
       : await onAdd(normalized);
     if (saved) close();
   };
+
+  // The open form's linked name: the stored name only while the draft still
+  // links the row's own contact (G-16).
+  const draftLinkedName =
+    draft === null
+      ? null
+      : displayLinkedName(
+          {
+            linked_contact_id: draft.linkedContactId,
+            linked_contact_name:
+              editing !== null &&
+              editing.linked_contact_id === draft.linkedContactId
+                ? editing.linked_contact_name
+                : null,
+          },
+          liveNames,
+        );
 
   return (
     <View style={styles.container}>
@@ -210,9 +319,9 @@ export function RelationshipEditor({
               {item.relation_type}
             </AppText>
           ) : null}
-          {item.linked_contact_name ? (
+          {displayLinkedName(item, liveNames) ? (
             <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Linked to {item.linked_contact_name}
+              Linked to {displayLinkedName(item, liveNames)}
             </AppText>
           ) : null}
           {item.note ? (
@@ -307,6 +416,11 @@ export function RelationshipEditor({
             }
             onPress={() => setPickerOpen(true)}
           />
+          {draftLinkedName ? (
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              Linked to {draftLinkedName}
+            </AppText>
+          ) : null}
           {draft.linkedContactId !== null ? (
             <Button
               role="tertiary"
@@ -314,22 +428,15 @@ export function RelationshipEditor({
               onPress={() => update("linkedContactId", null)}
             />
           ) : null}
-          <TextInput
+          {/* D-66 / D-114: wraps, Enter saves, pasted line breaks become
+              spaces; centres only under a host KeyboardCenteringProvider. */}
+          <EntryTextField
             accessibilityLabel="Relationship note optional"
             value={draft.note ?? ""}
             onChangeText={(value) => update("note", value)}
+            onSubmit={() => void commit()}
             placeholder="Note (optional)"
-            placeholderTextColor={colors.textPlaceholder}
-            multiline
-            style={[
-              styles.input,
-              styles.multiline,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
+            editable={!busy}
           />
           <View style={styles.switchRow}>
             <AppText role="body">Pin</AppText>
@@ -404,7 +511,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
   },
-  multiline: { minHeight: 88, textAlignVertical: "top" },
   row: {
     borderRadius: SPACING.sm,
     borderWidth: StyleSheet.hairlineWidth,
