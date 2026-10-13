@@ -121,6 +121,12 @@ import {
 } from "@/components/ui/field-error-logic";
 import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import {
+  ADD_GIFT_IDEA,
+  ADD_MEMORY,
+  ADD_OFF_LIMITS_ITEM,
+  ADD_THOUGHT_OF_THEM,
+} from "@/constants/glossary";
+import {
   getAiPermissionDefaults,
   memoryAiDefaultsMap,
 } from "@/db/ai-permissions-dao";
@@ -1734,7 +1740,7 @@ export function EditContactScreen({
               items={memoryBuckets.memories}
               globalAiEnabled={globalAiEnabled}
               aiDefaults={aiDefaults}
-              addButton={{ label: "Add Memory" }}
+              addButton={{ label: ADD_MEMORY }}
               onAdd={addMemoryRow}
               onEdit={editMemoryRow}
               onDelete={deleteMemoryRow}
@@ -1768,7 +1774,7 @@ export function EditContactScreen({
               fixedType="thought_of_them"
               globalAiEnabled={globalAiEnabled}
               aiDefaults={aiDefaults}
-              addButton={{ label: "Add Thought of Them" }}
+              addButton={{ label: ADD_THOUGHT_OF_THEM }}
               onAdd={addMemoryRow}
               onEdit={editMemoryRow}
               onDelete={deleteMemoryRow}
@@ -1802,7 +1808,7 @@ export function EditContactScreen({
               fixedType="gift_idea"
               globalAiEnabled={globalAiEnabled}
               aiDefaults={aiDefaults}
-              addButton={{ label: "Add Gift Idea" }}
+              addButton={{ label: ADD_GIFT_IDEA }}
               onAdd={addMemoryRow}
               onEdit={editMemoryRow}
               onDelete={deleteMemoryRow}
@@ -1878,7 +1884,7 @@ export function EditContactScreen({
               busy={saving}
               testID="edit-contact-off-limits"
               items={offLimitsItems}
-              addLabel="Add Off Limits Item"
+              addLabel={ADD_OFF_LIMITS_ITEM}
               onAdd={addOffLimitsRow}
               onEdit={editOffLimitsRow}
               onDelete={deleteOffLimitsRow}

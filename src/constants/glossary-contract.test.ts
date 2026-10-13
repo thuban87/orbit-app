@@ -625,6 +625,38 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
     });
   });
 
+  it("pins the Add/Edit Contact section Add labels (38.10 D-67, D-87, D-119)", () => {
+    expect({
+      ADD_OFF_LIMITS_ITEM: glossary.ADD_OFF_LIMITS_ITEM,
+      ADD_MEMORY: glossary.ADD_MEMORY,
+      ADD_GIFT_IDEA: glossary.ADD_GIFT_IDEA,
+      ADD_THOUGHT_OF_THEM: glossary.ADD_THOUGHT_OF_THEM,
+    }).toEqual({
+      ADD_OFF_LIMITS_ITEM: "Add Off Limits Item",
+      ADD_MEMORY: "Add Memory",
+      ADD_GIFT_IDEA: "Add Gift Idea",
+      ADD_THOUGHT_OF_THEM: "Add Thought of Them",
+    });
+    // Last Talked About and Current Location have no Add button (D-119).
+    const values = Object.values(glossary).map(String);
+    expect(values).not.toContain("Add Last Talked About");
+    expect(values).not.toContain("Add Current Location");
+  });
+
+  it("Add and Edit Contact read those labels from the glossary (38.10 plan 14)", () => {
+    for (const path of [
+      "src/screens/EditContactScreen.tsx",
+      "src/screens/CreateContactScreen.tsx",
+    ]) {
+      const screen = read(path);
+      expect(screen).toContain("addLabel={ADD_OFF_LIMITS_ITEM}");
+      expect(screen).toContain("addButton={{ label: ADD_MEMORY }}");
+      expect(screen).toContain("addButton={{ label: ADD_GIFT_IDEA }}");
+      expect(screen).toContain("addButton={{ label: ADD_THOUGHT_OF_THEM }}");
+      expect(screen).not.toMatch(/Add Last Talked About|Add Current Location/);
+    }
+  });
+
   it("the share card reads its control labels from the glossary (38.10 D-77, D-78)", () => {
     const card = read("src/components/ShareConfirmationCard.tsx");
     expect(card).toMatch(

@@ -96,6 +96,12 @@ import {
 } from "@/components/ui/field-error-logic";
 import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import {
+  ADD_GIFT_IDEA,
+  ADD_MEMORY,
+  ADD_OFF_LIMITS_ITEM,
+  ADD_THOUGHT_OF_THEM,
+} from "@/constants/glossary";
+import {
   getAiPermissionDefaults,
   memoryAiDefaultsMap,
 } from "@/db/ai-permissions-dao";
@@ -981,7 +987,7 @@ export function CreateContactScreen({
                   items={memoryBuckets.memories}
                   globalAiEnabled={globalAiEnabled}
                   aiDefaults={aiDefaults}
-                  addButton={{ label: "Add Memory" }}
+                  addButton={{ label: ADD_MEMORY }}
                   onAdd={addMemoryDraft}
                   onEdit={editMemoryDraft}
                   onDelete={deleteMemoryDraft}
@@ -1013,7 +1019,7 @@ export function CreateContactScreen({
                   fixedType="thought_of_them"
                   globalAiEnabled={globalAiEnabled}
                   aiDefaults={aiDefaults}
-                  addButton={{ label: "Add Thought of Them" }}
+                  addButton={{ label: ADD_THOUGHT_OF_THEM }}
                   onAdd={addMemoryDraft}
                   onEdit={editMemoryDraft}
                   onDelete={deleteMemoryDraft}
@@ -1045,7 +1051,7 @@ export function CreateContactScreen({
                   fixedType="gift_idea"
                   globalAiEnabled={globalAiEnabled}
                   aiDefaults={aiDefaults}
-                  addButton={{ label: "Add Gift Idea" }}
+                  addButton={{ label: ADD_GIFT_IDEA }}
                   onAdd={addMemoryDraft}
                   onEdit={editMemoryDraft}
                   onDelete={deleteMemoryDraft}
@@ -1114,7 +1120,7 @@ export function CreateContactScreen({
                   busy={saving}
                   testID="create-contact-off-limits"
                   items={offLimitsDrafts.map(offLimitsDraftToItem)}
-                  addLabel="Add Off Limits Item"
+                  addLabel={ADD_OFF_LIMITS_ITEM}
                   onAdd={addOffLimitsDraft}
                   onEdit={editOffLimitsDraft}
                   onDelete={deleteOffLimitsDraft}

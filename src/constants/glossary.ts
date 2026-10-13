@@ -46,3 +46,15 @@ export const QUARANTINE = "Quarantine";
 export const ALLOW_AI = "Allow AI";
 /** The share card's note action (D-77). */
 export const ADD_NOTE = "Add note";
+
+// The solid Add buttons of the inline Things to Remember sections on Add and
+// Edit Contact (38.10 D-67, D-87; plan 14). Last Talked About and Current
+// Location have no Add button there (D-119).
+/** Decided wording (D-87). */
+export const ADD_OFF_LIMITS_ITEM = "Add Off Limits Item";
+/** Proposed wording, for the plan-19 wording review (convergence c7, C-03). */
+export const ADD_MEMORY = "Add Memory";
+/** Proposed wording, for the plan-19 wording review (convergence c7, C-03). */
+export const ADD_GIFT_IDEA = "Add Gift Idea";
+/** Proposed wording, for the plan-19 wording review (convergence c7, C-03). */
+export const ADD_THOUGHT_OF_THEM = "Add Thought of Them";
