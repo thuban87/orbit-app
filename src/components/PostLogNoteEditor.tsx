@@ -1,53 +1,54 @@
 /**
- * Post-log capture editor (CAPT-05, dossier §I).
+ * Post-log Add Note sheet (CAPT-05, dossier §I; Phase 38.10 D-37, D-42, D-95).
  *
  * Opened by the Quick Log success snackbar's "Add Note" action, bound to the
- * just-created interaction. It saves EITHER an Interaction Note OR a basic
- * Memory — never both (the branch decision lives in the node-tested pure
- * `resolvePostLogSave`). "Create Memory Instead" turns the typed text into a
- * Memory (requested by DEFAULT_MEMORY_TYPE_KEY, D-11) and leaves the Interaction
- * Note empty; after a basic Memory is created it offers "Edit Memory" into the
- * full `MemoryEditor`.
+ * just-created interaction. It saves the interaction's note and, through the
+ * one-section "Also save to" picker (D-42), optionally a linked entry in Last
+ * Talked About, Gift Ideas, Thought of Them or Memories: one text in two
+ * places (D-37), written in the same transaction by `saveNoteWithLinkedEntry`.
+ * The decision lives in the node-tested pure `resolvePostLogSave`; the
+ * destination is `effectiveAlsoSaveTo(note, chosen)` and a blanked note resets
+ * the picker to None (convergence c10, Codex C-01). The old separate memory
+ * path and its follow-up editor are gone (D-42).
+ *
+ * The sheet has no Allow AI switch of its own: the interaction's switch lives
+ * on Log Interaction and Edit Interaction, and a linked entry follows it
+ * (D-49).
+ *
+ * F-18 layout (D-42; 38.9 feedback and button-order standards): one action
+ * row, Cancel then Save; a successful save shows a snackbar naming the person
+ * (and the section); an empty Save closes with nothing written.
  *
  * It carries its OWN save-in-flight guard (`savingRef`), separate from
  * runQuickLog's `pendingRef` which only protects the initial immediate write, so
- * a double-tapped Save commits at most once. Before a Note save it re-reads the
+ * a double-tapped Save commits at most once. Before a save it re-reads the
  * interaction; if it was already undone/deleted (Add-Note-after-Undo race) the
  * resolver returns "missing" and a friendly error is shown rather than editing a
  * deleted row. No colour literal (check:colors) — all colour via theme tokens.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, TextInput, View } from "react-native";
-import { getAppSettings } from "@/db/app-settings-dao";
+import { StyleSheet, TextInput, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { readInteractionForEdit } from "@/db/interaction-edit-read";
-import {
-  addMemory,
-  deleteMemory,
-  editMemory,
-  restoreMemory,
-  setMemoryAllowAi,
-} from "@/db/memories-dao";
-import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
-import { editTouchpointFull } from "@/db/recency-dao";
+import type { LinkedSection } from "@/db/linked-entry-dao";
+import { editTouchpointFull, saveNoteWithLinkedEntry } from "@/db/recency-dao";
 import { useContactHeader } from "@/hooks/use-contact-header";
-import { isAiMasterEnabled } from "@/logic/ai-enablement";
+import {
+  addedNoteSnackbar,
+  alsoSaveChoiceAfterNoteChange,
+  canAlsoSave,
+} from "@/logic/also-save-to-logic";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
-  commitThenReReadMemory,
-  resolvePostCreateMemoryTarget,
   resolvePostLogSave,
   shouldPromptOnNoteClose,
 } from "@/screens/post-log-note-logic";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
-import {
-  type MemoryDraft,
-  MemoryEditor,
-  type MemoryEditPatch,
-} from "./MemoryEditor";
+import { AlsoSaveToPicker } from "./AlsoSaveToPicker";
 import { PersonLine } from "./PersonLine";
 import { AppText, Button, Sheet } from "./ui";
 
@@ -73,11 +74,9 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   const { colors } = useTheme();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [createdMemory, setCreatedMemory] = useState<MemoryRow | null>(null);
-  const [editingMemory, setEditingMemory] = useState(false);
-  const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
-  // Whether the Edit Memory view's draft holds typed changes (D-14).
-  const [memoryDraftDirty, setMemoryDraftDirty] = useState(false);
+  // "Also save to" (D-42, D-95): one section or None; None once the note is
+  // blank (convergence c10, Codex C-01).
+  const [alsoSaveTo, setAlsoSaveTo] = useState<LinkedSection | null>(null);
   // Set beside savingRef: the ref is the guard, `busy` is render state for the
   // disabled look, so every control the save holds reads as disabled (D-26;
   // fix-pass WR-01).
@@ -87,7 +86,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
 
   const contactId = target?.contactId ?? null;
   const interactionId = target?.interactionId ?? null;
-  // D-45: who the note is for, under each heading of this sheet.
+  // D-45: who the note is for, under the sheet's heading.
   const person = useContactHeader(contactId);
 
   // Reset every time the editor opens for a new interaction.
@@ -95,29 +94,14 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     if (!target) return;
     setText("");
     setError(null);
-    setCreatedMemory(null);
-    setEditingMemory(false);
-    setMemoryDraftDirty(false);
+    setAlsoSaveTo(null);
     savingRef.current = false;
     setBusy(false);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const enabled = isAiMasterEnabled(await getAppSettings(getExecutor()));
-        if (!cancelled) setGlobalAiEnabled(enabled);
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to read AI availability", err);
-        if (!cancelled) setGlobalAiEnabled(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, [target]);
 
-  const reReadCreatedMemory = useCallback(async (id: number, cId: number) => {
-    const rows = await listMemoriesForContact(getExecutor(), cId);
-    return rows.find((row) => row.id === id) ?? null;
+  const onChangeText = useCallback((next: string) => {
+    setText(next);
+    setAlsoSaveTo((chosen) => alsoSaveChoiceAfterNoteChange(next, chosen));
   }, []);
 
   const saveNote = useCallback(async () => {
@@ -133,10 +117,10 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         interactionId,
       );
       const result = resolvePostLogSave({
-        kind: "note",
         text,
         interactionId,
         interactionExists: seed !== null,
+        alsoSaveTo,
       });
       if (result.target === "noop") {
         onClose();
@@ -146,19 +130,11 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         setError(MISSING_INTERACTION_MESSAGE);
         return;
       }
-      if (result.target !== "note") {
-        // Unreachable for a kind:"note" input — resolvePostLogSave only ever
-        // returns note/missing/noop here — but this narrows PostLogSaveResult
-        // to PostLogNoteResult so the compiler can see interactionId/note.
-        setError(SAVE_FAILED_MESSAGE);
-        return;
-      }
-      const now = localDateTime();
-      await editTouchpointFull(getExecutor(), {
+      const input = {
         interactionId: result.interactionId,
         contactId,
         occurredAt: seed.occurredAt,
-        now,
+        now: localDateTime(),
         channel: seed.channel,
         direction: seed.direction,
         connected: seed.connected,
@@ -166,10 +142,24 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         note: result.note,
         duration: seed.duration,
         allowAi: seed.allowAi,
-      });
+      };
+      if (result.alsoSaveTo !== null) {
+        // The note and its linked entry in one transaction (D-37, D-42).
+        await saveNoteWithLinkedEntry(getExecutor(), input, result.alsoSaveTo);
+      } else {
+        await editTouchpointFull(getExecutor(), input);
+      }
       // 38.3 D-21: publish the committed note to foreground consumers (Profile,
       // History, Dashboard) before closing — same shell tick as the Quick Log.
       bumpShellRefresh();
+      // F-18 / 38.9 D-39, D-46: the save is no longer silent.
+      showSnackbar({
+        kind: "success",
+        label: addedNoteSnackbar({
+          personName: person?.name ?? null,
+          section: result.alsoSaveTo,
+        }),
+      });
       onClose();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save interaction note", err);
@@ -178,194 +168,20 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       savingRef.current = false;
       setBusy(false);
     }
-  }, [contactId, interactionId, onClose, text]);
-
-  const createMemory = useCallback(async () => {
-    if (contactId === null) return;
-    if (savingRef.current) return;
-    savingRef.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = resolvePostLogSave({ kind: "memory", text });
-      if (result.target === "noop") {
-        onClose();
-        return;
-      }
-      if (result.target !== "memory") return;
-      const now = localDateTime();
-      // 38.3 review B-CR-01 (D-04): only a rejected addMemory is a failed save.
-      // Once it resolves the Memory durably exists and creation is TERMINAL
-      // (review WR-02): the shell tick (D-21) and the re-read run OUTSIDE the
-      // write's error path, so a failed re-read closes the editor instead of
-      // re-offering "Create Memory Instead" (which created a duplicate).
-      const outcome = await commitThenReReadMemory({
-        write: () =>
-          addMemory(getExecutor(), {
-            contactId,
-            type: result.type,
-            value: result.value,
-            createdAt: now,
-            now,
-          }),
-        publish: bumpShellRefresh,
-        reRead: (id) => reReadCreatedMemory(id, contactId),
-        onPostCommitError: (stage, err) =>
-          Logger.error(LOG_SCOPE, `memory ${stage} failed after commit`, err),
-      });
-      if (outcome.kind === "write-failed") {
-        Logger.error(LOG_SCOPE, "failed to create memory", outcome.error);
-        setError(SAVE_FAILED_MESSAGE);
-        return;
-      }
-      const next = resolvePostCreateMemoryTarget(outcome.row);
-      if (next.target === "close") {
-        onClose();
-        return;
-      }
-      setCreatedMemory(next.row);
-    } finally {
-      savingRef.current = false;
-      setBusy(false);
-    }
-  }, [contactId, onClose, reReadCreatedMemory, text]);
-
-  const onEditMemory = useCallback(
-    async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
-      if (contactId === null) return false;
-      // The edit save shares savingRef, so the sheet's exits hold while it is
-      // in flight (verification IN-01) and a double-tapped Save edits once.
-      if (savingRef.current) return false;
-      savingRef.current = true;
-      setBusy(true);
-      setError(null);
-      try {
-        // 38.3 review B-CR-01: a resolved editMemory is a successful save even
-        // if the re-read fails. A missing re-read row closes the editor rather
-        // than dropping back to the re-submittable Add-Note surface.
-        const outcome = await commitThenReReadMemory({
-          write: () =>
-            editMemory(getExecutor(), {
-              id,
-              contactId,
-              ...patch,
-              now: localDateTime(),
-            }),
-          publish: bumpShellRefresh,
-          reRead: () => reReadCreatedMemory(id, contactId),
-          onPostCommitError: (stage, err) =>
-            Logger.error(LOG_SCOPE, `memory ${stage} failed after edit`, err),
-        });
-        if (outcome.kind === "write-failed") {
-          Logger.error(LOG_SCOPE, "failed to edit memory", outcome.error);
-          // Shown under the Edit Memory heading; the form stays open with the
-          // draft so Save can be retried (fix-pass IN-04).
-          setError(SAVE_FAILED_MESSAGE);
-          return false;
-        }
-        if (outcome.row === null) {
-          onClose();
-          return true;
-        }
-        setCreatedMemory(outcome.row);
-        return true;
-      } finally {
-        savingRef.current = false;
-        setBusy(false);
-      }
-    },
-    [contactId, onClose, reReadCreatedMemory],
-  );
-
-  // showAdd is false in this bound context, so onAdd is never reached; it is
-  // provided to satisfy the MemoryEditor contract.
-  const onAddMemory = useCallback(
-    async (_draft: MemoryDraft): Promise<boolean> => false,
-    [],
-  );
-  // Delete, Restore and Allow AI wait for an in-flight save (verification
-  // IN-01, fix-pass IN-01): the shared savingRef holds them, as it holds every
-  // exit, so no second write races the edit. Delete and Allow AI report
-  // whether they took the action, so MemoryEditor closes or flips only then
-  // (third fix pass IN-01).
-  const onDeleteMemory = useCallback(
-    (id: number): boolean => {
-      if (contactId === null || savingRef.current) return false;
-      void deleteMemory(getExecutor(), { id, contactId, now: localDateTime() })
-        .then(() => {
-          bumpShellRefresh();
-          onClose();
-        })
-        .catch((err) =>
-          Logger.error(LOG_SCOPE, "failed to delete memory", err),
-        );
-      return true;
-    },
-    [contactId, onClose],
-  );
-  const onRestoreMemory = useCallback(
-    (id: number) => {
-      if (contactId === null || savingRef.current) return;
-      void restoreMemory(getExecutor(), {
-        id,
-        contactId,
-        now: localDateTime(),
-      })
-        .then(() => bumpShellRefresh())
-        .catch((err) =>
-          Logger.error(LOG_SCOPE, "failed to restore memory", err),
-        );
-    },
-    [contactId],
-  );
-  const onSetMemoryAllowAi = useCallback(
-    (id: number, allow: boolean): boolean => {
-      if (contactId === null || savingRef.current) return false;
-      void setMemoryAllowAi(getExecutor(), {
-        id,
-        contactId,
-        allow,
-        now: localDateTime(),
-      })
-        .then(() => bumpShellRefresh())
-        .catch((err) =>
-          Logger.error(LOG_SCOPE, "failed to set memory AI permission", err),
-        );
-      return true;
-    },
-    [contactId],
-  );
-
-  // Non-null only while the full editor is open. The Sheet variant and the
-  // body switch on this one value, so the expanded branch alone owns the
-  // ScrollView (sheet-consumers-contract, D-32).
-  const memoryBeingEdited = editingMemory ? createdMemory : null;
-  const personLine = person ? (
-    <PersonLine
-      name={person.name}
-      photo={person.photo}
-      contactId={person.contactId}
-    />
-  ) : null;
+  }, [alsoSaveTo, contactId, interactionId, onClose, person, text]);
 
   // The one dirty-aware close for every exit that is not a save (D-14, D-61;
-  // review CR-02, verification WR-01): Back, the scrim, Add Note's Cancel and
-  // Edit Memory's Done. Typed text asks "Discard changes?" first; untouched
-  // closes at once. confirmDiscard() is single-flight, so a second exit while
-  // the prompt is up never closes twice. A successful save still closes
-  // directly through onClose (D-61).
+  // review CR-02, verification WR-01): Back, the scrim and Cancel. Typed text
+  // or a chosen section asks "Discard changes?" first; untouched closes at
+  // once. confirmDiscard() is single-flight, so a second exit while the prompt
+  // is up never closes twice. A successful save still closes directly through
+  // onClose (D-61).
   const requestSheetClose = () => {
     // A save in flight owns the close (verification IN-01): its success closes
     // the sheet, its failure leaves it open with the error. Opening "Discard
     // changes?" now would leave the prompt over a sheet that is already gone.
     if (savingRef.current) return;
-    if (
-      !shouldPromptOnNoteClose({
-        text,
-        memoryCreated: createdMemory !== null,
-        memoryDraftDirty: memoryBeingEdited !== null && memoryDraftDirty,
-      })
-    ) {
+    if (!shouldPromptOnNoteClose({ text, alsoSaveTo })) {
       onClose();
       return;
     }
@@ -373,148 +189,74 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       if (discard) onClose();
     });
   };
-  // The Edit Memory form's own Cancel (D-61): an edited draft asks first; an
-  // untouched one closes the form at once. The sheet stays open either way.
-  const requestMemoryFormCancel = (close: () => void) => {
-    if (savingRef.current) return; // the edit save closes the form (IN-01)
-    // A failed edit's error belongs to the draft being left (IN-04).
-    const closeForm = () => {
-      setError(null);
-      close();
-    };
-    if (!memoryDraftDirty) {
-      closeForm();
-      return;
-    }
-    void confirmDiscard().then((discard) => {
-      if (discard) closeForm();
-    });
-  };
 
   return (
     <Sheet
       visible={target !== null}
       onRequestClose={requestSheetClose}
-      variant={memoryBeingEdited ? "expanded" : "compact"}
+      variant="compact"
     >
-      {memoryBeingEdited ? (
-        // The expanded sheet's consumer owns its workspace scroll (Sheet.tsx,
-        // D-32): the full editor is taller than the sheet even at the default
-        // font, so it scrolls to Allow AI, Cancel and Save (38.4 D-72).
-        <ScrollView
-          style={styles.editScroll}
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator
-        >
-          <AppText role="heading">Edit Memory</AppText>
-          {personLine}
-          {error ? (
-            <AppText role="caption" style={{ color: colors.danger }}>
-              {error}
-            </AppText>
-          ) : null}
-          <MemoryEditor
-            items={[memoryBeingEdited]}
-            // Only this one memory is shown, so its options open by default
-            // (no tap on the card needed; owner ruling D-73).
-            initiallyEditingId={memoryBeingEdited.id}
-            onDraftStateChange={(state) => setMemoryDraftDirty(state.dirty)}
-            onCancelRequest={requestMemoryFormCancel}
-            busy={busy}
-            showAdd={false}
-            onAdd={onAddMemory}
-            onEdit={onEditMemory}
-            onDelete={onDeleteMemory}
-            onRestore={onRestoreMemory}
-            onSetAllowAi={onSetMemoryAllowAi}
-            globalAiEnabled={globalAiEnabled}
+      <View style={styles.body}>
+        <AppText role="heading">Add Note</AppText>
+        {person ? (
+          <PersonLine
+            name={person.name}
+            photo={person.photo}
+            contactId={person.contactId}
           />
+        ) : null}
+        <TextInput
+          accessibilityLabel="Note for the logged interaction"
+          value={text}
+          onChangeText={onChangeText}
+          placeholder="What happened?"
+          placeholderTextColor={colors.textPlaceholder}
+          multiline
+          autoFocus
+          style={[
+            styles.input,
+            {
+              color: colors.textPrimary,
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
+        />
+        <AlsoSaveToPicker
+          testID="post-log-note-also-save-to"
+          value={alsoSaveTo}
+          onChange={setAlsoSaveTo}
+          disabled={busy || !canAlsoSave(text)}
+        />
+        {error ? (
+          <AppText role="caption" style={{ color: colors.danger }}>
+            {error}
+          </AppText>
+        ) : null}
+        <View style={styles.actions}>
           <Button
             role="tertiary"
-            label="Done"
+            label="Cancel"
             disabled={busy}
             onPress={requestSheetClose}
           />
-        </ScrollView>
-      ) : (
-        <View style={styles.body}>
-          {createdMemory ? (
-            <>
-              <AppText role="heading">Memory saved</AppText>
-              {personLine}
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Saved as a Memory, not a note on this interaction.
-              </AppText>
-              <View style={styles.actions}>
-                <Button
-                  role="tertiary"
-                  label="Edit Memory"
-                  onPress={() => setEditingMemory(true)}
-                />
-                <Button role="primary" label="Done" onPress={onClose} />
-              </View>
-            </>
-          ) : (
-            <>
-              <AppText role="heading">Add Note</AppText>
-              {personLine}
-              <TextInput
-                accessibilityLabel="Note for the logged interaction"
-                value={text}
-                onChangeText={setText}
-                placeholder="What happened?"
-                placeholderTextColor={colors.textPlaceholder}
-                multiline
-                autoFocus
-                style={[
-                  styles.input,
-                  {
-                    color: colors.textPrimary,
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                  },
-                ]}
-              />
-              {error ? (
-                <AppText role="caption" style={{ color: colors.danger }}>
-                  {error}
-                </AppText>
-              ) : null}
-              <View style={styles.actions}>
-                <Button
-                  role="tertiary"
-                  label="Cancel"
-                  disabled={busy}
-                  onPress={requestSheetClose}
-                />
-                <Button
-                  role="tertiary"
-                  label="Create Memory Instead"
-                  disabled={busy}
-                  onPress={() => void createMemory()}
-                />
-                <Button
-                  role="primary"
-                  label={error ? "Retry" : "Save"}
-                  disabled={busy}
-                  onPress={() => void saveNote()}
-                />
-              </View>
-            </>
-          )}
+          <Button
+            role="primary"
+            label={error ? "Retry" : "Save"}
+            disabled={busy}
+            onPress={() => void saveNote()}
+          />
         </View>
-      )}
+      </View>
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
   body: { gap: SPACING.base },
-  editScroll: { flex: 1 },
+  // F-18: one row, Cancel then Save (38.9 D-06 button order); no wrap.
   actions: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: SPACING.sm,
     justifyContent: "flex-end",
   },

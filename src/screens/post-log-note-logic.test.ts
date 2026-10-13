@@ -1,215 +1,98 @@
-import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_MEMORY_TYPE_KEY } from "@/db/memory-registry";
+import { describe, expect, it } from "vitest";
 import {
-  commitThenReReadMemory,
   type PostLogSaveResult,
-  resolvePostCreateMemoryTarget,
   resolvePostLogSave,
   shouldPromptOnNoteClose,
 } from "./post-log-note-logic";
 
-describe("resolvePostLogSave", () => {
-  it("note branch seeds the interaction note and creates no memory", () => {
-    const result = resolvePostLogSave({
-      kind: "note",
-      text: "Talked about the new job",
-      interactionId: 12,
-      interactionExists: true,
-    });
+const BASE = {
+  text: "Talked about the new job",
+  interactionId: 12,
+  interactionExists: true,
+  alsoSaveTo: null,
+} as const;
 
-    expect(result).toEqual<PostLogSaveResult>({
+describe("resolvePostLogSave", () => {
+  it("a note with no section seeds only the interaction note", () => {
+    expect(resolvePostLogSave(BASE)).toEqual<PostLogSaveResult>({
       target: "note",
       interactionId: 12,
       note: "Talked about the new job",
+      alsoSaveTo: null,
     });
-    // Mutual exclusion: a note result never carries an addMemory intent.
-    expect(result).not.toHaveProperty("type");
-    expect(result).not.toHaveProperty("value");
   });
 
-  it("memory branch creates a memory of the default type and no note patch", () => {
-    const result = resolvePostLogSave({
-      kind: "memory",
-      text: "Loves hiking",
-    });
-
-    expect(result).toEqual<PostLogSaveResult>({
-      target: "memory",
-      type: DEFAULT_MEMORY_TYPE_KEY,
-      value: "Loves hiking",
-    });
-    // Mutual exclusion: a memory result never carries a note patch.
-    expect(result).not.toHaveProperty("note");
-    expect(result).not.toHaveProperty("interactionId");
-  });
-
-  it("requests the memory by DEFAULT_MEMORY_TYPE_KEY, not a literal name", () => {
-    const result = resolvePostLogSave({ kind: "memory", text: "anything" });
-
-    expect(result.target).toBe("memory");
-    if (result.target === "memory") {
-      expect(result.type).toBe(DEFAULT_MEMORY_TYPE_KEY);
-      // Guard against a regression to a hardcoded display name / type ID.
-      expect(result.type).not.toBe("Memory");
-      expect(result.type).not.toBe("General");
-    }
-  });
-
-  it("treats empty / whitespace text as a no-op on both branches", () => {
+  it("a note with a section carries that section (D-42, D-95)", () => {
     expect(
-      resolvePostLogSave({
-        kind: "note",
-        text: "   ",
-        interactionId: 12,
-        interactionExists: true,
-      }),
-    ).toEqual({ target: "noop" });
+      resolvePostLogSave({ ...BASE, alsoSaveTo: "gift_idea" }),
+    ).toEqual<PostLogSaveResult>({
+      target: "note",
+      interactionId: 12,
+      note: "Talked about the new job",
+      alsoSaveTo: "gift_idea",
+    });
+  });
 
-    expect(resolvePostLogSave({ kind: "memory", text: "" })).toEqual({
+  it("trims the note before it is saved", () => {
+    const result = resolvePostLogSave({ ...BASE, text: "  padded  " });
+    expect(result.target === "note" && result.note).toBe("padded");
+  });
+
+  it("empty / whitespace text is a no-op, whatever section was chosen (c10 C-01)", () => {
+    expect(resolvePostLogSave({ ...BASE, text: "   " })).toEqual({
       target: "noop",
     });
+    expect(
+      resolvePostLogSave({
+        ...BASE,
+        text: "",
+        alsoSaveTo: "last_talked_about",
+      }),
+    ).toEqual({ target: "noop" });
   });
 
-  it("returns 'missing' for a note when the interaction was undone/deleted", () => {
+  it("returns 'missing' when the interaction was undone/deleted", () => {
     // Add-Note-after-Undo race (Review MEDIUM 34-06): no note patch is produced.
     const result = resolvePostLogSave({
-      kind: "note",
-      text: "Should not persist",
-      interactionId: 12,
+      ...BASE,
       interactionExists: false,
+      alsoSaveTo: "memory",
     });
-
     expect(result).toEqual({ target: "missing" });
     expect(result).not.toHaveProperty("note");
+    expect(result).not.toHaveProperty("alsoSaveTo");
   });
 
-  it("leaves the memory branch unaffected by interaction existence", () => {
-    const result = resolvePostLogSave({ kind: "memory", text: "still saves" });
-    expect(result.target).toBe("memory");
-  });
-
-  it("trims surrounding whitespace from the saved text", () => {
-    const note = resolvePostLogSave({
-      kind: "note",
-      text: "  padded note  ",
-      interactionId: 3,
-      interactionExists: true,
-    });
-    expect(note).toMatchObject({ target: "note", note: "padded note" });
-
-    const memory = resolvePostLogSave({ kind: "memory", text: "  padded  " });
-    expect(memory).toMatchObject({ target: "memory", value: "padded" });
-  });
-});
-
-describe("resolvePostCreateMemoryTarget (WR-02)", () => {
-  it("offers inline edit when the created Memory is re-read", () => {
-    const row = { id: 7, value: "coffee" };
-    expect(resolvePostCreateMemoryTarget(row)).toEqual({
-      target: "edit",
-      row,
-    });
-  });
-
-  it("closes (never re-opens Add Note) when the re-read misses the fresh row", () => {
-    // The addMemory write already committed; a null re-read must NOT route back
-    // to the re-submittable Add-Note surface, which would allow a duplicate.
-    expect(resolvePostCreateMemoryTarget<null>(null)).toEqual({
-      target: "close",
-    });
-  });
-});
-
-describe("commitThenReReadMemory — a committed Memory is never reported as failed (38.3 review B-CR-01, D-04)", () => {
-  it("reports write-failed only when the write itself rejects, and never publishes or re-reads", async () => {
-    const publish = vi.fn();
-    const reRead = vi.fn();
-    const outcome = await commitThenReReadMemory({
-      write: () => Promise.reject(new Error("disk")),
-      publish,
-      reRead,
-    });
-    expect(outcome.kind).toBe("write-failed");
-    expect(publish).not.toHaveBeenCalled();
-    expect(reRead).not.toHaveBeenCalled();
-  });
-
-  it("returns committed with the re-read row on the happy path, publishing before the re-read", async () => {
-    const order: string[] = [];
-    const outcome = await commitThenReReadMemory({
-      write: async () => {
-        order.push("write");
-        return 7;
-      },
-      publish: () => order.push("publish"),
-      reRead: async (id) => {
-        order.push(`reRead:${id}`);
-        return { id, value: "coffee" };
-      },
-    });
-    expect(order).toEqual(["write", "publish", "reRead:7"]);
-    expect(outcome).toEqual({
-      kind: "committed",
-      row: { id: 7, value: "coffee" },
-    });
-  });
-
-  it("returns committed with a null row (never write-failed) when the post-commit re-read throws", async () => {
-    const outcome = await commitThenReReadMemory({
-      write: async () => 7,
-      publish: () => {},
-      reRead: () => Promise.reject(new Error("read failed")),
-    });
-    expect(outcome.kind).toBe("committed");
-    if (outcome.kind === "committed") {
-      expect(outcome.row).toBeNull();
-      expect(outcome.reReadFailed).toBe(true);
-    }
-    // A null committed row closes the editor — terminal, no re-submittable surface.
-    if (outcome.kind === "committed") {
-      expect(resolvePostCreateMemoryTarget(outcome.row)).toEqual({
-        target: "close",
-      });
-    }
-  });
-
-  it("returns committed even when the publisher throws", async () => {
-    const reRead = vi.fn(async () => ({ id: 3 }));
-    const outcome = await commitThenReReadMemory({
-      write: async () => 3,
-      publish: () => {
-        throw new Error("publisher");
-      },
-      reRead,
-    });
-    expect(outcome).toEqual({ kind: "committed", row: { id: 3 } });
-    expect(reRead).toHaveBeenCalledTimes(1);
+  it("empty text wins over a missing interaction (nothing to save either way)", () => {
+    expect(
+      resolvePostLogSave({ ...BASE, text: " ", interactionExists: false }),
+    ).toEqual({ target: "noop" });
   });
 });
 
 describe("shouldPromptOnNoteClose (38.9 D-14; review CR-02)", () => {
-  const base = { text: "", memoryCreated: false, memoryDraftDirty: false };
-
-  it("an empty or whitespace-only note closes at once", () => {
-    expect(shouldPromptOnNoteClose(base)).toBe(false);
-    expect(shouldPromptOnNoteClose({ ...base, text: "  \n " })).toBe(false);
+  it("an untouched sheet closes at once", () => {
+    expect(shouldPromptOnNoteClose({ text: "", alsoSaveTo: null })).toBe(false);
+    expect(shouldPromptOnNoteClose({ text: "  \n ", alsoSaveTo: null })).toBe(
+      false,
+    );
   });
 
-  it("a typed note asks before Back or the scrim throws it away", () => {
-    expect(shouldPromptOnNoteClose({ ...base, text: "Coffee" })).toBe(true);
+  it("typed text asks first", () => {
+    expect(shouldPromptOnNoteClose({ text: "Coffee", alsoSaveTo: null })).toBe(
+      true,
+    );
   });
 
-  it("after the text became a Memory, only an edited memory draft asks", () => {
-    expect(
-      shouldPromptOnNoteClose({ ...base, text: "Coffee", memoryCreated: true }),
-    ).toBe(false);
+  it("a chosen section counts as work too", () => {
     expect(
       shouldPromptOnNoteClose({
-        ...base,
         text: "Coffee",
-        memoryCreated: true,
-        memoryDraftDirty: true,
+        alsoSaveTo: "thought_of_them",
       }),
     ).toBe(true);
+    expect(shouldPromptOnNoteClose({ text: "", alsoSaveTo: "memory" })).toBe(
+      true,
+    );
   });
 });

@@ -10,6 +10,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * under Title; a save failure stays in the operation `error`. An empty-title
  * Save requests the Title reveal and focus, and writes nothing.
  *
+ * "Also save to" on the Group Note (38.10 D-96; convergence c10, Codex C-01):
+ * the picker is enabled only while the Group Note has text, a blanked note
+ * resets it to None, and the save passes the effective section.
+ *
  * Deliberately not asserted (this plan only, review C8-M5): the message
  * wording and the title's accessibility label. Plan 15 rewrites both.
  */
@@ -19,11 +23,12 @@ const SLOT = {
   title: 0,
   value: 1,
   groupNote: 2,
-  participantIds: 3,
-  pickerVisible: 4,
-  saving: 5,
-  error: 6,
-  titleError: 7,
+  alsoSaveTo: 3,
+  participantIds: 4,
+  pickerVisible: 5,
+  saving: 6,
+  error: 7,
+  titleError: 8,
 } as const;
 
 const hooks = vi.hoisted(() => ({
@@ -62,6 +67,9 @@ vi.mock("react-native", () => ({
   },
   TextInput: "TextInput",
   View: "View",
+}));
+vi.mock("@/components/AlsoSaveToPicker", () => ({
+  AlsoSaveToPicker: "AlsoSaveToPicker",
 }));
 vi.mock("@/components/ContactPicker", () => ({
   ContactPicker: "ContactPicker",
@@ -162,6 +170,7 @@ describe("GroupLogScreen Save (38.9 D-19; F-12)", () => {
     render();
     expect(hooks.initial[SLOT.title]).toBe("");
     expect(hooks.initial[SLOT.groupNote]).toBe("");
+    expect(hooks.initial[SLOT.alsoSaveTo]).toBeNull();
     expect(hooks.initial[SLOT.participantIds]).toEqual([]);
     expect(hooks.initial[SLOT.pickerVisible]).toBe(false);
     expect(hooks.initial[SLOT.saving]).toBe(false);
@@ -290,5 +299,85 @@ describe("GroupLogScreen Save (38.9 D-19; F-12)", () => {
     expect(setter("title")).toHaveBeenCalledWith("D");
     expect(setter("titleError")).toHaveBeenCalledWith(null);
     expect(setter("error")).not.toHaveBeenCalled();
+  });
+});
+
+describe("GroupLogScreen Also save to (38.10 D-96; c10 C-01)", () => {
+  function picker(tree: TestElement[]): TestElement {
+    return byTestId(tree, "group-log-also-save-to");
+  }
+
+  it("the picker is enabled only while the Group Note has text", () => {
+    expect(picker(render()).props.disabled).toBe(true);
+    expect(picker(render({ groupNote: "   " })).props.disabled).toBe(true);
+    expect(picker(render({ groupNote: "Dinner chat" })).props.disabled).toBe(
+      false,
+    );
+    expect(
+      picker(render({ groupNote: "Dinner chat", saving: true })).props.disabled,
+    ).toBe(true);
+  });
+
+  it("passes the chosen section with a non-blank Group Note", async () => {
+    createGroupEvent.mockResolvedValueOnce({ groupEventId: 1 });
+    const tree = render({
+      title: "Dinner",
+      groupNote: "Talked about the trip",
+      alsoSaveTo: "last_talked_about",
+    });
+    await pressSave(tree);
+    expect(createGroupEvent).toHaveBeenCalledTimes(1);
+    expect(createGroupEvent.mock.calls[0][1]).toMatchObject({
+      groupNote: "Talked about the trip",
+      alsoSaveTo: "last_talked_about",
+    });
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("type a Group Note, choose a section, clear the note, Save: alsoSaveTo is null and the save succeeds", async () => {
+    // Choose Gift Ideas while the note has text.
+    const typed = render({ title: "Dinner", groupNote: "x" });
+    (picker(typed).props.onChange as (s: string | null) => void)("gift_idea");
+    expect(setter("alsoSaveTo")).toHaveBeenLastCalledWith("gift_idea");
+    // Clear the Group Note: the choice resets to None.
+    const chosen = render({
+      title: "Dinner",
+      groupNote: "x",
+      alsoSaveTo: "gift_idea",
+    });
+    (
+      byTestId(chosen, "group-log-group-note").props.onChangeText as (
+        t: string,
+      ) => void
+    )("");
+    expect(setter("groupNote")).toHaveBeenLastCalledWith("");
+    const reset = setter("alsoSaveTo").mock.calls.at(-1)?.[0] as (
+      prev: string | null,
+    ) => string | null;
+    expect(reset("gift_idea")).toBeNull();
+    // Save with the blank note, even with a stale choice: a plain save.
+    createGroupEvent.mockResolvedValueOnce({ groupEventId: 1 });
+    const cleared = render({
+      title: "Dinner",
+      groupNote: "",
+      alsoSaveTo: "gift_idea",
+    });
+    await pressSave(cleared);
+    expect(createGroupEvent).toHaveBeenCalledTimes(1);
+    expect(createGroupEvent.mock.calls[0][1]).toMatchObject({
+      groupNote: null,
+      alsoSaveTo: null,
+    });
+    expect(setter("error")).not.toHaveBeenCalledWith(expect.any(String));
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders no Allow AI switch for the copies (D-98, D-102)", () => {
+    const tree = render({ groupNote: "x" });
+    const form = tree.find(
+      (element) => element.type === "TouchpointRefineForm",
+    );
+    expect(form?.props.visibleFields).not.toContain("allowAi");
+    expect(tree.some((element) => element.type === "OrbitSwitch")).toBe(false);
   });
 });

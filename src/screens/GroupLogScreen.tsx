@@ -1,5 +1,14 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button and AppText use a
 // domain-specific semantic `role` prop, not a web ARIA role.
+/**
+ * Group Log (+ → Group Log). Phase 38.10 D-96: the Group Note has the one-section
+ * "Also save to" picker. Every participant gets a linked copy in that section,
+ * created AI-off by the DAO (D-98, D-102); this screen has no Allow AI switch
+ * for the copies and adds none. The picker is enabled only while the Group Note
+ * has text, a blanked note resets it to None, and the save passes
+ * `effectiveAlsoSaveTo(groupNote, chosen)`, never the raw choice (convergence
+ * c10, Codex C-01).
+ */
 import { useMemo, useRef, useState } from "react";
 import {
   Pressable,
@@ -8,6 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { AlsoSaveToPicker } from "@/components/AlsoSaveToPicker";
 import { ContactPicker } from "@/components/ContactPicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -19,7 +29,13 @@ import { FieldError } from "@/components/ui/FieldError";
 import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { getExecutor, localDateTime } from "@/db/database";
 import { createGroupEvent } from "@/db/group-events-dao";
+import type { LinkedSection } from "@/db/linked-entry-dao";
 import { newUid } from "@/db/uid";
+import {
+  alsoSaveChoiceAfterNoteChange,
+  canAlsoSave,
+  effectiveAlsoSaveTo,
+} from "@/logic/also-save-to-logic";
 import { toGroupParticipantInputs } from "@/logic/group-log-participant-inputs";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -54,6 +70,8 @@ export function GroupLogScreen({
   const [title, setTitle] = useState("");
   const [value, setValue] = useState(initialValue);
   const [groupNote, setGroupNote] = useState("");
+  // "Also save to" for the Group Note (D-96): one section or None.
+  const [alsoSaveTo, setAlsoSaveTo] = useState<LinkedSection | null>(null);
   const [participantIds, setParticipantIds] = useState<number[]>(
     () => route.params?.participantIds ?? [],
   );
@@ -115,6 +133,8 @@ export function GroupLogScreen({
         quality: value.quality,
         duration: value.duration,
         groupNote: groupNote || null,
+        // The section actually saved: none for a blank Group Note (c10 C-01).
+        alsoSaveTo: effectiveAlsoSaveTo(groupNote, alsoSaveTo),
         participants: toGroupParticipantInputs(participantIds, newUid),
       });
       bypassRef.current = true;
@@ -183,9 +203,15 @@ export function GroupLogScreen({
             Group Note
           </AppText>
           <TextInput
+            testID="group-log-group-note"
             accessibilityLabel="Group Note"
             value={groupNote}
-            onChangeText={setGroupNote}
+            onChangeText={(next) => {
+              setGroupNote(next);
+              setAlsoSaveTo((chosen) =>
+                alsoSaveChoiceAfterNoteChange(next, chosen),
+              );
+            }}
             multiline
             placeholder="Add shared context"
             placeholderTextColor={colors.textPlaceholder}
@@ -199,6 +225,12 @@ export function GroupLogScreen({
             ]}
           />
         </View>
+        <AlsoSaveToPicker
+          testID="group-log-also-save-to"
+          value={alsoSaveTo}
+          onChange={setAlsoSaveTo}
+          disabled={saving || !canAlsoSave(groupNote)}
+        />
         <View style={[styles.participants, { borderColor: colors.border }]}>
           <AppText role="label">Participants</AppText>
           {participantIds.length === 0 ? (
