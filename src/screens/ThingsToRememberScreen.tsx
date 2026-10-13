@@ -120,11 +120,12 @@ const EMPTY_KNOWLEDGE: KnowledgeState = {
 };
 
 function memoryGroupLabel(memory: MemoryRow): string {
-  if (memory.type === "custom")
-    return memory.custom_label ?? PROVISIONAL_MEMORY_LABEL;
+  // D-86: any memory's label wins, so a converted custom memory keeps it.
   return (
+    memory.custom_label ??
     MEMORY_TYPE_REGISTRY[memory.type as keyof typeof MEMORY_TYPE_REGISTRY]
-      ?.displayName ?? PROVISIONAL_MEMORY_LABEL
+      ?.displayName ??
+    PROVISIONAL_MEMORY_LABEL
   );
 }
 function firstClassRows(

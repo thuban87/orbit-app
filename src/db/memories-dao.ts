@@ -63,15 +63,6 @@ export function assertRegisteredMemoryType(
   }
 }
 
-function assertCustomLabel(
-  type: MemoryTypeKey,
-  customLabel: string | null,
-): void {
-  if (type === "custom" && customLabel === null) {
-    throw new Error("memories-dao: custom memory requires a label");
-  }
-}
-
 function assertOneChange(
   op: string,
   id: number,
@@ -96,7 +87,6 @@ export async function addMemoryCore(
   assertRegisteredMemoryType(input.type);
   const customLabel = normalizeOptional(input.customLabel);
   const value = normalizeOptional(input.value);
-  assertCustomLabel(input.type, customLabel);
   if (value === null && customLabel === null) {
     throw new Error("memories-dao: memory value or custom label is required");
   }
@@ -180,16 +170,12 @@ export async function editMemoryCore(
     return;
   }
 
-  const effectiveType = input.type ?? existing.type;
   const effectiveCustomLabel =
     input.customLabel === undefined
       ? existing.custom_label
       : normalizeOptional(input.customLabel);
   const effectiveValue =
     input.value === undefined ? existing.value : normalizeOptional(input.value);
-  if (effectiveType === "custom") {
-    assertCustomLabel("custom", effectiveCustomLabel);
-  }
   if (effectiveValue === null && effectiveCustomLabel === null) {
     throw new Error("memories-dao: memory value or custom label is required");
   }

@@ -13,6 +13,7 @@ import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { MemoryRow } from "@/db/memories-read";
 import {
   DEFAULT_MEMORY_TYPE_KEY,
+  isMemoryTypeKey,
   MEMORY_TYPE_REGISTRY,
   type MemoryTypeKey,
   PROVISIONAL_MEMORY_LABEL,
@@ -38,9 +39,13 @@ const PROVENANCE_LABELS = {
 /** The Button.tsx disabled look (D-26 "dimmed") for this file's Pressables. */
 const DISABLED_OPACITY = 0.5;
 
+// D-35: only user-pickable types are offered; imported is written by the
+// Contacts import alone.
 const MEMORY_TYPE_OPTIONS = (
   Object.keys(MEMORY_TYPE_REGISTRY) as MemoryTypeKey[]
-).map((type) => ({ type, label: MEMORY_TYPE_REGISTRY[type].displayName }));
+)
+  .filter((type) => MEMORY_TYPE_REGISTRY[type].userPickable)
+  .map((type) => ({ type, label: MEMORY_TYPE_REGISTRY[type].displayName }));
 
 function blankToNull(value: string): string | null {
   const trimmed = value.trim();
@@ -143,9 +148,10 @@ function TypePicker({
 }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
+  // From the registry, so a non-pickable stored type (imported) still shows
+  // its own name rather than the fallback noun.
   const selected =
-    MEMORY_TYPE_OPTIONS.find((option) => option.type === value)?.label ??
-    PROVISIONAL_MEMORY_LABEL;
+    MEMORY_TYPE_REGISTRY[value]?.displayName ?? PROVISIONAL_MEMORY_LABEL;
 
   return (
     <>
@@ -240,7 +246,11 @@ function TypePicker({
 
 export function initialDraft(item?: MemoryRow): MemoryDraft {
   return {
-    type: item?.type === "custom" ? "custom" : DEFAULT_MEMORY_TYPE_KEY,
+    // D-25 G-01: keep the stored type; an unregistered one falls back.
+    type:
+      item !== undefined && isMemoryTypeKey(item.type)
+        ? item.type
+        : DEFAULT_MEMORY_TYPE_KEY,
     customLabel: item?.custom_label ?? null,
     value: item?.value ?? null,
     note: item?.note ?? null,
@@ -391,11 +401,7 @@ export function MemoryEditor({
     setDraft((current) => (current ? { ...current, [key]: value } : current));
   };
   const commit = async () => {
-    if (
-      !draft ||
-      (draft.type === "custom" && !blankToNull(draft.customLabel ?? ""))
-    )
-      return;
+    if (!draft) return;
     const normalized = normalizeMemoryDraft(draft);
     const saved = editing
       ? await onEdit(editing.id, normalized)
@@ -419,12 +425,7 @@ export function MemoryEditor({
     : "Pick a date";
   const meaningfulDateInvalid =
     hasMeaningfulDate && !isPickableStoredDate(meaningfulDate);
-  const isCustom = draft?.type === "custom";
-  const canSave = Boolean(
-    draft &&
-      blankToNull(draft.value ?? "") &&
-      (!isCustom || blankToNull(draft.customLabel ?? "")),
-  );
+  const canSave = Boolean(draft && blankToNull(draft.value ?? ""));
   // An outlined action the host's save holds: dimmed while busy (D-26).
   const heldActionStyle = [
     styles.action,
@@ -472,23 +473,22 @@ export function MemoryEditor({
             value={draft.type}
             onSelect={(type) => update("type", type)}
           />
-          {isCustom ? (
-            <TextInput
-              accessibilityLabel="Custom memory label"
-              value={draft.customLabel ?? ""}
-              onChangeText={(value) => update("customLabel", value)}
-              placeholder="Memory label"
-              placeholderTextColor={colors.textPlaceholder}
-              style={[
-                styles.input,
-                {
-                  color: colors.textPrimary,
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-          ) : null}
+          {/* D-86: every memory type takes an optional label. */}
+          <TextInput
+            accessibilityLabel="Label (optional)"
+            value={draft.customLabel ?? ""}
+            onChangeText={(value) => update("customLabel", value)}
+            placeholder="Label (optional)"
+            placeholderTextColor={colors.textPlaceholder}
+            style={[
+              styles.input,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
+          />
           <TextInput
             accessibilityLabel="Memory value"
             value={draft.value ?? ""}

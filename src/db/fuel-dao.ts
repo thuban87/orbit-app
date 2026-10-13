@@ -214,7 +214,9 @@ export async function deleteFuelCore(
   await insertTombstoneCore(
     exec,
     {
-      entityType: "fuel",
+      // Compile-only (38.10-01): the legacy tombstone type is retired; plan 02
+      // turns this module into the Off Limits shim.
+      entityType: "off_limits",
       entityUid: target.uid,
       deletedAt: input.now,
     },

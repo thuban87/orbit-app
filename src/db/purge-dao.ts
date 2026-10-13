@@ -100,10 +100,10 @@ export const PURGE_CHILDREN: Record<
     tombstoneSql: "SELECT uid FROM events WHERE contact_id = ?",
     deleteSql: "DELETE FROM events WHERE contact_id = ?",
   },
-  fuel: {
-    countSql: "SELECT COUNT(*) AS n FROM fuel WHERE contact_id = ?",
-    tombstoneSql: "SELECT uid FROM fuel WHERE contact_id = ?",
-    deleteSql: "DELETE FROM fuel WHERE contact_id = ?",
+  off_limits: {
+    countSql: "SELECT COUNT(*) AS n FROM off_limits WHERE contact_id = ?",
+    tombstoneSql: "SELECT uid FROM off_limits WHERE contact_id = ?",
+    deleteSql: "DELETE FROM off_limits WHERE contact_id = ?",
   },
   custom_field_value: {
     countSql:
@@ -170,6 +170,9 @@ const KNOWLEDGE_CHILD_TABLES = {
   relationship: "relationships",
   current_state_entry: "current_state_entries",
   custom_field_value_history: "custom_field_value_history",
+  // off_limits exists only from migration 033; probed like the other
+  // knowledge children so a purge on an older schema still works (checker B1).
+  off_limits: "off_limits",
 } as const;
 
 type KnowledgeChildEntityType = keyof typeof KNOWLEDGE_CHILD_TABLES;
@@ -181,7 +184,7 @@ async function availableKnowledgeChildren(
     `SELECT name
        FROM sqlite_master
       WHERE type = 'table'
-        AND name IN ('memories', 'relationships', 'current_state_entries', 'custom_field_value_history')`,
+        AND name IN ('memories', 'relationships', 'current_state_entries', 'custom_field_value_history', 'off_limits')`,
   );
   const names = new Set(rows.map((row) => row.name));
   return new Set(
@@ -488,7 +491,7 @@ export function purgeContact(
       "contact_method_provenance",
       "interaction",
       "event",
-      "fuel",
+      "off_limits",
       "custom_field_value",
       "custom_field_value_history",
       "contact_link",

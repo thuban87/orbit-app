@@ -736,12 +736,6 @@ function validate(manifest: RawManifest): BackupManifest {
     const customLabel = memory.customLabel;
     const value = memory.value;
     if (
-      type === "custom" &&
-      (typeof customLabel !== "string" || customLabel.trim().length === 0)
-    ) {
-      fail("memories custom type requires a label");
-    }
-    if (
       (typeof customLabel !== "string" || customLabel.trim().length === 0) &&
       (typeof value !== "string" || value.trim().length === 0)
     ) {

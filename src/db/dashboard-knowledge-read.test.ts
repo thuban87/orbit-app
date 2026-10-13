@@ -195,11 +195,12 @@ describe("dashboard line-3 knowledge read", () => {
     await seedMemory(contactId, { value: "Outdated memory", outdated: 1 });
     await seedMemory(contactId, { value: "Deleted memory", deletedAt: NOW });
     await seedMemory(contactId, { type: "birthday", value: "Birthday memory" });
-    const originalDefault = MEMORY_TYPE_REGISTRY.custom.visibilityDefault;
-    MEMORY_TYPE_REGISTRY.custom.visibilityDefault = "hide";
+    const originalDefault =
+      MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault;
+    MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = "hide";
     try {
       await seedMemory(contactId, {
-        type: "custom",
+        type: "thought_of_them",
         value: "Registry hidden default",
       });
       const visibleRelationship = await seedRelationship(contactId, {
@@ -242,7 +243,7 @@ describe("dashboard line-3 knowledge read", () => {
         ]),
       );
     } finally {
-      MEMORY_TYPE_REGISTRY.custom.visibilityDefault = originalDefault;
+      MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = originalDefault;
     }
   });
 
@@ -276,12 +277,13 @@ describe("dashboard line-3 knowledge read", () => {
 
   it("over-fetches before registry visibility filtering so hidden defaults cannot consume a contact budget", async () => {
     const contactId = await seedContact();
-    const originalDefault = MEMORY_TYPE_REGISTRY.custom.visibilityDefault;
-    MEMORY_TYPE_REGISTRY.custom.visibilityDefault = "hide";
+    const originalDefault =
+      MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault;
+    MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = "hide";
     try {
       for (let index = 0; index < CANDIDATE_BUDGET + 2; index += 1) {
         await seedMemory(contactId, {
-          type: "custom",
+          type: "thought_of_them",
           value: `Hidden default ${index}`,
           createdAt: `2026-09-06 13:${String(index).padStart(2, "0")}:00`,
         });
@@ -301,7 +303,7 @@ describe("dashboard line-3 knowledge read", () => {
         candidates.filter((candidate) => candidate.contactId === contactId),
       ).toHaveLength(1);
     } finally {
-      MEMORY_TYPE_REGISTRY.custom.visibilityDefault = originalDefault;
+      MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = originalDefault;
     }
   });
 

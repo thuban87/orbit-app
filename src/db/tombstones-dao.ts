@@ -9,7 +9,7 @@ export type TombstoneEntityType =
   | "contact"
   | "interaction"
   | "event"
-  | "fuel"
+  | "off_limits"
   | "contact_link"
   | "contact_method"
   | "external_contact_link"
@@ -42,7 +42,7 @@ export function assertTombstoneEntityType(
     case "contact":
     case "interaction":
     case "event":
-    case "fuel":
+    case "off_limits":
     case "contact_link":
     case "contact_method":
     case "external_contact_link":
@@ -81,6 +81,29 @@ export async function insertTombstoneCore(
   if (bumpRevision) {
     await bumpDataRevisionCore(exec);
   }
+}
+
+/**
+ * Remove one piece of deletion evidence, assuming BEGIN is already open. Undo
+ * of a delete (D-69, plan 02) calls this as it restores the row. Deleting a
+ * tombstone that is not there is a no-op; more than one change is impossible
+ * under UNIQUE(entity_type, entity_uid) and throws so the caller rolls back.
+ */
+export async function deleteTombstoneCore(
+  exec: SqlExecutor,
+  input: { entityType: TombstoneEntityType; entityUid: string },
+): Promise<number> {
+  assertTombstoneEntityType(input.entityType);
+  const result = await exec.runAsync(
+    "DELETE FROM tombstones WHERE entity_type = ? AND entity_uid = ?",
+    [input.entityType, input.entityUid],
+  );
+  if (result.changes > 1) {
+    throw new Error(
+      `deleteTombstoneCore: removed ${result.changes} tombstones for ${input.entityType} ${input.entityUid}`,
+    );
+  }
+  return result.changes;
 }
 
 /** Query durable evidence in deterministic order for export and reconciliation. */

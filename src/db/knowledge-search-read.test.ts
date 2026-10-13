@@ -115,12 +115,13 @@ describe("knowledge search corpus read", () => {
       ["internal-provenance-marker", "internal-uid-marker", memoryId],
     );
 
-    const originalCustomSearchability = MEMORY_TYPE_REGISTRY.custom.searchable;
-    MEMORY_TYPE_REGISTRY.custom.searchable = false;
+    const originalGiftIdeaSearchability =
+      MEMORY_TYPE_REGISTRY.gift_idea.searchable;
+    MEMORY_TYPE_REGISTRY.gift_idea.searchable = false;
     try {
       await addMemory(exec, {
         contactId,
-        type: "custom",
+        type: "gift_idea",
         customLabel: "Hidden registry type",
         value: "Non-searchable Memory marker",
         createdAt: NOW,
@@ -264,7 +265,7 @@ describe("knowledge search corpus read", () => {
       expect(rankCandidates("internal-provenance-marker", corpus)).toEqual([]);
       expect(rankCandidates("internal-uid-marker", corpus)).toEqual([]);
     } finally {
-      MEMORY_TYPE_REGISTRY.custom.searchable = originalCustomSearchability;
+      MEMORY_TYPE_REGISTRY.gift_idea.searchable = originalGiftIdeaSearchability;
     }
   });
 

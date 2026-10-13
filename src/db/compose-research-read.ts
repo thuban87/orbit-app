@@ -92,9 +92,8 @@ const AVOID_GROUP = "Avoid";
 
 /** The human-readable group label for a memory (mirrors the Profile surface). */
 function memoryGroupLabel(row: MemoryRow): string {
-  if (row.type === "custom") {
-    return row.custom_label ?? PROVISIONAL_MEMORY_LABEL;
-  }
+  // D-86: any memory's label wins, so a converted custom memory keeps it.
+  if (row.custom_label) return row.custom_label;
   return isMemoryTypeKey(row.type)
     ? MEMORY_TYPE_REGISTRY[row.type].displayName
     : PROVISIONAL_MEMORY_LABEL;

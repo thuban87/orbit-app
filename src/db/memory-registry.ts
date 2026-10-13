@@ -1,9 +1,14 @@
 /**
  * Application-owned Memory metadata (KNOW-02).
  *
- * The type set is deliberately an in-code constant: a user can label a `custom`
+ * The type set is deliberately an in-code constant: a user can label any
  * Memory item, but cannot mint a new system type (ADR-028). Search and AI
  * metadata are declarative in 24.1; their consumers arrive in Phase 24.2.
+ *
+ * Phase 38.10: the `custom` type is removed and every memory takes an optional
+ * label (D-86); Gift Ideas and Thought of Them are app-defined types, each its
+ * own Things to Remember section (D-34, D-36, D-43, D-91); `imported` is not
+ * user-pickable (D-35).
  */
 
 /**
@@ -14,7 +19,11 @@
  */
 export const PROVISIONAL_MEMORY_LABEL = "Memory";
 
-export type MemoryTypeKey = "general" | "imported" | "custom";
+export type MemoryTypeKey =
+  | "general"
+  | "imported"
+  | "gift_idea"
+  | "thought_of_them";
 export const DEFAULT_MEMORY_TYPE_KEY: MemoryTypeKey = "general";
 
 export interface MemoryTypeMeta {
@@ -26,6 +35,8 @@ export interface MemoryTypeMeta {
   aiDefault: boolean;
   visibilityDefault: "show" | "hide";
   presentationOrder: number;
+  /** Whether the user may choose this type in a picker (D-35). */
+  userPickable: boolean;
 }
 
 export const MEMORY_TYPE_REGISTRY: Record<MemoryTypeKey, MemoryTypeMeta> = {
@@ -39,6 +50,31 @@ export const MEMORY_TYPE_REGISTRY: Record<MemoryTypeKey, MemoryTypeMeta> = {
     aiDefault: false,
     visibilityDefault: "show",
     presentationOrder: 20,
+    userPickable: true,
+  },
+  gift_idea: {
+    // D-34, D-43, D-91: its own section; searchable, AI-default off (D-92).
+    displayName: "Gift Ideas",
+    iconSemantic: "memory",
+    cardinality: "many",
+    historyAware: false,
+    searchable: true,
+    aiDefault: false,
+    visibilityDefault: "show",
+    presentationOrder: 22,
+    userPickable: true,
+  },
+  thought_of_them: {
+    // D-43: the share section; searchable, AI-default off (D-91, D-92).
+    displayName: "Thought of Them",
+    iconSemantic: "memory",
+    cardinality: "many",
+    historyAware: false,
+    searchable: true,
+    aiDefault: false,
+    visibilityDefault: "show",
+    presentationOrder: 23,
+    userPickable: true,
   },
   imported: {
     displayName: "Imported from Contacts App",
@@ -49,17 +85,8 @@ export const MEMORY_TYPE_REGISTRY: Record<MemoryTypeKey, MemoryTypeMeta> = {
     aiDefault: false,
     visibilityDefault: "show",
     presentationOrder: 25,
-  },
-  custom: {
-    // D-11: renamed "Memory" → "Custom" so it no longer collides with general's "Memory".
-    displayName: "Custom",
-    iconSemantic: "custom_memory",
-    cardinality: "many",
-    historyAware: false,
-    searchable: true,
-    aiDefault: false,
-    visibilityDefault: "show",
-    presentationOrder: 30,
+    // D-35: only the Contacts import writes this type.
+    userPickable: false,
   },
 };
 
@@ -111,7 +138,7 @@ export const KNOWLEDGE_GROUP_ORDER = [
 
 /** Provisional group name; its visibility default is part of the durable contract. */
 export const RELATIONSHIPS_GROUP = {
-  displayName: "Key people",
+  displayName: "Key People",
   visibilityDefault: "show",
   presentationOrder: 10,
 } as const;
