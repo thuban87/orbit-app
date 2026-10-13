@@ -22,7 +22,7 @@ import {
   editMemory,
   editMemoryCore,
   ImportedTypeProvenanceError,
-  setMemoryAllowAi,
+  setMemoryAllowAiCore,
   undoMemoryDelete,
 } from "@/db/memories-dao";
 import {
@@ -147,7 +147,7 @@ describe("memories DAO", () => {
     const before = (await exec.getFirstAsync<{ data_revision: number }>(
       "SELECT data_revision FROM app_settings WHERE id = 1",
     ))!.data_revision;
-    await setMemoryAllowAi(exec, {
+    await setMemoryAllowAiCore(exec, {
       id,
       contactId,
       allow: true,
@@ -159,14 +159,15 @@ describe("memories DAO", () => {
         [id, contactId],
       ),
     ).resolves.toEqual({ allow_ai: 1, modified_at: "2026-09-04 13:00:00" });
+    // The core leaves the single revision bump to its caller's wrapper.
     await expect(
       exec.getFirstAsync<{ data_revision: number }>(
         "SELECT data_revision FROM app_settings WHERE id = 1",
       ),
-    ).resolves.toEqual({ data_revision: before + 1 });
+    ).resolves.toEqual({ data_revision: before });
 
     await expect(
-      setMemoryAllowAi(exec, {
+      setMemoryAllowAiCore(exec, {
         id,
         contactId: otherContactId,
         allow: false,
@@ -1331,7 +1332,7 @@ describe("linked memory text from the entry side (D-37)", () => {
 describe("one Allow AI switch (D-49, D-103)", () => {
   it("switching the memory off switches the interaction off, and back on", async () => {
     const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
-    await setMemoryAllowAi(exec, {
+    await setMemoryAllowAiCore(exec, {
       id: memoryId,
       contactId,
       allow: false,
@@ -1339,7 +1340,7 @@ describe("one Allow AI switch (D-49, D-103)", () => {
     });
     expect((await interactionRow(interactionId))?.allow_ai).toBe(0);
     expect((await memoryRow(memoryId))?.allow_ai).toBe(0);
-    await setMemoryAllowAi(exec, {
+    await setMemoryAllowAiCore(exec, {
       id: memoryId,
       contactId,
       allow: true,
@@ -1386,7 +1387,7 @@ describe("one Allow AI switch (D-49, D-103)", () => {
       memoryId,
     ]);
     await expect(
-      setMemoryAllowAi(exec, {
+      setMemoryAllowAiCore(exec, {
         id: memoryId,
         contactId,
         allow: true,
@@ -1395,7 +1396,7 @@ describe("one Allow AI switch (D-49, D-103)", () => {
     ).rejects.toBeInstanceOf(InteractionNoteAiLockedError);
     expect((await memoryRow(memoryId))?.allow_ai).toBe(0);
     // Switching off is still allowed.
-    await setMemoryAllowAi(exec, {
+    await setMemoryAllowAiCore(exec, {
       id: memoryId,
       contactId,
       allow: false,
@@ -1407,7 +1408,7 @@ describe("one Allow AI switch (D-49, D-103)", () => {
     const { groupEventId, copies } = await seedGroupCopies();
     const [first] = copies;
     await expect(
-      setMemoryAllowAi(exec, {
+      setMemoryAllowAiCore(exec, {
         id: first.memoryId,
         contactId: first.contactId,
         allow: true,
@@ -1420,7 +1421,7 @@ describe("one Allow AI switch (D-49, D-103)", () => {
       [first.memoryId],
     );
     await expect(
-      setMemoryAllowAi(exec, {
+      setMemoryAllowAiCore(exec, {
         id: first.memoryId,
         contactId: first.contactId,
         allow: true,

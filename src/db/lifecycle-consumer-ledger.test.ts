@@ -137,7 +137,7 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
   },
   "src/db/first-class-knowledge-read.ts": {
     owner: "24.1-04",
-    note: "Read-only Things-to-Remember projection carries nullable interval_days for display; derived intensity delegates to the null-safe impact reader.",
+    note: "Read-only Things-to-Remember projection carries nullable interval_days for display; no cadence arithmetic.",
   },
   "src/logic/dashboard-query-logic.ts": {
     owner: "25-03",

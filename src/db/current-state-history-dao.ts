@@ -225,18 +225,6 @@ export function setCurrentStateValueCore(
   });
 }
 
-/** Set a standalone value and advance the durable data revision once. */
-export function setCurrentStateValue(
-  exec: SqlExecutor,
-  input: SetCurrentStateValueInput,
-): Promise<number> {
-  return inWriteTransaction(exec, async () => {
-    const id = await setCurrentStateValueCore(exec, input);
-    await bumpDataRevisionCore(exec);
-    return id;
-  });
-}
-
 /** Add one dated entry and advance the durable data revision once. */
 export function addCurrentStateEntry(
   exec: SqlExecutor,

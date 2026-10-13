@@ -1,23 +1,11 @@
 /** Local, read-only fields displayed by the Things-to-Remember surface. */
-import { getImpactInputs } from "@/db/impact-read";
 import type { SqlExecutor } from "@/db/types";
-import type { GravityResult } from "@/services/gravity-logic";
-import {
-  computeContactGravity,
-  computeContactIntensity,
-} from "@/services/impact";
-import type { IntensityResult } from "@/services/intensity-logic";
 
 export interface FirstClassFields {
   birthday: string | null;
   socialBattery: string | null;
   intervalDays: number | null;
   categoryName: string | null;
-}
-
-export interface FirstClassDerived {
-  gravity: GravityResult | null;
-  intensity: IntensityResult | null;
 }
 
 /**
@@ -50,31 +38,4 @@ export async function getFirstClassFields(
     intervalDays: row.interval_days,
     categoryName: row.category_name,
   };
-}
-
-/**
- * Derive gravity and intensity from one local impact read. These values are
- * intentionally never stored: they depend on history and the current clock.
- */
-export async function getFirstClassDerived(
-  exec: SqlExecutor,
-  contactId: number,
-  now: string,
-): Promise<FirstClassDerived | null> {
-  const inputs = await getImpactInputs(exec, contactId);
-  if (!inputs) {
-    return null;
-  }
-
-  const hasHistory = inputs.interactions.length > 0;
-  const gravity = hasHistory ? computeContactGravity(inputs, now) : null;
-  const derivedIntensity = hasHistory
-    ? computeContactIntensity(inputs, now)
-    : null;
-  const intensity =
-    derivedIntensity && "available" in derivedIntensity
-      ? null
-      : derivedIntensity;
-
-  return { gravity, intensity };
 }

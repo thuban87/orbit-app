@@ -52,7 +52,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | Relationship reader | `src/db/relationships-read.ts` | Reads live rows and optional linked-contact display names. |
 | State-history writer | `src/db/current-state-history-dao.ts` | Atomically sets, promotes, and edits retained current-state values. |
 | State-history reader | `src/db/current-state-history-read.ts` | Reads the current value, full backlist, and batched recognized fields. `getCurrentStateHistory` accepts a read-only `Pick<SqlExecutor,"getAllAsync">` surface so the History read (`history-read.ts`) can compose it without a writable executor. |
-| First-class reader | `src/db/first-class-knowledge-read.ts` | Projects core contact fields plus local gravity/intensity display values. |
+| First-class reader | `src/db/first-class-knowledge-read.ts` | Projects core contact fields (the unused gravity/intensity projection was removed in 38.10). |
 | Dashboard candidate reader | `src/db/dashboard-knowledge-read.ts` | Batches bounded, visibility-safe candidates for loaded List and Card result sets. |
 | Maintenance service | `src/services/memory-trash-sweep.ts` | Expires stale Memory and relationship trash at foreground launch. |
 | Screen owner | `src/screens/ThingsToRememberScreen.tsx` | Composes local reads, owns persistence calls, and reloads after a mutation. |
@@ -106,7 +106,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 ### Controlling AI eligibility and local search
 
 1. A new Memory seeds `allow_ai` from its registry type default; the imported type defaults off and existing rows are never retroactively changed.
-2. `setMemoryAllowAi()` scopes a toggle by Memory and contact identity, while `listAiEligibleMemories()` enforces `allow_ai = 1 AND deleted_at IS NULL` in SQL.
+2. `setMemoryAllowAiCore()` (called by `editMemory` and the contact and capture writers; the standalone `setMemoryAllowAi()` wrapper was removed in 38.10) scopes a toggle by Memory and contact identity, while `listAiEligibleMemories()` enforces `allow_ai = 1 AND deleted_at IS NULL` in SQL.
 3. The knowledge-search read accepts only eligible Dashboard IDs and exposes names, phone/email, category, searchable Memory content, relationship content, and eligible custom-field values. Its pure TypeScript scorer supplies bounded typo tolerance and raw-text offsets; identifiers, provenance, timestamps, and other internal metadata never enter searchable text.
 
 ### Supplying Dashboard renderer context
@@ -118,7 +118,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 ### Current-state history
 
 1. A user sets Last Talked About or Current Location through `MemoryHistoryScreen`.
-2. `setCurrentStateValue` demotes any existing current row and inserts the new current row in one transaction.
+2. `setCurrentStateValue` demotes any existing current row and inserts the new current row in one transaction. (Superseded in 38.10: adds are plain dated inserts through `addCurrentStateEntry` / `setCurrentStateValueCore`; the `setCurrentStateValue` wrapper was removed.)
 3. The drill-in renders the current value separately from earlier entries; editing an earlier entry is scoped by contact, field, and row identity.
 4. Promoting an earlier value atomically demotes the displaced current value instead of deleting it.
 5. The History & Insights Detail Sheet surfaces current-state changes as its third "knowledge-change" record family: `history-read` unions `getCurrentStateHistory` over **every** registered current-state field (calling it once would drop the others), and each row carries its `fieldKey` so a Detail Sheet tap routes back to `MemoryHistoryScreen` for editing. See `interaction-history.md`.
@@ -228,3 +228,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-23 | 38.2 | Made imported-note creation explicitly AI-off and recovery-safe, and advanced complete-edit knowledge baselines from committed identities. |
 | 2026-09-25 | 38.3 | Memory screen read-error state; editor never opens over a failed read (RG-035): loading, then the editor over successfully read Memories or "Couldn't load memories" with Retry; a failed re-read after a committed restore/delete/AI-permission write shows the read error without undoing or retrying the write. |
 | 2026-09-23 | 38.4 | Memory hosts (`MemoryScreen`, `ThingsToRememberScreen`, `EditContactScreen`, `PostLogNoteEditor`) decide AI availability with `isAiMasterEnabled` (RG-008, D-17; ADR-135); `MemoryEditor` switches are named and themed and its kind picker announces its value (RG-030). The post-log Edit Memory form scrolls at large text and opens the edited memory's form by default (D-72, D-73 b; ADR-174). |
+| 2026-10-13 | 38.10 | Code review IN-06: removed the test-only exports `setMemoryAllowAi`, `setCurrentStateValue`, `KNOWLEDGE_GROUP_ORDER` and `getFirstClassDerived`; tests use the live cores. |

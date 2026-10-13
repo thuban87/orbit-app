@@ -11,7 +11,7 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   addCurrentStateEntry,
-  setCurrentStateValue,
+  setCurrentStateValueCore,
 } from "@/db/current-state-history-dao";
 import {
   currentStateOrderSql,
@@ -60,7 +60,7 @@ describe("current-state history reads", () => {
 
   it("returns a single entry as Most Recent and as the only history row", async () => {
     const contactId = await makeContact();
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -101,14 +101,14 @@ describe("current-state history reads", () => {
 
   it("orders by entry date: a backdated entry slots into Previous", async () => {
     const contactId = await makeContact();
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
       entryDate: "2026-09-01",
       now: "2026-09-01 09:00:00",
     });
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Madison",
@@ -116,7 +116,7 @@ describe("current-state history reads", () => {
       now: "2026-09-03 09:00:00",
     });
     // Added last, but dated before Madison.
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Backdated",
@@ -211,20 +211,20 @@ describe("current-state history reads", () => {
 
   it("batches every field's Most Recent and excludes malformed keys without deleting them", async () => {
     const contactId = await makeContact();
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
       now: NOW,
     });
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "last_talked_about",
       value: "Old topic",
       entryDate: "2026-08-01",
       now: NOW,
     });
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "last_talked_about",
       value: "Coffee",
@@ -265,14 +265,14 @@ describe("currentStateOrderSql (D-51; F-D9)", () => {
 
   it("orders a backdated entry correctly in a query joined to contacts", async () => {
     const contactId = await makeContact();
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Newer",
       entryDate: "2026-09-03",
       now: "2026-09-03 09:00:00",
     });
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Backdated",

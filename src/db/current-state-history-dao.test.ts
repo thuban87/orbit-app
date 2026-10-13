@@ -23,7 +23,7 @@ import {
   editHistoryEntry,
   entryDateTimeOf,
   normalizeEntryTime,
-  setCurrentStateValue,
+  setCurrentStateValueCore,
   undoCurrentStateEntryDelete,
 } from "@/db/current-state-history-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
@@ -135,11 +135,11 @@ function addLinked(
   });
 }
 
-describe("setCurrentStateValue — a plain dated insert (D-45, D-48)", () => {
+describe("setCurrentStateValueCore — a plain dated insert (D-45, D-48)", () => {
   it("creates a direct entry dated today with no time", async () => {
     const contactId = await makeContact();
 
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -161,13 +161,13 @@ describe("setCurrentStateValue — a plain dated insert (D-45, D-48)", () => {
 
   it("keeps every earlier entry when a new one is added", async () => {
     const contactId = await makeContact();
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
       now: NOW,
     });
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Madison",
@@ -185,7 +185,7 @@ describe("setCurrentStateValue — a plain dated insert (D-45, D-48)", () => {
 
   it("takes an explicit entry date", async () => {
     const contactId = await makeContact();
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "last_talked_about",
       value: "Their trip",
@@ -201,7 +201,7 @@ describe("setCurrentStateValue — a plain dated insert (D-45, D-48)", () => {
     const contactId = await makeContact();
 
     await expect(
-      setCurrentStateValue(exec, {
+      setCurrentStateValueCore(exec, {
         contactId,
         fieldKey: "bogus" as "current_location",
         value: "Nope",
@@ -209,7 +209,7 @@ describe("setCurrentStateValue — a plain dated insert (D-45, D-48)", () => {
       }),
     ).rejects.toThrow("current-state-history-dao: unknown field_key");
     await expect(
-      setCurrentStateValue(exec, {
+      setCurrentStateValueCore(exec, {
         contactId,
         fieldKey: "current_location",
         value: "Nope",
@@ -322,7 +322,7 @@ describe("addCurrentStateEntry — dated add with origin markers", () => {
 describe("editHistoryEntry", () => {
   it("edits value, entry date and url in place", async () => {
     const contactId = await makeContact();
-    const id = await setCurrentStateValue(exec, {
+    const id = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -353,7 +353,7 @@ describe("editHistoryEntry", () => {
 
   it("rolls back an edit misrouted to another current-state field", async () => {
     const contactId = await makeContact();
-    const locationId = await setCurrentStateValue(exec, {
+    const locationId = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -379,7 +379,7 @@ describe("editHistoryEntry", () => {
 describe("delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
   it("deletes with a tombstone and restores the same uid and id", async () => {
     const contactId = await makeContact();
-    const id = await setCurrentStateValue(exec, {
+    const id = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -418,7 +418,7 @@ describe("delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
 
   it("a same-now Undo stamps modified_at one second after the tombstone", async () => {
     const contactId = await makeContact();
-    const id = await setCurrentStateValue(exec, {
+    const id = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -437,7 +437,7 @@ describe("delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
 
   it("delete → Undo → delete with the same now never stamps older than the row (c9)", async () => {
     const contactId = await makeContact();
-    const id = await setCurrentStateValue(exec, {
+    const id = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -468,7 +468,7 @@ describe("delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
 
   it("reuses the old id only when it is free (W6)", async () => {
     const contactId = await makeContact();
-    const id = await setCurrentStateValue(exec, {
+    const id = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -496,7 +496,7 @@ describe("delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
   it("refuses another contact's id and writes nothing", async () => {
     const contactId = await makeContact();
     const other = await makeContact("Other");
-    const id = await setCurrentStateValue(exec, {
+    const id = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -738,7 +738,7 @@ describe("delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
 
   it("revision: the delete and undo wrappers each bump once; the core with bumpRevision false bumps 0", async () => {
     const contactId = await makeContact();
-    const id = await setCurrentStateValue(exec, {
+    const id = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",

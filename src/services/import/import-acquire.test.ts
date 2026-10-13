@@ -34,7 +34,7 @@ import { readPromptContext } from "@/db/ai-context-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { UNBOUND_IMPORT } from "@/db/import-session-dao";
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
-import { setMemoryAllowAi } from "@/db/memories-dao";
+import { setMemoryAllowAiCore } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import {
@@ -191,7 +191,7 @@ describe("import acquisition", () => {
       [contactId],
     );
     if (!memory) throw new Error("missing imported note");
-    await setMemoryAllowAi(exec, {
+    await setMemoryAllowAiCore(exec, {
       id: memory.id,
       contactId,
       allow: true,
@@ -257,7 +257,7 @@ describe("import acquisition", () => {
       [result.contactId],
     );
     if (!memory) throw new Error("missing bulk note");
-    await setMemoryAllowAi(exec, {
+    await setMemoryAllowAiCore(exec, {
       id: memory.id,
       contactId: result.contactId,
       allow: true,

@@ -15,7 +15,7 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   addCurrentStateEntry,
-  setCurrentStateValue,
+  setCurrentStateValueCore,
 } from "@/db/current-state-history-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createGroupEvent } from "@/db/group-events-dao";
@@ -255,13 +255,13 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
   it("surfaces every registered current-state field, each record carrying its fieldKey", async () => {
     const exec = await freshExec();
     const contactId = await makeContact(exec);
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "last_talked_about",
       value: "new job",
       now: "2026-08-01 09:00:00",
     });
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
@@ -284,13 +284,13 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
     const exec = await freshExec();
     const contactId = await makeContact(exec);
     // Both fields written at the SAME timestamp — the family must be deterministic.
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Chicago",
       now: "2026-08-05 09:00:00",
     });
-    await setCurrentStateValue(exec, {
+    await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "last_talked_about",
       value: "new job",
@@ -312,7 +312,7 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
     const exec = await freshExec();
     const contactId = await makeContact(exec);
     // Added on 2026-10-05, about 2026-09-12; a direct entry has no time.
-    const backdated = await setCurrentStateValue(exec, {
+    const backdated = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "last_talked_about",
       value: "Their trip",
@@ -320,7 +320,7 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
       now: "2026-10-05 08:15:00",
     });
     // A same-day direct entry: its capture time is a real time on that day.
-    const sameDay = await setCurrentStateValue(exec, {
+    const sameDay = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "current_location",
       value: "Lisbon",
@@ -380,7 +380,7 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
       linkSource: "note",
       now: NOW,
     });
-    const direct = await setCurrentStateValue(exec, {
+    const direct = await setCurrentStateValueCore(exec, {
       contactId,
       fieldKey: "last_talked_about",
       value: "Direct",

@@ -20,7 +20,7 @@ import {
 } from "@/db/import-session-dao";
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
-import { setMemoryAllowAi } from "@/db/memories-dao";
+import { setMemoryAllowAiCore } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { findActiveExternalLink } from "@/services/import/duplicate-evidence";
@@ -155,7 +155,7 @@ describe("source consolidation", () => {
       [result.contactId],
     );
     if (!memory) throw new Error("missing consolidated note");
-    await setMemoryAllowAi(exec, {
+    await setMemoryAllowAiCore(exec, {
       id: memory.id,
       contactId: result.contactId,
       allow: true,

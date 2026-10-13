@@ -611,17 +611,6 @@ export function editMemory(
   });
 }
 
-/** Toggle explicit AI permission and mark the database dirty inside one mutex. */
-export function setMemoryAllowAi(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; allow: boolean; now: string },
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await setMemoryAllowAiCore(exec, input);
-    await bumpDataRevisionCore(exec);
-  });
-}
-
 /**
  * Hard-delete one Memory with Undo support inside one mutex. The core's
  * tombstone write is the single revision bump.

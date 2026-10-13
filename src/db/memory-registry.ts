@@ -129,13 +129,6 @@ export function isCurrentStateFieldKey(
   return CURRENT_STATE_FIELD_KEYS.includes(value as CurrentStateFieldKey);
 }
 
-/** The presentation order starts with featured/current information. */
-export const KNOWLEDGE_GROUP_ORDER = [
-  "current_state",
-  "relationships",
-  "memories",
-] as const;
-
 /** Provisional group name; its visibility default is part of the durable contract. */
 export const RELATIONSHIPS_GROUP = {
   displayName: "Key People",
