@@ -5,8 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // photo-field-widget-render pattern): `useState` returns its initial value,
 // or `true` for a `false` boolean while `forceOpenPickers` is set, so the
 // native date picker can be reached; every setter is recorded.
+// `draftOverride`, when set, stands in for every MemoryDraft-shaped state
+// (the open draft and its baseline), so a case can render a draft the user
+// has already edited (e.g. Allow AI toggled) and press Save.
 const hooks = vi.hoisted(() => ({
   forceOpenPickers: false,
+  draftOverride: null as unknown,
   setters: [] as unknown[],
 }));
 vi.mock("react", async (original) => ({
@@ -17,6 +21,16 @@ vi.mock("react", async (original) => ({
   useState: (value: unknown) => {
     const initial =
       typeof value === "function" ? (value as () => unknown)() : value;
+    const isDraft =
+      initial !== null && typeof initial === "object" && "allowAi" in initial;
+    if (isDraft && hooks.draftOverride !== null) {
+      return [
+        hooks.draftOverride,
+        (next: unknown) => {
+          hooks.setters.push(next);
+        },
+      ];
+    }
     return [
       initial === false && hooks.forceOpenPickers ? true : initial,
       (next: unknown) => {
@@ -48,17 +62,31 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 vi.mock("./icons/Icon", () => ({ Icon: "Icon" }));
-vi.mock("./MemoryCard", () => ({ MemoryCard: "MemoryCard" }));
-vi.mock("./ui", () => ({ AppText: "AppText", OrbitSwitch: "OrbitSwitch" }));
+vi.mock("./MemoryCard", () => ({
+  MemoryCard: "MemoryCard",
+  memoryTypeLabel: (memory: { custom_label: string | null }) =>
+    memory.custom_label ?? "Memory",
+}));
+vi.mock("./ui", () => ({
+  AppText: "AppText",
+  Button: "Button",
+  EntryTextField: "EntryTextField",
+  FieldError: "FieldError",
+  OrbitSwitch: "OrbitSwitch",
+}));
 
 import type { MemoryRow } from "@/db/memories-read";
 import {
+  canSaveMemoryDraft,
+  draftAfterTypeChange,
   initialDraft,
   initialEditorState,
   isMemoryDraftDirty,
   type MemoryDraft,
   MemoryEditor,
+  type MemoryEditorProps,
   memoryDraftState,
+  newMemoryDraft,
   normalizeMemoryDraft,
 } from "./MemoryEditor";
 
@@ -75,7 +103,11 @@ describe("initialDraft", () => {
 });
 
 describe("initialEditorState (D-73: post-log Edit Memory opens its form)", () => {
-  const memory = { id: 42, type: "custom", value: "Likes kayaks" } as MemoryRow;
+  const memory = {
+    id: 42,
+    type: "general",
+    value: "Likes kayaks",
+  } as MemoryRow;
 
   it("opens the named memory's form with no tap on its card", () => {
     const state = initialEditorState([memory], 42);
@@ -87,10 +119,12 @@ describe("initialEditorState (D-73: post-log Edit Memory opens its form)", () =>
     expect(initialEditorState([memory])).toEqual({
       editing: null,
       draft: null,
+      baseline: null,
     });
     expect(initialEditorState([memory], 7)).toEqual({
       editing: null,
       draft: null,
+      baseline: null,
     });
   });
 });
@@ -134,19 +168,33 @@ describe("memory draft dirty state (D-14, D-61; review C2-M1)", () => {
     ).toBe(false);
   });
 
-  it("memoryDraftState reports open and dirty", () => {
+  it("memoryDraftState reports open and dirty against the opened baseline", () => {
     expect(memoryDraftState(null, null)).toEqual({ open: false, dirty: false });
-    expect(memoryDraftState(null, initialDraft())).toEqual({
-      open: true,
-      dirty: false,
-    });
-    expect(memoryDraftState(memory, initialDraft(memory))).toEqual({
+    expect(memoryDraftState(initialDraft(), initialDraft())).toEqual({
       open: true,
       dirty: false,
     });
     expect(
-      memoryDraftState(null, { ...initialDraft(), value: "Birthday" }),
+      memoryDraftState(initialDraft(memory), initialDraft(memory)),
+    ).toEqual({
+      open: true,
+      dirty: false,
+    });
+    expect(
+      memoryDraftState(initialDraft(), {
+        ...initialDraft(),
+        value: "Birthday",
+      }),
     ).toEqual({ open: true, dirty: true });
+  });
+
+  it("an Allow AI change makes the draft dirty", () => {
+    expect(
+      isMemoryDraftDirty(initialDraft(memory), {
+        ...initialDraft(memory),
+        allowAi: 1,
+      }),
+    ).toBe(true);
   });
 });
 
@@ -191,8 +239,6 @@ describe("meaningful date (D-65, D-67)", () => {
         onAdd: vi.fn(),
         onEdit: vi.fn(),
         onDelete: vi.fn(),
-        onRestore: vi.fn(),
-        onSetAllowAi: vi.fn(),
         globalAiEnabled: true,
       }),
     );
@@ -324,8 +370,6 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
         onAdd: vi.fn(),
         onEdit: vi.fn(),
         onDelete: vi.fn(),
-        onRestore: vi.fn(),
-        onSetAllowAi: vi.fn(),
         globalAiEnabled: true,
         busy,
       }),
@@ -366,25 +410,6 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
     }
   });
 
-  const renderDeleted = (busy: boolean, onSetAllowAi = vi.fn()) => {
-    const onDelete = vi.fn();
-    const onRestore = vi.fn();
-    const tree = nodes(
-      MemoryEditor({
-        items: [{ ...memory, deleted_at: "2026-10-01 09:00:00" }],
-        initiallyEditingId: 5,
-        onAdd: vi.fn(),
-        onEdit: vi.fn(),
-        onDelete,
-        onRestore,
-        onSetAllowAi,
-        globalAiEnabled: true,
-        busy,
-      }),
-    );
-    return { tree, onDelete, onRestore, onSetAllowAi };
-  };
-  const labels = ["Move memory to Recently Deleted", "Restore memory"];
   /** Calls a handler prop, failing loudly when the control or prop is missing. */
   const invoke = (
     element: TestElement | undefined,
@@ -395,102 +420,81 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
     if (typeof handler !== "function") throw new Error(`missing ${prop}`);
     handler(...args);
   };
-
-  it("leaves Move to Recently Deleted, Restore and Allow AI live when idle (IN-01)", () => {
-    const { tree, onDelete, onRestore, onSetAllowAi } = renderDeleted(false);
-    for (const label of labels) {
-      expect(control(tree, label)?.props.disabled).toBe(false);
-      invoke(control(tree, label), "onPress");
-    }
-    expect(onDelete).toHaveBeenCalledWith(5);
-    expect(onRestore).toHaveBeenCalledWith(5);
-    const allowAi = tree.find(
-      (n) => n.props.accessibilityLabel === "Allow AI to use this",
-    );
-    expect(allowAi?.props.busy).toBe(false);
-    invoke(allowAi, "onValueChange", true);
-    expect(onSetAllowAi).toHaveBeenCalledWith(5, true);
-  });
-
-  it("holds Move to Recently Deleted, Restore and Allow AI while busy (IN-01)", () => {
-    const { tree, onDelete, onSetAllowAi } = renderDeleted(true);
-    // Both are disabled Pressables (RN never calls onPress on them).
-    for (const label of labels) {
-      expect(control(tree, label)?.props.disabled).toBe(true);
-      expect(control(tree, label)?.props.accessibilityState).toEqual({
-        disabled: true,
-      });
-      expect(dimmed(control(tree, label))).toBe(true);
-    }
-    // Delete also closes the form locally, so it guards its own handler too.
-    invoke(control(tree, labels[0]), "onPress");
-    expect(onDelete).not.toHaveBeenCalled();
-    // Allow AI is announced busy, never drawn disabled (which would show Off
-    // over a stored On, D-26), and ignores the tap: no optimistic flip.
-    const allowAi = tree.find(
-      (n) => n.props.accessibilityLabel === "Allow AI to use this",
-    );
-    expect(allowAi?.props.busy).toBe(true);
-    expect(allowAi?.props.disabled).toBe(false);
-    invoke(allowAi, "onValueChange", true);
-    expect(onSetAllowAi).not.toHaveBeenCalled();
-    expect(hooks.setters).toHaveLength(0);
-  });
-  it("applies Delete and Allow AI locally only when the host accepts (third fix pass IN-01)", () => {
-    // The host dropped both (its ref was claimed a frame before busy).
-    const refuse = vi.fn(() => false);
-    const refused = nodes(
+  const renderWith = (props: Partial<MemoryEditorProps>) =>
+    nodes(
       MemoryEditor({
         items: [memory],
         initiallyEditingId: 5,
         onAdd: vi.fn(),
         onEdit: vi.fn(),
-        onDelete: refuse,
-        onRestore: vi.fn(),
-        onSetAllowAi: refuse,
+        onDelete: vi.fn(),
         globalAiEnabled: true,
         busy: false,
+        ...props,
       }),
     );
-    invoke(control(refused, labels[0]), "onPress");
-    invoke(
-      refused.find(
-        (n) => n.props.accessibilityLabel === "Allow AI to use this",
-      ),
-      "onValueChange",
-      true,
-    );
-    expect(refuse).toHaveBeenCalledTimes(2);
-    // No local close, no optimistic flip.
-    expect(hooks.setters).toHaveLength(0);
+  const allowAiSwitch = (tree: TestElement[]) =>
+    tree.find((n) => n.props.accessibilityLabel === "Allow AI to use this");
 
-    // A host that accepts (true), or returns nothing, gets both applied.
+  it("leaves Delete and Allow AI live when idle; Delete goes to the host (D-69)", () => {
+    const onDelete = vi.fn();
+    const tree = renderWith({ onDelete });
+    expect(control(tree, "Delete memory")?.props.disabled).toBe(false);
+    invoke(control(tree, "Delete memory"), "onPress");
+    expect(onDelete).toHaveBeenCalledWith(5);
+    expect(allowAiSwitch(tree)?.props.busy).toBe(false);
+  });
+
+  it("holds Delete and Allow AI while busy (IN-01)", () => {
+    const onDelete = vi.fn();
+    const tree = renderWith({ onDelete, busy: true });
+    const del = control(tree, "Delete memory");
+    expect(del?.props.disabled).toBe(true);
+    expect(del?.props.accessibilityState).toEqual({ disabled: true });
+    expect(dimmed(del)).toBe(true);
+    // Delete also closes the form locally, so it guards its own handler too.
+    invoke(del, "onPress");
+    expect(onDelete).not.toHaveBeenCalled();
+    // Allow AI is announced busy, never drawn disabled (which would show Off
+    // over a stored On, D-26), and ignores the tap.
+    const allowAi = allowAiSwitch(tree);
+    expect(allowAi?.props.busy).toBe(true);
+    expect(allowAi?.props.disabled).toBe(false);
+    invoke(allowAi, "onValueChange", true);
+    expect(hooks.setters).toHaveLength(0);
+  });
+
+  it("closes on Delete only when the host accepts (third fix pass IN-01)", () => {
+    const refused = renderWith({ onDelete: vi.fn(() => false) });
+    invoke(control(refused, "Delete memory"), "onPress");
+    expect(hooks.setters).toHaveLength(0);
     for (const accept of [vi.fn(() => true), vi.fn(() => undefined)]) {
       hooks.setters = [];
-      const tree = nodes(
-        MemoryEditor({
-          items: [memory],
-          initiallyEditingId: 5,
-          onAdd: vi.fn(),
-          onEdit: vi.fn(),
-          onDelete: accept,
-          onRestore: vi.fn(),
-          onSetAllowAi: accept,
-          globalAiEnabled: true,
-          busy: false,
-        }),
-      );
-      invoke(
-        tree.find((n) => n.props.accessibilityLabel === "Allow AI to use this"),
-        "onValueChange",
-        true,
-      );
-      // setEditing with the flip.
-      expect(hooks.setters).toHaveLength(1);
-      invoke(control(tree, labels[0]), "onPress");
-      // close(): setEditing + setDraft.
+      const tree = renderWith({ onDelete: accept });
+      invoke(control(tree, "Delete memory"), "onPress");
+      // close(): setEditing + setDraft + setBaseline.
       expect(hooks.setters).toHaveLength(3);
     }
+  });
+
+  it("has no Restore and no Recently Deleted action (NEW-11, D-69)", () => {
+    const tree = nodes(
+      MemoryEditor({
+        items: [{ ...memory, deleted_at: "2026-10-01 09:00:00" }],
+        initiallyEditingId: 5,
+        onAdd: vi.fn(),
+        onEdit: vi.fn(),
+        onDelete: vi.fn(),
+        globalAiEnabled: true,
+      }),
+    );
+    expect(
+      tree.some((n) =>
+        /Restore|Recently Deleted/.test(
+          String(n.props.accessibilityLabel ?? ""),
+        ),
+      ),
+    ).toBe(false);
   });
 
   it("leaves the memory cards live when idle", () => {
@@ -499,8 +503,8 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
     expect(cards).toHaveLength(1);
     expect(cards[0]?.props.disabled).toBe(false);
     invoke(cards[0], "onPress");
-    // openExisting: setEditing + setDraft.
-    expect(hooks.setters).toHaveLength(2);
+    // openExisting: setEditing + setDraft + setBaseline + setAllowAiTouched.
+    expect(hooks.setters).toHaveLength(4);
   });
 
   it("holds the memory cards while busy: drawn disabled, a tap keeps the draft (third fix pass WR-02)", () => {
@@ -520,8 +524,6 @@ describe("busy holds the form's Cancel and Save (D-26; 38.9 fix-pass WR-01)", ()
           onAdd: vi.fn(),
           onEdit: vi.fn(),
           onDelete: vi.fn(),
-          onRestore: vi.fn(),
-          onSetAllowAi: vi.fn(),
           globalAiEnabled: true,
           busy,
         }),
@@ -568,5 +570,500 @@ describe("normalizeMemoryDraft (D-65)", () => {
     expect(
       isMemoryDraftDirty(stored, { ...stored, meaningfulDate: null }),
     ).toBe(true);
+  });
+});
+
+describe("38.10 plan 13: the reworked editor", () => {
+  type TestElement = ReactElement<Record<string, unknown>>;
+  function nodes(node: ReactNode): TestElement[] {
+    if (!node || typeof node !== "object") return [];
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    const element = node as TestElement;
+    return [element, ...nodes(element.props.children as ReactNode)];
+  }
+  function texts(tree: TestElement[]): string[] {
+    return tree.flatMap((node) => {
+      const children = node.props.children;
+      if (typeof children === "string") return [children];
+      if (Array.isArray(children)) {
+        return children.filter((c): c is string => typeof c === "string");
+      }
+      return [];
+    });
+  }
+  const invoke = (
+    element: TestElement | undefined,
+    prop: string,
+    ...args: unknown[]
+  ) => {
+    const handler = element?.props[prop];
+    if (typeof handler !== "function") throw new Error(`missing ${prop}`);
+    return handler(...args);
+  };
+  const row = (overrides: Partial<MemoryRow> = {}): MemoryRow =>
+    ({
+      id: 5,
+      uid: "m-5",
+      contact_id: 1,
+      type: "general",
+      custom_label: null,
+      value: "Trip",
+      note: null,
+      url: null,
+      meaningful_date: null,
+      pinned: 0,
+      outdated: 0,
+      hidden: null,
+      allow_ai: 0,
+      provenance: "user",
+      deleted_at: null,
+      interaction_id: null,
+      link_source: null,
+      group_note_copy: 0,
+      linked_note_ai_locked: 0,
+      ...overrides,
+    }) as MemoryRow;
+  const render = (props: Partial<MemoryEditorProps>) =>
+    nodes(
+      MemoryEditor({
+        items: [row()],
+        onAdd: vi.fn(),
+        onEdit: vi.fn(),
+        onDelete: vi.fn(),
+        globalAiEnabled: true,
+        ...props,
+      }),
+    );
+  const byLabel = (tree: TestElement[], label: string) =>
+    tree.find((n) => n.props.accessibilityLabel === label);
+  const pressable = (tree: TestElement[], label: string) =>
+    tree.find(
+      (n) => n.type === "Pressable" && n.props.accessibilityLabel === label,
+    );
+  // The harness does not expand function components, so the type picker is
+  // found as its own element.
+  const typePicker = (tree: TestElement[]) =>
+    tree.find(
+      (n) => typeof n.type === "function" && n.type.name === "TypePicker",
+    );
+
+  beforeEach(() => {
+    hooks.forceOpenPickers = false;
+    hooks.draftOverride = null;
+    hooks.setters = [];
+  });
+
+  describe("Allow AI is draft state (D-27, D-13)", () => {
+    it("the switch shows on the Add form too", () => {
+      const tree = render({ addOnly: true });
+      expect(byLabel(tree, "Allow AI to use this")).toBeDefined();
+    });
+
+    it("a toggle updates the draft only; no host write", () => {
+      const onEdit = vi.fn();
+      const onAdd = vi.fn();
+      const tree = render({ initiallyEditingId: 5, onEdit, onAdd });
+      invoke(byLabel(tree, "Allow AI to use this"), "onValueChange", true);
+      const updater = hooks.setters.find((s) => typeof s === "function") as (
+        d: MemoryDraft,
+      ) => MemoryDraft;
+      expect(updater(initialDraft(row())).allowAi).toBe(1);
+      expect(hooks.setters).toContain(true); // setAllowAiTouched(true)
+      expect(onEdit).not.toHaveBeenCalled();
+      expect(onAdd).not.toHaveBeenCalled();
+    });
+
+    it("toggling then Save hands onEdit the new allowAi", () => {
+      const onEdit = vi.fn(async () => true);
+      hooks.draftOverride = {
+        ...initialDraft(row({ allow_ai: 1 })),
+        allowAi: 0,
+      };
+      const tree = render({
+        items: [row({ allow_ai: 1 })],
+        initiallyEditingId: 5,
+        onEdit,
+      });
+      invoke(pressable(tree, "Save memory"), "onPress");
+      expect(onEdit).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ allowAi: 0 }),
+      );
+    });
+
+    it("toggling then Cancel calls nothing on the host", () => {
+      const onEdit = vi.fn();
+      const onAdd = vi.fn();
+      const onDelete = vi.fn();
+      hooks.draftOverride = { ...initialDraft(row()), allowAi: 1 };
+      const tree = render({ initiallyEditingId: 5, onEdit, onAdd, onDelete });
+      invoke(pressable(tree, "Cancel"), "onPress");
+      expect(onEdit).not.toHaveBeenCalled();
+      expect(onAdd).not.toHaveBeenCalled();
+      expect(onDelete).not.toHaveBeenCalled();
+    });
+
+    it("initialDraft reads allow_ai from the row", () => {
+      expect(initialDraft(row({ allow_ai: 1 })).allowAi).toBe(1);
+      expect(initialDraft(row()).allowAi).toBe(0);
+      expect(initialDraft().allowAi).toBe(0);
+    });
+  });
+
+  describe("locked switch (D-98, D-102, D-103)", () => {
+    it.each([
+      [
+        "a Group Note copy",
+        { group_note_copy: 1 },
+        "Group Notes are never shared with AI.",
+      ],
+      [
+        "a memory linked to a note locked by Off Limits",
+        { interaction_id: 9, link_source: "note", linked_note_ai_locked: 1 },
+        "Moved to Off Limits, so AI stays off.",
+      ],
+    ] as const)(
+      "%s shows the switch off and disabled with its reason",
+      (_, overrides, reason) => {
+        const locked = row(overrides as Partial<MemoryRow>);
+        const onEdit = vi.fn(async () => true);
+        const tree = render({ items: [locked], initiallyEditingId: 5, onEdit });
+        const sw = byLabel(tree, "Allow AI to use this");
+        expect(sw?.props.disabled).toBe(true);
+        expect(sw?.props.value).toBe(false);
+        expect(texts(tree)).toContain(reason);
+        invoke(sw, "onValueChange", true);
+        expect(hooks.setters).toHaveLength(0);
+        invoke(pressable(tree, "Save memory"), "onPress");
+        expect(onEdit).toHaveBeenCalledWith(
+          5,
+          expect.objectContaining({ allowAi: 0 }),
+        );
+      },
+    );
+
+    it("a locked row never seeds allowAi 1, even if stored", () => {
+      expect(
+        initialDraft(row({ group_note_copy: 1, allow_ai: 1 })).allowAi,
+      ).toBe(0);
+    });
+  });
+
+  describe("addOnly", () => {
+    it("renders no list and an open add form seeded from the type default", () => {
+      const tree = render({
+        addOnly: true,
+        fixedType: "gift_idea",
+        aiDefaults: { gift_idea: 1 },
+      });
+      expect(tree.some((n) => n.type === "MemoryCard")).toBe(false);
+      expect(texts(tree)).toContain("Add memory");
+      expect(byLabel(tree, "Allow AI to use this")?.props.value).toBe(true);
+      expect(typePicker(tree)).toBeUndefined();
+      expect(byLabel(tree, "Memory value")?.type).toBe("EntryTextField");
+    });
+  });
+
+  describe("registered type kept and locked (D-25, D-35)", () => {
+    it("keeps a gift idea's type on save", () => {
+      const onEdit = vi.fn(async () => true);
+      const gift = row({ type: "gift_idea" });
+      const tree = render({ items: [gift], initiallyEditingId: 5, onEdit });
+      invoke(pressable(tree, "Save memory"), "onPress");
+      expect(onEdit).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ type: "gift_idea" }),
+      );
+    });
+
+    it("an Imported row shows its type as text with no picker, and saves as imported", () => {
+      const onEdit = vi.fn(async () => true);
+      const imported = row({ type: "imported", provenance: "import" });
+      const tree = render({ items: [imported], initiallyEditingId: 5, onEdit });
+      expect(typePicker(tree)).toBeUndefined();
+      expect(texts(tree)).toContain("Imported from Contacts App");
+      expect(
+        byLabel(tree, "Memory type, Imported from Contacts App"),
+      ).toBeDefined();
+      invoke(pressable(tree, "Save memory"), "onPress");
+      expect(onEdit).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ type: "imported" }),
+      );
+    });
+
+    it("a general row in the same editor still shows the picker", () => {
+      const tree = render({ initiallyEditingId: 5 });
+      expect(typePicker(tree)).toBeDefined();
+    });
+
+    it("a fixedType host hides the picker", () => {
+      const tree = render({ initiallyEditingId: 5, fixedType: "general" });
+      expect(typePicker(tree)).toBeUndefined();
+    });
+  });
+
+  describe("draftAfterTypeChange (convergence c1 F-U3)", () => {
+    const defaults = { general: 1, gift_idea: 0 } as const;
+    it("an untouched new draft takes the new type's default", () => {
+      const draft = newMemoryDraft({ aiDefaults: defaults });
+      expect(draft.allowAi).toBe(1);
+      const next = draftAfterTypeChange(draft, "gift_idea", {
+        aiDefaults: defaults,
+        allowAiTouched: false,
+        isNew: true,
+      });
+      expect(next).toMatchObject({ type: "gift_idea", allowAi: 0 });
+    });
+
+    it("a touched switch keeps its choice", () => {
+      const draft = {
+        ...newMemoryDraft({ aiDefaults: defaults }),
+        allowAi: 1 as const,
+      };
+      expect(
+        draftAfterTypeChange(draft, "gift_idea", {
+          aiDefaults: defaults,
+          allowAiTouched: true,
+          isNew: true,
+        }).allowAi,
+      ).toBe(1);
+    });
+
+    it("an existing entry's type change never changes allowAi", () => {
+      const draft = initialDraft(row({ allow_ai: 1 }));
+      expect(
+        draftAfterTypeChange(draft, "gift_idea", {
+          aiDefaults: defaults,
+          allowAiTouched: false,
+          isNew: false,
+        }).allowAi,
+      ).toBe(1);
+    });
+
+    it("no aiDefaults gives 0", () => {
+      expect(
+        draftAfterTypeChange(newMemoryDraft(), "thought_of_them", {
+          allowAiTouched: false,
+          isNew: true,
+        }).allowAi,
+      ).toBe(0);
+    });
+
+    it("the picker routes through it", () => {
+      const tree = render({
+        initiallyEditingId: undefined,
+        addOnly: true,
+        aiDefaults: defaults,
+      });
+      const picker = typePicker(tree);
+      expect(picker).toBeDefined();
+      invoke(picker, "onSelect", "gift_idea");
+      const updater = hooks.setters.find((s) => typeof s === "function") as (
+        d: MemoryDraft,
+      ) => MemoryDraft;
+      expect(updater(newMemoryDraft({ aiDefaults: defaults }))).toMatchObject({
+        type: "gift_idea",
+        allowAi: 0,
+      });
+    });
+  });
+
+  describe("D-107 linked entries", () => {
+    const linked = row({ id: 7, interaction_id: 40, link_source: "note" });
+    const plain = row({ id: 8 });
+
+    it("a linked row's tap opens the interaction; long-press opens the form", () => {
+      const onOpenLinked = vi.fn();
+      const onTogglePin = vi.fn();
+      const tree = render({
+        items: [linked, plain],
+        onOpenLinked,
+        onTogglePin,
+      });
+      const [linkedCard, plainCard] = tree.filter(
+        (n) => n.type === "MemoryCard",
+      );
+      invoke(linkedCard, "onPress");
+      expect(onOpenLinked).toHaveBeenCalledWith(linked);
+      expect(hooks.setters).toHaveLength(0);
+      invoke(linkedCard, "onLongPress");
+      // openExisting: setEditing + setDraft + setBaseline + setAllowAiTouched.
+      expect(hooks.setters).toHaveLength(4);
+      expect(hooks.setters[0]).toBe(linked);
+      hooks.setters = [];
+      invoke(plainCard, "onPress");
+      expect(hooks.setters[0]).toBe(plain);
+      expect(plainCard.props.onLongPress).toBeUndefined();
+    });
+
+    it("a linked row exposes Edit and Pin / Unpin, wired to the form and onTogglePin", () => {
+      const onTogglePin = vi.fn();
+      const pinned = { ...linked, pinned: 1 };
+      const tree = render({
+        items: [linked, pinned],
+        onOpenLinked: vi.fn(),
+        onTogglePin,
+      });
+      const [card, pinnedCard] = tree.filter((n) => n.type === "MemoryCard");
+      expect(card.props.accessibilityActions).toEqual([
+        { name: "edit", label: "Edit" },
+        { name: "togglePin", label: "Pin" },
+      ]);
+      expect(pinnedCard.props.accessibilityActions).toEqual([
+        { name: "edit", label: "Edit" },
+        { name: "togglePin", label: "Unpin" },
+      ]);
+      expect(card.props.accessibilityLabel).toBe(
+        "Open the interaction for this Memory entry",
+      );
+      invoke(card, "onAccessibilityAction", {
+        nativeEvent: { actionName: "togglePin" },
+      });
+      expect(onTogglePin).toHaveBeenCalledWith(linked);
+      invoke(card, "onAccessibilityAction", {
+        nativeEvent: { actionName: "edit" },
+      });
+      expect(hooks.setters[0]).toBe(linked);
+    });
+
+    it("hosts without onOpenLinked keep tap-to-edit on linked rows", () => {
+      const tree = render({ items: [linked] });
+      const [card] = tree.filter((n) => n.type === "MemoryCard");
+      invoke(card, "onPress");
+      expect(hooks.setters[0]).toBe(linked);
+      expect(card.props.accessibilityActions).toBeUndefined();
+    });
+  });
+
+  describe("Show on Profile and Move (D-17, D-84)", () => {
+    it("passes each row's callbacks to its card", () => {
+      const onShowOnProfile = vi.fn();
+      const onMove = vi.fn();
+      const hidden = row({ hidden: 1 });
+      const tree = render({ items: [hidden], onShowOnProfile, onMove });
+      const [card] = tree.filter((n) => n.type === "MemoryCard");
+      invoke(card, "onShowOnProfile");
+      invoke(card, "onMove");
+      expect(onShowOnProfile).toHaveBeenCalledWith(hidden);
+      expect(onMove).toHaveBeenCalledWith(hidden);
+    });
+
+    it("hosts that pass neither render no new action", () => {
+      const [card] = render({}).filter((n) => n.type === "MemoryCard");
+      expect(card.props.onShowOnProfile).toBeUndefined();
+      expect(card.props.onMove).toBeUndefined();
+    });
+  });
+
+  describe("label-only memories (D-86, D-89 NEW-9; convergence c7)", () => {
+    const labelOnly = row({ custom_label: "Anniversary", value: null });
+
+    it("canSaveMemoryDraft: value only, label only, both blank", () => {
+      expect(canSaveMemoryDraft({ ...initialDraft(), value: "Tea" })).toBe(
+        true,
+      );
+      expect(
+        canSaveMemoryDraft({ ...initialDraft(), customLabel: "Anniversary" }),
+      ).toBe(true);
+      expect(
+        canSaveMemoryDraft({ ...initialDraft(), value: " ", customLabel: "" }),
+      ).toBe(false);
+    });
+
+    it("shows the label, enables Save and saves the label with a null value", () => {
+      const onEdit = vi.fn(async () => true);
+      const tree = render({
+        items: [labelOnly],
+        initiallyEditingId: 5,
+        onEdit,
+      });
+      expect(byLabel(tree, "Label (optional)")).toBeDefined();
+      expect(pressable(tree, "Save memory")?.props.disabled).toBe(false);
+      invoke(pressable(tree, "Save memory"), "onPress");
+      expect(onEdit).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ value: null, customLabel: "Anniversary" }),
+      );
+    });
+
+    it("Enter on the value field runs the same guarded save", () => {
+      const onEdit = vi.fn(async () => true);
+      const tree = render({
+        items: [labelOnly],
+        initiallyEditingId: 5,
+        onEdit,
+      });
+      invoke(byLabel(tree, "Memory value"), "onSubmit");
+      expect(onEdit).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ value: null, customLabel: "Anniversary" }),
+      );
+    });
+
+    it("Enter on a blank draft saves nothing", () => {
+      const onAdd = vi.fn(async () => true);
+      const tree = render({ addOnly: true, onAdd });
+      invoke(byLabel(tree, "Memory value"), "onSubmit");
+      expect(onAdd).not.toHaveBeenCalled();
+      expect(pressable(tree, "Add memory")?.props.disabled).toBe(true);
+    });
+  });
+
+  describe("clean baseline (38.9 D-14/D-15; convergence c7, Claude C-02)", () => {
+    it("an untouched fixed-type Add is clean", () => {
+      expect(
+        memoryDraftState(
+          newMemoryDraft({ fixedType: "gift_idea" }),
+          newMemoryDraft({ fixedType: "gift_idea" }),
+        ),
+      ).toEqual({ open: true, dirty: false });
+    });
+
+    it("an untouched default-on Add is clean", () => {
+      const seeded = newMemoryDraft({ aiDefaults: { general: 1 } });
+      expect(seeded.allowAi).toBe(1);
+      expect(memoryDraftState(seeded, { ...seeded })).toEqual({
+        open: true,
+        dirty: false,
+      });
+    });
+
+    it("initialEditorState's baseline equals its draft", () => {
+      const state = initialEditorState([row()], 5);
+      expect(state.baseline).toEqual(state.draft);
+    });
+
+    it("a new draft whose type changed from its baseline is dirty", () => {
+      const seeded = newMemoryDraft();
+      expect(
+        memoryDraftState(seeded, { ...seeded, type: "thought_of_them" }).dirty,
+      ).toBe(true);
+    });
+  });
+
+  describe("opt-in primary Add (D-67; convergence c7, Claude C-03)", () => {
+    it("renders a primary Button with the host's label", () => {
+      const tree = render({ addButton: { label: "Add Gift Idea" } });
+      const button = tree.find((n) => n.type === "Button");
+      expect(button?.props.role).toBe("primary");
+      expect(button?.props.label).toBe("Add Gift Idea");
+      invoke(button, "onPress");
+      // openNew: setEditing + setDraft + setBaseline + setAllowAiTouched.
+      expect(hooks.setters).toHaveLength(4);
+      expect(pressable(tree, "Add memory")).toBeUndefined();
+    });
+
+    it("without it the outlined Add memory action renders as today", () => {
+      const tree = render({});
+      expect(tree.some((n) => n.type === "Button")).toBe(false);
+      expect(pressable(tree, "Add memory")).toBeDefined();
+    });
+
+    it("showAdd false renders no Add action", () => {
+      const tree = render({ showAdd: false });
+      expect(tree.some((n) => n.type === "Button")).toBe(false);
+      expect(pressable(tree, "Add memory")).toBeUndefined();
+    });
   });
 });

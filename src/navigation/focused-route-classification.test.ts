@@ -35,6 +35,8 @@ const focusedRoutes = [
   // FAB and tab bar like the other focused workflows.
   "SystemBuilder",
   "EditInteraction",
+  // 38.10 D-75: the per-section memory editor.
+  "SectionEditor",
   // D-18: Compose's Research side hides the tab bar and the + like Compose.
   "ComposeResearch",
 ];
@@ -105,6 +107,7 @@ const routeDensities = [
   ["GroupLog", "dense"],
   ["UpdateContact", "dense"],
   ["Memory", "dense"],
+  ["SectionEditor", "dense"],
   ["Digest", "comfortable"],
   ["Home", "presentation"],
   ["Profile", "presentation"],

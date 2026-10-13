@@ -21,6 +21,7 @@ import {
   deleteMemoryNow,
   deleteMemoryNowCore,
   editMemory,
+  editMemoryCore,
   expireMemoryIfStale,
   ImportedTypeProvenanceError,
   purgeMemoryPermanently,
@@ -1700,5 +1701,110 @@ describe("editing one Group Note copy detaches it (D-117)", () => {
       now: NOW,
     });
     expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+});
+
+describe("editMemory saves a changed Allow AI with the text (D-27, D-13; plan 13 B-4)", () => {
+  async function seedPlain(allowAi: 0 | 1): Promise<{
+    contactId: number;
+    memoryId: number;
+  }> {
+    const contactId = await seedContact();
+    const memoryId = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Likes tea",
+      allowAi,
+      createdAt: NOW,
+      now: NOW,
+    });
+    return { contactId, memoryId };
+  }
+
+  it("writes a text change and allowAi 0 on an AI-on row with one revision bump", async () => {
+    const { contactId, memoryId } = await seedPlain(1);
+    const before = await readDataRevision(exec);
+    await editMemory(exec, {
+      id: memoryId,
+      contactId,
+      value: "Likes green tea",
+      allowAi: 0,
+      now: NOW,
+    });
+    expect(await memoryRow(memoryId)).toMatchObject({
+      value: "Likes green tea",
+      allow_ai: 0,
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("an allowAi equal to the stored value changes nothing beyond the text", async () => {
+    const { contactId, memoryId } = await seedPlain(1);
+    const before = await readDataRevision(exec);
+    await editMemory(exec, {
+      id: memoryId,
+      contactId,
+      value: "Likes oolong",
+      allowAi: 1,
+      now: NOW,
+    });
+    expect(await memoryRow(memoryId)).toMatchObject({
+      value: "Likes oolong",
+      allow_ai: 1,
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("allowAi 1 on a Group Note copy throws and rolls back the text and the detach", async () => {
+    const { copies } = await seedGroupCopies();
+    const [copy] = copies;
+    const before = await readDataRevision(exec);
+    await expect(
+      editMemory(exec, {
+        id: copy.memoryId,
+        contactId: copy.contactId,
+        value: "My own reunion notes",
+        allowAi: 1,
+        now: NOW,
+      }),
+    ).rejects.toBeInstanceOf(GroupNoteAiLockedError);
+    expect(await memoryRow(copy.memoryId)).toMatchObject({
+      value: "Planning the reunion",
+      allow_ai: 0,
+      interaction_id: copy.interactionId,
+      link_source: "group_note",
+      group_note_copy: 1,
+    });
+    expect(await readDataRevision(exec)).toBe(before);
+  });
+
+  it("a changed allowAi on a note-linked memory changes the interaction's allow_ai too", async () => {
+    const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
+    await editMemory(exec, {
+      id: memoryId,
+      contactId,
+      value: "Training for a marathon",
+      allowAi: 0,
+      now: NOW,
+    });
+    expect((await memoryRow(memoryId))?.allow_ai).toBe(0);
+    expect((await interactionRow(interactionId))?.allow_ai).toBe(0);
+  });
+
+  it("editMemoryCore called directly ignores allowAi", async () => {
+    const { contactId, memoryId } = await seedPlain(1);
+    await inWriteTransaction(exec, () =>
+      editMemoryCore(exec, {
+        id: memoryId,
+        contactId,
+        value: "Likes chai",
+        allowAi: 0,
+        now: NOW,
+      }),
+    );
+    expect(await memoryRow(memoryId)).toMatchObject({
+      value: "Likes chai",
+      allow_ai: 1,
+    });
   });
 });

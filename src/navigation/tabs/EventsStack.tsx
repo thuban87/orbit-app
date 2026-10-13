@@ -19,6 +19,7 @@ import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
+import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
@@ -47,6 +48,7 @@ const EVENTS_ROUTE_COMPONENTS = {
   EditInteraction: EditInteractionScreen,
   ThingsToRemember: ThingsToRememberScreen,
   MemoryHistory: MemoryHistoryScreen,
+  SectionEditor: SectionEditorScreen,
   OffLimitsEditor: OffLimitsEditorScreen,
   CropPhoto: CropPhotoScreen,
   SurvivorSelect: SurvivorSelectScreen,

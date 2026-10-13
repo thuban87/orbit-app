@@ -8,7 +8,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { FlatList, Pressable, StyleSheet, TextInput, View } from "react-native";
+import {
+  type AccessibilityActionEvent,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { MemoryRow } from "@/db/memories-read";
 import {
@@ -18,6 +25,7 @@ import {
   type MemoryTypeKey,
   PROVISIONAL_MEMORY_LABEL,
 } from "@/db/memory-registry";
+import { aiLockReason, memoryAiLock } from "@/logic/ai-lock";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
@@ -27,8 +35,8 @@ import {
   storedFromPickerEvent,
 } from "./date-pick-logic";
 import { Icon } from "./icons/Icon";
-import { MemoryCard } from "./MemoryCard";
-import { AppText, OrbitSwitch } from "./ui";
+import { MemoryCard, memoryTypeLabel } from "./MemoryCard";
+import { AppText, Button, EntryTextField, OrbitSwitch } from "./ui";
 
 const PROVENANCE_LABELS = {
   user: "Added by you",
@@ -70,9 +78,18 @@ export interface MemoryDraft {
   outdated: boolean;
   /** Null inherits the selected Memory type's visibility default. */
   hidden: boolean | null;
+  /**
+   * Allow AI is draft state (D-27): Save writes it, Cancel discards it.
+   * Numeric because the draft flows unchanged into `CreateMemoryInput`
+   * (checker cycle 3 W-3). A locked row stays 0 (D-98, D-102, D-103).
+   */
+  allowAi: 0 | 1;
 }
 
 export interface MemoryEditPatch extends MemoryDraft {}
+
+/** Per-type Allow AI defaults for new entries (D-13, D-92); missing → 0. */
+export type MemoryAiDefaults = Partial<Record<MemoryTypeKey, 0 | 1>>;
 
 export interface MemoryEditorProps {
   items: MemoryRow[];
@@ -87,20 +104,53 @@ export interface MemoryEditorProps {
    * counts as accepted, so hosts that ignore this contract are unchanged.
    */
   onDelete: (id: number) => unknown;
-  onRestore: (id: number) => void;
   /**
-   * Returns `false` (synchronously) when the host drops the write; the
-   * switch then keeps the stored value instead of flipping (third fix pass
-   * IN-01). Any other return counts as accepted, as for `onDelete`.
+   * Never called (38.10 D-69 removed the Restore UI, NEW-11). Optional so the
+   * hosts plans 14 and 17 rebuild still compile; plan 18 deletes it.
    */
-  onSetAllowAi: (id: number, allow: boolean) => unknown;
+  onRestore?: (id: number) => void;
+  /**
+   * Never called: Allow AI travels in the draft and the host saves it with
+   * Save (D-27). Optional until plan 18 deletes it.
+   */
+  onSetAllowAi?: (id: number, allow: boolean) => unknown;
   globalAiEnabled: boolean;
   /**
    * Opens this item's edit form on first render, so its options (Allow AI,
-   * Move to Recently Deleted, Cancel, Save) show without a tap on its card.
-   * Used where the editor shows one known memory (post-log Edit Memory, D-73).
+   * Delete, Cancel, Save) show without a tap on its card. The editor reads it
+   * only when it mounts, so a host that loads first mounts the editor after
+   * its read (the section editor's `editId`, D-107).
    */
   initiallyEditingId?: number;
+  /**
+   * Per-type Allow AI defaults seeding a new entry's switch (D-13, D-92).
+   * Optional: a missing map or type gives 0 (fails closed).
+   */
+  aiDefaults?: MemoryAiDefaults;
+  /**
+   * Hides the type picker and forces this type on new entries (a section
+   * host: the section editors, plan 14's inline Gift Ideas / Thought of Them).
+   */
+  fixedType?: MemoryTypeKey;
+  /** No list: the add form is open from the start (plan 17's add screen). */
+  addOnly?: boolean;
+  /**
+   * Opt-in solid primary Add (D-67: the Add/Edit Contact inline sections).
+   * Absent → the outlined "Add memory" action, unchanged.
+   */
+  addButton?: { label: string };
+  /**
+   * When set, tapping an entry linked to an interaction calls this instead of
+   * opening its form; long-press and the "Edit" screen-reader action open the
+   * form (D-107). Unlinked entries keep tap-to-edit.
+   */
+  onOpenLinked?: (item: MemoryRow) => void;
+  /** A linked entry's immediate Pin / Unpin screen-reader action (D-107). */
+  onTogglePin?: (item: MemoryRow) => void;
+  /** Section editors: a hidden entry is dimmed with "Show on Profile" (D-17). */
+  onShowOnProfile?: (item: MemoryRow) => void;
+  /** Section editors: every entry offers "Move" (D-84). */
+  onMove?: (item: MemoryRow) => void;
   /**
    * Reports whether a draft form is open and holds typed changes (38.9 D-14),
    * on every change and `{ open: false, dirty: false }` on unmount. Optional:
@@ -115,10 +165,10 @@ export interface MemoryEditorProps {
   onCancelRequest?: (close: () => void) => void;
   /**
    * The host's save is in flight (38.9 fix-pass WR-01, IN-01): the form's
-   * Cancel, Save, Move to Recently Deleted and Restore are held and drawn
-   * disabled (D-26) until it settles. Allow AI ignores taps and is announced
-   * busy, not drawn disabled, so it never shows Off over a stored On (the
-   * OrbitSwitch `busy` rule, C5-M2). The memory cards are held too (third
+   * Cancel, Save and Delete are held and drawn disabled (D-26) until it
+   * settles. Allow AI ignores taps and is announced busy, not drawn
+   * disabled, so it never shows Off over a stored On (the OrbitSwitch `busy`
+   * rule, C5-M2). The memory cards are held too (third
    * fix pass WR-02): a card tap would swap the draft being saved for that
    * memory's stored values, so a failed save would lose the typed edit.
    * Absent → false.
@@ -244,6 +294,14 @@ function TypePicker({
   );
 }
 
+/**
+ * A registered type the user may not pick (imported, D-35): its row shows the
+ * type as static text and can never be retyped from the editor.
+ */
+export function isLockedMemoryType(type: MemoryTypeKey): boolean {
+  return !MEMORY_TYPE_REGISTRY[type].userPickable;
+}
+
 export function initialDraft(item?: MemoryRow): MemoryDraft {
   return {
     // D-25 G-01: keep the stored type; an unregistered one falls back.
@@ -261,7 +319,58 @@ export function initialDraft(item?: MemoryRow): MemoryDraft {
     // A new Memory (and a legacy row with a malformed flag) must inherit the
     // registry default; only explicit database 0/1 values are overrides.
     hidden: item?.hidden === 1 ? true : item?.hidden === 0 ? false : null,
+    // A locked row stays 0 whatever is stored (D-98, D-102, D-103).
+    allowAi:
+      item !== undefined && memoryAiLock(item) === null && item.allow_ai === 1
+        ? 1
+        : 0,
   };
+}
+
+/**
+ * A new entry's draft as the add form opens (38.9 D-14/D-15 baseline): the
+ * host's fixed type or the default type, and that type's own Allow AI
+ * default (D-13, D-92; 0 when the host passes no map). PURE.
+ */
+export function newMemoryDraft({
+  fixedType,
+  aiDefaults,
+}: {
+  fixedType?: MemoryTypeKey;
+  aiDefaults?: MemoryAiDefaults;
+} = {}): MemoryDraft {
+  const type = fixedType ?? DEFAULT_MEMORY_TYPE_KEY;
+  return { ...initialDraft(), type, allowAi: aiDefaults?.[type] ?? 0 };
+}
+
+/**
+ * The draft after the user picks a type (convergence c1 F-U3): a new entry
+ * whose switch is untouched takes the new type's default; a touched switch
+ * and an existing entry keep their Allow AI (D-13: defaults affect new items
+ * only). PURE.
+ */
+export function draftAfterTypeChange(
+  draft: MemoryDraft,
+  type: MemoryTypeKey,
+  {
+    aiDefaults,
+    allowAiTouched,
+    isNew,
+  }: { aiDefaults?: MemoryAiDefaults; allowAiTouched: boolean; isNew: boolean },
+): MemoryDraft {
+  if (!isNew || allowAiTouched) return { ...draft, type };
+  return { ...draft, type, allowAi: aiDefaults?.[type] ?? 0 };
+}
+
+/**
+ * Whether a draft can be saved: a non-blank value or a non-blank label, the
+ * rule `addMemoryCore` / `editMemoryCore` enforce (D-86, D-89 NEW-9). PURE.
+ */
+export function canSaveMemoryDraft(draft: MemoryDraft): boolean {
+  return (
+    blankToNull(draft.value ?? "") !== null ||
+    blankToNull(draft.customLabel ?? "") !== null
+  );
 }
 
 /** Text fields compare blank-equivalent: typed-then-erased reads as untouched. */
@@ -271,7 +380,7 @@ function sameText(a: string | null, b: string | null): boolean {
 
 /**
  * Whether an open draft differs from what it opened with (38.9 D-14, D-61):
- * `initial` is `initialDraft(editing ?? undefined)`. PURE.
+ * `initial` is the draft as it was opened (its baseline). PURE.
  */
 export function isMemoryDraftDirty(
   initial: MemoryDraft,
@@ -286,7 +395,8 @@ export function isMemoryDraftDirty(
     sameText(initial.meaningfulDate, draft.meaningfulDate) &&
     initial.pinned === draft.pinned &&
     initial.outdated === draft.outdated &&
-    initial.hidden === draft.hidden
+    initial.hidden === draft.hidden &&
+    initial.allowAi === draft.allowAi
   );
 }
 
@@ -306,16 +416,26 @@ export function normalizeMemoryDraft(draft: MemoryDraft): MemoryDraft {
   };
 }
 
-/** The draft state a host's guard reads (D-14). PURE. */
+/**
+ * The draft state a host's guard reads (D-14): dirty against the draft as it
+ * was opened (`baseline`), so an untouched seeded Add is clean (38.9 D-14/D-15;
+ * convergence c7, Claude C-02). PURE.
+ */
 export function memoryDraftState(
-  editing: MemoryRow | null,
+  baseline: MemoryDraft | null,
   draft: MemoryDraft | null,
 ): MemoryDraftState {
   if (draft === null) return { open: false, dirty: false };
   return {
     open: true,
-    dirty: isMemoryDraftDirty(initialDraft(editing ?? undefined), draft),
+    dirty: isMemoryDraftDirty(baseline ?? initialDraft(), draft),
   };
+}
+
+export interface MemoryEditorOpeningState {
+  editing: MemoryRow | null;
+  draft: MemoryDraft | null;
+  baseline: MemoryDraft | null;
 }
 
 /**
@@ -325,15 +445,36 @@ export function memoryDraftState(
 export function initialEditorState(
   items: readonly MemoryRow[],
   initiallyEditingId?: number,
-): { editing: MemoryRow | null; draft: MemoryDraft | null } {
+): MemoryEditorOpeningState {
   const item =
     initiallyEditingId === undefined
       ? undefined
       : items.find((candidate) => candidate.id === initiallyEditingId);
-  return item
-    ? { editing: item, draft: initialDraft(item) }
-    : { editing: null, draft: null };
+  if (!item) return { editing: null, draft: null, baseline: null };
+  const draft = initialDraft(item);
+  return { editing: item, draft, baseline: draft };
 }
+
+/** The opening state for an `addOnly` editor or a list editor. PURE. */
+function openingEditorState(
+  items: readonly MemoryRow[],
+  options: {
+    addOnly: boolean;
+    initiallyEditingId?: number;
+    fixedType?: MemoryTypeKey;
+    aiDefaults?: MemoryAiDefaults;
+  },
+): MemoryEditorOpeningState {
+  if (!options.addOnly) {
+    return initialEditorState(items, options.initiallyEditingId);
+  }
+  const draft = newMemoryDraft(options);
+  return { editing: null, draft, baseline: draft };
+}
+
+/** The linked-entry screen-reader action names (D-107). */
+const EDIT_ACTION = "edit";
+const TOGGLE_PIN_ACTION = "togglePin";
 
 /** Memory form with parent-owned persistence; it deliberately imports no writer DAO. */
 export function MemoryEditor({
@@ -342,10 +483,16 @@ export function MemoryEditor({
   onAdd,
   onEdit,
   onDelete,
-  onRestore,
-  onSetAllowAi,
   globalAiEnabled,
   initiallyEditingId,
+  aiDefaults,
+  fixedType,
+  addOnly = false,
+  addButton,
+  onOpenLinked,
+  onTogglePin,
+  onShowOnProfile,
+  onMove,
   onDraftStateChange,
   onCancelRequest,
   busy = false,
@@ -353,35 +500,55 @@ export function MemoryEditor({
   testID,
 }: MemoryEditorProps) {
   const { colors } = useTheme();
+  const opening = () =>
+    openingEditorState(items, {
+      addOnly,
+      initiallyEditingId,
+      fixedType,
+      aiDefaults,
+    });
   const [editing, setEditing] = useState<MemoryRow | null>(
-    () => initialEditorState(items, initiallyEditingId).editing,
+    () => opening().editing,
   );
-  const [draft, setDraft] = useState<MemoryDraft | null>(
-    () => initialEditorState(items, initiallyEditingId).draft,
+  const [draft, setDraft] = useState<MemoryDraft | null>(() => opening().draft);
+  // The draft as it was opened: the dirty baseline (38.9 D-14/D-15).
+  const [baseline, setBaseline] = useState<MemoryDraft | null>(
+    () => opening().baseline,
   );
+  // Whether the user flipped Allow AI on the open draft (convergence c1 F-U3).
+  const [allowAiTouched, setAllowAiTouched] = useState(false);
   // The meaningful date's native picker (38.9 D-65), as TriStateLastSpoke does.
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // Single-flight Save (G-15): a double tap or Enter + tap commits once.
+  const committingRef = useRef(false);
 
   const openNew = () => {
     if (busy) return; // held while the host saves (third fix pass WR-02)
+    const seeded = newMemoryDraft({ fixedType, aiDefaults });
     setEditing(null);
-    setDraft(initialDraft());
+    setDraft(seeded);
+    setBaseline(seeded);
+    setAllowAiTouched(false);
   };
   const openExisting = (item: MemoryRow) => {
     // Held while the host saves the open draft (third fix pass WR-02).
     if (busy) return;
+    const opened = initialDraft(item);
     setEditing(item);
-    setDraft(initialDraft(item));
+    setDraft(opened);
+    setBaseline(opened);
+    setAllowAiTouched(false);
   };
   const close = () => {
     setEditing(null);
     setDraft(null);
+    setBaseline(null);
   };
 
   // Draft state for the host's guard (D-14). The callback is read through a
   // ref so a fresh closure each render never re-fires the report.
   const { open: draftOpen, dirty: draftDirty } = memoryDraftState(
-    editing,
+    baseline,
     draft,
   );
   const onDraftStateChangeRef = useRef(onDraftStateChange);
@@ -400,13 +567,24 @@ export function MemoryEditor({
   ) => {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
   };
+  // D-98, D-102, D-103: a locked row's switch is off and disabled, and the
+  // draft never carries 1 for it.
+  const aiLock = editing ? memoryAiLock(editing) : null;
   const commit = async () => {
-    if (!draft) return;
-    const normalized = normalizeMemoryDraft(draft);
-    const saved = editing
-      ? await onEdit(editing.id, normalized)
-      : await onAdd(normalized);
-    if (saved) close();
+    if (!draft || busy || !canSaveMemoryDraft(draft)) return;
+    if (committingRef.current) return;
+    committingRef.current = true;
+    try {
+      const normalized = normalizeMemoryDraft(
+        aiLock === null ? draft : { ...draft, allowAi: 0 },
+      );
+      const saved = editing
+        ? await onEdit(editing.id, normalized)
+        : await onAdd(normalized);
+      if (saved) close();
+    } finally {
+      committingRef.current = false;
+    }
   };
   // A pick stores the local YYYY-MM-DD through `update`, so it is a draft
   // change for the Plan 02 guard; a dismiss stores nothing (D-65, D-23).
@@ -425,7 +603,9 @@ export function MemoryEditor({
     : "Pick a date";
   const meaningfulDateInvalid =
     hasMeaningfulDate && !isPickableStoredDate(meaningfulDate);
-  const canSave = Boolean(draft && blankToNull(draft.value ?? ""));
+  const canSave = draft !== null && canSaveMemoryDraft(draft);
+  // The draft's type is fixed when it is not user-pickable (D-35).
+  const typeLocked = draft !== null && isLockedMemoryType(draft.type);
   // An outlined action the host's save holds: dimmed while busy (D-26).
   const heldActionStyle = [
     styles.action,
@@ -435,17 +615,72 @@ export function MemoryEditor({
 
   return (
     <View testID={testID} style={styles.container}>
-      {items.map((item) => (
-        <MemoryCard
-          key={item.id}
-          memory={item}
-          // A card tap replaces the open draft, so the save holds it (WR-02).
-          disabled={busy}
-          onPress={() => openExisting(item)}
-        />
-      ))}
+      {addOnly
+        ? null
+        : items.map((item) => {
+            // D-107: with a host that opens links, a linked entry's tap opens
+            // its interaction; Edit and Pin/Unpin are on long-press and the
+            // screen-reader actions. Unlinked entries keep tap-to-edit.
+            const linked =
+              onOpenLinked !== undefined && item.interaction_id !== null;
+            const linkedProps = linked
+              ? {
+                  onPress: () => {
+                    if (busy) return;
+                    onOpenLinked?.(item);
+                  },
+                  onLongPress: () => openExisting(item),
+                  // Proposed wording (this plan only; plan-19 wording review).
+                  accessibilityLabel: `Open the interaction for this ${memoryTypeLabel(item)} entry`,
+                  accessibilityHint:
+                    "Long-press or use actions to edit or pin.",
+                  accessibilityActions: [
+                    { name: EDIT_ACTION, label: "Edit" },
+                    ...(onTogglePin
+                      ? [
+                          {
+                            name: TOGGLE_PIN_ACTION,
+                            label: item.pinned === 1 ? "Unpin" : "Pin",
+                          },
+                        ]
+                      : []),
+                  ],
+                  onAccessibilityAction: (event: AccessibilityActionEvent) => {
+                    if (event.nativeEvent.actionName === EDIT_ACTION) {
+                      openExisting(item);
+                    } else if (
+                      event.nativeEvent.actionName === TOGGLE_PIN_ACTION &&
+                      !busy
+                    ) {
+                      onTogglePin?.(item);
+                    }
+                  },
+                }
+              : { onPress: () => openExisting(item) };
+            return (
+              <MemoryCard
+                key={item.id}
+                memory={item}
+                // A card tap replaces the open draft, so the save holds it (WR-02).
+                disabled={busy}
+                {...linkedProps}
+                onShowOnProfile={
+                  onShowOnProfile ? () => onShowOnProfile(item) : undefined
+                }
+                onMove={onMove ? () => onMove(item) : undefined}
+              />
+            );
+          })}
       {!draft ? (
-        showAdd ? (
+        addOnly || !showAdd ? null : addButton ? (
+          // D-67 opt-in: a solid primary Add (Add/Edit Contact, plan 14).
+          <Button
+            role="primary"
+            label={addButton.label}
+            disabled={busy}
+            onPress={() => openNew()}
+          />
+        ) : (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add memory"
@@ -458,7 +693,7 @@ export function MemoryEditor({
               Add memory
             </AppText>
           </Pressable>
-        ) : null
+        )
       ) : (
         <View
           style={[
@@ -469,10 +704,32 @@ export function MemoryEditor({
           <AppText role="heading">
             {editing ? "Edit memory" : "Add memory"}
           </AppText>
-          <TypePicker
-            value={draft.type}
-            onSelect={(type) => update("type", type)}
-          />
+          {typeLocked ? (
+            // D-35: a non-pickable stored type (Imported) is shown, never
+            // offered for change (convergence c3, Claude C-03).
+            <AppText
+              role="body"
+              accessibilityLabel={`Memory type, ${MEMORY_TYPE_REGISTRY[draft.type].displayName}`}
+              style={styles.typeStatic}
+            >
+              {MEMORY_TYPE_REGISTRY[draft.type].displayName}
+            </AppText>
+          ) : fixedType ? null : (
+            <TypePicker
+              value={draft.type}
+              onSelect={(type) =>
+                setDraft((current) =>
+                  current
+                    ? draftAfterTypeChange(current, type, {
+                        aiDefaults,
+                        allowAiTouched,
+                        isNew: editing === null,
+                      })
+                    : current,
+                )
+              }
+            />
+          )}
           {/* D-86: every memory type takes an optional label. */}
           <TextInput
             accessibilityLabel="Label (optional)"
@@ -489,22 +746,14 @@ export function MemoryEditor({
               },
             ]}
           />
-          <TextInput
+          {/* D-66: the shared entry field; Enter runs the same guarded
+              commit as Save, so it never submits what Save refuses. */}
+          <EntryTextField
             accessibilityLabel="Memory value"
             value={draft.value ?? ""}
             onChangeText={(value) => update("value", value)}
+            onSubmit={() => void commit()}
             placeholder="What should you remember?"
-            placeholderTextColor={colors.textPlaceholder}
-            multiline
-            style={[
-              styles.input,
-              styles.multiline,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
           />
           <TextInput
             accessibilityLabel="Memory note optional"
@@ -628,38 +877,33 @@ export function MemoryEditor({
               onValueChange={(value) => update("hidden", value)}
             />
           </View>
-          {editing ? (
-            <View style={styles.toggleRow}>
-              <View style={styles.visibilityCopy}>
-                <AppText role="body">Allow AI to use this</AppText>
-                {!globalAiEnabled ? (
-                  <AppText
-                    role="caption"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    Turn on AI in Settings first
-                  </AppText>
-                ) : null}
-              </View>
-              <OrbitSwitch
-                accessibilityLabel="Allow AI to use this"
-                disabled={!globalAiEnabled}
-                busy={busy}
-                value={editing.allow_ai === 1}
-                onValueChange={(allow) => {
-                  if (busy) return; // held while the host saves (IN-01)
-                  // Flip only when the host takes the write: a tap in the
-                  // frame before `busy` re-renders is dropped by the host's
-                  // ref, and must not show a permission never stored
-                  // (third fix pass IN-01).
-                  if (onSetAllowAi(editing.id, allow) === false) return;
-                  setEditing((current) =>
-                    current ? { ...current, allow_ai: allow ? 1 : 0 } : current,
-                  );
-                }}
-              />
+          {/* D-27: Allow AI is draft state on the Add and Edit forms alike;
+              Save writes it and Cancel discards it. */}
+          <View style={styles.toggleRow}>
+            <View style={styles.visibilityCopy}>
+              <AppText role="body">Allow AI to use this</AppText>
+              {aiLock !== null ? (
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  {aiLockReason(aiLock)}
+                </AppText>
+              ) : !globalAiEnabled ? (
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  Turn on AI in Settings first
+                </AppText>
+              ) : null}
             </View>
-          ) : null}
+            <OrbitSwitch
+              accessibilityLabel="Allow AI to use this"
+              disabled={aiLock !== null || !globalAiEnabled}
+              busy={busy}
+              value={aiLock === null && draft.allowAi === 1}
+              onValueChange={(allow) => {
+                if (busy || aiLock !== null) return; // held / locked
+                setAllowAiTouched(true);
+                update("allowAi", allow ? 1 : 0);
+              }}
+            />
+          </View>
           {editing ? (
             <AppText role="caption" style={{ color: colors.textSecondary }}>
               {provenanceLabel(editing.provenance)}
@@ -667,9 +911,10 @@ export function MemoryEditor({
           ) : null}
           <View style={styles.actions}>
             {editing ? (
+              // D-69: Delete is immediate; the host deletes and owns Undo.
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Move memory to Recently Deleted"
+                accessibilityLabel="Delete memory"
                 accessibilityState={{ disabled: busy }}
                 disabled={busy}
                 onPress={() => {
@@ -681,24 +926,8 @@ export function MemoryEditor({
                 }}
                 style={heldActionStyle}
               >
-                <AppText role="body" style={{ color: colors.textSecondary }}>
-                  Move to Recently Deleted
-                </AppText>
-              </Pressable>
-            ) : null}
-            {editing?.deleted_at ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Restore memory"
-                accessibilityState={{ disabled: busy }}
-                // Held while busy by `disabled`; it has no local side effect
-                // and the host also ignores it during a save (IN-01).
-                disabled={busy}
-                onPress={() => onRestore(editing.id)}
-                style={heldActionStyle}
-              >
-                <AppText role="body" style={{ color: colors.accentText }}>
-                  Restore
+                <AppText role="body" style={{ color: colors.danger }}>
+                  Delete
                 </AppText>
               </Pressable>
             ) : null}
@@ -805,6 +1034,11 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     justifyContent: "space-between",
     minHeight: 44,
+  },
+  typeStatic: {
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm,
+    textAlignVertical: "center",
   },
   typeTrigger: {
     borderRadius: SPACING.sm,

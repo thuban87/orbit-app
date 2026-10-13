@@ -1,4 +1,11 @@
-import { Linking, Pressable, StyleSheet, View } from "react-native";
+import {
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
+  Linking,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import type { MemoryRow } from "@/db/memories-read";
 import {
   MEMORY_TYPE_REGISTRY,
@@ -11,7 +18,7 @@ import { Icon } from "./icons/Icon";
 import { normaliseLinkUrl } from "./LinksEditor";
 import { AppText } from "./ui";
 
-function memoryTypeLabel(memory: MemoryRow): string {
+export function memoryTypeLabel(memory: MemoryRow): string {
   // D-86: any memory's label wins, so a converted custom memory keeps it.
   return (
     memory.custom_label ??
@@ -35,8 +42,31 @@ export interface MemoryCardProps {
    */
   disabled?: boolean;
   subdued?: boolean;
+  /** Long-press handler (D-107: a linked row's Edit lives here). */
+  onLongPress?: () => void;
+  /**
+   * Overrides the fixed `Edit … memory` label, e.g. for a linked row whose tap
+   * opens its interaction (D-107; checker cycle 3 W-6). Absent → unchanged.
+   */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  /** Host screen-reader actions (D-107 Edit / Pin / Unpin). */
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+  /**
+   * Section editors only (D-17; enforces phase-10 §AF): a hidden row is dimmed
+   * and offers a visible and a screen-reader "Show on Profile" action that
+   * calls this. Absent → no action and no extra dimming.
+   */
+  onShowOnProfile?: () => void;
+  /** Section editors only (D-84): a visible and a screen-reader "Move". */
+  onMove?: () => void;
   testID?: string;
 }
+
+/** The card's own screen-reader action names. */
+const SHOW_ON_PROFILE_ACTION = "showOnProfile";
+const MOVE_ACTION = "move";
 
 /** The Button.tsx disabled look (D-26 "dimmed"). */
 const DISABLED_OPACITY = 0.5;
@@ -47,9 +77,79 @@ export function MemoryCard({
   onPress,
   disabled = false,
   subdued = false,
+  onLongPress,
+  accessibilityLabel,
+  accessibilityHint,
+  accessibilityActions,
+  onAccessibilityAction,
+  onShowOnProfile,
+  onMove,
   testID,
 }: MemoryCardProps) {
   const { colors } = useTheme();
+  const canShowOnProfile = onShowOnProfile !== undefined && memory.hidden === 1;
+  const dimmed = subdued || canShowOnProfile;
+  const actions: AccessibilityActionInfo[] = [
+    ...(accessibilityActions ?? []),
+    ...(canShowOnProfile
+      ? [{ name: SHOW_ON_PROFILE_ACTION, label: "Show on Profile" }]
+      : []),
+    ...(onMove ? [{ name: MOVE_ACTION, label: "Move" }] : []),
+  ];
+  const handleAction = (event: AccessibilityActionEvent) => {
+    if (disabled) return;
+    const name = event.nativeEvent.actionName;
+    if (name === SHOW_ON_PROFILE_ACTION && canShowOnProfile) {
+      onShowOnProfile?.();
+      return;
+    }
+    if (name === MOVE_ACTION && onMove) {
+      onMove();
+      return;
+    }
+    onAccessibilityAction?.(event);
+  };
+  const rowActions =
+    canShowOnProfile || onMove ? (
+      <View style={styles.rowActions}>
+        {canShowOnProfile ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Show on Profile"
+            accessibilityState={{ disabled }}
+            disabled={disabled}
+            hitSlop={8}
+            onPress={(event) => {
+              event.stopPropagation();
+              onShowOnProfile?.();
+            }}
+            style={styles.rowAction}
+          >
+            <AppText role="caption" style={{ color: colors.textPrimary }}>
+              Show on Profile
+            </AppText>
+          </Pressable>
+        ) : null}
+        {onMove ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Move"
+            accessibilityState={{ disabled }}
+            disabled={disabled}
+            hitSlop={8}
+            onPress={(event) => {
+              event.stopPropagation();
+              onMove();
+            }}
+            style={styles.rowAction}
+          >
+            <AppText role="caption" style={{ color: colors.textPrimary }}>
+              Move
+            </AppText>
+          </Pressable>
+        ) : null}
+      </View>
+    ) : null;
   const content = (
     <View
       testID={testID}
@@ -58,7 +158,7 @@ export function MemoryCard({
         {
           backgroundColor: colors.surface,
           borderColor: colors.border,
-          opacity: subdued || memory.outdated === 1 ? 0.68 : 1,
+          opacity: dimmed || memory.outdated === 1 ? 0.68 : 1,
         },
       ]}
     >
@@ -124,6 +224,16 @@ export function MemoryCard({
         </AppText>
       ) : null}
       {memory.url ? (
+        // D-24: the URL itself, then its Open action.
+        <AppText
+          numberOfLines={2}
+          role="caption"
+          style={{ color: colors.textSecondary }}
+        >
+          {memory.url}
+        </AppText>
+      ) : null}
+      {memory.url ? (
         <Pressable
           accessibilityRole="link"
           accessibilityLabel="Open memory link"
@@ -143,6 +253,7 @@ export function MemoryCard({
           </AppText>
         </Pressable>
       ) : null}
+      {rowActions}
     </View>
   );
 
@@ -151,10 +262,16 @@ export function MemoryCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Edit ${memoryTypeLabel(memory)} memory`}
+      accessibilityLabel={
+        accessibilityLabel ?? `Edit ${memoryTypeLabel(memory)} memory`
+      }
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
+      accessibilityActions={actions.length > 0 ? actions : undefined}
+      onAccessibilityAction={actions.length > 0 ? handleAction : undefined}
       disabled={disabled}
       onPress={disabled ? undefined : onPress}
+      onLongPress={disabled ? undefined : onLongPress}
       style={disabled ? styles.disabled : null}
     >
       {content}
@@ -178,6 +295,8 @@ const styles = StyleSheet.create({
   },
   link: { alignSelf: "flex-start", minHeight: 44, justifyContent: "center" },
   marker: { justifyContent: "center", minHeight: 44, minWidth: 44 },
+  rowAction: { justifyContent: "center", minHeight: 44 },
+  rowActions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.base },
   markers: {
     flexDirection: "row",
     flexShrink: 1,

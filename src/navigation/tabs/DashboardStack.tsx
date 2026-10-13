@@ -20,6 +20,7 @@ import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
+import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
@@ -50,6 +51,7 @@ export function DashboardStack() {
       />
       <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
+      <Stack.Screen name="SectionEditor" component={SectionEditorScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />

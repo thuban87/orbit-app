@@ -113,6 +113,13 @@ export interface EditMemoryInput {
   outdated?: boolean;
   hidden?: boolean | null;
   provenance?: MemoryProvenance;
+  /**
+   * The editor's Allow AI choice (D-27). `editMemoryCore` ignores it; only the
+   * `editMemory` wrapper applies it, and only when it differs from the stored
+   * value, through `setMemoryAllowAiCore` in the same transaction (38.10 plan
+   * 13; checker cycle 5 B-4).
+   */
+  allowAi?: 0 | 1;
   now: string;
 }
 
@@ -636,13 +643,36 @@ export function addMemory(
   });
 }
 
-/** Patch one Memory and mark the database dirty for backup inside one mutex. */
+/**
+ * Patch one Memory and mark the database dirty for backup inside one mutex.
+ *
+ * A changed `allowAi` (D-27: Allow AI is draft state saved with Save) is
+ * written after the text edit through `setMemoryAllowAiCore`, so a note
+ * partner follows (D-49) and a locked row refuses a switch-on (D-102, D-103),
+ * rolling back the text edit too. An unchanged value writes nothing more, so
+ * a locked row whose draft stays at its stored 0 never reaches the refusal.
+ * One save advances `data_revision` by exactly 1.
+ */
 export function editMemory(
   exec: SqlExecutor,
   input: EditMemoryInput,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await editMemoryCore(exec, input);
+    if (input.allowAi !== undefined) {
+      const stored = await exec.getFirstAsync<{ allow_ai: number }>(
+        "SELECT allow_ai FROM memories WHERE id = ? AND contact_id = ?",
+        [input.id, input.contactId],
+      );
+      if (stored !== null && stored.allow_ai !== input.allowAi) {
+        await setMemoryAllowAiCore(exec, {
+          id: input.id,
+          contactId: input.contactId,
+          allow: input.allowAi === 1,
+          now: input.now,
+        });
+      }
+    }
     await bumpDataRevisionCore(exec);
   });
 }

@@ -4,7 +4,7 @@ import type {
   NavigatorScreenParams,
 } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import type { CurrentStateFieldKey, MemoryTypeKey } from "@/db/memory-registry";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { AiCloudProviderId } from "@/services/ai-types";
@@ -65,14 +65,37 @@ export type DashboardStackParamList = {
     contactId: number;
   };
   UpdateContact: { contactId?: number } | undefined;
-  Memory: { contactId?: number } | undefined;
+  /**
+   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
+   * name is kept). `type` presets the type; `origin` is declared only.
+   */
+  Memory: {
+    contactId: number;
+    type?: MemoryTypeKey;
+    origin?: "fab" | "profile" | "update";
+  };
   Settings: undefined;
   CustomFields: undefined;
   Create: undefined;
   Profile: ProfileRouteParams;
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
-  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  /**
+   * `editId` opens that entry's edit form after the read (D-107; plan 17
+   * consumes it); `openAdd` opens the add form.
+   */
+  MemoryHistory: {
+    contactId: number;
+    fieldKey: CurrentStateFieldKey;
+    openAdd?: boolean;
+    editId?: number;
+  };
+  /**
+   * One memory-type section's editor (38.10 D-75): Memories, Thought of Them,
+   * Gift Ideas or Imported. `editId` opens that entry's edit form after the
+   * read, falling back to the list when it is not there (D-107).
+   */
+  SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number };
   Edit: { contactId: number };
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
@@ -171,10 +194,33 @@ export type OrreryStackParamList = {
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
   UpdateContact: { contactId?: number } | undefined;
-  Memory: { contactId?: number } | undefined;
+  /**
+   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
+   * name is kept). `type` presets the type; `origin` is declared only.
+   */
+  Memory: {
+    contactId: number;
+    type?: MemoryTypeKey;
+    origin?: "fab" | "profile" | "update";
+  };
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
-  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  /**
+   * `editId` opens that entry's edit form after the read (D-107; plan 17
+   * consumes it); `openAdd` opens the add form.
+   */
+  MemoryHistory: {
+    contactId: number;
+    fieldKey: CurrentStateFieldKey;
+    openAdd?: boolean;
+    editId?: number;
+  };
+  /**
+   * One memory-type section's editor (38.10 D-75): Memories, Thought of Them,
+   * Gift Ideas or Imported. `editId` opens that entry's edit form after the
+   * read, falling back to the list when it is not there (D-107).
+   */
+  SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number };
   Edit: { contactId: number };
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
@@ -254,11 +300,34 @@ export type DigestStackParamList = {
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
   UpdateContact: { contactId?: number } | undefined;
-  Memory: { contactId?: number } | undefined;
+  /**
+   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
+   * name is kept). `type` presets the type; `origin` is declared only.
+   */
+  Memory: {
+    contactId: number;
+    type?: MemoryTypeKey;
+    origin?: "fab" | "profile" | "update";
+  };
   Edit: { contactId: number };
   EditInteraction: { contactId: number; interactionId: number };
   ThingsToRemember: { contactId: number };
-  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  /**
+   * `editId` opens that entry's edit form after the read (D-107; plan 17
+   * consumes it); `openAdd` opens the add form.
+   */
+  MemoryHistory: {
+    contactId: number;
+    fieldKey: CurrentStateFieldKey;
+    openAdd?: boolean;
+    editId?: number;
+  };
+  /**
+   * One memory-type section's editor (38.10 D-75): Memories, Thought of Them,
+   * Gift Ideas or Imported. `editId` opens that entry's edit form after the
+   * read, falling back to the list when it is not there (D-107).
+   */
+  SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number };
   CropPhoto: {
     rawUri: string;
@@ -296,11 +365,34 @@ export type EventsStackParamList = {
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
   UpdateContact: { contactId?: number } | undefined;
-  Memory: { contactId?: number } | undefined;
+  /**
+   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
+   * name is kept). `type` presets the type; `origin` is declared only.
+   */
+  Memory: {
+    contactId: number;
+    type?: MemoryTypeKey;
+    origin?: "fab" | "profile" | "update";
+  };
   Edit: { contactId: number };
   EditInteraction: { contactId: number; interactionId: number };
   ThingsToRemember: { contactId: number };
-  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  /**
+   * `editId` opens that entry's edit form after the read (D-107; plan 17
+   * consumes it); `openAdd` opens the add form.
+   */
+  MemoryHistory: {
+    contactId: number;
+    fieldKey: CurrentStateFieldKey;
+    openAdd?: boolean;
+    editId?: number;
+  };
+  /**
+   * One memory-type section's editor (38.10 D-75): Memories, Thought of Them,
+   * Gift Ideas or Imported. `editId` opens that entry's edit form after the
+   * read, falling back to the list when it is not there (D-107).
+   */
+  SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number };
   CropPhoto: {
     rawUri: string;
@@ -395,7 +487,15 @@ export type SettingsStackParamList = {
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
   UpdateContact: { contactId?: number } | undefined;
-  Memory: { contactId?: number } | undefined;
+  /**
+   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
+   * name is kept). `type` presets the type; `origin` is declared only.
+   */
+  Memory: {
+    contactId: number;
+    type?: MemoryTypeKey;
+    origin?: "fab" | "profile" | "update";
+  };
   /**
    * Knowledge-change edit routes. The History section's `onOpenKnowledgeChange`
    * reuses ContactProfileScreen's existing knowledge nav to `ThingsToRemember`
@@ -404,7 +504,22 @@ export type SettingsStackParamList = {
    * an unregistered route. Registered to mirror those stacks (review cycle-2 HIGH).
    */
   ThingsToRemember: { contactId: number };
-  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  /**
+   * `editId` opens that entry's edit form after the read (D-107; plan 17
+   * consumes it); `openAdd` opens the add form.
+   */
+  MemoryHistory: {
+    contactId: number;
+    fieldKey: CurrentStateFieldKey;
+    openAdd?: boolean;
+    editId?: number;
+  };
+  /**
+   * One memory-type section's editor (38.10 D-75): Memories, Thought of Them,
+   * Gift Ideas or Imported. `editId` opens that entry's edit form after the
+   * read, falling back to the list when it is not there (D-107).
+   */
+  SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   /**
    * Things to Remember always offers Recently Deleted, so a Settings-hosted
    * Profile must resolve it too (RG-021, react-native/AUD-RN-004).

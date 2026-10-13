@@ -37,6 +37,7 @@ import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
 import { RestorePreviewScreen } from "@/screens/RestorePreviewScreen";
 import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
+import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SettingsAboutScreen } from "@/screens/SettingsAboutScreen";
 import { SettingsAIScreen } from "@/screens/SettingsAIScreen";
 import { SettingsAppearanceScreen } from "@/screens/SettingsAppearanceScreen";
@@ -259,6 +260,7 @@ export function SettingsStack() {
         component={ThingsToRememberScreen}
       />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
+      <Stack.Screen name="SectionEditor" component={SectionEditorScreen} />
       {/* Things to Remember always offers Recently Deleted (RG-021, D-24). */}
       <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />

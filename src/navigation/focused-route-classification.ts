@@ -34,6 +34,8 @@ const FOCUSED_WORKFLOW_ROUTES = new Set<string>([
   // tab bar hide here too.
   "SystemBuilder",
   "EditInteraction",
+  // 38.10 D-75: the per-section memory editor is an editing workflow.
+  "SectionEditor",
   // D-18: Compose's read-only Research side hides the tab bar and the + like
   // Compose does.
   "ComposeResearch",
@@ -75,6 +77,7 @@ const ROUTE_DENSITY: Readonly<Record<string, SurfaceDensity>> = {
   GroupLog: "dense",
   UpdateContact: "dense",
   Memory: "dense",
+  SectionEditor: "dense",
   Digest: "comfortable",
 };
 

@@ -104,3 +104,19 @@ describe("+ forms over the current tab (D-38)", () => {
     expect(fabRoutesCoverIntents).toBe(true);
   });
 });
+
+describe("the per-section memory editor route (38.10 D-75)", () => {
+  it("is Profile-reachable and registered in Digest and Events", () => {
+    expect(PROFILE_REACHABLE_ROUTES).toContain("SectionEditor");
+    expect(DIGEST_STACK_ROUTES).toContain("SectionEditor");
+    expect(EVENTS_STACK_ROUTES).toContain("SectionEditor");
+  });
+
+  it.each(LITERAL_STACKS)("%s registers SectionEditor", (file) => {
+    expect(
+      stackSource(file).includes(
+        '<Stack.Screen name="SectionEditor" component={SectionEditorScreen} />',
+      ),
+    ).toBe(true);
+  });
+});

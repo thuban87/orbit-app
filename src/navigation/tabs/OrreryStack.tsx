@@ -20,6 +20,7 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
+import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
@@ -73,6 +74,7 @@ export function OrreryStack() {
       />
       <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
+      <Stack.Screen name="SectionEditor" component={SectionEditorScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
