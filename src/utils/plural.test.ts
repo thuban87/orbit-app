@@ -18,8 +18,8 @@ describe("plural (38.9 D-21)", () => {
   });
 
   it("keeps a multi-word noun whole", () => {
-    expect(plural(1, "fuel item")).toBe("1 fuel item");
-    expect(plural(4, "fuel item")).toBe("4 fuel items");
+    expect(plural(1, "gift idea")).toBe("1 gift idea");
+    expect(plural(4, "gift idea")).toBe("4 gift ideas");
   });
 });
 

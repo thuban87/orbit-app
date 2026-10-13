@@ -2099,7 +2099,7 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
   });
 
   it("NEW-1: a Create Off Limits draft carrying an old kind topic lands in off_limits, never as a memory (D-11)", async () => {
-    // A host draft (the legacy editor's FuelDraft) still carries a kind; it is
+    // A host draft (the retired kind editor's draft) still carries a kind; it is
     // ignored: the off_limits table has no kind.
     const drafts = [{ kind: "topic", text: "their health" }];
     const { contactId } = await createContactFull(exec, {

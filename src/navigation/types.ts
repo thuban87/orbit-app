@@ -121,7 +121,7 @@ export type DashboardStackParamList = {
    * The entry-agnostic compose surface (CMP-01/02/03). Params are SERIALIZABLE
    * ONLY — a bare `contactId` plus the optional origin, NO callback params
    * (native-stack serialization + deep-link safety). The screen self-fetches
-   * header + fuel + SMS capability from the id alone, so Phase 11 (notification)
+   * header + knowledge + SMS capability from the id alone, so Phase 11 (notification)
    * and Phase 12 (widget) can open it with just a contact id and no wiring.
    * Registered additively; `initialRouteName` stays `Home` and every existing
    * route is untouched.

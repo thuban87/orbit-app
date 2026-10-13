@@ -3,7 +3,7 @@
  * OffLimitsInlineEditor — the inline Off Limits section on Add Contact and
  * Edit Contact (38.10 plan 14; D-05, D-08, D-65, D-67, D-87, D-104).
  *
- * It replaces the retired fuel editor host on both forms (D-08). Every row is
+ * It replaces the retired kind editor host on both forms (D-08). Every row is
  * Off Limits; there is no kind control (D-11, NEW-1). The parent owns the
  * draft list: Add, Save and Delete only change the form's draft, and the
  * form's own Save writes them (D-104 held deletes; Cancel / Discard brings a

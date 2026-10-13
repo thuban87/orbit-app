@@ -254,7 +254,7 @@ describe("listOrbitingContacts — field set + status parity", () => {
 
   it("PARITY: the composed SELECT embeds the imported STATUS_SQL/PROGRESS_SQL", () => {
     // status can never drift from status.ts — the fragments are imported, not
-    // re-typed (mirrors dashboard-read's fuel-parity guard).
+    // re-typed.
     expect(ORBITING_SELECT).toContain(STATUS_SQL);
     expect(ORBITING_SELECT).toContain(PROGRESS_SQL);
   });

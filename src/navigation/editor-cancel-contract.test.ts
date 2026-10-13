@@ -236,11 +236,12 @@ describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)",
         );
       }
       // The inline Off Limits editor's add / edit form (review CR-01; 38.10
-      // plan 14 retired the fuel editor host, D-08).
+      // plan 14 retired the kind editor host, D-08). The retired editor is
+      // deleted, and the permanent retired-wording contract added in 38.10-18
+      // keeps its name out of every file in src/.
       expect(screen).toMatch(
         /<OffLimitsInlineEditor[\s\S]*?ref=\{offLimitsEditorRef\}[\s\S]*?onDraftStateChange=/,
       );
-      expect(screen).not.toContain("FuelEditor");
       expect(screen).toMatch(/offLimits:\s*offLimitsDraft/);
       expect(screen).toMatch(/giftIdeas:\s*giftIdeasDraft/);
       expect(screen).toMatch(/thoughtOfThem:\s*thoughtOfThemDraft/);

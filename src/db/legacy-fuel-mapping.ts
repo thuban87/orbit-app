@@ -19,6 +19,8 @@
  * Pure: no executor, no clock, no uid source.
  */
 
+import { firstNonBlank, isBlank } from "@/utils/blank-text";
+
 /** The documented legacy kind vocabulary. Stored rows may hold any string. */
 export type LegacyFuelKind =
   | "recent"
@@ -145,23 +147,9 @@ export type LegacyFuelMapping =
     }
   | { home: "none"; uid: string; reason: "contentless" };
 
-/** True when the value is null/undefined or only whitespace. */
-export function isBlank(value: string | null | undefined): boolean {
-  return value === null || value === undefined || value.trim().length === 0;
-}
-
-/**
- * The first candidate that is non-blank after trimming, returned as stored
- * (untrimmed, matching the memories DAO's `normalizeOptional`), or null.
- */
-export function firstNonBlank(
-  ...candidates: (string | null | undefined)[]
-): string | null {
-  for (const candidate of candidates) {
-    if (!isBlank(candidate)) return candidate as string;
-  }
-  return null;
-}
+// `isBlank` / `firstNonBlank` live in `@/utils/blank-text` (38.10-18) so the
+// live move DAO need not import this module; they are re-exported unchanged.
+export { firstNonBlank, isBlank };
 
 const DATE_PREFIX = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 

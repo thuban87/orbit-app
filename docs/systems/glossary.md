@@ -69,6 +69,18 @@ The contract fails if any of these returns to a user-visible literal in `src/` o
 | "Group Event(s)", "group event(s)", "Group event(s)" | Event(s) ("Edit Event", "Dissolve this event?") | D-22 |
 | "group interaction(s)", "Group interaction(s)" | event ("Make this an event") | D-22 |
 
+### "fuel" (38.10 D-01, D-87)
+
+"fuel" is gone from code and wording: its table, DAOs, editor and every label were removed in
+Phase 38.10, and its rows now live in Off Limits, Gift Ideas, Thought of Them, Last Talked About
+or a general memory. It is not a `RETIRED_FORMS` entry, because that contract checks literals
+only and the immutable shipped migrations must keep naming the table. Instead
+`src/no-fuel-contract.test.ts` reads every file under `src/` and `App.tsx`, comments included,
+and fails on any match outside a file-level allowlist: the shipped migrations that created,
+moved or dropped the table (001, 009, 011, 016, 017, 033) and their tests, the legacy mapping
+module, the v7 backup converter, and the regression tests that must name the retired table to
+guard against its return. Each allowlist entry records its reason in the test.
+
 ### Developer wording (D-41)
 
 Plain words replace developer wording in the screens Phase 38.9 converted. The contract checks
@@ -129,8 +141,9 @@ None. The constants are the configuration.
 - **Phase 38.9 D-21, D-22, D-41, D-42, D-49, D-56, D-63** (`.planning/phases/38.9-ux-standards/38.9-CONTEXT.md`)
   — the canonical terms, the enforcements and the rule that decided terms are not renamed.
   These are extracted to ADRs at milestone close.
-- **Phase 38.10 D-87, D-90, D-105** (`.planning/phases/38.10-fuel-retirement-things-to-remember/38.10-CONTEXT.md`)
-  — the Things to Remember terms and the Profile entry-sheet wording; "Avoid" is not retired.
+- **Phase 38.10 D-01, D-87, D-90, D-105** (`.planning/phases/38.10-fuel-retirement-things-to-remember/38.10-CONTEXT.md`)
+  — the Things to Remember terms, the Profile entry-sheet wording and the removal of "fuel"
+  (D-01); "Avoid" is not a retired form.
 
 ## Gotchas
 
@@ -165,3 +178,4 @@ None. The constants are the configuration.
 | 2026-10-11 | 38.9 | "Event(s)" as the user-facing noun (D-22); developer wording rewritten in plain words in the converted screens (D-41, D-63); contract extended with both. |
 | 2026-10-11 | 38.9 | "group interaction" retired: the conversion entry and its prompt read "Make this an event" (D-22; fix-pass verification IN-02). |
 | 2026-10-13 | 38.10 | Things to Remember, Off Limits, Close and Not set added as canonical terms (D-90); the Profile's section registry, entry sheet and custom-field display read them; the contract pins their values (plan 16). |
+| 2026-10-13 | 38.10 | "fuel" retired from code and wording (D-01, D-87), enforced by `src/no-fuel-contract.test.ts` with a migration allowlist rather than by `RETIRED_FORMS` (plan 18). |

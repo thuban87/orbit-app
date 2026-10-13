@@ -33,7 +33,6 @@ import {
   undoCurrentStateEntryDeleteCore,
 } from "@/db/current-state-history-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
-import { firstNonBlank } from "@/db/legacy-fuel-mapping";
 import {
   addMemoryCore,
   deleteMemoryNowCore,
@@ -52,6 +51,7 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import type { LinkSource } from "@/db/undo-restore";
+import { firstNonBlank } from "@/utils/blank-text";
 
 // --- Types -------------------------------------------------------------------
 
