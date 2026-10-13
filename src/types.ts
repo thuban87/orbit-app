@@ -90,9 +90,6 @@ export interface OrbitContact {
 
   /** Contact's birthday (MM-DD or YYYY-MM-DD format) */
   birthday?: string;
-
-  /** Conversational fuel content (cached) */
-  fuel?: string[];
 }
 
 /**

@@ -13,8 +13,9 @@
  *   - the response gate derives the interaction/event uid via actionUid().
  *
  * COPY IS FROZEN GENERIC. Body builders substitute ONLY the contact name — no
- * fuel, no PII, no log-derived text is ever eligible to be baked into a scheduled
- * notification body (a body may be glanced on the lock screen; T-11-01). Fuel is
+ * knowledge text, no PII, no log-derived text is ever eligible to be baked into a
+ * scheduled notification body (a body may be glanced on the lock screen;
+ * T-11-01). Off Limits never appears here (38.10 D-10). Things to Remember is
  * shown on the compose screen the tap opens, never in the shade text.
  */
 

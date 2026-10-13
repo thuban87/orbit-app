@@ -33,8 +33,6 @@ function row(
     snooze_until: null,
     status: "stable",
     progress: 0.1,
-    fuelText: null,
-    snippet: null,
     ...over,
   };
 }
@@ -60,7 +58,6 @@ describe("shapeWidgetTiles", () => {
           id: 1,
           name: "Ada Lovelace",
           photo: "avatars/1.jpg",
-          fuelText: "Ask about Analytical Engine",
         }),
       ],
       { capacity: WIDGET_GRID_CAPACITY, swatchCount: SWATCH_COUNT },
@@ -72,7 +69,6 @@ describe("shapeWidgetTiles", () => {
       initials: getInitials("Ada Lovelace"),
       swatchIndex: swatchIndex("Ada Lovelace", SWATCH_COUNT),
       relativePhoto: "avatars/1.jpg",
-      fuelText: "Ask about Analytical Engine",
     });
   });
 

@@ -3,16 +3,16 @@
  * dashboard and the never-contacted screen both render per contact. It holds NO
  * DB read, NO `getExecutor`, NO `useNavigation` — the caller (Plan 05/07/09)
  * wires `onPress` and passes explicit props scoped by `dashboard-read` (08-01),
- * which already excludes `off_limits` / unconfirmed `source='ai'` / archived rows
- * in-query. The card performs no `.filter()` that could resurface private data
- * (threat T-08-10).
+ * which excludes archived rows in-query. The card carries no knowledge text at
+ * all (38.10 D-01, D-10): Off Limits and every other Things to Remember entry
+ * stay off it, so there is nothing private for it to resurface (threat T-08-10).
  *
  * LOCKED content contract (08-UI-SPEC § Card Content Contract): Avatar
  * (recyclingKey=contactId + the canonical path's display revision — an
  * anti-face-flash CORRECTNESS requirement in the recycling FlatList, NOT an
  * optimization; the revision lives in `photo-display`, 38.6 D-01), a status ring
- * coloured + weighted by the band, the name (one line), the ranked fuel line OR a
- * fuel-match snippet, a category label (hidden when null), and a favourite marker.
+ * coloured + weighted by the band, the name (one line), a category label (hidden
+ * when null), and a favourite marker.
  *
  * NOTHING LOG-DERIVED (04-log D/G): no recency string, no "N days ago", no channel
  * glyph, no gravity bar, no intensity, no quality — those are profile-only. The
@@ -40,7 +40,6 @@
  */
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { RankedFuelLine } from "@/components/RankedFuelLine";
 import {
   DECAYING,
   FAVORITE,
@@ -70,10 +69,6 @@ export interface ContactCardProps {
   categoryLabel: string | null;
   /** True when `favourite_rank IS NOT NULL`. */
   isFavourite: boolean;
-  /** The top-ranked fuel line (already excluded/ranked by getRankedFuel). */
-  fuelText: string | null;
-  /** A fuel-match snippet when the list is filtered by a search term, else null. */
-  snippet: string | null;
   /** Caller wires navigation — the card stays presentational. */
   onPress: () => void;
 }
@@ -106,8 +101,6 @@ export function ContactCard({
   status,
   categoryLabel,
   isFavourite,
-  fuelText,
-  snippet,
   onPress,
 }: ContactCardProps) {
   const { colors } = useTheme();
@@ -156,26 +149,6 @@ export function ContactCard({
         >
           {name}
         </Text>
-
-        {/* snippet present → show WHY it matched (fuel-match); else the ranked
-            fuel line. The DAO (08-01) sets snippet non-null whenever the fuel text
-            matches the term (incl. a name+fuel match, review MEDIUM-6), so the
-            card's rule stays simply "snippet present → show snippet". */}
-        {snippet !== null ? (
-          <Text
-            testID={`dashboard-card-fuel-${contactId}`}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            style={[styles.snippet, { color: colors.textSecondary }]}
-          >
-            {snippet}
-          </Text>
-        ) : (
-          <RankedFuelLine
-            text={fuelText}
-            testID={`dashboard-card-fuel-${contactId}`}
-          />
-        )}
       </View>
 
       <View style={styles.trailing}>
@@ -240,10 +213,6 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 15,
     fontWeight: "400",
-  },
-  snippet: {
-    fontSize: 13,
-    fontWeight: "600",
   },
   trailing: {
     alignItems: "flex-end",

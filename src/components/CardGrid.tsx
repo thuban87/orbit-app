@@ -163,7 +163,6 @@ export function CardGrid({
                 ? (searchResultsByContactId.get(item.id) ?? null)
                 : undefined
             }
-            searchSnippet={isSearchMode ? item.snippet : null}
           />
         );
       }}

@@ -12,7 +12,7 @@
  *
  * SIZE-DRIVEN LAYOUT (Codex HIGH): `renderFavourites` TAKES the library's
  * `widgetInfo` (the resize handler in 12-06 passes `props.widgetInfo`) and selects
- * the SMALL (mark-grid) vs LARGE (avatar + fuel + Mark/Log/Message) tree via the
+ * the SMALL (mark-grid) vs LARGE (avatar + name + Mark/Log/Message) tree via the
  * pure `pickLayout`. Without the size argument one layout would be dead code or
  * every size would render identically. A plain `WIDGET_UPDATE` with no size info
  * defaults to SMALL.
@@ -66,7 +66,7 @@ import { encodeTileThumbs } from "./widget-photo";
 // --- Tunable constants (top-of-file per project convention) ------------------
 
 /**
- * The dp width at/above which a resized widget renders the LARGE (fuel + actions)
+ * The dp width at/above which a resized widget renders the LARGE (name + actions)
  * tree; below it, the SMALL mark-grid. Device-spike-calibrated (12-08 on-device
  * UAT): the default 4-cell Pixel placement measures ~296dp, so the breakpoint sits
  * just below it (280) to render LARGE at the default size. Single-number edit.
@@ -93,7 +93,6 @@ const SPACING_XL = 24;
 
 // Typography (sp) — UI-SPEC typography table.
 const NAME_SP = 13;
-const FUEL_SP = 11;
 const BTN_LABEL_SP = 11;
 const GLYPH_SP = 16;
 const INITIALS_SP = 18;
@@ -348,8 +347,8 @@ function ActionButton({
 }
 
 /**
- * LARGE tile row: avatar + ring on the left, a middle column of name over the
- * ranked fuel line, then the three action buttons — Mark (WIDGET_MARK), Log
+ * LARGE tile row: avatar + ring on the left, the name in the middle (no
+ * knowledge line, 38.10 D-59), then the three action buttons — Mark (WIDGET_MARK), Log
  * (OPEN_URI → orbit://contact/{id}, the owner-ratified Profile target, 12-04
  * Task-1), Contact (OPEN_URI → orbit://reach/{id}). The text label is the
  * source of truth; the glyph is decorative (UI-SPEC copy contract).
@@ -408,12 +407,6 @@ function LargeTile({
             fontSize: NAME_SP,
             fontWeight: "600",
           }}
-        />
-        <TextWidget
-          text={tile.fuelText ?? ""}
-          maxLines={1}
-          truncate="END"
-          style={{ color: asColor(palette.textSecondary), fontSize: FUEL_SP }}
         />
       </FlexWidget>
 
@@ -495,7 +488,7 @@ function SmallGrid({
   );
 }
 
-/** The LARGE list: one full-width avatar + fuel + actions row per favourite. */
+/** The LARGE list: one full-width avatar + name + actions row per favourite. */
 function LargeGrid({
   rendered,
   palette,

@@ -121,8 +121,6 @@ export interface GridCardProps {
   line3?: { text: string; iconName?: IconName } | null;
   /** Reserved for Plan 04's search-mode card presentation. */
   searchResult?: DashboardSearchResult | null;
-  /** Reserved for Plan 04's name/fuel search fallback. */
-  searchSnippet?: string | null;
 }
 
 export function GridCard({
@@ -149,7 +147,6 @@ export function GridCard({
   isFavourite = false,
   onToggleFavourite,
   searchResult,
-  searchSnippet = null,
 }: GridCardProps) {
   const { colors } = useTheme();
   const displayState: StatusDisplayState = isSnoozed(snoozeUntil, now)
@@ -169,8 +166,9 @@ export function GridCard({
         searchResult?.moreMatchesLabel,
       )
     : null;
-  const displayedSearchSnippet =
-    strongestMatch?.snippet ?? (searchResult === null ? searchSnippet : null);
+  // Only the corpus match carries a snippet; a name-only hit (null result)
+  // shows the explanation alone.
+  const displayedSearchSnippet = strongestMatch?.snippet ?? null;
   // Announce the search context this card renders (RG-031 AUD-UIA-007). Normal
   // Grid intentionally omits List's adaptive line three (38.1), so it has none.
   const baseAccessibilityLabel = buildRowAccessibilityDescription({

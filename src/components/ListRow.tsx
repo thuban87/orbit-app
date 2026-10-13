@@ -152,8 +152,6 @@ export interface ListRowProps {
   onEditContact?: () => void;
   /** Reserved for Plan 06's search-specific row presentation. */
   searchResult?: DashboardSearchResult | null;
-  /** Name/fuel search fallback; present only when `searchResult` is null. */
-  searchSnippet?: string | null;
   /**
    * The list host's swipe translation (px), mirrored from `ReanimatedSwipeable`.
    * A see-through row raises its tint while it is non-zero (D-48).
@@ -177,7 +175,6 @@ export function ListRow({
   onLogInteraction,
   onEditContact,
   searchResult,
-  searchSnippet = null,
   swipeTranslation,
 }: ListRowProps) {
   const backing = listRowBacking(useArtTreatment("contactsListEntries"));
@@ -200,8 +197,9 @@ export function ListRow({
         searchResult?.moreMatchesLabel,
       )
     : null;
-  const displayedSearchSnippet =
-    strongestMatch?.snippet ?? (searchResult === null ? searchSnippet : null);
+  // Only the corpus match carries a snippet; a name-only hit (null result)
+  // shows the explanation alone.
+  const displayedSearchSnippet = strongestMatch?.snippet ?? null;
   // Announce exactly the context this row renders (RG-031 AUD-UIA-007): the
   // search explanation + displayed snippet, else the adaptive line three.
   const accessibilityLabel = buildRowAccessibilityDescription({

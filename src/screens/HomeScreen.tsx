@@ -1976,7 +1976,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                         ? (searchResultsByContactId.get(item.id) ?? null)
                         : undefined
                     }
-                    searchSnippet={isSearchMode ? item.snippet : null}
                     onLogInteraction={onLogInteraction}
                     onEditContact={onEditContact}
                     openRowRef={openRowRef}

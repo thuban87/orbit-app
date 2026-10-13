@@ -9,7 +9,9 @@
  *     favourites branch already CASE-wraps a never-contacted favourite to
  *     status=null (dashboard-read.ts HIGH-1); re-deriving it here would resurrect
  *     the never-contacted='stable' bug. This module never imports status.ts.
- *   - the ranked fuel line: carried through as `fuelText` unchanged.
+ *   - no knowledge line: a tile is identity and status only (38.10 D-59; the
+ *     widget-overhaul phase decides any replacement). Off Limits never reaches
+ *     the widget (D-10).
  *   - the Dashboard Default order: `listDashboardPopulation` owns the shared
  *     relationship-health ordering for the Favorites population. This service
  *     only truncates that already-ordered projection (ADR-075).
@@ -50,7 +52,6 @@ export interface WidgetTile {
   initials: string;
   swatchIndex: number;
   relativePhoto: string | null;
-  fuelText: string | null;
 }
 
 /**
@@ -70,7 +71,6 @@ export function shapeWidgetTiles(
     initials: getInitials(r.name),
     swatchIndex: swatchIndex(r.name, opts.swatchCount),
     relativePhoto: r.photo,
-    fuelText: r.fuelText,
   }));
 }
 

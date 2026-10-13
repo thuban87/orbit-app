@@ -70,8 +70,6 @@ const never = (id: number) => ({
   snooze_until: null,
   status: null,
   progress: null,
-  fuelText: null,
-  snippet: null,
 });
 
 const render = (overrides: Record<string, unknown> = {}) =>

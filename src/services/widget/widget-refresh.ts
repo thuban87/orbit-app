@@ -14,8 +14,8 @@
  *      headless tap path. The actual `registerWidgetSweep()` call is made once,
  *      module-guarded, in App.tsx by 12-07.
  *   2. `notifyWidgetDataChanged()` is a fire-and-forget publisher for FOREGROUND
- *      mutation call sites (manual log, favourite toggle/reorder, fuel edits —
- *      wired in 12-07). It calls `void pushWidgetUpdate()` (NOT awaited) so a
+ *      mutation call sites (manual log, favourite toggle/reorder — wired in
+ *      12-07). It calls `void pushWidgetUpdate()` (NOT awaited) so a
  *      successful user write is never blocked or rolled back by a widget-render
  *      failure.
  *

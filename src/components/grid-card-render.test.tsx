@@ -206,15 +206,9 @@ describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
     ).toBe(summary);
   });
 
-  it("List row name/fuel fallback announces the displayed fallback snippet", () => {
-    const nodes = resolve(
-      ListRow({
-        ...baseProps,
-        searchResult: null,
-        searchSnippet: "Loves bouldering",
-      }),
-    );
-    expect(rootLabel(nodes)).toBe(`${summary} 1 match · "Loves bouldering".`);
+  it("List row name-only hit (no corpus result) announces the explanation alone", () => {
+    const nodes = resolve(ListRow({ ...baseProps, searchResult: null }));
+    expect(rootLabel(nodes)).toBe(`${summary} 1 match.`);
   });
 
   it("Grid card announces the rendered search context", () => {
