@@ -7,12 +7,14 @@ import { listLinks } from "@/db/contact-links-dao";
 import { getContactForEdit } from "@/db/contact-read";
 import { createContactFull, updateContactFull } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { addMemory } from "@/db/memories-dao";
 import { listMemoriesForContact } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import {
   buildEditInput,
   type EditFormState,
+  memoryRowToDraftRow,
   seedEditState,
 } from "./edit-contact-logic";
 import { runEditContactSave } from "./edit-contact-save-coordinator";
@@ -79,11 +81,10 @@ const adapters = {
     id: row.id,
     personName: row.person_name,
   }),
-  toOffLimitsDraft: (row: {
-    id: number;
-    kind: string;
-    text: string | null;
-  }) => ({ id: row.id, kind: "off_limits" as const, text: row.text }),
+  toOffLimitsDraft: (row: { id: number; text: string | null }) => ({
+    id: row.id,
+    text: row.text,
+  }),
 };
 
 describe("runEditContactSave", () => {
@@ -207,7 +208,7 @@ describe("runEditContactSave", () => {
     const richForm: EditFormState = {
       ...form,
       relationships: [{ id: -3, personName: "Sam" }],
-      offLimits: [{ id: -4, kind: "off_limits", text: "Private" }],
+      offLimits: [{ id: -4, text: "Private" }],
       lastTalkedAbout: "Plans",
       currentLocation: "Chicago",
     };
@@ -443,5 +444,153 @@ describe("runEditContactSave", () => {
     expect(
       (await listMemoriesForContact(exec, contactId)).map((row) => row.uid),
     ).toEqual(committed.map((row) => row.uid));
+  });
+  // ---------------------------------------------------------------------------
+  // Real-adapter saves (plan 38.10-09): provenance (D-25; NEW-6), Allow AI as
+  // draft state (D-27) and held deletes (D-104).
+  // ---------------------------------------------------------------------------
+
+  async function realSave(
+    contactId: number,
+    seedRows: Awaited<ReturnType<typeof listMemoriesForContact>>,
+    form: EditFormState,
+  ) {
+    const seededMemories = seedRows.map(memoryRowToDraftRow);
+    return runEditContactSave({
+      exec,
+      input: buildEditInput(form, {
+        contactId,
+        now: "2026-09-24 09:00:00",
+        interactionUid: uid(),
+        editDefs: [],
+        neverContacted: false,
+        effectivePhoneRegion: null,
+        seededMemories,
+        seededRelationships: [],
+        seededOffLimits: [],
+        seededCurrentState: {},
+      }),
+      submittedForm: form,
+      getCurrentForm: () => form,
+      submittedLinks: [],
+      getCurrentLinks: () => [],
+      seededLinks: [],
+      seededMemories,
+      seededRelationships: [],
+      seededOffLimits: [],
+      initialTrackingEnabled: true,
+      neverContacted: false,
+      ...adapters,
+      toMemoryDraft: memoryRowToDraftRow,
+      refresh: async () => undefined,
+    });
+  }
+
+  async function seededForm(contactId: number) {
+    const read = await getContactForEdit(exec, contactId, []);
+    if (!read) throw new Error("missing contact");
+    const rows = await listMemoriesForContact(exec, contactId);
+    const form: EditFormState = {
+      ...seedEditState(read),
+      memories: rows.map(memoryRowToDraftRow),
+      relationships: [],
+      offLimits: [],
+    };
+    return { rows, form };
+  }
+
+  it("an Edit save of an imported memory keeps provenance import (D-25; NEW-6)", async () => {
+    const { contactId } = await setup();
+    await addMemory(exec, {
+      contactId,
+      type: "imported",
+      value: "From the phone",
+      provenance: "import",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const { rows, form } = await seededForm(contactId);
+    const edited: EditFormState = {
+      ...form,
+      memories: (form.memories ?? []).map((row) => ({
+        ...row,
+        value: "From the phone, edited",
+      })),
+    };
+    const outcome = await realSave(contactId, rows, edited);
+    expect(outcome.status).toBe("saved");
+    const [after] = await listMemoriesForContact(exec, contactId);
+    expect(after.value).toBe("From the phone, edited");
+    expect(after.provenance).toBe("import");
+    expect(after.type).toBe("imported");
+    if (outcome.status === "saved") {
+      expect(outcome.baseline.memories[0].provenance).toBe("import");
+    }
+  });
+
+  it("an Allow AI change on an existing memory is written only at Save (D-27)", async () => {
+    const { contactId } = await setup();
+    await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Likes tea",
+      allowAi: 0,
+      createdAt: NOW,
+      now: NOW,
+    });
+    const { rows, form } = await seededForm(contactId);
+    const draft: EditFormState = {
+      ...form,
+      memories: (form.memories ?? []).map((row) => ({ ...row, allowAi: 1 })),
+    };
+    // Building the save input touches nothing: the choice is draft state.
+    buildEditInput(draft, {
+      contactId,
+      now: NOW,
+      interactionUid: uid(),
+      editDefs: [],
+      neverContacted: false,
+      effectivePhoneRegion: null,
+      seededMemories: rows.map(memoryRowToDraftRow),
+    });
+    expect((await listMemoriesForContact(exec, contactId))[0].allow_ai).toBe(0);
+
+    const outcome = await realSave(contactId, rows, draft);
+    expect(outcome.status).toBe("saved");
+    expect((await listMemoriesForContact(exec, contactId))[0].allow_ai).toBe(1);
+  });
+
+  it("a memory deleted in the form is untouched until Save, then hard-deleted with a tombstone (D-104)", async () => {
+    const { contactId } = await setup();
+    await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Delete me",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const { rows, form } = await seededForm(contactId);
+    const draft: EditFormState = { ...form, memories: [] };
+    buildEditInput(draft, {
+      contactId,
+      now: NOW,
+      interactionUid: uid(),
+      editDefs: [],
+      neverContacted: false,
+      effectivePhoneRegion: null,
+      seededMemories: rows.map(memoryRowToDraftRow),
+    });
+    // Still there: Cancel at this point would bring it back.
+    expect(await listMemoriesForContact(exec, contactId)).toHaveLength(1);
+
+    const outcome = await realSave(contactId, rows, draft);
+    expect(outcome.status).toBe("saved");
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT entity_type FROM tombstones WHERE entity_uid = ?",
+        [rows[0].uid],
+      ),
+    ).toEqual([{ entity_type: "memory" }]);
   });
 });

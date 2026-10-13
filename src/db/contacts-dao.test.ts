@@ -43,9 +43,9 @@ import {
 } from "@/db/current-state-history-read";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { listFuelForEditor } from "@/db/fuel-read";
 import { listMemoriesForContact } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
+import { listOffLimitsForContact } from "@/db/off-limits-read";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { listRelationshipsForContact } from "@/db/relationships-read";
 import { inWriteTransaction } from "@/db/transaction";
@@ -229,7 +229,7 @@ describe("updateContactFull — lifecycle event and committed returns", () => {
         ],
       },
       relationships: { add: [{ personName: "Sam" }] },
-      offLimits: { add: [{ kind: "off_limits", text: "Private" }] },
+      offLimits: { add: [{ text: "Private" }] },
       currentStateEntries: [{ fieldKey: "last_talked_about", value: "Plans" }],
     });
     expect(result.addedIds.memories).toHaveLength(2);
@@ -244,9 +244,7 @@ describe("updateContactFull — lifecycle event and committed returns", () => {
       await listRelationshipsForContact(exec, contactId),
     );
     expect(result.offLimits).toEqual(
-      (await listFuelForEditor(exec, contactId)).filter(
-        (row) => row.kind === "off_limits",
-      ),
+      await listOffLimitsForContact(exec, contactId),
     );
     expect(result.currentState.last_talked_about).toEqual(
       await getCurrentStateValue(exec, contactId, "last_talked_about"),
@@ -1165,7 +1163,7 @@ describe("updateContactFull — Memories knowledge subdomain (CAPT-04, §E)", ()
     expect(rows[0].value).toBe("updated");
   });
 
-  it("DELETES a memory via the delete list (soft-delete leaves it off the live read)", async () => {
+  it("DELETES a memory via the delete list: a hard delete with a tombstone (D-69, D-104)", async () => {
     const contactId = await makeContact();
     await updateContactFull(exec, {
       ...baseEdit(contactId),
@@ -1180,6 +1178,18 @@ describe("updateContactFull — Memories knowledge subdomain (CAPT-04, §E)", ()
     });
 
     expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM memories WHERE id = ?",
+        [seeded.id],
+      ),
+    ).toEqual({ n: 0 });
+    expect(
+      await exec.getAllAsync(
+        "SELECT entity_type, entity_uid FROM tombstones WHERE entity_uid = ?",
+        [seeded.uid],
+      ),
+    ).toEqual([{ entity_type: "memory", entity_uid: seeded.uid }]);
   });
 
   it("ROLLS BACK the whole edit (metadata + memory) when a mid-transaction memory write throws", async () => {
@@ -1328,73 +1338,95 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
     ).toBe("Berlin");
   });
 
-  it("writes NO new current_state row when the value is unchanged", async () => {
+  it("appends every submitted entry as a NEW dated entry and never overwrites (D-26, D-65)", async () => {
     const contactId = await makeContact();
     await updateContactFull(exec, {
       ...baseEdit(contactId),
       currentStateEntries: [{ fieldKey: "last_talked_about", value: "same" }],
     });
 
-    const countRows = async () =>
-      (
-        await exec.getFirstAsync<{ n: number }>(
-          "SELECT COUNT(*) AS n FROM current_state_entries WHERE contact_id = ? AND field_key = ?",
-          [contactId, "last_talked_about"],
-        )
-      )?.n ?? 0;
-    expect(await countRows()).toBe(1);
+    const rows = () =>
+      exec.getAllAsync<{ value: string; entry_date: string }>(
+        `SELECT value, entry_date FROM current_state_entries
+          WHERE contact_id = ? AND field_key = ?
+          ORDER BY ${currentStateOrderSql()}`,
+        [contactId, "last_talked_about"],
+      );
+    // Without a draft date the entry is dated the local day of `now`.
+    expect(await rows()).toEqual([
+      { value: "same", entry_date: EDIT_NOW.slice(0, 10) },
+    ]);
 
-    // Re-submit the SAME value — setCurrentStateValueCore must be skipped.
+    // The DAO no longer skips a value equal to the stored one: the form layer
+    // decides when to send an entry (edit-contact-logic, checker cycle 5 W-5).
     await updateContactFull(exec, {
       ...baseEdit(contactId),
-      now: "2026-08-15 10:07:00",
+      now: "2026-08-16 10:07:00",
       currentStateEntries: [{ fieldKey: "last_talked_about", value: "same" }],
     });
-    expect(await countRows()).toBe(1); // no spurious history row
+    expect(await rows()).toHaveLength(2);
 
-    // A CHANGED value retains the prior as history (demote + insert).
+    // A picked date is stored as the entry's date; earlier entries stay.
     await updateContactFull(exec, {
       ...baseEdit(contactId),
-      now: "2026-08-15 10:08:00",
+      now: "2026-08-17 10:08:00",
       currentStateEntries: [
-        { fieldKey: "last_talked_about", value: "changed" },
+        {
+          fieldKey: "last_talked_about",
+          value: "changed",
+          entryDate: "2026-08-17",
+        },
       ],
     });
-    expect(await countRows()).toBe(2);
+    expect(await rows()).toEqual([
+      { value: "changed", entry_date: "2026-08-17" },
+      { value: "same", entry_date: "2026-08-16" },
+      { value: "same", entry_date: EDIT_NOW.slice(0, 10) },
+    ]);
     expect(
       (await getCurrentStateValue(exec, contactId, "last_talked_about"))?.value,
     ).toBe("changed");
   });
 
-  // --- Off Limits (fuel, kind-scoped) ---------------------------------------
-  it("round-trips an off-limits fuel add/edit/delete through listFuelForEditor", async () => {
+  // --- Off Limits (its own table, D-11) -------------------------------------
+  it("round-trips an Off Limits add/edit/delete through the off_limits table", async () => {
     const contactId = await makeContact();
 
     await updateContactFull(exec, {
       ...baseEdit(contactId),
-      offLimits: { add: [{ kind: "off_limits", text: "politics" }] },
+      offLimits: { add: [{ text: "politics" }] },
     });
-    let fuel = await listFuelForEditor(exec, contactId);
-    expect(fuel).toHaveLength(1);
-    expect(fuel[0].kind).toBe("off_limits");
-    expect(fuel[0].text).toBe("politics");
+    let rows = await listOffLimitsForContact(exec, contactId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text).toBe("politics");
 
     await updateContactFull(exec, {
       ...baseEdit(contactId),
       now: "2026-08-15 10:05:00",
-      offLimits: { edit: [{ id: fuel[0].id, text: "religion" }] },
+      offLimits: { edit: [{ id: rows[0].id, text: "religion" }] },
     });
-    fuel = await listFuelForEditor(exec, contactId);
-    expect(fuel).toHaveLength(1); // edited in place
-    expect(fuel[0].kind).toBe("off_limits"); // still off_limits
-    expect(fuel[0].text).toBe("religion");
+    rows = await listOffLimitsForContact(exec, contactId);
+    expect(rows).toHaveLength(1); // edited in place
+    expect(rows[0].text).toBe("religion");
 
     await updateContactFull(exec, {
       ...baseEdit(contactId),
       now: "2026-08-15 10:06:00",
-      offLimits: { delete: [{ id: fuel[0].id }] },
+      offLimits: { delete: [{ id: rows[0].id }] },
     });
-    expect(await listFuelForEditor(exec, contactId)).toEqual([]);
+    expect(await listOffLimitsForContact(exec, contactId)).toEqual([]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT entity_type FROM tombstones WHERE entity_uid = ?",
+        [rows[0].uid],
+      ),
+    ).toEqual([{ entity_type: "off_limits" }]);
+    // Nothing reached memories: Off Limits never becomes AI-eligible (D-09).
+    expect(
+      await exec.getAllAsync("SELECT id FROM memories WHERE contact_id = ?", [
+        contactId,
+      ]),
+    ).toEqual([]);
   });
 
   it("an Off Limits edit cannot reach another contact's Off Limits (cross-contact, D-11)", async () => {
@@ -1408,9 +1440,9 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
     ).lastInsertRowId;
     await updateContactFull(exec, {
       ...baseEdit(contactId),
-      offLimits: { add: [{ kind: "off_limits", text: "secret" }] },
+      offLimits: { add: [{ text: "secret" }] },
     });
-    const [ownRow] = await listFuelForEditor(exec, contactId);
+    const [ownRow] = await listOffLimitsForContact(exec, contactId);
 
     // Another contact's id is refused for edit and delete (whole edit rolls back).
     await expect(
@@ -1434,7 +1466,7 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
       now: "2026-08-15 10:06:00",
       offLimits: { delete: [{ id: ownRow.id }] },
     });
-    expect(await listFuelForEditor(exec, contactId)).toEqual([]);
+    expect(await listOffLimitsForContact(exec, contactId)).toEqual([]);
     expect(
       await exec.getAllAsync(
         "SELECT id, text, modified_at FROM off_limits WHERE contact_id = ?",
@@ -1447,9 +1479,9 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
     const contactId = await makeContact();
     await updateContactFull(exec, {
       ...baseEdit(contactId),
-      offLimits: { add: [{ kind: "off_limits", text: "to remove" }] },
+      offLimits: { add: [{ text: "to remove" }] },
     });
-    const [row] = await listFuelForEditor(exec, contactId);
+    const [row] = await listOffLimitsForContact(exec, contactId);
 
     const before = await readDataRevision(exec);
     await updateContactFull(exec, {
@@ -1465,9 +1497,119 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
     const before = await readDataRevision(exec);
     await updateContactFull(exec, {
       ...baseEdit(contactId),
-      offLimits: { add: [{ kind: "off_limits", text: "added" }] },
+      offLimits: { add: [{ text: "added" }] },
     });
     expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  // --- Held deletes: exactly one revision bump (checker cycle 5 W-3) ---------
+  it("a save that deletes one memory advances data_revision by EXACTLY 1", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      memories: { add: [{ type: "general", value: "gone" }] },
+    });
+    const [memory] = await listMemoriesForContact(exec, contactId);
+    const before = await readDataRevision(exec);
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      memories: { delete: [{ id: memory.id }] },
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("a save that deletes one key person advances data_revision by EXACTLY 1", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      relationships: { add: [{ personName: "Robin" }] },
+    });
+    const [person] = await listRelationshipsForContact(exec, contactId);
+    const before = await readDataRevision(exec);
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      relationships: { delete: [{ id: person.id }] },
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+    expect(await listRelationshipsForContact(exec, contactId)).toEqual([]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT entity_type FROM tombstones WHERE entity_uid = ?",
+        [person.uid],
+      ),
+    ).toEqual([{ entity_type: "relationship" }]);
+  });
+
+  it("a save deleting a memory, a key person and an Off Limits row together advances data_revision by EXACTLY 1", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      memories: { add: [{ type: "general", value: "m" }] },
+      relationships: { add: [{ personName: "Kai" }] },
+      offLimits: { add: [{ text: "o" }] },
+    });
+    const [memory] = await listMemoriesForContact(exec, contactId);
+    const [person] = await listRelationshipsForContact(exec, contactId);
+    const [offLimits] = await listOffLimitsForContact(exec, contactId);
+    const before = await readDataRevision(exec);
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      memories: { delete: [{ id: memory.id }] },
+      relationships: { delete: [{ id: person.id }] },
+      offLimits: { delete: [{ id: offLimits.id }] },
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM tombstones WHERE entity_uid IN (?, ?, ?)",
+        [memory.uid, person.uid, offLimits.uid],
+      ),
+    ).toEqual({ n: 3 });
+  });
+
+  // --- Allow AI is draft state written at Save (D-27) ------------------------
+  it("a memory edit carrying allowAi writes it at Save; the DAO refuses AI on a Group Note copy (D-27, D-102)", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      memories: {
+        add: [{ type: "general", value: "ai later", allowAi: 0 }],
+      },
+    });
+    const [memory] = await listMemoriesForContact(exec, contactId);
+    expect(memory.allow_ai).toBe(0);
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      memories: { edit: [{ id: memory.id, type: "general", allowAi: 1 }] },
+    });
+    expect((await listMemoriesForContact(exec, contactId))[0].allow_ai).toBe(1);
+
+    // A Group Note copy can never be turned on: the whole save rolls back.
+    const copyId = (
+      await exec.runAsync(
+        `INSERT INTO memories (uid, contact_id, type, value, provenance,
+           created_at, modified_at, allow_ai, group_note_copy)
+         VALUES (?, ?, 'general', 'copy', 'user', ?, ?, 0, 1)`,
+        [uid(), contactId, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    await expect(
+      updateContactFull(exec, {
+        ...baseEdit(contactId, "Renamed"),
+        now: "2026-08-15 10:07:00",
+        memories: { edit: [{ id: copyId, type: "general", allowAi: 1 }] },
+      }),
+    ).rejects.toThrow();
+    expect(await name(contactId)).toBe("Know Owner");
+    expect(
+      await exec.getFirstAsync("SELECT allow_ai FROM memories WHERE id = ?", [
+        copyId,
+      ]),
+    ).toEqual({ allow_ai: 0 });
   });
 
   // --- Atomic rollback across the subdomains --------------------------------
@@ -1487,13 +1629,13 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
     expect(await listRelationshipsForContact(exec, contactId)).toEqual([]);
   });
 
-  it("rolls back the whole edit when an off-limits fuel delete targets a missing row", async () => {
+  it("rolls back the whole edit when an Off Limits delete targets a missing row", async () => {
     const contactId = await makeContact("Original");
     await expect(
       updateContactFull(exec, {
         ...baseEdit(contactId, "Changed"),
         currentStateEntries: [{ fieldKey: "current_location", value: "Paris" }],
-        // A non-existent fuel id → deleteFuelCore's assertOneChange throws.
+        // A non-existent id → deleteOffLimitsCore throws.
         offLimits: { delete: [{ id: 999999 }] },
       }),
     ).rejects.toThrow();
@@ -1819,7 +1961,7 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
         { fieldKey: "last_talked_about", value: "new job" },
         { fieldKey: "current_location", value: "Berlin" },
       ],
-      offLimits: [{ kind: "off_limits", text: "politics" }],
+      offLimits: [{ text: "politics" }],
     });
 
     const memory = await exec.getFirstAsync<{ value: string }>(
@@ -1855,14 +1997,80 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
     expect(offLimits?.text).toBe("politics");
   });
 
-  it("injects the FULL framework set for relationships and fuel (cycle-4 MEDIUM #1)", async () => {
+  it("tracer: writes an Off Limits row, a Gift Idea, a Thought of Them and a dated Last Talked About entry to their own homes (D-05, D-65, D-01)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Homes",
+      intervalDays: 14,
+      now: NOW,
+      memories: [
+        { type: "gift_idea", value: "A fountain pen" },
+        { type: "thought_of_them", value: "Saw their favourite band" },
+      ],
+      currentStateEntries: [
+        {
+          fieldKey: "last_talked_about",
+          value: "Their trip",
+          entryDate: "2026-08-10",
+        },
+        { fieldKey: "current_location", value: "Lisbon" },
+      ],
+      offLimits: [{ label: "Topic", text: "Their ex" }],
+    });
+
+    expect(
+      await exec.getAllAsync<{ type: string; value: string }>(
+        "SELECT type, value FROM memories WHERE contact_id = ? ORDER BY id",
+        [contactId],
+      ),
+    ).toEqual([
+      { type: "gift_idea", value: "A fountain pen" },
+      { type: "thought_of_them", value: "Saw their favourite band" },
+    ]);
+    expect(
+      await exec.getAllAsync(
+        `SELECT field_key, value, entry_date, entry_time
+           FROM current_state_entries WHERE contact_id = ? ORDER BY field_key`,
+        [contactId],
+      ),
+    ).toEqual([
+      {
+        field_key: "current_location",
+        value: "Lisbon",
+        entry_date: NOW.slice(0, 10),
+        entry_time: null,
+      },
+      {
+        field_key: "last_talked_about",
+        value: "Their trip",
+        entry_date: "2026-08-10",
+        entry_time: null,
+      },
+    ]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT label, text, url, group_note_copy, from_share FROM off_limits WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual([
+      {
+        label: "Topic",
+        text: "Their ex",
+        url: null,
+        group_note_copy: 0,
+        from_share: 0,
+      },
+    ]);
+  });
+
+  it("injects the FULL framework set for relationships and Off Limits (cycle-4 MEDIUM #1)", async () => {
     const { contactId } = await createContactFull(exec, {
       uid: uid(),
       name: "Framework fields",
       intervalDays: 14,
       now: NOW,
       relationships: [{ personName: "Sam" }],
-      offLimits: [{ kind: "off_limits", text: "work drama" }],
+      offLimits: [{ text: "work drama" }],
     });
 
     const relationship = await exec.getFirstAsync<{
@@ -1890,13 +2098,16 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
     expect(offLimits?.modified_at).toBe(NOW);
   });
 
-  it("NEW-1: a Create Off Limits draft with kind topic lands in off_limits, never as a memory (D-11)", async () => {
+  it("NEW-1: a Create Off Limits draft carrying an old kind topic lands in off_limits, never as a memory (D-11)", async () => {
+    // A host draft (the legacy editor's FuelDraft) still carries a kind; it is
+    // ignored: the off_limits table has no kind.
+    const drafts = [{ kind: "topic", text: "their health" }];
     const { contactId } = await createContactFull(exec, {
       uid: uid(),
       name: "New one",
       intervalDays: 14,
       now: NOW,
-      offLimits: [{ kind: "topic", text: "their health" }],
+      offLimits: drafts,
     });
     expect(
       await exec.getAllAsync(

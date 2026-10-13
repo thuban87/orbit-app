@@ -56,13 +56,9 @@ import {
   type ContactMethodSaveResult,
   listContactMethods,
 } from "@/db/contact-methods-dao";
-import {
-  type SetCurrentStateValueInput,
-  setCurrentStateValueCore,
-} from "@/db/current-state-history-dao";
+import { addCurrentStateEntryCore } from "@/db/current-state-history-dao";
 import {
   type CurrentStateEntryRow,
-  getCurrentStateValue,
   getCurrentStateValues,
 } from "@/db/current-state-history-read";
 import { applyUserCustomValueEditCore } from "@/db/custom-value-edit-dao";
@@ -71,21 +67,25 @@ import { recordEventCore } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
 import {
-  addFuelCore,
-  deleteFuelCore,
-  type EditFuelInput,
-  editFuelCore,
-  type NewFuelItem,
-} from "@/db/fuel-dao";
-import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
-import {
   addMemoryCore,
-  deleteMemoryCore,
+  deleteMemoryNowCore,
   type EditMemoryInput,
   editMemoryCore,
   type NewMemoryInput,
+  setMemoryAllowAiCore,
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
+import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import {
+  addOffLimitsCore,
+  deleteOffLimitsCore,
+  type EditOffLimitsInput,
+  editOffLimitsCore,
+} from "@/db/off-limits-dao";
+import {
+  listOffLimitsForContact,
+  type OffLimitsRow,
+} from "@/db/off-limits-read";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
   type FirstInteractionInput,
@@ -94,7 +94,7 @@ import {
 } from "@/db/recency-dao";
 import {
   addRelationshipCore,
-  deleteRelationshipCore,
+  deleteRelationshipNowCore,
   type EditRelationshipInput,
   editRelationshipCore,
   type NewRelationshipInput,
@@ -119,12 +119,17 @@ export interface CustomValueInput {
 //
 // Each array element carries ONLY the per-record SEMANTIC fields and OMITS the
 // framework fields that do not exist until the contact row is inserted
-// (`contactId`, the `createdAt`/`now` stamps, and — for fuel — a minted `uid` +
-// `source`). `createContactFullCore` injects that full normalization set post-
+// (`contactId`, the `createdAt`/`now` stamps, and — for Off Limits — a minted
+// `uid`). `createContactFullCore` injects that full normalization set post-
 // insert before invoking each `*Core` writer, so the element shape is NOT the raw
 // `*Core` writer input on the create path (Review cycle-3/4 MEDIUM). Keeping the
 // shapes as `Omit<...>` of the writer inputs guarantees they stay in lockstep
 // with the underlying DAO contracts.
+//
+// Phase 38.10 (D-01, D-05, D-65): every Things to Remember item goes straight
+// to its own home — memories (Gift Ideas and Thought of Them included), key
+// people, `off_limits` and dated `current_state_entries`. Nothing here writes
+// through the retired knowledge-table names.
 // =============================================================================
 
 /** A Memory to create with the contact (semantic fields only). */
@@ -137,16 +142,25 @@ export type CreateRelationshipInput = Omit<
   NewRelationshipInput,
   "contactId" | "createdAt" | "now"
 >;
-/** A current-state value (Last Talked About / Current Location) — semantic only. */
-export type CreateCurrentStateInput = Omit<
-  SetCurrentStateValueInput,
-  "contactId" | "now"
->;
-/** A fuel row (Off Limits and other kinds) to create — semantic fields only. */
-export type CreateFuelInput = Omit<
-  NewFuelItem,
-  "uid" | "contactId" | "createdAt" | "source" | "now"
->;
+/**
+ * A dated Last Talked About / Current Location entry — semantic only. Every
+ * one is a new dated entry; earlier entries stay as history (D-26, D-65).
+ */
+export interface CreateCurrentStateInput {
+  fieldKey: CurrentStateFieldKey;
+  value: string;
+  /** Local `YYYY-MM-DD`; omitted means the local date of `now` (D-65). */
+  entryDate?: string;
+}
+/**
+ * An Off Limits entry to create — semantic fields only. The table has no kind
+ * and no AI column, so whatever a form sends lands as Off Limits (D-09, D-11).
+ */
+export interface CreateOffLimitsInput {
+  label?: string | null;
+  text?: string | null;
+  url?: string | null;
+}
 
 /**
  * A brand-new contact plus (optionally) its first touchpoint and `show_on_new`
@@ -183,10 +197,24 @@ export interface CreateContactFullInput {
    */
   memories?: CreateMemoryInput[];
   relationships?: CreateRelationshipInput[];
-  /** Last Talked About + Current Location values. */
+  /** Dated Last Talked About + Current Location entries. */
   currentStateEntries?: CreateCurrentStateInput[];
-  /** Off Limits (and any other fuel-kind) rows. */
-  offLimits?: CreateFuelInput[];
+  /** Off Limits entries (always Off Limits, D-11). */
+  offLimits?: CreateOffLimitsInput[];
+}
+
+/** The local `YYYY-MM-DD` of a local wall-clock `now` (never a UTC slice). */
+function localDateOf(now: string): string {
+  return now.slice(0, 10);
+}
+
+/** Only the Off Limits content fields; extra draft keys never reach SQL. */
+function offLimitsContent(input: CreateOffLimitsInput): CreateOffLimitsInput {
+  return {
+    label: input.label ?? null,
+    text: input.text ?? null,
+    url: input.url ?? null,
+  };
 }
 
 /**
@@ -331,23 +359,24 @@ export async function createContactFullCore(
     });
   }
   for (const entry of input.currentStateEntries ?? []) {
-    await setCurrentStateValueCore(exec, {
-      ...entry,
+    // A dated entry: the draft's date, else today's local date (D-65).
+    await addCurrentStateEntryCore(exec, {
       contactId,
+      fieldKey: entry.fieldKey,
+      value: entry.value,
+      entryDate: entry.entryDate ?? localDateOf(input.now),
+      entryTime: null,
       now: input.now,
     });
   }
-  for (const fuel of input.offLimits ?? []) {
-    // Fuel additionally needs a minted uid + provenance beyond contactId/stamps.
-    // NEW-1 (D-11): an Off Limits draft is always Off Limits. Forcing the kind
-    // keeps typed Off Limits text from landing as an AI-eligible memory.
-    await addFuelCore(exec, {
-      ...fuel,
-      kind: "off_limits",
+  for (const offLimits of input.offLimits ?? []) {
+    // NEW-1 (D-11): an Off Limits draft is always Off Limits — the table has no
+    // kind, so typed Off Limits text can never land as an AI-eligible memory.
+    await addOffLimitsCore(exec, {
+      ...offLimitsContent(offLimits),
       uid: newUid(),
       contactId,
       createdAt: input.now,
-      source: "user",
       now: input.now,
     });
   }
@@ -369,9 +398,8 @@ export async function createContactFullCore(
   // create: the contact INSERT is always a change and the method core ran with
   // its bump suppressed, so a knowledge-only / unchanged-method create still
   // advances backup-freshness by EXACTLY 1 and no path double-bumps (Review
-  // cycle-3 MEDIUM). The composed create adds NO delete core, so the
-  // `deleteFuelCore` default-bump exception (the EDIT path, fixed in 34-05) is
-  // unreachable here.
+  // cycle-3 MEDIUM). The composed create calls NO tombstone-writing core, so no
+  // inner bump can happen here.
   await bumpDataRevisionCore(exec);
   return {
     contactId,
@@ -436,15 +464,21 @@ export interface KnowledgeCollectionDiff<TAdd, TEdit> {
   delete?: KnowledgeDeleteRef[];
 }
 
-/** An edit patch to one existing Memory (row `id` + patched fields). */
-export type EditMemoryPatch = Omit<EditMemoryInput, "contactId" | "now">;
+/**
+ * An edit patch to one existing Memory (row `id` + patched fields). `allowAi`
+ * is present only when the form's Allow AI choice changed; the aggregate then
+ * writes it through `setMemoryAllowAiCore` at Save (D-27).
+ */
+export type EditMemoryPatch = Omit<EditMemoryInput, "contactId" | "now"> & {
+  allowAi?: 0 | 1;
+};
 /** An edit patch to one existing relationship (row `id` + patched fields). */
 export type EditRelationshipPatch = Omit<
   EditRelationshipInput,
   "contactId" | "now"
 >;
-/** An edit patch to one existing off-limits fuel row (row `id` + patched fields). */
-export type EditFuelPatch = Omit<EditFuelInput, "contactId" | "now">;
+/** An edit patch to one existing Off Limits entry (row `id` + patched fields). */
+export type EditOffLimitsPatch = Omit<EditOffLimitsInput, "contactId" | "now">;
 
 /** The edit payload — the mutable `contacts` columns + custom values + optional first-touch. */
 export interface UpdateContactFullInput {
@@ -488,14 +522,17 @@ export interface UpdateContactFullInput {
     CreateRelationshipInput,
     EditRelationshipPatch
   >;
-  /** Last Talked About + Current Location — written only when the value changed. */
+  /**
+   * Last Talked About + Current Location — each element is a NEW dated entry
+   * (D-26, D-65). The form layer decides when to send one (edit-contact-logic
+   * skips a value equal to its seed); the DAO appends every one it receives.
+   */
   currentStateEntries?: CreateCurrentStateInput[];
   /**
-   * Off Limits fuel diff — KIND-SCOPED to `off_limits` (Review cycle-4 MEDIUM #3):
-   * every add/edit is forced to `kind:"off_limits"` by the DAO so the diff can never
-   * add/edit/delete a `recent`/`topic`/`fact`/`gift` row.
+   * Off Limits diff against the `off_limits` table, which holds nothing else:
+   * every add/edit/delete is scoped by `(id, contact_id)` (D-11).
    */
-  offLimits?: KnowledgeCollectionDiff<CreateFuelInput, EditFuelPatch>;
+  offLimits?: KnowledgeCollectionDiff<CreateOffLimitsInput, EditOffLimitsPatch>;
 }
 
 /**
@@ -581,13 +618,17 @@ export async function setContactFrequencyCore(
  * whole edit back with the contact metadata. NON-mutexed: call only inside an open
  * `inWriteTransaction`.
  *
- *   • Collections (memories/relationships/off-limits fuel) apply the pre-computed
+ *   • Collections (memories / key people / Off Limits) apply the pre-computed
  *     `{ add, edit, delete }` lists — the DAO never re-diffs.
- *   • Off-limits fuel is KIND-SCOPED: every add/edit is FORCED to `kind:"off_limits"`
- *     and the delete suppresses the tombstone self-bump (`bumpRevision:false`) so the
- *     aggregate bumps exactly once (Review cycle-4 MEDIUM #2/#3).
- *   • Current-state values write via `setCurrentStateValueCore` ONLY when the incoming
- *     value differs from the stored current value — never rewriting history.
+ *   • Deletes are hard deletes with a tombstone (D-69), held by the form until
+ *     Save (D-104). Every tombstone-writing core runs with `bumpRevision: false`,
+ *     so the aggregate's own bump stays the only one (PLAN-MAP §5).
+ *   • A memory edit carrying `allowAi` writes it through `setMemoryAllowAiCore`
+ *     at Save (D-27); the DAO still refuses AI on a Group Note copy (D-102).
+ *   • Each current-state element appends a NEW dated entry (D-26, D-65); the
+ *     form layer owns the "unchanged from seed" skip.
+ *   • Off Limits writes go to `off_limits` only, scoped by `(id, contact_id)`
+ *     (D-11).
  *   • NO `data_revision` bump here — `updateContactFull` owns the single bump.
  */
 async function applyKnowledgeDiffsCore(
@@ -613,11 +654,25 @@ async function applyKnowledgeDiffsCore(
         await addMemoryCore(exec, { ...add, contactId, createdAt: now, now }),
       );
     }
-    for (const patch of input.memories.edit ?? []) {
+    for (const edit of input.memories.edit ?? []) {
+      const { allowAi, ...patch } = edit;
       await editMemoryCore(exec, { ...patch, contactId, now });
+      if (allowAi === 0 || allowAi === 1) {
+        await setMemoryAllowAiCore(exec, {
+          id: patch.id,
+          contactId,
+          allow: allowAi === 1,
+          now,
+        });
+      }
     }
     for (const ref of input.memories.delete ?? []) {
-      await deleteMemoryCore(exec, { id: ref.id, contactId, now });
+      await deleteMemoryNowCore(exec, {
+        id: ref.id,
+        contactId,
+        now,
+        bumpRevision: false,
+      });
     }
   }
 
@@ -637,45 +692,54 @@ async function applyKnowledgeDiffsCore(
       await editRelationshipCore(exec, { ...patch, contactId, now });
     }
     for (const ref of input.relationships.delete ?? []) {
-      await deleteRelationshipCore(exec, { id: ref.id, contactId, now });
+      await deleteRelationshipNowCore(exec, {
+        id: ref.id,
+        contactId,
+        now,
+        bumpRevision: false,
+      });
     }
   }
 
-  // --- Last Talked About / Current Location (write only on change) ----------
+  // --- Last Talked About / Current Location (dated append) -----------------
   for (const entry of input.currentStateEntries ?? []) {
-    const stored = await getCurrentStateValue(exec, contactId, entry.fieldKey);
-    if (stored?.value === entry.value) continue; // unchanged → no history row
-    await setCurrentStateValueCore(exec, { ...entry, contactId, now });
+    await addCurrentStateEntryCore(exec, {
+      contactId,
+      fieldKey: entry.fieldKey,
+      value: entry.value,
+      entryDate: entry.entryDate ?? localDateOf(now),
+      entryTime: null,
+      now,
+    });
   }
 
-  // --- Off Limits (fuel, kind-scoped to off_limits) -------------------------
+  // --- Off Limits -----------------------------------------------------------
   if (input.offLimits) {
     for (const add of input.offLimits.add ?? []) {
-      // FORCE kind:"off_limits" — the diff can only ever add an off_limits row.
       addedIds.offLimits.push(
-        await addFuelCore(exec, {
-          ...add,
-          kind: "off_limits",
+        await addOffLimitsCore(exec, {
+          ...offLimitsContent(add),
           uid: newUid(),
           contactId,
           createdAt: now,
-          source: "user",
           now,
         }),
       );
     }
     for (const patch of input.offLimits.edit ?? []) {
-      // FORCE kind:"off_limits" — an edit can never change a row to another kind.
-      await editFuelCore(exec, {
-        ...patch,
-        kind: "off_limits",
+      // Only the fields present are written; scoped by (id, contact_id).
+      await editOffLimitsCore(exec, {
+        id: patch.id,
         contactId,
+        label: patch.label,
+        text: patch.text,
+        url: patch.url,
         now,
       });
     }
     for (const ref of input.offLimits.delete ?? []) {
       // Suppress the tombstone self-bump so the aggregate bumps exactly once.
-      await deleteFuelCore(exec, {
+      await deleteOffLimitsCore(exec, {
         id: ref.id,
         contactId,
         now,
@@ -699,7 +763,7 @@ export function updateContactFull(
   methodSaveResult: ContactMethodSaveResult | null;
   memories: MemoryRow[];
   relationships: RelationshipRow[];
-  offLimits: FuelItem[];
+  offLimits: OffLimitsRow[];
   currentState: Partial<
     Record<"last_talked_about" | "current_location", CurrentStateEntryRow>
   >;
@@ -847,14 +911,14 @@ export function updateContactFull(
     await bumpDataRevisionCore(exec);
     const memories = await listMemoriesForContact(exec, input.id);
     const relationships = await listRelationshipsForContact(exec, input.id);
-    const fuel = await listFuelForEditor(exec, input.id);
+    const offLimits = await listOffLimitsForContact(exec, input.id);
     const currentState = await getCurrentStateValues(exec, input.id);
     return {
       methods: methodSaveResult?.methods ?? [],
       methodSaveResult,
       memories,
       relationships,
-      offLimits: fuel.filter((row) => row.kind === "off_limits"),
+      offLimits,
       currentState,
       addedIds,
     };

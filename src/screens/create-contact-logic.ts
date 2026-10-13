@@ -30,8 +30,8 @@ import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import type {
   CreateContactFullInput,
   CreateCurrentStateInput,
-  CreateFuelInput,
   CreateMemoryInput,
+  CreateOffLimitsInput,
   CreateRelationshipInput,
 } from "@/db/contacts-dao";
 import { newUid } from "@/db/uid";
@@ -60,11 +60,16 @@ export interface CreateFormState {
    */
   memories?: CreateMemoryInput[];
   relationships?: CreateRelationshipInput[];
-  /** Single current value for "Last Talked About" (blank → omitted). */
+  /** "Last Talked About" entry text (blank → omitted). */
   lastTalkedAbout?: string;
-  /** Single current value for "Current Location" (blank → omitted). */
+  /** The local `YYYY-MM-DD` picked for that entry; omitted means today (D-65). */
+  lastTalkedAboutDate?: string;
+  /** "Current Location" entry text (blank → omitted). */
   currentLocation?: string;
-  offLimits?: CreateFuelInput[];
+  /** The local `YYYY-MM-DD` picked for that entry; omitted means today (D-65). */
+  currentLocationDate?: string;
+  /** Off Limits drafts — always written as Off Limits (D-11; NEW-1). */
+  offLimits?: CreateOffLimitsInput[];
 }
 
 /** Caller-supplied non-deterministic inputs, so the builder stays pure/testable. */
@@ -243,6 +248,15 @@ export function firstInteractionOccurredAt(
   }
 }
 
+/** An Off Limits draft's content fields only (label, text, url). */
+function offLimitsContent(row: CreateOffLimitsInput): CreateOffLimitsInput {
+  const out: CreateOffLimitsInput = {};
+  if (row.label !== undefined) out.label = row.label;
+  if (row.text !== undefined) out.text = row.text;
+  if (row.url !== undefined) out.url = row.url;
+  return out;
+}
+
 /**
  * Build the atomic-create input for `createContactFull`. Blank method controls
  * are discarded but nonblank invalid drafts stay durable; `name` is trimmed. The custom block is the `createDefs` mapped
@@ -287,23 +301,38 @@ export function buildCreateInput(
   if (memories.length > 0) input.memories = memories;
   const relationships = state.relationships ?? [];
   if (relationships.length > 0) input.relationships = relationships;
+  // Dated entries (D-65): the picked date when there is one, else the DAO
+  // dates the entry today.
   const currentStateEntries: CreateCurrentStateInput[] = [];
-  if (state.lastTalkedAbout?.trim()) {
-    currentStateEntries.push({
-      fieldKey: "last_talked_about",
-      value: state.lastTalkedAbout.trim(),
-    });
-  }
-  if (state.currentLocation?.trim()) {
-    currentStateEntries.push({
-      fieldKey: "current_location",
-      value: state.currentLocation.trim(),
-    });
-  }
+  const addEntry = (
+    fieldKey: CreateCurrentStateInput["fieldKey"],
+    text: string | undefined,
+    entryDate: string | undefined,
+  ): void => {
+    const value = text?.trim();
+    if (!value) return;
+    currentStateEntries.push(
+      entryDate === undefined
+        ? { fieldKey, value }
+        : { fieldKey, value, entryDate },
+    );
+  };
+  addEntry(
+    "last_talked_about",
+    state.lastTalkedAbout,
+    state.lastTalkedAboutDate,
+  );
+  addEntry(
+    "current_location",
+    state.currentLocation,
+    state.currentLocationDate,
+  );
   if (currentStateEntries.length > 0) {
     input.currentStateEntries = currentStateEntries;
   }
-  const offLimits = state.offLimits ?? [];
+  // Only the content fields go through; any extra key a host's draft carries
+  // (an old kind or source) never reaches the DAO (D-11; NEW-1).
+  const offLimits = (state.offLimits ?? []).map(offLimitsContent);
   if (offLimits.length > 0) input.offLimits = offLimits;
 
   return input;

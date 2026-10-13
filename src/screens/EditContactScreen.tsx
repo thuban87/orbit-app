@@ -162,9 +162,9 @@ import {
   EDIT_FIELD_REVEAL_ORDER,
   EDIT_SECTION_FIELD_MAP,
   type EditFormState,
-  type FuelDraftRow,
   isNeverContacted,
   type MemoryDraftRow,
+  type OffLimitsDraftRow,
   type RelationshipDraftRow,
   resolveErrorSection,
   seedEditState,
@@ -317,13 +317,17 @@ function relationshipDraftRowToItem(
 }
 
 /**
- * Seed an off-limits draft row from a committed fuel row. Kind is FORCED to
- * off_limits (the caller has already filtered to off_limits rows — belt AND
- * braces against the DATA-LOSS hazard, Review cycle-4 MEDIUM #3).
+ * Seed an Off Limits draft row from a committed row. Both the legacy editor row
+ * and the `off_limits` read row satisfy this shape (compile-only, 38.10-09;
+ * plan 14 rebuilds this screen).
  */
-function fuelItemToDraftRow(item: FuelItem): FuelDraftRow {
+function fuelItemToDraftRow(item: {
+  id: number;
+  label: string | null;
+  text: string | null;
+  url: string | null;
+}): OffLimitsDraftRow {
   return {
-    kind: "off_limits",
     label: item.label,
     text: item.text,
     url: item.url,
@@ -333,7 +337,7 @@ function fuelItemToDraftRow(item: FuelItem): FuelDraftRow {
 
 /** Render an off-limits draft row back to the FuelEditor's committed-row shape. */
 function fuelDraftRowToItem(
-  row: FuelDraftRow,
+  row: OffLimitsDraftRow,
   contactId: number,
   now: string,
 ): FuelItem {
@@ -360,7 +364,7 @@ interface SignatureOptions {
   effectivePhoneRegion: string | null;
   seededMemories: MemoryDraftRow[];
   seededRelationships: RelationshipDraftRow[];
-  seededOffLimits: FuelDraftRow[];
+  seededOffLimits: OffLimitsDraftRow[];
   seededCurrentState: CurrentStateSeed;
 }
 
@@ -396,7 +400,7 @@ function valuesSignature(values: Record<string, string | null>): string {
 interface KnowledgeSeeds {
   memories: MemoryDraftRow[];
   relationships: RelationshipDraftRow[];
-  offLimits: FuelDraftRow[];
+  offLimits: OffLimitsDraftRow[];
   currentState: CurrentStateSeed;
   /** id → allow_ai, for the Memory editor's edit-only Allow-AI control display. */
   memoryAllowAi: Map<number, number>;
@@ -429,7 +433,9 @@ export function EditContactScreen({
   const [seededRelationships, setSeededRelationships] = useState<
     RelationshipDraftRow[]
   >([]);
-  const [seededOffLimits, setSeededOffLimits] = useState<FuelDraftRow[]>([]);
+  const [seededOffLimits, setSeededOffLimits] = useState<OffLimitsDraftRow[]>(
+    [],
+  );
   const [seededCurrentState, setSeededCurrentState] =
     useState<CurrentStateSeed>({});
   // The edit-only Allow-AI availability (real app setting, NOT a hardcoded false —

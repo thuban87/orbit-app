@@ -39,16 +39,19 @@ import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import type { ContactForEdit } from "@/db/contact-read";
 import type {
   CreateCurrentStateInput,
-  CreateFuelInput,
   CreateMemoryInput,
+  CreateOffLimitsInput,
   CreateRelationshipInput,
-  EditFuelPatch,
   EditMemoryPatch,
+  EditOffLimitsPatch,
   EditRelationshipPatch,
   KnowledgeCollectionDiff,
   KnowledgeDeleteRef,
   UpdateContactFullInput,
 } from "@/db/contacts-dao";
+import type { MemoryProvenance } from "@/db/memories-dao";
+import type { MemoryRow } from "@/db/memories-read";
+import { DEFAULT_MEMORY_TYPE_KEY, isMemoryTypeKey } from "@/db/memory-registry";
 import {
   firstInteractionOccurredAt,
   resolveErrorSection,
@@ -71,12 +74,133 @@ export { resolveErrorSection };
 // re-diffs (Review cycle-3 LOW).
 // =============================================================================
 
-/** A Memory draft row (existing rows carry `id`; new rows omit it). */
-export type MemoryDraftRow = CreateMemoryInput & { id?: number };
+/**
+ * A Memory draft row (existing rows carry `id`; new rows omit it). It carries
+ * the row's real `provenance` (D-25) and its Allow AI choice as draft state
+ * (`allowAi`, D-27), plus two read-only lock markers copied from the row
+ * (D-102, D-103): a form never writes them, and a locked row never asks for
+ * Allow AI on. All are optional, so older hosts still compile.
+ */
+export type MemoryDraftRow = CreateMemoryInput & {
+  id?: number;
+  /** Read-only D-102 marker: a Group Note copy is AI-off for good. */
+  readonly groupNoteCopy?: 0 | 1;
+  /** Read-only D-103 marker: the linked note was locked AI-off for good. */
+  readonly linkedNoteAiLocked?: 0 | 1;
+};
 /** A relationship draft row (existing rows carry `id`; new rows omit it). */
 export type RelationshipDraftRow = CreateRelationshipInput & { id?: number };
-/** An off-limits fuel draft row (existing rows carry `id`; new rows omit it). */
-export type FuelDraftRow = CreateFuelInput & { id?: number };
+/** An Off Limits draft row (existing rows carry `id`; new rows omit it). */
+export interface OffLimitsDraftRow {
+  id?: number;
+  label?: string | null;
+  text?: string | null;
+  url?: string | null;
+}
+
+// =============================================================================
+// MEMORY DRAFT ADAPTERS (D-25, D-27, D-102, D-103; checker cycle 2 W-1;
+// convergence c1 F-U5). Pure and React-free: they mirror the memory editor's
+// draft mapping field by field instead of importing MemoryEditor.tsx, so the
+// node tests stay React-free. The forms seed, render and patch memory drafts
+// through these three only, so provenance and both lock markers survive.
+// =============================================================================
+
+function flag(value: number | null | undefined): 0 | 1 {
+  return value === 1 ? 1 : 0;
+}
+
+function provenanceOf(value: string): MemoryProvenance {
+  return value === "import" || value === "share" ? value : "user";
+}
+
+/**
+ * Seed a Memory draft row from a committed row: every editable field, the row
+ * id, its real provenance (D-25), its Allow AI value (D-27) and both read-only
+ * lock markers (D-102, D-103). The type mapping matches the memory editor's
+ * `initialDraft`, so an untouched seeded row diffs equal.
+ */
+export function memoryRowToDraftRow(row: MemoryRow): MemoryDraftRow {
+  return {
+    type: isMemoryTypeKey(row.type) ? row.type : DEFAULT_MEMORY_TYPE_KEY,
+    customLabel: row.custom_label ?? null,
+    value: row.value ?? null,
+    note: row.note ?? null,
+    url: row.url ?? null,
+    meaningfulDate: row.meaningful_date ?? null,
+    pinned: row.pinned === 1,
+    outdated: row.outdated === 1,
+    hidden: row.hidden === 1 ? true : row.hidden === 0 ? false : null,
+    id: row.id,
+    provenance: provenanceOf(row.provenance),
+    allowAi: flag(row.allow_ai),
+    groupNoteCopy: flag(row.group_note_copy),
+    linkedNoteAiLocked: flag(row.linked_note_ai_locked),
+  };
+}
+
+/**
+ * Render a Memory draft row back to the committed-row shape the memory editor
+ * shows. Provenance falls back to `user` only for a draft that never had one
+ * (a new row); the markers drive the locked Allow AI switch (W-1).
+ */
+export function memoryDraftRowToItem(
+  row: MemoryDraftRow,
+  contactId: number,
+): MemoryRow {
+  return {
+    id: row.id ?? 0,
+    uid: "",
+    contact_id: contactId,
+    type: row.type,
+    custom_label: row.customLabel ?? null,
+    value: row.value ?? null,
+    note: row.note ?? null,
+    url: row.url ?? null,
+    meaningful_date: row.meaningfulDate ?? null,
+    pinned: row.pinned ? 1 : 0,
+    outdated: row.outdated ? 1 : 0,
+    hidden: row.hidden == null ? null : row.hidden ? 1 : 0,
+    provenance: row.provenance ?? "user",
+    created_at: "",
+    modified_at: "",
+    deleted_at: null,
+    allow_ai: row.allowAi ?? 0,
+    interaction_id: null,
+    link_source: null,
+    group_note_copy: row.groupNoteCopy ?? 0,
+    linked_note_ai_locked: row.linkedNoteAiLocked ?? 0,
+  };
+}
+
+/**
+ * Apply an in-form editor patch to a Memory draft row. The patch wins for
+ * editable fields; the id, provenance and both lock markers always come from
+ * the row, because the editor's patch never carries them (F-U5, Codex C-12).
+ */
+export function applyMemoryPatch(
+  row: MemoryDraftRow,
+  patch: MemoryDraftRow,
+): MemoryDraftRow {
+  const merged: MemoryDraftRow = { ...row, ...patch, id: row.id };
+  const keep = {
+    provenance: row.provenance,
+    groupNoteCopy: row.groupNoteCopy,
+    linkedNoteAiLocked: row.linkedNoteAiLocked,
+  };
+  const out: Record<string, unknown> = { ...merged };
+  for (const [key, value] of Object.entries(keep)) {
+    if (value === undefined) delete out[key];
+    else out[key] = value;
+  }
+  if (row.id === undefined) delete out.id;
+  return out as MemoryDraftRow;
+}
+
+/** True when either lock marker says this memory may never turn AI on. */
+function isAiLocked(row: MemoryDraftRow | undefined): boolean {
+  return row?.groupNoteCopy === 1 || row?.linkedNoteAiLocked === 1;
+}
 
 /** The two current-state fields, keyed for the seeded baseline comparison. */
 export type CurrentStateSeed = Partial<
@@ -120,15 +244,22 @@ export interface EditFormState {
    * Knowledge-subdomain drafts (CAPT-04, dossier §E) — all OPTIONAL; omitting them
    * preserves the lean metadata+custom-values edit. `buildEditInput` diffs each
    * against its seeded baseline (deps.seeded*) into the `{ add, edit, delete }`
-   * contract. `offLimits` rows are off_limits fuel only (kind forced by the diff).
+   * contract. A deleted row is simply absent from its draft until Save (D-104).
    */
   memories?: MemoryDraftRow[];
   relationships?: RelationshipDraftRow[];
-  offLimits?: FuelDraftRow[];
-  /** Single current value for "Last talked about" (blank → no write). */
+  offLimits?: OffLimitsDraftRow[];
+  /** "Last talked about" entry text (blank → no write). */
   lastTalkedAbout?: string;
-  /** Single current value for "Current location" (blank → no write). */
+  /**
+   * The local `YYYY-MM-DD` the user picked for a new Last Talked About entry.
+   * Set only when the user explicitly added a dated entry; omitted means today.
+   */
+  lastTalkedAboutDate?: string;
+  /** "Current location" entry text (blank → no write). */
   currentLocation?: string;
+  /** The picked local date for a new Current Location entry (see above). */
+  currentLocationDate?: string;
 }
 
 /** Caller-supplied non-deterministic inputs, so the builder stays pure/testable. */
@@ -147,12 +278,10 @@ export interface BuildEditInputDeps {
   /**
    * Seeded knowledge baselines (same draft shape) the current draft is diffed
    * against. Omitted baselines are treated as empty (every draft row is an add).
-   * `seededOffLimits` is DEFENSIVELY re-filtered to `kind === "off_limits"` inside
-   * `buildEditInput` — see the off-limits kind-scope note (Review cycle-4 MEDIUM #3).
    */
   seededMemories?: MemoryDraftRow[];
   seededRelationships?: RelationshipDraftRow[];
-  seededOffLimits?: FuelDraftRow[];
+  seededOffLimits?: OffLimitsDraftRow[];
   seededCurrentState?: CurrentStateSeed;
 }
 
@@ -278,10 +407,15 @@ export function collectEditBlockingErrors(
   return errors;
 }
 
-/** The comparable signature of a draft row (all fields EXCEPT the row `id`). */
+/**
+ * The comparable signature of a draft row (all fields EXCEPT the row `id`). A
+ * key holding `undefined` reads the same as an absent key.
+ */
 function rowSignature(row: Record<string, unknown>): string {
   const { id: _id, ...rest } = row;
-  const keys = Object.keys(rest).sort();
+  const keys = Object.keys(rest)
+    .filter((key) => rest[key] !== undefined)
+    .sort();
   return JSON.stringify(keys.map((key) => [key, rest[key]]));
 }
 
@@ -300,7 +434,7 @@ function diffKnowledgeCollection<TRow extends { id?: number }, TAdd, TEdit>(
   seed: TRow[],
   draft: TRow[],
   toAdd: (row: TRow) => TAdd,
-  toEdit: (row: TRow & { id: number }) => TEdit,
+  toEdit: (row: TRow & { id: number }, seeded: TRow) => TEdit,
 ): KnowledgeCollectionDiff<TAdd, TEdit> | undefined {
   const seedById = new Map<number, TRow>();
   for (const row of seed) {
@@ -326,7 +460,7 @@ function diffKnowledgeCollection<TRow extends { id?: number }, TAdd, TEdit>(
       continue;
     }
     if (rowSignature(seeded) !== rowSignature(row)) {
-      edit.push(toEdit(row as TRow & { id: number }));
+      edit.push(toEdit(row as TRow & { id: number }, seeded));
     }
   }
 
@@ -345,7 +479,13 @@ function diffKnowledgeCollection<TRow extends { id?: number }, TAdd, TEdit>(
   return result;
 }
 
-/** The current-state entries whose trimmed draft value is non-blank AND changed. */
+/**
+ * The current-state entries to append. A non-blank trimmed value becomes one
+ * new dated entry when it differs from the seed, or when the user explicitly
+ * added a dated entry. A value equal to its seed with no picked date writes
+ * nothing, so an untouched save never appends a duplicate (checker cycle 5
+ * W-5); the DAO appends every entry it receives (D-26, D-65).
+ */
 function currentStateEntriesDiff(
   state: EditFormState,
   seed: CurrentStateSeed,
@@ -354,15 +494,96 @@ function currentStateEntriesDiff(
   const consider = (
     fieldKey: "last_talked_about" | "current_location",
     draftValue: string | undefined,
+    entryDate: string | undefined,
   ): void => {
     const value = draftValue?.trim();
     if (!value) return; // blank → no write (clearing is out of scope, as on create)
-    if (value === seed[fieldKey]) return; // unchanged → no history row
-    entries.push({ fieldKey, value });
+    if (value === seed[fieldKey] && entryDate === undefined) return; // unchanged
+    entries.push(
+      entryDate === undefined
+        ? { fieldKey, value }
+        : { fieldKey, value, entryDate },
+    );
   };
-  consider("last_talked_about", state.lastTalkedAbout);
-  consider("current_location", state.currentLocation);
+  consider(
+    "last_talked_about",
+    state.lastTalkedAbout,
+    state.lastTalkedAboutDate,
+  );
+  consider(
+    "current_location",
+    state.currentLocation,
+    state.currentLocationDate,
+  );
   return entries;
+}
+
+/**
+ * A locked memory (Group Note copy, D-102; locked linked note, D-103) never
+ * asks for Allow AI on: a draft value of 1 falls back to the seed's value (0
+ * for a new row), so the diff can never emit `allowAi: 1` for it (W-1).
+ */
+function clampLockedAllowAi(
+  row: MemoryDraftRow,
+  seeded: MemoryDraftRow | undefined,
+): MemoryDraftRow {
+  if (row.allowAi !== 1 || !(isAiLocked(row) || isAiLocked(seeded))) {
+    return row;
+  }
+  const fallback = seeded?.allowAi === 1 ? 1 : 0;
+  return { ...row, allowAi: fallback };
+}
+
+/**
+ * A new memory's add payload: the draft without its id, link fields or lock
+ * markers (a form never writes them; D-102, D-103). `allowAi` is the user's
+ * explicit choice (D-27), honoured by the DAO for provenance `user` only.
+ */
+function memoryAddPayload(row: MemoryDraftRow): CreateMemoryInput {
+  const {
+    id: _id,
+    groupNoteCopy: _groupNoteCopy,
+    linkedNoteAiLocked: _linkedNoteAiLocked,
+    interactionId: _interactionId,
+    linkSource: _linkSource,
+    ...add
+  } = row;
+  if (isAiLocked(row) && add.allowAi === 1) add.allowAi = 0;
+  return add;
+}
+
+/**
+ * An existing memory's edit patch: the editable fields plus `allowAi` only
+ * when the draft's choice differs from the seed (D-27). Provenance, link
+ * fields and lock markers are never sent: a form edit keeps the stored ones
+ * (D-25, D-102, D-103).
+ */
+function memoryEditPatch(
+  row: MemoryDraftRow & { id: number },
+  seeded: MemoryDraftRow,
+): EditMemoryPatch {
+  const {
+    allowAi,
+    groupNoteCopy: _groupNoteCopy,
+    linkedNoteAiLocked: _linkedNoteAiLocked,
+    provenance: _provenance,
+    interactionId: _interactionId,
+    linkSource: _linkSource,
+    ...patch
+  } = row;
+  if (allowAi === undefined || allowAi === seeded.allowAi) return patch;
+  if (allowAi === 1 && (isAiLocked(row) || isAiLocked(seeded))) return patch;
+  return { ...patch, allowAi };
+}
+
+/** An Off Limits draft's id and content fields, dropping any extra keys. */
+function offLimitsDraftContent(row: OffLimitsDraftRow): OffLimitsDraftRow {
+  const out: OffLimitsDraftRow = {};
+  if (row.id !== undefined) out.id = row.id;
+  if (row.label !== undefined) out.label = row.label;
+  if (row.text !== undefined) out.text = row.text;
+  if (row.url !== undefined) out.url = row.url;
+  return out;
 }
 
 /**
@@ -374,10 +595,8 @@ function currentStateEntriesDiff(
  *
  * Knowledge subdomains (CAPT-04, dossier §E): each draft is diffed against its
  * seeded baseline into the pinned `{ add, edit, delete }` contract; an untouched
- * subdomain is omitted entirely. The `offLimits` diff is KIND-SCOPED — the seed is
- * defensively filtered to `kind === "off_limits"` and every add/edit forces
- * `kind:"off_limits"` so a `recent`/`topic`/`fact`/`gift` row can NEVER appear in
- * the off_limits diff (Review cycle-4 MEDIUM #3, DATA LOSS).
+ * subdomain is omitted entirely. A deleted row is held in the draft (absent)
+ * until Save, which then hard-deletes it with a tombstone (D-104, D-69).
  */
 export function buildEditInput(
   state: EditFormState,
@@ -423,15 +642,25 @@ export function buildEditInput(
   // KNOWLEDGE SUBDOMAINS (CAPT-04, §E) — diff each draft vs its seeded baseline
   // into the pinned {add,edit,delete} contract; omit an untouched subdomain.
   if (state.memories !== undefined) {
+    const seededMemories = deps.seededMemories ?? [];
+    const seedById = new Map<number, MemoryDraftRow>();
+    for (const row of seededMemories) {
+      if (row.id != null) seedById.set(row.id, row);
+    }
     const diff = diffKnowledgeCollection<
       MemoryDraftRow,
       CreateMemoryInput,
       EditMemoryPatch
     >(
-      deps.seededMemories ?? [],
-      state.memories,
-      ({ id: _id, ...add }) => add,
-      (row) => ({ ...row }),
+      seededMemories,
+      state.memories.map((row) =>
+        clampLockedAllowAi(
+          row,
+          row.id != null ? seedById.get(row.id) : undefined,
+        ),
+      ),
+      memoryAddPayload,
+      memoryEditPatch,
     );
     if (diff) input.memories = diff;
   }
@@ -451,24 +680,18 @@ export function buildEditInput(
   }
 
   if (state.offLimits !== undefined) {
-    // KIND-SCOPE both sides to off_limits (DATA LOSS guard, cycle-4 MEDIUM #3):
-    // filter the seed defensively and force kind on every add/edit, so no
-    // recent/topic/fact/gift row can ever land in the off_limits diff.
-    const seededOffLimits = (deps.seededOffLimits ?? []).filter(
-      (row) => row.kind === "off_limits",
-    );
-    const draftOffLimits = state.offLimits.filter(
-      (row) => row.kind === "off_limits",
-    );
+    // Off Limits rows live in their own table, so every row in this diff is
+    // Off Limits whatever extra keys a host's draft carries (D-11; NEW-1).
+    // Only the content fields are compared and sent.
     const diff = diffKnowledgeCollection<
-      FuelDraftRow,
-      CreateFuelInput,
-      EditFuelPatch
+      OffLimitsDraftRow,
+      CreateOffLimitsInput,
+      EditOffLimitsPatch
     >(
-      seededOffLimits,
-      draftOffLimits,
-      ({ id: _id, ...add }) => ({ ...add, kind: "off_limits" }),
-      (row) => ({ ...row, kind: "off_limits" }),
+      (deps.seededOffLimits ?? []).map(offLimitsDraftContent),
+      state.offLimits.map(offLimitsDraftContent),
+      ({ id: _id, ...add }) => add,
+      (row) => ({ ...row }),
     );
     if (diff) input.offLimits = diff;
   }

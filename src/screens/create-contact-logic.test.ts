@@ -269,7 +269,7 @@ describe("buildCreateInput", () => {
       state({
         memories: [{ type: "general", value: "Loves hiking" }],
         relationships: [{ personName: "Alex", relationType: "sibling" }],
-        offLimits: [{ kind: "off_limits", text: "politics" }],
+        offLimits: [{ text: "politics" }],
       }),
       deps(),
     );
@@ -277,7 +277,37 @@ describe("buildCreateInput", () => {
     expect(out.relationships).toEqual([
       { personName: "Alex", relationType: "sibling" },
     ]);
-    expect(out.offLimits).toEqual([{ kind: "off_limits", text: "politics" }]);
+    expect(out.offLimits).toEqual([{ text: "politics" }]);
+  });
+
+  it("sends only Off Limits content fields: an old kind or source on a host draft never reaches the DAO (D-11; NEW-1)", () => {
+    // The legacy editor's drafts still carry a kind until plan 14.
+    const hostDrafts = [
+      { kind: "topic", source: "user", label: null, text: "health", url: null },
+    ];
+    const out = buildCreateInput(state({ offLimits: hostDrafts }), deps());
+    expect(out.offLimits).toEqual([{ label: null, text: "health", url: null }]);
+    expect(out.offLimits?.[0]).not.toHaveProperty("kind");
+    expect(out.offLimits?.[0]).not.toHaveProperty("source");
+  });
+
+  it("carries a picked entry date on a current-state entry (D-65)", () => {
+    const out = buildCreateInput(
+      state({
+        lastTalkedAbout: "Their trip",
+        lastTalkedAboutDate: "2026-08-01",
+        currentLocation: "Berlin",
+      }),
+      deps(),
+    );
+    expect(out.currentStateEntries).toEqual([
+      {
+        fieldKey: "last_talked_about",
+        value: "Their trip",
+        entryDate: "2026-08-01",
+      },
+      { fieldKey: "current_location", value: "Berlin" },
+    ]);
   });
 
   it("maps non-blank Last Talked About + Current Location to currentStateEntries", () => {

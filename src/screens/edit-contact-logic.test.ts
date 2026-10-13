@@ -5,7 +5,9 @@ import {
   toFieldErrors,
 } from "@/components/ui/field-error-logic";
 import type { ContactEditRow, ContactForEdit } from "@/db/contact-read";
+import type { MemoryRow } from "@/db/memories-read";
 import {
+  applyMemoryPatch,
   type BuildEditInputDeps,
   buildBirthdayForStorage,
   buildEditInput,
@@ -14,9 +16,11 @@ import {
   EDIT_FIELD_REVEAL_ORDER,
   EDIT_SECTION_FIELD_MAP,
   type EditFormState,
-  type FuelDraftRow,
   isNeverContacted,
   type MemoryDraftRow,
+  memoryDraftRowToItem,
+  memoryRowToDraftRow,
+  type OffLimitsDraftRow,
   parseBirthdayForForm,
   resolveErrorSection,
   seedEditState,
@@ -422,41 +426,268 @@ describe("buildEditInput — knowledge-subdomain diffs (CAPT-04, §E)", () => {
     ]);
   });
 
-  it("off_limits diff is KIND-SCOPED: a non-off_limits seed row is NEVER a delete, and every add/edit carries kind:off_limits (DATA LOSS guard)", () => {
-    const seeded: FuelDraftRow[] = [
-      { id: 10, kind: "off_limits", text: "politics" },
-      { id: 11, kind: "recent", text: "coffee" }, // MUST never be computed as a delete
-      { id: 12, kind: "gift", text: "book" }, // MUST never be computed as a delete
+  it("current-state: a value equal to its seed emits nothing; a changed value emits exactly one (checker cycle 5 W-5)", () => {
+    const seed = { last_talked_about: "Their trip" };
+    expect(
+      buildEditInput(
+        state({ lastTalkedAbout: "Their trip" }),
+        deps({ seededCurrentState: seed }),
+      ).currentStateEntries,
+    ).toBeUndefined();
+    expect(
+      buildEditInput(
+        state({ lastTalkedAbout: "Their new job" }),
+        deps({ seededCurrentState: seed }),
+      ).currentStateEntries,
+    ).toEqual([{ fieldKey: "last_talked_about", value: "Their new job" }]);
+  });
+
+  it("current-state: an explicitly dated entry is sent with its date, even when the text equals the seed (D-65)", () => {
+    expect(
+      buildEditInput(
+        state({
+          lastTalkedAbout: "Their trip",
+          lastTalkedAboutDate: "2026-08-14",
+        }),
+        deps({ seededCurrentState: { last_talked_about: "Their trip" } }),
+      ).currentStateEntries,
+    ).toEqual([
+      {
+        fieldKey: "last_talked_about",
+        value: "Their trip",
+        entryDate: "2026-08-14",
+      },
+    ]);
+  });
+
+  it("Off Limits: every row is Off Limits; a removed seed row is a delete and a new row is a content-only add (D-11; NEW-1)", () => {
+    const seeded: OffLimitsDraftRow[] = [
+      { id: 10, text: "politics" },
+      { id: 11, text: "coffee" },
     ];
-    const draft: FuelDraftRow[] = [
-      // off_limits id 10 dropped -> should be the ONLY delete
-      { kind: "off_limits", text: "religion" }, // new off_limits -> add
-    ];
+    // A host draft still carrying the legacy editor's kind (until plan 14).
+    const hostDraft = { kind: "topic", text: "religion" };
+    const draft: OffLimitsDraftRow[] = [{ id: 11, text: "coffee" }, hostDraft];
 
     const out = buildEditInput(
       state({ offLimits: draft }),
       deps({ seededOffLimits: seeded }),
     );
 
-    expect(out.offLimits?.delete).toEqual([{ id: 10 }]); // only the off_limits row
-    expect(out.offLimits?.add).toEqual([
-      { kind: "off_limits", text: "religion" },
-    ]);
-    for (const add of out.offLimits?.add ?? []) {
-      expect(add.kind).toBe("off_limits");
-    }
+    expect(out.offLimits?.delete).toEqual([{ id: 10 }]);
+    expect(out.offLimits?.add).toEqual([{ text: "religion" }]);
+    expect(out.offLimits?.add?.[0]).not.toHaveProperty("kind");
+    expect(out.offLimits?.edit).toBeUndefined();
   });
 
-  it("off_limits edit in place forces kind:off_limits on the edit patch", () => {
-    const seeded: FuelDraftRow[] = [
-      { id: 20, kind: "off_limits", text: "old" },
+  it("Off Limits: an edit in place sends only the id and content fields", () => {
+    const seeded: OffLimitsDraftRow[] = [
+      { id: 20, label: null, text: "old", url: null },
     ];
+    const edited = {
+      id: 20,
+      kind: "off_limits",
+      label: null,
+      text: "new",
+      url: null,
+    };
     const out = buildEditInput(
-      state({ offLimits: [{ id: 20, kind: "off_limits", text: "new" }] }),
+      state({ offLimits: [edited] }),
       deps({ seededOffLimits: seeded }),
     );
     expect(out.offLimits?.edit).toEqual([
-      { id: 20, kind: "off_limits", text: "new" },
+      { id: 20, label: null, text: "new", url: null },
+    ]);
+  });
+
+  it("Off Limits: an extra key on an untouched row is not a change", () => {
+    const seeded: OffLimitsDraftRow[] = [{ id: 30, text: "same" }];
+    const draftRow = { id: 30, kind: "off_limits", text: "same" };
+    expect(
+      buildEditInput(
+        state({ offLimits: [draftRow] }),
+        deps({ seededOffLimits: seeded }),
+      ).offLimits,
+    ).toBeUndefined();
+  });
+
+  it("a deleted memory is only absent from the draft: the diff turns it into a delete at Save (D-104)", () => {
+    const seeded: MemoryDraftRow[] = [
+      { id: 5, type: "general", value: "keep" },
+      { id: 6, type: "general", value: "drop" },
+    ];
+    const out = buildEditInput(
+      state({ memories: [seeded[0]] }),
+      deps({ seededMemories: seeded }),
+    );
+    expect(out.memories).toEqual({ delete: [{ id: 6 }] });
+  });
+});
+
+// =============================================================================
+// Memory draft adapters and Allow AI as draft state (D-25, D-27, D-102, D-103;
+// checker cycle 2 W-1; convergence c1 F-U5).
+// =============================================================================
+
+function memoryRow(overrides: Partial<MemoryRow> = {}): MemoryRow {
+  return {
+    id: 41,
+    uid: "m-uid",
+    contact_id: 7,
+    type: "general",
+    custom_label: null,
+    value: "A thing",
+    note: null,
+    url: null,
+    meaningful_date: null,
+    pinned: 0,
+    outdated: 0,
+    hidden: null,
+    provenance: "user",
+    created_at: NOW,
+    modified_at: NOW,
+    deleted_at: null,
+    allow_ai: 0,
+    interaction_id: null,
+    link_source: null,
+    group_note_copy: 0,
+    linked_note_ai_locked: 0,
+    ...overrides,
+  };
+}
+
+describe("memory draft adapters (D-25, D-102, D-103)", () => {
+  it("round-trips group_note_copy and linked_note_ai_locked through the draft", () => {
+    const copy = memoryRow({ group_note_copy: 1 });
+    const locked = memoryRow({ id: 42, linked_note_ai_locked: 1 });
+    const copyItem = memoryDraftRowToItem(memoryRowToDraftRow(copy), 7);
+    const lockedItem = memoryDraftRowToItem(memoryRowToDraftRow(locked), 7);
+    expect(copyItem.group_note_copy).toBe(1);
+    expect(copyItem.linked_note_ai_locked).toBe(0);
+    expect(lockedItem.group_note_copy).toBe(0);
+    expect(lockedItem.linked_note_ai_locked).toBe(1);
+  });
+
+  it("round-trips provenance import and allow_ai 1", () => {
+    const row = memoryRow({ provenance: "import", allow_ai: 1 });
+    const draft = memoryRowToDraftRow(row);
+    expect(draft).toMatchObject({ id: 41, provenance: "import", allowAi: 1 });
+    const item = memoryDraftRowToItem(draft, 7);
+    expect(item.provenance).toBe("import");
+    expect(item.allow_ai).toBe(1);
+    expect(item.id).toBe(41);
+    expect(item.interaction_id).toBeNull();
+    expect(item.link_source).toBeNull();
+  });
+
+  it("a draft with no provenance maps to user", () => {
+    const item = memoryDraftRowToItem({ type: "general", value: "new" }, 7);
+    expect(item.provenance).toBe("user");
+    expect(item.allow_ai).toBe(0);
+    expect(item.group_note_copy).toBe(0);
+    expect(item.linked_note_ai_locked).toBe(0);
+  });
+
+  it("applyMemoryPatch keeps provenance, the lock markers and the id, and takes the patched text (F-U5)", () => {
+    const row = memoryRowToDraftRow(
+      memoryRow({ provenance: "import", group_note_copy: 1 }),
+    );
+    const patched = applyMemoryPatch(row, {
+      type: "general",
+      value: "Edited text",
+      provenance: "user",
+      groupNoteCopy: 0,
+    });
+    expect(patched).toMatchObject({
+      id: 41,
+      value: "Edited text",
+      provenance: "import",
+      groupNoteCopy: 1,
+      linkedNoteAiLocked: 0,
+    });
+  });
+
+  it("an untouched seeded row diffs equal (no edit)", () => {
+    const seeded = [memoryRowToDraftRow(memoryRow({ provenance: "import" }))];
+    expect(
+      buildEditInput(
+        state({ memories: seeded.map((row) => ({ ...row })) }),
+        deps({ seededMemories: seeded }),
+      ).memories,
+    ).toBeUndefined();
+  });
+});
+
+describe("buildEditInput — Allow AI is draft state (D-27, D-102, D-103)", () => {
+  it("an Allow AI change on an existing memory becomes allowAi on its edit patch", () => {
+    const seeded = [memoryRowToDraftRow(memoryRow())];
+    const out = buildEditInput(
+      state({ memories: [{ ...seeded[0], allowAi: 1 }] }),
+      deps({ seededMemories: seeded }),
+    );
+    expect(out.memories?.edit).toHaveLength(1);
+    expect(out.memories?.edit?.[0]).toMatchObject({ id: 41, allowAi: 1 });
+  });
+
+  it("an unchanged Allow AI is not sent, and the edit patch never carries provenance or markers", () => {
+    const seeded = [memoryRowToDraftRow(memoryRow({ provenance: "import" }))];
+    const out = buildEditInput(
+      state({ memories: [{ ...seeded[0], value: "changed" }] }),
+      deps({ seededMemories: seeded }),
+    );
+    const patch = out.memories?.edit?.[0];
+    expect(patch).toMatchObject({ id: 41, value: "changed" });
+    expect(patch).not.toHaveProperty("allowAi");
+    expect(patch).not.toHaveProperty("provenance");
+    expect(patch).not.toHaveProperty("groupNoteCopy");
+    expect(patch).not.toHaveProperty("linkedNoteAiLocked");
+  });
+
+  it("a Group Note copy set to allowAi 1 emits no allowAi 1 and no marker fields (W-1)", () => {
+    const seeded = [memoryRowToDraftRow(memoryRow({ group_note_copy: 1 }))];
+    const out = buildEditInput(
+      state({ memories: [{ ...seeded[0], allowAi: 1 }] }),
+      deps({ seededMemories: seeded }),
+    );
+    expect(out.memories).toBeUndefined();
+    const edited = buildEditInput(
+      state({ memories: [{ ...seeded[0], allowAi: 1, value: "edited" }] }),
+      deps({ seededMemories: seeded }),
+    );
+    const patch = edited.memories?.edit?.[0];
+    expect(patch).toMatchObject({ id: 41, value: "edited" });
+    expect(patch).not.toHaveProperty("allowAi");
+    expect(patch).not.toHaveProperty("groupNoteCopy");
+    expect(patch).not.toHaveProperty("linkedNoteAiLocked");
+  });
+
+  it("a locked linked memory set to allowAi 1 emits no allowAi 1 and no marker fields (W-1)", () => {
+    const seeded = [
+      memoryRowToDraftRow(memoryRow({ linked_note_ai_locked: 1 })),
+    ];
+    const out = buildEditInput(
+      state({ memories: [{ ...seeded[0], allowAi: 1, value: "edited" }] }),
+      deps({ seededMemories: seeded }),
+    );
+    const patch = out.memories?.edit?.[0];
+    expect(patch).toMatchObject({ id: 41, value: "edited" });
+    expect(patch).not.toHaveProperty("allowAi");
+    expect(patch).not.toHaveProperty("linkedNoteAiLocked");
+  });
+
+  it("a new memory's add carries its Allow AI choice but never a lock marker", () => {
+    const out = buildEditInput(
+      state({
+        memories: [
+          { type: "general", value: "new", allowAi: 1 },
+          { type: "general", value: "odd", allowAi: 1, groupNoteCopy: 1 },
+        ],
+      }),
+      deps(),
+    );
+    expect(out.memories?.add).toEqual([
+      { type: "general", value: "new", allowAi: 1 },
+      { type: "general", value: "odd", allowAi: 0 },
     ]);
   });
 });

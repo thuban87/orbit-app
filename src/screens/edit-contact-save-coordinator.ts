@@ -13,8 +13,8 @@ import { advanceBaseline } from "@/logic/committed-baseline";
 import type {
   CurrentStateSeed,
   EditFormState,
-  FuelDraftRow,
   MemoryDraftRow,
+  OffLimitsDraftRow,
   RelationshipDraftRow,
 } from "./edit-contact-logic";
 
@@ -22,7 +22,7 @@ export interface EditContactBaselines {
   form: EditFormState;
   memories: MemoryDraftRow[];
   relationships: RelationshipDraftRow[];
-  offLimits: FuelDraftRow[];
+  offLimits: OffLimitsDraftRow[];
   currentState: CurrentStateSeed;
   links: ContactLinkRow[];
   linksDraft: DraftLink[];
@@ -69,14 +69,16 @@ export interface EditContactSaveArgs {
   seededLinks: ContactLinkRow[];
   seededMemories: MemoryDraftRow[];
   seededRelationships: RelationshipDraftRow[];
-  seededOffLimits: FuelDraftRow[];
+  seededOffLimits: OffLimitsDraftRow[];
   initialTrackingEnabled: boolean;
   neverContacted: boolean;
   toMemoryDraft: (row: MetadataResult["memories"][number]) => MemoryDraftRow;
   toRelationshipDraft: (
     row: MetadataResult["relationships"][number],
   ) => RelationshipDraftRow;
-  toOffLimitsDraft: (row: MetadataResult["offLimits"][number]) => FuelDraftRow;
+  toOffLimitsDraft: (
+    row: MetadataResult["offLimits"][number],
+  ) => OffLimitsDraftRow;
   afterMetadataCommit?: () => void | Promise<void>;
   refresh: () => Promise<unknown>;
   writeMetadata?: typeof updateContactFull;
