@@ -21,11 +21,19 @@
  *     can never surface (review LOW #4): memories use `resolveVisibility`;
  *     relationships EXCLUDE hidden via `resolveRelationshipVisibility` (the list
  *     returns hidden rows, so the filter is REQUIRED); current-state uses
- *     `getCurrentStateValues` (is_current = 1) ONLY — never the history read;
- *     custom fields come from the populated-only `readPopulatedCustomFields`.
- *   - Off Limits is projected as a read-only "Avoid" group: `isOffLimits = true`,
- *     `aiEligible = false` ALWAYS. Off Limits is NEVER carried to AI in any form
- *     and can NEVER be Message Focus (D-14 / ADR-107, T-35-16).
+ *     `getCurrentStateValues` (each field's Most Recent entry by date, D-45)
+ *     ONLY — never the history read; custom fields come from the
+ *     populated-only `readPopulatedCustomFields`.
+ *   - Memory `aiEligible` comes from the SAME SQL predicate as the AI read
+ *     (`listAiEligibleMemories`), so a linked memory whose interaction has AI
+ *     off can never be Message Focus (D-49).
+ *   - Off Limits is projected as a read-only Off Limits group (D-87):
+ *     `isOffLimits = true`, `aiEligible = false` ALWAYS. Off Limits is NEVER
+ *     carried to AI in any form and can NEVER be Message Focus (D-09, D-10;
+ *     ADR-107, T-35-16).
+ *   - Values stay the raw stored text: Message Focus sends `value` to AI, and
+ *     display formatting happens at render in `compose-research-logic.ts`
+ *     (38.9 D-66/D-70). This module formats nothing.
  *   - Operational / derived status (gravity, intensity) is EXCLUDED — Research
  *     shows conversation-relevant knowledge, not operational metadata (COMP-08).
  * =============================================================================
@@ -36,6 +44,7 @@ import {
   getFirstClassFields,
 } from "@/db/first-class-knowledge-read";
 import {
+  listAiEligibleMemories,
   listMemoriesForContact,
   type MemoryRow,
   resolveVisibility,
@@ -48,10 +57,8 @@ import {
   PROVISIONAL_MEMORY_LABEL,
   RELATIONSHIPS_GROUP,
 } from "@/db/memory-registry";
-import {
-  readPopulatedCustomFields,
-  readProfileOffLimits,
-} from "@/db/profile-knowledge-read";
+import { listOffLimitsForContact } from "@/db/off-limits-read";
+import { readPopulatedCustomFields } from "@/db/profile-knowledge-read";
 import {
   listRelationshipsForContact,
   resolveRelationshipVisibility,
@@ -64,13 +71,20 @@ import { plural } from "@/utils/plural";
  * One normalized, display-ready knowledge item for the Research side.
  *
  * `aiEligible` is derived ONCE here from the item's own source-specific permission
- * (memory `allow_ai` / custom-field `share_with_ai`; every other source is false).
- * `isOffLimits` marks the read-only Avoid group, which is always `aiEligible:
- * false`. `id` is a stable `sourceType:sourceId` identity used by the session
- * store to dedupe / toggle Message Focus by identity.
+ * (the memory AI predicate in SQL / custom-field `share_with_ai`; every other
+ * source is false). `isOffLimits` marks the read-only Off Limits group, which
+ * is always `aiEligible: false`. `id` is a stable `sourceType:sourceId`
+ * identity used by the session store to dedupe / toggle Message Focus by
+ * identity.
  */
 export interface ResearchItem {
   id: string;
+  /**
+   * A stable group key (`current`, `basics`, `key_people`, `memory:<type>`,
+   * `custom:<group>`, `off_limits`). The screen groups and keys by it, never by
+   * the display name, so two groups sharing a name stay distinct (D-29, J-X01).
+   */
+  groupId: string;
   group: string;
   label: string;
   value: string;
@@ -82,21 +96,42 @@ export interface ResearchItem {
    * stored text, and Message Focus projects only `label` and `value`.
    */
   fieldType?: FieldType;
+  /**
+   * Memory items only: the raw stored meaningful date, formatted at render
+   * (D-29). Never projected to Message Focus.
+   */
+  meaningfulDate?: string;
+  /**
+   * Current-state items only: the raw entry date (D-41), formatted at render
+   * (D-29). Never projected to Message Focus.
+   */
+  entryDate?: string;
 }
 
 /** Display group names for sources without a registry group of their own. */
 const CURRENT_STATE_GROUP = "Current";
 const BASICS_GROUP = "Basics";
 const CUSTOM_GROUP = "Custom";
-const AVOID_GROUP = "Avoid";
+const OFF_LIMITS_GROUP = "Off Limits";
 
-/** The human-readable group label for a memory (mirrors the Profile surface). */
-function memoryGroupLabel(row: MemoryRow): string {
-  // D-86: any memory's label wins, so a converted custom memory keeps it.
-  if (row.custom_label) return row.custom_label;
+/**
+ * A memory's section name: the registry display name of its type, so Gift
+ * Ideas and Thought of Them show as their own sections like Memories (D-29,
+ * D-91, D-89 one registry), matching the Profile's sections.
+ */
+function memorySectionName(row: MemoryRow): string {
   return isMemoryTypeKey(row.type)
     ? MEMORY_TYPE_REGISTRY[row.type].displayName
     : PROVISIONAL_MEMORY_LABEL;
+}
+
+/**
+ * A memory's item label: its own label when it has one (D-86 keeps a converted
+ * custom memory's label), else its section name. The screen hides a label that
+ * repeats its group heading (J-09).
+ */
+function memoryItemLabel(row: MemoryRow): string {
+  return row.custom_label?.trim() || memorySectionName(row);
 }
 
 /**
@@ -147,6 +182,7 @@ export async function readComposeResearch(
     firstClass,
     relationships,
     memories,
+    eligibleMemories,
     customGroups,
     offLimits,
   ] = await Promise.all([
@@ -154,24 +190,29 @@ export async function readComposeResearch(
     getFirstClassFields(exec, contactId),
     listRelationshipsForContact(exec, contactId),
     listMemoriesForContact(exec, contactId),
+    listAiEligibleMemories(exec, contactId),
     readPopulatedCustomFields(exec, contactId),
-    readProfileOffLimits(exec, contactId),
+    listOffLimitsForContact(exec, contactId),
   ]);
+  const eligibleIds = new Set(eligibleMemories.map((row) => row.id));
 
   const items: ResearchItem[] = [];
 
-  // 1. Current state — getCurrentStateValues is `is_current = 1` ONLY; a
-  //    superseded/historical entry can never leak in (never the retained history read).
+  // 1. Current state — getCurrentStateValues returns each field's Most Recent
+  //    entry by date (D-45) ONLY; an earlier entry can never leak in (never the
+  //    retained history read).
   for (const key of CURRENT_STATE_FIELD_KEYS) {
     const entry = currentValues[key];
     if (!entry) continue;
     items.push({
       id: `current:${key}`,
+      groupId: "current",
       group: CURRENT_STATE_GROUP,
       label: CURRENT_STATE_FIELD_REGISTRY[key].displayName,
       value: entry.value,
       aiEligible: false,
       isOffLimits: false,
+      entryDate: entry.entry_date,
     });
   }
 
@@ -180,6 +221,7 @@ export async function readComposeResearch(
     for (const field of firstClassResearchItems(firstClass)) {
       items.push({
         id: `firstclass:${field.key}`,
+        groupId: "basics",
         group: BASICS_GROUP,
         label: field.label,
         value: field.value,
@@ -195,6 +237,7 @@ export async function readComposeResearch(
     if (resolveRelationshipVisibility(row.hidden) !== "show") continue;
     items.push({
       id: `relationship:${row.id}`,
+      groupId: "key_people",
       group: RELATIONSHIPS_GROUP.displayName,
       label: row.person_name,
       value: row.relation_type ?? row.linked_contact_name ?? row.note ?? "",
@@ -203,18 +246,25 @@ export async function readComposeResearch(
     });
   }
 
-  // 4. Memories — visible only (soft-deleted already dropped by the read); per-item
-  //    allow_ai is the ONLY Add-to-AI eligibility truth.
+  // 4. Memories (every memory-type section) — visible only (soft-deleted
+  //    already dropped by the read). Add-to-AI eligibility is membership in the
+  //    SQL-gated AI read, never a JS re-derivation (D-13, D-49).
   for (const row of memories) {
     if (resolveVisibility(row.type, row.hidden) !== "show") continue;
-    items.push({
+    const item: ResearchItem = {
       id: `memory:${row.id}`,
-      group: memoryGroupLabel(row),
-      label: memoryGroupLabel(row),
+      groupId: `memory:${row.type}`,
+      group: memorySectionName(row),
+      label: memoryItemLabel(row),
       value: row.value ?? row.note ?? "",
-      aiEligible: row.allow_ai === 1,
+      aiEligible: eligibleIds.has(row.id),
       isOffLimits: false,
-    });
+    };
+    items.push(
+      row.meaningful_date
+        ? { ...item, meaningfulDate: row.meaningful_date }
+        : item,
+    );
   }
 
   // 5. Custom fields — populated only; per-field share_with_ai drives eligibility.
@@ -222,6 +272,7 @@ export async function readComposeResearch(
     for (const field of group.items) {
       items.push({
         id: `custom:${field.fieldDefId}`,
+        groupId: `custom:${group.name ?? ""}`,
         group: group.name ?? CUSTOM_GROUP,
         label: field.label,
         value: field.rawValue ?? "",
@@ -232,12 +283,15 @@ export async function readComposeResearch(
     }
   }
 
-  // 6. Off Limits → the read-only Avoid group; never Add-to-AI, never Message Focus.
+  // 6. Off Limits → the read-only Off Limits group (D-87); never Add-to-AI,
+  //    never Message Focus (D-10). An unlabeled item has an empty label, so its
+  //    text shows once with no label line and no fallback wording (D-111).
   for (const row of offLimits) {
     items.push({
       id: `offlimits:${row.id}`,
-      group: AVOID_GROUP,
-      label: row.label ?? AVOID_GROUP,
+      groupId: "off_limits",
+      group: OFF_LIMITS_GROUP,
+      label: row.label?.trim() ? row.label : "",
       value: row.text ?? "",
       aiEligible: false,
       isOffLimits: true,

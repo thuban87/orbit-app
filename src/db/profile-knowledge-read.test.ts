@@ -6,10 +6,10 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { addOffLimits } from "@/db/off-limits-dao";
+import { listOffLimitsForContact } from "@/db/off-limits-read";
 import {
   readPopulatedCustomFields,
   readProfileKnowledge,
-  readProfileOffLimits,
 } from "@/db/profile-knowledge-read";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -310,7 +310,7 @@ describe("Profile knowledge projection", () => {
     const expected = [
       expect.objectContaining({ contact_id: owner, text: "Avoid layoffs" }),
     ];
-    expect(await readProfileOffLimits(readOnly(), owner)).toEqual(expected);
+    expect(await listOffLimitsForContact(readOnly(), owner)).toEqual(expected);
     expect((await readProfileKnowledge(readOnly(), owner)).offLimits).toEqual(
       expected,
     );

@@ -270,18 +270,6 @@ export async function readPopulatedCustomFields(
 }
 
 /**
- * Owner-facing Off Limits projection (D-36): the `off_limits` table through
- * its own read. It is never reused for ranking or AI (D-09). Kept as a
- * delegating name for `compose-research-read` until plan 06 retargets it.
- */
-export function readProfileOffLimits(
-  exec: ReadOnlyExecutor,
-  contactId: number,
-): Promise<OffLimitsRow[]> {
-  return listOffLimitsForContact(exec, contactId);
-}
-
-/**
  * Read renderer-neutral Profile knowledge without flattening its semantic owners.
  * Hidden rows are counted for administration but never admitted to visible caps;
  * featured rows are references and are removed from their ordinary child lists.
@@ -296,7 +284,8 @@ export async function readProfileKnowledge(
       listRelationshipsForContact(exec, contactId),
       listMemoriesForContact(exec, contactId),
       readCustomFields(exec, contactId),
-      readProfileOffLimits(exec, contactId),
+      // Owner-facing Off Limits (D-36); never reused for AI (D-09).
+      listOffLimitsForContact(exec, contactId),
     ]);
 
   const visibleRelationships = relationshipRows.filter(

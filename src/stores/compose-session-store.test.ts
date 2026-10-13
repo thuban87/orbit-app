@@ -29,6 +29,7 @@ afterEach(() => {
 function researchItem(overrides: Partial<ResearchItem> = {}): ResearchItem {
   return {
     id: "memory:1",
+    groupId: "memory:general",
     group: "Memory",
     label: "Memory",
     value: "Bring the recipe",

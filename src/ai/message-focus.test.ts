@@ -10,6 +10,7 @@ const item = (
   overrides: Partial<ResearchItem> = {},
 ): ResearchItem => ({
   id,
+  groupId: "memory:general",
   group: "Memories",
   label: `Label ${id}`,
   value,

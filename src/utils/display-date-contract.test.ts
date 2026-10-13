@@ -168,11 +168,16 @@ describe("stored-birthday display sites (D-70)", () => {
     },
   );
 
-  it("Research formats only the firstclass:birthday caption", () => {
+  it("Research formats the birthday, meaningful and entry dates at render only (D-29)", () => {
     const helper = codeOnly(source("src/screens/compose-research-logic.ts"));
     expect(helper).toMatch(
       /item\.id === "firstclass:birthday"\)\s*\{\s*return formatStoredBirthdayForDisplay\(item\.value\);/,
     );
+    // Memory meaningful dates and current-state entry dates go through the
+    // D-48 formatter with a raw fallback; the birthday formatter is not reused.
+    expect(helper).toMatch(/formatDisplayDateOrFallback\(date, date\)/);
+    expect(helper).toMatch(/withDate\(item\.value, item\.meaningfulDate\)/);
+    expect(helper).toMatch(/withDate\(item\.value, item\.entryDate\)/);
     const screen = codeOnly(source("src/screens/ComposeResearchScreen.tsx"));
     expect(screen).toContain("researchItemDisplayValue(item)");
     // Add to AI carries the raw item.

@@ -1078,7 +1078,13 @@ describe("move Undo (D-118)", () => {
       expect(back).toHaveLength(1);
       const { modified_at: _a, ...originalFields } = original;
       const { modified_at: _b, ...restoredFields } = back[0];
-      expect(restoredFields).toEqual(
+      // Compare the stored columns only: the public memory read also projects
+      // a derived column (linked_note_ai_locked) the raw row does not have.
+      expect(
+        Object.fromEntries(
+          Object.entries(restoredFields).filter(([key]) => key in original),
+        ),
+      ).toEqual(
         Object.fromEntries(
           Object.entries(originalFields).filter(([key]) => key in back[0]),
         ),

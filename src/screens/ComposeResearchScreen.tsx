@@ -3,11 +3,16 @@
  * to Remember" Research side of Compose.
  *
  * This is a COMPACT, read-only PROJECTION over the normalized `ResearchItem[]`
- * from `compose-research-read` — NOT the full `ThingsToRememberScreen` editor. It
+ * from `compose-research-read` — NOT a knowledge editor. It
  * reuses ONLY the read boundary; it imports no editor component, no mutation DAO,
  * and exposes no add / edit / delete. It shows only populated conversation-relevant
  * groups (empty groups are simply absent) with Off Limits rendered as a distinct,
- * read-only "Avoid" group that never exposes Add to AI.
+ * read-only Off Limits group that never exposes Add to AI (D-87, D-10).
+ *
+ *   - Groups are keyed by `ResearchItem.groupId` in first-seen order, so one
+ *     section never appears twice and React keys stay unique (D-29, J-X01).
+ *   - Values render through `compose-research-logic.ts` (display only, D-29);
+ *     Add to AI always carries the raw item.
  *
  *   - Eligibility is CONSUMED, never re-derived: an Add to AI / "Added ✓" toggle is
  *     rendered only where `ResearchItem.aiEligible` is true; the screen never reads
@@ -38,7 +43,11 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
-import { researchItemDisplayValue } from "./compose-research-logic";
+import {
+  groupResearchItems,
+  researchItemDisplayValue,
+  researchItemShowsLabel,
+} from "./compose-research-logic";
 
 const LOG_SCOPE = "compose-research";
 
@@ -64,26 +73,6 @@ export function ComposeResearchRoute({
   route,
 }: RootStackScreenProps<"ComposeResearch">) {
   return <ComposeResearchScreen contactId={route.params.contactId} />;
-}
-
-/** One consecutive run of items sharing a display group. */
-interface ResearchGroup {
-  name: string;
-  items: ResearchItem[];
-}
-
-/** Fold the already-ordered item list into consecutive display groups. */
-function groupItems(items: ResearchItem[]): ResearchGroup[] {
-  const groups: ResearchGroup[] = [];
-  for (const item of items) {
-    const last = groups[groups.length - 1];
-    if (last && last.name === item.group) {
-      last.items.push(item);
-    } else {
-      groups.push({ name: item.group, items: [item] });
-    }
-  }
-  return groups;
 }
 
 export function ComposeResearchScreen({
@@ -132,7 +121,7 @@ export function ComposeResearchScreen({
     }, [contactId, startSession]),
   );
 
-  const groups = useMemo(() => groupItems(items), [items]);
+  const groups = useMemo(() => groupResearchItems(items), [items]);
   const selectedIds = useMemo(
     () => new Set(messageFocus.map((item) => item.id)),
     [messageFocus],
@@ -165,15 +154,20 @@ export function ComposeResearchScreen({
           <>
             <AppText role="label">Things to Remember</AppText>
             {groups.map((group) => (
-              <View key={group.name} style={styles.group}>
+              <View key={group.id} style={styles.group}>
                 <AppText role="label" style={{ color: colors.textSecondary }}>
                   {group.name}
                 </AppText>
                 {group.items.map((item) => (
                   <View key={item.id} style={styles.row}>
                     <View style={styles.rowText}>
-                      <AppText role="label">{item.label}</AppText>
-                      {item.value ? (
+                      {/* An empty label (an unlabeled Off Limits item, D-111)
+                          or one repeating its group heading (J-09) draws no
+                          label line, so the text shows once. */}
+                      {researchItemShowsLabel(item, group.name) ? (
+                        <AppText role="label">{item.label}</AppText>
+                      ) : null}
+                      {researchItemDisplayValue(item) ? (
                         <AppText role="caption">
                           {/* Render only (38.9 D-66, D-70; C7-L2): the item
                               value and what Add to AI carries stay raw. */}
