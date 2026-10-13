@@ -15,8 +15,8 @@ import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { KeyPeopleEditorScreen } from "@/screens/KeyPeopleEditorScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
+import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
-import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
@@ -68,7 +68,7 @@ export function OrreryStack() {
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
       <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
-      <Stack.Screen name="Memory" component={MemoryScreen} />
+      <Stack.Screen name="Memory" component={MemoryAddScreen} />
       <Stack.Screen
         name="ThingsToRemember"
         component={ThingsToRememberScreen}

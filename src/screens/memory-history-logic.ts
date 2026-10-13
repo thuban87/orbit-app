@@ -15,12 +15,19 @@
  * - Move is offered only from Last Talked About: Current Location is not a
  *   D-84 section (convergence c1 F-U12).
  *
+ * The + → Memory add form's rules live here too (D-63, D-64; G-11):
+ * the success label and whether the flow returns to that same Profile.
+ *
  * Every snackbar string here is a proposal (this plan only) for the plan-19
- * wording review. React-native-free and DAO-free at runtime (type-only DAO
+ * wording review, except "Memory saved for <name>" (D-64, owner-decided). React-native-free and DAO-free at runtime (type-only DAO
  * imports), so it is unit-tested in the node env.
  */
 import type { CurrentStateEntryRow } from "@/db/current-state-history-read";
-import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import {
+  type CurrentStateFieldKey,
+  MEMORY_TYPE_REGISTRY,
+  type MemoryTypeKey,
+} from "@/db/memory-registry";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
 import { formatDisplayDateOrFallback, formatLocalDate } from "@/utils/dates";
 import { deletedSnackbar, restoredSnackbar } from "./section-editor-logic";
@@ -151,4 +158,49 @@ export function historyRestoredSnackbar(
   name: string | null,
 ): string {
   return restoredSnackbar(title, name);
+}
+
+/** " for Ann", or "" while the person line has not loaded. */
+function forName(name: string | null): string {
+  return name === null || name.trim() === "" ? "" : ` for ${name}`;
+}
+
+/**
+ * The + → Memory success label (D-64, G-11; convergence c2 G-U6). With no
+ * type (+ → Memory) or the general type it is exactly "Memory saved for
+ * <name>" (D-64, owner-decided). A Profile section's Add passes its type, and
+ * the label names that section from the registry (D-89): "Saved to Gift Ideas
+ * for <name>" (proposal, this plan only, for the plan-19 wording review).
+ */
+export function memorySavedLabel(
+  type: MemoryTypeKey | undefined,
+  name: string | null,
+): string {
+  if (type === "gift_idea" || type === "thought_of_them") {
+    return `Saved to ${MEMORY_TYPE_REGISTRY[type].displayName}${forName(name)}`;
+  }
+  return `Memory saved${forName(name)}`;
+}
+
+/** The slice of a stack's navigation state `returnsToSameProfile` reads. */
+export interface StackRouteLike {
+  name: string;
+  params?: object;
+}
+
+/**
+ * Whether going back from the add form lands on this contact's Profile
+ * (convergence c1 F-U11, Claude C-15): the route directly below the focused
+ * one is `Profile` with the same `contactId`. Then the success snackbar drops
+ * its "Open Profile" action, since the user is already there.
+ */
+export function returnsToSameProfile(
+  routes: readonly StackRouteLike[],
+  index: number,
+  contactId: number,
+): boolean {
+  const below = index >= 1 ? routes[index - 1] : undefined;
+  if (below === undefined || below.name !== "Profile") return false;
+  const params = below.params as { contactId?: unknown } | undefined;
+  return params?.contactId === contactId;
 }

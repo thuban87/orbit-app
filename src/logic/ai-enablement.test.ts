@@ -35,7 +35,8 @@ describe("isAiMasterEnabled", () => {
 
 describe("Memory hosts derive AI availability from the canonical master", () => {
   const HOSTS = [
-    "src/screens/MemoryScreen.tsx",
+    // 38.10 plan 17: the + → Memory add form (D-63).
+    "src/screens/MemoryAddScreen.tsx",
     "src/screens/ThingsToRememberScreen.tsx",
     "src/screens/EditContactScreen.tsx",
     // 38.10: the per-section memory editor (plan 13). The Add Note sheet

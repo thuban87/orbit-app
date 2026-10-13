@@ -15,8 +15,8 @@ import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { KeyPeopleEditorScreen } from "@/screens/KeyPeopleEditorScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
+import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
-import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
@@ -44,7 +44,7 @@ const DIGEST_ROUTE_COMPONENTS = {
   Create: CreateContactScreen,
   GroupLog: GroupLogScreen,
   UpdateContact: UpdateContactScreen,
-  Memory: MemoryScreen,
+  Memory: MemoryAddScreen,
   Edit: EditContactScreen,
   EditInteraction: EditInteractionScreen,
   ThingsToRemember: ThingsToRememberScreen,

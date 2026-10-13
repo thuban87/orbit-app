@@ -39,17 +39,17 @@ function functionBody(source: string, name: string): string {
 }
 
 describe("+ → Memory: Back and Cancel close the draft first (G-12; D-14, D-61)", () => {
-  const screen = read("src/screens/MemoryScreen.tsx");
+  const screen = read("src/screens/MemoryAddScreen.tsx");
   const editor = read("src/components/MemoryEditor.tsx");
 
-  it("MemoryScreen guards with a sub-editor that closes the draft, and no route dirt", () => {
+  it("MemoryAddScreen guards with a sub-editor that closes the draft, and no route dirt", () => {
     expect(screen).toMatch(
       /useDiscardKeepGuard\(\{[\s\S]*?hasUnsavedChanges:\s*false/,
     );
     expect(screen).toMatch(/subEditor:\s*\{[\s\S]*?closeDraft\(\)/);
   });
 
-  it("MemoryScreen routes the editor's Cancel through requestClose", () => {
+  it("MemoryAddScreen routes the editor's Cancel through requestClose", () => {
     expect(screen).toMatch(
       /onCancelRequest=\{\(close\)\s*=>\s*requestClose\(close,/,
     );

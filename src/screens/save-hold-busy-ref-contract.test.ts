@@ -122,9 +122,9 @@ const CASES: ScreenCase[] = [
     backDisabled: "saving",
   },
   {
-    path: "src/screens/MemoryScreen.tsx",
+    path: "src/screens/MemoryAddScreen.tsx",
     ref: "savingRef",
-    saves: ["const add = async (", "const edit = async ("],
+    saves: ["const add = async ("],
     backDisabled: "saving",
   },
   {
@@ -191,36 +191,18 @@ describe.each(CASES)(
   },
 );
 
-describe("MemoryScreen's Delete and Allow AI wait for an add or edit (third fix pass IN-01)", () => {
-  const source = read("src/screens/MemoryScreen.tsx");
+// The + → Memory form is add-only (38.10 D-63), so it has no edit, Delete
+// or Allow AI handler to pin (checker W16).
+describe("MemoryAddScreen lets a parked removal through only when a save fails (WR-01)", () => {
+  const source = read("src/screens/MemoryAddScreen.tsx");
 
-  it.each([
-    "const remove = (id: number): boolean =>",
-    "const setAllowAi = (id: number, allow: boolean): boolean =>",
-  ])(
-    "%s reports a drop while the ref is held, and acceptance otherwise",
-    (marker) => {
-      const start = source.indexOf(marker);
-      expect(start, marker).toBeGreaterThan(-1);
-      const body = blockFrom(source, start + marker.length, marker);
-      expect(body).toContain(
-        "if (contactId === null || savingRef.current) return false;",
-      );
-      expect(body.trimEnd().endsWith("return true;\n  }")).toBe(true);
-    },
-  );
-});
-
-describe("MemoryScreen lets a parked removal through only when a save fails (WR-01)", () => {
-  const source = read("src/screens/MemoryScreen.tsx");
-
-  it.each(["const add = async (", "const edit = async ("])(
+  it.each(["const add = async ("])(
     "%s skips the settle after a commit: its deferred goBack wins",
     (marker) => {
       const body = saveBody(source, marker);
       expect(body).toContain("let committed = false;");
       expect(body.indexOf("committed = true;")).toBeLessThan(
-        body.indexOf("returnToChooser();"),
+        body.indexOf("setSavedTick("),
       );
       expect(body).toContain("if (!committed) settleHold();");
     },
@@ -328,8 +310,8 @@ describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", ()
  * would otherwise close it (after a Discard prompt if dirty) while the save
  * committed anyway.
  */
-describe("MemoryScreen holds MemoryEditor's in-form controls while saving", () => {
-  const source = read("src/screens/MemoryScreen.tsx");
+describe("MemoryAddScreen holds MemoryEditor's in-form controls while saving", () => {
+  const source = read("src/screens/MemoryAddScreen.tsx");
 
   it("passes the save mirror to MemoryEditor as busy", () => {
     const tags = source.match(/<MemoryEditor\s[\s\S]*?\/>/g) ?? [];
@@ -338,7 +320,7 @@ describe("MemoryScreen holds MemoryEditor's in-form controls while saving", () =
   });
 
   it("the mirror is set beside the ref in both saves", () => {
-    for (const marker of ["const add = async (", "const edit = async ("]) {
+    for (const marker of ["const add = async ("]) {
       const body = saveBody(source, marker);
       expect(body.indexOf("setSaving(true)")).toBeGreaterThan(
         body.indexOf("beginInFlight(savingRef)"),

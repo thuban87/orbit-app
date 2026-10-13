@@ -27,6 +27,8 @@ import {
   historyTitle,
   isPickableEntryDate,
   maxPickableDate,
+  memorySavedLabel,
+  returnsToSameProfile,
   rowPressAction,
 } from "./memory-history-logic";
 import { openEditTarget } from "./section-editor-logic";
@@ -259,5 +261,59 @@ describe("titles and snackbars (D-89; 38.9 D-39/D-46; F-U8)", () => {
     expect(historyDeletedSnackbar("Last Talked About", null)).toBe(
       "Deleted Last Talked About entry",
     );
+  });
+});
+
+describe("memorySavedLabel (D-64; convergence c2 G-U6)", () => {
+  it("keeps the owner's wording for + → Memory and the general type", () => {
+    expect(memorySavedLabel(undefined, "Ana")).toBe("Memory saved for Ana");
+    expect(memorySavedLabel("general", "Ana")).toBe("Memory saved for Ana");
+  });
+
+  it("names a Profile section's type from the registry", () => {
+    expect(memorySavedLabel("gift_idea", "Ana")).toBe(
+      "Saved to Gift Ideas for Ana",
+    );
+    expect(memorySavedLabel("thought_of_them", "Ana")).toBe(
+      "Saved to Thought of Them for Ana",
+    );
+  });
+
+  it("drops the name while the person line has not loaded", () => {
+    expect(memorySavedLabel(undefined, null)).toBe("Memory saved");
+  });
+});
+
+describe("returnsToSameProfile (convergence c1 F-U11, Claude C-15)", () => {
+  const memory = { name: "Memory", params: { contactId: 7 } };
+
+  it("is true when that contact's Profile is directly below", () => {
+    const routes = [
+      { name: "Dashboard" },
+      { name: "Profile", params: { contactId: 7 } },
+      memory,
+    ];
+    expect(returnsToSameProfile(routes, 2, 7)).toBe(true);
+  });
+
+  it("is false for another contact's Profile", () => {
+    const routes = [{ name: "Profile", params: { contactId: 8 } }, memory];
+    expect(returnsToSameProfile(routes, 1, 7)).toBe(false);
+  });
+
+  it("is false for the Dashboard or nothing below", () => {
+    expect(returnsToSameProfile([{ name: "Dashboard" }, memory], 1, 7)).toBe(
+      false,
+    );
+    expect(returnsToSameProfile([memory], 0, 7)).toBe(false);
+  });
+
+  it("reads the route directly below, not any lower Profile", () => {
+    const routes = [
+      { name: "Profile", params: { contactId: 7 } },
+      { name: "EditContact", params: { contactId: 7 } },
+      memory,
+    ];
+    expect(returnsToSameProfile(routes, 2, 7)).toBe(false);
   });
 });

@@ -28,8 +28,8 @@ import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
 import { KeyPeopleEditorScreen } from "@/screens/KeyPeopleEditorScreen";
 import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
+import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
-import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
@@ -251,7 +251,7 @@ export function SettingsStack() {
       <Stack.Screen name="Create" component={SettingsCreateHostRoute} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
       <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
-      <Stack.Screen name="Memory" component={MemoryScreen} />
+      <Stack.Screen name="Memory" component={MemoryAddScreen} />
       {/* Knowledge-change edit routes (review cycle-2 HIGH): the History
           detail-sheet's knowledge-change edit reuses ContactProfileScreen's nav
           to ThingsToRemember; register both here (parallel to Dashboard/Orrery)

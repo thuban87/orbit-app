@@ -714,8 +714,9 @@ describe("useDiscardKeepGuard requestClose (D-61)", () => {
 });
 
 describe("+ → Memory Back sequence (G-12; D-14, review C2-M1)", () => {
-  // MemoryScreen's options: no route-level dirt, the open draft is the
-  // sub-editor, close = memoryEditorRef.current?.closeDraft().
+  // MemoryAddScreen's options: no route-level dirt, the open draft is the
+  // sub-editor, close = memoryEditorRef.current?.closeDraft(). (The screen
+  // then leaves once the add-only draft has closed.)
   const memoryGuard = (open: boolean, dirty: boolean, bypass = false) => {
     const closeDraft = vi.fn();
     const mounted = mountGuard(false, bypass, {
