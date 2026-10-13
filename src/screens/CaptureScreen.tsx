@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit Button's visual-role domain prop, not ARIA.
 /**
  * CaptureScreen (CAP-01/02/03/04; Phase 38.10 D-04, D-12, D-74, D-77, D-79,
  * D-83, D-89, D-100, D-120) — the share-sheet contact picker. Whatever the user
@@ -48,7 +49,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
   BackHandler,
-  FlatList,
   Keyboard,
   type LayoutChangeEvent,
   Pressable,
@@ -58,12 +58,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Avatar } from "@/components/Avatar";
+import { ContactPickerList } from "@/components/ContactPicker";
 import {
   type ShareCardActions,
   ShareConfirmationCard,
   type ShareConfirmationCardHandle,
 } from "@/components/ShareConfirmationCard";
+import { Button } from "@/components/ui/Button";
 import { sheetKeyboardLayout } from "@/components/ui/sheet-contract";
 import { NEW_CONTACT_DEFAULT_INTERVAL_DAYS } from "@/constants/new-contact-defaults";
 import {
@@ -108,7 +109,6 @@ import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
-import { plural } from "@/utils/plural";
 import { finishActivity } from "../../modules/orbit-share-finish";
 
 const LOG_SCOPE = "capture";
@@ -124,9 +124,6 @@ const UNDO_FAILED = {
   kind: "error",
   label: "Couldn't undo. Please try again.",
 } as const;
-
-/** The recycling-grid cell union: a real face, or the always-present ＋ tile. */
-type GridItem = { kind: "face"; row: CapturePickRow } | { kind: "new" };
 
 /** The share sequence and the payload snapshot it writes from. */
 interface SequenceState {
@@ -215,10 +212,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // A pick / multi Done / inline create write is in flight.
   const [committing, setCommitting] = useState(false);
 
-  // Multi-select (CAP-02): `multiSelect` is the mode flag, `selected` the chosen
-  // contact ids. Long-press enters the mode; tap toggles; Done fans out.
+  // Multi-select (CAP-02, I-09): the screen owns the mode flag for Back
+  // (38.9 D-33); the embedded list owns the selection and clears it when the
+  // flag turns off. "Select several" or a long-press enters it.
   const [multiSelect, setMultiSelect] = useState(false);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   // The card's note editor, mirrored for Back (38.9 D-33).
   const [noteOpen, setNoteOpen] = useState(false);
@@ -228,8 +225,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   const [inlineOpen, setInlineOpen] = useState(false);
   const [inlineName, setInlineName] = useState("");
 
-  // Tap-to-reveal search (CAP-01).
-  const [searchOpen, setSearchOpen] = useState(false);
+  // The always-visible search (D-80), owned here so Back can clear it first
+  // (38.9 D-33: "search open" means "search has text").
   const [searchText, setSearchText] = useState("");
 
   // ---- Share sequence (render-time; c3, c4, c11, c12) -------------------------
@@ -246,12 +243,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     setSequenceState(advanced);
     setCard(null);
     setMultiSelect(false);
-    setSelected(new Set());
     setNoteOpen(false);
     setNoteText("");
     setInlineOpen(false);
     setInlineName("");
-    setSearchOpen(false);
     setSearchText("");
   }
   const seq = current.sequence.seq;
@@ -309,10 +304,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     finishActivity();
   }, [resetShareIntent]);
 
-  // Leave multi-select WITHOUT writing — clears the selection and drops the bar.
+  // Leave multi-select WITHOUT writing; the list drops its selection.
   const exitMultiSelect = useCallback(() => {
     setMultiSelect(false);
-    setSelected(new Set());
   }, []);
 
   // Load the picker (favourites → share recency → rest, includes never-contacted,
@@ -348,9 +342,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     setInlineName("");
   }, []);
 
-  // Close the revealed search and restore the full grid.
+  // Clear the search text and restore the full list.
   const closeSearch = useCallback(() => {
-    setSearchOpen(false);
     setSearchText("");
   }, []);
 
@@ -367,7 +360,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         const outcome = resolveCaptureBack({
           inlineOpen,
           inlineName,
-          searchOpen,
+          searchOpen: searchText !== "",
           multiSelect,
           noteOpen,
           noteText,
@@ -404,7 +397,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     }, [
       inlineOpen,
       inlineName,
-      searchOpen,
+      searchText,
       multiSelect,
       noteOpen,
       noteText,
@@ -446,7 +439,6 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             names: people.map((person) => person.name),
           });
           setMultiSelect(false);
-          setSelected(new Set());
         },
         onError: (err) => {
           Logger.error(LOG_SCOPE, "failed to save share", err);
@@ -458,7 +450,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   );
 
   // Single-tap commit — save the share immediately, then show the card.
-  const onPickFace = useCallback(
+  const onPick = useCallback(
     async (row: CapturePickRow) => {
       // WR-01: the defensive twin of the list's disable.
       if (
@@ -474,46 +466,37 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     [card, shareTo],
   );
 
-  // Long-press a face → enter multi-select with that face selected.
-  const onLongPressFace = useCallback((row: CapturePickRow) => {
-    setMultiSelect(true);
-    setSelected(new Set([row.id]));
-  }, []);
-
-  // In multi-select, a tap TOGGLES a face in/out of the selection set.
-  const onToggleFace = useCallback((row: CapturePickRow) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(row.id)) {
-        next.delete(row.id);
-      } else {
-        next.add(row.id);
-      }
-      return next;
-    });
-  }, []);
-
   // Multi-select Done — N independent share rows in ONE transaction (CAP-02,
-  // D-79). B3: guarded at zero selection.
-  const onDoneMulti = useCallback(async () => {
-    if (selected.size === 0) return;
-    if (
-      shareListLocked({
-        cardMounted: card !== null,
-        writePending: isCommittingRef.current,
-      })
-    ) {
-      return;
-    }
-    const byId = new Map(rows.map((row) => [row.id, row]));
-    const people = [...selected]
-      .map((id) => byId.get(id))
-      .filter((row): row is CapturePickRow => row !== undefined);
-    await shareTo(people);
-  }, [selected, card, rows, shareTo]);
+  // D-79). The list keeps the selection when this throws, so a failed share
+  // can be retried: report it (snackbar), then rethrow (convergence c11).
+  const onConfirmMulti = useCallback(
+    async (contactIds: number[]) => {
+      if (contactIds.length === 0) return;
+      if (
+        shareListLocked({
+          cardMounted: card !== null,
+          writePending: isCommittingRef.current,
+        })
+      ) {
+        throw new Error("capture: a share is already being saved");
+      }
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const people = contactIds
+        .map((id) => byId.get(id))
+        .filter((row): row is CapturePickRow => row !== undefined);
+      const outcome = await shareTo(people);
+      if (outcome.status === "failed") throw outcome.error;
+      if (outcome.status === "busy") {
+        throw new Error("capture: a share is already being saved");
+      }
+    },
+    [card, rows, shareTo],
+  );
 
-  // Tap the ＋ tile → reveal the inline name-only create sheet.
-  const onOpenInlineCreate = useCallback(() => {
+  // "New contact" → the name-only create sheet, starting with the search
+  // text (D-82, I-07).
+  const onOpenInlineCreate = useCallback((typed: string) => {
+    setInlineName(typed.trim());
     setInlineOpen(true);
   }, []);
 
@@ -675,16 +658,6 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     [],
   );
 
-  // Reveal the demoted search field (autofocus happens only once revealed).
-  const onRevealSearch = useCallback(() => {
-    setSearchOpen(true);
-  }, []);
-
-  // Clear the query (✕) → restore the full grid; the field stays revealed.
-  const onClearSearch = useCallback(() => {
-    setSearchText("");
-  }, []);
-
   // ---- Render --------------------------------------------------------------
 
   const closePill = (
@@ -718,224 +691,90 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     );
   }
 
-  // Live-filter by name when the search field is revealed and non-blank (in-memory
-  // case-insensitive substring — the set is small). The ＋ tile is always appended,
-  // filtered or not, so inline-create stays reachable from any query.
-  const query = searchText.trim().toLowerCase();
-  const visibleRows =
-    searchOpen && query.length > 0
-      ? rows.filter((row) => row.name.toLowerCase().includes(query))
-      : rows;
-
-  const data: GridItem[] = [
-    ...visibleRows.map((row): GridItem => ({ kind: "face", row })),
-    { kind: "new" },
-  ];
-
-  const header = (
-    <View style={styles.headerBlock}>
-      <View style={styles.headerRow}>
-        {closePill}
-        <Text
-          testID="capture-title"
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
-          Save to…
-        </Text>
-        <Pressable
-          testID="capture-search-reveal"
-          accessibilityRole="button"
-          accessibilityLabel="Search contacts"
-          onPress={onRevealSearch}
-          style={styles.searchReveal}
-        >
-          <Text style={{ color: colors.textSecondary }}>🔍</Text>
-        </Pressable>
-      </View>
-
-      {/* Payload preview strip — WHAT is being filed, before WHO (the snapshot). */}
-      <View
-        testID="capture-payload-preview"
-        style={[
-          styles.preview,
-          {
-            backgroundColor: colors.surfaceElevated,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <Text
-          numberOfLines={1}
-          style={[styles.previewText, { color: colors.textPrimary }]}
-        >
-          {viewPayload.displayText ?? viewPayload.url}
-        </Text>
-        {viewPayload.url ? (
-          <Text
-            numberOfLines={1}
-            style={[styles.previewHost, { color: colors.textSecondary }]}
-          >
-            {hostOf(viewPayload.url)}
-          </Text>
-        ) : null}
-      </View>
-
-      {searchOpen ? (
-        <View style={styles.searchFieldRow}>
-          <TextInput
-            testID="capture-search-input"
-            autoFocus
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Search people"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          <Pressable
-            testID="capture-search-clear"
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-            onPress={onClearSearch}
-            style={styles.searchClear}
-          >
-            <Text style={{ color: colors.textSecondary }}>✕</Text>
-          </Pressable>
-        </View>
-      ) : null}
-    </View>
-  );
-
-  const renderItem = ({ item }: { item: GridItem }) => {
-    if (item.kind === "new") {
-      return (
-        <Pressable
-          testID="capture-new-contact-tile"
-          accessibilityRole="button"
-          accessibilityLabel="New contact"
-          accessibilityState={{ disabled: listLocked || multiSelect }}
-          disabled={listLocked || multiSelect}
-          onPress={onOpenInlineCreate}
-          style={[styles.tile, styles.newTile, { borderColor: colors.accent }]}
-        >
-          <View style={styles.newGlyphBox}>
-            <Text style={[styles.newGlyph, { color: colors.accentText }]}>
-              ＋
-            </Text>
-          </View>
-          <Text
-            numberOfLines={1}
-            style={[styles.tileName, { color: colors.textPrimary }]}
-          >
-            New contact
-          </Text>
-        </Pressable>
-      );
-    }
-
-    const { row } = item;
-    const isSelected = multiSelect && selected.has(row.id);
-    return (
-      <Pressable
-        testID={`capture-face-${row.id}`}
-        accessibilityRole="button"
-        accessibilityLabel={
-          multiSelect ? `Select ${row.name}` : `Save to ${row.name}`
-        }
-        accessibilityState={{ disabled: listLocked, selected: isSelected }}
-        disabled={listLocked}
-        onPress={() => (multiSelect ? onToggleFace(row) : void onPickFace(row))}
-        onLongPress={() => onLongPressFace(row)}
-        style={[
-          styles.tile,
-          isSelected ? styles.tileSelected : null,
-          isSelected ? { borderColor: colors.borderStrong } : null,
-        ]}
-      >
-        <View>
-          <Avatar
-            photo={row.photo}
-            name={row.name}
-            contactId={row.id}
-            size={64}
-          />
-          {isSelected ? (
-            <View
-              testID={`capture-face-check-${row.id}`}
-              style={[styles.checkBadge, { backgroundColor: colors.accent }]}
-            >
-              <Text style={[styles.checkGlyph, { color: colors.onAccent }]}>
-                ✓
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        <Text
-          numberOfLines={1}
-          style={[styles.tileName, { color: colors.textPrimary }]}
-        >
-          {row.name}
-        </Text>
-      </Pressable>
-    );
-  };
-
-  const doneDisabled = selected.size === 0 || committing;
-
   return (
-    <View style={{ flex: 1 }} onLayout={onRootLayout}>
-      <FlatList
-        testID="capture-picker-root"
-        data={data}
-        renderItem={renderItem}
-        keyExtractor={(item) =>
-          item.kind === "new" ? "new" : `face-${item.row.id}`
-        }
-        numColumns={3}
-        columnWrapperStyle={styles.column}
-        contentContainerStyle={[
-          styles.grid,
-          { paddingBottom: bottomOffset + 64 },
-        ]}
-        ListHeaderComponent={header}
-        keyboardShouldPersistTaps="handled"
-        extraData={rowsLoading}
-      />
+    <View
+      testID="capture-picker-root"
+      style={styles.root}
+      onLayout={onRootLayout}
+    >
+      <View style={styles.headerBlock}>
+        <View style={styles.headerRow}>
+          {closePill}
+          <Text
+            testID="capture-title"
+            accessibilityRole="header"
+            style={[styles.title, { color: colors.textPrimary }]}
+          >
+            Save to…
+          </Text>
+        </View>
 
-      {multiSelect && card === null ? (
+        {/* Payload preview strip — WHAT is being filed, before WHO (the snapshot). */}
         <View
-          testID="capture-multiselect-bar"
+          testID="capture-payload-preview"
           style={[
-            styles.multiBar,
+            styles.preview,
             {
-              bottom: bottomOffset,
-              backgroundColor: colors.accent,
-              opacity: doneDisabled ? 0.5 : 1,
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
             },
           ]}
         >
-          <Pressable
-            testID="capture-multiselect-done"
-            accessibilityRole="button"
-            accessibilityLabel={`Save to ${plural(selected.size, "contact")}`}
-            accessibilityState={{ disabled: doneDisabled }}
-            disabled={doneDisabled}
-            onPress={() => void onDoneMulti()}
-            style={styles.multiDone}
+          <Text
+            numberOfLines={1}
+            style={[styles.previewText, { color: colors.textPrimary }]}
           >
-            <Text style={[styles.multiDoneLabel, { color: colors.onAccent }]}>
-              Done · {selected.size}
+            {viewPayload.displayText ?? viewPayload.url}
+          </Text>
+          {viewPayload.url ? (
+            <Text
+              numberOfLines={1}
+              style={[styles.previewHost, { color: colors.textSecondary }]}
+            >
+              {hostOf(viewPayload.url)}
             </Text>
-          </Pressable>
+          ) : null}
         </View>
-      ) : null}
+      </View>
+
+      {/* The app's list picker with always-visible search (D-80): favourites,
+          then share recency, never archived, never-contacted included (D-30,
+          D-12). Keyed on the share sequence so a new share starts fresh (I-14).
+          Inert while the card is up or a pick is pending (WR-01). */}
+      <View
+        style={[
+          styles.listArea,
+          { paddingBottom: lift > 0 ? lift : insets.bottom },
+        ]}
+      >
+        <ContactPickerList
+          key={seq}
+          style={styles.list}
+          rows={rows}
+          loading={rowsLoading && rows.length === 0}
+          keepSourceOrder
+          allowArchivedSearch={false}
+          tapToSelect
+          multiSelectEntry
+          searchResetKey={seq}
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          multiSelect={multiSelect}
+          onMultiSelectChange={setMultiSelect}
+          disabled={listLocked}
+          onPick={(row) => {
+            const picked = rows.find((r) => r.id === row.id);
+            if (picked) void onPick(picked);
+          }}
+          onConfirm={onConfirmMulti}
+          confirmErrorLabel="Couldn't save. Please try again."
+          leadingAction={{
+            label: "New contact",
+            testID: "capture-new-contact",
+            onPress: onOpenInlineCreate,
+          }}
+        />
+      </View>
 
       {inlineOpen ? (
         <View
@@ -967,29 +806,25 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
               },
             ]}
           />
-          <Pressable
-            testID="capture-inline-submit"
-            accessibilityRole="button"
-            accessibilityLabel="Create and save"
-            accessibilityState={{
-              disabled: inlineName.trim().length === 0 || committing,
-            }}
-            disabled={inlineName.trim().length === 0 || committing}
-            onPress={() => void onInlineSubmit()}
-            style={[
-              styles.inlineSubmit,
-              {
-                backgroundColor: colors.accent,
-                opacity: inlineName.trim().length === 0 || committing ? 0.5 : 1,
-              },
-            ]}
-          >
-            <Text
-              style={[styles.inlineSubmitLabel, { color: colors.onAccent }]}
-            >
-              Create & save
-            </Text>
-          </Pressable>
+          {/* NEW-3: a visible Cancel; Back still prompts for a typed name. */}
+          <View style={styles.inlineActions}>
+            <Button
+              testID="capture-inline-cancel"
+              role="tertiary"
+              label="Cancel"
+              accessibilityLabel="Cancel new contact"
+              disabled={committing}
+              onPress={closeInlineCreate}
+            />
+            <Button
+              testID="capture-inline-submit"
+              role="primary"
+              label="Create & save"
+              accessibilityLabel="Create and save"
+              disabled={inlineName.trim().length === 0 || committing}
+              onPress={() => void onInlineSubmit()}
+            />
+          </View>
         </View>
       ) : null}
 
@@ -1014,16 +849,25 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
 }
 
 const styles = StyleSheet.create({
-  grid: {
-    padding: 16,
-    gap: 12,
-  },
-  column: {
-    gap: 12,
+  root: {
+    flex: 1,
   },
   headerBlock: {
     gap: 16,
-    marginBottom: 12,
+    padding: 16,
+    paddingBottom: 12,
+  },
+  listArea: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  list: {
+    flex: 1,
+  },
+  inlineActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
   },
   headerRow: {
     flexDirection: "row",
@@ -1047,33 +891,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
   },
-  searchReveal: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchFieldRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    fontWeight: "400",
-    minHeight: 44,
-  },
-  searchClear: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   preview: {
     borderWidth: 1,
     borderRadius: 10,
@@ -1087,70 +904,6 @@ const styles = StyleSheet.create({
   previewHost: {
     fontSize: 13,
     fontWeight: "600",
-  },
-  tile: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: "center",
-    gap: 8,
-  },
-  tileSelected: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 8,
-  },
-  checkBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkGlyph: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  tileName: {
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  newTile: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 8,
-    justifyContent: "center",
-  },
-  newGlyphBox: {
-    width: 64,
-    height: 64,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  newGlyph: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  multiBar: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    borderRadius: 12,
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  multiDone: {
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  multiDoneLabel: {
-    fontSize: 16,
-    fontWeight: "700",
   },
   errorRoot: {
     flex: 1,
@@ -1180,16 +933,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "400",
     minHeight: 44,
-  },
-  inlineSubmit: {
-    minHeight: 44,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  inlineSubmitLabel: {
-    fontSize: 16,
-    fontWeight: "700",
   },
 });

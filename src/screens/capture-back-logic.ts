@@ -5,12 +5,15 @@
  * New-contact surface holding a typed name prompts before it closes.
  *
  * Precedence: New-contact surface, search, multi-select, note, cancel. 38.10's
- * Capture rebuild keeps this behaviour (D-33).
+ * Capture rebuild keeps this behaviour (D-33). Its search is always visible
+ * (D-80), so `searchOpen` now means "the search has text": Back clears it
+ * before anything else closes.
  */
 
 export type CaptureBackState = {
   inlineOpen: boolean;
   inlineName: string;
+  /** The search has text (38.10: the field itself is always shown). */
   searchOpen: boolean;
   multiSelect: boolean;
   noteOpen: boolean;

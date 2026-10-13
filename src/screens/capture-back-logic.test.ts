@@ -7,7 +7,8 @@ import {
 /**
  * Capture's own hardware Back (38.9 D-33, with D-14 enforced inside it): Back
  * first closes the innermost open surface, and prompts only when typed text
- * would be lost.
+ * would be lost. Since 38.10 the search is always visible (D-80), so
+ * `searchOpen` means "the search has text" and Back clears it.
  */
 
 const IDLE: CaptureBackState = {
@@ -35,7 +36,7 @@ describe("resolveCaptureBack (D-33, D-14)", () => {
     ).toBe("prompt-discard-inline");
   });
 
-  it("closes an open search", () => {
+  it("clears a search that has text", () => {
     expect(resolveCaptureBack({ ...IDLE, searchOpen: true })).toBe(
       "close-search",
     );
@@ -69,7 +70,7 @@ describe("resolveCaptureBack (D-33, D-14)", () => {
     );
   });
 
-  it("resolves in order: inline, search, multi-select, note, cancel", () => {
+  it("resolves in order: inline, search text, multi-select, note, cancel", () => {
     const everything: CaptureBackState = {
       inlineOpen: true,
       inlineName: "Ann",

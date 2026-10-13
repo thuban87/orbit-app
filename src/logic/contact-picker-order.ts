@@ -74,18 +74,34 @@ export function orderPickerRows<TRow extends PickerOrderRow>(
   });
 }
 
+export interface FilterPickerOptions {
+  /**
+   * Keep the rows in the order given (the share screen's favourites, then
+   * share recency; 38.10 D-80, D-30) instead of `orderPickerRows`.
+   */
+  keepOrder?: boolean;
+  /**
+   * Whether a search may reveal archived contacts (default true). The share
+   * screen never offers them (D-12, D-80).
+   */
+  allowArchived?: boolean;
+}
+
 /**
  * An archived contact is intentionally hidden in the default list. It may be
- * displayed only after an explicit search term matches its name.
+ * displayed only after an explicit search term matches its name, and never
+ * when `allowArchived` is false. Absent options behave exactly as before.
  */
 export function filterPicker<TRow extends PickerOrderRow>(
-  rows: TRow[],
+  rows: readonly TRow[],
   term: string,
+  { keepOrder = false, allowArchived = true }: FilterPickerOptions = {},
 ): TRow[] {
   const hasSearch = term.trim().length > 0;
-  return orderPickerRows(
-    rows.filter(
-      (row) => (!row.archived_at || hasSearch) && matchPickerRow(row, term),
-    ),
+  const filtered = rows.filter(
+    (row) =>
+      (!row.archived_at || (hasSearch && allowArchived)) &&
+      matchPickerRow(row, term),
   );
+  return keepOrder ? filtered : orderPickerRows(filtered);
 }

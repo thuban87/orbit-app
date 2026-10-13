@@ -58,6 +58,23 @@ describe("contact picker multi-select helpers", () => {
     expect(picker).toContain("Couldn't add those contacts. Please try again.");
   });
 
+  it("only the modal wrapper dismisses or touches the shell transient (38.10 c11)", () => {
+    const picker = readFileSync(
+      new URL("./ContactPicker.tsx", import.meta.url),
+      "utf8",
+    );
+    const listStart = picker.indexOf("export function ContactPickerList(");
+    const modalStart = picker.indexOf("export function ContactPicker(");
+    expect(listStart).toBeGreaterThan(-1);
+    expect(modalStart).toBeGreaterThan(listStart);
+    const list = picker.slice(listStart, modalStart);
+    const modal = picker.slice(modalStart);
+    expect(list).not.toMatch(/closeTransient|openTransient|dismiss\(/);
+    expect(list).toContain("onConfirmed?.()");
+    expect(modal).toContain("onConfirmed={dismiss}");
+    expect(modal).toContain('closeTransient("contact-picker")');
+  });
+
   it("uses the one batch-write, commit-vs-refresh owner contract on both saved-event screens (38.3 D-19)", () => {
     for (const screen of [
       "EditGroupEventScreen.tsx",
@@ -115,5 +132,23 @@ describe("applyPickerExclusions", () => {
         excludeContactIds: [],
       }),
     ).toBe(rows);
+  });
+});
+
+describe("a rethrowing owner keeps the selection (38.10 share screen; c11)", () => {
+  it("returns ok: false with the same ordered ids when onConfirm reports then rethrows", async () => {
+    const reported: string[] = [];
+    const owner = async () => {
+      try {
+        throw new Error("share failed");
+      } catch (err) {
+        reported.push((err as Error).message);
+        throw err;
+      }
+    };
+    await expect(
+      confirmMultiSelection(new Set([4, 2, 8]), owner),
+    ).resolves.toEqual({ ok: false, contactIds: [4, 2, 8] });
+    expect(reported).toEqual(["share failed"]);
   });
 });

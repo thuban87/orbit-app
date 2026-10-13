@@ -208,3 +208,39 @@ describe("CaptureScreen confirmation card (38.10 D-77, D-100, D-120)", () => {
     expect(CAPTURE_SOURCE).not.toMatch(/payload\.displayText === null/);
   });
 });
+
+describe("CaptureScreen list picker (38.10 D-80, D-82, D-12; c7, c10)", () => {
+  const list = CAPTURE_SOURCE.slice(
+    CAPTURE_SOURCE.indexOf("<ContactPickerList"),
+    CAPTURE_SOURCE.indexOf("/>", CAPTURE_SOURCE.indexOf("<ContactPickerList")),
+  );
+
+  it("embeds the shared list in source order, never offering archived contacts", () => {
+    expect(list).toContain("key={seq}");
+    expect(list).toContain("searchResetKey={seq}");
+    expect(list).toContain("keepSourceOrder");
+    expect(list).toContain("allowArchivedSearch={false}");
+    expect(list).toContain('label: "New contact"');
+  });
+
+  it("is inert while the card is up or a pick is pending (WR-01)", () => {
+    expect(list).toContain("disabled={listLocked}");
+    expect(CAPTURE_SOURCE).toMatch(
+      /const listLocked = shareListLocked\(\{\s*cardMounted: card !== null,\s*writePending: committing,/,
+    );
+  });
+
+  it("owns search and multi-select for Back (38.9 D-33)", () => {
+    expect(list).toContain("searchText={searchText}");
+    expect(list).toContain("onSearchTextChange={setSearchText}");
+    expect(list).toContain("multiSelect={multiSelect}");
+    expect(list).toContain("onMultiSelectChange={setMultiSelect}");
+    expect(backHandlerSource()).toContain('searchOpen: searchText !== ""');
+  });
+
+  it("has no face-grid styles left", () => {
+    expect(CAPTURE_SOURCE).not.toMatch(
+      /\b(tile|tileSelected|newTile|newGlyphBox|checkBadge):/,
+    );
+  });
+});

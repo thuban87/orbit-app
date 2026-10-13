@@ -85,3 +85,55 @@ describe("contact picker ordering and visibility", () => {
     expect(filterPicker([row({ id: 1, name: "Ada" })], "nobody")).toEqual([]);
   });
 });
+
+describe("filterPicker keepOrder (38.10 D-80, D-30; convergence c11)", () => {
+  // Favourites, then share recency: an order orderPickerRows would change,
+  // since Older has an older last_contact than Newer but comes first.
+  const favourite = row({ id: 1, name: "Fav", favourite_rank: 0 });
+  const older = row({
+    id: 2,
+    name: "Ann Older",
+    last_contact: "2026-01-01 09:00:00",
+  });
+  const newer = row({
+    id: 3,
+    name: "Ann Newer",
+    last_contact: "2026-09-01 09:00:00",
+  });
+  const never = row({ id: 4, name: "Ann Never" });
+  const source = [favourite, older, newer, never];
+
+  it("keeps the source order with an empty term", () => {
+    expect(filterPicker(source, "", { keepOrder: true })).toEqual(source);
+  });
+
+  it("keeps the source order with a term that matches several rows", () => {
+    expect(filterPicker(source, "ann", { keepOrder: true })).toEqual([
+      older,
+      newer,
+      never,
+    ]);
+  });
+
+  it("reorders as before without the option", () => {
+    expect(filterPicker(source, "")).toEqual([favourite, newer, older, never]);
+    expect(filterPicker(source, "ann")).toEqual([newer, older, never]);
+  });
+
+  it("never offers an archived contact when allowArchived is false, even on a match (T-38.10-35)", () => {
+    const archived = row({
+      id: 5,
+      name: "Ann Archived",
+      archived_at: "2026-05-01 09:00:00",
+    });
+    expect(
+      filterPicker([...source, archived], "ann archived", {
+        keepOrder: true,
+        allowArchived: false,
+      }),
+    ).toEqual([]);
+    expect(
+      filterPicker([...source, archived], "ann archived", { keepOrder: true }),
+    ).toEqual([archived]);
+  });
+});
