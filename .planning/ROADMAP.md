@@ -1579,7 +1579,7 @@ Wave 4 *(blocked on Wave 3 completion)*
 - [x] 38.10-08-PLAN.md — Sharing data layer and resume-prompt gate
 
 Wave 5 *(blocked on Wave 4 completion)*
-- [ ] 38.10-09-PLAN.md — Contact-form data layer and the shared entry field (D-66)
+- [x] 38.10-09-PLAN.md — Contact-form data layer and the shared entry field (D-66)
 - [ ] 38.10-10-PLAN.md — Linked notes data (Also save to, Group Log copies, History tags)
 - [ ] 38.10-11-PLAN.md — Share screen UI
 
@@ -1741,7 +1741,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
-| 38.10 Fuel Retirement, Things to Remember & Sharing | 8/19 | In Progress|  |
+| 38.10 Fuel Retirement, Things to Remember & Sharing | 9/19 | In Progress|  |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
