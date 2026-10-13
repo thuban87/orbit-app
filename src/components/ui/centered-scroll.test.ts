@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeAfterBlur,
   CENTERING_MARGIN,
   centeredScrollY,
+  fieldToCentreOnShow,
   keyboardSpacer,
 } from "./centered-scroll";
 
@@ -150,5 +152,48 @@ describe("centeredScrollY (D-66)", () => {
     expect(
       centeredScrollY({ ...BASE, fieldY: 600, fieldH: 60, scrollY: first }),
     ).toBe(first);
+  });
+});
+
+describe("fieldToCentreOnShow (convergence c2 G-U5)", () => {
+  function fieldRef(focused: { value: boolean }) {
+    return { current: { isFocused: () => focused.value } };
+  }
+
+  it("returns null when there is no active field", () => {
+    expect(fieldToCentreOnShow(null)).toBeNull();
+  });
+
+  it("returns null when the active field is no longer focused", () => {
+    expect(fieldToCentreOnShow(fieldRef({ value: false }))).toBeNull();
+  });
+
+  it("returns null when the active ref has unmounted", () => {
+    expect(fieldToCentreOnShow({ current: null })).toBeNull();
+  });
+
+  it("returns the ref when the active field is focused", () => {
+    const ref = fieldRef({ value: true });
+    expect(fieldToCentreOnShow(ref)).toBe(ref);
+  });
+
+  it("focus, then blur of that ref, then a keyboard show yields null", () => {
+    const focus = { value: false };
+    const ref = fieldRef(focus);
+    // focus
+    let active: typeof ref | null = ref;
+    focus.value = true;
+    // blur of the same ref (the user moved to a plain field)
+    focus.value = false;
+    active = activeAfterBlur(active, ref);
+    // keyboardDidShow with a new height
+    expect(fieldToCentreOnShow(active)).toBeNull();
+  });
+
+  it("a late blur from an earlier field keeps the newer active field", () => {
+    const first = fieldRef({ value: false });
+    const second = fieldRef({ value: true });
+    expect(activeAfterBlur(second, first)).toBe(second);
+    expect(fieldToCentreOnShow(activeAfterBlur(second, first))).toBe(second);
   });
 });

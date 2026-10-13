@@ -30,12 +30,28 @@ export {
   type EmptyStateProps,
 } from "./EmptyState";
 export {
+  EntryDateField,
+  type EntryDateFieldProps,
+} from "./EntryDateField";
+export {
+  ENTRY_VISIBLE_LINES,
+  EntryTextField,
+  type EntryTextFieldProps,
+} from "./EntryTextField";
+export {
   emptyStateHeading,
   SEARCH_ECHO_MAX_CHARS,
   truncateSearchEcho,
 } from "./empty-state-logic";
 export { FieldError, type FieldErrorProps } from "./FieldError";
 export { GlassSurface, type GlassSurfaceProps } from "./GlassSurface";
+export {
+  type CenteringFieldRef,
+  type KeyboardCentering,
+  KeyboardCenteringProvider,
+  type KeyboardCenteringProviderProps,
+  useKeyboardCenteringContext,
+} from "./KeyboardCenteringProvider";
 export {
   OptionSelectRow,
   type OptionSelectRowProps,
@@ -53,3 +69,8 @@ export {
   SCRIM_OPACITY,
 } from "./overlay-base";
 export { Sheet, type SheetProps, type SheetVariant } from "./Sheet";
+export {
+  type UseKeyboardCenteringArgs,
+  type UseKeyboardCenteringResult,
+  useKeyboardCentering,
+} from "./use-keyboard-centering";

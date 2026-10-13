@@ -97,3 +97,31 @@ export function centeredScrollY({
   const clamped = Math.min(Math.max(0, target), maxScroll);
   return Math.abs(clamped - scrollY) < 0.5 ? scrollY : clamped;
 }
+
+/** A ref to a field that can say whether it still holds focus. */
+export interface FocusableFieldRef {
+  readonly current: { isFocused(): boolean } | null;
+}
+
+/**
+ * The field a keyboard show should re-centre, or null (convergence c2 G-U5,
+ * Claude C-04 / Cursor CU-02). A show (including a keyboard height change)
+ * re-centres only while the active entry field still holds focus: moving to a
+ * plain field (Name, phone) can re-fire the show with a new height, and the
+ * screen must not scroll back to the stale entry field.
+ */
+export function fieldToCentreOnShow<T extends FocusableFieldRef>(
+  active: T | null,
+): T | null {
+  if (active === null) return null;
+  return active.current?.isFocused() === true ? active : null;
+}
+
+/**
+ * The active field after `blurred` loses focus: cleared only when the blurred
+ * ref is the active one, so a late blur from an earlier field never clears a
+ * newer active field.
+ */
+export function activeAfterBlur<T>(active: T | null, blurred: T): T | null {
+  return active === blurred ? null : active;
+}

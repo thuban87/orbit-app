@@ -288,6 +288,15 @@ describe("native date pickers (D-65, D-66, D-67)", () => {
     expect(code).not.toMatch(/minimumDate|maximumDate/);
   });
 
+  it("EntryDateField caps the date at maxDate and stores picker output (D-101)", () => {
+    const code = codeOnly(source("src/components/ui/EntryDateField.tsx"));
+    expect(code).toMatch(/<DateTimePicker/);
+    expect(code).toMatch(/maximumDate=\{maxDate\}/);
+    expect(code).toMatch(/storedFromPickerEvent\(/);
+    expect(code).not.toMatch(/minimumDate/);
+    expect(code).not.toMatch(/onChange\([^)]*formatDisplayDate/);
+  });
+
   it("date-pick-logic imports no display formatter and no React", () => {
     const code = source("src/components/date-pick-logic.ts");
     for (const name of DISPLAY_FORMATTERS) {

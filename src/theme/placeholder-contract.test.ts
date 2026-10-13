@@ -106,8 +106,12 @@ describe("placeholder token contract (RG-029, D-24)", () => {
   it("finds the app's placeholder props (the scan is not vacuous)", () => {
     // 77 since 38.9-13: the Memory meaningful date (D-65) and the custom Date
     // field (D-66) became native date pickers, so their two TextInputs and
-    // placeholder props are gone.
-    expect(sites.length).toBeGreaterThanOrEqual(77);
+    // placeholder props are gone. Transitional floor 43 from 38.10-09
+    // (2026-10-13): plans 11–18 convert or delete 35 sites in 15 files while
+    // they move to the shared EntryTextField (one site); 42 sites sit in files
+    // no later 38.10 plan touches, plus EntryTextField's. 38.10-18 re-pins the
+    // exact post-phase count.
+    expect(sites.length).toBeGreaterThanOrEqual(43);
   });
 
   it("every placeholderTextColor uses colors.textPlaceholder", () => {
