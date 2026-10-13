@@ -745,3 +745,92 @@ describe("Edit Contact inline name error (38.9 D-19, E-02)", () => {
     }
   });
 });
+
+describe("Last Talked About / Current Location rows start blank (38.10 plan 14; D-65, D-26)", () => {
+  // Edit Contact seeds both rows and their CurrentStateSeed blank
+  // (convergence c3, Claude C-04), so the latest stored entry never hides
+  // a new entry with the same text.
+  const BLANK_SEED = {};
+  const YESTERDAY = "2026-08-14";
+
+  it("the latest entry's text again on a new date is appended once (convergence c3, Claude C-04)", () => {
+    // The contact's latest stored Last Talked About is also "soccer"; the
+    // form does not see it, because the seed is blank.
+    const out = buildEditInput(
+      state({ lastTalkedAbout: "soccer", lastTalkedAboutDate: YESTERDAY }),
+      deps({ seededCurrentState: BLANK_SEED }),
+    );
+    expect(out.currentStateEntries).toEqual([
+      {
+        fieldKey: "last_talked_about",
+        value: "soccer",
+        entryDate: YESTERDAY,
+      },
+    ]);
+  });
+
+  it("with today's default date (no pick) the same text is still appended once", () => {
+    const out = buildEditInput(
+      state({ lastTalkedAbout: "soccer" }),
+      deps({ seededCurrentState: BLANK_SEED }),
+    );
+    expect(out.currentStateEntries).toEqual([
+      { fieldKey: "last_talked_about", value: "soccer" },
+    ]);
+  });
+
+  it("a blank row emits no entry, so an untouched form stays clean", () => {
+    const untouched = state({ lastTalkedAbout: "", currentLocation: "" });
+    const out = buildEditInput(
+      untouched,
+      deps({ seededCurrentState: BLANK_SEED }),
+    );
+    expect(out.currentStateEntries).toBeUndefined();
+    // A picked date with no text is not an entry either.
+    expect(
+      buildEditInput(
+        state({ lastTalkedAbout: "  ", lastTalkedAboutDate: YESTERDAY }),
+        deps({ seededCurrentState: BLANK_SEED }),
+      ).currentStateEntries,
+    ).toBeUndefined();
+  });
+
+  it("a second Save after a partial save appends nothing (convergence c5, Claude C-02)", () => {
+    const options = deps({ seededCurrentState: BLANK_SEED });
+    const submitted = state({
+      lastTalkedAbout: "soccer",
+      lastTalkedAboutDate: YESTERDAY,
+      currentLocation: "",
+    });
+    const first = buildEditInput(submitted, options);
+    expect(first.currentStateEntries).toHaveLength(1);
+
+    // applyCommittedBaseline after a linksFailed / canonicalDuplicate outcome
+    // keeps the screen open with both rows blank, their dates reset to
+    // today's default and the seed blank. The committed signature is built
+    // the same way (editInputSignature = JSON.stringify(buildEditInput)).
+    const afterPartialSave = {
+      ...submitted,
+      lastTalkedAbout: "",
+      lastTalkedAboutDate: undefined,
+      currentLocation: "",
+      currentLocationDate: undefined,
+    };
+    const committed = {
+      ...submitted,
+      lastTalkedAbout: "",
+      lastTalkedAboutDate: undefined,
+      currentLocation: "",
+      currentLocationDate: undefined,
+    };
+    expect(JSON.stringify(buildEditInput(afterPartialSave, options))).toBe(
+      JSON.stringify(buildEditInput(committed, options)),
+    );
+    const second = buildEditInput(afterPartialSave, options);
+    expect(second.currentStateEntries).toBeUndefined();
+    const total =
+      (first.currentStateEntries?.length ?? 0) +
+      (second.currentStateEntries?.length ?? 0);
+    expect(total).toBe(1);
+  });
+});

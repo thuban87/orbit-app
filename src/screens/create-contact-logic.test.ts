@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/field-error-logic";
 import { resolveCategorySelection } from "@/logic/category-logic";
 import {
+  addDraftItem,
   type BuildCreateInputDeps,
   buildCreateInput,
   CREATE_FIELD_REVEAL_ORDER,
   CREATE_SECTION_FIELD_MAP,
   type CreateFormState,
   canSave,
+  canSaveOffLimitsForm,
   collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
@@ -24,7 +26,13 @@ import {
   createFormSeedState,
   firstInteractionOccurredAt,
   isCreateFormDirty,
+  isOffLimitsFormDirty,
+  normalizeOffLimitsForm,
+  offLimitsFormDraft,
+  partitionMemoryRows,
   pickCreateSubEditor,
+  removeDraftItem,
+  replaceDraftItem,
   resolveErrorSection,
 } from "./create-contact-logic";
 
@@ -566,5 +574,193 @@ describe("pickCreateSubEditor (C5-M1; D-13, D-14)", () => {
         offLimits: empty,
       }),
     ).toEqual({ open: false, dirty: false, which: null });
+  });
+
+  it("Gift Ideas, Thought of Them and Imported drafts hold Back in form order after Off Limits (38.10 plan 14)", () => {
+    const base = { memory: closed, relationship: closed, offLimits: closed };
+    expect(pickCreateSubEditor({ ...base, giftIdeas: typed })).toEqual({
+      open: true,
+      dirty: true,
+      which: "giftIdeas",
+    });
+    expect(pickCreateSubEditor({ ...base, thoughtOfThem: typed })).toEqual({
+      open: true,
+      dirty: true,
+      which: "thoughtOfThem",
+    });
+    expect(
+      pickCreateSubEditor({
+        ...base,
+        offLimits: typed,
+        giftIdeas: typed,
+        thoughtOfThem: typed,
+      }).which,
+    ).toBe("offLimits");
+    expect(
+      pickCreateSubEditor({ ...base, giftIdeas: typed, thoughtOfThem: typed })
+        .which,
+    ).toBe("giftIdeas");
+    expect(
+      pickCreateSubEditor({ ...base, giftIdeas: empty, thoughtOfThem: empty }),
+    ).toEqual({ open: false, dirty: false, which: null });
+  });
+
+  it("an open, typed-into Imported edit holds Back; an open untyped one does not (D-116; convergence c4, Claude C-02)", () => {
+    const allClosed = {
+      memory: closed,
+      relationship: closed,
+      offLimits: closed,
+      giftIdeas: closed,
+      thoughtOfThem: closed,
+    };
+    expect(pickCreateSubEditor({ ...allClosed, imported: typed })).toEqual({
+      open: true,
+      dirty: true,
+      which: "imported",
+    });
+    expect(pickCreateSubEditor({ ...allClosed, imported: empty })).toEqual({
+      open: false,
+      dirty: false,
+      which: null,
+    });
+    expect(
+      pickCreateSubEditor({
+        ...allClosed,
+        thoughtOfThem: typed,
+        imported: typed,
+      }).which,
+    ).toBe("thoughtOfThem");
+  });
+});
+
+describe("partitionMemoryRows (convergence c3, Claude C-02; D-116)", () => {
+  const rows = [
+    { id: 1, type: "general" },
+    { id: 2, type: "gift_idea" },
+    { id: 3, type: "thought_of_them" },
+    { id: 4, type: "imported" },
+    { id: 5, type: "general" },
+    { id: 6, type: "gift_idea" },
+  ];
+
+  it("puts each type in its own section, keeping ids and order", () => {
+    expect(partitionMemoryRows(rows)).toEqual({
+      memories: [
+        { id: 1, type: "general" },
+        { id: 5, type: "general" },
+      ],
+      giftIdeas: [
+        { id: 2, type: "gift_idea" },
+        { id: 6, type: "gift_idea" },
+      ],
+      thoughtOfThem: [{ id: 3, type: "thought_of_them" }],
+      imported: [{ id: 4, type: "imported" }],
+    });
+  });
+
+  it("a Gift Idea shows only in Gift Ideas, and imported never in Memories", () => {
+    const buckets = partitionMemoryRows(rows);
+    const all = [
+      ...buckets.memories,
+      ...buckets.giftIdeas,
+      ...buckets.thoughtOfThem,
+      ...buckets.imported,
+    ];
+    expect(all).toHaveLength(rows.length);
+    expect(buckets.memories.some((row) => row.type === "imported")).toBe(false);
+    expect(buckets.memories.some((row) => row.id === 2)).toBe(false);
+  });
+
+  it("an unregistered type lands in Memories (this plan only)", () => {
+    expect(partitionMemoryRows([{ id: 9, type: "legacy" }]).memories).toEqual([
+      { id: 9, type: "legacy" },
+    ]);
+  });
+
+  it("a row retyped from general to gift_idea moves to Gift Ideas when recomputed", () => {
+    const before = partitionMemoryRows(rows);
+    expect(before.memories.map((row) => row.id)).toEqual([1, 5]);
+    const retyped = rows.map((row) =>
+      row.id === 1 ? { ...row, type: "gift_idea" } : row,
+    );
+    const after = partitionMemoryRows(retyped);
+    expect(after.memories.map((row) => row.id)).toEqual([5]);
+    expect(after.giftIdeas.map((row) => row.id)).toEqual([1, 2, 6]);
+  });
+});
+
+describe("Add Contact stable draft ids (convergence c7, Claude C-04 / Cursor CU-02)", () => {
+  it("removing the first draft then replacing the third by id changes the third, not index 2", () => {
+    let items = addDraftItem([], { type: "general", value: "a" }, -1);
+    items = addDraftItem(items, { type: "gift_idea", value: "b" }, -2);
+    items = addDraftItem(items, { type: "general", value: "c" }, -3);
+    items = removeDraftItem(items, -1);
+    items = replaceDraftItem(items, -3, { type: "general", value: "C" });
+    expect(items).toEqual([
+      { id: -2, draft: { type: "gift_idea", value: "b" } },
+      { id: -3, draft: { type: "general", value: "C" } },
+    ]);
+    // Nothing sits at index 2 any more; a position-based edit would miss.
+    expect(items[2]).toBeUndefined();
+  });
+
+  it("replacing or removing an unknown id leaves the list unchanged", () => {
+    const items = addDraftItem([], { value: "a" }, -1);
+    expect(replaceDraftItem(items, -9, { value: "z" })).toEqual(items);
+    expect(removeDraftItem(items, -9)).toEqual(items);
+  });
+
+  it("partitionMemoryRows over the mapped rows keeps the stable ids", () => {
+    let items = addDraftItem([], { type: "general" }, -1);
+    items = addDraftItem(items, { type: "thought_of_them" }, -2);
+    items = addDraftItem(items, { type: "gift_idea" }, -3);
+    items = removeDraftItem(items, -1);
+    const rows = items.map((item) => ({ id: item.id, type: item.draft.type }));
+    const buckets = partitionMemoryRows(rows);
+    expect(buckets.thoughtOfThem).toEqual([
+      { id: -2, type: "thought_of_them" },
+    ]);
+    expect(buckets.giftIdeas).toEqual([{ id: -3, type: "gift_idea" }]);
+    expect(buckets.memories).toEqual([]);
+  });
+});
+
+describe("inline Off Limits form rules (D-66, D-67, D-104)", () => {
+  it("opens blank for an add and with the row's text and label for an edit", () => {
+    expect(offLimitsFormDraft()).toEqual({ text: "", label: "" });
+    expect(offLimitsFormDraft({ text: "Ex", label: null })).toEqual({
+      text: "Ex",
+      label: "",
+    });
+  });
+
+  it("is dirty only when text or label changed after trimming", () => {
+    const base = offLimitsFormDraft({ text: "Ex", label: "Family" });
+    expect(isOffLimitsFormDirty(base, { text: "Ex ", label: "Family" })).toBe(
+      false,
+    );
+    expect(isOffLimitsFormDirty(base, { text: "Exes", label: "Family" })).toBe(
+      true,
+    );
+    expect(isOffLimitsFormDirty(base, { text: "Ex", label: "" })).toBe(true);
+    expect(
+      isOffLimitsFormDirty(offLimitsFormDraft(), { text: "  ", label: "" }),
+    ).toBe(false);
+  });
+
+  it("saves with text, a label, or a stored link, never blank", () => {
+    expect(canSaveOffLimitsForm({ text: "  ", label: "" })).toBe(false);
+    expect(canSaveOffLimitsForm({ text: "Politics", label: "" })).toBe(true);
+    expect(canSaveOffLimitsForm({ text: "", label: "Work" })).toBe(true);
+    expect(
+      canSaveOffLimitsForm({ text: "", label: "" }, "https://example.com"),
+    ).toBe(true);
+  });
+
+  it("hands the host trimmed values, blank as null", () => {
+    expect(normalizeOffLimitsForm({ text: " Politics ", label: " " })).toEqual({
+      text: "Politics",
+      label: null,
+    });
   });
 });

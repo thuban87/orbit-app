@@ -27,6 +27,10 @@ import {
   toMethodDrafts,
 } from "@/components/contact-methods-editor-model";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import {
+  isSavableEntry,
+  normalizeEntryText,
+} from "@/components/ui/entry-text-logic";
 import type {
   CreateContactFullInput,
   CreateCurrentStateInput,
@@ -435,7 +439,7 @@ export function isCreateFormDirty(
   return seedSignature !== currentSignature;
 }
 
-/** An in-section editor's reported draft state (MemoryEditor / RelationshipEditor / FuelEditor). */
+/** An in-section editor's reported draft state (MemoryEditor / RelationshipEditor / the inline Off Limits editor). */
 export interface DraftState {
   open: boolean;
   dirty: boolean;
@@ -446,7 +450,13 @@ export type PickedSubEditor =
   | {
       open: true;
       dirty: true;
-      which: "memory" | "relationship" | "offLimits";
+      which:
+        | "memory"
+        | "relationship"
+        | "offLimits"
+        | "giftIdeas"
+        | "thoughtOfThem"
+        | "imported";
     };
 
 const CLOSED_DRAFT_STATE: DraftState = { open: false, dirty: false };
@@ -455,26 +465,172 @@ const CLOSED_DRAFT_STATE: DraftState = { open: false, dirty: false };
  * The open draft that holds Back on Add Contact and Edit Contact (C5-M1;
  * D-13, D-14): only a draft that is both open and typed into counts, so an
  * empty open draft never holds the user. The first such draft in the fixed
- * order memory, relationship, Off Limits (this plan only) is closed first.
+ * order memory, relationship, Off Limits, Gift Ideas, Thought of Them,
+ * Imported (this plan only) is closed first. Last Talked About and Current
+ * Location have no draft (38.10 D-119): their typed text is form dirt.
+ * `imported` is Edit Contact only (D-116); Add Contact leaves it closed.
  */
 export function pickCreateSubEditor({
   memory,
   relationship,
   offLimits = CLOSED_DRAFT_STATE,
+  giftIdeas = CLOSED_DRAFT_STATE,
+  thoughtOfThem = CLOSED_DRAFT_STATE,
+  imported = CLOSED_DRAFT_STATE,
 }: {
   memory: DraftState;
   relationship: DraftState;
-  /** The Off Limits FuelEditor's new-item draft (38.9 review CR-01). */
+  /** The inline Off Limits editor's add or edit draft (38.9 review CR-01). */
   offLimits?: DraftState;
+  /** The Gift Ideas section's memory draft (38.10 plan 14). */
+  giftIdeas?: DraftState;
+  /** The Thought of Them section's memory draft (38.10 plan 14). */
+  thoughtOfThem?: DraftState;
+  /** Edit Contact's Imported from Contacts App edit draft (D-116). */
+  imported?: DraftState;
 }): PickedSubEditor {
-  if (memory.open && memory.dirty) {
-    return { open: true, dirty: true, which: "memory" };
-  }
-  if (relationship.open && relationship.dirty) {
-    return { open: true, dirty: true, which: "relationship" };
-  }
-  if (offLimits.open && offLimits.dirty) {
-    return { open: true, dirty: true, which: "offLimits" };
+  const ordered = [
+    ["memory", memory],
+    ["relationship", relationship],
+    ["offLimits", offLimits],
+    ["giftIdeas", giftIdeas],
+    ["thoughtOfThem", thoughtOfThem],
+    ["imported", imported],
+  ] as const;
+  for (const [which, state] of ordered) {
+    if (state.open && state.dirty) return { open: true, dirty: true, which };
   }
   return { open: false, dirty: false, which: null };
+}
+
+// =============================================================================
+// THINGS TO REMEMBER SECTIONS ON ADD / EDIT CONTACT (38.10 plan 14).
+// =============================================================================
+
+/** The memory rows each form section shows (D-65, D-116). */
+export interface MemoryRowBuckets<T> {
+  memories: T[];
+  giftIdeas: T[];
+  thoughtOfThem: T[];
+  imported: T[];
+}
+
+/**
+ * Split the form's single memory list into its sections (convergence c3,
+ * Claude C-02; D-116): `general` → Memories, `gift_idea` → Gift Ideas,
+ * `thought_of_them` → Thought of Them, `imported` → its own bucket, and any
+ * other type → Memories (this plan only). Each bucket keeps input order and
+ * the rows themselves (ids included). Hosts call it during render, so a row
+ * retyped in the Memories section shows in its new section next render.
+ * PURE.
+ */
+export function partitionMemoryRows<T extends { type: string }>(
+  rows: readonly T[],
+): MemoryRowBuckets<T> {
+  const buckets: MemoryRowBuckets<T> = {
+    memories: [],
+    giftIdeas: [],
+    thoughtOfThem: [],
+    imported: [],
+  };
+  for (const row of rows) {
+    if (row.type === "gift_idea") buckets.giftIdeas.push(row);
+    else if (row.type === "thought_of_them") buckets.thoughtOfThem.push(row);
+    else if (row.type === "imported") buckets.imported.push(row);
+    else buckets.memories.push(row);
+  }
+  return buckets;
+}
+
+/**
+ * An Add Contact draft with a stable id (convergence c7, Claude C-04 /
+ * Cursor CU-02). Ids come from a decrementing counter, so they never shift
+ * when another draft is removed.
+ */
+export interface DraftItem<D> {
+  id: number;
+  draft: D;
+}
+
+/** Append a draft under its new id. PURE. */
+export function addDraftItem<D>(
+  items: readonly DraftItem<D>[],
+  draft: D,
+  id: number,
+): DraftItem<D>[] {
+  return [...items, { id, draft }];
+}
+
+/** Replace the draft whose id matches; no match leaves the list as it was. PURE. */
+export function replaceDraftItem<D>(
+  items: readonly DraftItem<D>[],
+  id: number,
+  draft: D,
+): DraftItem<D>[] {
+  return items.map((item) => (item.id === id ? { id, draft } : item));
+}
+
+/** Remove the draft whose id matches. PURE. */
+export function removeDraftItem<D>(
+  items: readonly DraftItem<D>[],
+  id: number,
+): DraftItem<D>[] {
+  return items.filter((item) => item.id !== id);
+}
+
+/** The inline Off Limits form's typed fields (D-66 text, optional label). */
+export interface OffLimitsFormDraft {
+  text: string;
+  label: string;
+}
+
+/** The form as it opens for a row (edit) or blank (add). PURE. */
+export function offLimitsFormDraft(row?: {
+  text?: string | null;
+  label?: string | null;
+}): OffLimitsFormDraft {
+  return { text: row?.text ?? "", label: row?.label ?? "" };
+}
+
+/**
+ * Whether the open Off Limits form differs from what it opened with (38.9
+ * D-14): text compares after the save-time normalising, so typed-then-erased
+ * reads as untouched. PURE.
+ */
+export function isOffLimitsFormDirty(
+  baseline: OffLimitsFormDraft,
+  draft: OffLimitsFormDraft,
+): boolean {
+  return (
+    normalizeEntryText(baseline.text) !== normalizeEntryText(draft.text) ||
+    baseline.label.trim() !== draft.label.trim()
+  );
+}
+
+/**
+ * Whether the Off Limits form can be saved: text or a label, or an existing
+ * row's stored link (the DAO needs one of label, text or url). PURE.
+ */
+export function canSaveOffLimitsForm(
+  draft: OffLimitsFormDraft,
+  storedUrl?: string | null,
+): boolean {
+  return (
+    isSavableEntry(draft.text) ||
+    draft.label.trim().length > 0 ||
+    (storedUrl ?? "").trim().length > 0
+  );
+}
+
+/** The trimmed fields handed to the host; blank becomes null. PURE. */
+export function normalizeOffLimitsForm(draft: OffLimitsFormDraft): {
+  text: string | null;
+  label: string | null;
+} {
+  const text = normalizeEntryText(draft.text);
+  const label = draft.label.trim();
+  return {
+    text: text.length > 0 ? text : null,
+    label: label.length > 0 ? label : null,
+  };
 }

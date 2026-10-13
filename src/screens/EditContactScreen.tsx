@@ -5,14 +5,25 @@
  * About, Key People/Relationships, Current Location, Memories, Custom Fields, Off
  * Limits. Every knowledge subdomain is a first-class TOP-LEVEL editing section (never
  * a nested knowledge drawer), composing the SAME canonical editors used
- * elsewhere (MemoryEditor / RelationshipEditor / FuelEditor / current-state inputs).
+ * elsewhere (MemoryEditor / RelationshipEditor) plus the inline Off Limits editor.
+ *
+ * 38.10 plan 14 (D-05, D-65, D-67, D-116, D-119): the Things to Remember sections
+ * are filled in on the form itself, in the D-44 order: Last Talked About, Key
+ * People, Current Location, Memories, Thought of Them, Gift Ideas, Custom Fields,
+ * Off Limits, Imported from Contacts App. One memory draft list feeds the four
+ * memory sections through `partitionMemoryRows`, recomputed every render. Last
+ * Talked About and Current Location are always-visible "add an entry" rows (the
+ * shared D-66 field and a date capped at today, D-101) that start blank, so the
+ * form's Save appends any non-blank entry (D-119, D-121). Every Things to
+ * Remember delete is held until Save (D-104), and Allow AI is draft state saved
+ * by Save (D-27). The shared entry fields centre above the keyboard through
+ * `KeyboardCenteringProvider` (D-66).
  *
  * Seeded by `getContactForEdit` (metadata / custom-values / links / methods) PLUS an
  * EXPLICIT per-subdomain read for each knowledge section (`getContactForEdit` returns
  * NO knowledge subdomain — verified contact-read.ts:154-213): Memories →
  * `listMemoriesForContact`, Key People → `listRelationshipsForContact`, Off Limits →
- * `listFuelForEditor(...).filter(kind === "off_limits")`, Last Talked About + Current
- * Location → `getCurrentStateValues`.
+ * `listOffLimitsForContact`. Last Talked About and Current Location seed blank.
  *
  * SINGLE form-level Save over the retained TWO-TRANSACTION boundary (dossier §AE):
  * metadata + ALL five knowledge subdomains persist through `updateContactFull` (one
@@ -29,11 +40,8 @@
  * `last_contact` directly. A contact that ALREADY has `last_contact` set shows NO
  * last-spoke control here: correcting an existing recency timeline is Phase 6.
  *
- * OFF LIMITS is KIND-SCOPED (Review cycle-4 MEDIUM #3, DATA LOSS): its FuelEditor is
- * seeded ONLY from `off_limits` rows and every add/edit is forced to
- * `kind:"off_limits"`, so the section can never show/create/edit/delete a
- * `recent`/`topic`/`fact`/`gift` row; combined with 34-05's kind-scoped diff, a
- * contact's other fuel kinds survive an Off Limits edit.
+ * OFF LIMITS lives in its own table (38.10 D-08, D-11): the section reads and writes
+ * only Off Limits rows, and it has no kind control.
  *
  * The screen builds NO SQL and re-implements NO custom widget: the input-shaping
  * correctness lives in the node-tested `edit-contact-logic.ts`. This file is the RN
@@ -47,6 +55,7 @@ import DateTimePicker, {
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -66,22 +75,21 @@ import {
 } from "@/components/contact-methods-editor-model";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
-import {
-  type FuelDraft,
-  type FuelDraftState,
-  FuelEditor,
-  type FuelEditorHandle,
-  type FuelEditPatch,
-} from "@/components/FuelEditor";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import {
-  initialDraft as initialMemoryDraft,
+  type MemoryAiDefaults,
   type MemoryDraft,
   type MemoryDraftState,
   MemoryEditor,
   type MemoryEditorHandle,
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
+import {
+  OffLimitsInlineEditor,
+  type OffLimitsInlineEditorHandle,
+  type OffLimitsInlineFields,
+  type OffLimitsInlineItem,
+} from "@/components/OffLimitsInlineEditor";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import {
   type RelationshipDraft,
@@ -95,10 +103,15 @@ import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {
   AccordionSection,
   AppText,
+  Button,
+  EntryDateField,
+  EntryTextField,
   FieldError,
+  KeyboardCenteringProvider,
   OptionSelectRow,
   OptionSheet,
   OrbitSwitch,
+  useKeyboardCentering,
 } from "@/components/ui";
 import {
   clearFieldError,
@@ -107,6 +120,10 @@ import {
   toFieldErrors,
 } from "@/components/ui/field-error-logic";
 import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
+import {
+  getAiPermissionDefaults,
+  memoryAiDefaultsMap,
+} from "@/db/ai-permissions-dao";
 import { getAppSettings } from "@/db/app-settings-dao";
 import type { ContactLinkRow, DraftLink } from "@/db/contact-links-dao";
 import {
@@ -116,16 +133,16 @@ import {
   listCategories,
 } from "@/db/contact-read";
 import type { updateContactFull } from "@/db/contacts-dao";
-import { getCurrentStateValues } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm } from "@/db/field-values-dao";
-import type { FuelItem } from "@/db/fuel-read";
-import { listFuelForEditor } from "@/db/fuel-read";
-import { setMemoryAllowAi } from "@/db/memories-dao";
-import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
+import { listMemoriesForContact } from "@/db/memories-read";
 import { CURRENT_STATE_FIELD_REGISTRY } from "@/db/memory-registry";
+import {
+  listOffLimitsForContact,
+  type OffLimitsRow,
+} from "@/db/off-limits-read";
 import {
   listRelationshipsForContact,
   type RelationshipRow,
@@ -153,8 +170,12 @@ import { FREQUENCY_DAYS, parseDate } from "@/types";
 import { formatLocalDate, formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
-import { pickCreateSubEditor } from "./create-contact-logic";
 import {
+  partitionMemoryRows,
+  pickCreateSubEditor,
+} from "./create-contact-logic";
+import {
+  applyMemoryPatch,
   buildEditInput,
   type CurrentStateSeed,
   canSave,
@@ -164,6 +185,8 @@ import {
   type EditFormState,
   isNeverContacted,
   type MemoryDraftRow,
+  memoryDraftRowToItem,
+  memoryRowToDraftRow,
   type OffLimitsDraftRow,
   type RelationshipDraftRow,
   resolveErrorSection,
@@ -173,11 +196,25 @@ import {
   type EditContactBaselines,
   runEditContactSave,
 } from "./edit-contact-save-coordinator";
+import { sectionEmptyText, sectionTitle } from "./section-editor-logic";
 
 const LOG_SCOPE = "edit-contact";
 
 /** An editor with no open draft (D-14). */
 const CLOSED_DRAFT = { open: false, dirty: false } as const;
+
+/**
+ * The Last Talked About / Current Location seed: always blank (38.10 plan 14;
+ * convergence c3, Claude C-04). Both rows start blank, so a non-blank row is
+ * a new entry even when its text matches the latest stored one (D-26, D-65);
+ * a blank row writes nothing, so an untouched form stays clean.
+ */
+const BLANK_CURRENT_STATE: CurrentStateSeed = {};
+
+/** Enter in the two "add an entry" boxes only closes the keyboard (D-121). */
+function dismissKeyboard(): void {
+  Keyboard.dismiss();
+}
 
 /** The social-battery options (D-28 option sheet). "No selection" = null → stored NULL. */
 const SOCIAL_BATTERY_OPTIONS = ["Charger", "Neutral", "Drain"] as const;
@@ -244,42 +281,6 @@ function buildLinksForDiff(draft: LinkDraft[]): DraftLink[] {
 // SAME field shape the editor commits, so an untouched seeded row diffs equal.
 // =============================================================================
 
-/** Seed a Memory draft row from a committed row (keeps its real id + all fields). */
-function memoryRowToDraftRow(row: MemoryRow): MemoryDraftRow {
-  return { ...initialMemoryDraft(row), id: row.id };
-}
-
-/** Render a Memory draft row back to the editor's committed-row shape. */
-function memoryDraftRowToItem(
-  row: MemoryDraftRow,
-  contactId: number,
-  allowAi: number,
-): MemoryRow {
-  return {
-    id: row.id ?? 0,
-    uid: "",
-    contact_id: contactId,
-    type: row.type,
-    custom_label: row.customLabel ?? null,
-    value: row.value ?? null,
-    note: row.note ?? null,
-    url: row.url ?? null,
-    meaningful_date: row.meaningfulDate ?? null,
-    pinned: row.pinned ? 1 : 0,
-    outdated: row.outdated ? 1 : 0,
-    hidden: row.hidden == null ? null : row.hidden ? 1 : 0,
-    provenance: "user",
-    created_at: "",
-    modified_at: "",
-    deleted_at: null,
-    allow_ai: allowAi,
-    interaction_id: null,
-    link_source: null,
-    group_note_copy: 0,
-    linked_note_ai_locked: 0,
-  };
-}
-
 /** Seed a relationship draft row from a committed row (keeps id + all fields). */
 function relationshipRowToDraftRow(row: RelationshipRow): RelationshipDraftRow {
   return {
@@ -316,41 +317,18 @@ function relationshipDraftRowToItem(
   };
 }
 
-/**
- * Seed an Off Limits draft row from a committed row. Both the legacy editor row
- * and the `off_limits` read row satisfy this shape (compile-only, 38.10-09;
- * plan 14 rebuilds this screen).
- */
-function fuelItemToDraftRow(item: {
-  id: number;
-  label: string | null;
-  text: string | null;
-  url: string | null;
-}): OffLimitsDraftRow {
-  return {
-    label: item.label,
-    text: item.text,
-    url: item.url,
-    id: item.id,
-  };
+/** Seed an Off Limits draft row from a committed row (D-11: content fields only). */
+function offLimitsRowToDraftRow(row: OffLimitsRow): OffLimitsDraftRow {
+  return { label: row.label, text: row.text, url: row.url, id: row.id };
 }
 
-/** Render an off-limits draft row back to the FuelEditor's committed-row shape. */
-function fuelDraftRowToItem(
-  row: OffLimitsDraftRow,
-  contactId: number,
-  now: string,
-): FuelItem {
+/** Render an Off Limits draft row for the inline Off Limits editor. */
+function offLimitsDraftRowToItem(row: OffLimitsDraftRow): OffLimitsInlineItem {
   return {
     id: row.id ?? 0,
-    contact_id: contactId,
-    kind: "off_limits",
-    label: row.label ?? null,
     text: row.text ?? null,
+    label: row.label ?? null,
     url: row.url ?? null,
-    // A real stamp so the editor's age line reads "today" for a fresh draft.
-    created_at: now,
-    source: "user",
   };
 }
 
@@ -401,9 +379,6 @@ interface KnowledgeSeeds {
   memories: MemoryDraftRow[];
   relationships: RelationshipDraftRow[];
   offLimits: OffLimitsDraftRow[];
-  currentState: CurrentStateSeed;
-  /** id → allow_ai, for the Memory editor's edit-only Allow-AI control display. */
-  memoryAllowAi: Map<number, number>;
   /** id → linked contact name, for the relationship editor's "Linked to" line. */
   relationshipLinkedNames: Map<number, string | null>;
 }
@@ -436,15 +411,15 @@ export function EditContactScreen({
   const [seededOffLimits, setSeededOffLimits] = useState<OffLimitsDraftRow[]>(
     [],
   );
-  const [seededCurrentState, setSeededCurrentState] =
-    useState<CurrentStateSeed>({});
-  // The edit-only Allow-AI availability (real app setting, NOT a hardcoded false —
+  // The Allow-AI availability (real app setting, NOT a hardcoded false —
   // Review cycle-4 LOW #4 / D-04). A stubbed false would silently disable the
   // per-Memory Allow-AI control that 34-07's privacy design relies on.
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
-  // id → allow_ai for existing Memories (display only; the toggle persists
-  // IMMEDIATELY via setMemoryAllowAi, mirroring the standalone knowledge surface).
-  const memoryAllowAiRef = useRef<Map<number, number>>(new Map());
+  // Per-type Allow AI defaults for new memories (D-13, D-92): a new entry and
+  // a type change on an untouched switch take the type's own default.
+  const [aiDefaults, setAiDefaults] = useState<MemoryAiDefaults | undefined>(
+    undefined,
+  );
   // id → linked contact name for existing relationships (display only).
   const relationshipLinkedNamesRef = useRef<Map<number, string | null>>(
     new Map(),
@@ -504,8 +479,11 @@ export function EditContactScreen({
     keyPeople: false,
     currentLocation: false,
     memories: false,
+    thoughtOfThem: false,
+    giftIdeas: false,
     custom: false,
     offLimits: false,
+    imported: false,
   });
   const setSectionExpanded = useCallback((sectionId: string, next: boolean) => {
     setExpandedSections((prev) => ({ ...prev, [sectionId]: next }));
@@ -523,6 +501,12 @@ export function EditContactScreen({
   // the Name field, so a blocked Save can expand the erroring section, scroll
   // its first invalid field into view and focus it.
   const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
+  // Every shared entry field on the form centres above the keyboard through
+  // the provider below (D-66; convergence c1 F-U1).
+  const { centering, bottomSpacer } = useKeyboardCentering({
+    scrollRef,
+    contentRef,
+  });
   const sectionRefs = useRef<Record<string, View | null>>({});
   const registerSectionRef = useCallback(
     (sectionId: string) => (node: View | null) => {
@@ -555,37 +539,27 @@ export function EditContactScreen({
   );
 
   // Read every knowledge subdomain seed for the contact (§E). `getContactForEdit`
-  // returns NONE of these, so each needs its OWN explicit read. Off Limits is
-  // FILTERED to `kind === "off_limits"` here (listFuelForEditor returns every kind
-  // — a DATA-LOSS guard, Review cycle-4 MEDIUM #3). Used by initial hydration AND
-  // initial hydration. Later saves advance from their transactional returns.
+  // returns NONE of these, so each needs its OWN explicit read. Off Limits rows
+  // live in their own table (D-08, D-11). Used by initial hydration; later
+  // saves advance from their transactional returns. Last Talked About and
+  // Current Location seed blank (BLANK_CURRENT_STATE), so they need no read.
   const readKnowledgeSeeds = useCallback(async (): Promise<KnowledgeSeeds> => {
     const exec = getExecutor();
-    const [memoryRows, relationshipRows, fuelRows, currentValues] =
-      await Promise.all([
-        listMemoriesForContact(exec, contactId),
-        listRelationshipsForContact(exec, contactId),
-        listFuelForEditor(exec, contactId),
-        getCurrentStateValues(exec, contactId),
-      ]);
-    const memoryAllowAi = new Map<number, number>();
-    for (const row of memoryRows) memoryAllowAi.set(row.id, row.allow_ai);
+    const [memoryRows, relationshipRows, offLimitsRows] = await Promise.all([
+      listMemoriesForContact(exec, contactId),
+      listRelationshipsForContact(exec, contactId),
+      listOffLimitsForContact(exec, contactId),
+    ]);
     const relationshipLinkedNames = new Map<number, string | null>();
     for (const row of relationshipRows) {
       relationshipLinkedNames.set(row.id, row.linked_contact_name);
     }
-    const offLimitsRows = fuelRows.filter((row) => row.kind === "off_limits");
-    const currentState: CurrentStateSeed = {};
-    const lta = currentValues.last_talked_about?.value;
-    const loc = currentValues.current_location?.value;
-    if (lta != null) currentState.last_talked_about = lta;
-    if (loc != null) currentState.current_location = loc;
     return {
+      // Provenance, Allow AI and both lock markers ride in the draft row
+      // (D-25, D-27, D-102, D-103; plan 09 adapters).
       memories: memoryRows.map(memoryRowToDraftRow),
       relationships: relationshipRows.map(relationshipRowToDraftRow),
-      offLimits: offLimitsRows.map(fuelItemToDraftRow),
-      currentState,
-      memoryAllowAi,
+      offLimits: offLimitsRows.map(offLimitsRowToDraftRow),
       relationshipLinkedNames,
     };
   }, [contactId]);
@@ -613,11 +587,13 @@ export function EditContactScreen({
     try {
       const exec = getExecutor();
       const defs = await listDefs(exec, { includeQuarantined: false });
-      const [result, settings, knowledge] = await Promise.all([
-        getContactForEdit(exec, contactId, defs),
-        getAppSettings(exec),
-        readKnowledgeSeeds(),
-      ]);
+      const [result, settings, knowledge, permissionDefaults] =
+        await Promise.all([
+          getContactForEdit(exec, contactId, defs),
+          getAppSettings(exec),
+          readKnowledgeSeeds(),
+          getAiPermissionDefaults(exec),
+        ]);
       if (!result) {
         void notice({
           title: "Couldn't load this contact",
@@ -636,18 +612,18 @@ export function EditContactScreen({
         memories: knowledge.memories,
         relationships: knowledge.relationships,
         offLimits: knowledge.offLimits,
-        lastTalkedAbout: knowledge.currentState.last_talked_about ?? "",
-        currentLocation: knowledge.currentState.current_location ?? "",
+        // Blank "add an entry" rows (D-65, D-119; convergence c3, Claude C-04).
+        lastTalkedAbout: "",
+        currentLocation: "",
       };
-      memoryAllowAiRef.current = knowledge.memoryAllowAi;
       relationshipLinkedNamesRef.current = knowledge.relationshipLinkedNames;
       setEditDefs(nextEditDefs);
       setNeverContacted(nextNeverContacted);
       setGlobalAiEnabled(isAiMasterEnabled(settings));
+      setAiDefaults(memoryAiDefaultsMap(permissionDefaults));
       setSeededMemories(knowledge.memories);
       setSeededRelationships(knowledge.relationships);
       setSeededOffLimits(knowledge.offLimits);
-      setSeededCurrentState(knowledge.currentState);
       setForm(nextForm);
       setStale(false);
       setInitialTrackingEnabled(result.contact.trackingEnabled === 1);
@@ -660,7 +636,7 @@ export function EditContactScreen({
         seededMemories: knowledge.memories,
         seededRelationships: knowledge.relationships,
         seededOffLimits: knowledge.offLimits,
-        seededCurrentState: knowledge.currentState,
+        seededCurrentState: BLANK_CURRENT_STATE,
       });
       // The committed baseline for orphan cleanup: the pre-edit custom values.
       committedValuesRef.current = { ...result.values };
@@ -791,6 +767,9 @@ export function EditContactScreen({
     },
     [],
   );
+  // An in-form edit keeps the row's id, provenance and both lock markers
+  // (applyMemoryPatch; D-25, D-102, D-103; convergence c1 F-U5). Allow AI
+  // travels in the patch and is saved by the form's Save (D-27).
   const editMemoryRow = useCallback(
     async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
       setForm((prev) =>
@@ -798,7 +777,7 @@ export function EditContactScreen({
           ? {
               ...prev,
               memories: (prev.memories ?? []).map((row) =>
-                row.id === id ? { ...patch, id } : row,
+                row.id === id ? applyMemoryPatch(row, patch) : row,
               ),
             }
           : prev,
@@ -817,24 +796,6 @@ export function EditContactScreen({
         : prev,
     );
   }, []);
-  // The Allow-AI toggle persists IMMEDIATELY (not through Save), mirroring the
-  // standalone knowledge surface — a per-item privacy control, not draft state.
-  const setMemoryAllowAiFor = useCallback(
-    async (id: number, allow: boolean): Promise<void> => {
-      try {
-        await setMemoryAllowAi(getExecutor(), {
-          id,
-          contactId,
-          allow,
-          now: localDateTime(),
-        });
-        memoryAllowAiRef.current.set(id, allow ? 1 : 0);
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to set memory AI permission", err);
-      }
-    },
-    [contactId],
-  );
 
   // -- Key People / Relationships draft mutators (§E). --
   const addRelationshipRow = useCallback(
@@ -881,41 +842,31 @@ export function EditContactScreen({
     );
   }, []);
 
-  // -- Off Limits draft mutators (§E). KIND-SCOPED (Review cycle-4 MEDIUM #3, DATA
-  // LOSS): every add/edit is FORCED to `kind:"off_limits"` regardless of what the
-  // FuelEditor emits, so this section can never create/edit a non-off_limits row;
-  // combined with the seed being pre-filtered to off_limits and buildEditInput's
-  // defensive re-filter, a contact's other fuel kinds can never enter this diff. --
-  const addOffLimitsRow = useCallback(
-    async (draft: FuelDraft): Promise<boolean> => {
-      const id = newRowIdRef.current--;
+  // -- Off Limits draft mutators (§E). Every row is Off Limits (D-11); a new
+  // row gets a negative synthetic id, and a delete is held until Save (D-104). --
+  const addOffLimitsRow = useCallback((fields: OffLimitsInlineFields) => {
+    const id = newRowIdRef.current--;
+    setForm((prev) =>
+      prev
+        ? { ...prev, offLimits: [...(prev.offLimits ?? []), { ...fields, id }] }
+        : prev,
+    );
+  }, []);
+  const editOffLimitsRow = useCallback(
+    (id: number, fields: OffLimitsInlineFields) => {
       setForm((prev) =>
         prev
           ? {
               ...prev,
-              offLimits: [
-                ...(prev.offLimits ?? []),
-                { ...draft, kind: "off_limits", id },
-              ],
+              offLimits: (prev.offLimits ?? []).map((row) =>
+                row.id === id ? { ...row, ...fields } : row,
+              ),
             }
           : prev,
       );
-      return true;
     },
     [],
   );
-  const editOffLimitsRow = useCallback((id: number, patch: FuelEditPatch) => {
-    setForm((prev) =>
-      prev
-        ? {
-            ...prev,
-            offLimits: (prev.offLimits ?? []).map((row) =>
-              row.id === id ? { ...row, ...patch, kind: "off_limits" } : row,
-            ),
-          }
-        : prev,
-    );
-  }, []);
   const deleteOffLimitsRow = useCallback((id: number) => {
     setForm((prev) =>
       prev
@@ -946,11 +897,17 @@ export function EditContactScreen({
     setSeededMemories(baseline.memories);
     setSeededRelationships(baseline.relationships);
     setSeededOffLimits(baseline.offLimits);
-    setSeededCurrentState(baseline.currentState);
     setSeededLinks(baseline.links);
     setLinksDraft(baseline.linksDraft);
+    // The "add an entry" rows go blank again with today's date, so a Save
+    // that keeps the form open (linksFailed, canonicalDuplicate) cannot append
+    // the same entry twice (D-65, D-101; convergence c5, Claude C-02).
     setForm({
       ...baseline.form,
+      lastTalkedAbout: "",
+      lastTalkedAboutDate: undefined,
+      currentLocation: "",
+      currentLocationDate: undefined,
       methods:
         JSON.stringify(baseline.form.methods) ===
         JSON.stringify(submittedForm.methods)
@@ -965,8 +922,10 @@ export function EditContactScreen({
       memories: baseline.memories,
       relationships: baseline.relationships,
       offLimits: baseline.offLimits,
-      lastTalkedAbout: baseline.currentState.last_talked_about ?? "",
-      currentLocation: baseline.currentState.current_location ?? "",
+      lastTalkedAbout: "",
+      lastTalkedAboutDate: undefined,
+      currentLocation: "",
+      currentLocationDate: undefined,
       lastSpoke: baseline.neverContacted
         ? submittedForm.lastSpoke
         : { kind: "not-yet" },
@@ -980,7 +939,7 @@ export function EditContactScreen({
       seededMemories: baseline.memories,
       seededRelationships: baseline.relationships,
       seededOffLimits: baseline.offLimits,
-      seededCurrentState: baseline.currentState,
+      seededCurrentState: BLANK_CURRENT_STATE,
     });
   }
 
@@ -1029,7 +988,7 @@ export function EditContactScreen({
         seededMemories,
         seededRelationships,
         seededOffLimits,
-        seededCurrentState,
+        seededCurrentState: BLANK_CURRENT_STATE,
       });
       const lifecycleDirection =
         submittedForm.trackingEnabled === initialTrackingEnabled
@@ -1052,7 +1011,7 @@ export function EditContactScreen({
         neverContacted,
         toMemoryDraft: memoryRowToDraftRow,
         toRelationshipDraft: relationshipRowToDraftRow,
-        toOffLimitsDraft: fuelItemToDraftRow,
+        toOffLimitsDraft: offLimitsRowToDraftRow,
         afterMetadataCommit: () => {
           if (lifecycleDirection) {
             void applyLifecycleTransitionEffects(
@@ -1171,31 +1130,47 @@ export function EditContactScreen({
         seededMemories,
         seededRelationships,
         seededOffLimits,
-        seededCurrentState,
+        seededCurrentState: BLANK_CURRENT_STATE,
       }) ||
       valuesSignature(form.values) !==
         valuesSignature(committedValuesRef.current) ||
       JSON.stringify(buildLinksForDiff(linksDraft)) !==
         JSON.stringify(buildLinksForDiff(toLinkDrafts(seededLinks))));
 
-  // The in-section Memory and Key People editors keep an open draft's typing
-  // privately until it is added (D-13, same class as C5-M1; D-14): an open
-  // draft with typed text holds Back (closing it first) and holds a fold of
-  // its section (D-68). The route check and the save bypass are unchanged.
+  // The in-section editors keep an open draft's typing privately until it is
+  // added (D-13, same class as C5-M1; D-14): an open draft with typed text
+  // holds Back (closing it first) and holds a fold of its section (D-68).
+  // Each MemoryEditor host has its own ref and draft state (Memories, Thought
+  // of Them, Gift Ideas, Imported; convergence c4, Claude C-02 / Cursor
+  // CU-04, CU-05). Last Talked About and Current Location have no draft
+  // (D-119): typed text there is form dirt. The route check and the save
+  // bypass are unchanged.
   const memoryEditorRef = useRef<MemoryEditorHandle>(null);
+  const thoughtOfThemEditorRef = useRef<MemoryEditorHandle>(null);
+  const giftIdeasEditorRef = useRef<MemoryEditorHandle>(null);
+  const importedEditorRef = useRef<MemoryEditorHandle>(null);
   const relationshipEditorRef = useRef<RelationshipEditorHandle>(null);
+  const offLimitsEditorRef = useRef<OffLimitsInlineEditorHandle>(null);
   const [memoryDraft, setMemoryDraft] =
+    useState<MemoryDraftState>(CLOSED_DRAFT);
+  const [thoughtOfThemDraft, setThoughtOfThemDraft] =
+    useState<MemoryDraftState>(CLOSED_DRAFT);
+  const [giftIdeasDraft, setGiftIdeasDraft] =
+    useState<MemoryDraftState>(CLOSED_DRAFT);
+  const [importedDraft, setImportedDraft] =
     useState<MemoryDraftState>(CLOSED_DRAFT);
   const [relationshipDraft, setRelationshipDraft] =
     useState<RelationshipDraftState>(CLOSED_DRAFT);
-  // The Off Limits FuelEditor's new-item draft row (38.9 review CR-01).
-  const fuelEditorRef = useRef<FuelEditorHandle>(null);
+  // The inline Off Limits editor's add or edit form (38.9 review CR-01).
   const [offLimitsDraft, setOffLimitsDraft] =
-    useState<FuelDraftState>(CLOSED_DRAFT);
+    useState<MemoryDraftState>(CLOSED_DRAFT);
   const pickedDraft = pickCreateSubEditor({
     memory: memoryDraft,
     relationship: relationshipDraft,
     offLimits: offLimitsDraft,
+    giftIdeas: giftIdeasDraft,
+    thoughtOfThem: thoughtOfThemDraft,
+    imported: importedDraft,
   });
   const { requestClose, settleHold } = useDiscardKeepGuard({
     hasUnsavedChanges,
@@ -1211,7 +1186,13 @@ export function EditContactScreen({
         } else if (pickedDraft.which === "relationship") {
           relationshipEditorRef.current?.closeDraft();
         } else if (pickedDraft.which === "offLimits") {
-          fuelEditorRef.current?.closeDraft();
+          offLimitsEditorRef.current?.closeDraft();
+        } else if (pickedDraft.which === "giftIdeas") {
+          giftIdeasEditorRef.current?.closeDraft();
+        } else if (pickedDraft.which === "thoughtOfThem") {
+          thoughtOfThemEditorRef.current?.closeDraft();
+        } else if (pickedDraft.which === "imported") {
+          importedEditorRef.current?.closeDraft();
         }
       },
     },
@@ -1251,16 +1232,13 @@ export function EditContactScreen({
     : "Set birthday";
   const birthdaySeed =
     (form.birthdayInput ? parseDate(form.birthdayInput) : null) ?? new Date();
-  const draftNow = localDateTime();
-  // 38.10 plan 13: Allow AI is draft state saved at Save (D-27), so a
-  // reopened entry shows the draft's value, not the stored one.
-  const memoryItems = (form.memories ?? []).map((row) =>
-    memoryDraftRowToItem(
-      row,
-      contactId,
-      row.allowAi ??
-        (row.id != null ? (memoryAllowAiRef.current.get(row.id) ?? 0) : 0),
-    ),
+  // One memory draft list, split into its sections every render (convergence
+  // c3, Claude C-02; D-116). The rows keep their ids, so each section's
+  // add / edit / delete still edits the single list by id. The adapter
+  // carries the draft's Allow AI (a reopened entry shows the draft value,
+  // D-27), its provenance (D-25) and both lock markers (D-102, D-103).
+  const memoryBuckets = partitionMemoryRows(
+    (form.memories ?? []).map((row) => memoryDraftRowToItem(row, contactId)),
   );
   const relationshipItems = (form.relationships ?? []).map((row) =>
     relationshipDraftRowToItem(
@@ -1271,9 +1249,10 @@ export function EditContactScreen({
         : null,
     ),
   );
-  const offLimitsItems = (form.offLimits ?? []).map((row) =>
-    fuelDraftRowToItem(row, contactId, draftNow),
-  );
+  const offLimitsItems = (form.offLimits ?? []).map(offLimitsDraftRowToItem);
+  // The two "add an entry" dates default to today and cannot pass it (D-101).
+  const todayStored = formatLocalDate(new Date());
+  const todayDate = new Date();
 
   return (
     <View style={styles.root}>
@@ -1288,521 +1267,699 @@ export function EditContactScreen({
         testID="edit-contact-screen"
         contentContainerStyle={styles.content}
       >
-        {/* -- Identity: photo + name/category + birthday/social battery + the two
+        <KeyboardCenteringProvider value={centering}>
+          {/* -- Identity: photo + name/category + birthday/social battery + the two
           reminder toggles — the exhaustive identity/admin section. -- */}
-        <AccordionSection
-          sectionId="identity"
-          title="Identity"
-          expanded={expandedSections.identity}
-          onExpandedChange={(next) => setSectionExpanded("identity", next)}
-          containerRef={registerSectionRef("identity")}
-        >
-          {/* Photo (edit-only — contactId always exists here). Held as SEPARATE state,
+          <AccordionSection
+            sectionId="identity"
+            title="Identity"
+            expanded={expandedSections.identity}
+            onExpandedChange={(next) => setSectionExpanded("identity", next)}
+            containerRef={registerSectionRef("identity")}
+          >
+            {/* Photo (edit-only — contactId always exists here). Held as SEPARATE state,
             written through its own DAO by PhotoSourcePicker/CropPhotoScreen, refreshed
             via the photo-only useFocusEffect above — never through the metadata Save. */}
-          <View style={styles.field}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              Photo
-            </AppText>
-            <PhotoSourcePicker
-              target={{ kind: "contact", contactId }}
-              photo={photo}
-              name={form.name}
-              onChanged={refreshPhoto}
-            />
-          </View>
-
-          <View ref={nameFieldRef} style={styles.field}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              Name
-            </AppText>
-            <TextInput
-              ref={nameInputRef}
-              testID="edit-contact-name"
-              accessibilityLabel="Name"
-              value={form.name}
-              onChangeText={(v) => {
-                setField("name", v);
-                clearError("name");
-              }}
-              placeholder="Their name"
-              placeholderTextColor={colors.textPlaceholder}
-              style={inputStyle}
-            />
-            <FieldError
-              testID="edit-contact-name-error"
-              message={fieldErrors.name}
-            />
-          </View>
-
-          <View style={styles.field}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              Category
-            </AppText>
-            <OptionSelectRow
-              testID="edit-contact-category"
-              label="Category"
-              currentLabel={
-                categories.find((row) => row.id === form.categoryId)?.name ??
-                "Uncategorized"
-              }
-              onPress={() => setCategorySheetOpen(true)}
-            />
-            <CategoryChoiceSheet
-              visible={categorySheetOpen}
-              categories={categories}
-              selectedId={form.categoryId}
-              onSelect={(value) => setField("categoryId", value)}
-              onRequestClose={() => setCategorySheetOpen(false)}
-            />
-          </View>
-
-          {/* Birthday: native date picker + a "Year unknown" toggle (the native
-            picker has no month/day-only mode, so year-optional is app logic —
-            MM-DD when unknown, YYYY-MM-DD when known; Pitfall 7). */}
-          <View style={styles.field}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              Birthday
-            </AppText>
-            <Pressable
-              testID="edit-contact-birthday"
-              accessibilityRole="button"
-              accessibilityLabel="Birthday"
-              onPress={() => setShowBirthdayPicker(true)}
-              style={[
-                styles.input,
-                styles.birthdayTrigger,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <AppText
-                role="body"
-                style={{
-                  color: form.birthdayInput
-                    ? colors.textPrimary
-                    : colors.textSecondary,
-                }}
-              >
-                {birthdayLabel}
-              </AppText>
-            </Pressable>
-            <View style={styles.toggleRow}>
-              <AppText role="label" style={{ color: colors.textPrimary }}>
-                Year unknown
-              </AppText>
-              <OrbitSwitch
-                testID="edit-contact-birthday-year-unknown"
-                accessibilityLabel="Year unknown"
-                value={form.birthdayYearUnknown}
-                onValueChange={(v) => setField("birthdayYearUnknown", v)}
-              />
-            </View>
-            {showBirthdayPicker ? (
-              <DateTimePicker
-                testID="edit-contact-birthday-picker"
-                value={birthdaySeed}
-                mode="date"
-                onChange={onBirthdayChange}
-              />
-            ) : null}
-          </View>
-
-          <View style={styles.field}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              Social battery
-            </AppText>
-            {/* A stored value outside the options shows raw and is kept. */}
-            <OptionSelectRow
-              testID="edit-contact-social-battery"
-              label="Social battery"
-              currentLabel={form.socialBattery ?? "No selection"}
-              onPress={() => setSocialBatterySheetOpen(true)}
-            />
-            <OptionSheet
-              visible={socialBatterySheetOpen}
-              title="Social battery"
-              options={SOCIAL_BATTERY_SHEET_OPTIONS}
-              selected={form.socialBattery}
-              onSelect={(value) => setField("socialBattery", value)}
-              onRequestClose={() => setSocialBatterySheetOpen(false)}
-            />
-          </View>
-
-          {/* Behaviour toggles — the ToggleFieldWidget on/off "1"/"0" convention. */}
-          <View style={styles.field}>
-            <View style={styles.toggleRow}>
-              <AppText role="label" style={{ color: colors.textPrimary }}>
-                Rarely responds
-              </AppText>
-              <OrbitSwitch
-                testID="edit-contact-rarely-responds"
-                accessibilityLabel="Rarely responds"
-                value={form.rarelyResponds === 1}
-                onValueChange={(v) => setField("rarelyResponds", v ? 1 : 0)}
-              />
-            </View>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Attempts to reach out won't reset their orbit
-            </AppText>
-          </View>
-
-          <View style={styles.field}>
-            <View style={styles.toggleRow}>
-              <AppText role="label" style={{ color: colors.textPrimary }}>
-                Mute reminders
-              </AppText>
-              <OrbitSwitch
-                testID="edit-contact-reminders-off"
-                accessibilityLabel="Mute reminders"
-                value={form.remindersOff === 1}
-                onValueChange={(v) => setField("remindersOff", v ? 1 : 0)}
-              />
-            </View>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Keep them in Orbit, but never get reminders about them.
-            </AppText>
-          </View>
-        </AccordionSection>
-
-        {/* -- Relationship Basics: Bound/Unbound + Frequency + (never-contacted)
-          last-spoke. -- */}
-        <AccordionSection
-          sectionId="relationship"
-          title="Relationship Basics"
-          expanded={expandedSections.relationship}
-          onExpandedChange={(next) => setSectionExpanded("relationship", next)}
-          containerRef={registerSectionRef("relationship")}
-        >
-          <View style={styles.field}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              Orbit participation
-            </AppText>
-            <View style={styles.lifecycleChoices}>
-              {([true, false] as const).map((enabled) => {
-                const selected = form.trackingEnabled === enabled;
-                const label = enabled ? "Bound" : "Unbound";
-                return (
-                  <Pressable
-                    key={label}
-                    testID={`edit-contact-${label.toLowerCase()}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={label}
-                    accessibilityState={{ selected }}
-                    onPress={() =>
-                      setForm((current) =>
-                        current
-                          ? {
-                              ...current,
-                              trackingEnabled: enabled,
-                              intervalDays: enabled
-                                ? (current.intervalDays ??
-                                  FREQUENCY_DAYS.Monthly)
-                                : current.intervalDays,
-                              intervalValid: true,
-                            }
-                          : current,
-                      )
-                    }
-                    style={[
-                      styles.lifecycleChoice,
-                      {
-                        borderColor: selected ? colors.accent : colors.border,
-                        backgroundColor: selected
-                          ? colors.accent
-                          : colors.surface,
-                      },
-                    ]}
-                  >
-                    <AppText
-                      role="label"
-                      style={{
-                        color: selected ? colors.onAccent : colors.textPrimary,
-                      }}
-                    >
-                      {label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {form.trackingEnabled
-                ? "Bound contacts appear in your active orbit and get reach-out reminders."
-                : "Unbound contacts keep their details and history without reach-out reminders."}
-            </AppText>
-          </View>
-
-          {form.trackingEnabled ? (
             <View style={styles.field}>
               <AppText role="label" style={{ color: colors.textSecondary }}>
-                Frequency
+                Photo
               </AppText>
-              <FrequencyPicker
-                testID="edit-contact-frequency"
-                value={form.intervalDays ?? FREQUENCY_DAYS.Monthly}
-                onChange={(v) => setField("intervalDays", v)}
-                onValidityChange={setIntervalValid}
+              <PhotoSourcePicker
+                target={{ kind: "contact", contactId }}
+                photo={photo}
+                name={form.name}
+                onChanged={refreshPhoto}
               />
             </View>
-          ) : null}
-          {/* LAST-SPOKE (owner ruling / CONTEXT Area 3): rendered ONLY when the
+
+            <View ref={nameFieldRef} style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Name
+              </AppText>
+              <TextInput
+                ref={nameInputRef}
+                testID="edit-contact-name"
+                accessibilityLabel="Name"
+                value={form.name}
+                onChangeText={(v) => {
+                  setField("name", v);
+                  clearError("name");
+                }}
+                placeholder="Their name"
+                placeholderTextColor={colors.textPlaceholder}
+                style={inputStyle}
+              />
+              <FieldError
+                testID="edit-contact-name-error"
+                message={fieldErrors.name}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Category
+              </AppText>
+              <OptionSelectRow
+                testID="edit-contact-category"
+                label="Category"
+                currentLabel={
+                  categories.find((row) => row.id === form.categoryId)?.name ??
+                  "Uncategorized"
+                }
+                onPress={() => setCategorySheetOpen(true)}
+              />
+              <CategoryChoiceSheet
+                visible={categorySheetOpen}
+                categories={categories}
+                selectedId={form.categoryId}
+                onSelect={(value) => setField("categoryId", value)}
+                onRequestClose={() => setCategorySheetOpen(false)}
+              />
+            </View>
+
+            {/* Birthday: native date picker + a "Year unknown" toggle (the native
+            picker has no month/day-only mode, so year-optional is app logic —
+            MM-DD when unknown, YYYY-MM-DD when known; Pitfall 7). */}
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Birthday
+              </AppText>
+              <Pressable
+                testID="edit-contact-birthday"
+                accessibilityRole="button"
+                accessibilityLabel="Birthday"
+                onPress={() => setShowBirthdayPicker(true)}
+                style={[
+                  styles.input,
+                  styles.birthdayTrigger,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <AppText
+                  role="body"
+                  style={{
+                    color: form.birthdayInput
+                      ? colors.textPrimary
+                      : colors.textSecondary,
+                  }}
+                >
+                  {birthdayLabel}
+                </AppText>
+              </Pressable>
+              <View style={styles.toggleRow}>
+                <AppText role="label" style={{ color: colors.textPrimary }}>
+                  Year unknown
+                </AppText>
+                <OrbitSwitch
+                  testID="edit-contact-birthday-year-unknown"
+                  accessibilityLabel="Year unknown"
+                  value={form.birthdayYearUnknown}
+                  onValueChange={(v) => setField("birthdayYearUnknown", v)}
+                />
+              </View>
+              {showBirthdayPicker ? (
+                <DateTimePicker
+                  testID="edit-contact-birthday-picker"
+                  value={birthdaySeed}
+                  mode="date"
+                  onChange={onBirthdayChange}
+                />
+              ) : null}
+            </View>
+
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Social battery
+              </AppText>
+              {/* A stored value outside the options shows raw and is kept. */}
+              <OptionSelectRow
+                testID="edit-contact-social-battery"
+                label="Social battery"
+                currentLabel={form.socialBattery ?? "No selection"}
+                onPress={() => setSocialBatterySheetOpen(true)}
+              />
+              <OptionSheet
+                visible={socialBatterySheetOpen}
+                title="Social battery"
+                options={SOCIAL_BATTERY_SHEET_OPTIONS}
+                selected={form.socialBattery}
+                onSelect={(value) => setField("socialBattery", value)}
+                onRequestClose={() => setSocialBatterySheetOpen(false)}
+              />
+            </View>
+
+            {/* Behaviour toggles — the ToggleFieldWidget on/off "1"/"0" convention. */}
+            <View style={styles.field}>
+              <View style={styles.toggleRow}>
+                <AppText role="label" style={{ color: colors.textPrimary }}>
+                  Rarely responds
+                </AppText>
+                <OrbitSwitch
+                  testID="edit-contact-rarely-responds"
+                  accessibilityLabel="Rarely responds"
+                  value={form.rarelyResponds === 1}
+                  onValueChange={(v) => setField("rarelyResponds", v ? 1 : 0)}
+                />
+              </View>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                Attempts to reach out won't reset their orbit
+              </AppText>
+            </View>
+
+            <View style={styles.field}>
+              <View style={styles.toggleRow}>
+                <AppText role="label" style={{ color: colors.textPrimary }}>
+                  Mute reminders
+                </AppText>
+                <OrbitSwitch
+                  testID="edit-contact-reminders-off"
+                  accessibilityLabel="Mute reminders"
+                  value={form.remindersOff === 1}
+                  onValueChange={(v) => setField("remindersOff", v ? 1 : 0)}
+                />
+              </View>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                Keep them in Orbit, but never get reminders about them.
+              </AppText>
+            </View>
+          </AccordionSection>
+
+          {/* -- Relationship Basics: Bound/Unbound + Frequency + (never-contacted)
+          last-spoke. -- */}
+          <AccordionSection
+            sectionId="relationship"
+            title="Relationship Basics"
+            expanded={expandedSections.relationship}
+            onExpandedChange={(next) =>
+              setSectionExpanded("relationship", next)
+            }
+            containerRef={registerSectionRef("relationship")}
+          >
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Orbit participation
+              </AppText>
+              <View style={styles.lifecycleChoices}>
+                {([true, false] as const).map((enabled) => {
+                  const selected = form.trackingEnabled === enabled;
+                  const label = enabled ? "Bound" : "Unbound";
+                  return (
+                    <Pressable
+                      key={label}
+                      testID={`edit-contact-${label.toLowerCase()}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={label}
+                      accessibilityState={{ selected }}
+                      onPress={() =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                trackingEnabled: enabled,
+                                intervalDays: enabled
+                                  ? (current.intervalDays ??
+                                    FREQUENCY_DAYS.Monthly)
+                                  : current.intervalDays,
+                                intervalValid: true,
+                              }
+                            : current,
+                        )
+                      }
+                      style={[
+                        styles.lifecycleChoice,
+                        {
+                          borderColor: selected ? colors.accent : colors.border,
+                          backgroundColor: selected
+                            ? colors.accent
+                            : colors.surface,
+                        },
+                      ]}
+                    >
+                      <AppText
+                        role="label"
+                        style={{
+                          color: selected
+                            ? colors.onAccent
+                            : colors.textPrimary,
+                        }}
+                      >
+                        {label}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                {form.trackingEnabled
+                  ? "Bound contacts appear in your active orbit and get reach-out reminders."
+                  : "Unbound contacts keep their details and history without reach-out reminders."}
+              </AppText>
+            </View>
+
+            {form.trackingEnabled ? (
+              <View style={styles.field}>
+                <AppText role="label" style={{ color: colors.textSecondary }}>
+                  Frequency
+                </AppText>
+                <FrequencyPicker
+                  testID="edit-contact-frequency"
+                  value={form.intervalDays ?? FREQUENCY_DAYS.Monthly}
+                  onChange={(v) => setField("intervalDays", v)}
+                  onValidityChange={setIntervalValid}
+                />
+              </View>
+            ) : null}
+            {/* LAST-SPOKE (owner ruling / CONTEXT Area 3): rendered ONLY when the
             seeded contact is never-contacted (last_contact IS NULL). Its Today/Pick
             date choice routes a FIRST interaction through updateContactFull's
             single-writer path — never a direct last_contact write. A contact that
             already has last_contact set has NO control here; timeline correction is
             Phase 6. Default "Not yet" so an untouched save logs nothing. */}
-          {neverContacted ? (
+            {neverContacted ? (
+              <View style={styles.field}>
+                <AppText role="label" style={{ color: colors.textSecondary }}>
+                  Last spoke
+                </AppText>
+                <TriStateLastSpoke
+                  testID="edit-contact-last-spoke"
+                  value={form.lastSpoke}
+                  onChange={(v: LastSpokeValue) => setField("lastSpoke", v)}
+                />
+              </View>
+            ) : null}
+          </AccordionSection>
+
+          {/* -- Contact Methods: phone/email + links (the reach fields). -- */}
+          <AccordionSection
+            sectionId="methods"
+            title="Contact Methods"
+            expanded={expandedSections.methods}
+            onExpandedChange={(next) => setSectionExpanded("methods", next)}
+            containerRef={registerSectionRef("methods")}
+          >
+            <ContactMethodsEditor
+              testID="edit-contact-methods"
+              methods={form.methods}
+              duplicateHelper={duplicateHelper}
+              onAdd={(type) =>
+                setField(
+                  "methods",
+                  addMethodDraft(form.methods, type, newUid()),
+                )
+              }
+              onUpdate={(uid, patch) =>
+                setField("methods", updateMethodDraft(form.methods, uid, patch))
+              }
+              onRemove={(uid) =>
+                setField("methods", removeMethodDraft(form.methods, uid))
+              }
+              onChoosePrimary={(uid) =>
+                setField("methods", choosePrimary(form.methods, uid))
+              }
+            />
+            {/* Links (CRUD-04): grouped with the reach fields; edited as draft state,
+            persisted once on Save via applyLinkDiff (the second transaction). */}
             <View style={styles.field}>
               <AppText role="label" style={{ color: colors.textSecondary }}>
-                Last spoke
+                Links
               </AppText>
-              <TriStateLastSpoke
-                testID="edit-contact-last-spoke"
-                value={form.lastSpoke}
-                onChange={(v: LastSpokeValue) => setField("lastSpoke", v)}
+              <LinksEditor
+                testID="edit-contact-links"
+                links={linksDraft}
+                onAdd={addLinkRow}
+                onUpdate={updateLinkRow}
+                onRemove={removeLinkRow}
               />
             </View>
-          ) : null}
-        </AccordionSection>
+          </AccordionSection>
 
-        {/* -- Contact Methods: phone/email + links (the reach fields). -- */}
-        <AccordionSection
-          sectionId="methods"
-          title="Contact Methods"
-          expanded={expandedSections.methods}
-          onExpandedChange={(next) => setSectionExpanded("methods", next)}
-          containerRef={registerSectionRef("methods")}
-        >
-          <ContactMethodsEditor
-            testID="edit-contact-methods"
-            methods={form.methods}
-            duplicateHelper={duplicateHelper}
-            onAdd={(type) =>
-              setField("methods", addMethodDraft(form.methods, type, newUid()))
-            }
-            onUpdate={(uid, patch) =>
-              setField("methods", updateMethodDraft(form.methods, uid, patch))
-            }
-            onRemove={(uid) =>
-              setField("methods", removeMethodDraft(form.methods, uid))
-            }
-            onChoosePrimary={(uid) =>
-              setField("methods", choosePrimary(form.methods, uid))
-            }
-          />
-          {/* Links (CRUD-04): grouped with the reach fields; edited as draft state,
-            persisted once on Save via applyLinkDiff (the second transaction). */}
-          <View style={styles.field}>
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              Links
-            </AppText>
-            <LinksEditor
-              testID="edit-contact-links"
-              links={linksDraft}
-              onAdd={addLinkRow}
-              onUpdate={updateLinkRow}
-              onRemove={removeLinkRow}
-            />
-          </View>
-        </AccordionSection>
-
-        {/* -- Last Talked About (current-state value). -- */}
-        <AccordionSection
-          sectionId="lastTalked"
-          title="Last Talked About"
-          expanded={expandedSections.lastTalked}
-          onExpandedChange={(next) => setSectionExpanded("lastTalked", next)}
-          containerRef={registerSectionRef("lastTalked")}
-        >
-          <TextInput
-            testID="edit-contact-last-talked"
-            accessibilityLabel={
-              CURRENT_STATE_FIELD_REGISTRY.last_talked_about.displayName
-            }
-            value={form.lastTalkedAbout ?? ""}
-            onChangeText={(v) => setField("lastTalkedAbout", v)}
-            placeholder="What did you last talk about?"
-            placeholderTextColor={colors.textPlaceholder}
-            style={inputStyle}
-          />
-        </AccordionSection>
-
-        {/* -- Key People / Relationships. -- */}
-        <AccordionSection
-          sectionId="keyPeople"
-          title="Key People"
-          expanded={expandedSections.keyPeople}
-          onExpandedChange={(next) =>
-            next
-              ? setSectionExpanded("keyPeople", true)
-              : requestClose(() => {
-                  relationshipEditorRef.current?.closeDraft();
-                  setSectionExpanded("keyPeople", false);
-                }, relationshipDraft.dirty)
-          }
-          containerRef={registerSectionRef("keyPeople")}
-        >
-          <RelationshipEditor
-            contactId={contactId}
-            ref={relationshipEditorRef}
-            onDraftStateChange={setRelationshipDraft}
-            items={relationshipItems}
-            onAdd={addRelationshipRow}
-            onEdit={editRelationshipRow}
-            onDelete={deleteRelationshipRow}
-            onRestore={() => {}}
-          />
-        </AccordionSection>
-
-        {/* -- Current Location (current-state value). -- */}
-        <AccordionSection
-          sectionId="currentLocation"
-          title="Current Location"
-          expanded={expandedSections.currentLocation}
-          onExpandedChange={(next) =>
-            setSectionExpanded("currentLocation", next)
-          }
-          containerRef={registerSectionRef("currentLocation")}
-        >
-          <TextInput
-            testID="edit-contact-current-location"
-            accessibilityLabel={
-              CURRENT_STATE_FIELD_REGISTRY.current_location.displayName
-            }
-            value={form.currentLocation ?? ""}
-            onChangeText={(v) => setField("currentLocation", v)}
-            placeholder="Where are they now?"
-            placeholderTextColor={colors.textPlaceholder}
-            style={inputStyle}
-          />
-        </AccordionSection>
-
-        {/* -- Memories (§E). Seeded by its OWN read (listMemoriesForContact); the
-          Allow-AI control reflects the canonical AI master (isAiMasterEnabled,
-          ADR-135 / 38.4 RG-008), never a hardcoded false or the retired
-          aiProvider field (Review cycle-4 LOW #4 / D-04). -- */}
-        <AccordionSection
-          sectionId="memories"
-          title="Memories"
-          expanded={expandedSections.memories}
-          onExpandedChange={(next) =>
-            next
-              ? setSectionExpanded("memories", true)
-              : requestClose(() => {
-                  memoryEditorRef.current?.closeDraft();
-                  setSectionExpanded("memories", false);
-                }, memoryDraft.dirty)
-          }
-          containerRef={registerSectionRef("memories")}
-        >
-          <MemoryEditor
-            testID="edit-contact-memories"
-            ref={memoryEditorRef}
-            onDraftStateChange={setMemoryDraft}
-            items={memoryItems}
-            globalAiEnabled={globalAiEnabled}
-            onAdd={addMemoryRow}
-            onEdit={editMemoryRow}
-            onDelete={deleteMemoryRow}
-            onRestore={() => {}}
-            onSetAllowAi={(id, allow) => void setMemoryAllowAiFor(id, allow)}
-          />
-        </AccordionSection>
-
-        {/* -- Custom block: EVERY non-quarantined field, as a top-level section. -- */}
-        {editDefs.length > 0 ? (
+          {/* -- Last Talked About: an always-visible "add an entry" row (D-65,
+          D-119). Blank to start; the form's Save appends a non-blank entry
+          dated by the capped picker (D-101). Enter only closes the keyboard
+          (D-121). Earlier entries stay on its history page. -- */}
           <AccordionSection
-            sectionId="custom"
-            title="Custom Fields"
-            expanded={expandedSections.custom}
-            onExpandedChange={(next) => setSectionExpanded("custom", next)}
-            containerRef={registerSectionRef("custom")}
+            sectionId="lastTalked"
+            title="Last Talked About"
+            expanded={expandedSections.lastTalked}
+            onExpandedChange={(next) => setSectionExpanded("lastTalked", next)}
+            containerRef={registerSectionRef("lastTalked")}
           >
-            <View testID="edit-contact-custom-block" style={styles.customBlock}>
-              {editDefs.map((def) => (
-                <View key={def.id} style={styles.field}>
-                  <AppText role="label" style={{ color: colors.textSecondary }}>
-                    {def.label}
-                  </AppText>
-                  <FieldValueInput
-                    testID={`edit-contact-custom-${def.col_name}`}
-                    field={def}
-                    contactId={contactId}
-                    value={form.values[def.col_name] ?? null}
-                    onChange={(v) =>
-                      setForm((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              values: { ...prev.values, [def.col_name]: v },
-                            }
-                          : prev,
-                      )
-                    }
-                  />
-                </View>
-              ))}
+            <View style={styles.field}>
+              <EntryTextField
+                testID="edit-contact-last-talked"
+                accessibilityLabel={
+                  CURRENT_STATE_FIELD_REGISTRY.last_talked_about.displayName
+                }
+                value={form.lastTalkedAbout ?? ""}
+                onChangeText={(v) => setField("lastTalkedAbout", v)}
+                onSubmit={dismissKeyboard}
+                placeholder="What did you last talk about?"
+              />
+              <EntryDateField
+                testID="edit-contact-last-talked-date"
+                accessibilityLabel={`${CURRENT_STATE_FIELD_REGISTRY.last_talked_about.displayName} date`}
+                value={form.lastTalkedAboutDate ?? todayStored}
+                onChange={(date) => setField("lastTalkedAboutDate", date)}
+                maxDate={todayDate}
+              />
+              <Button
+                testID="edit-contact-last-talked-see-all"
+                role="tertiary"
+                label="See all"
+                accessibilityLabel="See all Last Talked About entries"
+                onPress={() =>
+                  navigation.navigate("MemoryHistory", {
+                    contactId,
+                    fieldKey: "last_talked_about",
+                  })
+                }
+              />
             </View>
           </AccordionSection>
-        ) : null}
 
-        {/* -- Off Limits (§E). KIND-SCOPED to off_limits — seeded ONLY from off_limits
-          fuel, every add/edit forced to kind:"off_limits" so the contact's other
-          fuel kinds can never enter this diff (Review cycle-4 MEDIUM #3). -- */}
-        <AccordionSection
-          sectionId="offLimits"
-          title="Off Limits"
-          expanded={expandedSections.offLimits}
-          onExpandedChange={(next) =>
-            next
-              ? setSectionExpanded("offLimits", true)
-              : requestClose(() => {
-                  fuelEditorRef.current?.closeDraft();
-                  setSectionExpanded("offLimits", false);
-                }, offLimitsDraft.dirty)
-          }
-          containerRef={registerSectionRef("offLimits")}
-        >
-          <FuelEditor
-            ref={fuelEditorRef}
-            onDraftStateChange={setOffLimitsDraft}
-            testID="edit-contact-off-limits"
-            items={offLimitsItems}
-            now={draftNow}
-            onAdd={addOffLimitsRow}
-            onEdit={editOffLimitsRow}
-            onDelete={deleteOffLimitsRow}
-          />
-        </AccordionSection>
+          {/* -- Key People / Relationships. -- */}
+          <AccordionSection
+            sectionId="keyPeople"
+            title="Key People"
+            expanded={expandedSections.keyPeople}
+            onExpandedChange={(next) =>
+              next
+                ? setSectionExpanded("keyPeople", true)
+                : requestClose(() => {
+                    relationshipEditorRef.current?.closeDraft();
+                    setSectionExpanded("keyPeople", false);
+                  }, relationshipDraft.dirty)
+            }
+            containerRef={registerSectionRef("keyPeople")}
+          >
+            <RelationshipEditor
+              contactId={contactId}
+              ref={relationshipEditorRef}
+              onDraftStateChange={setRelationshipDraft}
+              onCancelRequest={(close) =>
+                requestClose(close, relationshipDraft.dirty)
+              }
+              busy={saving}
+              items={relationshipItems}
+              onAdd={addRelationshipRow}
+              onEdit={editRelationshipRow}
+              onDelete={deleteRelationshipRow}
+              onRestore={() => {}}
+            />
+          </AccordionSection>
 
-        {/* Save stays PRESSABLE when the form is incomplete so a blocked press
+          {/* -- Current Location: the same "add an entry" row (D-65, D-101,
+          D-119, D-121). -- */}
+          <AccordionSection
+            sectionId="currentLocation"
+            title="Current Location"
+            expanded={expandedSections.currentLocation}
+            onExpandedChange={(next) =>
+              setSectionExpanded("currentLocation", next)
+            }
+            containerRef={registerSectionRef("currentLocation")}
+          >
+            <View style={styles.field}>
+              <EntryTextField
+                testID="edit-contact-current-location"
+                accessibilityLabel={
+                  CURRENT_STATE_FIELD_REGISTRY.current_location.displayName
+                }
+                value={form.currentLocation ?? ""}
+                onChangeText={(v) => setField("currentLocation", v)}
+                onSubmit={dismissKeyboard}
+                placeholder="Where are they now?"
+              />
+              <EntryDateField
+                testID="edit-contact-current-location-date"
+                accessibilityLabel={`${CURRENT_STATE_FIELD_REGISTRY.current_location.displayName} date`}
+                value={form.currentLocationDate ?? todayStored}
+                onChange={(date) => setField("currentLocationDate", date)}
+                maxDate={todayDate}
+              />
+            </View>
+          </AccordionSection>
+
+          {/* -- Memories (§E). Seeded by its OWN read (listMemoriesForContact)
+          and shown through the `memories` bucket only. The Allow-AI control
+          reflects the canonical AI master (isAiMasterEnabled, ADR-135 / 38.4
+          RG-008), never a hardcoded false or the retired aiProvider field
+          (Review cycle-4 LOW #4 / D-04); Allow AI is draft state saved by
+          Save (D-27). -- */}
+          <AccordionSection
+            sectionId="memories"
+            title={sectionTitle("general")}
+            expanded={expandedSections.memories}
+            onExpandedChange={(next) =>
+              next
+                ? setSectionExpanded("memories", true)
+                : requestClose(() => {
+                    memoryEditorRef.current?.closeDraft();
+                    setSectionExpanded("memories", false);
+                  }, memoryDraft.dirty)
+            }
+            containerRef={registerSectionRef("memories")}
+          >
+            <MemoryEditor
+              testID="edit-contact-memories"
+              ref={memoryEditorRef}
+              onDraftStateChange={setMemoryDraft}
+              onCancelRequest={(close) =>
+                requestClose(close, memoryDraft.dirty)
+              }
+              busy={saving}
+              items={memoryBuckets.memories}
+              globalAiEnabled={globalAiEnabled}
+              aiDefaults={aiDefaults}
+              addButton={{ label: "Add Memory" }}
+              onAdd={addMemoryRow}
+              onEdit={editMemoryRow}
+              onDelete={deleteMemoryRow}
+            />
+          </AccordionSection>
+
+          {/* -- Thought of Them (D-65): its own type only. -- */}
+          <AccordionSection
+            sectionId="thoughtOfThem"
+            title={sectionTitle("thought_of_them")}
+            expanded={expandedSections.thoughtOfThem}
+            onExpandedChange={(next) =>
+              next
+                ? setSectionExpanded("thoughtOfThem", true)
+                : requestClose(() => {
+                    thoughtOfThemEditorRef.current?.closeDraft();
+                    setSectionExpanded("thoughtOfThem", false);
+                  }, thoughtOfThemDraft.dirty)
+            }
+            containerRef={registerSectionRef("thoughtOfThem")}
+          >
+            <MemoryEditor
+              testID="edit-contact-thought-of-them"
+              ref={thoughtOfThemEditorRef}
+              onDraftStateChange={setThoughtOfThemDraft}
+              onCancelRequest={(close) =>
+                requestClose(close, thoughtOfThemDraft.dirty)
+              }
+              busy={saving}
+              items={memoryBuckets.thoughtOfThem}
+              fixedType="thought_of_them"
+              globalAiEnabled={globalAiEnabled}
+              aiDefaults={aiDefaults}
+              addButton={{ label: "Add Thought of Them" }}
+              onAdd={addMemoryRow}
+              onEdit={editMemoryRow}
+              onDelete={deleteMemoryRow}
+            />
+          </AccordionSection>
+
+          {/* -- Gift Ideas (D-65): its own type only. -- */}
+          <AccordionSection
+            sectionId="giftIdeas"
+            title={sectionTitle("gift_idea")}
+            expanded={expandedSections.giftIdeas}
+            onExpandedChange={(next) =>
+              next
+                ? setSectionExpanded("giftIdeas", true)
+                : requestClose(() => {
+                    giftIdeasEditorRef.current?.closeDraft();
+                    setSectionExpanded("giftIdeas", false);
+                  }, giftIdeasDraft.dirty)
+            }
+            containerRef={registerSectionRef("giftIdeas")}
+          >
+            <MemoryEditor
+              testID="edit-contact-gift-ideas"
+              ref={giftIdeasEditorRef}
+              onDraftStateChange={setGiftIdeasDraft}
+              onCancelRequest={(close) =>
+                requestClose(close, giftIdeasDraft.dirty)
+              }
+              busy={saving}
+              items={memoryBuckets.giftIdeas}
+              fixedType="gift_idea"
+              globalAiEnabled={globalAiEnabled}
+              aiDefaults={aiDefaults}
+              addButton={{ label: "Add Gift Idea" }}
+              onAdd={addMemoryRow}
+              onEdit={editMemoryRow}
+              onDelete={deleteMemoryRow}
+            />
+          </AccordionSection>
+
+          {/* -- Custom block: EVERY non-quarantined field, as a top-level section. -- */}
+          {editDefs.length > 0 ? (
+            <AccordionSection
+              sectionId="custom"
+              title="Custom Fields"
+              expanded={expandedSections.custom}
+              onExpandedChange={(next) => setSectionExpanded("custom", next)}
+              containerRef={registerSectionRef("custom")}
+            >
+              <View
+                testID="edit-contact-custom-block"
+                style={styles.customBlock}
+              >
+                {editDefs.map((def) => (
+                  <View key={def.id} style={styles.field}>
+                    <AppText
+                      role="label"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {def.label}
+                    </AppText>
+                    <FieldValueInput
+                      testID={`edit-contact-custom-${def.col_name}`}
+                      field={def}
+                      contactId={contactId}
+                      value={form.values[def.col_name] ?? null}
+                      onChange={(v) =>
+                        setForm((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                values: { ...prev.values, [def.col_name]: v },
+                              }
+                            : prev,
+                        )
+                      }
+                    />
+                  </View>
+                ))}
+              </View>
+            </AccordionSection>
+          ) : null}
+
+          {/* -- Off Limits (§E): its own table, no kind control (D-08, D-11).
+          Inline rows with the shared field and a solid "Add Off Limits Item"
+          (D-67, D-87); deletes are held until Save (D-104). -- */}
+          <AccordionSection
+            sectionId="offLimits"
+            title="Off Limits"
+            expanded={expandedSections.offLimits}
+            onExpandedChange={(next) =>
+              next
+                ? setSectionExpanded("offLimits", true)
+                : requestClose(() => {
+                    offLimitsEditorRef.current?.closeDraft();
+                    setSectionExpanded("offLimits", false);
+                  }, offLimitsDraft.dirty)
+            }
+            containerRef={registerSectionRef("offLimits")}
+          >
+            <OffLimitsInlineEditor
+              ref={offLimitsEditorRef}
+              onDraftStateChange={setOffLimitsDraft}
+              onCancelRequest={(close) =>
+                requestClose(close, offLimitsDraft.dirty)
+              }
+              busy={saving}
+              testID="edit-contact-off-limits"
+              items={offLimitsItems}
+              addLabel="Add Off Limits Item"
+              onAdd={addOffLimitsRow}
+              onEdit={editOffLimitsRow}
+              onDelete={deleteOffLimitsRow}
+            />
+          </AccordionSection>
+
+          {/* -- Imported from Contacts App (D-116): the imported contact notes,
+          last as on the Profile (D-44). No Add (D-35); each note can be
+          edited (its type stays fixed) or deleted, held until Save (D-104).
+          An empty section shows a text-only line. -- */}
+          <AccordionSection
+            sectionId="imported"
+            title={sectionTitle("imported")}
+            expanded={expandedSections.imported}
+            onExpandedChange={(next) =>
+              next
+                ? setSectionExpanded("imported", true)
+                : requestClose(() => {
+                    importedEditorRef.current?.closeDraft();
+                    setSectionExpanded("imported", false);
+                  }, importedDraft.dirty)
+            }
+            containerRef={registerSectionRef("imported")}
+          >
+            {memoryBuckets.imported.length === 0 ? (
+              <AppText
+                testID="edit-contact-imported-empty"
+                role="body"
+                style={{ color: colors.textSecondary }}
+              >
+                {sectionEmptyText("imported").body}
+              </AppText>
+            ) : null}
+            <MemoryEditor
+              testID="edit-contact-imported"
+              ref={importedEditorRef}
+              onDraftStateChange={setImportedDraft}
+              onCancelRequest={(close) =>
+                requestClose(close, importedDraft.dirty)
+              }
+              busy={saving}
+              items={memoryBuckets.imported}
+              showAdd={false}
+              globalAiEnabled={globalAiEnabled}
+              aiDefaults={aiDefaults}
+              onAdd={addMemoryRow}
+              onEdit={editMemoryRow}
+              onDelete={deleteMemoryRow}
+            />
+          </AccordionSection>
+
+          {/* Save stays PRESSABLE when the form is incomplete so a blocked press
           reveals + focuses the erroring section (CAPT-14) rather than being an
           inert disabled button; it is only truly disabled while a save is in
           flight. Visual emphasis still follows `savable`. */}
-        <Pressable
-          testID="edit-contact-save"
-          accessibilityRole="button"
-          accessibilityLabel="Save changes"
-          accessibilityState={{ disabled: saving }}
-          disabled={saving}
-          onPress={() => void handleSave()}
-          style={[
-            styles.saveBtn,
-            {
-              backgroundColor: savable ? colors.accent : colors.surface,
-              borderColor: savable ? colors.accent : colors.border,
-            },
-          ]}
-        >
-          <AppText
-            role="label"
-            style={{
-              color: savable ? colors.onAccent : colors.textSecondary,
-            }}
+          <Pressable
+            testID="edit-contact-save"
+            accessibilityRole="button"
+            accessibilityLabel="Save changes"
+            accessibilityState={{ disabled: saving }}
+            disabled={saving}
+            onPress={() => void handleSave()}
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor: savable ? colors.accent : colors.surface,
+                borderColor: savable ? colors.accent : colors.border,
+              },
+            ]}
           >
-            Save changes
-          </AppText>
-        </Pressable>
+            <AppText
+              role="label"
+              style={{
+                color: savable ? colors.onAccent : colors.textSecondary,
+              }}
+            >
+              Save changes
+            </AppText>
+          </Pressable>
+        </KeyboardCenteringProvider>
+        {bottomSpacer}
       </ScrollView>
     </View>
   );

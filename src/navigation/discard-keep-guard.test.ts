@@ -865,18 +865,18 @@ describe("Add Contact / Edit Contact Off Limits draft on Back (review CR-01; D-1
       offLimits: { open: true, dirty: true },
     });
     expect(picked.which).toBe("offLimits");
-    const closeFuelDraft = vi.fn();
+    const closeOffLimitsDraft = vi.fn();
     const { fire } = mountGuard(false, false, {
       open: picked.open,
       dirty: picked.dirty,
-      close: closeFuelDraft,
+      close: closeOffLimitsDraft,
     });
     const event = fire({ type: "GO_BACK" });
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(confirmStore.getState().queue).toHaveLength(1);
     confirmStore.getState().resolveCurrent(true);
     await flush();
-    expect(closeFuelDraft).toHaveBeenCalledOnce();
+    expect(closeOffLimitsDraft).toHaveBeenCalledOnce();
     expect(nav.dispatch).not.toHaveBeenCalled();
   });
 });
