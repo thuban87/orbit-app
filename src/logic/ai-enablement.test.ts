@@ -41,6 +41,9 @@ describe("Memory hosts derive AI availability from the canonical master", () => 
     // 38.10: the per-section memory editor (plan 13). The Add Note sheet
     // lost its memory path and its AI master read in plan 12 (D-42).
     "src/screens/SectionEditorScreen.tsx",
+    // 38.10 plan 14: Add Contact's memory sections read the real AI master
+    // instead of a hard-coded false (D-27).
+    "src/screens/CreateContactScreen.tsx",
   ] as const;
 
   for (const host of HOSTS) {

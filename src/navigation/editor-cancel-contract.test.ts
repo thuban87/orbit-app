@@ -188,8 +188,16 @@ describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)",
       throw new Error(`unterminated onExpandedChange for ${id}`);
     };
 
-    it(`${path}: Memories, Key People and Off Limits fold through requestClose + closeDraft`, () => {
-      for (const id of ["memories", "keyPeople", "offLimits"]) {
+    it(`${path}: Memories, Thought of Them, Gift Ideas, Key People and Off Limits fold through requestClose + closeDraft`, () => {
+      // Last Talked About and Current Location have no draft row (38.10
+      // D-119), so they fold directly; Imported is Edit Contact only (below).
+      for (const id of [
+        "memories",
+        "thoughtOfThem",
+        "giftIdeas",
+        "keyPeople",
+        "offLimits",
+      ]) {
         const handler = foldHandler(id);
         expect(handler).toContain("requestClose(");
         expect(handler).toContain("closeDraft()");
@@ -198,7 +206,12 @@ describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)",
     });
 
     it(`${path}: other sections fold directly`, () => {
-      for (const id of ["identity", "methods", "currentLocation"]) {
+      for (const id of [
+        "identity",
+        "methods",
+        "lastTalked",
+        "currentLocation",
+      ]) {
         expect(foldHandler(id)).toMatch(
           new RegExp(
             `^\\{\\(next\\)\\s*=>\\s*setSectionExpanded\\("${id}",\\s*next\\)\\s*\\}$`,
@@ -214,14 +227,44 @@ describe("Edit Contact / Add Contact section fold (D-68; D-13 for Add Contact)",
       expect(screen).toMatch(
         /<RelationshipEditor[\s\S]*?ref=\{relationshipEditorRef\}[\s\S]*?onDraftStateChange=/,
       );
-      // The Off Limits draft row (review CR-01).
+      for (const ref of ["thoughtOfThemEditorRef", "giftIdeasEditorRef"]) {
+        expect(screen).toMatch(
+          new RegExp(
+            `<MemoryEditor[\\s\\S]*?ref=\\{${ref}\\}[\\s\\S]*?onDraftStateChange=`,
+          ),
+        );
+      }
+      // The inline Off Limits editor's add / edit form (review CR-01; 38.10
+      // plan 14 retired the fuel editor host, D-08).
       expect(screen).toMatch(
-        /<FuelEditor[\s\S]*?ref=\{fuelEditorRef\}[\s\S]*?onDraftStateChange=/,
+        /<OffLimitsInlineEditor[\s\S]*?ref=\{offLimitsEditorRef\}[\s\S]*?onDraftStateChange=/,
       );
+      expect(screen).not.toContain("FuelEditor");
       expect(screen).toMatch(/offLimits:\s*offLimitsDraft/);
+      expect(screen).toMatch(/giftIdeas:\s*giftIdeasDraft/);
+      expect(screen).toMatch(/thoughtOfThem:\s*thoughtOfThemDraft/);
       expect(screen).toMatch(/subEditor:\s*\{[\s\S]*?pickedDraft/);
     });
   }
+
+  it("Edit Contact: Imported from Contacts App folds through requestClose + closeDraft with its own editor (D-116; convergence c4, Claude C-02 / Cursor CU-04)", () => {
+    // Imported exists on Edit Contact only, so it is outside the loop above.
+    const screen = read("src/screens/EditContactScreen.tsx");
+    const start = screen.indexOf('sectionId="imported"');
+    expect(start).toBeGreaterThan(-1);
+    const attr = screen.indexOf("onExpandedChange={", start);
+    const handler = screen.slice(attr, screen.indexOf("containerRef=", attr));
+    expect(handler).toContain("requestClose(");
+    expect(handler).toContain("importedEditorRef.current?.closeDraft()");
+    expect(handler).toMatch(/next\s*\?\s*setSectionExpanded\(/);
+    expect(screen).toMatch(
+      /<MemoryEditor[\s\S]*?ref=\{importedEditorRef\}[\s\S]*?onDraftStateChange=\{setImportedDraft\}/,
+    );
+    expect(screen).toMatch(/imported:\s*importedDraft/);
+    expect(read("src/screens/CreateContactScreen.tsx")).not.toContain(
+      'sectionId="imported"',
+    );
+  });
 
   it("AccordionSection does not import the guard", () => {
     expect(read("src/components/ui/AccordionSection.tsx")).not.toContain(
