@@ -237,6 +237,8 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   "aiDefaultMemoryAllow",
   "aiDefaultInteractionNoteAllow",
   "aiDefaultCustomFieldShare",
+  "aiDefaultGiftIdeaAllow",
+  "aiDefaultThoughtOfThemAllow",
 ]);
 
 const SECRET_SHAPED_KEY =

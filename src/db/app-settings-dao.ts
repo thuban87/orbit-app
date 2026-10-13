@@ -493,6 +493,8 @@ export interface PortableSettingsSnapshot {
   aiDefaultMemoryAllow?: 0 | 1;
   aiDefaultInteractionNoteAllow?: 0 | 1;
   aiDefaultCustomFieldShare?: 0 | 1;
+  aiDefaultGiftIdeaAllow?: 0 | 1;
+  aiDefaultThoughtOfThemAllow?: 0 | 1;
   modifiedAt: string;
 }
 
@@ -576,7 +578,9 @@ type WritableSettingsKey =
   | "aiWritingFreeform"
   | "aiDefaultMemoryAllow"
   | "aiDefaultInteractionNoteAllow"
-  | "aiDefaultCustomFieldShare";
+  | "aiDefaultCustomFieldShare"
+  | "aiDefaultGiftIdeaAllow"
+  | "aiDefaultThoughtOfThemAllow";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -628,6 +632,8 @@ interface AppSettingsRow {
   ai_default_memory_allow: number;
   ai_default_interaction_note_allow: number;
   ai_default_custom_field_share: number;
+  ai_default_gift_idea_allow: number;
+  ai_default_thought_of_them_allow: number;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -673,6 +679,8 @@ const TOGGLE_FIELDS: Array<keyof AppSettingsPatch> = [
   "aiDefaultMemoryAllow",
   "aiDefaultInteractionNoteAllow",
   "aiDefaultCustomFieldShare",
+  "aiDefaultGiftIdeaAllow",
+  "aiDefaultThoughtOfThemAllow",
 ];
 
 const BACKUP_DAY_FIELDS: Array<keyof AppSettingsPatch> = [
@@ -740,6 +748,8 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   aiDefaultMemoryAllow: "ai_default_memory_allow",
   aiDefaultInteractionNoteAllow: "ai_default_interaction_note_allow",
   aiDefaultCustomFieldShare: "ai_default_custom_field_share",
+  aiDefaultGiftIdeaAllow: "ai_default_gift_idea_allow",
+  aiDefaultThoughtOfThemAllow: "ai_default_thought_of_them_allow",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -936,6 +946,8 @@ export async function getPortableSettingsSnapshot(
       | "ai_default_memory_allow"
       | "ai_default_interaction_note_allow"
       | "ai_default_custom_field_share"
+      | "ai_default_gift_idea_allow"
+      | "ai_default_thought_of_them_allow"
       | "ai_provider"
       | "ai_model"
       | "ai_custom_endpoint"
@@ -962,7 +974,8 @@ export async function getPortableSettingsSnapshot(
             ai_enabled, ai_active_connection, ai_writing_tone,
             ai_writing_length, ai_writing_directness, ai_writing_freeform,
             ai_default_memory_allow, ai_default_interaction_note_allow,
-            ai_default_custom_field_share,
+            ai_default_custom_field_share, ai_default_gift_idea_allow,
+            ai_default_thought_of_them_allow,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, backup_interval_days, backup_retention_days,
             modified_at
@@ -1033,6 +1046,10 @@ export async function getPortableSettingsSnapshot(
     aiDefaultCustomFieldShare: (row.ai_default_custom_field_share ? 1 : 0) as
       | 0
       | 1,
+    aiDefaultGiftIdeaAllow: (row.ai_default_gift_idea_allow ? 1 : 0) as 0 | 1,
+    aiDefaultThoughtOfThemAllow: (row.ai_default_thought_of_them_allow
+      ? 1
+      : 0) as 0 | 1,
     aiProvider: row.ai_provider as AiProviderId,
     aiModel: row.ai_model,
     aiCustomEndpoint: row.ai_custom_endpoint,

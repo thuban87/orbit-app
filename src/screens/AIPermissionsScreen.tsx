@@ -19,6 +19,7 @@ import {
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import {
+  type AiDefaultKey,
   type AiPermissionCategory,
   type AiPermissionDefaults,
   type AiPermissionImpact,
@@ -59,18 +60,51 @@ const TYPE_CHIPS: FilterChip<AiPermissionTypeFilter>[] = [
   { key: "custom-field", label: "Custom fields" },
 ];
 
+/**
+ * One "new items" default row. `defaultKey` is the setting it writes;
+ * `reviewCategory` is the closed review filter its "Review existing" link
+ * opens. Gift Ideas and Thought of Them have their own defaults (D-61) but are
+ * reviewed as memories, so the review union stays closed (RESEARCH Pitfall 5).
+ */
 const DEFAULT_ROWS: ReadonlyArray<{
-  category: AiPermissionCategory;
+  defaultKey: AiDefaultKey;
+  reviewCategory: AiPermissionCategory;
   key: keyof AiPermissionDefaults;
   label: string;
+  caption?: string;
 }> = [
-  { category: "memory", key: "memory", label: "Memories" },
   {
-    category: "interaction-note",
+    defaultKey: "memory",
+    reviewCategory: "memory",
+    key: "memory",
+    label: "Memories",
+  },
+  {
+    defaultKey: "gift_idea",
+    reviewCategory: "memory",
+    key: "giftIdea",
+    label: "Gift Ideas",
+    caption: "New items default to Allow AI",
+  },
+  {
+    defaultKey: "thought_of_them",
+    reviewCategory: "memory",
+    key: "thoughtOfThem",
+    label: "Thought of Them",
+    caption: "New items default to Allow AI",
+  },
+  {
+    defaultKey: "interaction-note",
+    reviewCategory: "interaction-note",
     key: "interactionNote",
     label: "Interaction notes",
   },
-  { category: "custom-field", key: "customField", label: "Custom fields" },
+  {
+    defaultKey: "custom-field",
+    reviewCategory: "custom-field",
+    key: "customField",
+    label: "Custom fields",
+  },
 ];
 
 type PendingAction =
@@ -94,6 +128,19 @@ function ReviewExistingLinkLabel() {
   );
 }
 
+/**
+ * A default row's caption. Like `ReviewExistingLinkLabel`, it reads the
+ * palette inside the card's GlassSurface scope so it takes the card's tone.
+ */
+function DefaultRowCaption({ text }: { text: string }) {
+  const { colors } = useTheme();
+  return (
+    <AppText role="caption" style={{ color: colors.textSecondary }}>
+      {text}
+    </AppText>
+  );
+}
+
 /** Back is the shared header's only (38.9 D-16, D-07). */
 export function AIPermissionsScreen() {
   const { colors } = useTheme();
@@ -103,6 +150,8 @@ export function AIPermissionsScreen() {
     memory: 0,
     interactionNote: 0,
     customField: 0,
+    giftIdea: 0,
+    thoughtOfThem: 0,
   });
   const [items, setItems] = useState<AiPermissionItem[]>([]);
   const [query, setQuery] = useState("");
@@ -177,7 +226,7 @@ export function AIPermissionsScreen() {
   );
 
   async function toggleDefault(
-    category: AiPermissionCategory,
+    category: AiDefaultKey,
     key: keyof AiPermissionDefaults,
     enabled: boolean,
   ) {
@@ -270,19 +319,18 @@ export function AIPermissionsScreen() {
             {DEFAULT_NOTE}
           </AppText>
           {DEFAULT_ROWS.map((row) => (
-            <GlassSurface
-              key={row.category}
-              density="dense"
-              style={styles.card}
-            >
+            <GlassSurface key={row.key} density="dense" style={styles.card}>
               <View style={styles.defaultRow}>
                 <View style={styles.copy}>
                   <AppText role="body">{row.label}</AppText>
+                  {row.caption ? (
+                    <DefaultRowCaption text={row.caption} />
+                  ) : null}
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Review existing ${row.label}`}
                     onPress={() => {
-                      setTypeFilter(row.category);
+                      setTypeFilter(row.reviewCategory);
                       setEnabledOnly(false);
                     }}
                     style={styles.reviewLink}
@@ -294,7 +342,7 @@ export function AIPermissionsScreen() {
                   accessibilityLabel={`Allow AI for new ${row.label}`}
                   value={defaults[row.key] === 1}
                   onValueChange={(value) =>
-                    void toggleDefault(row.category, row.key, value)
+                    void toggleDefault(row.defaultKey, row.key, value)
                   }
                 />
               </View>

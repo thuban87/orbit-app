@@ -8,7 +8,11 @@
  * closed union and every exhaustive switch below.
  */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
-import { isMemoryTypeKey, MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
+import {
+  isMemoryTypeKey,
+  MEMORY_TYPE_REGISTRY,
+  type MemoryTypeKey,
+} from "@/db/memory-registry";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -19,10 +23,23 @@ export type AiPermissionCategory =
 
 export type AiPermissionValue = 0 | 1;
 
+/**
+ * A creation-time default key. Wider than the closed review union
+ * `AiPermissionCategory` on purpose (RESEARCH Pitfall 5): Gift Ideas and
+ * Thought of Them have their own new-item defaults (D-13, D-14, D-61) but are
+ * reviewed as memories, so they can never be routed to a review writer.
+ */
+export type AiDefaultKey =
+  | AiPermissionCategory
+  | "gift_idea"
+  | "thought_of_them";
+
 export interface AiPermissionDefaults {
   memory: AiPermissionValue;
   interactionNote: AiPermissionValue;
   customField: AiPermissionValue;
+  giftIdea: AiPermissionValue;
+  thoughtOfThem: AiPermissionValue;
 }
 
 export interface AiPermissionRef {
@@ -53,11 +70,37 @@ export interface AiPermissionImpact {
   items: number;
 }
 
+/** Review categories. `assertRef` checks against this closed map only. */
 const DEFAULT_COLUMN: Record<AiPermissionCategory, string> = {
   memory: "ai_default_memory_allow",
   "interaction-note": "ai_default_interaction_note_allow",
   "custom-field": "ai_default_custom_field_share",
 };
+
+/** Every creation-time default column, by default key. */
+const DEFAULT_COLUMN_BY_KEY: Record<AiDefaultKey, string> = {
+  ...DEFAULT_COLUMN,
+  gift_idea: "ai_default_gift_idea_allow",
+  thought_of_them: "ai_default_thought_of_them_allow",
+};
+
+function defaultColumn(key: AiDefaultKey): string | undefined {
+  return Object.hasOwn(DEFAULT_COLUMN_BY_KEY, key)
+    ? DEFAULT_COLUMN_BY_KEY[key]
+    : undefined;
+}
+
+/** The new-item default key a memory type follows (D-13, D-14). */
+export function aiDefaultKeyForMemoryType(type: MemoryTypeKey): AiDefaultKey {
+  switch (type) {
+    case "gift_idea":
+      return "gift_idea";
+    case "thought_of_them":
+      return "thought_of_them";
+    default:
+      return "memory";
+  }
+}
 
 function assertPermissionValue(
   value: number,
@@ -97,10 +140,14 @@ export async function getAiPermissionDefaults(
     memory: number;
     interactionNote: number;
     customField: number;
+    giftIdea: number;
+    thoughtOfThem: number;
   }>(
     `SELECT ai_default_memory_allow AS memory,
             ai_default_interaction_note_allow AS interactionNote,
-            ai_default_custom_field_share AS customField
+            ai_default_custom_field_share AS customField,
+            ai_default_gift_idea_allow AS giftIdea,
+            ai_default_thought_of_them_allow AS thoughtOfThem
        FROM app_settings
       WHERE id = 1`,
   );
@@ -108,19 +155,46 @@ export async function getAiPermissionDefaults(
   assertPermissionValue(row.memory);
   assertPermissionValue(row.interactionNote);
   assertPermissionValue(row.customField);
+  assertPermissionValue(row.giftIdea);
+  assertPermissionValue(row.thoughtOfThem);
   return {
     memory: row.memory,
     interactionNote: row.interactionNote,
     customField: row.customField,
+    giftIdea: row.giftIdea,
+    thoughtOfThem: row.thoughtOfThem,
   };
+}
+
+/**
+ * Each user-pickable memory type's new-item default, read from one defaults
+ * snapshot. The Memory editor hosts (plans 13, 14, 17) all build their
+ * per-type map through this, so they cannot drift.
+ */
+export function memoryAiDefaultsMap(
+  defaults: AiPermissionDefaults,
+): Partial<Record<MemoryTypeKey, AiPermissionValue>> {
+  const byKey: Record<AiDefaultKey, AiPermissionValue> = {
+    memory: defaults.memory,
+    "interaction-note": defaults.interactionNote,
+    "custom-field": defaults.customField,
+    gift_idea: defaults.giftIdea,
+    thought_of_them: defaults.thoughtOfThem,
+  };
+  const map: Partial<Record<MemoryTypeKey, AiPermissionValue>> = {};
+  for (const type of Object.keys(MEMORY_TYPE_REGISTRY) as MemoryTypeKey[]) {
+    if (!MEMORY_TYPE_REGISTRY[type].userPickable) continue;
+    map[type] = byKey[aiDefaultKeyForMemoryType(type)];
+  }
+  return map;
 }
 
 /** Resolve the durable creation-time default for one eligible information type. */
 export async function resolveNewItemAiDefault(
   exec: SqlExecutor,
-  category: AiPermissionCategory,
+  category: AiDefaultKey,
 ): Promise<AiPermissionValue> {
-  const column = DEFAULT_COLUMN[category];
+  const column = defaultColumn(category);
   if (!column) throw new Error("Unknown AI permission category");
   const row = await exec.getFirstAsync<{ value: number }>(
     `SELECT ${column} AS value FROM app_settings WHERE id = 1`,
@@ -133,12 +207,12 @@ export async function resolveNewItemAiDefault(
 /** Change only the category default; existing item flags are intentionally untouched. */
 export function setAiPermissionDefault(
   exec: SqlExecutor,
-  category: AiPermissionCategory,
+  category: AiDefaultKey,
   value: AiPermissionValue,
   now: string,
 ): Promise<void> {
   assertPermissionValue(value);
-  const column = DEFAULT_COLUMN[category];
+  const column = defaultColumn(category);
   if (!column)
     return Promise.reject(new Error("Unknown AI permission category"));
   return inWriteTransaction(exec, async () => {

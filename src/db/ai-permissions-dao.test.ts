@@ -6,11 +6,13 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   type AiPermissionRef,
+  aiDefaultKeyForMemoryType,
   bulkDisableAiPermissions,
   bulkEnableAiPermissions,
   getAiPermissionDefaults,
   getBulkPermissionImpact,
   listAiPermissionItems,
+  memoryAiDefaultsMap,
   resolveNewItemAiDefault,
   setAiPermissionDefault,
   summarizeAiPermissionItems,
@@ -91,6 +93,61 @@ async function seedReviewRows() {
   };
 }
 
+describe("per-type new-item defaults (D-13, D-14, D-61)", () => {
+  it("reads, writes and resolves the Gift Ideas and Thought of Them defaults on their own columns", async () => {
+    await setAiPermissionDefault(exec, "gift_idea", 1, NOW);
+    expect(await getAiPermissionDefaults(exec)).toEqual({
+      memory: 0,
+      interactionNote: 0,
+      customField: 0,
+      giftIdea: 1,
+      thoughtOfThem: 0,
+    });
+    await expect(resolveNewItemAiDefault(exec, "gift_idea")).resolves.toBe(1);
+    await expect(
+      resolveNewItemAiDefault(exec, "thought_of_them"),
+    ).resolves.toBe(0);
+    await expect(resolveNewItemAiDefault(exec, "memory")).resolves.toBe(0);
+    await setAiPermissionDefault(exec, "thought_of_them", 1, NOW);
+    await expect(
+      exec.getFirstAsync(
+        "SELECT ai_default_gift_idea_allow AS g, ai_default_thought_of_them_allow AS t FROM app_settings WHERE id = 1",
+      ),
+    ).resolves.toEqual({ g: 1, t: 1 });
+  });
+
+  it("maps each memory type to its default key", () => {
+    expect(aiDefaultKeyForMemoryType("gift_idea")).toBe("gift_idea");
+    expect(aiDefaultKeyForMemoryType("thought_of_them")).toBe(
+      "thought_of_them",
+    );
+    expect(aiDefaultKeyForMemoryType("general")).toBe("memory");
+    expect(aiDefaultKeyForMemoryType("imported")).toBe("memory");
+  });
+
+  it("memoryAiDefaultsMap gives each user-pickable type its own default", () => {
+    expect(
+      memoryAiDefaultsMap({
+        memory: 1,
+        interactionNote: 0,
+        customField: 0,
+        giftIdea: 0,
+        thoughtOfThem: 0,
+      }),
+    ).toEqual({ general: 1, gift_idea: 0, thought_of_them: 0 });
+  });
+
+  it("a new key can never be routed into the review writers (closed union)", async () => {
+    await expect(
+      bulkEnableAiPermissions(
+        exec,
+        [{ category: "gift_idea" as never, id: 1 }],
+        NOW,
+      ),
+    ).rejects.toThrow("unknown category");
+  });
+});
+
 describe("AI permissions DAO", () => {
   it("reads and writes category defaults without changing existing permissions", async () => {
     const seeded = await seedReviewRows();
@@ -98,6 +155,8 @@ describe("AI permissions DAO", () => {
       memory: 0,
       interactionNote: 0,
       customField: 0,
+      giftIdea: 0,
+      thoughtOfThem: 0,
     });
 
     await setAiPermissionDefault(exec, "memory", 1, NOW);

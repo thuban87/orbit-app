@@ -16,7 +16,10 @@
  * `#[0-9a-fA-F]{3,8}` pattern never matches the source (a `#` immediately
  * followed by `$`), and every reject input is a string the gate does not match.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { PORTABLE_SETTINGS_KEYS } from "@/backup/backup-schema";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
@@ -45,36 +48,9 @@ import {
   updateAppSettings,
   updateAppSettingsCore,
 } from "@/db/app-settings-dao";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
-import { migration008 } from "@/db/migrations/008-restore-photo-journal";
-import { migration009 } from "@/db/migrations/009-contact-method-normalization";
-import { migration010 } from "@/db/migrations/010-contact-method-label";
-import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
-import { migration012 } from "@/db/migrations/012-import-sessions";
-import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
-import { migration014 } from "@/db/migrations/014-interaction-assists";
-import { migration015 } from "@/db/migrations/015-theme-settings";
-import { migration016 } from "@/db/migrations/016-contact-knowledge";
-import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
-import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
-import { migration019 } from "@/db/migrations/019-dashboard-prefs";
-import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
-import { migration021 } from "@/db/migrations/021-orrery-preferences";
-import { migration022 } from "@/db/migrations/022-orrery-systems";
-import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
-import { migration025 } from "@/db/migrations/025-interaction-history-schema";
-import { migration026 } from "@/db/migrations/026-group-events-schema";
-import { migration027 } from "@/db/migrations/027-default-interaction-channel";
-import { migration028 } from "@/db/migrations/028-compose-message-mode";
-import { migration029 } from "@/db/migrations/029-ai-configuration";
-import { migration030 } from "@/db/migrations/030-your-week-period";
-import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -118,47 +94,12 @@ async function migrateToV2(): Promise<void> {
 }
 
 /**
- * Bring a fresh in-memory DB to v14. The DAO selects the backup columns added by
- * migration 007, so every current-schema test needs the complete launch path.
+ * Bring a fresh in-memory DB to the current head. The DAO selects columns
+ * added as late as migration 033 (the Gift Ideas / Thought of Them AI
+ * defaults), so every current-schema test needs the complete launch path.
  */
 async function migrateToV5(): Promise<void> {
-  await runMigrations(
-    exec,
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-      migration008,
-      migration009,
-      migration010,
-      migration011,
-      migration012,
-      migration013,
-      migration014,
-      migration015,
-      migration016,
-      migration017,
-      migration018,
-      migration019,
-      migration020,
-      migration021,
-      migration022,
-      migration023,
-      profilePresentationMigration,
-      migration025,
-      migration026,
-      migration027,
-      migration028,
-      migration029,
-      migration030,
-    ],
-    30,
-    { now: NOW, newUid },
-  );
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid });
 }
 
 /** The disabled-by-default AI fields, for splicing into full-object expectations. */
@@ -998,6 +939,35 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
     await migrateToV5();
   });
 
+  it("round-trips the Gift Ideas and Thought of Them AI defaults through the portable snapshot (D-61, D-92)", async () => {
+    expect(PORTABLE_SETTINGS_KEYS.has("aiDefaultGiftIdeaAllow")).toBe(true);
+    expect(PORTABLE_SETTINGS_KEYS.has("aiDefaultThoughtOfThemAllow")).toBe(
+      true,
+    );
+    await updateAppSettings(
+      exec,
+      { aiDefaultGiftIdeaAllow: 1, aiDefaultThoughtOfThemAllow: 1 },
+      LATER,
+    );
+    expect(await getPortableSettingsSnapshot(exec)).toMatchObject({
+      aiDefaultGiftIdeaAllow: 1,
+      aiDefaultThoughtOfThemAllow: 1,
+    });
+    await updateAppSettings(exec, { aiDefaultThoughtOfThemAllow: 0 }, LATER);
+    expect(await getPortableSettingsSnapshot(exec)).toMatchObject({
+      aiDefaultGiftIdeaAllow: 1,
+      aiDefaultThoughtOfThemAllow: 0,
+    });
+    // Validation runs before the transaction opens and throws synchronously.
+    expect(() =>
+      updateAppSettings(
+        exec,
+        { aiDefaultGiftIdeaAllow: 2 as unknown as 0 | 1 },
+        LATER,
+      ),
+    ).toThrow("aiDefaultGiftIdeaAllow must be 0 or 1");
+  });
+
   it("returns an explicit portable projection without device-local bookkeeping", async () => {
     const snapshot = await getPortableSettingsSnapshot(exec);
     expect(snapshot).toMatchObject({
@@ -1019,6 +989,8 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
       aiDefaultMemoryAllow: 0,
       aiDefaultInteractionNoteAllow: 0,
       aiDefaultCustomFieldShare: 0,
+      aiDefaultGiftIdeaAllow: 0,
+      aiDefaultThoughtOfThemAllow: 0,
       backupIntervalDays: 1,
       backupRetentionDays: 7,
       modifiedAt: NOW,
