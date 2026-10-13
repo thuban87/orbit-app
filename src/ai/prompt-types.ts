@@ -21,20 +21,6 @@
  */
 
 /**
- * One ranked conversational-fuel entry that is eligible for a prompt. Sourced
- * ONLY through `getRankedFuel`, which already excludes `off_limits`,
- * unconfirmed `source='ai'`, and blank rows IN SQL (fuel-read.ts). `ageDays` is
- * the whole-day age of the row at read time (FUEL-04 age), never the raw
- * `created_at` timestamp.
- */
-export interface RankedFuelEntry {
-  readonly text: string;
-  readonly kind: string;
-  readonly label?: string;
-  readonly ageDays: number;
-}
-
-/**
  * The neutral this-period contact-rate / long-run cadence aggregate derived from
  * the interaction log (LOG-03 intensity). Every field is a derived NUMBER — the
  * raw interaction rows, and in particular the free-text interaction column, are
@@ -139,8 +125,8 @@ export interface PromptMessageFocusItem {
  * `contacts`). Every other `contacts` column (phone, email, birthday, photo,
  * links, snooze, archive state, raw `last_contact`, `category_id` itself, and
  * the derivation-only `interval_days` / `rarely_responds`) is PROHIBITED from
- * egress. Everything else here is ranked eligible fuel, neutral derived
- * aggregates, or live opted-in field values.
+ * egress. Everything else here is neutral derived aggregates, live opted-in
+ * field values and memories, or gated recent-interaction rows.
  */
 export interface PromptContext {
   /** The contact's display name — one of the two permitted direct identifiers. */
@@ -150,8 +136,6 @@ export interface PromptContext {
    * through a narrow `LEFT JOIN categories` — NEVER the raw `category_id`.
    */
   readonly category: string;
-  /** Ranked eligible fuel with age, in rank order (≤ any resolver limit). */
-  readonly rankedFuel: ReadonlyArray<RankedFuelEntry>;
   /** Coarse named gravity tier (LOG-03) — never the raw gravity number. */
   readonly gravityTier: string;
   /** Neutral this-period rate / cadence aggregate. */
@@ -172,8 +156,9 @@ export interface PromptContext {
   readonly sharedMemories?: ReadonlyArray<SharedFieldValue>;
   /**
    * The newest three interactions. Date/time, channel, and Tone are always
-   * carried; `note` exists only when that row's `allow_ai=1`. Group Notes are
-   * never read. Each row is serialized explicitly in its own bounded DATA block.
+   * carried; `note` exists only when the SQL gate allows it (the row allows AI,
+   * is not locked, and no linked memory has AI off). Group Notes are never
+   * read. Each row is serialized explicitly in its own bounded DATA block.
    */
   readonly recentInteractions?: ReadonlyArray<RecentInteractionContext>;
   /** Durable global Writing Style. When present it supersedes the legacy note. */
@@ -190,7 +175,7 @@ export interface PromptContext {
 
 /**
  * One safe truncation disclosure. `category` names WHAT was trimmed (e.g.
- * "conversational fuel", "style template", or a field label); `detail` is a
+ * "shared field", "style template", or a field label); `detail` is a
  * safe, count-oriented description. Neither field ever contains the omitted
  * content itself (no retained withheld text — AI-04).
  */

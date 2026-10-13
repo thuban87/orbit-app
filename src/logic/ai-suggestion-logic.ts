@@ -53,7 +53,7 @@
  * prompt resolution, the provider call, the AbortController factory, the timer,
  * the draft mutation, freshness facts — is INJECTED, so the whole lifecycle is
  * proven off-device with Vitest. The lifecycle has NO DAO/contact/interaction/
- * fuel/cache/export write capability.
+ * knowledge/cache/export write capability.
  *
  * ACK GATE REMOVED (D-09 / ADR-079, Trip-Wire 4): the ADR-052 first-send
  * acknowledgement gate and the entire acknowledgement path are gone — generation

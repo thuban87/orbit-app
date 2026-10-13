@@ -140,6 +140,7 @@ import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
+import { countContactPromptItems } from "@/screens/settings-ai-logic";
 import { AiError, type AiErrorCode, AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
 import {
@@ -572,12 +573,7 @@ export function ComposeScreen({
         const lane = connection?.lane ?? "custom";
         const classified = classifyAiFailure(err, lane);
         const context = promptContextRef.current;
-        const itemCount = context
-          ? context.rankedFuel.length +
-            context.sharedFields.length +
-            (context.sharedMemories?.length ?? 0) +
-            (context.recentInteractions?.length ?? 0)
-          : 0;
+        const itemCount = context ? countContactPromptItems(context) : 0;
         const diagnostic = buildAiDiagnostic({
           operation,
           lane,

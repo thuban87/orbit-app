@@ -23,7 +23,6 @@ const context = (
 ): PromptContext => ({
   contactName: "Alex",
   category: "Friend",
-  rankedFuel: [],
   gravityTier: "solid",
   intensity: {
     currentCount: 1,

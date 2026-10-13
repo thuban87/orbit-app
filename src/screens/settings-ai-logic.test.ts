@@ -27,7 +27,6 @@ import {
 const EMPTY_CONTEXT: PromptContext = {
   contactName: "Casey",
   category: "Friend",
-  rankedFuel: [],
   gravityTier: "steady",
   intensity: {
     currentCount: 0,
@@ -48,7 +47,7 @@ function frozenPrompt(text: string): ResolvedPrompt {
     prompt: text,
     inspectorDisplay: text,
     truncations: Object.freeze([
-      Object.freeze({ category: "conversational fuel", detail: "2 trimmed" }),
+      Object.freeze({ category: "shared field: City", detail: "2 trimmed" }),
     ]),
     payload: text,
   }) as ResolvedPrompt;
@@ -214,7 +213,6 @@ describe("whole-system and contact-specific prompt previews", () => {
   it("derives contact review blocks from that exact resolved prompt and omits global boilerplate", () => {
     const context: PromptContext = {
       ...EMPTY_CONTEXT,
-      rankedFuel: [{ text: "Garden plans", kind: "interest", ageDays: 2 }],
       sharedFields: [{ label: "City", value: "Madison" }],
       sharedMemories: [{ label: "Trip", value: "Coast" }],
       recentInteractions: [
@@ -247,8 +245,7 @@ describe("whole-system and contact-specific prompt previews", () => {
     const whole = buildWholePromptPreview(resolved);
     expect(whole.display).toContain("PRIVATE GLOBAL STYLE");
     expect(whole.display).toContain("PRIVATE GLOBAL PERSONALIZATION");
-    expect(review.heading).toBe("Sharing 4 items with AI about Casey");
-    expect(review.display).toContain("Garden plans");
+    expect(review.heading).toBe("Sharing 3 items with AI about Casey");
     expect(review.display).toContain("Madison");
     expect(review.display).toContain("Coast");
     expect(review.display).toContain("Talked about tomatoes");

@@ -26,7 +26,6 @@ const LOG_SCOPE = "ai-preview";
 const EMPTY_PREVIEW_CONTEXT: PromptContext = {
   contactName: "Example contact",
   category: "",
-  rankedFuel: [],
   gravityTier: "",
   intensity: {
     currentCount: 0,

@@ -14,12 +14,12 @@
  *   Contact data is DATA, never instructions (T-14-09, CLAUDE.md). The immutable
  *   product instruction is a source constant; every contact-derived value is
  *   serialized inside explicit `DATA` delimiters and is never concatenated into
- *   the instruction. Injection-shaped fuel or field values therefore render as
- *   delimited data and cannot alter the static instruction.
+ *   the instruction. Injection-shaped field, memory or note values therefore
+ *   render as delimited data and cannot alter the static instruction.
  *
- *   Determinism + abuse bounds: the legacy template ≤ 2,000 code points, ≤ 8
- *   ranked fuel entries in rank order, and each human-entered value ≤ 300 code
- *   points — counted with `Array.from`, never UTF-16 `.length`. Permitted context
+ *   Determinism + abuse bounds: the legacy template ≤ 2,000 code points and
+ *   each human-entered value ≤ 300 code points — counted with `Array.from`,
+ *   never UTF-16 `.length`. Permitted context
  *   is never dropped to fit a fixed product budget. The selected model's real
  *   context window is the only total-capacity constraint and is checked by
  *   context-estimate (AICFG-07). Per-value trimming is disclosed by category.
@@ -37,10 +37,8 @@ import type {
 
 /** Max code points of the user-editable style template. */
 export const TEMPLATE_LIMIT = 2_000;
-/** Max code points of a single human-entered value (fuel text / field value). */
+/** Max code points of a single human-entered value (field / memory / note). */
 export const PER_VALUE_LIMIT = 300;
-/** Max ranked fuel entries carried into a prompt, in rank order. */
-export const MAX_RANKED_FUEL = 8;
 
 // Output sizing is NO LONGER a flat constant here. The former stopgap
 // `MAX_OUTPUT_TOKENS` (bumped 120 → 1024 → 2048) was fragile for THINKING models
@@ -84,9 +82,9 @@ export const STATIC_INSTRUCTION = [
  */
 export const DEFAULT_STYLE_NOTE = [
   "Keep it casual and authentic, not robotic. Reference a specific topic from",
-  "the conversational fuel or shared details when one is available. Match the",
-  "tone to the relationship category. Keep it to three or four sentences and do",
-  "not use em dashes.",
+  "the shared details when one is available. Match the tone to the",
+  "relationship category. Keep it to three or four sentences and do not use em",
+  "dashes.",
 ].join("\n");
 
 /**
@@ -360,39 +358,7 @@ export function resolvePrompt(
     }
   }
 
-  // (2) Ranked fuel: keep rank order, cap at MAX_RANKED_FUEL, bound each value.
-  const totalFuel = context.rankedFuel.length;
-  const keptFuel = context.rankedFuel.slice(0, MAX_RANKED_FUEL);
-  if (totalFuel > MAX_RANKED_FUEL) {
-    truncations.push({
-      category: "conversational fuel",
-      detail: `kept the top ${MAX_RANKED_FUEL} of ${totalFuel} entries in rank order; ${
-        totalFuel - MAX_RANKED_FUEL
-      } omitted`,
-    });
-  }
-  let fuelValueTrimmed = false;
-  const fuelLines = keptFuel.map((f) => {
-    const [value, trimmed] = trimToCodePoints(
-      sanitizeValue(f.text),
-      PER_VALUE_LIMIT,
-    );
-    if (trimmed) {
-      fuelValueTrimmed = true;
-    }
-    const labelPart = f.label ? ` ${sanitizeValue(f.label)}` : "";
-    return `- [${f.kind}${labelPart}, ${f.ageDays}d ago] ${value}`;
-  });
-  if (fuelValueTrimmed) {
-    truncations.push({
-      category: "conversational fuel",
-      detail: `one or more entries trimmed to ${PER_VALUE_LIMIT} code points`,
-    });
-  }
-  const fuelBlock =
-    fuelLines.length > 0 ? fuelLines.join("\n") : NONE_AVAILABLE;
-
-  // (3) Shared field values: preserve every permitted value, applying only the
+  // (2) Shared field values: preserve every permitted value, applying only the
   // disclosed per-value abuse bound.
   const boundedFields = context.sharedFields.map((field) => {
     const [value, trimmed] = trimToCodePoints(
@@ -419,8 +385,6 @@ export function resolvePrompt(
     `Interaction quality: ${qualityLine(context)}`,
     `Touchpoints: ${context.cadence.totalCount} total, ${context.cadence.connectedCount} connected`,
     `Most recent channel: ${context.newestChannel || NONE_AVAILABLE}`,
-    "Conversational fuel (most relevant first):",
-    fuelBlock,
     "Additional shared details:",
     FIELD_MARKER,
     "===== END DATA: CONTACT CONTEXT =====",

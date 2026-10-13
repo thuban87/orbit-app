@@ -247,7 +247,6 @@ export interface ContactPromptReview {
 /** Count independently permitted contact items; base aggregate context is not a permission item. */
 export function countContactPromptItems(context: PromptContext): number {
   return (
-    context.rankedFuel.length +
     context.sharedFields.length +
     (context.sharedMemories?.length ?? 0) +
     (context.recentInteractions?.length ?? 0)

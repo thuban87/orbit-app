@@ -41,7 +41,6 @@ function flush(): Promise<void> {
 const CONTEXT: PromptContext = {
   contactName: "Sam Rivers",
   category: "Close friends",
-  rankedFuel: [{ text: "Just got back from Lisbon", kind: "note", ageDays: 3 }],
   gravityTier: "steady",
   intensity: {
     currentCount: 1,
