@@ -13,6 +13,7 @@ import {
   getAppSettings,
   recordAutomaticBackupHealthCore,
 } from "@/db/app-settings-dao";
+import { hasMeaningfulBackupData } from "@/db/backup-meaningful-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { inWriteTransaction } from "@/db/transaction";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -117,23 +118,12 @@ export function BackupScreen({
         const exec = getExecutor();
         const [settings, meaningful, skippedRecord] = await Promise.all([
           getAppSettings(exec),
-          exec.getFirstAsync<{ meaningful: number }>(
-            `SELECT EXISTS(
-              SELECT 1 FROM contacts
-              UNION ALL SELECT 1 FROM interactions
-              UNION ALL SELECT 1 FROM events
-              UNION ALL SELECT 1 FROM fuel
-              UNION ALL SELECT 1 FROM contact_links
-              UNION ALL SELECT 1 FROM custom_field_defs
-              UNION ALL SELECT 1 FROM custom_field_values
-              UNION ALL SELECT 1 FROM profile WHERE name IS NOT NULL OR photo IS NOT NULL
-            ) AS meaningful`,
-          ),
+          hasMeaningfulBackupData(exec),
           readAutomaticSkippedPhotos(),
         ]);
         const nudge = resolveBackupNudge(
           {
-            hasMeaningfulData: meaningful?.meaningful === 1,
+            hasMeaningfulData: meaningful,
             lastAutomaticBackupAt: settings.lastAutomaticBackupAt,
             currentDataRevision: settings.dataRevision,
             lastBackupDataRevision: settings.lastBackupDataRevision,

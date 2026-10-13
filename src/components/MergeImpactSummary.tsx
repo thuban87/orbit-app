@@ -6,6 +6,10 @@ import {
   GroupMergeCollisionError,
   type MergeResolutions,
 } from "@/db/merge-dao";
+import {
+  type MergeImpactCounts,
+  readMergeImpactCounts,
+} from "@/db/merge-impact-read";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardWith } from "@/navigation/reset-intents";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -15,14 +19,6 @@ import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
 import { plural } from "@/utils/plural";
 import { ShellAppBar } from "./ShellAppBar";
-
-type Counts = {
-  interactions: number;
-  fuel: number;
-  events: number;
-  methods: number;
-  links: number;
-};
 
 export function MergeImpactSummary({
   navigation,
@@ -35,37 +31,20 @@ export function MergeImpactSummary({
     survivor: "Contact",
     absorbed: "Contact",
   });
-  const [counts, setCounts] = useState<Counts | null>(null);
+  const [counts, setCounts] = useState<MergeImpactCounts | null>(null);
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   useEffect(() => {
     const exec = getExecutor();
     void Promise.all([
       getContactHeader(exec, survivorId),
       getContactHeader(exec, absorbedId),
-      ...[
-        "interactions",
-        "fuel",
-        "events",
-        "contact_methods",
-        "external_contact_links",
-      ].map((table) =>
-        exec.getFirstAsync<{ n: number }>(
-          `SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ?`,
-          [absorbedId],
-        ),
-      ),
-    ]).then(([survivor, absorbed, ...rows]) => {
+      readMergeImpactCounts(exec, absorbedId),
+    ]).then(([survivor, absorbed, impact]) => {
       setNames({
         survivor: survivor?.name ?? "Contact",
         absorbed: absorbed?.name ?? "Contact",
       });
-      setCounts({
-        interactions: rows[0]?.n ?? 0,
-        fuel: rows[1]?.n ?? 0,
-        events: rows[2]?.n ?? 0,
-        methods: rows[3]?.n ?? 0,
-        links: rows[4]?.n ?? 0,
-      });
+      setCounts(impact);
     });
   }, [absorbedId, survivorId]);
   const typedResolutions: MergeResolutions = resolutions;
@@ -120,10 +99,9 @@ export function MergeImpactSummary({
   const rows = counts
     ? [
         plural(counts.interactions, "interaction", "interactions"),
-        plural(counts.fuel, "fuel item", "fuel items"),
         plural(counts.events, "event", "events"),
         plural(counts.methods, "contact method", "contact methods"),
-        plural(counts.links, "external link", "external links"),
+        plural(counts.externalLinks, "external link", "external links"),
       ]
     : [];
   return (
