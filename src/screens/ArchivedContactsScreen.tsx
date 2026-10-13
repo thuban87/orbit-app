@@ -72,8 +72,9 @@ function confirmPurge(message: string): Promise<boolean> {
 /**
  * The locked impact-summary body (UI-SPEC "Destructive confirmation — purge"):
  * "Permanently delete {name} and {parts}? This cannot be undone." The parts are
- * the genuine multi-row children only (interactions / fuel items / links), each
- * omitted when its count is 0 — never a custom-values or events count. When a
+ * the genuine multi-row children only (interactions, events, links, memories,
+ * relationships; `impactSummaryLines`), each omitted when its count is 0 —
+ * never a custom-values count. When a
  * contact owns no such children, the "and {parts}" clause is dropped so the copy
  * stays grammatical.
  */

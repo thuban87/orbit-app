@@ -470,19 +470,9 @@ export async function mergeContacts(
       );
     }
 
-    // Demote absorbed current values that would collide with the survivor's
-    // current value before reparenting into the partial unique index.
-    await exec.runAsync(
-      `UPDATE current_state_entries
-          SET is_current = 0, modified_at = ?
-        WHERE contact_id = ?
-          AND is_current = 1
-          AND field_key IN (
-            SELECT field_key FROM current_state_entries
-             WHERE contact_id = ? AND is_current = 1
-          )`,
-      [input.now, absorbed.id, survivor.id],
-    );
+    // Current state needs no pre-step: "Most Recent" is the entry with the
+    // latest date (D-45), so both contacts' entries simply reparent and
+    // interleave by date. There is no per-field current flag to collide on.
     // This must precede reparenting: links in either direction between the two
     // merging contacts would otherwise become persisted self-links.
     await exec.runAsync(
@@ -497,8 +487,8 @@ export async function mergeContacts(
       [survivor.id, input.now, absorbed.id],
     );
 
-    // Like the current_state_entries partial-unique pre-handling above, detect
-    // an interaction constraint collision before the blanket reparent. ADR-010
+    // Detect an interaction constraint collision before the blanket reparent,
+    // so the refusal happens before any child row moves. ADR-010
     // recency remains correct on the no-collision path via the existing single
     // recomputeLastContactCore(survivor) at the end of this transaction.
     const sharedGroup = await exec.getFirstAsync<{ found: number }>(
@@ -516,7 +506,7 @@ export async function mergeContacts(
     for (const table of [
       "interactions",
       "events",
-      "fuel",
+      "off_limits",
       "custom_field_values",
       "contact_links",
       "contact_methods",

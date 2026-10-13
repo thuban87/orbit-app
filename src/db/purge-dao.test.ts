@@ -5,13 +5,19 @@
  * and the REAL purge DAO, asserting the irreversible whole-contact delete:
  *   - computeImpact returns the correct per-child COUNT + a hasCustomValues
  *     boolean (custom_field_values is a multi-row child, deliberately not rendered).
- *   - impactSummaryLines is a pure omit-zero render helper: interactions / fuel /
- *     links only (never custom values, never events), a 0-count child → no line.
+ *   - impactSummaryLines is a pure omit-zero render helper: interactions /
+ *     events / links / memories / relationships (never custom values, never an
+ *     Off Limits line, D-87), a 0-count child → no line. Memory and key-person
+ *     counts are live rows only (D-88).
  *   - purgeContact on an ARCHIVED contact deletes every owned child (incl.
  *     field_history, which has no FK) + the contact in ONE transaction, leaving a
  *     second contact untouched.
  *   - purgeContact on a LIVE (non-archived) contact THROWS and deletes NOTHING —
  *     the write-boundary guard (T-04-12), not just UI routing.
+ *   - purgeContactCore runs inside a caller's transaction (D-100): with the
+ *     archive gate turned off it removes a live contact with tombstones and
+ *     rolls back with the caller (D-106).
+ *   - one purge advances data_revision by exactly 1 (PLAN-MAP §5).
  *   - a mid-transaction failure rolls the whole fan-out back (nothing deleted).
  *   - a supplied onPurgeExtensions adapter fires POST-COMMIT (the contact is
  *     already gone when it runs), and a THROWING adapter does NOT undo the commit.
@@ -22,6 +28,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { archiveContact, createContactFull } from "@/db/contacts-dao";
+import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { acceptImportSessionWithRows } from "@/db/import-session-dao";
 import { runMigrations } from "@/db/migrations/runner";
@@ -29,8 +36,10 @@ import {
   computeImpact,
   impactSummaryLines,
   purgeContact,
+  purgeContactCore,
 } from "@/db/purge-dao";
 import { listJournalEntriesCore } from "@/db/restore-photo-journal-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-15 12:00:00";
@@ -103,11 +112,11 @@ async function seedEvent(contactId: number): Promise<void> {
   );
 }
 
-async function seedFuel(contactId: number): Promise<void> {
+async function seedOffLimits(contactId: number): Promise<void> {
   await exec.runAsync(
-    `INSERT INTO fuel (uid, contact_id, kind, created_at, source, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [uid(), contactId, "note", NOW, "manual", NOW],
+    `INSERT INTO off_limits (uid, contact_id, text, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [uid(), contactId, "Her divorce", NOW, NOW],
   );
 }
 
@@ -193,8 +202,8 @@ async function seedKnowledge(contactId: number): Promise<void> {
   );
   await exec.runAsync(
     `INSERT INTO current_state_entries
-       (uid, contact_id, field_key, value, is_current, created_at, modified_at)
-     VALUES (?, ?, 'city', 'Austin', 1, ?, ?)`,
+       (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
+     VALUES (?, ?, 'city', 'Austin', '2026-08-15', ?, ?)`,
     [uid(), contactId, NOW, NOW],
   );
 }
@@ -204,7 +213,7 @@ async function ownedRowCount(contactId: number): Promise<number> {
   const tables: Array<[string, string]> = [
     ["interactions", "contact_id"],
     ["events", "contact_id"],
-    ["fuel", "contact_id"],
+    ["off_limits", "contact_id"],
     ["custom_field_values", "contact_id"],
     ["contact_links", "contact_id"],
     ["field_history", "contact_id"],
@@ -221,7 +230,7 @@ async function ownedRowCount(contactId: number): Promise<number> {
   return total;
 }
 
-/** Seed a contact with N of each child (2 interactions, 3 fuel, 1 link, …). */
+/** Seed a contact with N of each child (2 interactions, 3 Off Limits, 1 link, …). */
 async function seedFullContact(
   name: string,
   opts: { archived?: boolean } = {},
@@ -230,9 +239,9 @@ async function seedFullContact(
   await seedInteraction(id);
   await seedInteraction(id);
   await seedEvent(id);
-  await seedFuel(id);
-  await seedFuel(id);
-  await seedFuel(id);
+  await seedOffLimits(id);
+  await seedOffLimits(id);
+  await seedOffLimits(id);
   await seedLink(id);
   await seedCustomValues(id);
   await seedHistory(id);
@@ -247,7 +256,6 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
     expect(impact).toEqual({
       interactions: 2,
       events: 1,
-      fuel: 3,
       links: 1,
       methods: 0,
       externalLinks: 0,
@@ -266,7 +274,6 @@ describe("computeImpact — per-child counts + hasCustomValues (CRUD-06)", () =>
     expect(impact).toEqual({
       interactions: 0,
       events: 0,
-      fuel: 0,
       links: 0,
       methods: 0,
       externalLinks: 0,
@@ -324,11 +331,10 @@ describe("purgeContact — retained custom-field history", () => {
 });
 
 describe("impactSummaryLines — pure omit-zero render helper", () => {
-  it("renders interactions / events / fuel / links, in order, pluralised", () => {
+  it("renders interactions / events / links / memories / relationships, in order, pluralised", () => {
     const lines = impactSummaryLines("Chris", {
       interactions: 12,
       events: 5,
-      fuel: 4,
       links: 1,
       methods: 0,
       externalLinks: 0,
@@ -342,7 +348,6 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
     expect(lines).toEqual([
       "12 interactions",
       "5 events",
-      "4 fuel items",
       "1 link",
       "2 memories",
       "1 relationship",
@@ -353,7 +358,6 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
     const lines = impactSummaryLines("Chris", {
       interactions: 1,
       events: 0,
-      fuel: 0,
       links: 2,
       methods: 0,
       externalLinks: 0,
@@ -370,7 +374,6 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
     const lines = impactSummaryLines("Chris", {
       interactions: 0,
       events: 3,
-      fuel: 0,
       links: 0,
       methods: 0,
       externalLinks: 0,
@@ -388,7 +391,6 @@ describe("impactSummaryLines — pure omit-zero render helper", () => {
     const lines = impactSummaryLines("Chris", {
       interactions: 0,
       events: 0,
-      fuel: 0,
       links: 0,
       methods: 0,
       externalLinks: 0,
@@ -634,7 +636,7 @@ describe("purgeContact — deletion evidence and merge-safe sun state", () => {
       `SELECT 'contact' AS entity_type, uid AS entity_uid FROM contacts WHERE id = ?
        UNION ALL SELECT 'interaction', uid FROM interactions WHERE contact_id = ?
        UNION ALL SELECT 'event', uid FROM events WHERE contact_id = ?
-       UNION ALL SELECT 'fuel', uid FROM fuel WHERE contact_id = ?
+       UNION ALL SELECT 'off_limits', uid FROM off_limits WHERE contact_id = ?
        UNION ALL SELECT 'contact_link', uid FROM contact_links WHERE contact_id = ?
        UNION ALL SELECT 'custom_field_value', uid FROM custom_field_values WHERE contact_id = ?
        ORDER BY entity_type, entity_uid`,
@@ -745,5 +747,218 @@ describe("purgeContact — deletion evidence and merge-safe sun state", () => {
         [ids[6]],
       ),
     ).toEqual({ photo_rel_path: "import-staging/other.jpg" });
+  });
+});
+
+describe("purge — Off Limits and live-only counts (D-87, D-88)", () => {
+  it("counts only live memories and key people; the purge still removes soft rows", async () => {
+    const target = await seedContact("Counts");
+    await seedKnowledge(target);
+    await exec.runAsync(
+      `INSERT INTO memories (uid, contact_id, type, created_at, modified_at, deleted_at)
+       VALUES ('soft-memory', ?, 'general', ?, ?, ?)`,
+      [target, NOW, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO relationships (uid, contact_id, person_name, created_at, modified_at, deleted_at)
+       VALUES ('soft-person', ?, 'Gone', ?, ?, ?)`,
+      [target, NOW, NOW, NOW],
+    );
+
+    const impact = await computeImpact(exec, target);
+    expect(impact).toEqual(
+      expect.objectContaining({ memories: 1, relationships: 1 }),
+    );
+    expect(impactSummaryLines("Counts", impact)).toEqual([
+      "1 memory",
+      "1 relationship",
+    ]);
+
+    await purgeContact(exec, target, { now: NOW });
+    for (const table of ["memories", "relationships"] as const) {
+      expect(
+        await exec.getFirstAsync<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ?`,
+          [target],
+        ),
+      ).toEqual({ n: 0 });
+    }
+  });
+
+  it("tombstones and deletes a contact's Off Limits rows and shows no line for them", async () => {
+    const target = await seedContact("Private");
+    const other = await seedContact("Other");
+    await seedOffLimits(target);
+    await seedOffLimits(target);
+    await seedOffLimits(other);
+    const targetUids = (
+      await exec.getAllAsync<{ uid: string }>(
+        "SELECT uid FROM off_limits WHERE contact_id = ? ORDER BY uid",
+        [target],
+      )
+    ).map((row) => row.uid);
+
+    // Off Limits is a purge child but never a dialog line (D-87 removes lines only).
+    expect(
+      impactSummaryLines("Private", await computeImpact(exec, target)),
+    ).toEqual([]);
+
+    await purgeContact(exec, target, { now: NOW });
+
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM off_limits WHERE contact_id = ?",
+        [target],
+      ),
+    ).toEqual({ n: 0 });
+    expect(
+      await exec.getAllAsync<{ entity_uid: string; deleted_at: string }>(
+        "SELECT entity_uid, deleted_at FROM tombstones WHERE entity_type = 'off_limits' ORDER BY entity_uid",
+      ),
+    ).toEqual(
+      targetUids.map((entity_uid) => ({ entity_uid, deleted_at: NOW })),
+    );
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM off_limits WHERE contact_id = ?",
+        [other],
+      ),
+    ).toEqual({ n: 1 });
+  });
+});
+
+describe("purgeContactCore — caller-owned transaction (D-100, D-106)", () => {
+  async function seedLiveOwner(): Promise<number> {
+    const id = await seedContact("Share-created", { archived: false });
+    await exec.runAsync(
+      `INSERT INTO memories (uid, contact_id, type, created_at, modified_at)
+       VALUES ('core-memory', ?, 'general', ?, ?)`,
+      [id, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO off_limits (uid, contact_id, text, created_at, modified_at)
+       VALUES ('core-off-limits', ?, 'Topic', ?, ?)`,
+      [id, NOW, NOW],
+    );
+    return id;
+  }
+
+  const tombstoneRows = () =>
+    exec.getAllAsync<{ entity_type: string }>(
+      "SELECT entity_type FROM tombstones ORDER BY entity_type",
+    );
+
+  it("keeps the archive gate on by default, even inside a caller's transaction", async () => {
+    const id = await seedLiveOwner();
+    await expect(
+      inWriteTransaction(exec, () => purgeContactCore(exec, id, { now: NOW })),
+    ).rejects.toThrow(/not archived/);
+    expect(
+      await exec.getFirstAsync("SELECT id FROM contacts WHERE id = ?", [id]),
+    ).toEqual({ id });
+    expect(await tombstoneRows()).toEqual([]);
+  });
+
+  it("with the archive gate off, removes a live contact with its tombstones and returns the post-commit cleanup", async () => {
+    const id = await seedLiveOwner();
+    const cleanup = await inWriteTransaction(exec, () =>
+      purgeContactCore(exec, id, {
+        now: NOW,
+        requireArchived: false,
+        bumpRevision: false,
+      }),
+    );
+
+    expect(
+      await exec.getFirstAsync("SELECT id FROM contacts WHERE id = ?", [id]),
+    ).toBeNull();
+    for (const table of ["memories", "off_limits"] as const) {
+      expect(
+        await exec.getFirstAsync<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ?`,
+          [id],
+        ),
+      ).toEqual({ n: 0 });
+    }
+    expect(await tombstoneRows()).toEqual([
+      { entity_type: "contact" },
+      { entity_type: "memory" },
+      { entity_type: "off_limits" },
+    ]);
+
+    const adapter = vi.fn();
+    await cleanup(adapter);
+    expect(adapter).toHaveBeenCalledWith(id, { importStagingPaths: [] });
+    // A throwing adapter is logged, never rethrown.
+    await expect(
+      cleanup(() => {
+        throw new Error("cleanup blew up");
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rolls back with the caller when the caller's transaction fails", async () => {
+    const id = await seedLiveOwner();
+    const boom = new Error("caller failed after the purge");
+    await expect(
+      inWriteTransaction(exec, async () => {
+        await purgeContactCore(exec, id, {
+          now: NOW,
+          requireArchived: false,
+          bumpRevision: false,
+        });
+        throw boom;
+      }),
+    ).rejects.toThrow(boom);
+
+    expect(
+      await exec.getFirstAsync("SELECT id FROM contacts WHERE id = ?", [id]),
+    ).toEqual({ id });
+    for (const table of ["memories", "off_limits"] as const) {
+      expect(
+        await exec.getFirstAsync<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ?`,
+          [id],
+        ),
+      ).toEqual({ n: 1 });
+    }
+    expect(await tombstoneRows()).toEqual([]);
+  });
+});
+
+describe("purge — revision bumps (PLAN-MAP §5)", () => {
+  it("purgeContact of an archived contact with several children advances data_revision by exactly 1", async () => {
+    const id = await seedContact("Bumped");
+    await seedKnowledge(id);
+    await seedOffLimits(id);
+    await seedOffLimits(id);
+    await seedInteraction(id);
+    const before = await readDataRevision(exec);
+
+    await purgeContact(exec, id, { now: NOW });
+
+    expect(await readDataRevision(exec)).toBe(before + 1);
+    // Six children plus the contact were tombstoned in that one bump.
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM tombstones",
+      ),
+    ).toEqual({ n: 7 });
+  });
+
+  it("purgeContactCore with bumpRevision false advances it by 0", async () => {
+    const id = await seedContact("Unbumped");
+    await seedKnowledge(id);
+    await seedOffLimits(id);
+    const before = await readDataRevision(exec);
+
+    await inWriteTransaction(exec, () =>
+      purgeContactCore(exec, id, { now: NOW, bumpRevision: false }),
+    );
+
+    expect(await readDataRevision(exec)).toBe(before);
+    expect(
+      await exec.getFirstAsync("SELECT id FROM contacts WHERE id = ?", [id]),
+    ).toBeNull();
   });
 });

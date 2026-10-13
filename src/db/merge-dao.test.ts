@@ -293,28 +293,6 @@ describe("mergeContacts", () => {
         NOW,
       ],
     );
-    await exec.runAsync(
-      `INSERT INTO current_state_entries
-         (uid, contact_id, field_key, value, is_current, created_at, modified_at)
-       VALUES (?, ?, 'city', 'Survivor city', 1, ?, ?),
-              (?, ?, 'city', 'Absorbed city', 1, ?, ?),
-              (?, ?, 'hobby', 'Climbing', 1, ?, ?)`,
-      [
-        uid(),
-        survivor,
-        NOW,
-        NOW,
-        uid(),
-        absorbed,
-        NOW,
-        NOW,
-        uid(),
-        absorbed,
-        NOW,
-        NOW,
-      ],
-    );
-
     await mergeContacts(exec, {
       survivorId: survivor,
       absorbedId: absorbed,
@@ -358,35 +336,121 @@ describe("mergeContacts", () => {
         linked_contact_id: survivor,
       },
     ]);
+  });
+
+  it("off_limits and current state reparent to the survivor", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const LATER = "2026-08-31 09:00:00";
+    // Both contacts hold a dated city entry. With no current flag (D-45) the
+    // merge needs no demotion step: both move or stay, and date decides order.
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
+       VALUES (?, ?, 'city', 'Survivor city', '2026-08-01', ?, ?),
+              (?, ?, 'city', 'Absorbed city', '2026-08-20', ?, ?),
+              (?, ?, 'hobby', 'Climbing', '2026-07-04', ?, ?)`,
+      [
+        uid(),
+        survivor,
+        NOW,
+        NOW,
+        uid(),
+        absorbed,
+        NOW,
+        NOW,
+        uid(),
+        absorbed,
+        NOW,
+        NOW,
+      ],
+    );
+    const interaction = await exec.runAsync(
+      "INSERT INTO interactions (uid, contact_id, occurred_at, recorded_at, source, note, modified_at) VALUES (?, ?, ?, ?, 'manual', 'Talked about the move', ?)",
+      [uid(), absorbed, NOW, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, entry_date, interaction_id, link_source, created_at, modified_at)
+       VALUES (?, ?, 'last_talked_about', 'Talked about the move', '2026-08-30', ?, 'note', ?, ?)`,
+      [uid(), absorbed, interaction.lastInsertRowId, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO off_limits (uid, contact_id, label, text, created_at, modified_at)
+       VALUES ('ol-survivor', ?, NULL, 'Politics', ?, ?),
+              ('ol-absorbed', ?, 'Family', 'Her brother', ?, ?)`,
+      [survivor, NOW, NOW, absorbed, NOW, NOW],
+    );
+
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: LATER,
+    });
+
     expect(
-      await exec.getAllAsync<{
-        field_key: string;
-        value: string;
-        is_current: number;
-        contact_id: number;
-      }>(
-        "SELECT field_key, value, is_current, contact_id FROM current_state_entries ORDER BY field_key, is_current DESC",
+      await exec.getAllAsync(
+        "SELECT uid, contact_id, label, text, modified_at FROM off_limits ORDER BY uid",
+      ),
+    ).toEqual([
+      {
+        uid: "ol-absorbed",
+        contact_id: survivor,
+        label: "Family",
+        text: "Her brother",
+        modified_at: LATER,
+      },
+      {
+        uid: "ol-survivor",
+        contact_id: survivor,
+        label: null,
+        text: "Politics",
+        modified_at: NOW,
+      },
+    ]);
+    expect(
+      await exec.getAllAsync(
+        `SELECT field_key, value, entry_date, contact_id, interaction_id
+           FROM current_state_entries
+          ORDER BY field_key, entry_date DESC`,
       ),
     ).toEqual([
       {
         field_key: "city",
-        value: "Survivor city",
-        is_current: 1,
+        value: "Absorbed city",
+        entry_date: "2026-08-20",
         contact_id: survivor,
+        interaction_id: null,
       },
       {
         field_key: "city",
-        value: "Absorbed city",
-        is_current: 0,
+        value: "Survivor city",
+        entry_date: "2026-08-01",
         contact_id: survivor,
+        interaction_id: null,
       },
       {
         field_key: "hobby",
         value: "Climbing",
-        is_current: 1,
+        entry_date: "2026-07-04",
         contact_id: survivor,
+        interaction_id: null,
+      },
+      {
+        field_key: "last_talked_about",
+        value: "Talked about the move",
+        entry_date: "2026-08-30",
+        contact_id: survivor,
+        interaction_id: interaction.lastInsertRowId,
       },
     ]);
+    // The linked interaction moved with its entry, so the link stays same-contact.
+    expect(
+      await exec.getFirstAsync<{ contact_id: number }>(
+        "SELECT contact_id FROM interactions WHERE id = ?",
+        [interaction.lastInsertRowId],
+      ),
+    ).toEqual({ contact_id: survivor });
   });
 
   it("normalizes only known per-type primary choices", () => {
