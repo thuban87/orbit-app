@@ -1,40 +1,31 @@
 /**
  * ai-context-read — H1 privacy proof (AI-03).
  *
- * Drives a fresh in-memory `node:sqlite` DB through the REAL migration-1 fixture
+ * Drives a fresh in-memory `node:sqlite` DB through the REAL migration chain
  * and the REAL DAOs, proving that `readPromptContext` serializes ONLY the closed
- * `PromptContext` allowlist: forbidden fuel, the free-text interaction column,
+ * `PromptContext` allowlist: Off Limits, Last Talked About, Current Location,
+ * memories and notes outside the two-sided AI gate, the free-text interaction column,
  * the free-text events column (a different table), non-allowlisted `contacts`
  * columns, and unapproved/quarantined/blank custom values can NEVER become prompt
  * input. Every excluded value carries a distinctive marker asserted absent from
  * the fully serialized context.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { readPromptContext } from "@/db/ai-context-read";
+import { addCurrentStateEntry } from "@/db/current-state-history-dao";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { recordEvent } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { getValuesForContact, upsertValue } from "@/db/field-values-dao";
-import { addFuel } from "@/db/fuel-dao";
 import { createGroupEvent } from "@/db/group-events-dao";
 import { addMemory } from "@/db/memories-dao";
-import { migration001 } from "@/db/migrations/001-initial";
-import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
-import { migration009 } from "@/db/migrations/009-contact-method-normalization";
-import { migration010 } from "@/db/migrations/010-contact-method-label";
-import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
-import { migration016 } from "@/db/migrations/016-contact-knowledge";
-import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
-import { migration025 } from "@/db/migrations/025-interaction-history-schema";
-import { migration026 } from "@/db/migrations/026-group-events-schema";
-import { migration029 } from "@/db/migrations/029-ai-configuration";
 import { runMigrations } from "@/db/migrations/runner";
+import { addOffLimits } from "@/db/off-limits-dao";
 import {
   createContactWithInteraction,
   recordTouchpoint,
@@ -54,33 +45,11 @@ beforeEach(async () => {
   defIdCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(
-    exec,
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-      migration009,
-      migration010,
-      migration011,
-    ],
-    11,
-    { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
-  );
-  await runMigrations(
-    exec,
-    [migration016, migration017, migration025, migration026, migration029],
-    29,
-    {
-      now: NOW,
-      newUid: uid,
-      defaultPhoneRegion: "US",
-    },
-  );
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+    defaultPhoneRegion: "US",
+  });
 });
 
 describe("readPromptContext — Group Notes are structurally unreachable", () => {
@@ -274,33 +243,44 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       c,
     ]);
 
-    // Fuel: an off_limits item and an unconfirmed source='ai' item must NOT surface;
-    // a normal item must.
-    await addFuel(exec, {
+    // Off Limits (label and text), Last Talked About, Current Location and an
+    // AI-off memory must NOT surface; an opted-in memory must (D-09, D-16, D-31).
+    await addOffLimits(exec, {
       uid: uid(),
       contactId: c,
-      kind: "off_limits",
+      label: "OFFLIMITS_LABEL_MARKER",
       text: "OFFLIMITS_MARKER",
-      createdAt: NOW,
-      source: "user",
+      url: "https://offlimits.example/OFFLIMITS_URL_MARKER",
       now: NOW,
     });
-    await addFuel(exec, {
-      uid: uid(),
+    await addCurrentStateEntry(exec, {
       contactId: c,
-      kind: "fact",
-      text: "AICONFIRM_MARKER",
-      createdAt: NOW,
-      source: "ai",
+      fieldKey: "last_talked_about",
+      value: "LASTTALKED_MARKER",
+      entryDate: "2026-08-01",
       now: NOW,
     });
-    await addFuel(exec, {
-      uid: uid(),
+    await addCurrentStateEntry(exec, {
       contactId: c,
-      kind: "topic",
-      text: "Loves trail running",
+      fieldKey: "current_location",
+      value: "LOCATION_MARKER",
+      entryDate: "2026-08-01",
+      now: NOW,
+    });
+    await addMemory(exec, {
+      contactId: c,
+      type: "general",
+      value: "AIOFF_MEMORY_MARKER",
+      allowAi: 0,
+      createdAt: NOW,
+      now: NOW,
+    });
+    await addMemory(exec, {
+      contactId: c,
+      type: "thought_of_them",
+      value: "Loves trail running",
+      allowAi: 1,
       createdAt: "2026-08-01 09:00:00",
-      source: "user",
       now: NOW,
     });
 
@@ -355,7 +335,7 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     const ctx = await readPromptContext(exec, c, NOW);
     const serialized = JSON.stringify(ctx);
 
-    // The allowed fuel item is present…
+    // The opted-in memory is present…
     expect(serialized).toContain("Loves trail running");
     // …and every forbidden marker is absent.
     for (const marker of [
@@ -367,7 +347,11 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       "CANONICAL_EMAIL_MARKER",
       "1991-02-03",
       "OFFLIMITS_MARKER",
-      "AICONFIRM_MARKER",
+      "OFFLIMITS_LABEL_MARKER",
+      "OFFLIMITS_URL_MARKER",
+      "LASTTALKED_MARKER",
+      "LOCATION_MARKER",
+      "AIOFF_MEMORY_MARKER",
       "NOTEPROSE_MARKER",
       "EVENTPROSE_MARKER",
       "UNFLAGGED_MARKER",
@@ -483,33 +467,6 @@ describe("readPromptContext — allowlist projection (H1)", () => {
 
     const ctx = await readPromptContext(exec, c, NOW);
     expect(ctx.sharedFields).toEqual([]);
-  });
-
-  it("keeps ranked fuel in rank order with whole-day age, dropping raw timestamps", async () => {
-    const c = await makeContact(30, 0, 1);
-    // 'recent' outranks 'topic'; created 4 days before NOW.
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "topic",
-      text: "Second",
-      createdAt: "2026-08-10 12:00:00",
-      source: "user",
-      now: NOW,
-    });
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "recent",
-      text: "First",
-      createdAt: "2026-08-10 12:00:00",
-      source: "user",
-      now: NOW,
-    });
-    const ctx = await readPromptContext(exec, c, NOW);
-    expect(ctx.rankedFuel.map((f) => f.text)).toEqual(["First", "Second"]);
-    expect(ctx.rankedFuel[0].ageDays).toBe(4);
-    expect(JSON.stringify(ctx)).not.toContain("2026-08-10");
   });
 
   it("reports newestChannel as explicit 'unspecified' when there are no interactions", async () => {
@@ -690,13 +647,11 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
 
   it("never carries an Off Limits value in ANY AI-facing shape, including the gated notes (D-14 / ADR-107)", async () => {
     const c = await makeContact();
-    await addFuel(exec, {
+    await addOffLimits(exec, {
       uid: uid(),
       contactId: c,
-      kind: "off_limits",
+      label: "OFFLIMITS_LABEL_NEVER_AI",
       text: "OFFLIMITS_NEVER_AI",
-      createdAt: NOW,
-      source: "user",
       now: NOW,
     });
     // An allow_ai=1 interaction never turns an off-limits value into a carried note.
@@ -714,9 +669,10 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
     ]);
 
     const ctx = await readPromptContext(exec, c, NOW);
-    // Off Limits appears in NEITHER the positive fuel projection NOR the gated
-    // notes NOR any other AI-facing shape.
+    // Off Limits appears in NEITHER the memories NOR the gated notes NOR any
+    // other AI-facing shape (D-09: the AI read never touches its table).
     expect(JSON.stringify(ctx)).not.toContain("OFFLIMITS_NEVER_AI");
+    expect(JSON.stringify(ctx)).not.toContain("OFFLIMITS_LABEL_NEVER_AI");
     expect(ctx.recentInteractions).toEqual([
       {
         occurredAt: "2026-08-10 10:00:00",
@@ -737,21 +693,7 @@ describe("readInteractionAggregates — migrated-vocabulary regression (D-06 tri
     let n = 0;
     const seedUid = () => `mig-uid-${++n}`;
     const legacyExec = nodeSqliteExecutor(openTestDb());
-    const preMigrations = [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-      migration009,
-      migration010,
-      migration011,
-      migration016,
-      migration017,
-    ];
-    await runMigrations(legacyExec, preMigrations, 17, {
+    await runMigrations(legacyExec, MIGRATIONS, 17, {
       now: NOW,
       newUid: seedUid,
       defaultPhoneRegion: "US",
@@ -775,8 +717,10 @@ describe("readInteractionAggregates — migrated-vocabulary regression (D-06 tri
       );
     }
 
-    // Apply migration 025 — remaps the four legacy rows to Positive/Neutral/Negative.
-    await runMigrations(legacyExec, [...preMigrations, migration025], 25, {
+    // Apply the chain through migration 025 — which remaps the four legacy
+    // rows to Positive/Neutral/Negative — and on to the current schema, so the
+    // read runs where the memory and note gates find migration 033's columns.
+    await runMigrations(legacyExec, MIGRATIONS, TARGET_VERSION, {
       now: NOW,
       newUid: seedUid,
       defaultPhoneRegion: "US",
@@ -787,5 +731,347 @@ describe("readInteractionAggregates — migrated-vocabulary regression (D-06 tri
     expect(ctx.quality).toEqual({ good: 2, fine: 1, hard: 1 });
     // The newest channel was 'text' -> migrated to 'Message'.
     expect(ctx.newestChannel).toBe("Message");
+  });
+});
+
+describe("readPromptContext — two-sided AI gate in SQL (D-31, D-49, D-102, D-103)", () => {
+  async function logNote(
+    contactId: number,
+    occurredAt: string,
+    note: string,
+    allowAi: 0 | 1,
+  ): Promise<number> {
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId,
+      uid: uid(),
+      occurredAt,
+      channel: "Message",
+      connected: 1,
+      note,
+      now: NOW,
+    });
+    await exec.runAsync("UPDATE interactions SET allow_ai = ? WHERE id = ?", [
+      allowAi,
+      interactionId,
+    ]);
+    return interactionId;
+  }
+
+  async function linkMemory(
+    contactId: number,
+    interactionId: number,
+    value: string,
+    allowAi: 0 | 1,
+    linkSource: "note" | "group_note" = "note",
+  ): Promise<number> {
+    return addMemory(exec, {
+      contactId,
+      type: "general",
+      value,
+      allowAi,
+      interactionId,
+      linkSource,
+      createdAt: NOW,
+      now: NOW,
+    });
+  }
+
+  /** Push four newer interactions so `occurredAt` falls outside the 3 recent rows. */
+  async function pushOutOfRecent(contactId: number): Promise<void> {
+    for (const at of [
+      "2026-08-11 10:00:00",
+      "2026-08-12 10:00:00",
+      "2026-08-13 10:00:00",
+    ]) {
+      await recordTouchpoint(exec, {
+        contactId,
+        uid: uid(),
+        occurredAt: at,
+        channel: "Message",
+        connected: 1,
+        now: NOW,
+      });
+    }
+  }
+
+  /** Write a row the schema CHECKs forbid, to prove the predicate on its own. */
+  async function withChecksOff(sql: string, params: unknown[]): Promise<void> {
+    await exec.execAsync("PRAGMA ignore_check_constraints = ON");
+    try {
+      await exec.runAsync(sql, params as never[]);
+    } finally {
+      await exec.execAsync("PRAGMA ignore_check_constraints = OFF");
+    }
+  }
+
+  const occurrences = (haystack: string, needle: string) =>
+    haystack.split(needle).length - 1;
+
+  it("sends a linked memory only when its interaction allows AI", async () => {
+    const c = await makeContact();
+    const interactionId = await logNote(
+      c,
+      "2026-08-01 10:00:00",
+      "LINKED_TEXT",
+      0,
+    );
+    await linkMemory(c, interactionId, "LINKED_TEXT", 1);
+    await pushOutOfRecent(c);
+
+    expect(JSON.stringify(await readPromptContext(exec, c, NOW))).not.toContain(
+      "LINKED_TEXT",
+    );
+
+    await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
+      interactionId,
+    ]);
+    expect((await readPromptContext(exec, c, NOW)).sharedMemories).toEqual([
+      { label: "Memory", value: "LINKED_TEXT" },
+    ]);
+  });
+
+  it("omits an interaction note whose linked memory has AI off, keeping the row", async () => {
+    const c = await makeContact();
+    const interactionId = await logNote(
+      c,
+      "2026-08-10 10:00:00",
+      "ONE_SWITCH_NOTE",
+      1,
+    );
+    await linkMemory(c, interactionId, "ONE_SWITCH_NOTE", 0);
+
+    const ctx = await readPromptContext(exec, c, NOW);
+    expect(JSON.stringify(ctx)).not.toContain("ONE_SWITCH_NOTE");
+    expect(ctx.recentInteractions).toEqual([
+      { occurredAt: "2026-08-10 10:00:00", channel: "Message", tone: null },
+    ]);
+  });
+
+  it("never sends a Group Note-linked memory, even at Allow AI 1", async () => {
+    const c = await makeContact();
+    const interactionId = await logNote(
+      c,
+      "2026-08-01 10:00:00",
+      "participant note",
+      1,
+    );
+    await linkMemory(c, interactionId, "GROUP_LINK_MARKER", 1, "group_note");
+    await pushOutOfRecent(c);
+
+    expect(JSON.stringify(await readPromptContext(exec, c, NOW))).not.toContain(
+      "GROUP_LINK_MARKER",
+    );
+  });
+
+  it("sends Gift Ideas and Thought of Them only at Allow AI 1", async () => {
+    const c = await makeContact();
+    await addMemory(exec, {
+      contactId: c,
+      type: "gift_idea",
+      value: "GIFT_OFF",
+      allowAi: 0,
+      createdAt: NOW,
+      now: NOW,
+    });
+    await addMemory(exec, {
+      contactId: c,
+      type: "thought_of_them",
+      value: "THOUGHT_OFF",
+      allowAi: 0,
+      createdAt: NOW,
+      now: NOW,
+    });
+    await addMemory(exec, {
+      contactId: c,
+      type: "gift_idea",
+      value: "GIFT_ON",
+      allowAi: 1,
+      createdAt: NOW,
+      now: NOW,
+    });
+    await addMemory(exec, {
+      contactId: c,
+      type: "thought_of_them",
+      value: "THOUGHT_ON",
+      allowAi: 1,
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    const ctx = await readPromptContext(exec, c, NOW);
+    const values = ctx.sharedMemories?.map((m) => m.value).sort();
+    expect(values).toEqual(["GIFT_ON", "THOUGHT_ON"]);
+    expect(JSON.stringify(ctx)).not.toMatch(/GIFT_OFF|THOUGHT_OFF/);
+  });
+
+  it("never sends Last Talked About or Off Limits values, linked or not", async () => {
+    const c = await makeContact();
+    const interactionId = await logNote(
+      c,
+      "2026-08-10 10:00:00",
+      "ordinary note",
+      1,
+    );
+    await addCurrentStateEntry(exec, {
+      contactId: c,
+      fieldKey: "last_talked_about",
+      value: "LTA_DIRECT_MARKER",
+      entryDate: "2026-08-10",
+      now: NOW,
+    });
+    await addCurrentStateEntry(exec, {
+      contactId: c,
+      fieldKey: "last_talked_about",
+      value: "LTA_LINKED_MARKER",
+      entryDate: "2026-08-10",
+      interactionId,
+      linkSource: "note",
+      now: NOW,
+    });
+    await addOffLimits(exec, {
+      uid: uid(),
+      contactId: c,
+      text: "OFFLIMITS_GATE_MARKER",
+      now: NOW,
+    });
+
+    const serialized = JSON.stringify(await readPromptContext(exec, c, NOW));
+    for (const marker of [
+      "LTA_DIRECT_MARKER",
+      "LTA_LINKED_MARKER",
+      "OFFLIMITS_GATE_MARKER",
+    ]) {
+      expect(serialized).not.toContain(marker);
+    }
+    expect(serialized).toContain("ordinary note");
+  });
+
+  it("D-102: an unlinked Group Note copy is still never sent", async () => {
+    const c = await makeContact();
+    // The schema CHECK already forces a copy AI-off; forge allow_ai 1 to prove
+    // the predicate's own marker term keeps it out once interaction_id is NULL
+    // (FK SET NULL, detach or dissolve).
+    await withChecksOff(
+      `INSERT INTO memories
+         (uid, contact_id, type, value, provenance, created_at, modified_at,
+          allow_ai, interaction_id, link_source, group_note_copy)
+       VALUES (?, ?, 'general', 'UNLINKED_COPY_MARKER', 'user', ?, ?, 1, NULL, NULL, 1)`,
+      [uid(), c, NOW, NOW],
+    );
+
+    expect(JSON.stringify(await readPromptContext(exec, c, NOW))).not.toContain(
+      "UNLINKED_COPY_MARKER",
+    );
+  });
+
+  it("D-102: a Group Note copy whose interaction was deleted stays out", async () => {
+    const c = await makeContact();
+    const interactionId = await logNote(
+      c,
+      "2026-08-01 10:00:00",
+      "participant",
+      0,
+    );
+    await addMemory(exec, {
+      contactId: c,
+      type: "general",
+      value: "DELETED_EVENT_COPY",
+      interactionId,
+      linkSource: "group_note",
+      groupNoteCopy: 1,
+      createdAt: NOW,
+      now: NOW,
+    });
+    await exec.runAsync("DELETE FROM interactions WHERE id = ?", [
+      interactionId,
+    ]);
+    const copy = await exec.getFirstAsync<{
+      interaction_id: number | null;
+      group_note_copy: number;
+    }>("SELECT interaction_id, group_note_copy FROM memories WHERE value = ?", [
+      "DELETED_EVENT_COPY",
+    ]);
+    expect(copy).toEqual({ interaction_id: null, group_note_copy: 1 });
+
+    expect(JSON.stringify(await readPromptContext(exec, c, NOW))).not.toContain(
+      "DELETED_EVENT_COPY",
+    );
+  });
+
+  it("D-103: a locked interaction note is omitted and its note-linked memory excluded", async () => {
+    const c = await makeContact();
+    const interactionId = await logNote(
+      c,
+      "2026-08-10 10:00:00",
+      "LOCKED_NOTE_MARKER",
+      0,
+    );
+    await linkMemory(c, interactionId, "LOCKED_NOTE_MARKER", 1);
+    // Realistic shape: the lock forces the interaction AI-off.
+    await exec.runAsync(
+      "UPDATE interactions SET note_ai_locked = 1 WHERE id = ?",
+      [interactionId],
+    );
+    expect(JSON.stringify(await readPromptContext(exec, c, NOW))).not.toContain(
+      "LOCKED_NOTE_MARKER",
+    );
+
+    // Forge allow_ai 1 past the CHECK: the lock term alone still withholds both.
+    await withChecksOff("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
+      interactionId,
+    ]);
+    const ctx = await readPromptContext(exec, c, NOW);
+    expect(JSON.stringify(ctx)).not.toContain("LOCKED_NOTE_MARKER");
+    expect(ctx.recentInteractions).toEqual([
+      { occurredAt: "2026-08-10 10:00:00", channel: "Message", tone: null },
+    ]);
+  });
+
+  it("F-D1: a note-linked memory whose interaction belongs to another contact is excluded", async () => {
+    const c = await makeContact();
+    const other = await makeContact();
+    const foreignInteraction = await logNote(
+      other,
+      "2026-08-01 10:00:00",
+      "foreign note",
+      1,
+    );
+    await linkMemory(c, foreignInteraction, "CROSS_CONTACT_MARKER", 1);
+
+    expect(JSON.stringify(await readPromptContext(exec, c, NOW))).not.toContain(
+      "CROSS_CONTACT_MARKER",
+    );
+  });
+
+  it("F-D11: a linked note in the recent rows is sent once; an older one is sent as a memory", async () => {
+    const c = await makeContact();
+    const recentId = await logNote(
+      c,
+      "2026-08-10 10:00:00",
+      "RECENT_LINKED",
+      1,
+    );
+    await linkMemory(c, recentId, "RECENT_LINKED", 1);
+
+    const ctx = await readPromptContext(exec, c, NOW);
+    expect(occurrences(JSON.stringify(ctx), "RECENT_LINKED")).toBe(1);
+    expect(ctx.recentInteractions?.[0]?.note).toBe("RECENT_LINKED");
+    expect(ctx.sharedMemories).toEqual([]);
+
+    const other = await makeContact();
+    const olderId = await logNote(
+      other,
+      "2026-08-01 10:00:00",
+      "OLDER_LINKED",
+      1,
+    );
+    await linkMemory(other, olderId, "OLDER_LINKED", 1);
+    await pushOutOfRecent(other);
+
+    const olderCtx = await readPromptContext(exec, other, NOW);
+    expect(occurrences(JSON.stringify(olderCtx), "OLDER_LINKED")).toBe(1);
+    expect(olderCtx.sharedMemories).toEqual([
+      { label: "Memory", value: "OLDER_LINKED" },
+    ]);
   });
 });

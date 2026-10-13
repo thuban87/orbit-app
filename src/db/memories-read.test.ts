@@ -205,4 +205,118 @@ describe("memories read", () => {
       (await listMemoriesForContact(exec, contactId)).map((row) => row.id),
     ).toEqual([liveId]);
   });
+
+  describe("two-sided AI eligibility (D-49, D-102, D-103, F-D1)", () => {
+    async function seedInteraction(
+      contactId: number,
+      allowAi: 0 | 1,
+      locked: 0 | 1 = 0,
+    ): Promise<number> {
+      const result = await exec.runAsync(
+        `INSERT INTO interactions
+           (uid, contact_id, occurred_at, recorded_at, channel, direction,
+            connected, source, modified_at, note, allow_ai, note_ai_locked)
+         VALUES (?, ?, ?, ?, 'Message', 'outbound', 1, 'manual', ?, 'n', ?, ?)`,
+        [`i-${++uidCounter}`, contactId, NOW, NOW, NOW, allowAi, locked],
+      );
+      return result.lastInsertRowId;
+    }
+
+    async function linked(
+      contactId: number,
+      interactionId: number,
+      linkSource: "note" | "group_note" = "note",
+    ): Promise<number> {
+      return addMemory(exec, {
+        contactId,
+        type: "general",
+        value: "Linked",
+        allowAi: 1,
+        interactionId,
+        linkSource,
+        createdAt: NOW,
+        now: NOW,
+      });
+    }
+
+    const eligibleIds = async (contactId: number) =>
+      (await listAiEligibleMemories(exec, contactId)).map((row) => row.id);
+
+    it("admits a note-linked memory only while its interaction allows AI", async () => {
+      const contactId = await seedContact();
+      const interactionId = await seedInteraction(contactId, 0);
+      const memoryId = await linked(contactId, interactionId);
+      expect(await eligibleIds(contactId)).toEqual([]);
+      await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
+        interactionId,
+      ]);
+      expect(await eligibleIds(contactId)).toEqual([memoryId]);
+    });
+
+    it("excludes a memory linked to a locked note and projects the lock", async () => {
+      const contactId = await seedContact();
+      const interactionId = await seedInteraction(contactId, 0, 1);
+      const memoryId = await linked(contactId, interactionId);
+      expect(await eligibleIds(contactId)).toEqual([]);
+      const [row] = await listMemoriesForContact(exec, contactId);
+      expect(row).toEqual(
+        expect.objectContaining({ id: memoryId, linked_note_ai_locked: 1 }),
+      );
+    });
+
+    it("excludes Group Note links and copies, linked or not", async () => {
+      const contactId = await seedContact();
+      await linked(
+        contactId,
+        await seedInteraction(contactId, 1),
+        "group_note",
+      );
+      const copyId = await addMemory(exec, {
+        contactId,
+        type: "general",
+        value: "Copy",
+        interactionId: await seedInteraction(contactId, 1),
+        linkSource: "group_note",
+        groupNoteCopy: 1,
+        createdAt: NOW,
+        now: NOW,
+      });
+      expect(await eligibleIds(contactId)).toEqual([]);
+      // Unlinked (FK SET NULL / detach): the marker alone keeps it out.
+      await exec.runAsync(
+        "UPDATE memories SET interaction_id = NULL, link_source = NULL WHERE id = ?",
+        [copyId],
+      );
+      expect(await eligibleIds(contactId)).toEqual([]);
+      const row = (await listMemoriesForContact(exec, contactId)).find(
+        (memory) => memory.id === copyId,
+      );
+      expect(row?.linked_note_ai_locked).toBe(0);
+    });
+
+    it("excludes a memory linked to another contact's interaction", async () => {
+      const contactId = await seedContact();
+      const otherId = await seedContact();
+      const foreign = await seedInteraction(otherId, 1);
+      await linked(contactId, foreign);
+      expect(await eligibleIds(contactId)).toEqual([]);
+    });
+
+    it("projects linked_note_ai_locked 0 for standalone and unlocked links", async () => {
+      const contactId = await seedContact();
+      const interactionId = await seedInteraction(contactId, 1);
+      await linked(contactId, interactionId);
+      await addMemory(exec, {
+        contactId,
+        type: "gift_idea",
+        value: "Standalone",
+        allowAi: 1,
+        createdAt: NOW,
+        now: NOW,
+      });
+      const rows = await listMemoriesForContact(exec, contactId);
+      expect(rows.map((row) => row.linked_note_ai_locked)).toEqual([0, 0]);
+      expect(await eligibleIds(contactId)).toHaveLength(2);
+    });
+  });
 });

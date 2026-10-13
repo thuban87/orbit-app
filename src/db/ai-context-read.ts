@@ -12,31 +12,33 @@
  *      narrow `LEFT JOIN categories`. No `SELECT *`. Every other `contacts`
  *      column — phone, email, birthday, photo, links, snooze, archive state, raw
  *      `last_contact`, `category_id` itself — is prohibited from egress.
- *   2. The free-text interaction column and the free-text events column (a
- *      DIFFERENT table) are NEVER selected here. The aggregate interaction read
+ *   2. The free-text events column (a DIFFERENT table) is NEVER selected
+ *      here. The free-text interaction column is read ONLY through the gated
+ *      recent-interaction projection (rule 4). The aggregate interaction read
  *      lists ONLY channel / quality / connected / occurred_at.
  *   3. `interval_days` and `rarely_responds` are read via `getImpactInputs` for
  *      DERIVATION ONLY. They MUST NOT be placed on `PromptContext` or reach the
  *      payload (C3-M3); Unbound intensity is explicitly neutral.
- *   4. Fuel comes ONLY through `getRankedFuel` (off_limits / unconfirmed-AI /
- *      blank already excluded in SQL). Custom values come ONLY through the
- *      validated `col_name` boundary in field-values-dao, filtered to live,
- *      non-quarantined, `share_with_ai=1` defs. NEVER add a fallback query that
- *      widens the allowlist, and NEVER interpolate a label as SQL.
+ *   4. Memories come ONLY through `listAiEligibleMemories`, whose SQL predicate
+ *      is two-sided (D-31, D-49, D-102, D-103). An interaction note is gated in
+ *      the SQL projection below (a CASE, never a WHERE, so ADR-078's structured
+ *      rows keep flowing). Off Limits, Last Talked About and Current Location
+ *      are never read here, in any shape (D-09, D-16). Custom values come ONLY
+ *      through the validated `col_name` boundary in field-values-dao, filtered
+ *      to live, non-quarantined, `share_with_ai=1` defs. NEVER add a fallback
+ *      query that widens the allowlist, and NEVER interpolate a label as SQL.
  * =============================================================================
  */
 import type {
   CadenceAggregate,
   PromptContext,
   QualityAggregate,
-  RankedFuelEntry,
   RecentInteractionContext,
   SharedFieldValue,
 } from "@/ai/prompt-types";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { getValuesForContact } from "@/db/field-values-dao";
-import { getRankedFuel } from "@/db/fuel-read";
 import { getImpactInputs } from "@/db/impact-read";
 import { listAiEligibleMemories } from "@/db/memories-read";
 import { isMemoryTypeKey, MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
@@ -47,41 +49,7 @@ import {
 } from "@/services/impact";
 import { formatLocalDate } from "@/utils/dates";
 
-const MS_PER_DAY = 86_400_000;
 const UNSPECIFIED_CHANNEL = "unspecified";
-
-/**
- * Parse a stored `YYYY-MM-DD HH:MM:SS` (or bare `YYYY-MM-DD`) as LOCAL ms —
- * local components so there is no UTC evening off-by-one (dates.ts convention).
- * Returns null for an unparseable value so age falls back to 0 rather than throw.
- */
-function parseLocalMs(stored: string): number | null {
-  const m = stored
-    .trim()
-    .match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if (!m) {
-    return null;
-  }
-  const [, y, mo, d, hh, mm, ss] = m;
-  return new Date(
-    Number(y),
-    Number(mo) - 1,
-    Number(d),
-    Number(hh ?? 0),
-    Number(mm ?? 0),
-    Number(ss ?? 0),
-  ).getTime();
-}
-
-/** Whole-day age (clamped ≥ 0) of `createdAt` relative to `now`. */
-function ageDaysOf(createdAt: string, now: string): number {
-  const createdMs = parseLocalMs(createdAt);
-  const nowMs = parseLocalMs(now);
-  if (createdMs === null || nowMs === null) {
-    return 0;
-  }
-  return Math.max(0, Math.floor((nowMs - createdMs) / MS_PER_DAY));
-}
 
 /** Default local wall-clock `YYYY-MM-DD HH:MM:SS` (production callers omit `now`). */
 function localNow(): string {
@@ -152,30 +120,50 @@ async function readInteractionAggregates(
   };
 }
 
+/** One recent interaction with its internal id (never serialized). */
+interface RecentInteractionRow {
+  id: number;
+  context: RecentInteractionContext;
+}
+
 /**
  * The structured recent-interaction branch of the closed egress projection
  * (ADR-078, unchanged by ADR-107). Always carries the compact date/time,
- * channel, and Tone for the contact's three newest rows. A note is added ONLY
- * where that row's `allow_ai = 1`; blank notes are minimized away.
+ * channel, and Tone for the contact's three newest rows. The note is gated in
+ * SQL by a CASE projection (D-13: fails closed in SQL, never in JS only): it is
+ * projected only when the interaction allows AI, is not locked by a move into
+ * Off Limits (D-103), and no memory linked to that note has AI off (D-49: one
+ * switch covers every place the text appears). Rows are never filtered, so the
+ * structured fields keep flowing. Blank notes are minimized away.
  *
  * Group Notes — the Phase 33 event-level shared record — live in the SEPARATE
  * `group_events` table and are DELIBERATELY never read here, so they can never
  * be carried under any `allow_ai` value (D-08). Only `interactions.note` (the
  * per-interaction note) is read, `contactId` is the sole `?`-bound value, and
- * only static column names are literal text. Pure read — no transaction.
+ * only static column names are literal text. The interaction id is read for
+ * the linked-note de-duplication in `readPromptContext` and is never placed on
+ * the context. Pure read — no transaction.
  */
 async function readRecentInteractions(
   exec: SqlExecutor,
   contactId: number,
-): Promise<RecentInteractionContext[]> {
+): Promise<RecentInteractionRow[]> {
   const rows = await exec.getAllAsync<{
+    id: number;
     occurred_at: string;
     channel: string;
     quality: string | null;
     note: string | null;
-    allow_ai: number;
   }>(
-    `SELECT occurred_at, channel, quality, note, allow_ai
+    `SELECT id, occurred_at, channel, quality,
+            CASE WHEN allow_ai = 1
+                  AND note_ai_locked = 0
+                  AND NOT EXISTS (
+                        SELECT 1 FROM memories m
+                         WHERE m.interaction_id = interactions.id
+                           AND m.link_source = 'note'
+                           AND m.allow_ai = 0)
+                 THEN note END AS note
        FROM interactions
       WHERE contact_id = ?
       ORDER BY occurred_at DESC, id DESC
@@ -188,9 +176,12 @@ async function readRecentInteractions(
       channel: row.channel,
       tone: row.quality,
     };
-    return row.allow_ai === 1 && row.note?.trim()
-      ? { ...projection, note: row.note }
-      : projection;
+    return {
+      id: row.id,
+      context: row.note?.trim()
+        ? { ...projection, note: row.note }
+        : projection,
+    };
   });
 }
 
@@ -231,15 +222,26 @@ async function readSharedFields(
 /**
  * The Memory branch of the closed egress projection. Permission is enforced by
  * listAiEligibleMemories in SQL; blanks are minimized away before serialization.
+ * A note-linked memory whose interaction note is already sent among the recent
+ * interactions is left out, so a linked note is sent once (D-37: the two texts
+ * are the same; convergence c1 F-D11). This only narrows egress.
  */
 async function readSharedMemories(
   exec: SqlExecutor,
   contactId: number,
+  sentNoteInteractionIds: ReadonlySet<number>,
 ): Promise<SharedFieldValue[]> {
   const rows = await listAiEligibleMemories(exec, contactId);
   const out: SharedFieldValue[] = [];
   for (const row of rows) {
     if (row.value === null || row.value.trim() === "") {
+      continue;
+    }
+    if (
+      row.link_source === "note" &&
+      row.interaction_id !== null &&
+      sentNoteInteractionIds.has(row.interaction_id)
+    ) {
       continue;
     }
     const label =
@@ -283,19 +285,7 @@ export async function readPromptContext(
     throw new Error(`readPromptContext: no contact id=${contactId}`);
   }
 
-  // (2) Ranked eligible fuel (off_limits / unconfirmed-AI / blank excluded in
-  //     SQL). Keep rank order; attach whole-day age; drop the raw timestamp.
-  const fuelRows = await getRankedFuel(exec, contactId);
-  const rankedFuel: RankedFuelEntry[] = fuelRows.map((f) => {
-    const entry: RankedFuelEntry = {
-      text: f.text ?? "",
-      kind: f.kind,
-      ageDays: ageDaysOf(f.created_at, now),
-    };
-    return f.label != null ? { ...entry, label: f.label } : entry;
-  });
-
-  // (3) Derived gravity tier + intensity aggregate. getImpactInputs reads
+  // (2) Derived gravity tier + intensity aggregate. getImpactInputs reads
   //     lifecycle plus interval_days / rarely_responds internally; none of those
   //     raw values are placed on PromptContext (C3-M3).
   const impact = await getImpactInputs(exec, contactId);
@@ -321,23 +311,32 @@ export async function readPromptContext(
           trailingAvgGapDays: intensityResult.trailingAvgGapDays,
         };
 
-  // (4) Neutral interaction aggregates + newest channel (no prose selected).
+  // (3) Neutral interaction aggregates + newest channel (no prose selected).
   const aggregates = await readInteractionAggregates(exec, contactId);
 
-  // (5) Live opted-in custom values, by label, through the validated boundary.
+  // (4) Live opted-in custom values, by label, through the validated boundary.
   const sharedFields = await readSharedFields(exec, contactId);
-  // The existing fuel projection is intentionally unaffected: its SQL still
-  // excludes source='ai', while migration 017 leaves no such fuel rows to read.
-  const sharedMemories = await readSharedMemories(exec, contactId);
 
-  // (6) Gated recent-interaction notes (allow_ai=1 only), rendered by the sole
-  //     prompt builder. Off Limits is carried in no shape (D-14/ADR-107).
-  const recentInteractions = await readRecentInteractions(exec, contactId);
+  // (5) SQL-gated recent-interaction notes (D-49, D-103). Off Limits, Last
+  //     Talked About and Current Location are carried in no shape (D-09, D-16).
+  const recentRows = await readRecentInteractions(exec, contactId);
+  const recentInteractions = recentRows.map((row) => row.context);
+  const sentNoteInteractionIds = new Set(
+    recentRows
+      .filter((row) => row.context.note !== undefined)
+      .map((row) => row.id),
+  );
+
+  // (6) SQL-gated memories, minus note-linked ones already sent as a note.
+  const sharedMemories = await readSharedMemories(
+    exec,
+    contactId,
+    sentNoteInteractionIds,
+  );
 
   return {
     contactName: identity.name,
     category: identity.categoryName ?? "",
-    rankedFuel,
     gravityTier,
     intensity,
     quality: aggregates.quality,

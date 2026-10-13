@@ -448,6 +448,25 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
     await exec.execAsync(
       "ALTER TABLE interactions ADD COLUMN allow_ai INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0, 1))",
     );
+    // The same read now projects and gates on migration 033's link and lock
+    // columns (memory eligibility, the interaction-note CASE, D-49/D-102/D-103).
+    // Mirror their exact shapes; the defaults leave every memory unlinked and
+    // every note unlocked, so the custom-field assertions stay authoritative.
+    await exec.execAsync(`
+ALTER TABLE memories
+  ADD COLUMN interaction_id INTEGER REFERENCES interactions(id) ON DELETE SET NULL;
+ALTER TABLE memories
+  ADD COLUMN link_source TEXT
+    CHECK (link_source IS NULL OR link_source IN ('note','group_note'))
+    CHECK (interaction_id IS NULL OR link_source IS NOT NULL);
+ALTER TABLE memories
+  ADD COLUMN group_note_copy INTEGER NOT NULL DEFAULT 0
+    CHECK (group_note_copy IN (0,1))
+    CHECK (group_note_copy = 0 OR allow_ai = 0);
+ALTER TABLE interactions
+  ADD COLUMN note_ai_locked INTEGER NOT NULL DEFAULT 0
+    CHECK (note_ai_locked IN (0,1))
+    CHECK (note_ai_locked = 0 OR allow_ai = 0);`);
     const liveDefs = await listDefs(exec, { includeQuarantined: false });
     const initial = await getValuesForContact(exec, alex, liveDefs);
     expect(initial).toMatchObject({
