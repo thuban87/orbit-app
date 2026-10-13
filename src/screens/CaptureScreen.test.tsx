@@ -155,3 +155,56 @@ describe("CaptureScreen Back closes the innermost surface first (38.9 D-33, D-14
     expect(handler).toMatch(/return true;/);
   });
 });
+
+const SHARE_CARD_LOGIC_SOURCE = readFileSync(
+  fileURLToPath(new URL("../logic/share-card-logic.ts", import.meta.url)),
+  "utf8",
+);
+
+describe("CaptureScreen confirmation card (38.10 D-77, D-100, D-120)", () => {
+  it("mounts the card only from a completed write", () => {
+    // Each write path publishes the card from runShareWrite's onSuccess.
+    const writes = CAPTURE_SOURCE.split("runShareWrite({").slice(1);
+    const pickWrites = writes.filter(
+      (body) =>
+        body.includes("shareToContacts(") ||
+        body.includes("createContactAndShare("),
+    );
+    expect(pickWrites).toHaveLength(2);
+    for (const body of pickWrites) {
+      const success = body.indexOf("onSuccess:");
+      expect(success).toBeGreaterThan(-1);
+      expect(body.indexOf("setCard({", success)).toBeGreaterThan(success);
+    }
+    expect(CAPTURE_SOURCE).toMatch(
+      /\{card !== null \? \(\s*<ShareConfirmationCard\s+key=\{seq\}/,
+    );
+  });
+
+  it("declares the auto-close constant at the top of the card logic", () => {
+    const declaration = SHARE_CARD_LOGIC_SOURCE.indexOf(
+      "export const SHARE_CARD_AUTO_CLOSE_MS =",
+    );
+    expect(declaration).toBeGreaterThan(-1);
+    const firstFunction = SHARE_CARD_LOGIC_SOURCE.indexOf("function ");
+    expect(declaration).toBeLessThan(firstFunction);
+  });
+
+  it("has no screen-level finish timer and no finish on Undo", () => {
+    expect(CAPTURE_SOURCE).not.toMatch(/armAutoReturn|returnTimer/);
+    // finishActivity() is called from cancelCapture only.
+    expect(CAPTURE_SOURCE.split("finishActivity();").length - 1).toBe(1);
+    const undo = CAPTURE_SOURCE.slice(
+      CAPTURE_SOURCE.indexOf("undo: (target) =>"),
+      CAPTURE_SOURCE.indexOf("UNDO_FAILED,"),
+    );
+    expect(undo).toContain("undoCreateContactAndShare(");
+    expect(undo).toContain("shareScreenAfterUndo(");
+    expect(undo).not.toMatch(/finishActivity|cancelCapture/);
+  });
+
+  it("reads the share snapshot for the empty state and the preview strip (c10)", () => {
+    expect(CAPTURE_SOURCE).toContain("captureViewPayload(snapshot)");
+    expect(CAPTURE_SOURCE).not.toMatch(/payload\.displayText === null/);
+  });
+});

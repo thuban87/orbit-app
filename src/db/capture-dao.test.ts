@@ -19,21 +19,30 @@ import {
   assertShareUndoRowsCore,
   createContactAndShare,
   moveShareRows,
+  moveShareRowsWithAi,
+  SHARE_UNDO_NO_FK_COLUMNS,
+  SHARE_UNDO_OWNERSHIP,
   type ShareRowRef,
   ShareUndoRefusedError,
   setShareRowsAllowAi,
   shareRowsMatchCreatedContactCore,
   shareToContacts,
+  undoCreateContactAndShare,
   undoShareRows,
 } from "@/db/capture-dao";
 import { getCurrentStateHistory } from "@/db/current-state-history-read";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { upsertValue } from "@/db/field-values-dao";
 import { addMemory } from "@/db/memories-dao";
 import { listMemoriesForContact } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import type { CapturePayload } from "@/logic/capture-logic";
+import {
+  initialShareCardState,
+  shareCardReducer,
+} from "@/logic/share-card-logic";
 
 const CREATED = "2026-09-01 08:00:00";
 const NOW = "2026-10-13 12:00:00";
@@ -735,5 +744,681 @@ describe("applyShareNote: the note leads, the link is kept", () => {
     for (const id of [a, b]) {
       expect((await memoriesOf(id))[0]?.value).toBe("A great article");
     }
+  });
+});
+
+// --- moveShareRowsWithAi (convergence c2 G-U1, c4 Codex C-01) -----------------
+
+async function storedAllowAi(rows: readonly ShareRowRef[]) {
+  const out: number[] = [];
+  for (const ref of rows) {
+    const row = await exec.getFirstAsync<{ allow_ai: number }>(
+      "SELECT allow_ai FROM memories WHERE id = ? AND contact_id = ?",
+      [ref.id, ref.contactId],
+    );
+    out.push(row?.allow_ai ?? Number.NaN);
+  }
+  return out;
+}
+
+describe("moveShareRowsWithAi: the switch shows what the move stored (G-U1)", () => {
+  it("AI on, then Gift Ideas: aiOn true, equal to the stored allow_ai; the card shows on", async () => {
+    const a = await seedContact();
+    const rows = await shareToContacts(exec, [a], LINK_SHARE, NOW);
+    await setShareRowsAllowAi(exec, rows, true, NOW);
+
+    let result: Awaited<ReturnType<typeof moveShareRowsWithAi>> | undefined;
+    expect(
+      await revisionDelta(async () => {
+        result = await moveShareRowsWithAi(exec, rows, "gift_idea", LATER);
+      }),
+    ).toBe(1);
+    expect(result?.aiOn).toBe(true);
+    expect(await storedAllowAi(result?.rows ?? [])).toEqual([1]);
+
+    const card = [
+      { type: "selectChip", section: "gift_idea" } as const,
+      {
+        type: "writeSucceeded",
+        result: {
+          kind: "move",
+          rows: result?.rows ?? [],
+          section: "gift_idea",
+          aiOn: result?.aiOn ?? false,
+        },
+      } as const,
+    ].reduce(
+      shareCardReducer,
+      shareCardReducer(initialShareCardState(rows, null), { type: "toggleAi" }),
+    );
+    expect(card.aiOn).toBe(true);
+  });
+
+  it("through Last Talked About and back to Gift Ideas lands off, stored 0", async () => {
+    const a = await seedContact();
+    const rows = await shareToContacts(exec, [a], LINK_SHARE, NOW);
+    await setShareRowsAllowAi(exec, rows, true, NOW);
+
+    const lta = await moveShareRowsWithAi(
+      exec,
+      rows,
+      "last_talked_about",
+      LATER,
+    );
+    expect(lta.aiOn).toBe(false);
+    let back: Awaited<ReturnType<typeof moveShareRowsWithAi>> | undefined;
+    expect(
+      await revisionDelta(async () => {
+        back = await moveShareRowsWithAi(exec, lta.rows, "gift_idea", LATER);
+      }),
+    ).toBe(1);
+    expect(back?.aiOn).toBe(false);
+    expect(await storedAllowAi(back?.rows ?? [])).toEqual([0]);
+
+    const card = shareCardReducer(
+      shareCardReducer(initialShareCardState(lta.rows, null), {
+        type: "selectChip",
+        section: "gift_idea",
+      }),
+      {
+        type: "writeSucceeded",
+        result: {
+          kind: "move",
+          rows: back?.rows ?? [],
+          section: "gift_idea",
+          aiOn: back?.aiOn ?? true,
+        },
+      },
+    );
+    expect(card.aiOn).toBe(false);
+  });
+
+  it("two copies, both on, move together and stay on (D-79)", async () => {
+    const a = await seedContact("Alex");
+    const b = await seedContact("Blair");
+    const rows = await shareToContacts(exec, [a, b], LINK_SHARE, NOW);
+    await setShareRowsAllowAi(exec, rows, true, NOW);
+
+    const moved = await moveShareRowsWithAi(exec, rows, "memory", LATER);
+    expect(moved.aiOn).toBe(true);
+    expect(await storedAllowAi(moved.rows)).toEqual([1, 1]);
+  });
+
+  it("a failed allow_ai read rolls the move back: old refs resolve, revision unchanged", async () => {
+    const a = await seedContact();
+    const rows = await shareToContacts(exec, [a], LINK_SHARE, NOW);
+    const throwing: SqlExecutor = {
+      ...exec,
+      execAsync: (sql) => exec.execAsync(sql),
+      runAsync: (sql, params) => exec.runAsync(sql, params),
+      getAllAsync: (sql, params) => exec.getAllAsync(sql, params),
+      getFirstAsync: (sql, params) => {
+        if (sql.includes("SELECT allow_ai FROM memories")) {
+          return Promise.reject(new Error("forced read failure"));
+        }
+        return exec.getFirstAsync(sql, params);
+      },
+    };
+
+    const before = await readDataRevision(exec);
+    // Gift Ideas keeps the row in memories, so the allow_ai read runs.
+    await expect(
+      moveShareRowsWithAi(throwing, rows, "gift_idea", LATER),
+    ).rejects.toThrow("forced read failure");
+    expect(await readDataRevision(exec)).toBe(before);
+    const [memory] = await memoriesOf(a);
+    expect(memory).toMatchObject({
+      id: rows[0]?.id,
+      type: "thought_of_them",
+    });
+
+    const card = shareCardReducer(
+      shareCardReducer(initialShareCardState(rows, null), {
+        type: "selectChip",
+        section: "gift_idea",
+      }),
+      { type: "writeFailed" },
+    );
+    expect(card.rows).toBe(rows);
+    expect(card.section).toBe("thought_of_them");
+    expect(card.aiOn).toBe(false);
+
+    // The unchanged wrapper still moves and bumps once.
+    expect(
+      await revisionDelta(() =>
+        moveShareRows(exec, rows, "last_talked_about", LATER),
+      ),
+    ).toBe(1);
+  });
+});
+
+// --- undoCreateContactAndShare (D-100, D-106, D-109, D-110) --------------------
+
+const NEW_CONTACT = {
+  uid: "c-new",
+  name: "Robin",
+  intervalDays: 30,
+  methodDrafts: [],
+};
+
+async function addGlobalDef(
+  colName: string,
+  opts: {
+    quarantined?: boolean;
+    scope?: string;
+    historyRetained?: boolean;
+  } = {},
+): Promise<number> {
+  return (
+    await exec.runAsync(
+      `INSERT INTO custom_field_defs
+         (uid, col_name, label, type, display_order, quarantined_at, scope,
+          history_retained, created_at, modified_at)
+       VALUES (?, ?, ?, 'text', ?, ?, ?, ?, ?, ?)`,
+      [
+        `def-${colName}`,
+        colName,
+        colName,
+        ++counter,
+        opts.quarantined ? CREATED : null,
+        opts.scope ?? "global",
+        opts.historyRetained ? 1 : 0,
+        CREATED,
+        CREATED,
+      ],
+    )
+  ).lastInsertRowId;
+}
+
+async function contactExists(id: number): Promise<boolean> {
+  return (
+    (await count("SELECT COUNT(*) AS n FROM contacts WHERE id = ?", [id])) === 1
+  );
+}
+
+async function tombstoneCount(entityType: string): Promise<number> {
+  return count("SELECT COUNT(*) AS n FROM tombstones WHERE entity_type = ?", [
+    entityType,
+  ]);
+}
+
+describe("undoCreateContactAndShare: removes the share and the created contact (D-100)", () => {
+  it("removes both, with tombstones and one bump, global fields seeded (W-11, D-109)", async () => {
+    await addGlobalDef("nickname");
+    await addGlobalDef("old_field", { quarantined: true });
+    const { contactId, rows } = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    // The create path leaves the contact row and its seeds as the guard expects.
+    expect(
+      await exec.getFirstAsync(
+        "SELECT photo, created_at, modified_at FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ photo: null, created_at: NOW, modified_at: NOW });
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM custom_field_values WHERE contact_id = ? AND value IS NULL AND modified_at = created_at",
+        [contactId],
+      ),
+    ).toBe(2);
+
+    let result: { contactRemoved: boolean } | undefined;
+    expect(
+      await revisionDelta(async () => {
+        result = await undoCreateContactAndShare(exec, contactId, rows, LATER);
+      }),
+    ).toBe(1);
+
+    expect(result).toEqual({ contactRemoved: true });
+    expect(await contactExists(contactId)).toBe(false);
+    expect(
+      await count("SELECT COUNT(*) AS n FROM memories WHERE contact_id = ?", [
+        contactId,
+      ]),
+    ).toBe(0);
+    expect(await tombstoneCount("contact")).toBe(1);
+    expect(await tombstoneCount("memory")).toBe(1);
+  });
+
+  it("also removes the contact after a chip move to Last Talked About", async () => {
+    const { contactId, rows } = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    const moved = await moveShareRows(exec, rows, "last_talked_about", LATER);
+
+    await expect(
+      undoCreateContactAndShare(exec, contactId, moved, LATER),
+    ).resolves.toEqual({ contactRemoved: true });
+    expect(await contactExists(contactId)).toBe(false);
+  });
+
+  const BLOCKERS: [string, (id: number) => Promise<unknown>][] = [
+    [
+      "a contact method",
+      (id) =>
+        exec.runAsync(
+          `INSERT INTO contact_methods (uid, contact_id, method_type, raw_value,
+             display_value, display_order, created_at, modified_at)
+           VALUES ('m1', ?, 'phone', '555', '555', 0, ?, ?)`,
+          [id, LATER, LATER],
+        ),
+    ],
+    [
+      "a filled-in custom field",
+      async (id) => {
+        const def = await exec.getFirstAsync<{ id: number }>(
+          "SELECT id FROM custom_field_defs WHERE col_name = 'nickname'",
+        );
+        await upsertValue(exec, id, def?.id ?? 0, "v1", "Bobby", LATER);
+      },
+    ],
+    [
+      "an interaction",
+      (id) =>
+        exec.runAsync(
+          `INSERT INTO interactions (uid, contact_id, occurred_at, recorded_at, source, modified_at)
+           VALUES ('i1', ?, ?, ?, 'manual', ?)`,
+          [id, LATER, LATER, LATER],
+        ),
+    ],
+    [
+      "an inbound key-person link",
+      async (id) => {
+        const other = await seedContact("Other");
+        await exec.runAsync(
+          `INSERT INTO relationships (uid, contact_id, person_name, linked_contact_id, created_at, modified_at)
+           VALUES ('r-in', ?, 'Robin', ?, ?, ?)`,
+          [other, id, LATER, LATER],
+        );
+      },
+    ],
+    [
+      "a key person the contact owns",
+      (id) =>
+        exec.runAsync(
+          `INSERT INTO relationships (uid, contact_id, person_name, created_at, modified_at)
+           VALUES ('r-own', ?, 'Sam', ?, ?)`,
+          [id, LATER, LATER],
+        ),
+    ],
+    [
+      "another memory",
+      (id) =>
+        addMemory(exec, {
+          contactId: id,
+          type: "general",
+          value: "Likes tea",
+          createdAt: LATER,
+          now: LATER,
+        }),
+    ],
+    [
+      "a photo",
+      (id) =>
+        exec.runAsync(
+          "UPDATE contacts SET photo = 'photos/x.jpg' WHERE id = ?",
+          [id],
+        ),
+    ],
+    [
+      "an edited contact row",
+      (id) =>
+        exec.runAsync(
+          "UPDATE contacts SET name = 'Robin B', modified_at = ? WHERE id = ?",
+          [LATER, id],
+        ),
+    ],
+    [
+      "an event",
+      (id) =>
+        exec.runAsync(
+          `INSERT INTO events (uid, contact_id, type, occurred_at, recorded_at, modified_at)
+           VALUES ('e1', ?, 'archive', ?, ?, ?)`,
+          [id, LATER, LATER, LATER],
+        ),
+    ],
+    [
+      "an Off Limits row",
+      (id) =>
+        exec.runAsync(
+          `INSERT INTO off_limits (uid, contact_id, text, created_at, modified_at)
+           VALUES ('o1', ?, 'Politics', ?, ?)`,
+          [id, LATER, LATER],
+        ),
+    ],
+    [
+      "a field_history row",
+      (id) =>
+        exec.runAsync(
+          `INSERT INTO field_history (contact_id, field_col_name, old_value, operation, created_at)
+           VALUES (?, 'nickname', 'x', 'convert', ?)`,
+          [id, LATER],
+        ),
+    ],
+    [
+      "a custom-field history row",
+      async (id) => {
+        const def = await exec.getFirstAsync<{ id: number }>(
+          "SELECT id FROM custom_field_defs WHERE col_name = 'nickname'",
+        );
+        await exec.runAsync(
+          `INSERT INTO custom_field_value_history (uid, contact_id, field_def_id, value, created_at)
+           VALUES ('h1', ?, ?, 'x', ?)`,
+          [id, def?.id ?? 0, LATER],
+        );
+      },
+    ],
+    [
+      "a value for a contact-scoped definition",
+      async (id) => {
+        const def = await addGlobalDef("scoped", { scope: "contact" });
+        await exec.runAsync(
+          `INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at)
+           VALUES ('v-scoped', ?, ?, NULL, ?, ?)`,
+          [id, def, NOW, NOW],
+        );
+      },
+    ],
+    [
+      "the orrery sun reference",
+      (id) =>
+        exec.runAsync(
+          "UPDATE app_settings SET sun_contact_id = ? WHERE id = 1",
+          [id],
+        ),
+    ],
+  ];
+
+  for (const [name, addBlocker] of BLOCKERS) {
+    it(`keeps the contact when it has ${name}: only the share goes (D-109, D-110)`, async () => {
+      await addGlobalDef("nickname");
+      const { contactId, rows } = await createContactAndShare(
+        exec,
+        NEW_CONTACT,
+        LINK_SHARE,
+        NOW,
+      );
+      await addBlocker(contactId);
+
+      let result: { contactRemoved: boolean } | undefined;
+      expect(
+        await revisionDelta(async () => {
+          result = await undoCreateContactAndShare(
+            exec,
+            contactId,
+            rows,
+            LATER,
+          );
+        }),
+      ).toBe(1);
+
+      expect(result).toEqual({ contactRemoved: false });
+      expect(await contactExists(contactId)).toBe(true);
+      expect(
+        await count(
+          "SELECT COUNT(*) AS n FROM contacts WHERE id = ? AND archived_at IS NULL",
+          [contactId],
+        ),
+      ).toBe(1);
+      expect(
+        await count("SELECT COUNT(*) AS n FROM memories WHERE id = ?", [
+          rows[0]?.id ?? 0,
+        ]),
+      ).toBe(0);
+      expect(await tombstoneCount("contact")).toBe(0);
+    });
+  }
+
+  it("keeps the contact when a field with history off was filled then cleared (c6)", async () => {
+    const def = await addGlobalDef("nickname");
+    const { contactId, rows } = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    await upsertValue(exec, contactId, def, "v1", "Bobby", LATER);
+    await upsertValue(exec, contactId, def, "v1", null, LATER);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM custom_field_value_history WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toBe(0);
+
+    await expect(
+      undoCreateContactAndShare(exec, contactId, rows, LATER),
+    ).resolves.toEqual({ contactRemoved: false });
+    expect(await contactExists(contactId)).toBe(true);
+  });
+
+  it("runs onPurgeExtensions once after commit when removed, never when kept; a throw is not fatal (W-4)", async () => {
+    const removed = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    const calls: { id: number; inTx: boolean }[] = [];
+    const onPurgeExtensions = vi.fn(async (id: number) => {
+      // After COMMIT the mutex is free: a new write transaction can open.
+      let inTx = false;
+      try {
+        await exec.execAsync("BEGIN");
+        await exec.execAsync("ROLLBACK");
+      } catch {
+        inTx = true;
+      }
+      calls.push({ id, inTx });
+    });
+    await undoCreateContactAndShare(
+      exec,
+      removed.contactId,
+      removed.rows,
+      LATER,
+      {
+        onPurgeExtensions,
+      },
+    );
+    expect(calls).toEqual([{ id: removed.contactId, inTx: false }]);
+
+    const kept = await createContactAndShare(
+      exec,
+      { ...NEW_CONTACT, uid: "c-kept" },
+      LINK_SHARE,
+      NOW,
+    );
+    await exec.runAsync(
+      `INSERT INTO off_limits (uid, contact_id, text, created_at, modified_at)
+       VALUES ('o-kept', ?, 'x', ?, ?)`,
+      [kept.contactId, LATER, LATER],
+    );
+    const neverCalled = vi.fn();
+    await expect(
+      undoCreateContactAndShare(exec, kept.contactId, kept.rows, LATER, {
+        onPurgeExtensions: neverCalled,
+      }),
+    ).resolves.toEqual({ contactRemoved: false });
+    expect(neverCalled).not.toHaveBeenCalled();
+
+    const third = await createContactAndShare(
+      exec,
+      { ...NEW_CONTACT, uid: "c-third" },
+      LINK_SHARE,
+      NOW,
+    );
+    await expect(
+      undoCreateContactAndShare(exec, third.contactId, third.rows, LATER, {
+        onPurgeExtensions: () => {
+          throw new Error("cleanup failed");
+        },
+      }),
+    ).resolves.toEqual({ contactRemoved: true });
+    expect(await contactExists(third.contactId)).toBe(false);
+  });
+
+  it("rolls back both the share delete and the purge on a forced failure", async () => {
+    const { contactId, rows } = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    const failing: SqlExecutor = {
+      ...exec,
+      execAsync: (sql) => exec.execAsync(sql),
+      runAsync: (sql, params) => {
+        if (
+          sql.includes("UPDATE app_settings") &&
+          sql.includes("data_revision")
+        ) {
+          return Promise.reject(new Error("forced bump failure"));
+        }
+        return exec.runAsync(sql, params);
+      },
+      getAllAsync: (sql, params) => exec.getAllAsync(sql, params),
+      getFirstAsync: (sql, params) => exec.getFirstAsync(sql, params),
+    };
+
+    const before = await readDataRevision(exec);
+    await expect(
+      undoCreateContactAndShare(failing, contactId, rows, LATER),
+    ).rejects.toThrow();
+    expect(await readDataRevision(exec)).toBe(before);
+    expect(await contactExists(contactId)).toBe(true);
+    expect((await memoriesOf(contactId))[0]?.id).toBe(rows[0]?.id);
+    expect(await tombstoneCount("contact")).toBe(0);
+    expect(await tombstoneCount("memory")).toBe(0);
+  });
+
+  it("rows that are not the created batch remove only the share (F-D6)", async () => {
+    const { contactId } = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    const later = await shareToContacts(exec, [contactId], LINK_SHARE, LATER);
+
+    await expect(
+      undoCreateContactAndShare(exec, contactId, later, LATER),
+    ).resolves.toEqual({ contactRemoved: false });
+    expect(await contactExists(contactId)).toBe(true);
+    expect(await memoriesOf(contactId)).toHaveLength(1);
+  });
+
+  it("an empty or non-share ref list throws and deletes nothing (F-D6)", async () => {
+    const { contactId, rows } = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    const userMemory = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Typed",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const before = await readDataRevision(exec);
+
+    await expect(
+      undoCreateContactAndShare(exec, contactId, [], LATER),
+    ).rejects.toBeInstanceOf(ShareUndoRefusedError);
+    await expect(
+      undoCreateContactAndShare(
+        exec,
+        contactId,
+        [...rows, { table: "memories", id: userMemory, contactId }],
+        LATER,
+      ),
+    ).rejects.toBeInstanceOf(ShareUndoRefusedError);
+    expect(await readDataRevision(exec)).toBe(before);
+    expect(await memoriesOf(contactId)).toHaveLength(2);
+    expect(await contactExists(contactId)).toBe(true);
+  });
+});
+
+describe("SHARE_UNDO_OWNERSHIP covers every contact-owned column (W-5)", () => {
+  it("equals the FK children of contacts at TARGET_VERSION plus the no-FK list", async () => {
+    const fks = await exec.getAllAsync<{ tbl: string; col: string }>(
+      `SELECT m.name AS tbl, p."from" AS col
+         FROM sqlite_master m
+         JOIN pragma_foreign_key_list(m.name) p
+        WHERE m.type = 'table' AND p."table" = 'contacts'`,
+    );
+    const expected = new Set([
+      ...fks.map((fk) => `${fk.tbl}.${fk.col}`),
+      ...SHARE_UNDO_NO_FK_COLUMNS,
+    ]);
+    expect(new Set(Object.keys(SHARE_UNDO_OWNERSHIP))).toEqual(expected);
+  });
+
+  it("every column named like a contact id is in the list (this plan only)", async () => {
+    const cols = await exec.getAllAsync<{ tbl: string; col: string }>(
+      `SELECT m.name AS tbl, p.name AS col
+         FROM sqlite_master m
+         JOIN pragma_table_info(m.name) p
+        WHERE m.type = 'table'`,
+    );
+    const contactIdColumns = cols
+      .filter(
+        (c) => /(^|_)contact_id$/.test(c.col) && !c.col.startsWith("external_"),
+      )
+      .map((c) => `${c.tbl}.${c.col}`);
+    for (const key of contactIdColumns) {
+      expect(Object.keys(SHARE_UNDO_OWNERSHIP)).toContain(key);
+    }
+  });
+});
+
+describe("Undo then re-pick writes a new share from the same payload (D-120)", () => {
+  it("share to A, Undo, share to B: B has the share, A has none", async () => {
+    const a = await seedContact("Alex");
+    const b = await seedContact("Blair");
+
+    let rows: ShareRowRef[] = [];
+    expect(
+      await revisionDelta(async () => {
+        rows = await shareToContacts(exec, [a], LINK_SHARE, NOW);
+      }),
+    ).toBe(1);
+    expect(await revisionDelta(() => undoShareRows(exec, rows, NOW))).toBe(1);
+    expect(
+      await revisionDelta(() => shareToContacts(exec, [b], LINK_SHARE, LATER)),
+    ).toBe(1);
+
+    expect(await memoriesOf(a)).toHaveLength(0);
+    const bShares = await memoriesOf(b);
+    expect(bShares).toHaveLength(1);
+    expect(bShares[0]).toMatchObject({
+      type: "thought_of_them",
+      value: "A great article",
+    });
+  });
+
+  it("after a create-and-share Undo that removed the contact, the re-pick to B writes a new share", async () => {
+    const b = await seedContact("Blair");
+    const created = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    await expect(
+      undoCreateContactAndShare(exec, created.contactId, created.rows, NOW),
+    ).resolves.toEqual({ contactRemoved: true });
+
+    await shareToContacts(exec, [b], LINK_SHARE, LATER);
+    expect(await memoriesOf(b)).toHaveLength(1);
+    expect(await contactExists(created.contactId)).toBe(false);
   });
 });

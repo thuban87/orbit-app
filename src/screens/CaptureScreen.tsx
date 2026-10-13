@@ -1,84 +1,110 @@
 /**
- * CaptureScreen (CAP-01/02/03/04) — the share-sheet contact picker. A grid of faces
- * that files whatever the user shared (a link, a text selection) onto a contact as
- * ONE Thought of Them memory (38.10 D-04), then returns to the source app. The 95% path is
- * exactly one tap; long-press promotes to multi-select (fan-out to N contacts), the
- * ＋ tile inline-creates a name-only contact, and an optional note recomposes the
- * just-written row(s)' display text.
+ * CaptureScreen (CAP-01/02/03/04; Phase 38.10 D-04, D-12, D-74, D-77, D-79,
+ * D-83, D-89, D-100, D-120) — the share-sheet contact picker. Whatever the user
+ * shared (a link, a text selection) is saved the moment a person is picked, as
+ * one Thought of Them memory per person (D-04, D-79). The confirmation card
+ * then lets the user move it with the section chips, undo it, add a note or
+ * allow AI, and closes back to the source app (D-74, D-77).
  *
  * =============================================================================
  * LOAD-BEARING INVARIANTS (this is the share→save→return surface):
- *   - The payload is drained from `useShareIntentContext()` and resolved via
- *     `resolveCapturePayload` (the pure 10-02 resolver) into `{ displayText, url }`.
- *     The url column is ALWAYS canonical and NEVER opened during capture (store
- *     only — the screen never navigates to or opens the url, T-10-01/T-10-05).
- *   - A single tap writes the share IMMEDIATELY (a Thought of Them memory,
- *     provenance 'share', Allow AI off; 38.10 D-04, D-57), BEFORE any prompt — `resetOnBackground` kills an un-written payload, so the
- *     write must not wait behind the optional note (T-10-04 / D-CAP write-on-pick).
- *   - Long-press enters multi-select; Done writes N INDEPENDENT share rows in ONE
- *     transaction via `shareToContacts` (never a join table, never a nested
- *     mutex). Done is DISABLED + guarded at zero selection (B3) — no empty
- *     transaction, no "Saved to 0 contacts".
- *   - Capture writes ONLY share rows. It NEVER touches `contacts.last_contact` or writes
- *     an interaction row — capture is not a touchpoint (DATA-04 single-writer). The
- *     inline-create path omits `firstInteraction` so a new contact lands NULL
- *     last_contact (never-contacted); sharing a link is not "contacting".
- *   - EVERY commit path (single-tap, multi Done, inline Create & save, note-Done)
- *     shares the ONE `isCommittingRef` in-flight latch (set BEFORE the first
- *     `await`, cleared in `finally`) and disables its control while set — a rapid
- *     double-tap cannot double-write (B2/C2). A SINGLE `localDateTime()` stamp is
- *     reused per write (A10).
- *   - The returned share-row refs are retained in `writtenRows` so the optional
- *     note edits the exact row(s) by table + id + contactId (A1/A2). The note
- *     recompose applies to ALL N rows ATOMICALLY via the `applyShareNote` DAO
- *     (never an inline transaction, B1).
- *   - A focused `useFocusEffect` hardware-Back handler owns Back (A6/C1; 38.9
- *     D-33 via `resolveCaptureBack`): Back first closes the open New-contact
- *     surface, then an open search, then EXITS multi-select (any count) WITHOUT
- *     writing, else cancels via the shared `cancelCapture()`. A typed name or
- *     note shows the "Discard changes?" prompt first (D-13/D-14). The Close pill ALWAYS calls
- *     `cancelCapture()` (resetShareIntent → finishActivity); it never merely exits
- *     the mode.
- *   - Confirmation ("Saved to …") + auto-return use setState + a `useRef`
- *     setTimeout — NEVER a per-frame React-state animation (CLAUDE.md). The timer
- *     is cleared on unmount and cancelled the moment the note affordance is touched.
- *   - Every colour resolves through `useTheme().colors.*` — zero hex literals
- *     (CLAUDE.md / check:colors). `Avatar` is used verbatim (size 64) — its
- *     recyclingKey anti-face-flash is a correctness requirement in the recycling
- *     grid; photo freshness comes from the display revision (38.6 D-01).
+ *   - The share is written BEFORE any prompt or card interaction (D-12;
+ *     T-10-04): `resetOnBackground` kills an unwritten payload.
+ *   - SHARE SEQUENCE (convergence c3, c4, c10, c11, c12): a live share intent
+ *     with a new identity advances `seq`, during render (idempotent for the
+ *     same intent). The library's reset to its empty default object on
+ *     background never advances it, so the card, its rows and its Undo
+ *     survive a background trip. Each `seq` snapshots its payload; every
+ *     write, the note base, the preview strip and the "Nothing to save" gate
+ *     read that snapshot, never the live intent. The same render resets every
+ *     screen-owned share state (search, multi-select, note mirror, the
+ *     New-contact sheet, the mounted card). `seq` keys the card.
+ *   - EVERY async share handler (pick, multi-select Done, inline create and
+ *     every card action) runs through `runShareWrite`: ONE `isCommittingRef`
+ *     latch (set before the first await, cleared in finally), the `seq`
+ *     captured at the start, and UI published only for an unchanged `seq`.
+ *     The database write stands either way.
+ *   - The list is inert while the card is up or a pick write is pending
+ *     (`shareListLocked`, WR-01); each pick handler also returns early.
+ *   - Capture writes ONLY share rows. It never touches `last_contact` or writes
+ *     an interaction (DATA-04; capture is not a touchpoint). Inline create is
+ *     name-only and never-contacted (D-83).
+ *   - Undo returns to the unlocked list with the same `seq` and snapshot
+ *     (D-120); it never calls `finishActivity()`. A share that created its
+ *     contact is undone through `undoCreateContactAndShare` (D-100, D-110).
+ *   - The card's own timer is the only auto-close (no screen-level finish
+ *     timer). It finishes only for an unchanged `seq` while the app is active.
+ *   - Back (38.9 D-33 via `resolveCaptureBack`) closes the innermost surface
+ *     first; a typed name or note shows "Discard changes?" first. The Close
+ *     pill always cancels (`resetShareIntent` → `finishActivity`).
+ *   - Capture keeps its own chrome (no shell app bar), never uses the native
+ *     alert and opens no RN Modal. Every colour resolves through
+ *     `useTheme().colors.*` (check:colors).
  * =============================================================================
  */
 import { useFocusEffect } from "@react-navigation/native";
 import { useShareIntentContext } from "expo-share-intent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   BackHandler,
   FlatList,
+  Keyboard,
+  type LayoutChangeEvent,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/Avatar";
+import {
+  type ShareCardActions,
+  ShareConfirmationCard,
+  type ShareConfirmationCardHandle,
+} from "@/components/ShareConfirmationCard";
+import { sheetKeyboardLayout } from "@/components/ui/sheet-contract";
 import { NEW_CONTACT_DEFAULT_INTERVAL_DAYS } from "@/constants/new-contact-defaults";
 import {
   applyShareNote,
   createContactAndShare,
+  moveShareRowsWithAi,
   type ShareRowRef,
+  setShareRowsAllowAi,
   shareToContacts,
+  undoCreateContactAndShare,
+  undoShareRows,
 } from "@/db/capture-dao";
 import {
   type CapturePickRow,
   listCapturePickContacts,
 } from "@/db/capture-read";
 import { getExecutor, localDateTime } from "@/db/database";
+import type { PurgeExtensions } from "@/db/purge-dao";
+import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
-import { resolveCapturePayload } from "@/logic/capture-logic";
+import {
+  advanceShareSequence,
+  buildAutoCloseCallback,
+  captureViewPayload,
+  isLiveShareIntent,
+  runShareWrite,
+  type ShareIntentLike,
+  type ShareSequence,
+  type ShareSnapshot,
+  type ShareUndoResult,
+  shareListLocked,
+  shareScreenAfterUndo,
+  takeShareSnapshot,
+  undoResultSnackbar,
+} from "@/logic/share-card-logic";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { resolveCaptureBack } from "@/screens/capture-back-logic";
-import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-notification-cleanup";
+import { deleteImportStaging } from "@/services/photos/photo-storage";
+import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -87,16 +113,82 @@ import { finishActivity } from "../../modules/orbit-share-finish";
 
 const LOG_SCOPE = "capture";
 
-/**
- * How long the "Saved to …" confirmation shows before Orbit finishes back to the
- * source app (the brief-toast-then-return lock, CONTEXT #3). A single-number tunable
- * per CLAUDE.md — touching the note affordance cancels this timer entirely so the
- * note is never rushed.
- */
-const AUTO_RETURN_MS = 1500;
+/** Space between a bottom surface and the keyboard or system bar (I-02, I-16). */
+const BOTTOM_SURFACE_MARGIN = 16;
+
+const SAVE_FAILED = {
+  kind: "error",
+  label: "Couldn't save. Please try again.",
+} as const;
+const UNDO_FAILED = {
+  kind: "error",
+  label: "Couldn't undo. Please try again.",
+} as const;
 
 /** The recycling-grid cell union: a real face, or the always-present ＋ tile. */
 type GridItem = { kind: "face"; row: CapturePickRow } | { kind: "new" };
+
+/** The share sequence and the payload snapshot it writes from. */
+interface SequenceState {
+  sequence: ShareSequence;
+  snapshot: ShareSnapshot | null;
+}
+
+/** The mounted confirmation card: the written rows and who they went to. */
+interface MountedCard {
+  rows: ShareRowRef[];
+  createdContactId: number | null;
+  names: string[];
+}
+
+/** Advance the share sequence from `prev`; snapshot only when it moves. */
+function nextSequenceState(
+  prev: SequenceState,
+  intent: unknown,
+): SequenceState {
+  const sequence = advanceShareSequence(
+    prev.sequence,
+    intent,
+    isLiveShareIntent(intent),
+  );
+  if (sequence === prev.sequence) return prev;
+  return {
+    sequence,
+    snapshot: takeShareSnapshot(sequence.seq, intent as ShareIntentLike),
+  };
+}
+
+const NO_SEQUENCE: SequenceState = {
+  sequence: { intent: null, seq: 0 },
+  snapshot: null,
+};
+
+/**
+ * Post-commit cleanup for a D-100 purge, composed as ArchivedContactsScreen
+ * composes it: import staging, then photos, then notifications, each in its
+ * own try/catch so one failure cannot skip the others (checker cycle 3 W-4).
+ */
+function buildShareUndoPurgeCleanup(exec: SqlExecutor): PurgeExtensions {
+  const photoCleanup = buildPhotoPurgeCleanup(exec);
+  const notifCleanup = buildNotificationPurgeCleanup();
+  return async (purgedId, { importStagingPaths }) => {
+    try {
+      for (const path of importStagingPaths) deleteImportStaging(path);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "post-commit import staging cleanup failed", err);
+    }
+    try {
+      await photoCleanup(purgedId);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "post-commit photo cleanup failed", err);
+    }
+    try {
+      await notifCleanup(purgedId);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "post-commit notification cleanup failed", err);
+    }
+  };
+}
 
 /**
  * The bare host of a canonical url, for the preview strip's second line. Never
@@ -113,65 +205,105 @@ function hostOf(url: string): string {
 
 export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { shareIntent, resetShareIntent } = useShareIntentContext();
 
-  // Resolve the share payload ONCE per intent → { displayText, url }. Memoized on
-  // the shareIntent identity so a re-render never re-derives (the resolver is pure).
-  const payload = useMemo(
-    () =>
-      resolveCapturePayload({
-        text: shareIntent.text ?? "",
-        webUrl: shareIntent.webUrl,
-        title: shareIntent.meta?.title,
-      }),
-    [shareIntent],
-  );
-
   const [rows, setRows] = useState<CapturePickRow[]>([]);
-  // The just-written share rows, retained so the optional note edits the exact
-  // row(s) (A1/A2). Set the instant a commit resolves.
-  const [writtenRows, setWrittenRows] = useState<ShareRowRef[]>([]);
-  // Drives the confirmation surface + face-tile disabling. `committing` disables the
-  // grid while a write is in flight; `savedLabel` (non-null) shows the toast text.
+  const [rowsLoading, setRowsLoading] = useState(true);
+  // The mounted confirmation card (null = the list is showing).
+  const [card, setCard] = useState<MountedCard | null>(null);
+  // A pick / multi Done / inline create write is in flight.
   const [committing, setCommitting] = useState(false);
-  const [savedLabel, setSavedLabel] = useState<string | null>(null);
 
   // Multi-select (CAP-02): `multiSelect` is the mode flag, `selected` the chosen
   // contact ids. Long-press enters the mode; tap toggles; Done fans out.
   const [multiSelect, setMultiSelect] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
-  // Optional-note surface: `noteOpen` reveals the multiline field (cancelling the
-  // auto-return), `noteText` is its contents. On Done the note recomposes the
-  // just-written row(s)' display text to `note — base` (url untouched).
+  // The card's note editor, mirrored for Back (38.9 D-33).
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
 
-  // Inline name-only create (CAP-04): `inlineOpen` reveals the ＋-tile create sheet,
-  // `inlineName` is the single name field. Submit creates a never-contacted contact
-  // and saves the share to it in one transaction.
+  // Inline name-only create (CAP-04, D-83).
   const [inlineOpen, setInlineOpen] = useState(false);
   const [inlineName, setInlineName] = useState("");
 
-  // Tap-to-reveal search (CAP-01): demoted, NOT autofocused on entry — the keyboard
-  // stays closed on the fast path. `searchOpen` reveals the field; `searchText`
-  // live-filters the grid by name (in-memory, case-insensitive substring).
+  // Tap-to-reveal search (CAP-01).
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
 
-  // ONE in-flight latch shared by EVERY commit path (single-tap, multi Done, inline
-  // create, note-Done — B2/C2). A ref (not state) so the guard is synchronous — set
-  // BEFORE the first await, cleared in finally — and a rapid double-tap that fires
-  // before a re-render still early-returns.
-  const isCommittingRef = useRef(false);
-  // The auto-return timer id; cleared on unmount and cancelled when the note
-  // affordance is touched (setState + setTimeout, never a per-frame animation).
-  const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ---- Share sequence (render-time; c3, c4, c11, c12) -------------------------
+  const [sequenceState, setSequenceState] = useState<SequenceState>(() =>
+    nextSequenceState(NO_SEQUENCE, shareIntent),
+  );
+  let current = sequenceState;
+  const advanced = nextSequenceState(sequenceState, shareIntent);
+  if (advanced !== sequenceState) {
+    // React's "adjust state while rendering": the render that first sees a new
+    // live share already uses the new seq and snapshot, and every screen-owned
+    // share state starts fresh in the same step (never in an effect).
+    current = advanced;
+    setSequenceState(advanced);
+    setCard(null);
+    setMultiSelect(false);
+    setSelected(new Set());
+    setNoteOpen(false);
+    setNoteText("");
+    setInlineOpen(false);
+    setInlineName("");
+    setSearchOpen(false);
+    setSearchText("");
+  }
+  const seq = current.sequence.seq;
+  const snapshot = current.snapshot;
+  // The current seq for async handlers' after-await check. Written during
+  // render on purpose: it is idempotent and must already hold the new seq when
+  // a write that started under the old one resolves.
+  const seqRef = useRef(seq);
+  seqRef.current = seq;
+  // The mounted card as of this render, for the Undo publish.
+  const cardStateRef = useRef(card);
+  cardStateRef.current = card;
 
-  // Cancel the share and return to the source app WITHOUT writing. The SINGLE cancel
-  // path (A6/C1): the Close pill calls it unconditionally, and the focused Back
-  // handler calls it only when NOT in multi-select (in multi-select, Back exits the
-  // mode instead — see the BackHandler effect).
+  // ONE in-flight latch shared by EVERY write path (picks and card actions).
+  const isCommittingRef = useRef(false);
+  const cardRef = useRef<ShareConfirmationCardHandle>(null);
+
+  // ---- Keyboard and system bars (I-02, I-16) ---------------------------------
+  const [keyboardHeight, setKeyboardHeight] = useState(() =>
+    Keyboard.isVisible() ? (Keyboard.metrics()?.height ?? 0) : 0,
+  );
+  const [frameHeight, setFrameHeight] = useState(0);
+  const restingFrameHeight = useRef(0);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (event) =>
+      setKeyboardHeight(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardHeight(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  const onRootLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    restingFrameHeight.current = Math.max(restingFrameHeight.current, height);
+    setFrameHeight(height);
+  }, []);
+  const { lift } = sheetKeyboardLayout({
+    variant: "compact",
+    frameHeight,
+    restingFrameHeight: restingFrameHeight.current,
+    keyboardHeight,
+    topClearance: insets.top,
+  });
+  const bottomOffset =
+    BOTTOM_SURFACE_MARGIN + (lift > 0 ? lift : insets.bottom);
+
+  // Cancel the share and return to the source app WITHOUT writing. The Close
+  // pill, Done and Back's cancel all use it.
   const cancelCapture = useCallback(() => {
     resetShareIntent();
     finishActivity();
@@ -183,26 +315,31 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     setSelected(new Set());
   }, []);
 
-  // Load the picker grid on every focus (favourites → capture-MRU → rest, includes
-  // never-contacted, excludes archived). A `cancelled` guard drops a superseded
-  // focus's result (the ComposeScreen idiom). Local SQLite; no network on the read.
+  // Load the picker (favourites → share recency → rest, includes never-contacted,
+  // excludes archived; D-30, D-12). A superseded request is dropped. Local
+  // SQLite; no network on the read.
+  const rowsRequest = useRef(0);
+  const loadRows = useCallback(() => {
+    const request = ++rowsRequest.current;
+    setRowsLoading(true);
+    void listCapturePickContacts(getExecutor())
+      .then((result) => {
+        if (rowsRequest.current === request) setRows(result);
+      })
+      .catch((err) => {
+        Logger.error(LOG_SCOPE, "failed to load capture contacts", err);
+      })
+      .finally(() => {
+        if (rowsRequest.current === request) setRowsLoading(false);
+      });
+  }, []);
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      void (async () => {
-        try {
-          const result = await listCapturePickContacts(getExecutor());
-          if (!cancelled) {
-            setRows(result);
-          }
-        } catch (err) {
-          Logger.error(LOG_SCOPE, "failed to load capture contacts", err);
-        }
-      })();
+      loadRows();
       return () => {
-        cancelled = true;
+        rowsRequest.current += 1;
       };
-    }, []),
+    }, [loadRows]),
   );
 
   // Close the inline New-contact surface and drop its typed name.
@@ -217,15 +354,13 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     setSearchText("");
   }, []);
 
-  // Focused hardware/system-Back handler (A6/C1, mirrors the ComposeScreen idiom —
-  // useFocusEffect + BackHandler, return true to consume so native-stack does not
-  // pop/finish). 38.9 D-33: Back first closes the innermost open surface
-  // (New-contact, then search, then multi-select WITHOUT writing), and a typed
-  // name or note shows the shared "Discard changes?" prompt (D-13, D-14) instead
-  // of being dropped. Discarding a note cancels as before: the rows are already
-  // written, only the note is lost. A second Back while the prompt is pending gets
-  // false from the single-flight confirmDiscard() and is consumed with no second
-  // prompt (review C2-L3). The Close pill is Back-independent and ALWAYS cancels.
+  // Focused hardware/system-Back handler (A6/C1; 38.9 D-33): Back first closes
+  // the innermost open surface (New-contact, then search, then multi-select
+  // WITHOUT writing), and a typed name or note shows the shared "Discard
+  // changes?" prompt (D-13, D-14). The card's auto-close is held while the
+  // note prompt shows (D-77). Discarding a note cancels: the rows are already
+  // written, only the note is lost. A second Back while the prompt is pending
+  // gets false from the single-flight confirmDiscard() (review C2-L3).
   useFocusEffect(
     useCallback(() => {
       const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -253,7 +388,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             exitMultiSelect();
             break;
           case "prompt-discard-note":
+            cardRef.current?.discardOpened();
             void confirmDiscard().then((discard) => {
+              cardRef.current?.discardClosed();
               if (discard) cancelCapture();
             });
             break;
@@ -278,78 +415,63 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     ]),
   );
 
-  // Clear a pending auto-return timer on unmount (no finish/setState after teardown).
-  useEffect(() => {
-    return () => {
-      if (returnTimer.current) {
-        clearTimeout(returnTimer.current);
-        returnTimer.current = null;
+  const listLocked = shareListLocked({
+    cardMounted: card !== null,
+    writePending: committing,
+  });
+
+  /** Write a share to picked people, then mount the card (D-04, D-77, D-79). */
+  const shareTo = useCallback(
+    (people: readonly CapturePickRow[]) => {
+      if (snapshot === null || people.length === 0) {
+        return Promise.resolve({ status: "busy" } as const);
       }
-    };
-  }, []);
+      const stamp = localDateTime();
+      return runShareWrite({
+        latch: isCommittingRef,
+        startSeq: seqRef.current,
+        currentSeq: () => seqRef.current,
+        onBusyChange: setCommitting,
+        write: () =>
+          shareToContacts(
+            getExecutor(),
+            people.map((person) => person.id),
+            snapshot.payload,
+            stamp,
+          ),
+        onSuccess: (written) => {
+          setCard({
+            rows: written,
+            createdContactId: null,
+            names: people.map((person) => person.name),
+          });
+          setMultiSelect(false);
+          setSelected(new Set());
+        },
+        onError: (err) => {
+          Logger.error(LOG_SCOPE, "failed to save share", err);
+          showSnackbar(SAVE_FAILED);
+        },
+      });
+    },
+    [snapshot],
+  );
 
-  // Arm the brief-toast → auto-return (setState + setTimeout, never a per-frame
-  // animation). Shared by every commit path; cancelled the moment "Add a note" is
-  // touched so the note is never rushed.
-  const armAutoReturn = useCallback(() => {
-    if (returnTimer.current) {
-      clearTimeout(returnTimer.current);
-    }
-    returnTimer.current = setTimeout(() => {
-      returnTimer.current = null;
-      resetShareIntent();
-      finishActivity();
-    }, AUTO_RETURN_MS);
-  }, [resetShareIntent]);
-
-  // Single-tap commit — save the share immediately, then confirm + auto-return.
-  // Guarded against a rapid double-tap by the shared `isCommittingRef` (set before
-  // the first await, cleared in finally) AND `committing` disabling the faces (B2).
+  // Single-tap commit — save the share immediately, then show the card.
   const onPickFace = useCallback(
     async (row: CapturePickRow) => {
-      // WR-01: once a commit has landed the confirmation surface + auto-return own
-      // the screen — the grid is locked (see `locked` in render). This early return
-      // is the defensive twin of that disable: a tap that slips through before the
-      // re-render must not write a SECOND row to a DIFFERENT contact during the
-      // ~1.5s auto-return window.
-      if (savedLabel !== null) {
+      // WR-01: the defensive twin of the list's disable.
+      if (
+        shareListLocked({
+          cardMounted: card !== null,
+          writePending: isCommittingRef.current,
+        })
+      ) {
         return;
       }
-      if (isCommittingRef.current) {
-        return;
-      }
-      isCommittingRef.current = true;
-      setCommitting(true);
-      try {
-        // ONE stamp for the whole write (A10).
-        const stamp = localDateTime();
-        const written = await shareToContacts(
-          getExecutor(),
-          [row.id],
-          payload,
-          stamp,
-        );
-        // Retain the written row for the note recompose (A1/A2).
-        setWrittenRows(written);
-        setSavedLabel(`Saved to ${row.name}`);
-        // The widget shows no knowledge line since 38.10, so a share changes
-        // nothing it draws; this refresh is harmless and stays until plan 11
-        // rebuilds the screen.
-        notifyWidgetDataChanged();
-        armAutoReturn();
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to save share", err);
-        // Leave the payload intact (still live until background) for a retry.
-        showSnackbar({
-          kind: "error",
-          label: "Couldn't save. Please try again.",
-        });
-      } finally {
-        isCommittingRef.current = false;
-        setCommitting(false);
-      }
+      await shareTo([row]);
     },
-    [payload, savedLabel, armAutoReturn],
+    [card, shareTo],
   );
 
   // Long-press a face → enter multi-select with that face selected.
@@ -371,188 +493,187 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     });
   }, []);
 
-  // Multi-select Done — fan N INDEPENDENT share rows into ONE transaction via
-  // shareToContacts (CAP-02). B3: guard `selected.size === 0` BEFORE building any
-  // row or opening the transaction (Done is also disabled at zero). B2: the shared
-  // isCommittingRef latch is set before the first await and cleared in finally.
+  // Multi-select Done — N independent share rows in ONE transaction (CAP-02,
+  // D-79). B3: guarded at zero selection.
   const onDoneMulti = useCallback(async () => {
-    if (selected.size === 0) {
+    if (selected.size === 0) return;
+    if (
+      shareListLocked({
+        cardMounted: card !== null,
+        writePending: isCommittingRef.current,
+      })
+    ) {
       return;
     }
-    if (isCommittingRef.current) {
-      return;
-    }
-    isCommittingRef.current = true;
-    setCommitting(true);
-    try {
-      // ONE stamp reused across all N rows (A10).
-      const stamp = localDateTime();
-      // shareToContacts returns the written rows in input order — store them so
-      // the optional note can recompose all N rows (A1).
-      const written = await shareToContacts(
-        getExecutor(),
-        [...selected],
-        payload,
-        stamp,
-      );
-      setWrittenRows(written);
-      // Harmless widget refresh, kept until plan 11 rebuilds the screen (the
-      // widget shows no knowledge line since 38.10).
-      notifyWidgetDataChanged();
-      // SG-03: N=1 is reachable (long-press one face, immediately Done), so singularise.
-      const n = written.length;
-      setSavedLabel(`Saved to ${n} ${n === 1 ? "contact" : "contacts"}`);
-      // Drop the multi-select bar; the confirmation surface takes over.
-      setMultiSelect(false);
-      setSelected(new Set());
-      armAutoReturn();
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to save multi-person share", err);
-      showSnackbar({
-        kind: "error",
-        label: "Couldn't save. Please try again.",
-      });
-    } finally {
-      isCommittingRef.current = false;
-      setCommitting(false);
-    }
-  }, [selected, payload, armAutoReturn]);
-
-  // Touching "Add a note" cancels the auto-return (the note is never rushed) and
-  // reveals the note field. No timer runs while the note is open.
-  const onAddNote = useCallback(() => {
-    if (returnTimer.current) {
-      clearTimeout(returnTimer.current);
-      returnTimer.current = null;
-    }
-    setNoteOpen(true);
-  }, []);
-
-  // Note Done — recompose the written row(s)' display text to `note — base` and
-  // patch text ONLY (url/created_at untouched). C2: gated on the SAME shared
-  // isCommittingRef latch (set before the first await, cleared in finally, the
-  // button disabled while set) so a rapid double-tap cannot re-apply. Keyed by the
-  // written rows' table + id + contactId (A1). Every row is updated atomically via
-  // the `applyShareNote` DAO (one transaction) — the screen NEVER opens a
-  // transaction inline (B1). A blank/whitespace note leaves the base untouched → treated as Skip.
-  const onNoteDone = useCallback(async () => {
-    // WR-02: a blank/whitespace note is a true Skip — no recompose write. Without
-    // this guard the resolver returns `base` (the already-written display text) for a
-    // blank note, so `composed !== null` held and the row was needlessly rewritten to
-    // the SAME text, bumping `modified_at` on a latency-sensitive return path and
-    // contradicting the stated contract. Dismiss + re-arm the auto-return, nothing more.
-    const note = noteText.trim();
-    if (note.length === 0) {
-      setNoteText("");
-      setNoteOpen(false);
-      armAutoReturn();
-      return;
-    }
-    if (isCommittingRef.current) {
-      return;
-    }
-    isCommittingRef.current = true;
-    setCommitting(true);
-    try {
-      // The DAO recomposes "note leads" through resolveCapturePayload and writes
-      // every row in one transaction. ONE stamp for the edit `now` (A10).
-      if (writtenRows.length > 0) {
-        await applyShareNote(
-          getExecutor(),
-          writtenRows,
-          note,
-          {
-            text: shareIntent.text ?? "",
-            webUrl: shareIntent.webUrl,
-            title: shareIntent.meta?.title,
-          },
-          localDateTime(),
-        );
-        // Harmless widget refresh, kept until plan 11 rebuilds the screen (the
-        // widget shows no knowledge line since 38.10).
-        notifyWidgetDataChanged();
-      }
-      // SG-02: clear the draft after a successful note so it can't reappear later.
-      setNoteText("");
-      setNoteOpen(false);
-      armAutoReturn();
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to apply capture note", err);
-      showSnackbar({
-        kind: "error",
-        label: "Couldn't save. Please try again.",
-      });
-    } finally {
-      isCommittingRef.current = false;
-      setCommitting(false);
-    }
-  }, [shareIntent, noteText, writtenRows, armAutoReturn]);
-
-  // Note Skip — dismiss the note field and arm the auto-return with the unchanged
-  // single-tap / multi display text (no write).
-  const onNoteSkip = useCallback(() => {
-    // SG-02: clear the draft so a stale note can't resurface if "Add a note" is
-    // reopened on a later capture within the same screen instance.
-    setNoteText("");
-    setNoteOpen(false);
-    armAutoReturn();
-  }, [armAutoReturn]);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const people = [...selected]
+      .map((id) => byId.get(id))
+      .filter((row): row is CapturePickRow => row !== undefined);
+    await shareTo(people);
+  }, [selected, card, rows, shareTo]);
 
   // Tap the ＋ tile → reveal the inline name-only create sheet.
   const onOpenInlineCreate = useCallback(() => {
     setInlineOpen(true);
   }, []);
 
-  // Inline Create & save — create a NAME-ONLY contact (never-contacted) and save
-  // the share to it in ONE transaction (38.10 D-28, NEW-3). A7: the empty/blank-name
-  // guard runs FIRST (submit is also disabled at trim-length 0) so a blank name can
-  // never reach createContactAndShare. B2: the shared isCommittingRef latch is set
-  // after the guard, before the first await, cleared in finally.
+  // Inline Create & save — a NAME-ONLY, never-contacted contact (monthly
+  // default, D-83) and its share in ONE transaction (D-28, NEW-3). A7: a blank
+  // name never reaches createContactAndShare.
   const onInlineSubmit = useCallback(async () => {
     const trimmedName = inlineName.trim();
-    if (trimmedName.length === 0) {
+    if (trimmedName.length === 0 || snapshot === null) return;
+    if (
+      shareListLocked({
+        cardMounted: card !== null,
+        writePending: isCommittingRef.current,
+      })
+    ) {
       return;
     }
-    if (isCommittingRef.current) {
-      return;
-    }
-    isCommittingRef.current = true;
-    setCommitting(true);
-    try {
-      // ONE stamp for the contact and its share (A10); both get it as created_at.
-      const stamp = localDateTime();
+    // ONE stamp for the contact and its share (A10); both get it as created_at.
+    const stamp = localDateTime();
+    await runShareWrite({
+      latch: isCommittingRef,
+      startSeq: seqRef.current,
+      currentSeq: () => seqRef.current,
+      onBusyChange: setCommitting,
       // NAME-ONLY: no first interaction, so last_contact stays NULL
       // (never-contacted, CAP-04 — sharing a link is not "contacting").
-      const { rows: written } = await createContactAndShare(
-        getExecutor(),
-        {
-          uid: newUid(),
-          name: trimmedName,
-          intervalDays: NEW_CONTACT_DEFAULT_INTERVAL_DAYS,
-          // Explicit normalized empty set: Capture remains name-only and Bound by
-          // the v11 DDL default without reviving retired scalar phone/email inputs.
-          methodDrafts: [],
+      write: () =>
+        createContactAndShare(
+          getExecutor(),
+          {
+            uid: newUid(),
+            name: trimmedName,
+            intervalDays: NEW_CONTACT_DEFAULT_INTERVAL_DAYS,
+            // Explicit normalized empty set: Capture remains name-only and Bound by
+            // the v11 DDL default without reviving retired scalar phone/email inputs.
+            methodDrafts: [],
+          },
+          snapshot.payload,
+          stamp,
+        ),
+      onSuccess: ({ contactId, rows: written }) => {
+        setCard({
+          rows: written,
+          createdContactId: contactId,
+          names: [trimmedName],
+        });
+        setInlineOpen(false);
+        setInlineName("");
+        setMultiSelect(false);
+      },
+      onError: (err) => {
+        Logger.error(LOG_SCOPE, "failed inline-create share", err);
+        showSnackbar(SAVE_FAILED);
+      },
+    });
+  }, [inlineName, snapshot, card]);
+
+  // ---- Card actions (every one seq-guarded and single-flight) ----------------
+  const cardActions = useMemo<ShareCardActions>(() => {
+    const write = <T,>(
+      run: () => Promise<T>,
+      onSuccess?: (value: T) => void,
+      failure: { kind: "error"; label: string } = SAVE_FAILED,
+    ) =>
+      runShareWrite({
+        latch: isCommittingRef,
+        startSeq: seqRef.current,
+        currentSeq: () => seqRef.current,
+        write: run,
+        onSuccess,
+        onError: (err) => {
+          Logger.error(LOG_SCOPE, "share card write failed", err);
+          showSnackbar(failure);
         },
-        payload,
-        stamp,
-      );
-      // Retain the row for the optional-note recompose (A1).
-      setWrittenRows(written);
-      setSavedLabel(`Saved to ${trimmedName}`);
-      setInlineOpen(false);
-      setInlineName("");
-      armAutoReturn();
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed inline-create share", err);
-      showSnackbar({
-        kind: "error",
-        label: "Couldn't save. Please try again.",
       });
-    } finally {
-      isCommittingRef.current = false;
-      setCommitting(false);
-    }
-  }, [inlineName, payload, armAutoReturn]);
+    return {
+      move: (written, section) =>
+        write(() =>
+          moveShareRowsWithAi(getExecutor(), written, section, localDateTime()),
+        ),
+      setAi: (written, allow) =>
+        write(async () => {
+          await setShareRowsAllowAi(
+            getExecutor(),
+            written,
+            allow,
+            localDateTime(),
+          );
+          return allow;
+        }),
+      saveNote: (written, note) =>
+        snapshot === null
+          ? Promise.resolve({ status: "busy" } as const)
+          : write(() =>
+              applyShareNote(
+                getExecutor(),
+                written,
+                note,
+                snapshot.shareText,
+                localDateTime(),
+              ),
+            ),
+      undo: (target) =>
+        write(
+          async (): Promise<ShareUndoResult> => {
+            const exec = getExecutor();
+            const stamp = localDateTime();
+            if (target.kind === "create-and-share") {
+              const { contactRemoved } = await undoCreateContactAndShare(
+                exec,
+                target.contactId,
+                target.rows,
+                stamp,
+                { onPurgeExtensions: buildShareUndoPurgeCleanup(exec) },
+              );
+              return { kind: "create-and-share", contactRemoved };
+            }
+            await undoShareRows(exec, target.rows, stamp);
+            return { kind: "share" };
+          },
+          (result) => {
+            // D-120: back to the unlocked list with the same shared item.
+            const mounted = cardStateRef.current;
+            const after = shareScreenAfterUndo({
+              seq: seqRef.current,
+              snapshot,
+              card: mounted,
+              noteOpen: false,
+              noteText: "",
+              searchText: "",
+            });
+            setCard(after.card);
+            setNoteOpen(after.noteOpen);
+            setNoteText(after.noteText);
+            showSnackbar(undoResultSnackbar(result, mounted?.names[0] ?? ""));
+            loadRows();
+          },
+          UNDO_FAILED,
+        ),
+    };
+  }, [snapshot, loadRows]);
+
+  const onAutoClose = useMemo(
+    () =>
+      buildAutoCloseCallback({
+        armedSeq: seq,
+        currentSeq: () => seqRef.current,
+        appState: () => AppState.currentState,
+        finish: cancelCapture,
+      }),
+    [seq, cancelCapture],
+  );
+
+  const onNoteStateChange = useCallback(
+    (note: { editing: boolean; text: string }) => {
+      setNoteOpen(note.editing);
+      setNoteText(note.text);
+    },
+    [],
+  );
 
   // Reveal the demoted search field (autofocus happens only once revealed).
   const onRevealSearch = useCallback(() => {
@@ -580,8 +701,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     </Pressable>
   );
 
-  // Empty-payload defensive branch: nothing usable to save → error state + Close.
-  if (payload.displayText === null && payload.url === null) {
+  // Empty-payload defensive branch: no snapshot yet, or a share that resolves
+  // to nothing (c10). Reads the snapshot, so a background reset never lands here.
+  const viewPayload = captureViewPayload(snapshot);
+  if (viewPayload === null) {
     return (
       <View testID="capture-picker-root" style={styles.errorRoot}>
         <Text
@@ -620,8 +743,6 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         >
           Save to…
         </Text>
-        {/* Search reveal — icon-only, keyboard stays CLOSED (NOT autofocused) until
-            tapped: the field below autofocuses only once revealed (CAP-01). */}
         <Pressable
           testID="capture-search-reveal"
           accessibilityRole="button"
@@ -633,7 +754,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         </Pressable>
       </View>
 
-      {/* Payload preview strip — WHAT is being filed, before WHO. */}
+      {/* Payload preview strip — WHAT is being filed, before WHO (the snapshot). */}
       <View
         testID="capture-payload-preview"
         style={[
@@ -648,21 +769,18 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           numberOfLines={1}
           style={[styles.previewText, { color: colors.textPrimary }]}
         >
-          {payload.displayText ?? payload.url}
+          {viewPayload.displayText ?? viewPayload.url}
         </Text>
-        {payload.url ? (
+        {viewPayload.url ? (
           <Text
             numberOfLines={1}
             style={[styles.previewHost, { color: colors.textSecondary }]}
           >
-            {hostOf(payload.url)}
+            {hostOf(viewPayload.url)}
           </Text>
         ) : null}
       </View>
 
-      {/* Revealed search field — hidden until the reveal is tapped; autofocuses ONLY
-          when revealed so the keyboard never opens on the fast path. Live-filters the
-          grid by name; the ✕ clears the query and restores the full grid. */}
       {searchOpen ? (
         <View style={styles.searchFieldRow}>
           <TextInput
@@ -695,13 +813,6 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     </View>
   );
 
-  // WR-01: the grid is inert once a write is in flight (`committing`) OR a commit has
-  // already landed (`savedLabel !== null`) — the confirmation surface + auto-return
-  // own the screen after a successful commit, so no further pick is allowed until
-  // return. This closes the ~1.5s window where a stray tap on a DIFFERENT face would
-  // otherwise write a second wrong-contact share row.
-  const locked = committing || savedLabel !== null;
-
   const renderItem = ({ item }: { item: GridItem }) => {
     if (item.kind === "new") {
       return (
@@ -709,8 +820,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           testID="capture-new-contact-tile"
           accessibilityRole="button"
           accessibilityLabel="New contact"
-          accessibilityState={{ disabled: locked || multiSelect }}
-          disabled={locked || multiSelect}
+          accessibilityState={{ disabled: listLocked || multiSelect }}
+          disabled={listLocked || multiSelect}
           onPress={onOpenInlineCreate}
           style={[styles.tile, styles.newTile, { borderColor: colors.accent }]}
         >
@@ -738,8 +849,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         accessibilityLabel={
           multiSelect ? `Select ${row.name}` : `Save to ${row.name}`
         }
-        accessibilityState={{ disabled: locked, selected: isSelected }}
-        disabled={locked}
+        accessibilityState={{ disabled: listLocked, selected: isSelected }}
+        disabled={listLocked}
         onPress={() => (multiSelect ? onToggleFace(row) : void onPickFace(row))}
         onLongPress={() => onLongPressFace(row)}
         style={[
@@ -779,7 +890,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   const doneDisabled = selected.size === 0 || committing;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onLayout={onRootLayout}>
       <FlatList
         testID="capture-picker-root"
         data={data}
@@ -789,20 +900,25 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         }
         numColumns={3}
         columnWrapperStyle={styles.column}
-        contentContainerStyle={styles.grid}
+        contentContainerStyle={[
+          styles.grid,
+          { paddingBottom: bottomOffset + 64 },
+        ]}
         ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled"
+        extraData={rowsLoading}
       />
 
-      {/* Multi-select "Done · N" bar — overlays the grid while in multi-select. B3:
-          disabled at zero selection (dimmed + accessibilityState), and the handler
-          guards `selected.size === 0` before writing. */}
-      {multiSelect ? (
+      {multiSelect && card === null ? (
         <View
           testID="capture-multiselect-bar"
           style={[
             styles.multiBar,
-            { backgroundColor: colors.accent, opacity: doneDisabled ? 0.5 : 1 },
+            {
+              bottom: bottomOffset,
+              backgroundColor: colors.accent,
+              opacity: doneDisabled ? 0.5 : 1,
+            },
           ]}
         >
           <Pressable
@@ -821,17 +937,16 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         </View>
       ) : null}
 
-      {/* Inline name-only create sheet (CAP-04) — a single autofocused name field +
-          "Create & save". A7: submit is DISABLED at trim-length 0 (and the handler
-          guards again) so a blank name never reaches createContactAndShare. On submit
-          a never-contacted contact is created and the share saved to it — NO
-          "add detail now?" prompt (detail is refined later on the profile). */}
       {inlineOpen ? (
         <View
           testID="capture-inline-create"
           style={[
             styles.inlineSurface,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+            {
+              bottom: bottomOffset,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
           ]}
         >
           <TextInput
@@ -878,99 +993,21 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
         </View>
       ) : null}
 
-      {/* Confirmation + optional-note surface — the "Saved to …" toast and, until
-          the note is opened, the "Add a note" affordance (which cancels the
-          auto-return). Once opened, the multiline note field + Done/Skip replace the
-          affordance; Done recomposes the written row(s)' display text to `note —
-          base` (url untouched), keyed by id + contactId. setState + setTimeout only,
-          never a per-frame animation. */}
-      {savedLabel !== null && writtenRows.length > 0 ? (
-        <View
-          style={[
-            styles.confirmSurface,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text
-            testID="capture-confirmation-toast"
-            style={[styles.confirmText, { color: colors.textPrimary }]}
-          >
-            {savedLabel}
-          </Text>
-
-          {noteOpen ? (
-            <View style={styles.noteBlock}>
-              <TextInput
-                testID="capture-note-input"
-                multiline
-                value={noteText}
-                onChangeText={setNoteText}
-                placeholder={
-                  'Add your words — e.g. "for Dad, he asked about this"'
-                }
-                placeholderTextColor={colors.textPlaceholder}
-                style={[
-                  styles.noteInput,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                    color: colors.textPrimary,
-                  },
-                ]}
-              />
-              <View style={styles.noteActions}>
-                <Pressable
-                  testID="capture-note-skip"
-                  accessibilityRole="button"
-                  accessibilityLabel="Skip note"
-                  onPress={onNoteSkip}
-                  style={styles.noteSkip}
-                >
-                  <Text
-                    style={[
-                      styles.noteSkipText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    Skip
-                  </Text>
-                </Pressable>
-                <Pressable
-                  testID="capture-note-done"
-                  accessibilityRole="button"
-                  accessibilityLabel="Save note"
-                  accessibilityState={{ disabled: committing }}
-                  disabled={committing}
-                  onPress={() => void onNoteDone()}
-                  style={styles.noteDone}
-                >
-                  <Text
-                    style={[styles.noteDoneText, { color: colors.accentText }]}
-                  >
-                    Done
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <Pressable
-              testID="capture-note-affordance"
-              accessibilityRole="button"
-              accessibilityLabel="Add a note"
-              onPress={onAddNote}
-              style={styles.noteAffordance}
-            >
-              <Text
-                style={[
-                  styles.noteAffordanceText,
-                  { color: colors.accentText },
-                ]}
-              >
-                Add a note
-              </Text>
-            </Pressable>
-          )}
-        </View>
+      {/* The confirmation card (D-77): the share is already saved. Keyed on the
+          share sequence, so a new share remounts it fresh (c3). */}
+      {card !== null ? (
+        <ShareConfirmationCard
+          key={seq}
+          ref={cardRef}
+          rows={card.rows}
+          createdContactId={card.createdContactId}
+          contactNames={card.names}
+          actions={cardActions}
+          onAutoClose={onAutoClose}
+          onDone={cancelCapture}
+          onNoteStateChange={onNoteStateChange}
+          bottomOffset={bottomOffset}
+        />
       ) : null}
     </View>
   );
@@ -1101,7 +1138,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    bottom: 16,
     borderRadius: 12,
     minHeight: 44,
     justifyContent: "center",
@@ -1127,70 +1163,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
   },
-  confirmSurface: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-    flexDirection: "column",
-    alignItems: "stretch",
-  },
-  confirmText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  noteAffordance: {
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  noteAffordanceText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  noteBlock: {
-    gap: 12,
-  },
-  noteInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    fontWeight: "400",
-    minHeight: 88,
-    textAlignVertical: "top",
-  },
-  noteActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 16,
-  },
-  noteSkip: {
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  noteSkipText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  noteDone: {
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  noteDoneText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
   inlineSurface: {
     position: "absolute",
     left: 16,
     right: 16,
-    bottom: 16,
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
