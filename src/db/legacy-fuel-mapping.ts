@@ -282,6 +282,22 @@ export function allocatedLegacyUid(
 }
 
 /**
+ * The Last Talked About value for a legacy `recent` row (D-56 as amended by
+ * D-128): "<label>: <text>" with both parts trimmed when both are non-blank,
+ * else the first non-blank of (text, label, url) as stored. Migration 033
+ * carries a frozen copy of this rule.
+ */
+export function legacyLastTalkedAboutValue(
+  row: Pick<LegacyFuelRowInput, "label" | "text" | "url">,
+): string {
+  if (!isBlank(row.label) && !isBlank(row.text)) {
+    return `${(row.label as string).trim()}: ${(row.text as string).trim()}`;
+  }
+  // Non-null: a contentless row never reaches the recent branch.
+  return firstNonBlank(row.text, row.label, row.url) as string;
+}
+
+/**
  * Map one legacy row to its new home (D-56, D-97, D-108, RESEARCH 1.5).
  *
  * - off_limits -> off_limits: label, text and url as-is; `fromShare` 1 when
@@ -290,9 +306,11 @@ export function allocatedLegacyUid(
  *   general / general: value = first non-blank of (text, url), custom label =
  *   label when non-blank, url as-is, provenance `share` for a share else
  *   `user`, Allow AI off (D-56).
- * - recent -> current_state_entries as Last Talked About: value = first
- *   non-blank of (text, label, url), url as-is, entry date by
- *   `legacyEntryDate`, no entry time (D-48).
+ * - recent -> current_state_entries as Last Talked About: value =
+ *   "<label>: <text>" (both trimmed) when label and text are both non-blank
+ *   (D-128, so the label is not lost), else the first non-blank of (text,
+ *   label, url); url as-is, entry date by `legacyEntryDate`, no entry time
+ *   (D-48).
  * - contentless non-off_limits rows -> `none` (D-97).
  *
  * The uid, created_at and modified_at are kept (RESEARCH 1.4), except that a
@@ -332,8 +350,7 @@ export function mapLegacyFuelRow(
       home: "current_state",
       uid,
       fieldKey: "last_talked_about",
-      // Non-null: a contentless row never reaches this branch.
-      value: firstNonBlank(row.text, row.label, row.url) as string,
+      value: legacyLastTalkedAboutValue(row),
       url: row.url ?? null,
       entryDate: legacyEntryDate(row.createdAt, row.modifiedAt, options.now),
       entryTime: null,

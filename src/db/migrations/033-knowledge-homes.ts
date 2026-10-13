@@ -226,6 +226,23 @@ function firstNonBlankFrozen(...candidates: (string | null)[]): string | null {
   return null;
 }
 
+/**
+ * Frozen Last Talked About value for a legacy `recent` row (D-56 as amended by
+ * D-128): "<label>: <text>" with both parts trimmed when both are non-blank,
+ * else the first non-blank of (text, label, url) as stored.
+ */
+function lastTalkedAboutValueFrozen(row: {
+  label: string | null;
+  text: string | null;
+  url: string | null;
+}): string | null {
+  const { label, text } = row;
+  if (label !== null && text !== null && !blank(label) && !blank(text)) {
+    return `${label.trim()}: ${text.trim()}`;
+  }
+  return firstNonBlankFrozen(row.text, row.label, row.url);
+}
+
 function datePrefixFrozen(value: string): string | null {
   const prefix = value.slice(0, 10);
   return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(prefix) ? prefix : null;
@@ -555,7 +572,7 @@ export async function applyMigration033(
     }
 
     if (home === "current_state_entries") {
-      const value = firstNonBlankFrozen(row.text, row.label, row.url);
+      const value = lastTalkedAboutValueFrozen(row);
       const entryDate = entryDateFrozen(
         row.created_at,
         row.modified_at,

@@ -13,6 +13,7 @@ import {
   type LegacyFuelRowInput,
   type LegacyUidAllocation,
   legacyEntryDate,
+  legacyLastTalkedAboutValue,
   mapLegacyFuelRow,
   remintLegacyUid,
 } from "@/db/legacy-fuel-mapping";
@@ -172,6 +173,29 @@ describe("mapLegacyFuelRow — kinds and sources (D-56, D-108)", () => {
         OPTS,
       ),
     ).toMatchObject({ value: "only-url", fromShare: 0 });
+  });
+
+  it("D-128: a recent row with both label and text keeps the label as '<label>: <text>' (trimmed)", () => {
+    expect(
+      mapLegacyFuelRow(
+        row({ kind: "recent", label: "  Work ", text: " new job  ", url: "U" }),
+        OPTS,
+      ),
+    ).toMatchObject({
+      home: "current_state",
+      value: "Work: new job",
+      url: "U",
+    });
+    // Text alone keeps the text as stored; label alone keeps the label.
+    expect(
+      mapLegacyFuelRow(row({ kind: "recent", label: " ", text: " Hi " }), OPTS),
+    ).toMatchObject({ value: " Hi " });
+    expect(
+      mapLegacyFuelRow(row({ kind: "recent", label: "Lbl", text: "  " }), OPTS),
+    ).toMatchObject({ value: "Lbl" });
+    expect(
+      legacyLastTalkedAboutValue({ label: "A", text: "B", url: null }),
+    ).toBe("A: B");
   });
 
   it("D-97: a contentless off_limits row is kept; any other contentless kind maps to none", () => {
@@ -387,6 +411,12 @@ describe("migration 033 pin", () => {
       row({ uid: "gift-label", kind: "gift", text: null, label: "Only" }),
       row({ uid: "odd", kind: "whatever" }),
       row({ uid: "recent", kind: "recent", text: null, label: "Lbl" }),
+      row({
+        uid: "recent-labelled",
+        kind: "recent",
+        label: " Work ",
+        text: " new job ",
+      }),
       row({
         uid: "recent-odd",
         kind: "recent",

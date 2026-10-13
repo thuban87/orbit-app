@@ -281,6 +281,14 @@ describe("migration 033 — legacy rows by kind and source (D-56, D-108)", () =>
         source: "share",
       },
       { uid: "recent-url", kind: "recent", url: "https://x.test/url-only" },
+      // D-128: label and text both present -> "<label>: <text>", trimmed.
+      {
+        uid: "recent-labelled",
+        kind: "recent",
+        label: "  Work ",
+        text: " new job  ",
+        url: "https://x.test/job",
+      },
       {
         uid: "recent-odd",
         kind: "recent",
@@ -405,6 +413,20 @@ describe("migration 033 — legacy rows by kind and source (D-56, D-108)", () =>
       ),
     ).toEqual([
       {
+        uid: "recent-labelled",
+        field_key: "last_talked_about",
+        value: "Work: new job",
+        entry_date: "2026-08-01",
+        entry_time: null,
+        url: "https://x.test/job",
+        interaction_id: null,
+        link_source: null,
+        group_note_copy: 0,
+        from_share: 0,
+        created_at: "2026-08-01 09:00:00",
+        modified_at: "2026-08-02 10:00:00",
+      },
+      {
         uid: "recent-odd",
         field_key: "last_talked_about",
         value: "Odd created",
@@ -463,7 +485,7 @@ describe("migration 033 — legacy rows by kind and source (D-56, D-108)", () =>
       {
         uid: "recent-user",
         field_key: "last_talked_about",
-        value: "Talked about the move",
+        value: "Lbl: Talked about the move",
         entry_date: "2026-07-04",
         entry_time: null,
         url: null,

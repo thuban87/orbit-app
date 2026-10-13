@@ -155,6 +155,15 @@ const LEGACY_ROWS: LegacySeed[] = [
     label: "Label only",
     source: "user",
   },
+  // D-128: label and text both present -> "<label>: <text>", trimmed.
+  {
+    uid: "recent-labelled",
+    contact: "alex",
+    kind: "recent",
+    label: " Work ",
+    text: "new job ",
+    source: "user",
+  },
   {
     uid: "recent-url",
     contact: "bea",
@@ -642,6 +651,12 @@ describe("migration 033 and the v7 converter agree (RESEARCH 1.4)", () => {
     );
     expect(a.currentState).toContainEqual(
       expect.objectContaining({ uid: "recent-share", from_share: 1 }),
+    );
+    expect(a.currentState).toContainEqual(
+      expect.objectContaining({
+        uid: "recent-labelled",
+        value: "Work: new job",
+      }),
     );
     // The collided legacy tombstone lands under the re-minted memory uid only.
     expect(a.tombstones).toEqual(
