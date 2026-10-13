@@ -4,6 +4,7 @@ import type {
   AiPermissionItem,
   AiPermissionRef,
 } from "@/db/ai-permissions-dao";
+import { aiLockReason } from "@/logic/ai-lock";
 import { plural } from "@/utils/plural";
 
 export type AiPermissionTypeFilter = "all" | AiPermissionCategory;
@@ -211,23 +212,32 @@ export function permissionGroupA11yLabel(
 /**
  * An item row's accessibility label (38.4 review Lane D WR-03): its label and
  * value, then its AI access state, which the visible Enabled/Disabled caption
- * shows and an explicit label would otherwise hide. Selection is announced by
- * the row's checkbox state.
+ * shows and an explicit label would otherwise hide. A locked item (38.10
+ * D-102, D-103) also announces its lock reason, which the row shows. Selection
+ * is announced by the row's checkbox state.
  */
 export function permissionItemA11yLabel(item: AiPermissionItem): string {
+  const lock = item.locked ? `. ${aiLockReason(item.locked)}` : "";
   return `${item.label}: ${item.value}, ${
     item.enabled === 1 ? "Enabled, AI can access" : "Disabled, AI can't access"
-  }`;
+  }${lock}`;
 }
 
-/** Convert selected display rows to unique permission-owning row references. */
+/**
+ * Convert selected display rows to unique permission-owning row references.
+ * For an Enable action a locked item (a Group Note copy, D-102; a note moved to
+ * Off Limits, D-103) is dropped: it can never be turned on. Disable keeps
+ * every selected item. The DAO also clamps locked refs to 0 (plan 10).
+ */
 export function selectedPermissionRefs(
   items: readonly AiPermissionItem[],
   selectedItemKeys: ReadonlySet<string>,
+  action: "enable" | "disable" = "disable",
 ): AiPermissionRef[] {
   const refs = new Map<string, AiPermissionRef>();
   for (const item of items) {
     if (!selectedItemKeys.has(item.itemKey)) continue;
+    if (action === "enable" && item.locked !== null) continue;
     refs.set(`${item.category}:${item.id}`, {
       category: item.category,
       id: item.id,

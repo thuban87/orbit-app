@@ -4,8 +4,14 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { readInteractionForEdit } from "@/db/interaction-edit-read";
+import {
+  blankNoteBlockedBy,
+  readInteractionForEdit,
+  readOwnNoteLinkedSection,
+} from "@/db/interaction-edit-read";
+import type { LinkedEntry } from "@/db/linked-entry-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { recordTouchpointWithLinkedEntry } from "@/db/recency-dao";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -102,7 +108,23 @@ describe("readInteractionForEdit — contact-scoped single-row load for editing"
       note: "quick call about the trip",
       duration: 900,
       allowAi: 1,
+      noteAiLocked: 0,
     });
+  });
+
+  it("reports a note moved into Off Limits as AI-locked (38.10 D-103)", async () => {
+    const contactId = await contact();
+    const id = await interaction(contactId, { allowAi: 0 });
+    expect(
+      (await readInteractionForEdit(readOnly(), contactId, id))?.noteAiLocked,
+    ).toBe(0);
+    await exec.runAsync(
+      "UPDATE interactions SET note_ai_locked = 1 WHERE id = ?",
+      [id],
+    );
+    expect(
+      (await readInteractionForEdit(readOnly(), contactId, id))?.noteAiLocked,
+    ).toBe(1);
   });
 
   it("reads a null note, null duration, and allow_ai=0 back faithfully", async () => {
@@ -143,5 +165,88 @@ describe("readInteractionForEdit — contact-scoped single-row load for editing"
       getAllAsync: exec.getAllAsync.bind(exec),
     };
     expect(await readInteractionForEdit(ro, contactId, id)).not.toBeNull();
+  });
+});
+
+function entry(
+  interactionId: number,
+  linkSource: LinkedEntry["linkSource"],
+  section: LinkedEntry["section"] = "gift_idea",
+): LinkedEntry {
+  return {
+    table:
+      section === "last_talked_about" ? "current_state_entries" : "memories",
+    id: interactionId * 10,
+    contactId: 1,
+    interactionId,
+    linkSource,
+    section,
+    label: section,
+  };
+}
+
+describe("blankNoteBlockedBy — own-note links only (Research Q4; checker cycle 5 W-4; D-113)", () => {
+  it("a blank participant note with only a Group Note copy is not blocked", () => {
+    expect(
+      blankNoteBlockedBy([entry(7, "group_note")], { interactionId: 7 }),
+    ).toBeNull();
+  });
+
+  it("a blank participant note with a note link is blocked, naming its section", () => {
+    expect(
+      blankNoteBlockedBy(
+        [
+          entry(7, "group_note", "memory"),
+          entry(7, "note", "last_talked_about"),
+        ],
+        { interactionId: 7 },
+      ),
+    ).toBe("last_talked_about");
+  });
+
+  it("a blank own note with only group_note entries for that interaction is not blocked", () => {
+    expect(
+      blankNoteBlockedBy(
+        [entry(7, "group_note", "memory"), entry(7, "group_note", "gift_idea")],
+        { interactionId: 7 },
+      ),
+    ).toBeNull();
+  });
+
+  it("another interaction's note link never blocks this one", () => {
+    expect(
+      blankNoteBlockedBy([entry(8, "note")], { interactionId: 7 }),
+    ).toBeNull();
+    expect(blankNoteBlockedBy([], { interactionId: 7 })).toBeNull();
+  });
+});
+
+describe("readOwnNoteLinkedSection — the edit screens' pre-check read", () => {
+  it("returns the section of the interaction's own linked note, else null", async () => {
+    const contactId = await contact();
+    const plain = await interaction(contactId);
+    expect(await readOwnNoteLinkedSection(readOnly(), plain)).toBeNull();
+
+    const { interactionId } = await recordTouchpointWithLinkedEntry(
+      exec,
+      {
+        contactId,
+        uid: uid(),
+        occurredAt: "2026-09-01 09:30:00",
+        now: NOW,
+        channel: "Call",
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        note: "Loves kites",
+        duration: null,
+        allowAi: 0,
+        source: "manual",
+      },
+      "gift_idea",
+    );
+    expect(await readOwnNoteLinkedSection(readOnly(), interactionId)).toBe(
+      "gift_idea",
+    );
   });
 });

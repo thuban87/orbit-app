@@ -96,3 +96,14 @@ export function addedNoteSnackbar(input: {
   const whom = input.personName ? ` for ${input.personName}` : "";
   return `Added note${whom}${alsoSavedSuffix(input.section)}`;
 }
+
+/**
+ * The inline error under a note that is also saved to a section when it is
+ * cleared to blank (Research Q4; the edit screens). Copy from the plan; the
+ * no-section fallback (the DAO refused but the section could not be read) is
+ * proposed wording, reviewed in plan 19.
+ */
+export function linkedNoteBlankMessage(section: LinkedSection | null): string {
+  const where = section === null ? "another section" : alsoSaveToLabel(section);
+  return `This note is also saved to ${where}. Keep some text, or remove it there first.`;
+}

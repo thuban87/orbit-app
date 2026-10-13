@@ -615,3 +615,67 @@ describe("AI permission accessibility labels (Lane D WR-03)", () => {
     );
   });
 });
+
+describe("locked items in the review list (38.10 D-102, D-103)", () => {
+  const GROUP_COPY: AiPermissionItem = {
+    category: "memory",
+    id: 4,
+    itemKey: "memory:4",
+    contactId: 10,
+    contactUid: "alex",
+    contactName: "Alex",
+    label: "Gift Ideas",
+    value: "Kite",
+    enabled: 0,
+    locked: "group_note",
+  };
+  const OFF_LIMITS_NOTE: AiPermissionItem = {
+    category: "interaction-note",
+    id: 5,
+    itemKey: "interaction-note:5",
+    contactId: 10,
+    contactUid: "alex",
+    contactName: "Alex",
+    label: "Interaction note",
+    value: "Private",
+    enabled: 0,
+    locked: "off_limits",
+  };
+  const ALL = [...ITEMS, GROUP_COPY, OFF_LIMITS_NOTE];
+  const selected = new Set([
+    "memory:1",
+    "interaction-note:2",
+    "memory:4",
+    "interaction-note:5",
+  ]);
+
+  it("Enable selected never includes a locked item", () => {
+    expect(selectedPermissionRefs(ALL, selected, "enable")).toEqual([
+      { category: "memory", id: 1 },
+      { category: "interaction-note", id: 2 },
+    ]);
+    expect(
+      selectedPermissionRefs(ALL, new Set(["memory:4"]), "enable"),
+    ).toEqual([]);
+  });
+
+  it("Disable stays possible for a locked item", () => {
+    expect(selectedPermissionRefs(ALL, selected, "disable")).toEqual([
+      { category: "memory", id: 1 },
+      { category: "interaction-note", id: 2 },
+      { category: "memory", id: 4 },
+      { category: "interaction-note", id: 5 },
+    ]);
+    // The default action keeps every selected item (Disable).
+    expect(selectedPermissionRefs(ALL, selected)).toHaveLength(4);
+  });
+
+  it("a locked row announces it is AI-off and why", () => {
+    expect(permissionItemA11yLabel(GROUP_COPY)).toBe(
+      "Gift Ideas: Kite, Disabled, AI can't access. Group Notes are never shared with AI.",
+    );
+    expect(permissionItemA11yLabel(OFF_LIMITS_NOTE)).toBe(
+      "Interaction note: Private, Disabled, AI can't access. Moved to Off Limits, so AI stays off.",
+    );
+  });
+});

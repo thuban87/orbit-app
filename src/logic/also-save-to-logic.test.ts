@@ -8,6 +8,7 @@ import {
   alsoSaveToLabel,
   canAlsoSave,
   effectiveAlsoSaveTo,
+  linkedNoteBlankMessage,
   loggedInteractionSnackbar,
 } from "./also-save-to-logic";
 
@@ -119,6 +120,17 @@ describe("snackbar copy (38.9 D-39, D-46)", () => {
     ).toBe("Added note for Ann Lee, also saved to Gift Ideas");
     expect(addedNoteSnackbar({ personName: null, section: null })).toBe(
       "Added note",
+    );
+  });
+});
+
+describe("linkedNoteBlankMessage (Research Q4)", () => {
+  it("names the section the note is also saved to", () => {
+    expect(linkedNoteBlankMessage("last_talked_about")).toBe(
+      "This note is also saved to Last Talked About. Keep some text, or remove it there first.",
+    );
+    expect(linkedNoteBlankMessage(null)).toBe(
+      "This note is also saved to another section. Keep some text, or remove it there first.",
     );
   });
 });

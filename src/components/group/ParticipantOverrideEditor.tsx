@@ -59,6 +59,12 @@ interface ParticipantOverrideEditorProps {
   participant: GroupEventParticipant;
   draft: ParticipantEditDraft;
   onChange: (draft: ParticipantEditDraft) => void;
+  /**
+   * 38.10 Research Q4: the inline error under the participant's note (a linked
+   * own note cleared to blank). Passed straight to the form; absent or null
+   * renders nothing.
+   */
+  noteError?: string | null;
 }
 
 const FOLLOW_FIELDS = [
@@ -72,6 +78,7 @@ export function ParticipantOverrideEditor({
   participant,
   draft,
   onChange,
+  noteError,
 }: ParticipantOverrideEditorProps) {
   const { colors } = useTheme();
 
@@ -108,6 +115,7 @@ export function ParticipantOverrideEditor({
         value={draft.value}
         onChange={changeValue}
         now={event.occurredAt}
+        noteError={noteError}
         visibleFields={[
           "channel",
           "direction",

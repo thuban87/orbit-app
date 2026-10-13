@@ -32,6 +32,7 @@ import {
   setAiPermissionDefault,
 } from "@/db/ai-permissions-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { aiLockReason } from "@/logic/ai-lock";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -220,8 +221,14 @@ export function AIPermissionsScreen() {
     () => visibleSelectedKeys(filtered, expandedContact, selected),
     [expandedContact, filtered, selected],
   );
-  const refs = useMemo(
+  // Disable acts on every visible selected row; Enable never includes a locked
+  // one (38.10 D-102, D-103).
+  const selectedRefs = useMemo(
     () => selectedPermissionRefs(filtered, visibleSelected),
+    [filtered, visibleSelected],
+  );
+  const enableRefs = useMemo(
+    () => selectedPermissionRefs(filtered, visibleSelected, "enable"),
     [filtered, visibleSelected],
   );
 
@@ -257,10 +264,10 @@ export function AIPermissionsScreen() {
   }
 
   async function requestEnable() {
-    if (refs.length === 0) return;
+    if (enableRefs.length === 0) return;
     setActionError(null);
     try {
-      const impact = await getBulkPermissionImpact(getExecutor(), refs);
+      const impact = await getBulkPermissionImpact(getExecutor(), enableRefs);
       setPendingAction({ kind: "enable", impact });
     } catch (caught) {
       Logger.error(
@@ -273,6 +280,7 @@ export function AIPermissionsScreen() {
   }
 
   async function applyPending() {
+    const refs = pendingAction?.kind === "enable" ? enableRefs : selectedRefs;
     if (!pendingAction || refs.length === 0 || busy) return;
     setBusy(true);
     setActionError(null);
@@ -467,6 +475,14 @@ export function AIPermissionsScreen() {
                                     >
                                       {item.value}
                                     </AppText>
+                                    {item.locked ? (
+                                      <AppText
+                                        role="caption"
+                                        style={{ color: scoped.textSecondary }}
+                                      >
+                                        {aiLockReason(item.locked)}
+                                      </AppText>
+                                    ) : null}
                                   </View>
                                   <AppText
                                     role="caption"
@@ -507,7 +523,7 @@ export function AIPermissionsScreen() {
                 <Button
                   role="primary"
                   label="Enable selected"
-                  disabled={busy}
+                  disabled={busy || enableRefs.length === 0}
                   onPress={() => void requestEnable()}
                 />
               </View>

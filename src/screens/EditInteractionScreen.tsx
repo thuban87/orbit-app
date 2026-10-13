@@ -24,6 +24,14 @@
  * `Save changes` action, and a discard-keep guard for unsaved edits (the header
  * Back calls goBack, which the guard intercepts).
  *
+ * LINKED NOTES (38.10 Research Q4, D-37): clearing a note that is also saved to
+ * a section is refused with an inline `FieldError` under the note naming the
+ * section, and nothing is saved. The pre-check reads the interaction's own
+ * `note` links inside the guarded save (after `beginInFlight`, checker I8); the
+ * DAO's `LinkedNoteBlankError` maps to the same error, so the rule fails
+ * closed. A note moved into Off Limits shows its Allow AI switch locked off
+ * with the reason (D-103; the DAO clamps anyway).
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,10 +41,24 @@ import {
   TouchpointRefineForm,
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
+import {
+  clearFieldError,
+  type FieldErrors,
+  toFieldErrors,
+} from "@/components/ui/field-error-logic";
 import { getExecutor, localDateTime } from "@/db/database";
-import { readInteractionForEdit } from "@/db/interaction-edit-read";
+import {
+  readInteractionForEdit,
+  readOwnNoteLinkedSection,
+} from "@/db/interaction-edit-read";
+import { LinkedNoteBlankError } from "@/db/linked-entry-dao";
 import { editTouchpointFull } from "@/db/recency-dao";
 import { useContactHeader } from "@/hooks/use-contact-header";
+import { aiLockReason } from "@/logic/ai-lock";
+import {
+  canAlsoSave,
+  linkedNoteBlankMessage,
+} from "@/logic/also-save-to-logic";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -70,6 +92,10 @@ export function EditInteractionScreen({
   // reads this ref to hold Back while the save runs (fix-pass WR-02).
   const savingRef = useRef(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Inline field errors (38.9 D-19): the note's linked-blank refusal (Q4).
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // D-103: the note was moved into Off Limits, so AI stays off for good.
+  const [noteAiLocked, setNoteAiLocked] = useState(false);
   // The seeded snapshot — the dirty-check baseline for the discard-keep guard.
   const seedRef = useRef<string | null>(null);
   const bypassRef = useRef(false);
@@ -92,6 +118,7 @@ export function EditInteractionScreen({
       }
       const seeded = seedRefineValue(loaded);
       seedRef.current = JSON.stringify(seeded);
+      setNoteAiLocked(loaded.noteAiLocked === 1);
       setValue(seeded);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load interaction for edit", err);
@@ -131,6 +158,22 @@ export function EditInteractionScreen({
     setSaving(true);
     setSaveError(null);
     try {
+      // Q4 pre-check, inside the guarded save (checker I8): a blank note that
+      // is also saved to a section is refused under the field, not saved.
+      if (!canAlsoSave(value.note)) {
+        const section = await readOwnNoteLinkedSection(
+          getExecutor(),
+          interactionId,
+        );
+        if (section !== null) {
+          setFieldErrors(
+            toFieldErrors([
+              { field: "note", message: linkedNoteBlankMessage(section) },
+            ]),
+          );
+          return;
+        }
+      }
       const writeNow = localDateTime();
       // The SOLE recency writer — one transaction, future-date guard, recompute.
       await editTouchpointFull(
@@ -145,6 +188,19 @@ export function EditInteractionScreen({
     } catch (err) {
       // Failure preserves the full form state and never completes (never
       // navigates) — the user corrects and retries in place.
+      if (err instanceof LinkedNoteBlankError) {
+        // The DAO's own refusal (fails closed): the same error under the note.
+        const section = await readOwnNoteLinkedSection(
+          getExecutor(),
+          interactionId,
+        ).catch(() => null);
+        setFieldErrors(
+          toFieldErrors([
+            { field: "note", message: linkedNoteBlankMessage(section) },
+          ]),
+        );
+        return;
+      }
       Logger.error(LOG_SCOPE, "failed to save interaction edit", err);
       setSaveError(resolveSave(value, false).error);
     } finally {
@@ -198,8 +254,18 @@ export function EditInteractionScreen({
         <TouchpointRefineForm
           testID="edit-interaction-form"
           value={value}
-          onChange={setValue}
+          onChange={(next) => {
+            // Editing the note clears its error (38.9 D-19).
+            if (next.note !== value.note) {
+              setFieldErrors((errors) => clearFieldError(errors, "note"));
+            }
+            setValue(next);
+          }}
           now={now}
+          noteError={fieldErrors.note ?? null}
+          allowAiLockedReason={
+            noteAiLocked ? aiLockReason("off_limits") : undefined
+          }
         />
 
         {saveError ? (

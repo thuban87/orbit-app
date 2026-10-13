@@ -1,5 +1,17 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button and AppText use a
 // domain-specific semantic `role` prop, not a web ARIA role.
+/**
+ * Edit Event. 38.10:
+ * - The Group Note is NOT pre-checked (D-113; convergence c1 F-U13): clearing
+ *   it saves through the normal event save, and the DAO detaches its copies
+ *   in the same transaction. No error, confirm or message for it.
+ * - The per-participant editor refuses clearing a participant's OWN note while
+ *   it is also saved to a section (Research Q4; checker cycle 2 W-13): an
+ *   inline error under the note, inside the Sheet (docs/systems/
+ *   ux-standards.md "Validation errors inside a sheet render inline"). Its
+ *   "Save participant" is single-flight on its own ref (38.9 standards via
+ *   D-19; convergence c11, Claude C-10).
+ */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,6 +31,11 @@ import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantShee
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { TouchpointRefineForm } from "@/components/TouchpointRefineForm";
 import { AppText, Button, Sheet } from "@/components/ui";
+import {
+  clearFieldError,
+  type FieldErrors,
+  toFieldErrors,
+} from "@/components/ui/field-error-logic";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addParticipants,
@@ -31,7 +48,13 @@ import {
   type GroupEventParticipant,
   readGroupEventDetail,
 } from "@/db/group-events-read";
+import { readOwnNoteLinkedSection } from "@/db/interaction-edit-read";
+import { LinkedNoteBlankError } from "@/db/linked-entry-dao";
 import { newUid } from "@/db/uid";
+import {
+  canAlsoSave,
+  linkedNoteBlankMessage,
+} from "@/logic/also-save-to-logic";
 import {
   buildParticipantFieldPatch,
   buildParticipantFollowPatch,
@@ -84,6 +107,14 @@ export function EditGroupEventScreen({
   const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const bypassRef = useRef(false);
+  // "Save participant" single-flight (convergence c11, Claude C-10; this plan
+  // only): its own ref, separate from the event save's `savingRef`, mirrored
+  // in state for the disabled look.
+  const participantSavingRef = useRef(false);
+  const [participantSaving, setParticipantSaving] = useState(false);
+  // Inline errors in the participant Sheet (Research Q4; 38.9 D-19).
+  const [participantFieldErrors, setParticipantFieldErrors] =
+    useState<FieldErrors>({});
 
   // Mount-only seed: the ONE path that sets the draft and its baseline (D-17).
   useEffect(() => {
@@ -233,10 +264,29 @@ export function EditGroupEventScreen({
 
   async function saveParticipant() {
     if (!editing || !participantDraftState || !event) return;
+    if (!beginInFlight(participantSavingRef)) return;
+    setParticipantSaving(true);
     const initial = participantDraft(editing, event);
     const draftParticipant = participantDraftState;
     setError(null);
     try {
+      // Q4 pre-check, inside the guarded save: the participant's own note,
+      // blank while also saved to a section, is refused under the field. A
+      // Group Note copy never blocks (D-113).
+      if (!canAlsoSave(draftParticipant.value.note)) {
+        const section = await readOwnNoteLinkedSection(
+          getExecutor(),
+          editing.interactionId,
+        );
+        if (section !== null) {
+          setParticipantFieldErrors(
+            toFieldErrors([
+              { field: "note", message: linkedNoteBlankMessage(section) },
+            ]),
+          );
+          return;
+        }
+      }
       await saveParticipantEdits(getExecutor(), {
         interactionId: editing.interactionId,
         contactId: editing.contactId,
@@ -247,9 +297,26 @@ export function EditGroupEventScreen({
       });
       setEditing(null);
       setParticipantDraftState(null);
+      setParticipantFieldErrors({});
       void refreshEvent();
-    } catch {
+    } catch (err) {
+      if (err instanceof LinkedNoteBlankError) {
+        // The DAO's own refusal (fails closed): the same error under the note.
+        const section = await readOwnNoteLinkedSection(
+          getExecutor(),
+          editing.interactionId,
+        ).catch(() => null);
+        setParticipantFieldErrors(
+          toFieldErrors([
+            { field: "note", message: linkedNoteBlankMessage(section) },
+          ]),
+        );
+        return;
+      }
       setError("Couldn't save this participant. Please try again.");
+    } finally {
+      setParticipantSaving(false);
+      endInFlight(participantSavingRef);
     }
   }
 
@@ -332,6 +399,7 @@ export function EditGroupEventScreen({
                     onPress={() => {
                       setEditing(item);
                       setParticipantDraftState(participantDraft(item, event));
+                      setParticipantFieldErrors({});
                     }}
                   />
                   <Button
@@ -400,11 +468,21 @@ export function EditGroupEventScreen({
               event={event}
               participant={editing}
               draft={participantDraftState}
-              onChange={setParticipantDraftState}
+              onChange={(next) => {
+                // Editing the note clears its error (38.9 D-19).
+                if (next.value.note !== participantDraftState.value.note) {
+                  setParticipantFieldErrors((errors) =>
+                    clearFieldError(errors, "note"),
+                  );
+                }
+                setParticipantDraftState(next);
+              }}
+              noteError={participantFieldErrors.note ?? null}
             />
             <Button
               role="primary"
               label="Save participant"
+              disabled={participantSaving}
               onPress={() => void saveParticipant()}
             />
           </View>

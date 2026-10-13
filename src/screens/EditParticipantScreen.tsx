@@ -1,5 +1,13 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button and AppText use a
 // domain-specific semantic `role` prop, not a web ARIA role.
+/**
+ * Edit participant (a `linkedEntryRoute` target). 38.10 Research Q4 (checker
+ * cycle 2 W-13): clearing this participant's OWN note while it is also saved
+ * to a section is refused with an inline error under the note naming the
+ * section, and nothing is saved. A Group Note copy never blocks (D-113). The
+ * pre-check runs inside the guarded save; the DAO's `LinkedNoteBlankError`
+ * maps to the same error; every other failure keeps the generic message.
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import {
@@ -9,6 +17,11 @@ import {
 } from "@/components/group/ParticipantOverrideEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button } from "@/components/ui";
+import {
+  clearFieldError,
+  type FieldErrors,
+  toFieldErrors,
+} from "@/components/ui/field-error-logic";
 import { getExecutor, localDateTime } from "@/db/database";
 import { saveParticipantEdits } from "@/db/group-events-dao";
 import {
@@ -16,6 +29,12 @@ import {
   type GroupEventParticipant,
   readGroupEventDetail,
 } from "@/db/group-events-read";
+import { readOwnNoteLinkedSection } from "@/db/interaction-edit-read";
+import { LinkedNoteBlankError } from "@/db/linked-entry-dao";
+import {
+  canAlsoSave,
+  linkedNoteBlankMessage,
+} from "@/logic/also-save-to-logic";
 import {
   buildParticipantFieldPatch,
   buildParticipantFollowPatch,
@@ -42,6 +61,8 @@ export function EditParticipantScreen({
   const [draft, setDraft] = useState<ParticipantEditDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Inline field errors (38.9 D-19): the note's linked-blank refusal (Q4).
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   // Synchronous in-flight flag: `saving` state lags a render, so the guard
   // reads this ref to hold Back while the save runs (fix-pass WR-02).
   const savingRef = useRef(false);
@@ -88,6 +109,22 @@ export function EditParticipantScreen({
     const follow = buildParticipantFollowPatch(initial, draft);
     const fields = buildParticipantFieldPatch(initial, draft);
     try {
+      // Q4 pre-check, inside the guarded save: this participant's own note,
+      // blank while also saved to a section, is refused under the field.
+      if (!canAlsoSave(draft.value.note)) {
+        const section = await readOwnNoteLinkedSection(
+          getExecutor(),
+          interactionId,
+        );
+        if (section !== null) {
+          setFieldErrors(
+            toFieldErrors([
+              { field: "note", message: linkedNoteBlankMessage(section) },
+            ]),
+          );
+          return;
+        }
+      }
       await saveParticipantEdits(getExecutor(), {
         interactionId,
         contactId,
@@ -98,7 +135,20 @@ export function EditParticipantScreen({
       });
       bypassRef.current = true;
       navigation.goBack();
-    } catch {
+    } catch (err) {
+      if (err instanceof LinkedNoteBlankError) {
+        // The DAO's own refusal (fails closed): the same error under the note.
+        const section = await readOwnNoteLinkedSection(
+          getExecutor(),
+          interactionId,
+        ).catch(() => null);
+        setFieldErrors(
+          toFieldErrors([
+            { field: "note", message: linkedNoteBlankMessage(section) },
+          ]),
+        );
+        return;
+      }
       setError("Couldn't save this participant. Please try again.");
     } finally {
       setSaving(false);
@@ -145,7 +195,14 @@ export function EditParticipantScreen({
           event={loaded.event}
           participant={loaded.participant}
           draft={draft}
-          onChange={setDraft}
+          onChange={(next) => {
+            // Editing the note clears its error (38.9 D-19).
+            if (next.value.note !== draft.value.note) {
+              setFieldErrors((errors) => clearFieldError(errors, "note"));
+            }
+            setDraft(next);
+          }}
+          noteError={fieldErrors.note ?? null}
         />
         {error ? (
           <AppText role="caption" style={{ color: colors.danger }}>

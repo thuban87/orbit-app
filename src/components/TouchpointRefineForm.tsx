@@ -29,6 +29,12 @@
  * legacy channel with a scoped `channelOptions`) is shown raw on the trigger
  * and is never rewritten unless the user picks another option.
  *
+ * 38.10 additive props (plan 12; every other consumer unchanged):
+ * - `noteError` renders a `FieldError` directly under the note field (Research
+ *   Q4: a linked note cleared to blank; 38.9 D-19, docs/systems/ux-standards.md).
+ * - `allowAiLockedReason` renders the Allow AI switch off and disabled with
+ *   the reason in the caption slot (D-103); the user cannot turn it on.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import DateTimePicker, {
@@ -49,6 +55,7 @@ import {
 } from "@/components/touchpoint-refine-logic";
 import { OptionSelectRow, OptionSheet, OrbitSwitch } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
+import { FieldError } from "@/components/ui/FieldError";
 import { useTheme } from "@/theme";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 
@@ -165,6 +172,16 @@ interface TouchpointRefineFormProps {
    * note's text. Off by default.").
    */
   allowAiCaption?: string;
+  /**
+   * 38.10 D-103: when set, the Allow AI switch renders off and disabled and
+   * this reason replaces the caption. Absent → unchanged.
+   */
+  allowAiLockedReason?: string;
+  /**
+   * 38.10 Research Q4: an inline error rendered under the note field. Absent or
+   * null renders nothing.
+   */
+  noteError?: string | null;
 }
 
 export type TouchpointRefineField =
@@ -205,6 +222,8 @@ export function TouchpointRefineForm({
   channelOptions,
   moreOptionsFields,
   allowAiCaption,
+  allowAiLockedReason,
+  noteError,
 }: TouchpointRefineFormProps) {
   const { colors } = useTheme();
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -397,6 +416,7 @@ export function TouchpointRefineForm({
                 },
               ]}
             />
+            <FieldError testID={`${testID}-note-error`} message={noteError} />
           </View>
         );
       case "duration": {
@@ -489,8 +509,11 @@ export function TouchpointRefineForm({
           </View>
         );
       }
-      case "allowAi":
-        // Per-interaction egress gate; defaults OFF — D-04.
+      case "allowAi": {
+        // Per-interaction egress gate; defaults OFF — D-04. A locked note
+        // (D-103) shows off and disabled, with its reason in the caption slot.
+        const locked = allowAiLockedReason !== undefined;
+        const caption = locked ? allowAiLockedReason : allowAiCaption;
         return (
           <View style={styles.field}>
             <View style={styles.toggleRow}>
@@ -500,20 +523,24 @@ export function TouchpointRefineForm({
               <OrbitSwitch
                 testID={`${testID}-allow-ai`}
                 accessibilityLabel="Allow AI"
-                value={value.allowAi === 1}
-                onValueChange={(v) => set("allowAi", coerceAllowAi(v))}
+                value={locked ? false : value.allowAi === 1}
+                disabled={locked}
+                onValueChange={(v) => {
+                  if (!locked) set("allowAi", coerceAllowAi(v));
+                }}
               />
             </View>
-            {allowAiCaption ? (
+            {caption ? (
               <Text
                 testID={`${testID}-allow-ai-caption`}
                 style={[styles.hint, { color: colors.textSecondary }]}
               >
-                {allowAiCaption}
+                {caption}
               </Text>
             ) : null}
           </View>
         );
+      }
       default:
         return null;
     }
