@@ -1252,11 +1252,14 @@ export function EditContactScreen({
   const birthdaySeed =
     (form.birthdayInput ? parseDate(form.birthdayInput) : null) ?? new Date();
   const draftNow = localDateTime();
+  // 38.10 plan 13: Allow AI is draft state saved at Save (D-27), so a
+  // reopened entry shows the draft's value, not the stored one.
   const memoryItems = (form.memories ?? []).map((row) =>
     memoryDraftRowToItem(
       row,
       contactId,
-      row.id != null ? (memoryAllowAiRef.current.get(row.id) ?? 0) : 0,
+      row.allowAi ??
+        (row.id != null ? (memoryAllowAiRef.current.get(row.id) ?? 0) : 0),
     ),
   );
   const relationshipItems = (form.relationships ?? []).map((row) =>
