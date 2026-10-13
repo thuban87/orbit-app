@@ -31,12 +31,14 @@ export interface RelationshipEditorProps {
   items: RelationshipRow[];
   onAdd: (draft: RelationshipDraft) => Promise<boolean>;
   onEdit: (id: number, draft: RelationshipDraft) => Promise<boolean>;
-  onDelete: (id: number) => void;
   /**
-   * Unused: deletes are immediate with the host's Undo (D-69, NEW-11). Kept
-   * optional only while hosts still pass the attribute; plan 18 removes it.
+   * Delete sits in the open edit form, not on the row card (38.9 D-30 via
+   * 38.10 D-19; 38.10-18, as MemoryEditor and OffLimitsForm do). The form
+   * closes after the call unless the host returns `false` synchronously
+   * (it dropped the delete), the MemoryEditor contract. Deletes are
+   * immediate with the host's Undo (D-69).
    */
-  onRestore?: (id: number) => void;
+  onDelete: (id: number) => unknown;
   /**
    * Reports whether the add/edit form is open and holds typed changes (38.9
    * D-14), on every change and `{ open: false, dirty: false }` on unmount.
@@ -51,12 +53,12 @@ export interface RelationshipEditorProps {
   onCancelRequest?: (close: () => void) => void;
   /**
    * The host's save is in flight (38.9 WR-02 follow-up; D-13, D-14): the
-   * form's Cancel and Save are held and drawn disabled (D-26) until it
-   * settles. So are the list's Edit, Delete, Show on Profile and Add key
-   * person (third fix pass WR-02): Edit and Add would swap the draft being
-   * saved (a failed save would then lose the typed edit), and Show on
-   * Profile and Delete would race it (the host's slot drops Show on Profile
-   * silently). Absent → false.
+   * form's Cancel, Save and Delete are held and drawn disabled (D-26) until
+   * it settles. So are the list's Edit, Show on Profile and Add key person
+   * (third fix pass WR-02): Edit and Add would swap the draft being saved (a
+   * failed save would then lose the typed edit), and Show on Profile and
+   * Delete would race it (the host's slot drops Show on Profile silently).
+   * Absent → false.
    */
   busy?: boolean;
   /**
@@ -337,15 +339,6 @@ export function RelationshipEditor({
               disabled={busy}
               onPress={() => openEdit(item)}
             />
-            <Button
-              role="tertiary"
-              label="Delete"
-              disabled={busy}
-              onPress={() => {
-                if (busy) return;
-                onDelete(item.id);
-              }}
-            />
             {item.hidden === 1 ? (
               <Button
                 role="tertiary"
@@ -480,6 +473,20 @@ export function RelationshipEditor({
               onPress={() => void commit()}
             />
           </View>
+          {editing ? (
+            // D-69: Delete is immediate; the host deletes and owns Undo. In
+            // the form, so deleting the row also closes its form (38.10-18).
+            <Button
+              role="tertiary"
+              label="Delete"
+              disabled={busy}
+              onPress={() => {
+                if (busy) return; // held while the host saves (WR-02)
+                if (onDelete(editing.id) === false) return;
+                close();
+              }}
+            />
+          ) : null}
         </View>
       )}
       <ContactPicker

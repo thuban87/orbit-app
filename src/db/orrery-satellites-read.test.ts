@@ -9,9 +9,9 @@ import { readOrrerySatellites } from "@/db/orrery-satellites-read";
 import { purgeContact } from "@/db/purge-dao";
 import {
   addRelationship,
-  deleteRelationship,
+  deleteRelationshipNow,
   editRelationship,
-  restoreRelationship,
+  undoRelationshipDelete,
 } from "@/db/relationships-dao";
 import {
   createCustomSystem,
@@ -95,9 +95,13 @@ describe("eligible Orrery relationship projection", () => {
       now,
       linkedContactId: null,
     });
-    await deleteRelationship(exec, { id, contactId: 1, now });
+    const snapshot = await deleteRelationshipNow(exec, {
+      id,
+      contactId: 1,
+      now,
+    });
     expect(await readOrrerySatellites(exec, parents)).toEqual([]);
-    await restoreRelationship(exec, { id, contactId: 1, now });
+    await undoRelationshipDelete(exec, snapshot, now);
     expect(await readOrrerySatellites(exec, parents)).toHaveLength(1);
     for (const sql of [
       "UPDATE contacts SET tracking_enabled=0 WHERE id=1",

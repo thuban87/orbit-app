@@ -8,13 +8,9 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   addRelationship,
-  deleteRelationship,
   deleteRelationshipNow,
   deleteRelationshipNowCore,
   editRelationship,
-  expireRelationshipIfStale,
-  purgeRelationshipPermanently,
-  restoreRelationship,
   undoRelationshipDelete,
 } from "@/db/relationships-dao";
 import { listRelationshipsForContact } from "@/db/relationships-read";
@@ -44,76 +40,6 @@ async function seedContact(name = "Alex"): Promise<number> {
 }
 
 describe("relationships DAO", () => {
-  it("marks manual permanent purges and successful stale expiry dirty for backup", async () => {
-    const contactId = await seedContact();
-    const id = await addRelationship(exec, {
-      contactId,
-      personName: "Delete",
-      createdAt: NOW,
-      now: NOW,
-    });
-    const uid = (await exec.getFirstAsync<{ uid: string }>(
-      "SELECT uid FROM relationships WHERE id=?",
-      [id],
-    ))!.uid;
-    await deleteRelationship(exec, { id, contactId, now: NOW });
-    const beforePurge = (await exec.getFirstAsync<{ data_revision: number }>(
-      "SELECT data_revision FROM app_settings WHERE id=1",
-    ))!.data_revision;
-    await purgeRelationshipPermanently(exec, { id, contactId });
-    await expect(
-      exec.getFirstAsync<{ data_revision: number }>(
-        "SELECT data_revision FROM app_settings WHERE id=1",
-      ),
-    ).resolves.toEqual({ data_revision: beforePurge + 1 });
-    await expect(
-      exec.getFirstAsync(
-        "SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_type='relationship' AND entity_uid=?",
-        [uid],
-      ),
-    ).resolves.toEqual({
-      entity_type: "relationship",
-      entity_uid: uid,
-      deleted_at: NOW,
-    });
-
-    const staleId = await addRelationship(exec, {
-      contactId,
-      personName: "Stale",
-      createdAt: NOW,
-      now: NOW,
-    });
-    const staleUid = (await exec.getFirstAsync<{ uid: string }>(
-      "SELECT uid FROM relationships WHERE id=?",
-      [staleId],
-    ))!.uid;
-    await exec.runAsync(
-      "UPDATE relationships SET deleted_at=datetime('now','localtime', ?) WHERE id=?",
-      ["-31 days", staleId],
-    );
-    const beforeExpiry = (await exec.getFirstAsync<{ data_revision: number }>(
-      "SELECT data_revision FROM app_settings WHERE id=1",
-    ))!.data_revision;
-    await expect(
-      expireRelationshipIfStale(
-        exec,
-        { id: staleId, contactId },
-        "-30 days",
-        NOW,
-      ),
-    ).resolves.toBe(true);
-    await expect(
-      exec.getFirstAsync<{ data_revision: number }>(
-        "SELECT data_revision FROM app_settings WHERE id=1",
-      ),
-    ).resolves.toEqual({ data_revision: beforeExpiry + 1 });
-    await expect(
-      exec.getFirstAsync(
-        "SELECT entity_uid FROM tombstones WHERE entity_type='relationship' AND entity_uid=?",
-        [staleUid],
-      ),
-    ).resolves.toEqual({ entity_uid: staleUid });
-  });
   it("adds a relationship with optional link fields and preserves multi-byte text", async () => {
     const contactId = await seedContact();
     const linkedContactId = await seedContact("Blair");
@@ -281,98 +207,6 @@ describe("relationships DAO", () => {
       }),
     );
   });
-
-  it("soft-deletes, restores, and permanently purges only soft-deleted rows", async () => {
-    const contactId = await seedContact();
-    const id = await addRelationship(exec, {
-      contactId,
-      personName: "Sam",
-      createdAt: NOW,
-      now: NOW,
-    });
-
-    await expect(
-      purgeRelationshipPermanently(exec, { id, contactId }),
-    ).rejects.toThrow("purgeRelationshipPermanently: no relationship matched");
-    await deleteRelationship(exec, {
-      id,
-      contactId,
-      now: "2026-09-04 13:00:00",
-    });
-    expect(
-      await exec.getFirstAsync<{ deleted_at: string | null }>(
-        "SELECT deleted_at FROM relationships WHERE id = ?",
-        [id],
-      ),
-    ).toEqual({ deleted_at: "2026-09-04 13:00:00" });
-    await restoreRelationship(exec, {
-      id,
-      contactId,
-      now: "2026-09-04 14:00:00",
-    });
-    await deleteRelationship(exec, {
-      id,
-      contactId,
-      now: "2026-09-04 15:00:00",
-    });
-    await purgeRelationshipPermanently(exec, { id, contactId });
-    expect(
-      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [
-        id,
-      ]),
-    ).toBeNull();
-  });
-
-  it("expires only a relationship still past the soft-delete window under the write lock", async () => {
-    const contactId = await seedContact();
-    const staleId = await addRelationship(exec, {
-      contactId,
-      personName: "Stale",
-      createdAt: NOW,
-      now: NOW,
-    });
-    const freshId = await addRelationship(exec, {
-      contactId,
-      personName: "Fresh",
-      createdAt: NOW,
-      now: NOW,
-    });
-    await exec.runAsync(
-      "UPDATE relationships SET deleted_at = datetime('now', 'localtime', ?) WHERE id = ?",
-      ["-31 days", staleId],
-    );
-    await exec.runAsync(
-      "UPDATE relationships SET deleted_at = datetime('now', 'localtime', ?) WHERE id = ?",
-      ["-1 days", freshId],
-    );
-
-    await expect(
-      expireRelationshipIfStale(
-        exec,
-        { id: staleId, contactId },
-        "-30 days",
-        NOW,
-      ),
-    ).resolves.toBe(true);
-    await expect(
-      expireRelationshipIfStale(
-        exec,
-        { id: freshId, contactId },
-        "-30 days",
-        NOW,
-      ),
-    ).resolves.toBe(false);
-    expect(
-      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [
-        staleId,
-      ]),
-    ).toBeNull();
-    expect(
-      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [
-        freshId,
-      ]),
-    ).not.toBeNull();
-  });
 });
 
 describe("key people delete with Undo (D-69)", () => {
@@ -471,11 +305,11 @@ describe("key people delete with Undo (D-69)", () => {
         now: LATER,
       }),
     ).rejects.toThrow("deleteRelationshipNow: no relationship matched");
-    await deleteRelationship(exec, {
-      id: blairRow,
-      contactId: blair,
-      now: NOW,
-    });
+    // A row with deleted_at set (only pre-033 trash; D-88) is never a target.
+    await exec.runAsync(
+      "UPDATE relationships SET deleted_at = ? WHERE id = ?",
+      [NOW, blairRow],
+    );
     await expect(
       deleteRelationshipNow(exec, {
         id: blairRow,

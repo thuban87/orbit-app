@@ -52,11 +52,6 @@ export interface RelationshipSnapshot {
   tombstoned_at: string;
 }
 
-export interface RelationshipCandidate {
-  id: number;
-  contactId: number;
-}
-
 function assertOneChange(
   op: string,
   id: number,
@@ -175,83 +170,11 @@ export async function editRelationshipCore(
   );
 }
 
-/** Soft-delete a relationship while the caller owns the write transaction. */
-export async function deleteRelationshipCore(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  const result = await exec.runAsync(
-    `UPDATE relationships
-        SET deleted_at = ?, modified_at = ?
-      WHERE id = ? AND contact_id = ?`,
-    [input.now, input.now, input.id, input.contactId],
-  );
-  assertOneChange(
-    "deleteRelationship",
-    input.id,
-    input.contactId,
-    result.changes,
-  );
-}
-
-/** Restore a soft-deleted relationship while the caller owns the write transaction. */
-export async function restoreRelationshipCore(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  const result = await exec.runAsync(
-    `UPDATE relationships
-        SET deleted_at = NULL, modified_at = ?
-      WHERE id = ? AND contact_id = ?`,
-    [input.now, input.id, input.contactId],
-  );
-  assertOneChange(
-    "restoreRelationship",
-    input.id,
-    input.contactId,
-    result.changes,
-  );
-}
-
-/** Physically remove a soft-deleted relationship while the caller owns the transaction. */
-export async function purgeRelationshipPermanentlyCore(
-  exec: SqlExecutor,
-  id: number,
-  contactId: number,
-): Promise<void> {
-  const target = await exec.getFirstAsync<{ uid: string; deleted_at: string }>(
-    "SELECT uid, deleted_at FROM relationships WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
-    [id, contactId],
-  );
-  if (!target) {
-    assertOneChange("purgeRelationshipPermanently", id, contactId, 0);
-    return;
-  }
-  await insertTombstoneCore(
-    exec,
-    {
-      entityType: "relationship",
-      entityUid: target.uid,
-      deletedAt: target.deleted_at,
-    },
-    { bumpRevision: false },
-  );
-  const result = await exec.runAsync(
-    "DELETE FROM relationships WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
-    [id, contactId],
-  );
-  assertOneChange(
-    "purgeRelationshipPermanently",
-    id,
-    contactId,
-    result.changes,
-  );
-}
-
 /**
  * Hard-delete one live key person with a tombstone, returning the snapshot
- * Undo needs (D-69). Scoped by `(id, contact_id)`; a soft-deleted row is not a
- * target. The snapshot records the linked contact's uid (c4). The tombstone
+ * Undo needs (D-69). Scoped by `(id, contact_id)`; a row with `deleted_at`
+ * set is not a target (no writer sets it since 38.10-18; migration 033 purged
+ * the old trash rows, D-88). The snapshot records the linked contact's uid (c4). The tombstone
  * and `tombstoned_at` use `deleteStampAt(now, row.modified_at)` (c9);
  * `bumpRevision` (default true) is forwarded to the tombstone write.
  */
@@ -386,71 +309,6 @@ export function editRelationship(
   return inWriteTransaction(exec, async () => {
     await editRelationshipCore(exec, input);
     await bumpDataRevisionCore(exec);
-  });
-}
-
-export function deleteRelationship(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await deleteRelationshipCore(exec, input);
-    await bumpDataRevisionCore(exec);
-  });
-}
-
-export function restoreRelationship(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await restoreRelationshipCore(exec, input);
-    await bumpDataRevisionCore(exec);
-  });
-}
-
-/** User-confirmed immediate purge for an already soft-deleted relationship. */
-export function purgeRelationshipPermanently(
-  exec: SqlExecutor,
-  candidate: RelationshipCandidate,
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await purgeRelationshipPermanentlyCore(
-      exec,
-      candidate.id,
-      candidate.contactId,
-    );
-    await bumpDataRevisionCore(exec);
-  });
-}
-
-/**
- * Sweep writer: re-check the full stale predicate under the write lock before
- * invoking the non-mutexed core, so a restore or fresh re-delete survives.
- */
-export function expireRelationshipIfStale(
-  exec: SqlExecutor,
-  candidate: RelationshipCandidate,
-  windowModifier: string,
-  _now: string,
-): Promise<boolean> {
-  return inWriteTransaction(exec, async () => {
-    const stale = await exec.getFirstAsync<{ one: number }>(
-      `SELECT 1 AS one FROM relationships
-        WHERE id = ?
-          AND contact_id = ?
-          AND deleted_at IS NOT NULL
-          AND deleted_at < datetime('now', 'localtime', ?)`,
-      [candidate.id, candidate.contactId, windowModifier],
-    );
-    if (stale === null) return false;
-    await purgeRelationshipPermanentlyCore(
-      exec,
-      candidate.id,
-      candidate.contactId,
-    );
-    await bumpDataRevisionCore(exec);
-    return true;
   });
 }
 

@@ -1673,7 +1673,6 @@ export function EditContactScreen({
               onAdd={addRelationshipRow}
               onEdit={editRelationshipRow}
               onDelete={deleteRelationshipRow}
-              onRestore={() => {}}
             />
           </AccordionSection>
 

@@ -932,7 +932,6 @@ export function CreateContactScreen({
                       removeDraftItem(prev, id),
                     )
                   }
-                  onRestore={() => {}}
                 />
               </AccordionSection>
 

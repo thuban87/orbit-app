@@ -45,7 +45,6 @@ import {
   onSweepSettled,
   registerSweepHook,
 } from "@/services/launch-sweep";
-import { registerMemoryTrashSweep } from "@/services/memory-trash-sweep";
 // Module-scope side-effect import (Pitfall P5): importing headless-task RUNS its
 // `TaskManager.defineTask` + `registerTaskAsync` so a killed-app action tap reaches
 // the headless write path. React never mounts in the headless context, so no
@@ -124,7 +123,6 @@ Notifications.setNotificationHandler({
 // remounts), and registering the same hook twice would double-run it — so this
 // module-scope flag makes registration idempotent across effect re-entries.
 let fieldSweepRegistered = false;
-let memoryTrashSweepRegistered = false;
 let backupSweepRegistered = false;
 let backupCacheSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
@@ -249,13 +247,6 @@ function AppShell() {
     if (!fieldSweepRegistered) {
       registerFieldSweep(getExecutor);
       fieldSweepRegistered = true;
-    }
-    // Memory and Undo-only relationship trash expire only on a real foreground
-    // launch, after migration makes their tables available and before the
-    // trigger fires its cold-start sweep.
-    if (!memoryTrashSweepRegistered) {
-      registerMemoryTrashSweep(getExecutor);
-      memoryTrashSweepRegistered = true;
     }
     // Durable assist rows are bounded only during a real foreground launch. The
     // hook gets its executor lazily and is registered before the cold-start

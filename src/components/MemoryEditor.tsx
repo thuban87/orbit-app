@@ -106,16 +106,6 @@ export interface MemoryEditorProps {
    * counts as accepted, so hosts that ignore this contract are unchanged.
    */
   onDelete: (id: number) => unknown;
-  /**
-   * Never called (38.10 D-69 removed the Restore UI, NEW-11). Optional so the
-   * hosts plans 14 and 17 rebuild still compile; plan 18 deletes it.
-   */
-  onRestore?: (id: number) => void;
-  /**
-   * Never called: Allow AI travels in the draft and the host saves it with
-   * Save (D-27). Optional until plan 18 deletes it.
-   */
-  onSetAllowAi?: (id: number, allow: boolean) => unknown;
   globalAiEnabled: boolean;
   /**
    * Opens this item's edit form on first render, so its options (Allow AI,

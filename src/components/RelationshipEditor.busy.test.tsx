@@ -128,7 +128,8 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     pinned: 0,
     hidden: 1,
   } as unknown as RelationshipRow;
-  const listLabels = ["Edit", "Delete", "Show on Profile"];
+  // Delete is not on the row card (38.10-18): it sits in the open edit form.
+  const listLabels = ["Edit", "Show on Profile"];
   const press = (tree: TestElement[], label: string) => {
     const handler = button(tree, label)?.props.onPress;
     if (typeof handler !== "function") throw new Error(`missing ${label}`);
@@ -139,13 +140,12 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     hooks.seeds = {};
   });
 
-  it("leaves Edit, Delete, Show on Profile and Add key person live when idle", () => {
+  it("leaves Edit, Show on Profile and Add key person live when idle", () => {
     const tree = render(false, [hiddenRow]);
     for (const label of [...listLabels, "Add key person"]) {
       expect(button(tree, label)?.props.disabled, label).toBe(false);
     }
-    press(tree, "Delete");
-    expect(handlers.onDelete).toHaveBeenCalledWith(7);
+    expect(button(tree, "Delete")).toBeUndefined();
     press(tree, "Show on Profile");
     expect(handlers.onEdit).toHaveBeenCalledWith(
       7,
@@ -246,5 +246,63 @@ describe("RelationshipEditor initiallyEditingId (D-107; convergence c6, Codex C-
     const tree = render(false, [item], 99);
     expect(button(tree, "Add key person")).toBeDefined();
     expect(tree.some((n) => n.type === "EntryTextField")).toBe(false);
+  });
+});
+
+describe("RelationshipEditor Delete sits in the open edit form (38.9 D-30; 38.10-18)", () => {
+  const item = {
+    id: 5,
+    person_name: "Ria",
+    relation_type: "Friend",
+    linked_contact_id: null,
+    linked_contact_name: null,
+    note: null,
+    pinned: 0,
+    hidden: null,
+  } as unknown as RelationshipRow;
+  const pressDelete = (tree: TestElement[]) => {
+    const handler = button(tree, "Delete")?.props.onPress;
+    if (typeof handler !== "function") throw new Error("missing Delete");
+    handler();
+  };
+
+  beforeEach(() => {
+    hooks.seeds = {};
+  });
+
+  it("the row card has no Delete; the open edit form has one", () => {
+    expect(button(render(false, [item]), "Delete")).toBeUndefined();
+    const tree = render(false, [item], 5);
+    expect(button(tree, "Delete")?.props.role).toBe("tertiary");
+    expect(button(tree, "Delete")?.props.disabled).toBe(false);
+  });
+
+  it("the add form has no Delete", () => {
+    hooks.seeds = { [DRAFT_SLOT]: { ...initialDraft(), personName: "Sam" } };
+    expect(button(render(false, [item]), "Delete")).toBeUndefined();
+  });
+
+  it("Delete calls the host with the open row's id and closes the form", () => {
+    const tree = render(false, [item], 5);
+    pressDelete(tree);
+    expect(handlers.onDelete).toHaveBeenCalledWith(5);
+    // close(): editing, draft and pickerOpen are reset.
+    expect(hooks.setters).toBe(3);
+  });
+
+  it("a host that drops the delete (returns false) keeps the form open", () => {
+    const tree = render(false, [item], 5);
+    handlers.onDelete.mockReturnValue(false);
+    pressDelete(tree);
+    expect(handlers.onDelete).toHaveBeenCalledWith(5);
+    expect(hooks.setters).toBe(0);
+  });
+
+  it("is held while the host saves: drawn disabled, a press does nothing", () => {
+    const tree = render(true, [item], 5);
+    expect(button(tree, "Delete")?.props.disabled).toBe(true);
+    pressDelete(tree);
+    expect(handlers.onDelete).not.toHaveBeenCalled();
+    expect(hooks.setters).toBe(0);
   });
 });

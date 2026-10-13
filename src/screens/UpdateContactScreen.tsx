@@ -579,8 +579,10 @@ function KeyPeopleFocusedEditor({
   };
   // D-69: the delete happens at once (a hard delete with a tombstone) and
   // Undo puts it back.
-  const remove = (id: number) => {
-    if (savingRef.current) return;
+  // `false` tells the editor the delete was dropped, so its form stays open
+  // (the MemoryEditor contract; 38.10-18 moved Delete into the form).
+  const remove = (id: number): boolean => {
+    if (savingRef.current) return false;
     void (async () => {
       let snapshot: RelationshipSnapshot;
       try {
@@ -607,6 +609,7 @@ function KeyPeopleFocusedEditor({
         },
       });
     })();
+    return true;
   };
 
   return (

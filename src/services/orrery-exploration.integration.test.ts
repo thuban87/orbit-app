@@ -24,9 +24,9 @@ import { purgeContact } from "@/db/purge-dao";
 import { recordTouchpoint } from "@/db/recency-dao";
 import {
   addRelationship,
-  deleteRelationship,
+  deleteRelationshipNow,
   editRelationship,
-  restoreRelationship,
+  undoRelationshipDelete,
 } from "@/db/relationships-dao";
 import { commitRingReorder, type RingReorderRequest } from "@/db/ring-seq-dao";
 import { snoozeContact } from "@/db/snooze-dao";
@@ -721,9 +721,13 @@ describe("Orrery production exploration integration", () => {
       linkedContactId: null,
       now: NOW,
     });
-    await deleteRelationship(exec, { id, contactId: parent.id, now: NOW });
+    const snapshot = await deleteRelationshipNow(exec, {
+      id,
+      contactId: parent.id,
+      now: NOW,
+    });
     expect(await rows()).toEqual([]);
-    await restoreRelationship(exec, { id, contactId: parent.id, now: NOW });
+    const undoneId = await undoRelationshipDelete(exec, snapshot, NOW);
     expect(await rows()).toHaveLength(1);
     await updateAppSettings(
       exec,
@@ -748,7 +752,11 @@ describe("Orrery production exploration integration", () => {
     for (const key of ["camera", "pose", "focus", "sunContactId"])
       expect(manifest.appSettings).not.toHaveProperty(key);
     expect(manifest.backupFormatVersion).toBe(8);
-    await deleteRelationship(exec, { id, contactId: parent.id, now: LATER });
+    await deleteRelationshipNow(exec, {
+      id: undoneId,
+      contactId: parent.id,
+      now: LATER,
+    });
     const restored = await applyRestore(exec, manifest, "replace-all", {
       reconcileNotificationSchedule: async () => {},
       reconcileDigestSchedule: async () => {},

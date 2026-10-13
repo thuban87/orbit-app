@@ -98,17 +98,14 @@ import { applyRestore } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { updateAppSettingsCore } from "@/db/app-settings-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { deleteMemory, purgeMemoryPermanently } from "@/db/memories-dao";
+import { deleteMemoryNow } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
 import {
   createContactWithInteraction,
   recordTouchpoint,
 } from "@/db/recency-dao";
-import {
-  deleteRelationship,
-  purgeRelationshipPermanently,
-} from "@/db/relationships-dao";
+import { deleteRelationshipNow } from "@/db/relationships-dao";
 import type { SqlExecutor } from "@/db/types";
 import { computeAiAvailability } from "@/logic/ai-availability";
 import { FakePhotoFs } from "@/services/photos/__testkit__/fake-photo-fs";
@@ -1404,23 +1401,16 @@ describe("applyRestore", () => {
       ["revived-relationship"],
     );
     const deletedAt = "2026-08-27 12:00:00";
-    await deleteMemory(destination, {
+    // The one delete path since D-69: immediate, tombstoned (38.10-18).
+    await deleteMemoryNow(destination, {
       id: memory!.id,
       contactId: destinationContact!.id,
       now: deletedAt,
     });
-    await purgeMemoryPermanently(destination, {
-      id: memory!.id,
-      contactId: destinationContact!.id,
-    });
-    await deleteRelationship(destination, {
+    await deleteRelationshipNow(destination, {
       id: relationship!.id,
       contactId: destinationContact!.id,
       now: deletedAt,
-    });
-    await purgeRelationshipPermanently(destination, {
-      id: relationship!.id,
-      contactId: destinationContact!.id,
     });
 
     await expect(

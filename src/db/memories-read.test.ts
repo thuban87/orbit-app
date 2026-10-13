@@ -9,7 +9,6 @@ import {
   listAiEligibleMemories,
   listMemoriesForContact,
   listProfileVisibleMemoriesForContact,
-  listRecentlyDeleted,
   resolveVisibility,
 } from "@/db/memories-read";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
@@ -150,7 +149,7 @@ describe("memories read", () => {
     ).toEqual([firstId, olderId]);
   });
 
-  it("lists only soft-deleted memories newest-first for one contact", async () => {
+  it("never lists a row with deleted_at set (pre-033 trash; D-88)", async () => {
     const contactId = await seedContact();
     const otherContactId = await seedContact();
     const olderId = await addMemory(exec, {
@@ -196,14 +195,11 @@ describe("memories read", () => {
     ]);
 
     expect(
-      (await listRecentlyDeleted(exec, contactId)).map((row) => row.id),
-    ).toEqual([newerId, olderId]);
-    expect(
-      (await listRecentlyDeleted(exec, otherContactId)).map((row) => row.id),
-    ).toEqual([otherId]);
-    expect(
       (await listMemoriesForContact(exec, contactId)).map((row) => row.id),
     ).toEqual([liveId]);
+    expect(
+      (await listMemoriesForContact(exec, otherContactId)).map((row) => row.id),
+    ).toEqual([]);
   });
 
   describe("two-sided AI eligibility (D-49, D-102, D-103, F-D1)", () => {

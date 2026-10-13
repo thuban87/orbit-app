@@ -123,12 +123,6 @@ export interface EditMemoryInput {
   now: string;
 }
 
-/** The identifying slice a trash-sweep candidate needs to expire one Memory. */
-export interface MemoryCandidate {
-  id: number;
-  contactId: number;
-}
-
 function normalizeOptional(value: string | null | undefined): string | null {
   return value === undefined || value === null || value.trim().length === 0
     ? null
@@ -438,67 +432,6 @@ export async function editMemoryCore(
   }
 }
 
-/** Soft-delete one Memory while the caller owns the shared transaction. */
-export async function deleteMemoryCore(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  const result = await exec.runAsync(
-    `UPDATE memories
-        SET deleted_at = ?, modified_at = ?
-      WHERE id = ? AND contact_id = ?`,
-    [input.now, input.now, input.id, input.contactId],
-  );
-  assertOneChange("deleteMemory", input.id, input.contactId, result.changes);
-}
-
-/** Restore one soft-deleted Memory while the caller owns the transaction. */
-export async function restoreMemoryCore(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  const result = await exec.runAsync(
-    `UPDATE memories
-        SET deleted_at = NULL, modified_at = ?
-      WHERE id = ? AND contact_id = ?`,
-    [input.now, input.id, input.contactId],
-  );
-  assertOneChange("restoreMemory", input.id, input.contactId, result.changes);
-}
-
-/**
- * Physically remove an already soft-deleted Memory while the caller owns the
- * shared transaction. The deleted_at guard preserves the two-stage lifecycle.
- */
-export async function purgeMemoryPermanentlyCore(
-  exec: SqlExecutor,
-  id: number,
-  contactId: number,
-): Promise<void> {
-  const target = await exec.getFirstAsync<{ uid: string; deleted_at: string }>(
-    "SELECT uid, deleted_at FROM memories WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
-    [id, contactId],
-  );
-  if (!target) {
-    assertOneChange("purgeMemoryPermanently", id, contactId, 0);
-    return;
-  }
-  await insertTombstoneCore(
-    exec,
-    {
-      entityType: "memory",
-      entityUid: target.uid,
-      deletedAt: target.deleted_at,
-    },
-    { bumpRevision: false },
-  );
-  const result = await exec.runAsync(
-    "DELETE FROM memories WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
-    [id, contactId],
-  );
-  assertOneChange("purgeMemoryPermanently", id, contactId, result.changes);
-}
-
 const MEMORY_SNAPSHOT_COLUMNS = `m.id, m.uid, m.contact_id, m.type, m.custom_label, m.value,
        m.note, m.url, m.meaningful_date, m.pinned, m.outdated, m.hidden,
        m.provenance, m.created_at, m.modified_at, m.allow_ai, m.interaction_id,
@@ -506,8 +439,9 @@ const MEMORY_SNAPSHOT_COLUMNS = `m.id, m.uid, m.contact_id, m.type, m.custom_lab
 
 /**
  * Hard-delete one live Memory with a tombstone, returning the snapshot Undo
- * needs (D-69). Scoped by `(id, contact_id)`; a soft-deleted row is not a
- * target (it belongs to the trash lifecycle). The tombstone and
+ * needs (D-69). Scoped by `(id, contact_id)`; a row with `deleted_at` set is
+ * not a target (no writer sets it since 38.10-18 retired the trash, and
+ * migration 033 purged the old trash rows, D-88). The tombstone and
  * `tombstoned_at` use `deleteStampAt(now, row.modified_at)` (convergence c9).
  * `bumpRevision` (default true) is forwarded to the tombstone write; an
  * aggregate that bumps once itself passes false.
@@ -685,66 +619,6 @@ export function setMemoryAllowAi(
   return inWriteTransaction(exec, async () => {
     await setMemoryAllowAiCore(exec, input);
     await bumpDataRevisionCore(exec);
-  });
-}
-
-/** Soft-delete one Memory and mark the database dirty inside one mutex. */
-export function deleteMemory(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await deleteMemoryCore(exec, input);
-    await bumpDataRevisionCore(exec);
-  });
-}
-
-/** Restore one Memory and mark the database dirty for backup inside one mutex. */
-export function restoreMemory(
-  exec: SqlExecutor,
-  input: { id: number; contactId: number; now: string },
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await restoreMemoryCore(exec, input);
-    await bumpDataRevisionCore(exec);
-  });
-}
-
-/** User-confirmed immediate purge for an already soft-deleted Memory. */
-export function purgeMemoryPermanently(
-  exec: SqlExecutor,
-  candidate: MemoryCandidate,
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await purgeMemoryPermanentlyCore(exec, candidate.id, candidate.contactId);
-    await bumpDataRevisionCore(exec);
-  });
-}
-
-/**
- * Sweep writer: re-check the complete stale predicate under the write lock
- * before invoking the non-mutexed core, so restored or freshly re-deleted rows
- * survive the advisory candidate scan.
- */
-export function expireMemoryIfStale(
-  exec: SqlExecutor,
-  candidate: MemoryCandidate,
-  windowModifier: string,
-  _now: string,
-): Promise<boolean> {
-  return inWriteTransaction(exec, async () => {
-    const stale = await exec.getFirstAsync<{ one: number }>(
-      `SELECT 1 AS one FROM memories
-        WHERE id = ?
-          AND contact_id = ?
-          AND deleted_at IS NOT NULL
-          AND deleted_at < datetime('now', 'localtime', ?)`,
-      [candidate.id, candidate.contactId, windowModifier],
-    );
-    if (stale === null) return false;
-    await purgeMemoryPermanentlyCore(exec, candidate.id, candidate.contactId);
-    await bumpDataRevisionCore(exec);
-    return true;
   });
 }
 
