@@ -126,7 +126,8 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         onClose();
         return;
       }
-      if (result.target === "missing" || seed === null) {
+      if (result.target !== "note" || seed === null) {
+        // "missing": the interaction was undone before the note landed.
         setError(MISSING_INTERACTION_MESSAGE);
         return;
       }
