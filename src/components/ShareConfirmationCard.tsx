@@ -47,6 +47,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { chipTone } from "@/components/ui/chip-tone";
 import { OrbitSwitch } from "@/components/ui/OrbitSwitch";
+import { ADD_NOTE, ALLOW_AI } from "@/constants/glossary";
 import type { ShareRowRef, ShareSection } from "@/db/capture-dao";
 import {
   canStartCardWrite,
@@ -367,11 +368,11 @@ export const ShareConfirmationCard = forwardRef<
 
       <View style={styles.aiRow}>
         <Text style={[styles.aiLabel, { color: colors.textPrimary }]}>
-          Allow AI
+          {ALLOW_AI}
         </Text>
         <OrbitSwitch
           testID="capture-allow-ai"
-          accessibilityLabel="Allow AI"
+          accessibilityLabel={ALLOW_AI}
           value={state.aiOn}
           disabled={state.aiDisabled || locked}
           busy={state.writePending === "ai"}
@@ -392,7 +393,7 @@ export const ShareConfirmationCard = forwardRef<
             <Button
               testID="capture-note-affordance"
               role="tertiary"
-              label="Add note"
+              label={ADD_NOTE}
               disabled={locked}
               onPress={() => dispatch({ type: "noteOpened" })}
             />

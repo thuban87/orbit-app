@@ -598,6 +598,8 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
       DIGEST: glossary.DIGEST,
       CONTACTS: glossary.CONTACTS,
       EVENTS: glossary.EVENTS,
+      ALLOW_AI: glossary.ALLOW_AI,
+      ADD_NOTE: glossary.ADD_NOTE,
     }).toEqual({
       NEVER_CONTACTED: "Never Contacted",
       FAVORITES: "Favorites",
@@ -618,7 +620,20 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
       DIGEST: "Digest",
       CONTACTS: "Contacts",
       EVENTS: "Events",
+      ALLOW_AI: "Allow AI",
+      ADD_NOTE: "Add note",
     });
+  });
+
+  it("the share card reads its control labels from the glossary (38.10 D-77, D-78)", () => {
+    const card = read("src/components/ShareConfirmationCard.tsx");
+    expect(card).toMatch(
+      /import \{[^}]*\bADD_NOTE\b[^}]*\bALLOW_AI\b[^}]*\} from "@\/constants\/glossary"/,
+    );
+    expect(card).toContain("label={ADD_NOTE}");
+    expect(card).toContain("accessibilityLabel={ALLOW_AI}");
+    expect(card).not.toContain('"Allow AI"');
+    expect(card).not.toContain('"Add note"');
   });
 
   it("the Contacts population filter uses the glossary labels (D-42, D-49)", () => {

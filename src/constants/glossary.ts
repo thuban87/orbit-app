@@ -39,3 +39,10 @@ export const UNBOUND = "Unbound";
 export const ORBIT_PARTICIPATION = "Orbit participation";
 export const INTERACTION_ASSIST = "Interaction Assist";
 export const QUARANTINE = "Quarantine";
+
+// The share confirmation card's controls (38.10 D-77, D-78). The section chip
+// names come from the memory-type and Profile-module registries (D-89 G-23).
+/** The per-item AI switch a new share starts with off (D-03, D-78). */
+export const ALLOW_AI = "Allow AI";
+/** The share card's note action (D-77). */
+export const ADD_NOTE = "Add note";
