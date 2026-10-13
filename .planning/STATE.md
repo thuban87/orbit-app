@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.10
-current_phase_name: Fuel Retirement, Things to Remember & Sharing
-status: ready_to_execute
+current_phase_name: Fuel Retirement, Things to Remember & Sharing (INSERTED)
+status: executing
 stopped_at: Phase 38.10 planned (19 plans, 10 waves)
-last_updated: "2026-10-12T21:03:45.291Z"
-last_activity: 2026-10-12
-last_activity_desc: Phase 38.10 planned — 19 plans, plan-check cycles 1–7, owner rulings D-92–D-111
-state_head: 88998800f760d9a7d081426d0cf369d025fc5ec1
+last_updated: "2026-10-13T15:37:47.283Z"
+last_activity: 2026-10-13
+last_activity_desc: Phase 38.10 execution started
+state_head: 04388c38f0991f86e275e77825b3095b9657762c
 progress:
   total_phases: 38
   completed_phases: 23
@@ -42,20 +42,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 38.9 — UX Standards
+**Current focus:** Phase 38.10 — Fuel Retirement, Things to Remember & Sharing (INSERTED)
 
 ## Current Position
 
-Phase: 38.10 (Fuel Retirement, Things to Remember & Sharing) — READY TO EXECUTE
-Plan: Not started
-Status: Phase 38.10 PLANNED 2026-10-12: 19 plans in 10 waves (owner-approved count), 7 plan-check cycles, owner rulings D-92–D-111 in 38.10-CONTEXT; test timing = per task own tests, per plan tsc + touched tests, per wave full gate (owner 2026-10-12, PLAN-MAP §5). Next: /gsd-execute-phase 38.10. Phase 38.9 COMPLETE 2026-10-11: 17/17 plans, verification passed 75/75 (38.9-VERIFICATION.md); TalkBack device checks owner-deferred; owner look check on release passed; routed follow-ups in .planning/todos/pending/2026-10-11-*.
+Phase: 38.10 (Fuel Retirement, Things to Remember & Sharing (INSERTED)) — EXECUTING
+Plan: 1 of 19
+Status: Executing Phase 38.10 (started 2026-10-13). 19 plans in 10 waves, sequential on main (no worktrees); test timing = per task own tests, per plan tsc + touched tests, per wave full gate (owner 2026-10-12, PLAN-MAP §5). Phase 38.9 COMPLETE 2026-10-11 (38.9-VERIFICATION.md 75/75).
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-11 — Phase 38.9 complete, transitioned to Phase 38.10
+Last activity: 2026-10-13 — Phase 38.10 execution started
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 38.9. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 39, 40. (38.8 completed 2026-10-09.) (38.7 completed 2026-10-05.)
 Next: phase-dossier for 38.10 (then 38.11, 38.12). Phase 39 is planned after 38.12. The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
