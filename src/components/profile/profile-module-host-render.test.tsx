@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import type { ProfileSnapshot } from "@/db/profile-read";
 import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import type { ProfilePresentation } from "@/profile/types";
@@ -131,14 +132,46 @@ function sectionHeaderCaptions(
     : [];
 }
 
+const oneEntry = <T,>(item: T) => ({
+  items: [item],
+  total: 1,
+  remainingCount: 0,
+  hiddenCount: 0,
+  showHiddenAvailable: false,
+});
+const noEntries = {
+  items: [],
+  total: 0,
+  remainingCount: 0,
+  hiddenCount: 0,
+  showHiddenAvailable: false,
+};
+
+/** One entry in every Things to Remember child (D-72 needs entries). */
+const fullKnowledge = {
+  currentState: {
+    last_talked_about: { id: 1, value: "Trip", previous: [] },
+    current_location: { id: 2, value: "Lisbon", previous: [] },
+  },
+  featured: oneEntry({ owner: "memory", id: 3, row: { id: 3 } }),
+  relationships: oneEntry({ id: 4 }),
+  memories: oneEntry({ id: 5 }),
+  thoughtOfThem: oneEntry({ id: 6 }),
+  giftIdeas: oneEntry({ id: 7 }),
+  importedNotes: oneEntry({ id: 8 }),
+  customFields: [{ name: null, items: [{ fieldDefId: 9 }] }],
+  offLimits: [{ id: 10 }],
+} as unknown as ProfileKnowledge;
+
 function profileHostNodes(
   onKnowledgeAction = vi.fn(),
   hostPresentation: ProfilePresentation = presentation,
+  knowledge: ProfileKnowledge = fullKnowledge,
 ): Node[] {
   return all(
     resolve(
       ProfileModuleHost({
-        snapshot: snapshot({ status: "ready", data: {} as never }),
+        snapshot: snapshot({ status: "ready", data: knowledge }),
         presentation: hostPresentation,
         todayLocal: "2026-09-19",
         historyRevision: 0,
@@ -225,31 +258,42 @@ describe("ProfileModuleHost section-header captions", () => {
     expect(onKnowledgeAction).toHaveBeenCalledWith({
       action: "edit",
       childId: "off-limits",
-      target: { owner: "fuel", id: 0 },
+      target: { owner: "offLimits", id: 0 },
     });
   });
 
-  it("gives every editable child owner its own correctly routed heading action", () => {
+  it("gives every child with entries its D-72 heading action, routed as an edit intent", () => {
     const cases = [
-      ["pinned-featured", "Pinned / Featured", "memory"],
-      ["last-talked-about", "Last Talked About", "current-state"],
-      ["key-people", "Key People", "relationship"],
-      ["current-location", "Current Location", "current-state"],
-      ["memories", "Memories", "memory"],
-      ["custom-fields", "Custom Fields", "custom-field"],
-      ["off-limits", "Off Limits", "fuel"],
-      ["imported-contact-notes", "Imported from Contacts App", "memory"],
+      ["last-talked-about", "Add", "Last Talked About", "current-state"],
+      ["thought-of-them", "Add", "Thought of Them", "memory"],
+      ["gift-ideas", "Add", "Gift Ideas", "memory"],
+      ["memories", "Add", "Memories", "memory"],
+      ["current-location", "Edit", "Current Location", "current-state"],
+      ["key-people", "Edit", "Key People", "relationship"],
+      ["off-limits", "Edit", "Off Limits", "offLimits"],
+      ["custom-fields", "Edit", "Custom Fields", "custom-field"],
+      [
+        "imported-contact-notes",
+        "Edit",
+        "Imported from Contacts App",
+        "memory",
+      ],
     ] as const;
 
-    for (const [childId, label, owner] of cases) {
+    for (const [childId, verb, label, owner] of cases) {
       const onKnowledgeAction = vi.fn();
-      const action = profileHostNodes(
+      const nodes = profileHostNodes(
         onKnowledgeAction,
         childPresentation(childId),
-      ).find((node) => node.props.accessibilityLabel === `Edit ${label}`);
+      );
+      const action = nodes.find(
+        (node) => node.props.accessibilityLabel === `${verb} ${label}`,
+      );
 
-      expect(action).toBeDefined();
-      if (!action) throw new Error(`${label} edit action is missing`);
+      expect(action, `${verb} ${label}`).toBeDefined();
+      if (!action) throw new Error(`${label} heading action is missing`);
+      const icon = all([action]).find((node) => node.type === "Icon");
+      expect(icon?.props.name).toBe(verb === "Add" ? "add" : "edit");
       (action.props.onPress as () => void)();
       expect(onKnowledgeAction).toHaveBeenCalledWith({
         action: "edit",
@@ -257,6 +301,58 @@ describe("ProfileModuleHost section-header captions", () => {
         target: { owner, id: 0 },
       });
     }
+
+    const pinned = profileHostNodes(
+      vi.fn(),
+      childPresentation("pinned-featured"),
+    );
+    for (const label of ["Add Pinned / Featured", "Edit Pinned / Featured"]) {
+      expect(
+        pinned.find((node) => node.props.accessibilityLabel === label),
+      ).toBeUndefined();
+    }
+  });
+
+  it("draws no heading action on an empty section, and keeps it on one with entries (D-72; c11)", () => {
+    const knowledge = {
+      ...fullKnowledge,
+      currentState: {},
+      memories: oneEntry({ id: 5 }),
+      giftIdeas: noEntries,
+    } as unknown as ProfileKnowledge;
+    const labels = (id: KnowledgeChildId) =>
+      profileHostNodes(vi.fn(), childPresentation(id), knowledge)
+        .map((node) => node.props.accessibilityLabel)
+        .filter((label): label is string => typeof label === "string");
+
+    expect(labels("current-location")).not.toContain("Edit Current Location");
+    expect(labels("gift-ideas")).not.toContain("Add Gift Ideas");
+    expect(labels("memories")).toContain("Add Memories");
+  });
+
+  it("draws no heading action while the knowledge read has failed", () => {
+    const nodes = all(
+      resolve(
+        ProfileModuleHost({
+          snapshot: snapshot({ status: "error", message: "Couldn't load" }),
+          presentation: childPresentation("memories"),
+          todayLocal: "2026-09-19",
+          historyRevision: 0,
+          onRequestScrollTo: vi.fn(),
+          onSetFrequency: vi.fn(async () => {}),
+          onSnooze: vi.fn(async () => {}),
+          onUnsnooze: vi.fn(async () => {}),
+          onKnowledgeAction: vi.fn(),
+          onKnowledgeViewAll: vi.fn(),
+          onOpenValueHistory: vi.fn(),
+          onOpenKnowledgeChange: vi.fn(),
+          onContactMethodAction: vi.fn(),
+        }),
+      ),
+    );
+    expect(
+      nodes.find((node) => node.props.accessibilityLabel === "Add Memories"),
+    ).toBeUndefined();
   });
 });
 

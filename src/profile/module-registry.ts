@@ -122,6 +122,22 @@ export const PROFILE_MODULE_REGISTRY: Readonly<
     collapsible: true,
     supportedSizes: [],
   },
+  // Gift Ideas and Thought of Them are Things to Remember sections (D-34),
+  // titled as their memory types are (D-91).
+  "thought-of-them": {
+    id: "thought-of-them",
+    label: "Thought of Them",
+    parent: "things-to-remember",
+    collapsible: true,
+    supportedSizes: [],
+  },
+  "gift-ideas": {
+    id: "gift-ideas",
+    label: "Gift Ideas",
+    parent: "things-to-remember",
+    collapsible: true,
+    supportedSizes: [],
+  },
   "custom-fields": {
     id: "custom-fields",
     label: "Custom Fields",

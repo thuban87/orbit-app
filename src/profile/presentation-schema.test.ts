@@ -14,7 +14,20 @@ describe("Profile presentation schema", () => {
       FACTORY_PROFILE_LAYOUT.topLevel.every((placement) => !placement.expanded),
     ).toBe(true);
     expect(FACTORY_PROFILE_LAYOUT.overview).toHaveLength(6);
-    expect(FACTORY_PROFILE_LAYOUT.thingsToRemember).toHaveLength(8);
+    expect(FACTORY_PROFILE_LAYOUT.thingsToRemember).toHaveLength(10);
+    // D-44 order.
+    expect(FACTORY_PROFILE_LAYOUT.thingsToRemember.map((p) => p.id)).toEqual([
+      "pinned-featured",
+      "last-talked-about",
+      "key-people",
+      "current-location",
+      "memories",
+      "thought-of-them",
+      "gift-ideas",
+      "custom-fields",
+      "off-limits",
+      "imported-contact-notes",
+    ]);
   });
 
   it.each([

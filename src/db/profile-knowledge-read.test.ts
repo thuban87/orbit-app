@@ -216,6 +216,73 @@ describe("Profile knowledge projection", () => {
     ]);
   });
 
+  async function memory(
+    owner: number,
+    type: string,
+    value: string,
+    flags: { pinned?: 0 | 1; hidden?: 0 | 1 } = {},
+  ): Promise<number> {
+    const result = await exec.runAsync(
+      `INSERT INTO memories
+         (uid, contact_id, type, value, pinned, hidden, provenance,
+          created_at, modified_at, allow_ai)
+       VALUES (?, ?, ?, ?, ?, ?, 'user', ?, ?, 0)`,
+      [
+        uid(),
+        owner,
+        type,
+        value,
+        flags.pinned ?? 0,
+        flags.hidden ?? 0,
+        NOW,
+        NOW,
+      ],
+    );
+    return result.lastInsertRowId;
+  }
+
+  it("splits Memories, Thought of Them and Gift Ideas, each with its own hidden count (D-34; c6 C-02)", async () => {
+    const owner = await contact("Owner");
+    await memory(owner, "general", "A memory");
+    await memory(owner, "thought_of_them", "Saw their band");
+    await memory(owner, "gift_idea", "Teapot");
+    await memory(owner, "gift_idea", "Hidden gift", { hidden: 1 });
+
+    const result = await readProfileKnowledge(readOnly(), owner);
+    expect(result.memories.items.map((row) => row.value)).toEqual(["A memory"]);
+    expect(result.thoughtOfThem.items.map((row) => row.value)).toEqual([
+      "Saw their band",
+    ]);
+    expect(result.giftIdeas.items.map((row) => row.value)).toEqual(["Teapot"]);
+    expect(result.giftIdeas.hiddenCount).toBe(1);
+    expect(result.giftIdeas.showHiddenAvailable).toBe(true);
+    expect(result.memories.hiddenCount).toBe(0);
+    expect(result.memories.showHiddenAvailable).toBe(false);
+    expect(result.thoughtOfThem.hiddenCount).toBe(0);
+  });
+
+  it("returns every pinned item in Pinned with nothing remaining (D-112; c1 F-U6)", async () => {
+    const owner = await contact("Owner");
+    await memory(owner, "general", "One", { pinned: 1 });
+    await memory(owner, "gift_idea", "Two", { pinned: 1 });
+    await memory(owner, "thought_of_them", "Three", { pinned: 1 });
+    await exec.runAsync(
+      `INSERT INTO relationships
+         (uid, contact_id, person_name, pinned, hidden, created_at, modified_at)
+       VALUES (?, ?, 'Four', 1, 0, ?, ?)`,
+      [uid(), owner, NOW, NOW],
+    );
+
+    const result = await readProfileKnowledge(readOnly(), owner);
+    expect(result.featured.items).toHaveLength(4);
+    expect(result.featured.total).toBe(4);
+    expect(result.featured.remainingCount).toBe(0);
+    // Pinned rows stay out of their own sections.
+    expect(result.memories.items).toEqual([]);
+    expect(result.giftIdeas.items).toEqual([]);
+    expect(result.thoughtOfThem.items).toEqual([]);
+  });
+
   it("caps repeatable visible collections after filtering and reports truthful totals", async () => {
     const owner = await contact("Owner");
     for (let index = 0; index < 5; index += 1) {

@@ -1,11 +1,50 @@
-import { parseAndCanonicalizeProfileLayout } from "./presentation-schema";
+import {
+  FACTORY_PROFILE_LAYOUT,
+  parseAndCanonicalizeProfileLayout,
+} from "./presentation-schema";
 import type {
   MissingProfilePresentationReference,
   ProfileBackgroundTemplateValue,
+  ProfileLayoutDocument,
   ProfileLayoutTemplateValue,
   ProfilePresentation,
   ProfilePresentationInputs,
 } from "./types";
+
+/**
+ * Read-time completion of a saved layout (D-44). A layout saved before a
+ * Things to Remember section existed (Thought of Them and Gift Ideas, 38.10)
+ * lacks its id; each missing child is inserted at its factory position, just
+ * after the nearest earlier factory child the layout has, with its factory
+ * flags. The user's own order and flags are kept. Nothing is written back, so
+ * no migration is needed.
+ */
+export function completeThingsToRememberChildren(
+  document: ProfileLayoutDocument,
+): ProfileLayoutDocument {
+  const factory = FACTORY_PROFILE_LAYOUT.thingsToRemember;
+  const result = document.thingsToRemember.map((placement) => ({
+    ...placement,
+  }));
+  const present = new Set(result.map((placement) => placement.id));
+  if (factory.every((placement) => present.has(placement.id))) return document;
+  factory.forEach((placement, factoryIndex) => {
+    if (present.has(placement.id)) return;
+    let insertAt = 0;
+    for (let earlier = factoryIndex - 1; earlier >= 0; earlier -= 1) {
+      const index = result.findIndex(
+        (candidate) => candidate.id === factory[earlier]?.id,
+      );
+      if (index >= 0) {
+        insertAt = index + 1;
+        break;
+      }
+    }
+    result.splice(insertAt, 0, { ...placement });
+    present.add(placement.id);
+  });
+  return { ...document, thingsToRemember: result };
+}
 
 export function resolveProfilePresentation(
   input: ProfilePresentationInputs,
@@ -47,6 +86,10 @@ export function resolveProfilePresentation(
     source: "factory",
     templateUid: null,
     document: parseAndCanonicalizeProfileLayout(input.factoryLayout),
+  };
+  layout = {
+    ...layout,
+    document: completeThingsToRememberChildren(layout.document),
   };
 
   let background: ProfilePresentation["background"] | null = null;

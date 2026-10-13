@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { formatMonthDay } from "@/utils/dates";
+import type { MemoryRow } from "@/db/memories-read";
+import type {
+  ProfileCollection,
+  ProfileCurrentStateEntry,
+  ProfileKnowledge,
+} from "@/db/profile-knowledge-read";
+import type { RelationshipRow } from "@/db/relationships-read";
+import { formatDisplayDateOrFallback, formatMonthDay } from "@/utils/dates";
 import {
   buildKnowledgePresentation,
+  childHasEntries,
   customValueDisplayText,
   formatCustomFieldValue,
+  headingActionFor,
+  type KnowledgeChildId,
   type KnowledgePresentationInput,
 } from "./knowledge-presentation";
+import { PROFILE_THINGS_TO_REMEMBER_MODULE_IDS } from "./persisted-contract";
 
 const THIS_YEAR = new Date().getFullYear();
 
@@ -67,6 +78,20 @@ const input: KnowledgePresentationInput = {
       showHiddenAvailable: false,
     },
     memories: {
+      items: [],
+      total: 0,
+      remainingCount: 0,
+      hiddenCount: 0,
+      showHiddenAvailable: false,
+    },
+    thoughtOfThem: {
+      items: [],
+      total: 0,
+      remainingCount: 0,
+      hiddenCount: 0,
+      showHiddenAvailable: false,
+    },
+    giftIdeas: {
       items: [],
       total: 0,
       remainingCount: 0,
@@ -207,26 +232,31 @@ describe("knowledge presentation", () => {
   it("keeps child identity/order, semantic caps, hidden recovery, and detail ownership", () => {
     const result = buildKnowledgePresentation(input);
 
+    // D-44 order.
     expect(result.children.map((child) => child.id)).toEqual([
       "pinned-featured",
       "last-talked-about",
       "key-people",
       "current-location",
       "memories",
+      "thought-of-them",
+      "gift-ideas",
       "custom-fields",
       "off-limits",
       "imported-contact-notes",
     ]);
+    // One count format (D-89 / audit D-34); Pinned has no View all (D-112);
+    // the sheet offers Edit and Pin/Unpin, never Hide (D-70).
     expect(result.children[0]).toMatchObject({
-      bodySummary: "1 shown · 3 more",
-      viewAllLabel: "View all 4 featured items",
+      bodySummary: "4 items",
+      viewAllLabel: null,
       showHiddenAvailable: true,
       items: [
         expect.objectContaining({
           detail: expect.objectContaining({ owner: "memory", id: 10 }),
           management: expect.objectContaining({
-            longPress: ["edit", "unpin", "hide"],
-            accessibility: ["edit", "unpin", "hide"],
+            longPress: ["edit", "unpin"],
+            accessibility: ["edit", "unpin"],
           }),
         }),
       ],
@@ -262,8 +292,10 @@ describe("knowledge presentation", () => {
     expect(offLimits?.items[0]).toMatchObject({
       sparkle: false,
       explicitPermission: undefined,
-      detail: { owner: "fuel", id: 90 },
+      detail: { owner: "offLimits", id: 90 },
     });
+    expect(offLimits?.items[0]?.id).toBe("off-limits:90");
+    expect(offLimits?.bodySummary).toBe("1 item");
   });
 
   it("formats every live custom field type exhaustively", () => {
@@ -378,8 +410,9 @@ describe("knowledge presentation", () => {
     for (const text of ["Rex", "/photos/pet.jpg", "file:///x.jpg", " "]) {
       expect(formatCustomFieldValue("photo", text)).toBe("Photo unavailable");
     }
-    expect(formatCustomFieldValue("photo", null)).toBe("Not available yet");
-    expect(formatCustomFieldValue("photo", "")).toBe("Not available yet");
+    // An empty always-show field reads "Not set" (D-87).
+    expect(formatCustomFieldValue("photo", null)).toBe("Not set");
+    expect(formatCustomFieldValue("photo", "")).toBe("Not set");
 
     const withText: KnowledgePresentationInput = {
       ...input,
@@ -414,6 +447,325 @@ describe("knowledge presentation", () => {
       preview: "Photo unavailable",
       rawValue: "Rex",
       invalid: false,
+    });
+  });
+
+  describe("38.10 Profile sections (D-44, D-52, D-68, D-72, D-112, D-24, D-37)", () => {
+    const none = <T>(): ProfileCollection<T> => ({
+      items: [],
+      total: 0,
+      remainingCount: 0,
+      hiddenCount: 0,
+      showHiddenAvailable: false,
+    });
+    const some = <T>(items: T[]): ProfileCollection<T> => ({
+      items,
+      total: items.length,
+      remainingCount: 0,
+      hiddenCount: 0,
+      showHiddenAvailable: false,
+    });
+    const memory = (id: number, over: Partial<MemoryRow> = {}): MemoryRow => ({
+      id,
+      uid: `memory-${id}`,
+      contact_id: 7,
+      type: "general",
+      custom_label: null,
+      value: `Memory ${id}`,
+      note: null,
+      url: null,
+      meaningful_date: null,
+      pinned: 0,
+      outdated: 0,
+      hidden: 0,
+      provenance: "user",
+      created_at: "2026-09-01 12:00:00",
+      modified_at: "2026-09-01 12:00:00",
+      deleted_at: null,
+      allow_ai: 0,
+      interaction_id: null,
+      link_source: null,
+      group_note_copy: 0,
+      linked_note_ai_locked: 0,
+      ...over,
+    });
+    const person = (
+      id: number,
+      over: Partial<RelationshipRow> = {},
+    ): RelationshipRow => ({
+      id,
+      uid: `person-${id}`,
+      contact_id: 7,
+      person_name: `Person ${id}`,
+      relation_type: null,
+      linked_contact_id: null,
+      linked_contact_name: null,
+      note: null,
+      pinned: 0,
+      hidden: 0,
+      created_at: "2026-09-01 12:00:00",
+      modified_at: "2026-09-01 12:00:00",
+      deleted_at: null,
+      ...over,
+    });
+    const entry = (
+      id: number,
+      fieldKey: ProfileCurrentStateEntry["field_key"],
+      over: Partial<ProfileCurrentStateEntry> = {},
+    ): ProfileCurrentStateEntry => ({
+      id,
+      uid: `entry-${id}`,
+      contact_id: 7,
+      field_key: fieldKey,
+      value: `Entry ${id}`,
+      created_at: "2026-09-01 12:00:00",
+      modified_at: "2026-09-01 12:00:00",
+      previous: [],
+      ...over,
+    });
+    const empty: ProfileKnowledge = {
+      currentState: {},
+      featured: none(),
+      relationships: none(),
+      memories: none(),
+      thoughtOfThem: none(),
+      giftIdeas: none(),
+      importedNotes: none(),
+      customFields: [],
+      offLimits: [],
+    };
+    const full: ProfileKnowledge = {
+      currentState: {
+        last_talked_about: entry(1, "last_talked_about"),
+        current_location: entry(2, "current_location"),
+      },
+      featured: some([{ owner: "memory", id: 50, row: memory(50) }]),
+      relationships: some([person(1)]),
+      memories: some([memory(1)]),
+      thoughtOfThem: some([memory(2, { type: "thought_of_them" })]),
+      giftIdeas: some([memory(3, { type: "gift_idea" })]),
+      importedNotes: some([memory(4, { type: "imported" })]),
+      customFields: input.knowledge.customFields,
+      offLimits: input.knowledge.offLimits,
+    };
+    const build = (knowledge: ProfileKnowledge) =>
+      buildKnowledgePresentation({ contactId: 7, knowledge });
+    const child = (knowledge: ProfileKnowledge, id: KnowledgeChildId) => {
+      const found = build(knowledge).children.find((c) => c.id === id);
+      if (!found) throw new Error(`missing ${id}`);
+      return found;
+    };
+
+    it("headingActionFor follows D-72, and every built child carries it", () => {
+      const expected: Record<KnowledgeChildId, "add" | "edit" | "none"> = {
+        "pinned-featured": "none",
+        "last-talked-about": "add",
+        "key-people": "edit",
+        "current-location": "edit",
+        memories: "add",
+        "thought-of-them": "add",
+        "gift-ideas": "add",
+        "custom-fields": "edit",
+        "off-limits": "edit",
+        "imported-contact-notes": "edit",
+      };
+      for (const id of PROFILE_THINGS_TO_REMEMBER_MODULE_IDS) {
+        expect(headingActionFor(id)).toBe(expected[id]);
+      }
+      for (const built of build(full).children) {
+        expect(built.headingAction).toBe(headingActionFor(built.id));
+      }
+    });
+
+    it("childHasEntries is false for an empty section and true with one entry", () => {
+      expect(childHasEntries("current-location", empty)).toBe(false);
+      expect(childHasEntries("current-location", full)).toBe(true);
+      expect(childHasEntries("gift-ideas", empty)).toBe(false);
+      expect(childHasEntries("gift-ideas", full)).toBe(true);
+      for (const id of PROFILE_THINGS_TO_REMEMBER_MODULE_IDS) {
+        expect(childHasEntries(id, empty)).toBe(false);
+        expect(childHasEntries(id, full)).toBe(true);
+      }
+    });
+
+    it("titles the sections from the registry (D-91)", () => {
+      expect(child(full, "thought-of-them").title).toBe("Thought of Them");
+      expect(child(full, "gift-ideas").title).toBe("Gift Ideas");
+      expect(child(full, "gift-ideas").items[0]?.title).toBe("Gift Ideas");
+      expect(child(full, "memories").items[0]?.title).toBe("Memory");
+    });
+
+    it("gives every empty section its line and 'Add …', except Imported and Pinned (D-68; c2 G-U3)", () => {
+      const labels = Object.fromEntries(
+        build(empty).children.map((c) => [c.id, c.emptyAction]),
+      );
+      expect(labels).toEqual({
+        "pinned-featured": null,
+        "last-talked-about": "Add Last Talked About",
+        "key-people": "Add Key Person",
+        "current-location": "Add Current Location",
+        memories: "Add Memory",
+        "thought-of-them": "Add Thought of Them",
+        "gift-ideas": "Add Gift Idea",
+        "custom-fields": "Add Custom Field",
+        "off-limits": "Add Off Limits Item",
+        "imported-contact-notes": null,
+      });
+      for (const built of build(empty).children) {
+        expect(built.bodySummary).toBe("Nothing added yet");
+      }
+      for (const built of build(full).children) {
+        expect(built.emptyAction).toBeNull();
+      }
+    });
+
+    it("shows Most Recent and Previous by the entry date, date only (D-41, D-48; c6 C-02)", () => {
+      const backdated = {
+        entry_date: "2026-09-12",
+        created_at: "2026-10-05 14:30:00",
+      };
+      const knowledge: ProfileKnowledge = {
+        ...empty,
+        currentState: {
+          last_talked_about: entry(1, "last_talked_about", {
+            ...backdated,
+            previous: [
+              entry(2, "last_talked_about", backdated),
+              entry(3, "last_talked_about", {
+                created_at: "2026-08-03 21:15:00",
+              }),
+            ],
+          }),
+        },
+      };
+      const items = child(knowledge, "last-talked-about").items;
+      const sep12 = formatDisplayDateOrFallback("2026-09-12");
+      expect(items.map((item) => item.metadata[0])).toEqual([
+        sep12,
+        sep12,
+        formatDisplayDateOrFallback("2026-08-03"),
+      ]);
+      expect(items[0]?.metadata[0]).not.toMatch(/\d:\d/);
+    });
+
+    it("labels 'See all (N)' on Last Talked About and Current Location (D-52, D-53; c9)", () => {
+      const knowledge: ProfileKnowledge = {
+        ...empty,
+        currentState: {
+          last_talked_about: entry(1, "last_talked_about", { total: 8 }),
+          current_location: entry(2, "current_location", { total: 2 }),
+        },
+      };
+      expect(child(knowledge, "last-talked-about").viewAllLabel).toBe(
+        "See all (8)",
+      );
+      expect(child(knowledge, "current-location").viewAllLabel).toBe(
+        "See all (2)",
+      );
+      expect(child(empty, "current-location").viewAllLabel).toBeNull();
+    });
+
+    it("keeps a pinned memory and a pinned key person with the same id, and every pinned item (D-112; c1 F-U6)", () => {
+      const twin: ProfileKnowledge = {
+        ...empty,
+        featured: some([
+          { owner: "memory", id: 5, row: memory(5, { pinned: 1 }) },
+          {
+            owner: "relationship",
+            id: 5,
+            row: person(5, { pinned: 1 }),
+          },
+        ]),
+      };
+      expect(child(twin, "pinned-featured").items.map((i) => i.id)).toEqual([
+        "memory:5",
+        "relationship:5",
+      ]);
+      const five: ProfileKnowledge = {
+        ...empty,
+        featured: some(
+          [1, 2, 3, 4, 5].map((id) => ({
+            owner: "memory" as const,
+            id,
+            row: memory(id, { pinned: 1 }),
+          })),
+        ),
+      };
+      const pinned = child(five, "pinned-featured");
+      expect(pinned.items).toHaveLength(5);
+      expect(pinned.viewAllLabel).toBeNull();
+    });
+
+    it("carries a stored URL in the detail of entries and Off Limits items (D-24; c1 F-U9)", () => {
+      const knowledge: ProfileKnowledge = {
+        ...empty,
+        currentState: {
+          last_talked_about: entry(1, "last_talked_about", {
+            url: "https://example.test/trip",
+          }),
+        },
+        offLimits: [
+          {
+            ...input.knowledge.offLimits[0]!,
+            url: "https://example.test/news",
+          },
+        ],
+        memories: some([memory(9, { url: "https://example.test/soup" })]),
+      };
+      expect(child(knowledge, "last-talked-about").items[0]?.detail.url).toBe(
+        "https://example.test/trip",
+      );
+      expect(child(knowledge, "off-limits").items[0]).toMatchObject({
+        metadata: ["Link"],
+        detail: { url: "https://example.test/news" },
+      });
+      expect(child(knowledge, "memories").items[0]?.detail.url).toBe(
+        "https://example.test/soup",
+      );
+      expect(child(full, "memories").items[0]?.detail).not.toHaveProperty(
+        "url",
+      );
+    });
+
+    it("carries the interaction link only on a linked entry (D-37, D-107)", () => {
+      const knowledge: ProfileKnowledge = {
+        ...empty,
+        currentState: {
+          last_talked_about: entry(1, "last_talked_about", {
+            interaction_id: 40,
+            link_source: "note",
+            previous: [entry(2, "last_talked_about")],
+          }),
+        },
+        memories: some([
+          memory(1, { interaction_id: 41, link_source: "group_note" }),
+          memory(2),
+        ]),
+      };
+      const [linkedEntry, plainEntry] = child(
+        knowledge,
+        "last-talked-about",
+      ).items;
+      expect(linkedEntry?.detail.link).toEqual({
+        interactionId: 40,
+        linkSource: "note",
+      });
+      expect(plainEntry?.detail).not.toHaveProperty("link");
+      const [linkedMemory, plainMemory] = child(knowledge, "memories").items;
+      expect(linkedMemory?.detail.link).toEqual({
+        interactionId: 41,
+        linkSource: "group_note",
+      });
+      expect(plainMemory?.detail).not.toHaveProperty("link");
+    });
+
+    it("never offers Hide on an entry (D-70)", () => {
+      for (const built of build(full).children) {
+        for (const item of built.items) {
+          expect(item.management.accessibility).not.toContain("hide");
+          expect(item.management.longPress).not.toContain("hide");
+        }
+      }
     });
   });
 });

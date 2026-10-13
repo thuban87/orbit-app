@@ -27,7 +27,12 @@ describe("Profile knowledge component contracts", () => {
     expect(source).toContain("View history");
     expect(source).not.toContain('role="destructive"');
     expect(hostSource()).toContain("knowledgeHeaderAction");
-    expect(hostSource()).toContain("accessibilityLabel={`Edit");
+    // D-72: Add or the pencil from the one `headingActionFor` table, gated by
+    // `childHasEntries` (convergence c11, c12).
+    expect(hostSource()).toContain("headingActionFor(id)");
+    expect(hostSource()).toContain("childHasEntries(");
+    expect(hostSource()).toMatch(/`Add \$\{actionLabel\}`/);
+    expect(hostSource()).toMatch(/`Edit \$\{actionLabel\}`/);
   });
 
   it("registers Things to Remember and full contact-method rows in the module host", () => {

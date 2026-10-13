@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
-import { resolveProfilePresentation } from "./resolve-presentation";
+import {
+  completeThingsToRememberChildren,
+  resolveProfilePresentation,
+} from "./resolve-presentation";
 import type { ProfilePresentationInputs } from "./types";
 
 const layout = (visible: boolean) => ({
@@ -127,5 +130,74 @@ describe("resolveProfilePresentation", () => {
       background: { source: "theme", imagePath: "theme:galaxy" },
       layout: { source: "category", templateUid: "category-layout" },
     });
+  });
+
+  it("completes a saved layout that predates Thought of Them and Gift Ideas, at their D-44 positions", () => {
+    const saved = {
+      ...FACTORY_PROFILE_LAYOUT,
+      // A user-ordered layout saved before 38.10: Memories moved to the top,
+      // Imported shown expanded, Off Limits hidden.
+      thingsToRemember: [
+        { id: "memories" as const, visible: true, expanded: true },
+        { id: "pinned-featured" as const, visible: true, expanded: true },
+        { id: "last-talked-about" as const, visible: true, expanded: true },
+        { id: "key-people" as const, visible: true, expanded: false },
+        { id: "current-location" as const, visible: true, expanded: true },
+        { id: "custom-fields" as const, visible: true, expanded: true },
+        { id: "off-limits" as const, visible: false, expanded: true },
+        {
+          id: "imported-contact-notes" as const,
+          visible: true,
+          expanded: true,
+        },
+      ],
+    };
+    const input = base();
+    input.contact.freeformLayout = saved;
+    const resolved = resolveProfilePresentation(input).layout.document;
+    expect(resolved.thingsToRemember.map((p) => p.id)).toEqual([
+      "memories",
+      "thought-of-them",
+      "gift-ideas",
+      "pinned-featured",
+      "last-talked-about",
+      "key-people",
+      "current-location",
+      "custom-fields",
+      "off-limits",
+      "imported-contact-notes",
+    ]);
+    expect(
+      resolved.thingsToRemember.find((p) => p.id === "gift-ideas"),
+    ).toEqual({ id: "gift-ideas", visible: true, expanded: true });
+    // The user's own flags are kept.
+    expect(
+      resolved.thingsToRemember.find((p) => p.id === "off-limits")?.visible,
+    ).toBe(false);
+    expect(
+      resolved.thingsToRemember.find((p) => p.id === "key-people")?.expanded,
+    ).toBe(false);
+    // The stored document itself is not rewritten.
+    expect(saved.thingsToRemember).toHaveLength(8);
+  });
+
+  it("completes a template layout too, and leaves a complete layout unchanged", () => {
+    const old = {
+      ...FACTORY_PROFILE_LAYOUT,
+      thingsToRemember: FACTORY_PROFILE_LAYOUT.thingsToRemember.filter(
+        (p) => p.id !== "thought-of-them" && p.id !== "gift-ideas",
+      ),
+    };
+    const input = base();
+    input.layoutTemplates = [{ uid: "global-layout", layout: old }];
+    input.category = null;
+    const resolved = resolveProfilePresentation(input);
+    expect(resolved.layout.source).toBe("global");
+    expect(resolved.layout.document.thingsToRemember).toEqual(
+      FACTORY_PROFILE_LAYOUT.thingsToRemember,
+    );
+    expect(completeThingsToRememberChildren(FACTORY_PROFILE_LAYOUT)).toBe(
+      FACTORY_PROFILE_LAYOUT,
+    );
   });
 });

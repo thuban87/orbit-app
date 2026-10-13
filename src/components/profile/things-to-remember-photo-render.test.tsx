@@ -89,6 +89,8 @@ const knowledge = {
   featured: emptyCollection,
   relationships: emptyCollection,
   memories: emptyCollection,
+  thoughtOfThem: emptyCollection,
+  giftIdeas: emptyCollection,
   importedNotes: emptyCollection,
   customFields: [
     {

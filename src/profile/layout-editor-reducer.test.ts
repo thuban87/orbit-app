@@ -76,7 +76,18 @@ describe("Profile layout editor reducer", () => {
 
     expect(draft.topLevel).toHaveLength(4);
     expect(draft.overview).toHaveLength(6);
-    expect(draft.thingsToRemember).toHaveLength(8);
+    expect(draft.thingsToRemember).toHaveLength(10);
+    // A layout saved before Thought of Them and Gift Ideas gets them at their
+    // D-44 places, as the Profile shows them, not at the end.
+    const pre3810 = createProfileLayoutEditorDraft({
+      ...FACTORY_PROFILE_LAYOUT,
+      thingsToRemember: FACTORY_PROFILE_LAYOUT.thingsToRemember.filter(
+        (p) => p.id !== "thought-of-them" && p.id !== "gift-ideas",
+      ),
+    });
+    expect(pre3810.thingsToRemember).toEqual(
+      FACTORY_PROFILE_LAYOUT.thingsToRemember,
+    );
     expect(
       createAllSectionsPreview(
         profileLayoutEditorReducer(draft, {

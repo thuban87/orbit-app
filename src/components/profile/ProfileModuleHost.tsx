@@ -19,6 +19,10 @@ import {
 } from "@/db/profile-presentation-dao";
 import type { ProfileSnapshot } from "@/db/profile-read";
 import {
+  childHasEntries,
+  headingActionFor,
+} from "@/profile/knowledge-presentation";
+import {
   completeHistoryScroll,
   createHistoryRevealScroll,
   type HistoryRevealScroll,
@@ -357,7 +361,18 @@ export function ProfileModuleHost({
               : undefined
           }
           onToggle={toggle}
-          headerAction={knowledgeHeaderAction(placement.id as KnowledgeChildId)}
+          // One heading action only once a section has entries (D-72): the
+          // same rule as the empty line and its "Add …", so the two never
+          // both show. An error snapshot draws none.
+          headerAction={
+            snapshot.knowledge.status === "ready" &&
+            childHasEntries(
+              placement.id as KnowledgeChildId,
+              snapshot.knowledge.data,
+            )
+              ? knowledgeHeaderAction(placement.id as KnowledgeChildId)
+              : null
+          }
         >
           {snapshot.knowledge.status === "error" ? (
             <AppText role="body">{snapshot.knowledge.message}</AppText>
@@ -388,20 +403,29 @@ export function ProfileModuleHost({
       case "custom-fields":
         return { owner: "custom-field", id: 0 };
       case "off-limits":
-        return { owner: "fuel", id: 0 };
+        return { owner: "offLimits", id: 0 };
       case "pinned-featured":
       case "memories":
+      case "thought-of-them":
+      case "gift-ideas":
       case "imported-contact-notes":
         return { owner: "memory", id: 0 };
     }
   };
 
+  // Add for a section the user adds to, the pencil for one edited in its own
+  // editor, nothing for Pinned (D-72; the one table is `headingActionFor`).
+  // Both emit an `edit` intent; the screen picks the destination per id.
   const knowledgeHeaderAction = (id: KnowledgeChildId, label?: string) => {
+    const kind = headingActionFor(id);
+    if (kind === "none") return null;
     const actionLabel = label ?? PROFILE_MODULE_REGISTRY[id].label;
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Edit ${actionLabel}`}
+        accessibilityLabel={
+          kind === "add" ? `Add ${actionLabel}` : `Edit ${actionLabel}`
+        }
         hitSlop={8}
         onPress={() =>
           onKnowledgeAction({
@@ -412,7 +436,7 @@ export function ProfileModuleHost({
         }
         style={styles.sectionEdit}
       >
-        <Icon name="edit" tone="accentText" />
+        <Icon name={kind === "add" ? "add" : "edit"} tone="accentText" />
       </Pressable>
     );
   };

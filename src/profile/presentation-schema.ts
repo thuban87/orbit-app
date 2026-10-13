@@ -140,12 +140,15 @@ export const FACTORY_PROFILE_LAYOUT: ProfileLayoutDocument = {
       size: ProfileModuleSize;
     }
   >,
+  // D-44 order.
   thingsToRemember: [
     placement("pinned-featured", true),
     placement("last-talked-about", true),
     placement("key-people", true),
     placement("current-location", true),
     placement("memories", true),
+    placement("thought-of-them", true),
+    placement("gift-ideas", true),
     placement("custom-fields", true),
     placement("off-limits", true),
     placement("imported-contact-notes", false),

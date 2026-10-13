@@ -1,19 +1,28 @@
+import {
+  ADD_GIFT_IDEA,
+  ADD_MEMORY,
+  ADD_OFF_LIMITS_ITEM,
+  ADD_THOUGHT_OF_THEM,
+} from "@/constants/glossary";
 import { PHOTO_UNAVAILABLE_LABEL } from "@/constants/photo-copy";
 import { parsers } from "@/db/field-parsers";
 import type { MemoryRow } from "@/db/memories-read";
+import {
+  MEMORY_TYPE_REGISTRY,
+  PROVISIONAL_MEMORY_LABEL,
+} from "@/db/memory-registry";
 import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import type {
   ProfileCollection,
+  ProfileCurrentStateEntry,
   ProfileCustomFieldValue,
   ProfileKnowledge,
 } from "@/db/profile-knowledge-read";
 import type { RelationshipRow } from "@/db/relationships-read";
 import type { FieldType } from "@/schemas/types";
-import {
-  formatDateTimeMinuteOrFallback,
-  formatDisplayDateOrFallback,
-} from "@/utils/dates";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { plural } from "@/utils/plural";
+import { PROFILE_MODULE_REGISTRY } from "./module-registry";
 import type { ProfileModuleId } from "./persisted-contract";
 
 export type KnowledgeChildId = Extract<
@@ -23,6 +32,8 @@ export type KnowledgeChildId = Extract<
   | "key-people"
   | "current-location"
   | "memories"
+  | "thought-of-them"
+  | "gift-ideas"
   | "custom-fields"
   | "off-limits"
   | "imported-contact-notes"
@@ -33,15 +44,29 @@ export type KnowledgeOwner =
   | "relationship"
   | "current-state"
   | "custom-field"
-  | "fuel";
+  | "offLimits";
 
-export type KnowledgeAction = "edit" | "pin" | "unpin" | "hide" | "restore";
+/** An entry's actions: Edit, and Pin / Unpin where its table has a pin (D-22, D-70). */
+export type KnowledgeAction = "edit" | "pin" | "unpin";
+
+/** The interaction a linked entry opens on tap (D-37, D-48, D-107). */
+export interface KnowledgeEntryLink {
+  interactionId: number;
+  linkSource: "note" | "group_note";
+}
 
 export interface KnowledgeDetailTarget {
   owner: KnowledgeOwner;
   id: number;
   history?: { contactId: number; fieldDefId: number };
+  /** Absent for an unlinked entry (D-37, D-48). */
+  link?: KnowledgeEntryLink;
+  /** A stored link, shown with Open in the entry's sheet (D-24). */
+  url?: string;
 }
+
+/** The one heading action a section with entries shows (D-72). */
+export type KnowledgeHeadingAction = "add" | "edit" | "none";
 
 export interface KnowledgeManagement {
   longPress: readonly KnowledgeAction[];
@@ -83,6 +108,14 @@ export interface KnowledgePresentationChild {
   groups: KnowledgePresentationGroup[];
   viewAllLabel: string | null;
   showHiddenAvailable: boolean;
+  /** Always `headingActionFor(id)` (D-72). */
+  headingAction: KnowledgeHeadingAction;
+  /**
+   * The empty section's "Add …" label (D-68); null when the section has
+   * entries, and always null for Imported (no add form, D-35) and Pinned (no
+   * action, D-72, D-112).
+   */
+  emptyAction: string | null;
 }
 
 export interface KnowledgePresentationInput {
@@ -105,50 +138,178 @@ export const KNOWLEDGE_ACTION_OWNERS: Readonly<Record<KnowledgeOwner, string>> =
     relationship: "relationship owner",
     "current-state": "current-state writer",
     "custom-field": "normalized value/history writer",
-    fuel: "fuel owner",
+    offLimits: "Off Limits owner",
   });
 
+/** D-44 order. */
 const CHILD_ORDER: readonly KnowledgeChildId[] = [
   "pinned-featured",
   "last-talked-about",
   "key-people",
   "current-location",
   "memories",
+  "thought-of-them",
+  "gift-ideas",
   "custom-fields",
   "off-limits",
   "imported-contact-notes",
 ];
+
+/**
+ * The heading action of a section once it has entries (D-72): Add for Last
+ * Talked About, Thought of Them, Gift Ideas and Memories; a pencil for
+ * Current Location, Key People, Off Limits, Custom Fields and Imported; none
+ * for Pinned. The presentation and `ProfileModuleHost` both read this one
+ * table, so they cannot disagree.
+ */
+export function headingActionFor(id: KnowledgeChildId): KnowledgeHeadingAction {
+  switch (id) {
+    case "last-talked-about":
+    case "thought-of-them":
+    case "gift-ideas":
+    case "memories":
+      return "add";
+    case "current-location":
+    case "key-people":
+    case "off-limits":
+    case "custom-fields":
+    case "imported-contact-notes":
+      return "edit";
+    case "pinned-featured":
+      return "none";
+  }
+}
+
+/**
+ * Whether a section has at least one entry to show (D-72). The empty line and
+ * "Add …" and the heading action all follow this one rule, so an empty
+ * section never shows both.
+ */
+export function childHasEntries(
+  id: KnowledgeChildId,
+  knowledge: ProfileKnowledge,
+): boolean {
+  switch (id) {
+    case "pinned-featured":
+      return knowledge.featured.total > 0;
+    case "last-talked-about":
+      return knowledge.currentState.last_talked_about != null;
+    case "current-location":
+      return knowledge.currentState.current_location != null;
+    case "key-people":
+      return knowledge.relationships.total > 0;
+    case "memories":
+      return knowledge.memories.total > 0;
+    case "thought-of-them":
+      return knowledge.thoughtOfThem.total > 0;
+    case "gift-ideas":
+      return knowledge.giftIdeas.total > 0;
+    case "custom-fields":
+      return knowledge.customFields.some((group) => group.items.length > 0);
+    case "off-limits":
+      return knowledge.offLimits.length > 0;
+    case "imported-contact-notes":
+      return knowledge.importedNotes.total > 0;
+  }
+}
+
+/**
+ * The empty section's "Add …" label (D-68). Imported has no add form (D-35)
+ * and Pinned no action (D-72, D-112). The four memory-type and Off Limits
+ * labels are the glossary's; the other three are proposals for the plan-19
+ * wording review.
+ */
+function emptyActionLabel(id: KnowledgeChildId): string | null {
+  switch (id) {
+    case "last-talked-about":
+      return "Add Last Talked About";
+    case "current-location":
+      return "Add Current Location";
+    case "key-people":
+      return "Add Key Person";
+    case "memories":
+      return ADD_MEMORY;
+    case "thought-of-them":
+      return ADD_THOUGHT_OF_THEM;
+    case "gift-ideas":
+      return ADD_GIFT_IDEA;
+    case "custom-fields":
+      return "Add Custom Field";
+    case "off-limits":
+      return ADD_OFF_LIMITS_ITEM;
+    case "imported-contact-notes":
+    case "pinned-featured":
+      return null;
+  }
+}
+
+/** The empty line of a section with no entries (D-68). */
+const EMPTY_LINE = "Nothing added yet";
+
+/** Section titles come from the one registry (D-89 G-23, D-91). */
+function childTitle(id: KnowledgeChildId): string {
+  return PROFILE_MODULE_REGISTRY[id].label;
+}
 
 function management(actions: readonly KnowledgeAction[]): KnowledgeManagement {
   // Accessibility actions intentionally mirror long press; neither is sole path.
   return { longPress: actions, accessibility: actions };
 }
 
-function summary(total: number, remainingCount = 0): string {
-  if (total === 0) return "Nothing added yet";
-  const shown = total - remainingCount;
-  return remainingCount > 0
-    ? `${shown} shown · ${remainingCount} more`
-    : `${shown} shown`;
+/** Every count reads "N items" (D-89, audit D-34). */
+function countLine(total: number): string {
+  return total === 0 ? EMPTY_LINE : plural(total, "item");
 }
 
 function viewAllLabel(total: number, noun: string): string | null {
   return total > 3 ? `View all ${total} ${noun}` : null;
 }
 
-function unique<T extends { id: number }>(items: readonly T[]): T[] {
-  const ids = new Set<number>();
+function unique<T extends { id: number }>(
+  items: readonly T[],
+  key: (item: T) => string | number = (item) => item.id,
+): T[] {
+  const seen = new Set<string | number>();
   return items.filter((item) => {
-    if (ids.has(item.id)) return false;
-    ids.add(item.id);
+    const value = key(item);
+    if (seen.has(value)) return false;
+    seen.add(value);
     return true;
   });
 }
 
+/** The entry's interaction link, absent when it is unlinked (D-37, D-48). */
+function entryLink(row: {
+  interaction_id?: number | null;
+  link_source?: string | null;
+}): KnowledgeEntryLink | undefined {
+  if (row.interaction_id == null) return undefined;
+  return {
+    interactionId: row.interaction_id,
+    linkSource: row.link_source === "group_note" ? "group_note" : "note",
+  };
+}
+
+/** Optional detail fields: the stored URL (D-24) and the link (D-37). */
+function detailExtras(row: {
+  url?: string | null;
+  interaction_id?: number | null;
+  link_source?: string | null;
+}): Pick<KnowledgeDetailTarget, "link" | "url"> {
+  const link = entryLink(row);
+  return {
+    ...(row.url ? { url: row.url } : {}),
+    ...(link ? { link } : {}),
+  };
+}
+
 function memoryItem(memory: MemoryRow): KnowledgePresentationItem {
+  // D-86: the label wins; otherwise the type's registry name (D-91).
   const title =
     memory.custom_label ??
-    (memory.type === "imported" ? "Imported note" : "Memory");
+    MEMORY_TYPE_REGISTRY[memory.type as keyof typeof MEMORY_TYPE_REGISTRY]
+      ?.displayName ??
+    PROVISIONAL_MEMORY_LABEL;
   const metadata = [
     // D-48 display, raw when not a date (38.9 D-65); storage unchanged.
     memory.meaningful_date
@@ -166,12 +327,8 @@ function memoryItem(memory: MemoryRow): KnowledgePresentationItem {
     title,
     preview: memory.value ?? memory.note ?? null,
     metadata,
-    detail: { owner: "memory", id: memory.id },
-    management: management([
-      "edit",
-      memory.pinned === 1 ? "unpin" : "pin",
-      "hide",
-    ]),
+    detail: { owner: "memory", id: memory.id, ...detailExtras(memory) },
+    management: management(["edit", memory.pinned === 1 ? "unpin" : "pin"]),
     sparkle: memory.allow_ai === 1,
   };
 }
@@ -185,77 +342,101 @@ function relationshipItem(row: RelationshipRow): KnowledgePresentationItem {
       (value): value is string => value != null && value !== "",
     ),
     detail: { owner: "relationship", id: row.id },
-    management: management([
-      "edit",
-      row.pinned === 1 ? "unpin" : "pin",
-      "hide",
-    ]),
+    management: management(["edit", row.pinned === 1 ? "unpin" : "pin"]),
     sparkle: false,
+  };
+}
+
+function childChrome(
+  id: KnowledgeChildId,
+  knowledge: ProfileKnowledge,
+): Pick<KnowledgePresentationChild, "headingAction" | "emptyAction"> {
+  return {
+    headingAction: headingActionFor(id),
+    emptyAction: childHasEntries(id, knowledge) ? null : emptyActionLabel(id),
   };
 }
 
 function repeatableChild<T extends { id: number }>(input: {
   id: KnowledgeChildId;
-  title: string;
+  knowledge: ProfileKnowledge;
   collection: ProfileCollection<T>;
-  noun: string;
+  /** Null for no View all (Pinned, D-112). */
+  noun: string | null;
   item: (value: T) => KnowledgePresentationItem;
+  key?: (value: T) => string | number;
 }): KnowledgePresentationChild {
-  const values = unique(input.collection.items);
+  const values = unique(input.collection.items, input.key);
+  const hasEntries = childHasEntries(input.id, input.knowledge);
   return {
     id: input.id,
-    title: input.title,
-    bodySummary: summary(
-      input.collection.total,
-      input.collection.remainingCount,
-    ),
+    title: childTitle(input.id),
+    bodySummary: hasEntries ? countLine(input.collection.total) : EMPTY_LINE,
     items: values.map(input.item),
     groups: [],
-    viewAllLabel: viewAllLabel(input.collection.total, input.noun),
+    viewAllLabel:
+      input.noun === null
+        ? null
+        : viewAllLabel(input.collection.total, input.noun),
     showHiddenAvailable: input.collection.showHiddenAvailable,
+    ...childChrome(input.id, input.knowledge),
+  };
+}
+
+/**
+ * Most Recent and Previous show the date the entry is about, never the
+ * capture time (D-41, D-48): `entry_date`, else `created_at`'s date part.
+ */
+function currentStateItem(
+  entry: ProfileCurrentStateEntry,
+  position: "most-recent" | "previous",
+): KnowledgePresentationItem {
+  const when = entry.entry_date ?? entry.created_at;
+  return {
+    id: `current-state:${entry.id}`,
+    title: position === "most-recent" ? "Most Recent" : "Previous",
+    preview: entry.value,
+    metadata: [
+      formatDisplayDateOrFallback(when, when),
+      ...(entry.url ? ["Link"] : []),
+    ],
+    detail: {
+      owner: "current-state",
+      id: entry.id,
+      ...detailExtras(entry),
+    },
+    management: management(["edit"]),
+    sparkle: false,
+    temporalPosition: position,
   };
 }
 
 function formatCurrentState(
-  id: KnowledgeChildId,
+  id: "last-talked-about" | "current-location",
   input: KnowledgePresentationInput,
 ): KnowledgePresentationChild {
   const entry =
     id === "last-talked-about"
       ? input.knowledge.currentState.last_talked_about
       : input.knowledge.currentState.current_location;
-  const title =
-    id === "last-talked-about" ? "Last Talked About" : "Current Location";
-  const currentItem = entry
-    ? {
-        id: `current-state:${entry.id}`,
-        title: "Most Recent",
-        preview: entry.value,
-        metadata: [formatDateTimeMinuteOrFallback(entry.created_at)],
-        detail: { owner: "current-state" as const, id: entry.id },
-        management: management(["edit"]),
-        sparkle: false,
-        temporalPosition: "most-recent" as const,
-      }
-    : null;
-  const previousItems = (entry?.previous ?? []).slice(0, 5).map((previous) => ({
-    id: `current-state:${previous.id}`,
-    title: "Previous",
-    preview: previous.value,
-    metadata: [formatDateTimeMinuteOrFallback(previous.created_at)],
-    detail: { owner: "current-state" as const, id: previous.id },
-    management: management(["edit"]),
-    sparkle: false,
-    temporalPosition: "previous" as const,
-  }));
+  const previousItems = (entry?.previous ?? [])
+    .slice(0, 5)
+    .map((previous) => currentStateItem(previous, "previous"));
   return {
     id,
-    title,
-    bodySummary: entry ? "" : "Nothing added yet",
-    items: currentItem ? [currentItem, ...previousItems] : [],
+    title: childTitle(id),
+    bodySummary: entry ? "" : EMPTY_LINE,
+    items: entry
+      ? [currentStateItem(entry, "most-recent"), ...previousItems]
+      : [],
     groups: [],
-    viewAllLabel: null,
+    // "See all (N)" under Previous whenever the section has entries (D-52,
+    // D-53); it opens the full history page.
+    viewAllLabel: entry
+      ? `See all (${entry.total ?? 1 + entry.previous.length})`
+      : null,
     showHiddenAvailable: false,
+    ...childChrome(id, input.knowledge),
   };
 }
 
@@ -285,7 +466,8 @@ export function formatCustomFieldValue(
   type: FieldType,
   value: string | null,
 ): string {
-  if (value == null || value === "") return "Not available yet";
+  // An empty always-show field reads "Not set" (D-87).
+  if (value == null || value === "") return "Not set";
   switch (type) {
     case "date":
       return customValueDisplayText(type, value);
@@ -349,80 +531,102 @@ function customFieldsChild(
   const items = groups.flatMap((group) => group.items);
   return {
     id: "custom-fields",
-    title: "Custom Fields",
-    bodySummary:
-      items.length === 0 ? "Nothing added yet" : plural(items.length, "field"),
+    title: childTitle("custom-fields"),
+    bodySummary: countLine(items.length),
     items,
     groups,
     viewAllLabel: null,
     showHiddenAvailable: false,
+    ...childChrome("custom-fields", input.knowledge),
   };
 }
 
 function offLimitsChild(
   input: KnowledgePresentationInput,
 ): KnowledgePresentationChild {
-  const items = unique(input.knowledge.offLimits).map((row) => ({
-    id: `fuel:${row.id}`,
-    title: row.label ?? "Off Limits",
-    preview: row.text,
-    metadata: row.url ? ["Link"] : [],
-    detail: { owner: "fuel" as const, id: row.id },
-    management: management(["edit"]),
-    // D-12: an ordinary fuel row has no durable permission and must never imply one.
-    sparkle: false,
-    explicitPermission: undefined,
-  }));
+  // Fully visible, never collapsed, no sparkle (D-10).
+  const items = unique(input.knowledge.offLimits).map(
+    (row): KnowledgePresentationItem => ({
+      id: `off-limits:${row.id}`,
+      title: row.label ?? "Off Limits",
+      preview: row.text,
+      metadata: row.url ? ["Link"] : [],
+      detail: { owner: "offLimits", id: row.id, ...detailExtras(row) },
+      management: management(["edit"]),
+      // D-12: an ordinary Off Limits row has no durable permission and must never imply one.
+      sparkle: false,
+      explicitPermission: undefined,
+    }),
+  );
   return {
     id: "off-limits",
-    title: "Off Limits",
-    bodySummary:
-      items.length === 0 ? "Nothing added yet" : `${items.length} saved`,
+    title: childTitle("off-limits"),
+    bodySummary: countLine(items.length),
+    // D-105: this helper stays.
     helper: "Avoid bringing these up",
     items,
     groups: [],
     viewAllLabel: viewAllLabel(items.length, "off-limit items"),
     showHiddenAvailable: false,
+    ...childChrome("off-limits", input.knowledge),
   };
 }
 
-/** Build one compact, source-typed presentation model for the fixed TTR order. */
+/** Build one compact, source-typed presentation model in the D-44 order. */
 export function buildKnowledgePresentation(
   input: KnowledgePresentationInput,
 ): KnowledgePresentation {
+  const knowledge = input.knowledge;
   const byId: Record<KnowledgeChildId, KnowledgePresentationChild> = {
     "pinned-featured": repeatableChild({
       id: "pinned-featured",
-      title: "Pinned / Featured",
-      collection: input.knowledge.featured,
-      noun: "featured items",
+      knowledge,
+      collection: knowledge.featured,
+      // Every pinned item shows, with no View all (D-112).
+      noun: null,
       item: (reference) =>
         reference.owner === "memory"
           ? memoryItem(reference.row)
           : relationshipItem(reference.row),
+      // Memory and key-person ids are independent keys (convergence c1 F-U6).
+      key: (reference) => `${reference.owner}:${reference.id}`,
     }),
     "last-talked-about": formatCurrentState("last-talked-about", input),
     "key-people": repeatableChild({
       id: "key-people",
-      title: "Key People",
-      collection: input.knowledge.relationships,
+      knowledge,
+      collection: knowledge.relationships,
       noun: "people",
       item: relationshipItem,
     }),
     "current-location": formatCurrentState("current-location", input),
     memories: repeatableChild({
       id: "memories",
-      title: "Memories",
-      collection: input.knowledge.memories,
+      knowledge,
+      collection: knowledge.memories,
       noun: "memories",
+      item: memoryItem,
+    }),
+    "thought-of-them": repeatableChild({
+      id: "thought-of-them",
+      knowledge,
+      collection: knowledge.thoughtOfThem,
+      noun: "Thought of Them entries",
+      item: memoryItem,
+    }),
+    "gift-ideas": repeatableChild({
+      id: "gift-ideas",
+      knowledge,
+      collection: knowledge.giftIdeas,
+      noun: "gift ideas",
       item: memoryItem,
     }),
     "custom-fields": customFieldsChild(input),
     "off-limits": offLimitsChild(input),
     "imported-contact-notes": repeatableChild({
       id: "imported-contact-notes",
-      title: "Imported from Contacts App",
-      collection: input.knowledge.importedNotes,
+      knowledge,
+      collection: knowledge.importedNotes,
       noun: "imported notes",
       item: memoryItem,
     }),

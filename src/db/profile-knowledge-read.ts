@@ -89,7 +89,12 @@ export interface ProfileKnowledge {
   currentState: Partial<Record<CurrentStateFieldKey, ProfileCurrentStateEntry>>;
   featured: ProfileCollection<ProfileFeaturedReference>;
   relationships: ProfileCollection<RelationshipRow>;
+  /** Memories (`general`, and any other non-imported type without a section). */
   memories: ProfileCollection<MemoryRow>;
+  /** Thought of Them, its own section (D-34, D-44). */
+  thoughtOfThem: ProfileCollection<MemoryRow>;
+  /** Gift Ideas, its own section (D-34, D-44). */
+  giftIdeas: ProfileCollection<MemoryRow>;
   importedNotes: ProfileCollection<MemoryRow>;
   customFields: ProfileCustomFieldGroup[];
   offLimits: OffLimitsRow[];
@@ -269,6 +274,29 @@ export async function readPopulatedCustomFields(
   return groupCustomFieldRows(rows, contactId);
 }
 
+type ProfileMemorySection =
+  | "memories"
+  | "thoughtOfThem"
+  | "giftIdeas"
+  | "importedNotes";
+
+/**
+ * The Profile section a memory type belongs to (D-34, D-44). Any type without
+ * a section of its own stays under Memories, as before.
+ */
+function profileMemorySection(type: string): ProfileMemorySection {
+  switch (type) {
+    case "imported":
+      return "importedNotes";
+    case "thought_of_them":
+      return "thoughtOfThem";
+    case "gift_idea":
+      return "giftIdeas";
+    default:
+      return "memories";
+  }
+}
+
 /**
  * Read renderer-neutral Profile knowledge without flattening its semantic owners.
  * Hidden rows are counted for administration but never admitted to visible caps;
@@ -296,16 +324,15 @@ export async function readProfileKnowledge(
   const visibleMemories = memoryRows.filter(
     (row) => resolveVisibility(row.type, row.hidden) === "show",
   );
-  const hiddenGeneral = memoryRows.filter(
-    (row) =>
-      row.type !== "imported" &&
-      resolveVisibility(row.type, row.hidden) === "hide",
-  ).length;
-  const hiddenImported = memoryRows.filter(
-    (row) =>
-      row.type === "imported" &&
-      resolveVisibility(row.type, row.hidden) === "hide",
-  ).length;
+  // One hidden count per section (convergence c6, Claude C-02): a hidden
+  // Gift Idea never counts toward Memories. Show hidden is otherwise
+  // unchanged (D-71 deferred).
+  const hiddenOf = (section: ProfileMemorySection) =>
+    memoryRows.filter(
+      (row) =>
+        profileMemorySection(row.type) === section &&
+        resolveVisibility(row.type, row.hidden) === "hide",
+    ).length;
 
   const featuredRelationships = visibleRelationships.filter(
     (row) => row.pinned === 1,
@@ -326,19 +353,27 @@ export async function readProfileKnowledge(
   const relationshipItems = visibleRelationships.filter(
     (row) => row.pinned !== 1,
   );
-  const generalItems = visibleMemories.filter(
-    (row) => row.type !== "imported" && row.pinned !== 1,
-  );
-  const importedItems = visibleMemories.filter(
-    (row) => row.type === "imported" && row.pinned !== 1,
-  );
+  // Pinned rows stay out of their own sections, so Pinned is where they show.
+  const sectionItems = (section: ProfileMemorySection) =>
+    visibleMemories.filter(
+      (row) => profileMemorySection(row.type) === section && row.pinned !== 1,
+    );
 
   return {
     currentState,
-    featured: collection(featured, 0),
+    // Pinned shows every pinned item, with no cap (D-112).
+    featured: collection(featured, 0, featured.length),
     relationships: collection(relationshipItems, hiddenRelationships),
-    memories: collection(generalItems, hiddenGeneral),
-    importedNotes: collection(importedItems, hiddenImported),
+    memories: collection(sectionItems("memories"), hiddenOf("memories")),
+    thoughtOfThem: collection(
+      sectionItems("thoughtOfThem"),
+      hiddenOf("thoughtOfThem"),
+    ),
+    giftIdeas: collection(sectionItems("giftIdeas"), hiddenOf("giftIdeas")),
+    importedNotes: collection(
+      sectionItems("importedNotes"),
+      hiddenOf("importedNotes"),
+    ),
     customFields,
     offLimits,
   };
