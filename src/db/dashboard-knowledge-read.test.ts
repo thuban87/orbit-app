@@ -104,19 +104,23 @@ async function seedRelationship(
 async function seedCurrentState(
   contactId: number,
   value: string,
-  isCurrent: number,
+  options: Partial<{
+    fieldKey: string;
+    entryDate: string;
+    createdAt: string;
+  }> = {},
 ): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO current_state_entries (
-       uid, contact_id, field_key, value, is_current, created_at, modified_at
+       uid, contact_id, field_key, value, entry_date, created_at, modified_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       `state-${++uidCounter}`,
       contactId,
-      `field-${uidCounter}`,
+      options.fieldKey ?? `field-${uidCounter}`,
       value,
-      isCurrent,
-      NOW,
+      options.entryDate ?? NOW.slice(0, 10),
+      options.createdAt ?? NOW,
       NOW,
     ],
   );
@@ -134,7 +138,7 @@ describe("dashboard line-3 knowledge read", () => {
     const relationshipId = await seedRelationship(contactId, {
       personName: "Sam",
     });
-    const stateId = await seedCurrentState(contactId, "Austin", 1);
+    const stateId = await seedCurrentState(contactId, "Austin");
     const seen: Array<{ sql: string; params: readonly unknown[] }> = [];
     const countingExec: SqlExecutor = {
       ...exec,
@@ -215,12 +219,17 @@ describe("dashboard line-3 knowledge read", () => {
         personName: "Deleted relationship",
         deletedAt: NOW,
       });
-      const currentState = await seedCurrentState(
-        contactId,
-        "Current place",
-        1,
-      );
-      await seedCurrentState(contactId, "Former place", 0);
+      // Same field: the older-dated entry is not Most Recent, even though it
+      // was added later (D-45, D-51).
+      const currentState = await seedCurrentState(contactId, "Current place", {
+        fieldKey: "current_location",
+        entryDate: "2026-09-05",
+        createdAt: "2026-09-05 12:00:00",
+      });
+      await seedCurrentState(contactId, "Former place", {
+        fieldKey: "current_location",
+        entryDate: "2026-08-01",
+      });
 
       const candidates = await readLine3Candidates(exec, [contactId]);
       expect(candidates.map((candidate) => candidate.id)).toEqual(
@@ -245,6 +254,62 @@ describe("dashboard line-3 knowledge read", () => {
     } finally {
       MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = originalDefault;
     }
+  });
+
+  it("D-94: leaves out Gift Ideas and includes Thought of Them, shares included", async () => {
+    const contactId = await seedContact();
+    await seedMemory(contactId, { type: "gift_idea", value: "Pottery class" });
+    const thought = await exec.runAsync(
+      `INSERT INTO memories (
+         uid, contact_id, type, value, provenance, created_at, modified_at
+       ) VALUES ('shared-thought', ?, 'thought_of_them', 'Saw their band poster', 'share', ?, ?)`,
+      [contactId, NOW, NOW],
+    );
+    const general = await seedMemory(contactId, { value: "Likes tea" });
+    await exec.runAsync(
+      `INSERT INTO off_limits (uid, contact_id, text, created_at, modified_at)
+       VALUES ('ol-1', ?, 'Avoid the divorce', ?, ?)`,
+      [contactId, NOW, NOW],
+    );
+
+    const candidates = await readLine3Candidates(exec, [contactId]);
+    const memoryIds = candidates
+      .filter((candidate) => candidate.kind === "memory")
+      .map((candidate) => candidate.id)
+      .sort((a, b) => a - b);
+    expect(memoryIds).toEqual(
+      [thought.lastInsertRowId, general].sort((a, b) => a - b),
+    );
+    expect(candidates.map((candidate) => candidate.value)).not.toContain(
+      "Pottery class",
+    );
+    expect(candidates.map((candidate) => candidate.value)).not.toContain(
+      "Avoid the divorce",
+    );
+  });
+
+  it("shows each field's Most Recent entry by entry date", async () => {
+    const contactId = await seedContact();
+    await seedCurrentState(contactId, "Older topic", {
+      fieldKey: "last_talked_about",
+      entryDate: "2026-08-20",
+      createdAt: "2026-09-06 11:00:00",
+    });
+    const newest = await seedCurrentState(contactId, "Newest topic", {
+      fieldKey: "last_talked_about",
+      entryDate: "2026-09-02",
+      createdAt: "2026-09-02 09:00:00",
+    });
+    const location = await seedCurrentState(contactId, "Porto", {
+      fieldKey: "current_location",
+    });
+
+    const states = (await readLine3Candidates(exec, [contactId])).filter(
+      (candidate) => candidate.kind === "current-state",
+    );
+    expect(states.map((candidate) => candidate.id).sort()).toEqual(
+      [newest, location].sort(),
+    );
   });
 
   it("bounds candidates per contact without letting deep history starve another contact", async () => {

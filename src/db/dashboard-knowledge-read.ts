@@ -6,6 +6,7 @@
  * list-row selector; no component is permitted to issue a per-row knowledge
  * query while rendering a virtualized list.
  */
+import { currentStateOrderSql } from "@/db/current-state-history-read";
 import { resolveVisibility } from "@/db/memories-read";
 import { resolveRelationshipVisibility } from "@/db/relationships-read";
 import type { SqlExecutor } from "@/db/types";
@@ -88,7 +89,9 @@ SELECT id, contactId, type, value, pinned, meaningfulDate, hidden, createdAt
      WHERE m.contact_id IN (${placeholders(contactIds)})
        AND m.deleted_at IS NULL
        AND m.outdated = 0
-       AND m.type != 'birthday'
+       -- D-94: Gift Ideas never reach the Dashboard line; Thought of Them
+       -- (shares included) does. Off Limits is another table, never read here.
+       AND m.type NOT IN ('birthday', 'gift_idea')
        AND COALESCE(NULLIF(TRIM(m.value), ''), NULLIF(TRIM(m.note), ''), NULLIF(TRIM(m.custom_label), '')) IS NOT NULL
   )
  WHERE candidateRowNumber <= ${PER_CONTACT_WINDOW}
@@ -121,23 +124,34 @@ SELECT id, contactId, type, value, pinned, hidden, createdAt
  ORDER BY contactId, pinned DESC, createdAt DESC, id DESC`;
 }
 
+/**
+ * Each field's Most Recent entry (the first row in `currentStateOrderSql`
+ * order, D-45, D-51), then the per-contact candidate window.
+ */
 function currentStateSql(contactIds: readonly number[]): string {
   return `
 SELECT id, contactId, type, value, createdAt
   FROM (
-    SELECT cse.id,
-           cse.contact_id AS contactId,
-           cse.field_key AS type,
-           cse.value,
-           cse.created_at AS createdAt,
+    SELECT id, contactId, type, value, createdAt,
            ROW_NUMBER() OVER (
-             PARTITION BY cse.contact_id
-             ORDER BY cse.created_at DESC, cse.id DESC
+             PARTITION BY contactId
+             ORDER BY createdAt DESC, id DESC
            ) AS candidateRowNumber
-      FROM current_state_entries cse
-     WHERE cse.contact_id IN (${placeholders(contactIds)})
-       AND cse.is_current = 1
-       AND NULLIF(TRIM(cse.value), '') IS NOT NULL
+      FROM (
+        SELECT cse.id,
+               cse.contact_id AS contactId,
+               cse.field_key AS type,
+               cse.value,
+               cse.created_at AS createdAt,
+               ROW_NUMBER() OVER (
+                 PARTITION BY cse.contact_id, cse.field_key
+                 ORDER BY ${currentStateOrderSql("cse")}
+               ) AS fieldRowNumber
+          FROM current_state_entries cse
+         WHERE cse.contact_id IN (${placeholders(contactIds)})
+      )
+     WHERE fieldRowNumber = 1
+       AND NULLIF(TRIM(value), '') IS NOT NULL
   )
  WHERE candidateRowNumber <= ${PER_CONTACT_WINDOW}
  ORDER BY contactId, createdAt DESC, id DESC`;
