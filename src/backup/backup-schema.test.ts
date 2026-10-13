@@ -18,7 +18,7 @@ const valid = (): Record<string, any> => ({
   contactMethodProvenance: [],
   interactions: [],
   events: [],
-  fuel: [],
+  offLimits: [],
   contactLinks: [],
   customFieldDefs: [],
   customFieldValues: [],
@@ -245,12 +245,12 @@ describe("Profile presentation restore acceptance", () => {
 });
 
 describe("parseBackupManifest", () => {
-  it("migrates format 6 to 7 with the rolling Your Week default", () => {
+  it("migrates format 6 through 8 with the rolling Your Week default", () => {
     const legacy = valid();
     legacy.backupFormatVersion = 6;
     delete legacy.appSettings.yourWeekPeriod;
     expect(parseBackupManifest(legacy)).toMatchObject({
-      backupFormatVersion: 7,
+      backupFormatVersion: 8,
       appSettings: { yourWeekPeriod: "rolling7" },
     });
   });
@@ -379,9 +379,12 @@ describe("parseBackupManifest", () => {
           outdated: 0,
           hidden: null,
           provenance: "user",
+          allowAi: 0,
           createdAt: "2026-08-25 12:00:00",
           modifiedAt: "2026-08-25 12:00:00",
-          deletedAt: null,
+          interactionUid: null,
+          linkSource: null,
+          groupNoteCopy: 0,
         },
       ];
       manifest.currentStateEntries = [
@@ -390,7 +393,13 @@ describe("parseBackupManifest", () => {
           contactUid: "contact-a",
           fieldKey: "current_location",
           value: "Chicago",
-          isCurrent: 1,
+          entryDate: "2026-08-25",
+          entryTime: null,
+          url: null,
+          interactionUid: null,
+          linkSource: null,
+          groupNoteCopy: 0,
+          fromShare: 0,
           createdAt: "2026-08-25 12:00:00",
           modifiedAt: "2026-08-25 12:00:00",
         },
@@ -398,19 +407,57 @@ describe("parseBackupManifest", () => {
       return manifest;
     };
 
+    expect(() => parseBackupManifest(knowledgeManifest())).not.toThrow();
+
     for (const patch of [
       { type: "future_memory" },
-      { type: "custom", customLabel: "  " },
+      // D-86: the custom type is retired, even with a label.
+      { type: "custom", customLabel: "Label" },
       { value: " \t" },
       { pinned: 2 },
       { outdated: -1 },
       { hidden: 2 },
       { provenance: "remote" },
+      // D-69: no soft-deleted rows in format 8.
+      { deletedAt: "2026-08-25 12:00:00" },
+      // D-102: a Group Note copy can never be allowed to AI.
+      { groupNoteCopy: 1, allowAi: 1 },
+      { groupNoteCopy: 2 },
+      { allowAi: 2 },
+      // D-37: a linked row needs a link source of note or group_note.
+      { interactionUid: "interaction-a", linkSource: null },
+      { interactionUid: "interaction-a", linkSource: "photo" },
+      { interactionUid: 7, linkSource: "note" },
     ]) {
       const manifest = knowledgeManifest();
       Object.assign(manifest.memories[0], patch);
       expect(() => parseBackupManifest(manifest)).toThrow(BackupSchemaError);
     }
+
+    for (const patch of [
+      { entryDate: undefined },
+      { entryDate: "2026-8-25" },
+      { entryDate: "2026-08-25 12:00:00" },
+      { entryTime: 9 },
+      { url: {} },
+      { groupNoteCopy: 2 },
+      { fromShare: -1 },
+      { interactionUid: "interaction-a", linkSource: undefined },
+    ]) {
+      const manifest = knowledgeManifest();
+      Object.assign(manifest.currentStateEntries[0], patch);
+      expect(() => parseBackupManifest(manifest)).toThrow(BackupSchemaError);
+    }
+
+    // The retired current flag is gone: two entries for one field are history.
+    const history = knowledgeManifest();
+    history.currentStateEntries.push({
+      ...history.currentStateEntries[0],
+      uid: "state-b",
+      value: "Denver",
+      entryDate: "2026-08-26",
+    });
+    expect(parseBackupManifest(history).currentStateEntries).toHaveLength(2);
 
     const unknownField = knowledgeManifest();
     unknownField.currentStateEntries[0].fieldKey = "future_state";
@@ -455,6 +502,8 @@ describe("parseBackupManifest", () => {
       { relationType: 12 },
       { note: {} },
       { deletedAt: false },
+      // D-69: format 8 carries no soft-deleted key people.
+      { deletedAt: "2026-08-25 12:00:00" },
     ]) {
       const manifest = relationshipManifest();
       Object.assign(manifest.relationships[0], patch);
@@ -506,7 +555,7 @@ describe("parseBackupManifest", () => {
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
-    expect(parsed.backupFormatVersion).toBe(7);
+    expect(parsed.backupFormatVersion).toBe(8);
     expect(parsed.contacts[0]).not.toHaveProperty("phone");
     expect(parsed.contacts[0]).not.toHaveProperty("email");
     expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
@@ -548,7 +597,7 @@ describe("parseBackupManifest", () => {
 
     const parsed = parseBackupManifest(legacy);
 
-    expect(parsed.backupFormatVersion).toBe(7);
+    expect(parsed.backupFormatVersion).toBe(8);
     expect(parsed.contacts).toEqual([
       expect.objectContaining({
         uid: "contact-a",
@@ -562,7 +611,7 @@ describe("parseBackupManifest", () => {
     });
   });
 
-  it("upgrades v4 through v7 and requires the complete inventory", () => {
+  it("upgrades v4 through v8 and requires the complete inventory", () => {
     const legacy = valid();
     legacy.backupFormatVersion = 4;
     legacy.appSettings.includeUnboundNeverContacted = 1;
@@ -581,7 +630,7 @@ describe("parseBackupManifest", () => {
     ])
       delete legacy[key];
     const upgraded = parseBackupManifest(legacy);
-    expect(upgraded.backupFormatVersion).toBe(7);
+    expect(upgraded.backupFormatVersion).toBe(8);
     expect(upgraded.systems).toEqual([]);
     expect(upgraded.profileContactPresentation).toEqual([]);
     expect(upgraded.appSettings.includeUnboundNeverContacted).toBe(1);
@@ -901,5 +950,443 @@ describe("background ids at the parse boundary (38.5 D-47)", () => {
         ).toThrow(/invalid background id/);
       }
     }
+  });
+});
+
+describe("format 8 (Phase 38.10)", () => {
+  const STAMP = "2026-08-25 12:00:00";
+  const withContact = () => {
+    const manifest = valid();
+    manifest.contacts = [
+      {
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        modifiedAt: STAMP,
+      },
+    ];
+    return manifest;
+  };
+  const memory = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    contactUid: "contact-a",
+    type: "general",
+    customLabel: null,
+    value: `text ${uid}`,
+    note: null,
+    url: null,
+    meaningfulDate: null,
+    pinned: 0,
+    outdated: 0,
+    hidden: null,
+    provenance: "user",
+    allowAi: 0,
+    createdAt: STAMP,
+    modifiedAt: STAMP,
+    interactionUid: null,
+    linkSource: null,
+    groupNoteCopy: 0,
+    ...extra,
+  });
+  const entry = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    contactUid: "contact-a",
+    fieldKey: "last_talked_about",
+    value: `topic ${uid}`,
+    entryDate: "2026-08-25",
+    entryTime: null,
+    url: null,
+    interactionUid: null,
+    linkSource: null,
+    groupNoteCopy: 0,
+    fromShare: 0,
+    createdAt: STAMP,
+    modifiedAt: STAMP,
+    ...extra,
+  });
+
+  it("validates Off Limits rows, legacy contentless ones included", () => {
+    const manifest = withContact();
+    manifest.offLimits = [
+      {
+        uid: "off-a",
+        contactUid: "contact-a",
+        label: "Divorce",
+        text: null,
+        url: null,
+        groupNoteCopy: 0,
+        fromShare: 1,
+        createdAt: STAMP,
+        modifiedAt: STAMP,
+      },
+      {
+        uid: "off-b",
+        contactUid: "contact-a",
+        label: null,
+        text: null,
+        url: null,
+        groupNoteCopy: 0,
+        fromShare: 0,
+        createdAt: STAMP,
+        modifiedAt: STAMP,
+      },
+    ];
+    expect(parseBackupManifest(manifest).offLimits).toHaveLength(2);
+
+    for (const patch of [
+      { contactUid: "missing" },
+      { label: 4 },
+      { fromShare: 2 },
+      { groupNoteCopy: "1" },
+      { createdAt: null },
+    ]) {
+      const bad = withContact();
+      bad.offLimits = [{ ...manifest.offLimits[0], ...patch }];
+      expect(() => parseBackupManifest(bad)).toThrow(BackupSchemaError);
+    }
+
+    const duplicate = withContact();
+    duplicate.offLimits = [manifest.offLimits[0], manifest.offLimits[0]];
+    expect(() => parseBackupManifest(duplicate)).toThrow(/duplicate uid/);
+
+    const orphan = withContact();
+    orphan.offLimits = [manifest.offLimits[0]];
+    orphan.tombstones = [
+      { entityType: "contact", entityUid: "contact-a", deletedAt: STAMP },
+    ];
+    expect(() => parseBackupManifest(orphan)).toThrow(/surviving contact/);
+  });
+
+  it("accepts an off_limits tombstone and rejects the retired legacy type", () => {
+    const manifest = valid();
+    manifest.tombstones = [
+      { entityType: "off_limits", entityUid: "off-a", deletedAt: STAMP },
+    ];
+    expect(parseBackupManifest(manifest).tombstones).toEqual(
+      manifest.tombstones,
+    );
+
+    const retired = valid();
+    retired.tombstones = [
+      { entityType: "fuel", entityUid: "x", deletedAt: STAMP },
+    ];
+    expect(() => parseBackupManifest(retired)).toThrow(/tombstones/);
+  });
+
+  it("ignores an unknown legacy knowledge array in a format-8 file", () => {
+    const manifest = withContact();
+    manifest.fuel = [{ uid: "ignored" }];
+    const parsed = parseBackupManifest(manifest) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty("fuel");
+    expect(parsed.offLimits).toEqual([]);
+  });
+
+  it("rejects a duplicate interaction link within a table (D-95), not unlinked leftovers", () => {
+    const linked = withContact();
+    linked.memories = [
+      memory("m-1", { interactionUid: "i-1", linkSource: "note" }),
+      memory("m-2", { interactionUid: "i-1", linkSource: "note" }),
+    ];
+    expect(() => parseBackupManifest(linked)).toThrow(
+      /duplicate interaction link/,
+    );
+
+    const entries = withContact();
+    entries.currentStateEntries = [
+      entry("s-1", {
+        interactionUid: "i-1",
+        linkSource: "group_note",
+        groupNoteCopy: 1,
+      }),
+      entry("s-2", {
+        interactionUid: "i-1",
+        linkSource: "group_note",
+        groupNoteCopy: 1,
+      }),
+    ];
+    expect(() => parseBackupManifest(entries)).toThrow(
+      /duplicate interaction link/,
+    );
+
+    // One link per source and per table is fine (the cross-table collapse is
+    // restore's job).
+    const distinct = withContact();
+    distinct.memories = [
+      memory("m-1", { interactionUid: "i-1", linkSource: "note" }),
+      memory("m-2", {
+        interactionUid: "i-1",
+        linkSource: "group_note",
+        groupNoteCopy: 1,
+      }),
+    ];
+    distinct.currentStateEntries = [
+      entry("s-1", { interactionUid: "i-1", linkSource: "note" }),
+    ];
+    expect(() => parseBackupManifest(distinct)).not.toThrow();
+
+    // W-10: ON DELETE SET NULL leaves unlinked rows with a leftover source.
+    const leftovers = withContact();
+    leftovers.memories = [
+      memory("m-1", { linkSource: "note" }),
+      memory("m-2", { linkSource: "note" }),
+    ];
+    leftovers.currentStateEntries = [
+      entry("s-1", { linkSource: "note" }),
+      entry("s-2", { linkSource: "note" }),
+    ];
+    expect(parseBackupManifest(leftovers).memories).toHaveLength(2);
+  });
+
+  it("rejects a locked interaction note allowed to AI (D-103)", () => {
+    const interaction = {
+      uid: "i-1",
+      contactUid: "contact-a",
+      occurredAt: STAMP,
+      modifiedAt: STAMP,
+    };
+    const ok = withContact();
+    ok.interactions = [{ ...interaction, allowAi: 0, noteAiLocked: 1 }];
+    expect(() => parseBackupManifest(ok)).not.toThrow();
+    for (const patch of [
+      { allowAi: 1, noteAiLocked: 1 },
+      { noteAiLocked: 2 },
+      { allowAi: 3 },
+    ]) {
+      const bad = withContact();
+      bad.interactions = [{ ...interaction, ...patch }];
+      expect(() => parseBackupManifest(bad)).toThrow(BackupSchemaError);
+    }
+  });
+});
+
+describe("format 7 files convert on parse (D-55, D-56)", () => {
+  const STAMP = "2026-08-25 12:00:00";
+  const legacy = (
+    kind: string,
+    uid: string,
+    extra: Record<string, unknown> = {},
+  ) => ({
+    uid,
+    contactUid: "contact-a",
+    kind,
+    label: null,
+    text: `${kind} text`,
+    url: null,
+    createdAt: "2026-07-01 09:30:00",
+    source: "typed",
+    modifiedAt: "2026-07-02 10:00:00",
+    ...extra,
+  });
+  const v7 = () => {
+    const manifest = valid();
+    manifest.backupFormatVersion = 7;
+    delete manifest.offLimits;
+    manifest.contacts = [
+      {
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        modifiedAt: STAMP,
+      },
+    ];
+    manifest.fuel = [
+      legacy("off_limits", "f-off", { label: "Politics", text: null }),
+      legacy("off_limits", "f-off-empty", { text: null }),
+      legacy("gift", "f-gift", {
+        label: "Book",
+        text: null,
+        url: "https://b.test",
+      }),
+      legacy("topic", "f-topic", { source: "share", text: "Shared article" }),
+      legacy("topic", "f-topic-typed"),
+      legacy("fact", "f-fact"),
+      legacy("recent", "f-recent", { source: "share" }),
+      legacy("mystery", "f-unknown"),
+      legacy("gift", "f-blank", { text: "  " }),
+    ];
+    manifest.memories = [
+      {
+        uid: "m-custom",
+        contactUid: "contact-a",
+        type: "custom",
+        customLabel: "Allergy",
+        value: "Peanuts",
+        note: null,
+        url: null,
+        meaningfulDate: null,
+        pinned: 0,
+        outdated: 0,
+        hidden: null,
+        provenance: "user",
+        allowAi: 1,
+        createdAt: STAMP,
+        modifiedAt: STAMP,
+        deletedAt: null,
+      },
+      {
+        uid: "m-trash",
+        contactUid: "contact-a",
+        type: "general",
+        customLabel: null,
+        value: "gone",
+        note: null,
+        url: null,
+        meaningfulDate: null,
+        pinned: 0,
+        outdated: 0,
+        hidden: null,
+        provenance: "user",
+        allowAi: 0,
+        createdAt: STAMP,
+        modifiedAt: STAMP,
+        deletedAt: "2026-08-20 08:00:00",
+      },
+    ];
+    manifest.relationships = [
+      {
+        uid: "r-trash",
+        contactUid: "contact-a",
+        personName: "Sam",
+        relationType: null,
+        note: null,
+        pinned: 0,
+        hidden: null,
+        createdAt: STAMP,
+        modifiedAt: STAMP,
+        deletedAt: "2026-08-21 08:00:00",
+      },
+    ];
+    manifest.currentStateEntries = [
+      {
+        uid: "s-old",
+        contactUid: "contact-a",
+        fieldKey: "current_location",
+        value: "Chicago",
+        isCurrent: 1,
+        createdAt: "2026-05-05 05:05:05",
+        modifiedAt: STAMP,
+      },
+    ];
+    manifest.tombstones = [
+      {
+        entityType: "fuel",
+        entityUid: "f-dead",
+        deletedAt: "2026-08-01 00:00:00",
+      },
+    ];
+    return manifest;
+  };
+
+  it("moves every legacy kind to its D-56 home with Allow AI off", () => {
+    const parsed = parseBackupManifest(v7());
+    expect(parsed.backupFormatVersion).toBe(8);
+    expect(parsed).not.toHaveProperty("fuel");
+
+    // A v7 off_limits row parses to offLimits with the same uid.
+    expect(parsed.offLimits[0]).toMatchObject({
+      uid: "f-off",
+      contactUid: "contact-a",
+      label: "Politics",
+      text: null,
+      fromShare: 0,
+      groupNoteCopy: 0,
+    });
+    // D-97: a contentless off_limits row is copied; any other kind is skipped.
+    expect(parsed.offLimits.map((row) => row.uid)).toEqual([
+      "f-off",
+      "f-off-empty",
+    ]);
+
+    const byUid = new Map(parsed.memories.map((row) => [row.uid, row]));
+    expect(byUid.get("f-gift")).toMatchObject({
+      type: "gift_idea",
+      customLabel: "Book",
+      value: "https://b.test",
+      url: "https://b.test",
+      allowAi: 0,
+      provenance: "user",
+    });
+    expect(byUid.get("f-topic")).toMatchObject({
+      type: "thought_of_them",
+      value: "Shared article",
+      provenance: "share",
+      allowAi: 0,
+    });
+    expect(byUid.get("f-fact")).toMatchObject({ type: "general", allowAi: 0 });
+    expect(byUid.get("f-unknown")).toMatchObject({
+      type: "general",
+      allowAi: 0,
+    });
+    expect(byUid.has("f-blank")).toBe(false);
+
+    const recent = parsed.currentStateEntries.find(
+      (row) => row.uid === "f-recent",
+    );
+    expect(recent).toMatchObject({
+      fieldKey: "last_talked_about",
+      value: "recent text",
+      entryDate: "2026-07-01",
+      entryTime: null,
+      fromShare: 1,
+    });
+    expect(recent).not.toHaveProperty("allowAi");
+  });
+
+  it("converts custom memories, trash and current state, and triples legacy tombstones", () => {
+    const parsed = parseBackupManifest(v7());
+    const custom = parsed.memories.find((row) => row.uid === "m-custom");
+    expect(custom).toMatchObject({
+      type: "general",
+      customLabel: "Allergy",
+      modifiedAt: STAMP,
+      groupNoteCopy: 0,
+    });
+    expect(custom).not.toHaveProperty("deletedAt");
+    expect(parsed.memories.some((row) => row.uid === "m-trash")).toBe(false);
+    expect(parsed.relationships).toEqual([]);
+
+    const location = parsed.currentStateEntries.find(
+      (row) => row.uid === "s-old",
+    );
+    expect(location).toMatchObject({
+      entryDate: "2026-05-05",
+      entryTime: null,
+    });
+    expect(location).not.toHaveProperty("isCurrent");
+
+    expect(parsed.tombstones).toEqual(
+      expect.arrayContaining([
+        {
+          entityType: "memory",
+          entityUid: "m-trash",
+          deletedAt: "2026-08-20 08:00:00",
+        },
+        {
+          entityType: "relationship",
+          entityUid: "r-trash",
+          deletedAt: "2026-08-21 08:00:00",
+        },
+        {
+          entityType: "memory",
+          entityUid: "f-dead",
+          deletedAt: "2026-08-01 00:00:00",
+        },
+        {
+          entityType: "off_limits",
+          entityUid: "f-dead",
+          deletedAt: "2026-08-01 00:00:00",
+        },
+        {
+          entityType: "current_state_entry",
+          entityUid: "f-dead",
+          deletedAt: "2026-08-01 00:00:00",
+        },
+      ]),
+    );
+    expect(parsed.tombstones).toHaveLength(5);
+    expect(parsed.appSettings).toMatchObject({
+      aiDefaultGiftIdeaAllow: 0,
+      aiDefaultThoughtOfThemAllow: 0,
+    });
   });
 });

@@ -7,6 +7,7 @@ import {
   type BackupManifest,
   BackupSchemaError,
 } from "@/backup/types";
+import { convertV7ToV8 } from "@/backup/v7-legacy-conversion";
 import {
   assertDefaultInteractionChannel,
   assertMessageMode,
@@ -137,6 +138,9 @@ const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
       },
     };
   },
+  // Phase 38.10 (D-55): the legacy knowledge rows move to their D-56 homes.
+  // The step lives in its own module (the D-01 gate allowlist, plan 18).
+  7: (manifest) => convertV7ToV8(manifest),
 };
 
 function fail(message: string): never {
@@ -247,7 +251,7 @@ const TOMBSTONE_ENTITY_TYPES = new Set([
   "contact",
   "interaction",
   "event",
-  "fuel",
+  "off_limits",
   "contact_link",
   "contact_method",
   "external_contact_link",
@@ -404,6 +408,53 @@ function isNullableBinaryFlag(
   return value === null || value === undefined || isBinaryFlag(value);
 }
 
+/** A 0/1 marker; absent reads as 0 (format-8 writers always emit it). */
+function isMarker(value: unknown): boolean {
+  return value === undefined || isBinaryFlag(value);
+}
+
+function isOptionalText(value: unknown): boolean {
+  return value === null || value === undefined || typeof value === "string";
+}
+
+const ENTRY_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+
+/**
+ * An interaction link (D-37): a nullable `interactionUid` and a nullable
+ * `linkSource` of `'note'` or `'group_note'`. A linked row needs a source
+ * (migration 033's CHECK); an unlinked row may keep a leftover source, which
+ * an interaction delete legally leaves behind (ON DELETE SET NULL).
+ */
+function assertLink(row: RawManifest, label: string): void {
+  const { interactionUid, linkSource } = row;
+  if (
+    (interactionUid !== null &&
+      interactionUid !== undefined &&
+      (typeof interactionUid !== "string" || interactionUid.length === 0)) ||
+    (linkSource !== null &&
+      linkSource !== undefined &&
+      linkSource !== "note" &&
+      linkSource !== "group_note") ||
+    (typeof interactionUid === "string" &&
+      (linkSource === null || linkSource === undefined))
+  )
+    fail(`${label} has an invalid interaction link`);
+}
+
+/**
+ * D-95: one linked row per (interaction, link source) within a table. Only
+ * linked rows count; unlinked rows with a leftover source are not duplicates.
+ */
+function assertUniqueLinks(rows: RawManifest[], label: string): void {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (typeof row.interactionUid !== "string") continue;
+    const key = `${row.interactionUid}\u0000${String(row.linkSource)}`;
+    if (seen.has(key)) fail(`${label} has a duplicate interaction link`);
+    seen.add(key);
+  }
+}
+
 function isMemoryProvenance(
   value: unknown,
 ): value is "user" | "import" | "share" {
@@ -447,7 +498,7 @@ function validate(manifest: RawManifest): BackupManifest {
     "contactMethodProvenance",
     "interactions",
     "events",
-    "fuel",
+    "offLimits",
     "contactLinks",
     "customFieldDefs",
     "customFieldValues",
@@ -536,9 +587,15 @@ function validate(manifest: RawManifest): BackupManifest {
   for (const row of newArrays.systemOverrides)
     if (typeof row.contactUid !== "string" || !contacts.has(row.contactUid))
       fail("systemOverrides has an unknown contact UID");
-  for (const row of arrays.interactions)
+  for (const row of arrays.interactions) {
     if (row.groupEventUid != null && typeof row.groupEventUid !== "string")
       fail("interactions has an invalid Group Event UID");
+    if (!isNullableBinaryFlag(row.allowAi) || !isMarker(row.noteAiLocked))
+      fail("interactions has an invalid flag");
+    // D-103: migration 033's CHECK (note_ai_locked = 0 OR allow_ai = 0).
+    if (row.noteAiLocked === 1 && row.allowAi === 1)
+      fail("interactions has a locked note allowed to AI");
+  }
   for (const row of newArrays.profileContactPresentation)
     if (!contacts.has(row.contactUid as string))
       fail("profileContactPresentation has an unknown contact UID");
@@ -577,7 +634,7 @@ function validate(manifest: RawManifest): BackupManifest {
     "contactMethodProvenance",
     "interactions",
     "events",
-    "fuel",
+    "offLimits",
     "contactLinks",
     "customFieldValues",
     "memories",
@@ -679,7 +736,7 @@ function validate(manifest: RawManifest): BackupManifest {
   for (const [label, rows] of Object.entries({
     interactions: arrays.interactions,
     events: arrays.events,
-    fuel: arrays.fuel,
+    offLimits: arrays.offLimits,
     contactLinks: arrays.contactLinks,
   })) {
     for (const row of rows) {
@@ -724,7 +781,6 @@ function validate(manifest: RawManifest): BackupManifest {
       "note",
       "url",
       "meaningfulDate",
-      "deletedAt",
     ] as const)
       if (
         memory[key] !== null &&
@@ -751,7 +807,18 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("memories has an invalid flag");
     if (!isMemoryProvenance(memory.provenance))
       fail("memories has an invalid provenance");
+    // D-69: format 8 carries no soft-deleted rows (deletion is a tombstone).
+    if (memory.deletedAt !== null && memory.deletedAt !== undefined)
+      fail("memories has a deleted row");
+    if (!isNullableBinaryFlag(memory.allowAi))
+      fail("memories has an invalid flag");
+    assertLink(memory, "memories");
+    if (!isMarker(memory.groupNoteCopy)) fail("memories has an invalid flag");
+    // D-102: migration 033's CHECK (group_note_copy = 0 OR allow_ai = 0).
+    if (memory.groupNoteCopy === 1 && memory.allowAi === 1)
+      fail("memories has a Group Note copy allowed to AI");
   }
+  assertUniqueLinks(arrays.memories, "memories");
   for (const relationship of arrays.relationships) {
     if (
       typeof relationship.contactUid !== "string" ||
@@ -763,7 +830,7 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("relationships has an invalid row");
     if (relationship.personName.trim().length === 0)
       fail("relationships requires a person name");
-    for (const key of ["relationType", "note", "deletedAt"] as const)
+    for (const key of ["relationType", "note"] as const)
       if (
         relationship[key] !== null &&
         relationship[key] !== undefined &&
@@ -784,8 +851,10 @@ function validate(manifest: RawManifest): BackupManifest {
       !isNullableBinaryFlag(relationship.hidden)
     )
       fail("relationships has an invalid flag");
+    // D-69: format 8 carries no soft-deleted rows.
+    if (relationship.deletedAt !== null && relationship.deletedAt !== undefined)
+      fail("relationships has a deleted row");
   }
-  const currentPairs = new Set<string>();
   for (const entry of arrays.currentStateEntries) {
     if (
       typeof entry.contactUid !== "string" ||
@@ -794,19 +863,33 @@ function validate(manifest: RawManifest): BackupManifest {
       typeof entry.value !== "string" ||
       typeof entry.createdAt !== "string" ||
       typeof entry.modifiedAt !== "string" ||
-      (entry.isCurrent !== 0 && entry.isCurrent !== 1)
+      typeof entry.entryDate !== "string" ||
+      !ENTRY_DATE.test(entry.entryDate) ||
+      !isOptionalText(entry.entryTime) ||
+      !isOptionalText(entry.url)
     )
       fail("currentStateEntries has an invalid row");
     if (!isCurrentStateFieldKey(entry.fieldKey))
       fail("currentStateEntries has an unregistered field key");
     if (entry.value.trim().length === 0)
       fail("currentStateEntries has a blank value");
-    if (entry.isCurrent === 1) {
-      const pair = `${entry.contactUid}\u0000${entry.fieldKey}`;
-      if (currentPairs.has(pair))
-        fail("currentStateEntries has duplicate current value");
-      currentPairs.add(pair);
-    }
+    assertLink(entry, "currentStateEntries");
+    if (!isMarker(entry.groupNoteCopy) || !isMarker(entry.fromShare))
+      fail("currentStateEntries has an invalid flag");
+  }
+  assertUniqueLinks(arrays.currentStateEntries, "currentStateEntries");
+  for (const row of arrays.offLimits) {
+    if (
+      typeof row.createdAt !== "string" ||
+      typeof row.modifiedAt !== "string" ||
+      !isOptionalText(row.label) ||
+      !isOptionalText(row.text) ||
+      !isOptionalText(row.url)
+    )
+      fail("offLimits has an invalid row");
+    // A legacy contentless Off Limits row is valid (D-97 copies it as-is).
+    if (!isMarker(row.groupNoteCopy) || !isMarker(row.fromShare))
+      fail("offLimits has an invalid flag");
   }
   const profile =
     manifest.profile === null ? null : record(manifest.profile, "profile");
@@ -911,7 +994,7 @@ function validate(manifest: RawManifest): BackupManifest {
   for (const [label, rows] of Object.entries({
     interactions: arrays.interactions,
     events: arrays.events,
-    fuel: arrays.fuel,
+    offLimits: arrays.offLimits,
     contactLinks: arrays.contactLinks,
   })) {
     for (const row of rows) {
@@ -987,7 +1070,7 @@ function validate(manifest: RawManifest): BackupManifest {
     contactMethodProvenance: arrays.contactMethodProvenance,
     interactions: arrays.interactions,
     events: arrays.events,
-    fuel: arrays.fuel,
+    offLimits: arrays.offLimits,
     contactLinks: arrays.contactLinks,
     customFieldDefs: arrays.customFieldDefs,
     customFieldValues: arrays.customFieldValues,

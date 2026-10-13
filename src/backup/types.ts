@@ -11,7 +11,7 @@ export interface ReconciliationTombstone {
 }
 
 /** Bump only when the portable JSON wire shape changes, never with SQLite. */
-export const BACKUP_FORMAT_VERSION = 7;
+export const BACKUP_FORMAT_VERSION = 8;
 /** Container/envelope evolution is independent from the plaintext manifest. */
 export const BACKUP_ENVELOPE_VERSION = 1;
 
@@ -56,14 +56,28 @@ export interface BackupManifest {
   contactMethods: Record<string, unknown>[];
   externalContactLinks: Record<string, unknown>[];
   contactMethodProvenance: Record<string, unknown>[];
+  /** Format 8: `noteAiLocked` 0/1 (D-103). */
   interactions: Record<string, unknown>[];
   events: Record<string, unknown>[];
-  fuel: Record<string, unknown>[];
+  /**
+   * Format 8 (Phase 38.10, D-55): Off Limits rows. `groupNoteCopy` (D-102) and
+   * `fromShare` (D-108) are 0/1 origin markers; there is no AI flag.
+   */
+  offLimits: Record<string, unknown>[];
   contactLinks: Record<string, unknown>[];
   customFieldDefs: Record<string, unknown>[];
   customFieldValues: Record<string, unknown>[];
+  /**
+   * Format 8: `interactionUid` / `linkSource` (D-37) and `groupNoteCopy`
+   * (D-102); no `deletedAt` (D-69).
+   */
   memories: Record<string, unknown>[];
+  /** Format 8: no `deletedAt` (D-69). */
   relationships: Record<string, unknown>[];
+  /**
+   * Format 8: `entryDate`, `entryTime`, `url`, `interactionUid`, `linkSource`,
+   * `groupNoteCopy` and `fromShare`; no `isCurrent` (D-41, D-48, D-102, D-108).
+   */
   currentStateEntries: Record<string, unknown>[];
   customFieldValueHistory: Record<string, unknown>[];
   systems: Record<string, unknown>[];
