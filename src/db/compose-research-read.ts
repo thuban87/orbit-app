@@ -164,7 +164,8 @@ function firstClassResearchItems(
     out.push({
       key: "interval",
       label: "Contact frequency",
-      value: plural(fc.intervalDays, "day"),
+      // Same wording as the Profile overview (D-125).
+      value: `Every ${plural(fc.intervalDays, "day")}`,
     });
   }
   if (fc.categoryName != null) {

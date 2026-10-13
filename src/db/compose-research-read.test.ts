@@ -362,6 +362,14 @@ describe("compose-research-read — normalized ResearchItem projection", () => {
     expect(item?.meaningfulDate).toBe("2026-10-20");
   });
 
+  it("words Contact frequency as the Profile overview does (D-125)", async () => {
+    const owner = await contact("Owner");
+    const item = (await readComposeResearch(exec, owner)).find(
+      (i) => i.label === "Contact frequency",
+    );
+    expect(item?.value).toBe("Every 30 days");
+  });
+
   it("shows a value-less memory's note but never offers it to Message Focus (D-124)", async () => {
     const owner = await contact("Owner");
     const id = await addMemory(owner, {
