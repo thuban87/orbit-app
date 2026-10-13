@@ -93,6 +93,7 @@ describe("Update Contact: every editor Cancel follows the Back rule (E-09; D-14,
     expect(screen).not.toMatch(/const onCancel = /);
     const render = functionBody(screen, "renderActiveEditor");
     const editorCancels = render.match(/onCancel=\{[^}]*\}/g) ?? [];
+    // Eight row editors since the in-place Memory editor (38.10 D-115).
     expect(editorCancels.length).toBeGreaterThanOrEqual(7);
     for (const cancel of editorCancels) {
       expect(cancel).toBe("onCancel={requestRowCancel}");

@@ -186,6 +186,17 @@ describe("chooser session (repeated-update loop)", () => {
     expect(cancelled.lastSavedRowKey).toBeNull();
   });
 
+  it("the Memory row opens in place and a save returns to the chooser (CAPT-12; D-115)", () => {
+    const opened = openRow(startSession(3), "memory");
+    expect(opened.activeRowKey).toBe("memory");
+    expect(isChooserVisible(opened)).toBe(false);
+    const saved = completeSave(opened);
+    expect(isChooserVisible(saved)).toBe(true);
+    expect(saved.activeRowKey).toBeNull();
+    expect(saved.lastSavedRowKey).toBe("memory");
+    expect(saved.contactId).toBe(3);
+  });
+
   it("Done exits the session", () => {
     const done = finishSession(startSession(3));
     expect(done.done).toBe(true);
@@ -224,6 +235,16 @@ describe("resolveUpdateEditorClose (D-14 innermost first; review H1)", () => {
   });
 
   it("key-person path: an open form closes before the Key people row", () => {
+    expect(
+      resolveUpdateEditorClose({
+        rowOpen: true,
+        innerOpen: true,
+        target: "innermost",
+      }),
+    ).toBe("inner");
+  });
+
+  it("memory path: an open memory draft closes before the Memory row (D-115)", () => {
     expect(
       resolveUpdateEditorClose({
         rowOpen: true,

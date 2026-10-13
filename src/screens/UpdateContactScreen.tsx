@@ -12,10 +12,16 @@
  * the RN shell + navigation, device-UAT at the phase gate.
  *
  * CURRENT-STATE ROWS (Review cycle-3 MEDIUM 34-07): Last Talked About and
- * Current Location are `current_state` fields persisted via `setCurrentStateValue`
- * keyed by `last_talked_about` / `current_location`. They record NO interaction
- * and never touch `last_contact` — they are NOT routed through `TriStateLastSpoke`
- * (the first-interaction control that writes `last_contact`).
+ * Current Location are `current_state` fields; a new entry is added through
+ * `addCurrentStateEntry` keyed by `last_talked_about` / `current_location`,
+ * dated today by default and never later (38.10 D-41, D-101). They record NO
+ * interaction and never touch `last_contact` — they are NOT routed through
+ * `TriStateLastSpoke` (the first-interaction control that writes
+ * `last_contact`).
+ *
+ * 38.10: the Memory row opens an in-place memory editor (D-115); Off Limits
+ * uses the dedicated Off Limits form and DAO (D-08); Key People and memory
+ * deletes are immediate with Undo (D-69). No keyboard centring here (D-114).
  *
  * FAILURE-SAFETY (CAPT-14): a failed inner save preserves that editor's state,
  * shows the locked failure copy, and never returns to the chooser (no completion).
@@ -33,6 +39,7 @@ import {
   useState,
 } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -54,35 +61,73 @@ import {
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import {
+  type MemoryAiDefaults,
+  type MemoryDraft,
+  type MemoryDraftState,
+  MemoryEditor,
+  type MemoryEditorHandle,
+  type MemoryEditPatch,
+} from "@/components/MemoryEditor";
+import {
+  OffLimitsForm,
+  type OffLimitsFormFields,
+} from "@/components/OffLimitsForm";
+import {
   type RelationshipDraft,
   type RelationshipDraftState,
   RelationshipEditor,
   type RelationshipEditorHandle,
 } from "@/components/RelationshipEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText } from "@/components/ui";
+import { AppText, Button, EntryDateField } from "@/components/ui";
+import {
+  getAiPermissionDefaults,
+  memoryAiDefaultsMap,
+} from "@/db/ai-permissions-dao";
 import { getAppSettings } from "@/db/app-settings-dao";
 import {
   applyContactMethodDiff,
   listContactMethods,
 } from "@/db/contact-methods-dao";
 import { getContactHeader } from "@/db/contact-read";
-import { setCurrentStateValue } from "@/db/current-state-history-dao";
+import { addCurrentStateEntry } from "@/db/current-state-history-dao";
 import { getCurrentStateValue } from "@/db/current-state-history-read";
 import { saveUserCustomValueEdit } from "@/db/custom-value-edit-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";
-import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
-import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
-import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import { LinkedNoteBlankError } from "@/db/linked-entry-dao";
+import {
+  addMemory,
+  deleteMemoryNow,
+  editMemory,
+  type MemorySnapshot,
+  undoMemoryDelete,
+} from "@/db/memories-dao";
+import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
+import {
+  type CurrentStateFieldKey,
+  isMemoryTypeKey,
+} from "@/db/memory-registry";
+import {
+  addOffLimits,
+  deleteOffLimits,
+  editOffLimits,
+  type OffLimitsSnapshot,
+  undoDeleteOffLimits,
+} from "@/db/off-limits-dao";
+import {
+  listOffLimitsForContact,
+  type OffLimitsRow,
+} from "@/db/off-limits-read";
 import { setProfileContactFrequency } from "@/db/profile-relationship-actions";
 import {
   addRelationship,
-  deleteRelationship,
+  deleteRelationshipNow,
   editRelationship,
-  restoreRelationship,
+  type RelationshipSnapshot,
+  undoRelationshipDelete,
 } from "@/db/relationships-dao";
 import {
   listRelationshipsForContact,
@@ -90,6 +135,8 @@ import {
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
 import { useContactHeader } from "@/hooks/use-contact-header";
+import { isAiMasterEnabled } from "@/logic/ai-enablement";
+import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
@@ -97,12 +144,30 @@ import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
 import {
   beginInFlight,
   endInFlight,
   type InFlightRef,
 } from "@/utils/single-flight";
+import {
+  HISTORY_MOST_RECENT,
+  isPickableEntryDate,
+  maxPickableDate,
+} from "./memory-history-logic";
+import {
+  createOffLimitsEditorController,
+  type OffLimitsEditorOp,
+  offLimitsDeletedSnackbar,
+  offLimitsRestoredSnackbar,
+} from "./off-limits-editor-controller";
+import {
+  deletedSnackbar,
+  LINKED_ENTRY_NEEDS_TEXT,
+  restoredSnackbar,
+  sectionTitle,
+} from "./section-editor-logic";
 import {
   buildChooserRows,
   type ChooserRow,
@@ -121,6 +186,31 @@ import {
 const LOG_SCOPE = "update-contact-screen";
 const FAILURE_COPY = "Couldn't save. Please try again.";
 const DEFAULT_INTERVAL_DAYS = 30;
+
+/** " for Ann", or "" while the person line has not loaded. */
+function forName(name: string | null): string {
+  return name === null || name.trim() === "" ? "" : ` for ${name}`;
+}
+
+/** An error snackbar with a Dismiss action (38.9 D-39; as the editors use). */
+function errorNotice(label: string): void {
+  showSnackbar({
+    kind: "error",
+    label,
+    action: {
+      label: "Dismiss",
+      accessibilityLabel: "Dismiss error",
+      onPress: () => {},
+    },
+  });
+}
+
+/** The person's name for a snackbar fired after an await. */
+function useNameRef(name: string | null) {
+  const nameRef = useRef<string | null>(name);
+  nameRef.current = name;
+  return nameRef;
+}
 
 /**
  * Reports an editor's typed-changes state to the screen's guard (38.9 D-14,
@@ -256,7 +346,11 @@ function PrimaryButton({
   );
 }
 
-/** Last Talked About / Current Location — a current-state text value (D-10). */
+/**
+ * Last Talked About / Current Location — adds one dated entry (D-10, D-41).
+ * The date defaults to today and cannot pass it (D-101); a direct entry
+ * stores a date only (D-48). Most Recent is the read's first row (D-45).
+ */
 function CurrentStateFocusedEditor({
   contactId,
   fieldKey,
@@ -276,8 +370,12 @@ function CurrentStateFocusedEditor({
 }) {
   const { colors } = useTheme();
   const [value, setValue] = useState("");
+  // D-41 / D-101: today by default, never later.
+  const [seedDate] = useState(() => maxPickableDate());
+  const [entryDate, setEntryDate] = useState(seedDate);
   useReportDirty(
-    isRowDraftDirty({ kind: "text", seed: "", current: value }),
+    isRowDraftDirty({ kind: "text", seed: "", current: value }) ||
+      entryDate !== seedDate,
     onDirtyChange,
   );
   const [current, setCurrent] = useState<string | null>(null);
@@ -298,18 +396,21 @@ function CurrentStateFocusedEditor({
     };
   }, [contactId, fieldKey]);
 
+  const dateValid = isPickableEntryDate(entryDate);
   const save = async () => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || !dateValid) return;
     // Synchronous single-flight guard — a double-tap must not write twice (WR-03).
     if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setError(false);
     try {
-      await setCurrentStateValue(getExecutor(), {
+      await addCurrentStateEntry(getExecutor(), {
         contactId,
         fieldKey,
         value: trimmed,
+        entryDate,
+        entryTime: null,
         now: localDateTime(),
       });
       onSaved();
@@ -331,7 +432,7 @@ function CurrentStateFocusedEditor({
       cancelDisabled={saving}
     >
       <AppText role="caption" style={{ color: colors.textSecondary }}>
-        {current ? `Most recent: ${current}` : "Not set"}
+        {current ? `${HISTORY_MOST_RECENT}: ${current}` : "Not set"}
       </AppText>
       <TextInput
         accessibilityLabel={`New ${title} value`}
@@ -348,9 +449,16 @@ function CurrentStateFocusedEditor({
           },
         ]}
       />
+      <EntryDateField
+        accessibilityLabel={`${title} date`}
+        value={entryDate}
+        onChange={setEntryDate}
+        // D-101: never past today.
+        maxDate={new Date()}
+      />
       <PrimaryButton
         label="Save"
-        disabled={!value.trim() || saving}
+        disabled={!value.trim() || !dateValid || saving}
         onPress={() => void save()}
       />
     </EditorFrame>
@@ -360,6 +468,7 @@ function CurrentStateFocusedEditor({
 /** Key People / Relationships — the canonical RelationshipEditor. */
 function KeyPeopleFocusedEditor({
   contactId,
+  personName,
   onSaved,
   onCancel,
   relationshipRef,
@@ -368,6 +477,8 @@ function KeyPeopleFocusedEditor({
   rowSave,
 }: {
   contactId: number;
+  /** For the snackbars (38.9 D-39/D-46); null while it loads. */
+  personName: string | null;
   onSaved: () => void;
   onCancel: () => void;
   /** The open key-person form is the inner level (D-14). */
@@ -377,6 +488,7 @@ function KeyPeopleFocusedEditor({
   rowSave: RowSave;
 }) {
   const [items, setItems] = useState<RelationshipRow[]>([]);
+  const nameRef = useNameRef(personName);
   const [savedTick, setSavedTick] = useState(0);
   // Synchronous single-flight guard so a double-tap cannot INSERT a duplicate
   // relationship (WR-03); shared with edit for consistency. The screen's slot,
@@ -445,37 +557,57 @@ function KeyPeopleFocusedEditor({
       rowSave.settleHold();
     }
   };
-  const restore = (id: number) =>
-    void restoreRelationship(getExecutor(), {
-      id,
-      contactId,
-      now: localDateTime(),
-    })
-      .then(load)
-      .catch((cause) =>
-        Logger.error(LOG_SCOPE, "failed to restore relationship", cause),
+  // The same wording as the Key People editor (plan 15; proposed for the
+  // plan-19 review): verb first, naming the person (38.9 D-39/D-46).
+  const undoDelete = (snapshot: RelationshipSnapshot) => {
+    void (async () => {
+      try {
+        await undoRelationshipDelete(getExecutor(), snapshot, localDateTime());
+      } catch (cause) {
+        Logger.error(LOG_SCOPE, "failed to undo a key person delete", cause);
+        errorNotice("Couldn't undo the delete.");
+        return;
+      }
+      void load().catch((cause) =>
+        Logger.error(LOG_SCOPE, "failed to reload relationships", cause),
       );
-  const remove = (id: number) =>
-    void deleteRelationship(getExecutor(), {
-      id,
-      contactId,
-      now: localDateTime(),
-    })
-      .then(() => {
-        void load();
-        showSnackbar({
-          kind: "success",
-          label: "Relationship removed",
-          action: {
-            label: "Undo",
-            accessibilityLabel: "Undo removing relationship",
-            onPress: () => restore(id),
-          },
+      showSnackbar({
+        kind: "success",
+        label: `Key person restored${forName(nameRef.current)}`,
+      });
+    })();
+  };
+  // D-69: the delete happens at once (a hard delete with a tombstone) and
+  // Undo puts it back.
+  const remove = (id: number) => {
+    if (savingRef.current) return;
+    void (async () => {
+      let snapshot: RelationshipSnapshot;
+      try {
+        snapshot = await deleteRelationshipNow(getExecutor(), {
+          id,
+          contactId,
+          now: localDateTime(),
         });
-      })
-      .catch((cause) =>
-        Logger.error(LOG_SCOPE, "failed to delete relationship", cause),
+      } catch (cause) {
+        Logger.error(LOG_SCOPE, "failed to delete relationship", cause);
+        errorNotice("Couldn't delete. Please try again.");
+        return;
+      }
+      void load().catch((cause) =>
+        Logger.error(LOG_SCOPE, "failed to reload relationships", cause),
       );
+      showSnackbar({
+        kind: "success",
+        label: `Deleted key person${forName(nameRef.current)}`,
+        action: {
+          label: "Undo",
+          accessibilityLabel: "Undo deleting the key person",
+          onPress: () => undoDelete(snapshot),
+        },
+      });
+    })();
+  };
 
   return (
     <EditorFrame
@@ -490,7 +622,6 @@ function KeyPeopleFocusedEditor({
         onAdd={add}
         onEdit={edit}
         onDelete={remove}
-        onRestore={restore}
         ref={relationshipRef}
         onDraftStateChange={onDraftStateChange}
         onCancelRequest={onCancelRequest}
@@ -500,78 +631,134 @@ function KeyPeopleFocusedEditor({
   );
 }
 
-/** Off Limits — a focused editor over the contact's off_limits fuel rows. */
-function OffLimitsFocusedEditor({
+interface MemoryEditorData {
+  rows: MemoryRow[];
+  globalAiEnabled: boolean;
+  aiDefaults: MemoryAiDefaults;
+}
+
+/**
+ * Memory — an in-place memory editor (D-115, D-114; CAPT-12). It lists the
+ * contact's memories and has the type picker (Memory, Gift Ideas, Thought of
+ * Them; never Imported, D-35). Each save returns to the chooser; a delete
+ * stays here, with Undo (D-69). The one exception to the shared per-section
+ * editors (D-75, D-63): it never opens the section editor or the add form.
+ * No keyboard centring here (D-114): its entry field wraps and saves on
+ * Enter. A linked row keeps tap-to-edit (this plan only; D-107 names the
+ * section editors).
+ */
+function MemoryFocusedEditor({
   contactId,
+  title,
+  personName,
   onSaved,
   onCancel,
-  onDirtyChange,
+  memoryRef,
+  onDraftStateChange,
+  onCancelRequest,
   rowSave,
 }: {
   contactId: number;
+  title: string;
+  /** For the snackbars (38.9 D-39/D-46); null while it loads. */
+  personName: string | null;
   onSaved: () => void;
   onCancel: () => void;
-  onDirtyChange?: (dirty: boolean) => void;
+  /** The open memory form is the inner level (D-14). */
+  memoryRef: Ref<MemoryEditorHandle>;
+  onDraftStateChange: (state: MemoryDraftState) => void;
+  onCancelRequest: (close: () => void) => void;
   rowSave: RowSave;
 }) {
   const { colors } = useTheme();
-  const [items, setItems] = useState<FuelItem[]>([]);
-  const [draft, setDraft] = useState("");
-  // Per-edit seed (review C4-M3): "" for a new item, the item's text once an
-  // existing item is selected, re-seeded whenever the selection changes.
-  const [draftSeed, setDraftSeed] = useState("");
-  useReportDirty(
-    isRowDraftDirty({ kind: "text", seed: draftSeed, current: draft }),
-    onDirtyChange,
-  );
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [error, setError] = useState(false);
+  const nameRef = useNameRef(personName);
+  const [phase, setPhase] = useState<ReadPhase<MemoryEditorData>>(readLoading);
+  // Only the latest load may publish; unmount invalidates outstanding reads.
+  const readAuthority = useMemo(() => createLatestRequestAuthority(), []);
+  const [savedTick, setSavedTick] = useState(0);
+  // The screen's slot, so its guard holds Back while a save runs (WR-02).
   const { saving, setSaving, savingRef } = useRowSave(rowSave);
 
-  const load = useCallback(async () => {
-    const rows = await listFuelForEditor(getExecutor(), contactId);
-    setItems(rows.filter((row) => row.kind === "off_limits"));
-  }, [contactId]);
+  /** NEVER rejects: a failure lands in the error phase (ADR-168; RG-035). */
+  const load = useCallback(async (): Promise<void> => {
+    await runGatedRead({
+      gate: readAuthority,
+      read: async (): Promise<MemoryEditorData> => {
+        const exec = getExecutor();
+        const settings = await getAppSettings(exec);
+        const defaults = await getAiPermissionDefaults(exec);
+        const rows = await listMemoriesForContact(exec, contactId);
+        return {
+          rows,
+          globalAiEnabled: isAiMasterEnabled(settings),
+          aiDefaults: memoryAiDefaultsMap(defaults),
+        };
+      },
+      publish: setPhase,
+      onError: (cause) =>
+        Logger.error(LOG_SCOPE, "failed to load memories", cause),
+    });
+  }, [contactId, readAuthority]);
 
   useEffect(() => {
-    void load().catch((cause) =>
-      Logger.error(LOG_SCOPE, "failed to load off-limits", cause),
-    );
-  }, [load]);
+    void load();
+    return () => readAuthority.invalidate();
+  }, [load, readAuthority]);
 
-  const save = async () => {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    // The add branch mints a fresh newUid() per call, so UNIQUE cannot catch a
-    // double-tap duplicate — the synchronous ref guard is what prevents it (WR-03).
-    if (!beginInFlight(savingRef)) return;
+  // Defer return-to-chooser so MemoryEditor finishes its own close().
+  useEffect(() => {
+    if (savedTick > 0) onSaved();
+  }, [savedTick, onSaved]);
+
+  const saveFailed = (cause: unknown) =>
+    errorNotice(
+      cause instanceof LinkedNoteBlankError
+        ? LINKED_ENTRY_NEEDS_TEXT
+        : FAILURE_COPY,
+    );
+
+  const add = async (draft: MemoryDraft): Promise<boolean> => {
+    if (!beginInFlight(savingRef)) return false;
     setSaving(true);
-    setError(false);
     try {
       const now = localDateTime();
-      if (editingId === null) {
-        await addFuel(getExecutor(), {
-          uid: newUid(),
-          contactId,
-          kind: "off_limits",
-          text: trimmed,
-          createdAt: now,
-          source: "manual",
-          now,
-        });
-      } else {
-        await editFuel(getExecutor(), {
-          id: editingId,
-          contactId,
-          kind: "off_limits",
-          text: trimmed,
-          now,
-        });
-      }
-      onSaved();
+      // The draft carries Allow AI, seeded per type (D-13, D-92).
+      await addMemory(getExecutor(), {
+        contactId,
+        ...draft,
+        createdAt: now,
+        now,
+      });
+      setSavedTick((tick) => tick + 1);
+      return true;
     } catch (cause) {
-      Logger.error(LOG_SCOPE, "failed to save off-limits", cause);
-      setError(true);
+      Logger.error(LOG_SCOPE, "failed to add memory", cause);
+      saveFailed(cause);
+      return false;
+    } finally {
+      setSaving(false);
+      endInFlight(savingRef);
+      rowSave.settleHold();
+    }
+  };
+  // Text and a changed Allow AI save in one transaction through the
+  // `editMemory` wrapper (D-27, D-49; it refuses a locked row).
+  const edit = async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
+    if (!beginInFlight(savingRef)) return false;
+    setSaving(true);
+    try {
+      await editMemory(getExecutor(), {
+        id,
+        contactId,
+        ...patch,
+        now: localDateTime(),
+      });
+      setSavedTick((tick) => tick + 1);
+      return true;
+    } catch (cause) {
+      Logger.error(LOG_SCOPE, "failed to edit memory", cause);
+      saveFailed(cause);
+      return false;
     } finally {
       setSaving(false);
       endInFlight(savingRef);
@@ -579,12 +766,235 @@ function OffLimitsFocusedEditor({
     }
   };
 
-  const remove = (id: number) =>
-    void deleteFuel(getExecutor(), { id, contactId, now: localDateTime() })
-      .then(load)
-      .catch((cause) =>
-        Logger.error(LOG_SCOPE, "failed to delete off-limits", cause),
-      );
+  const undoDelete = (snapshot: MemorySnapshot, section: string) => {
+    void (async () => {
+      try {
+        await undoMemoryDelete(getExecutor(), snapshot, localDateTime());
+      } catch (cause) {
+        Logger.error(LOG_SCOPE, "failed to undo a memory delete", cause);
+        errorNotice("Couldn't undo the delete.");
+        return;
+      }
+      void load();
+      showSnackbar({
+        kind: "success",
+        label: restoredSnackbar(section, nameRef.current),
+      });
+    })();
+  };
+
+  // D-69: the delete happens at once (a hard delete with a tombstone; a
+  // linked entry's interaction and note stay, D-37) and Undo puts it back.
+  // It stays in this editor.
+  const remove = (id: number): boolean => {
+    if (savingRef.current) return false;
+    const rows = phase.phase === "loaded" ? phase.data.rows : [];
+    const row = rows.find((candidate) => candidate.id === id);
+    // The deleted row's own section name (D-89); an unknown type reads as
+    // Memories.
+    const section = sectionTitle(
+      row !== undefined && isMemoryTypeKey(row.type) ? row.type : "general",
+    );
+    void (async () => {
+      let snapshot: MemorySnapshot;
+      try {
+        snapshot = await deleteMemoryNow(getExecutor(), {
+          id,
+          contactId,
+          now: localDateTime(),
+        });
+      } catch (cause) {
+        Logger.error(LOG_SCOPE, "failed to delete memory", cause);
+        errorNotice("Couldn't delete. Please try again.");
+        return;
+      }
+      void load();
+      showSnackbar({
+        kind: "success",
+        label: deletedSnackbar(section, nameRef.current),
+        action: {
+          label: "Undo",
+          accessibilityLabel: `Undo deleting the ${section} entry`,
+          onPress: () => undoDelete(snapshot, section),
+        },
+      });
+    })();
+    return true;
+  };
+
+  return (
+    <EditorFrame
+      title={title}
+      error={false}
+      onCancel={onCancel}
+      cancelDisabled={saving}
+    >
+      {phase.phase === "loading" ? (
+        <View
+          testID="update-memory-loading"
+          accessibilityLabel={`Loading ${title}`}
+          style={styles.readState}
+        >
+          <ActivityIndicator color={colors.accentText} />
+        </View>
+      ) : phase.phase === "error" ? (
+        <View testID="update-memory-read-error" style={styles.readError}>
+          <AppText role="body" style={{ color: colors.textPrimary }}>
+            {`Couldn't load ${title}`}
+          </AppText>
+          <Button
+            role="tertiary"
+            label="Retry"
+            accessibilityLabel={`Retry loading ${title}`}
+            onPress={() => void load()}
+          />
+        </View>
+      ) : (
+        <MemoryEditor
+          testID="update-memory-editor"
+          items={phase.data.rows}
+          onAdd={add}
+          onEdit={edit}
+          onDelete={remove}
+          globalAiEnabled={phase.data.globalAiEnabled}
+          aiDefaults={phase.data.aiDefaults}
+          ref={memoryRef}
+          onDraftStateChange={onDraftStateChange}
+          onCancelRequest={onCancelRequest}
+          busy={saving}
+        />
+      )}
+    </EditorFrame>
+  );
+}
+
+/**
+ * Off Limits — the dedicated Off Limits form and DAO (D-08). Writes go
+ * through the Off Limits editor's controller, which re-reads the contact's
+ * rows before every edit and delete (D-11). Delete sits in the open form
+ * (38.9 D-30) and happens at once with Undo (D-69). No AI control (D-09).
+ */
+function OffLimitsFocusedEditor({
+  contactId,
+  personName,
+  onSaved,
+  onCancel,
+  onDirtyChange,
+  rowSave,
+}: {
+  contactId: number;
+  /** For the snackbars (38.9 D-39/D-46); null while it loads. */
+  personName: string | null;
+  onSaved: () => void;
+  onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  rowSave: RowSave;
+}) {
+  const { colors } = useTheme();
+  const nameRef = useNameRef(personName);
+  const [items, setItems] = useState<OffLimitsRow[]>([]);
+  // The open form: a new item (the default), or one stored row.
+  const [editing, setEditing] = useState<OffLimitsRow | null>(null);
+  // Remounts the form for each open (it owns its draft).
+  const [formKey, setFormKey] = useState(0);
+  const [formDirty, setFormDirty] = useState(false);
+  useReportDirty(formDirty, onDirtyChange);
+  const [error, setError] = useState(false);
+  const { saving, setSaving, savingRef } = useRowSave(rowSave);
+
+  const loadRef = useRef<() => Promise<void>>(async () => {});
+  const controller = useMemo(
+    () =>
+      createOffLimitsEditorController({
+        contactId,
+        dao: {
+          list: (id) => listOffLimitsForContact(getExecutor(), id),
+          add: (input) => addOffLimits(getExecutor(), input),
+          edit: (input) => editOffLimits(getExecutor(), input),
+          delete: (input) => deleteOffLimits(getExecutor(), input),
+          undo: (snapshot, now) =>
+            undoDeleteOffLimits(getExecutor(), snapshot, now),
+        },
+        now: localDateTime,
+        newUid,
+        onChanged: () => void loadRef.current(),
+        onError: (cause, op: OffLimitsEditorOp) => {
+          Logger.error(LOG_SCOPE, `failed to ${op} off-limits`, cause);
+          if (op === "add" || op === "edit") setError(true);
+          else if (op === "delete") {
+            errorNotice("Couldn't delete. Please try again.");
+          } else errorNotice("Couldn't undo the delete.");
+        },
+      }),
+    [contactId],
+  );
+
+  const load = useCallback(async () => {
+    try {
+      setItems(await controller.list());
+    } catch (cause) {
+      Logger.error(LOG_SCOPE, "failed to load off-limits", cause);
+    }
+  }, [controller]);
+  loadRef.current = load;
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const openForm = (row: OffLimitsRow | null) => {
+    setFormKey((key) => key + 1);
+    setFormDirty(false);
+    setEditing(row);
+  };
+
+  const save = async (fields: OffLimitsFormFields) => {
+    if (!beginInFlight(savingRef)) return;
+    setSaving(true);
+    setError(false);
+    let ok = false;
+    try {
+      ok =
+        editing === null
+          ? await controller.onAdd(fields)
+          : await controller.onEdit(editing.id, fields);
+    } finally {
+      setSaving(false);
+      endInFlight(savingRef);
+      rowSave.settleHold();
+    }
+    // A failed save keeps the form and its draft (CAPT-14).
+    if (ok) onSaved();
+  };
+
+  const undoDelete = (snapshot: OffLimitsSnapshot) => {
+    void (async () => {
+      if (!(await controller.onUndo(snapshot))) return;
+      showSnackbar({
+        kind: "success",
+        label: offLimitsRestoredSnackbar(nameRef.current),
+      });
+    })();
+  };
+
+  // D-69: replaces the old unconfirmed, unscoped delete (T-38.10-48).
+  const remove = (row: OffLimitsRow) => {
+    if (savingRef.current) return;
+    openForm(null);
+    void (async () => {
+      const snapshot = await controller.onDelete(row.id);
+      if (snapshot === null) return;
+      showSnackbar({
+        kind: "success",
+        label: offLimitsDeletedSnackbar(nameRef.current),
+        action: {
+          label: "Undo",
+          accessibilityLabel: "Undo deleting the Off Limits item",
+          onPress: () => undoDelete(snapshot),
+        },
+      });
+    })();
+  };
 
   return (
     <EditorFrame
@@ -594,55 +1004,35 @@ function OffLimitsFocusedEditor({
       cancelDisabled={saving}
     >
       {items.map((item) => (
-        <View
+        <Pressable
           key={item.id}
-          style={[styles.listRow, { borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${item.text ?? item.label ?? "Off Limits item"}`}
+          accessibilityState={{ disabled: saving }}
+          disabled={saving}
+          onPress={() => openForm(item)}
+          style={[
+            styles.listRow,
+            {
+              borderColor:
+                editing?.id === item.id ? colors.accent : colors.border,
+            },
+          ]}
         >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Edit ${item.text ?? "off-limits topic"}`}
-            onPress={() => {
-              setEditingId(item.id);
-              setDraft(item.text ?? "");
-              setDraftSeed(item.text ?? "");
-            }}
-            style={styles.listRowMain}
-          >
-            <AppText role="body">{item.text ?? item.label ?? ""}</AppText>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Remove ${item.text ?? "off-limits topic"}`}
-            onPress={() => remove(item.id)}
-            style={[styles.smallAction, { borderColor: colors.border }]}
-          >
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Remove
-            </AppText>
-          </Pressable>
-        </View>
+          <AppText role="body">{item.text ?? item.label ?? ""}</AppText>
+        </Pressable>
       ))}
-      <TextInput
-        accessibilityLabel="Off-limits topic"
-        value={draft}
-        onChangeText={setDraft}
-        placeholder="What should you avoid?"
-        placeholderTextColor={colors.textPlaceholder}
-        multiline
-        style={[
-          styles.input,
-          styles.multiline,
-          {
-            color: colors.textPrimary,
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
-        ]}
-      />
-      <PrimaryButton
-        label={editingId === null ? "Add" : "Save"}
-        disabled={!draft.trim() || saving}
-        onPress={() => void save()}
+      <OffLimitsForm
+        key={formKey}
+        testID="update-off-limits-form"
+        initial={editing}
+        onSave={save}
+        // The form's Cancel closes the row, as the frame's Cancel does, so
+        // it follows the Back rule (D-61).
+        onCancel={onCancel}
+        onDelete={editing === null ? undefined : () => remove(editing)}
+        onDirtyChange={setFormDirty}
+        busy={saving}
       />
     </EditorFrame>
   );
@@ -1103,24 +1493,30 @@ export function UpdateContactScreen({
   >(null);
   const [relationshipDraftOpen, setRelationshipDraftOpen] = useState(false);
   const relationshipRef = useRef<RelationshipEditorHandle>(null);
+  // The Memory row's open form is its inner level (D-115, D-14).
+  const [memoryDraftOpen, setMemoryDraftOpen] = useState(false);
+  const memoryRef = useRef<MemoryEditorHandle>(null);
   const bypassRef = useRef(false);
   // The open row editor's save slot (fix-pass WR-02): the guard reads the ref,
   // the state draws the header Back disabled (D-26).
   const rowSavingRef = useRef(false);
   const [rowSaving, setRowSaving] = useState(false);
   const rowOpen = session.activeRowKey != null;
-  const innerOpen = genericSelectedDefId !== null || relationshipDraftOpen;
+  const innerOpen =
+    genericSelectedDefId !== null || relationshipDraftOpen || memoryDraftOpen;
 
   /** Closes one level: the inner editor, or the whole row. */
   function closeLevel(level: "inner" | "row" | null) {
     if (level === null) return;
     if (level === "inner") {
       if (genericSelectedDefId !== null) setGenericSelectedDefId(null);
+      else if (memoryDraftOpen) memoryRef.current?.closeDraft();
       else relationshipRef.current?.closeDraft();
     } else {
       setSession((s) => cancelRow(s));
       setGenericSelectedDefId(null);
       setRelationshipDraftOpen(false);
+      setMemoryDraftOpen(false);
     }
     setActiveRowDirty(false);
   }
@@ -1175,20 +1571,23 @@ export function UpdateContactScreen({
     setActiveRowDirty(state.dirty);
   };
 
+  const onMemoryDraftState = (state: MemoryDraftState) => {
+    setMemoryDraftOpen(state.open);
+    setActiveRowDirty(state.dirty);
+  };
+
   // A successful inner save closes directly, with no prompt.
   const onSaved = () => {
     setSession((s) => completeSave(s));
     setGenericSelectedDefId(null);
     setRelationshipDraftOpen(false);
+    setMemoryDraftOpen(false);
     setActiveRowDirty(false);
   };
 
+  // Every row opens in place, Memory included (D-115).
   const onSelectRow = (row: ChooserRow) => {
     if (contactId === null) return;
-    if (row.kind === "memory") {
-      navigation.navigate("Memory", { contactId });
-      return;
-    }
     setSession((s) => openRow(s, row.key));
   };
 
@@ -1229,6 +1628,7 @@ export function UpdateContactScreen({
         return (
           <KeyPeopleFocusedEditor
             contactId={contactId}
+            personName={person?.name ?? null}
             onSaved={onSaved}
             onCancel={requestRowCancel}
             rowSave={rowSave}
@@ -1237,10 +1637,25 @@ export function UpdateContactScreen({
             onCancelRequest={() => requestInnerCancel()}
           />
         );
+      case "memory":
+        return (
+          <MemoryFocusedEditor
+            contactId={contactId}
+            title={activeRow.label}
+            personName={person?.name ?? null}
+            onSaved={onSaved}
+            onCancel={requestRowCancel}
+            rowSave={rowSave}
+            memoryRef={memoryRef}
+            onDraftStateChange={onMemoryDraftState}
+            onCancelRequest={() => requestInnerCancel()}
+          />
+        );
       case "off_limits":
         return (
           <OffLimitsFocusedEditor
             contactId={contactId}
+            personName={person?.name ?? null}
             onSaved={onSaved}
             onCancel={requestRowCancel}
             rowSave={rowSave}
@@ -1392,7 +1807,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
   },
-  multiline: { minHeight: 84, textAlignVertical: "top" },
   primary: {
     alignItems: "center",
     borderRadius: RADII.sm,
@@ -1417,14 +1831,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: SPACING.sm,
   },
-  listRowMain: { flex: 1, justifyContent: "center", minHeight: 44 },
+  readState: { minHeight: 88, alignItems: "center", justifyContent: "center" },
+  readError: { gap: SPACING.sm, alignItems: "flex-start" },
   disabled: { opacity: DISABLED_OPACITY },
-  smallAction: {
-    alignItems: "center",
-    borderRadius: RADII.sm,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 36,
-    paddingHorizontal: SPACING.sm,
-  },
 });

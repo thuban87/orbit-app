@@ -219,8 +219,9 @@ describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", ()
   });
 
   it("every row editor saves through the screen's slot, not a local ref", () => {
-    // CurrentState, KeyPeople, OffLimits, ContactMethod, Frequency, CustomField.
-    expect(source.match(/= useRowSave\(rowSave\);/g)).toHaveLength(6);
+    // CurrentState, KeyPeople, Memory (38.10 D-115), OffLimits, ContactMethod,
+    // Frequency, CustomField.
+    expect(source.match(/= useRowSave\(rowSave\);/g)).toHaveLength(7);
     expect(source).not.toMatch(/const savingRef = useRef\(/);
     const useRowSave = blockFrom(
       source,
@@ -238,7 +239,8 @@ describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", ()
       "renderActiveEditor",
     );
     const editors = render.match(/<\w+FocusedEditor[\s\S]*?\/>/g) ?? [];
-    expect(editors).toHaveLength(7);
+    // The seven row editors plus the in-place Memory editor (38.10 D-115).
+    expect(editors).toHaveLength(8);
     for (const editor of editors) expect(editor).toContain("rowSave={rowSave}");
     // The Generic chooser threads it to the field it opens.
     // The body: past the destructured, typed parameter list.
@@ -258,8 +260,9 @@ describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", ()
       ...source.matchAll(/const (?:save|add|edit) = async \(/g),
     ].map((match) => match.index ?? -1);
     // Five `save`s (CurrentState, OffLimits, ContactMethod, Frequency,
-    // CustomField) and KeyPeople's `add` + `edit`.
-    expect(markers).toHaveLength(7);
+    // CustomField), KeyPeople's `add` + `edit` and the Memory editor's
+    // `add` + `edit` (38.10 D-115).
+    expect(markers).toHaveLength(9);
     for (const at of markers) {
       const body = blockFrom(source, source.indexOf(")", at), "row save");
       const claim = body.indexOf("beginInFlight(savingRef)");
@@ -285,7 +288,8 @@ describe("UpdateContactScreen holds its exits while a row save runs (WR-02)", ()
     const markers = [
       ...source.matchAll(/const (?:save|add|edit) = async \(/g),
     ].map((match) => match.index ?? -1);
-    expect(markers).toHaveLength(7);
+    // The same nine saves as above (Memory's `add` + `edit` included).
+    expect(markers).toHaveLength(9);
     for (const at of markers) {
       const body = blockFrom(source, source.indexOf(")", at), "row save");
       const finallyAt = body.lastIndexOf("} finally {");
@@ -356,17 +360,18 @@ describe("UpdateContactScreen holds the row editors' Cancel while a row saves", 
 
   it("every saving row editor holds its frame's Cancel with its save state", () => {
     const tags = source.match(/<EditorFrame[\s\S]*?>/g) ?? [];
-    // CurrentState, KeyPeople, OffLimits, ContactMethod, Frequency,
-    // CustomField; the Generic chooser has no save of its own (its opened
-    // field renders CustomFieldFocusedEditor in its place).
+    // CurrentState, KeyPeople, Memory (38.10 D-115), OffLimits,
+    // ContactMethod, Frequency, CustomField; the Generic chooser has no save
+    // of its own (its opened field renders CustomFieldFocusedEditor in its
+    // place).
     const held = tags.filter((tag) => tag.includes("cancelDisabled={saving}"));
-    expect(held).toHaveLength(6);
-    expect(tags).toHaveLength(7);
+    expect(held).toHaveLength(7);
+    expect(tags).toHaveLength(8);
     expect(
       source.match(
         /const \{ saving, setSaving, savingRef \} = useRowSave\(rowSave\);/g,
       ),
-    ).toHaveLength(6);
+    ).toHaveLength(7);
   });
 
   it("Key people holds the relationship form's Cancel through busy", () => {
