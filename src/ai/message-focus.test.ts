@@ -61,6 +61,15 @@ describe("projectMessageFocus", () => {
     ]);
   });
 
+  it("sends a memory's main text, never the note shown in its place (D-124)", () => {
+    const noteOnly = item("m1", "private note", { focusValue: "" });
+    const main = item("m2", "Likes jazz", { focusValue: "Likes jazz" });
+    expect(projectMessageFocus([noteOnly, main], [noteOnly, main])).toEqual([
+      { label: "Label m1", value: "" },
+      { label: "Label m2", value: "Likes jazz" },
+    ]);
+  });
+
   it("cannot transmit missing, revoked, or off-limits selections", () => {
     const selected = [
       item("memory:missing", "STALE_MISSING"),

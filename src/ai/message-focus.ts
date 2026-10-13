@@ -31,7 +31,12 @@ export function projectMessageFocus(
     if (fresh?.aiEligible !== true || fresh.isOffLimits === true) {
       continue;
     }
-    projected.push({ label: fresh.label, value: fresh.value });
+    // A memory sends its main text only, never the note shown in its place
+    // when the main text is empty (D-124).
+    projected.push({
+      label: fresh.label,
+      value: fresh.focusValue ?? fresh.value,
+    });
   }
 
   return projected;

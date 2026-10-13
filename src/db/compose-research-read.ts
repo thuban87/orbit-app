@@ -106,6 +106,12 @@ export interface ResearchItem {
    * (D-29). Never projected to Message Focus.
    */
   entryDate?: string;
+  /**
+   * Memory items only: the text Message Focus may send, which is the memory's
+   * main text and never its note (D-124), the same as the AI read sends.
+   * `value` falls back to the note for display only.
+   */
+  focusValue?: string;
 }
 
 /** Display group names for sources without a registry group of their own. */
@@ -257,6 +263,7 @@ export async function readComposeResearch(
       group: memorySectionName(row),
       label: memoryItemLabel(row),
       value: row.value ?? row.note ?? "",
+      focusValue: row.value ?? "",
       aiEligible: eligibleIds.has(row.id),
       isOffLimits: false,
     };

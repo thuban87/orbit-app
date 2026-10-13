@@ -362,6 +362,28 @@ describe("compose-research-read — normalized ResearchItem projection", () => {
     expect(item?.meaningfulDate).toBe("2026-10-20");
   });
 
+  it("shows a value-less memory's note but never offers it to Message Focus (D-124)", async () => {
+    const owner = await contact("Owner");
+    const id = await addMemory(owner, {
+      value: "placeholder",
+      customLabel: "Anniversary",
+      allowAi: 1,
+    });
+    await exec.runAsync(
+      "UPDATE memories SET value = NULL, note = 'private note' WHERE id = ?",
+      [id],
+    );
+    const withMain = await addMemory(owner, {
+      value: "Likes jazz",
+      allowAi: 1,
+    });
+
+    const items = byId(await readComposeResearch(exec, owner));
+    expect(items.get(`memory:${id}`)?.value).toBe("private note");
+    expect(items.get(`memory:${id}`)?.focusValue).toBe("");
+    expect(items.get(`memory:${withMain}`)?.focusValue).toBe("Likes jazz");
+  });
+
   it("gives every item of one section the same group id, pinned or not (J-X01)", async () => {
     const owner = await contact("Owner");
     await addMemory(owner, { value: "Pinned", allowAi: 0, pinned: 1 });

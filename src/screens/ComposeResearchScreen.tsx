@@ -149,7 +149,7 @@ export function ComposeResearchScreen({
         contentContainerStyle={styles.content}
       >
         {items.length === 0 ? (
-          <AppText role="caption">nothing to remember yet</AppText>
+          <AppText role="caption">Nothing to remember yet</AppText>
         ) : (
           <>
             <AppText role="label">Things to Remember</AppText>
