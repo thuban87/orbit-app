@@ -9,22 +9,16 @@
  * failure, serialized under concurrency, and byte-identical local wall-clock on
  * the timestamp round-trip (the DATA-05 status contract).
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   resolveNewItemAiDefault,
   setAiPermissionDefault,
 } from "@/db/ai-permissions-dao";
-import { migration001 } from "@/db/migrations/001-initial";
-import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
-import { migration025 } from "@/db/migrations/025-interaction-history-schema";
-import { migration026 } from "@/db/migrations/026-group-events-schema";
-import { migration029 } from "@/db/migrations/029-ai-configuration";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -48,27 +42,12 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(
-    exec,
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-      // migration 025 adds interactions.duration/allow_ai — the columns the single
-      // recency writer now populates. The runner applies only the array members
-      // <= target, so 008-024 stay skipped; 025 depends only on interactions (001)
-      // and app_settings (002).
-      migration025,
-      migration026,
-      migration029,
-    ],
-    29,
-    { now: NOW, newUid: uid },
-  );
+  // The full chain: the single writer's UPDATE names migration 033's
+  // note_ai_locked column (D-103).
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function lastContact(contactId: number): Promise<string | null> {
@@ -1043,5 +1022,99 @@ describe("recency DAO — composable cores", () => {
     ).toBe(before?.data_revision);
     expect(await interactionTombstones()).toHaveLength(1);
     expect(await lastContact(contactId)).toBeNull();
+  });
+});
+
+describe("recency DAO — durable note AI lock (D-103)", () => {
+  async function lockState(interactionId: number) {
+    return exec.getFirstAsync<{ allow_ai: number; note_ai_locked: number }>(
+      "SELECT allow_ai, note_ai_locked FROM interactions WHERE id = ?",
+      [interactionId],
+    );
+  }
+
+  async function seedAllowed(): Promise<{
+    contactId: number;
+    interactionId: number;
+  }> {
+    const contactId = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId,
+      uid: uid(),
+      occurredAt: "2026-07-01 10:00:00",
+      now: NOW,
+      note: "Their new job",
+    });
+    await editFull(interactionId, contactId, NOW, { allowAi: 1 });
+    expect(await lockState(interactionId)).toEqual({
+      allow_ai: 1,
+      note_ai_locked: 0,
+    });
+    return { contactId, interactionId };
+  }
+
+  it("lockNoteAi sets the lock and forces allow_ai to 0 in the same write", async () => {
+    const { contactId, interactionId } = await seedAllowed();
+    const cur = await readInteraction(interactionId);
+    await inWriteTransaction(exec, () =>
+      editTouchpointFullCore(exec, {
+        interactionId,
+        contactId,
+        now: NOW,
+        occurredAt: cur.occurred_at,
+        channel: cur.channel,
+        direction: cur.direction,
+        connected: cur.connected,
+        quality: cur.quality,
+        note: cur.note,
+        duration: cur.duration,
+        allowAi: 1,
+        lockNoteAi: true,
+      }),
+    );
+    expect(await lockState(interactionId)).toEqual({
+      allow_ai: 0,
+      note_ai_locked: 1,
+    });
+  });
+
+  it("a later edit asking for allowAi 1 is clamped to 0 and never clears the lock", async () => {
+    const { contactId, interactionId } = await seedAllowed();
+    await editFull(interactionId, contactId, NOW, { allowAi: 0 });
+    const cur = await readInteraction(interactionId);
+    await editTouchpointFull(exec, {
+      interactionId,
+      contactId,
+      now: NOW,
+      occurredAt: cur.occurred_at,
+      channel: cur.channel,
+      direction: cur.direction,
+      connected: cur.connected,
+      quality: cur.quality,
+      note: cur.note,
+      duration: cur.duration,
+      allowAi: 0,
+      lockNoteAi: true,
+    });
+    await editFull(interactionId, contactId, NOW, {
+      allowAi: 1,
+      note: "Edited note",
+    });
+    expect(await lockState(interactionId)).toEqual({
+      allow_ai: 0,
+      note_ai_locked: 1,
+    });
+    expect((await readInteraction(interactionId)).note).toBe("Edited note");
+  });
+
+  it("an unlocked interaction keeps the caller's allowAi", async () => {
+    const { contactId, interactionId } = await seedAllowed();
+    await editFull(interactionId, contactId, NOW, { allowAi: 0 });
+    expect(await lockState(interactionId)).toEqual({
+      allow_ai: 0,
+      note_ai_locked: 0,
+    });
+    await editFull(interactionId, contactId, NOW, { allowAi: 1 });
+    expect((await lockState(interactionId))?.allow_ai).toBe(1);
   });
 });

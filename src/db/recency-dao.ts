@@ -107,6 +107,13 @@ export interface EditTouchpointFullInput {
   duration: number | null;
   /** Per-interaction Allow-AI gate, 0/1 (D-04). The refine form seeds it (default 0/OFF). */
   allowAi: number;
+  /**
+   * D-103: set the durable note AI lock (the move into Off Limits, D-93). The
+   * lock is set once and never cleared; while it is set, `allow_ai` stays 0
+   * whatever `allowAi` says (clamped in SQL; migration 033's CHECK is the
+   * schema backstop).
+   */
+  lockNoteAi?: boolean;
 }
 
 /** A deletion of an existing interaction. */
@@ -339,6 +346,11 @@ export async function editTouchpointFullCore(
   // failure this module's invariant guards against). Scoping by contact_id
   // makes a mismatch update 0 rows; asserting changes === 1 turns that into a
   // loud rollback instead of silent corruption.
+  //
+  // D-103: `note_ai_locked` can be set here (lockNoteAi) but never cleared,
+  // and while it is set allow_ai is clamped to 0 in SQL, so no edit can turn
+  // AI back on for a note moved into Off Limits.
+  const lockNoteAi = input.lockNoteAi === true ? 1 : 0;
   const result = await exec.runAsync(
     `UPDATE interactions
           SET occurred_at = ?,
@@ -348,7 +360,9 @@ export async function editTouchpointFullCore(
               quality     = ?,
               note        = ?,
               duration    = ?,
-              allow_ai    = ?,
+              allow_ai    = CASE WHEN note_ai_locked = 1 OR ? = 1 THEN 0
+                                 ELSE ? END,
+              note_ai_locked = MAX(note_ai_locked, ?),
               modified_at = ?
         WHERE id = ? AND contact_id = ?`,
     [
@@ -359,7 +373,9 @@ export async function editTouchpointFullCore(
       input.quality,
       input.note,
       input.duration,
+      lockNoteAi,
       input.allowAi,
+      lockNoteAi,
       input.now,
       input.interactionId,
       input.contactId,
