@@ -26,6 +26,7 @@ import {
   PROVISIONAL_MEMORY_LABEL,
 } from "@/db/memory-registry";
 import { aiLockReason, memoryAiLock } from "@/logic/ai-lock";
+import { isValidLinkInput, LINK_FIELD_ERROR } from "@/logic/url-validation";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
@@ -35,8 +36,9 @@ import {
   storedFromPickerEvent,
 } from "./date-pick-logic";
 import { Icon } from "./icons/Icon";
+import { normaliseLinkUrl } from "./LinksEditor";
 import { MemoryCard, memoryTypeLabel } from "./MemoryCard";
-import { AppText, Button, EntryTextField, OrbitSwitch } from "./ui";
+import { AppText, Button, EntryTextField, FieldError, OrbitSwitch } from "./ui";
 
 const PROVENANCE_LABELS = {
   user: "Added by you",
@@ -363,13 +365,25 @@ export function draftAfterTypeChange(
 }
 
 /**
+ * The Link field's error (G-13 via D-89): null when blank or a web address,
+ * where a missing scheme is added only by `normaliseLinkUrl`. PURE.
+ */
+export function memoryLinkError(draft: MemoryDraft): string | null {
+  return isValidLinkInput(draft.url ?? "", normaliseLinkUrl)
+    ? null
+    : LINK_FIELD_ERROR;
+}
+
+/**
  * Whether a draft can be saved: a non-blank value or a non-blank label, the
- * rule `addMemoryCore` / `editMemoryCore` enforce (D-86, D-89 NEW-9). PURE.
+ * rule `addMemoryCore` / `editMemoryCore` enforce (D-86, D-89 NEW-9), and a
+ * Link that is blank or valid (G-13). PURE.
  */
 export function canSaveMemoryDraft(draft: MemoryDraft): boolean {
   return (
-    blankToNull(draft.value ?? "") !== null ||
-    blankToNull(draft.customLabel ?? "") !== null
+    (blankToNull(draft.value ?? "") !== null ||
+      blankToNull(draft.customLabel ?? "") !== null) &&
+    memoryLinkError(draft) === null
   );
 }
 
@@ -604,6 +618,7 @@ export function MemoryEditor({
   const meaningfulDateInvalid =
     hasMeaningfulDate && !isPickableStoredDate(meaningfulDate);
   const canSave = draft !== null && canSaveMemoryDraft(draft);
+  const linkError = draft === null ? null : memoryLinkError(draft);
   // The draft's type is fixed when it is not user-pickable (D-35).
   const typeLocked = draft !== null && isLockedMemoryType(draft.type);
   // An outlined action the host's save holds: dimmed while busy (D-26).
@@ -790,6 +805,7 @@ export function MemoryEditor({
               },
             ]}
           />
+          <FieldError message={linkError} testID="memory-link-error" />
           {/* Meaningful date (38.9 D-65, D-67): a native date picker, full
               date only, no range limit; optional, with Clear. */}
           <View style={styles.dateField}>

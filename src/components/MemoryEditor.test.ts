@@ -86,6 +86,7 @@ import {
   MemoryEditor,
   type MemoryEditorProps,
   memoryDraftState,
+  memoryLinkError,
   newMemoryDraft,
   normalizeMemoryDraft,
 } from "./MemoryEditor";
@@ -1065,5 +1066,91 @@ describe("38.10 plan 13: the reworked editor", () => {
       expect(tree.some((n) => n.type === "Button")).toBe(false);
       expect(pressable(tree, "Add memory")).toBeUndefined();
     });
+  });
+});
+
+describe("Link validation (G-13 via D-89)", () => {
+  type TestElement = ReactElement<Record<string, unknown>>;
+  function nodes(node: ReactNode): TestElement[] {
+    if (!node || typeof node !== "object") return [];
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    const element = node as TestElement;
+    return [element, ...nodes(element.props.children as ReactNode)];
+  }
+  /** Calls a handler prop, failing loudly when it is missing. */
+  const call = (element: TestElement | undefined, prop: string) => {
+    const handler = element?.props[prop];
+    if (typeof handler !== "function") throw new Error(`missing ${prop}`);
+    handler();
+  };
+  const draft = (url: string | null): MemoryDraft => ({
+    ...initialDraft(),
+    value: "Gift",
+    url,
+  });
+
+  beforeEach(() => {
+    hooks.forceOpenPickers = false;
+    hooks.draftOverride = null;
+    hooks.setters = [];
+  });
+
+  it("a blank or web link saves; another scheme or plain words do not", () => {
+    expect(memoryLinkError(draft(null))).toBeNull();
+    expect(memoryLinkError(draft("example.com"))).toBeNull();
+    expect(memoryLinkError(draft("https://example.com/x"))).toBeNull();
+    expect(memoryLinkError(draft("javascript:alert(1)"))).toBe(
+      "Enter a web link, like example.com",
+    );
+    expect(canSaveMemoryDraft(draft("hello world"))).toBe(false);
+  });
+
+  it("shows the FieldError and holds Save while the link is invalid", () => {
+    const onAdd = vi.fn(async () => true);
+    hooks.draftOverride = draft("not a link");
+    const tree = nodes(
+      MemoryEditor({
+        items: [],
+        addOnly: true,
+        onAdd,
+        onEdit: vi.fn(),
+        onDelete: vi.fn(),
+        globalAiEnabled: true,
+      }),
+    );
+    const error = tree.find((n) => n.type === "FieldError");
+    expect(error?.props.message).toBe("Enter a web link, like example.com");
+    const save = tree.find(
+      (n) =>
+        n.type === "Pressable" && n.props.accessibilityLabel === "Add memory",
+    );
+    expect(save?.props.disabled).toBe(true);
+    call(
+      tree.find((n) => n.props.accessibilityLabel === "Memory value"),
+      "onSubmit",
+    );
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it("a double tap on Save commits once (G-15)", () => {
+    const onAdd = vi.fn(() => new Promise<boolean>(() => {}));
+    hooks.draftOverride = draft(null);
+    const tree = nodes(
+      MemoryEditor({
+        items: [],
+        addOnly: true,
+        onAdd,
+        onEdit: vi.fn(),
+        onDelete: vi.fn(),
+        globalAiEnabled: true,
+      }),
+    );
+    const save = tree.find(
+      (n) =>
+        n.type === "Pressable" && n.props.accessibilityLabel === "Add memory",
+    );
+    call(save, "onPress");
+    call(save, "onPress");
+    expect(onAdd).toHaveBeenCalledTimes(1);
   });
 });

@@ -12,6 +12,8 @@
  * - Linked entries: tap opens the interaction; Edit and Pin/Unpin are on
  *   long-press and the screen-reader actions (D-107, D-37, D-48).
  * - Hidden entries are dimmed with "Show on Profile" (D-17).
+ * - Every entry but Imported can move to another D-84 section through
+ *   `MoveEntrySheet`, with the D-85 confirm and Undo (D-118).
  * - Delete is immediate with an Undo snackbar naming the person (D-69;
  *   38.9 D-39/D-46). Pin/Unpin carries Undo too.
  * - Allow AI travels in the editor's draft; Save writes it with the text
@@ -32,6 +34,7 @@ import {
   type MemoryEditorHandle,
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
+import { MoveEntrySheet } from "@/components/MoveEntrySheet";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   AppText,
@@ -73,8 +76,10 @@ import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import {
   addedSnackbar,
   canAdd,
+  canMove,
   deletedSnackbar,
   LINKED_ENTRY_NEEDS_TEXT,
+  moveSectionOf,
   openEditTarget,
   restoredSnackbar,
   savedSnackbar,
@@ -429,6 +434,14 @@ export function SectionEditorScreen({
     })();
   };
 
+  // D-84: Move opens the shared sheet for that entry (never for Imported).
+  const [moveItem, setMoveItem] = useState<MemoryRow | null>(null);
+  const moveSection = moveSectionOf(type);
+  const openMoveSheet = (item: MemoryRow) => {
+    if (savingRef.current) return;
+    setMoveItem(item);
+  };
+
   const empty = sectionEmptyText(type);
 
   return (
@@ -495,6 +508,9 @@ export function SectionEditorScreen({
                 onOpenLinked={openLinked}
                 onTogglePin={togglePin}
                 onShowOnProfile={showOnProfile}
+                onMove={
+                  canMove(type) ? (item) => openMoveSheet(item) : undefined
+                }
                 onDraftStateChange={setDraftState}
                 onCancelRequest={(close) =>
                   requestClose(close, draftState.dirty)
@@ -506,6 +522,17 @@ export function SectionEditorScreen({
         </KeyboardCenteringProvider>
         {bottomSpacer}
       </ScrollView>
+      {moveItem !== null && moveSection !== null ? (
+        <MoveEntrySheet
+          entryRef={{ table: "memories", id: moveItem.id, contactId }}
+          row={moveItem}
+          section={moveSection}
+          contactName={person?.name ?? null}
+          onMoved={() => void load()}
+          onMoveUndone={() => void load()}
+          onClose={() => setMoveItem(null)}
+        />
+      ) : null}
     </View>
   );
 }
