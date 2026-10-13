@@ -13,6 +13,7 @@ import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
+import { KeyPeopleEditorScreen } from "@/screens/KeyPeopleEditorScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MemoryScreen } from "@/screens/MemoryScreen";
@@ -50,6 +51,7 @@ const DIGEST_ROUTE_COMPONENTS = {
   MemoryHistory: MemoryHistoryScreen,
   SectionEditor: SectionEditorScreen,
   OffLimitsEditor: OffLimitsEditorScreen,
+  KeyPeopleEditor: KeyPeopleEditorScreen,
   CropPhoto: CropPhotoScreen,
   SurvivorSelect: SurvivorSelectScreen,
   MergeConflicts: MergeConflictsScreen,

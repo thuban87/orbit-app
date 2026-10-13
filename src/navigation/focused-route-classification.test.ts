@@ -37,6 +37,8 @@ const focusedRoutes = [
   "EditInteraction",
   // 38.10 D-75: the per-section memory editor.
   "SectionEditor",
+  // 38.10 D-75: the Key People editor.
+  "KeyPeopleEditor",
   // D-18: Compose's Research side hides the tab bar and the + like Compose.
   "ComposeResearch",
 ];
@@ -108,6 +110,7 @@ const routeDensities = [
   ["UpdateContact", "dense"],
   ["Memory", "dense"],
   ["SectionEditor", "dense"],
+  ["KeyPeopleEditor", "dense"],
   ["Digest", "comfortable"],
   ["Home", "presentation"],
   ["Profile", "presentation"],

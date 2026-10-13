@@ -14,6 +14,7 @@ import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { KeyPeopleEditorScreen } from "@/screens/KeyPeopleEditorScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MemoryScreen } from "@/screens/MemoryScreen";
@@ -53,6 +54,7 @@ export function DashboardStack() {
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="SectionEditor" component={SectionEditorScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
+      <Stack.Screen name="KeyPeopleEditor" component={KeyPeopleEditorScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
       <Stack.Screen name="EditGroupEvent" component={EditGroupEventScreen} />

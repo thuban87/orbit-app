@@ -96,7 +96,8 @@ export type DashboardStackParamList = {
    * read, falling back to the list when it is not there (D-107).
    */
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
-  OffLimitsEditor: { contactId: number };
+  OffLimitsEditor: { contactId: number; editId?: number };
+  KeyPeopleEditor: { contactId: number; editId?: number };
   Edit: { contactId: number };
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
   EditInteraction: { contactId: number; interactionId: number };
@@ -221,7 +222,8 @@ export type OrreryStackParamList = {
    * read, falling back to the list when it is not there (D-107).
    */
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
-  OffLimitsEditor: { contactId: number };
+  OffLimitsEditor: { contactId: number; editId?: number };
+  KeyPeopleEditor: { contactId: number; editId?: number };
   Edit: { contactId: number };
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
   EditInteraction: { contactId: number; interactionId: number };
@@ -328,7 +330,8 @@ export type DigestStackParamList = {
    * read, falling back to the list when it is not there (D-107).
    */
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
-  OffLimitsEditor: { contactId: number };
+  OffLimitsEditor: { contactId: number; editId?: number };
+  KeyPeopleEditor: { contactId: number; editId?: number };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;
@@ -393,7 +396,8 @@ export type EventsStackParamList = {
    * read, falling back to the list when it is not there (D-107).
    */
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
-  OffLimitsEditor: { contactId: number };
+  OffLimitsEditor: { contactId: number; editId?: number };
+  KeyPeopleEditor: { contactId: number; editId?: number };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;
@@ -525,7 +529,8 @@ export type SettingsStackParamList = {
    * Profile must resolve it too (RG-021, react-native/AUD-RN-004).
    */
   RecentlyDeleted: { contactId: number };
-  OffLimitsEditor: { contactId: number };
+  OffLimitsEditor: { contactId: number; editId?: number };
+  KeyPeopleEditor: { contactId: number; editId?: number };
   Edit: { contactId: number };
   /**
    * The canonical Edit Interaction route (HIST-12). Registered here too because

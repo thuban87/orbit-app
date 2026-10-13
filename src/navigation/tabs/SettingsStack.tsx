@@ -25,6 +25,7 @@ import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
 import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
+import { KeyPeopleEditorScreen } from "@/screens/KeyPeopleEditorScreen";
 import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
@@ -264,6 +265,7 @@ export function SettingsStack() {
       {/* Things to Remember always offers Recently Deleted (RG-021, D-24). */}
       <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
+      <Stack.Screen name="KeyPeopleEditor" component={KeyPeopleEditorScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
       <Stack.Screen

@@ -79,6 +79,7 @@ import {
   offLimitsRestoredSnackbar,
   offLimitsSavedSnackbar,
 } from "./off-limits-editor-controller";
+import { openEditTarget } from "./section-editor-logic";
 
 const LOG_SCOPE = "off-limits-editor";
 const TITLE = "Off Limits";
@@ -109,7 +110,7 @@ export function OffLimitsEditorScreen({
   route,
 }: RootStackScreenProps<"OffLimitsEditor">) {
   const { colors } = useTheme();
-  const { contactId } = route.params;
+  const { contactId, editId } = route.params;
   // Single-person form: the person line under the fixed title (38.9 D-45).
   const person = useContactHeader(contactId);
   // Snackbars fired after an await read the latest name.
@@ -119,6 +120,10 @@ export function OffLimitsEditorScreen({
   const [phase, setPhase] = useState<ReadPhase<OffLimitsRow[]>>(readLoading);
   // Only the latest load may publish; blur invalidates outstanding reads.
   const readAuthority = useMemo(() => createLatestRequestAuthority(), []);
+
+  // `editId` opens its form once per navigation (D-107; convergence c6): a
+  // reload after Save does not reopen it.
+  const editConsumedRef = useRef(false);
 
   const [form, setForm] = useState<FormTarget | null>(null);
   const [formDirty, setFormDirty] = useState(false);
@@ -189,10 +194,22 @@ export function OffLimitsEditorScreen({
       gate: readAuthority,
       read: () => controller.list(),
       publish: setPhase,
+      onLoaded: (rows) => {
+        if (editConsumedRef.current) return;
+        editConsumedRef.current = true;
+        const target = openEditTarget(editId, rows);
+        const row = rows.find((candidate) => candidate.id === target);
+        // Opens it exactly as tapping the row's Edit does.
+        if (row) {
+          setFormKey((key) => key + 1);
+          setFormDirty(false);
+          setForm({ mode: "edit", row });
+        }
+      },
       onError: (error) =>
         Logger.error(LOG_SCOPE, "failed to load Off Limits", error),
     });
-  }, [controller, readAuthority]);
+  }, [controller, editId, readAuthority]);
   loadRef.current = load;
 
   useFocusEffect(

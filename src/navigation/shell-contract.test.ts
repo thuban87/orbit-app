@@ -120,3 +120,36 @@ describe("the per-section memory editor route (38.10 D-75)", () => {
     ).toBe(true);
   });
 });
+
+describe("the Key People and Off Limits editor routes (38.10 D-75, D-08, D-107)", () => {
+  it("KeyPeopleEditor is Profile-reachable and registered in Digest and Events", () => {
+    expect(PROFILE_REACHABLE_ROUTES).toContain("KeyPeopleEditor");
+    expect(DIGEST_STACK_ROUTES).toContain("KeyPeopleEditor");
+    expect(EVENTS_STACK_ROUTES).toContain("KeyPeopleEditor");
+  });
+
+  it.each(LITERAL_STACKS)("%s registers KeyPeopleEditor", (file) => {
+    expect(
+      stackSource(file).includes(
+        '<Stack.Screen name="KeyPeopleEditor" component={KeyPeopleEditorScreen} />',
+      ),
+    ).toBe(true);
+  });
+
+  it("both editors take an optional editId in every param list", () => {
+    const types = readFileSync(
+      join(process.cwd(), "src", "navigation", "types.ts"),
+      "utf8",
+    );
+    expect(
+      types.match(
+        /KeyPeopleEditor: \{ contactId: number; editId\?: number \};/g,
+      ),
+    ).toHaveLength(5);
+    expect(
+      types.match(
+        /OffLimitsEditor: \{ contactId: number; editId\?: number \};/g,
+      ),
+    ).toHaveLength(5);
+  });
+});
