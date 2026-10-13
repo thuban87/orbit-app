@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NavigationContainer } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
-import { ShareIntentProvider } from "expo-share-intent";
+import { ShareIntentProvider, useShareIntentContext } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
@@ -69,7 +69,10 @@ import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-s
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
 import { subscribeAppState, useAssistBanner } from "@/stores/assist-store";
-import { setFocusedRouteName } from "@/stores/focused-route-store";
+import {
+  setFocusedRouteName,
+  useFocusedRouteStore,
+} from "@/stores/focused-route-store";
 import { publishForegroundRefresh } from "@/stores/shell-refresh-store";
 import {
   themeSelectionFromSettings,
@@ -169,6 +172,13 @@ function AppShell() {
     useState<ResumableImport | null>(null);
   const [resumableReconcile, setResumableReconcile] =
     useState<ResumableReconcile | null>(null);
+  // 38.10 D-23: both resume prompts stay hidden while a share is pending or the
+  // Capture screen is focused, on cold and warm starts. Both hooks run
+  // unconditionally here, above the early returns (rules of hooks). The route
+  // selector returns a boolean, so the shell does not re-render on every
+  // navigation. The resumable state is kept, so a prompt returns afterwards.
+  const { hasShareIntent } = useShareIntentContext();
+  const onCapture = useFocusedRouteStore((s) => s.routeName === "Capture");
 
   const syncFocusedRoute = () => {
     setFocusedRouteName(navigationRef.current?.getCurrentRoute()?.name);
@@ -416,6 +426,12 @@ function AppShell() {
   // ready-gated single-owner `<ShareIntentGate/>` keys its navigate effect on
   // (with `hasShareIntent`) — driving the pending share to Capture the moment
   // BOTH settle (A4/A4-refine), with no linking getInitialURL racing the provider.
+  const suppressed = hasShareIntent || onCapture;
+  const activeResumePrompt = resolveActiveResumePrompt(
+    resumableImport,
+    resumableReconcile,
+    { suppressed },
+  );
   return (
     <NavigationContainer
       ref={navigationRef}
@@ -442,15 +458,13 @@ function AppShell() {
       <Snackbar />
       {/* 38.9 D-24: the single host for imperative confirm()/notice() dialogs. */}
       <DialogHost />
-      {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
-      "import" ? (
+      {activeResumePrompt === "import" ? (
         <ResumeImportPrompt
           resumable={resumableImport}
           onDismiss={() => setResumableImport(null)}
         />
       ) : null}
-      {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
-      "reconcile" ? (
+      {activeResumePrompt === "reconcile" ? (
         <ResumeReconcilePrompt
           resumable={resumableReconcile}
           onDismiss={() => setResumableReconcile(null)}
