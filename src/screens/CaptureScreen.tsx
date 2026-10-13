@@ -1,25 +1,25 @@
 /**
  * CaptureScreen (CAP-01/02/03/04) — the share-sheet contact picker. A grid of faces
  * that files whatever the user shared (a link, a text selection) onto a contact as
- * ONE conversational-fuel row, then returns to the source app. The 95% path is
+ * ONE Thought of Them memory (38.10 D-04), then returns to the source app. The 95% path is
  * exactly one tap; long-press promotes to multi-select (fan-out to N contacts), the
  * ＋ tile inline-creates a name-only contact, and an optional note recomposes the
  * just-written row(s)' display text.
  *
  * =============================================================================
- * LOAD-BEARING INVARIANTS (this is the share→fuel→return surface):
+ * LOAD-BEARING INVARIANTS (this is the share→save→return surface):
  *   - The payload is drained from `useShareIntentContext()` and resolved via
  *     `resolveCapturePayload` (the pure 10-02 resolver) into `{ displayText, url }`.
  *     The url column is ALWAYS canonical and NEVER opened during capture (store
  *     only — the screen never navigates to or opens the url, T-10-01/T-10-05).
- *   - A single tap writes the fuel row IMMEDIATELY (kind='topic', source='share'),
- *     BEFORE any prompt — `resetOnBackground` kills an un-written payload, so the
+ *   - A single tap writes the share IMMEDIATELY (a Thought of Them memory,
+ *     provenance 'share', Allow AI off; 38.10 D-04, D-57), BEFORE any prompt — `resetOnBackground` kills an un-written payload, so the
  *     write must not wait behind the optional note (T-10-04 / D-CAP write-on-pick).
- *   - Long-press enters multi-select; Done writes N INDEPENDENT fuel rows in ONE
- *     transaction via `captureMultiAttach` (never a join table, never a nested
+ *   - Long-press enters multi-select; Done writes N INDEPENDENT share rows in ONE
+ *     transaction via `shareToContacts` (never a join table, never a nested
  *     mutex). Done is DISABLED + guarded at zero selection (B3) — no empty
  *     transaction, no "Saved to 0 contacts".
- *   - Capture writes ONLY fuel. It NEVER touches `contacts.last_contact` or writes
+ *   - Capture writes ONLY share rows. It NEVER touches `contacts.last_contact` or writes
  *     an interaction row — capture is not a touchpoint (DATA-04 single-writer). The
  *     inline-create path omits `firstInteraction` so a new contact lands NULL
  *     last_contact (never-contacted); sharing a link is not "contacting".
@@ -28,10 +28,10 @@
  *     `await`, cleared in `finally`) and disables its control while set — a rapid
  *     double-tap cannot double-write (B2/C2). A SINGLE `localDateTime()` stamp is
  *     reused per write (A10).
- *   - The returned rowid(s) + contactId(s) are retained in `writtenRows` so the
- *     optional note can editFuel the exact row(s) by id + contactId — there is NO
- *     uid-based fuel lookup (A1/A2). The note recompose applies to ALL N rows
- *     ATOMICALLY via the `captureMultiNote` DAO (never an inline transaction, B1).
+ *   - The returned share-row refs are retained in `writtenRows` so the optional
+ *     note edits the exact row(s) by table + id + contactId (A1/A2). The note
+ *     recompose applies to ALL N rows ATOMICALLY via the `applyShareNote` DAO
+ *     (never an inline transaction, B1).
  *   - A focused `useFocusEffect` hardware-Back handler owns Back (A6/C1; 38.9
  *     D-33 via `resolveCaptureBack`): Back first closes the open New-contact
  *     surface, then an open search, then EXITS multi-select (any count) WITHOUT
@@ -61,14 +61,18 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { captureMultiAttach, captureMultiNote } from "@/db/capture-dao";
+import { NEW_CONTACT_DEFAULT_INTERVAL_DAYS } from "@/constants/new-contact-defaults";
+import {
+  applyShareNote,
+  createContactAndShare,
+  type ShareRowRef,
+  shareToContacts,
+} from "@/db/capture-dao";
 import {
   type CapturePickRow,
   listCapturePickContacts,
 } from "@/db/capture-read";
-import { createContactFull } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { addFuel, editFuel, type NewFuelItem } from "@/db/fuel-dao";
 import { newUid } from "@/db/uid";
 import { resolveCapturePayload } from "@/logic/capture-logic";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
@@ -90,16 +94,6 @@ const LOG_SCOPE = "capture";
  * note is never rushed.
  */
 const AUTO_RETURN_MS = 1500;
-
-/**
- * The `interval_days` an inline name-only create lands with — the app's Monthly
- * default (the value the standard create form ships, `create-contact-logic`). A
- * single-number tunable; the cadence is refined later on the profile.
- */
-const INLINE_CREATE_INTERVAL_DAYS = 30;
-
-/** One fuel row written by a commit, retained for the optional-note recompose. */
-type WrittenRow = { id: number; contactId: number };
 
 /** The recycling-grid cell union: a real face, or the always-present ＋ tile. */
 type GridItem = { kind: "face"; row: CapturePickRow } | { kind: "new" };
@@ -134,9 +128,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   );
 
   const [rows, setRows] = useState<CapturePickRow[]>([]);
-  // The just-written rows, retained so the optional note can editFuel the exact
-  // row(s) by id + contactId (A1/A2). Set the instant a commit resolves.
-  const [writtenRows, setWrittenRows] = useState<WrittenRow[]>([]);
+  // The just-written share rows, retained so the optional note edits the exact
+  // row(s) (A1/A2). Set the instant a commit resolves.
+  const [writtenRows, setWrittenRows] = useState<ShareRowRef[]>([]);
   // Drives the confirmation surface + face-tile disabling. `committing` disables the
   // grid while a write is in flight; `savedLabel` (non-null) shows the toast text.
   const [committing, setCommitting] = useState(false);
@@ -155,7 +149,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
 
   // Inline name-only create (CAP-04): `inlineOpen` reveals the ＋-tile create sheet,
   // `inlineName` is the single name field. Submit creates a never-contacted contact
-  // then captures the fuel row to it.
+  // and saves the share to it in one transaction.
   const [inlineOpen, setInlineOpen] = useState(false);
   const [inlineName, setInlineName] = useState("");
 
@@ -308,7 +302,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     }, AUTO_RETURN_MS);
   }, [resetShareIntent]);
 
-  // Single-tap commit — write ONE fuel row immediately, then confirm + auto-return.
+  // Single-tap commit — save the share immediately, then confirm + auto-return.
   // Guarded against a rapid double-tap by the shared `isCommittingRef` (set before
   // the first await, cleared in finally) AND `committing` disabling the faces (B2).
   const onPickFace = useCallback(
@@ -327,29 +321,24 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       isCommittingRef.current = true;
       setCommitting(true);
       try {
-        // ONE stamp reused for createdAt + now (A10) — not two independent calls.
+        // ONE stamp for the whole write (A10).
         const stamp = localDateTime();
-        const fuelId = await addFuel(getExecutor(), {
-          uid: newUid(),
-          contactId: row.id,
-          kind: "topic",
-          source: "share",
-          text: payload.displayText,
-          url: payload.url,
-          createdAt: stamp,
-          now: stamp,
-        });
-        // Retain the rowid + contactId for the note recompose (A1/A2) — there is no
-        // uid-based fuel lookup; the note edits this exact row by id+contactId.
-        setWrittenRows([{ id: fuelId, contactId: row.id }]);
+        const written = await shareToContacts(
+          getExecutor(),
+          [row.id],
+          payload,
+          stamp,
+        );
+        // Retain the written row for the note recompose (A1/A2).
+        setWrittenRows(written);
         setSavedLabel(`Saved to ${row.name}`);
-        // Share→fuel on an EXISTING (possibly-favourite) contact can change the
-        // widget's ranked fuelText. (Inline-create targets a brand-new contact that
-        // cannot be a favourite yet, so it is excluded — see onInlineSubmit.)
+        // The widget shows no knowledge line since 38.10, so a share changes
+        // nothing it draws; this refresh is harmless and stays until plan 11
+        // rebuilds the screen.
         notifyWidgetDataChanged();
         armAutoReturn();
       } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to write capture fuel", err);
+        Logger.error(LOG_SCOPE, "failed to save share", err);
         // Leave the payload intact (still live until background) for a retry.
         showSnackbar({
           kind: "error",
@@ -382,8 +371,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     });
   }, []);
 
-  // Multi-select Done — fan N INDEPENDENT fuel rows into ONE transaction via
-  // captureMultiAttach (CAP-02). B3: guard `selected.size === 0` BEFORE building any
+  // Multi-select Done — fan N INDEPENDENT share rows into ONE transaction via
+  // shareToContacts (CAP-02). B3: guard `selected.size === 0` BEFORE building any
   // row or opening the transaction (Done is also disabled at zero). B2: the shared
   // isCommittingRef latch is set before the first await and cleared in finally.
   const onDoneMulti = useCallback(async () => {
@@ -396,24 +385,19 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     isCommittingRef.current = true;
     setCommitting(true);
     try {
-      // ONE stamp reused across all N rows' createdAt + now (A10).
+      // ONE stamp reused across all N rows (A10).
       const stamp = localDateTime();
-      const newRows: NewFuelItem[] = [...selected].map((contactId) => ({
-        uid: newUid(),
-        contactId,
-        kind: "topic",
-        source: "share",
-        text: payload.displayText,
-        url: payload.url,
-        createdAt: stamp,
-        now: stamp,
-      }));
-      // captureMultiAttach returns the ordered { id, contactId }[] — store it so the
-      // optional note can recompose all N rows by id + contactId (A1).
-      const written = await captureMultiAttach(getExecutor(), newRows);
+      // shareToContacts returns the written rows in input order — store them so
+      // the optional note can recompose all N rows (A1).
+      const written = await shareToContacts(
+        getExecutor(),
+        [...selected],
+        payload,
+        stamp,
+      );
       setWrittenRows(written);
-      // Multi fan-out writes fuel to EXISTING contacts — any favourite among them
-      // can change its widget fuelText.
+      // Harmless widget refresh, kept until plan 11 rebuilds the screen (the
+      // widget shows no knowledge line since 38.10).
       notifyWidgetDataChanged();
       // SG-03: N=1 is reachable (long-press one face, immediately Done), so singularise.
       const n = written.length;
@@ -423,7 +407,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
       setSelected(new Set());
       armAutoReturn();
     } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to write multi-attach fuel", err);
+      Logger.error(LOG_SCOPE, "failed to save multi-person share", err);
       showSnackbar({
         kind: "error",
         label: "Couldn't save. Please try again.",
@@ -447,11 +431,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // Note Done — recompose the written row(s)' display text to `note — base` and
   // patch text ONLY (url/created_at untouched). C2: gated on the SAME shared
   // isCommittingRef latch (set before the first await, cleared in finally, the
-  // button disabled while set) so a rapid double-tap cannot re-apply. Keyed by BOTH
-  // id AND contactId — there is no uid-based fuel lookup (A1). Single row uses the
-  // `editFuel` DAO wrapper; N>1 applies atomically via the `captureMultiNote` DAO
-  // (editFuelCore × N in ONE transaction) — the screen NEVER opens a transaction
-  // inline (B1). A blank/whitespace note leaves the base untouched → treated as Skip.
+  // button disabled while set) so a rapid double-tap cannot re-apply. Keyed by the
+  // written rows' table + id + contactId (A1). Every row is updated atomically via
+  // the `applyShareNote` DAO (one transaction) — the screen NEVER opens a
+  // transaction inline (B1). A blank/whitespace note leaves the base untouched → treated as Skip.
   const onNoteDone = useCallback(async () => {
     // WR-02: a blank/whitespace note is a true Skip — no recompose write. Without
     // this guard the resolver returns `base` (the already-written display text) for a
@@ -471,30 +454,22 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     isCommittingRef.current = true;
     setCommitting(true);
     try {
-      const composed = resolveCapturePayload({
-        text: shareIntent.text ?? "",
-        webUrl: shareIntent.webUrl,
-        title: shareIntent.meta?.title,
-        note,
-      }).displayText;
-      // The recompose yields a non-blank text on the normal share path; the null case
-      // is the url-only edge (base null), unreachable from a real share. ONE stamp for
-      // the edit `now` (A10).
-      if (composed !== null) {
-        const stamp = localDateTime();
-        if (writtenRows.length === 1) {
-          const { id, contactId } = writtenRows[0];
-          await editFuel(getExecutor(), {
-            id,
-            contactId,
-            text: composed,
-            now: stamp,
-          });
-        } else if (writtenRows.length > 1) {
-          await captureMultiNote(getExecutor(), writtenRows, composed, stamp);
-        }
-        // The note recompose rewrote the just-written fuel row(s)' display text on
-        // EXISTING contacts — any favourite among them can change its widget fuelText.
+      // The DAO recomposes "note leads" through resolveCapturePayload and writes
+      // every row in one transaction. ONE stamp for the edit `now` (A10).
+      if (writtenRows.length > 0) {
+        await applyShareNote(
+          getExecutor(),
+          writtenRows,
+          note,
+          {
+            text: shareIntent.text ?? "",
+            webUrl: shareIntent.webUrl,
+            title: shareIntent.meta?.title,
+          },
+          localDateTime(),
+        );
+        // Harmless widget refresh, kept until plan 11 rebuilds the screen (the
+        // widget shows no knowledge line since 38.10).
         notifyWidgetDataChanged();
       }
       // SG-02: clear the draft after a successful note so it can't reappear later.
@@ -528,13 +503,11 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     setInlineOpen(true);
   }, []);
 
-  // Inline Create & save — create a NAME-ONLY contact (never-contacted) then capture
-  // the fuel row to it. A7: the empty/blank-name guard runs FIRST (submit is also
-  // disabled at trim-length 0) so a blank name can never reach createContactFull.
-  // B2: the shared isCommittingRef latch is set after the guard, before the first
-  // await, cleared in finally. B4: the contact id is DESTRUCTURED from
-  // createContactFull's `{ contactId, interactionId }` object return. Two
-  // transactions (create then addFuel) is acceptable (RESEARCH Q5).
+  // Inline Create & save — create a NAME-ONLY contact (never-contacted) and save
+  // the share to it in ONE transaction (38.10 D-28, NEW-3). A7: the empty/blank-name
+  // guard runs FIRST (submit is also disabled at trim-length 0) so a blank name can
+  // never reach createContactAndShare. B2: the shared isCommittingRef latch is set
+  // after the guard, before the first await, cleared in finally.
   const onInlineSubmit = useCallback(async () => {
     const trimmedName = inlineName.trim();
     if (trimmedName.length === 0) {
@@ -546,37 +519,31 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
     isCommittingRef.current = true;
     setCommitting(true);
     try {
-      // ONE stamp reused for the create + the fuel write (A10).
+      // ONE stamp for the contact and its share (A10); both get it as created_at.
       const stamp = localDateTime();
-      // NAME-ONLY: omit `firstInteraction` so last_contact stays NULL
+      // NAME-ONLY: no first interaction, so last_contact stays NULL
       // (never-contacted, CAP-04 — sharing a link is not "contacting").
-      const { contactId } = await createContactFull(getExecutor(), {
-        uid: newUid(),
-        name: trimmedName,
-        intervalDays: INLINE_CREATE_INTERVAL_DAYS,
-        // Explicit normalized empty set: Capture remains name-only and Bound by
-        // the v11 DDL default without reviving retired scalar phone/email inputs.
-        methodDrafts: [],
-        now: stamp,
-      });
-      const fuelId = await addFuel(getExecutor(), {
-        uid: newUid(),
-        contactId,
-        kind: "topic",
-        source: "share",
-        text: payload.displayText,
-        url: payload.url,
-        createdAt: stamp,
-        now: stamp,
-      });
+      const { rows: written } = await createContactAndShare(
+        getExecutor(),
+        {
+          uid: newUid(),
+          name: trimmedName,
+          intervalDays: NEW_CONTACT_DEFAULT_INTERVAL_DAYS,
+          // Explicit normalized empty set: Capture remains name-only and Bound by
+          // the v11 DDL default without reviving retired scalar phone/email inputs.
+          methodDrafts: [],
+        },
+        payload,
+        stamp,
+      );
       // Retain the row for the optional-note recompose (A1).
-      setWrittenRows([{ id: fuelId, contactId }]);
+      setWrittenRows(written);
       setSavedLabel(`Saved to ${trimmedName}`);
       setInlineOpen(false);
       setInlineName("");
       armAutoReturn();
     } catch (err) {
-      Logger.error(LOG_SCOPE, "failed inline-create capture", err);
+      Logger.error(LOG_SCOPE, "failed inline-create share", err);
       showSnackbar({
         kind: "error",
         label: "Couldn't save. Please try again.",
@@ -732,7 +699,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // already landed (`savedLabel !== null`) — the confirmation surface + auto-return
   // own the screen after a successful commit, so no further pick is allowed until
   // return. This closes the ~1.5s window where a stray tap on a DIFFERENT face would
-  // otherwise write a second wrong-contact fuel row.
+  // otherwise write a second wrong-contact share row.
   const locked = committing || savedLabel !== null;
 
   const renderItem = ({ item }: { item: GridItem }) => {
@@ -856,8 +823,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
 
       {/* Inline name-only create sheet (CAP-04) — a single autofocused name field +
           "Create & save". A7: submit is DISABLED at trim-length 0 (and the handler
-          guards again) so a blank name never reaches createContactFull. On submit a
-          never-contacted contact is created and the fuel row captured to it — NO
+          guards again) so a blank name never reaches createContactAndShare. On submit
+          a never-contacted contact is created and the share saved to it — NO
           "add detail now?" prompt (detail is refined later on the profile). */}
       {inlineOpen ? (
         <View

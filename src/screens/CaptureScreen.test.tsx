@@ -53,14 +53,18 @@ beforeEach(async () => {
 describe("CaptureScreen inline create lifecycle contract", () => {
   it("passes the explicit Bound cadence and an empty normalized method list without scalar compatibility inputs", () => {
     const call = CAPTURE_SOURCE.match(
-      /createContactFull\(getExecutor\(\),\s*\{(?<input>[\s\S]*?)\n\s*\}\);/,
+      /createContactAndShare\(\s*getExecutor\(\),\s*\{(?<input>[\s\S]*?)\n\s*\},/,
     );
 
     expect(call?.groups?.input).toContain(
-      "intervalDays: INLINE_CREATE_INTERVAL_DAYS",
+      "intervalDays: NEW_CONTACT_DEFAULT_INTERVAL_DAYS",
+    );
+    expect(CAPTURE_SOURCE).toMatch(
+      /import \{ NEW_CONTACT_DEFAULT_INTERVAL_DAYS \} from "@\/constants\/new-contact-defaults"/,
     );
     expect(call?.groups?.input).toContain("methodDrafts: []");
     expect(call?.groups?.input).not.toMatch(/\b(phone|email)\s*:/);
+    expect(call?.groups?.input).not.toContain("firstInteraction");
   });
 
   it("persists the inline Bound contract through the v11 default with no methods or contact event", async () => {
