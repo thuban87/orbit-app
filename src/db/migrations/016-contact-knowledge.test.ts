@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { MIGRATIONS } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -13,9 +13,16 @@ function createExecutor(): SqlExecutor {
   return nodeSqliteExecutor(openTestDb());
 }
 
+/**
+ * Pinned to v32, the last schema these assertions describe (is_current, its
+ * partial index, the legacy knowledge table). Migration 033 reshapes all three;
+ * its own suite covers v33 (38.10-01).
+ */
+const V32_SCHEMA_VERSION = 32;
+
 async function migrateTo16(exec: SqlExecutor): Promise<void> {
   let counter = 0;
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+  await runMigrations(exec, MIGRATIONS, V32_SCHEMA_VERSION, {
     now: NOW,
     newUid: () => `uid-${++counter}`,
   });

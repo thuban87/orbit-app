@@ -217,12 +217,13 @@ describe("category identity repository audit", () => {
     const migrationTests = source("src/db/migrations/full-chain.test.ts");
     const backupTypes = source("src/backup/types.ts");
     expect(database).toContain(
-      "TARGET_VERSION = IMPORT_BATCH_CADENCE_SCHEMA_VERSION",
+      "TARGET_VERSION = KNOWLEDGE_HOMES_SCHEMA_VERSION",
     );
     expect(database).toContain("migration030");
     expect(database).toContain("migration031");
     expect(database).toContain("migration032");
-    expect(migrationTests).toContain("expect(TARGET_VERSION).toBe(32)");
+    expect(database).toContain("migration033");
+    expect(migrationTests).toContain("expect(TARGET_VERSION).toBe(33)");
     expect(backupTypes).toMatch(/BACKUP_FORMAT_VERSION\s*=\s*7/);
   });
 

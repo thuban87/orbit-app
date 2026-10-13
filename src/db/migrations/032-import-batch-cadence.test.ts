@@ -28,9 +28,11 @@ async function columns(exec: SqlExecutor): Promise<string[]> {
  * import's batch cadence on the durable session so resume keeps it.
  */
 describe("migration 032 — import batch cadence (D-57)", () => {
-  it("is the registered schema head", () => {
+  it("is registered at or below the schema head", () => {
     expect(IMPORT_BATCH_CADENCE_SCHEMA_VERSION).toBe(32);
-    expect(TARGET_VERSION).toBe(IMPORT_BATCH_CADENCE_SCHEMA_VERSION);
+    expect(TARGET_VERSION).toBeGreaterThanOrEqual(
+      IMPORT_BATCH_CADENCE_SCHEMA_VERSION,
+    );
     expect(MIGRATIONS.filter((m) => m.version === 32)).toHaveLength(1);
   });
 
@@ -49,7 +51,7 @@ describe("migration 032 — import batch cadence (D-57)", () => {
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, d);
 
     expect(await exec.getFirstAsync("PRAGMA user_version")).toEqual({
-      user_version: 32,
+      user_version: TARGET_VERSION,
     });
     expect(await columns(exec)).toContain("batch_interval_days");
     expect(

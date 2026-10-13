@@ -90,7 +90,10 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 32),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(32);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 33),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(33);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
@@ -162,6 +165,35 @@ describe("registered migration chain", () => {
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tombstones'",
       ),
     ).toEqual({ name: "tombstones" });
+    // Migration 033 (38.10): off_limits replaces the legacy knowledge table,
+    // current_state_entries is dated, and the two new AI defaults exist at 0.
+    const tableNames = new Set(
+      (
+        await exec.getAllAsync<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type = 'table'",
+        )
+      ).map((r) => r.name),
+    );
+    expect(tableNames.has("off_limits")).toBe(true);
+    expect(tableNames.has("fuel")).toBe(false);
+    const currentStateCols = new Set(
+      (
+        await exec.getAllAsync<{ name: string }>(
+          "PRAGMA table_info(current_state_entries)",
+        )
+      ).map((r) => r.name),
+    );
+    expect(currentStateCols.has("entry_date")).toBe(true);
+    expect(currentStateCols.has("from_share")).toBe(true);
+    expect(currentStateCols.has("is_current")).toBe(false);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT ai_default_gift_idea_allow, ai_default_thought_of_them_allow FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({
+      ai_default_gift_idea_allow: 0,
+      ai_default_thought_of_them_allow: 0,
+    });
     expect(
       await exec.getFirstAsync<{ data_revision: number }>(
         "SELECT data_revision FROM app_settings WHERE id = 1",
