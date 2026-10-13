@@ -65,6 +65,10 @@ function placeholders(values: readonly unknown[]): string {
   return values.map(() => "?").join(", ");
 }
 
+/**
+ * D-94: Gift Ideas never reach the line-3 candidates; Thought of Them (shares
+ * included) does. Off Limits is another table and is never read here (D-10).
+ */
 function memorySql(contactIds: readonly number[]): string {
   return `
 SELECT id, contactId, type, value, pinned, meaningfulDate, hidden, createdAt
@@ -89,8 +93,6 @@ SELECT id, contactId, type, value, pinned, meaningfulDate, hidden, createdAt
      WHERE m.contact_id IN (${placeholders(contactIds)})
        AND m.deleted_at IS NULL
        AND m.outdated = 0
-       -- D-94: Gift Ideas never reach the Dashboard line; Thought of Them
-       -- (shares included) does. Off Limits is another table, never read here.
        AND m.type NOT IN ('birthday', 'gift_idea')
        AND COALESCE(NULLIF(TRIM(m.value), ''), NULLIF(TRIM(m.note), ''), NULLIF(TRIM(m.custom_label), '')) IS NOT NULL
   )
