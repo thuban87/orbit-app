@@ -137,15 +137,18 @@ describe("Profile Contact Frequency selector (AUD-UIA-005, D-66)", () => {
   });
 });
 
-describe("Fuel kind picker (AUD-UIA-005)", () => {
-  const fuel = source("src/components/FuelEditor.tsx");
+// 38.10 plan 13: the retired Off Limits kind picker's assertion moves to the
+// memory type picker, which carries the same AUD-UIA-005 treatment.
+describe("Memory type picker (AUD-UIA-005)", () => {
+  const editor = source("src/components/MemoryEditor.tsx");
 
-  it("exposes the current kind as the trigger value", () => {
-    expect(fuel).toContain("accessibilityValue={{ text: kindLabel(value) }}");
+  it("exposes the current type as the trigger value", () => {
+    expect(editor).toContain('accessibilityLabel="Memory type"');
+    expect(editor).toContain("accessibilityValue={{ text: selected }}");
   });
 
-  it("marks the selected kind with state and a non-colour glyph", () => {
-    const option = optionRegion(fuel);
+  it("marks the selected type with state and a non-colour glyph", () => {
+    const option = optionRegion(editor);
     expect(option).toContain("accessibilityState={{ selected: isSelected }}");
     expect(option).toMatch(/<Icon name="select" state="active"/);
   });
