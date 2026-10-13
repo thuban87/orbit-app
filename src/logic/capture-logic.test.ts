@@ -1,7 +1,7 @@
 /**
  * Pure share-payload resolver — proof (CAP-02 / CAP-03).
  *
- * resolveCapturePayload(input) maps an incoming share payload to a fuel row's
+ * resolveCapturePayload(input) maps an incoming share payload to the share text's
  * `{ displayText, url }` and recomposes the display text when the user adds an
  * optional note (the `note — base` composition). EXPLICIT precedence, proven
  * off-device (RESEARCH §Q6):
@@ -11,7 +11,7 @@
  *     derived from or overwritten by prose/title/note;
  *   - a non-blank note leads: `note — base`; the base is NEVER discarded;
  *   - blank / whitespace-only display text normalizes to null at the boundary
- *     (fuel-read's RANKED_FUEL_EXCLUSIONS drops blank text in-query).
+ *     (a blank share text is never saved as a Thought of Them value).
  */
 import { describe, expect, it } from "vitest";
 import { resolveCapturePayload } from "@/logic/capture-logic";
@@ -73,7 +73,7 @@ describe("resolveCapturePayload — CAP-03 payload → { displayText, url } (Tas
     });
   });
 
-  it("extended-whitespace text (tab/VT/FF/NBSP) → displayText null (mirrors the fuel-read TRIM set)", () => {
+  it("extended-whitespace text (tab/VT/FF/NBSP) → displayText null (the boundary trim set)", () => {
     expect(resolveCapturePayload({ text: "\t ", webUrl: null })).toEqual({
       displayText: null,
       url: null,

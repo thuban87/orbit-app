@@ -6,7 +6,8 @@
  *
  * It answers ONE question: given an incoming Android share payload (raw text, the
  * library's first-http `webUrl`, the patched EXTRA_SUBJECT `title`) and an optional
- * user note, WHICH `{ displayText, url }` does the fuel row get?
+ * user note, WHICH `{ displayText, url }` does the share text get when it is
+ * saved as a Thought of Them memory (38.10 D-04)?
  *
  * EXPLICIT PRECEDENCE, top to bottom — the RESEARCH Q6 payload table + note rule:
  *
@@ -32,12 +33,12 @@
  *     EXTRA_SUBJECT title". A whitespace-only note is treated as absent (the base
  *     survives untouched).
  *
- *   display text is normalized with a TRIM over the SAME whitespace set fuel-read's
- *     `RANKED_FUEL_EXCLUSIONS` uses -- space (32), tab (9), LF (10), VT (11),
- *     FF (12), CR (13), NBSP (160) -- and an empty result becomes `null` (the
- *     blank-boundary rule: fuel-read drops NULL/blank/whitespace-only text in-query,
- *     so a blank row must never be written here). This is the only place the
- *     boundary is enforced for a share-written row.
+ *   display text is normalized with a TRIM over a wide whitespace set -- space
+ *     (32), tab (9), LF (10), VT (11), FF (12), CR (13), NBSP (160) -- and an
+ *     empty result becomes `null` (the blank-boundary rule: a blank or
+ *     whitespace-only share text is never saved as text; the share DAO falls back
+ *     to the URL). This is the only place the boundary is enforced for share
+ *     text.
  *
  * Pure: same inputs -> same output; no I/O; never throws.
  */
@@ -46,10 +47,10 @@
 const NOTE_SEPARATOR = " — ";
 
 /**
- * The whitespace set fuel-read's `RANKED_FUEL_EXCLUSIONS` TRIM strips, matched here
- * so a blank / whitespace-only row can't slip past this boundary and get dropped
- * in-query downstream: tab (9), LF (10), VT (11), FF (12), CR (13), space (32),
- * NBSP (160). Built from char codes so no invisible literal lives in source.
+ * The whitespace set the boundary trim strips, so a blank / whitespace-only share
+ * text can't slip past it and be saved as an empty-looking item: tab (9), LF (10),
+ * VT (11), FF (12), CR (13), space (32), NBSP (160). Built from char codes so no
+ * invisible literal lives in source.
  */
 const BOUNDARY_WS = String.fromCharCode(9, 10, 11, 12, 13, 32, 160);
 const BOUNDARY_TRIM = new RegExp(`^[${BOUNDARY_WS}]+|[${BOUNDARY_WS}]+$`, "g");
@@ -66,11 +67,11 @@ export interface CaptureInput {
   note?: string | null;
 }
 
-/** The resolved fuel-row shape this module produces. */
+/** The resolved share-text shape this module produces. */
 export interface CapturePayload {
-  /** The editable display text destined for `fuel.text`; null when blank. */
+  /** The editable share text, saved as the Thought of Them value; null when blank. */
   displayText: string | null;
-  /** The canonical URL destined for `fuel.url`; null when the share carried none. */
+  /** The canonical URL, saved as the item's link; null when the share carried none. */
   url: string | null;
 }
 
@@ -82,7 +83,7 @@ function nonBlank(value: string | null | undefined): string | null {
 }
 
 /**
- * Resolve an incoming share payload (+ optional note) to a fuel row's
+ * Resolve an incoming share payload (+ optional note) to the share text's
  * `{ displayText, url }`. Pure: same inputs -> same output; no I/O; never throws.
  * See the module header for the full precedence.
  */
