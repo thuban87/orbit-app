@@ -1,3 +1,4 @@
+import { OFF_LIMITS, THINGS_TO_REMEMBER } from "@/constants/glossary";
 import type {
   ProfileModuleId,
   ProfileModuleParentId,
@@ -26,7 +27,7 @@ export const PROFILE_MODULE_REGISTRY: Readonly<
   },
   "things-to-remember": {
     id: "things-to-remember",
-    label: "Things to Remember",
+    label: THINGS_TO_REMEMBER,
     parent: "profile",
     collapsible: true,
     supportedSizes: [],
@@ -147,7 +148,7 @@ export const PROFILE_MODULE_REGISTRY: Readonly<
   },
   "off-limits": {
     id: "off-limits",
-    label: "Off Limits",
+    label: OFF_LIMITS,
     parent: "things-to-remember",
     collapsible: true,
     supportedSizes: [],

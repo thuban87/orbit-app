@@ -40,6 +40,16 @@ export const ORBIT_PARTICIPATION = "Orbit participation";
 export const INTERACTION_ASSIST = "Interaction Assist";
 export const QUARANTINE = "Quarantine";
 
+// Things to Remember on the Profile (38.10 D-90, D-87).
+/** Topics to avoid bringing up with a person, shown in full on the Profile (D-90, D-10). */
+export const OFF_LIMITS = "Off Limits";
+/** The Profile's remembered-information section and its children (D-90, D-44). */
+export const THINGS_TO_REMEMBER = "Things to Remember";
+/** The close button of a detail sheet, such as the Profile entry sheet (D-90, D-87). */
+export const CLOSE = "Close";
+/** An empty always-show custom field on the Profile (D-90, D-87). */
+export const NOT_SET = "Not set";
+
 // The share confirmation card's controls (38.10 D-77, D-78). The section chip
 // names come from the memory-type and Profile-module registries (D-89 G-23).
 /** The per-item AI switch a new share starts with off (D-03, D-78). */

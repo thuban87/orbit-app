@@ -46,6 +46,10 @@ identifiers keep their own spelling (see Gotchas).
 | Orbit participation | `ORBIT_PARTICIPATION` | The Bound/Unbound choice when adding or importing contacts. |
 | Interaction Assist | `INTERACTION_ASSIST` | The pending "did you reach them?" confirmation after a hand-off. |
 | Quarantine | `QUARANTINE` | Removing a custom field that still holds values, recoverable for a period before it is deleted. |
+| Things to Remember | `THINGS_TO_REMEMBER` | The Profile section that holds what to remember about a person: Pinned, Last Talked About, Key People, Current Location, Memories, Thought of Them, Gift Ideas, Custom Fields, Off Limits and Imported from Contacts App (38.10 D-44, D-90). |
+| Off Limits | `OFF_LIMITS` | Topics to avoid bringing up with a person. Shown in full on the Profile and in Compose Research, never sent to AI (38.10 D-09, D-10, D-90). The Profile helper "Avoid bringing these up" stays (D-105). |
+| Close | `CLOSE` | The button that closes a detail sheet, such as the Profile entry sheet (38.10 D-87, D-90). |
+| Not set | `NOT_SET` | An empty always-show custom field on the Profile (38.10 D-87, D-90). |
 
 Sentence-case copy uses the same words in lower case where a label sits inside a sentence
 ("Add favorite", "Not favorite", "3 never contacted →").
@@ -125,6 +129,8 @@ None. The constants are the configuration.
 - **Phase 38.9 D-21, D-22, D-41, D-42, D-49, D-56, D-63** (`.planning/phases/38.9-ux-standards/38.9-CONTEXT.md`)
   — the canonical terms, the enforcements and the rule that decided terms are not renamed.
   These are extracted to ADRs at milestone close.
+- **Phase 38.10 D-87, D-90, D-105** (`.planning/phases/38.10-fuel-retirement-things-to-remember/38.10-CONTEXT.md`)
+  — the Things to Remember terms and the Profile entry-sheet wording; "Avoid" is not retired.
 
 ## Gotchas
 
@@ -158,3 +164,4 @@ None. The constants are the configuration.
 | 2026-10-11 | 38.9 | Created: canonical constants (D-21, D-41), Never Contacted / Favorite / Wobbly / Log Interaction / Contacts enforced app-wide (D-22, D-42, D-49, D-56), retired-form contract. |
 | 2026-10-11 | 38.9 | "Event(s)" as the user-facing noun (D-22); developer wording rewritten in plain words in the converted screens (D-41, D-63); contract extended with both. |
 | 2026-10-11 | 38.9 | "group interaction" retired: the conversion entry and its prompt read "Make this an event" (D-22; fix-pass verification IN-02). |
+| 2026-10-13 | 38.10 | Things to Remember, Off Limits, Close and Not set added as canonical terms (D-90); the Profile's section registry, entry sheet and custom-field display read them; the contract pins their values (plan 16). |

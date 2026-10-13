@@ -3,6 +3,8 @@ import {
   ADD_MEMORY,
   ADD_OFF_LIMITS_ITEM,
   ADD_THOUGHT_OF_THEM,
+  NOT_SET,
+  OFF_LIMITS,
 } from "@/constants/glossary";
 import { PHOTO_UNAVAILABLE_LABEL } from "@/constants/photo-copy";
 import { parsers } from "@/db/field-parsers";
@@ -494,7 +496,7 @@ export function formatCustomFieldValue(
   value: string | null,
 ): string {
   // An empty always-show field reads "Not set" (D-87).
-  if (value == null || value === "") return "Not set";
+  if (value == null || value === "") return NOT_SET;
   switch (type) {
     case "date":
       return customValueDisplayText(type, value);
@@ -575,7 +577,7 @@ function offLimitsChild(
   const items = unique(input.knowledge.offLimits).map(
     (row): KnowledgePresentationItem => ({
       id: `off-limits:${row.id}`,
-      title: row.label ?? "Off Limits",
+      title: row.label ?? OFF_LIMITS,
       preview: row.text,
       metadata: row.url ? ["Link"] : [],
       detail: { owner: "offLimits", id: row.id, ...detailExtras(row) },

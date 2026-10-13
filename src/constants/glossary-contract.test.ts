@@ -625,6 +625,33 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
     });
   });
 
+  it("pins the Things to Remember terms (38.10 D-90)", () => {
+    expect({
+      OFF_LIMITS: glossary.OFF_LIMITS,
+      THINGS_TO_REMEMBER: glossary.THINGS_TO_REMEMBER,
+      CLOSE: glossary.CLOSE,
+      NOT_SET: glossary.NOT_SET,
+    }).toEqual({
+      OFF_LIMITS: "Off Limits",
+      THINGS_TO_REMEMBER: "Things to Remember",
+      CLOSE: "Close",
+      NOT_SET: "Not set",
+    });
+  });
+
+  it("the Profile's Things to Remember surfaces read those terms from the glossary (38.10 D-90)", () => {
+    const registry = read("src/profile/module-registry.ts");
+    expect(registry).toContain("label: THINGS_TO_REMEMBER");
+    expect(registry).toContain("label: OFF_LIMITS");
+    const presentation = read("src/profile/knowledge-presentation.ts");
+    expect(presentation).toContain("return NOT_SET;");
+    expect(presentation).toContain("row.label ?? OFF_LIMITS");
+    expect(presentation).not.toContain('"Not available yet"');
+    const sheet = read("src/components/profile/ThingsToRemember.tsx");
+    expect(sheet).toContain("label={CLOSE}");
+    expect(sheet).not.toContain('label="Done"');
+  });
+
   it("pins the Add/Edit Contact section Add labels (38.10 D-67, D-87, D-119)", () => {
     expect({
       ADD_OFF_LIMITS_ITEM: glossary.ADD_OFF_LIMITS_ITEM,

@@ -9,6 +9,7 @@ import {
 import { Icon } from "@/components/icons/Icon";
 import { openMemoryLink } from "@/components/MemoryCard";
 import { AppText, Button, Sheet } from "@/components/ui";
+import { CLOSE } from "@/constants/glossary";
 import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import {
   buildKnowledgePresentation,
@@ -155,7 +156,7 @@ function DetailSheet({
               }}
             />
           ))}
-          <Button role="secondary" label="Close" onPress={onClose} />
+          <Button role="secondary" label={CLOSE} onPress={onClose} />
         </View>
       ) : null}
     </Sheet>

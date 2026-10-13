@@ -2,7 +2,10 @@ import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemoryRow } from "@/db/memories-read";
 import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
-import type { KnowledgePresentationItem } from "@/profile/knowledge-presentation";
+import type {
+  KnowledgeEntryLink,
+  KnowledgePresentationItem,
+} from "@/profile/knowledge-presentation";
 
 /**
  * Things to Remember entry actions on the Profile (38.10 D-70, D-87, D-107,
@@ -37,7 +40,11 @@ vi.mock("@/components/MemoryCard", () => ({
   openMemoryLink: (url: string) => openMemoryLink(url),
 }));
 
-import { KnowledgeCard, ThingsToRemember } from "./ThingsToRemember";
+import {
+  type KnowledgeActionIntent,
+  KnowledgeCard,
+  ThingsToRemember,
+} from "./ThingsToRemember";
 
 interface Node {
   type: string;
@@ -131,8 +138,8 @@ function render(
   knowledge: ProfileKnowledge,
   childId: Parameters<typeof ThingsToRemember>[0]["childIds"] = ["memories"],
   handlers: {
-    onAction?: ReturnType<typeof vi.fn>;
-    onOpenLinked?: ReturnType<typeof vi.fn>;
+    onAction?: (intent: KnowledgeActionIntent) => void;
+    onOpenLinked?: (link: KnowledgeEntryLink) => void;
   } = {},
 ): Node[] {
   return all(
