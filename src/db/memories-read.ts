@@ -22,6 +22,12 @@ export interface MemoryRow {
   deleted_at: string | null;
   /** Explicit, per-item permission for AI egress; defaults to 0 in migration 017. */
   allow_ai: number;
+  /** The linked interaction (migration 033); NULL when standalone. */
+  interaction_id: number | null;
+  /** Which of the interaction's notes this links to: 'note' | 'group_note'. */
+  link_source: string | null;
+  /** D-102 Group Note copy marker (0/1); a copy is always AI-off. */
+  group_note_copy: number;
 }
 
 /**
@@ -33,7 +39,7 @@ export const MEMORY_AI_ELIGIBILITY = "allow_ai = 1 AND deleted_at IS NULL";
 const LIST_MEMORIES_FOR_CONTACT = `
 SELECT id, uid, contact_id, type, custom_label, value, note, url,
        meaningful_date, pinned, outdated, hidden, provenance, created_at, modified_at,
-       deleted_at, allow_ai
+       deleted_at, allow_ai, interaction_id, link_source, group_note_copy
   FROM memories
  WHERE contact_id = ? AND deleted_at IS NULL
  ORDER BY pinned DESC,
@@ -45,7 +51,7 @@ SELECT id, uid, contact_id, type, custom_label, value, note, url,
 const LIST_RECENTLY_DELETED = `
 SELECT id, uid, contact_id, type, custom_label, value, note, url,
        meaningful_date, pinned, outdated, hidden, provenance, created_at, modified_at,
-       deleted_at, allow_ai
+       deleted_at, allow_ai, interaction_id, link_source, group_note_copy
   FROM memories
  WHERE contact_id = ? AND deleted_at IS NOT NULL
  ORDER BY deleted_at DESC, id DESC`;
@@ -69,7 +75,7 @@ export function listRecentlyDeleted(
 const LIST_AI_ELIGIBLE_MEMORIES = `
 SELECT id, uid, contact_id, type, custom_label, value, note, url,
        meaningful_date, pinned, outdated, hidden, provenance, created_at, modified_at,
-       deleted_at, allow_ai
+       deleted_at, allow_ai, interaction_id, link_source, group_note_copy
   FROM memories
  WHERE contact_id = ? AND ${MEMORY_AI_ELIGIBILITY}
  ORDER BY pinned DESC,

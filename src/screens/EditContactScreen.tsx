@@ -273,6 +273,9 @@ function memoryDraftRowToItem(
     modified_at: "",
     deleted_at: null,
     allow_ai: allowAi,
+    interaction_id: null,
+    link_source: null,
+    group_note_copy: 0,
   };
 }
 

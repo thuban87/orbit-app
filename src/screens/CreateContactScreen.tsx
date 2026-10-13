@@ -170,6 +170,9 @@ function memoryDraftToRow(draft: MemoryDraft, index: number): MemoryRow {
     modified_at: DRAFT_TS,
     deleted_at: null,
     allow_ai: 0,
+    interaction_id: null,
+    link_source: null,
+    group_note_copy: 0,
   };
 }
 
