@@ -1560,7 +1560,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 16/19 plans executed
+**Plans**: 17/19 plans executed
 
 Wave 1
 - [x] 38.10-01-PLAN.md — Migration 033 (knowledge homes), shared fuel mapping, registry and tombstone changes
@@ -1593,7 +1593,7 @@ Wave 7 *(blocked on Wave 6 completion)*
 
 Wave 8 *(blocked on Wave 7 completion)*
 - [x] 38.10-16-PLAN.md — Profile Things to Remember
-- [ ] 38.10-17-PLAN.md — History page, + → Memory Add form, Update Contact
+- [x] 38.10-17-PLAN.md — History page, + → Memory Add form, Update Contact
 
 Wave 9 *(blocked on Wave 8 completion)*
 - [ ] 38.10-18-PLAN.md — Retirement sweep and permanent no-fuel test
@@ -1741,7 +1741,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
-| 38.10 Fuel Retirement, Things to Remember & Sharing | 16/19 | In Progress|  |
+| 38.10 Fuel Retirement, Things to Remember & Sharing | 17/19 | In Progress|  |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
