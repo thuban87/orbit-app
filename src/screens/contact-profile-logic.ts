@@ -1,37 +1,296 @@
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
-import type { CurrentStateFieldKey } from "@/db/memory-registry";
-import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
+import {
+  type CurrentStateFieldKey,
+  isMemoryTypeKey,
+  type MemoryTypeKey,
+} from "@/db/memory-registry";
+import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
+import type {
+  KnowledgeChildId,
+  KnowledgeDetailTarget,
+} from "@/profile/knowledge-presentation";
 import type { ProfileCollapseMap } from "@/profile/persisted-contract";
+import {
+  sectionPinSnackbar,
+  sectionPinUndoneSnackbar,
+} from "@/screens/section-editor-logic";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { isAppBackgrounded } from "@/utils/screen-visibility";
 
 export type ProfileMethodType = "phone" | "email";
 
-/** Source-owned destinations for Profile knowledge collection affordances. */
+/**
+ * Where a Profile knowledge affordance goes (D-72, D-75, D-68, D-107). The
+ * Things to Remember list screen is never a destination (D-63, D-75).
+ */
 export type ProfileKnowledgeDestination =
-  | { screen: "MemoryHistory"; fieldKey: CurrentStateFieldKey }
-  | { screen: "OffLimitsEditor" | "Edit" | "ThingsToRemember" };
+  | {
+      screen: "MemoryHistory";
+      fieldKey: CurrentStateFieldKey;
+      openAdd?: true;
+      editId?: number;
+    }
+  | { screen: "Memory"; type: MemoryTypeKey; origin: "profile" }
+  | { screen: "SectionEditor"; type: MemoryTypeKey; editId?: number }
+  | { screen: "KeyPeopleEditor" | "OffLimitsEditor"; editId?: number }
+  | { screen: "Edit" }
+  /** The section has no action here (Pinned; empty Imported). */
+  | { screen: "none" };
 
-/** Keeps the host's semantic child IDs from leaking into navigation. */
+const NO_DESTINATION: ProfileKnowledgeDestination = { screen: "none" };
+
+const addMemory = (type: MemoryTypeKey): ProfileKnowledgeDestination => ({
+  screen: "Memory",
+  type,
+  origin: "profile",
+});
+
+/**
+ * The heading action of a section with entries (D-72): Add for Last Talked
+ * About and the three memory sections, the section's own editor for the
+ * pencils, nothing for Pinned (D-112).
+ */
 export function profileKnowledgeDestination(
   id: KnowledgeChildId,
 ): ProfileKnowledgeDestination {
   switch (id) {
     case "last-talked-about":
+      return {
+        screen: "MemoryHistory",
+        fieldKey: "last_talked_about",
+        openAdd: true,
+      };
+    case "memories":
+      return addMemory("general");
+    case "thought-of-them":
+      return addMemory("thought_of_them");
+    case "gift-ideas":
+      return addMemory("gift_idea");
+    case "current-location":
+      return { screen: "MemoryHistory", fieldKey: "current_location" };
+    case "key-people":
+      return { screen: "KeyPeopleEditor" };
+    case "off-limits":
+      return { screen: "OffLimitsEditor" };
+    case "custom-fields":
+      return { screen: "Edit" };
+    case "imported-contact-notes":
+      return { screen: "SectionEditor", type: "imported" };
+    case "pinned-featured":
+      return NO_DESTINATION;
+  }
+}
+
+/**
+ * An empty section's "Add …" opens its add form (D-68). Current Location's
+ * opens the history page's add form, where its pencil does not. Imported has
+ * no add form (D-35) and Pinned no action (D-72, D-112). Key People, Off
+ * Limits and Custom Fields open their editors, as their pencils do (this plan
+ * only, inferred from D-68).
+ */
+export function profileKnowledgeEmptyDestination(
+  id: KnowledgeChildId,
+): ProfileKnowledgeDestination {
+  switch (id) {
+    case "last-talked-about":
+      return {
+        screen: "MemoryHistory",
+        fieldKey: "last_talked_about",
+        openAdd: true,
+      };
+    case "current-location":
+      return {
+        screen: "MemoryHistory",
+        fieldKey: "current_location",
+        openAdd: true,
+      };
+    case "memories":
+      return addMemory("general");
+    case "thought-of-them":
+      return addMemory("thought_of_them");
+    case "gift-ideas":
+      return addMemory("gift_idea");
+    case "key-people":
+      return { screen: "KeyPeopleEditor" };
+    case "off-limits":
+      return { screen: "OffLimitsEditor" };
+    case "custom-fields":
+      return { screen: "Edit" };
+    case "imported-contact-notes":
+    case "pinned-featured":
+      return NO_DESTINATION;
+  }
+}
+
+/**
+ * View all, "See all (N)" and Show hidden (D-75, D-52, D-53). Separate from
+ * the heading table, so Memories' View all never opens the Add form. Show
+ * hidden is a retarget only (D-71 deferred).
+ */
+export function profileKnowledgeCollectionDestination(
+  id: KnowledgeChildId,
+): ProfileKnowledgeDestination {
+  switch (id) {
+    case "memories":
+      return { screen: "SectionEditor", type: "general" };
+    case "thought-of-them":
+      return { screen: "SectionEditor", type: "thought_of_them" };
+    case "gift-ideas":
+      return { screen: "SectionEditor", type: "gift_idea" };
+    case "imported-contact-notes":
+      return { screen: "SectionEditor", type: "imported" };
+    // This plan only, inferred from D-75: the section's own editor.
+    case "key-people":
+      return { screen: "KeyPeopleEditor" };
+    case "off-limits":
+      return { screen: "OffLimitsEditor" };
+    case "last-talked-about":
       return { screen: "MemoryHistory", fieldKey: "last_talked_about" };
     case "current-location":
       return { screen: "MemoryHistory", fieldKey: "current_location" };
-    case "off-limits":
-      return { screen: "OffLimitsEditor" };
-    case "key-people":
-    case "custom-fields":
-      return { screen: "Edit" };
     case "pinned-featured":
-    case "memories":
-    case "imported-contact-notes":
-      return { screen: "ThingsToRemember" };
+    case "custom-fields":
+      return NO_DESTINATION;
   }
+}
+
+/** The Profile memory row with this id, from any section that lists it. */
+function profileMemoryRow(knowledge: ProfileKnowledge | null, id: number) {
+  if (!knowledge) return undefined;
+  const pinned = knowledge.featured.items.flatMap((reference) =>
+    reference.owner === "memory" ? [reference.row] : [],
+  );
+  return [
+    ...pinned,
+    ...knowledge.memories.items,
+    ...knowledge.thoughtOfThem.items,
+    ...knowledge.giftIdeas.items,
+    ...knowledge.importedNotes.items,
+  ].find((row) => row.id === id);
+}
+
+/** The current-state field that holds this entry (Most Recent or Previous). */
+function currentStateFieldOf(
+  knowledge: ProfileKnowledge | null,
+  id: number,
+): CurrentStateFieldKey {
+  const found = Object.entries(knowledge?.currentState ?? {}).find(
+    ([, entry]) =>
+      entry?.id === id ||
+      entry?.previous.some((previous) => previous.id === id),
+  )?.[0];
+  return (found ?? "last_talked_about") as CurrentStateFieldKey;
+}
+
+/**
+ * An item's Edit opens that entry's form in its own editor (D-107, D-75): the
+ * memory's section editor (its type picks the section), the history page, the
+ * Key People or Off Limits editor, each with `editId`; a custom field opens
+ * Edit Contact.
+ */
+export function editDestination(
+  target: KnowledgeDetailTarget,
+  knowledge: ProfileKnowledge | null,
+): ProfileKnowledgeDestination {
+  switch (target.owner) {
+    case "memory": {
+      const type = profileMemoryRow(knowledge, target.id)?.type;
+      return {
+        screen: "SectionEditor",
+        type: type !== undefined && isMemoryTypeKey(type) ? type : "general",
+        editId: target.id,
+      };
+    }
+    case "current-state":
+      return {
+        screen: "MemoryHistory",
+        fieldKey: currentStateFieldOf(knowledge, target.id),
+        editId: target.id,
+      };
+    case "relationship":
+      return { screen: "KeyPeopleEditor", editId: target.id };
+    case "offLimits":
+      return { screen: "OffLimitsEditor", editId: target.id };
+    case "custom-field":
+      return { screen: "Edit" };
+  }
+}
+
+/** A route name with its params, every destination field forwarded. */
+export type ProfileKnowledgeNavigation =
+  | [
+      "MemoryHistory",
+      {
+        contactId: number;
+        fieldKey: CurrentStateFieldKey;
+        openAdd?: true;
+        editId?: number;
+      },
+    ]
+  | ["Memory", { contactId: number; type: MemoryTypeKey; origin: "profile" }]
+  | [
+      "SectionEditor",
+      { contactId: number; type: MemoryTypeKey; editId?: number },
+    ]
+  | ["KeyPeopleEditor", { contactId: number; editId?: number }]
+  | ["OffLimitsEditor", { contactId: number; editId?: number }]
+  | ["Edit", { contactId: number }];
+
+/** Route and params for a destination; null when it has none. */
+export function knowledgeNavigateParams(
+  destination: ProfileKnowledgeDestination,
+  contactId: number,
+): ProfileKnowledgeNavigation | null {
+  const editId = (value: number | undefined) =>
+    value === undefined ? {} : { editId: value };
+  switch (destination.screen) {
+    case "MemoryHistory":
+      return [
+        "MemoryHistory",
+        {
+          contactId,
+          fieldKey: destination.fieldKey,
+          ...(destination.openAdd ? { openAdd: true as const } : {}),
+          ...editId(destination.editId),
+        },
+      ];
+    case "Memory":
+      return [
+        "Memory",
+        { contactId, type: destination.type, origin: destination.origin },
+      ];
+    case "SectionEditor":
+      return [
+        "SectionEditor",
+        { contactId, type: destination.type, ...editId(destination.editId) },
+      ];
+    case "KeyPeopleEditor":
+      return ["KeyPeopleEditor", { contactId, ...editId(destination.editId) }];
+    case "OffLimitsEditor":
+      return ["OffLimitsEditor", { contactId, ...editId(destination.editId) }];
+    case "Edit":
+      return ["Edit", { contactId }];
+    case "none":
+      return null;
+  }
+}
+
+/**
+ * The Profile's Pin / Unpin snackbar, naming the person (D-21, D-22; 38.9
+ * D-39/D-46 via D-19). Same wording as the section editors (plan 13);
+ * proposed wording for the plan-19 review.
+ */
+export function pinSnackbar(pinned: boolean, name: string | null): string {
+  return sectionPinSnackbar(pinned, name);
+}
+
+/** The confirming snackbar after a Profile Pin / Unpin's Undo (38.9 D-39). */
+export function pinUndoneSnackbar(
+  pinned: boolean,
+  name: string | null,
+): string {
+  return sectionPinUndoneSnackbar(pinned, name);
 }
 
 export interface ProfileMethodRow {

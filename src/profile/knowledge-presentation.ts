@@ -181,6 +181,33 @@ export function headingActionFor(id: KnowledgeChildId): KnowledgeHeadingAction {
 }
 
 /**
+ * The placeholder target a section-level intent (heading action, empty
+ * "Add …") carries: the section's owner with id 0. The destination is chosen
+ * per section id by the screen.
+ */
+export function knowledgeChildTarget(
+  id: KnowledgeChildId,
+): KnowledgeDetailTarget {
+  switch (id) {
+    case "last-talked-about":
+    case "current-location":
+      return { owner: "current-state", id: 0 };
+    case "key-people":
+      return { owner: "relationship", id: 0 };
+    case "custom-fields":
+      return { owner: "custom-field", id: 0 };
+    case "off-limits":
+      return { owner: "offLimits", id: 0 };
+    case "pinned-featured":
+    case "memories":
+    case "thought-of-them":
+    case "gift-ideas":
+    case "imported-contact-notes":
+      return { owner: "memory", id: 0 };
+  }
+}
+
+/**
  * Whether a section has at least one entry to show (D-72). The empty line and
  * "Add …" and the heading action all follow this one rule, so an empty
  * section never shows both.

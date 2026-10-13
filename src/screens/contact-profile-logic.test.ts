@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
+import type { MemoryRow } from "@/db/memories-read";
+import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
+import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import {
   canStartLifecycleTransition,
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
   consumeProfileReachOutIntent,
   createProfileSnapshotLoader,
+  editDestination,
+  knowledgeNavigateParams,
   PROFILE_APP_BAR,
   PROFILE_APP_BAR_SCRIM_OPACITY,
   PROFILE_APP_BAR_SCRIM_THRESHOLD,
@@ -13,12 +18,16 @@ import {
   PROFILE_HERO_AVATAR_SIZE,
   PROFILE_HERO_GAP,
   PROFILE_LEGACY_NAME_TOP,
+  pinSnackbar,
+  pinUndoneSnackbar,
   profileAppBarGlyphClearance,
   profileAppBarHitBoxClearance,
   profileAppBarScrolled,
   profileContentTopPadding,
   profileErrorPlacement,
+  profileKnowledgeCollectionDestination,
   profileKnowledgeDestination,
+  profileKnowledgeEmptyDestination,
   profileLifecycleView,
   profileMethodGroups,
   profileNameTop,
@@ -250,15 +259,276 @@ describe("Relationship Overview collapse tracer", () => {
 });
 
 describe("integrated Profile controller contracts", () => {
-  it("routes the Things to Remember collection action through its memories owner", () => {
-    expect(profileKnowledgeDestination("memories")).toEqual({
-      screen: "ThingsToRemember",
-    });
-  });
+  describe("Things to Remember routes (D-72, D-75, D-68, D-107; c8, c9, c10)", () => {
+    const ids: readonly KnowledgeChildId[] = [
+      "pinned-featured",
+      "last-talked-about",
+      "key-people",
+      "current-location",
+      "memories",
+      "thought-of-them",
+      "gift-ideas",
+      "custom-fields",
+      "off-limits",
+      "imported-contact-notes",
+    ];
 
-  it("routes Custom Fields to the contact's value editor", () => {
-    expect(profileKnowledgeDestination("custom-fields")).toEqual({
-      screen: "Edit",
+    it("gives each section with entries its D-72 heading destination, and Pinned none", () => {
+      expect(
+        Object.fromEntries(
+          ids.map((id) => [id, profileKnowledgeDestination(id)]),
+        ),
+      ).toEqual({
+        "pinned-featured": { screen: "none" },
+        "last-talked-about": {
+          screen: "MemoryHistory",
+          fieldKey: "last_talked_about",
+          openAdd: true,
+        },
+        "key-people": { screen: "KeyPeopleEditor" },
+        "current-location": {
+          screen: "MemoryHistory",
+          fieldKey: "current_location",
+        },
+        memories: { screen: "Memory", type: "general", origin: "profile" },
+        "thought-of-them": {
+          screen: "Memory",
+          type: "thought_of_them",
+          origin: "profile",
+        },
+        "gift-ideas": {
+          screen: "Memory",
+          type: "gift_idea",
+          origin: "profile",
+        },
+        "custom-fields": { screen: "Edit" },
+        "off-limits": { screen: "OffLimitsEditor" },
+        "imported-contact-notes": { screen: "SectionEditor", type: "imported" },
+      });
+    });
+
+    it("sends an empty section's 'Add …' to its add form; Imported and Pinned have none (D-68; c2 G-U3, c10)", () => {
+      expect(
+        Object.fromEntries(
+          ids.map((id) => [id, profileKnowledgeEmptyDestination(id)]),
+        ),
+      ).toEqual({
+        "pinned-featured": { screen: "none" },
+        "last-talked-about": {
+          screen: "MemoryHistory",
+          fieldKey: "last_talked_about",
+          openAdd: true,
+        },
+        "key-people": { screen: "KeyPeopleEditor" },
+        "current-location": {
+          screen: "MemoryHistory",
+          fieldKey: "current_location",
+          openAdd: true,
+        },
+        memories: { screen: "Memory", type: "general", origin: "profile" },
+        "thought-of-them": {
+          screen: "Memory",
+          type: "thought_of_them",
+          origin: "profile",
+        },
+        "gift-ideas": {
+          screen: "Memory",
+          type: "gift_idea",
+          origin: "profile",
+        },
+        "custom-fields": { screen: "Edit" },
+        "off-limits": { screen: "OffLimitsEditor" },
+        "imported-contact-notes": { screen: "none" },
+      });
+      // The pencil opens the history page without its add form.
+      expect(
+        profileKnowledgeDestination("current-location"),
+      ).not.toHaveProperty("openAdd");
+    });
+
+    it("routes View all, See all and Show hidden to the section's own editor, never Add (c8, c9)", () => {
+      expect(
+        Object.fromEntries(
+          ids.map((id) => [id, profileKnowledgeCollectionDestination(id)]),
+        ),
+      ).toEqual({
+        "pinned-featured": { screen: "none" },
+        "last-talked-about": {
+          screen: "MemoryHistory",
+          fieldKey: "last_talked_about",
+        },
+        "key-people": { screen: "KeyPeopleEditor" },
+        "current-location": {
+          screen: "MemoryHistory",
+          fieldKey: "current_location",
+        },
+        memories: { screen: "SectionEditor", type: "general" },
+        "thought-of-them": { screen: "SectionEditor", type: "thought_of_them" },
+        "gift-ideas": { screen: "SectionEditor", type: "gift_idea" },
+        "custom-fields": { screen: "none" },
+        "off-limits": { screen: "OffLimitsEditor" },
+        "imported-contact-notes": { screen: "SectionEditor", type: "imported" },
+      });
+      expect(profileKnowledgeCollectionDestination("memories").screen).not.toBe(
+        "Memory",
+      );
+      for (const id of ["last-talked-about", "current-location"] as const) {
+        expect(profileKnowledgeCollectionDestination(id)).not.toHaveProperty(
+          "openAdd",
+        );
+      }
+    });
+
+    it("never routes anywhere to the retired Things to Remember screen (D-63, D-75)", () => {
+      for (const id of ids) {
+        for (const destination of [
+          profileKnowledgeDestination(id),
+          profileKnowledgeEmptyDestination(id),
+          profileKnowledgeCollectionDestination(id),
+        ]) {
+          expect(destination.screen).not.toBe("ThingsToRemember");
+        }
+      }
+    });
+
+    it("forwards every destination field to the route params (c10)", () => {
+      expect(
+        knowledgeNavigateParams(
+          profileKnowledgeDestination("last-talked-about"),
+          4,
+        ),
+      ).toEqual([
+        "MemoryHistory",
+        { contactId: 4, fieldKey: "last_talked_about", openAdd: true },
+      ]);
+      expect(
+        knowledgeNavigateParams(
+          profileKnowledgeEmptyDestination("current-location"),
+          4,
+        ),
+      ).toEqual([
+        "MemoryHistory",
+        { contactId: 4, fieldKey: "current_location", openAdd: true },
+      ]);
+      expect(
+        knowledgeNavigateParams(profileKnowledgeDestination("gift-ideas"), 4),
+      ).toEqual([
+        "Memory",
+        { contactId: 4, type: "gift_idea", origin: "profile" },
+      ]);
+      expect(
+        knowledgeNavigateParams(
+          profileKnowledgeCollectionDestination("current-location"),
+          4,
+        ),
+      ).toEqual([
+        "MemoryHistory",
+        { contactId: 4, fieldKey: "current_location" },
+      ]);
+      expect(
+        knowledgeNavigateParams(
+          profileKnowledgeDestination("pinned-featured"),
+          4,
+        ),
+      ).toBeNull();
+    });
+
+    describe("an item's Edit opens that entry's form (D-107; c6 C-03)", () => {
+      const row = (id: number, type: string) =>
+        ({ id, type, pinned: 0 }) as unknown as MemoryRow;
+      const list = (rows: MemoryRow[]) => ({
+        items: rows,
+        total: rows.length,
+        remainingCount: 0,
+        hiddenCount: 0,
+        showHiddenAvailable: false,
+      });
+      const knowledge = {
+        currentState: {
+          current_location: {
+            id: 30,
+            previous: [{ id: 31, previous: [] }],
+          },
+        },
+        featured: {
+          ...list([]),
+          items: [
+            {
+              owner: "memory",
+              id: 5,
+              row: { ...row(5, "gift_idea"), pinned: 1 },
+            },
+          ],
+          total: 1,
+        },
+        relationships: list([]),
+        memories: list([row(1, "general")]),
+        thoughtOfThem: list([row(2, "thought_of_them")]),
+        giftIdeas: list([row(3, "gift_idea")]),
+        importedNotes: list([row(4, "imported")]),
+        customFields: [],
+        offLimits: [],
+      } as unknown as ProfileKnowledge;
+
+      it("opens a memory in its own section's editor, chosen by its type", () => {
+        for (const [id, type] of [
+          [1, "general"],
+          [2, "thought_of_them"],
+          [3, "gift_idea"],
+          [4, "imported"],
+          // A pinned Gift Idea still opens Gift Ideas.
+          [5, "gift_idea"],
+        ] as const) {
+          expect(editDestination({ owner: "memory", id }, knowledge)).toEqual({
+            screen: "SectionEditor",
+            type,
+            editId: id,
+          });
+        }
+      });
+
+      it("opens a current-state entry, a key person and an Off Limits item with editId", () => {
+        expect(
+          editDestination({ owner: "current-state", id: 31 }, knowledge),
+        ).toEqual({
+          screen: "MemoryHistory",
+          fieldKey: "current_location",
+          editId: 31,
+        });
+        expect(
+          editDestination({ owner: "relationship", id: 8 }, knowledge),
+        ).toEqual({
+          screen: "KeyPeopleEditor",
+          editId: 8,
+        });
+        expect(
+          editDestination({ owner: "offLimits", id: 9 }, knowledge),
+        ).toEqual({
+          screen: "OffLimitsEditor",
+          editId: 9,
+        });
+        expect(
+          knowledgeNavigateParams(
+            editDestination({ owner: "offLimits", id: 9 }, knowledge),
+            4,
+          ),
+        ).toEqual(["OffLimitsEditor", { contactId: 4, editId: 9 }]);
+      });
+
+      it("opens Edit Contact for a custom field", () => {
+        expect(
+          editDestination({ owner: "custom-field", id: 22 }, knowledge),
+        ).toEqual({
+          screen: "Edit",
+        });
+      });
+    });
+
+    it("names the person in the Pin / Unpin snackbars and their Undo (c8 CU-05)", () => {
+      expect(pinSnackbar(true, "Ada")).toBe("Pinned for Ada");
+      expect(pinSnackbar(false, "Ada")).toBe("Unpinned for Ada");
+      expect(pinUndoneSnackbar(true, "Ada")).toBe("Pin undone for Ada");
+      expect(pinUndoneSnackbar(false, "Ada")).toBe("Unpin undone for Ada");
     });
   });
 

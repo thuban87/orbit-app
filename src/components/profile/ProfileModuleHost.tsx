@@ -21,6 +21,8 @@ import type { ProfileSnapshot } from "@/db/profile-read";
 import {
   childHasEntries,
   headingActionFor,
+  type KnowledgeEntryLink,
+  knowledgeChildTarget,
 } from "@/profile/knowledge-presentation";
 import {
   completeHistoryScroll,
@@ -172,6 +174,11 @@ export interface ProfileModuleHostProps {
    */
   onOpenKnowledgeChange: (fieldKey: CurrentStateFieldKey) => void;
   onKnowledgeViewAll: (intent: KnowledgeViewAllIntent) => void;
+  /**
+   * Opens the interaction a linked entry belongs to (D-107). Optional: without
+   * it a linked card opens its sheet.
+   */
+  onOpenLinked?: (link: KnowledgeEntryLink) => void;
   onOpenValueHistory: (target: {
     contactId: number;
     fieldDefId: number;
@@ -205,6 +212,7 @@ export function ProfileModuleHost({
   onUnsnooze,
   onKnowledgeAction,
   onKnowledgeViewAll,
+  onOpenLinked,
   onOpenValueHistory,
   onOpenKnowledgeChange,
   onContactMethodAction,
@@ -383,6 +391,7 @@ export function ProfileModuleHost({
               childIds={[placement.id as KnowledgeChildId]}
               onAction={onKnowledgeAction}
               onViewAll={onKnowledgeViewAll}
+              onOpenLinked={onOpenLinked}
               onOpenValueHistory={onOpenValueHistory}
             />
           )}
@@ -390,28 +399,6 @@ export function ProfileModuleHost({
       ))}
     </View>
   );
-
-  const knowledgeTarget = (
-    id: KnowledgeChildId,
-  ): KnowledgeActionIntent["target"] => {
-    switch (id) {
-      case "last-talked-about":
-      case "current-location":
-        return { owner: "current-state", id: 0 };
-      case "key-people":
-        return { owner: "relationship", id: 0 };
-      case "custom-fields":
-        return { owner: "custom-field", id: 0 };
-      case "off-limits":
-        return { owner: "offLimits", id: 0 };
-      case "pinned-featured":
-      case "memories":
-      case "thought-of-them":
-      case "gift-ideas":
-      case "imported-contact-notes":
-        return { owner: "memory", id: 0 };
-    }
-  };
 
   // Add for a section the user adds to, the pencil for one edited in its own
   // editor, nothing for Pinned (D-72; the one table is `headingActionFor`).
@@ -431,7 +418,7 @@ export function ProfileModuleHost({
           onKnowledgeAction({
             action: "edit",
             childId: id,
-            target: knowledgeTarget(id),
+            target: knowledgeChildTarget(id),
           })
         }
         style={styles.sectionEdit}

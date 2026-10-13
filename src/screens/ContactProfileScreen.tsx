@@ -20,10 +20,7 @@ import { ProfileHero } from "@/components/profile/ProfileHero";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileModuleHost } from "@/components/profile/ProfileModuleHost";
 import { ProfileTemplateManager } from "@/components/profile/ProfileTemplateManager";
-import type {
-  KnowledgeActionIntent,
-  KnowledgeChildId,
-} from "@/components/profile/ThingsToRemember";
+import type { KnowledgeActionIntent } from "@/components/profile/ThingsToRemember";
 import { ReachOutRouter } from "@/components/ReachOutRouter";
 import { AppText } from "@/components/ui/AppText";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
@@ -34,7 +31,8 @@ import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { deriveReachRoutes } from "@/db/interaction-assist-read";
-import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import { getLinkedInteractionRefCore } from "@/db/linked-entry-dao";
+import { editMemory } from "@/db/memories-dao";
 import { resetProfilePresentation } from "@/db/profile-presentation-dao";
 import { type ProfileSnapshot, readProfileSnapshot } from "@/db/profile-read";
 import {
@@ -42,21 +40,31 @@ import {
   snoozeProfileContact,
   unsnoozeProfileContact,
 } from "@/db/profile-relationship-actions";
+import { editRelationship } from "@/db/relationships-dao";
+import { linkedEntryRoute } from "@/logic/linked-entry-route";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import type { KnowledgeEntryLink } from "@/profile/knowledge-presentation";
 import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import {
   closeTopmostProfileOverlay,
   consumeProfileReachOutIntent,
   createProfileSnapshotLoader,
+  editDestination,
+  knowledgeNavigateParams,
   PROFILE_APP_BAR,
   PROFILE_APP_BAR_SCRIM_OPACITY,
   PROFILE_APP_BAR_SCROLL_SCRIM,
+  type ProfileKnowledgeDestination,
   type ProfileOverlay,
+  pinSnackbar,
+  pinUndoneSnackbar,
   profileAppBarScrolled,
   profileErrorPlacement,
+  profileKnowledgeCollectionDestination,
   profileKnowledgeDestination,
+  profileKnowledgeEmptyDestination,
   profileLifecycleView,
   profileOverflowEntries,
   profileScrollA11yOffset,
@@ -336,63 +344,182 @@ export function ContactProfileScreen({
     [load],
   );
 
-  const routeKnowledgeChild = useCallback(
-    (id: KnowledgeChildId) => {
-      const destination = profileKnowledgeDestination(id);
-      switch (destination.screen) {
+  // Every Profile knowledge route goes through one forwarding step, so
+  // openAdd, type, origin, fieldKey and editId all reach their screens.
+  const navigateKnowledge = useCallback(
+    (destination: ProfileKnowledgeDestination) => {
+      const target = knowledgeNavigateParams(destination, contactId);
+      if (target === null) return;
+      switch (target[0]) {
         case "MemoryHistory":
-          navigation.navigate("MemoryHistory", {
-            contactId,
-            fieldKey: destination.fieldKey,
-          });
+          navigation.navigate("MemoryHistory", target[1]);
+          return;
+        case "Memory":
+          navigation.navigate("Memory", target[1]);
+          return;
+        case "SectionEditor":
+          navigation.navigate("SectionEditor", target[1]);
+          return;
+        case "KeyPeopleEditor":
+          navigation.navigate("KeyPeopleEditor", target[1]);
           return;
         case "OffLimitsEditor":
-          navigation.navigate("OffLimitsEditor", { contactId });
+          navigation.navigate("OffLimitsEditor", target[1]);
           return;
         case "Edit":
-          navigation.navigate("Edit", { contactId });
-          return;
-        case "ThingsToRemember":
-          navigation.navigate("ThingsToRemember", { contactId });
+          navigation.navigate("Edit", target[1]);
       }
     },
     [contactId, navigation],
   );
 
+  // D-21, D-22: Pin / Unpin through the scoped partial-patch writers, then a
+  // snackbar naming the person with Undo (38.9 D-39/D-46 via D-19).
+  const writePin = useCallback(
+    async (
+      target: KnowledgeActionIntent["target"],
+      pinned: boolean,
+    ): Promise<boolean> => {
+      try {
+        const now = localDateTime();
+        if (target.owner === "memory") {
+          await editMemory(getExecutor(), {
+            id: target.id,
+            contactId,
+            pinned,
+            now,
+          });
+        } else if (target.owner === "relationship") {
+          await editRelationship(getExecutor(), {
+            id: target.id,
+            contactId,
+            pinned,
+            now,
+          });
+        } else {
+          return false;
+        }
+      } catch (cause) {
+        Logger.error(
+          LOG_SCOPE,
+          "failed to pin or unpin from the Profile",
+          cause,
+        );
+        return false;
+      }
+      void load();
+      return true;
+    },
+    [contactId, load],
+  );
+
+  const togglePin = useCallback(
+    (target: KnowledgeActionIntent["target"], pinned: boolean) => {
+      const name = snapshot?.identity.name ?? null;
+      void (async () => {
+        if (!(await writePin(target, pinned))) {
+          showSnackbar({
+            kind: "error",
+            label: "Couldn't save. Please try again.",
+          });
+          return;
+        }
+        showSnackbar({
+          kind: "success",
+          label: pinSnackbar(pinned, name),
+          action: {
+            label: "Undo",
+            accessibilityLabel: pinned ? "Undo pin" : "Undo unpin",
+            onPress: () => {
+              void (async () => {
+                if (!(await writePin(target, !pinned))) {
+                  showSnackbar({
+                    kind: "error",
+                    label: pinned
+                      ? "Couldn't undo the pin."
+                      : "Couldn't undo the unpin.",
+                  });
+                  return;
+                }
+                showSnackbar({
+                  kind: "success",
+                  label: pinUndoneSnackbar(pinned, name),
+                });
+              })();
+            },
+          },
+        });
+      })();
+    },
+    [snapshot?.identity.name, writePin],
+  );
+
   const routeKnowledgeAction = useCallback(
     (intent: KnowledgeActionIntent) => {
       if (intent.childId) {
-        routeKnowledgeChild(intent.childId);
+        // A section-level control: the heading action or an empty "Add …".
+        navigateKnowledge(
+          intent.affordance === "empty"
+            ? profileKnowledgeEmptyDestination(intent.childId)
+            : profileKnowledgeDestination(intent.childId),
+        );
         return;
       }
-      switch (intent.target.owner) {
-        case "fuel":
-          navigation.navigate("OffLimitsEditor", { contactId });
+      switch (intent.action) {
+        case "pin":
+        case "unpin":
+          togglePin(intent.target, intent.action === "pin");
           return;
-        case "relationship":
-        case "custom-field":
-          navigation.navigate("Edit", { contactId });
-          return;
-        case "memory":
-          navigation.navigate("ThingsToRemember", { contactId });
-          return;
-        case "current-state": {
-          const currentState =
-            snapshot?.knowledge.status === "ready"
-              ? snapshot.knowledge.data.currentState
-              : {};
-          const fieldKey = (Object.entries(currentState).find(
-            ([, entry]) =>
-              entry?.id === intent.target.id ||
-              entry?.previous.some(
-                (previous) => previous.id === intent.target.id,
-              ),
-          )?.[0] ?? "last_talked_about") as CurrentStateFieldKey;
-          navigation.navigate("MemoryHistory", { contactId, fieldKey });
-        }
+        case "edit":
+          navigateKnowledge(
+            editDestination(
+              intent.target,
+              snapshot?.knowledge.status === "ready"
+                ? snapshot.knowledge.data
+                : null,
+            ),
+          );
       }
     },
-    [contactId, navigation, routeKnowledgeChild, snapshot],
+    [navigateKnowledge, snapshot, togglePin],
+  );
+
+  // D-107: tapping a linked entry opens its interaction.
+  const openLinkedEntry = useCallback(
+    (link: KnowledgeEntryLink) => {
+      void (async () => {
+        let target: ReturnType<typeof linkedEntryRoute>;
+        try {
+          const ref = await getLinkedInteractionRefCore(
+            getExecutor(),
+            link.interactionId,
+          );
+          target = linkedEntryRoute(
+            ref === null ? null : { ...ref, linkSource: link.linkSource },
+          );
+        } catch (cause) {
+          Logger.error(LOG_SCOPE, "failed to open the interaction", cause);
+          return;
+        }
+        if (target === null) {
+          // The interaction is gone; the entry is standalone now.
+          void load();
+          return;
+        }
+        switch (target.name) {
+          case "GroupEventDetail":
+            navigation.navigate("GroupEventDetail", target.params);
+            return;
+          case "EditParticipant":
+            navigation.navigate("EditParticipant", target.params);
+            return;
+          case "EditInteraction":
+            navigation.navigate("EditInteraction", target.params);
+            return;
+        }
+      })();
+    },
+    [load, navigation],
   );
 
   const toggleFavourite = useCallback(async () => {
@@ -671,9 +798,17 @@ export function ContactProfileScreen({
                 onSnooze={snooze}
                 onUnsnooze={unsnooze}
                 onKnowledgeAction={routeKnowledgeAction}
-                onKnowledgeViewAll={(intent) => routeKnowledgeChild(intent.id)}
-                // Temporal history owns its full add/edit/promote screen; the
-                // stable field key remains serializable across every host stack.
+                // View all, "See all (N)" and Show hidden have their own
+                // destinations (D-75, D-52, D-53); Show hidden is a retarget
+                // only (D-71 deferred).
+                onKnowledgeViewAll={(intent) =>
+                  navigateKnowledge(
+                    profileKnowledgeCollectionDestination(intent.id),
+                  )
+                }
+                onOpenLinked={openLinkedEntry}
+                // Temporal history owns its full add/edit screen; the stable
+                // field key remains serializable across every host stack.
                 onOpenKnowledgeChange={(fieldKey) =>
                   navigation.navigate("MemoryHistory", { contactId, fieldKey })
                 }

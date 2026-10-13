@@ -1,7 +1,13 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  type AccessibilityActionEvent,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Icon } from "@/components/icons/Icon";
+import { openMemoryLink } from "@/components/MemoryCard";
 import { AppText, Button, Sheet } from "@/components/ui";
 import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import {
@@ -9,8 +15,10 @@ import {
   type KnowledgeAction,
   type KnowledgeChildId,
   type KnowledgeDetailTarget,
+  type KnowledgeEntryLink,
   type KnowledgePresentationChild,
   type KnowledgePresentationItem,
+  knowledgeChildTarget,
 } from "@/profile/knowledge-presentation";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -21,6 +29,22 @@ export interface KnowledgeActionIntent {
   target: KnowledgeDetailTarget;
   /** Present for a heading action that manages the entire child collection. */
   childId?: KnowledgeChildId;
+  /**
+   * Which section-level control fired: the heading action (absent) or an
+   * empty section's "Add …" (D-68), whose destination differs.
+   */
+  affordance?: "heading" | "empty";
+}
+
+/** The entry sheet's and the card's action labels (D-87). */
+const ACTION_LABELS: Readonly<Record<KnowledgeAction, string>> = {
+  edit: "Edit",
+  pin: "Pin",
+  unpin: "Unpin",
+};
+
+function isKnowledgeAction(name: string): name is KnowledgeAction {
+  return Object.hasOwn(ACTION_LABELS, name);
 }
 
 export interface KnowledgeViewAllIntent {
@@ -42,6 +66,11 @@ export interface ThingsToRememberProps {
     contactId: number;
     fieldDefId: number;
   }) => void;
+  /**
+   * Opens the interaction a linked entry belongs to (D-107, D-37). Optional:
+   * without it a linked card opens its sheet like any other.
+   */
+  onOpenLinked?: (link: KnowledgeEntryLink) => void;
 }
 
 function childIcon(id: KnowledgeChildId): "favorite" | "message" | "settings" {
@@ -52,6 +81,8 @@ function childIcon(id: KnowledgeChildId): "favorite" | "message" | "settings" {
     case "key-people":
     case "current-location":
     case "memories":
+    case "thought-of-them":
+    case "gift-ideas":
     case "custom-fields":
     case "off-limits":
     case "imported-contact-notes":
@@ -75,6 +106,7 @@ function DetailSheet({
     fieldDefId: number;
   }) => void;
 }) {
+  const url = item?.detail.url;
   return (
     <Sheet visible={item !== null} onRequestClose={onClose} variant="detail">
       {item ? (
@@ -86,6 +118,20 @@ function DetailSheet({
               {entry}
             </AppText>
           ))}
+          {url ? (
+            // D-24: a link entry's sheet shows its URL with Open.
+            <View style={styles.link}>
+              <AppText role="caption" numberOfLines={2}>
+                {url}
+              </AppText>
+              <Button
+                role="tertiary"
+                label="Open"
+                accessibilityLabel="Open link"
+                onPress={() => openMemoryLink(url)}
+              />
+            </View>
+          ) : null}
           {item.invalid ? (
             <AppText role="caption">
               This value needs attention. Tap Edit to fix it.
@@ -102,40 +148,54 @@ function DetailSheet({
             <Button
               key={action}
               role="tertiary"
-              label={action === "hide" ? "Hide from Profile" : action}
+              label={ACTION_LABELS[action]}
               onPress={() => {
                 onAction({ action, target: item.detail });
                 onClose();
               }}
             />
           ))}
-          <Button role="secondary" label="Done" onPress={onClose} />
+          <Button role="secondary" label="Close" onPress={onClose} />
         </View>
       ) : null}
     </Sheet>
   );
 }
 
-function KnowledgeCard({
+/**
+ * One entry card. Tap opens a linked entry's interaction (D-107) or the
+ * entry's sheet; long-press opens the sheet; the screen-reader actions run
+ * Edit, Pin or Unpin directly.
+ */
+export function KnowledgeCard({
   item,
   onOpen,
+  onAction,
+  onOpenLinked,
   hideTitle = false,
 }: {
   item: KnowledgePresentationItem;
   onOpen: () => void;
+  onAction: (action: KnowledgeAction) => void;
+  onOpenLinked?: (link: KnowledgeEntryLink) => void;
   hideTitle?: boolean;
 }) {
+  const link = item.detail.link;
+  const onPress = link && onOpenLinked ? () => onOpenLinked(link) : onOpen;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${item.title}${item.invalid ? ", needs attention" : ""}`}
       accessibilityActions={item.management.accessibility.map((action) => ({
         name: action,
-        label: action === "hide" ? "Hide from Profile" : action,
+        label: ACTION_LABELS[action],
       }))}
-      onAccessibilityAction={() => onOpen()}
+      onAccessibilityAction={(event: AccessibilityActionEvent) => {
+        const name = event.nativeEvent.actionName;
+        if (isKnowledgeAction(name)) onAction(name);
+      }}
       onLongPress={onOpen}
-      onPress={onOpen}
+      onPress={onPress}
       style={styles.card}
     >
       {!hideTitle ? (
@@ -161,16 +221,26 @@ function KnowledgeCard({
   );
 }
 
-function KnowledgeChild({
+export function KnowledgeChild({
   child,
   suppressHeading,
   onOpen,
+  onItemAction,
+  onOpenLinked,
+  onEmptyAdd,
   onViewAll,
 }: {
   child: KnowledgePresentationChild;
   /** A one-child ProfileSection already supplies this semantic heading. */
   suppressHeading: boolean;
   onOpen: (item: KnowledgePresentationItem) => void;
+  onItemAction: (
+    item: KnowledgePresentationItem,
+    action: KnowledgeAction,
+  ) => void;
+  onOpenLinked?: (link: KnowledgeEntryLink) => void;
+  /** An empty section's "Add …" (D-68). */
+  onEmptyAdd: (child: KnowledgePresentationChild) => void;
   onViewAll: (
     child: KnowledgePresentationChild,
     includeHidden: boolean,
@@ -198,6 +268,14 @@ function KnowledgeChild({
         <AppText role="body">{child.bodySummary}</AppText>
       ) : null}
       {child.helper ? <AppText role="caption">{child.helper}</AppText> : null}
+      {child.items.length === 0 && child.emptyAction ? (
+        // D-68: an empty section's "Add …" opens its add form.
+        <Button
+          role="tertiary"
+          label={child.emptyAction}
+          onPress={() => onEmptyAdd(child)}
+        />
+      ) : null}
       {isTemporal ? (
         <View style={styles.temporal}>
           {mostRecent.length > 0 ? (
@@ -209,6 +287,8 @@ function KnowledgeChild({
                   item={item}
                   hideTitle
                   onOpen={() => onOpen(item)}
+                  onAction={(action) => onItemAction(item, action)}
+                  onOpenLinked={onOpenLinked}
                 />
               ))}
             </View>
@@ -222,6 +302,8 @@ function KnowledgeChild({
                   item={item}
                   hideTitle
                   onOpen={() => onOpen(item)}
+                  onAction={(action) => onItemAction(item, action)}
+                  onOpenLinked={onOpenLinked}
                 />
               ))}
             </View>
@@ -239,6 +321,8 @@ function KnowledgeChild({
                   key={item.id}
                   item={item}
                   onOpen={() => onOpen(item)}
+                  onAction={(action) => onItemAction(item, action)}
+                  onOpenLinked={onOpenLinked}
                 />
               ))}
             </View>
@@ -250,6 +334,8 @@ function KnowledgeChild({
               key={item.id}
               item={item}
               onOpen={() => onOpen(item)}
+              onAction={(action) => onItemAction(item, action)}
+              onOpenLinked={onOpenLinked}
             />
           ))
         : null}
@@ -287,6 +373,7 @@ export function ThingsToRemember({
   onAction,
   onViewAll,
   onOpenValueHistory,
+  onOpenLinked,
 }: ThingsToRememberProps) {
   const presentation = useMemo(
     () => buildKnowledgePresentation({ contactId, knowledge }),
@@ -306,6 +393,18 @@ export function ThingsToRemember({
           child={child}
           suppressHeading={childIds?.length === 1}
           onOpen={setSelected}
+          onItemAction={(item, action) =>
+            onAction({ action, target: item.detail })
+          }
+          onOpenLinked={onOpenLinked}
+          onEmptyAdd={(target) =>
+            onAction({
+              action: "edit",
+              childId: target.id,
+              target: knowledgeChildTarget(target.id),
+              affordance: "empty",
+            })
+          }
           onViewAll={(target, includeHidden) =>
             onViewAll({ id: target.id, includeHidden })
           }
@@ -333,6 +432,7 @@ const styles = StyleSheet.create({
   },
   container: { gap: SPACING.lg },
   group: { gap: SPACING.xs },
+  link: { gap: SPACING.xs },
   sheetContent: { gap: SPACING.sm },
   temporal: { gap: SPACING.lg },
   temporalGroup: { gap: SPACING.xs },
