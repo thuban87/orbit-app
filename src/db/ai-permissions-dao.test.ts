@@ -56,7 +56,7 @@ async function seedReviewRows() {
     `INSERT INTO memories
        (uid,contact_id,type,value,allow_ai,created_at,modified_at)
      VALUES (?,?,?,?,0,?,?)`,
-    [uid(), blair, "custom", "Keeps bees", NOW, NOW],
+    [uid(), blair, "gift_idea", "Keeps bees", NOW, NOW],
   );
   const note = await exec.runAsync(
     `INSERT INTO interactions
@@ -134,7 +134,7 @@ describe("AI permissions DAO", () => {
       ["Alex", "memory", "Memory"],
       ["Alex", "interaction-note", "Interaction note"],
       ["Alex", "custom-field", "Favorite constellation"],
-      ["Blair", "memory", "Custom"],
+      ["Blair", "memory", "Gift Ideas"],
       ["Blair", "custom-field", "Favorite constellation"],
     ]);
     expect(

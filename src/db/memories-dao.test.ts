@@ -158,7 +158,7 @@ describe("memories DAO", () => {
     const contactId = await seedContact();
     const id = await addMemory(exec, {
       contactId,
-      type: "custom",
+      type: "general",
       customLabel: "Note",
       value: "Delete",
       createdAt: NOW,
@@ -191,7 +191,7 @@ describe("memories DAO", () => {
 
     const staleId = await addMemory(exec, {
       contactId,
-      type: "custom",
+      type: "general",
       customLabel: "Note",
       value: "Stale",
       createdAt: NOW,
@@ -291,7 +291,7 @@ describe("memories DAO", () => {
     expect((await listMemoriesForContact(exec, alex))[0]?.value).toBe(value);
   });
 
-  it("rejects unregistered types and label-free custom memories before writing", async () => {
+  it("rejects unregistered types, including the retired custom type, before writing (D-86)", async () => {
     const contactId = await seedContact();
     await expect(
       addMemory(exec, {
@@ -306,12 +306,12 @@ describe("memories DAO", () => {
       addMemory(exec, {
         contactId,
         type: "custom",
-        customLabel: " \t",
-        value: "No label",
+        customLabel: "Has a label",
+        value: "Retired type",
         createdAt: NOW,
         now: NOW,
       }),
-    ).rejects.toThrow("memories-dao: custom memory requires a label");
+    ).rejects.toThrow("memories-dao: unregistered memory type");
     expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
   });
 
@@ -388,12 +388,12 @@ describe("memories DAO", () => {
     ).resolves.toEqual({ value: "Original value", custom_label: null });
   });
 
-  it("rejects wrong-pair and invalid effective custom patches without changing the row", async () => {
+  it("rejects wrong-pair and invalid patches without changing the row; a label may be cleared while a value remains (D-86)", async () => {
     const contactId = await seedContact();
     const otherContactId = await seedContact("Blair");
     const id = await addMemory(exec, {
       contactId,
-      type: "custom",
+      type: "gift_idea",
       customLabel: "Nickname",
       value: "Ace",
       createdAt: NOW,
@@ -420,16 +420,32 @@ describe("memories DAO", () => {
       editMemory(exec, {
         id,
         contactId,
-        customLabel: "  ",
+        type: "custom",
         now: "2026-09-04 13:00:00",
       }),
-    ).rejects.toThrow("memories-dao: custom memory requires a label");
+    ).rejects.toThrow("memories-dao: unregistered memory type");
 
     expect(await listMemoriesForContact(exec, contactId)).toEqual([
       expect.objectContaining({
         id,
-        type: "custom",
+        type: "gift_idea",
         custom_label: "Nickname",
+        value: "Ace",
+      }),
+    ]);
+
+    // D-86: the label is optional on every type; clearing it keeps the value.
+    await editMemory(exec, {
+      id,
+      contactId,
+      customLabel: "  ",
+      now: "2026-09-04 13:00:00",
+    });
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([
+      expect.objectContaining({
+        id,
+        type: "gift_idea",
+        custom_label: null,
         value: "Ace",
       }),
     ]);

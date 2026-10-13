@@ -293,6 +293,8 @@ describe("Phase 17 composed backup regressions", () => {
       ["interactions", "interaction"],
       ["events", "event"],
       ["fuel", "fuel"],
+      // 38.10 (migration 033): Off Limits rows tombstone as off_limits.
+      ["off_limits", "off_limits"],
       ["contact_links", "contact_link"],
       ["custom_field_defs", "custom_field_def"],
       ["custom_field_values", "custom_field_value"],
@@ -313,6 +315,10 @@ describe("Phase 17 composed backup regressions", () => {
     ]);
     const nonMergeable = new Map([
       ["field_history", "local audit history"],
+      // 38.10: a tombstone is deletion evidence itself. Undo (D-69) removes it
+      // while restoring the row with a newer modified_at, so Merge resolves
+      // through the row; migration 033 rewrites the retired legacy type.
+      ["tombstones", "deletion evidence itself (Undo, migration 033)"],
       ["restore_photo_journal", "restore crash-recovery journal"],
       // Import snapshots are device-local workflow state. A discard deletes only
       // unresolved rows and their staged photos; imported contacts remain durable
