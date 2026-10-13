@@ -116,9 +116,7 @@ const routeDensities = [
   ["Profile", "presentation"],
   ["Archived", "presentation"],
   ["UnboundContacts", "presentation"],
-  ["RecentlyDeleted", "presentation"],
   ["GroupEvents", "presentation"],
-  ["ThingsToRemember", "presentation"],
   ["MemoryHistory", "presentation"],
 ] as const;
 
@@ -141,8 +139,6 @@ describe("systemBackgroundSlotOverride", () => {
   });
 
   it.each([
-    "ThingsToRemember",
-    "RecentlyDeleted",
     "MemoryHistory",
     "SystemBuilder",
     "SystemsManagement",

@@ -45,9 +45,6 @@
         "src/screens/ComposeScreen.tsx",
         "src/screens/CreateContactScreen.tsx",
         "src/screens/EditContactScreen.tsx",
-        "src/screens/MemoryScreen.tsx",
-        "src/screens/RecentlyDeletedScreen.tsx",
-        "src/screens/ThingsToRememberScreen.tsx",
         "src/screens/UpdateContactScreen.tsx"
       ],
       "linter": {

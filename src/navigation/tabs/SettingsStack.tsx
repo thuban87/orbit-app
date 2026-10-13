@@ -32,7 +32,6 @@ import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
-import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
@@ -50,7 +49,6 @@ import { SettingsOrreryScreen } from "@/screens/SettingsOrreryScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
-import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import type {
   RootStackScreenProps,
@@ -254,16 +252,11 @@ export function SettingsStack() {
       <Stack.Screen name="Memory" component={MemoryAddScreen} />
       {/* Knowledge-change edit routes (review cycle-2 HIGH): the History
           detail-sheet's knowledge-change edit reuses ContactProfileScreen's nav
-          to ThingsToRemember; register both here (parallel to Dashboard/Orrery)
-          so a Settings-originated edit resolves instead of throwing. */}
-      <Stack.Screen
-        name="ThingsToRemember"
-        component={ThingsToRememberScreen}
-      />
+          to the section editors; register them here (parallel to
+          Dashboard/Orrery) so a Settings-originated edit resolves instead of
+          throwing. */}
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="SectionEditor" component={SectionEditorScreen} />
-      {/* Things to Remember always offers Recently Deleted (RG-021, D-24). */}
-      <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
       <Stack.Screen name="KeyPeopleEditor" component={KeyPeopleEditorScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />

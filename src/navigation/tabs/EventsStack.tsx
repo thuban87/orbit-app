@@ -19,10 +19,8 @@ import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
-import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
-import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import { EVENTS_STACK_ROUTES } from "../shell-contract";
 import type { EventsStackParamList } from "../types";
@@ -34,7 +32,6 @@ const EVENTS_ROUTE_COMPONENTS = {
   GroupEvents: GroupEventsScreen,
   GroupEventDetail: GroupEventDetailScreen,
   Profile: ContactProfileScreen,
-  RecentlyDeleted: RecentlyDeletedScreen,
   EditGroupEvent: EditGroupEventScreen,
   EditParticipant: EditParticipantScreen,
   Compose: ComposeScreen,
@@ -47,7 +44,6 @@ const EVENTS_ROUTE_COMPONENTS = {
   Memory: MemoryAddScreen,
   Edit: EditContactScreen,
   EditInteraction: EditInteractionScreen,
-  ThingsToRemember: ThingsToRememberScreen,
   MemoryHistory: MemoryHistoryScreen,
   SectionEditor: SectionEditorScreen,
   OffLimitsEditor: OffLimitsEditorScreen,

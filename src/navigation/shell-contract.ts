@@ -11,7 +11,6 @@ export const INITIAL_TAB = "DigestTab" as const;
 export const DIGEST_STACK_ROUTES = [
   "Digest",
   "Profile",
-  "RecentlyDeleted",
   "GroupEventDetail",
   "EditGroupEvent",
   "EditParticipant",
@@ -24,7 +23,6 @@ export const DIGEST_STACK_ROUTES = [
   "Memory",
   "Edit",
   "EditInteraction",
-  "ThingsToRemember",
   "MemoryHistory",
   "SectionEditor",
   "OffLimitsEditor",
@@ -39,7 +37,6 @@ export const EVENTS_STACK_ROUTES = [
   "GroupEvents",
   "GroupEventDetail",
   "Profile",
-  "RecentlyDeleted",
   "EditGroupEvent",
   "EditParticipant",
   "Compose",
@@ -51,7 +48,6 @@ export const EVENTS_STACK_ROUTES = [
   "Memory",
   "Edit",
   "EditInteraction",
-  "ThingsToRemember",
   "MemoryHistory",
   "SectionEditor",
   "OffLimitsEditor",
@@ -70,7 +66,6 @@ export const EVENTS_STACK_ROUTES = [
  */
 export const PROFILE_REACHABLE_ROUTES = [
   "Profile",
-  "RecentlyDeleted",
   "GroupEventDetail",
   "EditGroupEvent",
   "EditParticipant",
@@ -79,7 +74,6 @@ export const PROFILE_REACHABLE_ROUTES = [
   "LogContact",
   "Edit",
   "EditInteraction",
-  "ThingsToRemember",
   "MemoryHistory",
   "SectionEditor",
   "OffLimitsEditor",

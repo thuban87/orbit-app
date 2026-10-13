@@ -78,8 +78,6 @@ export type DashboardStackParamList = {
   CustomFields: undefined;
   Create: undefined;
   Profile: ProfileRouteParams;
-  ThingsToRemember: { contactId: number };
-  RecentlyDeleted: { contactId: number };
   /**
    * `editId` opens that entry's edit form after the read (D-107; plan 17
    * consumes it); `openAdd` opens the add form.
@@ -204,8 +202,6 @@ export type OrreryStackParamList = {
     type?: MemoryTypeKey;
     origin?: "fab" | "profile" | "update";
   };
-  ThingsToRemember: { contactId: number };
-  RecentlyDeleted: { contactId: number };
   /**
    * `editId` opens that entry's edit form after the read (D-107; plan 17
    * consumes it); `openAdd` opens the add form.
@@ -284,7 +280,6 @@ export type BackupStackParamList = {
 export type DigestStackParamList = {
   Digest: undefined;
   Profile: ProfileRouteParams;
-  RecentlyDeleted: { contactId: number };
   GroupEventDetail: { groupEventId: number };
   EditGroupEvent: { groupEventId: number };
   EditParticipant: {
@@ -313,7 +308,6 @@ export type DigestStackParamList = {
   };
   Edit: { contactId: number };
   EditInteraction: { contactId: number; interactionId: number };
-  ThingsToRemember: { contactId: number };
   /**
    * `editId` opens that entry's edit form after the read (D-107; plan 17
    * consumes it); `openAdd` opens the add form.
@@ -351,7 +345,6 @@ export type EventsStackParamList = {
   GroupEvents: undefined;
   GroupEventDetail: { groupEventId: number };
   Profile: ProfileRouteParams;
-  RecentlyDeleted: { contactId: number };
   EditGroupEvent: { groupEventId: number };
   EditParticipant: {
     groupEventId: number;
@@ -379,7 +372,6 @@ export type EventsStackParamList = {
   };
   Edit: { contactId: number };
   EditInteraction: { contactId: number; interactionId: number };
-  ThingsToRemember: { contactId: number };
   /**
    * `editId` opens that entry's edit form after the read (D-107; plan 17
    * consumes it); `openAdd` opens the add form.
@@ -502,15 +494,11 @@ export type SettingsStackParamList = {
   };
   /**
    * Knowledge-change edit routes. The History section's `onOpenKnowledgeChange`
-   * reuses ContactProfileScreen's existing knowledge nav to `ThingsToRemember`
-   * (and `MemoryHistory`), which are registered in Dashboard/Orrery but were
-   * ABSENT here — so a Settings-originated knowledge-change edit would throw on
-   * an unregistered route. Registered to mirror those stacks (review cycle-2 HIGH).
-   */
-  ThingsToRemember: { contactId: number };
-  /**
-   * `editId` opens that entry's edit form after the read (D-107; plan 17
-   * consumes it); `openAdd` opens the add form.
+   * reuses ContactProfileScreen's knowledge nav (`MemoryHistory` and the
+   * section editors), so a Settings-hosted Profile registers them too, to
+   * mirror the other stacks (review cycle-2 HIGH). `editId` opens that entry's
+   * edit form after the read (D-107; plan 17 consumes it); `openAdd` opens the
+   * add form.
    */
   MemoryHistory: {
     contactId: number;
@@ -524,11 +512,6 @@ export type SettingsStackParamList = {
    * read, falling back to the list when it is not there (D-107).
    */
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
-  /**
-   * Things to Remember always offers Recently Deleted, so a Settings-hosted
-   * Profile must resolve it too (RG-021, react-native/AUD-RN-004).
-   */
-  RecentlyDeleted: { contactId: number };
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
   Edit: { contactId: number };

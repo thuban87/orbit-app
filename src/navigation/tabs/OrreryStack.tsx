@@ -20,12 +20,10 @@ import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
-import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
-import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import { useOrrerySessionStore } from "@/stores/orrery-session-store";
 import type { OrreryStackParamList } from "../types";
@@ -69,11 +67,6 @@ export function OrreryStack() {
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
       <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
       <Stack.Screen name="Memory" component={MemoryAddScreen} />
-      <Stack.Screen
-        name="ThingsToRemember"
-        component={ThingsToRememberScreen}
-      />
-      <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
       <Stack.Screen name="SectionEditor" component={SectionEditorScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />

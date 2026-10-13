@@ -19,10 +19,8 @@ import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
-import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
-import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import { DIGEST_STACK_ROUTES } from "../shell-contract";
 import type { DigestStackParamList } from "../types";
@@ -33,7 +31,6 @@ type DigestRouteName = (typeof DIGEST_STACK_ROUTES)[number];
 const DIGEST_ROUTE_COMPONENTS = {
   Digest: DigestScreen,
   Profile: ContactProfileScreen,
-  RecentlyDeleted: RecentlyDeletedScreen,
   GroupEventDetail: GroupEventDetailScreen,
   EditGroupEvent: EditGroupEventScreen,
   EditParticipant: EditParticipantScreen,
@@ -47,7 +44,6 @@ const DIGEST_ROUTE_COMPONENTS = {
   Memory: MemoryAddScreen,
   Edit: EditContactScreen,
   EditInteraction: EditInteractionScreen,
-  ThingsToRemember: ThingsToRememberScreen,
   MemoryHistory: MemoryHistoryScreen,
   SectionEditor: SectionEditorScreen,
   OffLimitsEditor: OffLimitsEditorScreen,
