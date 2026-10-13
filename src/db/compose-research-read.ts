@@ -65,6 +65,7 @@ import {
 } from "@/db/relationships-read";
 import type { SqlExecutor } from "@/db/types";
 import type { FieldType } from "@/schemas/types";
+import { firstNonBlank } from "@/utils/blank-text";
 import { plural } from "@/utils/plural";
 
 /**
@@ -294,13 +295,15 @@ export async function readComposeResearch(
   // 6. Off Limits → the read-only Off Limits group (D-87); never Add-to-AI,
   //    never Message Focus (D-10). An unlabeled item has an empty label, so its
   //    text shows once with no label line and no fallback wording (D-111).
+  //    With no text, its link shows as the text, so a link-only item is not
+  //    a blank row (code review IN-02).
   for (const row of offLimits) {
     items.push({
       id: `offlimits:${row.id}`,
       groupId: "off_limits",
       group: OFF_LIMITS_GROUP,
       label: row.label?.trim() ? row.label : "",
-      value: row.text ?? "",
+      value: firstNonBlank(row.text, row.url) ?? "",
       aiEligible: false,
       isOffLimits: true,
     });

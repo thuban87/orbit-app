@@ -293,6 +293,26 @@ describe("compose-research-read — normalized ResearchItem projection", () => {
     });
   });
 
+  it("shows a link-only Off Limits item's link as its text (code review IN-02)", async () => {
+    const owner = await contact("Owner");
+    await addOffLimits(exec, {
+      uid: uid(),
+      contactId: owner,
+      url: "https://example.test/sore-spot",
+      now: NOW,
+    });
+
+    const [item] = (await readComposeResearch(exec, owner)).filter(
+      (row) => row.isOffLimits,
+    );
+    expect(item).toMatchObject({
+      group: "Off Limits",
+      label: "",
+      value: "https://example.test/sore-spot",
+      aiEligible: false,
+    });
+  });
+
   it("takes memory Add-to-AI eligibility from the SQL AI predicate (D-49)", async () => {
     const owner = await contact("Owner");
     const interaction = await exec.runAsync(
