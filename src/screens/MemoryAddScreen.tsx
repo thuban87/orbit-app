@@ -143,7 +143,8 @@ export function MemoryAddScreen({
   // Return to where + → Memory started after a committed save (deferred),
   // then confirm it (D-64). The bypass lets the save leave without a prompt.
   useEffect(() => {
-    if (savedTick > 0 && !leftRef.current) {
+    if (savedTick > 0) {
+      if (leftRef.current) return;
       leftRef.current = true;
       bypassRef.current = true;
       navigation.goBack();
