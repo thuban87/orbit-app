@@ -1,5 +1,23 @@
-/** Durable Group Event write path. The parent is context, never an interaction. */
+/**
+ * Durable Group Event write path. The parent is context, never an interaction.
+ *
+ * Group Note copies (Phase 38.10 D-96, D-98, D-102, D-113, D-117): Group Log
+ * can save its Group Note to one section, and every participant gets a copy
+ * linked to their own interaction row (`link_source = 'group_note'`,
+ * `group_note_copy = 1`, always AI-off). `updateGroupEventCore` stays the
+ * single writer of `group_events.group_note` and propagates to the copies;
+ * detach, dissolve and a blank Group Note unlink copies (text kept, marker
+ * kept); deletes unlink through FK SET NULL.
+ */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import {
+  groupCopySectionCore,
+  insertLinkedEntryCore,
+  type LinkedSection,
+  propagateGroupCopyDatesCore,
+  propagateGroupNoteCore,
+  unlinkGroupCopiesCore,
+} from "@/db/linked-entry-dao";
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import {
   deleteInteractionCore,
@@ -34,6 +52,13 @@ export interface CreateGroupEventInput {
   duration?: number | null;
   groupNote?: string | null;
   participants: CreateGroupEventParticipant[];
+  /**
+   * "Also save to" for the Group Note (D-96): every participant gets a linked,
+   * AI-off copy in this section. `undefined` and `null` both mean no copy
+   * (plan 12 passes `effectiveAlsoSaveTo(...)`, null for None or a blank note;
+   * convergence c11, Claude C-02). Ignored when the Group Note is blank.
+   */
+  alsoSaveTo?: LinkedSection | null;
 }
 
 export interface UpdateGroupEventPatch {
@@ -354,21 +379,47 @@ export function createGroupEvent(
       ],
     );
     const groupEventId = parent.lastInsertRowId;
+    const groupNote = input.groupNote ?? null;
+    // Loose `!= null`: absent and null both skip every linked-entry step, so a
+    // plain Group Log issues no SQL naming a migration-033 column (a v26
+    // fixture in contact-status-read.test.ts relies on this).
+    const alsoSaveTo =
+      input.alsoSaveTo != null &&
+      groupNote !== null &&
+      groupNote.trim().length > 0
+        ? input.alsoSaveTo
+        : null;
     for (const participant of input.participants) {
-      await insertInteractionCore(exec, participant.contactId, input.now, {
-        uid: participant.uid,
-        occurredAt: input.occurredAt,
-        channel: input.channel ?? "In Person",
-        quality: input.quality ?? null,
-        duration: input.duration ?? null,
-        direction: participant.direction ?? null,
-        connected: participant.connected,
-        note: participant.note ?? null,
-        groupEventId,
-        geFollowChannel: 1,
-        geFollowQuality: 1,
-        geFollowDuration: 1,
-      });
+      const interactionId = await insertInteractionCore(
+        exec,
+        participant.contactId,
+        input.now,
+        {
+          uid: participant.uid,
+          occurredAt: input.occurredAt,
+          channel: input.channel ?? "In Person",
+          quality: input.quality ?? null,
+          duration: input.duration ?? null,
+          direction: participant.direction ?? null,
+          connected: participant.connected,
+          note: participant.note ?? null,
+          groupEventId,
+          geFollowChannel: 1,
+          geFollowQuality: 1,
+          geFollowDuration: 1,
+        },
+      );
+      if (alsoSaveTo !== null && groupNote !== null) {
+        await insertLinkedEntryCore(exec, {
+          interactionId,
+          contactId: participant.contactId,
+          section: alsoSaveTo,
+          text: groupNote,
+          linkSource: "group_note",
+          occurredAt: input.occurredAt,
+          now: input.now,
+        });
+      }
       await recomputeLastContactCore(exec, participant.contactId, input.now);
     }
     await bumpDataRevisionCore(exec);
@@ -425,6 +476,13 @@ export async function updateGroupEventCore(
         changedChild(child, input.now, { occurredAt: input.occurredAt }),
       );
     }
+    // The children's own `note` links follow through editTouchpointFullCore;
+    // Group Note copies follow here, date and time only (D-41, D-48).
+    await propagateGroupCopyDatesCore(exec, {
+      groupEventId: input.groupEventId,
+      occurredAt: input.occurredAt,
+      now: input.now,
+    });
     changed = true;
   }
 
@@ -459,6 +517,13 @@ export async function updateGroupEventCore(
     if (result.changes !== 1) {
       throw new Error(`Group Event id=${input.groupEventId} no longer exists`);
     }
+    // D-96 / D-113: update every still-linked copy, or detach them all when
+    // the Group Note is now blank.
+    await propagateGroupNoteCore(exec, {
+      groupEventId: input.groupEventId,
+      groupNote: input.patch.groupNote.value,
+      now: input.now,
+    });
     changed = true;
   }
 
@@ -616,21 +681,55 @@ export function addParticipants(
       }
     }
 
+    // D-96 "every participant": a new participant gets a Group Note copy in
+    // the section the event's existing copies use. No copies left (none
+    // chosen, all unlinked or deleted) or a blank Group Note: no copy (I-11).
+    const copySection = await groupCopySectionCore(exec, input.groupEventId);
+    const groupNote =
+      copySection === null
+        ? null
+        : ((
+            await exec.getFirstAsync<{ group_note: string | null }>(
+              "SELECT group_note FROM group_events WHERE id = ?",
+              [input.groupEventId],
+            )
+          )?.group_note ?? null);
+
     for (const participant of input.participants) {
-      await insertInteractionCore(exec, participant.contactId, input.now, {
-        uid: participant.uid,
-        occurredAt: event.occurred_at,
-        channel: eventValue(event, "channel") as string,
-        quality: event.quality,
-        duration: event.duration,
-        direction: participant.direction ?? null,
-        connected: participant.connected,
-        note: participant.note ?? null,
-        groupEventId: input.groupEventId,
-        geFollowChannel: 1,
-        geFollowQuality: 1,
-        geFollowDuration: 1,
-      });
+      const interactionId = await insertInteractionCore(
+        exec,
+        participant.contactId,
+        input.now,
+        {
+          uid: participant.uid,
+          occurredAt: event.occurred_at,
+          channel: eventValue(event, "channel") as string,
+          quality: event.quality,
+          duration: event.duration,
+          direction: participant.direction ?? null,
+          connected: participant.connected,
+          note: participant.note ?? null,
+          groupEventId: input.groupEventId,
+          geFollowChannel: 1,
+          geFollowQuality: 1,
+          geFollowDuration: 1,
+        },
+      );
+      if (
+        copySection !== null &&
+        groupNote !== null &&
+        groupNote.trim().length > 0
+      ) {
+        await insertLinkedEntryCore(exec, {
+          interactionId,
+          contactId: participant.contactId,
+          section: copySection,
+          text: groupNote,
+          linkSource: "group_note",
+          occurredAt: event.occurred_at,
+          now: input.now,
+        });
+      }
       await recomputeLastContactCore(exec, participant.contactId, input.now);
     }
     await bumpDataRevisionCore(exec);
@@ -694,6 +793,12 @@ export function detachParticipant(
         `Group Event child id=${input.interactionId} is not a member of groupEventId=${input.groupEventId}`,
       );
     }
+    // The participant's Group Note copy becomes an ordinary entry; it keeps
+    // its text and stays AI-off (D-102; F-D12 stamp).
+    await unlinkGroupCopiesCore(exec, {
+      interactionIds: [input.interactionId],
+      now: input.now,
+    });
     await bumpDataRevisionCore(exec);
   });
 }
@@ -723,6 +828,12 @@ export function dissolveGroupEvent(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     const parentUid = await loadGroupEventUid(exec, input.groupEventId);
+    // Unlink every Group Note copy while the children still name the event
+    // (D-102: text and marker kept; F-D12 stamp).
+    await unlinkGroupCopiesCore(exec, {
+      groupEventId: input.groupEventId,
+      now: input.now,
+    });
     await exec.runAsync(
       `UPDATE interactions
           SET group_event_id = NULL,

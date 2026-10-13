@@ -47,5 +47,7 @@ export function buildGroupEventDetailInteraction(
     groupTitle: event.title,
     groupNote: event.groupNote,
     groupLinked: true as const,
+    // HistoryInteractionRecord field; the event detail shows no section tags.
+    linkedSections: [],
   };
 }

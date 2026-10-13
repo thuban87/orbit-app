@@ -609,3 +609,92 @@ export async function unlinkGroupCopiesCore(
   }
   return changed;
 }
+
+/** The event's participant interactions, as a subquery bound to one `?`. */
+const EVENT_CHILDREN_SQL =
+  "SELECT id FROM interactions WHERE group_event_id = ?";
+
+/**
+ * Copy an edited Group Note onto every still-linked copy of the event (D-96).
+ * A blank Group Note (after trim) does not throw: every copy is detached and
+ * keeps its own text, `group_note_copy = 1` and allow_ai 0 (D-113, D-102,
+ * D-37). Called by `updateGroupEventCore`, the single writer of the Group
+ * Note; this core never writes `group_events`.
+ */
+export async function propagateGroupNoteCore(
+  exec: SqlExecutor,
+  input: { groupEventId: number; groupNote: string | null; now: string },
+): Promise<void> {
+  if (!isNonBlank(input.groupNote)) {
+    await unlinkGroupCopiesCore(exec, {
+      groupEventId: input.groupEventId,
+      now: input.now,
+    });
+    return;
+  }
+  for (const table of ["memories", "current_state_entries"] as const) {
+    await exec.runAsync(
+      `UPDATE ${table}
+          SET value = ?, modified_at = ?
+        WHERE link_source = 'group_note'
+          AND interaction_id IN (${EVENT_CHILDREN_SQL})
+          AND value IS NOT ?`,
+      [input.groupNote, input.now, input.groupEventId, input.groupNote],
+    );
+  }
+}
+
+/**
+ * Move each still-linked Last Talked About copy of the event to the event's
+ * new date and `HH:MM:SS` time (D-41, D-48). Text is never touched here.
+ */
+export async function propagateGroupCopyDatesCore(
+  exec: SqlExecutor,
+  input: { groupEventId: number; occurredAt: string; now: string },
+): Promise<void> {
+  const { entryDate, entryTime } = entryDateTimeOf(input.occurredAt);
+  await exec.runAsync(
+    `UPDATE current_state_entries
+        SET entry_date = ?, entry_time = ?, modified_at = ?
+      WHERE link_source = 'group_note'
+        AND interaction_id IN (${EVENT_CHILDREN_SQL})
+        AND (entry_date IS NOT ? OR entry_time IS NOT ?)`,
+    [entryDate, entryTime, input.now, input.groupEventId, entryDate, entryTime],
+  );
+}
+
+/**
+ * The section the event's Group Note copies live in, read from one live
+ * still-linked copy (its table and, for memories, its type), or null when the
+ * event has none (no section chosen, or every copy unlinked or deleted;
+ * checker cycle 2 I-11).
+ */
+export async function groupCopySectionCore(
+  exec: ReadOnlyExecutor,
+  groupEventId: number,
+): Promise<LinkedSection | null> {
+  const row = await exec.getFirstAsync<{
+    tbl: "memories" | "current_state_entries";
+    kind: string;
+  }>(
+    `SELECT tbl, kind FROM (
+       SELECT 'current_state_entries' AS tbl, field_key AS kind, id
+         FROM current_state_entries
+        WHERE link_source = 'group_note'
+          AND interaction_id IN (${EVENT_CHILDREN_SQL})
+       UNION ALL
+       SELECT 'memories' AS tbl, type AS kind, id
+         FROM memories
+        WHERE link_source = 'group_note'
+          AND deleted_at IS NULL
+          AND interaction_id IN (${EVENT_CHILDREN_SQL})
+     )
+     ORDER BY id LIMIT 1`,
+    [groupEventId, groupEventId],
+  );
+  if (!row) return null;
+  if (row.tbl === "current_state_entries") {
+    return row.kind === "last_talked_about" ? "last_talked_about" : null;
+  }
+  return linkedSectionOfMemoryType(row.kind);
+}

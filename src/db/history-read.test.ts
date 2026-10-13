@@ -21,6 +21,7 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createGroupEvent } from "@/db/group-events-dao";
 import { isGroupLinked, readContactHistory } from "@/db/history-read";
 import { runMigrations } from "@/db/migrations/runner";
+import { recordTouchpointWithLinkedEntry } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-09-05 12:00:00";
@@ -389,5 +390,72 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
     const history = await readContactHistory(exec, contactId);
     expect(history.knowledgeChanges.map((r) => r.id)).toEqual([direct]);
     expect(history.interactions.map((r) => r.id)).toEqual([interactionId]);
+  });
+
+  it("tags a linked interaction row with its section, once (D-37)", async () => {
+    const exec = await freshExec();
+    const contactId = await makeContact(exec);
+    const plain = await insertInteraction(
+      exec,
+      contactId,
+      "2026-09-02 08:00:00",
+      {
+        note: "Plain note",
+      },
+    );
+    const { interactionId: memoryLinked } =
+      await recordTouchpointWithLinkedEntry(
+        exec,
+        {
+          contactId,
+          uid: uid(),
+          occurredAt: "2026-09-01 10:00:00",
+          now: NOW,
+          note: "Wants a hiking book",
+        },
+        "gift_idea",
+      );
+    const { interactionId: ltaLinked } = await recordTouchpointWithLinkedEntry(
+      exec,
+      {
+        contactId,
+        uid: uid(),
+        occurredAt: "2026-08-31 10:00:00",
+        now: NOW,
+        note: "Their trip",
+      },
+      "last_talked_about",
+    );
+    const other = await makeContact(exec, "Sam");
+    await createGroupEvent(exec, {
+      uid: uid(),
+      title: "Dinner",
+      occurredAt: "2026-08-30 19:00:00",
+      now: NOW,
+      groupNote: "Reunion plans",
+      participants: [
+        { contactId, uid: uid() },
+        { contactId: other, uid: uid() },
+      ],
+      alsoSaveTo: "memory",
+    });
+
+    const history = await readContactHistory(exec, contactId);
+    const tags = new Map(
+      history.interactions.map((r) => [r.id, r.linkedSections]),
+    );
+    expect(tags.get(plain)).toEqual([]);
+    expect(tags.get(memoryLinked)).toEqual([
+      { section: "gift_idea", label: "Gift Ideas" },
+    ]);
+    expect(tags.get(ltaLinked)).toEqual([
+      { section: "last_talked_about", label: "Last talked about" },
+    ]);
+    const groupRow = history.interactions.find((r) => r.groupLinked);
+    expect(groupRow?.linkedSections).toEqual([
+      { section: "memory", label: "Memory" },
+    ]);
+    // The linked Last Talked About entry is not a second History row.
+    expect(history.knowledgeChanges).toEqual([]);
   });
 });

@@ -30,6 +30,10 @@
  */
 import { getCurrentStateHistory } from "@/db/current-state-history-read";
 import {
+  getLinkedEntriesCore,
+  type LinkedSection,
+} from "@/db/linked-entry-dao";
+import {
   CURRENT_STATE_FIELD_KEYS,
   type CurrentStateFieldKey,
 } from "@/db/memory-registry";
@@ -53,6 +57,18 @@ export interface HistoryInteractionRecord {
   readonly groupTitle: string | null;
   readonly groupNote: string | null;
   readonly groupLinked: boolean;
+  /**
+   * The sections this interaction's note (or Group Note copy) is also saved
+   * to, labelled from the registry (D-37, D-89). A linked note shows once,
+   * on this row, tagged with its section; empty when none.
+   */
+  readonly linkedSections: readonly HistoryLinkedSection[];
+}
+
+/** One section tag on a History interaction row (D-37). */
+export interface HistoryLinkedSection {
+  readonly section: LinkedSection;
+  readonly label: string;
 }
 
 /** A read-only lifecycle event record (archive/restore/snooze/unsnooze/bind/unbind). */
@@ -187,6 +203,17 @@ export async function readContactHistory(
     contactId,
   ]);
 
+  // One lookup over both entry tables' interaction_id (D-37).
+  const linkedByInteraction = new Map<number, HistoryLinkedSection[]>();
+  for (const entry of await getLinkedEntriesCore(
+    exec,
+    interactionRows.map((row) => row.id),
+  )) {
+    const tags = linkedByInteraction.get(entry.interactionId) ?? [];
+    tags.push({ section: entry.section, label: entry.label });
+    linkedByInteraction.set(entry.interactionId, tags);
+  }
+
   const interactions: HistoryInteractionRecord[] = interactionRows.map(
     (row) => ({
       id: row.id,
@@ -203,6 +230,7 @@ export async function readContactHistory(
       groupTitle: row.group_title,
       groupNote: row.group_note,
       groupLinked: isGroupLinked({ groupEventId: row.group_event_id }),
+      linkedSections: linkedByInteraction.get(row.id) ?? [],
     }),
   );
 

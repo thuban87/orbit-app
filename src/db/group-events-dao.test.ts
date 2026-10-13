@@ -20,8 +20,15 @@ import {
   setParticipantOverride,
   updateGroupEvent,
 } from "@/db/group-events-dao";
+import {
+  insertLinkedEntryCore,
+  LinkedNoteBlankError,
+  type LinkedSection,
+} from "@/db/linked-entry-dao";
+import { editMemory } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { resolveDisplay } from "@/logic/group-inheritance";
 import {
@@ -1561,5 +1568,365 @@ describe("updateGroupEvent revision bumps (checker cycle 5 W-3)", () => {
     const before = await readDataRevision(exec);
     await updateGroupEvent(exec, { groupEventId, now: NOW, patch: {} });
     expect(await readDataRevision(exec)).toBe(before);
+  });
+});
+
+// --- Group Note copies (D-96, D-98, D-102, D-113, D-117) ----------------------
+
+const LATER = "2026-09-12 15:30:00";
+
+interface CopyRow {
+  tbl: "memories" | "current_state_entries";
+  id: number;
+  contact_id: number;
+  value: string;
+  allow_ai: number | null;
+  interaction_id: number | null;
+  link_source: string | null;
+  group_note_copy: number;
+  modified_at: string;
+  entry_date: string | null;
+  entry_time: string | null;
+}
+
+async function copyRows(): Promise<CopyRow[]> {
+  return exec.getAllAsync<CopyRow>(
+    `SELECT 'memories' AS tbl, id, contact_id, value, allow_ai, interaction_id,
+            link_source, group_note_copy, modified_at,
+            NULL AS entry_date, NULL AS entry_time
+       FROM memories
+     UNION ALL
+     SELECT 'current_state_entries' AS tbl, id, contact_id, value,
+            NULL AS allow_ai, interaction_id, link_source, group_note_copy,
+            modified_at, entry_date, entry_time
+       FROM current_state_entries
+     ORDER BY contact_id, tbl, id`,
+  );
+}
+
+async function eventWithCopies(
+  alsoSaveTo: LinkedSection | null | "absent" = "memory",
+  groupNote: string | null = "Reunion plans",
+): Promise<{ groupEventId: number; contacts: number[] }> {
+  const contacts = [
+    await contact("Alex"),
+    await contact("Sam"),
+    await contact("Jordan"),
+  ];
+  const { groupEventId } = await createGroupEvent(exec, {
+    uid: uid(),
+    title: "Dinner",
+    occurredAt: "2026-09-10 18:00:00",
+    now: NOW,
+    groupNote,
+    participants: contacts.map((contactId) => ({
+      contactId,
+      uid: uid(),
+      note: `Own note ${contactId}`,
+    })),
+    ...(alsoSaveTo === "absent" ? {} : { alsoSaveTo }),
+  });
+  return { groupEventId, contacts };
+}
+
+async function childOf(groupEventId: number, contactId: number) {
+  const row = await exec.getFirstAsync<{ id: number }>(
+    "SELECT id FROM interactions WHERE group_event_id = ? AND contact_id = ?",
+    [groupEventId, contactId],
+  );
+  if (!row) throw new Error("no child");
+  return row.id;
+}
+
+describe("createGroupEvent with Also save to (D-96, D-98, D-102)", () => {
+  it("gives every participant a linked, AI-off copy", async () => {
+    const { groupEventId, contacts } = await eventWithCopies("memory");
+    const rows = await copyRows();
+    expect(rows).toHaveLength(3);
+    for (const [index, contactId] of contacts.entries()) {
+      expect(rows[index]).toMatchObject({
+        tbl: "memories",
+        contact_id: contactId,
+        value: "Reunion plans",
+        allow_ai: 0,
+        interaction_id: await childOf(groupEventId, contactId),
+        link_source: "group_note",
+        group_note_copy: 1,
+      });
+    }
+  });
+
+  it("alsoSaveTo null or absent makes no copy in either table", async () => {
+    await eventWithCopies(null);
+    await eventWithCopies("absent");
+    expect(await copyRows()).toEqual([]);
+    expect(await count("group_events")).toBe(2);
+    expect(await count("interactions")).toBe(6);
+  });
+
+  it("a blank Group Note makes no copy", async () => {
+    await eventWithCopies("memory", "   ");
+    expect(await copyRows()).toEqual([]);
+  });
+});
+
+describe("Group Note propagation (D-96, D-113)", () => {
+  it("a Group Note edit updates every copy", async () => {
+    const { groupEventId } = await eventWithCopies("thought_of_them");
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: LATER,
+      patch: { groupNote: { value: "New plans" } },
+    });
+    expect((await copyRows()).map((r) => [r.value, r.modified_at])).toEqual([
+      ["New plans", LATER],
+      ["New plans", LATER],
+      ["New plans", LATER],
+    ]);
+  });
+
+  it("a date edit moves each Last Talked About copy's date and keeps its text", async () => {
+    const { groupEventId } = await eventWithCopies("last_talked_about");
+    expect((await copyRows())[0]).toMatchObject({
+      entry_date: "2026-09-10",
+      entry_time: "18:00:00",
+    });
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: LATER,
+      occurredAt: "2026-09-11 07:05:00",
+      patch: {},
+    });
+    for (const row of await copyRows()) {
+      expect(row).toMatchObject({
+        value: "Reunion plans",
+        entry_date: "2026-09-11",
+        entry_time: "07:05:00",
+        link_source: "group_note",
+      });
+    }
+  });
+
+  it("a date edit does not clobber a memory copy's text", async () => {
+    const { groupEventId } = await eventWithCopies("memory");
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: LATER,
+      occurredAt: "2026-09-11 07:05:00",
+      patch: {},
+    });
+    expect((await copyRows()).map((r) => r.value)).toEqual([
+      "Reunion plans",
+      "Reunion plans",
+      "Reunion plans",
+    ]);
+  });
+
+  it("D-113: clearing the Group Note detaches every copy with its text kept", async () => {
+    const { groupEventId } = await eventWithCopies("memory");
+    await expect(
+      updateGroupEvent(exec, {
+        groupEventId,
+        now: LATER,
+        patch: { groupNote: { value: "  " } },
+      }),
+    ).resolves.toBeUndefined();
+    for (const row of await copyRows()) {
+      expect(row).toMatchObject({
+        value: "Reunion plans",
+        interaction_id: null,
+        link_source: null,
+        group_note_copy: 1,
+        allow_ai: 0,
+        modified_at: LATER,
+      });
+    }
+    expect(
+      await exec.getFirstAsync(
+        "SELECT group_note FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual({ group_note: "  " });
+
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: NOW,
+      patch: { groupNote: { value: "Back again" } },
+    });
+    expect((await copyRows()).map((r) => r.value)).toEqual([
+      "Reunion plans",
+      "Reunion plans",
+      "Reunion plans",
+    ]);
+    const newcomer = await contact("Riley");
+    await addParticipants(exec, {
+      groupEventId,
+      now: NOW,
+      participants: [{ contactId: newcomer, uid: uid() }],
+    });
+    expect(await copyRows()).toHaveLength(3);
+  });
+
+  it("a participant's own linked note cleared to blank still throws LinkedNoteBlankError", async () => {
+    const { groupEventId, contacts } = await eventWithCopies("memory");
+    const alex = contacts[0];
+    const interactionId = await childOf(groupEventId, alex);
+    await inWriteTransaction(exec, () =>
+      insertLinkedEntryCore(exec, {
+        interactionId,
+        contactId: alex,
+        section: "gift_idea",
+        text: `Own note ${alex}`,
+        linkSource: "note",
+        occurredAt: "2026-09-10 18:00:00",
+        now: NOW,
+      }),
+    );
+    await expect(
+      setParticipantFields(exec, {
+        groupEventId,
+        interactionId,
+        contactId: alex,
+        now: LATER,
+        fields: { note: "" },
+      }),
+    ).rejects.toBeInstanceOf(LinkedNoteBlankError);
+  });
+
+  it("D-117: a copy edited from the entry side detaches; later Group Note edits reach only linked copies", async () => {
+    const { groupEventId } = await eventWithCopies("memory");
+    const [edited, ...others] = await copyRows();
+    await editMemory(exec, {
+      id: edited.id,
+      contactId: edited.contact_id,
+      value: "My version",
+      now: LATER,
+    });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT group_note FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual({ group_note: "Reunion plans" });
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: LATER,
+      patch: { groupNote: { value: "Second draft" } },
+    });
+    const rows = await copyRows();
+    expect(rows.find((r) => r.id === edited.id)).toMatchObject({
+      value: "My version",
+      interaction_id: null,
+      link_source: null,
+      group_note_copy: 1,
+      allow_ai: 0,
+    });
+    for (const other of others) {
+      expect(rows.find((r) => r.id === other.id)).toMatchObject({
+        value: "Second draft",
+        link_source: "group_note",
+      });
+    }
+  });
+});
+
+describe("Group Note copies on participant and event lifecycle (D-102, F-D12)", () => {
+  it("detachParticipant unlinks only that participant's copy", async () => {
+    const { groupEventId, contacts } = await eventWithCopies("memory");
+    const sam = contacts[1];
+    await detachParticipant(exec, {
+      groupEventId,
+      interactionId: await childOf(groupEventId, sam),
+      now: LATER,
+    });
+    const rows = await copyRows();
+    expect(rows.find((r) => r.contact_id === sam)).toMatchObject({
+      interaction_id: null,
+      link_source: null,
+      group_note_copy: 1,
+      allow_ai: 0,
+      modified_at: LATER,
+      value: "Reunion plans",
+    });
+    expect(
+      rows
+        .filter((r) => r.link_source === "group_note")
+        .map((r) => r.contact_id),
+    ).toEqual([contacts[0], contacts[2]]);
+  });
+
+  it("dissolveGroupEvent unlinks every copy, marker and text kept", async () => {
+    const { groupEventId } = await eventWithCopies("last_talked_about");
+    await dissolveGroupEvent(exec, { groupEventId, now: LATER });
+    for (const row of await copyRows()) {
+      expect(row).toMatchObject({
+        interaction_id: null,
+        link_source: null,
+        group_note_copy: 1,
+        modified_at: LATER,
+        value: "Reunion plans",
+      });
+    }
+  });
+
+  it("deleteGroupEventAndInteractions leaves standalone, still-locked copies (FK SET NULL)", async () => {
+    const { groupEventId } = await eventWithCopies("memory");
+    await deleteGroupEventAndInteractions(exec, { groupEventId, now: LATER });
+    for (const row of await copyRows()) {
+      expect(row).toMatchObject({
+        interaction_id: null,
+        group_note_copy: 1,
+        allow_ai: 0,
+        value: "Reunion plans",
+      });
+    }
+  });
+
+  it("deleteGroupChild leaves that copy standalone and still locked", async () => {
+    const { groupEventId, contacts } = await eventWithCopies("memory");
+    const jordan = contacts[2];
+    await deleteGroupChild(exec, {
+      groupEventId,
+      interactionId: await childOf(groupEventId, jordan),
+      contactId: jordan,
+      now: LATER,
+    });
+    expect(
+      (await copyRows()).find((r) => r.contact_id === jordan),
+    ).toMatchObject({ interaction_id: null, group_note_copy: 1, allow_ai: 0 });
+  });
+
+  it("an added participant gets a copy in the same section as the existing copies", async () => {
+    const { groupEventId } = await eventWithCopies("gift_idea");
+    const riley = await contact("Riley");
+    await addParticipants(exec, {
+      groupEventId,
+      now: LATER,
+      participants: [{ contactId: riley, uid: uid() }],
+    });
+    const added = await exec.getFirstAsync(
+      `SELECT type, value, allow_ai, link_source, group_note_copy, interaction_id
+         FROM memories WHERE contact_id = ?`,
+      [riley],
+    );
+    expect(added).toEqual({
+      type: "gift_idea",
+      value: "Reunion plans",
+      allow_ai: 0,
+      link_source: "group_note",
+      group_note_copy: 1,
+      interaction_id: await childOf(groupEventId, riley),
+    });
+  });
+
+  it("an added participant gets no copy when the event has none", async () => {
+    const { groupEventId } = await eventWithCopies(null);
+    const riley = await contact("Riley");
+    await addParticipants(exec, {
+      groupEventId,
+      now: LATER,
+      participants: [{ contactId: riley, uid: uid() }],
+    });
+    expect(await copyRows()).toEqual([]);
   });
 });

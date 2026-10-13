@@ -114,6 +114,7 @@ function interaction(
     groupTitle: null,
     groupNote: null,
     groupLinked: false,
+    linkedSections: [],
     ...extra,
   };
 }
