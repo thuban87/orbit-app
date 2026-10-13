@@ -251,6 +251,69 @@ describe("HistoryRecordRow", () => {
     expect(onOpenInteraction).toHaveBeenCalledWith(8, "2026-10-06");
   });
 
+  it("tags a linked note's row with its section, inside the one Pressable (38.10 D-37)", () => {
+    const { tree, onOpenInteraction } = renderRow(
+      recordOf({
+        interactions: [
+          interaction(10, "2026-10-06 19:30:00", {
+            linkedSections: [
+              { section: "gift_idea", label: "Gift Ideas" },
+              { section: "last_talked_about", label: "Last talked about" },
+            ],
+          }),
+        ],
+      }),
+    );
+    const [root] = tree;
+    expect(root.type).toBe("Pressable");
+    expect(all(tree).filter((n) => n.type === "Pressable")).toHaveLength(1);
+    const tags = all(tree).filter(
+      (n) => n.props.testID === "history-row-interaction-10-linked",
+    );
+    expect(tags).toHaveLength(2);
+    // Plain text inside the row: not separately accessible (W-6).
+    for (const tag of tags) {
+      expect(tag.props.accessible).toBe(false);
+      expect(tag.props.accessibilityLabel).toBeUndefined();
+    }
+    expect(tags.map(textOf)).toEqual(["Gift Ideas", "Last Talked About"]);
+    // The section names join the row's label, which keeps its time.
+    expect(root.props.accessibilityLabel).toBe(
+      "Interaction, Call, 7:30 PM, Outbound, Great, also saved to Gift Ideas, Last Talked About. A long note that should wrap onto at most two lines in the row.",
+    );
+    (root.props.onPress as () => void)();
+    expect(onOpenInteraction).toHaveBeenCalledWith(10, "2026-10-06");
+  });
+
+  it("names a section once when a note link and a Group Note copy share it", () => {
+    const { tree } = renderRow(
+      recordOf({
+        interactions: [
+          interaction(11, "2026-10-06 19:30:00", {
+            linkedSections: [
+              { section: "memory", label: "Memory" },
+              { section: "memory", label: "Memory" },
+            ],
+          }),
+        ],
+      }),
+    );
+    const tags = all(tree).filter(
+      (n) => n.props.testID === "history-row-interaction-11-linked",
+    );
+    expect(tags.map(textOf)).toEqual(["Memories"]);
+  });
+
+  it("renders no section tag for an unlinked interaction", () => {
+    const { tree } = renderRow(
+      recordOf({ interactions: [interaction(12, "2026-10-06 19:30:00")] }),
+    );
+    expect(
+      all(tree).some((n) => String(n.props.testID ?? "").endsWith("-linked")),
+    ).toBe(false);
+    expect(tree[0].props.accessibilityLabel).not.toContain("also saved to");
+  });
+
   it("renders no group label for a standalone interaction", () => {
     const { tree } = renderRow(
       recordOf({ interactions: [interaction(9, "2026-10-06 19:30:00")] }),

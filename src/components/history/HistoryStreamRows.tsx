@@ -12,7 +12,9 @@
  *     Event title) also shows a restrained group-event label (D-16). The whole
  *     row, label included, is ONE press target opening this person's canonical
  *     InteractionDetail (D-42). No long-press, no AI sparkle, no duration
- *     (D-44..D-46).
+ *     (D-44..D-46). A note also saved to a section shows once, here, with a
+ *     tag per section (38.10 D-37); the tags are plain text inside the row and
+ *     their names join the row's spoken label.
  *   • Lifecycle event — muted and read-only (D-40): a grey icon, the shared
  *     `EVENT_LABELS` label, the minute time and the detail line when present.
  *   • Knowledge change — pencil icon, field name, minute time and a one-line
@@ -38,6 +40,7 @@ import {
   CURRENT_STATE_FIELD_REGISTRY,
   type CurrentStateFieldKey,
 } from "@/db/memory-registry";
+import { alsoSaveToLabel } from "@/logic/also-save-to-logic";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -108,11 +111,22 @@ export function HistoryRecordRow({
     const metaSuffix = metaParts.length > 0 ? `, ${metaParts.join(", ")}` : "";
     const groupSuffix = groupTitle ? `, event ${groupTitle}` : "";
     const noteSuffix = r.note ? `. ${r.note}` : "";
+    // 38.10 D-37: the section names join the row's label; the tags themselves
+    // are not separately accessible (checker cycle 5 W-6).
+    // A participant's own note and a Group Note copy can share a section;
+    // each section is named once.
+    const linkedLabels = [
+      ...new Set(r.linkedSections.map((s) => alsoSaveToLabel(s.section))),
+    ];
+    const linkedSuffix =
+      linkedLabels.length > 0
+        ? `, also saved to ${linkedLabels.join(", ")}`
+        : "";
     return (
       <Pressable
         testID={`history-row-${item.key}`}
         accessibilityRole="button"
-        accessibilityLabel={`Interaction, ${r.channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}${metaSuffix}${groupSuffix}${noteSuffix}`}
+        accessibilityLabel={`Interaction, ${r.channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}${metaSuffix}${groupSuffix}${linkedSuffix}${noteSuffix}`}
         style={styles.row}
         onPress={() => onOpenInteraction(r.id, item.date)}
       >
@@ -137,6 +151,22 @@ export function HistoryRecordRow({
                 </AppText>
               </View>
             ) : null}
+            {linkedLabels.map((label) => (
+              <View
+                key={label}
+                testID={`history-row-${item.key}-linked`}
+                accessible={false}
+                style={[styles.groupLabel, { borderColor: colors.border }]}
+              >
+                <AppText
+                  role="caption"
+                  numberOfLines={1}
+                  style={{ color: colors.textSecondary }}
+                >
+                  {label}
+                </AppText>
+              </View>
+            ))}
           </View>
           {meta ? (
             <AppText role="caption" style={{ color: colors.textSecondary }}>

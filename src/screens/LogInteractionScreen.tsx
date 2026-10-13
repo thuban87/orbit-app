@@ -33,10 +33,19 @@
  * state, shows "Couldn't save / Please try again." with Retry, and never navigates
  * / never shows completion.
  *
+ * ALSO SAVE TO (38.10 D-37, D-38, D-40, D-95): a one-section picker under the
+ * form. The save branches on `effectiveAlsoSaveTo(note, chosen)` (convergence
+ * c10, Codex C-01): a section with a non-blank note goes through
+ * `recordTouchpointWithLinkedEntry` (interaction + linked entry in one
+ * transaction); anything else is the plain `recordTouchpoint`. A note cleared
+ * to blank resets the choice to None. The success snackbar names the person
+ * and the section (38.9 D-39, D-46).
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
+import { AlsoSaveToPicker } from "@/components/AlsoSaveToPicker";
 import { ContactPicker } from "@/components/ContactPicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -53,12 +62,23 @@ import {
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { recordTouchpoint } from "@/db/recency-dao";
+import type { LinkedSection } from "@/db/linked-entry-dao";
+import {
+  recordTouchpoint,
+  recordTouchpointWithLinkedEntry,
+} from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
 import { useContactHeader } from "@/hooks/use-contact-header";
+import {
+  alsoSaveChoiceAfterNoteChange,
+  canAlsoSave,
+  effectiveAlsoSaveTo,
+  loggedInteractionSnackbar,
+} from "@/logic/also-save-to-logic";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
@@ -102,6 +122,9 @@ export function LogInteractionScreen({
   const [value, setValue] = useState<TouchpointRefineValue | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // "Also save to" (D-95): one section or None. Reset to None whenever the note
+  // goes blank (convergence c10, Codex C-01).
+  const [alsoSaveTo, setAlsoSaveTo] = useState<LinkedSection | null>(null);
   // Once the user explicitly overrides Direction, a channel change must not
   // re-fight it (CAPT-08 §R/§S). A ref so it never triggers a re-render.
   const userOverrodeDirection = useRef(false);
@@ -176,6 +199,7 @@ export function LogInteractionScreen({
   // Direction); a direction change marks the user override so later channel
   // changes stop re-fighting it.
   const handleChange = useCallback((next: TouchpointRefineValue) => {
+    setAlsoSaveTo((chosen) => alsoSaveChoiceAfterNoteChange(next.note, chosen));
     setValue((prev) => {
       if (!prev) return next;
       if (next.channel !== prev.channel) {
@@ -213,18 +237,23 @@ export function LogInteractionScreen({
     setSaveError(null);
 
     const writeNow = localDateTime();
+    // The section actually saved: none for a blank note (c10 C-01).
+    const section = effectiveAlsoSaveTo(value.note, alsoSaveTo);
     try {
       try {
         // The SOLE recency writer — one transaction, future-date guard, recompute.
-        // The interaction is the source of truth from this point on.
-        await recordTouchpoint(
-          getExecutor(),
-          buildLogInteractionInput(value, {
-            contactId,
-            uid: newUid(),
-            now: writeNow,
-          }),
-        );
+        // The interaction is the source of truth from this point on. With a
+        // section, the linked entry is written in the same transaction (D-37).
+        const input = buildLogInteractionInput(value, {
+          contactId,
+          uid: newUid(),
+          now: writeNow,
+        });
+        if (section !== null) {
+          await recordTouchpointWithLinkedEntry(getExecutor(), input, section);
+        } else {
+          await recordTouchpoint(getExecutor(), input);
+        }
       } catch (err) {
         // Interaction save failed: preserve the full form state, surface the
         // locked error + Retry, never complete / never navigate (CAPT-14).
@@ -265,6 +294,15 @@ export function LogInteractionScreen({
       // Committed: nudge the widget; derived consumers recompute on their next
       // focused read. Return to the origin-aware caller (Profile).
       notifyWidgetDataChanged();
+      // 38.9 D-39 / D-46: verb first, then whom, plus the section.
+      showSnackbar({
+        kind: "success",
+        label: loggedInteractionSnackbar({
+          channel: value.channel,
+          personName: person?.name ?? null,
+          section,
+        }),
+      });
       bypassRef.current = true;
       navigation.goBack();
     } finally {
@@ -330,6 +368,13 @@ export function LogInteractionScreen({
           channelOptions={ORDINARY_LOG_CHANNEL_OPTIONS}
           moreOptionsFields={MORE_OPTIONS_FIELDS}
           allowAiCaption={ALLOW_AI_CAPTION}
+        />
+
+        <AlsoSaveToPicker
+          testID="log-interaction-also-save-to"
+          value={alsoSaveTo}
+          onChange={setAlsoSaveTo}
+          disabled={saving || !canAlsoSave(value.note)}
         />
 
         {saveError ? (
