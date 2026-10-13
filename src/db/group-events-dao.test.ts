@@ -1543,3 +1543,23 @@ describe("participant patch builder round-trip (RG-019)", () => {
     expect(await readDataRevision(exec)).toBe(revision);
   });
 });
+
+describe("updateGroupEvent revision bumps (checker cycle 5 W-3)", () => {
+  it("a changed Group Note advances data_revision by exactly 1", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const before = await readDataRevision(exec);
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: NOW,
+      patch: { groupNote: { value: "New shared note" } },
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("an empty patch advances data_revision by 0", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const before = await readDataRevision(exec);
+    await updateGroupEvent(exec, { groupEventId, now: NOW, patch: {} });
+    expect(await readDataRevision(exec)).toBe(before);
+  });
+});

@@ -559,3 +559,53 @@ export async function setLinkedAllowAiCore(
   );
   return row?.allow_ai === 1 ? 1 : 0;
 }
+
+// --- Group Note copies -----------------------------------------------------------
+
+export type UnlinkGroupCopiesScope =
+  | { interactionIds: readonly number[]; now: string }
+  | { groupEventId: number; now: string };
+
+/**
+ * Detach Group Note copies (D-113 blank Group Note, D-117 copy-side edit,
+ * participant detach, dissolve). Sets `interaction_id` and `link_source` to
+ * NULL on the `group_note`-linked rows of those interactions in both tables
+ * and stamps `modified_at = now`, so a Merge from another device sees the
+ * unlinked copy as the newer edit (F-D12; verify-data CX-C09). Leaves the
+ * text and `group_note_copy = 1` alone, so the copy stays AI-off for good
+ * (D-102). Run it before the event's `group_event_id` links are cleared when
+ * scoped by event. Returns the number of rows detached.
+ */
+export async function unlinkGroupCopiesCore(
+  exec: SqlExecutor,
+  scope: UnlinkGroupCopiesScope,
+): Promise<number> {
+  let changed = 0;
+  if ("groupEventId" in scope) {
+    for (const table of ["memories", "current_state_entries"] as const) {
+      const result = await exec.runAsync(
+        `UPDATE ${table}
+            SET interaction_id = NULL, link_source = NULL, modified_at = ?
+          WHERE link_source = 'group_note'
+            AND interaction_id IN
+                (SELECT id FROM interactions WHERE group_event_id = ?)`,
+        [scope.now, scope.groupEventId],
+      );
+      changed += result.changes;
+    }
+    return changed;
+  }
+  for (const ids of chunks([...new Set(scope.interactionIds)], ID_CHUNK)) {
+    const marks = placeholders(ids.length);
+    for (const table of ["memories", "current_state_entries"] as const) {
+      const result = await exec.runAsync(
+        `UPDATE ${table}
+            SET interaction_id = NULL, link_source = NULL, modified_at = ?
+          WHERE link_source = 'group_note' AND interaction_id IN (${marks})`,
+        [scope.now, ...ids],
+      );
+      changed += result.changes;
+    }
+  }
+  return changed;
+}

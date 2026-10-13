@@ -18,7 +18,12 @@ import {
   summarizeAiPermissionItems,
 } from "@/db/ai-permissions-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { createGroupEvent, dissolveGroupEvent } from "@/db/group-events-dao";
+import { moveKnowledgeEntry, undoKnowledgeMove } from "@/db/knowledge-move-dao";
+import { insertLinkedEntryCore } from "@/db/linked-entry-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { recordTouchpointWithLinkedEntry } from "@/db/recency-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-09-14 08:00:00";
@@ -271,7 +276,221 @@ describe("AI permissions DAO", () => {
       new URL("./ai-permissions-dao.ts", import.meta.url),
       "utf8",
     );
-    expect(source).not.toMatch(/\bfuel\b|off_limits|group_events/i);
+    // D-09 / D-10: no SQL against Off Limits or Group Events (Group Notes
+    // never reach AI, ADR-078 / ADR-136). "off_limits" may appear as a lock
+    // label (checker cycle 3 B-3).
+    expect(source).not.toMatch(
+      /\b(FROM|JOIN|INTO|UPDATE)\s+(off_limits|group_events)\b/i,
+    );
+    expect(source).toContain('"off_limits"');
     expect(source).not.toMatch(/enableAll|disableAll/);
+  });
+});
+
+describe("review list eligibility and locks (ADR-136; D-86, D-102, D-103)", () => {
+  async function allowOf(table: "memories" | "interactions", id: number) {
+    return (
+      await exec.getFirstAsync<{ allow_ai: number }>(
+        `SELECT allow_ai FROM ${table} WHERE id = ?`,
+        [id],
+      )
+    )?.allow_ai;
+  }
+
+  async function noteLinked(allowAi: 0 | 1) {
+    const contactId = await seedContact("Casey");
+    const { interactionId, linkedEntry } =
+      await recordTouchpointWithLinkedEntry(
+        exec,
+        {
+          contactId,
+          uid: uid(),
+          occurredAt: "2026-09-10 10:00:00",
+          now: NOW,
+          note: "Moving to Denver",
+          allowAi,
+        },
+        "memory",
+      );
+    if (!linkedEntry) throw new Error("no linked entry");
+    return { contactId, interactionId, memoryId: linkedEntry.id };
+  }
+
+  async function groupCopy() {
+    const alex = await seedContact("Alex");
+    const sam = await seedContact("Sam");
+    const { groupEventId } = await createGroupEvent(exec, {
+      uid: uid(),
+      title: "Dinner",
+      occurredAt: "2026-09-10 19:00:00",
+      now: NOW,
+      groupNote: "Reunion plans",
+      participants: [
+        { contactId: alex, uid: uid() },
+        { contactId: sam, uid: uid() },
+      ],
+    });
+    const child = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM interactions WHERE group_event_id = ? AND contact_id = ?",
+      [groupEventId, alex],
+    );
+    if (!child) throw new Error("no child");
+    const ref = await inWriteTransaction(exec, () =>
+      insertLinkedEntryCore(exec, {
+        interactionId: child.id,
+        contactId: alex,
+        section: "memory",
+        text: "Reunion plans",
+        linkSource: "group_note",
+        occurredAt: "2026-09-10 19:00:00",
+        now: NOW,
+      }),
+    );
+    return { groupEventId, memoryId: ref.id };
+  }
+
+  it("lists a label-only memory under its label with the type's name as value, and bulk-disables it", async () => {
+    const alex = await seedContact("Alex");
+    const memory = await exec.runAsync(
+      `INSERT INTO memories
+         (uid,contact_id,type,custom_label,allow_ai,created_at,modified_at)
+       VALUES (?,?,'thought_of_them','Anniversary',1,?,?)`,
+      [uid(), alex, NOW, NOW],
+    );
+    const items = await listAiPermissionItems(exec, { category: "memory" });
+    expect(items).toEqual([
+      expect.objectContaining({
+        id: memory.lastInsertRowId,
+        label: "Anniversary",
+        value: "Thought of Them",
+        enabled: 1,
+        locked: null,
+      }),
+    ]);
+    await bulkDisableAiPermissions(
+      exec,
+      [{ category: "memory", id: memory.lastInsertRowId }],
+      NOW,
+    );
+    expect(await allowOf("memories", memory.lastInsertRowId)).toBe(0);
+  });
+
+  it("lists a note-linked pair as two items, one per category, switched together (G-D6)", async () => {
+    const { interactionId, memoryId } = await noteLinked(1);
+    const keys = (await listAiPermissionItems(exec, {})).map((i) => i.itemKey);
+    expect(keys).toEqual([
+      `memory:${memoryId}`,
+      `interaction-note:${interactionId}`,
+    ]);
+    await expect(
+      bulkDisableAiPermissions(
+        exec,
+        [
+          { category: "memory", id: memoryId },
+          { category: "interaction-note", id: interactionId },
+        ],
+        NOW,
+      ),
+    ).resolves.toEqual({ contacts: 1, items: 2 });
+    await bulkEnableAiPermissions(
+      exec,
+      [{ category: "interaction-note", id: interactionId }],
+      NOW,
+    );
+    expect(await allowOf("memories", memoryId)).toBe(1);
+    await bulkDisableAiPermissions(
+      exec,
+      [{ category: "memory", id: memoryId }],
+      NOW,
+    );
+    expect(await allowOf("interactions", interactionId)).toBe(0);
+  });
+
+  it("reports a Group Note copy as locked before and after its event is dissolved (D-102)", async () => {
+    const { groupEventId, memoryId } = await groupCopy();
+    const lockOf = async () =>
+      (await listAiPermissionItems(exec, { category: "memory" })).find(
+        (item) => item.id === memoryId,
+      )?.locked;
+    expect(await lockOf()).toBe("group_note");
+    await dissolveGroupEvent(exec, { groupEventId, now: NOW });
+    await exec.runAsync(
+      "UPDATE memories SET interaction_id = NULL, link_source = NULL WHERE id = ?",
+      [memoryId],
+    );
+    expect(await lockOf()).toBe("group_note");
+  });
+
+  it("bulk enable over a mixed selection turns on only the unlocked items and counts only them", async () => {
+    const seeded = await seedReviewRows();
+    const { memoryId: copyId } = await groupCopy();
+    const locked = await noteLinked(0);
+    await exec.runAsync(
+      "UPDATE interactions SET note_ai_locked = 1 WHERE id = ?",
+      [locked.interactionId],
+    );
+    const selection: AiPermissionRef[] = [
+      { category: "memory", id: seeded.disabledMemoryId },
+      { category: "memory", id: copyId },
+      { category: "memory", id: locked.memoryId },
+      { category: "interaction-note", id: locked.interactionId },
+    ];
+    const items = await listAiPermissionItems(exec, {});
+    expect(
+      items
+        .filter((item) => item.locked !== null)
+        .map((item) => [item.itemKey, item.locked]),
+    ).toEqual([
+      [`memory:${copyId}`, "group_note"],
+      [`memory:${locked.memoryId}`, "off_limits"],
+      [`interaction-note:${locked.interactionId}`, "off_limits"],
+    ]);
+    await expect(getBulkPermissionImpact(exec, selection)).resolves.toEqual({
+      contacts: 1,
+      items: 1,
+    });
+    await expect(
+      bulkEnableAiPermissions(exec, selection, NOW),
+    ).resolves.toEqual({ contacts: 1, items: 1 });
+    expect(await allowOf("memories", seeded.disabledMemoryId)).toBe(1);
+    expect(await allowOf("memories", copyId)).toBe(0);
+    expect(await allowOf("memories", locked.memoryId)).toBe(0);
+    expect(await allowOf("interactions", locked.interactionId)).toBe(0);
+  });
+
+  it("a note moved to Off Limits and undone stays AI-off on both sides through the DAO path (D-103)", async () => {
+    const { contactId, interactionId, memoryId } = await noteLinked(1);
+    const moved = await moveKnowledgeEntry(exec, {
+      ref: { table: "memories", id: memoryId, contactId },
+      target: "off_limits",
+      now: NOW,
+    });
+    const restored = await undoKnowledgeMove(exec, moved.undo, NOW);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT allow_ai, interaction_id, link_source FROM memories WHERE id = ?",
+        [restored.id],
+      ),
+    ).toEqual({
+      allow_ai: 0,
+      interaction_id: interactionId,
+      link_source: "note",
+    });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT allow_ai, note_ai_locked FROM interactions WHERE id = ?",
+        [interactionId],
+      ),
+    ).toEqual({ allow_ai: 0, note_ai_locked: 1 });
+
+    await expect(
+      bulkEnableAiPermissions(
+        exec,
+        [{ category: "interaction-note", id: interactionId }],
+        NOW,
+      ),
+    ).resolves.toEqual({ contacts: 0, items: 0 });
+    expect(await allowOf("interactions", interactionId)).toBe(0);
+    expect(await allowOf("memories", restored.id)).toBe(0);
   });
 });

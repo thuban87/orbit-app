@@ -28,7 +28,12 @@ import {
 } from "@/db/current-state-history-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createGroupEvent, detachParticipant } from "@/db/group-events-dao";
+import {
+  insertLinkedEntryCore,
+  LinkedEntryDateError,
+} from "@/db/linked-entry-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { recordTouchpointWithLinkedEntry } from "@/db/recency-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -760,5 +765,168 @@ describe("delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
     );
     expect(await revision()).toBe(before);
     expect(await tombstoneStamp(snapshot.uid)).toBe("2026-09-04 14:00:00");
+  });
+});
+
+// --- Linked Last Talked About from the entry side (D-37, D-41, D-117) ---------
+
+async function ltaRow(id: number) {
+  return exec.getFirstAsync<{
+    value: string;
+    entry_date: string;
+    entry_time: string | null;
+    interaction_id: number | null;
+    link_source: string | null;
+    group_note_copy: number;
+    modified_at: string;
+  }>(
+    `SELECT value, entry_date, entry_time, interaction_id, link_source,
+            group_note_copy, modified_at
+       FROM current_state_entries WHERE id = ?`,
+    [id],
+  );
+}
+
+describe("linked Last Talked About edits (D-37, D-41)", () => {
+  async function seedLinked() {
+    const contactId = await makeContact();
+    const { interactionId, linkedEntry } =
+      await recordTouchpointWithLinkedEntry(
+        exec,
+        {
+          contactId,
+          uid: uid(),
+          occurredAt: "2026-09-01 20:15:00",
+          now: NOW,
+          note: "Their trip to Lisbon",
+        },
+        "last_talked_about",
+      );
+    if (!linkedEntry) throw new Error("no linked entry");
+    return { contactId, interactionId, entryId: linkedEntry.id };
+  }
+
+  it("editing a note-linked entry's text changes the interaction note", async () => {
+    const { contactId, interactionId, entryId } = await seedLinked();
+    await editHistoryEntry(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      entryId,
+      value: "Their trip to Porto",
+      now: LATER,
+    });
+    expect(
+      await exec.getFirstAsync("SELECT note FROM interactions WHERE id = ?", [
+        interactionId,
+      ]),
+    ).toEqual({ note: "Their trip to Porto" });
+    expect(await ltaRow(entryId)).toMatchObject({
+      value: "Their trip to Porto",
+      entry_date: "2026-09-01",
+      entry_time: "20:15:00",
+      link_source: "note",
+    });
+  });
+
+  it("rejects a new date on a linked entry; the date follows the interaction", async () => {
+    const { contactId, entryId } = await seedLinked();
+    await expect(
+      editHistoryEntry(exec, {
+        contactId,
+        fieldKey: "last_talked_about",
+        entryId,
+        value: "Their trip to Lisbon",
+        entryDate: "2026-08-01",
+        now: LATER,
+      }),
+    ).rejects.toBeInstanceOf(LinkedEntryDateError);
+    // The stored date passed back unchanged is accepted.
+    await editHistoryEntry(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      entryId,
+      value: "Their trip to Lisbon!",
+      entryDate: "2026-09-01",
+      now: LATER,
+    });
+    expect((await ltaRow(entryId))?.value).toBe("Their trip to Lisbon!");
+  });
+});
+
+describe("editing one Group Note Last Talked About copy detaches it (D-117)", () => {
+  it("keeps the new text on that copy only; the Group Note and other copies stay", async () => {
+    const contacts = [
+      await makeContact("Alex"),
+      await makeContact("Sam"),
+      await makeContact("Jordan"),
+    ];
+    const { groupEventId } = await createGroupEvent(exec, {
+      uid: uid(),
+      title: "Dinner",
+      occurredAt: "2026-09-01 19:00:00",
+      now: NOW,
+      groupNote: "Planning the reunion",
+      participants: contacts.map((contactId) => ({ contactId, uid: uid() })),
+    });
+    const children = await exec.getAllAsync<{
+      id: number;
+      contact_id: number;
+    }>(
+      "SELECT id, contact_id FROM interactions WHERE group_event_id = ? ORDER BY id",
+      [groupEventId],
+    );
+    const copies = await inWriteTransaction(exec, async () => {
+      const refs: { contactId: number; interactionId: number; id: number }[] =
+        [];
+      for (const child of children) {
+        const ref = await insertLinkedEntryCore(exec, {
+          interactionId: child.id,
+          contactId: child.contact_id,
+          section: "last_talked_about",
+          text: "Planning the reunion",
+          linkSource: "group_note",
+          occurredAt: "2026-09-01 19:00:00",
+          now: NOW,
+        });
+        refs.push({
+          contactId: child.contact_id,
+          interactionId: child.id,
+          id: ref.id,
+        });
+      }
+      return refs;
+    });
+    const [edited, ...others] = copies;
+    const before = await revision();
+    await editHistoryEntry(exec, {
+      contactId: edited.contactId,
+      fieldKey: "last_talked_about",
+      entryId: edited.id,
+      value: "Just my part of it",
+      now: LATER,
+    });
+    expect(await revision()).toBe(before + 1);
+    expect(await ltaRow(edited.id)).toEqual({
+      value: "Just my part of it",
+      entry_date: "2026-09-01",
+      entry_time: "19:00:00",
+      interaction_id: null,
+      link_source: null,
+      group_note_copy: 1,
+      modified_at: LATER,
+    });
+    for (const other of others) {
+      expect(await ltaRow(other.id)).toMatchObject({
+        value: "Planning the reunion",
+        interaction_id: other.interactionId,
+        link_source: "group_note",
+      });
+    }
+    expect(
+      await exec.getFirstAsync(
+        "SELECT group_note FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual({ group_note: "Planning the reunion" });
   });
 });

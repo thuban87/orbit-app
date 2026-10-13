@@ -5,7 +5,15 @@ vi.mock("expo-sqlite", () => ({}));
 import { compareRowAndTombstone } from "@/backup/reconciliation";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { setAiPermissionDefault } from "@/db/ai-permissions-dao";
+import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { createGroupEvent, dissolveGroupEvent } from "@/db/group-events-dao";
+import {
+  GroupNoteAiLockedError,
+  InteractionNoteAiLockedError,
+  insertLinkedEntryCore,
+  LinkedNoteBlankError,
+} from "@/db/linked-entry-dao";
 import {
   addMemory,
   addMemoryCore,
@@ -25,6 +33,10 @@ import {
   listMemoriesForContact,
 } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
+import {
+  editTouchpointFull,
+  recordTouchpointWithLinkedEntry,
+} from "@/db/recency-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -1363,5 +1375,330 @@ describe("memory delete with Undo (D-69; F-D3, F-D4, G-D1, G-D2, c9)", () => {
       }),
     );
     expect(await revision()).toBe(before);
+  });
+});
+
+// --- Linked notes from the entry side (D-37, D-49, D-102, D-103, D-117) -------
+
+async function seedNoteLinkedMemory(allowAi: 0 | 1 = 1): Promise<{
+  contactId: number;
+  interactionId: number;
+  memoryId: number;
+}> {
+  const contactId = await seedContact();
+  const { interactionId, linkedEntry } = await recordTouchpointWithLinkedEntry(
+    exec,
+    {
+      contactId,
+      uid: `linked-interaction-${++uidCounter}`,
+      occurredAt: "2026-09-01 10:00:00",
+      now: NOW,
+      note: "Training for a marathon",
+      allowAi,
+    },
+    "memory",
+  );
+  if (!linkedEntry) throw new Error("no linked entry");
+  return { contactId, interactionId, memoryId: linkedEntry.id };
+}
+
+async function interactionRow(id: number) {
+  return exec.getFirstAsync<{
+    note: string | null;
+    allow_ai: number;
+    note_ai_locked: number;
+  }>("SELECT note, allow_ai, note_ai_locked FROM interactions WHERE id = ?", [
+    id,
+  ]);
+}
+
+async function memoryRow(id: number) {
+  return exec.getFirstAsync<{
+    value: string | null;
+    allow_ai: number;
+    interaction_id: number | null;
+    link_source: string | null;
+    group_note_copy: number;
+    modified_at: string;
+  }>(
+    `SELECT value, allow_ai, interaction_id, link_source, group_note_copy,
+            modified_at
+       FROM memories WHERE id = ?`,
+    [id],
+  );
+}
+
+/** An event with three participants, each holding a Group Note memory copy. */
+async function seedGroupCopies(): Promise<{
+  groupEventId: number;
+  copies: { contactId: number; interactionId: number; memoryId: number }[];
+}> {
+  const contacts = [
+    await seedContact("Alex"),
+    await seedContact("Sam"),
+    await seedContact("Jordan"),
+  ];
+  const { groupEventId } = await createGroupEvent(exec, {
+    uid: `event-${++uidCounter}`,
+    title: "Dinner",
+    occurredAt: "2026-09-01 19:00:00",
+    now: NOW,
+    groupNote: "Planning the reunion",
+    participants: contacts.map((contactId) => ({
+      contactId,
+      uid: `child-${++uidCounter}`,
+    })),
+  });
+  const children = await exec.getAllAsync<{ id: number; contact_id: number }>(
+    "SELECT id, contact_id FROM interactions WHERE group_event_id = ? ORDER BY id",
+    [groupEventId],
+  );
+  const copies: {
+    contactId: number;
+    interactionId: number;
+    memoryId: number;
+  }[] = [];
+  await inWriteTransaction(exec, async () => {
+    for (const child of children) {
+      const ref = await insertLinkedEntryCore(exec, {
+        interactionId: child.id,
+        contactId: child.contact_id,
+        section: "memory",
+        text: "Planning the reunion",
+        linkSource: "group_note",
+        occurredAt: "2026-09-01 19:00:00",
+        now: NOW,
+      });
+      copies.push({
+        contactId: child.contact_id,
+        interactionId: child.id,
+        memoryId: ref.id,
+      });
+    }
+  });
+  return { groupEventId, copies };
+}
+
+describe("linked memory text from the entry side (D-37)", () => {
+  it("editing a note-linked memory's text changes the interaction note", async () => {
+    const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
+    await editMemory(exec, {
+      id: memoryId,
+      contactId,
+      value: "Running the Boston marathon",
+      now: "2026-09-04 13:00:00",
+    });
+    expect((await interactionRow(interactionId))?.note).toBe(
+      "Running the Boston marathon",
+    );
+    expect(await memoryRow(memoryId)).toMatchObject({
+      value: "Running the Boston marathon",
+      link_source: "note",
+      interaction_id: interactionId,
+    });
+  });
+
+  it("clearing a note-linked memory's text (label kept) throws LinkedNoteBlankError", async () => {
+    const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
+    await expect(
+      editMemory(exec, {
+        id: memoryId,
+        contactId,
+        value: "",
+        customLabel: "Race",
+        now: NOW,
+      }),
+    ).rejects.toBeInstanceOf(LinkedNoteBlankError);
+    expect((await interactionRow(interactionId))?.note).toBe(
+      "Training for a marathon",
+    );
+    expect((await memoryRow(memoryId))?.value).toBe("Training for a marathon");
+  });
+
+  it("an unchanged value does not touch the interaction", async () => {
+    const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
+    await exec.runAsync(
+      "UPDATE interactions SET modified_at = ? WHERE id = ?",
+      ["2026-01-01 00:00:00", interactionId],
+    );
+    await editMemory(exec, {
+      id: memoryId,
+      contactId,
+      value: "Training for a marathon",
+      pinned: true,
+      now: NOW,
+    });
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM interactions WHERE id = ?",
+      [interactionId],
+    );
+    expect(row?.modified_at).toBe("2026-01-01 00:00:00");
+  });
+});
+
+describe("one Allow AI switch (D-49, D-103)", () => {
+  it("switching the memory off switches the interaction off, and back on", async () => {
+    const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
+    await setMemoryAllowAi(exec, {
+      id: memoryId,
+      contactId,
+      allow: false,
+      now: NOW,
+    });
+    expect((await interactionRow(interactionId))?.allow_ai).toBe(0);
+    expect((await memoryRow(memoryId))?.allow_ai).toBe(0);
+    await setMemoryAllowAi(exec, {
+      id: memoryId,
+      contactId,
+      allow: true,
+      now: NOW,
+    });
+    expect((await interactionRow(interactionId))?.allow_ai).toBe(1);
+    expect((await memoryRow(memoryId))?.allow_ai).toBe(1);
+  });
+
+  it("switching the interaction off switches the memory off", async () => {
+    const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
+    const cur = await exec.getFirstAsync<{
+      occurred_at: string;
+      channel: string;
+      connected: number;
+    }>(
+      "SELECT occurred_at, channel, connected FROM interactions WHERE id = ?",
+      [interactionId],
+    );
+    if (!cur) throw new Error("missing");
+    await editTouchpointFull(exec, {
+      interactionId,
+      contactId,
+      now: NOW,
+      occurredAt: cur.occurred_at,
+      channel: cur.channel,
+      direction: null,
+      connected: cur.connected,
+      quality: null,
+      note: "Training for a marathon",
+      duration: null,
+      allowAi: 0,
+    });
+    expect((await memoryRow(memoryId))?.allow_ai).toBe(0);
+  });
+
+  it("refuses to switch on a memory whose note was moved to Off Limits", async () => {
+    const { contactId, interactionId, memoryId } = await seedNoteLinkedMemory();
+    await exec.runAsync(
+      "UPDATE interactions SET allow_ai = 0, note_ai_locked = 1 WHERE id = ?",
+      [interactionId],
+    );
+    await exec.runAsync("UPDATE memories SET allow_ai = 0 WHERE id = ?", [
+      memoryId,
+    ]);
+    await expect(
+      setMemoryAllowAi(exec, {
+        id: memoryId,
+        contactId,
+        allow: true,
+        now: NOW,
+      }),
+    ).rejects.toBeInstanceOf(InteractionNoteAiLockedError);
+    expect((await memoryRow(memoryId))?.allow_ai).toBe(0);
+    // Switching off is still allowed.
+    await setMemoryAllowAi(exec, {
+      id: memoryId,
+      contactId,
+      allow: false,
+      now: NOW,
+    });
+  });
+
+  it("refuses to switch on a Group Note copy, before and after it is unlinked (D-102)", async () => {
+    const { groupEventId, copies } = await seedGroupCopies();
+    const [first] = copies;
+    await expect(
+      setMemoryAllowAi(exec, {
+        id: first.memoryId,
+        contactId: first.contactId,
+        allow: true,
+        now: NOW,
+      }),
+    ).rejects.toBeInstanceOf(GroupNoteAiLockedError);
+    await dissolveGroupEvent(exec, { groupEventId, now: NOW });
+    await exec.runAsync(
+      "UPDATE memories SET interaction_id = NULL, link_source = NULL WHERE id = ?",
+      [first.memoryId],
+    );
+    await expect(
+      setMemoryAllowAi(exec, {
+        id: first.memoryId,
+        contactId: first.contactId,
+        allow: true,
+        now: NOW,
+      }),
+    ).rejects.toBeInstanceOf(GroupNoteAiLockedError);
+    expect(await memoryRow(first.memoryId)).toMatchObject({
+      allow_ai: 0,
+      group_note_copy: 1,
+    });
+  });
+});
+
+describe("editing one Group Note copy detaches it (D-117)", () => {
+  it("keeps the new text on that copy only; the Group Note and other copies stay", async () => {
+    const { groupEventId, copies } = await seedGroupCopies();
+    const [edited, ...others] = copies;
+    const later = "2026-09-04 15:30:00";
+    await editMemory(exec, {
+      id: edited.memoryId,
+      contactId: edited.contactId,
+      value: "My own reunion notes",
+      now: later,
+    });
+    expect(await memoryRow(edited.memoryId)).toEqual({
+      value: "My own reunion notes",
+      allow_ai: 0,
+      interaction_id: null,
+      link_source: null,
+      group_note_copy: 1,
+      modified_at: later,
+    });
+    for (const other of others) {
+      expect(await memoryRow(other.memoryId)).toMatchObject({
+        value: "Planning the reunion",
+        interaction_id: other.interactionId,
+        link_source: "group_note",
+      });
+    }
+    expect(
+      await exec.getFirstAsync(
+        "SELECT group_note FROM group_events WHERE id = ?",
+        [groupEventId],
+      ),
+    ).toEqual({ group_note: "Planning the reunion" });
+  });
+
+  it("an edit that leaves the text unchanged does not detach", async () => {
+    const { copies } = await seedGroupCopies();
+    const [copy] = copies;
+    await editMemory(exec, {
+      id: copy.memoryId,
+      contactId: copy.contactId,
+      value: "Planning the reunion",
+      pinned: true,
+      now: NOW,
+    });
+    expect((await memoryRow(copy.memoryId))?.link_source).toBe("group_note");
+  });
+
+  it("editMemory on a copy whose text changes advances data_revision by exactly 1", async () => {
+    const { copies } = await seedGroupCopies();
+    const [copy] = copies;
+    const before = await readDataRevision(exec);
+    await editMemory(exec, {
+      id: copy.memoryId,
+      contactId: copy.contactId,
+      value: "Changed",
+      now: NOW,
+    });
+    expect(await readDataRevision(exec)).toBe(before + 1);
   });
 });

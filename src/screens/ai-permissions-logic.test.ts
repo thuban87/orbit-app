@@ -26,6 +26,7 @@ const ITEMS: AiPermissionItem[] = [
     label: "Memory",
     value: "Astronomy",
     enabled: 1,
+    locked: null,
   },
   {
     category: "interaction-note",
@@ -37,6 +38,7 @@ const ITEMS: AiPermissionItem[] = [
     label: "Interaction note",
     value: "Telescope",
     enabled: 0,
+    locked: null,
   },
   {
     category: "custom-field",
@@ -48,6 +50,7 @@ const ITEMS: AiPermissionItem[] = [
     label: "Favorite constellation",
     value: "Lyra",
     enabled: 1,
+    locked: null,
   },
 ];
 
@@ -285,6 +288,7 @@ const RECONCILE_ITEMS: AiPermissionItem[] = [
     label: "Memory",
     value: "Chess",
     enabled: 0,
+    locked: null,
   },
   {
     category: "interaction-note",
@@ -296,6 +300,7 @@ const RECONCILE_ITEMS: AiPermissionItem[] = [
     label: "Interaction note",
     value: "Lunch",
     enabled: 0,
+    locked: null,
   },
   {
     category: "custom-field",
@@ -307,6 +312,7 @@ const RECONCILE_ITEMS: AiPermissionItem[] = [
     label: "Favorite constellation",
     value: "Orion",
     enabled: 1,
+    locked: null,
   },
   {
     category: "memory",
@@ -318,6 +324,7 @@ const RECONCILE_ITEMS: AiPermissionItem[] = [
     label: "Memory",
     value: "Sailing",
     enabled: 0,
+    locked: null,
   },
   {
     category: "memory",
@@ -329,6 +336,7 @@ const RECONCILE_ITEMS: AiPermissionItem[] = [
     label: "Memory",
     value: "Birding",
     enabled: 0,
+    locked: null,
   },
 ];
 

@@ -6,8 +6,17 @@
  * Review reads are deliberately limited to the three eligible stores represented
  * by `AiPermissionCategory`; adding another category requires widening this
  * closed union and every exhaustive switch below.
+ *
+ * Locks (Phase 38.10 D-102, D-103): a Group Note copy and a note moved into
+ * Off Limits can never be switched on. The review list reports each item's
+ * lock, bulk enable skips locked items in its count, and every UPDATE clamps
+ * them to 0 in SQL. A `note`-linked memory and its interaction share one
+ * switch (D-49): each side's write syncs the other. This module writes with
+ * its own scoped SQL and never imports memories-dao (that module imports this
+ * one; checker W9).
  */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { setLinkedAllowAiCore } from "@/db/linked-entry-dao";
 import {
   isMemoryTypeKey,
   MEMORY_TYPE_REGISTRY,
@@ -48,6 +57,12 @@ export interface AiPermissionRef {
   id: number;
 }
 
+/**
+ * Why an item can never be switched on: a Group Note copy (D-102) or a note
+ * moved into Off Limits (D-103). A lock label, not a store this module reads.
+ */
+export type AiPermissionLock = "group_note" | "off_limits" | null;
+
 export interface AiPermissionItem extends AiPermissionRef {
   /** Stable identity of this displayed contact/item pair. */
   itemKey: string;
@@ -57,6 +72,7 @@ export interface AiPermissionItem extends AiPermissionRef {
   label: string;
   value: string;
   enabled: AiPermissionValue;
+  locked: AiPermissionLock;
 }
 
 export interface AiPermissionReviewFilter {
@@ -237,6 +253,7 @@ interface MemoryReviewRow {
   value: string | null;
   note: string | null;
   enabled: number;
+  locked: string | null;
 }
 
 interface NoteReviewRow {
@@ -246,6 +263,7 @@ interface NoteReviewRow {
   contactName: string;
   value: string;
   enabled: number;
+  locked: string | null;
 }
 
 interface FieldReviewRow {
@@ -267,9 +285,36 @@ function memoryLabel(row: MemoryReviewRow): string {
     : "Memory";
 }
 
+/**
+ * The review value: the memory's text, else its note, else (a label-only
+ * memory, D-86) the type's display name, never empty (convergence c9).
+ */
 function memoryValue(row: MemoryReviewRow): string {
-  return row.value?.trim() || row.note?.trim() || "Memory";
+  return (
+    row.value?.trim() ||
+    row.note?.trim() ||
+    (isMemoryTypeKey(row.type)
+      ? MEMORY_TYPE_REGISTRY[row.type].displayName
+      : "Memory")
+  );
 }
+
+function asLock(value: string | null): AiPermissionLock {
+  return value === "group_note" || value === "off_limits" ? value : null;
+}
+
+/**
+ * A memory is locked as a Group Note copy (its own marker, D-102) or when its
+ * `note` partner interaction was moved into Off Limits (D-103).
+ */
+const MEMORY_LOCK_SQL = `CASE
+           WHEN m.group_note_copy = 1 THEN 'group_note'
+           WHEN m.link_source = 'note' AND EXISTS (
+             SELECT 1 FROM interactions li
+              WHERE li.id = m.interaction_id AND li.note_ai_locked = 1
+           ) THEN 'off_limits'
+           ELSE NULL
+         END`;
 
 function stableCompare(a: AiPermissionItem, b: AiPermissionItem): number {
   const byName = a.contactName.localeCompare(b.contactName, undefined, {
@@ -301,11 +346,14 @@ export async function listAiPermissionItems(
     const rows = await exec.getAllAsync<MemoryReviewRow>(
       `SELECT m.id, c.id AS contactId, c.uid AS contactUid,
               c.name AS contactName, m.type, m.custom_label AS customLabel,
-              m.value, m.note, m.allow_ai AS enabled
+              m.value, m.note, m.allow_ai AS enabled,
+              ${MEMORY_LOCK_SQL} AS locked
          FROM memories m
          JOIN contacts c ON c.id = m.contact_id
         WHERE m.deleted_at IS NULL
-          AND (trim(COALESCE(m.value, '')) != '' OR trim(COALESCE(m.note, '')) != '')
+          AND (trim(COALESCE(m.value, '')) != ''
+               OR trim(COALESCE(m.note, '')) != ''
+               OR trim(COALESCE(m.custom_label, '')) != '')
         ORDER BY c.name COLLATE NOCASE, c.uid, m.id`,
     );
     for (const row of rows) {
@@ -320,13 +368,16 @@ export async function listAiPermissionItems(
         label: memoryLabel(row),
         value: memoryValue(row),
         enabled: row.enabled,
+        locked: asLock(row.locked),
       });
     }
   }
   if (filter.category === undefined || filter.category === "interaction-note") {
     const rows = await exec.getAllAsync<NoteReviewRow>(
       `SELECT i.id, c.id AS contactId, c.uid AS contactUid,
-              c.name AS contactName, i.note AS value, i.allow_ai AS enabled
+              c.name AS contactName, i.note AS value, i.allow_ai AS enabled,
+              CASE WHEN i.note_ai_locked = 1 THEN 'off_limits' ELSE NULL END
+                AS locked
          FROM interactions i
          JOIN contacts c ON c.id = i.contact_id
         WHERE trim(COALESCE(i.note, '')) != ''
@@ -344,6 +395,7 @@ export async function listAiPermissionItems(
         label: "Interaction note",
         value: row.value,
         enabled: row.enabled,
+        locked: asLock(row.locked),
       });
     }
   }
@@ -371,6 +423,7 @@ export async function listAiPermissionItems(
         label: row.label,
         value: row.value,
         enabled: row.enabled,
+        locked: null,
       });
     }
   }
@@ -405,6 +458,18 @@ async function itemsForRefs(
   );
 }
 
+/**
+ * The items a write of `value` would actually change: a locked item never
+ * turns on (D-102, D-103), so it is never counted for an enable.
+ */
+function wouldChange(
+  item: AiPermissionItem,
+  value: AiPermissionValue,
+): boolean {
+  if (item.enabled === value) return false;
+  return value === 0 || item.locked === null;
+}
+
 /** Calculate the complete contact/item blast radius before a bulk-enable confirm. */
 export async function getBulkPermissionImpact(
   exec: SqlExecutor,
@@ -412,7 +477,9 @@ export async function getBulkPermissionImpact(
 ): Promise<AiPermissionImpact> {
   const selection = explicitSelection(refs);
   return summarizeAiPermissionItems(
-    (await itemsForRefs(exec, selection)).filter((item) => item.enabled === 0),
+    (await itemsForRefs(exec, selection)).filter((item) =>
+      wouldChange(item, 1),
+    ),
   );
 }
 
@@ -424,21 +491,35 @@ async function setSelectedPermissions(
 ): Promise<AiPermissionImpact> {
   const selection = explicitSelection(refs);
   const impact = summarizeAiPermissionItems(
-    (await itemsForRefs(exec, selection)).filter(
-      (item) => item.enabled !== value,
+    (await itemsForRefs(exec, selection)).filter((item) =>
+      wouldChange(item, value),
     ),
   );
   return inWriteTransaction(exec, async () => {
     for (const ref of selection) {
+      // A locked ref is clamped to 0 in SQL: a no-op that still matches its
+      // one row, so migration 033's CHECKs are never hit (D-102, D-103).
       const [sql, params] =
         ref.category === "memory"
           ? [
-              "UPDATE memories SET allow_ai=?, modified_at=? WHERE id=?",
+              `UPDATE memories
+                  SET allow_ai = CASE
+                        WHEN group_note_copy = 1 OR EXISTS (
+                          SELECT 1 FROM interactions i
+                           WHERE i.id = memories.interaction_id
+                             AND memories.link_source = 'note'
+                             AND i.note_ai_locked = 1
+                        ) THEN 0 ELSE ? END,
+                      modified_at = ?
+                WHERE id = ?`,
               [value, now, ref.id],
             ]
           : ref.category === "interaction-note"
             ? [
-                "UPDATE interactions SET allow_ai=?, modified_at=? WHERE id=?",
+                `UPDATE interactions
+                    SET allow_ai = CASE WHEN note_ai_locked = 1 THEN 0 ELSE ? END,
+                        modified_at = ?
+                  WHERE id = ?`,
                 [value, now, ref.id],
               ]
             : [
@@ -451,10 +532,54 @@ async function setSelectedPermissions(
           `AI permission item ${ref.category}:${ref.id} changed ${result.changes} rows`,
         );
       }
+      await syncLinkedPartner(exec, ref, now);
     }
     await bumpDataRevisionCore(exec);
     return impact;
   });
+}
+
+/**
+ * D-49 partner sync after a review write. A memory sets its `note`
+ * interaction through `setLinkedAllowAiCore` (clamped there). An
+ * interaction note copies its STORED, clamped value into its `note`-linked
+ * memories, never the requested one, so a partner can never be written 1 past
+ * a `note_ai_locked` interaction (D-103; convergence c11, Claude C-01).
+ */
+async function syncLinkedPartner(
+  exec: SqlExecutor,
+  ref: AiPermissionRef,
+  now: string,
+): Promise<void> {
+  if (ref.category === "memory") {
+    const row = await exec.getFirstAsync<{
+      allow_ai: number;
+      interaction_id: number | null;
+      link_source: string | null;
+    }>(
+      "SELECT allow_ai, interaction_id, link_source FROM memories WHERE id = ?",
+      [ref.id],
+    );
+    if (row?.link_source === "note" && row.interaction_id !== null) {
+      await setLinkedAllowAiCore(exec, {
+        interactionId: row.interaction_id,
+        allowAi: row.allow_ai,
+        now,
+      });
+    }
+    return;
+  }
+  if (ref.category === "interaction-note") {
+    await exec.runAsync(
+      `UPDATE memories
+          SET allow_ai = CASE WHEN group_note_copy = 1 THEN 0
+                              ELSE (SELECT allow_ai FROM interactions WHERE id = ?)
+                         END,
+              modified_at = ?
+        WHERE interaction_id = ? AND link_source = 'note'`,
+      [ref.id, now, ref.id],
+    );
+  }
 }
 
 export function bulkDisableAiPermissions(

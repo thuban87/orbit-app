@@ -411,6 +411,53 @@ export async function editTouchpointFullCore(
 }
 
 /**
+ * D-37 from the entry side: set an interaction's note through the single
+ * interaction writer, every other field as stored. Propagation then writes
+ * the same text back to the linked entry (idempotent); a blank note while
+ * linked throws LinkedNoteBlankError (Q4). An interaction that is gone or
+ * belongs to another contact is left alone (the link is treated as unlinked,
+ * as the move DAO does). Caller owns the transaction.
+ */
+export async function editInteractionNoteCore(
+  exec: SqlExecutor,
+  input: {
+    interactionId: number;
+    contactId: number;
+    note: string | null;
+    now: string;
+  },
+): Promise<void> {
+  const row = await exec.getFirstAsync<{
+    occurred_at: string;
+    channel: string;
+    direction: string | null;
+    connected: number;
+    quality: string | null;
+    duration: number | null;
+    allow_ai: number;
+  }>(
+    `SELECT occurred_at, channel, direction, connected, quality, duration,
+            allow_ai
+       FROM interactions WHERE id = ? AND contact_id = ?`,
+    [input.interactionId, input.contactId],
+  );
+  if (!row) return;
+  await editTouchpointFullCore(exec, {
+    interactionId: input.interactionId,
+    contactId: input.contactId,
+    now: input.now,
+    occurredAt: row.occurred_at,
+    channel: row.channel,
+    direction: row.direction,
+    connected: row.connected,
+    quality: row.quality,
+    note: input.note,
+    duration: row.duration,
+    allowAi: row.allow_ai,
+  });
+}
+
+/**
  * Log Interaction with "Also save to" (D-37, D-38, D-95): the interaction and
  * its linked entry in ONE transaction, then recency and one revision bump.
  * `alsoSaveTo` null records a plain touchpoint. The entry's text is the note

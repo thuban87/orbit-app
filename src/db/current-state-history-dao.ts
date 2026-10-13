@@ -18,11 +18,17 @@
  * DAO) passes false.
  */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
-import { entryDateTimeOf, normalizeEntryTime } from "@/db/linked-entry-dao";
+import {
+  entryDateTimeOf,
+  LinkedEntryDateError,
+  normalizeEntryTime,
+  unlinkGroupCopiesCore,
+} from "@/db/linked-entry-dao";
 import {
   type CurrentStateFieldKey,
   isCurrentStateFieldKey,
 } from "@/db/memory-registry";
+import { editInteractionNoteCore } from "@/db/recency-dao";
 import { deleteTombstoneCore, insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -246,6 +252,16 @@ export function addCurrentStateEntry(
 /**
  * Update a stored entry in place. The three-key scope intentionally fails
  * closed if a route's field key does not match the supplied entry id.
+ *
+ * Linked entries (D-37, D-41, D-117):
+ * - a linked entry's date follows its interaction: an `entryDate` that
+ *   differs from the stored one throws `LinkedEntryDateError` (checked on the
+ *   row as stored, before any detach below);
+ * - a `note` link's new text is written to the interaction too, through the
+ *   single interaction writer, which propagates it back here;
+ * - a Group Note copy whose text changes is detached first and then edited as
+ *   an ordinary entry (it keeps `group_note_copy = 1`); the Group Note and the
+ *   other copies are untouched.
  */
 export async function editHistoryEntryCore(
   exec: SqlExecutor,
@@ -254,6 +270,37 @@ export async function editHistoryEntryCore(
   assertFieldKey(input.fieldKey);
   assertMeaningfulValue(input.value);
   if (input.entryDate !== undefined) assertEntryDate(input.entryDate);
+
+  const stored = await exec.getFirstAsync<{
+    value: string;
+    entry_date: string;
+    interaction_id: number | null;
+    link_source: string | null;
+  }>(
+    `SELECT value, entry_date, interaction_id, link_source
+       FROM current_state_entries
+      WHERE id = ? AND contact_id = ? AND field_key = ?`,
+    [input.entryId, input.contactId, input.fieldKey],
+  );
+  const linkedInteractionId = stored?.interaction_id ?? null;
+  if (
+    linkedInteractionId !== null &&
+    input.entryDate !== undefined &&
+    input.entryDate !== stored?.entry_date
+  ) {
+    throw new LinkedEntryDateError();
+  }
+  const textChanged = stored !== null && input.value !== stored.value;
+  if (
+    textChanged &&
+    linkedInteractionId !== null &&
+    stored?.link_source === "group_note"
+  ) {
+    await unlinkGroupCopiesCore(exec, {
+      interactionIds: [linkedInteractionId],
+      now: input.now,
+    });
+  }
 
   const sets = ["value = ?"];
   const params: (string | number | null)[] = [input.value];
@@ -275,6 +322,19 @@ export async function editHistoryEntryCore(
     [...params, input.entryId, input.contactId, input.fieldKey],
   );
   assertOneChange("editHistoryEntry", updated.changes);
+
+  if (
+    textChanged &&
+    linkedInteractionId !== null &&
+    stored?.link_source === "note"
+  ) {
+    await editInteractionNoteCore(exec, {
+      interactionId: linkedInteractionId,
+      contactId: input.contactId,
+      note: input.value,
+      now: input.now,
+    });
+  }
 }
 
 /** Edit a single entry inside one write. */

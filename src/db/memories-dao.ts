@@ -4,7 +4,14 @@ import {
   resolveNewItemAiDefault,
 } from "@/db/ai-permissions-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import {
+  GroupNoteAiLockedError,
+  InteractionNoteAiLockedError,
+  setLinkedAllowAiCore,
+  unlinkGroupCopiesCore,
+} from "@/db/linked-entry-dao";
 import { MEMORY_TYPE_REGISTRY, type MemoryTypeKey } from "@/db/memory-registry";
+import { editInteractionNoteCore } from "@/db/recency-dao";
 import { deleteTombstoneCore, insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -226,11 +233,46 @@ export async function addMemoryCore(
   return result.lastInsertRowId;
 }
 
-/** Toggle explicit AI permission for one Memory while the caller owns the transaction. */
+/**
+ * Toggle explicit AI permission for one Memory while the caller owns the
+ * transaction.
+ *
+ * - A Group Note copy (`group_note_copy = 1`, linked or not) can never be
+ *   switched on: `GroupNoteAiLockedError` (ADR-136; D-98, D-102).
+ * - A memory whose `note` partner was moved into Off Limits can never be
+ *   switched on: `InteractionNoteAiLockedError` (D-103).
+ * - A `note`-linked memory has one switch with its interaction (D-49): the
+ *   interaction's flag is set in the same transaction.
+ * The UI never offers the two locked cases; these are backstops.
+ */
 export async function setMemoryAllowAiCore(
   exec: SqlExecutor,
   input: { id: number; contactId: number; allow: boolean; now: string },
 ): Promise<void> {
+  const row = await exec.getFirstAsync<{
+    group_note_copy: number;
+    interaction_id: number | null;
+    link_source: string | null;
+    partner_locked: number;
+  }>(
+    `SELECT m.group_note_copy, m.interaction_id, m.link_source,
+            COALESCE(i.note_ai_locked, 0) AS partner_locked
+       FROM memories m
+       LEFT JOIN interactions i
+         ON i.id = m.interaction_id AND m.link_source = 'note'
+      WHERE m.id = ? AND m.contact_id = ?`,
+    [input.id, input.contactId],
+  );
+  if (!row) {
+    assertOneChange("setMemoryAllowAi", input.id, input.contactId, 0);
+    return;
+  }
+  if (input.allow && row.group_note_copy === 1) {
+    throw new GroupNoteAiLockedError();
+  }
+  if (input.allow && row.partner_locked === 1) {
+    throw new InteractionNoteAiLockedError();
+  }
   const result = await exec.runAsync(
     `UPDATE memories
         SET allow_ai = ?, modified_at = ?
@@ -243,6 +285,13 @@ export async function setMemoryAllowAiCore(
     input.contactId,
     result.changes,
   );
+  if (row.link_source === "note" && row.interaction_id !== null) {
+    await setLinkedAllowAiCore(exec, {
+      interactionId: row.interaction_id,
+      allowAi: input.allow ? 1 : 0,
+      now: input.now,
+    });
+  }
 }
 
 /**
@@ -260,8 +309,11 @@ export async function editMemoryCore(
     type: string;
     custom_label: string | null;
     value: string | null;
+    interaction_id: number | null;
+    link_source: string | null;
   }>(
-    "SELECT type, custom_label, value FROM memories WHERE id = ? AND contact_id = ?",
+    `SELECT type, custom_label, value, interaction_id, link_source
+       FROM memories WHERE id = ? AND contact_id = ?`,
     [input.id, input.contactId],
   );
   if (!existing) {
@@ -289,6 +341,25 @@ export async function editMemoryCore(
     input.value === undefined ? existing.value : normalizeOptional(input.value);
   if (effectiveValue === null && effectiveCustomLabel === null) {
     throw new Error("memories-dao: memory value or custom label is required");
+  }
+
+  // Linked text (D-37, D-117): only a real change of the stored text counts.
+  const textChanged =
+    input.value !== undefined && effectiveValue !== existing.value;
+  const linkedInteractionId = existing.interaction_id;
+  if (
+    textChanged &&
+    linkedInteractionId !== null &&
+    existing.link_source === "group_note"
+  ) {
+    // D-117: editing one person's Group Note copy detaches that copy only.
+    // It keeps the edited text, group_note_copy 1 and allow_ai 0 (D-102);
+    // the Group Note and every other copy are untouched (single writer of
+    // group_events is the group-events DAO; checker W9).
+    await unlinkGroupCopiesCore(exec, {
+      interactionIds: [linkedInteractionId],
+      now: input.now,
+    });
   }
 
   const sets: string[] = [];
@@ -343,6 +414,21 @@ export async function editMemoryCore(
     [...params, input.id, input.contactId],
   );
   assertOneChange("editMemory", input.id, input.contactId, result.changes);
+
+  // D-37: a participant's own linked note (link_source 'note') changes on
+  // both sides; the interaction writer propagates back to this row.
+  if (
+    textChanged &&
+    linkedInteractionId !== null &&
+    existing.link_source === "note"
+  ) {
+    await editInteractionNoteCore(exec, {
+      interactionId: linkedInteractionId,
+      contactId: input.contactId,
+      note: effectiveValue,
+      now: input.now,
+    });
+  }
 }
 
 /** Soft-delete one Memory while the caller owns the shared transaction. */

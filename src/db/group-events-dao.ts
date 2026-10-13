@@ -379,6 +379,8 @@ export function createGroupEvent(
 /**
  * The sole atomic Edit Group Event save. Group Note remains on the parent; the
  * three ordinary shared values are materialized only onto children that follow.
+ * The wrapper owns the future-date guard, the transaction and the one revision
+ * bump (only when something changed).
  */
 export function updateGroupEvent(
   exec: SqlExecutor,
@@ -393,64 +395,74 @@ export function updateGroupEvent(
   }
 
   return inWriteTransaction(exec, async () => {
-    // This guarded read intentionally remains the transaction's first statement.
-    await loadGroupEvent(exec, input.groupEventId);
-    let changed = false;
-
-    if (input.occurredAt !== undefined) {
-      await exec.runAsync(
-        "UPDATE group_events SET occurred_at = ?, modified_at = ? WHERE id = ?",
-        [input.occurredAt, input.now, input.groupEventId],
-      );
-      for (const child of await loadGroupChildren(exec, input.groupEventId)) {
-        await editTouchpointFullCore(
-          exec,
-          changedChild(child, input.now, { occurredAt: input.occurredAt }),
-        );
-      }
-      changed = true;
-    }
-
-    for (const field of ["channel", "quality", "duration"] as const) {
-      const operation = input.patch[field];
-      if (operation === undefined) continue;
-      const result = await exec.runAsync(
-        `UPDATE group_events SET ${field} = ?, modified_at = ? WHERE id = ?`,
-        [operation.value, input.now, input.groupEventId],
-      );
-      if (result.changes !== 1) {
-        throw new Error(
-          `Group Event id=${input.groupEventId} no longer exists`,
-        );
-      }
-      const children = computeFollowingChildren(
-        await loadGroupChildren(exec, input.groupEventId),
-        field,
-      );
-      for (const child of children) {
-        await editTouchpointFullCore(
-          exec,
-          changedChild(child, input.now, { [field]: operation.value }),
-        );
-      }
-      changed = true;
-    }
-
-    if (input.patch.groupNote !== undefined) {
-      const result = await exec.runAsync(
-        "UPDATE group_events SET group_note = ?, modified_at = ? WHERE id = ?",
-        [input.patch.groupNote.value, input.now, input.groupEventId],
-      );
-      if (result.changes !== 1) {
-        throw new Error(
-          `Group Event id=${input.groupEventId} no longer exists`,
-        );
-      }
-      changed = true;
-    }
-
+    const { changed } = await updateGroupEventCore(exec, input);
     if (changed) await bumpDataRevisionCore(exec);
   });
+}
+
+/**
+ * The Edit Group Event body for a caller that already owns the transaction.
+ * The single writer of `group_events.group_note` (checker W9). Opens no
+ * transaction and never bumps the data revision (PLAN-MAP §5 "Revision
+ * bumps"): it reports `changed` so the caller bumps once.
+ */
+export async function updateGroupEventCore(
+  exec: SqlExecutor,
+  input: UpdateGroupEventInput,
+): Promise<{ changed: boolean }> {
+  // This guarded read intentionally remains the transaction's first statement.
+  await loadGroupEvent(exec, input.groupEventId);
+  let changed = false;
+
+  if (input.occurredAt !== undefined) {
+    await exec.runAsync(
+      "UPDATE group_events SET occurred_at = ?, modified_at = ? WHERE id = ?",
+      [input.occurredAt, input.now, input.groupEventId],
+    );
+    for (const child of await loadGroupChildren(exec, input.groupEventId)) {
+      await editTouchpointFullCore(
+        exec,
+        changedChild(child, input.now, { occurredAt: input.occurredAt }),
+      );
+    }
+    changed = true;
+  }
+
+  for (const field of ["channel", "quality", "duration"] as const) {
+    const operation = input.patch[field];
+    if (operation === undefined) continue;
+    const result = await exec.runAsync(
+      `UPDATE group_events SET ${field} = ?, modified_at = ? WHERE id = ?`,
+      [operation.value, input.now, input.groupEventId],
+    );
+    if (result.changes !== 1) {
+      throw new Error(`Group Event id=${input.groupEventId} no longer exists`);
+    }
+    const children = computeFollowingChildren(
+      await loadGroupChildren(exec, input.groupEventId),
+      field,
+    );
+    for (const child of children) {
+      await editTouchpointFullCore(
+        exec,
+        changedChild(child, input.now, { [field]: operation.value }),
+      );
+    }
+    changed = true;
+  }
+
+  if (input.patch.groupNote !== undefined) {
+    const result = await exec.runAsync(
+      "UPDATE group_events SET group_note = ?, modified_at = ? WHERE id = ?",
+      [input.patch.groupNote.value, input.now, input.groupEventId],
+    );
+    if (result.changes !== 1) {
+      throw new Error(`Group Event id=${input.groupEventId} no longer exists`);
+    }
+    changed = true;
+  }
+
+  return { changed };
 }
 
 /** Set one inheritable participant field to a deliberately detached value. */
