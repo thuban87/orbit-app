@@ -97,37 +97,8 @@ import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { updateAppSettingsCore } from "@/db/app-settings-dao";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { deleteMemory, purgeMemoryPermanently } from "@/db/memories-dao";
-import { migration001 } from "@/db/migrations/001-initial";
-import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
-import { migration008 } from "@/db/migrations/008-restore-photo-journal";
-import { migration009 } from "@/db/migrations/009-contact-method-normalization";
-import { migration010 } from "@/db/migrations/010-contact-method-label";
-import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
-import { migration012 } from "@/db/migrations/012-import-sessions";
-import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
-import { migration014 } from "@/db/migrations/014-interaction-assists";
-import { migration015 } from "@/db/migrations/015-theme-settings";
-import { migration016 } from "@/db/migrations/016-contact-knowledge";
-import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
-import { migration018 } from "@/db/migrations/018-custom-field-scope-history";
-import { migration019 } from "@/db/migrations/019-dashboard-prefs";
-import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
-import { migration021 } from "@/db/migrations/021-orrery-preferences";
-import { migration022 } from "@/db/migrations/022-orrery-systems";
-import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
-import { migration025 } from "@/db/migrations/025-interaction-history-schema";
-import { migration026 } from "@/db/migrations/026-group-events-schema";
-import { migration027 } from "@/db/migrations/027-default-interaction-channel";
-import { migration028 } from "@/db/migrations/028-compose-message-mode";
-import { migration029 } from "@/db/migrations/029-ai-configuration";
-import { migration030 } from "@/db/migrations/030-your-week-period";
-import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
 import {
@@ -148,49 +119,9 @@ import { resolveBackground } from "@/theme/backgrounds";
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
 const newUid = () => `uid-${++uid}`;
-const migrations = [
-  migration001,
-  migration002,
-  migration003,
-  migration004,
-  migration005,
-  migration006,
-  migration007,
-  migration008,
-  migration009,
-  migration010,
-  migration011,
-  migration012,
-  migration013,
-  migration014,
-  migration015,
-  migration016,
-  migration017,
-  migration018,
-  migration019,
-  migration020,
-];
-
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(
-    exec,
-    [
-      ...migrations,
-      migration021,
-      migration022,
-      migration023,
-      profilePresentationMigration,
-      migration025,
-      migration026,
-      migration027,
-      migration028,
-      migration029,
-      migration030,
-    ],
-    30,
-    { now: NOW, newUid },
-  );
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid });
   return exec;
 }
 
@@ -1515,7 +1446,7 @@ describe("applyRestore", () => {
     ]);
   });
 
-  it("round-trips live and deleted knowledge, linked people, and current/history state", async () => {
+  it("round-trips live and deleted knowledge, linked people, and dated current state", async () => {
     const source = await db();
     const owner = await source.runAsync(
       "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
@@ -1530,7 +1461,7 @@ describe("applyRestore", () => {
       [
         "memory-live",
         owner.lastInsertRowId,
-        "custom",
+        "general",
         "Note",
         "Live",
         1,
@@ -1541,12 +1472,14 @@ describe("applyRestore", () => {
         null,
       ],
     );
+    // A soft-deleted row (only the legacy soft cores can still write one)
+    // travels as a tombstone, never as a row (D-69).
     await source.runAsync(
       "INSERT INTO memories (uid,contact_id,type,custom_label,value,pinned,outdated,provenance,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
       [
         "memory-deleted",
         owner.lastInsertRowId,
-        "custom",
+        "general",
         "Note",
         "Deleted",
         0,
@@ -1571,25 +1504,29 @@ describe("applyRestore", () => {
       ],
     );
     await source.runAsync(
-      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,entry_date,entry_time,url,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
       [
         "state-history",
         owner.lastInsertRowId,
         "current_location",
         "Chicago",
-        0,
+        "2026-08-20",
+        null,
+        null,
         NOW,
         NOW,
       ],
     );
     await source.runAsync(
-      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,entry_date,entry_time,url,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
       [
         "state-current",
         owner.lastInsertRowId,
         "current_location",
         "Madison",
-        1,
+        "2026-08-24",
+        "18:30:00",
+        "https://map.test",
         NOW,
         "2026-08-26 12:00:00",
       ],
@@ -1597,6 +1534,12 @@ describe("applyRestore", () => {
     const manifest = await buildExportManifest(source, {
       exportedAt: NOW,
       readPhotoBase64: async () => "",
+    });
+    expect(manifest.memories.map((row) => row.uid)).toEqual(["memory-live"]);
+    expect(manifest.tombstones).toContainEqual({
+      entityType: "memory",
+      entityUid: "memory-deleted",
+      deletedAt: "2026-08-26 12:00:00",
     });
     const destination = await db();
     await expect(
@@ -1606,10 +1549,12 @@ describe("applyRestore", () => {
       destination.getAllAsync(
         "SELECT uid,deleted_at FROM memories ORDER BY uid",
       ),
-    ).resolves.toEqual([
-      { uid: "memory-deleted", deleted_at: "2026-08-26 12:00:00" },
-      { uid: "memory-live", deleted_at: null },
-    ]);
+    ).resolves.toEqual([{ uid: "memory-live", deleted_at: null }]);
+    await expect(
+      destination.getFirstAsync(
+        "SELECT deleted_at FROM tombstones WHERE entity_type='memory' AND entity_uid='memory-deleted'",
+      ),
+    ).resolves.toEqual({ deleted_at: "2026-08-26 12:00:00" });
     await expect(
       destination.getFirstAsync<{ linked_uid: string }>(
         "SELECT linked.uid AS linked_uid FROM relationships r JOIN contacts linked ON linked.id=r.linked_contact_id WHERE r.uid=?",
@@ -1618,11 +1563,21 @@ describe("applyRestore", () => {
     ).resolves.toEqual({ linked_uid: "knowledge-linked" });
     await expect(
       destination.getAllAsync(
-        "SELECT uid,is_current FROM current_state_entries ORDER BY uid",
+        "SELECT uid,entry_date,entry_time,url FROM current_state_entries ORDER BY uid",
       ),
     ).resolves.toEqual([
-      { uid: "state-current", is_current: 1 },
-      { uid: "state-history", is_current: 0 },
+      {
+        uid: "state-current",
+        entry_date: "2026-08-24",
+        entry_time: "18:30:00",
+        url: "https://map.test",
+      },
+      {
+        uid: "state-history",
+        entry_date: "2026-08-20",
+        entry_time: null,
+        url: null,
+      },
     ]);
   });
   it("reconciles all decisions before one transaction and UID-maps an incoming contact", async () => {
@@ -1970,13 +1925,13 @@ describe("applyRestore", () => {
       ],
     );
     await destination.runAsync(
-      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,entry_date,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
       [
         "old-current-state",
         oldContact.lastInsertRowId,
         "current_location",
         "Old location",
-        1,
+        "2026-08-25",
         NOW,
         NOW,
       ],
@@ -2973,7 +2928,7 @@ describe("applyRestore", () => {
     ).resolves.toEqual({ default_interaction_channel: "remember" });
   });
 
-  it("round-trips allow_ai, scoped/history/group defs, value history, soft-deletes, and a history tombstone in merge", async () => {
+  it("round-trips allow_ai, scoped/history/group defs, value history, soft-deletes as tombstones, and a history tombstone in merge", async () => {
     const source = await db();
     const owner = await source.runAsync(
       "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
@@ -3016,7 +2971,7 @@ describe("applyRestore", () => {
       [
         "mem-deleted",
         ownerId,
-        "custom",
+        "general",
         "Note",
         "Deleted",
         0,
@@ -3113,9 +3068,14 @@ describe("applyRestore", () => {
       }>("SELECT uid,allow_ai,deleted_at FROM memories ORDER BY uid"),
     ).resolves.toEqual([
       { uid: "mem-allow", allow_ai: 1, deleted_at: null },
-      { uid: "mem-deleted", allow_ai: 0, deleted_at: "2026-08-26 12:00:00" },
       { uid: "mem-imported", allow_ai: 0, deleted_at: null },
     ]);
+    // D-69: the soft-deleted source row arrives as a tombstone, not a row.
+    await expect(
+      destination.getFirstAsync(
+        "SELECT deleted_at FROM tombstones WHERE entity_type='memory' AND entity_uid='mem-deleted'",
+      ),
+    ).resolves.toEqual({ deleted_at: "2026-08-26 12:00:00" });
     await expect(
       destination.getFirstAsync<{ type: string }>(
         "SELECT type FROM memories WHERE uid=?",
@@ -3319,5 +3279,1012 @@ describe("applyRestore", () => {
         "SELECT COUNT(*) AS n FROM custom_field_value_history",
       ),
     ).resolves.toEqual({ n: 0 });
+  });
+});
+
+describe("knowledge links and AI permission on restore (Phase 38.10)", () => {
+  const OLD = "2026-08-25 12:00:00";
+  const MID = "2026-08-26 12:00:00";
+  const NEW = "2026-08-27 12:00:00";
+  type Wire = Record<string, unknown>;
+  type Manifest = Record<string, Wire[]> & Record<string, unknown>;
+
+  async function linkDb(): Promise<SqlExecutor> {
+    const exec = await db();
+    for (const [uid, name] of [
+      ["kc-a", "Alex"],
+      ["kc-b", "Blair"],
+    ])
+      await exec.runAsync(
+        "INSERT INTO contacts (uid,name,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?)",
+        [uid, name, 14, 0, 0, OLD, OLD],
+      );
+    return exec;
+  }
+  async function idOf(
+    exec: SqlExecutor,
+    table: string,
+    uid: string,
+  ): Promise<number> {
+    const row = await exec.getFirstAsync<{ id: number }>(
+      `SELECT id FROM ${table} WHERE uid=?`,
+      [uid],
+    );
+    if (!row) throw new Error(`no ${table} ${uid}`);
+    return row.id;
+  }
+  async function seedEvent(
+    exec: SqlExecutor,
+    uid: string,
+    o: { groupNote: string | null; occurredAt?: string; modifiedAt?: string },
+  ): Promise<void> {
+    await exec.runAsync(
+      "INSERT INTO group_events (uid,title,occurred_at,group_note,created_at,modified_at) VALUES (?,?,?,?,?,?)",
+      [
+        uid,
+        "Dinner",
+        o.occurredAt ?? "2026-08-20 19:00:00",
+        o.groupNote,
+        OLD,
+        o.modifiedAt ?? OLD,
+      ],
+    );
+  }
+  async function seedInteraction(
+    exec: SqlExecutor,
+    uid: string,
+    contactUid: string,
+    o: {
+      note?: string | null;
+      allowAi?: number;
+      noteAiLocked?: number;
+      groupEventUid?: string;
+      occurredAt?: string;
+      modifiedAt?: string;
+    } = {},
+  ): Promise<void> {
+    await exec.runAsync(
+      "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,connected,quality,note,allow_ai,note_ai_locked,group_event_id,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      [
+        uid,
+        await idOf(exec, "contacts", contactUid),
+        o.occurredAt ?? "2026-08-20 19:00:00",
+        OLD,
+        "Message",
+        1,
+        "Positive",
+        o.note === undefined ? `note of ${uid}` : o.note,
+        o.allowAi ?? 1,
+        o.noteAiLocked ?? 0,
+        o.groupEventUid
+          ? await idOf(exec, "group_events", o.groupEventUid)
+          : null,
+        "manual",
+        o.modifiedAt ?? OLD,
+      ],
+    );
+  }
+  async function seedMemory(
+    exec: SqlExecutor,
+    uid: string,
+    contactUid: string,
+    o: {
+      value?: string;
+      allowAi?: number;
+      interactionUid?: string;
+      linkSource?: "note" | "group_note" | null;
+      groupNoteCopy?: number;
+      modifiedAt?: string;
+    } = {},
+  ): Promise<void> {
+    await exec.runAsync(
+      "INSERT INTO memories (uid,contact_id,type,value,pinned,outdated,provenance,allow_ai,interaction_id,link_source,group_note_copy,created_at,modified_at) VALUES (?,?,'general',?,0,0,'user',?,?,?,?,?,?)",
+      [
+        uid,
+        await idOf(exec, "contacts", contactUid),
+        o.value ?? `text of ${uid}`,
+        o.allowAi ?? 0,
+        o.interactionUid
+          ? await idOf(exec, "interactions", o.interactionUid)
+          : null,
+        o.linkSource ?? null,
+        o.groupNoteCopy ?? 0,
+        OLD,
+        o.modifiedAt ?? OLD,
+      ],
+    );
+  }
+  async function seedEntry(
+    exec: SqlExecutor,
+    uid: string,
+    contactUid: string,
+    o: {
+      value?: string;
+      entryDate?: string;
+      entryTime?: string | null;
+      interactionUid?: string;
+      linkSource?: "note" | "group_note" | null;
+      groupNoteCopy?: number;
+      fromShare?: number;
+      modifiedAt?: string;
+    } = {},
+  ): Promise<void> {
+    await exec.runAsync(
+      "INSERT INTO current_state_entries (uid,contact_id,field_key,value,entry_date,entry_time,url,interaction_id,link_source,group_note_copy,from_share,created_at,modified_at) VALUES (?,?,'last_talked_about',?,?,?,NULL,?,?,?,?,?,?)",
+      [
+        uid,
+        await idOf(exec, "contacts", contactUid),
+        o.value ?? `topic of ${uid}`,
+        o.entryDate ?? "2026-08-10",
+        o.entryTime ?? null,
+        o.interactionUid
+          ? await idOf(exec, "interactions", o.interactionUid)
+          : null,
+        o.linkSource ?? null,
+        o.groupNoteCopy ?? 0,
+        o.fromShare ?? 0,
+        OLD,
+        o.modifiedAt ?? OLD,
+      ],
+    );
+  }
+  /** A file equal to the destination as it stands, to edit into the incoming side. */
+  async function fileOf(exec: SqlExecutor): Promise<Manifest> {
+    return JSON.parse(
+      JSON.stringify(
+        await buildExportManifest(exec, {
+          exportedAt: OLD,
+          readPhotoBase64: async () => "",
+        }),
+      ),
+    ) as Manifest;
+  }
+  const wireMemory = (uid: string, contactUid: string, extra: Wire = {}) => ({
+    uid,
+    contactUid,
+    type: "general",
+    customLabel: null,
+    value: `incoming ${uid}`,
+    note: null,
+    url: null,
+    meaningfulDate: null,
+    pinned: 0,
+    outdated: 0,
+    hidden: null,
+    provenance: "user",
+    allowAi: 0,
+    interactionUid: null,
+    linkSource: null,
+    groupNoteCopy: 0,
+    createdAt: OLD,
+    modifiedAt: NEW,
+    ...extra,
+  });
+  const wireEntry = (uid: string, contactUid: string, extra: Wire = {}) => ({
+    uid,
+    contactUid,
+    fieldKey: "last_talked_about",
+    value: `incoming ${uid}`,
+    entryDate: "2026-08-11",
+    entryTime: null,
+    url: null,
+    interactionUid: null,
+    linkSource: null,
+    groupNoteCopy: 0,
+    fromShare: 0,
+    createdAt: OLD,
+    modifiedAt: NEW,
+    ...extra,
+  });
+  const wireInteraction = (
+    uid: string,
+    contactUid: string,
+    extra: Wire = {},
+  ) => ({
+    uid,
+    contactUid,
+    groupEventUid: null,
+    occurredAt: "2026-08-20 19:00:00",
+    recordedAt: OLD,
+    channel: "Message",
+    direction: null,
+    connected: 1,
+    quality: "Positive",
+    note: `note of ${uid}`,
+    duration: null,
+    allowAi: 1,
+    noteAiLocked: 0,
+    geFollowChannel: null,
+    geFollowQuality: null,
+    geFollowDuration: null,
+    source: "manual",
+    modifiedAt: NEW,
+    ...extra,
+  });
+  const merge = (exec: SqlExecutor, file: Manifest) =>
+    applyRestore(exec, parseBackupManifest(file), "merge");
+  const replaceAll = (exec: SqlExecutor, file: Manifest) =>
+    applyRestore(exec, parseBackupManifest(file), "replace-all");
+  const upsertWire = (file: Manifest, key: string, row: Wire) => {
+    file[key] = [...file[key].filter((item) => item.uid !== row.uid), row];
+  };
+  async function memoryOf(exec: SqlExecutor, uid: string) {
+    return exec.getFirstAsync<{
+      value: string | null;
+      allow_ai: number;
+      interaction_uid: string | null;
+      link_source: string | null;
+      group_note_copy: number;
+    }>(
+      "SELECT m.value,m.allow_ai,i.uid AS interaction_uid,m.link_source,m.group_note_copy FROM memories m LEFT JOIN interactions i ON i.id=m.interaction_id WHERE m.uid=?",
+      [uid],
+    );
+  }
+  async function entryOf(exec: SqlExecutor, uid: string) {
+    return exec.getFirstAsync<{
+      value: string;
+      entry_date: string;
+      entry_time: string | null;
+      interaction_uid: string | null;
+      link_source: string | null;
+      group_note_copy: number;
+      from_share: number;
+    }>(
+      "SELECT s.value,s.entry_date,s.entry_time,i.uid AS interaction_uid,s.link_source,s.group_note_copy,s.from_share FROM current_state_entries s LEFT JOIN interactions i ON i.id=s.interaction_id WHERE s.uid=?",
+      [uid],
+    );
+  }
+  async function interactionOf(exec: SqlExecutor, uid: string) {
+    return exec.getFirstAsync<{
+      allow_ai: number;
+      note_ai_locked: number;
+      note: string | null;
+    }>("SELECT allow_ai,note_ai_locked,note FROM interactions WHERE uid=?", [
+      uid,
+    ]);
+  }
+
+  it("Merge with a higher incoming allow_ai keeps the local lower value (D-13)", async () => {
+    const dest = await linkDb();
+    await seedInteraction(dest, "i-1", "kc-a", { allowAi: 0 });
+    await seedMemory(dest, "m-1", "kc-a", { allowAi: 0 });
+    const file = await fileOf(dest);
+    upsertWire(
+      file,
+      "interactions",
+      wireInteraction("i-1", "kc-a", { allowAi: 1, note: "edited" }),
+    );
+    upsertWire(
+      file,
+      "memories",
+      wireMemory("m-1", "kc-a", { allowAi: 1, value: "edited" }),
+    );
+    await expect(merge(dest, file)).resolves.toMatchObject({
+      status: "applied",
+    });
+    await expect(interactionOf(dest, "i-1")).resolves.toMatchObject({
+      allow_ai: 0,
+      note: "edited",
+    });
+    await expect(memoryOf(dest, "m-1")).resolves.toMatchObject({
+      allow_ai: 0,
+      value: "edited",
+    });
+  });
+
+  it("the linked-pair post-pass converges both link sources", async () => {
+    const source = await linkDb();
+    await seedEvent(source, "ge-1", {
+      groupNote: "Group text",
+      occurredAt: "2026-08-21 18:45",
+    });
+    await seedInteraction(source, "i-note", "kc-a", {
+      note: "Fresh note",
+      allowAi: 0,
+    });
+    await seedInteraction(source, "i-note-2", "kc-a", {
+      note: "Fresh note",
+      occurredAt: "2026-08-22 09:15:00",
+    });
+    await seedInteraction(source, "i-g1", "kc-a", { groupEventUid: "ge-1" });
+    await seedInteraction(source, "i-g2", "kc-b", { groupEventUid: "ge-1" });
+    // Diverged copies, as a cross-device Merge can leave them.
+    await seedMemory(source, "m-note", "kc-a", {
+      value: "Stale",
+      allowAi: 1,
+      interactionUid: "i-note",
+      linkSource: "note",
+    });
+    await seedEntry(source, "s-note", "kc-a", {
+      value: "Stale",
+      entryDate: "2026-08-01",
+      interactionUid: "i-note-2",
+      linkSource: "note",
+    });
+    await seedMemory(source, "m-group", "kc-a", {
+      value: "Stale",
+      interactionUid: "i-g1",
+      linkSource: "group_note",
+      groupNoteCopy: 1,
+    });
+    await seedEntry(source, "s-group", "kc-b", {
+      value: "Stale",
+      entryDate: "2026-08-01",
+      interactionUid: "i-g2",
+      linkSource: "group_note",
+      groupNoteCopy: 1,
+    });
+    const dest = await linkDb();
+    await expect(replaceAll(dest, await fileOf(source))).resolves.toMatchObject(
+      {
+        status: "applied",
+      },
+    );
+    await expect(memoryOf(dest, "m-note")).resolves.toMatchObject({
+      value: "Fresh note",
+      allow_ai: 0,
+      interaction_uid: "i-note",
+    });
+    await expect(interactionOf(dest, "i-note")).resolves.toMatchObject({
+      allow_ai: 0,
+    });
+    await expect(entryOf(dest, "s-note")).resolves.toMatchObject({
+      value: "Fresh note",
+      entry_date: "2026-08-22",
+      entry_time: "09:15:00",
+    });
+    await expect(memoryOf(dest, "m-group")).resolves.toMatchObject({
+      value: "Group text",
+      allow_ai: 0,
+      group_note_copy: 1,
+    });
+    await expect(entryOf(dest, "s-group")).resolves.toMatchObject({
+      value: "Group text",
+      entry_date: "2026-08-21",
+      entry_time: "18:45:00",
+      group_note_copy: 1,
+    });
+  });
+
+  describe("F-D1 ordered link pass", () => {
+    it("(a) memories: the newer row keeps the link, the older is unlinked with its text", async () => {
+      const dest = await linkDb();
+      await seedInteraction(dest, "i-1", "kc-a", { note: "Shared" });
+      await seedMemory(dest, "m-local", "kc-a", {
+        value: "Local copy",
+        interactionUid: "i-1",
+        linkSource: "note",
+      });
+      const file = await fileOf(dest);
+      file.memories = file.memories.filter((row) => row.uid !== "m-local");
+      upsertWire(
+        file,
+        "memories",
+        wireMemory("m-incoming", "kc-a", {
+          value: "Shared",
+          interactionUid: "i-1",
+          linkSource: "note",
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(memoryOf(dest, "m-incoming")).resolves.toMatchObject({
+        interaction_uid: "i-1",
+        link_source: "note",
+      });
+      await expect(memoryOf(dest, "m-local")).resolves.toMatchObject({
+        value: "Local copy",
+        interaction_uid: null,
+        link_source: null,
+      });
+    });
+
+    it("(b) current state: the same, never deleting the loser", async () => {
+      const dest = await linkDb();
+      await seedInteraction(dest, "i-1", "kc-a", { note: "Shared" });
+      await seedEntry(dest, "s-local", "kc-a", {
+        value: "Local copy",
+        interactionUid: "i-1",
+        linkSource: "note",
+      });
+      const file = await fileOf(dest);
+      file.currentStateEntries = file.currentStateEntries.filter(
+        (row) => row.uid !== "s-local",
+      );
+      upsertWire(
+        file,
+        "currentStateEntries",
+        wireEntry("s-incoming", "kc-a", {
+          value: "Shared",
+          interactionUid: "i-1",
+          linkSource: "note",
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(entryOf(dest, "s-incoming")).resolves.toMatchObject({
+        interaction_uid: "i-1",
+      });
+      await expect(entryOf(dest, "s-local")).resolves.toMatchObject({
+        value: "Local copy",
+        interaction_uid: null,
+      });
+    });
+
+    it("(c) cross-table: a linked memory and a linked entry on one pair, newer wins", async () => {
+      const dest = await linkDb();
+      await seedInteraction(dest, "i-1", "kc-a", { note: "Shared" });
+      await seedMemory(dest, "m-local", "kc-a", {
+        value: "Shared",
+        interactionUid: "i-1",
+        linkSource: "note",
+      });
+      const file = await fileOf(dest);
+      upsertWire(
+        file,
+        "currentStateEntries",
+        wireEntry("s-incoming", "kc-a", {
+          value: "Shared",
+          interactionUid: "i-1",
+          linkSource: "note",
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(entryOf(dest, "s-incoming")).resolves.toMatchObject({
+        interaction_uid: "i-1",
+      });
+      await expect(memoryOf(dest, "m-local")).resolves.toMatchObject({
+        value: "Shared",
+        interaction_uid: null,
+      });
+    });
+
+    it("(d) other-contact owner: the memory is unlinked and never takes B's note", async () => {
+      const dest = await linkDb();
+      await seedInteraction(dest, "i-b", "kc-b", { note: "Blair's note" });
+      const file = await fileOf(dest);
+      upsertWire(
+        file,
+        "memories",
+        wireMemory("m-a", "kc-a", {
+          value: "Alex's own text",
+          interactionUid: "i-b",
+          linkSource: "note",
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(memoryOf(dest, "m-a")).resolves.toMatchObject({
+        value: "Alex's own text",
+        interaction_uid: null,
+      });
+    });
+
+    it("(e) dissolved event: a Group Note copy is unlinked and stays locked", async () => {
+      const dest = await linkDb();
+      const file = await fileOf(dest);
+      upsertWire(
+        file,
+        "interactions",
+        wireInteraction("i-g", "kc-a", {
+          groupEventUid: "ge-gone",
+        }),
+      );
+      upsertWire(
+        file,
+        "memories",
+        wireMemory("m-copy", "kc-a", {
+          value: "Copied group note",
+          interactionUid: "i-g",
+          linkSource: "group_note",
+          groupNoteCopy: 1,
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(memoryOf(dest, "m-copy")).resolves.toMatchObject({
+        value: "Copied group note",
+        interaction_uid: null,
+        group_note_copy: 1,
+        allow_ai: 0,
+      });
+    });
+  });
+
+  it("F-D2: a retained newer interaction takes the incoming note lock, even as the only difference", async () => {
+    const dest = await linkDb();
+    await seedInteraction(dest, "i-1", "kc-a", {
+      allowAi: 1,
+      noteAiLocked: 0,
+      modifiedAt: NEW,
+    });
+    const file = await fileOf(dest);
+    const incoming = file.interactions.find((row) => row.uid === "i-1")!;
+    Object.assign(incoming, { noteAiLocked: 1, allowAi: 0, modifiedAt: OLD });
+    await expect(merge(dest, file)).resolves.toMatchObject({
+      status: "applied",
+      updated: 1,
+      inserted: 0,
+    });
+    await expect(interactionOf(dest, "i-1")).resolves.toMatchObject({
+      note_ai_locked: 1,
+      allow_ai: 0,
+    });
+  });
+
+  it("keeps a local lock marker when the newer incoming row has none (D-102, D-103)", async () => {
+    const dest = await linkDb();
+    await seedInteraction(dest, "i-1", "kc-a", { allowAi: 0, noteAiLocked: 1 });
+    await seedMemory(dest, "m-1", "kc-a", { allowAi: 0, groupNoteCopy: 1 });
+    const file = await fileOf(dest);
+    upsertWire(
+      file,
+      "interactions",
+      wireInteraction("i-1", "kc-a", {
+        allowAi: 1,
+        noteAiLocked: 0,
+      }),
+    );
+    upsertWire(
+      file,
+      "memories",
+      wireMemory("m-1", "kc-a", {
+        allowAi: 1,
+        groupNoteCopy: 0,
+      }),
+    );
+    await expect(merge(dest, file)).resolves.toMatchObject({
+      status: "applied",
+    });
+    await expect(interactionOf(dest, "i-1")).resolves.toMatchObject({
+      note_ai_locked: 1,
+      allow_ai: 0,
+    });
+    await expect(memoryOf(dest, "m-1")).resolves.toMatchObject({
+      group_note_copy: 1,
+      allow_ai: 0,
+    });
+  });
+
+  it("a v8 export -> parse -> restore round trip preserves the three markers", async () => {
+    const source = await linkDb();
+    await seedInteraction(source, "i-locked", "kc-a", {
+      allowAi: 0,
+      noteAiLocked: 1,
+    });
+    await seedMemory(source, "m-copy", "kc-a", { groupNoteCopy: 1 });
+    await seedEntry(source, "s-share", "kc-a", { fromShare: 1 });
+    await source.runAsync(
+      "INSERT INTO off_limits (uid,contact_id,label,text,url,group_note_copy,from_share,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      [
+        "o-1",
+        await idOf(source, "contacts", "kc-a"),
+        "Topic",
+        null,
+        null,
+        1,
+        1,
+        OLD,
+        OLD,
+      ],
+    );
+    const file = await fileOf(source);
+    expect(file.interactions[0]).toMatchObject({ noteAiLocked: 1 });
+    expect(file.offLimits[0]).toMatchObject({ groupNoteCopy: 1, fromShare: 1 });
+    const dest = await linkDb();
+    await expect(replaceAll(dest, file)).resolves.toMatchObject({
+      status: "applied",
+    });
+    await expect(interactionOf(dest, "i-locked")).resolves.toMatchObject({
+      note_ai_locked: 1,
+      allow_ai: 0,
+    });
+    await expect(memoryOf(dest, "m-copy")).resolves.toMatchObject({
+      group_note_copy: 1,
+    });
+    await expect(entryOf(dest, "s-share")).resolves.toMatchObject({
+      from_share: 1,
+    });
+    await expect(
+      dest.getFirstAsync(
+        "SELECT label,group_note_copy,from_share FROM off_limits WHERE uid='o-1'",
+      ),
+    ).resolves.toEqual({ label: "Topic", group_note_copy: 1, from_share: 1 });
+  });
+
+  it("W-10: unlinked rows with a leftover 'note' source validate and restore uncollapsed", async () => {
+    const dest = await linkDb();
+    const file = await fileOf(dest);
+    for (const uid of ["m-1", "m-2"])
+      upsertWire(
+        file,
+        "memories",
+        wireMemory(uid, "kc-a", { linkSource: "note" }),
+      );
+    for (const uid of ["s-1", "s-2"])
+      upsertWire(
+        file,
+        "currentStateEntries",
+        wireEntry(uid, "kc-a", { linkSource: "note" }),
+      );
+    await expect(merge(dest, file)).resolves.toMatchObject({
+      status: "applied",
+    });
+    for (const uid of ["m-1", "m-2"])
+      await expect(memoryOf(dest, uid)).resolves.toMatchObject({
+        value: `incoming ${uid}`,
+        link_source: "note",
+        interaction_uid: null,
+      });
+    for (const uid of ["s-1", "s-2"])
+      await expect(entryOf(dest, uid)).resolves.toMatchObject({
+        link_source: "note",
+      });
+  });
+
+  it("I-11: an incoming linked Group Note memory marked 0 restores locked", async () => {
+    const dest = await linkDb();
+    await seedEvent(dest, "ge-1", { groupNote: "Group text" });
+    await seedInteraction(dest, "i-g", "kc-a", { groupEventUid: "ge-1" });
+    const file = await fileOf(dest);
+    upsertWire(
+      file,
+      "memories",
+      wireMemory("m-copy", "kc-a", {
+        value: "Group text",
+        allowAi: 1,
+        groupNoteCopy: 0,
+        interactionUid: "i-g",
+        linkSource: "group_note",
+      }),
+    );
+    await expect(merge(dest, file)).resolves.toMatchObject({
+      status: "applied",
+    });
+    await expect(memoryOf(dest, "m-copy")).resolves.toMatchObject({
+      interaction_uid: "i-g",
+      group_note_copy: 1,
+      allow_ai: 0,
+    });
+  });
+
+  describe("C-01 step 0: Group Note origin evidence survives every detach", () => {
+    const crafted = (extra: Wire = {}) =>
+      wireMemory("m-copy", "kc-a", {
+        value: "Crafted copy",
+        allowAi: 1,
+        groupNoteCopy: 0,
+        linkSource: "group_note",
+        ...extra,
+      });
+    const expectLockedDetached = async (dest: SqlExecutor) =>
+      expect(memoryOf(dest, "m-copy")).resolves.toEqual({
+        value: "Crafted copy",
+        allow_ai: 0,
+        interaction_uid: null,
+        link_source: null,
+        group_note_copy: 1,
+      });
+
+    it("(a) missing owner", async () => {
+      const dest = await linkDb();
+      const file = await fileOf(dest);
+      upsertWire(file, "memories", crafted({ interactionUid: "i-nowhere" }));
+      upsertWire(
+        file,
+        "currentStateEntries",
+        wireEntry("s-copy", "kc-a", {
+          interactionUid: "i-nowhere",
+          linkSource: "group_note",
+          groupNoteCopy: 0,
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expectLockedDetached(dest);
+      await expect(entryOf(dest, "s-copy")).resolves.toMatchObject({
+        interaction_uid: null,
+        group_note_copy: 1,
+      });
+    });
+
+    it("(b) other contact", async () => {
+      const dest = await linkDb();
+      await seedEvent(dest, "ge-1", { groupNote: "Group text" });
+      await seedInteraction(dest, "i-b", "kc-b", { groupEventUid: "ge-1" });
+      const file = await fileOf(dest);
+      upsertWire(file, "memories", crafted({ interactionUid: "i-b" }));
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expectLockedDetached(dest);
+    });
+
+    it("(c) dissolved event", async () => {
+      const dest = await linkDb();
+      const file = await fileOf(dest);
+      upsertWire(
+        file,
+        "interactions",
+        wireInteraction("i-g", "kc-a", {
+          groupEventUid: "ge-gone",
+        }),
+      );
+      upsertWire(file, "memories", crafted({ interactionUid: "i-g" }));
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expectLockedDetached(dest);
+    });
+
+    it("(d) blank Group Note", async () => {
+      const dest = await linkDb();
+      await seedEvent(dest, "ge-1", { groupNote: "   " });
+      await seedInteraction(dest, "i-g", "kc-a", { groupEventUid: "ge-1" });
+      const file = await fileOf(dest);
+      upsertWire(file, "memories", crafted({ interactionUid: "i-g" }));
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expectLockedDetached(dest);
+    });
+
+    it("(e) collapse loser", async () => {
+      const dest = await linkDb();
+      await seedEvent(dest, "ge-1", { groupNote: "Group text" });
+      await seedInteraction(dest, "i-g", "kc-a", { groupEventUid: "ge-1" });
+      await seedMemory(dest, "m-winner", "kc-a", {
+        value: "Group text",
+        interactionUid: "i-g",
+        linkSource: "group_note",
+        groupNoteCopy: 1,
+        modifiedAt: NEW,
+      });
+      const file = await fileOf(dest);
+      // The newer local winner is retained (it is not in the file).
+      file.memories = file.memories.filter((row) => row.uid !== "m-winner");
+      upsertWire(
+        file,
+        "memories",
+        crafted({ interactionUid: "i-g", modifiedAt: MID }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expectLockedDetached(dest);
+      await expect(memoryOf(dest, "m-winner")).resolves.toMatchObject({
+        interaction_uid: "i-g",
+      });
+    });
+
+    it("(f) a leftover 'group_note' source with no interaction", async () => {
+      const dest = await linkDb();
+      const file = await fileOf(dest);
+      upsertWire(file, "memories", crafted());
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(memoryOf(dest, "m-copy")).resolves.toEqual({
+        value: "Crafted copy",
+        allow_ai: 0,
+        interaction_uid: null,
+        link_source: "group_note",
+        group_note_copy: 1,
+      });
+    });
+  });
+
+  it("C-02: a retained Group Note copy takes the newer event's date and time", async () => {
+    const dest = await linkDb();
+    await seedEvent(dest, "ge-1", {
+      groupNote: "Group text",
+      occurredAt: "2026-08-20 09:00:00",
+    });
+    await seedInteraction(dest, "i-g", "kc-a", { groupEventUid: "ge-1" });
+    await seedEntry(dest, "s-copy", "kc-a", {
+      value: "Group text",
+      entryDate: "2026-08-20",
+      entryTime: "09:00:00",
+      interactionUid: "i-g",
+      linkSource: "group_note",
+      groupNoteCopy: 1,
+    });
+    const file = await fileOf(dest);
+    const event = file.groupEvents.find((row) => row.uid === "ge-1")!;
+    Object.assign(event, { occurredAt: "2026-08-22 18:45", modifiedAt: NEW });
+    await expect(merge(dest, file)).resolves.toMatchObject({
+      status: "applied",
+    });
+    await expect(entryOf(dest, "s-copy")).resolves.toMatchObject({
+      interaction_uid: "i-g",
+      entry_date: "2026-08-22",
+      entry_time: "18:45:00",
+    });
+  });
+
+  describe("G-D3 link-slot release", () => {
+    async function slotCase(
+      table: "memories" | "currentStateEntries",
+      localUid: string,
+      incomingUid: string,
+    ) {
+      const dest = await linkDb();
+      await seedInteraction(dest, "i-1", "kc-a", { note: "Shared" });
+      const seed = table === "memories" ? seedMemory : seedEntry;
+      await seed(dest, localUid, "kc-a", {
+        value: "Local copy",
+        interactionUid: "i-1",
+        linkSource: "note",
+      });
+      const file = await fileOf(dest);
+      file[table] = file[table].filter((row) => row.uid !== localUid);
+      const wire = table === "memories" ? wireMemory : wireEntry;
+      upsertWire(
+        file,
+        table,
+        wire(incomingUid, "kc-a", {
+          value: "Shared",
+          interactionUid: "i-1",
+          linkSource: "note",
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      const read = table === "memories" ? memoryOf : entryOf;
+      await expect(read(dest, incomingUid)).resolves.toMatchObject({
+        interaction_uid: "i-1",
+      });
+      await expect(read(dest, localUid)).resolves.toMatchObject({
+        value: "Local copy",
+        interaction_uid: null,
+      });
+      const sql =
+        table === "memories"
+          ? "SELECT COUNT(*) AS n FROM memories WHERE interaction_id IS NOT NULL"
+          : "SELECT COUNT(*) AS n FROM current_state_entries WHERE interaction_id IS NOT NULL";
+      await expect(dest.getFirstAsync(sql)).resolves.toEqual({ n: 1 });
+    }
+
+    it("(a) older z-local, newer a-incoming", () =>
+      slotCase("memories", "z-local", "a-incoming"));
+    it("(b) older a-local, newer z-incoming", () =>
+      slotCase("memories", "a-local", "z-incoming"));
+    it("(c) the same in current state", () =>
+      slotCase("currentStateEntries", "z-local", "a-incoming"));
+
+    it("(d) a two-row swap commits", async () => {
+      const dest = await linkDb();
+      await seedInteraction(dest, "i-1", "kc-a", { note: "One" });
+      await seedInteraction(dest, "i-2", "kc-a", { note: "Two" });
+      await seedMemory(dest, "m-a", "kc-a", {
+        value: "One",
+        interactionUid: "i-1",
+        linkSource: "note",
+      });
+      await seedMemory(dest, "m-b", "kc-a", {
+        value: "Two",
+        interactionUid: "i-2",
+        linkSource: "note",
+      });
+      const file = await fileOf(dest);
+      upsertWire(
+        file,
+        "memories",
+        wireMemory("m-a", "kc-a", {
+          value: "Two",
+          interactionUid: "i-2",
+          linkSource: "note",
+        }),
+      );
+      upsertWire(
+        file,
+        "memories",
+        wireMemory("m-b", "kc-a", {
+          value: "One",
+          interactionUid: "i-1",
+          linkSource: "note",
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(memoryOf(dest, "m-a")).resolves.toMatchObject({
+        interaction_uid: "i-2",
+        value: "Two",
+      });
+      await expect(memoryOf(dest, "m-b")).resolves.toMatchObject({
+        interaction_uid: "i-1",
+        value: "One",
+      });
+    });
+  });
+
+  describe("G-D4 blank source", () => {
+    async function blankEventCase(kind: "memory" | "entry") {
+      const dest = await linkDb();
+      await seedEvent(dest, "ge-1", { groupNote: "Old group note" });
+      await seedInteraction(dest, "i-g", "kc-a", { groupEventUid: "ge-1" });
+      if (kind === "memory")
+        await seedMemory(dest, "copy", "kc-a", {
+          value: "Old group note",
+          interactionUid: "i-g",
+          linkSource: "group_note",
+          groupNoteCopy: 1,
+        });
+      else
+        await seedEntry(dest, "copy", "kc-a", {
+          value: "Old group note",
+          interactionUid: "i-g",
+          linkSource: "group_note",
+          groupNoteCopy: 1,
+        });
+      const file = await fileOf(dest);
+      Object.assign(file.groupEvents.find((row) => row.uid === "ge-1")!, {
+        groupNote: "",
+        modifiedAt: NEW,
+      });
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      return dest;
+    }
+
+    it("(a) a blank newer Group Note detaches a memory copy, which keeps its text and lock", async () => {
+      const dest = await blankEventCase("memory");
+      await expect(memoryOf(dest, "copy")).resolves.toEqual({
+        value: "Old group note",
+        allow_ai: 0,
+        interaction_uid: null,
+        link_source: null,
+        group_note_copy: 1,
+      });
+    });
+
+    it("(b) the same for a Last Talked About copy", async () => {
+      const dest = await blankEventCase("entry");
+      await expect(entryOf(dest, "copy")).resolves.toMatchObject({
+        value: "Old group note",
+        interaction_uid: null,
+        group_note_copy: 1,
+      });
+    });
+
+    it("(c) a newer blank interaction note detaches a retained note-linked memory", async () => {
+      const dest = await linkDb();
+      await seedInteraction(dest, "i-1", "kc-a", { note: "Kept text" });
+      await seedMemory(dest, "m-1", "kc-a", {
+        value: "Kept text",
+        allowAi: 1,
+        interactionUid: "i-1",
+        linkSource: "note",
+      });
+      const file = await fileOf(dest);
+      upsertWire(
+        file,
+        "interactions",
+        wireInteraction("i-1", "kc-a", {
+          note: "",
+          allowAi: 1,
+        }),
+      );
+      await expect(merge(dest, file)).resolves.toMatchObject({
+        status: "applied",
+      });
+      await expect(memoryOf(dest, "m-1")).resolves.toEqual({
+        value: "Kept text",
+        allow_ai: 1,
+        interaction_uid: null,
+        link_source: null,
+        group_note_copy: 0,
+      });
+    });
   });
 });

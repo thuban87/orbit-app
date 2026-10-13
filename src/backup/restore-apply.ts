@@ -29,6 +29,7 @@ import {
   applyCategoryDeletionFalloutCore,
   readCategoryDeletionPreviewCore,
 } from "@/db/categories-dao";
+import { entryDateTimeOf } from "@/db/current-state-history-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import {
   remapLegacyChannel,
@@ -230,7 +231,7 @@ const entities: readonly MergeableEntityType[] = [
   "contact_method_provenance",
   "interactions",
   "events",
-  "fuel",
+  "off_limits",
   "contact_links",
   "custom_field_values",
   "custom_field_value_history",
@@ -251,7 +252,7 @@ const tombstoneEntity: Record<MergeableEntityType, string | null> = {
   contact_method_provenance: "contact_method_provenance",
   interactions: "interaction",
   events: "event",
-  fuel: "fuel",
+  off_limits: "off_limits",
   contact_links: "contact_link",
   custom_field_defs: "custom_field_def",
   custom_field_values: "custom_field_value",
@@ -287,6 +288,7 @@ function incomingRows(
     custom_field_values: "customFieldValues",
     custom_field_value_history: "customFieldValueHistory",
     current_state_entries: "currentStateEntries",
+    off_limits: "offLimits",
     system_rules: "systemRules",
     system_overrides: "systemOverrides",
     system_prefs: "systemPrefs",
@@ -335,10 +337,11 @@ async function localRows(
     contact_method_provenance:
       "SELECT p.uid,m.uid AS methodUid,l.uid AS externalContactLinkUid,p.source_method_id AS sourceMethodId,p.created_at AS createdAt,p.modified_at FROM contact_method_provenance p JOIN contact_methods m ON m.id=p.method_id LEFT JOIN external_contact_links l ON l.id=p.external_contact_link_id",
     interactions:
-      "SELECT i.uid,c.uid AS contactUid,ge.uid AS groupEventUid,i.occurred_at AS occurredAt,i.recorded_at AS recordedAt,i.channel,i.direction,i.connected,i.quality,i.note,i.duration,i.allow_ai AS allowAi,i.ge_follow_channel AS geFollowChannel,i.ge_follow_quality AS geFollowQuality,i.ge_follow_duration AS geFollowDuration,i.source,i.modified_at FROM interactions i JOIN contacts c ON c.id=i.contact_id LEFT JOIN group_events ge ON ge.id=i.group_event_id",
+      "SELECT i.uid,c.uid AS contactUid,ge.uid AS groupEventUid,i.occurred_at AS occurredAt,i.recorded_at AS recordedAt,i.channel,i.direction,i.connected,i.quality,i.note,i.duration,i.allow_ai AS allowAi,i.note_ai_locked AS noteAiLocked,i.ge_follow_channel AS geFollowChannel,i.ge_follow_quality AS geFollowQuality,i.ge_follow_duration AS geFollowDuration,i.source,i.modified_at FROM interactions i JOIN contacts c ON c.id=i.contact_id LEFT JOIN group_events ge ON ge.id=i.group_event_id",
     events:
       "SELECT e.uid,c.uid AS contactUid,e.type,e.occurred_at AS occurredAt,e.detail,e.recorded_at AS recordedAt,e.modified_at FROM events e JOIN contacts c ON c.id=e.contact_id",
-    fuel: "SELECT f.uid,c.uid AS contactUid,f.kind,f.label,f.text,f.url,f.created_at AS createdAt,f.source,f.modified_at FROM fuel f JOIN contacts c ON c.id=f.contact_id",
+    off_limits:
+      "SELECT o.uid,c.uid AS contactUid,o.label,o.text,o.url,o.group_note_copy AS groupNoteCopy,o.from_share AS fromShare,o.created_at AS createdAt,o.modified_at FROM off_limits o JOIN contacts c ON c.id=o.contact_id",
     contact_links:
       "SELECT l.uid,c.uid AS contactUid,l.url,l.label,l.display_order AS displayOrder,l.created_at AS createdAt,l.modified_at FROM contact_links l JOIN contacts c ON c.id=l.contact_id",
     custom_field_defs:
@@ -348,11 +351,11 @@ async function localRows(
     custom_field_value_history:
       "SELECT h.uid,c.uid AS contactUid,d.uid AS fieldDefUid,h.value,h.created_at AS createdAt,h.created_at AS modified_at FROM custom_field_value_history h JOIN contacts c ON c.id=h.contact_id JOIN custom_field_defs d ON d.id=h.field_def_id",
     memories:
-      "SELECT m.uid,c.uid AS contactUid,m.type,m.custom_label AS customLabel,m.value,m.note,m.url,m.meaningful_date AS meaningfulDate,m.pinned,m.outdated,m.hidden,m.provenance,m.allow_ai AS allowAi,m.created_at AS createdAt,m.modified_at,m.deleted_at AS deletedAt FROM memories m JOIN contacts c ON c.id=m.contact_id",
+      "SELECT m.uid,c.uid AS contactUid,m.type,m.custom_label AS customLabel,m.value,m.note,m.url,m.meaningful_date AS meaningfulDate,m.pinned,m.outdated,m.hidden,m.provenance,m.allow_ai AS allowAi,li.uid AS interactionUid,m.link_source AS linkSource,m.group_note_copy AS groupNoteCopy,m.created_at AS createdAt,m.modified_at FROM memories m JOIN contacts c ON c.id=m.contact_id LEFT JOIN interactions li ON li.id=m.interaction_id",
     relationships:
-      "SELECT r.uid,c.uid AS contactUid,r.person_name AS personName,r.relation_type AS relationType,linked.uid AS linkedContactUid,r.note,r.pinned,r.hidden,r.created_at AS createdAt,r.modified_at,r.deleted_at AS deletedAt FROM relationships r JOIN contacts c ON c.id=r.contact_id LEFT JOIN contacts linked ON linked.id=r.linked_contact_id",
+      "SELECT r.uid,c.uid AS contactUid,r.person_name AS personName,r.relation_type AS relationType,linked.uid AS linkedContactUid,r.note,r.pinned,r.hidden,r.created_at AS createdAt,r.modified_at FROM relationships r JOIN contacts c ON c.id=r.contact_id LEFT JOIN contacts linked ON linked.id=r.linked_contact_id",
     current_state_entries:
-      "SELECT s.uid,c.uid AS contactUid,s.field_key AS fieldKey,s.value,s.is_current AS isCurrent,s.created_at AS createdAt,s.modified_at FROM current_state_entries s JOIN contacts c ON c.id=s.contact_id",
+      "SELECT s.uid,c.uid AS contactUid,s.field_key AS fieldKey,s.value,s.entry_date AS entryDate,s.entry_time AS entryTime,s.url,li.uid AS interactionUid,s.link_source AS linkSource,s.group_note_copy AS groupNoteCopy,s.from_share AS fromShare,s.created_at AS createdAt,s.modified_at FROM current_state_entries s JOIN contacts c ON c.id=s.contact_id LEFT JOIN interactions li ON li.id=s.interaction_id",
     systems: "SELECT uid,name,created_at AS createdAt,modified_at FROM systems",
     system_rules:
       "SELECT r.uid,s.uid AS systemUid,r.family,r.value,r.created_at AS createdAt,r.created_at AS modified_at FROM system_rules r JOIN systems s ON s.id=r.system_id",
@@ -412,7 +415,8 @@ async function idMap(
     | "contact_methods"
     | "external_contact_links"
     | "systems"
-    | "group_events",
+    | "group_events"
+    | "interactions",
 ): Promise<Map<string, number>> {
   return new Map(
     (
@@ -442,7 +446,7 @@ function normalizedWinner(
   })[0]!;
 }
 /** Normalize natural-key collisions after UID reconciliation, before survivors and writes are derived. */
-function normalizePlan(plan: Plan): void {
+function normalizePlan(plan: Plan, manifest: BackupManifest): void {
   const redirects = new Map<string, string>();
   const liveMethods = plan.contact_methods.filter(
     (action) =>
@@ -522,27 +526,117 @@ function normalizePlan(plan: Plan): void {
           updateRetained(loser);
         }
     }
-  const liveCurrent = plan.current_state_entries.filter(
+  lockRetainedInteractionNotes(plan, manifest);
+  repairKnowledgeLinks(plan);
+}
+const LINKED_TABLES = ["memories", "current_state_entries"] as const;
+function liveActions(actions: ReconciliationAction[]): ReconciliationAction[] {
+  return actions.filter(
     (action) =>
-      action.row &&
-      action.kind !== "delete" &&
-      action.kind !== "blocked" &&
-      action.row.isCurrent === 1,
+      action.row && ["insert", "update", "retain"].includes(action.kind),
   );
-  const byCurrent = new Map<string, ReconciliationAction[]>();
-  for (const action of liveCurrent) {
-    const row = action.row!;
-    const key = `${row.contactUid}\0${row.fieldKey}`;
-    byCurrent.set(key, [...(byCurrent.get(key) ?? []), action]);
+}
+function isBlankText(value: unknown): boolean {
+  return typeof value !== "string" || value.trim().length === 0;
+}
+/**
+ * D-103 (convergence c1 F-D2): a newer local interaction that Merge retains
+ * keeps the incoming file's note lock. The lock is sticky once either side
+ * has it, and a locked note is never allowed to AI. Replace-all has no
+ * `retain` actions, so this is a Merge-only repair in effect. Group Note copy
+ * and share markers need nothing here: they are fixed when a uid is created.
+ */
+function lockRetainedInteractionNotes(
+  plan: Plan,
+  manifest: BackupManifest,
+): void {
+  const incomingLocked = new Set(
+    manifest.interactions
+      .filter((row) => row.noteAiLocked === 1 && typeof row.uid === "string")
+      .map((row) => row.uid as string),
+  );
+  for (const action of plan.interactions) {
+    if (action.kind !== "retain" || !action.row) continue;
+    if (!incomingLocked.has(action.uid) || action.row.noteAiLocked === 1)
+      continue;
+    action.row.noteAiLocked = 1;
+    action.row.allowAi = 0;
+    updateRetained(action);
   }
-  for (const actions of byCurrent.values())
+}
+/**
+ * The ordered link pass (D-37, D-95, D-102, D-113; convergence c1 F-D1, c2
+ * G-D4, c3 C-01). It runs in both restore modes, over every surviving
+ * memory and current-state row, local-retained and incoming alike. A detach
+ * nulls `interactionUid` and `linkSource` and keeps the entry's own text,
+ * dates, `allowAi`, `groupNoteCopy` and `fromShare`; a detached retained row
+ * is promoted to an update so it is written. Nothing here deletes a row.
+ */
+function repairKnowledgeLinks(plan: Plan): void {
+  const liveInteractions = new Map(
+    liveActions(plan.interactions).map((action) => [action.uid, action.row!]),
+  );
+  const liveGroupEvents = new Map(
+    liveActions(plan.group_events).map((action) => [action.uid, action.row!]),
+  );
+  const linkable = LINKED_TABLES.flatMap((table) =>
+    liveActions(plan[table]).map((action) => ({ table, action })),
+  );
+  const detach = (action: ReconciliationAction) => {
+    action.row!.interactionUid = null;
+    action.row!.linkSource = null;
+    updateRetained(action);
+  };
+  // 0. Group Note origin evidence first (D-102; convergence c3 C-01): keyed on
+  // the link source alone, so a leftover 'group_note' on an unlinked row is
+  // still evidence. The detaches below then keep the marker and lock.
+  for (const { table, action } of linkable) {
+    const row = action.row!;
+    if (row.linkSource !== "group_note") continue;
+    let changed = false;
+    if (row.groupNoteCopy !== 1) {
+      row.groupNoteCopy = 1;
+      changed = true;
+    }
+    if (table === "memories" && row.allowAi !== 0) {
+      row.allowAi = 0;
+      changed = true;
+    }
+    if (changed) updateRetained(action);
+  }
+  const linked = () =>
+    linkable.filter(
+      ({ action }) => typeof action.row!.interactionUid === "string",
+    );
+  // 1. Owner check, 2. dissolved event or blank source.
+  for (const { action } of linked()) {
+    const row = action.row!;
+    const interaction = liveInteractions.get(row.interactionUid as string);
+    if (!interaction || interaction.contactUid !== row.contactUid) {
+      detach(action);
+      continue;
+    }
+    if (row.linkSource === "group_note") {
+      const event =
+        typeof interaction.groupEventUid === "string"
+          ? liveGroupEvents.get(interaction.groupEventUid)
+          : undefined;
+      if (!event || isBlankText(event.groupNote)) detach(action);
+    } else if (row.linkSource === "note" && isBlankText(interaction.note)) {
+      detach(action);
+    }
+  }
+  // 3. D-95: one link per (interaction, link source) across both tables. The
+  // newer row keeps the link; every loser is unlinked, never deleted.
+  const bySlot = new Map<string, ReconciliationAction[]>();
+  for (const { action } of linked()) {
+    const key = `${action.row!.interactionUid}\0${action.row!.linkSource}`;
+    bySlot.set(key, [...(bySlot.get(key) ?? []), action]);
+  }
+  for (const actions of bySlot.values())
     if (actions.length > 1) {
       const winner = normalizedWinner(actions);
-      for (const loser of actions)
-        if (loser !== winner) {
-          loser.row!.isCurrent = 0;
-          updateRetained(loser);
-        }
+      for (const loser of actions) if (loser !== winner) detach(loser);
     }
 }
 /** Resolve the v11 one-way cadence invariant before opening the restore transaction. */
@@ -767,6 +861,15 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
   const defs = await idMap(exec, "custom_field_defs");
   const systems = await idMap(exec, "systems");
   const groupEvents = await idMap(exec, "group_events");
+  // Resolved once the loop reaches memories / current state, after the
+  // interactions pass has written every surviving interaction. A missing
+  // interaction repairs to NULL, as a missing Group Event does.
+  let interactionIds: Map<string, number> | null = null;
+  const interactionIdOf = async (row: Row): Promise<number | null> => {
+    if (typeof row.interactionUid !== "string") return null;
+    interactionIds ??= await idMap(exec, "interactions");
+    return interactionIds.get(row.interactionUid) ?? null;
+  };
   for (const a of writes(plan, "system_rules")) {
     const r = a.row!;
     const system = systems.get(r.systemUid as string);
@@ -807,7 +910,7 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
     "external_contact_links",
     "interactions",
     "events",
-    "fuel",
+    "off_limits",
     "contact_links",
     "custom_field_values",
     "custom_field_value_history",
@@ -874,19 +977,20 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
       // source of truth) so a pre-Phase-32 backup can't reintroduce good/fine/hard/
       // text/email onto a v25 device and re-open the AI-context/digest miscount. Bound
       // as the remapped value so `excluded.quality`/`excluded.channel` carry it on BOTH
-      // the INSERT and the ON CONFLICT UPDATE paths. The SET arm also forces allow_ai=0
-      // (fail-closed consent, D-04): SQLite's column DEFAULT 0 fires only on fresh
-      // INSERT, so without this a merge-mode UPDATE (emitted only when the field-less
-      // backup row WINS reconciliation) would silently preserve an existing allow_ai=1.
-      // duration/allow_ai stay OUT of the INSERT column list / wire payload — Phase 36
-      // owns serialization + the format bump.
+      // the INSERT and the ON CONFLICT UPDATE paths.
+      // AI permission (D-13, Phase 38.10): restore never re-opens it. On a
+      // Merge conflict the row keeps MIN(local, incoming) allow_ai, and the
+      // D-103 note lock is sticky (MAX); a locked note is always written with
+      // allow_ai 0. allow_ai is computed from the MERGED lock, because every
+      // right-hand side of one UPDATE SET reads the pre-update row (checker
+      // cycle 3 I-6). An insert with the lock set is written with allow_ai 0.
       if (entity === "interactions") {
         const groupEvent =
           typeof r.groupEventUid === "string"
             ? (groupEvents.get(r.groupEventUid) ?? null)
             : null;
         await exec.runAsync(
-          "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,direction,connected,quality,note,duration,allow_ai,group_event_id,ge_follow_channel,ge_follow_quality,ge_follow_duration,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,occurred_at=excluded.occurred_at,recorded_at=excluded.recorded_at,channel=excluded.channel,direction=excluded.direction,connected=excluded.connected,quality=excluded.quality,note=excluded.note,duration=excluded.duration,allow_ai=excluded.allow_ai,group_event_id=excluded.group_event_id,ge_follow_channel=excluded.ge_follow_channel,ge_follow_quality=excluded.ge_follow_quality,ge_follow_duration=excluded.ge_follow_duration,source=excluded.source,modified_at=excluded.modified_at",
+          "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,direction,connected,quality,note,duration,allow_ai,note_ai_locked,group_event_id,ge_follow_channel,ge_follow_quality,ge_follow_duration,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,occurred_at=excluded.occurred_at,recorded_at=excluded.recorded_at,channel=excluded.channel,direction=excluded.direction,connected=excluded.connected,quality=excluded.quality,note=excluded.note,duration=excluded.duration,allow_ai=CASE WHEN MAX(note_ai_locked,excluded.note_ai_locked)=1 THEN 0 ELSE MIN(allow_ai,excluded.allow_ai) END,note_ai_locked=MAX(note_ai_locked,excluded.note_ai_locked),group_event_id=excluded.group_event_id,ge_follow_channel=excluded.ge_follow_channel,ge_follow_quality=excluded.ge_follow_quality,ge_follow_duration=excluded.ge_follow_duration,source=excluded.source,modified_at=excluded.modified_at",
           [
             r.uid,
             contact,
@@ -898,7 +1002,8 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
             remapLegacyQuality((r.quality ?? null) as string | null),
             r.note ?? null,
             r.duration ?? null,
-            r.allowAi ?? 0,
+            r.noteAiLocked === 1 ? 0 : (r.allowAi ?? 0),
+            r.noteAiLocked === 1 ? 1 : 0,
             groupEvent,
             r.geFollowChannel ?? null,
             r.geFollowQuality ?? null,
@@ -921,18 +1026,20 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
             r.modified_at,
           ],
         );
-      if (entity === "fuel")
+      // Off Limits (D-09, D-36) has no AI column. The D-102 / D-108 origin
+      // markers are sticky once either side has them.
+      if (entity === "off_limits")
         await exec.runAsync(
-          "INSERT INTO fuel (uid,contact_id,kind,label,text,url,created_at,source,modified_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,kind=excluded.kind,label=excluded.label,text=excluded.text,url=excluded.url,created_at=excluded.created_at,source=excluded.source,modified_at=excluded.modified_at",
+          "INSERT INTO off_limits (uid,contact_id,label,text,url,group_note_copy,from_share,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,label=excluded.label,text=excluded.text,url=excluded.url,group_note_copy=MAX(group_note_copy,excluded.group_note_copy),from_share=MAX(from_share,excluded.from_share),created_at=excluded.created_at,modified_at=excluded.modified_at",
           [
             r.uid,
             contact,
-            r.kind,
             r.label ?? null,
             r.text ?? null,
             r.url ?? null,
+            r.groupNoteCopy === 1 ? 1 : 0,
+            r.fromShare === 1 ? 1 : 0,
             r.createdAt,
-            r.source,
             r.modified_at,
           ],
         );
@@ -967,9 +1074,14 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
           [r.uid, contact, def, r.value ?? null, r.createdAt],
         );
       }
+      // Memories: the same MIN allow_ai rule as interactions (D-13), with the
+      // D-102 Group Note copy marker sticky and forcing allow_ai 0. The link
+      // is written from the row (the slot was released before this loop). A
+      // format-8 row is always live, so a winning row clears a local
+      // soft-delete stamp (no wire `deletedAt` is read; D-69).
       if (entity === "memories")
         await exec.runAsync(
-          "INSERT INTO memories (uid,contact_id,type,custom_label,value,note,url,meaningful_date,pinned,outdated,hidden,provenance,allow_ai,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,type=excluded.type,custom_label=excluded.custom_label,value=excluded.value,note=excluded.note,url=excluded.url,meaningful_date=excluded.meaningful_date,pinned=excluded.pinned,outdated=excluded.outdated,hidden=excluded.hidden,provenance=excluded.provenance,allow_ai=excluded.allow_ai,modified_at=excluded.modified_at,deleted_at=excluded.deleted_at",
+          "INSERT INTO memories (uid,contact_id,type,custom_label,value,note,url,meaningful_date,pinned,outdated,hidden,provenance,allow_ai,interaction_id,link_source,group_note_copy,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,type=excluded.type,custom_label=excluded.custom_label,value=excluded.value,note=excluded.note,url=excluded.url,meaningful_date=excluded.meaningful_date,pinned=excluded.pinned,outdated=excluded.outdated,hidden=excluded.hidden,provenance=excluded.provenance,allow_ai=CASE WHEN MAX(group_note_copy,excluded.group_note_copy)=1 THEN 0 ELSE MIN(allow_ai,excluded.allow_ai) END,interaction_id=excluded.interaction_id,link_source=excluded.link_source,group_note_copy=MAX(group_note_copy,excluded.group_note_copy),modified_at=excluded.modified_at,deleted_at=NULL",
           [
             r.uid,
             contact,
@@ -983,10 +1095,12 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
             r.outdated,
             r.hidden ?? null,
             r.provenance,
-            r.allowAi ?? 0,
+            r.groupNoteCopy === 1 ? 0 : (r.allowAi ?? 0),
+            await interactionIdOf(r),
+            r.linkSource ?? null,
+            r.groupNoteCopy === 1 ? 1 : 0,
             r.createdAt,
             r.modified_at,
-            r.deletedAt ?? null,
           ],
         );
       if (entity === "relationships") {
@@ -995,7 +1109,7 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
             ? (contacts.get(r.linkedContactUid) ?? null)
             : null;
         await exec.runAsync(
-          "INSERT INTO relationships (uid,contact_id,person_name,relation_type,linked_contact_id,note,pinned,hidden,created_at,modified_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,person_name=excluded.person_name,relation_type=excluded.relation_type,linked_contact_id=excluded.linked_contact_id,note=excluded.note,pinned=excluded.pinned,hidden=excluded.hidden,modified_at=excluded.modified_at,deleted_at=excluded.deleted_at",
+          "INSERT INTO relationships (uid,contact_id,person_name,relation_type,linked_contact_id,note,pinned,hidden,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,person_name=excluded.person_name,relation_type=excluded.relation_type,linked_contact_id=excluded.linked_contact_id,note=excluded.note,pinned=excluded.pinned,hidden=excluded.hidden,modified_at=excluded.modified_at,deleted_at=NULL",
           [
             r.uid,
             contact,
@@ -1007,19 +1121,26 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
             r.hidden ?? null,
             r.createdAt,
             r.modified_at,
-            r.deletedAt ?? null,
           ],
         );
       }
+      // Current state (D-41, D-45, D-48): dated entries with an optional
+      // link; the D-102 / D-108 markers are sticky.
       if (entity === "current_state_entries")
         await exec.runAsync(
-          "INSERT INTO current_state_entries (uid,contact_id,field_key,value,is_current,created_at,modified_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,field_key=excluded.field_key,value=excluded.value,is_current=excluded.is_current,modified_at=excluded.modified_at",
+          "INSERT INTO current_state_entries (uid,contact_id,field_key,value,entry_date,entry_time,url,interaction_id,link_source,group_note_copy,from_share,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET contact_id=excluded.contact_id,field_key=excluded.field_key,value=excluded.value,entry_date=excluded.entry_date,entry_time=excluded.entry_time,url=excluded.url,interaction_id=excluded.interaction_id,link_source=excluded.link_source,group_note_copy=MAX(group_note_copy,excluded.group_note_copy),from_share=MAX(from_share,excluded.from_share),modified_at=excluded.modified_at",
           [
             r.uid,
             contact,
             r.fieldKey,
             r.value,
-            r.isCurrent,
+            r.entryDate,
+            r.entryTime ?? null,
+            r.url ?? null,
+            await interactionIdOf(r),
+            r.linkSource ?? null,
+            r.groupNoteCopy === 1 ? 1 : 0,
+            r.fromShare === 1 ? 1 : 0,
             r.createdAt,
             r.modified_at,
           ],
@@ -1081,6 +1202,127 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
         r.modified_at,
       ],
     );
+  }
+}
+/** Stays well under SQLite's bound-variable limit (999 on older builds). */
+const RELEASE_CHUNK = 500;
+/**
+ * Link-slot release (convergence c2 G-D3). The partial UNIQUE indexes on
+ * `(interaction_id, link_source)` are immediate and the child loop writes in
+ * uid order, so a row whose link moves (a D-95 loser, a detach, a swap) could
+ * still hold its old slot when another row's upsert claims it, rolling the
+ * whole restore back. Every existing row the plan updates first lets go of its
+ * link; its upsert then writes the final link back. Retained rows are not
+ * touched: after the link pass each one is the only holder of its slot. Runs
+ * after the delete pass, in both modes (harmless on Replace-all's emptied
+ * tables).
+ */
+async function releaseLinkSlots(exec: SqlExecutor, plan: Plan): Promise<void> {
+  for (const table of LINKED_TABLES) {
+    const uids = plan[table]
+      .filter((action) => action.kind === "update")
+      .map((action) => action.uid);
+    for (let start = 0; start < uids.length; start += RELEASE_CHUNK) {
+      const chunk = uids.slice(start, start + RELEASE_CHUNK);
+      await exec.runAsync(
+        `UPDATE ${table} SET interaction_id=NULL,link_source=NULL WHERE interaction_id IS NOT NULL AND uid IN (${chunk.map(() => "?").join(",")})`,
+        chunk,
+      );
+    }
+  }
+}
+/** A linked entry's date and time from a local `occurred_at`, or null. */
+function linkedDateTime(
+  occurredAt: string | null,
+): { entryDate: string; entryTime: string | null } | null {
+  if (occurredAt === null) return null;
+  try {
+    return entryDateTimeOf(occurredAt);
+  } catch {
+    // An unparseable stamp leaves the entry's own date (never a rollback).
+    return null;
+  }
+}
+/**
+ * Linked-pair post-pass (RESEARCH 2.5; D-37, D-41, D-48, D-49, D-102). LWW
+ * runs per row, so a Merge can take an interaction and its linked entry from
+ * different sides. Inside the restore transaction, after every upsert, each
+ * linked row converges on its source: the entry takes the non-blank note or
+ * Group Note text; a linked Last Talked About entry takes its source's date
+ * and `HH:MM:SS` time (the rule of plan 10's propagation, which restore never
+ * reaches because it writes through upserts); a note-linked memory and its
+ * interaction both take MIN(allow_ai); a Group Note copy is forced to
+ * allow_ai 0 and group_note_copy 1 in one statement (migration 033's CHECK
+ * is evaluated after the whole SET). `modified_at` is left alone: this is a
+ * repair, not an edit.
+ */
+async function syncLinkedPairs(exec: SqlExecutor): Promise<void> {
+  const noteMemories = await exec.getAllAsync<{
+    id: number;
+    value: string | null;
+    allow_ai: number;
+    interaction_id: number;
+    note: string | null;
+    interaction_allow_ai: number;
+  }>(
+    "SELECT m.id,m.value,m.allow_ai,m.interaction_id,i.note,i.allow_ai AS interaction_allow_ai FROM memories m JOIN interactions i ON i.id=m.interaction_id WHERE m.link_source='note'",
+  );
+  for (const row of noteMemories) {
+    const value = isBlankText(row.note) ? row.value : row.note;
+    const allowAi = Math.min(row.allow_ai, row.interaction_allow_ai);
+    if (value !== row.value || allowAi !== row.allow_ai)
+      await exec.runAsync("UPDATE memories SET value=?,allow_ai=? WHERE id=?", [
+        value,
+        allowAi,
+        row.id,
+      ]);
+    if (allowAi !== row.interaction_allow_ai)
+      await exec.runAsync("UPDATE interactions SET allow_ai=? WHERE id=?", [
+        allowAi,
+        row.interaction_id,
+      ]);
+  }
+  const groupMemories = await exec.getAllAsync<{
+    id: number;
+    value: string | null;
+    group_note: string | null;
+  }>(
+    "SELECT m.id,m.value,ge.group_note FROM memories m JOIN interactions i ON i.id=m.interaction_id LEFT JOIN group_events ge ON ge.id=i.group_event_id WHERE m.link_source='group_note'",
+  );
+  for (const row of groupMemories)
+    await exec.runAsync(
+      "UPDATE memories SET value=?,allow_ai=0,group_note_copy=1 WHERE id=?",
+      [isBlankText(row.group_note) ? row.value : row.group_note, row.id],
+    );
+  const entries = await exec.getAllAsync<{
+    id: number;
+    value: string;
+    entry_date: string;
+    entry_time: string | null;
+    link_source: "note" | "group_note";
+    source_text: string | null;
+    occurred_at: string | null;
+  }>(
+    "SELECT s.id,s.value,s.entry_date,s.entry_time,s.link_source,CASE s.link_source WHEN 'note' THEN i.note ELSE ge.group_note END AS source_text,CASE s.link_source WHEN 'note' THEN i.occurred_at ELSE ge.occurred_at END AS occurred_at FROM current_state_entries s JOIN interactions i ON i.id=s.interaction_id LEFT JOIN group_events ge ON ge.id=i.group_event_id WHERE s.link_source IN ('note','group_note')",
+  );
+  for (const row of entries) {
+    const value = isBlankText(row.source_text)
+      ? row.value
+      : (row.source_text as string);
+    const dated = linkedDateTime(row.occurred_at);
+    const entryDate = dated?.entryDate ?? row.entry_date;
+    const entryTime = dated ? dated.entryTime : row.entry_time;
+    const groupNoteCopy = row.link_source === "group_note";
+    if (
+      value !== row.value ||
+      entryDate !== row.entry_date ||
+      entryTime !== row.entry_time ||
+      groupNoteCopy
+    )
+      await exec.runAsync(
+        `UPDATE current_state_entries SET value=?,entry_date=?,entry_time=?${groupNoteCopy ? ",group_note_copy=1" : ""} WHERE id=?`,
+        [value, entryDate, entryTime, row.id],
+      );
   }
 }
 async function targetFor(
@@ -1480,7 +1722,7 @@ async function replaceAllReset(
     ],
     interactions: ["interaction", "interactions"],
     events: ["event", "events"],
-    fuel: ["fuel", "fuel"],
+    off_limits: ["off_limits", "off_limits"],
     memories: ["memory", "memories"],
     relationships: ["relationship", "relationships"],
     current_state_entries: ["current_state_entry", "current_state_entries"],
@@ -1521,7 +1763,7 @@ async function replaceAllReset(
     contact_method_provenance: [],
     interactions: [],
     events: [],
-    fuel: [],
+    off_limits: [],
     contact_links: [],
     custom_field_defs: [],
     custom_field_values: [],
@@ -1550,7 +1792,7 @@ async function replaceAllReset(
     "interactions",
     "group_events",
     "events",
-    "fuel",
+    "off_limits",
     "current_state_entries",
     "relationships",
     "memories",
@@ -1850,7 +2092,7 @@ export async function applyRestore(
             incompatibilities,
           },
         };
-      normalizePlan(plan);
+      normalizePlan(plan, manifest);
       if (mode === "merge") {
         const deletedCategoryUids = new Set(
           plan.categories
@@ -2043,7 +2285,9 @@ export async function applyRestore(
       await importTombstones(exec, manifest);
       await upsertParents(exec, plan, backgroundPendingByUid);
       await upsertContacts(exec, plan);
+      await releaseLinkSlots(exec, plan);
       await upsertChildren(exec, plan);
+      await syncLinkedPairs(exec);
       await completeGlobalPairsCore(exec);
       if (mode === "replace-all") await clearReplacedLiveTombstones(exec);
       const contacts = await idMap(exec, "contacts");

@@ -76,7 +76,7 @@ export function syntheticManifest(targetBytes: number): BackupManifest {
     contactMethodProvenance: [],
     interactions: [],
     events: [],
-    fuel: [],
+    offLimits: [],
     contactLinks: [],
     customFieldDefs: [],
     customFieldValues: [],

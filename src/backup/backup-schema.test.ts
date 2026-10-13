@@ -1076,7 +1076,7 @@ describe("format 8 (Phase 38.10)", () => {
   it("ignores an unknown legacy knowledge array in a format-8 file", () => {
     const manifest = withContact();
     manifest.fuel = [{ uid: "ignored" }];
-    const parsed = parseBackupManifest(manifest) as Record<string, unknown>;
+    const parsed = parseBackupManifest(manifest);
     expect(parsed).not.toHaveProperty("fuel");
     expect(parsed.offLimits).toEqual([]);
   });

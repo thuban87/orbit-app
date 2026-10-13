@@ -46,7 +46,7 @@ export type MergeableEntityType =
   | "contact_method_provenance"
   | "interactions"
   | "events"
-  | "fuel"
+  | "off_limits"
   | "contact_links"
   | "custom_field_defs"
   | "custom_field_values"
@@ -121,7 +121,7 @@ export const ENTITY_POLICIES: Readonly<
     writeMode: "insert-if-missing",
     parentFields: [{ field: "contact_id", entityType: "contacts" }],
   },
-  fuel: {
+  off_limits: {
     writeMode: "lww",
     parentFields: [{ field: "contact_id", entityType: "contacts" }],
   },
@@ -146,6 +146,9 @@ export const ENTITY_POLICIES: Readonly<
       { field: "field_def_id", entityType: "custom_field_defs" },
     ],
   },
+  // `interactionUid` (D-37) is deliberately NOT a parent field: a missing
+  // interaction repairs the link to NULL in restore-apply, as `groupEventUid`
+  // does, so the entry survives as a standalone row.
   memories: {
     writeMode: "lww",
     parentFields: [{ field: "contact_id", entityType: "contacts" }],

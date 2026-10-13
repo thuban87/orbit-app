@@ -156,7 +156,7 @@ describe("reconciliation", () => {
     for (const entityType of [
       "interactions",
       "events",
-      "fuel",
+      "off_limits",
       "contact_links",
       "contact_methods",
       "external_contact_links",
@@ -250,10 +250,10 @@ describe("reconciliation", () => {
       "custom_field_values",
       "events",
       "external_contact_links",
-      "fuel",
       "group_events",
       "interactions",
       "memories",
+      "off_limits",
       "personalization_sections",
       "profile",
       "profile_background_templates",
@@ -366,5 +366,31 @@ describe("reconciliation", () => {
         [],
       ),
     ).toHaveLength(1);
+  });
+});
+
+describe("knowledge links (Phase 38.10)", () => {
+  it("never blocks a memory or entry over a missing interaction", () => {
+    // interactionUid is not a parent field: restore repairs it to NULL.
+    for (const entityType of ["memories", "current_state_entries"] as const)
+      expect(
+        reconcileEntity({
+          entityType,
+          localRows: [],
+          incomingRows: [
+            {
+              uid: `${entityType}-linked`,
+              modified_at: "2026-08-25 12:00:00",
+              contactUid: "contact-a",
+              interactionUid: "gone",
+              linkSource: "note",
+            },
+          ],
+          parentSurvivors: {
+            contacts: new Set(["contact-a"]),
+            interactions: new Set(),
+          },
+        }).actions,
+      ).toEqual([expect.objectContaining({ kind: "insert" })]);
   });
 });

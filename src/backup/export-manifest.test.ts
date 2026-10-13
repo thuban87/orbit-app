@@ -24,7 +24,7 @@ import { assertSafeRelative } from "@/db/photo-relative-path";
 const NOW = "2026-08-25 12:00:00";
 
 describe("buildExportManifest", () => {
-  it("exports category tombstones in format v7", async () => {
+  it("exports category tombstones in format v8", async () => {
     let count = 0;
     const exec = nodeSqliteExecutor(openTestDb());
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
@@ -39,7 +39,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(7);
+    expect(manifest.backupFormatVersion).toBe(8);
     expect(manifest.tombstones).toContainEqual({
       entityType: "category",
       entityUid: "gone-category",
@@ -88,7 +88,7 @@ describe("buildExportManifest", () => {
         exportedAt: NOW,
         readPhotoBase64: async () => "AQID",
       });
-      expect(manifest.backupFormatVersion).toBe(7);
+      expect(manifest.backupFormatVersion).toBe(8);
       expect(manifest.tombstones).toContainEqual(
         expect.objectContaining({
           entityType: "group_event",
@@ -120,8 +120,8 @@ describe("buildExportManifest", () => {
     });
 
     // D-06 trip-wire: Phase 36 owns the coordinated wire change to v5.
-    expect(BACKUP_FORMAT_VERSION).toBe(7);
-    expect(manifest.backupFormatVersion).toBe(7);
+    expect(BACKUP_FORMAT_VERSION).toBe(8);
+    expect(manifest.backupFormatVersion).toBe(8);
     expect(manifest.appSettings).toMatchObject({
       orreryLastSystem: "builtin:all-contacts",
       themePackage: "galaxy",
@@ -182,7 +182,7 @@ describe("buildExportManifest", () => {
       }),
     ]);
     // Phase 36 owns the format bump; this guard keeps it unchanged this phase.
-    expect(BACKUP_FORMAT_VERSION).toBe(7);
+    expect(BACKUP_FORMAT_VERSION).toBe(8);
   });
 
   it("serializes the v6 entity inventory with portable parent UIDs", async () => {
@@ -405,7 +405,7 @@ describe("buildExportManifest", () => {
       [
         "memory-deleted",
         contact!.id,
-        "custom",
+        "general",
         "Note",
         "Remember this",
         1,
@@ -416,6 +416,32 @@ describe("buildExportManifest", () => {
         NOW,
         "2026-08-26 12:00:00",
       ],
+    );
+    await exec.runAsync(
+      `INSERT INTO interactions (uid, contact_id, occurred_at, recorded_at, channel, connected, quality, note, allow_ai, note_ai_locked, source, modified_at)
+       VALUES (?, ?, ?, ?, 'Message', 1, 'Positive', ?, 0, 1, 'manual', ?)`,
+      ["interaction-a", contact!.id, NOW, NOW, "Talked about the move", NOW],
+    );
+    const interaction = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM interactions WHERE uid = ?",
+      ["interaction-a"],
+    );
+    await exec.runAsync(
+      `INSERT INTO memories (uid, contact_id, type, value, pinned, outdated, provenance, allow_ai, interaction_id, link_source, group_note_copy, created_at, modified_at)
+       VALUES (?, ?, 'gift_idea', ?, 0, 0, 'share', 0, ?, 'note', 0, ?, ?)`,
+      [
+        "memory-linked",
+        contact!.id,
+        "Talked about the move",
+        interaction!.id,
+        NOW,
+        NOW,
+      ],
+    );
+    await exec.runAsync(
+      `INSERT INTO off_limits (uid, contact_id, label, text, url, group_note_copy, from_share, created_at, modified_at)
+       VALUES (?, ?, ?, NULL, NULL, 0, 1, ?, ?)`,
+      ["off-a", contact!.id, "Politics", NOW, NOW],
     );
     await exec.runAsync(
       `INSERT INTO relationships (uid, contact_id, person_name, linked_contact_id, pinned, created_at, modified_at)
@@ -431,26 +457,29 @@ describe("buildExportManifest", () => {
       ],
     );
     await exec.runAsync(
-      `INSERT INTO current_state_entries (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+      `INSERT INTO current_state_entries (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         "state-history",
         contact!.id,
         "current_location",
         "Chicago",
-        0,
+        "2026-08-01",
         NOW,
         NOW,
       ],
     );
     await exec.runAsync(
-      `INSERT INTO current_state_entries (uid, contact_id, field_key, value, is_current, created_at, modified_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO current_state_entries (uid, contact_id, field_key, value, entry_date, entry_time, url, from_share, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         "state-current",
         contact!.id,
         "current_location",
         "Madison",
+        "2026-08-20",
+        "08:00:00",
+        "https://map.test",
         1,
         NOW,
         "2026-08-26 12:00:00",
@@ -511,18 +540,63 @@ describe("buildExportManifest", () => {
         value: "Old nickname",
       }),
     ]);
+    // D-69: the soft-deleted row travels as a tombstone, not as a row.
     expect(manifest.memories).toEqual([
       expect.objectContaining({
-        uid: "memory-deleted",
+        uid: "memory-linked",
         contactUid: "contact-a",
-        allowAi: 1,
-        deletedAt: "2026-08-26 12:00:00",
+        type: "gift_idea",
+        allowAi: 0,
+        interactionUid: "interaction-a",
+        linkSource: "note",
+        groupNoteCopy: 0,
       }),
     ]);
-    expect(manifest.currentStateEntries).toEqual([
-      expect.objectContaining({ uid: "state-current", isCurrent: 1 }),
-      expect.objectContaining({ uid: "state-history", isCurrent: 0 }),
+    expect(manifest.memories[0]).not.toHaveProperty("deletedAt");
+    expect(manifest.tombstones).toContainEqual({
+      entityType: "memory",
+      entityUid: "memory-deleted",
+      deletedAt: "2026-08-26 12:00:00",
+    });
+    expect(manifest.interactions).toEqual([
+      expect.objectContaining({
+        uid: "interaction-a",
+        allowAi: 0,
+        noteAiLocked: 1,
+      }),
     ]);
+    expect(manifest.offLimits).toEqual([
+      {
+        uid: "off-a",
+        contactUid: "contact-a",
+        label: "Politics",
+        text: null,
+        url: null,
+        groupNoteCopy: 0,
+        fromShare: 1,
+        createdAt: NOW,
+        modifiedAt: NOW,
+      },
+    ]);
+    // Newest first by the one current-state order (entry date, then time).
+    expect(manifest.currentStateEntries).toEqual([
+      expect.objectContaining({
+        uid: "state-current",
+        entryDate: "2026-08-20",
+        entryTime: "08:00:00",
+        url: "https://map.test",
+        interactionUid: null,
+        linkSource: null,
+        groupNoteCopy: 0,
+        fromShare: 1,
+      }),
+      expect.objectContaining({
+        uid: "state-history",
+        entryDate: "2026-08-01",
+        entryTime: null,
+      }),
+    ]);
+    expect(manifest.currentStateEntries[0]).not.toHaveProperty("isCurrent");
     expect(manifest.relationships).toEqual([
       expect.objectContaining({
         uid: "relationship-a",
@@ -548,7 +622,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(7);
+    expect(manifest.backupFormatVersion).toBe(8);
     for (const key of [
       "themePackage",
       "galaxyMode",
@@ -608,7 +682,7 @@ describe("buildExportManifest", () => {
     });
     expect(report.skippedPhotos).toBe(3);
     const { manifest } = report;
-    expect(manifest.backupFormatVersion).toBe(7);
+    expect(manifest.backupFormatVersion).toBe(8);
     expect(parseBackupManifest(manifest)).toEqual(manifest);
     const byUid = Object.fromEntries(manifest.contacts.map((r) => [r.uid, r]));
     expect(byUid["contact-a"]?.photoBase64).toBe("AQID");
@@ -694,7 +768,7 @@ describe("buildExportManifest", () => {
       photoBase64: null,
     });
     expect(value).not.toHaveProperty("photoSkipped");
-    expect(report.manifest.backupFormatVersion).toBe(7);
+    expect(report.manifest.backupFormatVersion).toBe(8);
     // The backup schema accepts a text value on a photo-type field.
     expect(
       parseBackupManifest(JSON.parse(JSON.stringify(report.manifest)))

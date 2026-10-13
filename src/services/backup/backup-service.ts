@@ -91,7 +91,7 @@ export function loadBackupForRestore(input: {
       manifest.contacts,
       manifest.interactions,
       manifest.events,
-      manifest.fuel,
+      manifest.offLimits,
       manifest.contactLinks,
       manifest.customFieldDefs,
       manifest.customFieldValues,
@@ -120,7 +120,7 @@ export function loadBackupForRestore(input: {
         relatedRowCount:
           manifest.interactions.length +
           manifest.events.length +
-          manifest.fuel.length +
+          manifest.offLimits.length +
           manifest.contactLinks.length +
           manifest.customFieldDefs.length +
           manifest.customFieldValues.length,

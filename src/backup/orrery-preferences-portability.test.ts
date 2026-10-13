@@ -150,8 +150,8 @@ describe("Orrery preferences portability boundary", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(BACKUP_FORMAT_VERSION).toBe(7);
-    expect(exported.backupFormatVersion).toBe(7);
+    expect(BACKUP_FORMAT_VERSION).toBe(8);
+    expect(exported.backupFormatVersion).toBe(8);
     expect(portable).toMatchObject({
       orreryDensity: "compact",
       orrerySatellitesEnabled: 1,

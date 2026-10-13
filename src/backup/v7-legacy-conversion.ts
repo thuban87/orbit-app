@@ -284,7 +284,7 @@ export function convertV7ToV8(
   });
 
   // D-88: soft-deleted memories and key people become tombstones (step 4).
-  const memories = purgeSoftDeleted(
+  const memories: RawRow[] = purgeSoftDeleted(
     memoriesIn,
     "memory",
     "memories",

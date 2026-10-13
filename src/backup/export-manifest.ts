@@ -6,6 +6,7 @@ import {
   BackupPhotoUnreadableError,
 } from "@/backup/types";
 import { getPortableSettingsSnapshot } from "@/db/app-settings-dao";
+import { currentStateOrderSql } from "@/db/current-state-history-read";
 import { SAFE_RELATIVE } from "@/db/photo-relative-path";
 import { inReadSnapshot, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -118,12 +119,12 @@ async function readManifest(
     contactMethodProvenance,
     interactions,
     events,
-    fuel,
+    offLimits,
     contactLinks,
     customFieldDefs,
     rawValues,
-    memories,
-    relationships,
+    memoryRows,
+    relationshipRows,
     currentStateEntries,
     customFieldValueHistory,
     systems,
@@ -158,13 +159,13 @@ async function readManifest(
       "SELECT p.uid, m.uid AS methodUid, l.uid AS externalContactLinkUid, p.source_method_id AS sourceMethodId, p.created_at AS createdAt, p.modified_at AS modifiedAt FROM contact_method_provenance p JOIN contact_methods m ON m.id = p.method_id LEFT JOIN external_contact_links l ON l.id = p.external_contact_link_id ORDER BY p.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
-      "SELECT i.uid, c.uid AS contactUid, ge.uid AS groupEventUid, i.occurred_at AS occurredAt, i.recorded_at AS recordedAt, i.channel, i.direction, i.connected, i.quality, i.note, i.duration, i.allow_ai AS allowAi, i.ge_follow_channel AS geFollowChannel, i.ge_follow_quality AS geFollowQuality, i.ge_follow_duration AS geFollowDuration, i.source, i.modified_at AS modifiedAt FROM interactions i JOIN contacts c ON c.id = i.contact_id LEFT JOIN group_events ge ON ge.id = i.group_event_id ORDER BY i.uid",
+      "SELECT i.uid, c.uid AS contactUid, ge.uid AS groupEventUid, i.occurred_at AS occurredAt, i.recorded_at AS recordedAt, i.channel, i.direction, i.connected, i.quality, i.note, i.duration, i.allow_ai AS allowAi, i.note_ai_locked AS noteAiLocked, i.ge_follow_channel AS geFollowChannel, i.ge_follow_quality AS geFollowQuality, i.ge_follow_duration AS geFollowDuration, i.source, i.modified_at AS modifiedAt FROM interactions i JOIN contacts c ON c.id = i.contact_id LEFT JOIN group_events ge ON ge.id = i.group_event_id ORDER BY i.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
       "SELECT e.uid, c.uid AS contactUid, e.type, e.occurred_at AS occurredAt, e.detail, e.recorded_at AS recordedAt, e.modified_at AS modifiedAt FROM events e JOIN contacts c ON c.id = e.contact_id ORDER BY e.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
-      "SELECT f.uid, c.uid AS contactUid, f.kind, f.label, f.text, f.url, f.created_at AS createdAt, f.source, f.modified_at AS modifiedAt FROM fuel f JOIN contacts c ON c.id = f.contact_id ORDER BY f.uid",
+      "SELECT o.uid, c.uid AS contactUid, o.label, o.text, o.url, o.group_note_copy AS groupNoteCopy, o.from_share AS fromShare, o.created_at AS createdAt, o.modified_at AS modifiedAt FROM off_limits o JOIN contacts c ON c.id = o.contact_id ORDER BY o.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
       "SELECT l.uid, c.uid AS contactUid, l.url, l.label, l.display_order AS displayOrder, l.created_at AS createdAt, l.modified_at AS modifiedAt FROM contact_links l JOIN contacts c ON c.id = l.contact_id ORDER BY l.uid",
@@ -176,13 +177,15 @@ async function readManifest(
       "SELECT v.uid, c.uid AS contactUid, d.uid AS fieldDefUid, d.type AS fieldType, d.col_name AS colName, c.id AS contactId, v.value, v.created_at AS createdAt, v.modified_at AS modifiedAt FROM custom_field_values v JOIN contacts c ON c.id = v.contact_id JOIN custom_field_defs d ON d.id = v.field_def_id ORDER BY v.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
-      "SELECT m.uid,c.uid AS contactUid,m.type,m.custom_label AS customLabel,m.value,m.note,m.url,m.meaningful_date AS meaningfulDate,m.pinned,m.outdated,m.hidden,m.provenance,m.allow_ai AS allowAi,m.created_at AS createdAt,m.modified_at AS modifiedAt,m.deleted_at AS deletedAt FROM memories m JOIN contacts c ON c.id=m.contact_id ORDER BY m.uid",
+      // D-69: live rows only. A soft-deleted row (only the legacy soft cores,
+      // retired in plan 18, can still write one) travels as a tombstone.
+      "SELECT m.uid,c.uid AS contactUid,m.type,m.custom_label AS customLabel,m.value,m.note,m.url,m.meaningful_date AS meaningfulDate,m.pinned,m.outdated,m.hidden,m.provenance,m.allow_ai AS allowAi,li.uid AS interactionUid,m.link_source AS linkSource,m.group_note_copy AS groupNoteCopy,m.created_at AS createdAt,m.modified_at AS modifiedAt,m.deleted_at AS deletedAt FROM memories m JOIN contacts c ON c.id=m.contact_id LEFT JOIN interactions li ON li.id=m.interaction_id ORDER BY m.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
       "SELECT r.uid,c.uid AS contactUid,r.person_name AS personName,r.relation_type AS relationType,linked.uid AS linkedContactUid,r.note,r.pinned,r.hidden,r.created_at AS createdAt,r.modified_at AS modifiedAt,r.deleted_at AS deletedAt FROM relationships r JOIN contacts c ON c.id=r.contact_id LEFT JOIN contacts linked ON linked.id=r.linked_contact_id ORDER BY r.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
-      "SELECT s.uid,c.uid AS contactUid,s.field_key AS fieldKey,s.value,s.is_current AS isCurrent,s.created_at AS createdAt,s.modified_at AS modifiedAt FROM current_state_entries s JOIN contacts c ON c.id=s.contact_id ORDER BY s.uid",
+      `SELECT s.uid,c.uid AS contactUid,s.field_key AS fieldKey,s.value,s.entry_date AS entryDate,s.entry_time AS entryTime,s.url,li.uid AS interactionUid,s.link_source AS linkSource,s.group_note_copy AS groupNoteCopy,s.from_share AS fromShare,s.created_at AS createdAt,s.modified_at AS modifiedAt FROM current_state_entries s JOIN contacts c ON c.id=s.contact_id LEFT JOIN interactions li ON li.id=s.interaction_id ORDER BY ${currentStateOrderSql("s")}`,
     ),
     ro.getAllAsync<Record<string, unknown>>(
       "SELECT h.uid,c.uid AS contactUid,d.uid AS fieldDefUid,h.value,h.created_at AS createdAt,h.created_at AS modifiedAt FROM custom_field_value_history h JOIN contacts c ON c.id=h.contact_id JOIN custom_field_defs d ON d.id=h.field_def_id ORDER BY h.uid",
@@ -228,6 +231,34 @@ async function readManifest(
       "SELECT entity_type, entity_uid, deleted_at FROM tombstones ORDER BY entity_type, entity_uid",
     ),
   ]);
+  // D-69: split soft-deleted memories and key people off as tombstones,
+  // merged with any tombstone already recorded for the same uid (later wins).
+  const tombstoneRows = new Map(
+    tombstones.map((row) => [
+      `${row.entity_type}\u0000${row.entity_uid}`,
+      {
+        entityType: row.entity_type,
+        entityUid: row.entity_uid,
+        deletedAt: row.deleted_at,
+      },
+    ]),
+  );
+  const live = (
+    rows: Record<string, unknown>[],
+    entityType: "memory" | "relationship",
+  ) =>
+    rows.flatMap(({ deletedAt, ...row }) => {
+      if (typeof deletedAt !== "string") return [row];
+      const entityUid = row.uid as string;
+      const key = `${entityType}\u0000${entityUid}`;
+      const current = tombstoneRows.get(key);
+      if (!current)
+        tombstoneRows.set(key, { entityType, entityUid, deletedAt });
+      else if (deletedAt > current.deletedAt) current.deletedAt = deletedAt;
+      return [];
+    });
+  const memories = live(memoryRows, "memory");
+  const relationships = live(relationshipRows, "relationship");
   const contactUid = new Map(
     contactRows.map((row) => [row.localContactId as number, row.uid as string]),
   );
@@ -292,7 +323,7 @@ async function readManifest(
     contactMethodProvenance,
     interactions,
     events,
-    fuel,
+    offLimits,
     contactLinks,
     customFieldDefs,
     customFieldValues: values,
@@ -311,11 +342,10 @@ async function readManifest(
     groupEvents,
     profileContactPresentation,
     profileCategoryPresentation,
-    tombstones: tombstones.map((row) => ({
-      entityType: row.entity_type,
-      entityUid: row.entity_uid,
-      deletedAt: row.deleted_at,
-    })),
+    // The SQL's (entity_type, entity_uid) order, in binary code-unit order.
+    tombstones: [...tombstoneRows.entries()]
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([, row]) => row),
   };
   assertNoLocalOnlyKeys(manifest);
   return {

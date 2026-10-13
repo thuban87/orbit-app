@@ -444,7 +444,7 @@ it("persists tombstone-only parent and child evidence, bumps revision, and block
   const destination = await db();
   await contact(oldSource, "deleted-contact");
   const olderSnapshot = await exported(oldSource);
-  for (const entityType of ["contact", "fuel"]) {
+  for (const entityType of ["contact", "off_limits"]) {
     await source.runAsync(
       "INSERT INTO tombstones(entity_type,entity_uid,deleted_at) VALUES(?,?,?)",
       [entityType, `deleted-${entityType}`, "2026-09-02 00:00:00"],
@@ -461,7 +461,7 @@ it("persists tombstone-only parent and child evidence, bumps revision, and block
     ),
   ).toEqual([
     { entity_type: "contact", entity_uid: "deleted-contact" },
-    { entity_type: "fuel", entity_uid: "deleted-fuel" },
+    { entity_type: "off_limits", entity_uid: "deleted-off_limits" },
   ]);
   expect((await applyRestore(destination, olderSnapshot, "merge")).status).toBe(
     "applied",
@@ -725,7 +725,7 @@ const JPEG_BASE64 = bytesToBase64([
 it.each(["merge", "replace-all"] as const)(
   "a mixed JPEG/WebP library restores and re-exports byte-for-byte under the unchanged .jpg names in %s (38.6 D-12/D-19/D-21)",
   async (mode) => {
-    expect(BACKUP_FORMAT_VERSION).toBe(7);
+    expect(BACKUP_FORMAT_VERSION).toBe(8);
     photo.files.clear();
     const source = await db();
     const destination = await db();
@@ -750,7 +750,7 @@ it.each(["merge", "replace-all"] as const)(
         readPhotoBase64: readMap,
       }),
     );
-    expect(manifest.backupFormatVersion).toBe(7);
+    expect(manifest.backupFormatVersion).toBe(8);
     const wire = Object.fromEntries(
       manifest.contacts.map((row) => [row.uid, row.photoBase64]),
     );
@@ -903,7 +903,7 @@ it("exports missing photos as marked nulls and counts them (D-24/D-26/D-29)", as
     photoBase64: null,
     photoSkipped: true,
   });
-  expect(manifest.backupFormatVersion).toBe(7);
+  expect(manifest.backupFormatVersion).toBe(8);
   const byUid = Object.fromEntries(manifest.contacts.map((r) => [r.uid, r]));
   expect(byUid["a-bytes"]?.photoBase64).toBe("QkJC");
   expect(byUid["a-bytes"]).not.toHaveProperty("photoSkipped");

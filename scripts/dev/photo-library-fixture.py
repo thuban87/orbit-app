@@ -169,7 +169,7 @@ def build_manifest(args):
         "contactMethodProvenance": [],
         "interactions": [],
         "events": [],
-        "fuel": [],
+        "offLimits": [],
         "contactLinks": [],
         "customFieldDefs": [],
         "customFieldValues": [],

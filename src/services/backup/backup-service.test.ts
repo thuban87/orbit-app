@@ -10,7 +10,7 @@ const manifest = {
   contacts: [],
   interactions: [],
   events: [],
-  fuel: [],
+  offLimits: [],
   contactLinks: [],
   customFieldDefs: [],
   customFieldValues: [],
@@ -307,7 +307,7 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 7,
+        backupFormatVersion: 8,
         encrypted: false,
         rowCount: 0,
         photoCount: 0,
@@ -336,7 +336,7 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 7,
+        backupFormatVersion: 8,
         encrypted: true,
         rowCount: 0,
         photoCount: 0,
