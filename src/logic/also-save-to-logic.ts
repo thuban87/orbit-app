@@ -21,6 +21,7 @@
 import type { LinkedSection } from "@/db/linked-entry-dao";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
+import { plural } from "@/utils/plural";
 
 /** D-38 order: Last Talked About, Gift Ideas, Thought of Them, Memories. */
 export const ALSO_SAVE_TO_SECTIONS: readonly LinkedSection[] = [
@@ -95,6 +96,21 @@ export function addedNoteSnackbar(input: {
 }): string {
   const whom = input.personName ? ` for ${input.personName}` : "";
   return `Added note${whom}${alsoSavedSuffix(input.section)}`;
+}
+
+/**
+ * Group Log's success snackbar (38.9 D-39, D-46: verb first, then whom; it was
+ * silent). Names the event and counts the people through the plural helper
+ * (D-21), plus the section the Group Note was also saved to. Proposed wording,
+ * reviewed in plan 19.
+ */
+export function loggedGroupEventSnackbar(input: {
+  title: string;
+  participantCount: number;
+  section: LinkedSection | null;
+}): string {
+  const people = plural(input.participantCount, "person", "people");
+  return `Logged ${input.title} with ${people}${alsoSavedSuffix(input.section)}`;
 }
 
 /**

@@ -35,10 +35,12 @@ import {
   alsoSaveChoiceAfterNoteChange,
   canAlsoSave,
   effectiveAlsoSaveTo,
+  loggedGroupEventSnackbar,
 } from "@/logic/also-save-to-logic";
 import { toGroupParticipantInputs } from "@/logic/group-log-participant-inputs";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
@@ -124,6 +126,7 @@ export function GroupLogScreen({
     setError(null);
     try {
       const now = localDateTime();
+      const savedSection = effectiveAlsoSaveTo(groupNote, alsoSaveTo);
       await createGroupEvent(getExecutor(), {
         uid: newUid(),
         title,
@@ -134,8 +137,17 @@ export function GroupLogScreen({
         duration: value.duration,
         groupNote: groupNote || null,
         // The section actually saved: none for a blank Group Note (c10 C-01).
-        alsoSaveTo: effectiveAlsoSaveTo(groupNote, alsoSaveTo),
+        alsoSaveTo: savedSection,
         participants: toGroupParticipantInputs(participantIds, newUid),
+      });
+      // 38.9 D-39 / D-46: Group Log was silent; verb first, then whom.
+      showSnackbar({
+        kind: "success",
+        label: loggedGroupEventSnackbar({
+          title: title.trim(),
+          participantCount: participantIds.length,
+          section: savedSection,
+        }),
       });
       bypassRef.current = true;
       navigation.goBack();

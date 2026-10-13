@@ -9,6 +9,7 @@ import {
   canAlsoSave,
   effectiveAlsoSaveTo,
   linkedNoteBlankMessage,
+  loggedGroupEventSnackbar,
   loggedInteractionSnackbar,
 } from "./also-save-to-logic";
 
@@ -121,6 +122,25 @@ describe("snackbar copy (38.9 D-39, D-46)", () => {
     expect(addedNoteSnackbar({ personName: null, section: null })).toBe(
       "Added note",
     );
+  });
+});
+
+describe("loggedGroupEventSnackbar (38.9 D-39)", () => {
+  it("Group Log: verb, event, people count, section", () => {
+    expect(
+      loggedGroupEventSnackbar({
+        title: "Book club",
+        participantCount: 3,
+        section: "last_talked_about",
+      }),
+    ).toBe("Logged Book club with 3 people, also saved to Last Talked About");
+    expect(
+      loggedGroupEventSnackbar({
+        title: "Lunch",
+        participantCount: 1,
+        section: null,
+      }),
+    ).toBe("Logged Lunch with 1 person");
   });
 });
 
