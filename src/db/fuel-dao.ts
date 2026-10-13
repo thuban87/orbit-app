@@ -17,7 +17,7 @@
  * which the Edit Contact aggregate's single bump relies on.
  */
 
-import { setCurrentStateValueCore } from "@/db/current-state-history-dao";
+import { addCurrentStateEntryCore } from "@/db/current-state-history-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { mapLegacyFuelRow } from "@/db/legacy-fuel-mapping";
 import { addMemoryCore } from "@/db/memories-dao";
@@ -135,10 +135,17 @@ export async function addFuelCore(
         now: input.now,
       });
     case "current_state":
-      return setCurrentStateValueCore(exec, {
+      // A dated Last Talked About entry; the url and the D-108 share marker
+      // go through too (plan 03).
+      return addCurrentStateEntryCore(exec, {
         contactId: input.contactId,
         fieldKey: mapped.fieldKey,
         value: mapped.value,
+        entryDate: mapped.entryDate,
+        entryTime: mapped.entryTime,
+        url: mapped.url,
+        fromShare: mapped.fromShare,
+        createdAt: input.createdAt,
         now: input.now,
       });
     case "none":

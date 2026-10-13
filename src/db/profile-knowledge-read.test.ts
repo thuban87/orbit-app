@@ -4,8 +4,8 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { getRankedFuel, RANKED_FUEL_EXCLUSIONS } from "@/db/fuel-read";
 import { runMigrations } from "@/db/migrations/runner";
+import { addOffLimits } from "@/db/off-limits-dao";
 import {
   readPopulatedCustomFields,
   readProfileKnowledge,
@@ -52,8 +52,8 @@ describe("Profile knowledge projection", () => {
     const linked = await contact("Linked");
     await exec.runAsync(
       `INSERT INTO current_state_entries
-         (uid, contact_id, field_key, value, is_current, created_at, modified_at)
-       VALUES (?, ?, 'last_talked_about', 'The garden', 1, ?, ?)`,
+         (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
+       VALUES (?, ?, 'last_talked_about', 'The garden', '2026-09-09', ?, ?)`,
       [uid(), owner, NOW, NOW],
     );
 
@@ -96,6 +96,7 @@ describe("Profile knowledge projection", () => {
     const result = await readProfileKnowledge(readOnly(), owner);
     expect(result.currentState.last_talked_about?.value).toBe("The garden");
     expect(result.currentState.last_talked_about?.previous).toEqual([]);
+    expect(result.currentState.last_talked_about?.total).toBe(1);
     expect(
       result.featured.items.map((item) => `${item.owner}:${item.id}`),
     ).toEqual([
@@ -113,38 +114,106 @@ describe("Profile knowledge projection", () => {
     ]);
   });
 
-  it("reads at most five prior temporal rows, structurally excluding the current row", async () => {
+  it("reads Most Recent by entry date, at most five Previous rows, and a total count (D-50, D-52, D-53)", async () => {
     const owner = await contact("Owner");
     await exec.runAsync(
       `INSERT INTO current_state_entries
-         (uid, contact_id, field_key, value, is_current, created_at, modified_at)
-       VALUES (?, ?, 'last_talked_about', 'Most recent', 1, ?, ?)`,
+         (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
+       VALUES (?, ?, 'last_talked_about', 'Most recent', '2026-09-09', ?, ?)`,
       [uid(), owner, "2026-09-09 12:00:00", NOW],
     );
     for (let index = 0; index < 6; index += 1) {
       const day = String(index + 1).padStart(2, "0");
       await exec.runAsync(
         `INSERT INTO current_state_entries
-           (uid, contact_id, field_key, value, is_current, created_at, modified_at)
-         VALUES (?, ?, 'last_talked_about', ?, 0, ?, ?)`,
-        [uid(), owner, `Previous ${index + 1}`, `2026-09-${day} 12:00:00`, NOW],
+           (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
+         VALUES (?, ?, 'last_talked_about', ?, ?, ?, ?)`,
+        [
+          uid(),
+          owner,
+          `Previous ${index + 1}`,
+          `2026-09-${day}`,
+          `2026-09-${day} 12:00:00`,
+          NOW,
+        ],
       );
     }
+    // Added last but backdated: it slots into Previous by its entry date.
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, entry_date, created_at, modified_at)
+       VALUES (?, ?, 'last_talked_about', 'Backdated', '2026-09-05', ?, ?)`,
+      [uid(), owner, "2026-09-10 08:00:00", NOW],
+    );
 
     const result = await readProfileKnowledge(readOnly(), owner);
     const current = result.currentState.last_talked_about;
     expect(current?.value).toBe("Most recent");
+    expect(current?.total).toBe(8);
     expect(current?.previous).toHaveLength(5);
     expect(current?.previous.map((entry) => entry.value)).toEqual([
       "Previous 6",
+      // Same entry date as Previous 5, earlier creation time.
       "Previous 5",
+      "Backdated",
       "Previous 4",
       "Previous 3",
-      "Previous 2",
     ]);
     expect(current?.previous.map((entry) => entry.id)).not.toContain(
       current?.id,
     );
+    expect(current?.previous.every((entry) => entry.total === undefined)).toBe(
+      true,
+    );
+  });
+
+  it("returns entry_date, entry_time, url, interaction_id and link_source on current and previous (c10 C-01)", async () => {
+    const owner = await contact("Owner");
+    const interactionId = (
+      await exec.runAsync(
+        `INSERT INTO interactions
+           (uid, contact_id, occurred_at, recorded_at, note, source, modified_at)
+         VALUES (?, ?, '2026-09-08 18:30:00', ?, 'Their trip', 'manual', ?)`,
+        [uid(), owner, NOW, NOW],
+      )
+    ).lastInsertRowId;
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, entry_date, entry_time, url,
+          interaction_id, link_source, created_at, modified_at)
+       VALUES (?, ?, 'last_talked_about', 'Their trip', '2026-09-08', '18:30:00',
+               'https://example.test/trip', ?, 'note', ?, ?)`,
+      [uid(), owner, interactionId, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, entry_date, url, created_at, modified_at)
+       VALUES (?, ?, 'last_talked_about', 'Older', '2026-09-01',
+               'https://example.test/older', ?, ?)`,
+      [uid(), owner, "2026-09-01 09:00:00", NOW],
+    );
+
+    const current = (await readProfileKnowledge(readOnly(), owner)).currentState
+      .last_talked_about;
+    expect(current).toMatchObject({
+      value: "Their trip",
+      entry_date: "2026-09-08",
+      entry_time: "18:30:00",
+      url: "https://example.test/trip",
+      interaction_id: interactionId,
+      link_source: "note",
+      total: 2,
+    });
+    expect(current?.previous).toEqual([
+      expect.objectContaining({
+        value: "Older",
+        entry_date: "2026-09-01",
+        entry_time: null,
+        url: "https://example.test/older",
+        interaction_id: null,
+        link_source: null,
+      }),
+    ]);
   });
 
   it("caps repeatable visible collections after filtering and reports truthful totals", async () => {
@@ -222,30 +291,28 @@ describe("Profile knowledge projection", () => {
     });
   });
 
-  it("reads only bound Off Limits rows and leaves ranked exclusions unchanged", async () => {
+  it("reads only the contact's Off Limits rows from the off_limits table (D-36)", async () => {
     const owner = await contact("Owner");
     const other = await contact("Other");
-    for (const [contactId, kind, text] of [
-      [owner, "off_limits", "Avoid layoffs"],
-      [owner, "topic", "Ask about hiking"],
-      [other, "off_limits", "Other secret"],
-    ] as const) {
-      await exec.runAsync(
-        `INSERT INTO fuel
-           (uid, contact_id, kind, text, created_at, source, modified_at)
-         VALUES (?, ?, ?, ?, ?, 'manual', ?)`,
-        [uid(), contactId, kind, text, NOW, NOW],
-      );
-    }
+    await addOffLimits(exec, {
+      uid: uid(),
+      contactId: owner,
+      text: "Avoid layoffs",
+      now: NOW,
+    });
+    await addOffLimits(exec, {
+      uid: uid(),
+      contactId: other,
+      text: "Other secret",
+      now: NOW,
+    });
 
-    expect(await readProfileOffLimits(readOnly(), owner)).toEqual([
-      expect.objectContaining({ kind: "off_limits", text: "Avoid layoffs" }),
-    ]);
-    expect(await getRankedFuel(exec, owner)).toEqual([
-      expect.objectContaining({ kind: "topic", text: "Ask about hiking" }),
-    ]);
-    expect(RANKED_FUEL_EXCLUSIONS).toBe(
-      `kind != 'off_limits'\n     AND source != 'ai'\n     AND NULLIF(TRIM(text, char(9) || char(10) || char(11) || char(12) || char(13) || char(160) || ' '), '') IS NOT NULL`,
+    const expected = [
+      expect.objectContaining({ contact_id: owner, text: "Avoid layoffs" }),
+    ];
+    expect(await readProfileOffLimits(readOnly(), owner)).toEqual(expected);
+    expect((await readProfileKnowledge(readOnly(), owner)).offLimits).toEqual(
+      expected,
     );
   });
 

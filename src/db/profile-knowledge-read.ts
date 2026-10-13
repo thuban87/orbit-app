@@ -1,19 +1,23 @@
+import { currentStateOrderSql } from "@/db/current-state-history-read";
 import {
   isValueInOptions,
   type ParseResult,
   parsers,
 } from "@/db/field-parsers";
 import type { CustomFieldDef } from "@/db/field-types";
-import type { FuelItem } from "@/db/fuel-read";
 import {
   listMemoriesForContact,
   type MemoryRow,
   resolveVisibility,
 } from "@/db/memories-read";
 import {
+  CURRENT_STATE_FIELD_KEYS,
   type CurrentStateFieldKey,
-  isCurrentStateFieldKey,
 } from "@/db/memory-registry";
+import {
+  listOffLimitsForContact,
+  type OffLimitsRow,
+} from "@/db/off-limits-read";
 import {
   listRelationshipsForContact,
   type RelationshipRow,
@@ -39,9 +43,22 @@ export interface ProfileCurrentStateEntry {
   value: string;
   created_at: string;
   modified_at: string;
+  /** Local `YYYY-MM-DD` the entry is about (D-41); optional for fixtures. */
+  entry_date?: string;
+  /** `HH:MM:SS` for a linked entry, NULL for a direct one (D-48). */
+  entry_time?: string | null;
+  url?: string | null;
+  /** The linked interaction, so a linked entry can open it (D-37, D-107). */
+  interaction_id?: number | null;
+  link_source?: string | null;
   /**
-   * Bounded retained entries for the same field, newest first. The current row
-   * is structurally absent: this query accepts only `is_current = 0` rows.
+   * How many entries the field holds in all (D-52, D-53). Set only on the
+   * top-level Most Recent entry, never on the nested `previous` rows.
+   */
+  total?: number;
+  /**
+   * Up to five earlier entries for the same field, in the current-state
+   * order (D-50, D-51). The Most Recent row is never repeated here.
    */
   previous: ProfileCurrentStateEntry[];
 }
@@ -75,12 +92,13 @@ export interface ProfileKnowledge {
   memories: ProfileCollection<MemoryRow>;
   importedNotes: ProfileCollection<MemoryRow>;
   customFields: ProfileCustomFieldGroup[];
-  offLimits: FuelItem[];
+  offLimits: OffLimitsRow[];
 }
 
 interface CurrentStateDbRow
-  extends Omit<ProfileCurrentStateEntry, "field_key"> {
+  extends Omit<ProfileCurrentStateEntry, "field_key" | "previous" | "total"> {
   field_key: string;
+  total: number;
 }
 
 interface CustomFieldDbRow {
@@ -110,50 +128,46 @@ function collection<T>(
   };
 }
 
+/** Most Recent plus the earlier entries the Profile shows (D-50, D-52). */
+const PROFILE_PREVIOUS_LIMIT = 5;
+
+/**
+ * One query per field, in `currentStateOrderSql()` order (D-45, D-51): the
+ * first row is Most Recent, the next five are Previous, and `total` counts
+ * every entry of the field (D-52, D-53).
+ */
 async function readCurrentState(
   exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<ProfileKnowledge["currentState"]> {
-  const rows = await exec.getAllAsync<CurrentStateDbRow>(
-    `SELECT id, uid, contact_id, field_key, value, created_at, modified_at
-       FROM current_state_entries
-      WHERE contact_id = ? AND is_current = 1
-      ORDER BY field_key, id DESC`,
-    [contactId],
-  );
   const result: ProfileKnowledge["currentState"] = {};
-  for (const row of rows) {
-    if (
-      isCurrentStateFieldKey(row.field_key) &&
-      result[row.field_key] === undefined
-    ) {
-      result[row.field_key] = {
-        ...row,
-        field_key: row.field_key,
-        previous: [],
-      };
-    }
-  }
   await Promise.all(
-    Object.values(result).map(async (current) => {
-      if (!current) return;
-      const previousRows = await exec.getAllAsync<CurrentStateDbRow>(
-        `SELECT id, uid, contact_id, field_key, value, created_at, modified_at
+    CURRENT_STATE_FIELD_KEYS.map(async (fieldKey) => {
+      const rows = await exec.getAllAsync<CurrentStateDbRow>(
+        `SELECT id, uid, contact_id, field_key, value, entry_date, entry_time,
+                url, interaction_id, link_source, created_at, modified_at,
+                COUNT(*) OVER () AS total
            FROM current_state_entries
-          WHERE contact_id = ? AND field_key = ? AND is_current = 0
-          ORDER BY created_at DESC, id DESC
-          LIMIT 5`,
-        [contactId, current.field_key],
+          WHERE contact_id = ? AND field_key = ?
+          ORDER BY ${currentStateOrderSql()}
+          LIMIT ?`,
+        [contactId, fieldKey, PROFILE_PREVIOUS_LIMIT + 1],
       );
-      current.previous = previousRows
-        .filter((row) => isCurrentStateFieldKey(row.field_key))
-        .map(
-          (row): ProfileCurrentStateEntry => ({
-            ...row,
-            field_key: row.field_key as CurrentStateFieldKey,
-            previous: [],
-          }),
-        );
+      const [first, ...earlier] = rows;
+      if (!first) return;
+      const entry = ({
+        total: _total,
+        ...row
+      }: CurrentStateDbRow): ProfileCurrentStateEntry => ({
+        ...row,
+        field_key: fieldKey,
+        previous: [],
+      });
+      result[fieldKey] = {
+        ...entry(first),
+        total: first.total,
+        previous: earlier.map(entry),
+      };
     }),
   );
   return result;
@@ -255,18 +269,16 @@ export async function readPopulatedCustomFields(
   return groupCustomFieldRows(rows, contactId);
 }
 
-/** Owner-facing Off Limits projection. It is never reused for ranking or AI. */
+/**
+ * Owner-facing Off Limits projection (D-36): the `off_limits` table through
+ * its own read. It is never reused for ranking or AI (D-09). Kept as a
+ * delegating name for `compose-research-read` until plan 06 retargets it.
+ */
 export function readProfileOffLimits(
   exec: ReadOnlyExecutor,
   contactId: number,
-): Promise<FuelItem[]> {
-  return exec.getAllAsync<FuelItem>(
-    `SELECT id, contact_id, kind, label, text, url, created_at, source
-       FROM fuel
-      WHERE contact_id = ? AND kind = 'off_limits'
-      ORDER BY created_at DESC, id DESC`,
-    [contactId],
-  );
+): Promise<OffLimitsRow[]> {
+  return listOffLimitsForContact(exec, contactId);
 }
 
 /**

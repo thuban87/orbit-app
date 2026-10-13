@@ -4,8 +4,7 @@
  *
  *   - addFuel routes by kind: off_limits -> off_limits; gift / topic / fact ->
  *     a Gift Ideas / Thought of Them / general memory with Allow AI off, share
- *     provenance kept. (No `recent` case here: that route runs through the
- *     current-state core, which plan 03 rebuilds; plan 03 adds its test.)
+ *     provenance kept; recent -> a dated Last Talked About entry (plan 03).
  *   - editFuel / deleteFuel reach only off_limits, scoped by (id, contact_id).
  *   - addFuelCore composes inside a caller-opened inWriteTransaction.
  */
@@ -161,6 +160,40 @@ describe("addFuel — routes by kind (D-56)", () => {
         created_at: NOW,
       },
     ]);
+    expect(await offLimitsRows(c)).toEqual([]);
+  });
+
+  it("recent lands as a dated Last Talked About entry, url and share origin kept (checker W3)", async () => {
+    const c = await seedContact();
+    await addFuel(exec, {
+      uid: "fuel-recent",
+      contactId: c,
+      kind: "recent",
+      text: "Their new job",
+      url: "https://example.test/job",
+      createdAt: "2026-08-10 18:00:00",
+      source: "share",
+      now: NOW,
+    });
+    expect(
+      await exec.getAllAsync(
+        `SELECT field_key, value, entry_date, entry_time, url, from_share,
+                created_at
+           FROM current_state_entries WHERE contact_id = ?`,
+        [c],
+      ),
+    ).toEqual([
+      {
+        field_key: "last_talked_about",
+        value: "Their new job",
+        entry_date: "2026-08-10",
+        entry_time: null,
+        url: "https://example.test/job",
+        from_share: 1,
+        created_at: "2026-08-10 18:00:00",
+      },
+    ]);
+    expect(await memoryRows(c)).toEqual([]);
     expect(await offLimitsRows(c)).toEqual([]);
   });
 

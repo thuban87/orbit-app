@@ -193,7 +193,7 @@ export function HistoryRecordRow({
     <Pressable
       testID={`history-row-${item.key}`}
       accessibilityRole="button"
-      accessibilityLabel={`Knowledge change, ${fieldLabel}, ${formatTimeMinuteOrFallback(r.createdAt)}${valueSuffix}`}
+      accessibilityLabel={`Knowledge change, ${[fieldLabel, r.timeAt === null ? null : formatTimeMinuteOrFallback(r.timeAt)].filter(Boolean).join(", ")}${valueSuffix}`}
       style={styles.row}
       onPress={() => onOpenKnowledgeChange(r.fieldKey, item.date)}
     >
@@ -201,9 +201,11 @@ export function HistoryRecordRow({
       <View style={styles.rowBody}>
         <View style={styles.rowHead}>
           <AppText role="label">{fieldLabel}</AppText>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            {formatTimeMinuteOrFallback(r.createdAt)}
-          </AppText>
+          {r.timeAt === null ? null : (
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              {formatTimeMinuteOrFallback(r.timeAt)}
+            </AppText>
+          )}
         </View>
         {r.value ? (
           <AppText role="body" numberOfLines={1}>

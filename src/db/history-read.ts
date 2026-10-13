@@ -68,11 +68,24 @@ export interface HistoryLifecycleRecord {
 export interface HistoryKnowledgeRecord {
   readonly id: number;
   readonly fieldKey: CurrentStateFieldKey;
-  /** LOCAL calendar date of the change (leading `YYYY-MM-DD` of created_at). */
+  /** The entry's LOCAL date: its `entry_date` (D-41). */
   readonly date: string;
   readonly createdAt: string;
+  /**
+   * The stream sort key, `YYYY-MM-DD HH:MM:SS`: `entry_date` plus
+   * `entry_time`, else created_at's time. The same key as
+   * `currentStateOrderSql`, so a backdated entry sits under its own day
+   * (D-41, D-45, D-51; convergence c3).
+   */
+  readonly sortAt: string;
+  /**
+   * The time the row shows, or null for none: entry date + entry time when
+   * set, created_at when it falls on the entry's own date, else null. A
+   * backdated direct entry stores a date only (D-48), so it shows no time
+   * rather than one from another day (convergence c6).
+   */
+  readonly timeAt: string | null;
   readonly value: string;
-  readonly isCurrent: number;
 }
 
 /** How a date renders as a marker: filled dot / ring / filled-with-count. */
@@ -265,23 +278,32 @@ async function readKnowledgeChanges(
   for (const fieldKey of CURRENT_STATE_FIELD_KEYS) {
     const rows = await getCurrentStateHistory(exec, contactId, fieldKey);
     for (const row of rows) {
+      // A linked note shows as its interaction's row (D-37).
+      if (row.interaction_id !== null) continue;
+      const createdTime = row.created_at.trim().slice(11, 19);
       family.push({
         id: row.id,
         fieldKey,
-        date: localDateOf(row.created_at),
+        date: row.entry_date,
         createdAt: row.created_at,
+        sortAt: `${row.entry_date} ${row.entry_time ?? createdTime}`,
+        timeAt:
+          row.entry_time !== null
+            ? `${row.entry_date} ${row.entry_time}`
+            : localDateOf(row.created_at) === row.entry_date
+              ? row.created_at
+              : null,
         value: row.value,
-        isCurrent: row.is_current,
       });
     }
   }
-  // Deterministic flattened order: newest created_at first, then registry field
+  // Deterministic flattened order: newest sortAt first, then registry field
   // order, then id DESC — stable even when two fields change at the same instant.
   const fieldOrder = (key: CurrentStateFieldKey) =>
     CURRENT_STATE_FIELD_KEYS.indexOf(key);
   family.sort((a, b) => {
-    if (a.createdAt !== b.createdAt) {
-      return a.createdAt < b.createdAt ? 1 : -1;
+    if (a.sortAt !== b.sortAt) {
+      return a.sortAt < b.sortAt ? 1 : -1;
     }
     if (a.fieldKey !== b.fieldKey) {
       return fieldOrder(a.fieldKey) - fieldOrder(b.fieldKey);

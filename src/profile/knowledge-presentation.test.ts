@@ -118,13 +118,15 @@ const input: KnowledgePresentationInput = {
     offLimits: [
       {
         id: 90,
+        uid: "off-limits-90",
         contact_id: 7,
-        kind: "off_limits",
         label: "Politics",
         text: "Avoid election news",
         url: null,
+        group_note_copy: 0,
+        from_share: 0,
         created_at: "2026-09-01 12:00:00",
-        source: "user",
+        modified_at: "2026-09-01 12:00:00",
       },
     ],
   },

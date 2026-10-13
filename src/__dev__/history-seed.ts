@@ -191,7 +191,7 @@ export async function seedHistoryFixture(
           detail: event.detail,
           now: event.occurredAt,
         });
-      // Chronological, so each call demotes the previous current value.
+      // Chronological; each call adds a dated entry (Most Recent is the latest date).
       for (const change of spec.knowledge)
         await setCurrentStateValueCore(exec, {
           contactId: id,

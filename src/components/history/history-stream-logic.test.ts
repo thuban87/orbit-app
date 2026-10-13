@@ -108,8 +108,22 @@ function knowledge(id: number, createdAt: string): HistoryKnowledgeRecord {
     fieldKey: "last_talked_about",
     date: createdAt.slice(0, 10),
     createdAt,
+    sortAt: createdAt,
+    timeAt: createdAt,
     value: "value",
-    isCurrent: 1,
+  };
+}
+
+/** A knowledge record dated by its entry, not its creation (D-41). */
+function datedKnowledge(
+  id: number,
+  sortAt: string,
+  createdAt: string,
+): HistoryKnowledgeRecord {
+  return {
+    ...knowledge(id, createdAt),
+    date: sortAt.slice(0, 10),
+    sortAt,
   };
 }
 
@@ -184,7 +198,7 @@ describe("orderStreamRecords", () => {
     );
   });
 
-  it("uses createdAt for knowledge records and occurredAt for the others", () => {
+  it("uses sortAt for knowledge records and occurredAt for the others", () => {
     const [first] = orderStreamRecords(
       source({ knowledgeChanges: [knowledge(1, "2026-10-05 10:00:00")] }),
     );
@@ -195,6 +209,40 @@ describe("orderStreamRecords", () => {
 });
 
 describe("buildStreamModel", () => {
+  it("files a backdated knowledge entry under its own day, one header per date (D-41, D-51; c3)", () => {
+    const model = buildStreamModel(
+      source({
+        interactions: [interaction(1, "2026-09-12 09:00:00")],
+        knowledgeChanges: [
+          // Dated 2026-09-12, created 2026-10-05.
+          datedKnowledge(1, "2026-09-12 14:00:00", "2026-10-05 08:00:00"),
+          // Dated today; two same-day entries order by entry time, not creation.
+          datedKnowledge(2, "2026-10-07 07:00:00", "2026-10-07 20:00:00"),
+          datedKnowledge(3, "2026-10-07 09:00:00", "2026-10-07 06:00:00"),
+        ],
+      }),
+      TODAY,
+    );
+    const view = visibleYear(initialStreamState(), model, 2026);
+    expect(view.months.map((month) => month.key)).toEqual([
+      "2026-10",
+      "2026-09",
+    ]);
+    const days = view.months.flatMap((month) =>
+      month.days.map((day) => day.date),
+    );
+    expect(days).toEqual(["2026-10-07", "2026-09-12"]);
+    expect(new Set(days).size).toBe(days.length);
+    expect(view.months[0].days[0].records.map((record) => record.key)).toEqual([
+      "knowledge-3",
+      "knowledge-2",
+    ]);
+    expect(view.months[1].days[0].records.map((record) => record.key)).toEqual([
+      "knowledge-1",
+      "interaction-1",
+    ]);
+  });
+
   it("groups by year, newest first, with the current year first", () => {
     const model = buildStreamModel(
       source({

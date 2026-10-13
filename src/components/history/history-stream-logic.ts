@@ -157,7 +157,7 @@ export function orderStreamRecords(history: StreamSource): StreamRecord[] {
         family: "knowledge",
         key: `knowledge-${record.id}`,
         id: record.id,
-        at: record.createdAt,
+        at: record.sortAt,
         date: record.date,
         record,
       }),

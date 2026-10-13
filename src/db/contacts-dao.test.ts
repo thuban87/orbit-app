@@ -37,7 +37,10 @@ import {
   updateContactFull,
   updateContactMetadataCore,
 } from "@/db/contacts-dao";
-import { getCurrentStateValue } from "@/db/current-state-history-read";
+import {
+  currentStateOrderSql,
+  getCurrentStateValue,
+} from "@/db/current-state-history-read";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { listFuelForEditor } from "@/db/fuel-read";
@@ -1836,7 +1839,8 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
     expect(relationship?.relation_type).toBe("sibling");
 
     const states = await exec.getAllAsync<{ field_key: string; value: string }>(
-      "SELECT field_key, value FROM current_state_entries WHERE contact_id = ? AND is_current = 1 ORDER BY field_key",
+      `SELECT field_key, value FROM current_state_entries WHERE contact_id = ?
+        ORDER BY field_key, ${currentStateOrderSql()}`,
       [contactId],
     );
     expect(states).toEqual([

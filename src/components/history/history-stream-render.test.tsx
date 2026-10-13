@@ -131,8 +131,9 @@ const KNOWLEDGE: HistoryKnowledgeRecord = {
   fieldKey: "current_location",
   date: "2026-10-04",
   createdAt: "2026-10-04 08:00:00",
+  sortAt: "2026-10-04 08:00:00",
+  timeAt: "2026-10-04 08:00:00",
   value: "Lisbon",
-  isCurrent: 1,
 };
 
 function source(parts: Partial<StreamSource>): StreamSource {
@@ -293,6 +294,18 @@ describe("HistoryRecordRow", () => {
     expect(root.props.accessibilityLabel).toBe(
       "Knowledge change, Current location, 8:00 AM. Lisbon",
     );
+    expect(textOf(root)).toContain("8:00 AM");
+  });
+
+  it("shows no time on a knowledge row whose timeAt is null (D-48; c6)", () => {
+    const { tree } = renderRow(
+      recordOf({ knowledgeChanges: [{ ...KNOWLEDGE, timeAt: null }] }),
+    );
+    const [root] = tree;
+    expect(root.props.accessibilityLabel).toBe(
+      "Knowledge change, Current location. Lisbon",
+    );
+    expect(textOf(root)).not.toMatch(/AM|PM|Unknown/);
   });
 });
 
@@ -374,7 +387,13 @@ describe("HistoryStream", () => {
     const { nodes } = renderStream({
       interactions: [interaction(1, "2026-10-01 09:00:00")],
       knowledgeChanges: [
-        { ...KNOWLEDGE, date: "2023-04-04", createdAt: "2023-04-04 08:00:00" },
+        {
+          ...KNOWLEDGE,
+          date: "2023-04-04",
+          createdAt: "2023-04-04 08:00:00",
+          sortAt: "2023-04-04 08:00:00",
+          timeAt: "2023-04-04 08:00:00",
+        },
       ],
     });
     const row = byTestID(nodes, "history-stream-year-row-2023");

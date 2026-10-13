@@ -13,7 +13,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { setCurrentStateValue } from "@/db/current-state-history-dao";
+import {
+  addCurrentStateEntry,
+  setCurrentStateValue,
+} from "@/db/current-state-history-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createGroupEvent } from "@/db/group-events-dao";
 import { isGroupLinked, readContactHistory } from "@/db/history-read";
@@ -302,5 +305,89 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
     const sameDay = a.knowledgeChanges.filter((r) => r.date === "2026-08-05");
     expect(sameDay[0].fieldKey).toBe("last_talked_about");
     expect(sameDay[1].fieldKey).toBe("current_location");
+  });
+
+  it("dates and sorts a backdated direct entry by its entry date, with times only from its own day (D-41, D-48; c3, c6)", async () => {
+    const exec = await freshExec();
+    const contactId = await makeContact(exec);
+    // Added on 2026-10-05, about 2026-09-12; a direct entry has no time.
+    const backdated = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      value: "Their trip",
+      entryDate: "2026-09-12",
+      now: "2026-10-05 08:15:00",
+    });
+    // A same-day direct entry: its capture time is a real time on that day.
+    const sameDay = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "current_location",
+      value: "Lisbon",
+      now: "2026-10-04 09:30:00",
+    });
+    // An entry with its own time (as a linked copy carries).
+    const timed = await addCurrentStateEntry(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      value: "Dinner plans",
+      entryDate: "2026-09-20",
+      entryTime: "19:45:00",
+      now: "2026-10-05 08:20:00",
+    });
+
+    const history = await readContactHistory(exec, contactId);
+    expect(history.knowledgeChanges.map((r) => r.id)).toEqual([
+      sameDay,
+      timed,
+      backdated,
+    ]);
+    const byId = new Map(history.knowledgeChanges.map((r) => [r.id, r]));
+    expect(byId.get(backdated)).toMatchObject({
+      date: "2026-09-12",
+      createdAt: "2026-10-05 08:15:00",
+      sortAt: "2026-09-12 08:15:00",
+      timeAt: null,
+    });
+    expect(byId.get(sameDay)).toMatchObject({
+      date: "2026-10-04",
+      sortAt: "2026-10-04 09:30:00",
+      timeAt: "2026-10-04 09:30:00",
+    });
+    expect(byId.get(timed)).toMatchObject({
+      date: "2026-09-20",
+      sortAt: "2026-09-20 19:45:00",
+      timeAt: "2026-09-20 19:45:00",
+    });
+  });
+
+  it("skips a linked entry: it shows as its interaction's row (D-37)", async () => {
+    const exec = await freshExec();
+    const contactId = await makeContact(exec);
+    const interactionId = await insertInteraction(
+      exec,
+      contactId,
+      "2026-09-01 10:00:00",
+      { note: "Their trip" },
+    );
+    await addCurrentStateEntry(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      value: "Their trip",
+      entryDate: "2026-09-01",
+      entryTime: "10:00:00",
+      interactionId,
+      linkSource: "note",
+      now: NOW,
+    });
+    const direct = await setCurrentStateValue(exec, {
+      contactId,
+      fieldKey: "last_talked_about",
+      value: "Direct",
+      now: NOW,
+    });
+
+    const history = await readContactHistory(exec, contactId);
+    expect(history.knowledgeChanges.map((r) => r.id)).toEqual([direct]);
+    expect(history.interactions.map((r) => r.id)).toEqual([interactionId]);
   });
 });

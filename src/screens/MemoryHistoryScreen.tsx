@@ -6,7 +6,6 @@ import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button } from "@/components/ui";
 import {
   editHistoryEntry,
-  promoteToCurrentValue,
   setCurrentStateValue,
 } from "@/db/current-state-history-dao";
 import {
@@ -74,9 +73,10 @@ export function MemoryHistoryScreen({
     void load().catch((error) =>
       Logger.error(LOG_SCOPE, "failed to refresh current-state history", error),
     );
+  // Most Recent is the first row in date order (D-45); the rest are earlier.
   const priorEntries = useMemo(
-    () => history.filter((row) => row.is_current === 0),
-    [history],
+    () => history.filter((row) => row.id !== current?.id),
+    [history, current],
   );
   const setNewValue = () => {
     const value = newDraft?.trim() ?? "";
@@ -114,18 +114,6 @@ export function MemoryHistoryScreen({
         Logger.error(LOG_SCOPE, "failed to edit history entry", error),
       );
   };
-  const makeCurrent = (entryId: number) =>
-    void promoteToCurrentValue(getExecutor(), {
-      contactId,
-      fieldKey,
-      targetId: entryId,
-      now: localDateTime(),
-    })
-      .then(reload)
-      .catch((error) =>
-        Logger.error(LOG_SCOPE, "failed to promote history entry", error),
-      );
-
   return (
     <View style={styles.root}>
       {/* House header (38.9 D-16, D-44), titled with the field's name. */}
@@ -262,11 +250,6 @@ export function MemoryHistoryScreen({
                           setEditing(entry);
                           setEditDraft(entry.value);
                         }}
-                      />
-                      <Button
-                        role="tertiary"
-                        label="Make current"
-                        onPress={() => makeCurrent(entry.id)}
                       />
                     </View>
                   )}
