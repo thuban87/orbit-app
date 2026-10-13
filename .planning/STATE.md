@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.10
 current_phase_name: Fuel Retirement, Things to Remember & Sharing (INSERTED)
 status: executing
-stopped_at: Completed 38.10-07-PLAN.md
-last_updated: "2026-10-13T18:02:00.000Z"
+stopped_at: Completed 38.10-08-PLAN.md
+last_updated: "2026-10-13T18:40:00.000Z"
 last_activity: 2026-10-13
-last_activity_desc: 38.10-07 complete (search covers Off Limits and current state with section-named hits, no knowledge line on widget/cards, ranked reader deleted, share recency from the new homes)
+last_activity_desc: 38.10-08 complete (share saved first as an AI-off Thought of Them memory through one atomic DAO, create+share one transaction, chip moves/undo/note/AI switch wrappers, resume prompts hidden during a share; end-of-W4 full gate green)
 state_head: feac3098f9a22e191ed29e77a45f9cebf81690b0
 progress:
   total_phases: 38
   completed_phases: 23
   total_plans: 319
-  completed_plans: 304
+  completed_plans: 305
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -47,15 +47,15 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.10 (Fuel Retirement, Things to Remember & Sharing (INSERTED)) — EXECUTING
-Plan: 8 of 19
-Status: Executing Phase 38.10 (started 2026-10-13). 38.10-01 COMPLETE 2026-10-13 (migration 033 head, TARGET_VERSION 33; W1-W4 red window open as planned, 34 test files expected red until W4). 38.10-02 COMPLETE 2026-10-13 (Off Limits DAO/read, delete with Undo, per-type AI defaults + two settings, fuel Off Limits shim; 38 test files expected red until W4). 38.10-03 COMPLETE 2026-10-13 (current state by date, delete with Undo, Profile/History/Dashboard reads, move DAO with Undo, D-103 lock in the interaction writer; 27 test files expected red until W4, all owned by plans 04-08). 38.10-04 COMPLETE 2026-10-13 (backup format 8, v7->v8 converter proven row-equal to migration 033, restore keeps MIN allow_ai and sticky lock markers, link pass + slot release + linked-pair post-pass; backup suites green). 38.10-05 COMPLETE 2026-10-13 (merge/purge cover Off Limits, retired dialog lines removed, live-only purge counts, purgeContactCore for the D-100 Undo, one data_revision bump per purge, merge review + backup nudge counts in DAOs). 38.10-06 COMPLETE 2026-10-13 (two-sided memory/note AI gate in SQL, linked note sent once, ranked prompt block and count gone, Compose Research reads Off Limits from its table with SQL eligibility, first-seen grouping and render-time dates; 6 test files expected red, all plans 07/08). 38.10-07 COMPLETE 2026-10-13 (search corpus adds Off Limits and every current-state entry, hits name their section; dashboard reads name-only; widget and cards carry no knowledge line; ranked reader, RankedFuelLine, fuel-kind-label, fuel-ranking deleted; share-picker recency from share memories + from_share entries; full suite 1 red file, capture-dao, plan 08). Next: wave 4, 38.10-08. 19 plans in 10 waves, sequential on main (no worktrees); test timing = per task own tests, per plan tsc + touched tests, per wave full gate (owner 2026-10-12, PLAN-MAP §5). Phase 38.9 COMPLETE 2026-10-11 (38.9-VERIFICATION.md 75/75).
+Plan: 9 of 19
+Status: Executing Phase 38.10 (started 2026-10-13). 38.10-01 COMPLETE 2026-10-13 (migration 033 head, TARGET_VERSION 33; W1-W4 red window open as planned, 34 test files expected red until W4). 38.10-02 COMPLETE 2026-10-13 (Off Limits DAO/read, delete with Undo, per-type AI defaults + two settings, fuel Off Limits shim; 38 test files expected red until W4). 38.10-03 COMPLETE 2026-10-13 (current state by date, delete with Undo, Profile/History/Dashboard reads, move DAO with Undo, D-103 lock in the interaction writer; 27 test files expected red until W4, all owned by plans 04-08). 38.10-04 COMPLETE 2026-10-13 (backup format 8, v7->v8 converter proven row-equal to migration 033, restore keeps MIN allow_ai and sticky lock markers, link pass + slot release + linked-pair post-pass; backup suites green). 38.10-05 COMPLETE 2026-10-13 (merge/purge cover Off Limits, retired dialog lines removed, live-only purge counts, purgeContactCore for the D-100 Undo, one data_revision bump per purge, merge review + backup nudge counts in DAOs). 38.10-06 COMPLETE 2026-10-13 (two-sided memory/note AI gate in SQL, linked note sent once, ranked prompt block and count gone, Compose Research reads Off Limits from its table with SQL eligibility, first-seen grouping and render-time dates; 6 test files expected red, all plans 07/08). 38.10-07 COMPLETE 2026-10-13 (search corpus adds Off Limits and every current-state entry, hits name their section; dashboard reads name-only; widget and cards carry no knowledge line; ranked reader, RankedFuelLine, fuel-kind-label, fuel-ranking deleted; share-picker recency from share memories + from_share entries; full suite 1 red file, capture-dao, plan 08). 38.10-08 COMPLETE 2026-10-13 (capture-dao on the new homes: shareToContacts, createContactAndShare in one transaction, moveShareRows, guarded undoShareRows, setShareRowsAllowAi, applyShareNote, shareRowsMatchCreatedContactCore; NEW_CONTACT_DEFAULT_INTERVAL_DAYS; resume prompts suppressed while a share is pending or Capture is focused; END OF W4 FULL GATE GREEN: tsc + check:colors + vitest 629 files / 8327 tests, 0 failed). Next: wave 5, 38.10-09. 19 plans in 10 waves, sequential on main (no worktrees); test timing = per task own tests, per plan tsc + touched tests, per wave full gate (owner 2026-10-12, PLAN-MAP §5). Phase 38.9 COMPLETE 2026-10-11 (38.9-VERIFICATION.md 75/75).
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-10-13 — 38.10-07 complete (search, widget, cards, dead code, share recency)
+Last activity: 2026-10-13 — 38.10-08 complete (sharing data layer, resume-prompt gate; W4 full gate green)
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 30, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 38.9. Still unchecked in ROADMAP: 28 (reconcile), 36, 37.1, 39, 40. (38.8 completed 2026-10-09.) (38.7 completed 2026-10-05.)
 Next: phase-dossier for 38.10 (then 38.11, 38.12). Phase 39 is planned after 38.12. The 38.5 G1 Orrery ANR is absorbed into 38.7 (D-52). 38.6 follow-ups are in .planning/todos/pending/2026-09-30-*. Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
@@ -447,6 +447,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.10 P02 | 22 min | 3 tasks | 26 files |
 | Phase 38.10 P06 | 18 min | 3 tasks | 28 files |
 | Phase 38.10 P07 | 13 min | 3 tasks | 37 files |
+| Phase 38.10 P08 | 17 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 

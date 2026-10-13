@@ -1560,7 +1560,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 7/19 plans executed
+**Plans**: 8/19 plans executed
 
 Wave 1
 - [x] 38.10-01-PLAN.md — Migration 033 (knowledge homes), shared fuel mapping, registry and tombstone changes
@@ -1576,7 +1576,7 @@ Wave 4 *(blocked on Wave 3 completion)*
 - [x] 38.10-05-PLAN.md — Merge, purge, inline SQL moved into DAOs
 - [x] 38.10-06-PLAN.md — AI context gated on both sides of a linked note, prompt clean-up, Compose Research
 - [x] 38.10-07-PLAN.md — Search, widget, cards, dead fuel code, share recency
-- [ ] 38.10-08-PLAN.md — Sharing data layer and resume-prompt gate
+- [x] 38.10-08-PLAN.md — Sharing data layer and resume-prompt gate
 
 Wave 5 *(blocked on Wave 4 completion)*
 - [ ] 38.10-09-PLAN.md — Contact-form data layer and the shared entry field (D-66)
@@ -1741,7 +1741,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
-| 38.10 Fuel Retirement, Things to Remember & Sharing | 7/19 | In Progress|  |
+| 38.10 Fuel Retirement, Things to Remember & Sharing | 8/19 | In Progress|  |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
