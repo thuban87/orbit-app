@@ -9,8 +9,9 @@
  * form's own Save writes them (D-104 held deletes; Cancel / Discard brings a
  * deleted row back).
  *
- * - Each row shows its text, label and any stored link, with Edit and Delete,
- *   the same row shape as Key People.
+ * - Each row shows its text, label and any stored link, and an Edit action.
+ *   Delete sits in the open edit form, as in the memory editor, so no
+ *   destructive action sits on a list card (38.9 D-30).
  * - Add and Edit open one form: the text is the shared D-66 field (wraps,
  *   Enter saves, a visible Save button stays; it centres through the host's
  *   KeyboardCenteringProvider), plus an optional label. A stored link is kept
@@ -172,15 +173,6 @@ export function OffLimitsInlineEditor({
               disabled={busy || draft !== null}
               onPress={() => openForm(item)}
             />
-            <Button
-              role="tertiary"
-              label="Delete"
-              disabled={busy || editing?.id === item.id}
-              onPress={() => {
-                if (busy) return;
-                onDelete(item.id);
-              }}
-            />
           </View>
         </View>
       ))}
@@ -247,6 +239,21 @@ export function OffLimitsInlineEditor({
               onPress={commit}
             />
           </View>
+          {editing ? (
+            // Held until the form's Save; Cancel or Discard brings it back
+            // (D-104), so it needs no confirm.
+            <Button
+              testID={testID ? `${testID}-delete` : undefined}
+              role="tertiary"
+              label="Delete"
+              disabled={busy}
+              onPress={() => {
+                if (busy) return;
+                onDelete(editing.id);
+                close();
+              }}
+            />
+          ) : null}
         </View>
       )}
     </View>
