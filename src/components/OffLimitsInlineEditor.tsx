@@ -12,16 +12,18 @@
  * - Each row shows its text, label and any stored link, and an Edit action.
  *   Delete sits in the open edit form, as in the memory editor, so no
  *   destructive action sits on a list card (38.9 D-30).
- * - Add and Edit open one form: the text is the shared D-66 field (wraps,
- *   Enter saves, a visible Save button stays; it centres through the host's
- *   KeyboardCenteringProvider), plus an optional label. A stored link is kept
- *   as it is.
+ * - Add and Edit open the shared `OffLimitsForm` (plan 15), the same form as
+ *   the Off Limits editor, so the two cannot drift: the text is the D-66
+ *   field (wraps, Enter saves, a visible Save button stays; it centres
+ *   through the host's KeyboardCenteringProvider), plus an optional label.
+ *   Its Link field is off here, so a stored link is kept as it is.
  * - The section ends with a solid "Add Off Limits Item" (D-67, D-87).
  * - The open form reports `{ open, dirty }` for the host's Back guard and
  *   section fold (38.9 D-13, D-14, D-68), and Cancel follows the Back rule
  *   through `onCancelRequest` (D-61).
  *
- * The form rules are pure and node-tested in `create-contact-logic.ts`.
+ * The form rules are pure and node-tested in `create-contact-logic.ts`;
+ * `OffLimitsForm` applies them.
  * Colours via theme tokens only (CLAUDE.md).
  */
 import {
@@ -31,18 +33,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
-import {
-  canSaveOffLimitsForm,
-  type DraftState,
-  isOffLimitsFormDirty,
-  normalizeOffLimitsForm,
-  type OffLimitsFormDraft,
-  offLimitsFormDraft,
-} from "@/screens/create-contact-logic";
+import { StyleSheet, View } from "react-native";
+import type { DraftState } from "@/screens/create-contact-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
-import { AppText, Button, EntryTextField } from "./ui";
+import { OffLimitsForm } from "./OffLimitsForm";
+import { AppText, Button } from "./ui";
 
 /** One Off Limits draft row as the section shows it. */
 export interface OffLimitsInlineItem {
@@ -81,6 +77,9 @@ export interface OffLimitsInlineEditorProps {
   testID?: string;
 }
 
+/** The open form: a new item (`null`) or the row being edited. */
+type OpenForm = { item: OffLimitsInlineItem | null; key: number };
+
 export function OffLimitsInlineEditor({
   items,
   addLabel,
@@ -94,27 +93,24 @@ export function OffLimitsInlineEditor({
   testID,
 }: OffLimitsInlineEditorProps) {
   const { colors } = useTheme();
-  const [editing, setEditing] = useState<OffLimitsInlineItem | null>(null);
-  const [draft, setDraft] = useState<OffLimitsFormDraft | null>(null);
-  const [baseline, setBaseline] = useState<OffLimitsFormDraft | null>(null);
+  const [form, setForm] = useState<OpenForm | null>(null);
+  const [dirty, setDirty] = useState(false);
+  // Remounts the shared form for each open (it owns its draft).
+  const openCountRef = useRef(0);
 
   const close = () => {
-    setEditing(null);
-    setDraft(null);
-    setBaseline(null);
+    setForm(null);
+    setDirty(false);
   };
   useImperativeHandle(ref, () => ({ closeDraft: close }));
 
   // Draft state for the host's guard, read through a ref so a fresh closure
   // each render never re-fires the report.
-  const open = draft !== null;
-  const dirty =
-    draft !== null &&
-    isOffLimitsFormDirty(baseline ?? offLimitsFormDraft(), draft);
+  const open = form !== null;
   const onDraftStateChangeRef = useRef(onDraftStateChange);
   onDraftStateChangeRef.current = onDraftStateChange;
   useEffect(() => {
-    onDraftStateChangeRef.current?.({ open, dirty });
+    onDraftStateChangeRef.current?.({ open, dirty: open && dirty });
   }, [open, dirty]);
   useEffect(
     () => () => onDraftStateChangeRef.current?.({ open: false, dirty: false }),
@@ -123,22 +119,12 @@ export function OffLimitsInlineEditor({
 
   const openForm = (item: OffLimitsInlineItem | null) => {
     if (busy) return;
-    const opened = offLimitsFormDraft(item ?? undefined);
-    setEditing(item);
-    setDraft(opened);
-    setBaseline(opened);
+    openCountRef.current += 1;
+    setDirty(false);
+    setForm({ item, key: openCountRef.current });
   };
 
-  const savable =
-    draft !== null && canSaveOffLimitsForm(draft, editing?.url ?? null);
-
-  const commit = () => {
-    if (draft === null || busy || !savable) return;
-    const fields = normalizeOffLimitsForm(draft);
-    if (editing) onEdit(editing.id, fields);
-    else onAdd(fields);
-    close();
-  };
+  const editing = form?.item ?? null;
 
   return (
     <View testID={testID} style={styles.container}>
@@ -170,13 +156,13 @@ export function OffLimitsInlineEditor({
             <Button
               role="secondary"
               label="Edit"
-              disabled={busy || draft !== null}
+              disabled={busy || form !== null}
               onPress={() => openForm(item)}
             />
           </View>
         </View>
       ))}
-      {draft === null ? (
+      {form === null ? (
         <Button
           testID={testID ? `${testID}-add` : undefined}
           role="primary"
@@ -185,76 +171,34 @@ export function OffLimitsInlineEditor({
           onPress={() => openForm(null)}
         />
       ) : (
-        <View
-          style={[
-            styles.form,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <EntryTextField
-            testID={testID ? `${testID}-text` : undefined}
-            accessibilityLabel="Off Limits item"
-            value={draft.text}
-            onChangeText={(text) =>
-              setDraft((prev) => (prev ? { ...prev, text } : prev))
-            }
-            onSubmit={commit}
-            returnKeyType="done"
-            placeholder="A topic to avoid bringing up"
-            editable={!busy}
-          />
-          <TextInput
-            testID={testID ? `${testID}-label` : undefined}
-            accessibilityLabel="Label (optional)"
-            value={draft.label}
-            onChangeText={(label) =>
-              setDraft((prev) => (prev ? { ...prev, label } : prev))
-            }
-            placeholder="Label (optional)"
-            placeholderTextColor={colors.textPlaceholder}
-            editable={!busy}
-            style={[
-              styles.input,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          <View style={styles.actions}>
-            <Button
-              role="secondary"
-              label="Cancel"
-              disabled={busy}
-              onPress={() =>
-                onCancelRequest ? onCancelRequest(close) : close()
-              }
-            />
-            <Button
-              testID={testID ? `${testID}-save` : undefined}
-              role="primary"
-              label="Save"
-              disabled={!savable || busy}
-              onPress={commit}
-            />
-          </View>
-          {editing ? (
-            // Held until the form's Save; Cancel or Discard brings it back
-            // (D-104), so it needs no confirm.
-            <Button
-              testID={testID ? `${testID}-delete` : undefined}
-              role="tertiary"
-              label="Delete"
-              disabled={busy}
-              onPress={() => {
-                if (busy) return;
-                onDelete(editing.id);
-                close();
-              }}
-            />
-          ) : null}
-        </View>
+        // The shared Off Limits form (plan 15), without its Link field: a
+        // stored link is kept as it is here.
+        <OffLimitsForm
+          key={form.key}
+          testID={testID ? `${testID}-form` : undefined}
+          initial={editing}
+          showLink={false}
+          busy={busy}
+          onDirtyChange={setDirty}
+          onSave={async ({ text, label }) => {
+            if (busy) return;
+            if (editing) onEdit(editing.id, { text, label });
+            else onAdd({ text, label });
+            close();
+          }}
+          onCancel={() => (onCancelRequest ? onCancelRequest(close) : close())}
+          onDelete={
+            editing
+              ? // Held until the form's Save; Cancel or Discard brings it
+                // back (D-104), so it needs no confirm.
+                () => {
+                  if (busy) return;
+                  onDelete(editing.id);
+                  close();
+                }
+              : undefined
+          }
+        />
       )}
     </View>
   );
@@ -263,19 +207,6 @@ export function OffLimitsInlineEditor({
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   container: { gap: SPACING.md },
-  form: {
-    borderRadius: SPACING.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: SPACING.sm,
-    padding: SPACING.base,
-  },
-  input: {
-    borderRadius: SPACING.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    minHeight: 44,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.sm,
-  },
   row: {
     borderRadius: SPACING.sm,
     borderWidth: StyleSheet.hairlineWidth,
