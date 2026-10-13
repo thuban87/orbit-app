@@ -128,9 +128,10 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
   // was deleted in the 38.9 code review, IN-05), less M37/M38/M39 (Capture
   // rebuilt: list picker and share card, 38.10-11), less M62 (the memory
   // form's Restore removed, 38.10-13), less M30 (the Memory screen retired,
-  // 38.10-17), less M51 (the retired kind editor deleted, 38.10-18).
-  it("covers the 55 swapped sites still in the tree", () => {
-    expect(done.length).toBe(55);
+  // 38.10-17), less M51 (the retired kind editor deleted, 38.10-18), less
+  // M21–M25 (the Things to Remember screen retired, 38.10-18).
+  it("covers the 50 swapped sites still in the tree", () => {
+    expect(done.length).toBe(50);
   });
 
   const superseded = rows.filter((row) => SUPERSEDED_STATUS.test(row.status));
