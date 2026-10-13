@@ -10,6 +10,7 @@ import {
   deleteMemory,
   editMemory,
   expireMemoryIfStale,
+  ImportedTypeProvenanceError,
   purgeMemoryPermanently,
   restoreMemory,
   setMemoryAllowAi,
@@ -41,7 +42,7 @@ async function seedContact(name = "Alex"): Promise<number> {
 }
 
 describe("memories DAO", () => {
-  it("keeps new import-provenance notes AI-off under an ON default while user-provenance imported types inherit it", async () => {
+  it("keeps a new import-provenance imported note AI-off under an ON default", async () => {
     const contactId = await seedContact();
     await setAiPermissionDefault(exec, "memory", 1, NOW);
     const imported = await addMemory(exec, {
@@ -52,24 +53,32 @@ describe("memories DAO", () => {
       createdAt: NOW,
       now: NOW,
     });
-    const owned = await addMemory(exec, {
-      contactId,
-      type: "imported",
-      provenance: "user",
-      value: "My note",
-      createdAt: NOW,
-      now: NOW,
-    });
     expect(
-      await exec.getAllAsync<{ id: number; allow_ai: number }>(
-        "SELECT id, allow_ai FROM memories WHERE id IN (?, ?) ORDER BY id",
-        [imported, owned],
+      await exec.getFirstAsync<{ allow_ai: number }>(
+        "SELECT allow_ai FROM memories WHERE id = ?",
+        [imported],
       ),
-    ).toEqual([
-      { id: imported, allow_ai: 0 },
-      { id: owned, allow_ai: 1 },
-    ]);
+    ).toEqual({ allow_ai: 0 });
   });
+
+  it("refuses type imported with any provenance but import, writing nothing (D-35, G-D5)", async () => {
+    const contactId = await seedContact();
+    await setAiPermissionDefault(exec, "memory", 1, NOW);
+    for (const provenance of ["user", "share", undefined] as const) {
+      await expect(
+        addMemory(exec, {
+          contactId,
+          type: "imported",
+          provenance,
+          value: "My note",
+          createdAt: NOW,
+          now: NOW,
+        }),
+      ).rejects.toBeInstanceOf(ImportedTypeProvenanceError);
+    }
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+  });
+
   it("applies the durable Memory default only to rows created afterward", async () => {
     const contactId = await seedContact();
     const first = await addMemory(exec, {
@@ -589,5 +598,78 @@ describe("memories DAO", () => {
         reDeletedId,
       ]),
     ).toEqual({ id: reDeletedId });
+  });
+});
+
+describe("allowAi seeding (D-27, D-57, ADR-091)", () => {
+  async function allowAiOf(id: number): Promise<number> {
+    return (await exec.getFirstAsync<{ allow_ai: number }>(
+      "SELECT allow_ai FROM memories WHERE id = ?",
+      [id],
+    ))!.allow_ai;
+  }
+
+  it("a share memory starts AI-off with the Memories default at 1", async () => {
+    const contactId = await seedContact();
+    await setAiPermissionDefault(exec, "memory", 1, NOW);
+    const id = await addMemory(exec, {
+      contactId,
+      type: "general",
+      provenance: "share",
+      value: "Shared",
+      createdAt: NOW,
+      now: NOW,
+    });
+    expect(await allowAiOf(id)).toBe(0);
+  });
+
+  it("an explicit allowAi 1 is ignored for share and import, stored for user", async () => {
+    const contactId = await seedContact();
+    const share = await addMemory(exec, {
+      contactId,
+      type: "general",
+      provenance: "share",
+      allowAi: 1,
+      value: "Shared",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const imported = await addMemory(exec, {
+      contactId,
+      type: "imported",
+      provenance: "import",
+      allowAi: 1,
+      value: "Imported",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const user = await addMemory(exec, {
+      contactId,
+      type: "general",
+      provenance: "user",
+      allowAi: 1,
+      value: "Mine",
+      createdAt: NOW,
+      now: NOW,
+    });
+    expect([
+      await allowAiOf(share),
+      await allowAiOf(imported),
+      await allowAiOf(user),
+    ]).toEqual([0, 0, 1]);
+  });
+
+  it("an explicit allowAi 0 wins over an ON default for provenance user", async () => {
+    const contactId = await seedContact();
+    await setAiPermissionDefault(exec, "memory", 1, NOW);
+    const id = await addMemory(exec, {
+      contactId,
+      type: "general",
+      allowAi: 0,
+      value: "Private",
+      createdAt: NOW,
+      now: NOW,
+    });
+    expect(await allowAiOf(id)).toBe(0);
   });
 });

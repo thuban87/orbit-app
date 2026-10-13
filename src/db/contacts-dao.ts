@@ -339,8 +339,11 @@ export async function createContactFullCore(
   }
   for (const fuel of input.offLimits ?? []) {
     // Fuel additionally needs a minted uid + provenance beyond contactId/stamps.
+    // NEW-1 (D-11): an Off Limits draft is always Off Limits. Forcing the kind
+    // keeps typed Off Limits text from landing as an AI-eligible memory.
     await addFuelCore(exec, {
       ...fuel,
+      kind: "off_limits",
       uid: newUid(),
       contactId,
       createdAt: input.now,

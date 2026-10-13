@@ -1394,34 +1394,50 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
     expect(await listFuelForEditor(exec, contactId)).toEqual([]);
   });
 
-  it("an Off Limits edit leaves recent/topic/fact/gift fuel rows fully intact (kind-scoped, DATA LOSS guard)", async () => {
+  it("an Off Limits edit cannot reach another contact's Off Limits (cross-contact, D-11)", async () => {
     const contactId = await makeContact();
-    // Seed the contact with one of every OTHER fuel kind plus an off_limits row.
-    for (const kind of ["recent", "topic", "fact", "gift"] as const) {
+    const otherId = await makeContact("Other Owner");
+    const otherRow = (
       await exec.runAsync(
-        "INSERT INTO fuel (uid, contact_id, kind, label, text, url, created_at, source, modified_at) VALUES (?, ?, ?, NULL, ?, NULL, ?, 'user', ?)",
-        [uid(), contactId, kind, `${kind}-text`, NOW, NOW],
-      );
-    }
+        "INSERT INTO off_limits (uid, contact_id, text, created_at, modified_at) VALUES (?, ?, 'theirs', ?, ?)",
+        [uid(), otherId, NOW, NOW],
+      )
+    ).lastInsertRowId;
     await updateContactFull(exec, {
       ...baseEdit(contactId),
       offLimits: { add: [{ kind: "off_limits", text: "secret" }] },
     });
-    const [offLimitsRow] = (await listFuelForEditor(exec, contactId)).filter(
-      (r) => r.kind === "off_limits",
-    );
+    const [ownRow] = await listFuelForEditor(exec, contactId);
 
-    // Edit AND delete the off_limits row — the other four kinds must survive.
+    // Another contact's id is refused for edit and delete (whole edit rolls back).
+    await expect(
+      updateContactFull(exec, {
+        ...baseEdit(contactId),
+        now: "2026-08-15 10:05:00",
+        offLimits: { edit: [{ id: otherRow, text: "hijacked" }] },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      updateContactFull(exec, {
+        ...baseEdit(contactId),
+        now: "2026-08-15 10:05:00",
+        offLimits: { delete: [{ id: otherRow }] },
+      }),
+    ).rejects.toThrow();
+
+    // Deleting this contact's own row leaves the other contact's row intact.
     await updateContactFull(exec, {
       ...baseEdit(contactId),
-      now: "2026-08-15 10:05:00",
-      offLimits: { delete: [{ id: offLimitsRow.id }] },
+      now: "2026-08-15 10:06:00",
+      offLimits: { delete: [{ id: ownRow.id }] },
     });
-
-    const surviving = (await listFuelForEditor(exec, contactId))
-      .map((r) => r.kind)
-      .sort();
-    expect(surviving).toEqual(["fact", "gift", "recent", "topic"]);
+    expect(await listFuelForEditor(exec, contactId)).toEqual([]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT id, text, modified_at FROM off_limits WHERE contact_id = ?",
+        [otherId],
+      ),
+    ).toEqual([{ id: otherRow, text: "theirs", modified_at: NOW }]);
   });
 
   it("an Off-Limits-DELETE edit advances data_revision by EXACTLY 1 (no double-bump)", async () => {
@@ -1828,12 +1844,11 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
       { field_key: "last_talked_about", value: "new job" },
     ]);
 
-    const fuel = await exec.getFirstAsync<{ kind: string; text: string }>(
-      "SELECT kind, text FROM fuel WHERE contact_id = ?",
+    const offLimits = await exec.getFirstAsync<{ text: string }>(
+      "SELECT text FROM off_limits WHERE contact_id = ?",
       [contactId],
     );
-    expect(fuel?.kind).toBe("off_limits");
-    expect(fuel?.text).toBe("politics");
+    expect(offLimits?.text).toBe("politics");
   });
 
   it("injects the FULL framework set for relationships and fuel (cycle-4 MEDIUM #1)", async () => {
@@ -1856,19 +1871,40 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
     expect(relationship?.created_at).toBe(NOW);
     expect(relationship?.modified_at).toBe(NOW);
 
-    const fuel = await exec.getFirstAsync<{
+    const offLimits = await exec.getFirstAsync<{
       uid: string | null;
-      source: string | null;
+      text: string | null;
       created_at: string | null;
       modified_at: string | null;
     }>(
-      "SELECT uid, source, created_at, modified_at FROM fuel WHERE contact_id = ?",
+      "SELECT uid, text, created_at, modified_at FROM off_limits WHERE contact_id = ?",
       [contactId],
     );
-    expect(fuel?.uid).toBeTruthy();
-    expect(fuel?.source).toBe("user");
-    expect(fuel?.created_at).toBe(NOW);
-    expect(fuel?.modified_at).toBe(NOW);
+    expect(offLimits?.uid).toBeTruthy();
+    expect(offLimits?.text).toBe("work drama");
+    expect(offLimits?.created_at).toBe(NOW);
+    expect(offLimits?.modified_at).toBe(NOW);
+  });
+
+  it("NEW-1: a Create Off Limits draft with kind topic lands in off_limits, never as a memory (D-11)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "New one",
+      intervalDays: 14,
+      now: NOW,
+      offLimits: [{ kind: "topic", text: "their health" }],
+    });
+    expect(
+      await exec.getAllAsync(
+        "SELECT text FROM off_limits WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual([{ text: "their health" }]);
+    expect(
+      await exec.getAllAsync("SELECT id FROM memories WHERE contact_id = ?", [
+        contactId,
+      ]),
+    ).toEqual([]);
   });
 
   it("rolls back the contact AND all enrichment when an enrichment write throws", async () => {

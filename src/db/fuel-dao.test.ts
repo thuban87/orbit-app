@@ -1,38 +1,28 @@
 /**
- * Conversational-fuel writer — behavioural proof (FUEL-01/FUEL-02).
+ * The Off Limits shim behind the retired knowledge-table DAO names
+ * (Phase 38.10 plan 02; D-01, D-08, D-11, D-56).
  *
- * Drives a fresh in-memory `node:sqlite` DB through the REAL migration-1 fixture
- * and the REAL fuel DAO, asserting the load-bearing writer contract (mirrors
- * events-dao.test.ts / contact-links-dao's both-keys scoping):
- *   - addFuel inserts EXACTLY ONE row with all 9 columns stored verbatim and
- *     created_at/modified_at = the caller-supplied stamps;
- *   - optional label/text/url store NULL when null/undefined;
- *   - all 5 kinds ('recent'|'topic'|'fact'|'gift'|'off_limits') persist verbatim
- *     (the column has no CHECK);
- *   - editFuel bumps modified_at, leaves created_at untouched, and is scoped by
- *     BOTH id AND contact_id (a wrong-contact edit changes 0 → throws → rollback);
- *   - deleteFuel removes the matching (id, contact_id) and a wrong-contact delete
- *     changes 0 → throws;
- *   - addFuelCore composes inside a caller-opened inWriteTransaction WITHOUT
- *     taking its own mutex (the multi-attach composition primitive Phase 10 uses).
+ *   - addFuel routes by kind: off_limits -> off_limits; gift / topic / fact ->
+ *     a Gift Ideas / Thought of Them / general memory with Allow AI off, share
+ *     provenance kept. (No `recent` case here: that route runs through the
+ *     current-state core, which plan 03 rebuilds; plan 03 adds its test.)
+ *   - editFuel / deleteFuel reach only off_limits, scoped by (id, contact_id).
+ *   - addFuelCore composes inside a caller-opened inWriteTransaction.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { setAiPermissionDefault } from "@/db/ai-permissions-dao";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   addFuel,
   addFuelCore,
   deleteFuel,
+  deleteFuelCore,
   editFuel,
-  type FuelKind,
 } from "@/db/fuel-dao";
-import { getRankedFuel } from "@/db/fuel-read";
-import { migration001 } from "@/db/migrations/001-initial";
-import { migration002 } from "@/db/migrations/002-app-settings";
-import { migration003 } from "@/db/migrations/003-orrery-settings";
-import { migration004 } from "@/db/migrations/004-ai-settings";
-import { migration005 } from "@/db/migrations/005-digest-settings";
-import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
-import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -40,356 +30,298 @@ import type { SqlExecutor } from "@/db/types";
 const NOW = "2026-08-15 12:00:00";
 const LATER = "2026-08-16 09:30:00";
 
-let uidCounter = 0;
-const uid = () => `uid-${++uidCounter}`;
-
+let counter = 0;
 let exec: SqlExecutor;
 
 beforeEach(async () => {
-  uidCounter = 0;
-  const db = openTestDb();
-  exec = nodeSqliteExecutor(db);
-  await runMigrations(
-    exec,
-    [
-      migration001,
-      migration002,
-      migration003,
-      migration004,
-      migration005,
-      migration006,
-      migration007,
-    ],
-    7,
-    { now: NOW, newUid: uid },
-  );
+  counter = 0;
+  exec = nodeSqliteExecutor(openTestDb());
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: () => `migration-uid-${++counter}`,
+  });
 });
 
-/** Insert a bare contact so the fuel FK (contact_id) is satisfiable. */
 async function seedContact(name = "Alex"): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts (uid, name, interval_days, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [uid(), name, 30, NOW, NOW],
+     VALUES (?, ?, 30, ?, ?)`,
+    [`contact-${++counter}`, name, NOW, NOW],
   );
   return result.lastInsertRowId;
 }
 
-type FuelRow = {
-  id: number;
-  uid: string;
-  contact_id: number;
-  kind: string;
-  label: string | null;
-  text: string | null;
-  url: string | null;
-  created_at: string;
-  source: string;
-  modified_at: string;
-};
-
-async function allFuel(contactId: number): Promise<FuelRow[]> {
-  return exec.getAllAsync<FuelRow>(
-    "SELECT * FROM fuel WHERE contact_id = ? ORDER BY id",
+async function offLimitsRows(contactId: number) {
+  return exec.getAllAsync<Record<string, unknown>>(
+    "SELECT * FROM off_limits WHERE contact_id = ? ORDER BY id",
     [contactId],
   );
 }
 
-async function fuelTombstones(): Promise<
-  Array<{ entity_uid: string; deleted_at: string }>
-> {
-  return exec.getAllAsync(
-    `SELECT entity_uid, deleted_at
-       FROM tombstones
-      WHERE entity_type = 'fuel'
-      ORDER BY entity_uid`,
+async function memoryRows(contactId: number) {
+  return exec.getAllAsync<Record<string, unknown>>(
+    `SELECT type, custom_label, value, url, provenance, allow_ai, created_at
+       FROM memories WHERE contact_id = ? ORDER BY id`,
+    [contactId],
   );
 }
 
-describe("addFuel — one row, all 9 columns verbatim, ?-bound", () => {
-  it("inserts exactly one row with every column stored verbatim and returns its rowid", async () => {
-    const c = await seedContact();
+async function revision(): Promise<number> {
+  return (await exec.getFirstAsync<{ data_revision: number }>(
+    "SELECT data_revision FROM app_settings WHERE id = 1",
+  ))!.data_revision;
+}
 
+describe("addFuel — routes by kind (D-56)", () => {
+  it("off_limits lands in off_limits with the caller's uid and stamps", async () => {
+    const c = await seedContact();
     const id = await addFuel(exec, {
       uid: "fuel-uid-1",
       contactId: c,
-      kind: "topic",
-      label: "Sailing",
-      text: "Ask about the regatta",
-      url: "https://example.com/regatta",
+      kind: "off_limits",
+      label: "Health",
+      text: "Do not ask",
+      url: "https://example.test",
+      createdAt: NOW,
+      source: "user",
+      now: LATER,
+    });
+    expect(await offLimitsRows(c)).toEqual([
+      {
+        id,
+        uid: "fuel-uid-1",
+        contact_id: c,
+        label: "Health",
+        text: "Do not ask",
+        url: "https://example.test",
+        group_note_copy: 0,
+        from_share: 0,
+        created_at: NOW,
+        modified_at: LATER,
+      },
+    ]);
+    expect(await memoryRows(c)).toEqual([]);
+  });
+
+  it("a share off_limits add is marked from_share (D-108)", async () => {
+    const c = await seedContact();
+    await addFuel(exec, {
+      uid: "fuel-share",
+      contactId: c,
+      kind: "off_limits",
+      text: "Shared",
+      createdAt: NOW,
+      source: "share",
+      now: NOW,
+    });
+    expect((await offLimitsRows(c))[0]).toMatchObject({ from_share: 1 });
+  });
+
+  it("gift / topic / fact land as Gift Ideas / Thought of Them / general memories, AI-off even under ON defaults", async () => {
+    const c = await seedContact();
+    await setAiPermissionDefault(exec, "memory", 1, NOW);
+    for (const kind of ["gift", "topic", "fact"] as const) {
+      await addFuel(exec, {
+        uid: `fuel-${kind}`,
+        contactId: c,
+        kind,
+        label: kind === "gift" ? "Birthday" : null,
+        text: `${kind} text`,
+        createdAt: NOW,
+        source: kind === "topic" ? "share" : "user",
+        now: NOW,
+      });
+    }
+    expect(await memoryRows(c)).toEqual([
+      {
+        type: "gift_idea",
+        custom_label: "Birthday",
+        value: "gift text",
+        url: null,
+        provenance: "user",
+        allow_ai: 0,
+        created_at: NOW,
+      },
+      {
+        type: "thought_of_them",
+        custom_label: null,
+        value: "topic text",
+        url: null,
+        provenance: "share",
+        allow_ai: 0,
+        created_at: NOW,
+      },
+      {
+        type: "general",
+        custom_label: null,
+        value: "fact text",
+        url: null,
+        provenance: "user",
+        allow_ai: 0,
+        created_at: NOW,
+      },
+    ]);
+    expect(await offLimitsRows(c)).toEqual([]);
+  });
+
+  it("refuses a contentless non-Off Limits add and writes nothing", async () => {
+    const c = await seedContact();
+    await expect(
+      addFuel(exec, {
+        uid: "fuel-empty",
+        contactId: c,
+        kind: "topic",
+        text: "  ",
+        createdAt: NOW,
+        source: "user",
+        now: NOW,
+      }),
+    ).rejects.toThrow("needs a label, text or url");
+    expect(await memoryRows(c)).toEqual([]);
+  });
+
+  it("addFuelCore composes inside a caller-opened transaction", async () => {
+    const c = await seedContact();
+    const ids = await inWriteTransaction(exec, async () => [
+      await addFuelCore(exec, {
+        uid: "a",
+        contactId: c,
+        kind: "off_limits",
+        text: "A",
+        createdAt: NOW,
+        source: "user",
+        now: NOW,
+      }),
+      await addFuelCore(exec, {
+        uid: "b",
+        contactId: c,
+        kind: "off_limits",
+        text: "B",
+        createdAt: NOW,
+        source: "user",
+        now: NOW,
+      }),
+    ]);
+    expect((await offLimitsRows(c)).map((row) => row.id)).toEqual(ids);
+  });
+
+  it("the add wrapper bumps data_revision exactly once", async () => {
+    const c = await seedContact();
+    const before = await revision();
+    await addFuel(exec, {
+      uid: "a",
+      contactId: c,
+      kind: "off_limits",
+      text: "A",
       createdAt: NOW,
       source: "user",
       now: NOW,
     });
+    expect(await revision()).toBe(before + 1);
+  });
+});
 
-    const rows = await allFuel(c);
-    expect(rows.length).toBe(1);
-    expect(id).toBe(rows[0]?.id);
-    expect(rows[0]).toMatchObject({
-      uid: "fuel-uid-1",
-      contact_id: c,
-      kind: "topic",
-      label: "Sailing",
-      text: "Ask about the regatta",
-      url: "https://example.com/regatta",
-      created_at: NOW,
+describe("editFuel / deleteFuel — Off Limits only, scoped (D-11)", () => {
+  async function seedOffLimits(contactId: number, uid: string, text: string) {
+    return addFuel(exec, {
+      uid,
+      contactId,
+      kind: "off_limits",
+      text,
+      createdAt: NOW,
       source: "user",
+      now: NOW,
+    });
+  }
+
+  it("edits only the fields present and leaves created_at alone", async () => {
+    const c = await seedContact();
+    const id = await seedOffLimits(c, "ol-1", "Original");
+    await editFuel(exec, {
+      id,
+      contactId: c,
+      kind: "off_limits",
+      label: "New label",
+      now: LATER,
+    });
+    expect((await offLimitsRows(c))[0]).toMatchObject({
+      label: "New label",
+      text: "Original",
+      created_at: NOW,
+      modified_at: LATER,
+    });
+  });
+
+  it("an edit naming another kind throws and changes nothing", async () => {
+    const c = await seedContact();
+    const id = await seedOffLimits(c, "ol-1", "Original");
+    await expect(
+      editFuel(exec, {
+        id,
+        contactId: c,
+        kind: "topic",
+        text: "X",
+        now: LATER,
+      }),
+    ).rejects.toThrow("only Off Limits entries can be edited");
+    expect((await offLimitsRows(c))[0]).toMatchObject({
+      text: "Original",
       modified_at: NOW,
     });
   });
 
-  it("stores label/text/url NULL when null or undefined", async () => {
-    const c = await seedContact();
-
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "fact",
-      label: null,
-      text: null,
-      url: null,
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-
-    const rows = await allFuel(c);
-    expect(rows.length).toBe(1);
-    expect(rows[0]?.label).toBeNull();
-    expect(rows[0]?.text).toBeNull();
-    expect(rows[0]?.url).toBeNull();
-  });
-
-  it("accepts all 5 kinds (no CHECK on the column)", async () => {
-    const c = await seedContact();
-    const kinds: FuelKind[] = ["recent", "topic", "fact", "gift", "off_limits"];
-
-    for (const kind of kinds) {
-      await addFuel(exec, {
-        uid: uid(),
-        contactId: c,
-        kind,
-        text: `text for ${kind}`,
-        createdAt: NOW,
-        source: "user",
-        now: NOW,
-      });
-    }
-
-    const rows = await allFuel(c);
-    expect(rows.map((r) => r.kind)).toEqual(kinds);
-  });
-});
-
-describe("editFuel — bumps modified_at, preserves created_at, both-keys scoped", () => {
-  it("updates kind/label/text/url and modified_at while leaving created_at untouched", async () => {
-    const c = await seedContact();
-    const id = await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "topic",
-      text: "old",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-
-    await editFuel(exec, {
-      id,
-      contactId: c,
-      kind: "gift",
-      label: "birthday",
-      text: "new text",
-      url: null,
-      now: LATER,
-    });
-
-    const rows = await allFuel(c);
-    expect(rows.length).toBe(1);
-    expect(rows[0]).toMatchObject({
-      kind: "gift",
-      label: "birthday",
-      text: "new text",
-      url: null,
-      created_at: NOW,
-      modified_at: LATER,
-    });
-  });
-
-  it("throws (rolls back) when the contactId does not match the row's contact", async () => {
-    const c1 = await seedContact("Alex");
-    const c2 = await seedContact("Blair");
-    const id = await addFuel(exec, {
-      uid: uid(),
-      contactId: c1,
-      kind: "topic",
-      text: "keep me",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-
+  it("refuses another contact's id and an unknown id for edit and delete", async () => {
+    const alex = await seedContact("Alex");
+    const blair = await seedContact("Blair");
+    const blairRow = await seedOffLimits(blair, "ol-b", "Blair private");
     await expect(
       editFuel(exec, {
-        id,
-        contactId: c2,
-        kind: "fact",
-        label: null,
-        text: "hijacked",
-        url: null,
+        id: blairRow,
+        contactId: alex,
+        text: "Hijack",
         now: LATER,
       }),
-    ).rejects.toThrow();
-
-    // The original row is untouched.
-    const rows = await allFuel(c1);
-    expect(rows[0]).toMatchObject({ kind: "topic", text: "keep me" });
-  });
-
-  it("two sequential single-field patches to the SAME row BOTH persist (no stale-snapshot revert, HIGH-1)", async () => {
-    const c = await seedContact();
-    const id = await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "topic",
-      label: "orig label",
-      text: "orig text",
-      url: "https://orig.example",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-
-    // First patch: ONLY text (as a blur commit would send it).
-    await editFuel(exec, { id, contactId: c, text: "new text", now: LATER });
-    // Second patch to the SAME row: ONLY label. A full-row rewrite merged onto a
-    // stale snapshot would revert text back to "orig text"; the patch-scoped
-    // UPDATE must leave the just-written text intact.
-    await editFuel(exec, { id, contactId: c, label: "new label", now: LATER });
-
-    const rows = await allFuel(c);
-    expect(rows.length).toBe(1);
-    expect(rows[0]).toMatchObject({
-      kind: "topic",
-      label: "new label",
-      text: "new text", // preserved across the label-only patch
-      url: "https://orig.example", // untouched by either patch
-      created_at: NOW,
-      modified_at: LATER,
-    });
-  });
-
-  it("a kind-only patch leaves label/text/url untouched (patch-scoped UPDATE, HIGH-1)", async () => {
-    const c = await seedContact();
-    const id = await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "topic",
-      label: "keep label",
-      text: "keep text",
-      url: "https://keep.example",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-
-    await editFuel(exec, { id, contactId: c, kind: "gift", now: LATER });
-
-    const rows = await allFuel(c);
-    expect(rows[0]).toMatchObject({
-      kind: "gift",
-      label: "keep label",
-      text: "keep text",
-      url: "https://keep.example",
-      created_at: NOW,
-      modified_at: LATER,
-    });
-  });
-});
-
-describe("deleteFuel — removes matching (id, contact_id), both-keys scoped", () => {
-  it("deletes the matching row", async () => {
-    const c = await seedContact();
-    const fuelUid = uid();
-    const id = await addFuel(exec, {
-      uid: fuelUid,
-      contactId: c,
-      kind: "recent",
-      text: "delete me",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-
-    let transactions = 0;
-    const countingExec: SqlExecutor = {
-      ...exec,
-      execAsync: async (sql) => {
-        if (sql === "BEGIN") transactions += 1;
-        await exec.execAsync(sql);
-      },
-    };
-
-    await deleteFuel(countingExec, { id, contactId: c, now: LATER });
-
-    const rows = await allFuel(c);
-    expect(rows.length).toBe(0);
-    expect(transactions).toBe(1);
-    expect(await fuelTombstones()).toEqual([
-      { entity_uid: fuelUid, deleted_at: LATER },
-    ]);
-  });
-
-  it("throws when the contactId does not match the row's contact (0 changes)", async () => {
-    const c1 = await seedContact("Alex");
-    const c2 = await seedContact("Blair");
-    const id = await addFuel(exec, {
-      uid: uid(),
-      contactId: c1,
-      kind: "topic",
-      text: "keep me",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-
+    ).rejects.toThrow("no Off Limits entry matched");
     await expect(
-      deleteFuel(exec, { id, contactId: c2, now: LATER }),
-    ).rejects.toThrow();
-
-    const rows = await allFuel(c1);
-    expect(rows.length).toBe(1);
-    expect(await fuelTombstones()).toEqual([]);
-  });
-});
-
-describe("addFuelCore — composes inside an open transaction, no own mutex", () => {
-  it("inserts multiple rows inside ONE caller-opened inWriteTransaction (multi-attach fan-out)", async () => {
-    const c = await seedContact();
-
-    await inWriteTransaction(exec, async () => {
-      await addFuelCore(exec, {
-        uid: uid(),
-        contactId: c,
-        kind: "topic",
-        text: "one",
-        createdAt: NOW,
-        source: "share",
-        now: NOW,
-      });
-      await addFuelCore(exec, {
-        uid: uid(),
-        contactId: c,
-        kind: "fact",
-        text: "two",
-        createdAt: NOW,
-        source: "share",
-        now: NOW,
-      });
+      deleteFuel(exec, { id: blairRow, contactId: alex, now: LATER }),
+    ).rejects.toThrow("no Off Limits entry matched");
+    await expect(
+      deleteFuel(exec, { id: 9999, contactId: alex, now: LATER }),
+    ).rejects.toThrow("no Off Limits entry matched");
+    expect((await offLimitsRows(blair))[0]).toMatchObject({
+      text: "Blair private",
+      modified_at: NOW,
     });
+  });
 
-    const rows = await allFuel(c);
-    expect(rows.length).toBe(2);
-    expect(rows.map((r) => r.text)).toEqual(["one", "two"]);
+  it("deleteFuel removes the row with an off_limits tombstone and one bump", async () => {
+    const c = await seedContact();
+    const id = await seedOffLimits(c, "ol-1", "Gone");
+    const before = await revision();
+    await deleteFuel(exec, { id, contactId: c, now: LATER });
+    expect(await offLimitsRows(c)).toEqual([]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT entity_type, entity_uid, deleted_at FROM tombstones WHERE entity_uid = 'ol-1'",
+      ),
+    ).toEqual([
+      { entity_type: "off_limits", entity_uid: "ol-1", deleted_at: LATER },
+    ]);
+    expect(await revision()).toBe(before + 1);
+  });
+
+  it("deleteFuelCore with bumpRevision false does not bump", async () => {
+    const c = await seedContact();
+    const id = await seedOffLimits(c, "ol-1", "Gone");
+    const before = await revision();
+    await inWriteTransaction(exec, () =>
+      deleteFuelCore(exec, {
+        id,
+        contactId: c,
+        now: LATER,
+        bumpRevision: false,
+      }),
+    );
+    expect(await revision()).toBe(before);
   });
 });

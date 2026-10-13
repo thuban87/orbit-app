@@ -1,56 +1,48 @@
 /**
- * Conversational-fuel writer (FUEL-01/FUEL-02) — per-item fuel on a contact:
- * add / edit / delete, across 5 kinds, with optional label/text/url.
+ * TEMPORARY Off Limits shim behind the retired knowledge-table DAO names
+ * (Phase 38.10 plan 02; deleted by plan 18).
  *
- * The `fuel` table already ships in migration 1 (`001-initial.ts`:167-179): `uid
- * TEXT UNIQUE`, `contact_id → contacts ON DELETE CASCADE`, `kind TEXT NOT NULL`
- * (no CHECK), `label`/`text`/`url` nullable TEXT, `created_at`/`source`/
- * `modified_at` NOT NULL. This is DAO-only; there is NO migration this phase and
- * NEVER an index/UNIQUE on any fuel column (nothing here needs one at tens-of-rows
- * scale, and a ranking index would require a forbidden migration 2).
+ * Migration 033 dropped the five-kind table. The exported names and types are
+ * kept so the UI hosts that later plans rewrite (Create / Edit Contact, the
+ * Off Limits editor, Update Contact, Capture) keep compiling. There is no SQL
+ * against the retired table here (D-01):
+ *   - adds route by kind through `legacy-fuel-mapping` (D-56): off_limits ->
+ *     the Off Limits DAO; gift / topic / fact -> a memory (Gift Ideas /
+ *     Thought of Them / general) with Allow AI off; recent -> Last Talked About;
+ *   - edits and deletes reach only `off_limits` (D-11). An edit carrying any
+ *     other kind throws.
  *
- * =============================================================================
- * CORE / WRAPPER SPLIT (the phase's central pattern — see transaction.ts):
- *   The shared mutex is NON-REENTRANT. The mutating CORES (`addFuelCore`,
- *   `editFuelCore`, `deleteFuelCore`) open NO transaction — they assume a BEGIN is
- *   already held. The standalone WRAPPERS (`addFuel`/`editFuel`/`deleteFuel`) each
- *   wrap their core in exactly ONE `inWriteTransaction` for single callers. Phase
- *   10's multi-attach capture will compose `addFuelCore` N times inside ONE outer
- *   `inWriteTransaction` so a whole fan-out is atomic — never nesting the mutex.
- * =============================================================================
- *
- * EVERY mutation is scoped by BOTH `id` AND `contact_id` and asserts exactly one
- * change (WR-04 both-keys precedent, contact-links-dao): a mismatched pair changes
- * 0 rows → a loud rollback instead of silent cross-contact corruption. Every value
- * is `?`-bound; fuel has FIXED columns so no identifier is ever interpolated
- * (unlike custom fields) — T-07-01. `created_at` is NEVER touched on edit (age is
- * stable from creation, FUEL-04). Timestamps are caller-supplied local wall-clock
- * (`localDateTime()`, never `toISOString`).
- *
- * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
+ * Core / wrapper split (transaction.ts): cores never open a transaction; each
+ * wrapper owns exactly one. `deleteFuelCore` keeps its `bumpRevision` option,
+ * which the Edit Contact aggregate's single bump relies on.
  */
 
+import { setCurrentStateValueCore } from "@/db/current-state-history-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
-import { insertTombstoneCore } from "@/db/tombstones-dao";
+import { mapLegacyFuelRow } from "@/db/legacy-fuel-mapping";
+import { addMemoryCore } from "@/db/memories-dao";
+import {
+  addOffLimitsCore,
+  deleteOffLimitsCore,
+  editOffLimitsCore,
+} from "@/db/off-limits-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /**
- * The 5-kind fuel vocabulary (FUEL-02). The column has no CHECK — the union is the
- * enforcement boundary. `off_limits` is a first-class kind: it is editable on the
- * profile (surfaced only by `fuel-read`'s `listFuelForEditor`) but every projection
- * (ranked line, search — Plans 02/04) MUST exclude it in-query.
+ * The legacy five-kind vocabulary. In the shim it only chooses an add's home
+ * (D-56); edits and deletes accept `off_limits` alone.
  */
 export type FuelKind = "recent" | "topic" | "fact" | "gift" | "off_limits";
 
 /**
- * The provenance of a fuel row. A `string` alias (the column has no CHECK) whose
- * documented vocabulary is: 'user' (typed on the profile), 'share' (Phase-10
- * multi-attach), and historical 'ai'/'manual' values retained for compatibility.
+ * The legacy provenance string. `share` routes a memory add to provenance
+ * `share` and marks an Off Limits add `from_share` (D-108); anything else is a
+ * user add.
  */
 export type FuelSource = string;
 
-/** One new fuel row to insert against an existing contact. */
+/** One new entry to add against an existing contact (routed by kind). */
 export interface NewFuelItem {
   /** Merge-key UUID for the new row (caller-minted, e.g. `newUid()`). */
   uid: string;
@@ -71,18 +63,14 @@ export interface NewFuelItem {
 }
 
 /**
- * A PATCH to an existing fuel row, scoped by BOTH id AND contactId. Only the
- * fields PRESENT (`!== undefined`) are written — a caller sends just the field(s)
- * that changed. This is deliberate (review HIGH-1): the UI commits one field at a
- * time (blur / kind-select), and a full-row rewrite merged onto a stale React
- * closure snapshot could silently revert a concurrent field's just-committed edit.
- * A patch-scoped UPDATE touches ONLY the submitted columns, so no unread column is
- * ever clobbered. `created_at` is never in the patch (age is stable from creation).
+ * A patch to an existing Off Limits entry, scoped by BOTH id AND contactId.
+ * Only the fields present (`!== undefined`) are written (review HIGH-1), so a
+ * one-field commit never reverts a concurrent edit. `created_at` never changes.
  */
 export interface EditFuelInput {
   id: number;
   contactId: number;
-  /** Present → UPDATE kind. Absent (`undefined`) → left untouched. */
+  /** Must be `off_limits` when present; any other kind throws. */
   kind?: FuelKind;
   /**
    * Present → UPDATE label (a blank optional is normalized to NULL at the commit
@@ -97,136 +85,99 @@ export interface EditFuelInput {
   now: string;
 }
 
-/** Throw (→ rollback) unless exactly one row matched (id, contact_id). */
-function assertOneChange(
-  op: string,
-  id: number,
-  contactId: number,
-  changes: number,
-): void {
-  if (changes !== 1) {
-    throw new Error(
-      `${op}: no fuel matched id=${id} for contactId=${contactId} (changed ${changes})`,
-    );
-  }
-}
-
 // --- Non-mutexed cores (assume BEGIN already open — never open a transaction) --
 
 /**
- * Insert ONE fuel row, assuming BEGIN is already open. The composition primitive
- * Phase-10 multi-attach calls N times inside its ONE outer `inWriteTransaction`.
- * The 9 columns are INSERTed in migration order; every value is `?`-bound; only
- * the column names are static text. Returns the new row's rowid.
+ * Add one entry, routed by kind to its post-033 home (D-56). A live add has no
+ * legacy uid to keep, so no allocation is passed: Off Limits keeps the
+ * caller-minted uid, and the memory / current-state cores mint their own.
+ * Returns the new row's id in its home table.
  */
 export async function addFuelCore(
   exec: SqlExecutor,
   input: NewFuelItem,
 ): Promise<number> {
-  const result = await exec.runAsync(
-    `INSERT INTO fuel
-       (uid, contact_id, kind, label, text, url, created_at, source, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      input.uid,
-      input.contactId,
-      input.kind,
-      input.label ?? null,
-      input.text ?? null,
-      input.url ?? null,
-      input.createdAt,
-      input.source,
-      input.now,
-    ],
+  const mapped = mapLegacyFuelRow(
+    {
+      uid: input.uid,
+      kind: input.kind,
+      label: input.label ?? null,
+      text: input.text ?? null,
+      url: input.url ?? null,
+      source: input.source,
+      createdAt: input.createdAt,
+      modifiedAt: input.now,
+    },
+    { now: input.now, contentlessRule: "skip" },
   );
-  return result.lastInsertRowId;
+  switch (mapped.home) {
+    case "off_limits":
+      return addOffLimitsCore(exec, {
+        uid: mapped.uid,
+        contactId: input.contactId,
+        label: mapped.label,
+        text: mapped.text,
+        url: mapped.url,
+        createdAt: input.createdAt,
+        fromShare: mapped.fromShare,
+        now: input.now,
+      });
+    case "memory":
+      return addMemoryCore(exec, {
+        contactId: input.contactId,
+        type: mapped.type,
+        value: mapped.value,
+        customLabel: mapped.customLabel,
+        url: mapped.url,
+        provenance: input.source === "share" ? "share" : "user",
+        allowAi: 0,
+        createdAt: input.createdAt,
+        now: input.now,
+      });
+    case "current_state":
+      return setCurrentStateValueCore(exec, {
+        contactId: input.contactId,
+        fieldKey: mapped.fieldKey,
+        value: mapped.value,
+        now: input.now,
+      });
+    case "none":
+      throw new Error("fuel-dao: an entry needs a label, text or url");
+  }
 }
 
 /**
- * PATCH-scoped UPDATE (review HIGH-1): SET only the columns PRESENT in the patch
- * (`kind`/`label`/`text`/`url` that are `!== undefined`), always bump modified_at,
- * for the matching (id, contact_id) + assertOneChange. An absent field is left
- * exactly as stored — so committing one field never reverts another that a
- * concurrent blur just wrote. NEVER touches `created_at` (age is stable).
- *
- * T-07-01 (SQL injection): the SET fragments (`"kind = ?"` …) are COMPILE-TIME
- * code-constant column names from a closed hardcoded set; every VALUE is `?`-bound
- * (id/contact_id included). No input is interpolated into the SQL text.
+ * Patch one Off Limits entry (D-11). Only the fields present are written; an
+ * edit that names any kind other than off_limits throws (the shim never
+ * guesses another table from an id).
  */
 export async function editFuelCore(
   exec: SqlExecutor,
   input: EditFuelInput,
 ): Promise<void> {
-  const sets: string[] = [];
-  const params: (string | null)[] = [];
-  if (input.kind !== undefined) {
-    sets.push("kind = ?");
-    params.push(input.kind);
+  if (input.kind !== undefined && input.kind !== "off_limits") {
+    throw new Error("fuel-dao: only Off Limits entries can be edited here");
   }
-  if (input.label !== undefined) {
-    sets.push("label = ?");
-    params.push(input.label);
-  }
-  if (input.text !== undefined) {
-    sets.push("text = ?");
-    params.push(input.text);
-  }
-  if (input.url !== undefined) {
-    sets.push("url = ?");
-    params.push(input.url);
-  }
-  sets.push("modified_at = ?");
-  params.push(input.now);
-
-  const result = await exec.runAsync(
-    `UPDATE fuel
-        SET ${sets.join(", ")}
-      WHERE id = ? AND contact_id = ?`,
-    [...params, input.id, input.contactId],
-  );
-  assertOneChange("editFuel", input.id, input.contactId, result.changes);
+  await editOffLimitsCore(exec, {
+    id: input.id,
+    contactId: input.contactId,
+    label: input.label,
+    text: input.text,
+    url: input.url,
+    now: input.now,
+  });
 }
 
 /**
- * DELETE the matching (id, contact_id) + assertOneChange, writing a tombstone.
- *
- * The tombstone's `insertTombstoneCore` self-bumps `data_revision` by DEFAULT
- * (`bumpRevision=true`) — UNLIKE the soft-delete `deleteMemoryCore`/
- * `deleteRelationshipCore`, which never bump. An aggregate composer that owns the
- * single bump itself (e.g. `updateContactFull`'s off-limits edit) passes
- * `bumpRevision:false` to suppress the tombstone self-bump and avoid a double-bump
- * (Review cycle-4 MEDIUM #2) — mirroring the `insertTombstoneCore(..., {bumpRevision:
- * false})` precedent the memory/relationship purge cores already use. The standalone
- * `deleteFuel` wrapper and every other caller keep the default (true).
+ * Hard-delete one Off Limits entry with its tombstone. The tombstone write
+ * bumps `data_revision` by default; an aggregate that owns the single bump
+ * (`updateContactFull`) passes `bumpRevision: false`.
  */
 export async function deleteFuelCore(
   exec: SqlExecutor,
   input: { id: number; contactId: number; now: string; bumpRevision?: boolean },
 ): Promise<void> {
-  const target = await exec.getFirstAsync<{ uid: string }>(
-    "SELECT uid FROM fuel WHERE id = ? AND contact_id = ?",
-    [input.id, input.contactId],
-  );
-  if (!target) {
-    assertOneChange("deleteFuel", input.id, input.contactId, 0);
-    return;
-  }
-  await insertTombstoneCore(
-    exec,
-    {
-      // Compile-only (38.10-01): the legacy tombstone type is retired; plan 02
-      // turns this module into the Off Limits shim.
-      entityType: "off_limits",
-      entityUid: target.uid,
-      deletedAt: input.now,
-    },
-    { bumpRevision: input.bumpRevision ?? true },
-  );
-  const result = await exec.runAsync(
-    "DELETE FROM fuel WHERE id = ? AND contact_id = ?",
-    [input.id, input.contactId],
-  );
-  assertOneChange("deleteFuel", input.id, input.contactId, result.changes);
+  await deleteOffLimitsCore(exec, input);
 }
 
 // --- Standalone wrappers (own ONE transaction each) --------------------------

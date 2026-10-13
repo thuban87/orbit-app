@@ -22,8 +22,24 @@ export interface NewMemoryInput {
   outdated?: boolean;
   hidden?: boolean | null;
   provenance?: MemoryProvenance;
+  /**
+   * An explicit Allow AI choice from an Add form (D-27). Honoured only for
+   * provenance `user`; share and import rows always start at 0 (D-57, ADR-091).
+   */
+  allowAi?: 0 | 1;
   createdAt: string;
   now: string;
+}
+
+/**
+ * Type `imported` belongs to the Contacts import alone (D-35, D-14, ADR-161):
+ * no other provenance may add one, and no edit may retype a row to or from it.
+ */
+export class ImportedTypeProvenanceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImportedTypeProvenanceError";
+  }
 }
 
 /** A patch to one Memory, scoped by both its row and owning contact. */
@@ -85,17 +101,27 @@ export async function addMemoryCore(
   input: NewMemoryInput,
 ): Promise<number> {
   assertRegisteredMemoryType(input.type);
+  if (input.type === "imported" && input.provenance !== "import") {
+    throw new ImportedTypeProvenanceError(
+      "memories-dao: only the Contacts import may add an imported memory",
+    );
+  }
   const customLabel = normalizeOptional(input.customLabel);
   const value = normalizeOptional(input.value);
   if (value === null && customLabel === null) {
     throw new Error("memories-dao: memory value or custom label is required");
   }
-  // ADR-091: third-party imported notes require per-item opt-in even if the
-  // user's general new-Memory default is on. Existing rows are untouched.
-  const allowAi =
-    input.provenance === "import"
-      ? 0
-      : await resolveNewItemAiDefault(exec, "memory");
+  // Allow AI seeding. Share and import rows always start AI-off (D-57;
+  // ADR-091: third-party notes need per-item opt-in), whatever was passed.
+  // Otherwise an explicit Add-form choice wins (D-27), else the default.
+  let allowAi: 0 | 1;
+  if (input.provenance === "share" || input.provenance === "import") {
+    allowAi = 0;
+  } else if (input.allowAi === 0 || input.allowAi === 1) {
+    allowAi = input.allowAi;
+  } else {
+    allowAi = await resolveNewItemAiDefault(exec, "memory");
+  }
 
   const result = await exec.runAsync(
     `INSERT INTO memories

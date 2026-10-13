@@ -1,16 +1,19 @@
 /**
- * Conversational-fuel editor read — behavioural proof (FUEL-01/FUEL-02).
- *
- * Drives a fresh in-memory `node:sqlite` DB through the REAL migration-1 fixture
- * and the REAL fuel-read module, asserting the choke-point read contract:
- *   - listFuelForEditor returns ALL of a contact's fuel — every kind INCLUDING
- *     off_limits, every source INCLUDING 'ai' — newest-first (created_at DESC,
- *     id DESC), because this is the ONE read you edit off_limits through;
+ * Legacy editor read, now the Off Limits shim (Phase 38.10 plan 02):
+ *   - listFuelForEditor reads `off_limits` in the old row shape (kind
+ *     `off_limits`, source `user`), newest-first (created_at DESC, id DESC);
  *   - a second contact's rows are excluded (contact_id bound);
- *   - a contact with no fuel returns [] (never throws).
+ *   - a contact with none returns [] (never throws).
+ *
+ * The ranked-fuel, parity and egress-fence describes below still read the
+ * retired table and stay red until plan 07 deletes them (W1-W4 red window).
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import type { FuelKind } from "@/db/fuel-dao";
 import { addFuel } from "@/db/fuel-dao";
 import {
@@ -20,7 +23,6 @@ import {
   RANK_CASE,
   RANKED_FUEL_EXCLUSIONS,
 } from "@/db/fuel-read";
-import { migration001 } from "@/db/migrations/001-initial";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { compareFuel } from "@/services/fuel-ranking";
@@ -36,7 +38,10 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001], 1, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function seedContact(name = "Alex"): Promise<number> {
@@ -48,102 +53,85 @@ async function seedContact(name = "Alex"): Promise<number> {
   return result.lastInsertRowId;
 }
 
-describe("listFuelForEditor — all kinds incl off_limits, newest-first, isolated", () => {
-  it("returns all 5 kinds (off_limits present) newest-first by created_at then id", async () => {
+async function addOffLimitsRow(
+  contactId: number,
+  text: string,
+  createdAt: string,
+  source = "user",
+): Promise<number> {
+  return addFuel(exec, {
+    uid: uid(),
+    contactId,
+    kind: "off_limits",
+    text,
+    createdAt,
+    source,
+    now: NOW,
+  });
+}
+
+describe("listFuelForEditor — Off Limits in the legacy row shape, newest-first, isolated", () => {
+  it("returns this contact's Off Limits newest-first by created_at then id", async () => {
     const c = await seedContact();
     // Two rows share a created_at → the id DESC tiebreak decides their order.
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "recent",
-      text: "oldest",
-      createdAt: "2026-08-10 09:00:00",
-      source: "user",
-      now: NOW,
-    });
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "topic",
-      text: "same-day A",
-      createdAt: "2026-08-12 09:00:00",
-      source: "user",
-      now: NOW,
-    });
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "fact",
-      text: "same-day B",
-      createdAt: "2026-08-12 09:00:00",
-      source: "ai",
-      now: NOW,
-    });
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "gift",
-      text: "newer",
-      createdAt: "2026-08-14 09:00:00",
-      source: "user",
-      now: NOW,
-    });
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c,
-      kind: "off_limits",
-      text: "private",
-      createdAt: "2026-08-15 09:00:00",
-      source: "user",
-      now: NOW,
-    });
+    await addOffLimitsRow(c, "oldest", "2026-08-10 09:00:00");
+    await addOffLimitsRow(c, "same-day A", "2026-08-12 09:00:00");
+    const sameDayB = await addOffLimitsRow(
+      c,
+      "same-day B",
+      "2026-08-12 09:00:00",
+      "share",
+    );
+    await addOffLimitsRow(c, "newest", "2026-08-15 09:00:00");
 
     const rows = await listFuelForEditor(exec, c);
-
-    // off_limits is surfaced here (the ONLY read that includes it).
-    expect(rows.map((r) => r.kind)).toContain("off_limits");
-    expect(rows.length).toBe(5);
-    // Newest-first by created_at, then id DESC for the same-day tie
-    // (fact was inserted after topic → higher id → comes first).
     expect(rows.map((r) => r.text)).toEqual([
-      "private",
-      "newer",
+      "newest",
       "same-day B",
       "same-day A",
       "oldest",
     ]);
-    // 'ai'-sourced rows are included in the editor read.
-    expect(rows.some((r) => r.source === "ai")).toBe(true);
+    // Legacy shape: every row reads as kind off_limits, source user.
+    expect(rows.every((r) => r.kind === "off_limits")).toBe(true);
+    expect(rows.every((r) => r.source === "user")).toBe(true);
+    expect(rows[1]).toEqual({
+      id: sameDayB,
+      contact_id: c,
+      kind: "off_limits",
+      label: null,
+      text: "same-day B",
+      url: null,
+      created_at: "2026-08-12 09:00:00",
+      source: "user",
+    });
+  });
+
+  it("does not list memories the shim routed elsewhere", async () => {
+    const c = await seedContact();
+    await addFuel(exec, {
+      uid: uid(),
+      contactId: c,
+      kind: "topic",
+      text: "a thought",
+      createdAt: NOW,
+      source: "user",
+      now: NOW,
+    });
+    expect(await listFuelForEditor(exec, c)).toEqual([]);
   });
 
   it("excludes another contact's rows (contact_id bound)", async () => {
     const c1 = await seedContact("Alex");
     const c2 = await seedContact("Blair");
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c1,
-      kind: "topic",
-      text: "mine",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
-    await addFuel(exec, {
-      uid: uid(),
-      contactId: c2,
-      kind: "topic",
-      text: "theirs",
-      createdAt: NOW,
-      source: "user",
-      now: NOW,
-    });
+    await addOffLimitsRow(c1, "mine", NOW);
+    await addOffLimitsRow(c2, "theirs", NOW);
 
     const rows = await listFuelForEditor(exec, c1);
     expect(rows.length).toBe(1);
     expect(rows[0]?.text).toBe("mine");
   });
 
-  it("returns [] for a contact with no fuel (never throws)", async () => {
+  it("returns [] for a contact with none (never throws)", async () => {
     const c = await seedContact();
     const rows = await listFuelForEditor(exec, c);
     expect(rows).toEqual([]);

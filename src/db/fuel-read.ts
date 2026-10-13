@@ -28,7 +28,11 @@ import type { FuelKind } from "@/db/fuel-dao";
 import type { SqlExecutor } from "@/db/types";
 import { FUEL_KIND_PRIORITY } from "@/services/fuel-ranking";
 
-/** One fuel row as rendered by the profile editor. */
+/**
+ * One Off Limits entry in the legacy editor row shape. Since migration 033 the
+ * shim reads `off_limits` only, so `kind` is always `off_limits` and `source`
+ * always `user` (Phase 38.10 plan 02; plan 18 deletes this module).
+ */
 export interface FuelItem {
   id: number;
   contact_id: number;
@@ -37,26 +41,25 @@ export interface FuelItem {
   text: string | null;
   url: string | null;
   created_at: string;
-  /** Provenance (see `FuelSource` in fuel-dao) — a plain string, no CHECK. */
+  /** Always `user` in the shim. */
   source: string;
 }
 
 /**
- * The editor list: ALL of a contact's fuel, every kind INCLUDING off_limits and
- * every source INCLUDING 'ai', newest-first. `created_at DESC` is the canonical
- * order; `id DESC` is the deterministic tiebreak when two rows share a created_at.
- * `contact_id` is the sole `?`-bound value; only column names are literal text.
+ * The editor list: a contact's Off Limits entries in the legacy row shape,
+ * newest first (`id DESC` breaks a created_at tie). `contact_id` is the sole
+ * bound value.
  */
-const LIST_FUEL_FOR_EDITOR = `SELECT id, contact_id, kind, label, text, url, created_at, source
-    FROM fuel
+const LIST_FUEL_FOR_EDITOR = `SELECT id, contact_id, 'off_limits' AS kind, label, text, url,
+         created_at, 'user' AS source
+    FROM off_limits
    WHERE contact_id = ?
    ORDER BY created_at DESC, id DESC`;
 
 /**
- * Read a contact's full fuel list for the profile editor, newest-first. Returns
- * `[]` for a contact with no fuel (never throws); rows for other contacts are
- * excluded (`contact_id` bound). This is the ONE read that surfaces off_limits —
- * see the read-path rules above. Pure read — no transaction.
+ * Read a contact's Off Limits entries for the legacy editor hosts,
+ * newest-first. Returns `[]` when there are none; other contacts' rows are
+ * excluded. Pure read — no transaction.
  */
 export function listFuelForEditor(
   exec: SqlExecutor,
