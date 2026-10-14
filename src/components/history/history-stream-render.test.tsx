@@ -258,7 +258,7 @@ describe("HistoryRecordRow", () => {
           interaction(10, "2026-10-06 19:30:00", {
             linkedSections: [
               { section: "gift_idea", label: "Gift Ideas" },
-              { section: "last_talked_about", label: "Last talked about" },
+              { section: "last_talked_about", label: "Last Talked About" },
             ],
           }),
         ],
@@ -356,7 +356,7 @@ describe("HistoryRecordRow", () => {
     );
     expect(value?.props.numberOfLines).toBe(1);
     expect(root.props.accessibilityLabel).toBe(
-      "Knowledge change, Current location, 8:00 AM. Lisbon",
+      "Knowledge change, Current Location, 8:00 AM. Lisbon",
     );
     expect(textOf(root)).toContain("8:00 AM");
   });
@@ -367,7 +367,7 @@ describe("HistoryRecordRow", () => {
     );
     const [root] = tree;
     expect(root.props.accessibilityLabel).toBe(
-      "Knowledge change, Current location. Lisbon",
+      "Knowledge change, Current Location. Lisbon",
     );
     expect(textOf(root)).not.toMatch(/AM|PM|Unknown/);
   });

@@ -61,13 +61,15 @@ describe("dropConfirmText (D-85)", () => {
     expect(text).toBe(
       "Moving this to Off Limits removes its note, its meaningful date, " +
         "its pin, its outdated mark, its Hide from Profile setting, its label, " +
-        "its link to the interaction note and its date.",
+        "its link to the interaction note and its date, and that note's " +
+        "Allow AI stays off for good.",
     );
     // Switched off (D-134): every field but the visibility setting.
     expect(dropConfirmText(all, "off_limits")).toBe(
       "Moving this to Off Limits removes its note, its meaningful date, " +
         "its pin, its outdated mark, its label, " +
-        "its link to the interaction note and its date.",
+        "its link to the interaction note and its date, and that note's " +
+        "Allow AI stays off for good.",
     );
   });
 
@@ -79,6 +81,23 @@ describe("dropConfirmText (D-85)", () => {
     expect(
       dropConfirmText(["note", "visibility setting"], "gift_idea"),
     ).not.toMatch(/Hide from Profile/);
+  });
+
+  it("adds the Allow AI lock clause when the link is dropped (D-137 W18)", () => {
+    expect(dropConfirmText(["linked note"], "off_limits")).toBe(
+      "Moving this to Off Limits removes its link to the interaction note, " +
+        "and that note's Allow AI stays off for good.",
+    );
+    expect(
+      dropConfirmText(["note", "linked note", "entry date"], "off_limits"),
+    ).toBe(
+      "Moving this to Off Limits removes its note, its link to the " +
+        "interaction note and its date, and that note's Allow AI stays off " +
+        "for good.",
+    );
+    expect(dropConfirmText(["note", "entry date"], "off_limits")).toBe(
+      "Moving this to Off Limits removes its note and its date.",
+    );
   });
 
   it("lists one field without a comma", () => {
@@ -101,16 +120,16 @@ describe("move snackbars (38.9 D-39/D-46; D-118)", () => {
     );
   });
 
-  it("the Undo confirmation names the original section and the person", () => {
+  it("the Undo confirmation names the original section and the person (D-137 W11)", () => {
     expect(moveUndoneSnackbar("memory", "Ann")).toBe(
-      "Move undone, back in Memories for Ann",
+      "Moved back to Memories for Ann",
     );
   });
 
   it("drops the name while the person line has not loaded", () => {
     expect(movedSnackbar("off_limits", null)).toBe("Moved to Off Limits");
     expect(moveUndoneSnackbar("off_limits", null)).toBe(
-      "Move undone, back in Off Limits",
+      "Moved back to Off Limits",
     );
   });
 });

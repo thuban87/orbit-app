@@ -449,7 +449,7 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
       { section: "gift_idea", label: "Gift Ideas" },
     ]);
     expect(tags.get(ltaLinked)).toEqual([
-      { section: "last_talked_about", label: "Last talked about" },
+      { section: "last_talked_about", label: "Last Talked About" },
     ]);
     const groupRow = history.interactions.find((r) => r.groupLinked);
     expect(groupRow?.linkedSections).toEqual([

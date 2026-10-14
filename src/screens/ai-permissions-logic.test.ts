@@ -94,8 +94,8 @@ describe("AI permission screen logic", () => {
  * 38.4 RG-008 / ui-accessibility/AUD-UIA-013 (D-17): the access claim comes from
  * the UNFILTERED enabled items; a failed load prints no count at all.
  * 38.4 D-44 (owner, OA-C1): a list line ALWAYS states what the list below shows
- * (items of the total, from how many contacts, how many of them AI can access),
- * replacing the old conditional "Showing N of M" line.
+ * (items of the total and how many of them are shared with AI; worded per
+ * 38.10 D-137 W1c), replacing the old conditional "Showing N of M" line.
  */
 describe("buildPermissionSummaryCopy", () => {
   const ALL_ENABLED = ITEMS.filter((item) => item.enabled === 1);
@@ -109,10 +109,8 @@ describe("buildPermissionSummaryCopy", () => {
         loadFailed: false,
       }),
     ).toEqual({
-      accessLine:
-        "AI can currently access information from 2 contacts · 2 items",
-      listLine:
-        "Showing all 2 items from 2 contacts · AI can access all of them",
+      accessLine: "AI can use 2 items, from 2 contacts.",
+      listLine: "This list: 2 of 2 items · 2 of these shared with AI.",
       emptyLine: null,
     });
   });
@@ -130,10 +128,10 @@ describe("buildPermissionSummaryCopy", () => {
       loadFailed: false,
     });
     expect(copy.accessLine).toBe(
-      "AI can currently access information from 2 contacts · 2 items",
+      "AI can use 2 items, from 2 contacts.",
     );
     expect(copy.listLine).toBe(
-      "Showing 1 of 3 items from 1 contact · AI can access it",
+      "This list: 1 of 3 items · 1 of these shared with AI.",
     );
   });
 
@@ -150,7 +148,7 @@ describe("buildPermissionSummaryCopy", () => {
       loadFailed: false,
     });
     expect(copy.listLine).toBe(
-      "Showing 2 of 3 items from 2 contacts · AI can access all of them",
+      "This list: 2 of 3 items · 2 of these shared with AI.",
     );
   });
 
@@ -168,14 +166,14 @@ describe("buildPermissionSummaryCopy", () => {
       loadFailed: false,
     });
     expect(copy.accessLine).toBe(
-      "AI can currently access information from 2 contacts · 2 items",
+      "AI can use 2 items, from 2 contacts.",
     );
     expect(copy.listLine).toBe(
-      "Showing 2 of 3 items from 1 contact · AI can access 1 of them",
+      "This list: 2 of 3 items · 1 of these shared with AI.",
     );
   });
 
-  it("shows 'Showing 0 of M' for an unmatched search and leaves the access totals unchanged", () => {
+  it("shows 'This list: 0 of M' for an unmatched search and leaves the access totals unchanged", () => {
     const filteredItems = filterAiPermissionItems(ITEMS, {
       query: "nobody",
       type: "all",
@@ -188,9 +186,9 @@ describe("buildPermissionSummaryCopy", () => {
       loadFailed: false,
     });
     expect(copy.accessLine).toBe(
-      "AI can currently access information from 2 contacts · 2 items",
+      "AI can use 2 items, from 2 contacts.",
     );
-    expect(copy.listLine).toBe("Showing 0 of 3 items");
+    expect(copy.listLine).toBe("This list: 0 of 3 items.");
     expect(copy.emptyLine).toBe("No information matches these filters.");
   });
 
@@ -214,8 +212,7 @@ describe("buildPermissionSummaryCopy", () => {
         loadFailed: false,
       }),
     ).toEqual({
-      accessLine:
-        "AI can currently access information from 0 contacts · 0 items",
+      accessLine: "AI can use 0 items, from 0 contacts.",
       listLine: null,
       emptyLine: "AI can't access any contact information yet.",
     });
@@ -229,14 +226,12 @@ describe("buildPermissionSummaryCopy", () => {
       enabledOnly: true,
       loadFailed: false,
     });
-    expect(copy.accessLine).toBe(
-      "AI can currently access information from 0 contacts · 0 items",
-    );
-    expect(copy.listLine).toBe("Showing 0 of 1 item");
+    expect(copy.accessLine).toBe("AI can use 0 items, from 0 contacts.");
+    expect(copy.listLine).toBe("This list: 0 of 1 item.");
     expect(copy.emptyLine).toBe("AI can't access any contact information yet.");
   });
 
-  it("says none of them when the list holds only items AI cannot access", () => {
+  it("says 0 of these when the list holds only items AI cannot access", () => {
     const disabledOnly = ITEMS.filter((item) => item.enabled === 0);
     const extra: AiPermissionItem = {
       ...disabledOnly[0],
@@ -251,7 +246,7 @@ describe("buildPermissionSummaryCopy", () => {
         enabledOnly: false,
         loadFailed: false,
       }).listLine,
-    ).toBe("Showing all 2 items from 1 contact · AI can access none of them");
+    ).toBe("This list: 2 of 2 items · 0 of these shared with AI.");
   });
 
   it("uses singular nouns for a single contact and item", () => {
@@ -264,8 +259,8 @@ describe("buildPermissionSummaryCopy", () => {
         loadFailed: false,
       }),
     ).toEqual({
-      accessLine: "AI can currently access information from 1 contact · 1 item",
-      listLine: "Showing 1 item from 1 contact · AI can access it",
+      accessLine: "AI can use 1 item, from 1 contact.",
+      listLine: "This list: 1 of 1 item · 1 of these shared with AI.",
       emptyLine: null,
     });
   });
@@ -385,38 +380,38 @@ describe("buildPermissionSummaryCopy reconciliation (D-44)", () => {
     const { filteredItems, copy } = copyFor(RECONCILE_STATES[0].filter);
     expect(groupAiPermissionItems(filteredItems)).toHaveLength(6);
     expect(copy.accessLine).toBe(
-      "AI can currently access information from 3 contacts · 3 items",
+      "AI can use 3 items, from 3 contacts.",
     );
     expect(copy.listLine).toBe(
-      "Showing all 8 items from 6 contacts · AI can access 3 of them",
+      "This list: 8 of 8 items · 3 of these shared with AI.",
     );
   });
 
   it("with Enabled only ON, every listed item is AI-accessible and the contact count matches the access line", () => {
     const { copy } = copyFor(RECONCILE_STATES[1].filter);
     expect(copy.accessLine).toBe(
-      "AI can currently access information from 3 contacts · 3 items",
+      "AI can use 3 items, from 3 contacts.",
     );
     expect(copy.listLine).toBe(
-      "Showing 3 of 8 items from 3 contacts · AI can access all of them",
+      "This list: 3 of 8 items · 3 of these shared with AI.",
     );
   });
 
   it("after Review existing… shows S of N and the enabled items of that type", () => {
     const { copy } = copyFor(RECONCILE_STATES[2].filter);
     expect(copy.listLine).toBe(
-      "Showing 4 of 8 items from 4 contacts · AI can access 1 of them",
+      "This list: 4 of 8 items · 1 of these shared with AI.",
     );
     expect(copy.accessLine).toBe(
-      "AI can currently access information from 3 contacts · 3 items",
+      "AI can use 3 items, from 3 contacts.",
     );
   });
 
-  it("an unmatched search shows Showing 0 of N and leaves the access line unchanged", () => {
+  it("an unmatched search shows This list: 0 of N and leaves the access line unchanged", () => {
     const { copy } = copyFor({ query: "zz", type: "all", enabledOnly: false });
-    expect(copy.listLine).toBe("Showing 0 of 8 items");
+    expect(copy.listLine).toBe("This list: 0 of 8 items.");
     expect(copy.accessLine).toBe(
-      "AI can currently access information from 3 contacts · 3 items",
+      "AI can use 3 items, from 3 contacts.",
     );
     expect(copy.emptyLine).toBe(PERMISSION_NO_MATCH_COPY);
   });
@@ -472,26 +467,10 @@ describe("permissionGroupCaption (D-44)", () => {
           filteredItems.filter((item) => item.enabled === 1),
         ).items,
       );
-      // The same three numbers the list line prints.
-      expect(copy.listLine, state.name).toContain(
-        `from ${groups.length} contact`,
+      // The same two numbers the list line prints (D-137 W1c wording).
+      expect(copy.listLine, state.name).toBe(
+        `This list: ${n} of ${RECONCILE_ITEMS.length} items · ${e} of these shared with AI.`,
       );
-      if (e === n) {
-        expect(copy.listLine, state.name).toMatch(
-          /AI can access (all of them|it)$/,
-        );
-      } else if (e === 0) {
-        expect(copy.listLine, state.name).toMatch(
-          /AI can access none of them$|AI can't access it$/,
-        );
-      } else {
-        expect(copy.listLine, state.name).toContain(
-          `AI can access ${e} of them`,
-        );
-      }
-      const shownPhrase =
-        n === RECONCILE_ITEMS.length ? `all ${n} items` : `${n} of `;
-      expect(copy.listLine, state.name).toContain(`Showing ${shownPhrase}`);
     }
   });
 });

@@ -249,14 +249,14 @@ export interface EditFormState {
   memories?: MemoryDraftRow[];
   relationships?: RelationshipDraftRow[];
   offLimits?: OffLimitsDraftRow[];
-  /** "Last talked about" entry text (blank → no write). */
+  /** "Last Talked About" entry text (blank → no write). */
   lastTalkedAbout?: string;
   /**
    * The local `YYYY-MM-DD` the user picked for a new Last Talked About entry.
    * Set only when the user explicitly added a dated entry; omitted means today.
    */
   lastTalkedAboutDate?: string;
-  /** "Current location" entry text (blank → no write). */
+  /** "Current Location" entry text (blank → no write). */
   currentLocation?: string;
   /** The picked local date for a new Current Location entry (see above). */
   currentLocationDate?: string;

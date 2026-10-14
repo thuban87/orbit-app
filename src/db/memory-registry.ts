@@ -120,12 +120,12 @@ export const CURRENT_STATE_FIELD_REGISTRY: Record<
   CurrentStateFieldMeta
 > = {
   last_talked_about: {
-    displayName: "Last talked about",
+    displayName: "Last Talked About",
     iconSemantic: "conversation",
     presentationOrder: 0,
   },
   current_location: {
-    displayName: "Current location",
+    displayName: "Current Location",
     iconSemantic: "location",
     presentationOrder: 1,
   },

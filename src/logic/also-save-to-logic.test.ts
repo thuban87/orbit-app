@@ -144,13 +144,13 @@ describe("loggedGroupEventSnackbar (38.9 D-39)", () => {
   });
 });
 
-describe("linkedNoteBlankMessage (Research Q4)", () => {
+describe("linkedNoteBlankMessage (Research Q4; D-137 W16b)", () => {
   it("names the section the note is also saved to", () => {
     expect(linkedNoteBlankMessage("last_talked_about")).toBe(
-      "This note is also saved to Last Talked About. Keep some text, or remove it there first.",
+      "This note is also saved to Last Talked About, so it can't be empty. Type something, or remove it from Last Talked About first.",
     );
     expect(linkedNoteBlankMessage(null)).toBe(
-      "This note is also saved to another section. Keep some text, or remove it there first.",
+      "This note is also saved to another section, so it can't be empty. Type something, or remove it from another section first.",
     );
   });
 });

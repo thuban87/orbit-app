@@ -88,9 +88,9 @@ export interface PermissionSummaryCopy {
   /** Actual AI access, from the unfiltered ENABLED items; null without a read. */
   accessLine: string | null;
   /**
-   * Exactly what the list below shows: its items of the total, from how many
-   * contacts, and how many of them AI can access (D-44). Null without a read,
-   * and null when there are no items at all (`emptyLine` covers that).
+   * Exactly what the list below shows: its items of the total, and how many
+   * of them are shared with AI (D-44; worded per D-137 W1c). Null without a
+   * read, and null when there are no items at all (`emptyLine` covers that).
    */
   listLine: string | null;
   /** Copy for an empty review list; null when the list has rows or no read. */
@@ -108,22 +108,16 @@ function enabledItems(
   return items.filter((item) => item.enabled === 1);
 }
 
-function accessPhrase(shown: number, accessible: number): string {
-  if (shown === 1)
-    return accessible === 1 ? "AI can access it" : "AI can't access it";
-  if (accessible === shown) return "AI can access all of them";
-  if (accessible === 0) return "AI can access none of them";
-  return `AI can access ${accessible} of them`;
-}
-
 /**
  * The permission summary copy (38.4 RG-008; ui-accessibility/AUD-UIA-013; D-17;
  * D-44). The access line is the truthful total: it is computed from the
  * UNFILTERED enabled items, never from the filtered view, so a search, a type
  * filter or the Enabled-only switch never reads as "AI can access less". The
  * list line describes exactly the rows below — how many items of the total,
- * from how many contacts, and how many of those AI can access — because the
- * list may include items AI cannot access (D-44). Every count uses
+ * and how many of those are shared with AI — because the list may include
+ * items AI cannot access (D-44). Wording per D-137 W1c: "AI can use N items,
+ * from M contacts." and "This list: X of Y items · Z of these shared with
+ * AI.". Every count uses
  * `summarizePermissionView`'s one counting rule (unique item keys and contact
  * uids), so the list line reconciles with the contact headers and, for the
  * full unfiltered view, with the access line. With no successful read there is
@@ -137,11 +131,11 @@ export function buildPermissionSummaryCopy(
     return { accessLine: null, listLine: null, emptyLine: null };
   }
   const access = summarizePermissionView(enabledItems(input.allItems));
-  const accessLine = `AI can currently access information from ${plural(
-    access.contacts,
-    "contact",
-    "contacts",
-  )} · ${plural(access.items, "item", "items")}`;
+  const accessLine = `AI can use ${plural(
+    access.items,
+    "item",
+    "items",
+  )}, from ${plural(access.contacts, "contact", "contacts")}.`;
   const total = summarizePermissionView(input.allItems).items;
   const shown = summarizePermissionView(input.filteredItems);
   const accessible = input.enabledOnly
@@ -149,19 +143,13 @@ export function buildPermissionSummaryCopy(
     : summarizePermissionView(enabledItems(input.filteredItems)).items;
   let listLine: string | null = null;
   if (total > 0 && shown.items === 0) {
-    listLine = `Showing 0 of ${plural(total, "item", "items")}`;
+    listLine = `This list: 0 of ${plural(total, "item", "items")}.`;
   } else if (total > 0) {
-    const itemsPhrase =
-      shown.items === total
-        ? total === 1
-          ? "1 item"
-          : `all ${total} items`
-        : `${shown.items} of ${plural(total, "item", "items")}`;
-    listLine = `Showing ${itemsPhrase} from ${plural(
-      shown.contacts,
-      "contact",
-      "contacts",
-    )} · ${accessPhrase(shown.items, accessible)}`;
+    listLine = `This list: ${shown.items} of ${plural(
+      total,
+      "item",
+      "items",
+    )} · ${accessible} of these shared with AI.`;
   }
   const emptyLine =
     input.filteredItems.length > 0

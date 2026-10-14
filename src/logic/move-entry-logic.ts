@@ -84,7 +84,12 @@ export function dropConfirmText(
     : fields.filter((field) => field !== "visibility setting");
   if (shown.length === 0) return null;
   const words = shown.map((field) => DROPPED_FIELD_WORDS[field]);
-  return `Moving this to ${moveSectionLabel(target)} removes ${listWords(words)}.`;
+  // D-137 W18: dropping the link (only a move into Off Limits does, D-103)
+  // also says that the note's Allow AI stays off for good.
+  const lockClause = shown.includes("linked note")
+    ? ", and that note's Allow AI stays off for good"
+    : "";
+  return `Moving this to ${moveSectionLabel(target)} removes ${listWords(words)}${lockClause}.`;
 }
 
 function forName(name: string | null): string {
@@ -99,10 +104,13 @@ export function movedSnackbar(
   return `Moved to ${moveSectionLabel(target)}${forName(name)}`;
 }
 
-/** The confirming snackbar after a move's Undo (D-118; 38.9 D-39). */
+/**
+ * The confirming snackbar after a move's Undo (D-118; 38.9 D-39), worded
+ * "Moved back to <Section> for <name>" (D-137 W11).
+ */
 export function moveUndoneSnackbar(
   original: KnowledgeSection,
   name: string | null,
 ): string {
-  return `Move undone, back in ${moveSectionLabel(original)}${forName(name)}`;
+  return `Moved back to ${moveSectionLabel(original)}${forName(name)}`;
 }
