@@ -692,18 +692,14 @@ export function MemoryEditor({
   // D-137 W14 / D-141: the section's own entry name, when the host gives one.
   // The open form names its draft's type (it follows the type picker); the
   // closed Add names the type a new entry starts as.
-  const formNoun =
-    draft === null ? null : entryNounFor(entryNoun, draft.type);
+  const formNoun = draft === null ? null : entryNounFor(entryNoun, draft.type);
   const formHeading = formNoun
     ? `${editing ? "Edit" : "Add"} ${formNoun}`
     : editing
       ? "Edit memory"
       : "Add memory";
   const addFormLabel = formNoun ? `Add ${formNoun}` : "Add memory";
-  const newNoun = entryNounFor(
-    entryNoun,
-    fixedType ?? DEFAULT_MEMORY_TYPE_KEY,
-  );
+  const newNoun = entryNounFor(entryNoun, fixedType ?? DEFAULT_MEMORY_TYPE_KEY);
   const outlinedAddLabel = newNoun ? `Add ${newNoun}` : "Add memory";
   // An outlined action the host's save holds: dimmed while busy (D-26).
   const heldActionStyle = [

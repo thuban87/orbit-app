@@ -54,11 +54,7 @@ import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import { memorySavedLabel, returnsToSameProfile } from "./memory-history-logic";
-import {
-  canAdd,
-  sectionEntryNoun,
-  sectionTitle,
-} from "./section-editor-logic";
+import { canAdd, sectionEntryNoun, sectionTitle } from "./section-editor-logic";
 
 const LOG_SCOPE = "memory-add";
 

@@ -127,9 +127,7 @@ describe("buildPermissionSummaryCopy", () => {
       enabledOnly: false,
       loadFailed: false,
     });
-    expect(copy.accessLine).toBe(
-      "AI can use 2 items, from 2 contacts.",
-    );
+    expect(copy.accessLine).toBe("AI can use 2 items, from 2 contacts.");
     expect(copy.listLine).toBe(
       "This list: 1 of 3 items · 1 of these shared with AI.",
     );
@@ -165,9 +163,7 @@ describe("buildPermissionSummaryCopy", () => {
       enabledOnly: false,
       loadFailed: false,
     });
-    expect(copy.accessLine).toBe(
-      "AI can use 2 items, from 2 contacts.",
-    );
+    expect(copy.accessLine).toBe("AI can use 2 items, from 2 contacts.");
     expect(copy.listLine).toBe(
       "This list: 2 of 3 items · 1 of these shared with AI.",
     );
@@ -185,9 +181,7 @@ describe("buildPermissionSummaryCopy", () => {
       enabledOnly: false,
       loadFailed: false,
     });
-    expect(copy.accessLine).toBe(
-      "AI can use 2 items, from 2 contacts.",
-    );
+    expect(copy.accessLine).toBe("AI can use 2 items, from 2 contacts.");
     expect(copy.listLine).toBe("This list: 0 of 3 items.");
     expect(copy.emptyLine).toBe("No information matches these filters.");
   });
@@ -379,9 +373,7 @@ describe("buildPermissionSummaryCopy reconciliation (D-44)", () => {
   it("with Enabled only OFF, type All and no search, lists every contact and AI can access exactly the access line's items", () => {
     const { filteredItems, copy } = copyFor(RECONCILE_STATES[0].filter);
     expect(groupAiPermissionItems(filteredItems)).toHaveLength(6);
-    expect(copy.accessLine).toBe(
-      "AI can use 3 items, from 3 contacts.",
-    );
+    expect(copy.accessLine).toBe("AI can use 3 items, from 3 contacts.");
     expect(copy.listLine).toBe(
       "This list: 8 of 8 items · 3 of these shared with AI.",
     );
@@ -389,9 +381,7 @@ describe("buildPermissionSummaryCopy reconciliation (D-44)", () => {
 
   it("with Enabled only ON, every listed item is AI-accessible and the contact count matches the access line", () => {
     const { copy } = copyFor(RECONCILE_STATES[1].filter);
-    expect(copy.accessLine).toBe(
-      "AI can use 3 items, from 3 contacts.",
-    );
+    expect(copy.accessLine).toBe("AI can use 3 items, from 3 contacts.");
     expect(copy.listLine).toBe(
       "This list: 3 of 8 items · 3 of these shared with AI.",
     );
@@ -402,17 +392,13 @@ describe("buildPermissionSummaryCopy reconciliation (D-44)", () => {
     expect(copy.listLine).toBe(
       "This list: 4 of 8 items · 1 of these shared with AI.",
     );
-    expect(copy.accessLine).toBe(
-      "AI can use 3 items, from 3 contacts.",
-    );
+    expect(copy.accessLine).toBe("AI can use 3 items, from 3 contacts.");
   });
 
   it("an unmatched search shows This list: 0 of N and leaves the access line unchanged", () => {
     const { copy } = copyFor({ query: "zz", type: "all", enabledOnly: false });
     expect(copy.listLine).toBe("This list: 0 of 8 items.");
-    expect(copy.accessLine).toBe(
-      "AI can use 3 items, from 3 contacts.",
-    );
+    expect(copy.accessLine).toBe("AI can use 3 items, from 3 contacts.");
     expect(copy.emptyLine).toBe(PERMISSION_NO_MATCH_COPY);
   });
 
