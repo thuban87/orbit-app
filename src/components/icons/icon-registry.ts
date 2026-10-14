@@ -83,6 +83,27 @@ export const ICON_REGISTRY = {
   },
   widget: { outline: "apps-outline", filled: "apps" },
 
+  // ---- Section Add FAB (38.10 D-131) ------------------------------------
+  // Planner glyph picks; the owner reviews them on the device pass and can swap
+  // any glyph here (ADR-086 swap seam). Ionicons has no thought-bubble glyph,
+  // so Thought of Them uses the closest, chatbubble-ellipses.
+  "section-memories": { outline: "book-outline", filled: "book" },
+  "section-thought-of-them": {
+    outline: "chatbubble-ellipses-outline",
+    filled: "chatbubble-ellipses",
+  },
+  "section-gift-ideas": { outline: "gift-outline", filled: "gift" },
+  "section-key-people": { outline: "people-outline", filled: "people" },
+  "section-off-limits": { outline: "ban-outline", filled: "ban" },
+  "section-last-talked-about": {
+    outline: "chatbubbles-outline",
+    filled: "chatbubbles",
+  },
+  "section-current-location": {
+    outline: "location-outline",
+    filled: "location",
+  },
+
   // ---- Plan 07 destructive affordance -----------------------------------
   warning: { outline: "warning-outline", filled: "warning" },
 

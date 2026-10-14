@@ -145,7 +145,10 @@ export function savedSnackbar(section: string, name: string | null): string {
 export const LINKED_ENTRY_NEEDS_TEXT =
   "This entry is linked to an interaction note, so it needs some text.";
 
-/** The empty section's text (D-68: text only here; the editor's Add acts). */
+/**
+ * The empty section's text (D-68: text only here; the Add acts). The Add sits
+ * at the top of the page (D-131), so the body points "above".
+ */
 export function sectionEmptyText(type: MemoryTypeKey): {
   heading: string;
   body: string;
@@ -154,7 +157,7 @@ export function sectionEmptyText(type: MemoryTypeKey): {
   return {
     heading: `Nothing in ${title} yet`,
     body: canAdd(type)
-      ? "Use Add memory below to add the first one."
+      ? "Use Add memory above to add the first one."
       : "Only the Contacts import adds entries here.",
   };
 }

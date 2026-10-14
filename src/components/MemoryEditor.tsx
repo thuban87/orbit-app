@@ -30,7 +30,11 @@ import { isValidLinkInput, LINK_FIELD_ERROR } from "@/logic/url-validation";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
-import { type CardEditSlot, cardEditSlots } from "./card-edit-slots";
+import {
+  type AddPlacement,
+  type CardEditSlot,
+  cardEditSlots,
+} from "./card-edit-slots";
 import {
   isPickableStoredDate,
   pickerSeedFromStored,
@@ -178,6 +182,13 @@ export interface MemoryEditorProps {
   cardEditMode?: boolean;
   /** Attached to the open form's outer View, so a host can scroll it into view. */
   formRef?: Ref<View>;
+  /**
+   * Where the Add sits (D-131; the section editors). "top": the add slot comes
+   * first and the editor renders NO Add of its own (the host renders the bar
+   * and calls `openNew()` on the handle); a new entry's form opens in that
+   * first slot. Absent → "end", the editor's own Add after the cards.
+   */
+  addPlacement?: AddPlacement;
   /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
   ref?: Ref<MemoryEditorHandle>;
   testID?: string;
@@ -186,11 +197,15 @@ export interface MemoryEditorProps {
 export interface MemoryDraftState {
   open: boolean;
   dirty: boolean;
+  /** The open draft is a NEW entry (D-131: the host hides its top Add bar). */
+  adding?: boolean;
 }
 
 export interface MemoryEditorHandle {
   /** Closes the open draft form without saving (no prompt). */
   closeDraft: () => void;
+  /** Opens a new entry's form (held while the host saves, as the Add is). */
+  openNew: () => void;
 }
 
 function TypePicker({
@@ -500,6 +515,7 @@ export function memoryEditorSlots(input: {
   cardEditMode: boolean;
   addOnly: boolean;
   showAdd: boolean;
+  addPlacement?: AddPlacement;
 }): CardEditSlot<MemoryRow>[] {
   return cardEditSlots(input);
 }
@@ -530,6 +546,7 @@ export function MemoryEditor({
   busy = false,
   cardEditMode = false,
   formRef,
+  addPlacement = "end",
   ref,
   testID,
 }: MemoryEditorProps) {
@@ -585,16 +602,21 @@ export function MemoryEditor({
     baseline,
     draft,
   );
+  const adding = draft !== null && editing === null;
   const onDraftStateChangeRef = useRef(onDraftStateChange);
   onDraftStateChangeRef.current = onDraftStateChange;
   useEffect(() => {
-    onDraftStateChangeRef.current?.({ open: draftOpen, dirty: draftDirty });
-  }, [draftOpen, draftDirty]);
+    onDraftStateChangeRef.current?.({
+      open: draftOpen,
+      dirty: draftDirty,
+      adding,
+    });
+  }, [draftOpen, draftDirty, adding]);
   useEffect(
     () => () => onDraftStateChangeRef.current?.({ open: false, dirty: false }),
     [],
   );
-  useImperativeHandle(ref, () => ({ closeDraft: close }));
+  useImperativeHandle(ref, () => ({ closeDraft: close, openNew }));
   const update = <K extends keyof MemoryDraft>(
     key: K,
     value: MemoryDraft[K],
@@ -1090,10 +1112,11 @@ export function MemoryEditor({
   const slots = memoryEditorSlots({
     items,
     editingId: editing?.id ?? null,
-    adding: draft !== null && editing === null,
+    adding,
     cardEditMode,
     addOnly,
     showAdd,
+    addPlacement,
   });
 
   return (
@@ -1103,7 +1126,10 @@ export function MemoryEditor({
           ? renderCard(slot.item)
           : slot.kind === "form"
             ? renderForm()
-            : renderAdd(),
+            : // D-131: with the Add at the top the host renders the bar.
+              addPlacement === "top"
+              ? null
+              : renderAdd(),
       )}
     </View>
   );

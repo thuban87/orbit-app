@@ -113,6 +113,12 @@ describe("section editor (38.10 D-75, D-35, D-84, D-107)", () => {
       "Only the Contacts import adds entries here.",
     );
   });
+
+  it("points at the Add above, where D-131 puts it", () => {
+    expect(sectionEmptyText("gift_idea").body).toBe(
+      "Use Add memory above to add the first one.",
+    );
+  });
 });
 
 describe("sectionAddLabel (D-130)", () => {

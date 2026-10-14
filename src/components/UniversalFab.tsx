@@ -50,7 +50,11 @@ import { newUid } from "@/db/uid";
 import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import { navigationRef } from "@/navigation/linking";
 import { navigateIntoTab } from "@/navigation/tab-entry";
-import { FAB_EDGE_GAP, FAB_SIZE } from "@/navigation/use-bottom-clearance";
+import {
+  FAB_EDGE_GAP,
+  FAB_SIDE_INSET,
+  FAB_SIZE,
+} from "@/navigation/use-bottom-clearance";
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
 import { runQuickLog } from "@/services/quick-log-command";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -496,7 +500,7 @@ const styles = StyleSheet.create({
   dial: { ...StyleSheet.absoluteFill },
   base: {
     position: "absolute",
-    right: 20,
+    right: FAB_SIDE_INSET,
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
@@ -507,7 +511,7 @@ const styles = StyleSheet.create({
   glyph: { fontSize: 32, lineHeight: 34, fontWeight: "600" },
   option: {
     position: "absolute",
-    right: 20,
+    right: FAB_SIDE_INSET,
     minHeight: 44,
     justifyContent: "center",
     borderRadius: 22,

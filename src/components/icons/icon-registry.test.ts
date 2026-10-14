@@ -114,6 +114,37 @@ describe("ICON_REGISTRY", () => {
     }
   });
 
+  it("registers the seven section Add FAB icons (38.10 D-131)", () => {
+    const registry: Record<string, { outline: string; filled: string }> =
+      ICON_REGISTRY;
+    expect({
+      "section-memories": registry["section-memories"],
+      "section-thought-of-them": registry["section-thought-of-them"],
+      "section-gift-ideas": registry["section-gift-ideas"],
+      "section-key-people": registry["section-key-people"],
+      "section-off-limits": registry["section-off-limits"],
+      "section-last-talked-about": registry["section-last-talked-about"],
+      "section-current-location": registry["section-current-location"],
+    }).toEqual({
+      "section-memories": { outline: "book-outline", filled: "book" },
+      "section-thought-of-them": {
+        outline: "chatbubble-ellipses-outline",
+        filled: "chatbubble-ellipses",
+      },
+      "section-gift-ideas": { outline: "gift-outline", filled: "gift" },
+      "section-key-people": { outline: "people-outline", filled: "people" },
+      "section-off-limits": { outline: "ban-outline", filled: "ban" },
+      "section-last-talked-about": {
+        outline: "chatbubbles-outline",
+        filled: "chatbubbles",
+      },
+      "section-current-location": {
+        outline: "location-outline",
+        filled: "location",
+      },
+    });
+  });
+
   it("reserves the `warning` name required by Plan 07 (REVIEWS 23-05 LOW)", () => {
     expect(ICON_REGISTRY.warning).toBeDefined();
     expect(ICON_REGISTRY.warning.outline).toBeTruthy();

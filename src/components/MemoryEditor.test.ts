@@ -1262,6 +1262,50 @@ describe("card edit mode (D-130)", () => {
         "form",
       ]);
     });
+
+    describe('addPlacement "top" (D-131)', () => {
+      const top = { ...base, addPlacement: "top" as const };
+
+      it("puts the add slot first, then the cards", () => {
+        expect(kinds(memoryEditorSlots(top))).toEqual(["add", 1, 2, 3]);
+      });
+
+      it("a new entry's form opens in the add slot, above the cards", () => {
+        expect(kinds(memoryEditorSlots({ ...top, adding: true }))).toEqual([
+          "form",
+          1,
+          2,
+          3,
+        ]);
+      });
+
+      it("an open in-place edit still takes its card's index", () => {
+        expect(kinds(memoryEditorSlots({ ...top, editingId: 2 }))).toEqual([
+          "add",
+          1,
+          "form",
+          3,
+        ]);
+      });
+
+      it("showAdd false gives only the cards; a removed edited row's form goes last", () => {
+        expect(kinds(memoryEditorSlots({ ...top, showAdd: false }))).toEqual([
+          1, 2, 3,
+        ]);
+        expect(kinds(memoryEditorSlots({ ...top, editingId: 9 }))).toEqual([
+          1,
+          2,
+          3,
+          "form",
+        ]);
+      });
+
+      it("the default stays at the end", () => {
+        expect(
+          kinds(memoryEditorSlots({ ...base, addPlacement: undefined })),
+        ).toEqual([1, 2, 3, "add"]);
+      });
+    });
   });
 
   const render = (props: Partial<MemoryEditorProps> = {}) =>
@@ -1318,6 +1362,30 @@ describe("card edit mode (D-130)", () => {
     }
     // The Add is held while the form is open.
     expect(slots[3]?.props.disabled).toBe(true);
+  });
+
+  it('addPlacement "top" renders no Add of its own (the host renders the bar)', () => {
+    const resting = children(render({ addPlacement: "top" }));
+    expect(resting.map((n) => n.type)).toEqual([
+      "MemoryCard",
+      "MemoryCard",
+      "MemoryCard",
+    ]);
+    expect(
+      nodes(render({ addPlacement: "top" })).some(
+        (n) =>
+          (n.type === "Button" && n.props.role === "primary") ||
+          n.props.accessibilityLabel === "Add memory",
+      ),
+    ).toBe(false);
+    const editing = children(
+      render({ addPlacement: "top", initiallyEditingId: 2 }),
+    );
+    expect(editing.map((n) => n.type)).toEqual([
+      "MemoryCard",
+      "View",
+      "MemoryCard",
+    ]);
   });
 
   it("each resting card gets a pencil that opens its form, and no Move", () => {

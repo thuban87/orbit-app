@@ -65,12 +65,22 @@ describe("card edit mode: the memory section editors (D-130)", () => {
   const screen = read(SECTION);
   const editor = read("src/components/MemoryEditor.tsx");
 
-  it("opts in with cardEditMode, a formRef and the solid Add", () => {
+  it("opts in with cardEditMode, a formRef and the solid Add at the top (D-131)", () => {
     const [tag] = openingTags(screen, "MemoryEditor");
     expect(tag).toBeDefined();
     expect(tag).toMatch(/\bcardEditMode\b/);
     expect(tag).toContain("formRef={formRef}");
-    expect(tag).toContain("addButton={{ label: sectionAddLabel(type) }}");
+    // Plan 21 (D-131): the screen renders the solid Add bar above the
+    // entries, and the editor renders no Add of its own.
+    expect(tag).toContain('addPlacement="top"');
+    expect(tag).not.toContain("addButton=");
+    const bar = openingTags(screen, "Button").find((button) =>
+      button.includes("label={sectionAddLabel(type)}"),
+    );
+    expect(bar).toContain('role="primary"');
+    expect(screen.indexOf("label={sectionAddLabel(type)}")).toBeLessThan(
+      screen.search(/<MemoryEditor\s/),
+    );
   });
 
   it("the editor's addButton Add is role primary and its form Delete is destructive", () => {

@@ -15,6 +15,10 @@
  *   unlinked card opens that card's form in its place, with Move and a red
  *   Delete at its top (hidden at rest); a linked card's pencil opens it too.
  *   The Add is solid.
+ * - Section Add FAB (D-131): the solid Add sits at the top, above the entries,
+ *   and a new entry's form opens in its place. Scrolled out of view, it morphs
+ *   into the bottom-left FAB (the page's icon with a +), whose tap scrolls to
+ *   the top and opens the add form. Imported has no Add, so no FAB (D-35).
  * - Hidden entries are dimmed with "Show on Profile" (D-17).
  * - Every entry but Imported can move to another D-84 section through
  *   `MoveEntrySheet`, with the D-85 confirm and Undo (D-118).
@@ -29,7 +33,8 @@
  */
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 import {
   type MemoryAiDefaults,
   type MemoryDraft,
@@ -39,7 +44,13 @@ import {
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
 import { MoveEntrySheet } from "@/components/MoveEntrySheet";
+import {
+  SectionAddFab,
+  useSectionAddMorph,
+  useSectionFabClearance,
+} from "@/components/SectionAddFab";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { sectionFabIcon } from "@/components/section-add-fab-logic";
 import {
   AppText,
   Button,
@@ -71,6 +82,7 @@ import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { linkedEntryRoute } from "@/logic/linked-entry-route";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -454,9 +466,23 @@ export function SectionEditorScreen({
   };
 
   const empty = sectionEmptyText(type);
+  const addable = canAdd(type);
+
+  // D-131: the top Add morphs into the bottom-left FAB once it scrolls off.
+  const focusedRoute = isFocusedWorkflow(route.name);
+  const morph = useSectionAddMorph({
+    loaded: phase.phase === "loaded",
+    formOpen: draftState.open,
+    focusedRoute,
+  });
+  const fabClearance = useSectionFabClearance(focusedRoute);
+  const openNewFromFab = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    editorRef.current?.openNew();
+  };
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={morph.onRootLayout}>
       {/* While an add or edit runs the guard holds Back (D-26; WR-02). */}
       <ShellAppBar
         variant="child"
@@ -464,10 +490,17 @@ export function SectionEditorScreen({
         person={person}
         backDisabled={saving}
       />
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}
-        contentContainerStyle={styles.content}
+        onLayout={morph.onViewportLayout}
+        onScroll={morph.scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={[
+          styles.content,
+          // The last entry scrolls fully above the section FAB.
+          { paddingBottom: fabClearance },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <KeyboardCenteringProvider value={centering}>
@@ -495,8 +528,23 @@ export function SectionEditorScreen({
             </View>
           ) : (
             <>
+              {addable && !draftState.adding ? (
+                // D-131: the solid Add at the top (D-130), the one Add on the
+                // page; a new entry's form opens in its place. Held while a
+                // form is open or a save runs.
+                <View onLayout={morph.onBarLayout}>
+                  {/* biome-ignore lint/a11y/useValidAriaRole: Button role is the design-system hierarchy role. */}
+                  <Button
+                    testID="section-editor-add"
+                    role="primary"
+                    label={sectionAddLabel(type)}
+                    disabled={saving || draftState.open}
+                    onPress={() => editorRef.current?.openNew()}
+                  />
+                </View>
+              ) : null}
               {phase.data.rows.length === 0 ? (
-                // D-68: text only; MemoryEditor's own Add is the one action.
+                // D-68: text only; the top Add is the one action.
                 <EmptyState
                   testID="section-editor-empty"
                   icon="list"
@@ -509,10 +557,10 @@ export function SectionEditorScreen({
                 ref={editorRef}
                 cardEditMode
                 formRef={formRef}
-                addButton={{ label: sectionAddLabel(type) }}
+                addPlacement="top"
                 items={phase.data.rows}
                 fixedType={type}
-                showAdd={canAdd(type)}
+                showAdd={addable}
                 globalAiEnabled={phase.data.globalAiEnabled}
                 aiDefaults={phase.data.aiDefaults}
                 initiallyEditingId={initialEditId}
@@ -535,7 +583,7 @@ export function SectionEditorScreen({
           )}
         </KeyboardCenteringProvider>
         {bottomSpacer}
-      </ScrollView>
+      </Animated.ScrollView>
       {moveItem !== null && moveSection !== null ? (
         <MoveEntrySheet
           entryRef={{ table: "memories", id: moveItem.id, contactId }}
@@ -545,6 +593,16 @@ export function SectionEditorScreen({
           onMoved={() => void load()}
           onMoveUndone={() => void load()}
           onClose={() => setMoveItem(null)}
+        />
+      ) : null}
+      {addable ? (
+        // Rendered last, so it floats over the content (D-131).
+        <SectionAddFab
+          morph={morph}
+          icon={sectionFabIcon(type)}
+          label={sectionAddLabel(type)}
+          hint="Scrolls to the top and opens the add form."
+          onPress={openNewFromFab}
         />
       ) : null}
     </View>

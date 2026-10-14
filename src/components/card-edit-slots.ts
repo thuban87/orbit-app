@@ -13,9 +13,15 @@
  * - `addOnly`: only the form while it is open.
  * - An edited row that is no longer in `items` (a reload removed it while its
  *   form was open) keeps its form, at the end, as before.
+ * - `addPlacement: "top"` (D-131, the section pages): the add slot (the Add,
+ *   or a new entry's form) comes FIRST, then the cards; an open in-place edit
+ *   still takes its card's index. Default "end" is everything above.
  *
  * PURE and React-free, so it is unit-tested in the node env.
  */
+
+/** Where the add slot sits: after the cards (default) or before them (D-131). */
+export type AddPlacement = "end" | "top";
 
 export type CardEditSlot<T> =
   | { kind: "card"; item: T }
@@ -31,6 +37,8 @@ export interface CardEditSlotsInput<T extends { id: number }> {
   cardEditMode: boolean;
   addOnly: boolean;
   showAdd: boolean;
+  /** Default "end". */
+  addPlacement?: AddPlacement;
 }
 
 export function cardEditSlots<T extends { id: number }>({
@@ -40,6 +48,7 @@ export function cardEditSlots<T extends { id: number }>({
   cardEditMode,
   addOnly,
   showAdd,
+  addPlacement = "end",
 }: CardEditSlotsInput<T>): CardEditSlot<T>[] {
   const formOpen = editingId !== null || adding;
   if (addOnly) return formOpen ? [{ kind: "form" }] : [];
@@ -52,6 +61,12 @@ export function cardEditSlots<T extends { id: number }>({
       ? { kind: "form" }
       : { kind: "card", item },
   );
+  if (addPlacement === "top") {
+    if (adding) return [{ kind: "form" }, ...slots];
+    // An edited row a reload removed keeps its form at the end (as "end").
+    if (formOpen && !inPlace) return [...slots, { kind: "form" }];
+    return showAdd ? [{ kind: "add" }, ...slots] : slots;
+  }
   if (inPlace) {
     if (showAdd) slots.push({ kind: "add" });
   } else if (formOpen) {
