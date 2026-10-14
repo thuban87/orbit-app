@@ -69,6 +69,8 @@ export const GENERIC_CUSTOM_FIELDS_LABEL = "Custom Fields";
  * two current-state rows, Key People, and Memory draw their labels from the
  * shared registry so the chooser cannot drift from the knowledge model; the
  * three first-class rows use the labels above. Category is intentionally omitted.
+ * Key People sits after Contact Frequency, just before the custom fields
+ * (38.10 D-136 W20a).
  */
 export function buildBuiltInRows(): ChooserRow[] {
   return [
@@ -76,11 +78,6 @@ export function buildBuiltInRows(): ChooserRow[] {
       key: "last_talked_about",
       kind: "last_talked_about",
       label: CURRENT_STATE_FIELD_REGISTRY.last_talked_about.displayName,
-    },
-    {
-      key: "key_people",
-      kind: "key_people",
-      label: RELATIONSHIPS_GROUP.displayName,
     },
     {
       key: "current_location",
@@ -98,6 +95,11 @@ export function buildBuiltInRows(): ChooserRow[] {
       key: "contact_frequency",
       kind: "contact_frequency",
       label: CONTACT_FREQUENCY_LABEL,
+    },
+    {
+      key: "key_people",
+      kind: "key_people",
+      label: RELATIONSHIPS_GROUP.displayName,
     },
   ];
 }

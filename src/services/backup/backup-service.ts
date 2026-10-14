@@ -28,6 +28,11 @@ import type {
 
 export type BackupPreview = {
   exportedAt: string;
+  /**
+   * The version the file was written in (38.10 D-136 O14), read from the raw
+   * file before the forward conversion; display only. The manifest handed to
+   * restore is the converted one, as before.
+   */
   backupFormatVersion: number;
   encrypted: boolean;
   rowCount: number;
@@ -60,6 +65,21 @@ export type ValidatedRestoreCandidate =
     };
 
 /**
+ * The format version a backup file was written in, read from the raw (and,
+ * if encrypted, decrypted) object before `parseBackupManifest` converts it
+ * forward (38.10 D-136 O14). A missing version is 1, the parser's own
+ * default. Only called after the parse has validated the whole file, so a bad
+ * version has already failed (T-38.10-61). Display only.
+ */
+function sourceFormatVersion(raw: unknown): number {
+  const version =
+    raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>).backupFormatVersion
+      : undefined;
+  return typeof version === "number" && Number.isInteger(version) ? version : 1;
+}
+
+/**
  * The write-free restore boundary. It deliberately returns aggregate data only:
  * callers retain the validated manifest privately until a later explicit apply.
  */
@@ -85,6 +105,8 @@ export function loadBackupForRestore(input: {
       raw = JSON.parse(new TextDecoder().decode(decrypted));
       encrypted = true;
     }
+    // Read before the forward conversion (D-136 O14; display only).
+    const fileVersion = sourceFormatVersion(raw);
     const manifest = parseBackupManifest(raw);
     const rows = [
       manifest.categories,
@@ -107,7 +129,7 @@ export function loadBackupForRestore(input: {
       manifest,
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: manifest.backupFormatVersion,
+        backupFormatVersion: fileVersion,
         encrypted,
         rowCount: rows.reduce(
           (count, value) => count + value.length,

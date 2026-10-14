@@ -195,7 +195,11 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     <Sheet
       visible={target !== null}
       onRequestClose={requestSheetClose}
-      variant="compact"
+      // D-136 O4: the detail sheet (60% of the resting window, still bounded
+      // above the keyboard) so the chips and Save show without scrolling at
+      // the test phones' font scale; the body still scrolls at larger text
+      // (38.4 D-32).
+      variant="detail"
     >
       <View style={styles.body}>
         <AppText role="heading">Add Note</AppText>

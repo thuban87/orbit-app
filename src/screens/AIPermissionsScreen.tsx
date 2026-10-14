@@ -79,6 +79,8 @@ const DEFAULT_ROWS: ReadonlyArray<{
     reviewCategory: "memory",
     key: "memory",
     label: "Memories",
+    // D-136 O13: the same caption the two newer memory-type rows carry.
+    caption: "New items default to Allow AI",
   },
   {
     defaultKey: "gift_idea",

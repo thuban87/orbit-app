@@ -353,17 +353,17 @@ describe("restore preview", () => {
       MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
     );
     const preview = loadBackupForPreview({ contents: JSON.stringify(v7File) });
-    expect(preview.status === "ready" && preview.preview.backupFormatVersion).toBe(
-      7,
-    );
+    expect(
+      preview.status === "ready" && preview.preview.backupFormatVersion,
+    ).toBe(7);
   });
 
   it("reports a current-format file as its own version", () => {
     const current = parseBackupManifest(manifest);
     const preview = loadBackupForPreview({ contents: JSON.stringify(current) });
-    expect(preview.status === "ready" && preview.preview.backupFormatVersion).toBe(
-      MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
-    );
+    expect(
+      preview.status === "ready" && preview.preview.backupFormatVersion,
+    ).toBe(MAX_SUPPORTED_BACKUP_FORMAT_VERSION);
     expect(MAX_SUPPORTED_BACKUP_FORMAT_VERSION).toBe(8);
   });
 

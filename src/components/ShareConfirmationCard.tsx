@@ -42,11 +42,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { chipTone } from "@/components/ui/chip-tone";
+import { EntryTextField } from "@/components/ui/EntryTextField";
 import { OrbitSwitch } from "@/components/ui/OrbitSwitch";
 import { ADD_NOTE, ALLOW_AI } from "@/constants/glossary";
 import type { ShareRowRef, ShareSection } from "@/db/capture-dao";
@@ -332,24 +332,18 @@ export const ShareConfirmationCard = forwardRef<
 
       {state.noteEditing ? (
         <View style={styles.noteBlock}>
-          <TextInput
+          {/* D-136 S5: the D-66 wrapping entry field. It wraps to about 3
+              lines and Enter saves (it blurs first, then onSaveNote also
+              dismisses the keyboard). Capture has no
+              KeyboardCenteringProvider, so it does not centre (D-66 scope). */}
+          <EntryTextField
             testID="capture-note-input"
             autoFocus
+            accessibilityLabel="Note"
             value={state.note}
             onChangeText={(text) => dispatch({ type: "setNote", text })}
             placeholder={'Add your words — e.g. "for Dad, he asked about this"'}
-            placeholderTextColor={colors.textPlaceholder}
-            returnKeyType="done"
-            submitBehavior="blurAndSubmit"
-            onSubmitEditing={onSaveNote}
-            style={[
-              styles.noteInput,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
+            onSubmit={onSaveNote}
           />
           <View style={styles.actions}>
             <Button
@@ -451,14 +445,6 @@ const styles = StyleSheet.create({
   },
   noteBlock: {
     gap: 8,
-  },
-  noteInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    minHeight: 44,
   },
   aiRow: {
     flexDirection: "row",

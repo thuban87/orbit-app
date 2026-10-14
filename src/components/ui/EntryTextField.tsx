@@ -52,6 +52,8 @@ export interface EntryTextFieldProps {
   accessibilityLabel: string;
   returnKeyType?: ReturnKeyTypeOptions;
   editable?: boolean;
+  /** Focuses the field when it mounts (the share card's note, 38.10 D-136 S5). */
+  autoFocus?: boolean;
   onFocus?: (event: FocusEvent) => void;
   onBlur?: (event: BlurEvent) => void;
   testID?: string;
@@ -65,6 +67,7 @@ export function EntryTextField({
   accessibilityLabel,
   returnKeyType = "done",
   editable,
+  autoFocus,
   onFocus,
   onBlur,
   testID,
@@ -102,6 +105,7 @@ export function EntryTextField({
       placeholderTextColor={colors.textPlaceholder}
       returnKeyType={returnKeyType}
       editable={editable}
+      autoFocus={autoFocus}
       multiline
       submitBehavior="submit"
       scrollEnabled
