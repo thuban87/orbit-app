@@ -151,7 +151,7 @@ import {
   resolveErrorSection,
 } from "./create-contact-logic";
 import type { OffLimitsDraftRow } from "./edit-contact-logic";
-import { sectionTitle } from "./section-editor-logic";
+import { sectionEntryNoun, sectionTitle } from "./section-editor-logic";
 
 const LOG_SCOPE = "create-contact";
 
@@ -876,7 +876,7 @@ export function CreateContactScreen({
                 <View style={styles.field}>
                   <EntryTextField
                     testID="create-contact-last-talked"
-                    accessibilityLabel="Last talked about"
+                    accessibilityLabel="Last Talked About"
                     value={lastTalkedAbout}
                     onChangeText={setLastTalkedAbout}
                     onSubmit={dismissKeyboard}
@@ -884,7 +884,7 @@ export function CreateContactScreen({
                   />
                   <EntryDateField
                     testID="create-contact-last-talked-date"
-                    accessibilityLabel="Last talked about date"
+                    accessibilityLabel="Last Talked About date"
                     value={lastTalkedAboutDate ?? todayStored}
                     onChange={setLastTalkedAboutDate}
                     maxDate={todayDate}
@@ -946,7 +946,7 @@ export function CreateContactScreen({
                 <View style={styles.field}>
                   <EntryTextField
                     testID="create-contact-current-location"
-                    accessibilityLabel="Current location"
+                    accessibilityLabel="Current Location"
                     value={currentLocation}
                     onChangeText={setCurrentLocation}
                     onSubmit={dismissKeyboard}
@@ -954,7 +954,7 @@ export function CreateContactScreen({
                   />
                   <EntryDateField
                     testID="create-contact-current-location-date"
-                    accessibilityLabel="Current location date"
+                    accessibilityLabel="Current Location date"
                     value={currentLocationDate ?? todayStored}
                     onChange={setCurrentLocationDate}
                     maxDate={todayDate}
@@ -977,6 +977,7 @@ export function CreateContactScreen({
               >
                 <MemoryEditor
                   testID="create-contact-memories"
+                  entryNoun={sectionEntryNoun}
                   ref={memoryEditorRef}
                   onDraftStateChange={setMemoryDraft}
                   onCancelRequest={(close) =>
@@ -1008,6 +1009,7 @@ export function CreateContactScreen({
               >
                 <MemoryEditor
                   testID="create-contact-thought-of-them"
+                  entryNoun={sectionEntryNoun("thought_of_them")}
                   ref={thoughtOfThemEditorRef}
                   onDraftStateChange={setThoughtOfThemDraft}
                   onCancelRequest={(close) =>
@@ -1040,6 +1042,7 @@ export function CreateContactScreen({
               >
                 <MemoryEditor
                   testID="create-contact-gift-ideas"
+                  entryNoun={sectionEntryNoun("gift_idea")}
                   ref={giftIdeasEditorRef}
                   onDraftStateChange={setGiftIdeasDraft}
                   onCancelRequest={(close) =>

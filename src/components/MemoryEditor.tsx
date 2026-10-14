@@ -99,6 +99,23 @@ export interface MemoryEditPatch extends MemoryDraft {}
 /** Per-type Allow AI defaults for new entries (D-13, D-92); missing → 0. */
 export type MemoryAiDefaults = Partial<Record<MemoryTypeKey, 0 | 1>>;
 
+/**
+ * One entry's name for the form heading and the add button ("Gift Idea" →
+ * "Add Gift Idea" / "Edit Gift Idea"; D-137 W14, D-141). A function names
+ * each entry by its own type (a host whose form has a type picker, Update
+ * Contact).
+ */
+export type MemoryEntryNoun = string | ((type: MemoryTypeKey) => string);
+
+/** The noun for an entry of `type`, or null without an `entryNoun`. PURE. */
+function entryNounFor(
+  entryNoun: MemoryEntryNoun | undefined,
+  type: MemoryTypeKey,
+): string | null {
+  if (entryNoun === undefined) return null;
+  return typeof entryNoun === "function" ? entryNoun(type) : entryNoun;
+}
+
 export interface MemoryEditorProps {
   items: MemoryRow[];
   /** Grouped callers render one editor per type; only the final group offers creation. */
@@ -134,7 +151,7 @@ export interface MemoryEditorProps {
   addOnly?: boolean;
   /**
    * Opt-in solid primary Add (D-67: the Add/Edit Contact inline sections).
-   * Absent → the outlined "Add memory" action, unchanged.
+   * Absent → the outlined Add action ("Add memory", or "Add <noun>" with `entryNoun`).
    */
   addButton?: { label: string };
   /**
@@ -190,6 +207,13 @@ export interface MemoryEditorProps {
    * first slot. Absent → "end", the editor's own Add after the cards.
    */
   addPlacement?: AddPlacement;
+  /**
+   * The section's own entry name (D-137 W14; D-141): the form heading reads
+   * "Add <noun>" / "Edit <noun>" and the add form's button (and the outlined
+   * Add) "Add <noun>". The edit form's spoken "Save memory" stays. Absent →
+   * "Add memory" / "Edit memory", unchanged.
+   */
+  entryNoun?: MemoryEntryNoun;
   /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
   ref?: Ref<MemoryEditorHandle>;
   testID?: string;
@@ -548,6 +572,7 @@ export function MemoryEditor({
   cardEditMode = false,
   formRef,
   addPlacement = "end",
+  entryNoun,
   ref,
   testID,
 }: MemoryEditorProps) {
@@ -664,6 +689,22 @@ export function MemoryEditor({
   const linkError = draft === null ? null : memoryLinkError(draft);
   // The draft's type is fixed when it is not user-pickable (D-35).
   const typeLocked = draft !== null && isLockedMemoryType(draft.type);
+  // D-137 W14 / D-141: the section's own entry name, when the host gives one.
+  // The open form names its draft's type (it follows the type picker); the
+  // closed Add names the type a new entry starts as.
+  const formNoun =
+    draft === null ? null : entryNounFor(entryNoun, draft.type);
+  const formHeading = formNoun
+    ? `${editing ? "Edit" : "Add"} ${formNoun}`
+    : editing
+      ? "Edit memory"
+      : "Add memory";
+  const addFormLabel = formNoun ? `Add ${formNoun}` : "Add memory";
+  const newNoun = entryNounFor(
+    entryNoun,
+    fixedType ?? DEFAULT_MEMORY_TYPE_KEY,
+  );
+  const outlinedAddLabel = newNoun ? `Add ${newNoun}` : "Add memory";
   // An outlined action the host's save holds: dimmed while busy (D-26).
   const heldActionStyle = [
     styles.action,
@@ -757,14 +798,14 @@ export function MemoryEditor({
       <Pressable
         key="memory-editor-add"
         accessibilityRole="button"
-        accessibilityLabel="Add memory"
+        accessibilityLabel={outlinedAddLabel}
         accessibilityState={{ disabled: addHeld }}
         disabled={addHeld}
         onPress={openNew}
         style={addActionStyle}
       >
         <AppText role="body" style={{ color: colors.accentText }}>
-          Add memory
+          {outlinedAddLabel}
         </AppText>
       </Pressable>
     );
@@ -799,7 +840,7 @@ export function MemoryEditor({
           // mode, at the top right of the open card.
           <View style={styles.formHeader}>
             <AppText role="heading" style={styles.formHeading}>
-              Edit memory
+              {formHeading}
             </AppText>
             <View style={styles.formHeaderActions}>
               {onMove ? (
@@ -826,9 +867,7 @@ export function MemoryEditor({
             </View>
           </View>
         ) : (
-          <AppText role="heading">
-            {editing ? "Edit memory" : "Add memory"}
-          </AppText>
+          <AppText role="heading">{formHeading}</AppText>
         )}
         {cardEditMode && editing?.url ? (
           // D-130, D-24: the card's Open link stays in edit mode.
@@ -1090,7 +1129,7 @@ export function MemoryEditor({
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={editing ? "Save memory" : "Add memory"}
+            accessibilityLabel={editing ? "Save memory" : addFormLabel}
             accessibilityState={{ disabled: !canSave || busy }}
             disabled={!canSave || busy}
             onPress={() => void commit()}
@@ -1109,7 +1148,7 @@ export function MemoryEditor({
                 color: canSave ? colors.onAccent : colors.textSecondary,
               }}
             >
-              {editing ? "Save" : "Add memory"}
+              {editing ? "Save" : addFormLabel}
             </AppText>
           </Pressable>
         </View>

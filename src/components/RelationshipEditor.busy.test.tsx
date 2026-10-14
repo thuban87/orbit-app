@@ -146,9 +146,9 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     hooks.seeds = {};
   });
 
-  it("leaves Edit and Add key person live when idle, with no Show on Profile", () => {
+  it("leaves Edit and Add Key Person live when idle, with no Show on Profile", () => {
     const tree = render(false, [hiddenRow]);
-    for (const label of [...listLabels, "Add key person"]) {
+    for (const label of [...listLabels, "Add Key Person"]) {
       expect(button(tree, label)?.props.disabled, label).toBe(false);
     }
     expect(button(tree, "Delete")).toBeUndefined();
@@ -157,13 +157,13 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
 
   it("draws them disabled while busy, and a press changes nothing", () => {
     const tree = render(true, [hiddenRow]);
-    for (const label of [...listLabels, "Add key person"]) {
+    for (const label of [...listLabels, "Add Key Person"]) {
       expect(button(tree, label)?.props.disabled, label).toBe(true);
       press(tree, label);
     }
     expect(handlers.onDelete).not.toHaveBeenCalled();
     expect(handlers.onEdit).not.toHaveBeenCalled();
-    // Edit and Add key person would swap the open draft.
+    // Edit and Add Key Person would swap the open draft.
     expect(hooks.setters).toBe(0);
   });
 });
@@ -316,7 +316,7 @@ describe("RelationshipEditor initiallyEditingId (D-107; convergence c6, Codex C-
     const tree = render(false, [item], 5);
     expect(
       tree.some(
-        (n) => n.type === "AppText" && n.props.children === "Edit key person",
+        (n) => n.type === "AppText" && n.props.children === "Edit Key Person",
       ),
     ).toBe(true);
     const name = tree.find(
@@ -324,12 +324,12 @@ describe("RelationshipEditor initiallyEditingId (D-107; convergence c6, Codex C-
         n.type === "TextInput" && n.props.accessibilityLabel === "Person name",
     );
     expect(name?.props.value).toBe("Ria");
-    expect(button(tree, "Add key person")).toBeUndefined();
+    expect(button(tree, "Add Key Person")).toBeUndefined();
   });
 
   it("an id absent from items shows the rows with no form", () => {
     const tree = render(false, [item], 99);
-    expect(button(tree, "Add key person")).toBeDefined();
+    expect(button(tree, "Add Key Person")).toBeDefined();
     expect(tree.some((n) => n.type === "EntryTextField")).toBe(false);
   });
 });
@@ -517,9 +517,9 @@ describe('RelationshipEditor addPlacement "top" (D-131: the host renders the Add
       .flat()
       .filter(Boolean) as TestElement[];
 
-  it("renders no Add key person Button of its own", () => {
+  it("renders no Add Key Person Button of its own", () => {
     const root = renderTop();
-    expect(button(nodes(root), "Add key person")).toBeUndefined();
+    expect(button(nodes(root), "Add Key Person")).toBeUndefined();
     expect(slotsOf(root).map((n) => n.type)).toEqual([
       "Pressable",
       "Pressable",
@@ -534,7 +534,7 @@ describe('RelationshipEditor addPlacement "top" (D-131: the host renders the Add
       "View",
       "ContactPicker",
     ]);
-    expect(button(nodes(root), "Add key person")).toBeUndefined();
+    expect(button(nodes(root), "Add Key Person")).toBeUndefined();
   });
 
   it("a new key person's form opens first, above the rows", () => {
@@ -548,7 +548,7 @@ describe('RelationshipEditor addPlacement "top" (D-131: the host renders the Add
     ]);
     expect(
       nodes(slots[0]).some(
-        (n) => n.type === "AppText" && n.props.children === "Add key person",
+        (n) => n.type === "AppText" && n.props.children === "Add Key Person",
       ),
     ).toBe(true);
   });

@@ -45,13 +45,13 @@ import {
 const DISSOLVE = {
   title: "Dissolve this event?",
   message:
-    "Each participant's interaction is kept as an individual interaction. The event and its shared note are removed. The Group Note is not copied into anyone's note.",
+    "Each participant's interaction is kept as an individual interaction. The event and its shared note are removed. The Group Note is not copied into anyone's note. Anything saved to a Things to Remember section stays on each person's Profile.",
   confirm: "Dissolve event",
 };
 const DELETE = {
   title: "Delete this event and all its interactions?",
   message:
-    "This permanently deletes the event and every participant's interaction. This can't be undone and may change each contact's Status, Gravity, and Intensity.",
+    "This permanently deletes the event and every participant's interaction. This can't be undone and may change each contact's Status, Gravity, and Intensity. Anything saved to a Things to Remember section stays on each person's Profile.",
   confirm: "Delete Event & Interactions",
 };
 

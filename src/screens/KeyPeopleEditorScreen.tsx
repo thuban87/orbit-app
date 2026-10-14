@@ -8,7 +8,7 @@
  * - Hosts the shared `RelationshipEditor`, mounted after the read so its
  *   `initiallyEditingId` (read at mount) can open `editId`'s form once per
  *   navigation; an entry that is gone falls back to the list (D-107).
- * - Section Add FAB (D-131): the solid "Add key person" sits at the top,
+ * - Section Add FAB (D-131): the solid "Add Key Person" sits at the top,
  *   above the rows and the empty state, rendered by this screen (the editor
  *   runs with its Add placement at the top and renders no Add of its own); a
  *   new key person's form opens in its place. Scrolled out of view, it morphs
@@ -83,8 +83,8 @@ import { openEditTarget } from "./section-editor-logic";
 
 const LOG_SCOPE = "key-people-editor";
 const TITLE = "Key People";
-/** The page's Add wording (today's; plan 25 applies D-137 W19). */
-const ADD_LABEL = "Add key person";
+/** The page's Add wording (D-137 W19). */
+const ADD_LABEL = "Add Key Person";
 
 /** " for Ann", or "" while the person line has not loaded. */
 function forName(name: string | null): string {
@@ -398,8 +398,8 @@ export function KeyPeopleEditorScreen({
                 <EmptyState
                   testID="key-people-editor-empty"
                   icon="list"
-                  heading="No key people yet"
-                  body="Use Add key person above to add the first one."
+                  heading="No Key People yet"
+                  body="Use Add Key Person above to add the first one."
                 />
               ) : null}
               <RelationshipEditor

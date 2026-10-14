@@ -166,6 +166,7 @@ import {
   deletedSnackbar,
   LINKED_ENTRY_NEEDS_TEXT,
   restoredSnackbar,
+  sectionEntryNoun,
   sectionTitle,
 } from "./section-editor-logic";
 import {
@@ -615,7 +616,7 @@ function KeyPeopleFocusedEditor({
 
   return (
     <EditorFrame
-      title="Key people"
+      title="Key People"
       error={false}
       onCancel={onCancel}
       cancelDisabled={saving}
@@ -857,6 +858,9 @@ function MemoryFocusedEditor({
       ) : (
         <MemoryEditor
           testID="update-memory-editor"
+          // D-141: each entry is named by its own type (the form has a type
+          // picker), "Add Gift Idea" / "Edit Thought of Them".
+          entryNoun={sectionEntryNoun}
           items={phase.data.rows}
           onAdd={add}
           onEdit={edit}

@@ -211,7 +211,11 @@ import {
   type EditContactBaselines,
   runEditContactSave,
 } from "./edit-contact-save-coordinator";
-import { sectionEmptyText, sectionTitle } from "./section-editor-logic";
+import {
+  sectionEmptyText,
+  sectionEntryNoun,
+  sectionTitle,
+} from "./section-editor-logic";
 
 const LOG_SCOPE = "edit-contact";
 
@@ -1812,6 +1816,7 @@ export function EditContactScreen({
           >
             <MemoryEditor
               testID="edit-contact-memories"
+              entryNoun={sectionEntryNoun}
               ref={memoryEditorRef}
               onDraftStateChange={setMemoryDraft}
               onCancelRequest={(close) =>
@@ -1845,6 +1850,7 @@ export function EditContactScreen({
           >
             <MemoryEditor
               testID="edit-contact-thought-of-them"
+              entryNoun={sectionEntryNoun("thought_of_them")}
               ref={thoughtOfThemEditorRef}
               onDraftStateChange={setThoughtOfThemDraft}
               onCancelRequest={(close) =>
@@ -1879,6 +1885,7 @@ export function EditContactScreen({
           >
             <MemoryEditor
               testID="edit-contact-gift-ideas"
+              entryNoun={sectionEntryNoun("gift_idea")}
               ref={giftIdeasEditorRef}
               onDraftStateChange={setGiftIdeasDraft}
               onCancelRequest={(close) =>
@@ -2001,6 +2008,7 @@ export function EditContactScreen({
             ) : null}
             <MemoryEditor
               testID="edit-contact-imported"
+              entryNoun={sectionEntryNoun("imported")}
               ref={importedEditorRef}
               onDraftStateChange={setImportedDraft}
               onCancelRequest={(close) =>

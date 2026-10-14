@@ -54,7 +54,11 @@ import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import { memorySavedLabel, returnsToSameProfile } from "./memory-history-logic";
-import { canAdd } from "./section-editor-logic";
+import {
+  canAdd,
+  sectionEntryNoun,
+  sectionTitle,
+} from "./section-editor-logic";
 
 const LOG_SCOPE = "memory-add";
 
@@ -71,6 +75,11 @@ export function MemoryAddScreen({
   const { contactId, type } = route.params;
   // Only a user-addable type is fixed on the form (Imported never, D-35).
   const fixedType = type !== undefined && canAdd(type) ? type : undefined;
+  // D-137 W14: the Profile's section Add titles the screen and names the
+  // form after its section ("Gift Ideas", "Add Gift Idea"); + → Memory keeps
+  // "Memory" and the form's own wording.
+  const screenTitle = fixedType ? sectionTitle(fixedType) : "Memory";
+  const entryNoun = fixedType ? sectionEntryNoun(fixedType) : undefined;
   // D-45: the person line under the fixed title.
   const person = useContactHeader(contactId);
   // The snackbar after a save reads the latest name.
@@ -237,7 +246,7 @@ export function MemoryAddScreen({
       {/* While an add runs the guard holds Back (D-26; WR-02). */}
       <ShellAppBar
         variant="child"
-        title="Memory"
+        title={screenTitle}
         person={person}
         backDisabled={saving}
       />
@@ -271,6 +280,7 @@ export function MemoryAddScreen({
             items={[]}
             addOnly
             fixedType={fixedType}
+            entryNoun={entryNoun}
             onAdd={add}
             // Add-only: there is no list, so nothing to edit or delete.
             onEdit={async () => false}

@@ -106,6 +106,7 @@ import {
   sectionAddLabel,
   sectionEmptyText,
   sectionEntries,
+  sectionEntryNoun,
   sectionPinSnackbar,
   sectionPinUndoneSnackbar,
   sectionTitle,
@@ -562,6 +563,7 @@ export function SectionEditorScreen({
                 cardEditMode
                 formRef={formRef}
                 addPlacement="top"
+                entryNoun={sectionEntryNoun(type)}
                 items={phase.data.rows}
                 fixedType={type}
                 showAdd={addable}

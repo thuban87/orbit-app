@@ -12,6 +12,11 @@
  * React-native-free and DAO-free at runtime (type-only imports), so it is
  * unit-tested in the node env.
  */
+import {
+  ADD_GIFT_IDEA,
+  ADD_MEMORY,
+  ADD_THOUGHT_OF_THEM,
+} from "@/constants/glossary";
 import type { KnowledgeSection } from "@/db/knowledge-move-dao";
 import type { MemoryRow } from "@/db/memories-read";
 import { MEMORY_TYPE_REGISTRY, type MemoryTypeKey } from "@/db/memory-registry";
@@ -52,12 +57,39 @@ export function canMove(type: MemoryTypeKey): boolean {
 }
 
 /**
- * The section's solid Add label (D-130). Today's wording for every type;
- * plan 25 applies D-137's section names here, and plan 21's section FAB
- * reads it too. Imported never shows an Add (D-35).
+ * The section's solid Add label (D-130), in the section's own name (D-137
+ * W14): the glossary ADD_* constants the Profile's empty-section Add uses.
+ * The section FAB reads it too (D-131). Imported never shows an Add (D-35),
+ * so it falls back to the Memories wording.
  */
-export function sectionAddLabel(_type: MemoryTypeKey): string {
-  return "Add memory";
+export function sectionAddLabel(type: MemoryTypeKey): string {
+  switch (type) {
+    case "gift_idea":
+      return ADD_GIFT_IDEA;
+    case "thought_of_them":
+      return ADD_THOUGHT_OF_THEM;
+    case "general":
+    case "imported":
+      return ADD_MEMORY;
+  }
+}
+
+/**
+ * One entry of the section, for its memory form's heading and add button
+ * ("Add Gift Idea", "Edit Gift Idea"; D-137 W14). Imported's heading reads
+ * "Edit Imported Note" (D-141).
+ */
+export function sectionEntryNoun(type: MemoryTypeKey): string {
+  switch (type) {
+    case "general":
+      return "Memory";
+    case "gift_idea":
+      return "Gift Idea";
+    case "thought_of_them":
+      return "Thought of Them";
+    case "imported":
+      return "Imported Note";
+  }
 }
 
 /** Only the Contacts import writes Imported, so its editor has no Add (D-35). */
@@ -157,7 +189,7 @@ export function sectionEmptyText(type: MemoryTypeKey): {
   return {
     heading: `Nothing in ${title} yet`,
     body: canAdd(type)
-      ? "Use Add memory above to add the first one."
+      ? `Use ${sectionAddLabel(type)} above to add the first one.`
       : "Only the Contacts import adds entries here.",
   };
 }

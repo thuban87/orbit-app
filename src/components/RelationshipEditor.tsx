@@ -61,7 +61,7 @@ export interface RelationshipEditorProps {
   /**
    * The host's save is in flight (38.9 WR-02 follow-up; D-13, D-14): the
    * form's Cancel, Save and Delete are held and drawn disabled (D-26) until
-   * it settles. So are the list's Edit, Show on Profile and Add key person
+   * it settles. So are the list's Edit, Show on Profile and Add Key Person
    * (third fix pass WR-02): Edit and Add would swap the draft being saved (a
    * failed save would then lose the typed edit), and Show on Profile and
    * Delete would race it (the host's slot drops Show on Profile silently).
@@ -464,7 +464,7 @@ export function RelationshipEditor({
     <Button
       key="relationship-editor-add"
       role="primary"
-      label="Add key person"
+      label="Add Key Person"
       disabled={addHeld}
       onPress={openNew}
     />
@@ -488,7 +488,7 @@ export function RelationshipEditor({
           // the open card. Key People has no Move (not a D-84 section).
           <View style={styles.formHeader}>
             <AppText role="heading" style={styles.formHeading}>
-              Edit key person
+              Edit Key Person
             </AppText>
             {/* D-69: Delete is immediate; the host deletes and owns Undo. */}
             <Button
@@ -504,7 +504,7 @@ export function RelationshipEditor({
           </View>
         ) : (
           <AppText role="heading">
-            {editing ? "Edit key person" : "Add key person"}
+            {editing ? "Edit Key Person" : "Add Key Person"}
           </AppText>
         )}
         <TextInput
@@ -584,7 +584,7 @@ export function RelationshipEditor({
               <View style={styles.visibilityCopy}>
                 <AppText role="body">Hide from Profile</AppText>
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  Presentation only — this doesn't hide it from search or AH.
+                  Presentation only — this doesn't hide it from search or AI.
                 </AppText>
               </View>
               <OrbitSwitch
