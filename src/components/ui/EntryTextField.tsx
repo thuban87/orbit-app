@@ -5,7 +5,8 @@
  *   in view (`maxHeight` = 3 body lines + vertical padding).
  * - The keyboard's action key (Done by default) fires `onSubmit` and inserts
  *   no newline: `multiline` with the submit `submitBehavior` (RESEARCH A3,
- *   confirmed in RN 0.86.2). The host keeps a visible Save button too.
+ *   confirmed in RN 0.86.2). The field blurs first, so the keyboard closes
+ *   even when the host unmounts it. The host keeps a visible Save button too.
  * - While typing, each change goes through `sanitizeEntryChange`: a newly
  *   typed or pasted line break becomes a space, a line break already in the
  *   value is kept (D-129), and nothing is trimmed, so a typed trailing space
@@ -88,7 +89,13 @@ export function EntryTextField({
       accessibilityLabel={accessibilityLabel}
       value={value}
       onChangeText={(text) => onChangeText(sanitizeEntryChange(value, text))}
-      onSubmitEditing={() => onSubmit()}
+      onSubmitEditing={() => {
+        // Blur first: the host usually closes the form on submit, and a field
+        // that unmounts while focused leaves Android's keyboard up with no
+        // field, covering the screen's Save (38.10-19 device pass).
+        inputRef.current?.blur();
+        onSubmit();
+      }}
       onFocus={handleFocus}
       onBlur={handleBlur}
       placeholder={placeholder}
