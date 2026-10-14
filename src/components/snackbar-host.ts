@@ -10,8 +10,16 @@
  * live-region announcement.
  */
 import type { IconTone } from "@/components/icons/icon-registry";
+import { FAB_SIDE_INSET, FAB_SIZE } from "@/navigation/use-bottom-clearance";
 import type { SnackbarKind } from "@/stores/snackbar-store";
 import { SPACING } from "@/theme/tokens/spacing";
+
+/** Root pill width when only the universal FAB shows: D-132's "~80%". */
+export const SNACKBAR_WIDTH_ONE_FAB = 0.8;
+/** Root pill width when a section FAB also shows: D-132's "~60%", centred. */
+export const SNACKBAR_WIDTH_WITH_SECTION_FAB = 0.6;
+/** Minimum gap between the pill and a FAB lane, so the FAB stays tappable. */
+export const SNACKBAR_FAB_GAP = SPACING.sm;
 
 /** The host id of the App.tsx snackbar, outside every overlay window. */
 export const ROOT_SNACKBAR_HOST = "root";
@@ -42,6 +50,71 @@ export function snackbarBottomPadding(
 ): number {
   if (host === ROOT_SNACKBAR_HOST) return ROOT_SNACKBAR_BOTTOM_PADDING;
   return insetBottom + SPACING.base;
+}
+
+/** The width a FAB lane plus its side inset and the gap take from one edge. */
+const FAB_LANE_RESERVE = FAB_SIDE_INSET + FAB_SIZE + SNACKBAR_FAB_GAP;
+
+/** Where the pill sits and how wide it is. */
+export interface SnackbarLayout {
+  /** The overlay's cross-axis alignment for the pill. */
+  alignItems: "flex-start" | "center";
+  /** A fixed pill width, or undefined to size to its content. */
+  width: number | undefined;
+}
+
+/**
+ * Root-host pill geometry around the FABs (38.10 D-132; resolves O2 per
+ * D-138). With only the universal FAB (bottom right) the pill is
+ * left-aligned at ~80%; with a section FAB (bottom left) it is centred at
+ * ~60%. Each width is clamped so the pill never reaches a FAB lane, which is
+ * what keeps the FAB tappable on narrow phones; a narrower pill wraps its text
+ * (taller is fine, D-132). With no FAB, and in every overlay window (no FAB
+ * there, 38.9 D-40/D-51), the geometry is unchanged: centred, content-sized.
+ * The overlay pads each side by `SPACING.base`. PURE.
+ */
+export function snackbarLayout(input: {
+  host: string;
+  windowWidth: number;
+  universalFab: boolean;
+  sectionFab: boolean;
+}): SnackbarLayout {
+  const { host, windowWidth, universalFab, sectionFab } = input;
+  if (host !== ROOT_SNACKBAR_HOST || (!universalFab && !sectionFab)) {
+    return { alignItems: "center", width: undefined };
+  }
+  if (sectionFab) {
+    return {
+      alignItems: "center",
+      width: Math.min(
+        Math.round(SNACKBAR_WIDTH_WITH_SECTION_FAB * windowWidth),
+        windowWidth - 2 * FAB_LANE_RESERVE,
+      ),
+    };
+  }
+  return {
+    alignItems: "flex-start",
+    width: Math.min(
+      Math.round(SNACKBAR_WIDTH_ONE_FAB * windowWidth),
+      windowWidth - SPACING.base - FAB_LANE_RESERVE,
+    ),
+  };
+}
+
+/**
+ * The pill's side padding (O5, D-132). The label starts `SPACING.base` from
+ * the left edge; with no action the same padding closes the right side so the
+ * text never runs into the pill's edge, and with an action the action's own
+ * padding does. PURE.
+ */
+export function snackbarPadding(hasAction: boolean): {
+  paddingLeft: number;
+  paddingRight: number;
+} {
+  return {
+    paddingLeft: SPACING.base,
+    paddingRight: hasAction ? 0 : SPACING.base,
+  };
 }
 
 /** How a snackbar of a given kind is drawn and announced (38.9 D-72, 38.10 D-132). */

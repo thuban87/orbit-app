@@ -1,11 +1,13 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography variant.
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
 import {
   ROOT_SNACKBAR_HOST,
   resolveSnackbarHostVisible,
   snackbarBottomPadding,
+  snackbarLayout,
+  snackbarPadding,
   snackbarPresentation,
 } from "@/components/snackbar-host";
 import { AppText } from "@/components/ui/AppText";
@@ -17,6 +19,11 @@ import {
   overlayRegistryStore,
   selectTopOverlayId,
 } from "@/stores/overlay-registry-store";
+import {
+  selectSectionFabPresent,
+  useSectionFabStore,
+} from "@/stores/section-fab-store";
+import { useShellObstacleStore } from "@/stores/shell-obstacle-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -49,12 +56,27 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   // Hidden from accessibility while the FAB dial is open (D-31, D-42 A).
   const fabDialOpen = shellTransientStore(selectFabDialOpen);
   const hostVisible = resolveSnackbarHostVisible(host, topOverlayId);
+  // D-132: the root pill sizes around the FABs on screen. UniversalFab
+  // publishes its "shell-fab" rect only while it shows; a section FAB
+  // registers only while it shows (section-fab-store).
+  const windowWidth = useWindowDimensions().width;
+  const universalFab = useShellObstacleStore(
+    (s) => s.rects["shell-fab"] !== undefined,
+  );
+  const sectionFab = useSectionFabStore(selectSectionFabPresent);
 
   if (!snackbar || !hostVisible) return null;
   // D-132: a notice is an accent pill and a destructive result the warning
   // pill; D-72: an error is announced assertively as an alert.
   const look = snackbarPresentation(snackbar.kind);
   const actionColor = colors[look.actionTone];
+  const layout = snackbarLayout({
+    host,
+    windowWidth,
+    universalFab,
+    sectionFab,
+  });
+  const hasAction = Boolean(snackbar.action || snackbar.secondaryAction);
 
   return (
     <View
@@ -65,7 +87,10 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
       pointerEvents="box-none"
       style={[
         styles.overlay,
-        { paddingBottom: snackbarBottomPadding(host, insets.bottom) },
+        {
+          alignItems: layout.alignItems,
+          paddingBottom: snackbarBottomPadding(host, insets.bottom),
+        },
       ]}
       {...fabDialBackgroundA11y(fabDialOpen)}
     >
@@ -74,9 +99,11 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
         accessibilityRole={look.accessibilityRole}
         style={[
           styles.surface,
+          snackbarPadding(hasAction),
           {
             backgroundColor: colors[look.fillTone],
             borderColor: colors[look.borderTone],
+            width: layout.width,
           },
         ]}
       >
@@ -146,12 +173,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     maxWidth: "100%",
     minHeight: 48,
-    paddingLeft: SPACING.base,
   },
   glyph: {
     marginRight: SPACING.sm,
   },
+  // Grows to fill a fixed-width pill (actions sit at its right end) and
+  // shrinks to wrap onto more lines (D-132: taller is fine).
   label: {
+    flexGrow: 1,
     flexShrink: 1,
   },
   action: {
