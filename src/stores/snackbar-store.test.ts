@@ -44,6 +44,16 @@ describe("snackbarStore", () => {
     });
   });
 
+  it("keeps a warning message unchanged (38.10 D-132)", () => {
+    const message = baseMessage({ kind: "warning", label: "Deleted." });
+    snackbarStore.getState().show(message);
+    expect(snackbarStore.getState().snackbar).toEqual(message);
+    vi.advanceTimersByTime(5999);
+    expect(snackbarStore.getState().snackbar).toEqual(message);
+    vi.advanceTimersByTime(1);
+    expect(snackbarStore.getState().snackbar).toBeNull();
+  });
+
   it("carries an optional secondaryAction when provided", () => {
     const onAddNote = vi.fn();
     snackbarStore.getState().show(

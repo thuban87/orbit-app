@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { AA_LARGE, contrastRatio } from "@/theme/contrast";
+import { applyAccent, resolveAccent } from "@/theme/accents";
+import { AA_LARGE, AA_NORMAL, contrastRatio } from "@/theme/contrast";
+import { ACCENT_IDS } from "@/theme/theme-option-ids";
 import { resolvePalette } from "@/theme/theme-presets";
 import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -44,22 +46,40 @@ describe("snackbarBottomPadding (D-51)", () => {
   });
 });
 
-describe("snackbarPresentation (owner ruling D-72; review WR-06)", () => {
-  it("an error has a danger outline, a warning glyph and an assertive alert", () => {
-    expect(snackbarPresentation("error")).toEqual({
-      borderTone: "danger",
-      warningGlyph: true,
-      liveRegion: "assertive",
-      accessibilityRole: "alert",
+describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
+  it("a notice is an accent pill with onAccent text and action, polite", () => {
+    expect(snackbarPresentation("success")).toEqual({
+      fillTone: "accent",
+      labelTone: "onAccent",
+      actionTone: "onAccent",
+      borderTone: "accent",
+      glyph: null,
+      liveRegion: "polite",
+      accessibilityRole: undefined,
     });
   });
 
-  it("success keeps the neutral pill and a polite announcement", () => {
-    expect(snackbarPresentation("success")).toEqual({
-      borderTone: "border",
-      warningGlyph: false,
+  it("a destructive result is the inverted warning pill with the warning glyph, polite", () => {
+    expect(snackbarPresentation("warning")).toEqual({
+      fillTone: "textPrimary",
+      labelTone: "background",
+      actionTone: "background",
+      borderTone: "textPrimary",
+      glyph: { tone: "background" },
       liveRegion: "polite",
       accessibilityRole: undefined,
+    });
+  });
+
+  it("an error has a danger outline, a danger glyph and an assertive alert", () => {
+    expect(snackbarPresentation("error")).toEqual({
+      fillTone: "surface",
+      labelTone: "textSecondary",
+      actionTone: "accentText",
+      borderTone: "danger",
+      glyph: { tone: "danger" },
+      liveRegion: "assertive",
+      accessibilityRole: "alert",
     });
   });
 
@@ -76,6 +96,36 @@ describe("snackbarPresentation (owner ruling D-72; review WR-06)", () => {
           contrastRatio(palette.danger, palette.surface),
         ).toBeGreaterThanOrEqual(AA_LARGE);
       });
+    }
+  }
+
+  // D-132: each kind's text on its fill is AA (4.5:1) in all four package x
+  // mode palettes, for every curated accent; the action reads the label tone
+  // and the glyph (when present) is >= 3:1 on the fill (WCAG 1.4.11).
+  for (const kind of ["success", "warning"] as const) {
+    for (const pkg of PACKAGES) {
+      for (const mode of MODES) {
+        it(`${kind} @ ${pkg}/${mode}: label on fill is AA for every accent`, () => {
+          const look = snackbarPresentation(kind);
+          expect(look.actionTone).toBe(look.labelTone);
+          for (const id of ACCENT_IDS) {
+            const palette = applyAccent(
+              resolvePalette(pkg, mode),
+              resolveAccent(id, pkg, mode),
+            );
+            const fill = palette[look.fillTone];
+            expect(
+              contrastRatio(palette[look.labelTone], fill),
+              `${id}`,
+            ).toBeGreaterThanOrEqual(AA_NORMAL);
+            if (look.glyph) {
+              expect(
+                contrastRatio(palette[look.glyph.tone], fill),
+              ).toBeGreaterThanOrEqual(AA_LARGE);
+            }
+          }
+        });
+      }
     }
   }
 });

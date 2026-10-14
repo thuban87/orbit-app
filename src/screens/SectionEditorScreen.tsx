@@ -325,8 +325,9 @@ export function SectionEditorScreen({
         return;
       }
       void load();
+      // D-132: a delete reports in the warning style.
       showSnackbar({
-        kind: "success",
+        kind: "warning",
         label: deletedSnackbar(title, nameRef.current),
         action: {
           label: "Undo",

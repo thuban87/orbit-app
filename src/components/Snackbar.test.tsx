@@ -12,7 +12,7 @@ describe("Snackbar actionless rendering", () => {
   });
 });
 
-describe("Snackbar error look (D-72; review WR-06)", () => {
+describe("Snackbar look (D-72; review WR-06; 38.10 D-132)", () => {
   const source = readFileSync(
     new URL("./Snackbar.tsx", import.meta.url),
     "utf8",
@@ -22,13 +22,18 @@ describe("Snackbar error look (D-72; review WR-06)", () => {
     expect(source).toContain("snackbarPresentation(snackbar.kind)");
     expect(source).toContain("accessibilityLiveRegion={look.liveRegion}");
     expect(source).toContain("accessibilityRole={look.accessibilityRole}");
+    expect(source).toContain("backgroundColor: colors[look.fillTone]");
     expect(source).toContain("borderColor: colors[look.borderTone]");
+    expect(source).toContain("color: colors[look.labelTone]");
+    expect(source).toContain("const actionColor = colors[look.actionTone];");
+    expect(source).not.toContain("colors.accentText");
+    expect(source).not.toContain("colors.surface");
     expect(source).not.toContain('accessibilityLiveRegion="polite"');
   });
 
-  it("renders the warning glyph in the danger token, hidden from TalkBack", () => {
+  it("renders the warning glyph in the look's glyph tone, hidden from TalkBack", () => {
     expect(source).toMatch(
-      /look\.warningGlyph \? \([\s\S]*?importantForAccessibility="no-hide-descendants"[\s\S]*?<Icon name="warning" tone="danger"/,
+      /look\.glyph \? \([\s\S]*?importantForAccessibility="no-hide-descendants"[\s\S]*?<Icon name="warning" tone=\{look\.glyph\.tone\}/,
     );
   });
 });

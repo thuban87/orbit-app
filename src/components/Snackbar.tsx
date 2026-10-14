@@ -51,9 +51,10 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   const hostVisible = resolveSnackbarHostVisible(host, topOverlayId);
 
   if (!snackbar || !hostVisible) return null;
-  // D-72: an error has a danger outline, a warning glyph and an assertive
-  // announcement; success keeps the neutral pill.
+  // D-132: a notice is an accent pill and a destructive result the warning
+  // pill; D-72: an error is announced assertively as an alert.
   const look = snackbarPresentation(snackbar.kind);
+  const actionColor = colors[look.actionTone];
 
   return (
     <View
@@ -74,22 +75,25 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
         style={[
           styles.surface,
           {
-            backgroundColor: colors.surface,
+            backgroundColor: colors[look.fillTone],
             borderColor: colors[look.borderTone],
           },
         ]}
       >
-        {look.warningGlyph ? (
-          // Decorative: the label and the alert role carry the meaning.
+        {look.glyph ? (
+          // Decorative: the label (and an error's alert role) carry the meaning.
           <View
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden
             style={styles.glyph}
           >
-            <Icon name="warning" tone="danger" size="sm" />
+            <Icon name="warning" tone={look.glyph.tone} size="sm" />
           </View>
         ) : null}
-        <AppText role="caption" style={styles.label}>
+        <AppText
+          role="caption"
+          style={[styles.label, { color: colors[look.labelTone] }]}
+        >
           {snackbar.label}
         </AppText>
         {snackbar.action ? (
@@ -103,7 +107,7 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
             }}
             style={styles.action}
           >
-            <AppText role="label" style={{ color: colors.accentText }}>
+            <AppText role="label" style={{ color: actionColor }}>
               {snackbar.action.label}
             </AppText>
           </Pressable>
@@ -118,7 +122,7 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
             }}
             style={styles.action}
           >
-            <AppText role="label" style={{ color: colors.accentText }}>
+            <AppText role="label" style={{ color: actionColor }}>
               {snackbar.secondaryAction.label}
             </AppText>
           </Pressable>

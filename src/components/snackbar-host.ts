@@ -9,6 +9,8 @@
  * single snackbar visible above the sheet or dialog that fired it, with one
  * live-region announcement.
  */
+import type { IconTone } from "@/components/icons/icon-registry";
+import type { SnackbarKind } from "@/stores/snackbar-store";
 import { SPACING } from "@/theme/tokens/spacing";
 
 /** The host id of the App.tsx snackbar, outside every overlay window. */
@@ -42,38 +44,71 @@ export function snackbarBottomPadding(
   return insetBottom + SPACING.base;
 }
 
-/** How a snackbar of a given kind is drawn and announced (38.9 D-72). */
+/** How a snackbar of a given kind is drawn and announced (38.9 D-72, 38.10 D-132). */
 export interface SnackbarPresentation {
+  /** Theme token for the pill's fill. */
+  fillTone: IconTone;
+  /** Theme token for the message text. */
+  labelTone: IconTone;
+  /** Theme token for the action labels (the pill's own foreground). */
+  actionTone: IconTone;
   /** Theme token for the pill's outline. */
-  borderTone: "danger" | "border";
-  /** A leading warning glyph in the `danger` tone (error only). */
-  warningGlyph: boolean;
+  borderTone: IconTone;
+  /** The leading reserved `warning` registry glyph and its tone, or none. */
+  glyph: { tone: IconTone } | null;
   /** Android live-region urgency for TalkBack. */
   liveRegion: "assertive" | "polite";
-  /** `alert` marks an error for assistive tech; success has no role. */
+  /** `alert` marks an error for assistive tech; the other kinds have no role. */
   accessibilityRole: "alert" | undefined;
 }
 
 /**
- * Error snackbars look and sound distinct from success ones (owner ruling
- * D-72; review WR-06): a `danger` outline and a warning glyph, announced
- * assertively. Success / neutral keeps the `border` outline and a polite
- * announcement. Timing is unchanged for both (D-04). PURE.
+ * Each kind's look, as palette KEYS (never colours; `Snackbar.tsx` resolves
+ * them through `useTheme().colors`). PURE.
+ *
+ * - success (a notice, D-132): an accent pill with `onAccent` text, the pair
+ *   ADR-084 validates for every curated accent. Polite.
+ * - warning (a destructive result, D-132): an inverted pill, `textPrimary`
+ *   fill with `background` text and the warning glyph, so it reads as a
+ *   warning rather than a notice and differs from the `surface` cards. The
+ *   body-text pair is AA in every palette; `danger`/`onDanger` is not
+ *   (galaxy-dark ~3.9:1). Polite: the user caused it.
+ * - error (38.9 D-72): a `danger` outline and glyph on the `surface` pill,
+ *   announced assertively as an alert.
+ *
+ * Timing is the same for every kind (38.9 D-04).
  */
-export function snackbarPresentation(
-  kind: "success" | "error",
-): SnackbarPresentation {
-  return kind === "error"
-    ? {
+export function snackbarPresentation(kind: SnackbarKind): SnackbarPresentation {
+  switch (kind) {
+    case "error":
+      return {
+        fillTone: "surface",
+        labelTone: "textSecondary",
+        actionTone: "accentText",
         borderTone: "danger",
-        warningGlyph: true,
+        glyph: { tone: "danger" },
         liveRegion: "assertive",
         accessibilityRole: "alert",
-      }
-    : {
-        borderTone: "border",
-        warningGlyph: false,
+      };
+    case "warning":
+      return {
+        fillTone: "textPrimary",
+        labelTone: "background",
+        actionTone: "background",
+        borderTone: "textPrimary",
+        glyph: { tone: "background" },
         liveRegion: "polite",
         accessibilityRole: undefined,
       };
+    default:
+      return {
+        fillTone: "accent",
+        labelTone: "onAccent",
+        actionTone: "onAccent",
+        borderTone: "accent",
+        glyph: null,
+        liveRegion: "polite",
+        accessibilityRole: undefined,
+      };
+  }
 }
