@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("react-native", () => ({
+  Pressable: "Pressable",
   StyleSheet: { create: <T>(styles: T) => styles },
   TextInput: "TextInput",
   View: "View",
@@ -27,6 +28,7 @@ import {
   isRelationshipDraftDirty,
   liveNameMap,
   relationshipDraftState,
+  relationshipEditorSlots,
 } from "./RelationshipEditor";
 
 const row = {
@@ -172,5 +174,60 @@ describe("initialEditorState (D-107; convergence c6, Codex C-03)", () => {
       editing: null,
       draft: null,
     });
+  });
+});
+
+describe("relationshipEditorSlots (D-130 card edit mode)", () => {
+  const items = [4, 5, 6].map((id) => ({ ...row, id })) as RelationshipRow[];
+  const kinds = (slots: ReturnType<typeof relationshipEditorSlots>) =>
+    slots.map((slot) => (slot.kind === "card" ? slot.item.id : slot.kind));
+
+  it("in card edit mode an open edit takes its row's index, then the Add", () => {
+    expect(
+      kinds(
+        relationshipEditorSlots({
+          items,
+          editingId: 5,
+          adding: false,
+          cardEditMode: true,
+        }),
+      ),
+    ).toEqual([4, "form", 6, "add"]);
+  });
+
+  it("an add form stays at the end", () => {
+    expect(
+      kinds(
+        relationshipEditorSlots({
+          items,
+          editingId: null,
+          adding: true,
+          cardEditMode: true,
+        }),
+      ),
+    ).toEqual([4, 5, 6, "form"]);
+  });
+
+  it("without card edit mode keeps today's order", () => {
+    expect(
+      kinds(
+        relationshipEditorSlots({
+          items,
+          editingId: 5,
+          adding: false,
+          cardEditMode: false,
+        }),
+      ),
+    ).toEqual([4, 5, 6, "form"]);
+    expect(
+      kinds(
+        relationshipEditorSlots({
+          items,
+          editingId: null,
+          adding: false,
+          cardEditMode: false,
+        }),
+      ),
+    ).toEqual([4, 5, 6, "add"]);
   });
 });

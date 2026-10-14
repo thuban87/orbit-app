@@ -183,7 +183,8 @@ describe("card edit mode: the Key People editor (D-130)", () => {
     const buttons = openingTags(editor, "Button");
     expect(
       buttons.some(
-        (tag) => tag.includes('role="primary"') && tag.includes("label={add"),
+        (tag) =>
+          tag.includes('role="primary"') && tag.includes("onPress={openNew}"),
       ),
     ).toBe(true);
     expect(buttons.some((tag) => tag.includes('role="destructive"'))).toBe(

@@ -39,6 +39,7 @@ vi.mock("react", async (original) => ({
   },
 }));
 vi.mock("react-native", () => ({
+  Pressable: "Pressable",
   StyleSheet: { create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   TextInput: "TextInput",
   View: "View",
@@ -73,6 +74,7 @@ const render = (
   busy?: boolean,
   items: RelationshipRow[] = [],
   initiallyEditingId?: number,
+  cardEditMode?: boolean,
 ) => {
   hooks.index = 0;
   hooks.setters = 0;
@@ -88,6 +90,7 @@ const render = (
       onDelete: handlers.onDelete,
       busy,
       initiallyEditingId,
+      cardEditMode,
     }),
   );
 };
@@ -304,5 +307,95 @@ describe("RelationshipEditor Delete sits in the open edit form (38.9 D-30; 38.10
     pressDelete(tree);
     expect(handlers.onDelete).not.toHaveBeenCalled();
     expect(hooks.setters).toBe(0);
+  });
+});
+
+describe("RelationshipEditor card edit mode (D-130)", () => {
+  const rowOf = (id: number, name: string) =>
+    ({
+      id,
+      person_name: name,
+      relation_type: null,
+      linked_contact_id: null,
+      linked_contact_name: null,
+      note: null,
+      pinned: 0,
+      hidden: null,
+    }) as unknown as RelationshipRow;
+  const first = rowOf(1, "Ria");
+  const second = rowOf(2, "Sam");
+
+  beforeEach(() => {
+    hooks.seeds = {};
+  });
+
+  it("opens the second row's form in its place, with a red Delete at its top", () => {
+    hooks.index = 0;
+    const root = RelationshipEditor({
+      contactId: 1,
+      items: [first, second],
+      onAdd: vi.fn(),
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+      initiallyEditingId: 2,
+      cardEditMode: true,
+    }) as TestElement;
+    const slots = (root.props.children as ReactNode[])
+      .flat()
+      .filter(Boolean) as TestElement[];
+    // Row 1, the form in row 2's place, the held Add, then the picker.
+    expect(slots.map((n) => n.type)).toEqual([
+      "Pressable",
+      "View",
+      "Button",
+      "ContactPicker",
+    ]);
+    expect(slots[0]?.props.accessibilityLabel).toBe("Edit Ria");
+    const tree = nodes(root);
+    expect(tree.some((n) => n.props.accessibilityLabel === "Edit Sam")).toBe(
+      false,
+    );
+    const form = nodes(slots[1]);
+    const deletes = form.filter(
+      (n) => n.type === "Button" && n.props.label === "Delete",
+    );
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]?.props.role).toBe("destructive");
+    // Before the form's fields: at its top.
+    expect(form.indexOf(deletes[0] as TestElement)).toBeLessThan(
+      form.findIndex((n) => n.props.accessibilityLabel === "Person name"),
+    );
+    // No "Edit" button, and no Move, anywhere; row 1 is held, as is the Add.
+    expect(button(tree, "Edit")).toBeUndefined();
+    expect(button(tree, "Move")).toBeUndefined();
+    expect(slots[0]?.props.disabled).toBe(true);
+    expect(slots[2]?.props.disabled).toBe(true);
+  });
+
+  it("a resting row has a pencil that opens its form, and no Edit button", () => {
+    const tree = render(false, [first], undefined, true);
+    expect(button(tree, "Edit")).toBeUndefined();
+    const pencil = tree.find(
+      (n) => n.type === "Button" && n.props.icon === "edit",
+    );
+    expect(pencil?.props.role).toBe("iconOnly");
+    expect(pencil?.props.accessibilityLabel).toBe("Edit Ria");
+    expect(pencil?.props.disabled).toBe(false);
+    const press = pencil?.props.onPress;
+    if (typeof press !== "function") throw new Error("missing onPress");
+    press();
+    // openEdit: setEditing + setDraft.
+    expect(hooks.setters).toBe(2);
+  });
+
+  it("Delete keeps the host contract in card edit mode", () => {
+    const tree = render(false, [first], 1, true);
+    const del = button(tree, "Delete");
+    expect(del?.props.role).toBe("destructive");
+    const press = del?.props.onPress;
+    if (typeof press !== "function") throw new Error("missing Delete");
+    press();
+    expect(handlers.onDelete).toHaveBeenCalledWith(1);
+    expect(hooks.setters).toBe(3);
   });
 });

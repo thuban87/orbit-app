@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
 import { AppText, Button, EntryTextField, OrbitSwitch } from "@/components/ui";
 import { getExecutor } from "@/db/database";
@@ -14,6 +14,7 @@ import type { RelationshipRow } from "@/db/relationships-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { type CardEditSlot, cardEditSlots } from "./card-edit-slots";
 
 const LOG_SCOPE = "relationship-editor";
 
@@ -67,6 +68,17 @@ export interface RelationshipEditorProps {
    * contract). Read at mount only.
    */
   initiallyEditingId?: number;
+  /**
+   * Card edit mode (D-130; the Key People editor only): each row is
+   * pressable with a pencil at its top right and no Edit button; an edit
+   * form opens in place of its row with a red Delete at its top and no
+   * bottom Delete; while a form is open the other rows and the Add are held.
+   * Absent → the editor renders exactly as before (Add/Edit Contact, Update
+   * Contact).
+   */
+  cardEditMode?: boolean;
+  /** Attached to the open form's outer View, so a host can scroll it into view. */
+  formRef?: Ref<View>;
   /** Exposes `closeDraft()` so the host's Back can close the open form (D-14). */
   ref?: Ref<RelationshipEditorHandle>;
 }
@@ -112,6 +124,20 @@ export function initialEditorState(
   return item
     ? { editing: item, draft: initialDraft(item) }
     : { editing: null, draft: null };
+}
+
+/**
+ * The editor's render order (D-130 card edit mode; see `cardEditSlots`): with
+ * `cardEditMode` an open edit takes its row's index; otherwise every row,
+ * then the form or the Add. PURE.
+ */
+export function relationshipEditorSlots(input: {
+  items: readonly RelationshipRow[];
+  editingId: number | null;
+  adding: boolean;
+  cardEditMode: boolean;
+}): CardEditSlot<RelationshipRow>[] {
+  return cardEditSlots({ ...input, addOnly: false, showAdd: true });
 }
 
 /** Live contact names by id, from the picker read. PURE. */
@@ -184,6 +210,8 @@ export function RelationshipEditor({
   onCancelRequest,
   busy = false,
   initiallyEditingId,
+  cardEditMode = false,
+  formRef,
   ref,
 }: RelationshipEditorProps) {
   const { colors } = useTheme();
@@ -294,190 +322,136 @@ export function RelationshipEditor({
           liveNames,
         );
 
-  return (
-    <View style={styles.container}>
-      {items.map((item) => (
-        <View
-          key={item.id}
-          style={[
-            styles.row,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              opacity: item.hidden === 1 ? 0.68 : 1,
-            },
-          ]}
-        >
-          <AppText
-            role="body"
-            style={
-              item.hidden === 1 ? { color: colors.textSecondary } : undefined
-            }
-          >
+  // D-130 (this plan only: the Off Limits editor's `controlsHeld` rule): in
+  // card edit mode an open form holds every other row and the Add, so a tap
+  // never replaces a typed draft silently.
+  const rowsHeld = busy || (cardEditMode && draft !== null);
+  const addHeld = busy || draft !== null;
+
+  // The row's details, shared by both row looks.
+  const rowDetails = (item: RelationshipRow) => (
+    <>
+      {item.relation_type ? (
+        <AppText role="caption" style={{ color: colors.textSecondary }}>
+          {item.relation_type}
+        </AppText>
+      ) : null}
+      {displayLinkedName(item, liveNames) ? (
+        <AppText role="caption" style={{ color: colors.textSecondary }}>
+          Linked to {displayLinkedName(item, liveNames)}
+        </AppText>
+      ) : null}
+      {item.note ? (
+        <AppText role="caption" style={{ color: colors.textSecondary }}>
+          {item.note}
+        </AppText>
+      ) : null}
+    </>
+  );
+  const showOnProfileButton = (item: RelationshipRow) => (
+    <Button
+      role="tertiary"
+      label="Show on Profile"
+      disabled={rowsHeld}
+      onPress={() => {
+        if (rowsHeld) return;
+        void onEdit(item.id, { ...initialDraft(item), hidden: 0 });
+      }}
+    />
+  );
+  const rowStyle = (item: RelationshipRow) => [
+    styles.row,
+    {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      opacity: item.hidden === 1 ? 0.68 : 1,
+    },
+  ];
+  const nameStyle = (item: RelationshipRow) =>
+    item.hidden === 1 ? { color: colors.textSecondary } : undefined;
+
+  const renderRow = (item: RelationshipRow) =>
+    cardEditMode ? (
+      // D-130: the row opens its form in place; the pencil at its top right.
+      // Proposed label (this plan only; plan-19 wording re-check).
+      <Pressable
+        key={item.id}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${item.person_name}`}
+        accessibilityState={{ disabled: rowsHeld }}
+        disabled={rowsHeld}
+        onPress={() => openEdit(item)}
+        style={rowStyle(item)}
+      >
+        <View style={styles.rowHeader}>
+          <AppText role="body" style={[styles.rowName, nameStyle(item)]}>
             {item.person_name}
           </AppText>
-          {item.relation_type ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {item.relation_type}
-            </AppText>
-          ) : null}
-          {displayLinkedName(item, liveNames) ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Linked to {displayLinkedName(item, liveNames)}
-            </AppText>
-          ) : null}
-          {item.note ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {item.note}
-            </AppText>
-          ) : null}
-          <View style={styles.actions}>
-            {/* Held while the host saves (third fix pass WR-02, D-26). */}
-            <Button
-              role="secondary"
-              label="Edit"
-              disabled={busy}
-              onPress={() => openEdit(item)}
-            />
-            {item.hidden === 1 ? (
-              <Button
-                role="tertiary"
-                label="Show on Profile"
-                disabled={busy}
-                onPress={() => {
-                  if (busy) return;
-                  void onEdit(item.id, { ...initialDraft(item), hidden: 0 });
-                }}
-              />
-            ) : null}
-          </View>
+          <Button
+            role="iconOnly"
+            icon="edit"
+            accessibilityLabel={`Edit ${item.person_name}`}
+            disabled={rowsHeld}
+            onPress={() => openEdit(item)}
+          />
         </View>
-      ))}
-      {!draft ? (
-        <Button
-          role="primary"
-          label="Add key person"
-          disabled={busy}
-          onPress={openNew}
-        />
-      ) : (
-        <View
-          style={[
-            styles.form,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText role="heading">
-            {editing ? "Edit key person" : "Add key person"}
-          </AppText>
-          <TextInput
-            accessibilityLabel="Person name"
-            value={draft.personName}
-            onChangeText={(value) => update("personName", value)}
-            placeholder="Person name"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.input,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          <TextInput
-            accessibilityLabel="Relationship type optional"
-            value={draft.relationType ?? ""}
-            onChangeText={(value) => update("relationType", value)}
-            placeholder="Relationship type (optional)"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.input,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
+        {rowDetails(item)}
+        {item.hidden === 1 ? (
+          <View style={styles.actions}>{showOnProfileButton(item)}</View>
+        ) : null}
+      </Pressable>
+    ) : (
+      <View key={item.id} style={rowStyle(item)}>
+        <AppText role="body" style={nameStyle(item)}>
+          {item.person_name}
+        </AppText>
+        {rowDetails(item)}
+        <View style={styles.actions}>
+          {/* Held while the host saves (third fix pass WR-02, D-26). */}
           <Button
             role="secondary"
-            label={
-              draft.linkedContactId === null
-                ? "Link Orbit contact (optional)"
-                : "Change linked Orbit contact"
-            }
-            onPress={() => setPickerOpen(true)}
+            label="Edit"
+            disabled={busy}
+            onPress={() => openEdit(item)}
           />
-          {draftLinkedName ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Linked to {draftLinkedName}
+          {item.hidden === 1 ? showOnProfileButton(item) : null}
+        </View>
+      </View>
+    );
+
+  const renderAdd = () => (
+    <Button
+      key="relationship-editor-add"
+      role="primary"
+      label="Add key person"
+      disabled={addHeld}
+      onPress={openNew}
+    />
+  );
+
+  // The one form markup, rendered in place of its row (card edit mode) or
+  // after the list (every other host).
+  const renderForm = () => {
+    if (draft === null) return null;
+    return (
+      <View
+        key="relationship-editor-form"
+        ref={formRef}
+        style={[
+          styles.form,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        {cardEditMode && editing ? (
+          // D-130: the red Delete only in edit mode, at the top right of
+          // the open card. Key People has no Move (not a D-84 section).
+          <View style={styles.formHeader}>
+            <AppText role="heading" style={styles.formHeading}>
+              Edit key person
             </AppText>
-          ) : null}
-          {draft.linkedContactId !== null ? (
+            {/* D-69: Delete is immediate; the host deletes and owns Undo. */}
             <Button
-              role="tertiary"
-              label="Clear linked contact"
-              onPress={() => update("linkedContactId", null)}
-            />
-          ) : null}
-          {/* D-66 / D-114: wraps, Enter saves, pasted line breaks become
-              spaces; centres only under a host KeyboardCenteringProvider. */}
-          <EntryTextField
-            accessibilityLabel="Relationship note optional"
-            value={draft.note ?? ""}
-            onChangeText={(value) => update("note", value)}
-            onSubmit={() => void commit()}
-            placeholder="Note (optional)"
-            editable={!busy}
-          />
-          <View style={styles.switchRow}>
-            <AppText role="body">Pin</AppText>
-            <OrbitSwitch
-              value={draft.pinned}
-              onValueChange={(value) => update("pinned", value)}
-              accessibilityLabel="Pin relationship"
-            />
-          </View>
-          <View style={styles.switchRow}>
-            <View style={styles.visibilityCopy}>
-              <AppText role="body">Hide from Profile</AppText>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Presentation only — this doesn't hide it from search or AH.
-              </AppText>
-            </View>
-            <OrbitSwitch
-              value={draft.hidden === 1}
-              onValueChange={(value) => update("hidden", value ? 1 : 0)}
-              accessibilityLabel="Hide from Profile"
-            />
-          </View>
-          <Button
-            role="tertiary"
-            label="Use default visibility"
-            onPress={() => update("hidden", null)}
-          />
-          <View style={styles.actions}>
-            <Button
-              role="secondary"
-              label="Cancel"
-              disabled={busy}
-              onPress={() =>
-                onCancelRequest ? onCancelRequest(close) : close()
-              }
-            />
-            <Button
-              role="primary"
-              label="Save"
-              disabled={!blankToNull(draft.personName) || busy}
-              onPress={() => void commit()}
-            />
-          </View>
-          {editing ? (
-            // D-69: Delete is immediate; the host deletes and owns Undo. In
-            // the form, so deleting the row also closes its form (38.10-18).
-            <Button
-              role="tertiary"
+              role="destructive"
               label="Delete"
               disabled={busy}
               onPress={() => {
@@ -486,8 +460,146 @@ export function RelationshipEditor({
                 close();
               }}
             />
-          ) : null}
+          </View>
+        ) : (
+          <AppText role="heading">
+            {editing ? "Edit key person" : "Add key person"}
+          </AppText>
+        )}
+        <TextInput
+          accessibilityLabel="Person name"
+          value={draft.personName}
+          onChangeText={(value) => update("personName", value)}
+          placeholder="Person name"
+          placeholderTextColor={colors.textPlaceholder}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            },
+          ]}
+        />
+        <TextInput
+          accessibilityLabel="Relationship type optional"
+          value={draft.relationType ?? ""}
+          onChangeText={(value) => update("relationType", value)}
+          placeholder="Relationship type (optional)"
+          placeholderTextColor={colors.textPlaceholder}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            },
+          ]}
+        />
+        <Button
+          role="secondary"
+          label={
+            draft.linkedContactId === null
+              ? "Link Orbit contact (optional)"
+              : "Change linked Orbit contact"
+          }
+          onPress={() => setPickerOpen(true)}
+        />
+        {draftLinkedName ? (
+          <AppText role="caption" style={{ color: colors.textSecondary }}>
+            Linked to {draftLinkedName}
+          </AppText>
+        ) : null}
+        {draft.linkedContactId !== null ? (
+          <Button
+            role="tertiary"
+            label="Clear linked contact"
+            onPress={() => update("linkedContactId", null)}
+          />
+        ) : null}
+        {/* D-66 / D-114: wraps, Enter saves, pasted line breaks become
+              spaces; centres only under a host KeyboardCenteringProvider. */}
+        <EntryTextField
+          accessibilityLabel="Relationship note optional"
+          value={draft.note ?? ""}
+          onChangeText={(value) => update("note", value)}
+          onSubmit={() => void commit()}
+          placeholder="Note (optional)"
+          editable={!busy}
+        />
+        <View style={styles.switchRow}>
+          <AppText role="body">Pin</AppText>
+          <OrbitSwitch
+            value={draft.pinned}
+            onValueChange={(value) => update("pinned", value)}
+            accessibilityLabel="Pin relationship"
+          />
         </View>
+        <View style={styles.switchRow}>
+          <View style={styles.visibilityCopy}>
+            <AppText role="body">Hide from Profile</AppText>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              Presentation only — this doesn't hide it from search or AH.
+            </AppText>
+          </View>
+          <OrbitSwitch
+            value={draft.hidden === 1}
+            onValueChange={(value) => update("hidden", value ? 1 : 0)}
+            accessibilityLabel="Hide from Profile"
+          />
+        </View>
+        <Button
+          role="tertiary"
+          label="Use default visibility"
+          onPress={() => update("hidden", null)}
+        />
+        <View style={styles.actions}>
+          <Button
+            role="secondary"
+            label="Cancel"
+            disabled={busy}
+            onPress={() => (onCancelRequest ? onCancelRequest(close) : close())}
+          />
+          <Button
+            role="primary"
+            label="Save"
+            disabled={!blankToNull(draft.personName) || busy}
+            onPress={() => void commit()}
+          />
+        </View>
+        {editing && !cardEditMode ? (
+          // D-69: Delete is immediate; the host deletes and owns Undo. In
+          // the form, so deleting the row also closes its form (38.10-18).
+          <Button
+            role="tertiary"
+            label="Delete"
+            disabled={busy}
+            onPress={() => {
+              if (busy) return; // held while the host saves (WR-02)
+              if (onDelete(editing.id) === false) return;
+              close();
+            }}
+          />
+        ) : null}
+      </View>
+    );
+  };
+
+  const slots = relationshipEditorSlots({
+    items,
+    editingId: editing?.id ?? null,
+    adding: draft !== null && editing === null,
+    cardEditMode,
+  });
+
+  return (
+    <View style={styles.container}>
+      {slots.map((slot) =>
+        slot.kind === "card"
+          ? renderRow(slot.item)
+          : slot.kind === "form"
+            ? renderForm()
+            : renderAdd(),
       )}
       <ContactPicker
         visible={pickerOpen}
@@ -511,6 +623,14 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     padding: SPACING.base,
   },
+  formHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
+  formHeading: { flexShrink: 1, paddingTop: SPACING.sm },
   input: {
     borderRadius: SPACING.sm,
     borderWidth: StyleSheet.hairlineWidth,
@@ -524,6 +644,13 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     padding: SPACING.sm,
   },
+  rowHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
+  rowName: { flex: 1 },
   switchRow: {
     alignItems: "center",
     flexDirection: "row",

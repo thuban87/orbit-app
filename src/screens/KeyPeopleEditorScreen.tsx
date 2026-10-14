@@ -10,6 +10,9 @@
  *   navigation; an entry that is gone falls back to the list (D-107).
  * - The empty state is text only: the editor's own "Add key person" is the
  *   single D-68 action.
+ * - Card edit mode (D-130): each row has a pencil at its top right; the
+ *   pencil or a tap on the row opens its form in the row's place, with a red
+ *   Delete at its top (no Move: Key People is not a D-84 section).
  * - Hidden rows are dimmed with "Show on Profile" by the editor; that button
  *   calls `onEdit` with `hidden: 0` (D-17). Pin and Unpin are the form's Pin
  *   switch, saved through `editRelationship`.
@@ -23,7 +26,7 @@
  * review. Every colour resolves through `useTheme().colors.*` (CLAUDE.md).
  */
 import { useFocusEffect } from "@react-navigation/native";
-import { type RefObject, useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import {
   type RelationshipDraft,
@@ -39,6 +42,7 @@ import {
   KeyboardCenteringProvider,
   useKeyboardCentering,
 } from "@/components/ui";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addRelationship,
@@ -142,15 +146,20 @@ export function KeyPeopleEditorScreen({
     },
   });
 
-  // D-66 on a D-75 editor: the note field centres above the keyboard.
-  const scrollRef = useRef<ScrollView>(null);
-  // ScrollView.d.ts types `innerViewRef` as a non-null `RefObject<View>`
-  // (as use-first-error-reveal.ts widens it).
-  const contentRef = useRef<View>(null) as RefObject<View>;
+  // D-66 on a D-75 editor: the note field centres above the keyboard; the
+  // same ScrollView pair scrolls an `editId` form into view (D-130).
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
   const { centering, bottomSpacer } = useKeyboardCentering({
     scrollRef,
     contentRef,
   });
+  // D-130: the form opens in place of its row. A tap opens it where the row
+  // was, on screen; an `editId` may name a row further down, so its form is
+  // scrolled into view once.
+  const formRef = useRef<View>(null);
+  useEffect(() => {
+    if (typeof initialEditId === "number") reveal(formRef);
+  }, [initialEditId, reveal]);
 
   /** NEVER rejects: a failure lands in the error phase (D-04). */
   const load = useCallback(async (): Promise<void> => {
@@ -347,6 +356,8 @@ export function KeyPeopleEditorScreen({
                 contactId={contactId}
                 items={rows}
                 initiallyEditingId={initialEditId}
+                cardEditMode
+                formRef={formRef}
                 onAdd={add}
                 onEdit={edit}
                 onDelete={remove}
