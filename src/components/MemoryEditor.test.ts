@@ -940,17 +940,41 @@ describe("38.10 plan 13: the reworked editor", () => {
     });
   });
 
-  describe("Show on Profile and Move (D-17, D-84)", () => {
-    it("passes each row's callbacks to its card", () => {
+  describe("Show on Profile and Move (D-17, D-84, D-134)", () => {
+    it("passes Move to its card, and no Show on Profile while the switch is off", () => {
       const onShowOnProfile = vi.fn();
       const onMove = vi.fn();
       const hidden = row({ hidden: 1 });
       const tree = render({ items: [hidden], onShowOnProfile, onMove });
       const [card] = tree.filter((n) => n.type === "MemoryCard");
-      invoke(card, "onShowOnProfile");
+      expect(card?.props.onShowOnProfile).toBeUndefined();
       invoke(card, "onMove");
-      expect(onShowOnProfile).toHaveBeenCalledWith(hidden);
       expect(onMove).toHaveBeenCalledWith(hidden);
+      expect(onShowOnProfile).not.toHaveBeenCalled();
+    });
+
+    it("renders no Hide from Profile switch or caption on the open form", () => {
+      const tree = render({
+        items: [row({ hidden: 1 })],
+        initiallyEditingId: 5,
+      });
+      expect(byLabel(tree, "Hide from Profile")).toBeUndefined();
+      expect(texts(tree)).not.toContain("Hide from Profile");
+      expect(texts(tree)).not.toContain("This is presentation only.");
+      // The open form is really there.
+      expect(byLabel(tree, "Pin memory")).toBeDefined();
+    });
+
+    it("saving an existing row keeps its stored hidden (D-134)", () => {
+      const onEdit = vi.fn(async () => true);
+      const stored = row({ hidden: 1 });
+      hooks.draftOverride = { ...initialDraft(stored), value: "Trip 2" };
+      const tree = render({ items: [stored], initiallyEditingId: 5, onEdit });
+      invoke(pressable(tree, "Save memory"), "onPress");
+      expect(onEdit).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ hidden: true, value: "Trip 2" }),
+      );
     });
 
     it("hosts that pass neither render no new action", () => {

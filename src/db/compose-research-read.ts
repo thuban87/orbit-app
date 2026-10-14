@@ -17,10 +17,16 @@
  *   - It composes read modules only; it opens no transaction and performs no
  *     write, no network, and no native-module import (node-testable).
  *   - Per-source DISPLAY visibility (what may render at all — distinct from
- *     aiEligible) is applied here so hidden / soft-deleted / historical knowledge
- *     can never surface (review LOW #4): memories use `resolveVisibility`;
- *     relationships EXCLUDE hidden via `resolveRelationshipVisibility` (the list
- *     returns hidden rows, so the filter is REQUIRED); current-state uses
+ *     aiEligible) is applied here so soft-deleted / historical knowledge can
+ *     never surface (review LOW #4): memories use `resolveVisibility`;
+ *     relationships go through `resolveRelationshipVisibility` (the list
+ *     returns hidden rows, so the filter stays REQUIRED for when Hide from
+ *     Profile returns). While `HIDE_FROM_PROFILE_ENABLED` is false (D-134)
+ *     both helpers return "show", so hidden memories and key people display
+ *     here too. A hidden memory's `aiEligible` is the same SQL-gated
+ *     membership as any memory's, with no hidden-specific guard: the owner
+ *     accepted that a previously hidden, Allow-AI-on memory can be Message
+ *     Focus (D-142). Key people are never AI-eligible. Current-state uses
  *     `getCurrentStateValues` (each field's Most Recent entry by date, D-45)
  *     ONLY — never the history read; custom fields come from the
  *     populated-only `readPopulatedCustomFields`.
@@ -239,8 +245,8 @@ export async function readComposeResearch(
     }
   }
 
-  // 3. Key people — EXCLUDE hidden (the list returns hidden rows); no permission
-  //    field → aiEligible false.
+  // 3. Key people — the visibility helper (every row shows while Hide from
+  //    Profile is off, D-134); no permission field → aiEligible false.
   for (const row of relationships) {
     if (resolveRelationshipVisibility(row.hidden) !== "show") continue;
     items.push({
@@ -255,8 +261,9 @@ export async function readComposeResearch(
   }
 
   // 4. Memories (every memory-type section) — visible only (soft-deleted
-  //    already dropped by the read). Add-to-AI eligibility is membership in the
-  //    SQL-gated AI read, never a JS re-derivation (D-13, D-49).
+  //    already dropped by the read; every row shows while Hide from Profile is
+  //    off, D-134). Add-to-AI eligibility is membership in the SQL-gated AI
+  //    read, never a JS re-derivation (D-13, D-49), hidden or not (D-142).
   for (const row of memories) {
     if (resolveVisibility(row.type, row.hidden) !== "show") continue;
     const item: ResearchItem = {

@@ -47,6 +47,8 @@ vi.mock("react-native", () => ({
 vi.mock("@/components/ContactPicker", () => ({
   ContactPicker: "ContactPicker",
 }));
+// D-133: the pinned marker's pushpin pulls in @expo/vector-icons.
+vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   Button: "Button",
@@ -132,7 +134,8 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     hidden: 1,
   } as unknown as RelationshipRow;
   // Delete is not on the row card (38.10-18): it sits in the open edit form.
-  const listLabels = ["Edit", "Show on Profile"];
+  // Show on Profile is gone while Hide from Profile is switched off (D-134).
+  const listLabels = ["Edit"];
   const press = (tree: TestElement[], label: string) => {
     const handler = button(tree, label)?.props.onPress;
     if (typeof handler !== "function") throw new Error(`missing ${label}`);
@@ -143,17 +146,13 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     hooks.seeds = {};
   });
 
-  it("leaves Edit, Show on Profile and Add key person live when idle", () => {
+  it("leaves Edit and Add key person live when idle, with no Show on Profile", () => {
     const tree = render(false, [hiddenRow]);
     for (const label of [...listLabels, "Add key person"]) {
       expect(button(tree, label)?.props.disabled, label).toBe(false);
     }
     expect(button(tree, "Delete")).toBeUndefined();
-    press(tree, "Show on Profile");
-    expect(handlers.onEdit).toHaveBeenCalledWith(
-      7,
-      expect.objectContaining({ hidden: 0 }),
-    );
+    expect(button(tree, "Show on Profile")).toBeUndefined();
   });
 
   it("draws them disabled while busy, and a press changes nothing", () => {
@@ -166,6 +165,89 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     expect(handlers.onEdit).not.toHaveBeenCalled();
     // Edit and Add key person would swap the open draft.
     expect(hooks.setters).toBe(0);
+  });
+});
+
+describe("RelationshipEditor with Hide from Profile switched off (D-134) and the pushpin (D-133)", () => {
+  const item = {
+    id: 5,
+    person_name: "Ria",
+    relation_type: "Friend",
+    linked_contact_id: null,
+    linked_contact_name: null,
+    note: null,
+    pinned: 1,
+    hidden: 1,
+  } as unknown as RelationshipRow;
+  const opacities = (tree: TestElement[]) =>
+    tree.flatMap((n) => {
+      const style = n.props.style;
+      const list = Array.isArray(style) ? style : [style];
+      return list
+        .map((entry) => (entry as { opacity?: number } | null)?.opacity)
+        .filter((value): value is number => value !== undefined);
+    });
+  const pins = (tree: TestElement[]) =>
+    tree.filter((n) => n.type === "Icon" && n.props.name === "pin");
+
+  beforeEach(() => {
+    hooks.seeds = {};
+  });
+
+  it("does not dim a hidden row or offer Show on Profile, in either row layout", () => {
+    for (const cardEditMode of [false, true]) {
+      const tree = render(false, [item], undefined, cardEditMode);
+      expect(opacities(tree)).not.toContain(0.68);
+      expect(button(tree, "Show on Profile")).toBeUndefined();
+    }
+  });
+
+  it("marks a pinned row with the pushpin in an accessible 'Pinned' marker, in either row layout", () => {
+    for (const cardEditMode of [false, true]) {
+      const tree = render(false, [item], undefined, cardEditMode);
+      expect(pins(tree)).toHaveLength(1);
+      expect(
+        tree.some(
+          (n) => n.props.accessibilityLabel === "Pinned" && n.props.accessible,
+        ),
+      ).toBe(true);
+      const unpinned = render(
+        false,
+        [{ ...item, pinned: 0 }],
+        undefined,
+        cardEditMode,
+      );
+      expect(pins(unpinned)).toHaveLength(0);
+    }
+  });
+
+  it("renders no Hide from Profile switch, caption or Use default visibility on the open form", () => {
+    const tree = render(false, [item], 5);
+    expect(
+      tree.some((n) => n.props.accessibilityLabel === "Hide from Profile"),
+    ).toBe(false);
+    expect(
+      tree.some(
+        (n) => n.type === "AppText" && n.props.children === "Hide from Profile",
+      ),
+    ).toBe(false);
+    expect(button(tree, "Use default visibility")).toBeUndefined();
+    // The open form is really there.
+    expect(
+      tree.some((n) => n.props.accessibilityLabel === "Pin relationship"),
+    ).toBe(true);
+  });
+
+  it("saving keeps the stored hidden (D-134)", async () => {
+    const tree = render(false, [item], 5);
+    const save = button(tree, "Save")?.props.onPress;
+    if (typeof save !== "function") throw new Error("missing Save");
+    save();
+    await Promise.resolve();
+    expect(handlers.onEdit).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ hidden: 1 }),
+    );
   });
 });
 

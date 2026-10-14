@@ -19,7 +19,9 @@
  *   and a new entry's form opens in its place. Scrolled out of view, it morphs
  *   into the bottom-left FAB (the page's icon with a +), whose tap scrolls to
  *   the top and opens the add form. Imported has no Add, so no FAB (D-35).
- * - Hidden entries are dimmed with "Show on Profile" (D-17).
+ * - Hidden entries are dimmed with "Show on Profile" (D-17), but only while
+ *   `HIDE_FROM_PROFILE_ENABLED` is on; it is off (D-134), so every entry
+ *   shows plainly.
  * - Every entry but Imported can move to another D-84 section through
  *   `MoveEntrySheet`, with the D-85 confirm and Undo (D-118).
  * - Delete is immediate with an Undo snackbar naming the person (D-69;
@@ -77,6 +79,7 @@ import {
   undoMemoryDelete,
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
+import { HIDE_FROM_PROFILE_ENABLED } from "@/db/memory-registry";
 import { useContactHeader } from "@/hooks/use-contact-header";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { linkedEntryRoute } from "@/logic/linked-entry-route";
@@ -570,7 +573,9 @@ export function SectionEditorScreen({
                 onDelete={remove}
                 onOpenLinked={openLinked}
                 onTogglePin={togglePin}
-                onShowOnProfile={showOnProfile}
+                onShowOnProfile={
+                  HIDE_FROM_PROFILE_ENABLED ? showOnProfile : undefined
+                }
                 onMove={
                   canMove(type) ? (item) => openMoveSheet(item) : undefined
                 }

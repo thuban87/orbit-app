@@ -56,12 +56,29 @@ describe("dropConfirmText (D-85)", () => {
       "linked note",
       "entry date",
     ];
-    const text = dropConfirmText(all, "off_limits");
+    // The kept wording for when Hide from Profile returns.
+    const text = dropConfirmText(all, "off_limits", true);
     expect(text).toBe(
       "Moving this to Off Limits removes its note, its meaningful date, " +
         "its pin, its outdated mark, its Hide from Profile setting, its label, " +
         "its link to the interaction note and its date.",
     );
+    // Switched off (D-134): every field but the visibility setting.
+    expect(dropConfirmText(all, "off_limits")).toBe(
+      "Moving this to Off Limits removes its note, its meaningful date, " +
+        "its pin, its outdated mark, its label, " +
+        "its link to the interaction note and its date.",
+    );
+  });
+
+  it("never names the Hide from Profile setting while it is switched off (D-134)", () => {
+    expect(dropConfirmText(["visibility setting"], "off_limits")).toBeNull();
+    expect(dropConfirmText(["note", "visibility setting"], "gift_idea")).toBe(
+      "Moving this to Gift Ideas removes its note.",
+    );
+    expect(
+      dropConfirmText(["note", "visibility setting"], "gift_idea"),
+    ).not.toMatch(/Hide from Profile/);
   });
 
   it("lists one field without a comma", () => {

@@ -9,6 +9,8 @@ vi.mock("react-native", () => ({
 vi.mock("@/components/ContactPicker", () => ({
   ContactPicker: "ContactPicker",
 }));
+// D-133: the pinned marker's pushpin pulls in @expo/vector-icons.
+vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   Button: "Button",

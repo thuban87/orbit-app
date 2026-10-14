@@ -82,13 +82,18 @@ describe("eligible Orrery relationship projection", () => {
   });
   it("reflects link/hide/delete/restore and parent lifecycle without contact fabrication", async () => {
     const id = await add();
-    for (const patch of [
-      { hidden: 1 as const },
-      { hidden: 0 as const, linkedContactId: 2 },
-    ]) {
-      await editRelationship(exec, { id, contactId: 1, now, ...patch });
-      expect(await readOrrerySatellites(exec, parents)).toEqual([]);
-    }
+    // A hidden key person is still a moon while Hide from Profile is off
+    // (D-134: the stored flag is ignored for display).
+    await editRelationship(exec, { id, contactId: 1, now, hidden: 1 });
+    expect(await readOrrerySatellites(exec, parents)).toHaveLength(1);
+    await editRelationship(exec, {
+      id,
+      contactId: 1,
+      now,
+      hidden: 0,
+      linkedContactId: 2,
+    });
+    expect(await readOrrerySatellites(exec, parents)).toEqual([]);
     await editRelationship(exec, {
       id,
       contactId: 1,

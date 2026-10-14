@@ -409,7 +409,7 @@ describe("knowledge search corpus read", () => {
     ).resolves.toEqual([]);
   });
 
-  it("excludes hidden or outdated knowledge while retaining visible entries", async () => {
+  it("excludes outdated knowledge and keeps hidden entries while Hide from Profile is off (D-134)", async () => {
     const contactId = await seedContact();
     const visibleMemory = await addMemory(exec, {
       contactId,
@@ -460,9 +460,10 @@ describe("knowledge search corpus read", () => {
     const text = corpus[0].entries.map((entry) => entry.text).join(" ");
     expect(text).toContain("Visible memory marker");
     expect(text).toContain("Visible relationship marker");
-    expect(text).not.toContain("Hidden memory marker");
+    // The stored flag is ignored for display (D-134), so hidden rows match.
+    expect(text).toContain("Hidden memory marker");
     expect(text).not.toContain("Outdated memory marker");
-    expect(text).not.toContain("Hidden relationship marker");
+    expect(text).toContain("Hidden relationship marker");
     expect(visibleMemory).toBeGreaterThan(0);
     expect(visibleRelationship).toBeGreaterThan(0);
   });

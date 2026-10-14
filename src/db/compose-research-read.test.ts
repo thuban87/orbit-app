@@ -229,16 +229,23 @@ describe("compose-research-read — normalized ResearchItem projection", () => {
     expect(items.some((item) => item.id.startsWith("firstclass:"))).toBe(false);
   });
 
-  it("excludes hidden, soft-deleted, and historical knowledge from the projection", async () => {
+  it("excludes soft-deleted and historical knowledge, and lists hidden rows while Hide from Profile is off (D-134)", async () => {
     const owner = await contact("Owner");
     const visibleMemory = await addMemory(owner, {
       value: "Visible",
       allowAi: 0,
     });
-    await addMemory(owner, { value: "Hidden", allowAi: 0, hidden: 1 });
+    const hiddenMemory = await addMemory(owner, {
+      value: "Hidden",
+      allowAi: 0,
+      hidden: 1,
+    });
     await addMemory(owner, { value: "Deleted", allowAi: 0, deleted: true });
     const visibleRel = await addRelationship(owner, { personName: "Casey" });
-    await addRelationship(owner, { personName: "Hidden Pat", hidden: 1 });
+    const hiddenRel = await addRelationship(owner, {
+      personName: "Hidden Pat",
+      hidden: 1,
+    });
 
     // An earlier and a Most Recent entry for one key (D-45: newest date wins;
     // the earlier one is inserted last so insertion order cannot decide).
@@ -259,10 +266,19 @@ describe("compose-research-read — normalized ResearchItem projection", () => {
     const ids = items.map((item) => item.id);
 
     expect(ids).toContain(`memory:${visibleMemory}`);
-    expect(items.some((item) => item.value === "Hidden")).toBe(false);
+    // The stored flag is ignored for display (D-134); Allow AI off keeps it
+    // out of Message Focus as for any memory.
+    expect(items.find((item) => item.id === `memory:${hiddenMemory}`)).toEqual(
+      expect.objectContaining({ value: "Hidden", aiEligible: false }),
+    );
     expect(items.some((item) => item.value === "Deleted")).toBe(false);
     expect(ids).toContain(`relationship:${visibleRel}`);
-    expect(items.some((item) => item.label === "Hidden Pat")).toBe(false);
+    // A hidden key person lists too, never AI-eligible.
+    expect(
+      items.find((item) => item.id === `relationship:${hiddenRel}`),
+    ).toEqual(
+      expect.objectContaining({ label: "Hidden Pat", aiEligible: false }),
+    );
 
     // Only the current value renders — the superseded one never leaks.
     const location = items.find(
@@ -311,6 +327,19 @@ describe("compose-research-read — normalized ResearchItem projection", () => {
       value: "https://example.test/sore-spot",
       aiEligible: false,
     });
+  });
+
+  it("makes a hidden memory that allows AI Message Focus eligible like any memory (D-142)", async () => {
+    const owner = await contact("Owner");
+    const hiddenAllowed = await addMemory(owner, {
+      value: "Hidden but allowed",
+      allowAi: 1,
+      hidden: 1,
+    });
+    const items = await readComposeResearch(exec, owner);
+    expect(items.find((item) => item.id === `memory:${hiddenAllowed}`)).toEqual(
+      expect.objectContaining({ aiEligible: true, isOffLimits: false }),
+    );
   });
 
   it("takes memory Add-to-AI eligibility from the SQL AI predicate (D-49)", async () => {

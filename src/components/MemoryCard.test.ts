@@ -143,7 +143,7 @@ describe("MemoryCard host props (D-107, D-17, D-84; plan 13)", () => {
     expect(tree.some((n) => n.props.accessibilityLabel === "Move")).toBe(false);
   });
 
-  it("dims a hidden row and offers Show on Profile when the host passes it", () => {
+  it("offers no Show on Profile and no dimming on a hidden row while the switch is off (D-134)", () => {
     const onShowOnProfile = vi.fn();
     const card = MemoryCard({
       memory: { ...memory, hidden: 1 },
@@ -155,21 +155,30 @@ describe("MemoryCard host props (D-107, D-17, D-84; plan 13)", () => {
     const opacity = ((view?.props.style ?? []) as { opacity?: number }[])
       .map((style) => style?.opacity)
       .find((value) => value !== undefined);
-    expect(opacity).toBe(0.68);
-    const button = tree.find(
-      (n) =>
-        n.type === "Pressable" &&
-        n.props.accessibilityLabel === "Show on Profile",
+    expect(opacity).toBe(1);
+    expect(
+      tree.some((n) => n.props.accessibilityLabel === "Show on Profile"),
+    ).toBe(false);
+    expect(card.props.accessibilityActions).toBeUndefined();
+    expect(onShowOnProfile).not.toHaveBeenCalled();
+  });
+
+  it("marks a pinned card with the pushpin, not the word (D-133)", () => {
+    const tree = nodes(
+      MemoryCard({ memory: { ...memory, pinned: 1 }, onPress: vi.fn() }),
     );
-    press(button);
-    expect(onShowOnProfile).toHaveBeenCalledTimes(1);
-    expect(card.props.accessibilityActions).toEqual([
-      { name: "showOnProfile", label: "Show on Profile" },
-    ]);
-    (card.props.onAccessibilityAction as (e: unknown) => void)(
-      action("showOnProfile"),
+    const marker = tree.find(
+      (n) => n.props.accessibilityLabel === "Pinned memory",
     );
-    expect(onShowOnProfile).toHaveBeenCalledTimes(2);
+    expect(marker).toBeDefined();
+    expect(
+      nodes(marker).some((n) => n.type === "Icon" && n.props.name === "pin"),
+    ).toBe(true);
+    expect(tree.some((n) => n.props.children === "Pinned")).toBe(false);
+    const unpinned = nodes(MemoryCard({ memory, onPress: vi.fn() }));
+    expect(
+      unpinned.some((n) => n.type === "Icon" && n.props.name === "pin"),
+    ).toBe(false);
   });
 
   it("a shown row is not dimmed and has no Show on Profile", () => {

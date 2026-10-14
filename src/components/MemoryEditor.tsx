@@ -20,6 +20,7 @@ import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import type { MemoryRow } from "@/db/memories-read";
 import {
   DEFAULT_MEMORY_TYPE_KEY,
+  HIDE_FROM_PROFILE_ENABLED,
   isMemoryTypeKey,
   MEMORY_TYPE_REGISTRY,
   type MemoryTypeKey,
@@ -727,8 +728,11 @@ export function MemoryEditor({
         // A card tap replaces the open draft, so the save holds it (WR-02).
         disabled={cardsHeld}
         {...linkedProps}
+        // No Show on Profile while the switch is off (D-134).
         onShowOnProfile={
-          onShowOnProfile ? () => onShowOnProfile(item) : undefined
+          HIDE_FROM_PROFILE_ENABLED && onShowOnProfile
+            ? () => onShowOnProfile(item)
+            : undefined
         }
         // D-130: in card edit mode Move is only in the open form.
         onMove={onMove && !cardEditMode ? () => onMove(item) : undefined}
@@ -1001,19 +1005,23 @@ export function MemoryEditor({
             onValueChange={(value) => update("outdated", value)}
           />
         </View>
-        <View style={styles.toggleRow}>
-          <View style={styles.visibilityCopy}>
-            <AppText role="body">Hide from Profile</AppText>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              This is presentation only.
-            </AppText>
+        {/* Hide from Profile is switched off (D-134): the row is gated, not
+              removed, and the draft keeps the stored `hidden` unchanged. */}
+        {HIDE_FROM_PROFILE_ENABLED ? (
+          <View style={styles.toggleRow}>
+            <View style={styles.visibilityCopy}>
+              <AppText role="body">Hide from Profile</AppText>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                This is presentation only.
+              </AppText>
+            </View>
+            <OrbitSwitch
+              accessibilityLabel="Hide from Profile"
+              value={draft.hidden === true}
+              onValueChange={(value) => update("hidden", value)}
+            />
           </View>
-          <OrbitSwitch
-            accessibilityLabel="Hide from Profile"
-            value={draft.hidden === true}
-            onValueChange={(value) => update("hidden", value)}
-          />
-        </View>
+        ) : null}
         {/* D-27: Allow AI is draft state on the Add and Edit forms alike;
               Save writes it and Cancel discards it. */}
         <View style={styles.toggleRow}>

@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import type { MemoryRow } from "@/db/memories-read";
 import {
+  HIDE_FROM_PROFILE_ENABLED,
   MEMORY_TYPE_REGISTRY,
   PROVISIONAL_MEMORY_LABEL,
 } from "@/db/memory-registry";
@@ -56,7 +57,8 @@ export interface MemoryCardProps {
   /**
    * Section editors only (D-17; enforces phase-10 §AF): a hidden row is dimmed
    * and offers a visible and a screen-reader "Show on Profile" action that
-   * calls this. Absent → no action and no extra dimming.
+   * calls this. Absent → no action and no extra dimming. Ignored while
+   * `HIDE_FROM_PROFILE_ENABLED` is false (D-134).
    */
   onShowOnProfile?: () => void;
   /** Section editors only (D-84): a visible and a screen-reader "Move". */
@@ -96,7 +98,12 @@ export function MemoryCard({
   testID,
 }: MemoryCardProps) {
   const { colors } = useTheme();
-  const canShowOnProfile = onShowOnProfile !== undefined && memory.hidden === 1;
+  // Hide from Profile is switched off (D-134): no Show on Profile and no
+  // hidden-row dimming, even when a host passes the handler.
+  const canShowOnProfile =
+    HIDE_FROM_PROFILE_ENABLED &&
+    onShowOnProfile !== undefined &&
+    memory.hidden === 1;
   const dimmed = subdued || canShowOnProfile;
   const actions: AccessibilityActionInfo[] = [
     ...(accessibilityActions ?? []),
@@ -183,9 +190,8 @@ export function MemoryCard({
                 accessible
                 style={styles.marker}
               >
-                <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  Pinned
-                </AppText>
+                {/* The pushpin replaces the word (D-133). */}
+                <Icon name="pin" tone="textSecondary" size="sm" />
               </View>
             ) : null}
             {memory.outdated === 1 ? (

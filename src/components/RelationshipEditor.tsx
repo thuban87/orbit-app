@@ -7,8 +7,10 @@ import {
 } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
+import { Icon } from "@/components/icons/Icon";
 import { AppText, Button, EntryTextField, OrbitSwitch } from "@/components/ui";
 import { getExecutor } from "@/db/database";
+import { HIDE_FROM_PROFILE_ENABLED } from "@/db/memory-registry";
 import { listPickerContacts } from "@/db/picker-read";
 import type { RelationshipRow } from "@/db/relationships-read";
 import { useTheme } from "@/theme";
@@ -383,16 +385,27 @@ export function RelationshipEditor({
       }}
     />
   );
+  // Hide from Profile is switched off (D-134): a hidden row is neither
+  // dimmed nor offered Show on Profile; the JSX stays for when it returns.
+  const shownAsHidden = (item: RelationshipRow) =>
+    HIDE_FROM_PROFILE_ENABLED && item.hidden === 1;
   const rowStyle = (item: RelationshipRow) => [
     styles.row,
     {
       backgroundColor: colors.surface,
       borderColor: colors.border,
-      opacity: item.hidden === 1 ? 0.68 : 1,
+      opacity: shownAsHidden(item) ? 0.68 : 1,
     },
   ];
   const nameStyle = (item: RelationshipRow) =>
-    item.hidden === 1 ? { color: colors.textSecondary } : undefined;
+    shownAsHidden(item) ? { color: colors.textSecondary } : undefined;
+  // D-133: every pinned card shows the pushpin instead of the word.
+  const pinMarker = (item: RelationshipRow) =>
+    item.pinned === 1 ? (
+      <View accessibilityLabel="Pinned" accessible style={styles.pinMarker}>
+        <Icon name="pin" tone="textSecondary" size="sm" />
+      </View>
+    ) : null;
 
   const renderRow = (item: RelationshipRow) =>
     cardEditMode ? (
@@ -411,6 +424,7 @@ export function RelationshipEditor({
           <AppText role="body" style={[styles.rowName, nameStyle(item)]}>
             {item.person_name}
           </AppText>
+          {pinMarker(item)}
           <Button
             role="iconOnly"
             icon="edit"
@@ -420,15 +434,18 @@ export function RelationshipEditor({
           />
         </View>
         {rowDetails(item)}
-        {item.hidden === 1 ? (
+        {shownAsHidden(item) ? (
           <View style={styles.actions}>{showOnProfileButton(item)}</View>
         ) : null}
       </Pressable>
     ) : (
       <View key={item.id} style={rowStyle(item)}>
-        <AppText role="body" style={nameStyle(item)}>
-          {item.person_name}
-        </AppText>
+        <View style={styles.rowHeader}>
+          <AppText role="body" style={[styles.rowName, nameStyle(item)]}>
+            {item.person_name}
+          </AppText>
+          {pinMarker(item)}
+        </View>
         {rowDetails(item)}
         <View style={styles.actions}>
           {/* Held while the host saves (third fix pass WR-02, D-26). */}
@@ -438,7 +455,7 @@ export function RelationshipEditor({
             disabled={busy}
             onPress={() => openEdit(item)}
           />
-          {item.hidden === 1 ? showOnProfileButton(item) : null}
+          {shownAsHidden(item) ? showOnProfileButton(item) : null}
         </View>
       </View>
     );
@@ -559,24 +576,30 @@ export function RelationshipEditor({
             accessibilityLabel="Pin relationship"
           />
         </View>
-        <View style={styles.switchRow}>
-          <View style={styles.visibilityCopy}>
-            <AppText role="body">Hide from Profile</AppText>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Presentation only — this doesn't hide it from search or AH.
-            </AppText>
-          </View>
-          <OrbitSwitch
-            value={draft.hidden === 1}
-            onValueChange={(value) => update("hidden", value ? 1 : 0)}
-            accessibilityLabel="Hide from Profile"
-          />
-        </View>
-        <Button
-          role="tertiary"
-          label="Use default visibility"
-          onPress={() => update("hidden", null)}
-        />
+        {/* Hide from Profile is switched off (D-134): gated, not removed;
+              the draft keeps the stored `hidden` unchanged. */}
+        {HIDE_FROM_PROFILE_ENABLED ? (
+          <>
+            <View style={styles.switchRow}>
+              <View style={styles.visibilityCopy}>
+                <AppText role="body">Hide from Profile</AppText>
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  Presentation only — this doesn't hide it from search or AH.
+                </AppText>
+              </View>
+              <OrbitSwitch
+                value={draft.hidden === 1}
+                onValueChange={(value) => update("hidden", value ? 1 : 0)}
+                accessibilityLabel="Hide from Profile"
+              />
+            </View>
+            <Button
+              role="tertiary"
+              label="Use default visibility"
+              onPress={() => update("hidden", null)}
+            />
+          </>
+        ) : null}
         <View style={styles.actions}>
           <Button
             role="secondary"
@@ -679,6 +702,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   rowName: { flex: 1 },
+  pinMarker: { paddingTop: SPACING.xs },
   switchRow: {
     alignItems: "center",
     flexDirection: "row",

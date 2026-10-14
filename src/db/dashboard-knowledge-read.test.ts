@@ -189,13 +189,16 @@ describe("dashboard line-3 knowledge read", () => {
     );
   });
 
-  it("filters each source by its own visibility and lifecycle rules", async () => {
+  it("filters each source by its own lifecycle rules, and shows hidden rows while Hide from Profile is off (D-134)", async () => {
     const contactId = await seedContact();
     const visibleMemory = await seedMemory(contactId, {
       value: "Visible memory",
       hidden: 0,
     });
-    await seedMemory(contactId, { value: "Hidden memory", hidden: 1 });
+    const hiddenMemory = await seedMemory(contactId, {
+      value: "Hidden memory",
+      hidden: 1,
+    });
     await seedMemory(contactId, { value: "Outdated memory", outdated: 1 });
     await seedMemory(contactId, { value: "Deleted memory", deletedAt: NOW });
     await seedMemory(contactId, { type: "birthday", value: "Birthday memory" });
@@ -203,7 +206,7 @@ describe("dashboard line-3 knowledge read", () => {
       MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault;
     MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = "hide";
     try {
-      await seedMemory(contactId, {
+      const registryHidden = await seedMemory(contactId, {
         type: "thought_of_them",
         value: "Registry hidden default",
       });
@@ -211,7 +214,7 @@ describe("dashboard line-3 knowledge read", () => {
         personName: "Visible relationship",
         hidden: 0,
       });
-      await seedRelationship(contactId, {
+      const hiddenRelationship = await seedRelationship(contactId, {
         personName: "Hidden relationship",
         hidden: 1,
       });
@@ -237,20 +240,23 @@ describe("dashboard line-3 knowledge read", () => {
           visibleMemory,
           visibleRelationship,
           currentState,
+          // The stored flag and a registry hide default are ignored for
+          // display while Hide from Profile is off (D-134).
+          hiddenMemory,
+          registryHidden,
+          hiddenRelationship,
         ]),
       );
-      expect(candidates.map((candidate) => candidate.value)).not.toEqual(
-        expect.arrayContaining([
-          "Hidden memory",
-          "Outdated memory",
-          "Deleted memory",
-          "Birthday memory",
-          "Registry hidden default",
-          "Hidden relationship",
-          "Deleted relationship",
-          "Former place",
-        ]),
-      );
+      const values = candidates.map((candidate) => candidate.value);
+      for (const excluded of [
+        "Outdated memory",
+        "Deleted memory",
+        "Birthday memory",
+        "Deleted relationship",
+        "Former place",
+      ]) {
+        expect(values, excluded).not.toContain(excluded);
+      }
     } finally {
       MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = originalDefault;
     }
@@ -340,7 +346,7 @@ describe("dashboard line-3 knowledge read", () => {
     );
   });
 
-  it("over-fetches before registry visibility filtering so hidden defaults cannot consume a contact budget", async () => {
+  it("ignores a registry hide default while Hide from Profile is off, so those rows fill the contact budget (D-134)", async () => {
     const contactId = await seedContact();
     const originalDefault =
       MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault;
@@ -359,14 +365,14 @@ describe("dashboard line-3 knowledge read", () => {
       });
 
       const candidates = await readLine3Candidates(exec, [contactId]);
-      expect(candidates).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ value: "Visible after hidden defaults" }),
-        ]),
+      const own = candidates.filter(
+        (candidate) => candidate.contactId === contactId,
       );
+      // The newest rows win the budget; none is dropped as hidden.
+      expect(own).toHaveLength(CANDIDATE_BUDGET);
       expect(
-        candidates.filter((candidate) => candidate.contactId === contactId),
-      ).toHaveLength(1);
+        own.every((candidate) => candidate.value?.startsWith("Hidden default")),
+      ).toBe(true);
     } finally {
       MEMORY_TYPE_REGISTRY.thought_of_them.visibilityDefault = originalDefault;
     }

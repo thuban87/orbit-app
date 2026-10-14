@@ -17,7 +17,10 @@ import type {
   DroppedFieldName,
   KnowledgeSection,
 } from "@/db/knowledge-move-dao";
-import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
+import {
+  HIDE_FROM_PROFILE_ENABLED,
+  MEMORY_TYPE_REGISTRY,
+} from "@/db/memory-registry";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
 
 /** D-84's sections, in the Profile's memory-first order. */
@@ -66,14 +69,21 @@ function listWords(words: readonly string[]): string {
 
 /**
  * D-85's confirm message: null when the move drops nothing, otherwise one
- * sentence naming every dropped field.
+ * sentence naming every dropped field. While Hide from Profile is switched off
+ * (D-134) the confirm never names that setting: the DAO still drops the stored
+ * value on a cross-table move, but the setting is hidden from every caption.
+ * `hideFromProfileEnabled` exists so tests can exercise the kept wording.
  */
 export function dropConfirmText(
   fields: readonly DroppedFieldName[],
   target: KnowledgeSection,
+  hideFromProfileEnabled: boolean = HIDE_FROM_PROFILE_ENABLED,
 ): string | null {
-  if (fields.length === 0) return null;
-  const words = fields.map((field) => DROPPED_FIELD_WORDS[field]);
+  const shown = hideFromProfileEnabled
+    ? fields
+    : fields.filter((field) => field !== "visibility setting");
+  if (shown.length === 0) return null;
+  const words = shown.map((field) => DROPPED_FIELD_WORDS[field]);
   return `Moving this to ${moveSectionLabel(target)} removes ${listWords(words)}.`;
 }
 
