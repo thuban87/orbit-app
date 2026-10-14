@@ -189,6 +189,20 @@ describe("card edit mode: the Key People editor (D-130)", () => {
     expect(tag).toContain("formRef={formRef}");
   });
 
+  it("the screen's solid Add sits at the top (D-131); the editor renders none there", () => {
+    // Plan 22 (D-131): the screen renders the primary Add bar above the
+    // rows, and the editor runs with its Add slot at the top.
+    const [tag] = openingTags(screen, "RelationshipEditor");
+    expect(tag).toContain('addPlacement="top"');
+    const bar = openingTags(screen, "Button").find((button) =>
+      button.includes('testID="key-people-editor-add"'),
+    );
+    expect(bar).toContain('role="primary"');
+    expect(screen.indexOf('testID="key-people-editor-add"')).toBeLessThan(
+      screen.search(/<RelationshipEditor\s/),
+    );
+  });
+
   it("RelationshipEditor's Add is role primary and its edit-mode Delete is destructive", () => {
     const buttons = openingTags(editor, "Button");
     expect(
