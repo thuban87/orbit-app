@@ -393,8 +393,9 @@ export function KeyPeopleEditorScreen({
                   />
                 </View>
               )}
-              {rows.length === 0 ? (
-                // D-68: text only; the top Add is the one action.
+              {rows.length === 0 && !draftState.open ? (
+                // D-68: text only; the top Add is the one action. D-145: it
+                // hides while the add form is open.
                 <EmptyState
                   testID="key-people-editor-empty"
                   icon="list"

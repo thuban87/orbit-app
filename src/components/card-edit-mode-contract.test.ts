@@ -242,3 +242,29 @@ describe("held rows are dimmed while a form is open (D-144)", () => {
     });
   }
 });
+
+describe("the empty state hides while the add form is open (D-145)", () => {
+  for (const [name, file, guard] of [
+    [
+      "section editors",
+      SECTION,
+      "phase.data.rows.length === 0 && !draftState.open",
+    ],
+    ["Key People", KEY_PEOPLE, "rows.length === 0 && !draftState.open"],
+    ["Off Limits", OFF_LIMITS, "rows.length === 0 && form === null"],
+  ] as const) {
+    it(`${name}: the empty state renders only with no form open`, () => {
+      const source = read(file);
+      const guardAt = source.indexOf(guard);
+      expect(guardAt, guard).toBeGreaterThanOrEqual(0);
+      const emptyAt = source.indexOf("<EmptyState", guardAt);
+      expect(emptyAt).toBeGreaterThan(guardAt);
+      expect(source.slice(guardAt, emptyAt)).not.toContain("</");
+    });
+  }
+
+  it("history page: the empty state gives way to the add form", () => {
+    const source = read(HISTORY);
+    expect(source).toMatch(/form\?\.mode === "add" \? null : \(\s*<EmptyState/);
+  });
+});

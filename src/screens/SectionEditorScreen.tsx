@@ -548,8 +548,9 @@ export function SectionEditorScreen({
                   />
                 </View>
               ) : null}
-              {phase.data.rows.length === 0 ? (
-                // D-68: text only; the top Add is the one action.
+              {phase.data.rows.length === 0 && !draftState.open ? (
+                // D-68: text only; the top Add is the one action. D-145: it
+                // hides while the add form is open.
                 <EmptyState
                   testID="section-editor-empty"
                   icon="list"
