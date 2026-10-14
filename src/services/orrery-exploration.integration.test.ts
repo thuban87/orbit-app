@@ -706,7 +706,9 @@ describe("Orrery production exploration integration", () => {
       hidden: 1,
       now: NOW,
     });
-    expect(await rows()).toEqual([]);
+    // Still a moon while Hide from Profile is off: the stored flag is
+    // ignored for display (38.10 D-134).
+    expect(await rows()).toHaveLength(1);
     await editRelationship(exec, {
       id,
       contactId: parent.id,

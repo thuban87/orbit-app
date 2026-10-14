@@ -23,6 +23,11 @@
  * {{ expanded }}` and its accessible name matches the visible title. The touch
  * target is ≥44×44 (MIN_TOUCH_TARGET).
  *
+ * LONG TITLES (38.10 D-136 O15): the title takes the row's free width and
+ * wraps (no line cap); the +/− glyph stays at the top right. A one-line title
+ * looks as before, because the heading's line is taller than the header's
+ * inner minimum, so top alignment and centring coincide.
+ *
  * ANIMATION: expand/collapse is a plain conditional render — NOT a React-state-
  * driven animated height. Driving an animation from `setState` per frame re-renders
  * the tree on the JS thread (CLAUDE.md animation rule); a section that simply
@@ -88,7 +93,9 @@ export function AccordionSection({
         onPress={() => onExpandedChange(!expanded)}
         style={styles.header}
       >
-        <AppText role="heading">{title}</AppText>
+        <AppText role="heading" style={styles.title}>
+          {title}
+        </AppText>
         <AppText role="heading" style={{ color: colors.textSecondary }}>
           {expanded ? "−" : "+"}
         </AppText>
@@ -114,11 +121,14 @@ const styles = StyleSheet.create({
   header: {
     minHeight: MIN_TOUCH_TARGET,
     flexDirection: "row",
-    alignItems: "center",
+    // Top-aligned so a wrapped title keeps the glyph at the top right (O15).
+    alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  title: { flex: 1 },
   body: {
     borderTopWidth: 1,
     padding: 16,

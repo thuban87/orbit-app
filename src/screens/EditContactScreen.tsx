@@ -139,12 +139,19 @@ import {
   listCategories,
 } from "@/db/contact-read";
 import type { updateContactFull } from "@/db/contacts-dao";
+import {
+  type CurrentStateEntryRow,
+  getCurrentStateValues,
+} from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForEditForm } from "@/db/field-values-dao";
 import { listMemoriesForContact } from "@/db/memories-read";
-import { CURRENT_STATE_FIELD_REGISTRY } from "@/db/memory-registry";
+import {
+  CURRENT_STATE_FIELD_REGISTRY,
+  type CurrentStateFieldKey,
+} from "@/db/memory-registry";
 import {
   listOffLimitsForContact,
   type OffLimitsRow,
@@ -172,6 +179,7 @@ import { confirm, notice } from "@/stores/confirm-store";
 import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 import { FREQUENCY_DAYS, parseDate } from "@/types";
 import { formatLocalDate, formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
@@ -180,6 +188,7 @@ import {
   partitionMemoryRows,
   pickCreateSubEditor,
 } from "./create-contact-logic";
+import { mostRecentEntryCard } from "./edit-contact-display";
 import {
   applyMemoryPatch,
   buildEditInput,
@@ -685,6 +694,27 @@ export function EditContactScreen({
     }, [refreshPhoto]),
   );
 
+  // D-135: each field's Most Recent entry, shown as a small card above its
+  // "See all". Its own state, never part of `form`, the seeded baseline or
+  // the dirty signature. Read on focus (so on first focus too, alongside the
+  // form's load), so an edit made on the history page through See all shows
+  // on return without reloading the form.
+  const [mostRecent, setMostRecent] = useState<
+    Partial<Record<CurrentStateFieldKey, CurrentStateEntryRow>>
+  >({});
+  const refreshMostRecent = useCallback(async () => {
+    try {
+      setMostRecent(await getCurrentStateValues(getExecutor(), contactId));
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to read the most recent entries", err);
+    }
+  }, [contactId]);
+  useFocusEffect(
+    useCallback(() => {
+      void refreshMostRecent();
+    }, [refreshMostRecent]),
+  );
+
   // ORPHAN CLEANUP (review cycle-2 MED custom-field orphan): a custom photo crop
   // persists its ~40 KB cv- master to disk BEFORE Save commits the field value, so
   // a Cancel / back-out / failed Save would leak it. On unmount, drain the staged
@@ -884,6 +914,32 @@ export function EditContactScreen({
     );
   }, []);
 
+  // D-135: the Most Recent entry as a small, non-interactive card above the
+  // field's "See all"; nothing when the field has no entry.
+  const renderMostRecentCard = (
+    fieldKey: CurrentStateFieldKey,
+    testID: string,
+  ) => {
+    const card = mostRecentEntryCard(mostRecent[fieldKey]);
+    if (!card) return null;
+    return (
+      <View
+        testID={testID}
+        style={[
+          styles.mostRecentCard,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <AppText role="body" numberOfLines={2}>
+          {card.value}
+        </AppText>
+        <AppText role="caption" style={{ color: colors.textSecondary }}>
+          {card.dateLabel}
+        </AppText>
+      </View>
+    );
+  };
+
   const savable = useMemo(
     () => form !== null && canSave(form) && !saving && !stale,
     [form, saving, stale],
@@ -922,6 +978,8 @@ export function EditContactScreen({
     });
     setNeverContacted(baseline.neverContacted);
     setInitialTrackingEnabled(baseline.initialTrackingEnabled);
+    // The Save may have appended an entry; refresh the D-135 cards.
+    void refreshMostRecent();
     committedValuesRef.current = { ...submittedForm.values };
     const committedForm: EditFormState = {
       ...submittedForm,
@@ -1605,7 +1663,8 @@ export function EditContactScreen({
           {/* -- Last Talked About: an always-visible "add an entry" row (D-65,
           D-119). Blank to start; the form's Save appends a non-blank entry
           dated by the capped picker (D-101). Enter only closes the keyboard
-          (D-121). Earlier entries stay on its history page. -- */}
+          (D-121). Earlier entries stay on its history page; the Most Recent one
+          shows as a small card above "See all" (D-135). -- */}
           <AccordionSection
             sectionId="lastTalked"
             title="Last Talked About"
@@ -1631,6 +1690,10 @@ export function EditContactScreen({
                 onChange={(date) => setField("lastTalkedAboutDate", date)}
                 maxDate={todayDate}
               />
+              {renderMostRecentCard(
+                "last_talked_about",
+                "edit-contact-last-talked-most-recent",
+              )}
               <Button
                 testID="edit-contact-last-talked-see-all"
                 role="tertiary"
@@ -1704,6 +1767,25 @@ export function EditContactScreen({
                 value={form.currentLocationDate ?? todayStored}
                 onChange={(date) => setField("currentLocationDate", date)}
                 maxDate={todayDate}
+              />
+              {renderMostRecentCard(
+                "current_location",
+                "edit-contact-current-location-most-recent",
+              )}
+              {/* D-135 places the card above "See all" in both sections, and
+                  D-53 gave Current Location the same See all and history
+                  page (planner reading; owner may veto at plan 19). */}
+              <Button
+                testID="edit-contact-current-location-see-all"
+                role="tertiary"
+                label="See all"
+                accessibilityLabel="See all Current Location entries"
+                onPress={() =>
+                  navigation.navigate("MemoryHistory", {
+                    contactId,
+                    fieldKey: "current_location",
+                  })
+                }
               />
             </View>
           </AccordionSection>
@@ -1983,6 +2065,12 @@ const styles = StyleSheet.create({
   },
   field: {
     gap: 8,
+  },
+  mostRecentCard: {
+    borderRadius: SPACING.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.xs,
+    padding: SPACING.sm,
   },
   input: {
     borderWidth: 1,
