@@ -3,8 +3,8 @@ import { create } from "zustand";
 /**
  * What a snackbar reports (38.10 D-132, D-140): `success` is a notice (accent
  * pill); `warning` is a destructive result (a delete or a removal); `error` is
- * a failure, announced as an alert (38.9 D-72). `snackbar-host.ts` maps each
- * kind to its look.
+ * a failure, drawn as the warning pill (D-140) and announced as an alert
+ * (38.9 D-72). `snackbar-host.ts` maps each kind to its look.
  */
 export type SnackbarKind = "success" | "warning" | "error";
 

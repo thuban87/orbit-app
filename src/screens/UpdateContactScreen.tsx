@@ -599,8 +599,9 @@ function KeyPeopleFocusedEditor({
       void load().catch((cause) =>
         Logger.error(LOG_SCOPE, "failed to reload relationships", cause),
       );
+      // D-132: a delete reports in the warning style.
       showSnackbar({
-        kind: "success",
+        kind: "warning",
         label: `Deleted key person${forName(nameRef.current)}`,
         action: {
           label: "Undo",
@@ -812,8 +813,9 @@ function MemoryFocusedEditor({
         return;
       }
       void load();
+      // D-132: a delete reports in the warning style.
       showSnackbar({
-        kind: "success",
+        kind: "warning",
         label: deletedSnackbar(section, nameRef.current),
         action: {
           label: "Undo",
@@ -987,8 +989,9 @@ function OffLimitsFocusedEditor({
     void (async () => {
       const snapshot = await controller.onDelete(row.id);
       if (snapshot === null) return;
+      // D-132: a delete reports in the warning style.
       showSnackbar({
-        kind: "success",
+        kind: "warning",
         label: offLimitsDeletedSnackbar(nameRef.current),
         action: {
           label: "Undo",

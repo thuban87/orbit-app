@@ -1039,23 +1039,28 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     if (claim) releaseBulkAction(claim);
   }, [releaseBulkAction]);
 
-  const commitBulkOutcome = useCallback((label: string) => {
-    // A bulk transaction is one durable commit: the single shell bump reaches
-    // Home's own subscriber (one fenced re-read) and every other shell
-    // consumer exactly once (D-23). Do not reseed frozenUniverse.
-    notifyWidgetDataChanged();
-    bumpShellRefresh();
-    AccessibilityInfo.announceForAccessibility(label);
-    showSnackbar({
-      kind: "success",
-      label,
-      action: {
-        label: "Dismiss",
-        accessibilityLabel: "Dismiss notification",
-        onPress: dismissSnackbar,
-      },
-    });
-  }, []);
+  // `kind` "warning" marks a removal (38.10 D-132); every other bulk result
+  // is a notice.
+  const commitBulkOutcome = useCallback(
+    (label: string, kind: "success" | "warning" = "success") => {
+      // A bulk transaction is one durable commit: the single shell bump reaches
+      // Home's own subscriber (one fenced re-read) and every other shell
+      // consumer exactly once (D-23). Do not reseed frozenUniverse.
+      notifyWidgetDataChanged();
+      bumpShellRefresh();
+      AccessibilityInfo.announceForAccessibility(label);
+      showSnackbar({
+        kind,
+        label,
+        action: {
+          label: "Dismiss",
+          accessibilityLabel: "Dismiss notification",
+          onPress: dismissSnackbar,
+        },
+      });
+    },
+    [],
+  );
 
   const performBulkQuickLog = useCallback(
     (ids: number[], claimed?: BulkActionClaim) => {
@@ -1076,8 +1081,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               onPress: () => {
                 void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
                   .then(() => {
+                    // The Undo hard-deletes the logged interactions: a removal.
                     commitBulkOutcome(
                       `Undid ${ids.length} logged ${pluralWord(ids.length, "interaction")}`,
+                      "warning",
                     );
                   })
                   .catch((undoError: unknown) =>
@@ -1239,6 +1246,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       .then(() =>
         commitBulkOutcome(
           `Removed ${plural(ids.length, "contact")} from Favorites`,
+          "warning",
         ),
       )
       .catch((writeError: unknown) => {

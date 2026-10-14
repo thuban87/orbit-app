@@ -77,38 +77,39 @@ describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
     });
   });
 
-  it("an error has a danger outline, a danger glyph and an assertive alert", () => {
+  it("an error takes the warning pill and keeps its assertive alert (D-140; 38.9 D-72)", () => {
     expect(snackbarPresentation("error")).toEqual({
-      fillTone: "surface",
-      labelTone: "textSecondary",
-      actionTone: "accentText",
-      borderTone: "danger",
-      glyphTone: "danger",
+      fillTone: "textPrimary",
+      labelTone: "background",
+      actionTone: "background",
+      borderTone: "textPrimary",
+      glyphTone: "background",
       liveRegion: "assertive",
       accessibilityRole: "alert",
     });
   });
 
-  // The outline and glyph are non-text graphics: >= 3:1 against the pill's
-  // `surface` fill (WCAG 1.4.11; AA_LARGE is the same 3.0) in every package x
-  // mode. Never weakened; a failing pair is an owner decision.
+  it("there are two looks in total: notice and warning (D-140)", () => {
+    const paint = (kind: "success" | "warning" | "error") => {
+      const {
+        liveRegion: _l,
+        accessibilityRole: _r,
+        ...rest
+      } = snackbarPresentation(kind);
+      return rest;
+    };
+    expect(paint("error")).toEqual(paint("warning"));
+    expect(paint("success")).not.toEqual(paint("warning"));
+  });
+
   const PACKAGES: ThemePackage[] = ["galaxy", "standard"];
   const MODES: ResolvedMode[] = ["dark", "light"];
-  for (const pkg of PACKAGES) {
-    for (const mode of MODES) {
-      it(`${pkg}/${mode}: danger outline and glyph read against the surface`, () => {
-        const palette = resolvePalette(pkg, mode);
-        expect(
-          contrastRatio(palette.danger, palette.surface),
-        ).toBeGreaterThanOrEqual(AA_LARGE);
-      });
-    }
-  }
 
   // D-132: each kind's text on its fill is AA (4.5:1) in all four package x
   // mode palettes, for every curated accent; the action reads the label tone
-  // and the glyph (when present) is >= 3:1 on the fill (WCAG 1.4.11).
-  for (const kind of ["success", "warning"] as const) {
+  // and the glyph (when present) is >= 3:1 on the fill (WCAG 1.4.11; AA_LARGE
+  // is the same 3.0). Never weakened; a failing pair is an owner decision.
+  for (const kind of ["success", "warning", "error"] as const) {
     for (const pkg of PACKAGES) {
       for (const mode of MODES) {
         it(`${kind} @ ${pkg}/${mode}: label on fill is AA for every accent`, () => {

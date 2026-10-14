@@ -83,8 +83,18 @@ type CategoryMutationCoordinatorInput = {
   pending: PendingCategoryMutation;
   setPending: (pending: PendingCategoryMutation | null) => void;
   finalizeUi: (finalize: PendingCategoryMutation["finalize"]) => void;
-  publishSuccess: (label: string) => void;
+  publishSuccess: (label: string, kind: CategoryResultKind) => void;
 };
+
+/** A committed category change reports as a notice or, for a delete, a warning. */
+export type CategoryResultKind = "success" | "warning";
+
+/** D-132: a delete reports in the warning style; add and rename are notices. */
+export function categoryResultKind(
+  operation: PendingCategoryMutation["operation"],
+): CategoryResultKind {
+  return operation === "delete" ? "warning" : "success";
+}
 
 export async function reconcilePendingCategoryMutation(
   input: CategoryMutationCoordinatorInput,
@@ -92,7 +102,10 @@ export async function reconcilePendingCategoryMutation(
   const outcome = await input.readback();
   if (outcome.status === "success") {
     input.finalizeUi(input.pending.finalize);
-    input.publishSuccess(input.pending.successLabel);
+    input.publishSuccess(
+      input.pending.successLabel,
+      categoryResultKind(input.pending.operation),
+    );
     input.setPending(null);
   }
   return outcome;
@@ -375,9 +388,9 @@ export function CategoryManagementScreen() {
     }, [load]),
   );
 
-  const publishSuccess = (label: string) => {
+  const publishSuccess = (label: string, kind: CategoryResultKind) => {
     bumpShellRefresh();
-    showSnackbar({ kind: "success", label });
+    showSnackbar({ kind, label });
   };
 
   const finalizeMutationUi = (

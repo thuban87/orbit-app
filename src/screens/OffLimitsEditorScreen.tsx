@@ -286,8 +286,9 @@ export function OffLimitsEditorScreen({
     void (async () => {
       const snapshot = await controller.onDelete(row.id);
       if (snapshot === null) return;
+      // D-132: a delete reports in the warning style.
       showSnackbar({
-        kind: "success",
+        kind: "warning",
         label: offLimitsDeletedSnackbar(nameRef.current),
         action: {
           label: "Undo",

@@ -80,9 +80,9 @@ describe("copy (D-83, D-87, D-89)", () => {
     expect(createdLabel("Robin")).toBe("Created Robin · checking in monthly");
   });
 
-  it("confirms every Undo with a success snackbar (D-110, D-120)", () => {
+  it("confirms every Undo with a warning snackbar (D-110, D-120; 38.10 D-132)", () => {
     expect(undoResultSnackbar({ kind: "share" }, "Alex")).toEqual({
-      kind: "success",
+      kind: "warning",
       label: "Share removed",
     });
     expect(
@@ -90,14 +90,14 @@ describe("copy (D-83, D-87, D-89)", () => {
         { kind: "create-and-share", contactRemoved: true },
         "Robin",
       ),
-    ).toEqual({ kind: "success", label: "Removed share and Robin" });
+    ).toEqual({ kind: "warning", label: "Removed share and Robin" });
     expect(
       undoResultSnackbar(
         { kind: "create-and-share", contactRemoved: false },
         "Robin",
       ),
     ).toEqual({
-      kind: "success",
+      kind: "warning",
       label: "Kept Robin because they have other details.",
     });
   });

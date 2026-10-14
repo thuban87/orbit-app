@@ -590,8 +590,9 @@ export function MemoryHistoryScreen({
       }
       closeForm();
       void load();
+      // D-132: a delete reports in the warning style.
       showSnackbar({
-        kind: "success",
+        kind: "warning",
         label: historyDeletedSnackbar(title, nameRef.current),
         action: {
           label: "Undo",

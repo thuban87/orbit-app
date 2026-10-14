@@ -67,7 +67,8 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
 
   if (!snackbar || !hostVisible) return null;
   // D-132: a notice is an accent pill and a destructive result the warning
-  // pill; D-72: an error is announced assertively as an alert.
+  // pill; D-140: an error is the warning pill too, announced assertively as
+  // an alert (D-72).
   const look = snackbarPresentation(snackbar.kind);
   const actionColor = colors[look.actionTone];
   const layout = snackbarLayout({

@@ -49,6 +49,7 @@ vi.mock("@/theme/use-reduced-motion", () => ({
 const {
   CATEGORY_MANAGER_COPY,
   categoryCountLabel,
+  categoryResultKind,
   createCategoryManagementLoadGuard,
   deletionImpactRows,
   isUnusedCategoryPreview,
@@ -183,11 +184,19 @@ describe("CategoryManagementScreen tracer contracts", () => {
 });
 
 describe("CategoryManagementScreen committed mutation coordinator", () => {
+  // D-132: a delete reports in the warning style; add and rename are notices.
   const operations = [
-    ["create", "Category added.", "editor"],
-    ["rename", "Category renamed.", "editor"],
-    ["delete", "Category deleted.", "delete"],
+    ["create", "Category added.", "editor", "success"],
+    ["rename", "Category renamed.", "editor", "success"],
+    ["delete", "Category deleted.", "delete", "warning"],
   ] as const;
+
+  it.each(operations)(
+    "%s reports as its snackbar kind",
+    (operation, _successLabel, _finalize, kind) => {
+      expect(categoryResultKind(operation)).toBe(kind);
+    },
+  );
 
   it.each(operations)(
     "keeps %s pending without success when its committed write cannot be read back",
@@ -221,7 +230,7 @@ describe("CategoryManagementScreen committed mutation coordinator", () => {
 
   it.each(operations)(
     "retries %s through readback only and finalizes success exactly once",
-    async (operation, successLabel, finalize) => {
+    async (operation, successLabel, finalize, kind) => {
       const mutation = vi.fn().mockResolvedValue(undefined);
       const readRows = vi
         .fn()
@@ -241,10 +250,12 @@ describe("CategoryManagementScreen committed mutation coordinator", () => {
       const setPending = vi.fn();
       const showSnackbar = vi.fn();
       const bumpShellRefresh = vi.fn();
-      const publishSuccess = vi.fn((label: string) => {
-        bumpShellRefresh();
-        showSnackbar({ kind: "success", label });
-      });
+      const publishSuccess = vi.fn(
+        (label: string, resultKind: "success" | "warning") => {
+          bumpShellRefresh();
+          showSnackbar({ kind: resultKind, label });
+        },
+      );
       const finalizeUi = vi.fn();
       const pending = { operation, successLabel, finalize };
 
@@ -279,11 +290,11 @@ describe("CategoryManagementScreen committed mutation coordinator", () => {
       expect(finalizeUi).toHaveBeenCalledTimes(1);
       expect(finalizeUi).toHaveBeenCalledWith(finalize);
       expect(publishSuccess).toHaveBeenCalledTimes(1);
-      expect(publishSuccess).toHaveBeenCalledWith(successLabel);
+      expect(publishSuccess).toHaveBeenCalledWith(successLabel, kind);
       expect(bumpShellRefresh).toHaveBeenCalledTimes(1);
       expect(showSnackbar).toHaveBeenCalledTimes(1);
       expect(showSnackbar).toHaveBeenCalledWith({
-        kind: "success",
+        kind,
         label: successLabel,
       });
       expect(setPending).toHaveBeenLastCalledWith(null);

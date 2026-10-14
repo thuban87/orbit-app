@@ -87,20 +87,21 @@ export type ShareUndoResult =
 
 /**
  * The confirming snackbar for every successful Undo (38.9 D-39/D-46; D-110,
- * D-120). The share is gone in every case; none is an error. Proposed wording
- * (this plan only), reviewed by the owner at plan 19.
+ * D-120). The share is gone in every case; none is an error. Each result
+ * deletes the share rows, so it reports in the warning style (38.10 D-132).
+ * Proposed wording (this plan only), reviewed by the owner at plan 19.
  */
 export function undoResultSnackbar(
   result: ShareUndoResult,
   name: string,
-): { kind: "success"; label: string } {
+): { kind: "warning"; label: string } {
   if (result.kind === "share") {
-    return { kind: "success", label: "Share removed" };
+    return { kind: "warning", label: "Share removed" };
   }
   return result.contactRemoved
-    ? { kind: "success", label: `Removed share and ${name}` }
+    ? { kind: "warning", label: `Removed share and ${name}` }
     : {
-        kind: "success",
+        kind: "warning",
         label: `Kept ${name} because they have other details.`,
       };
 }

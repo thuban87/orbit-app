@@ -162,9 +162,10 @@ export async function deleteManagedSystem(input: {
   });
   let undoStarted = false;
   let postDeleteRefresh: Promise<void>;
+  // D-132: a delete reports in the warning style (both labels).
   const showDeleteUndo = (label: string) =>
     showSnackbar({
-      kind: "success",
+      kind: "warning",
       label,
       action: {
         label: "Undo",

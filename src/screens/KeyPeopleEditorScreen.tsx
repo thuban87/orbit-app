@@ -304,8 +304,9 @@ export function KeyPeopleEditorScreen({
         return;
       }
       void load();
+      // D-132: a delete reports in the warning style.
       showSnackbar({
-        kind: "success",
+        kind: "warning",
         label: `Deleted key person${forName(nameRef.current)}`,
         action: {
           label: "Undo",

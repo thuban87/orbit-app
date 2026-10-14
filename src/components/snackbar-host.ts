@@ -135,6 +135,18 @@ export interface SnackbarPresentation {
   accessibilityRole: "alert" | undefined;
 }
 
+/** The warning pill's paint, shared by destructive results and errors (D-140). */
+const WARNING_LOOK = {
+  fillTone: "textPrimary",
+  labelTone: "background",
+  actionTone: "background",
+  borderTone: "textPrimary",
+  glyphTone: "background",
+} as const satisfies Pick<
+  SnackbarPresentation,
+  "fillTone" | "labelTone" | "actionTone" | "borderTone" | "glyphTone"
+>;
+
 /**
  * Each kind's look, as palette KEYS (never colours; `Snackbar.tsx` resolves
  * them through `useTheme().colors`). PURE.
@@ -146,8 +158,9 @@ export interface SnackbarPresentation {
  *   warning rather than a notice and differs from the `surface` cards. The
  *   body-text pair is AA in every palette; `danger`/`onDanger` is not
  *   (galaxy-dark ~3.9:1). Polite: the user caused it.
- * - error (38.9 D-72): a `danger` outline and glyph on the `surface` pill,
- *   announced assertively as an alert.
+ * - error (a failure, D-140): the same warning pill, so there are two looks
+ *   in total; it keeps its assertive announcement and `alert` role (38.9
+ *   D-72).
  *
  * Timing is the same for every kind (38.9 D-04).
  */
@@ -155,21 +168,13 @@ export function snackbarPresentation(kind: SnackbarKind): SnackbarPresentation {
   switch (kind) {
     case "error":
       return {
-        fillTone: "surface",
-        labelTone: "textSecondary",
-        actionTone: "accentText",
-        borderTone: "danger",
-        glyphTone: "danger",
+        ...WARNING_LOOK,
         liveRegion: "assertive",
         accessibilityRole: "alert",
       };
     case "warning":
       return {
-        fillTone: "textPrimary",
-        labelTone: "background",
-        actionTone: "background",
-        borderTone: "textPrimary",
-        glyphTone: "background",
+        ...WARNING_LOOK,
         liveRegion: "polite",
         accessibilityRole: undefined,
       };
