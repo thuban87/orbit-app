@@ -122,6 +122,11 @@ vi.mock("@/stores/section-fab-store", async (original) => ({
     selector: (s: { owners: ReadonlySet<string> }) => unknown,
   ) => selector({ owners: new Set<string>() }),
 }));
+// ...and sits above the FAB row, off the tab bar's height (38.10 D-143).
+vi.mock("@/stores/tab-bar-layout-store", async (original) => ({
+  ...(await original<typeof import("@/stores/tab-bar-layout-store")>()),
+  useMeasuredTabBarHeight: () => 0,
+}));
 vi.mock("@/db/database", () => ({ getExecutor: () => ({}) }));
 vi.mock("@/stores/orrery-preferences-store", () => ({
   useOrreryPreferencesStore: () => ({
