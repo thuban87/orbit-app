@@ -38,6 +38,7 @@ import {
 } from "react";
 import {
   AppState,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -246,6 +247,10 @@ export const ShareConfirmationCard = forwardRef<
   }, [actions, dispatch]);
 
   const onSaveNote = useCallback(() => {
+    // The note field unmounts without a blur when a button closes it, so
+    // Android leaves the keyboard up with no field; a later share then opens
+    // with the keyboard gap still reserved (38.10-19 device pass).
+    Keyboard.dismiss();
     const current = stateRef.current;
     const note = current.note.trim();
     // A blank note is a Skip: no write (WR-02).
@@ -353,7 +358,10 @@ export const ShareConfirmationCard = forwardRef<
               label="Skip"
               accessibilityLabel="Skip note"
               disabled={busy}
-              onPress={() => dispatch({ type: "noteClosed" })}
+              onPress={() => {
+                Keyboard.dismiss();
+                dispatch({ type: "noteClosed" });
+              }}
             />
             <Button
               testID="capture-note-done"
