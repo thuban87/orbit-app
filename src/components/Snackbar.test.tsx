@@ -37,3 +37,28 @@ describe("Snackbar look (D-72; review WR-06; 38.10 D-132)", () => {
     );
   });
 });
+
+describe("Snackbar root geometry (38.10 D-132; O2, O5)", () => {
+  const source = readFileSync(
+    new URL("./Snackbar.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("sizes and aligns the root pill around the FABs that show", () => {
+    expect(source).toContain("snackbarLayout(");
+    expect(source).toContain("selectSectionFabPresent");
+    expect(source).toContain('s.rects["shell-fab"] !== undefined');
+    expect(source).toContain("useWindowDimensions()");
+    expect(source).toContain("alignItems: layout.alignItems");
+    expect(source).toContain("width: layout.width");
+  });
+
+  it("keeps only the pill touchable and lets the label wrap", () => {
+    expect(source).toContain('pointerEvents="box-none"');
+    expect(source).not.toContain("numberOfLines");
+  });
+
+  it("pads the pill from snackbarPadding (O5)", () => {
+    expect(source).toContain("snackbarPadding(");
+  });
+});

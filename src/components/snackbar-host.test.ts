@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FAB_SIDE_INSET, FAB_SIZE } from "@/navigation/use-bottom-clearance";
 import { applyAccent, resolveAccent } from "@/theme/accents";
 import { AA_LARGE, AA_NORMAL, contrastRatio } from "@/theme/contrast";
 import { ACCENT_IDS } from "@/theme/theme-option-ids";
@@ -8,7 +9,12 @@ import { SPACING } from "@/theme/tokens/spacing";
 import {
   ROOT_SNACKBAR_HOST,
   resolveSnackbarHostVisible,
+  SNACKBAR_FAB_GAP,
+  SNACKBAR_WIDTH_ONE_FAB,
+  SNACKBAR_WIDTH_WITH_SECTION_FAB,
   snackbarBottomPadding,
+  snackbarLayout,
+  snackbarPadding,
   snackbarPresentation,
 } from "./snackbar-host";
 
@@ -128,4 +134,131 @@ describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
       }
     }
   }
+});
+
+describe("snackbarLayout (38.10 D-132; O2 per D-138)", () => {
+  const RESERVE = FAB_SIDE_INSET + FAB_SIZE + SNACKBAR_FAB_GAP;
+
+  it("pins D-132's targets and the gap token", () => {
+    expect(SNACKBAR_WIDTH_ONE_FAB).toBe(0.8);
+    expect(SNACKBAR_WIDTH_WITH_SECTION_FAB).toBe(0.6);
+    expect(SNACKBAR_FAB_GAP).toBe(SPACING.sm);
+  });
+
+  it("only the universal FAB: left-aligned at ~80%, clamped off the right lane", () => {
+    for (const W of [320, 393, 600]) {
+      expect(
+        snackbarLayout({
+          host: ROOT_SNACKBAR_HOST,
+          windowWidth: W,
+          universalFab: true,
+          sectionFab: false,
+        }),
+      ).toEqual({
+        alignItems: "flex-start",
+        width: Math.min(Math.round(0.8 * W), W - SPACING.base - RESERVE),
+      });
+    }
+  });
+
+  it("a section FAB (with or without the universal FAB): centred at ~60%, clamped off both lanes", () => {
+    for (const W of [320, 393, 600]) {
+      for (const universalFab of [true, false]) {
+        expect(
+          snackbarLayout({
+            host: ROOT_SNACKBAR_HOST,
+            windowWidth: W,
+            universalFab,
+            sectionFab: true,
+          }),
+        ).toEqual({
+          alignItems: "center",
+          width: Math.min(Math.round(0.6 * W), W - 2 * RESERVE),
+        });
+      }
+    }
+  });
+
+  it("no FAB, or any overlay host: today's geometry (centred, content-sized)", () => {
+    const today = { alignItems: "center", width: undefined };
+    expect(
+      snackbarLayout({
+        host: ROOT_SNACKBAR_HOST,
+        windowWidth: 393,
+        universalFab: false,
+        sectionFab: false,
+      }),
+    ).toEqual(today);
+    for (const universalFab of [true, false]) {
+      for (const sectionFab of [true, false]) {
+        expect(
+          snackbarLayout({
+            host: "sheet-1",
+            windowWidth: 393,
+            universalFab,
+            sectionFab,
+          }),
+        ).toEqual(today);
+      }
+    }
+  });
+
+  // The pill's horizontal span inside the overlay, which pads each side by
+  // SPACING.base: left-aligned starts at SPACING.base, centred sits on W/2.
+  function span(W: number, universalFab: boolean, sectionFab: boolean) {
+    const layout = snackbarLayout({
+      host: ROOT_SNACKBAR_HOST,
+      windowWidth: W,
+      universalFab,
+      sectionFab,
+    });
+    const width = layout.width as number;
+    const left =
+      layout.alignItems === "flex-start" ? SPACING.base : (W - width) / 2;
+    return { left, right: left + width };
+  }
+  const overlaps = (
+    a: { left: number; right: number },
+    lane: [number, number],
+  ) => a.left < lane[1] && a.right > lane[0];
+
+  for (const W of [320, 360, 393, 412, 480]) {
+    const rightLane: [number, number] = [
+      W - FAB_SIDE_INSET - FAB_SIZE,
+      W - FAB_SIDE_INSET,
+    ];
+    const leftLane: [number, number] = [
+      FAB_SIDE_INSET,
+      FAB_SIDE_INSET + FAB_SIZE,
+    ];
+    it(`W=${W}: the pill never reaches a present FAB's lane`, () => {
+      for (const [universalFab, sectionFab] of [
+        [true, false],
+        [true, true],
+        [false, true],
+      ] as const) {
+        const pill = span(W, universalFab, sectionFab);
+        expect(pill.left).toBeGreaterThanOrEqual(SPACING.base);
+        expect(pill.right).toBeLessThanOrEqual(W - SPACING.base);
+        if (universalFab) expect(overlaps(pill, rightLane)).toBe(false);
+        if (sectionFab) expect(overlaps(pill, leftLane)).toBe(false);
+      }
+    });
+  }
+});
+
+describe("snackbarPadding (O5, D-132)", () => {
+  it("closes the right side with SPACING.base when there is no action", () => {
+    expect(snackbarPadding(false)).toEqual({
+      paddingLeft: SPACING.base,
+      paddingRight: SPACING.base,
+    });
+  });
+
+  it("leaves the right side to the action's own padding", () => {
+    expect(snackbarPadding(true)).toEqual({
+      paddingLeft: SPACING.base,
+      paddingRight: 0,
+    });
+  });
 });
