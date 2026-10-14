@@ -38,15 +38,20 @@ vi.mock("react", () => ({
   useState: <T,>(initial: T) => {
     const slot = state.index;
     state.index += 1;
-    state.initial[slot] = initial;
+    // A function initial value is called, as React calls a lazy initialiser.
+    const value =
+      typeof initial === "function" ? (initial as () => T)() : initial;
+    state.initial[slot] = value;
     if (!state.setters[slot]) state.setters[slot] = vi.fn();
     return [
-      state.seed.has(slot) ? state.seed.get(slot) : initial,
+      state.seed.has(slot) ? state.seed.get(slot) : value,
       state.setters[slot],
     ];
   },
 }));
 vi.mock("react-native", () => ({
+  // D-146: the note box follows the keyboard; down in this harness.
+  Keyboard: { isVisible: () => false, addListener: vi.fn() },
   StyleSheet: { create: (styles: unknown) => styles },
   TextInput: "TextInput",
   View: "View",
@@ -153,6 +158,7 @@ const SLOT = {
   error: 1,
   alsoSaveTo: 2,
   busy: 3,
+  keyboardUp: 4,
 } as const;
 type SlotName = keyof typeof SLOT;
 
@@ -195,6 +201,7 @@ describe("the useState slot map the seeding relies on (verification IN-03)", () 
     expect(state.initial[SLOT.error]).toBeNull();
     expect(state.initial[SLOT.alsoSaveTo]).toBeNull();
     expect(state.initial[SLOT.busy]).toBe(false);
+    expect(state.initial[SLOT.keyboardUp]).toBe(false);
   });
 
   it("each slot drives what its name says", () => {
@@ -214,6 +221,16 @@ describe("the useState slot map the seeding relies on (verification IN-03)", () 
     expect(button(render({ busy: true }).tree, "Save").props?.disabled).toBe(
       true,
     );
+    // keyboardUp → the note box's height bounds (D-146).
+    const boxStyle = (keyboardUp: boolean) =>
+      Object.assign(
+        {},
+        ...(find(render({ keyboardUp }).tree, "TextInput")[0]?.props
+          ?.style as object[]),
+      );
+    expect(boxStyle(false)).toMatchObject({ minHeight: 84 });
+    expect(boxStyle(false).maxHeight).toBeUndefined();
+    expect(boxStyle(true)).toMatchObject({ minHeight: 48, maxHeight: 48 });
   });
 });
 

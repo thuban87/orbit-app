@@ -27,7 +27,7 @@
  * deleted row. No colour literal (check:colors) — all colour via theme tokens.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { Keyboard, StyleSheet, TextInput, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { readInteractionForEdit } from "@/db/interaction-edit-read";
 import type { LinkedSection } from "@/db/linked-entry-dao";
@@ -40,6 +40,7 @@ import {
 } from "@/logic/also-save-to-logic";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
+  postLogNoteBoxHeight,
   resolvePostLogSave,
   shouldPromptOnNoteClose,
 } from "@/screens/post-log-note-logic";
@@ -83,6 +84,21 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   const [busy, setBusy] = useState(false);
   // Own single-flight guard, distinct from runQuickLog's pendingRef.
   const savingRef = useRef(false);
+  // D-146: the note box is shorter while the keyboard is up. Set by the
+  // keyboard's show/hide events (one change per event, never per frame).
+  const [keyboardUp, setKeyboardUp] = useState(() => Keyboard.isVisible());
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () =>
+      setKeyboardUp(true),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardUp(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const contactId = target?.contactId ?? null;
   const interactionId = target?.interactionId ?? null;
@@ -196,9 +212,9 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       visible={target !== null}
       onRequestClose={requestSheetClose}
       // D-136 O4: the detail sheet (60% of the resting window, still bounded
-      // above the keyboard) so the chips and Save show without scrolling at
-      // the test phones' font scale; the body still scrolls at larger text
-      // (38.4 D-32).
+      // above the keyboard); with the keyboard up the note box is shorter so
+      // the chips and Save show without scrolling at the test phones' font
+      // scale (D-146); the body still scrolls at larger text (38.4 D-32).
       variant="detail"
     >
       <View style={styles.body}>
@@ -220,6 +236,9 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
           autoFocus
           style={[
             styles.input,
+            // D-146: shorter and capped while the keyboard is up, so the
+            // chips and Cancel/Save stay above it; the text scrolls inside.
+            postLogNoteBoxHeight(keyboardUp),
             {
               color: colors.textPrimary,
               backgroundColor: colors.background,
@@ -268,7 +287,6 @@ const styles = StyleSheet.create({
   input: {
     borderRadius: SPACING.sm,
     borderWidth: 1,
-    minHeight: 84,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     textAlignVertical: "top",

@@ -14,6 +14,7 @@
  */
 import type { LinkedSection } from "@/db/linked-entry-dao";
 import { effectiveAlsoSaveTo } from "@/logic/also-save-to-logic";
+import { SPACING } from "@/theme/tokens/spacing";
 
 /** Exactly one persistence outcome per save. */
 export type PostLogSaveTarget = "note" | "missing" | "noop";
@@ -85,4 +86,33 @@ export function shouldPromptOnNoteClose(state: {
   alsoSaveTo: LinkedSection | null;
 }): boolean {
   return state.text.trim() !== "" || state.alsoSaveTo !== null;
+}
+
+/** The note box's minimum height with the keyboard down (the resting layout). */
+export const NOTE_BOX_RESTING_MIN_HEIGHT = 84;
+
+/**
+ * The note box's height with the keyboard up (D-146): `SPACING["2xl"]` (48),
+ * about two lines at the test phones' font scale, then the box scrolls.
+ */
+export const NOTE_BOX_KEYBOARD_HEIGHT = SPACING["2xl"];
+
+/**
+ * The note box's height bounds (38.10 D-146). With the keyboard up the box is
+ * shorter and capped, so on a small phone at font scale 1.15 (a Pixel 3a) the
+ * "Also save to" chips and Cancel/Save stay visible above the keyboard without
+ * scrolling, however long the note grows; the text scrolls inside the box.
+ * With the keyboard down the resting layout is unchanged (D-136 O4). Driven by
+ * the keyboard's show/hide events, never per frame. PURE.
+ */
+export function postLogNoteBoxHeight(keyboardUp: boolean): {
+  minHeight: number;
+  maxHeight: number | undefined;
+} {
+  return keyboardUp
+    ? {
+        minHeight: NOTE_BOX_KEYBOARD_HEIGHT,
+        maxHeight: NOTE_BOX_KEYBOARD_HEIGHT,
+      }
+    : { minHeight: NOTE_BOX_RESTING_MIN_HEIGHT, maxHeight: undefined };
 }

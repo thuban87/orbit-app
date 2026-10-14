@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { SPACING } from "@/theme/tokens/spacing";
 import {
+  NOTE_BOX_KEYBOARD_HEIGHT,
+  NOTE_BOX_RESTING_MIN_HEIGHT,
   type PostLogSaveResult,
+  postLogNoteBoxHeight,
   resolvePostLogSave,
   shouldPromptOnNoteClose,
 } from "./post-log-note-logic";
@@ -94,5 +98,30 @@ describe("shouldPromptOnNoteClose (38.9 D-14; review CR-02)", () => {
     expect(shouldPromptOnNoteClose({ text: "", alsoSaveTo: "memory" })).toBe(
       true,
     );
+  });
+});
+
+describe("postLogNoteBoxHeight (D-146)", () => {
+  it("keeps the resting box with the keyboard down (D-136 O4 layout)", () => {
+    expect(NOTE_BOX_RESTING_MIN_HEIGHT).toBe(84);
+    expect(postLogNoteBoxHeight(false)).toEqual({
+      minHeight: 84,
+      maxHeight: undefined,
+    });
+  });
+
+  it("is shorter and capped with the keyboard up, so the chips and Save stay in view", () => {
+    expect(NOTE_BOX_KEYBOARD_HEIGHT).toBe(SPACING["2xl"]);
+    expect(postLogNoteBoxHeight(true)).toEqual({
+      minHeight: NOTE_BOX_KEYBOARD_HEIGHT,
+      maxHeight: NOTE_BOX_KEYBOARD_HEIGHT,
+    });
+    // At least the ~50 px (~18 dp at the Pixel 3a's 2.75 density) the chips
+    // and Save were cut by at font scale 1.15, with room to spare.
+    expect(
+      NOTE_BOX_RESTING_MIN_HEIGHT - NOTE_BOX_KEYBOARD_HEIGHT,
+    ).toBeGreaterThanOrEqual(2 * 18);
+    // Still a full touch target.
+    expect(NOTE_BOX_KEYBOARD_HEIGHT).toBeGreaterThanOrEqual(44);
   });
 });
