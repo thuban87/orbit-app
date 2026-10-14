@@ -46,6 +46,26 @@ export function historyTitle(fieldKey: CurrentStateFieldKey): string {
   }
 }
 
+/**
+ * The page's Add wording (D-131): today's "Add <title>", shown by the top Add
+ * bar and the section FAB's label and screen-reader name alike.
+ */
+export function historyAddLabel(fieldKey: CurrentStateFieldKey): string {
+  return `Add ${historyTitle(fieldKey)}`;
+}
+
+/** The page's `sectionFabIcon` key (D-131: chat / map pin). */
+export function historyFabSection(
+  fieldKey: CurrentStateFieldKey,
+): "last_talked_about" | "current_location" {
+  switch (fieldKey) {
+    case "last_talked_about":
+      return "last_talked_about";
+    case "current_location":
+      return "current_location";
+  }
+}
+
 /** What a tap on a row does (D-107): a linked row opens its interaction. */
 export type HistoryRowPressAction = "openLinked" | "edit";
 

@@ -16,6 +16,14 @@
  * - Add: the D-66 entry field and a date that defaults to today and cannot
  *   pass it (D-101). `openAdd` opens it; `editId` opens that entry's form
  *   once per navigation after the read (D-107; convergence c6).
+ * - Section Add FAB (D-131): the solid Add sits at the top, above the entries
+ *   and the empty state, whether or not the page has entries; the add form
+ *   opens in its place. Scrolled out of view, it morphs into the bottom-left
+ *   FAB (chat for Last Talked About, a map pin for Current Location, with a
+ *   +), opposite the universal FAB on the same baseline; its tap scrolls to
+ *   the top and opens the add form. The empty state is text only (D-68).
+ * - A tab page, not a focused one: the scroll content keeps the shell FAB's
+ *   `useBottomClearance` (38.4 D-52), which already clears a FAB-height row.
  * - Delete is immediate with Undo, then a confirming snackbar; a linked
  *   entry's interaction and note stay (D-47, D-69). It sits in the open
  *   form, off the row card (38.9 D-30, as the Off Limits editor does).
@@ -46,13 +54,15 @@ import {
   type AccessibilityActionEvent,
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 import { openMemoryLink } from "@/components/MemoryCard";
 import { MoveEntrySheet } from "@/components/MoveEntrySheet";
+import { SectionAddFab, useSectionAddMorph } from "@/components/SectionAddFab";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { sectionFabIcon } from "@/components/section-add-fab-logic";
 import {
   AppText,
   Button,
@@ -98,7 +108,9 @@ import {
   HISTORY_MOST_RECENT,
   HISTORY_PREVIOUS,
   type HistoryRowModel,
+  historyAddLabel,
   historyDeletedSnackbar,
+  historyFabSection,
   historyRestoredSnackbar,
   historyTitle,
   isPickableEntryDate,
@@ -389,6 +401,7 @@ export function MemoryHistoryScreen({
   const bottomClearance = useBottomClearance();
   const { contactId, fieldKey, openAdd, editId } = route.params;
   const title = historyTitle(fieldKey);
+  const addLabel = historyAddLabel(fieldKey);
   // D-45 (38.9): the person line under the fixed title.
   const person = useContactHeader(contactId);
   // Snackbars fired after an await read the latest name.
@@ -643,6 +656,21 @@ export function MemoryHistoryScreen({
   );
   const controlsHeld = saving || form !== null;
 
+  // D-131: the top Add morphs into the bottom-left FAB once it scrolls off.
+  // A tab page (not a focused route): the FAB sits above the in-flow tab
+  // bar, on the universal FAB's baseline.
+  const morph = useSectionAddMorph({
+    loaded: phase.phase === "loaded",
+    formOpen: form !== null,
+    focusedRoute: false,
+  });
+  const openAddFromFab = () => {
+    // Held while a write runs or a form is open, as the top Add is.
+    if (savingRef.current || form !== null) return;
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    openForm({ mode: "add" });
+  };
+
   const renderRow = (model: HistoryRowModel) => {
     const { row } = model;
     const editing = form?.mode === "edit" && form.row.id === row.id;
@@ -687,7 +715,7 @@ export function MemoryHistoryScreen({
   };
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={morph.onRootLayout}>
       {/* House header (38.9 D-16, D-44); Back is held while a write runs. */}
       <ShellAppBar
         variant="child"
@@ -695,9 +723,12 @@ export function MemoryHistoryScreen({
         person={person}
         backDisabled={saving}
       />
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}
+        onLayout={morph.onViewportLayout}
+        onScroll={morph.scrollHandler}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.content,
@@ -740,27 +771,28 @@ export function MemoryHistoryScreen({
                   onCancel={() => requestClose(closeForm, formDirty)}
                   onDirtyChange={setFormDirty}
                 />
-              ) : groups !== null && groups.mostRecent !== null ? (
-                <Button
-                  testID="memory-history-add"
-                  role="primary"
-                  label={`Add ${title}`}
-                  disabled={controlsHeld}
-                  onPress={() => openForm({ mode: "add" })}
-                />
-              ) : null}
+              ) : (
+                // D-131: the solid Add at the top (D-130), the one Add on the
+                // page, with entries or without. Held while a form is open or
+                // a write runs.
+                <View onLayout={morph.onBarLayout}>
+                  <Button
+                    testID="memory-history-add"
+                    role="primary"
+                    label={addLabel}
+                    disabled={controlsHeld}
+                    onPress={() => openForm({ mode: "add" })}
+                  />
+                </View>
+              )}
               {groups === null || groups.mostRecent === null ? (
                 form?.mode === "add" ? null : (
-                  // D-68: the empty page's one Add action.
+                  // D-68: text only; the top Add is the one action.
                   <EmptyState
                     testID="memory-history-empty"
                     icon="list"
                     heading={`Nothing in ${title} yet`}
                     body="Add the first entry with its date."
-                    action={{
-                      label: `Add ${title}`,
-                      onPress: () => openForm({ mode: "add" }),
-                    }}
                   />
                 )
               ) : (
@@ -785,7 +817,7 @@ export function MemoryHistoryScreen({
           )}
         </KeyboardCenteringProvider>
         {bottomSpacer}
-      </ScrollView>
+      </Animated.ScrollView>
       {movable && moveRow !== null ? (
         <MoveEntrySheet
           entryRef={{
@@ -801,6 +833,14 @@ export function MemoryHistoryScreen({
           onClose={() => setMoveRow(null)}
         />
       ) : null}
+      {/* Rendered last, so it floats over the content (D-131). */}
+      <SectionAddFab
+        morph={morph}
+        icon={sectionFabIcon(historyFabSection(fieldKey))}
+        label={addLabel}
+        hint="Scrolls to the top and opens the add form."
+        onPress={openAddFromFab}
+      />
     </View>
   );
 }

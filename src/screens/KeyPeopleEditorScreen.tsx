@@ -8,8 +8,13 @@
  * - Hosts the shared `RelationshipEditor`, mounted after the read so its
  *   `initiallyEditingId` (read at mount) can open `editId`'s form once per
  *   navigation; an entry that is gone falls back to the list (D-107).
- * - The empty state is text only: the editor's own "Add key person" is the
- *   single D-68 action.
+ * - Section Add FAB (D-131): the solid "Add key person" sits at the top,
+ *   above the rows and the empty state, rendered by this screen (the editor
+ *   runs with its Add placement at the top and renders no Add of its own); a
+ *   new key person's form opens in its place. Scrolled out of view, it morphs
+ *   into the bottom-left FAB (the people icon with a +), whose tap scrolls to
+ *   the top and opens the add form.
+ * - The empty state is text only: the top Add is the single D-68 action.
  * - Card edit mode (D-130): each row has a pencil at its top right; the
  *   pencil or a tap on the row opens its form in the row's place, with a red
  *   Delete at its top (no Move: Key People is not a D-84 section).
@@ -20,21 +25,29 @@
  *   confirming snackbar (D-69; 38.9 D-39/D-46 via D-19). No restore prop.
  * - The note field centres above the keyboard (D-66, D-75). Back closes an
  *   open form first, asking only when it holds changes (38.9 D-13/D-14).
- * - Focused route: no bottom clearance (fab-clearance-contract).
+ * - Focused route: no shell-FAB clearance (fab-clearance-contract); the
+ *   scroll content clears the section FAB instead (D-131).
  *
  * Snackbar wording is proposed (this plan only) for the plan-19 wording
  * review. Every colour resolves through `useTheme().colors.*` (CLAUDE.md).
  */
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 import {
   type RelationshipDraft,
   type RelationshipDraftState,
   RelationshipEditor,
   type RelationshipEditorHandle,
 } from "@/components/RelationshipEditor";
+import {
+  SectionAddFab,
+  useSectionAddMorph,
+  useSectionFabClearance,
+} from "@/components/SectionAddFab";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { sectionFabIcon } from "@/components/section-add-fab-logic";
 import {
   AppText,
   Button,
@@ -58,6 +71,7 @@ import {
 import { useContactHeader } from "@/hooks/use-contact-header";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -69,6 +83,8 @@ import { openEditTarget } from "./section-editor-logic";
 
 const LOG_SCOPE = "key-people-editor";
 const TITLE = "Key People";
+/** The page's Add wording (today's; plan 25 applies D-137 W19). */
+const ADD_LABEL = "Add key person";
 
 /** " for Ann", or "" while the person line has not loaded. */
 function forName(name: string | null): string {
@@ -301,8 +317,21 @@ export function KeyPeopleEditorScreen({
     return true;
   };
 
+  // D-131: the top Add morphs into the bottom-left FAB once it scrolls off.
+  const focusedRoute = isFocusedWorkflow(route.name);
+  const morph = useSectionAddMorph({
+    loaded: phase.phase === "loaded",
+    formOpen: draftState.open,
+    focusedRoute,
+  });
+  const fabClearance = useSectionFabClearance(focusedRoute);
+  const openNewFromFab = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    editorRef.current?.openNew();
+  };
+
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={morph.onRootLayout}>
       {/* While an add or edit runs the guard holds Back (D-26). */}
       <ShellAppBar
         variant="child"
@@ -310,10 +339,17 @@ export function KeyPeopleEditorScreen({
         person={person}
         backDisabled={saving}
       />
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}
-        contentContainerStyle={styles.content}
+        onLayout={morph.onViewportLayout}
+        onScroll={morph.scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={[
+          styles.content,
+          // The last row scrolls fully above the section FAB.
+          { paddingBottom: fabClearance },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <KeyboardCenteringProvider value={centering}>
@@ -342,13 +378,27 @@ export function KeyPeopleEditorScreen({
             </View>
           ) : (
             <>
+              {draftState.adding ? null : (
+                // D-131: the solid Add at the top (D-130), the one Add on the
+                // page; a new key person's form opens in its place. Held
+                // while a form is open or a save runs.
+                <View onLayout={morph.onBarLayout}>
+                  <Button
+                    testID="key-people-editor-add"
+                    role="primary"
+                    label={ADD_LABEL}
+                    disabled={saving || draftState.open}
+                    onPress={() => editorRef.current?.openNew()}
+                  />
+                </View>
+              )}
               {rows.length === 0 ? (
-                // D-68: text only; the editor's own "Add key person" acts.
+                // D-68: text only; the top Add is the one action.
                 <EmptyState
                   testID="key-people-editor-empty"
                   icon="list"
                   heading="No key people yet"
-                  body="Use Add key person below to add the first one."
+                  body="Use Add key person above to add the first one."
                 />
               ) : null}
               <RelationshipEditor
@@ -358,6 +408,7 @@ export function KeyPeopleEditorScreen({
                 initiallyEditingId={initialEditId}
                 cardEditMode
                 formRef={formRef}
+                addPlacement="top"
                 onAdd={add}
                 onEdit={edit}
                 onDelete={remove}
@@ -371,7 +422,15 @@ export function KeyPeopleEditorScreen({
           )}
         </KeyboardCenteringProvider>
         {bottomSpacer}
-      </ScrollView>
+      </Animated.ScrollView>
+      {/* Rendered last, so it floats over the content (D-131). */}
+      <SectionAddFab
+        morph={morph}
+        icon={sectionFabIcon("key_people")}
+        label={ADD_LABEL}
+        hint="Scrolls to the top and opens the add form."
+        onPress={openNewFromFab}
+      />
     </View>
   );
 }

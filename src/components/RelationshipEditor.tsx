@@ -14,7 +14,11 @@ import type { RelationshipRow } from "@/db/relationships-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
-import { type CardEditSlot, cardEditSlots } from "./card-edit-slots";
+import {
+  type AddPlacement,
+  type CardEditSlot,
+  cardEditSlots,
+} from "./card-edit-slots";
 
 const LOG_SCOPE = "relationship-editor";
 
@@ -79,6 +83,14 @@ export interface RelationshipEditorProps {
   cardEditMode?: boolean;
   /** Attached to the open form's outer View, so a host can scroll it into view. */
   formRef?: Ref<View>;
+  /**
+   * Where the Add sits (D-131; the Key People editor). "top": the add slot
+   * comes first and the editor renders NO Add of its own (the host renders
+   * the bar and calls `openNew()` on the handle); a new key person's form
+   * opens in that first slot. Absent → "end", the editor's own Add after the
+   * rows (Add/Edit Contact, Update Contact).
+   */
+  addPlacement?: AddPlacement;
   /** Exposes `closeDraft()` so the host's Back can close the open form (D-14). */
   ref?: Ref<RelationshipEditorHandle>;
 }
@@ -86,11 +98,15 @@ export interface RelationshipEditorProps {
 export interface RelationshipDraftState {
   open: boolean;
   dirty: boolean;
+  /** The open form is a NEW key person (D-131: the host hides its top Add bar). */
+  adding?: boolean;
 }
 
 export interface RelationshipEditorHandle {
   /** Closes the open add/edit form without saving (no prompt). */
   closeDraft: () => void;
+  /** Opens a new key person's form (held while the host saves, as the Add is). */
+  openNew: () => void;
 }
 
 function blankToNull(value: string): string | null {
@@ -129,13 +145,15 @@ export function initialEditorState(
 /**
  * The editor's render order (D-130 card edit mode; see `cardEditSlots`): with
  * `cardEditMode` an open edit takes its row's index; otherwise every row,
- * then the form or the Add. PURE.
+ * then the form or the Add. `addPlacement: "top"` (D-131) puts the add slot
+ * first. PURE.
  */
 export function relationshipEditorSlots(input: {
   items: readonly RelationshipRow[];
   editingId: number | null;
   adding: boolean;
   cardEditMode: boolean;
+  addPlacement?: AddPlacement;
 }): CardEditSlot<RelationshipRow>[] {
   return cardEditSlots({ ...input, addOnly: false, showAdd: true });
 }
@@ -212,6 +230,7 @@ export function RelationshipEditor({
   initiallyEditingId,
   cardEditMode = false,
   formRef,
+  addPlacement = "end",
   ref,
 }: RelationshipEditorProps) {
   const { colors } = useTheme();
@@ -266,21 +285,26 @@ export function RelationshipEditor({
     editing,
     draft,
   );
+  const adding = draft !== null && editing === null;
   const onDraftStateChangeRef = useRef(onDraftStateChange);
   onDraftStateChangeRef.current = onDraftStateChange;
   useEffect(() => {
-    onDraftStateChangeRef.current?.({ open: draftOpen, dirty: draftDirty });
-  }, [draftOpen, draftDirty]);
+    onDraftStateChangeRef.current?.({
+      open: draftOpen,
+      dirty: draftDirty,
+      adding,
+    });
+  }, [draftOpen, draftDirty, adding]);
   useEffect(
     () => () => onDraftStateChangeRef.current?.({ open: false, dirty: false }),
     [],
   );
-  useImperativeHandle(ref, () => ({ closeDraft: close }));
   const openNew = () => {
     if (busy) return; // held while the host saves (WR-02)
     setEditing(null);
     setDraft(initialDraft());
   };
+  useImperativeHandle(ref, () => ({ closeDraft: close, openNew }));
   const openEdit = (item: RelationshipRow) => {
     if (busy) return; // held while the host saves (WR-02)
     setEditing(item);
@@ -588,8 +612,9 @@ export function RelationshipEditor({
   const slots = relationshipEditorSlots({
     items,
     editingId: editing?.id ?? null,
-    adding: draft !== null && editing === null,
+    adding,
     cardEditMode,
+    addPlacement,
   });
 
   return (
@@ -599,7 +624,10 @@ export function RelationshipEditor({
           ? renderRow(slot.item)
           : slot.kind === "form"
             ? renderForm()
-            : renderAdd(),
+            : // D-131: with the Add at the top the host renders the bar.
+              addPlacement === "top"
+              ? null
+              : renderAdd(),
       )}
       <ContactPicker
         visible={pickerOpen}
