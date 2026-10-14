@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { FAB_SIDE_INSET, FAB_SIZE } from "@/navigation/use-bottom-clearance";
+import {
+  FAB_EDGE_GAP,
+  FAB_SIDE_INSET,
+  FAB_SIZE,
+} from "@/navigation/use-bottom-clearance";
 import { applyAccent, resolveAccent } from "@/theme/accents";
 import { AA_LARGE, AA_NORMAL, contrastRatio } from "@/theme/contrast";
 import { ACCENT_IDS } from "@/theme/theme-option-ids";
@@ -10,8 +14,6 @@ import {
   ROOT_SNACKBAR_HOST,
   resolveSnackbarHostVisible,
   SNACKBAR_FAB_GAP,
-  SNACKBAR_WIDTH_ONE_FAB,
-  SNACKBAR_WIDTH_WITH_SECTION_FAB,
   snackbarBottomPadding,
   snackbarLayout,
   snackbarPadding,
@@ -137,112 +139,94 @@ describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
   }
 });
 
-describe("snackbarLayout (38.10 D-132; O2 per D-138)", () => {
-  const RESERVE = FAB_SIDE_INSET + FAB_SIZE + SNACKBAR_FAB_GAP;
-
-  it("pins D-132's targets and the gap token", () => {
-    expect(SNACKBAR_WIDTH_ONE_FAB).toBe(0.8);
-    expect(SNACKBAR_WIDTH_WITH_SECTION_FAB).toBe(0.6);
-    expect(SNACKBAR_FAB_GAP).toBe(SPACING.sm);
-  });
-
-  it("only the universal FAB: left-aligned at ~80%, clamped off the right lane", () => {
-    for (const W of [320, 393, 600]) {
-      expect(
-        snackbarLayout({
-          host: ROOT_SNACKBAR_HOST,
-          windowWidth: W,
-          universalFab: true,
-          sectionFab: false,
-        }),
-      ).toEqual({
-        alignItems: "flex-start",
-        width: Math.min(Math.round(0.8 * W), W - SPACING.base - RESERVE),
-      });
-    }
-  });
-
-  it("a section FAB (with or without the universal FAB): centred at ~60%, clamped off both lanes", () => {
-    for (const W of [320, 393, 600]) {
-      for (const universalFab of [true, false]) {
-        expect(
-          snackbarLayout({
-            host: ROOT_SNACKBAR_HOST,
-            windowWidth: W,
-            universalFab,
-            sectionFab: true,
-          }),
-        ).toEqual({
-          alignItems: "center",
-          width: Math.min(Math.round(0.6 * W), W - 2 * RESERVE),
-        });
-      }
-    }
-  });
-
-  it("no FAB, or any overlay host: today's geometry (centred, content-sized)", () => {
-    const today = { alignItems: "center", width: undefined };
-    expect(
-      snackbarLayout({
-        host: ROOT_SNACKBAR_HOST,
-        windowWidth: 393,
-        universalFab: false,
-        sectionFab: false,
-      }),
-    ).toEqual(today);
-    for (const universalFab of [true, false]) {
-      for (const sectionFab of [true, false]) {
-        expect(
-          snackbarLayout({
-            host: "sheet-1",
-            windowWidth: 393,
-            universalFab,
-            sectionFab,
-          }),
-        ).toEqual(today);
-      }
-    }
-  });
-
-  // The pill's horizontal span inside the overlay, which pads each side by
-  // SPACING.base: left-aligned starts at SPACING.base, centred sits on W/2.
-  function span(W: number, universalFab: boolean, sectionFab: boolean) {
-    const layout = snackbarLayout({
-      host: ROOT_SNACKBAR_HOST,
+describe("snackbarLayout (38.10 D-143, amending D-132's widths)", () => {
+  const TAB_BAR = 80;
+  const INSET = 24;
+  const layoutFor = (
+    W: number,
+    universalFab: boolean,
+    sectionFab: boolean,
+    host = ROOT_SNACKBAR_HOST,
+  ) =>
+    snackbarLayout({
+      host,
       windowWidth: W,
       universalFab,
       sectionFab,
+      tabBarHeight: TAB_BAR,
+      insetBottom: INSET,
     });
-    const width = layout.width as number;
-    const left =
-      layout.alignItems === "flex-start" ? SPACING.base : (W - width) / 2;
-    return { left, right: left + width };
-  }
-  const overlaps = (
-    a: { left: number; right: number },
-    lane: [number, number],
-  ) => a.left < lane[1] && a.right > lane[0];
 
-  for (const W of [320, 360, 393, 412, 480]) {
-    const rightLane: [number, number] = [
-      W - FAB_SIDE_INSET - FAB_SIZE,
-      W - FAB_SIDE_INSET,
-    ];
-    const leftLane: [number, number] = [
-      FAB_SIDE_INSET,
-      FAB_SIDE_INSET + FAB_SIZE,
-    ];
-    it(`W=${W}: the pill never reaches a present FAB's lane`, () => {
+  it("pins the gap token", () => {
+    expect(SNACKBAR_FAB_GAP).toBe(SPACING.sm);
+  });
+
+  it("any FAB on screen: full width inside the side margins", () => {
+    for (const W of [320, 393, 600]) {
       for (const [universalFab, sectionFab] of [
         [true, false],
         [true, true],
         [false, true],
       ] as const) {
-        const pill = span(W, universalFab, sectionFab);
-        expect(pill.left).toBeGreaterThanOrEqual(SPACING.base);
-        expect(pill.right).toBeLessThanOrEqual(W - SPACING.base);
-        if (universalFab) expect(overlaps(pill, rightLane)).toBe(false);
-        if (sectionFab) expect(overlaps(pill, leftLane)).toBe(false);
+        const layout = layoutFor(W, universalFab, sectionFab);
+        expect(layout.alignItems).toBe("center");
+        expect(layout.width).toBe(W - 2 * SPACING.base);
+      }
+    }
+  });
+
+  it("the universal + (alone or with a section button on its baseline): just above the + row", () => {
+    for (const sectionFab of [true, false]) {
+      expect(layoutFor(393, true, sectionFab).paddingBottom).toBe(
+        TAB_BAR + FAB_EDGE_GAP + FAB_SIZE + SNACKBAR_FAB_GAP,
+      );
+    }
+  });
+
+  it("a section button alone (focused route, no tab bar): just above it, off the safe-area inset", () => {
+    expect(layoutFor(393, false, true).paddingBottom).toBe(
+      INSET + FAB_EDGE_GAP + FAB_SIZE + SNACKBAR_FAB_GAP,
+    );
+  });
+
+  it("no FAB, or any overlay host: today's geometry (centred, content-sized)", () => {
+    expect(layoutFor(393, false, false)).toEqual({
+      alignItems: "center",
+      width: undefined,
+      paddingBottom: snackbarBottomPadding(ROOT_SNACKBAR_HOST, INSET),
+    });
+    for (const universalFab of [true, false]) {
+      for (const sectionFab of [true, false]) {
+        expect(layoutFor(393, universalFab, sectionFab, "sheet-1")).toEqual({
+          alignItems: "center",
+          width: undefined,
+          paddingBottom: snackbarBottomPadding("sheet-1", INSET),
+        });
+      }
+    }
+  });
+
+  // The pill's span inside the overlay, which pads each side by SPACING.base;
+  // a centred pill sits on W/2. Vertically it ends above the FAB row's top.
+  for (const W of [320, 360, 393, 412, 480]) {
+    it(`W=${W}: the full-width pill keeps its margins and stays clear of every FAB`, () => {
+      for (const [universalFab, sectionFab] of [
+        [true, false],
+        [true, true],
+        [false, true],
+      ] as const) {
+        const layout = layoutFor(W, universalFab, sectionFab);
+        const width = layout.width as number;
+        const left = (W - width) / 2;
+        expect(left).toBe(SPACING.base);
+        expect(left + width).toBe(W - SPACING.base);
+        // Both FAB lanes lie under the pill horizontally, so it must sit
+        // wholly above the FAB row's top edge.
+        const fabRowTop =
+          (universalFab ? TAB_BAR : INSET) + FAB_EDGE_GAP + FAB_SIZE;
+        expect(layout.paddingBottom).toBeGreaterThan(fabRowTop);
+        expect(layout.paddingBottom - fabRowTop).toBe(SNACKBAR_FAB_GAP);
+        expect(left).toBeLessThan(FAB_SIDE_INSET + FAB_SIZE);
       }
     });
   }

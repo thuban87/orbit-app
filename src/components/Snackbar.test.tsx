@@ -38,19 +38,27 @@ describe("Snackbar look (D-72; review WR-06; 38.10 D-132)", () => {
   });
 });
 
-describe("Snackbar root geometry (38.10 D-132; O2, O5)", () => {
+describe("Snackbar root geometry (38.10 D-132, D-143; O2, O5)", () => {
   const source = readFileSync(
     new URL("./Snackbar.tsx", import.meta.url),
     "utf8",
   );
 
-  it("sizes and aligns the root pill around the FABs that show", () => {
+  it("sizes and places the root pill above the FABs that show (D-143)", () => {
     expect(source).toContain("snackbarLayout(");
     expect(source).toContain("selectSectionFabPresent");
     expect(source).toContain('s.rects["shell-fab"] !== undefined');
     expect(source).toContain("useWindowDimensions()");
     expect(source).toContain("alignItems: layout.alignItems");
     expect(source).toContain("width: layout.width");
+    expect(source).toContain("paddingBottom: layout.paddingBottom");
+    expect(source).toContain("useMeasuredTabBarHeight()");
+    expect(source).toContain("insetBottom: insets.bottom");
+  });
+
+  it("pads the text off the pill's top and bottom walls (D-143)", () => {
+    expect(source).toMatch(/surface: \{[\s\S]*?paddingVertical: SPACING\.xs/);
+    expect(source).toMatch(/label: \{[\s\S]*?paddingVertical: SPACING\.md/);
   });
 
   it("keeps only the pill touchable and lets the label wrap", () => {

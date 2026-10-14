@@ -1,12 +1,12 @@
 import { create } from "zustand";
 
 /**
- * Which screens currently SHOW a section Add FAB (Phase 38.10 D-131, D-132).
+ * Which screens currently SHOW a section Add FAB (Phase 38.10 D-131, D-143).
  *
  * A page registers while its section FAB is on screen (focused, its Add bar
  * scrolled off, no form open, the keyboard down) and unregisters when it hides,
- * blurs or unmounts. The root snackbar reads `selectSectionFabPresent` for its
- * narrower centred width when the section FAB is also present (D-132, plan 23).
+ * blurs or unmounts. The root snackbar reads `selectSectionFabPresent` to sit
+ * full width above the FAB row when a section FAB is present (D-143).
  * Keyed by owner id so two mounted pages can never clear each other's entry.
  *
  * Runtime-only and in-memory, like `snackbar-store.ts`.

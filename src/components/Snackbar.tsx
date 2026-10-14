@@ -5,7 +5,6 @@ import { Icon } from "@/components/icons/Icon";
 import {
   ROOT_SNACKBAR_HOST,
   resolveSnackbarHostVisible,
-  snackbarBottomPadding,
   snackbarLayout,
   snackbarPadding,
   snackbarPresentation,
@@ -26,6 +25,7 @@ import {
 import { useShellObstacleStore } from "@/stores/shell-obstacle-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { snackbarStore } from "@/stores/snackbar-store";
+import { useMeasuredTabBarHeight } from "@/stores/tab-bar-layout-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -56,10 +56,11 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   // Hidden from accessibility while the FAB dial is open (D-31, D-42 A).
   const fabDialOpen = shellTransientStore(selectFabDialOpen);
   const hostVisible = resolveSnackbarHostVisible(host, topOverlayId);
-  // D-132: the root pill sizes around the FABs on screen. UniversalFab
-  // publishes its "shell-fab" rect only while it shows; a section FAB
-  // registers only while it shows (section-fab-store).
+  // D-143: with a FAB on screen the root pill is full width, just above the
+  // FAB row. UniversalFab publishes its "shell-fab" rect only while it shows;
+  // a section FAB registers only while it shows (section-fab-store).
   const windowWidth = useWindowDimensions().width;
+  const tabBarHeight = useMeasuredTabBarHeight();
   const universalFab = useShellObstacleStore(
     (s) => s.rects["shell-fab"] !== undefined,
   );
@@ -76,6 +77,8 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
     windowWidth,
     universalFab,
     sectionFab,
+    tabBarHeight,
+    insetBottom: insets.bottom,
   });
   const hasAction = Boolean(snackbar.action || snackbar.secondaryAction);
 
@@ -90,7 +93,7 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
         styles.overlay,
         {
           alignItems: layout.alignItems,
-          paddingBottom: snackbarBottomPadding(host, insets.bottom),
+          paddingBottom: layout.paddingBottom,
         },
       ]}
       {...fabDialBackgroundA11y(fabDialOpen)}
@@ -174,15 +177,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     maxWidth: "100%",
     minHeight: 48,
+    // D-143: with the label's own padding, the text sits SPACING.base from
+    // the top and bottom walls, matching its side inset.
+    paddingVertical: SPACING.xs,
   },
   glyph: {
     marginRight: SPACING.sm,
   },
   // Grows to fill a fixed-width pill (actions sit at its right end) and
-  // shrinks to wrap onto more lines (D-132: taller is fine).
+  // shrinks to wrap onto more lines (D-132: taller is fine). D-143: vertical
+  // padding so wrapped text is not cramped against the pill's walls.
   label: {
     flexGrow: 1,
     flexShrink: 1,
+    paddingVertical: SPACING.md,
   },
   action: {
     alignItems: "center",
