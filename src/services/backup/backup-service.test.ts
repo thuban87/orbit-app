@@ -22,6 +22,10 @@ vi.mock("@/backup/export-manifest", () => ({
 }));
 vi.mock("expo-sqlite", () => ({}));
 
+import {
+  MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
+  parseBackupManifest,
+} from "@/backup/backup-schema";
 import type * as ExportManifestModule from "@/backup/export-manifest";
 import { BackupPhotoUnreadableError } from "@/backup/types";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
@@ -35,6 +39,7 @@ import {
   createManualExportService,
   createVerifiedPreRestoreSnapshot,
   loadBackupForPreview,
+  loadBackupForRestore,
   resolveWriteEncryptionMode,
   withBackupServiceLock,
 } from "@/services/backup/backup-service";
@@ -300,6 +305,68 @@ describe("manual backup service", () => {
 });
 
 describe("restore preview", () => {
+  // 38.10 D-136 O14: the preview shows the version the file was written in;
+  // what restore receives is still the converted (current) manifest.
+  const v7File = {
+    backupFormatVersion: 7,
+    envelopeVersion: 1,
+    metadata: { exportedAt: "2026-08-25 12:00:00", sqliteUserVersion: 32 },
+    appSettings: { sunContactUid: null, modifiedAt: "2026-08-25 12:00:00" },
+    categories: [],
+    profile: null,
+    contacts: [],
+    contactMethods: [],
+    externalContactLinks: [],
+    contactMethodProvenance: [],
+    interactions: [],
+    events: [],
+    fuel: [],
+    contactLinks: [],
+    customFieldDefs: [],
+    customFieldValues: [],
+    memories: [],
+    relationships: [],
+    currentStateEntries: [],
+    tombstones: [],
+    systems: [],
+    systemRules: [],
+    systemOverrides: [],
+    systemPrefs: [],
+    profileLayoutTemplates: [],
+    profileBackgroundTemplates: [],
+    aiConnections: [],
+    personalizationSections: [],
+    groupEvents: [],
+    profileContactPresentation: [],
+    profileCategoryPresentation: [],
+  };
+
+  it("reports a v7 file's own version 7, and restore still gets the converted manifest", () => {
+    const candidate = loadBackupForRestore({
+      contents: JSON.stringify(v7File),
+    });
+    expect(candidate.status).toBe("ready");
+    if (candidate.status !== "ready") return;
+    expect(candidate.preview.backupFormatVersion).toBe(7);
+    expect(candidate.manifest).toEqual(parseBackupManifest(v7File));
+    expect(candidate.manifest.backupFormatVersion).toBe(
+      MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
+    );
+    const preview = loadBackupForPreview({ contents: JSON.stringify(v7File) });
+    expect(preview.status === "ready" && preview.preview.backupFormatVersion).toBe(
+      7,
+    );
+  });
+
+  it("reports a current-format file as its own version", () => {
+    const current = parseBackupManifest(manifest);
+    const preview = loadBackupForPreview({ contents: JSON.stringify(current) });
+    expect(preview.status === "ready" && preview.preview.backupFormatVersion).toBe(
+      MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
+    );
+    expect(MAX_SUPPORTED_BACKUP_FORMAT_VERSION).toBe(8);
+  });
+
   it("returns only aggregate metadata after wholly validating plaintext content", () => {
     expect(
       loadBackupForPreview({ contents: JSON.stringify(manifest) }),
@@ -307,7 +374,8 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 8,
+        // The file's own version (38.10 D-136 O14), not the converted one.
+        backupFormatVersion: 1,
         encrypted: false,
         rowCount: 0,
         photoCount: 0,
@@ -336,7 +404,7 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 8,
+        backupFormatVersion: 1,
         encrypted: true,
         rowCount: 0,
         photoCount: 0,

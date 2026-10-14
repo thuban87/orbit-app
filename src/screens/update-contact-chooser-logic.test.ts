@@ -63,14 +63,16 @@ describe("buildChooserRows", () => {
 
   it("renders the seven built-in rows in a fixed order before custom fields", () => {
     const rows = buildChooserRows(CONTACT, []);
+    // 38.10 D-136 W20a: Key People sits between Contact Frequency and the
+    // custom fields.
     expect(kinds(rows)).toEqual([
       "last_talked_about",
-      "key_people",
       "current_location",
       "memory",
       "off_limits",
       "contact_method",
       "contact_frequency",
+      "key_people",
       "custom_fields",
     ]);
   });
