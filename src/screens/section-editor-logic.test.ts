@@ -12,6 +12,7 @@ import {
   sectionAddLabel,
   sectionEmptyText,
   sectionEntries,
+  sectionEntryNoun,
   sectionPinSnackbar,
   sectionPinUndoneSnackbar,
   sectionTitle,
@@ -114,18 +115,38 @@ describe("section editor (38.10 D-75, D-35, D-84, D-107)", () => {
     );
   });
 
-  it("points at the Add above, where D-131 puts it", () => {
+  it("points at the section's own Add above, where D-131 puts it (D-137 W14)", () => {
     expect(sectionEmptyText("gift_idea").body).toBe(
-      "Use Add memory above to add the first one.",
+      "Use Add Gift Idea above to add the first one.",
+    );
+    expect(sectionEmptyText("general").body).toBe(
+      "Use Add Memory above to add the first one.",
+    );
+    expect(sectionEmptyText("thought_of_them").body).toBe(
+      "Use Add Thought of Them above to add the first one.",
     );
   });
 });
 
-describe("sectionAddLabel (D-130)", () => {
-  it.each(["general", "gift_idea", "thought_of_them"] as const)(
-    "%s keeps today's Add wording (D-137 is plan 25's)",
-    (type) => {
-      expect(sectionAddLabel(type)).toBe("Add memory");
-    },
-  );
+describe("sectionAddLabel (D-130; D-137 W14)", () => {
+  it("uses each section's own name, the glossary ADD_* wording", () => {
+    expect(sectionAddLabel("general")).toBe("Add Memory");
+    expect(sectionAddLabel("gift_idea")).toBe("Add Gift Idea");
+    expect(sectionAddLabel("thought_of_them")).toBe("Add Thought of Them");
+  });
+});
+
+describe("sectionEntryNoun (D-137 W14; D-141)", () => {
+  it("names one entry of each section", () => {
+    expect(sectionEntryNoun("general")).toBe("Memory");
+    expect(sectionEntryNoun("gift_idea")).toBe("Gift Idea");
+    expect(sectionEntryNoun("thought_of_them")).toBe("Thought of Them");
+    expect(sectionEntryNoun("imported")).toBe("Imported Note");
+  });
+
+  it("matches the Add label for every section that has an Add", () => {
+    for (const type of ["general", "gift_idea", "thought_of_them"] as const) {
+      expect(sectionAddLabel(type)).toBe(`Add ${sectionEntryNoun(type)}`);
+    }
+  });
 });

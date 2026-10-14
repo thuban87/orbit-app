@@ -1094,6 +1094,71 @@ describe("38.10 plan 13: the reworked editor", () => {
       expect(pressable(tree, "Add memory")).toBeUndefined();
     });
   });
+
+  describe("entryNoun: the section's own name (D-137 W14; D-141)", () => {
+    const nounOf = (type: string) =>
+      ({
+        general: "Memory",
+        gift_idea: "Gift Idea",
+        thought_of_them: "Thought of Them",
+        imported: "Imported Note",
+      })[type] ?? "Memory";
+
+    it("names the add form heading and its save button", () => {
+      const tree = render({
+        addOnly: true,
+        fixedType: "gift_idea",
+        entryNoun: "Gift Idea",
+      });
+      expect(texts(tree).filter((t) => t === "Add Gift Idea")).toHaveLength(2);
+      expect(texts(tree)).not.toContain("Add memory");
+      expect(pressable(tree, "Add Gift Idea")).toBeDefined();
+      expect(pressable(tree, "Add memory")).toBeUndefined();
+    });
+
+    it("names the edit form heading; the spoken Save label stays", () => {
+      const tree = render({
+        items: [row({ type: "gift_idea" })],
+        initiallyEditingId: 5,
+        entryNoun: "Gift Idea",
+      });
+      expect(texts(tree)).toContain("Edit Gift Idea");
+      expect(texts(tree)).not.toContain("Edit memory");
+      expect(pressable(tree, "Save memory")).toBeDefined();
+    });
+
+    it("names the card edit mode heading", () => {
+      const tree = render({
+        items: [row({ type: "gift_idea" })],
+        initiallyEditingId: 5,
+        cardEditMode: true,
+        entryNoun: "Gift Idea",
+      });
+      expect(texts(tree)).toContain("Edit Gift Idea");
+      expect(texts(tree)).not.toContain("Edit memory");
+    });
+
+    it("a per-type noun follows the entry's own type (Update Contact)", () => {
+      const editing = render({
+        items: [row({ type: "thought_of_them" })],
+        initiallyEditingId: 5,
+        entryNoun: nounOf,
+      });
+      expect(texts(editing)).toContain("Edit Thought of Them");
+      // The outlined Add names the type a new entry starts as.
+      const closed = render({ entryNoun: nounOf });
+      expect(pressable(closed, "Add Memory")).toBeDefined();
+      expect(texts(closed)).toContain("Add Memory");
+      expect(pressable(closed, "Add memory")).toBeUndefined();
+    });
+
+    it("without entryNoun the old wording stays", () => {
+      const adding = render({ addOnly: true, fixedType: "gift_idea" });
+      expect(texts(adding)).toContain("Add memory");
+      const editing = render({ initiallyEditingId: 5 });
+      expect(texts(editing)).toContain("Edit memory");
+    });
+  });
 });
 
 describe("Link validation (G-13 via D-89)", () => {
