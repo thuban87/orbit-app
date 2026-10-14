@@ -270,6 +270,15 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   );
   const [frameHeight, setFrameHeight] = useState(0);
   const restingFrameHeight = useRef(0);
+  // A card shown over a searched list closes the keyboard: the search field
+  // stays focused behind the card, and Android otherwise keeps the keyboard
+  // (and its gap) over the card and the next share's list (38.10-19 device
+  // pass). A field that unmounts is blurred by its own handler first, since
+  // Keyboard.dismiss() cannot reach an unmounted field.
+  const cardShown = card !== null;
+  useEffect(() => {
+    if (cardShown) Keyboard.dismiss();
+  }, [cardShown]);
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", (event) =>
       setKeyboardHeight(event.endCoordinates.height),
@@ -338,6 +347,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
 
   // Close the inline New-contact surface and drop its typed name.
   const closeInlineCreate = useCallback(() => {
+    // Blur before the name field unmounts, or Android keeps the keyboard up.
+    Keyboard.dismiss();
     setInlineOpen(false);
     setInlineName("");
   }, []);
@@ -506,6 +517,8 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   const onInlineSubmit = useCallback(async () => {
     const trimmedName = inlineName.trim();
     if (trimmedName.length === 0 || snapshot === null) return;
+    // Blur while the name field is still mounted (see closeInlineCreate).
+    Keyboard.dismiss();
     if (
       shareListLocked({
         cardMounted: card !== null,
