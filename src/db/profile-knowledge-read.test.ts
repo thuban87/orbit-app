@@ -308,6 +308,88 @@ describe("Profile knowledge projection", () => {
     ]);
   });
 
+  it("a section shows its newest entries, ignoring pins; Pinned keeps every pinned row (D-148, D-133)", async () => {
+    const owner = await contact("Owner");
+    const at = (minute: number) =>
+      `2026-09-09 12:${String(minute).padStart(2, "0")}:00`;
+    const add = async (
+      type: string,
+      value: string,
+      minute: number,
+      pinned: 0 | 1,
+      meaningfulDate: string | null = null,
+    ) =>
+      exec.runAsync(
+        `INSERT INTO memories
+           (uid, contact_id, type, value, meaningful_date, pinned, hidden,
+            provenance, created_at, modified_at, allow_ai)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 'user', ?, ?, 0)`,
+        [uid(), owner, type, value, meaningfulDate, pinned, at(minute), NOW],
+      );
+    // Three old pinned Thought of Them entries, then four newer ones.
+    await add("thought_of_them", "Old pinned 1", 1, 1);
+    await add("thought_of_them", "Old pinned 2", 2, 1);
+    await add("thought_of_them", "Old pinned 3", 3, 1);
+    await add("thought_of_them", "New 4", 4, 0);
+    await add("thought_of_them", "New 5", 5, 0);
+    await add("thought_of_them", "Newest pinned 6", 6, 1);
+    await add("thought_of_them", "Newest 7", 7, 0);
+    // Memories: a dated entry still leads undated ones (the read's order
+    // without its pin key); pins never jump the queue.
+    await add("general", "Dated, pinned", 1, 1, "2020-01-01");
+    await add("general", "Dated later", 2, 0, "2024-05-05");
+    await add("general", "Undated new", 9, 0);
+    await add("general", "Undated newer, pinned", 10, 1);
+    for (const [name, minute, pinned] of [
+      ["Old pinned person", 1, 1],
+      ["Middle", 2, 0],
+      ["Newer", 3, 0],
+      ["Newest", 4, 0],
+    ] as const) {
+      await exec.runAsync(
+        `INSERT INTO relationships
+           (uid, contact_id, person_name, pinned, hidden, created_at, modified_at)
+         VALUES (?, ?, ?, ?, 0, ?, ?)`,
+        [uid(), owner, name, pinned, at(minute), NOW],
+      );
+    }
+
+    const result = await readProfileKnowledge(readOnly(), owner);
+    expect(result.thoughtOfThem.items.map((row) => row.value)).toEqual([
+      "Newest 7",
+      "Newest pinned 6",
+      "New 5",
+    ]);
+    expect(result.thoughtOfThem.total).toBe(7);
+    expect(result.thoughtOfThem.remainingCount).toBe(4);
+    expect(result.memories.items.map((row) => row.value)).toEqual([
+      "Dated later",
+      "Dated, pinned",
+      "Undated newer, pinned",
+    ]);
+    expect(result.relationships.items.map((row) => row.person_name)).toEqual([
+      "Newest",
+      "Newer",
+      "Middle",
+    ]);
+    // Pinned is unchanged: every pinned row, people first, in the read's order.
+    expect(
+      result.featured.items.map((reference) =>
+        reference.owner === "memory"
+          ? reference.row.value
+          : reference.row.person_name,
+      ),
+    ).toEqual([
+      "Old pinned person",
+      "Dated, pinned",
+      "Undated newer, pinned",
+      "Newest pinned 6",
+      "Old pinned 3",
+      "Old pinned 2",
+      "Old pinned 1",
+    ]);
+  });
+
   it("caps repeatable visible collections after filtering and reports truthful totals", async () => {
     const owner = await contact("Owner");
     for (let index = 0; index < 5; index += 1) {

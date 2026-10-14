@@ -297,13 +297,51 @@ function profileMemorySection(type: string): ProfileMemorySection {
   }
 }
 
+/** Descending text order (ISO dates and `YYYY-MM-DD HH:MM:SS` stamps). */
+function textDesc(a: string, b: string): number {
+  return a < b ? 1 : a > b ? -1 : 0;
+}
+
+/**
+ * A Profile section body's memory order (38.10 D-148): the newest entries,
+ * ignoring pins. This is the shared read's order (`listMemoriesForContact`,
+ * docs/systems/contact-knowledge.md) without its leading `pinned DESC` key:
+ * dated entries first by `meaningful_date` DESC, then `created_at` DESC, then
+ * `id` DESC. Pinned entries stay in Pinned (D-133) and appear in their
+ * section only when they are among its newest. Profile section bodies only:
+ * the section editors and the other hosts keep the shared read's pin-first
+ * order. PURE.
+ */
+export function profileSectionMemoryOrder(a: MemoryRow, b: MemoryRow): number {
+  const aUndated = a.meaningful_date === null ? 1 : 0;
+  const bUndated = b.meaningful_date === null ? 1 : 0;
+  if (aUndated !== bUndated) return aUndated - bUndated;
+  if (a.meaningful_date !== null && b.meaningful_date !== null) {
+    const byDate = textDesc(a.meaningful_date, b.meaningful_date);
+    if (byDate !== 0) return byDate;
+  }
+  return textDesc(a.created_at, b.created_at) || b.id - a.id;
+}
+
+/**
+ * The Profile Key People body's order (38.10 D-148): the newest first,
+ * ignoring pins; `listRelationshipsForContact` without `pinned DESC`. PURE.
+ */
+export function profileSectionRelationshipOrder(
+  a: RelationshipRow,
+  b: RelationshipRow,
+): number {
+  return textDesc(a.created_at, b.created_at) || b.id - a.id;
+}
+
 /**
  * Read renderer-neutral Profile knowledge without flattening its semantic owners.
  * Hidden rows are counted for administration but never admitted to visible caps
  * (while Hide from Profile is switched off nothing resolves hidden, so every
  * count is 0; D-134). Pinned rows show in Pinned and in their own section
  * (D-133): featured entries are references to rows that also stay in their
- * ordinary child lists.
+ * ordinary child lists, where each section shows its newest entries,
+ * ignoring pins (D-148).
  */
 export async function readProfileKnowledge(
   exec: ReadOnlyExecutor,
@@ -354,10 +392,16 @@ export async function readProfileKnowledge(
     ),
   ];
   // Pinned rows show in Pinned and in their own section (D-133), so a
-  // section whose only entry is pinned never reads as empty (O6).
-  const relationshipItems = visibleRelationships;
+  // section whose only entry is pinned never reads as empty (O6). Each
+  // section shows its newest entries, ignoring pins (D-148); Pinned keeps
+  // the read's order.
+  const relationshipItems = [...visibleRelationships].sort(
+    profileSectionRelationshipOrder,
+  );
   const sectionItems = (section: ProfileMemorySection) =>
-    visibleMemories.filter((row) => profileMemorySection(row.type) === section);
+    visibleMemories
+      .filter((row) => profileMemorySection(row.type) === section)
+      .sort(profileSectionMemoryOrder);
 
   return {
     currentState,
