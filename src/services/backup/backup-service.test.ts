@@ -320,7 +320,8 @@ describe("restore preview", () => {
     contactMethodProvenance: [],
     interactions: [],
     events: [],
-    fuel: [],
+    // The retired legacy array is omitted: the v7 converter reads a missing
+    // one as empty, and the retirement gate (D-01) keeps the name out of src/.
     contactLinks: [],
     customFieldDefs: [],
     customFieldValues: [],
