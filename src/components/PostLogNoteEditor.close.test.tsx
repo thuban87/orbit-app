@@ -225,8 +225,8 @@ describe("the useState slot map the seeding relies on (verification IN-03)", () 
     const boxStyle = (keyboardUp: boolean) =>
       Object.assign(
         {},
-        ...(find(render({ keyboardUp }).tree, "TextInput")[0]?.props
-          ?.style as object[]),
+        ...((find(render({ keyboardUp }).tree, "TextInput")[0]?.props?.style ??
+          []) as object[]),
       );
     expect(boxStyle(false)).toMatchObject({ minHeight: 84 });
     expect(boxStyle(false).maxHeight).toBeUndefined();
