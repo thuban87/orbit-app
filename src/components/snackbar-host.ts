@@ -54,8 +54,8 @@ export interface SnackbarPresentation {
   actionTone: IconTone;
   /** Theme token for the pill's outline. */
   borderTone: IconTone;
-  /** The leading reserved `warning` registry glyph and its tone, or none. */
-  glyph: { tone: IconTone } | null;
+  /** Tone of the leading reserved `warning` registry glyph; null = no glyph. */
+  glyphTone: IconTone | null;
   /** Android live-region urgency for TalkBack. */
   liveRegion: "assertive" | "polite";
   /** `alert` marks an error for assistive tech; the other kinds have no role. */
@@ -86,7 +86,7 @@ export function snackbarPresentation(kind: SnackbarKind): SnackbarPresentation {
         labelTone: "textSecondary",
         actionTone: "accentText",
         borderTone: "danger",
-        glyph: { tone: "danger" },
+        glyphTone: "danger",
         liveRegion: "assertive",
         accessibilityRole: "alert",
       };
@@ -96,7 +96,7 @@ export function snackbarPresentation(kind: SnackbarKind): SnackbarPresentation {
         labelTone: "background",
         actionTone: "background",
         borderTone: "textPrimary",
-        glyph: { tone: "background" },
+        glyphTone: "background",
         liveRegion: "polite",
         accessibilityRole: undefined,
       };
@@ -106,7 +106,7 @@ export function snackbarPresentation(kind: SnackbarKind): SnackbarPresentation {
         labelTone: "onAccent",
         actionTone: "onAccent",
         borderTone: "accent",
-        glyph: null,
+        glyphTone: null,
         liveRegion: "polite",
         accessibilityRole: undefined,
       };

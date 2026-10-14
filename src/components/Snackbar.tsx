@@ -80,14 +80,14 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
           },
         ]}
       >
-        {look.glyph ? (
+        {look.glyphTone ? (
           // Decorative: the label (and an error's alert role) carry the meaning.
           <View
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden
             style={styles.glyph}
           >
-            <Icon name="warning" tone={look.glyph.tone} size="sm" />
+            <Icon name="warning" tone={look.glyphTone} size="sm" />
           </View>
         ) : null}
         <AppText

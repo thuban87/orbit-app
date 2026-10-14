@@ -33,7 +33,7 @@ describe("Snackbar look (D-72; review WR-06; 38.10 D-132)", () => {
 
   it("renders the warning glyph in the look's glyph tone, hidden from TalkBack", () => {
     expect(source).toMatch(
-      /look\.glyph \? \([\s\S]*?importantForAccessibility="no-hide-descendants"[\s\S]*?<Icon name="warning" tone=\{look\.glyph\.tone\}/,
+      /look\.glyphTone \? \([\s\S]*?importantForAccessibility="no-hide-descendants"[\s\S]*?<Icon name="warning" tone=\{look\.glyphTone\}/,
     );
   });
 });

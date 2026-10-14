@@ -53,7 +53,7 @@ describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
       labelTone: "onAccent",
       actionTone: "onAccent",
       borderTone: "accent",
-      glyph: null,
+      glyphTone: null,
       liveRegion: "polite",
       accessibilityRole: undefined,
     });
@@ -65,7 +65,7 @@ describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
       labelTone: "background",
       actionTone: "background",
       borderTone: "textPrimary",
-      glyph: { tone: "background" },
+      glyphTone: "background",
       liveRegion: "polite",
       accessibilityRole: undefined,
     });
@@ -77,7 +77,7 @@ describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
       labelTone: "textSecondary",
       actionTone: "accentText",
       borderTone: "danger",
-      glyph: { tone: "danger" },
+      glyphTone: "danger",
       liveRegion: "assertive",
       accessibilityRole: "alert",
     });
@@ -118,9 +118,9 @@ describe("snackbarPresentation (38.9 D-72; 38.10 D-132)", () => {
               contrastRatio(palette[look.labelTone], fill),
               `${id}`,
             ).toBeGreaterThanOrEqual(AA_NORMAL);
-            if (look.glyph) {
+            if (look.glyphTone) {
               expect(
-                contrastRatio(palette[look.glyph.tone], fill),
+                contrastRatio(palette[look.glyphTone], fill),
               ).toBeGreaterThanOrEqual(AA_LARGE);
             }
           }
