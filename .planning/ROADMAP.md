@@ -1604,7 +1604,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 - [x] 38.10-21-PLAN.md — G2 Add bar morphs into a bottom-left section FAB, memory-type editors (D-131)
 - [x] 38.10-22-PLAN.md — G3 section FAB on Key People, Off Limits and history pages (D-131)
 - [x] 38.10-23-PLAN.md — G4 snackbar restyle: accent notices, warning kind, FAB-aware widths (D-132, D-140)
-- [ ] 38.10-24-PLAN.md — G5 pinned in both + pushpin, Hide hidden, Edit Contact most-recent card, Imported heading (D-133–D-136, D-142)
+- [x] 38.10-24-PLAN.md — G5 pinned in both + pushpin, Hide hidden, Edit Contact most-recent card, Imported heading (D-133–D-136, D-142)
 - [ ] 38.10-25-PLAN.md — G6 wording + small fixes (D-136, D-137, D-141)
 
 > **Inserted 2026-10-10 (owner).** Schema-bearing (new homes for fuel data). Verify the migration head on disk at plan time (milestone migration rule 2). Any new durable entity raises the backup format question, which is an owner decision. Phase 39's sharing lesson waits on this phase (D-99).
