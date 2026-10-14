@@ -399,3 +399,75 @@ describe("RelationshipEditor card edit mode (D-130)", () => {
     expect(hooks.setters).toBe(3);
   });
 });
+
+describe('RelationshipEditor addPlacement "top" (D-131: the host renders the Add)', () => {
+  const rowOf = (id: number, name: string) =>
+    ({
+      id,
+      person_name: name,
+      relation_type: null,
+      linked_contact_id: null,
+      linked_contact_name: null,
+      note: null,
+      pinned: 0,
+      hidden: null,
+    }) as unknown as RelationshipRow;
+
+  beforeEach(() => {
+    hooks.seeds = {};
+  });
+
+  const renderTop = (initiallyEditingId?: number) => {
+    hooks.index = 0;
+    return RelationshipEditor({
+      contactId: 1,
+      items: [rowOf(1, "Ria"), rowOf(2, "Sam")],
+      onAdd: vi.fn(),
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+      initiallyEditingId,
+      cardEditMode: true,
+      addPlacement: "top",
+    }) as TestElement;
+  };
+  const slotsOf = (root: TestElement) =>
+    (root.props.children as ReactNode[])
+      .flat()
+      .filter(Boolean) as TestElement[];
+
+  it("renders no Add key person Button of its own", () => {
+    const root = renderTop();
+    expect(button(nodes(root), "Add key person")).toBeUndefined();
+    expect(slotsOf(root).map((n) => n.type)).toEqual([
+      "Pressable",
+      "Pressable",
+      "ContactPicker",
+    ]);
+  });
+
+  it("an open edit still renders in its row's place", () => {
+    const root = renderTop(2);
+    expect(slotsOf(root).map((n) => n.type)).toEqual([
+      "Pressable",
+      "View",
+      "ContactPicker",
+    ]);
+    expect(button(nodes(root), "Add key person")).toBeUndefined();
+  });
+
+  it("a new key person's form opens first, above the rows", () => {
+    hooks.seeds = { [DRAFT_SLOT]: { ...initialDraft(), personName: "Sam" } };
+    const slots = slotsOf(renderTop());
+    expect(slots.map((n) => n.type)).toEqual([
+      "View",
+      "Pressable",
+      "Pressable",
+      "ContactPicker",
+    ]);
+    expect(
+      nodes(slots[0]).some(
+        (n) => n.type === "AppText" && n.props.children === "Add key person",
+      ),
+    ).toBe(true);
+  });
+});

@@ -230,4 +230,42 @@ describe("relationshipEditorSlots (D-130 card edit mode)", () => {
       ),
     ).toEqual([4, 5, 6, "add"]);
   });
+
+  describe('addPlacement "top" (D-131: the Key People editor)', () => {
+    const top = {
+      items,
+      editingId: null,
+      adding: false,
+      cardEditMode: true,
+      addPlacement: "top" as const,
+    };
+
+    it("puts the add slot first, then the rows", () => {
+      expect(kinds(relationshipEditorSlots(top))).toEqual(["add", 4, 5, 6]);
+    });
+
+    it("a new key person's form opens in the add slot, above the rows", () => {
+      expect(kinds(relationshipEditorSlots({ ...top, adding: true }))).toEqual([
+        "form",
+        4,
+        5,
+        6,
+      ]);
+    });
+
+    it("an open in-place edit keeps the edited row's index", () => {
+      expect(kinds(relationshipEditorSlots({ ...top, editingId: 5 }))).toEqual([
+        "add",
+        4,
+        "form",
+        6,
+      ]);
+    });
+
+    it("the default stays at the end", () => {
+      expect(
+        kinds(relationshipEditorSlots({ ...top, addPlacement: undefined })),
+      ).toEqual([4, 5, 6, "add"]);
+    });
+  });
 });

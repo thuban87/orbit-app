@@ -21,7 +21,9 @@ import {
   groupHistoryRows,
   HISTORY_MOST_RECENT,
   HISTORY_PREVIOUS,
+  historyAddLabel,
   historyDeletedSnackbar,
+  historyFabSection,
   historyRestoredSnackbar,
   historyRowDate,
   historyTitle,
@@ -315,5 +317,21 @@ describe("returnsToSameProfile (convergence c1 F-U11, Claude C-15)", () => {
       memory,
     ];
     expect(returnsToSameProfile(routes, 2, 7)).toBe(false);
+  });
+});
+
+describe("the history page's top Add and section FAB (D-131)", () => {
+  it("historyAddLabel is today's Add wording, Add + the page title", () => {
+    expect(historyAddLabel("last_talked_about")).toBe(
+      `Add ${historyTitle("last_talked_about")}`,
+    );
+    expect(historyAddLabel("current_location")).toBe(
+      `Add ${historyTitle("current_location")}`,
+    );
+  });
+
+  it("historyFabSection maps each field to its sectionFabIcon key", () => {
+    expect(historyFabSection("last_talked_about")).toBe("last_talked_about");
+    expect(historyFabSection("current_location")).toBe("current_location");
   });
 });
