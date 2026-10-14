@@ -8,8 +8,8 @@
  * given progress, where the FAB sits, how much scroll clearance it needs and
  * which icon each page shows.
  *
- * Worklets: `lerp`, `clamp01`, `morphFrame` and `fabTargetAfterScroll` run on
- * the UI thread (Reanimated). Each is declared ABOVE every worklet that calls
+ * Worklets: `lerp`, `clamp01`, `morphFrame`, `fabTargetAfterScroll` and
+ * `snapOnPause` run on the UI thread (Reanimated). Each is declared ABOVE every worklet that calls
  * it, because a worklet that calls one declared later in the same file is
  * undefined on device under Hermes, and vitest cannot catch that (owner memory
  * worklet-forward-ref-hazard; Phase 29 crashes).
@@ -106,6 +106,55 @@ export function fabTargetAfterScroll(
     return scrollY < barBottom - FAB_HIDE_HYSTERESIS ? 0 : 1;
   }
   return scrollY >= barBottom ? 1 : 0;
+}
+
+/**
+ * The value the morph snaps to when it pauses (blur, background): its current
+ * target, so no in-between frame is left on screen (CLAUDE.md pause rule).
+ * A worklet; it calls nothing in this file.
+ */
+export function snapOnPause(target: number): number {
+  "worklet";
+  return target;
+}
+
+/**
+ * Whether the FAB is held hidden whatever the scroll: before the read loads
+ * (no Add to morph), while any form is open, and while the keyboard is up
+ * (UniversalFab's keyboard rule).
+ */
+export function fabSuppressed({
+  loaded,
+  formOpen,
+  keyboardUp,
+}: {
+  loaded: boolean;
+  formOpen: boolean;
+  keyboardUp: boolean;
+}): boolean {
+  return !loaded || formOpen || keyboardUp;
+}
+
+/** The FAB's accessibility and touch props (UniversalFab's scrim-hiding pattern). */
+export function fabA11yProps(shown: boolean): {
+  accessible: boolean;
+  importantForAccessibility: "auto" | "no-hide-descendants";
+  accessibilityElementsHidden: boolean;
+  pointerEvents: "auto" | "none";
+} {
+  return shown
+    ? {
+        accessible: true,
+        importantForAccessibility: "auto",
+        accessibilityElementsHidden: false,
+        pointerEvents: "auto",
+      }
+    : {
+        accessible: false,
+        importantForAccessibility: "no-hide-descendants",
+        accessibilityElementsHidden: true,
+        pointerEvents: "none",
+      };
 }
 
 /**

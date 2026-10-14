@@ -60,11 +60,14 @@ import type { IconName } from "./icons/icon-registry";
 import {
   FAB_ICON_SIZE,
   FAB_PLUS_SIZE,
+  fabA11yProps,
+  fabSuppressed,
   fabTargetAfterScroll,
   MORPH_DURATION_MS,
   morphFrame,
   sectionFabBottomOffset,
   sectionFabClearance,
+  snapOnPause,
 } from "./section-add-fab-logic";
 import { FAB_BORDER_COLOR_KEY, FAB_BORDER_WIDTH } from "./universal-fab-logic";
 
@@ -131,7 +134,7 @@ export function useSectionAddMorph({
   const viewport = useSharedValue<LayoutBox>(EMPTY_BOX);
   const root = useSharedValue<LayoutBox>(EMPTY_BOX);
 
-  const suppressed = !loaded || formOpen || keyboardUp;
+  const suppressed = fabSuppressed({ loaded, formOpen, keyboardUp });
 
   // The one worklet that moves the target. Declared ABOVE both of its callers
   // (the scroll handler and the suppression effect): a worklet calling one
@@ -208,7 +211,7 @@ export function useSectionAddMorph({
     runOnUI(() => {
       "worklet";
       cancelAnimation(progress);
-      progress.value = target.value;
+      progress.value = snapOnPause(target.value);
     })();
   }, [isFocused, appActive, progress, target]);
 
@@ -343,6 +346,7 @@ export function SectionAddFab({
   if (icon === null) return null;
 
   const shown = morph.fabShown;
+  const a11y = fabA11yProps(shown);
   return (
     <Animated.View
       pointerEvents={shown ? "box-none" : "none"}
@@ -361,10 +365,10 @@ export function SectionAddFab({
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityHint={hint}
-        accessible={shown}
-        importantForAccessibility={shown ? "auto" : "no-hide-descendants"}
-        accessibilityElementsHidden={!shown}
-        pointerEvents={shown ? "auto" : "none"}
+        accessible={a11y.accessible}
+        importantForAccessibility={a11y.importantForAccessibility}
+        accessibilityElementsHidden={a11y.accessibilityElementsHidden}
+        pointerEvents={a11y.pointerEvents}
         onPress={onPress}
         style={StyleSheet.absoluteFill}
       >
