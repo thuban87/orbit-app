@@ -11,6 +11,10 @@
  *   navigation; an entry that is gone falls back to the list (D-107).
  * - Linked entries: tap opens the interaction; Edit and Pin/Unpin are on
  *   long-press and the screen-reader actions (D-107, D-37, D-48).
+ * - Card edit mode (D-130): a pencil on every card; the pencil or a tap on an
+ *   unlinked card opens that card's form in its place, with Move and a red
+ *   Delete at its top (hidden at rest); a linked card's pencil opens it too.
+ *   The Add is solid.
  * - Hidden entries are dimmed with "Show on Profile" (D-17).
  * - Every entry but Imported can move to another D-84 section through
  *   `MoveEntrySheet`, with the D-85 confirm and Undo (D-118).
@@ -24,7 +28,7 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md).
  */
 import { useFocusEffect } from "@react-navigation/native";
-import { type RefObject, useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import {
   type MemoryAiDefaults,
@@ -43,6 +47,7 @@ import {
   KeyboardCenteringProvider,
   useKeyboardCentering,
 } from "@/components/ui";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import {
   getAiPermissionDefaults,
   memoryAiDefaultsMap,
@@ -83,6 +88,7 @@ import {
   openEditTarget,
   restoredSnackbar,
   savedSnackbar,
+  sectionAddLabel,
   sectionEmptyText,
   sectionEntries,
   sectionPinSnackbar,
@@ -157,15 +163,20 @@ export function SectionEditorScreen({
     },
   });
 
-  // D-66: the entry field centres above the keyboard.
-  const scrollRef = useRef<ScrollView>(null);
-  // ScrollView.d.ts types `innerViewRef` as a non-null `RefObject<View>`
-  // (as use-first-error-reveal.ts widens it).
-  const contentRef = useRef<View>(null) as RefObject<View>;
+  // D-66: the entry field centres above the keyboard; the same ScrollView
+  // pair scrolls an `editId` form into view (D-130).
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
   const { centering, bottomSpacer } = useKeyboardCentering({
     scrollRef,
     contentRef,
   });
+  // D-130: the form opens in place of its card. A tap opens it where the
+  // card was, on screen; an `editId` (the Profile's item Edit, D-107) may
+  // name an entry further down, so its form is scrolled into view once.
+  const formRef = useRef<View>(null);
+  useEffect(() => {
+    if (typeof initialEditId === "number") reveal(formRef);
+  }, [initialEditId, reveal]);
 
   /** NEVER rejects: a failure lands in the error phase (D-04). */
   const load = useCallback(async (): Promise<void> => {
@@ -496,6 +507,9 @@ export function SectionEditorScreen({
               <MemoryEditor
                 testID="section-editor"
                 ref={editorRef}
+                cardEditMode
+                formRef={formRef}
+                addButton={{ label: sectionAddLabel(type) }}
                 items={phase.data.rows}
                 fixedType={type}
                 showAdd={canAdd(type)}

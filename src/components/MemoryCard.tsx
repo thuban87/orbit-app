@@ -16,7 +16,7 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { Icon } from "./icons/Icon";
 import { normaliseLinkUrl } from "./LinksEditor";
-import { AppText } from "./ui";
+import { AppText, Button } from "./ui";
 
 export function memoryTypeLabel(memory: MemoryRow): string {
   // D-86: any memory's label wins, so a converted custom memory keeps it.
@@ -61,6 +61,13 @@ export interface MemoryCardProps {
   onShowOnProfile?: () => void;
   /** Section editors only (D-84): a visible and a screen-reader "Move". */
   onMove?: () => void;
+  /**
+   * Card edit mode (D-130): a pencil at the card's top right that opens this
+   * card's form. Held with the card (`disabled`). Absent → no pencil.
+   */
+  onEditPress?: () => void;
+  /** The pencil's label; absent → the card's own `Edit … memory`. */
+  editAccessibilityLabel?: string;
   testID?: string;
 }
 
@@ -84,6 +91,8 @@ export function MemoryCard({
   onAccessibilityAction,
   onShowOnProfile,
   onMove,
+  onEditPress,
+  editAccessibilityLabel,
   testID,
 }: MemoryCardProps) {
   const { colors } = useTheme();
@@ -166,37 +175,55 @@ export function MemoryCard({
         <AppText role="label" style={{ color: colors.textSecondary }}>
           {memoryTypeLabel(memory)}
         </AppText>
-        <View style={styles.markers}>
-          {memory.pinned === 1 ? (
-            <View
-              accessibilityLabel="Pinned memory"
-              accessible
-              style={styles.marker}
-            >
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Pinned
-              </AppText>
-            </View>
-          ) : null}
-          {memory.outdated === 1 ? (
-            <View
-              accessibilityLabel="Marked outdated"
-              accessible
-              style={styles.marker}
-            >
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Outdated
-              </AppText>
-            </View>
-          ) : null}
-          {memory.allow_ai === 1 ? (
-            <View
-              accessibilityLabel="Shared with AI"
-              accessible
-              style={styles.marker}
-            >
-              <Icon name="sparkle" tone="accentText" />
-            </View>
+        <View style={styles.headerEnd}>
+          <View style={styles.markers}>
+            {memory.pinned === 1 ? (
+              <View
+                accessibilityLabel="Pinned memory"
+                accessible
+                style={styles.marker}
+              >
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  Pinned
+                </AppText>
+              </View>
+            ) : null}
+            {memory.outdated === 1 ? (
+              <View
+                accessibilityLabel="Marked outdated"
+                accessible
+                style={styles.marker}
+              >
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  Outdated
+                </AppText>
+              </View>
+            ) : null}
+            {memory.allow_ai === 1 ? (
+              <View
+                accessibilityLabel="Shared with AI"
+                accessible
+                style={styles.marker}
+              >
+                <Icon name="sparkle" tone="accentText" />
+              </View>
+            ) : null}
+          </View>
+          {onEditPress ? (
+            // D-130: the pencil sits at the far top right, after the markers.
+            <Button
+              role="iconOnly"
+              icon="edit"
+              accessibilityLabel={
+                editAccessibilityLabel ??
+                `Edit ${memoryTypeLabel(memory)} memory`
+              }
+              disabled={disabled}
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                onEditPress();
+              }}
+            />
           ) : null}
         </View>
       </View>
@@ -292,6 +319,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: SPACING.sm,
     justifyContent: "space-between",
+  },
+  headerEnd: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexShrink: 1,
+    gap: SPACING.xs,
   },
   link: { alignSelf: "flex-start", minHeight: 44, justifyContent: "center" },
   marker: { justifyContent: "center", minHeight: 44, minWidth: 44 },

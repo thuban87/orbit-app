@@ -30,6 +30,7 @@ import { isValidLinkInput, LINK_FIELD_ERROR } from "@/logic/url-validation";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
+import { type CardEditSlot, cardEditSlots } from "./card-edit-slots";
 import {
   isPickableStoredDate,
   pickerSeedFromStored,
@@ -37,7 +38,7 @@ import {
 } from "./date-pick-logic";
 import { Icon } from "./icons/Icon";
 import { normaliseLinkUrl } from "./LinksEditor";
-import { MemoryCard, memoryTypeLabel } from "./MemoryCard";
+import { MemoryCard, memoryTypeLabel, openMemoryLink } from "./MemoryCard";
 import { AppText, Button, EntryTextField, FieldError, OrbitSwitch } from "./ui";
 
 const PROVENANCE_LABELS = {
@@ -166,6 +167,17 @@ export interface MemoryEditorProps {
    * Absent → false.
    */
   busy?: boolean;
+  /**
+   * Card edit mode (D-130; the section editors only): every card has a pencil;
+   * an existing entry's form opens in place of its card, with Move (when
+   * `onMove` is set) and a red Delete at its top and the Open link above its
+   * fields; resting cards show no Move; while a form is open the other cards
+   * and the Add are held. Absent → the editor renders exactly as before
+   * (Add/Edit Contact, Update Contact, + → Memory).
+   */
+  cardEditMode?: boolean;
+  /** Attached to the open form's outer View, so a host can scroll it into view. */
+  formRef?: Ref<View>;
   /** Exposes `closeDraft()` so the host's Back can close the open draft (D-14). */
   ref?: Ref<MemoryEditorHandle>;
   testID?: string;
@@ -476,6 +488,22 @@ function openingEditorState(
   return { editing: null, draft, baseline: draft };
 }
 
+/**
+ * The editor's render order (D-130 card edit mode; see `cardEditSlots`): with
+ * `cardEditMode` an open edit takes its card's index; otherwise every card,
+ * then the form or the Add. PURE.
+ */
+export function memoryEditorSlots(input: {
+  items: readonly MemoryRow[];
+  editingId: number | null;
+  adding: boolean;
+  cardEditMode: boolean;
+  addOnly: boolean;
+  showAdd: boolean;
+}): CardEditSlot<MemoryRow>[] {
+  return cardEditSlots(input);
+}
+
 /** The linked-entry screen-reader action names (D-107). */
 const EDIT_ACTION = "edit";
 const TOGGLE_PIN_ACTION = "togglePin";
@@ -500,6 +528,8 @@ export function MemoryEditor({
   onDraftStateChange,
   onCancelRequest,
   busy = false,
+  cardEditMode = false,
+  formRef,
   ref,
   testID,
 }: MemoryEditorProps) {
@@ -618,365 +648,462 @@ export function MemoryEditor({
     busy ? styles.disabled : null,
   ];
 
-  return (
-    <View testID={testID} style={styles.container}>
-      {addOnly
-        ? null
-        : items.map((item) => {
-            // D-107: with a host that opens links, a linked entry's tap opens
-            // its interaction; Edit and Pin/Unpin are on long-press and the
-            // screen-reader actions. Unlinked entries keep tap-to-edit.
-            const linked =
-              onOpenLinked !== undefined && item.interaction_id !== null;
-            const linkedProps = linked
-              ? {
-                  onPress: () => {
-                    if (busy) return;
-                    onOpenLinked?.(item);
-                  },
-                  onLongPress: () => openExisting(item),
-                  // Proposed wording (this plan only; plan-19 wording review).
-                  accessibilityLabel: `Open the interaction for this ${memoryTypeLabel(item)} entry`,
-                  accessibilityHint:
-                    "Long-press or use actions to edit or pin.",
-                  accessibilityActions: [
-                    { name: EDIT_ACTION, label: "Edit" },
-                    ...(onTogglePin
-                      ? [
-                          {
-                            name: TOGGLE_PIN_ACTION,
-                            label: item.pinned === 1 ? "Unpin" : "Pin",
-                          },
-                        ]
-                      : []),
-                  ],
-                  onAccessibilityAction: (event: AccessibilityActionEvent) => {
-                    if (event.nativeEvent.actionName === EDIT_ACTION) {
-                      openExisting(item);
-                    } else if (
-                      event.nativeEvent.actionName === TOGGLE_PIN_ACTION &&
-                      !busy
-                    ) {
-                      onTogglePin?.(item);
-                    }
-                  },
-                }
-              : { onPress: () => openExisting(item) };
-            return (
-              <MemoryCard
-                key={item.id}
-                memory={item}
-                // A card tap replaces the open draft, so the save holds it (WR-02).
-                disabled={busy}
-                {...linkedProps}
-                onShowOnProfile={
-                  onShowOnProfile ? () => onShowOnProfile(item) : undefined
-                }
-                onMove={onMove ? () => onMove(item) : undefined}
-              />
-            );
-          })}
-      {!draft ? (
-        addOnly || !showAdd ? null : addButton ? (
-          // D-67 opt-in: a solid primary Add (Add/Edit Contact, plan 14).
-          <Button
-            role="primary"
-            label={addButton.label}
-            disabled={busy}
-            onPress={() => openNew()}
-          />
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add memory"
-            accessibilityState={{ disabled: busy }}
-            disabled={busy}
-            onPress={openNew}
-            style={heldActionStyle}
-          >
-            <AppText role="body" style={{ color: colors.accentText }}>
-              Add memory
-            </AppText>
-          </Pressable>
-        )
-      ) : (
-        <View
-          style={[
-            styles.form,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <AppText role="heading">
-            {editing ? "Edit memory" : "Add memory"}
-          </AppText>
-          {typeLocked ? (
-            // D-35: a non-pickable stored type (Imported) is shown, never
-            // offered for change (convergence c3, Claude C-03).
-            <AppText
-              role="body"
-              accessibilityLabel={`Memory type, ${MEMORY_TYPE_REGISTRY[draft.type].displayName}`}
-              style={styles.typeStatic}
-            >
-              {MEMORY_TYPE_REGISTRY[draft.type].displayName}
-            </AppText>
-          ) : fixedType ? null : (
-            <TypePicker
-              value={draft.type}
-              onSelect={(type) =>
-                setDraft((current) =>
-                  current
-                    ? draftAfterTypeChange(current, type, {
-                        aiDefaults,
-                        allowAiTouched,
-                        isNew: editing === null,
-                      })
-                    : current,
-                )
-              }
-            />
-          )}
-          {/* D-86: every memory type takes an optional label. */}
-          <TextInput
-            accessibilityLabel="Label (optional)"
-            value={draft.customLabel ?? ""}
-            onChangeText={(value) => update("customLabel", value)}
-            placeholder="Label (optional)"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.input,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-          {/* D-66: the shared entry field; Enter runs the same guarded
-              commit as Save, so it never submits what Save refuses. */}
-          <EntryTextField
-            accessibilityLabel="Memory value"
-            value={draft.value ?? ""}
-            onChangeText={(value) => update("value", value)}
-            onSubmit={() => void commit()}
-            placeholder="What should you remember?"
-          />
-          <TextInput
-            accessibilityLabel="Memory note optional"
-            value={draft.note ?? ""}
-            onChangeText={(value) => update("note", value)}
-            placeholder="Note (optional)"
-            placeholderTextColor={colors.textPlaceholder}
-            multiline
-            style={[
-              styles.input,
-              styles.multiline,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-          <TextInput
-            accessibilityLabel="Memory link optional"
-            value={draft.url ?? ""}
-            onChangeText={(value) => update("url", value)}
-            placeholder="Link (optional)"
-            placeholderTextColor={colors.textPlaceholder}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            style={[
-              styles.input,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-          <FieldError message={linkError} testID="memory-link-error" />
-          {/* Meaningful date (38.9 D-65, D-67): a native date picker, full
-              date only, no range limit; optional, with Clear. */}
-          <View style={styles.dateField}>
-            <AppText role="label">Meaningful date (optional)</AppText>
-            <View style={styles.dateRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Meaningful date"
-                accessibilityValue={{ text: meaningfulDateText }}
-                accessibilityHint="Opens the date picker"
-                onPress={() => setShowDatePicker(true)}
-                style={[
-                  styles.input,
-                  styles.dateTrigger,
+  // D-130 (this plan only: the Off Limits editor's `controlsHeld` rule): in
+  // card edit mode an open form holds every other card and the Add, so a tap
+  // never replaces a typed draft silently.
+  const formHeld = cardEditMode && draft !== null;
+  const cardsHeld = busy || formHeld;
+  const addHeld = busy || draft !== null;
+  const addActionStyle = [
+    styles.action,
+    { borderColor: colors.border },
+    addHeld ? styles.disabled : null,
+  ];
+
+  const renderCard = (item: MemoryRow) => {
+    // D-107: with a host that opens links, a linked entry's tap opens
+    // its interaction; Edit and Pin/Unpin are on long-press and the
+    // screen-reader actions. Unlinked entries keep tap-to-edit.
+    const linked = onOpenLinked !== undefined && item.interaction_id !== null;
+    const linkedProps = linked
+      ? {
+          onPress: () => {
+            if (busy) return;
+            onOpenLinked?.(item);
+          },
+          onLongPress: () => openExisting(item),
+          // Proposed wording (this plan only; plan-19 wording review).
+          accessibilityLabel: `Open the interaction for this ${memoryTypeLabel(item)} entry`,
+          accessibilityHint: "Long-press or use actions to edit or pin.",
+          accessibilityActions: [
+            { name: EDIT_ACTION, label: "Edit" },
+            ...(onTogglePin
+              ? [
                   {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
+                    name: TOGGLE_PIN_ACTION,
+                    label: item.pinned === 1 ? "Unpin" : "Pin",
                   },
-                ]}
-              >
-                <AppText
-                  role="body"
-                  style={{
-                    color: hasMeaningfulDate
-                      ? colors.textPrimary
-                      : colors.textPlaceholder,
-                  }}
-                >
-                  {meaningfulDateText}
-                </AppText>
-              </Pressable>
-              {hasMeaningfulDate ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear meaningful date"
-                  onPress={() => update("meaningfulDate", null)}
-                  style={[styles.action, { borderColor: colors.border }]}
-                >
-                  <AppText role="body" style={{ color: colors.textSecondary }}>
-                    Clear
-                  </AppText>
-                </Pressable>
-              ) : null}
-            </View>
-            {meaningfulDateInvalid ? (
-              <AppText role="caption" style={{ color: colors.danger }}>
-                Not a date
-              </AppText>
-            ) : null}
-            {showDatePicker ? (
-              <DateTimePicker
-                testID="memory-meaningful-date-picker"
-                value={pickerSeedFromStored(meaningfulDate)}
-                mode="date"
-                onChange={onMeaningfulDatePicked}
-              />
-            ) : null}
-          </View>
-          <View style={styles.toggleRow}>
-            <AppText role="body">Pin memory</AppText>
-            <OrbitSwitch
-              accessibilityLabel="Pin memory"
-              value={draft.pinned}
-              onValueChange={(value) => update("pinned", value)}
-            />
-          </View>
-          <View style={styles.toggleRow}>
-            <AppText role="body">Mark outdated</AppText>
-            <OrbitSwitch
-              accessibilityLabel="Mark outdated"
-              value={draft.outdated}
-              onValueChange={(value) => update("outdated", value)}
-            />
-          </View>
-          <View style={styles.toggleRow}>
-            <View style={styles.visibilityCopy}>
-              <AppText role="body">Hide from Profile</AppText>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                This is presentation only.
-              </AppText>
-            </View>
-            <OrbitSwitch
-              accessibilityLabel="Hide from Profile"
-              value={draft.hidden === true}
-              onValueChange={(value) => update("hidden", value)}
-            />
-          </View>
-          {/* D-27: Allow AI is draft state on the Add and Edit forms alike;
-              Save writes it and Cancel discards it. */}
-          <View style={styles.toggleRow}>
-            <View style={styles.visibilityCopy}>
-              <AppText role="body">Allow AI to use this</AppText>
-              {aiLock !== null ? (
-                <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  {aiLockReason(aiLock)}
-                </AppText>
-              ) : !globalAiEnabled ? (
-                <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  Turn on AI in Settings first
-                </AppText>
-              ) : null}
-            </View>
-            <OrbitSwitch
-              accessibilityLabel="Allow AI to use this"
-              disabled={aiLock !== null || !globalAiEnabled}
-              busy={busy}
-              value={aiLock === null && draft.allowAi === 1}
-              onValueChange={(allow) => {
-                if (busy || aiLock !== null) return; // held / locked
-                setAllowAiTouched(true);
-                update("allowAi", allow ? 1 : 0);
-              }}
-            />
-          </View>
-          {editing ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {provenanceLabel(editing.provenance)}
+                ]
+              : []),
+          ],
+          onAccessibilityAction: (event: AccessibilityActionEvent) => {
+            if (event.nativeEvent.actionName === EDIT_ACTION) {
+              openExisting(item);
+            } else if (
+              event.nativeEvent.actionName === TOGGLE_PIN_ACTION &&
+              !busy
+            ) {
+              onTogglePin?.(item);
+            }
+          },
+        }
+      : { onPress: () => openExisting(item) };
+    return (
+      <MemoryCard
+        key={item.id}
+        memory={item}
+        // A card tap replaces the open draft, so the save holds it (WR-02).
+        disabled={cardsHeld}
+        {...linkedProps}
+        onShowOnProfile={
+          onShowOnProfile ? () => onShowOnProfile(item) : undefined
+        }
+        // D-130: in card edit mode Move is only in the open form.
+        onMove={onMove && !cardEditMode ? () => onMove(item) : undefined}
+        onEditPress={cardEditMode ? () => openExisting(item) : undefined}
+      />
+    );
+  };
+
+  // Outside card edit mode the Add renders only while no form is open.
+  const renderAdd = () =>
+    addButton ? (
+      // D-67 opt-in: a solid primary Add (Add/Edit Contact, plan 14; the
+      // section editors, D-130).
+      <Button
+        key="memory-editor-add"
+        role="primary"
+        label={addButton.label}
+        disabled={addHeld}
+        onPress={() => openNew()}
+      />
+    ) : (
+      <Pressable
+        key="memory-editor-add"
+        accessibilityRole="button"
+        accessibilityLabel="Add memory"
+        accessibilityState={{ disabled: addHeld }}
+        disabled={addHeld}
+        onPress={openNew}
+        style={addActionStyle}
+      >
+        <AppText role="body" style={{ color: colors.accentText }}>
+          Add memory
+        </AppText>
+      </Pressable>
+    );
+
+  // D-130: Move closes the form through the host's dirty-aware close first,
+  // then hands the stored row to the host's move sheet (38.9 D-14 via D-19).
+  const moveFromForm = (row: MemoryRow) => {
+    if (busy || !onMove) return;
+    const closeThenMove = () => {
+      close();
+      onMove(row);
+    };
+    if (onCancelRequest) onCancelRequest(closeThenMove);
+    else closeThenMove();
+  };
+
+  // The one form markup, rendered in place of its card (card edit mode) or
+  // after the list (every other host).
+  const renderForm = () => {
+    if (draft === null) return null;
+    return (
+      <View
+        key="memory-editor-form"
+        ref={formRef}
+        style={[
+          styles.form,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        {cardEditMode && editing ? (
+          // D-130: Move (D-84 sections) and the red Delete only in edit
+          // mode, at the top right of the open card.
+          <View style={styles.formHeader}>
+            <AppText role="heading" style={styles.formHeading}>
+              Edit memory
             </AppText>
-          ) : null}
-          <View style={styles.actions}>
-            {editing ? (
-              // D-69: Delete is immediate; the host deletes and owns Undo.
-              <Pressable
-                accessibilityRole="button"
+            <View style={styles.formHeaderActions}>
+              {onMove ? (
+                <Button
+                  role="secondary"
+                  label="Move"
+                  accessibilityLabel="Move"
+                  disabled={busy}
+                  onPress={() => moveFromForm(editing)}
+                />
+              ) : null}
+              {/* D-69: Delete is immediate; the host deletes and owns Undo. */}
+              <Button
+                role="destructive"
+                label="Delete"
                 accessibilityLabel="Delete memory"
-                accessibilityState={{ disabled: busy }}
                 disabled={busy}
                 onPress={() => {
                   if (busy) return; // held while the host saves (IN-01)
-                  // Close only when the host takes the delete (third fix
-                  // pass IN-01).
                   if (onDelete(editing.id) === false) return;
                   close();
                 }}
-                style={heldActionStyle}
-              >
-                <AppText role="body" style={{ color: colors.danger }}>
-                  Delete
-                </AppText>
-              </Pressable>
-            ) : null}
+              />
+            </View>
+          </View>
+        ) : (
+          <AppText role="heading">
+            {editing ? "Edit memory" : "Add memory"}
+          </AppText>
+        )}
+        {cardEditMode && editing?.url ? (
+          // D-130, D-24: the card's Open link stays in edit mode.
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Open memory link"
+            hitSlop={8}
+            onPress={() => openMemoryLink(editing.url ?? "")}
+            style={styles.link}
+          >
+            <AppText role="caption" style={{ color: colors.accentText }}>
+              Open link
+            </AppText>
+          </Pressable>
+        ) : null}
+        {typeLocked ? (
+          // D-35: a non-pickable stored type (Imported) is shown, never
+          // offered for change (convergence c3, Claude C-03).
+          <AppText
+            role="body"
+            accessibilityLabel={`Memory type, ${MEMORY_TYPE_REGISTRY[draft.type].displayName}`}
+            style={styles.typeStatic}
+          >
+            {MEMORY_TYPE_REGISTRY[draft.type].displayName}
+          </AppText>
+        ) : fixedType ? null : (
+          <TypePicker
+            value={draft.type}
+            onSelect={(type) =>
+              setDraft((current) =>
+                current
+                  ? draftAfterTypeChange(current, type, {
+                      aiDefaults,
+                      allowAiTouched,
+                      isNew: editing === null,
+                    })
+                  : current,
+              )
+            }
+          />
+        )}
+        {/* D-86: every memory type takes an optional label. */}
+        <TextInput
+          accessibilityLabel="Label (optional)"
+          value={draft.customLabel ?? ""}
+          onChangeText={(value) => update("customLabel", value)}
+          placeholder="Label (optional)"
+          placeholderTextColor={colors.textPlaceholder}
+          style={[
+            styles.input,
+            {
+              color: colors.textPrimary,
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
+        />
+        {/* D-66: the shared entry field; Enter runs the same guarded
+              commit as Save, so it never submits what Save refuses. */}
+        <EntryTextField
+          accessibilityLabel="Memory value"
+          value={draft.value ?? ""}
+          onChangeText={(value) => update("value", value)}
+          onSubmit={() => void commit()}
+          placeholder="What should you remember?"
+        />
+        <TextInput
+          accessibilityLabel="Memory note optional"
+          value={draft.note ?? ""}
+          onChangeText={(value) => update("note", value)}
+          placeholder="Note (optional)"
+          placeholderTextColor={colors.textPlaceholder}
+          multiline
+          style={[
+            styles.input,
+            styles.multiline,
+            {
+              color: colors.textPrimary,
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
+        />
+        <TextInput
+          accessibilityLabel="Memory link optional"
+          value={draft.url ?? ""}
+          onChangeText={(value) => update("url", value)}
+          placeholder="Link (optional)"
+          placeholderTextColor={colors.textPlaceholder}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          style={[
+            styles.input,
+            {
+              color: colors.textPrimary,
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
+        />
+        <FieldError message={linkError} testID="memory-link-error" />
+        {/* Meaningful date (38.9 D-65, D-67): a native date picker, full
+              date only, no range limit; optional, with Clear. */}
+        <View style={styles.dateField}>
+          <AppText role="label">Meaningful date (optional)</AppText>
+          <View style={styles.dateRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancel"
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
-              onPress={() =>
-                onCancelRequest ? onCancelRequest(close) : close()
-              }
-              style={heldActionStyle}
-            >
-              <AppText role="body" style={{ color: colors.textSecondary }}>
-                Cancel
-              </AppText>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={editing ? "Save memory" : "Add memory"}
-              accessibilityState={{ disabled: !canSave || busy }}
-              disabled={!canSave || busy}
-              onPress={() => void commit()}
+              accessibilityLabel="Meaningful date"
+              accessibilityValue={{ text: meaningfulDateText }}
+              accessibilityHint="Opens the date picker"
+              onPress={() => setShowDatePicker(true)}
               style={[
-                styles.action,
+                styles.input,
+                styles.dateTrigger,
                 {
-                  backgroundColor: canSave ? colors.accent : colors.surface,
-                  borderColor: canSave ? colors.accent : colors.border,
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
                 },
-                busy ? styles.disabled : null,
               ]}
             >
               <AppText
                 role="body"
                 style={{
-                  color: canSave ? colors.onAccent : colors.textSecondary,
+                  color: hasMeaningfulDate
+                    ? colors.textPrimary
+                    : colors.textPlaceholder,
                 }}
               >
-                {editing ? "Save" : "Add memory"}
+                {meaningfulDateText}
               </AppText>
             </Pressable>
+            {hasMeaningfulDate ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear meaningful date"
+                onPress={() => update("meaningfulDate", null)}
+                style={[styles.action, { borderColor: colors.border }]}
+              >
+                <AppText role="body" style={{ color: colors.textSecondary }}>
+                  Clear
+                </AppText>
+              </Pressable>
+            ) : null}
           </View>
+          {meaningfulDateInvalid ? (
+            <AppText role="caption" style={{ color: colors.danger }}>
+              Not a date
+            </AppText>
+          ) : null}
+          {showDatePicker ? (
+            <DateTimePicker
+              testID="memory-meaningful-date-picker"
+              value={pickerSeedFromStored(meaningfulDate)}
+              mode="date"
+              onChange={onMeaningfulDatePicked}
+            />
+          ) : null}
         </View>
+        <View style={styles.toggleRow}>
+          <AppText role="body">Pin memory</AppText>
+          <OrbitSwitch
+            accessibilityLabel="Pin memory"
+            value={draft.pinned}
+            onValueChange={(value) => update("pinned", value)}
+          />
+        </View>
+        <View style={styles.toggleRow}>
+          <AppText role="body">Mark outdated</AppText>
+          <OrbitSwitch
+            accessibilityLabel="Mark outdated"
+            value={draft.outdated}
+            onValueChange={(value) => update("outdated", value)}
+          />
+        </View>
+        <View style={styles.toggleRow}>
+          <View style={styles.visibilityCopy}>
+            <AppText role="body">Hide from Profile</AppText>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              This is presentation only.
+            </AppText>
+          </View>
+          <OrbitSwitch
+            accessibilityLabel="Hide from Profile"
+            value={draft.hidden === true}
+            onValueChange={(value) => update("hidden", value)}
+          />
+        </View>
+        {/* D-27: Allow AI is draft state on the Add and Edit forms alike;
+              Save writes it and Cancel discards it. */}
+        <View style={styles.toggleRow}>
+          <View style={styles.visibilityCopy}>
+            <AppText role="body">Allow AI to use this</AppText>
+            {aiLock !== null ? (
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                {aiLockReason(aiLock)}
+              </AppText>
+            ) : !globalAiEnabled ? (
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                Turn on AI in Settings first
+              </AppText>
+            ) : null}
+          </View>
+          <OrbitSwitch
+            accessibilityLabel="Allow AI to use this"
+            disabled={aiLock !== null || !globalAiEnabled}
+            busy={busy}
+            value={aiLock === null && draft.allowAi === 1}
+            onValueChange={(allow) => {
+              if (busy || aiLock !== null) return; // held / locked
+              setAllowAiTouched(true);
+              update("allowAi", allow ? 1 : 0);
+            }}
+          />
+        </View>
+        {editing ? (
+          <AppText role="caption" style={{ color: colors.textSecondary }}>
+            {provenanceLabel(editing.provenance)}
+          </AppText>
+        ) : null}
+        <View style={styles.actions}>
+          {editing && !cardEditMode ? (
+            // D-69: Delete is immediate; the host deletes and owns Undo.
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete memory"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
+              onPress={() => {
+                if (busy) return; // held while the host saves (IN-01)
+                // Close only when the host takes the delete (third fix
+                // pass IN-01).
+                if (onDelete(editing.id) === false) return;
+                close();
+              }}
+              style={heldActionStyle}
+            >
+              <AppText role="body" style={{ color: colors.danger }}>
+                Delete
+              </AppText>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            accessibilityState={{ disabled: busy }}
+            disabled={busy}
+            onPress={() => (onCancelRequest ? onCancelRequest(close) : close())}
+            style={heldActionStyle}
+          >
+            <AppText role="body" style={{ color: colors.textSecondary }}>
+              Cancel
+            </AppText>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={editing ? "Save memory" : "Add memory"}
+            accessibilityState={{ disabled: !canSave || busy }}
+            disabled={!canSave || busy}
+            onPress={() => void commit()}
+            style={[
+              styles.action,
+              {
+                backgroundColor: canSave ? colors.accent : colors.surface,
+                borderColor: canSave ? colors.accent : colors.border,
+              },
+              busy ? styles.disabled : null,
+            ]}
+          >
+            <AppText
+              role="body"
+              style={{
+                color: canSave ? colors.onAccent : colors.textSecondary,
+              }}
+            >
+              {editing ? "Save" : "Add memory"}
+            </AppText>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const slots = memoryEditorSlots({
+    items,
+    editingId: editing?.id ?? null,
+    adding: draft !== null && editing === null,
+    cardEditMode,
+    addOnly,
+    showAdd,
+  });
+
+  return (
+    <View testID={testID} style={styles.container}>
+      {slots.map((slot) =>
+        slot.kind === "card"
+          ? renderCard(slot.item)
+          : slot.kind === "form"
+            ? renderForm()
+            : renderAdd(),
       )}
     </View>
   );
@@ -1003,6 +1130,21 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     padding: SPACING.base,
   },
+  formHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
+  formHeaderActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "flex-end",
+    marginLeft: "auto",
+  },
+  formHeading: { flexShrink: 1, paddingTop: SPACING.sm },
   input: {
     borderRadius: SPACING.sm,
     borderWidth: 1,
@@ -1010,6 +1152,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
   },
+  link: { alignSelf: "flex-start", justifyContent: "center", minHeight: 44 },
   modalRoot: {
     alignItems: "center",
     flex: 1,

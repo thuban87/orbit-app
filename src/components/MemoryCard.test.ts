@@ -11,7 +11,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 vi.mock("./icons/Icon", () => ({ Icon: "Icon" }));
-vi.mock("./ui", () => ({ AppText: "AppText" }));
+vi.mock("./ui", () => ({ AppText: "AppText", Button: "Button" }));
 
 import type { MemoryRow } from "@/db/memories-read";
 import { MemoryCard, openMemoryLink } from "./MemoryCard";
@@ -215,5 +215,71 @@ describe("MemoryCard host props (D-107, D-17, D-84; plan 13)", () => {
     expect(
       tree.some((n) => n.props.accessibilityLabel === "Open memory link"),
     ).toBe(true);
+  });
+});
+
+describe("MemoryCard pencil (D-130)", () => {
+  const memory = {
+    id: 5,
+    type: "gift_idea",
+    custom_label: null,
+    value: "Kayak",
+    note: null,
+    url: null,
+    meaningful_date: null,
+    pinned: 1,
+    outdated: 0,
+    hidden: null,
+    allow_ai: 1,
+    provenance: "user",
+    deleted_at: null,
+  } as unknown as MemoryRow;
+  type Element = { type: unknown; props: Record<string, unknown> };
+  function nodes(node: unknown): Element[] {
+    if (!node || typeof node !== "object") return [];
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    const element = node as Element;
+    return [element, ...nodes(element.props.children)];
+  }
+  const pencil = (tree: Element[]) =>
+    tree.find((n) => n.type === "Button" && n.props.icon === "edit");
+
+  it("renders an iconOnly pencil after the markers whose press calls onEditPress", () => {
+    const onEditPress = vi.fn();
+    const tree = nodes(MemoryCard({ memory, onPress: vi.fn(), onEditPress }));
+    const button = pencil(tree);
+    expect(button?.props.role).toBe("iconOnly");
+    expect(button?.props.accessibilityLabel).toBe("Edit Gift Ideas memory");
+    expect(button?.props.disabled).toBe(false);
+    // After the markers (Pinned, sparkle) in the header.
+    const order = tree.map((n) => n.props.accessibilityLabel);
+    expect(order.lastIndexOf("Edit Gift Ideas memory")).toBeGreaterThan(
+      order.indexOf("Shared with AI"),
+    );
+    const stopPropagation = vi.fn();
+    const onPress = button?.props.onPress;
+    if (typeof onPress !== "function") throw new Error("missing onPress");
+    onPress({ stopPropagation });
+    expect(onEditPress).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalled();
+  });
+
+  it("takes the host's label and is held with the card", () => {
+    const tree = nodes(
+      MemoryCard({
+        memory,
+        onPress: vi.fn(),
+        onEditPress: vi.fn(),
+        editAccessibilityLabel: "Edit this gift",
+        disabled: true,
+      }),
+    );
+    expect(pencil(tree)?.props.accessibilityLabel).toBe("Edit this gift");
+    expect(pencil(tree)?.props.disabled).toBe(true);
+  });
+
+  it("has no pencil without onEditPress", () => {
+    const tree = nodes(MemoryCard({ memory, onPress: vi.fn() }));
+    expect(pencil(tree)).toBeUndefined();
   });
 });

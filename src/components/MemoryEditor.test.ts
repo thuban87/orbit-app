@@ -62,10 +62,12 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 vi.mock("./icons/Icon", () => ({ Icon: "Icon" }));
+const { openMemoryLink } = vi.hoisted(() => ({ openMemoryLink: vi.fn() }));
 vi.mock("./MemoryCard", () => ({
   MemoryCard: "MemoryCard",
   memoryTypeLabel: (memory: { custom_label: string | null }) =>
     memory.custom_label ?? "Memory",
+  openMemoryLink,
 }));
 vi.mock("./ui", () => ({
   AppText: "AppText",
@@ -86,6 +88,7 @@ import {
   MemoryEditor,
   type MemoryEditorProps,
   memoryDraftState,
+  memoryEditorSlots,
   memoryLinkError,
   newMemoryDraft,
   normalizeMemoryDraft,
@@ -1152,5 +1155,288 @@ describe("Link validation (G-13 via D-89)", () => {
     call(save, "onPress");
     call(save, "onPress");
     expect(onAdd).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("card edit mode (D-130)", () => {
+  type TestElement = ReactElement<Record<string, unknown>>;
+  function nodes(node: ReactNode): TestElement[] {
+    if (!node || typeof node !== "object") return [];
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    const element = node as TestElement;
+    return [element, ...nodes(element.props.children as ReactNode)];
+  }
+  const invoke = (
+    element: TestElement | undefined,
+    prop: string,
+    ...args: unknown[]
+  ) => {
+    const handler = element?.props[prop];
+    if (typeof handler !== "function") throw new Error(`missing ${prop}`);
+    return handler(...args);
+  };
+  const row = (id: number, overrides: Partial<MemoryRow> = {}): MemoryRow =>
+    ({
+      id,
+      uid: `m-${id}`,
+      contact_id: 1,
+      type: "gift_idea",
+      custom_label: null,
+      value: `Gift ${id}`,
+      note: null,
+      url: null,
+      meaningful_date: null,
+      pinned: 0,
+      outdated: 0,
+      hidden: null,
+      allow_ai: 0,
+      provenance: "user",
+      deleted_at: null,
+      interaction_id: null,
+      link_source: null,
+      group_note_copy: 0,
+      linked_note_ai_locked: 0,
+      ...overrides,
+    }) as MemoryRow;
+  const items = [row(1), row(2), row(3)];
+  const kinds = (slots: ReturnType<typeof memoryEditorSlots>) =>
+    slots.map((slot) => (slot.kind === "card" ? slot.item.id : slot.kind));
+  const base = {
+    items,
+    editingId: null,
+    adding: false,
+    cardEditMode: true,
+    addOnly: false,
+    showAdd: true,
+  };
+
+  beforeEach(() => {
+    hooks.forceOpenPickers = false;
+    hooks.draftOverride = null;
+    hooks.setters = [];
+    openMemoryLink.mockClear();
+  });
+
+  describe("memoryEditorSlots", () => {
+    it("puts an open edit's form at its card's index, then the Add", () => {
+      expect(kinds(memoryEditorSlots({ ...base, editingId: 2 }))).toEqual([
+        1,
+        "form",
+        3,
+        "add",
+      ]);
+    });
+
+    it("without cardEditMode keeps today's order: every card, then the form", () => {
+      expect(
+        kinds(
+          memoryEditorSlots({ ...base, editingId: 2, cardEditMode: false }),
+        ),
+      ).toEqual([1, 2, 3, "form"]);
+    });
+
+    it("a new entry's form stays where the Add was", () => {
+      expect(kinds(memoryEditorSlots({ ...base, adding: true }))).toEqual([
+        1,
+        2,
+        3,
+        "form",
+      ]);
+    });
+
+    it("addOnly gives only the form; showAdd false and no draft gives only cards", () => {
+      expect(
+        kinds(memoryEditorSlots({ ...base, addOnly: true, adding: true })),
+      ).toEqual(["form"]);
+      expect(kinds(memoryEditorSlots({ ...base, showAdd: false }))).toEqual([
+        1, 2, 3,
+      ]);
+      expect(kinds(memoryEditorSlots(base))).toEqual([1, 2, 3, "add"]);
+    });
+
+    it("an edited row no longer in the list keeps its form at the end", () => {
+      expect(kinds(memoryEditorSlots({ ...base, editingId: 9 }))).toEqual([
+        1,
+        2,
+        3,
+        "form",
+      ]);
+    });
+  });
+
+  const render = (props: Partial<MemoryEditorProps> = {}) =>
+    MemoryEditor({
+      items,
+      onAdd: vi.fn(),
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+      globalAiEnabled: true,
+      fixedType: "gift_idea",
+      cardEditMode: true,
+      ...props,
+    }) as TestElement;
+  const children = (root: TestElement) =>
+    (root.props.children as TestElement[]).filter(Boolean);
+
+  it("opens the edited card's form in its place, with Move and a red Delete before the fields", () => {
+    const onMove = vi.fn();
+    const root = render({ initiallyEditingId: 2, onMove });
+    const slots = children(root);
+    expect(slots.map((n) => n.type)).toEqual([
+      "MemoryCard",
+      "View",
+      "MemoryCard",
+      "Pressable",
+    ]);
+    expect(slots[0]?.props.memory).toBe(items[0]);
+    expect(slots[2]?.props.memory).toBe(items[2]);
+    const form = nodes(slots[1]);
+    const ordered = form.map((n) =>
+      n.type === "Button"
+        ? `Button:${String(n.props.role)}:${String(n.props.label)}`
+        : String(n.props.accessibilityLabel ?? ""),
+    );
+    const move = ordered.indexOf("Button:secondary:Move");
+    const del = ordered.indexOf("Button:destructive:Delete");
+    const value = ordered.indexOf("Memory value");
+    expect(move).toBeGreaterThanOrEqual(0);
+    expect(del).toBeGreaterThan(move);
+    expect(value).toBeGreaterThan(del);
+    // The bottom Delete Pressable is not rendered in card edit mode.
+    expect(
+      form.some(
+        (n) =>
+          n.type === "Pressable" &&
+          n.props.accessibilityLabel === "Delete memory",
+      ),
+    ).toBe(false);
+    // Cards: no Move at rest, a pencil on each, held while the form is open.
+    for (const card of [slots[0], slots[2]]) {
+      expect(card?.props.onMove).toBeUndefined();
+      expect(typeof card?.props.onEditPress).toBe("function");
+      expect(card?.props.disabled).toBe(true);
+    }
+    // The Add is held while the form is open.
+    expect(slots[3]?.props.disabled).toBe(true);
+  });
+
+  it("each resting card gets a pencil that opens its form, and no Move", () => {
+    const onMove = vi.fn();
+    const cards = children(render({ onMove })).filter(
+      (n) => n.type === "MemoryCard",
+    );
+    expect(cards).toHaveLength(3);
+    for (const card of cards) {
+      expect(card.props.onMove).toBeUndefined();
+      expect(card.props.disabled).toBe(false);
+    }
+    invoke(cards[1], "onEditPress");
+    // openExisting: setEditing + setDraft + setBaseline + setAllowAiTouched.
+    expect(hooks.setters).toHaveLength(4);
+    expect(hooks.setters[0]).toBe(items[1]);
+  });
+
+  it("a linked card keeps tap-to-open (D-107) and its pencil opens edit mode", () => {
+    const linked = row(4, { interaction_id: 40, link_source: "note" });
+    const onOpenLinked = vi.fn();
+    const [card] = children(render({ items: [linked], onOpenLinked })).filter(
+      (n) => n.type === "MemoryCard",
+    );
+    invoke(card, "onPress");
+    expect(onOpenLinked).toHaveBeenCalledWith(linked);
+    expect(hooks.setters).toHaveLength(0);
+    invoke(card, "onEditPress");
+    expect(hooks.setters[0]).toBe(linked);
+  });
+
+  it("Delete keeps the host contract: refused stays open, accepted closes", () => {
+    const refused = vi.fn(() => false);
+    const del = (root: TestElement) =>
+      nodes(root).find(
+        (n) => n.type === "Button" && n.props.role === "destructive",
+      );
+    invoke(
+      del(render({ initiallyEditingId: 2, onDelete: refused })),
+      "onPress",
+    );
+    expect(refused).toHaveBeenCalledWith(2);
+    expect(hooks.setters).toHaveLength(0);
+    const accepted = vi.fn();
+    invoke(
+      del(render({ initiallyEditingId: 2, onDelete: accepted })),
+      "onPress",
+    );
+    expect(accepted).toHaveBeenCalledWith(2);
+    // close(): setEditing + setDraft + setBaseline.
+    expect(hooks.setters).toHaveLength(3);
+  });
+
+  it("Move closes through the host's dirty-aware close, then hands over the row", () => {
+    const onMove = vi.fn();
+    let requested: (() => void) | null = null;
+    const onCancelRequest = vi.fn((close: () => void) => {
+      requested = close;
+    });
+    const move = nodes(
+      render({ initiallyEditingId: 2, onMove, onCancelRequest }),
+    ).find((n) => n.type === "Button" && n.props.label === "Move");
+    invoke(move, "onPress");
+    expect(onCancelRequest).toHaveBeenCalledTimes(1);
+    expect(onMove).not.toHaveBeenCalled();
+    (requested as unknown as () => void)();
+    expect(hooks.setters).toHaveLength(3);
+    expect(onMove).toHaveBeenCalledWith(items[1]);
+  });
+
+  it("no onMove (Imported) gives Delete only", () => {
+    const tree = nodes(render({ initiallyEditingId: 2 }));
+    expect(
+      tree.some((n) => n.type === "Button" && n.props.label === "Move"),
+    ).toBe(false);
+    expect(
+      tree.some((n) => n.type === "Button" && n.props.role === "destructive"),
+    ).toBe(true);
+  });
+
+  it("the open form shows the stored Open link (D-24)", () => {
+    const linkRow = row(2, { url: "https://example.com/gift" });
+    const tree = nodes(
+      render({ items: [items[0], linkRow, items[2]], initiallyEditingId: 2 }),
+    );
+    const link = tree.find(
+      (n) => n.props.accessibilityLabel === "Open memory link",
+    );
+    expect(link?.props.accessibilityRole).toBe("link");
+    invoke(link, "onPress");
+    expect(openMemoryLink).toHaveBeenCalledWith("https://example.com/gift");
+  });
+
+  it("without cardEditMode the cards keep Move and get no pencil", () => {
+    const onMove = vi.fn();
+    const root = render({
+      cardEditMode: undefined,
+      onMove,
+      initiallyEditingId: 2,
+    });
+    const slots = children(root);
+    expect(slots.map((n) => n.type)).toEqual([
+      "MemoryCard",
+      "MemoryCard",
+      "MemoryCard",
+      "View",
+    ]);
+    for (const card of slots.slice(0, 3)) {
+      expect(typeof card.props.onMove).toBe("function");
+      expect(card.props.onEditPress).toBeUndefined();
+    }
+    const form = nodes(slots[3]);
+    expect(form.some((n) => n.type === "Button")).toBe(false);
+    expect(
+      form.some(
+        (n) =>
+          n.type === "Pressable" &&
+          n.props.accessibilityLabel === "Delete memory",
+      ),
+    ).toBe(true);
   });
 });

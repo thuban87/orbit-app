@@ -9,6 +9,7 @@ import {
   openEditTarget,
   restoredSnackbar,
   savedSnackbar,
+  sectionAddLabel,
   sectionEmptyText,
   sectionEntries,
   sectionPinSnackbar,
@@ -112,4 +113,13 @@ describe("section editor (38.10 D-75, D-35, D-84, D-107)", () => {
       "Only the Contacts import adds entries here.",
     );
   });
+});
+
+describe("sectionAddLabel (D-130)", () => {
+  it.each(["general", "gift_idea", "thought_of_them"] as const)(
+    "%s keeps today's Add wording (D-137 is plan 25's)",
+    (type) => {
+      expect(sectionAddLabel(type)).toBe("Add memory");
+    },
+  );
 });

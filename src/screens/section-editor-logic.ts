@@ -51,6 +51,15 @@ export function canMove(type: MemoryTypeKey): boolean {
   return type !== "imported";
 }
 
+/**
+ * The section's solid Add label (D-130). Today's wording for every type;
+ * plan 25 applies D-137's section names here, and plan 21's section FAB
+ * reads it too. Imported never shows an Add (D-35).
+ */
+export function sectionAddLabel(_type: MemoryTypeKey): string {
+  return "Add memory";
+}
+
 /** Only the Contacts import writes Imported, so its editor has no Add (D-35). */
 export function canAdd(type: MemoryTypeKey): boolean {
   return type !== "imported";
