@@ -104,6 +104,11 @@ export const ICON_REGISTRY = {
     filled: "location",
   },
 
+  // ---- Pinned marker (38.10 D-133) --------------------------------------
+  // The pushpin every pinned card shows instead of the word "Pinned" (O12).
+  // `location` / `section-current-location` is the map pin, not this one.
+  pin: { outline: "pin-outline", filled: "pin" },
+
   // ---- Plan 07 destructive affordance -----------------------------------
   warning: { outline: "warning-outline", filled: "warning" },
 

@@ -1,5 +1,8 @@
 /** Read choke point for live structured contact relationships. */
-import { RELATIONSHIPS_GROUP } from "@/db/memory-registry";
+import {
+  HIDE_FROM_PROFILE_ENABLED,
+  RELATIONSHIPS_GROUP,
+} from "@/db/memory-registry";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 
 export interface RelationshipRow {
@@ -37,10 +40,17 @@ export function listRelationshipsForContact(
   ]);
 }
 
-/** Resolve a Key People item's Profile presentation preference, never privacy. */
+/**
+ * Resolve a Key People item's Profile presentation preference, never privacy.
+ * While Hide from Profile is switched off (`HIDE_FROM_PROFILE_ENABLED`, D-134)
+ * every row shows; the rule below is kept for when the feature returns.
+ * `enabled` exists so tests can exercise that kept rule.
+ */
 export function resolveRelationshipVisibility(
   hidden: number | null,
+  enabled: boolean = HIDE_FROM_PROFILE_ENABLED,
 ): "show" | "hide" {
+  if (!enabled) return "show";
   if (hidden === 1) return "hide";
   if (hidden === 0) return "show";
   return RELATIONSHIPS_GROUP.visibilityDefault;

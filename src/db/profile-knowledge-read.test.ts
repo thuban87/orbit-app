@@ -47,7 +47,7 @@ function readOnly(): ReadOnlyExecutor {
 }
 
 describe("Profile knowledge projection", () => {
-  it("keeps semantic owners distinct, filters hidden before caps, and dedupes featured references", async () => {
+  it("keeps semantic owners distinct, shows hidden rows while the switch is off, and lists pinned rows in both places (D-133, D-134)", async () => {
     const owner = await contact("Owner");
     const linked = await contact("Linked");
     await exec.runAsync(
@@ -64,7 +64,7 @@ describe("Profile knowledge projection", () => {
        VALUES (?, ?, 'Blair', 'friend', ?, 'Met at work', 1, 0, ?, ?)`,
       [uid(), owner, linked, NOW, NOW],
     );
-    await exec.runAsync(
+    const hiddenRelationship = await exec.runAsync(
       `INSERT INTO relationships
          (uid, contact_id, person_name, pinned, hidden, created_at, modified_at)
        VALUES (?, ?, 'Hidden pinned', 1, 1, ?, ?)`,
@@ -78,7 +78,7 @@ describe("Profile knowledge projection", () => {
        VALUES (?, ?, 'general', 'Bring the recipe', 1, 0, 'user', ?, ?, 1)`,
       [uid(), owner, NOW, NOW],
     );
-    await exec.runAsync(
+    const hiddenMemory = await exec.runAsync(
       `INSERT INTO memories
          (uid, contact_id, type, value, pinned, hidden, provenance,
           created_at, modified_at, allow_ai)
@@ -97,18 +97,33 @@ describe("Profile knowledge projection", () => {
     expect(result.currentState.last_talked_about?.value).toBe("The garden");
     expect(result.currentState.last_talked_about?.previous).toEqual([]);
     expect(result.currentState.last_talked_about?.total).toBe(1);
+    // Pinned: every pinned row, the hidden ones too (D-134 ignores the flag).
     expect(
-      result.featured.items.map((item) => `${item.owner}:${item.id}`),
-    ).toEqual([
-      `relationship:${visibleRelationship.lastInsertRowId}`,
-      `memory:${visibleMemory.lastInsertRowId}`,
-    ]);
-    expect(result.relationships.items).toEqual([]);
-    expect(result.relationships.hiddenCount).toBe(1);
-    expect(result.relationships.showHiddenAvailable).toBe(true);
-    expect(result.memories.items).toEqual([]);
-    expect(result.memories.hiddenCount).toBe(1);
-    expect(result.memories.showHiddenAvailable).toBe(true);
+      result.featured.items.map((item) => `${item.owner}:${item.id}`).sort(),
+    ).toEqual(
+      [
+        `relationship:${visibleRelationship.lastInsertRowId}`,
+        `relationship:${hiddenRelationship.lastInsertRowId}`,
+        `memory:${visibleMemory.lastInsertRowId}`,
+        `memory:${hiddenMemory.lastInsertRowId}`,
+      ].sort(),
+    );
+    // ...and the same rows in their own sections (D-133).
+    expect(result.relationships.items.map((row) => row.id).sort()).toEqual(
+      [
+        visibleRelationship.lastInsertRowId,
+        hiddenRelationship.lastInsertRowId,
+      ].sort(),
+    );
+    expect(result.relationships.total).toBe(2);
+    expect(result.relationships.hiddenCount).toBe(0);
+    expect(result.relationships.showHiddenAvailable).toBe(false);
+    expect(result.memories.items.map((row) => row.id).sort()).toEqual(
+      [visibleMemory.lastInsertRowId, hiddenMemory.lastInsertRowId].sort(),
+    );
+    expect(result.memories.total).toBe(2);
+    expect(result.memories.hiddenCount).toBe(0);
+    expect(result.memories.showHiddenAvailable).toBe(false);
     expect(result.importedNotes.items).toEqual([
       expect.objectContaining({ type: "imported", value: "Imported note" }),
     ]);
@@ -241,7 +256,7 @@ describe("Profile knowledge projection", () => {
     return result.lastInsertRowId;
   }
 
-  it("splits Memories, Thought of Them and Gift Ideas, each with its own hidden count (D-34; c6 C-02)", async () => {
+  it("splits Memories, Thought of Them and Gift Ideas, and a hidden row shows in its section (D-34, D-134)", async () => {
     const owner = await contact("Owner");
     await memory(owner, "general", "A memory");
     await memory(owner, "thought_of_them", "Saw their band");
@@ -253,9 +268,13 @@ describe("Profile knowledge projection", () => {
     expect(result.thoughtOfThem.items.map((row) => row.value)).toEqual([
       "Saw their band",
     ]);
-    expect(result.giftIdeas.items.map((row) => row.value)).toEqual(["Teapot"]);
-    expect(result.giftIdeas.hiddenCount).toBe(1);
-    expect(result.giftIdeas.showHiddenAvailable).toBe(true);
+    expect(result.giftIdeas.items.map((row) => row.value).sort()).toEqual([
+      "Hidden gift",
+      "Teapot",
+    ]);
+    expect(result.giftIdeas.total).toBe(2);
+    expect(result.giftIdeas.hiddenCount).toBe(0);
+    expect(result.giftIdeas.showHiddenAvailable).toBe(false);
     expect(result.memories.hiddenCount).toBe(0);
     expect(result.memories.showHiddenAvailable).toBe(false);
     expect(result.thoughtOfThem.hiddenCount).toBe(0);
@@ -277,10 +296,16 @@ describe("Profile knowledge projection", () => {
     expect(result.featured.items).toHaveLength(4);
     expect(result.featured.total).toBe(4);
     expect(result.featured.remainingCount).toBe(0);
-    // Pinned rows stay out of their own sections.
-    expect(result.memories.items).toEqual([]);
-    expect(result.giftIdeas.items).toEqual([]);
-    expect(result.thoughtOfThem.items).toEqual([]);
+    // Pinned rows also show in their own sections (D-133), so an only-pinned
+    // section is never empty (O6).
+    expect(result.memories.items.map((row) => row.value)).toEqual(["One"]);
+    expect(result.giftIdeas.items.map((row) => row.value)).toEqual(["Two"]);
+    expect(result.thoughtOfThem.items.map((row) => row.value)).toEqual([
+      "Three",
+    ]);
+    expect(result.relationships.items.map((row) => row.person_name)).toEqual([
+      "Four",
+    ]);
   });
 
   it("caps repeatable visible collections after filtering and reports truthful totals", async () => {

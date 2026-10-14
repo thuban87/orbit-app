@@ -1,5 +1,9 @@
 /** Read choke point for live typed Memories. */
-import { isMemoryTypeKey, MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
+import {
+  HIDE_FROM_PROFILE_ENABLED,
+  isMemoryTypeKey,
+  MEMORY_TYPE_REGISTRY,
+} from "@/db/memory-registry";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -106,11 +110,17 @@ export function listAiEligibleMemories(
  * preference, not a privacy or AI-egress control. Unknown persisted types fail
  * visible so corrupt data can never disappear silently; invalid hidden values
  * instead inherit the registered type's default.
+ *
+ * While Hide from Profile is switched off (`HIDE_FROM_PROFILE_ENABLED`, D-134)
+ * every memory shows; the rule below is kept for when the feature returns.
+ * `enabled` exists so tests can exercise that kept rule.
  */
 export function resolveVisibility(
   type: string,
   hidden: number | null,
+  enabled: boolean = HIDE_FROM_PROFILE_ENABLED,
 ): "show" | "hide" {
+  if (!enabled) return "show";
   if (!isMemoryTypeKey(type)) return "show";
   if (hidden === 1) return "hide";
   if (hidden === 0) return "show";

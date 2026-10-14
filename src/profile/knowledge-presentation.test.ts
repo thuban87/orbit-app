@@ -696,6 +696,27 @@ describe("knowledge presentation", () => {
       expect(pinned.viewAllLabel).toBeNull();
     });
 
+    it("marks a pinned memory and key person with `pinned`, never the word (D-133; O12)", () => {
+      const knowledge: ProfileKnowledge = {
+        ...empty,
+        featured: some([
+          { owner: "memory", id: 5, row: memory(5, { pinned: 1 }) },
+          { owner: "relationship", id: 6, row: person(6, { pinned: 1 }) },
+        ]),
+        memories: some([memory(5, { pinned: 1 }), memory(7)]),
+        relationships: some([person(6, { pinned: 1 }), person(8)]),
+      };
+      const pinnedItems = child(knowledge, "pinned-featured").items;
+      expect(pinnedItems.map((item) => item.pinned)).toEqual([true, true]);
+      const memories = child(knowledge, "memories").items;
+      expect(memories.map((item) => item.pinned)).toEqual([true, false]);
+      const people = child(knowledge, "key-people").items;
+      expect(people.map((item) => item.pinned)).toEqual([true, false]);
+      for (const item of [...pinnedItems, ...memories, ...people]) {
+        expect(item.metadata).not.toContain("Pinned");
+      }
+    });
+
     it("carries a stored URL in the detail of entries and Off Limits items (D-24; c1 F-U9)", () => {
       const knowledge: ProfileKnowledge = {
         ...empty,

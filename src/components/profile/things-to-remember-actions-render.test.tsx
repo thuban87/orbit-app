@@ -219,6 +219,44 @@ describe("Things to Remember entry actions (D-70, D-87; I-9, I-1)", () => {
   });
 });
 
+describe("pinned cards and Show hidden (D-133, D-134)", () => {
+  const pins = (node: Node) =>
+    all([node]).filter(
+      (child) => child.type === "Icon" && child.props.name === "pin",
+    );
+
+  it("shows the pushpin on a pinned card, labelled ', pinned', and none on an unpinned one", () => {
+    const [plain, pinned] = cards(
+      render(withMemories([memory(1), memory(2, { pinned: 1 })])),
+    );
+    if (!plain || !pinned) throw new Error("cards are missing");
+    expect(pins(pinned)).toHaveLength(1);
+    expect(props(pinned).accessibilityLabel).toBe("Memory, pinned");
+    expect(pins(plain)).toHaveLength(0);
+    expect(props(plain).accessibilityLabel).toBe("Memory");
+    const texts = all([pinned])
+      .filter((node) => node.type === "literal")
+      .map((node) => node.text);
+    expect(texts).not.toContain("Pinned");
+  });
+
+  it("never renders Show hidden while Hide from Profile is switched off", () => {
+    const knowledge: ProfileKnowledge = {
+      ...withMemories([memory(1)]),
+      memories: {
+        ...emptyCollection,
+        items: [memory(1)],
+        total: 1,
+        hiddenCount: 1,
+        showHiddenAvailable: true,
+      },
+    };
+    const labels = buttonLabels(render(knowledge));
+    expect(labels).not.toContain("Show hidden");
+    expect(labels).not.toContain("Hide hidden");
+  });
+});
+
 describe("linked entries (D-107, D-37)", () => {
   const linked = memory(1, { interaction_id: 40, link_source: "note" });
 

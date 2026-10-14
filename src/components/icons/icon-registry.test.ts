@@ -145,6 +145,16 @@ describe("ICON_REGISTRY", () => {
     });
   });
 
+  it("registers the pushpin `pin`, distinct from the map pin (38.10 D-133)", () => {
+    expect(ICON_REGISTRY.pin).toEqual({
+      outline: "pin-outline",
+      filled: "pin",
+    });
+    expect(ICON_REGISTRY.pin.filled).not.toBe(
+      ICON_REGISTRY["section-current-location"].filled,
+    );
+  });
+
   it("reserves the `warning` name required by Plan 07 (REVIEWS 23-05 LOW)", () => {
     expect(ICON_REGISTRY.warning).toBeDefined();
     expect(ICON_REGISTRY.warning.outline).toBeTruthy();

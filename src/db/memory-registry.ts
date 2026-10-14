@@ -12,6 +12,14 @@
  */
 
 /**
+ * D-134 (owner, 2026-10-13): Hide from Profile is hidden everywhere in the UI
+ * and the stored `hidden` flag is ignored for display until the feature
+ * returns; flip to true to bring it back (D-71 is the deferred keep-or-drop
+ * decision). The flag itself stays in the schema and every writer keeps it.
+ */
+export const HIDE_FROM_PROFILE_ENABLED = false;
+
+/**
  * The durable noun for a Memory item, used as the fallback label wherever a
  * specific type/custom label is absent. The owner confirmed "Memory" as the
  * final terminology (D-11, 2026-09-12); the constant name is retained because it

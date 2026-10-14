@@ -10,6 +10,7 @@ import { Icon } from "@/components/icons/Icon";
 import { openMemoryLink } from "@/components/MemoryCard";
 import { AppText, Button, Sheet } from "@/components/ui";
 import { CLOSE } from "@/constants/glossary";
+import { HIDE_FROM_PROFILE_ENABLED } from "@/db/memory-registry";
 import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import {
   buildKnowledgePresentation,
@@ -186,7 +187,7 @@ export function KnowledgeCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${item.title}${item.invalid ? ", needs attention" : ""}`}
+      accessibilityLabel={`${item.title}${item.invalid ? ", needs attention" : ""}${item.pinned ? ", pinned" : ""}`}
       accessibilityActions={item.management.accessibility.map((action) => ({
         name: action,
         label: ACTION_LABELS[action],
@@ -204,6 +205,11 @@ export function KnowledgeCard({
           <AppText role="label">{item.title}</AppText>
           {item.sparkle ? (
             <Icon name="sparkle" tone="accentText" size="sm" />
+          ) : null}
+          {item.pinned ? (
+            // The pushpin replaces the word "Pinned" (D-133); decorative here,
+            // the card's label carries ", pinned".
+            <Icon name="pin" tone="textSecondary" size="sm" />
           ) : null}
         </View>
       ) : null}
@@ -347,7 +353,9 @@ export function KnowledgeChild({
           onPress={() => onViewAll(child, showingHidden)}
         />
       ) : null}
-      {child.showHiddenAvailable ? (
+      {/* Gated on the switch too, so the UI rule never rests on the data
+          rule alone (D-134). */}
+      {HIDE_FROM_PROFILE_ENABLED && child.showHiddenAvailable ? (
         <Button
           role="tertiary"
           label={showingHidden ? "Hide hidden" : "Show hidden"}

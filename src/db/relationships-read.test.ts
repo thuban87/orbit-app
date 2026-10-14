@@ -4,7 +4,10 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { RELATIONSHIPS_GROUP } from "@/db/memory-registry";
+import {
+  HIDE_FROM_PROFILE_ENABLED,
+  RELATIONSHIPS_GROUP,
+} from "@/db/memory-registry";
 import { runMigrations } from "@/db/migrations/runner";
 import { addRelationship } from "@/db/relationships-dao";
 import {
@@ -112,17 +115,33 @@ describe("relationships read", () => {
     ).toEqual([]);
   });
 
-  it("resolves explicit and inherited visibility defensively", () => {
-    expect(resolveRelationshipVisibility(1)).toBe("hide");
+  it("shows every row while Hide from Profile is switched off (D-134)", () => {
+    expect(HIDE_FROM_PROFILE_ENABLED).toBe(false);
+    expect(resolveRelationshipVisibility(1)).toBe("show");
     expect(resolveRelationshipVisibility(0)).toBe("show");
     expect(resolveRelationshipVisibility(null)).toBe("show");
-    expect(resolveRelationshipVisibility(2)).toBe("show");
 
     const group = RELATIONSHIPS_GROUP as { visibilityDefault: "show" | "hide" };
     const original = group.visibilityDefault;
     group.visibilityDefault = "hide";
     try {
-      expect(resolveRelationshipVisibility(null)).toBe("hide");
+      expect(resolveRelationshipVisibility(null)).toBe("show");
+    } finally {
+      group.visibilityDefault = original;
+    }
+  });
+
+  it("keeps the explicit and inherited rule behind the switch", () => {
+    expect(resolveRelationshipVisibility(1, true)).toBe("hide");
+    expect(resolveRelationshipVisibility(0, true)).toBe("show");
+    expect(resolveRelationshipVisibility(null, true)).toBe("show");
+    expect(resolveRelationshipVisibility(2, true)).toBe("show");
+
+    const group = RELATIONSHIPS_GROUP as { visibilityDefault: "show" | "hide" };
+    const original = group.visibilityDefault;
+    group.visibilityDefault = "hide";
+    try {
+      expect(resolveRelationshipVisibility(null, true)).toBe("hide");
     } finally {
       group.visibilityDefault = original;
     }

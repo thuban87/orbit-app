@@ -299,8 +299,11 @@ function profileMemorySection(type: string): ProfileMemorySection {
 
 /**
  * Read renderer-neutral Profile knowledge without flattening its semantic owners.
- * Hidden rows are counted for administration but never admitted to visible caps;
- * featured rows are references and are removed from their ordinary child lists.
+ * Hidden rows are counted for administration but never admitted to visible caps
+ * (while Hide from Profile is switched off nothing resolves hidden, so every
+ * count is 0; D-134). Pinned rows show in Pinned and in their own section
+ * (D-133): featured entries are references to rows that also stay in their
+ * ordinary child lists.
  */
 export async function readProfileKnowledge(
   exec: ReadOnlyExecutor,
@@ -350,14 +353,11 @@ export async function readProfileKnowledge(
       (row): ProfileFeaturedReference => ({ owner: "memory", id: row.id, row }),
     ),
   ];
-  const relationshipItems = visibleRelationships.filter(
-    (row) => row.pinned !== 1,
-  );
-  // Pinned rows stay out of their own sections, so Pinned is where they show.
+  // Pinned rows show in Pinned and in their own section (D-133), so a
+  // section whose only entry is pinned never reads as empty (O6).
+  const relationshipItems = visibleRelationships;
   const sectionItems = (section: ProfileMemorySection) =>
-    visibleMemories.filter(
-      (row) => profileMemorySection(row.type) === section && row.pinned !== 1,
-    );
+    visibleMemories.filter((row) => profileMemorySection(row.type) === section);
 
   return {
     currentState,

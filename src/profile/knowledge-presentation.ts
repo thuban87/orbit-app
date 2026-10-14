@@ -85,6 +85,8 @@ export interface KnowledgePresentationItem {
   detail: KnowledgeDetailTarget;
   management: KnowledgeManagement;
   sparkle: boolean;
+  /** A pinned row; its card shows the pushpin, not the word (D-133). */
+  pinned?: boolean;
   explicitPermission?: boolean;
   invalid?: boolean;
   rawValue?: string | null;
@@ -348,7 +350,6 @@ function memoryItem(memory: MemoryRow): KnowledgePresentationItem {
         )
       : null,
     memory.url ? "Link" : null,
-    memory.pinned === 1 ? "Pinned" : null,
     memory.outdated === 1 ? "Outdated" : null,
   ].filter((value): value is string => value != null && value !== "");
   return {
@@ -359,6 +360,7 @@ function memoryItem(memory: MemoryRow): KnowledgePresentationItem {
     detail: { owner: "memory", id: memory.id, ...detailExtras(memory) },
     management: management(["edit", memory.pinned === 1 ? "unpin" : "pin"]),
     sparkle: memory.allow_ai === 1,
+    pinned: memory.pinned === 1,
   };
 }
 
@@ -373,6 +375,7 @@ function relationshipItem(row: RelationshipRow): KnowledgePresentationItem {
     detail: { owner: "relationship", id: row.id },
     management: management(["edit", row.pinned === 1 ? "unpin" : "pin"]),
     sparkle: false,
+    pinned: row.pinned === 1,
   };
 }
 

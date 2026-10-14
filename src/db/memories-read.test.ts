@@ -11,7 +11,10 @@ import {
   listProfileVisibleMemoriesForContact,
   resolveVisibility,
 } from "@/db/memories-read";
-import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
+import {
+  HIDE_FROM_PROFILE_ENABLED,
+  MEMORY_TYPE_REGISTRY,
+} from "@/db/memory-registry";
 import { runMigrations } from "@/db/migrations/runner";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -71,24 +74,40 @@ describe("memories read", () => {
     expect(await listAiEligibleMemories(exec, contactId)).toEqual([]);
   });
 
-  it("resolves per-item overrides, registry defaults, and corrupt values defensively", () => {
-    expect(resolveVisibility("general", 1)).toBe("hide");
+  it("shows every memory while Hide from Profile is switched off (D-134)", () => {
+    expect(HIDE_FROM_PROFILE_ENABLED).toBe(false);
+    expect(resolveVisibility("general", 1)).toBe("show");
     expect(resolveVisibility("general", 0)).toBe("show");
     expect(resolveVisibility("general", null)).toBe("show");
-    expect(resolveVisibility("general", 2)).toBe("show");
-    expect(resolveVisibility("bogus", null)).toBe("show");
+    expect(resolveVisibility("bogus", 1)).toBe("show");
 
     const original = MEMORY_TYPE_REGISTRY.general.visibilityDefault;
     MEMORY_TYPE_REGISTRY.general.visibilityDefault = "hide";
     try {
-      expect(resolveVisibility("general", null)).toBe("hide");
-      expect(resolveVisibility("general", -1)).toBe("hide");
+      expect(resolveVisibility("general", null)).toBe("show");
     } finally {
       MEMORY_TYPE_REGISTRY.general.visibilityDefault = original;
     }
   });
 
-  it("returns full metadata and filters hidden items without changing visible order", async () => {
+  it("keeps the per-item rule behind the switch for when the feature returns", () => {
+    expect(resolveVisibility("general", 1, true)).toBe("hide");
+    expect(resolveVisibility("general", 0, true)).toBe("show");
+    expect(resolveVisibility("general", null, true)).toBe("show");
+    expect(resolveVisibility("general", 2, true)).toBe("show");
+    expect(resolveVisibility("bogus", null, true)).toBe("show");
+
+    const original = MEMORY_TYPE_REGISTRY.general.visibilityDefault;
+    MEMORY_TYPE_REGISTRY.general.visibilityDefault = "hide";
+    try {
+      expect(resolveVisibility("general", null, true)).toBe("hide");
+      expect(resolveVisibility("general", -1, true)).toBe("hide");
+    } finally {
+      MEMORY_TYPE_REGISTRY.general.visibilityDefault = original;
+    }
+  });
+
+  it("returns full metadata and keeps hidden items while the switch is off (D-134)", async () => {
     const contactId = await seedContact();
     const firstId = await addMemory(exec, {
       contactId,
@@ -142,11 +161,13 @@ describe("memories read", () => {
       }),
     );
 
+    // The stored flag is kept (hidden = 1) but ignored for display (D-134).
+    expect(rows[0]?.hidden).toBe(1);
     expect(
       (await listProfileVisibleMemoriesForContact(exec, contactId)).map(
         (row) => row.id,
       ),
-    ).toEqual([firstId, olderId]);
+    ).toEqual([rows[0]?.id, firstId, olderId]);
   });
 
   it("never lists a row with deleted_at set (pre-033 trash; D-88)", async () => {
