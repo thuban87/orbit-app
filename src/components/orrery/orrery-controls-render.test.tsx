@@ -107,6 +107,21 @@ vi.mock("@/stores/snackbar-store", () => ({
     selector: (s: { snackbar: null; dismiss: () => void }) => unknown,
   ) => selector({ snackbar: null, dismiss: () => {} }),
 }));
+// The host also sizes its pill around the FABs on screen (38.10 D-132).
+vi.mock("@/stores/shell-obstacle-store", async (original) => ({
+  ...(await original<typeof import("@/stores/shell-obstacle-store")>()),
+  useShellObstacleStore: Object.assign(
+    (selector: (s: { rects: Record<string, unknown> }) => unknown) =>
+      selector({ rects: {} }),
+    { getState: () => ({ rects: {} }) },
+  ),
+}));
+vi.mock("@/stores/section-fab-store", async (original) => ({
+  ...(await original<typeof import("@/stores/section-fab-store")>()),
+  useSectionFabStore: (
+    selector: (s: { owners: ReadonlySet<string> }) => unknown,
+  ) => selector({ owners: new Set<string>() }),
+}));
 vi.mock("@/db/database", () => ({ getExecutor: () => ({}) }));
 vi.mock("@/stores/orrery-preferences-store", () => ({
   useOrreryPreferencesStore: () => ({
