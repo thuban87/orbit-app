@@ -216,3 +216,29 @@ describe("card edit mode: the Key People editor (D-130)", () => {
     );
   });
 });
+
+describe("held rows are dimmed while a form is open (D-144)", () => {
+  // The memory cards' held look: MemoryCard draws a held card at
+  // DISABLED_OPACITY 0.5 (D-26). The other three pages reuse that value.
+  const card = read("src/components/MemoryCard.tsx");
+  const editor = read("src/components/MemoryEditor.tsx");
+
+  it("the memory cards are the reference: held with the form open, dimmed at 0.5", () => {
+    expect(card).toMatch(/const DISABLED_OPACITY = 0\.5;/);
+    expect(card).toContain("style={disabled ? styles.disabled : null}");
+    expect(editor).toContain("disabled={cardsHeld}");
+  });
+
+  for (const [name, file, held] of [
+    ["Off Limits", OFF_LIMITS, "controlsHeld"],
+    ["history page", HISTORY, "held"],
+    ["Key People", "src/components/RelationshipEditor.tsx", "rowsHeld"],
+  ] as const) {
+    it(`${name}: a held row draws the same 0.5 dimmed look`, () => {
+      const source = read(file);
+      expect(source).toMatch(/const DISABLED_OPACITY = 0\.5;/);
+      expect(source).toContain("held: { opacity: DISABLED_OPACITY }");
+      expect(source).toContain(`${held} ? styles.held : null`);
+    });
+  }
+});

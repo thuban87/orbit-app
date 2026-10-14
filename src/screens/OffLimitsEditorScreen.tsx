@@ -95,6 +95,8 @@ import {
 import { openEditTarget } from "./section-editor-logic";
 
 const LOG_SCOPE = "off-limits-editor";
+/** The memory cards' held look: the Button.tsx disabled look (D-26 "dimmed"; D-144). */
+const DISABLED_OPACITY = 0.5;
 const TITLE = "Off Limits";
 
 /** The open form: a new item, or one stored row. */
@@ -446,6 +448,8 @@ export function OffLimitsEditorScreen({
                         backgroundColor: colors.surface,
                         borderColor: colors.border,
                       },
+                      // D-144: a held row is dimmed, as the memory cards are.
+                      controlsHeld ? styles.held : null,
                     ]}
                   >
                     <View style={styles.rowHeader}>
@@ -536,6 +540,7 @@ export function OffLimitsEditorScreen({
 }
 
 const styles = StyleSheet.create({
+  held: { opacity: DISABLED_OPACITY },
   root: { flex: 1 },
   content: { gap: SPACING.md, padding: SPACING.base },
   link: { alignSelf: "flex-start" },

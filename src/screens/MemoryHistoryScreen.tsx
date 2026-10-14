@@ -123,6 +123,8 @@ import {
 } from "./section-editor-logic";
 
 const LOG_SCOPE = "memory-history";
+/** The memory cards' held look: the Button.tsx disabled look (D-26 "dimmed"; D-144). */
+const DISABLED_OPACITY = 0.5;
 const EDIT_ACTION = "edit";
 
 /** The open form: a new entry, or one stored row. */
@@ -343,6 +345,8 @@ function HistoryRow({
       style={[
         styles.row,
         { backgroundColor: colors.surface, borderColor: colors.border },
+        // D-144: a held row is dimmed, as the memory cards are.
+        held ? styles.held : null,
       ]}
     >
       <View style={styles.rowHeader}>
@@ -870,6 +874,7 @@ const styles = StyleSheet.create({
     padding: SPACING.base,
   },
   group: { gap: SPACING.sm },
+  held: { opacity: DISABLED_OPACITY },
   link: { alignSelf: "flex-start" },
   readError: { gap: SPACING.sm, alignItems: "flex-start" },
   readState: { minHeight: 88, alignItems: "center", justifyContent: "center" },

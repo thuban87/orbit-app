@@ -23,6 +23,8 @@ import {
 } from "./card-edit-slots";
 
 const LOG_SCOPE = "relationship-editor";
+/** The memory cards' held look: the Button.tsx disabled look (D-26 "dimmed"; D-144). */
+const DISABLED_OPACITY = 0.5;
 
 export interface RelationshipDraft {
   personName: string;
@@ -418,7 +420,8 @@ export function RelationshipEditor({
         accessibilityState={{ disabled: rowsHeld }}
         disabled={rowsHeld}
         onPress={() => openEdit(item)}
-        style={rowStyle(item)}
+        // D-144: a held row is dimmed, as the memory cards are.
+        style={[rowStyle(item), rowsHeld ? styles.held : null]}
       >
         <View style={styles.rowHeader}>
           <AppText role="body" style={[styles.rowName, nameStyle(item)]}>
@@ -682,6 +685,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   formHeading: { flexShrink: 1, paddingTop: SPACING.sm },
+  held: { opacity: DISABLED_OPACITY },
   input: {
     borderRadius: SPACING.sm,
     borderWidth: StyleSheet.hairlineWidth,
