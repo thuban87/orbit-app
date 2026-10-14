@@ -12,7 +12,33 @@
  * save, through `normalizeEntryText`.
  */
 
+import { SPACING } from "@/theme/tokens/spacing";
+import { TYPOGRAPHY } from "@/theme/tokens/typography";
+
 const NEWLINE = /\r\n|\r|\n/g;
+
+/** Lines shown before the field scrolls (D-66: "about 3 lines"). */
+export const ENTRY_VISIBLE_LINES = 3;
+
+/** The field's top and bottom padding. */
+export const ENTRY_VERTICAL_PADDING = SPACING.sm;
+
+/**
+ * The field's height cap: `ENTRY_VISIBLE_LINES` whole body lines plus the
+ * vertical padding (D-66). Android scales a TextInput's `lineHeight` by the
+ * system font scale but not its `maxHeight`, so a fixed cap clipped the
+ * third line at font scale 1.15 and the field scrolled its first line in
+ * half, mid-glyph (D-147, the share card's note). The cap scales with the
+ * font so whole lines fit at every scale. A non-finite or non-positive scale
+ * counts as 1. PURE.
+ */
+export function entryFieldMaxHeight(fontScale: number): number {
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  return Math.ceil(
+    ENTRY_VISIBLE_LINES * TYPOGRAPHY.body.lineHeight * scale +
+      2 * ENTRY_VERTICAL_PADDING,
+  );
+}
 
 /** Each `\r\n`, `\r` or `\n` becomes one space; nothing is trimmed. */
 export function sanitizeEntryInput(value: string): string {

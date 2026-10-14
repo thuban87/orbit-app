@@ -2,7 +2,8 @@
  * EntryTextField — the shared entry text field (38.10 D-66).
  *
  * - Wraps as multi-line, grows to about 3 lines, then scrolls with the cursor
- *   in view (`maxHeight` = 3 body lines + vertical padding).
+ *   in view (`maxHeight` = 3 body lines + vertical padding, scaled with the
+ *   system font so whole lines fit; D-147, `entryFieldMaxHeight`).
  * - The keyboard's action key (Done by default) fires `onSubmit` and inserts
  *   no newline: `multiline` with the submit `submitBehavior` (RESEARCH A3,
  *   confirmed in RN 0.86.2). The field blurs first, so the keyboard closes
@@ -25,19 +26,22 @@ import {
   type ReturnKeyTypeOptions,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
 } from "react-native";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
-import { sanitizeEntryChange } from "./entry-text-logic";
+import {
+  ENTRY_VERTICAL_PADDING,
+  ENTRY_VISIBLE_LINES,
+  entryFieldMaxHeight,
+  sanitizeEntryChange,
+} from "./entry-text-logic";
 import { useKeyboardCenteringContext } from "./KeyboardCenteringProvider";
 
-/** Lines shown before the field scrolls (D-66: "about 3 lines"). */
-export const ENTRY_VISIBLE_LINES = 3;
+export { ENTRY_VISIBLE_LINES };
 
 const BODY = TYPOGRAPHY.body;
-const VERTICAL_PADDING = SPACING.sm;
-const MAX_HEIGHT = ENTRY_VISIBLE_LINES * BODY.lineHeight + 2 * VERTICAL_PADDING;
 
 export interface EntryTextFieldProps {
   value: string;
@@ -74,6 +78,8 @@ export function EntryTextField({
 }: EntryTextFieldProps) {
   const { colors } = useTheme();
   const centering = useKeyboardCenteringContext();
+  // D-147: the cap follows the system font scale, so 3 whole lines fit.
+  const { fontScale } = useWindowDimensions();
   const inputRef = useRef<TextInput>(null);
 
   const handleFocus = (event: FocusEvent) => {
@@ -112,6 +118,7 @@ export function EntryTextField({
       style={[
         styles.input,
         {
+          maxHeight: entryFieldMaxHeight(fontScale),
           backgroundColor: colors.background,
           borderColor: colors.border,
           color: colors.textPrimary,
@@ -128,10 +135,9 @@ const styles = StyleSheet.create({
     fontFamily: resolveFontFamily(BODY.family, BODY.weight),
     fontSize: BODY.size,
     lineHeight: BODY.lineHeight,
-    maxHeight: MAX_HEIGHT,
     minHeight: 44,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: VERTICAL_PADDING,
+    paddingVertical: ENTRY_VERTICAL_PADDING,
     textAlignVertical: "top",
   },
 });

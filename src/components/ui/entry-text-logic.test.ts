@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import {
+  ENTRY_VERTICAL_PADDING,
+  ENTRY_VISIBLE_LINES,
+  entryFieldMaxHeight,
   isSavableEntry,
   normalizeEntryText,
   sanitizeEntryChange,
@@ -107,5 +111,33 @@ describe("isSavableEntry", () => {
 
   it("is true once there is visible text", () => {
     expect(isSavableEntry(" a ")).toBe(true);
+  });
+});
+
+describe("entryFieldMaxHeight (D-66 about 3 lines; D-147)", () => {
+  const LINE = TYPOGRAPHY.body.lineHeight;
+  const PAD = 2 * ENTRY_VERTICAL_PADDING;
+
+  it("fits 3 whole body lines plus padding at font scale 1", () => {
+    expect(ENTRY_VISIBLE_LINES).toBe(3);
+    expect(entryFieldMaxHeight(1)).toBe(3 * LINE + PAD);
+  });
+
+  it("grows with the font scale, so the first line is never cut (1.15, the test phones)", () => {
+    for (const scale of [0.85, 1, 1.15, 1.3, 2]) {
+      const cap = entryFieldMaxHeight(scale);
+      // Android scales the field's lineHeight by the font scale.
+      expect(cap - PAD).toBeGreaterThanOrEqual(
+        ENTRY_VISIBLE_LINES * LINE * scale,
+      );
+      expect(cap - PAD).toBeLessThan(ENTRY_VISIBLE_LINES * LINE * scale + 1);
+    }
+    expect(entryFieldMaxHeight(1.15)).toBeGreaterThan(entryFieldMaxHeight(1));
+  });
+
+  it("treats a missing or bad scale as 1", () => {
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(entryFieldMaxHeight(bad)).toBe(entryFieldMaxHeight(1));
+    }
   });
 });
