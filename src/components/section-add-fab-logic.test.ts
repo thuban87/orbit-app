@@ -5,6 +5,8 @@ import { FAB_EDGE_GAP, FAB_SIZE } from "@/navigation/use-bottom-clearance";
 import {
   clamp01,
   FAB_HIDE_HYSTERESIS,
+  fabA11yProps,
+  fabSuppressed,
   fabTargetAfterScroll,
   lerp,
   MORPH_DURATION_MS,
@@ -13,6 +15,7 @@ import {
   sectionFabBottomOffset,
   sectionFabClearance,
   sectionFabIcon,
+  snapOnPause,
 } from "./section-add-fab-logic";
 
 describe("section Add FAB tunables (D-131)", () => {
@@ -166,6 +169,53 @@ describe("sectionFabIcon (D-131)", () => {
 
   it("Imported has no Add, so no FAB (D-35)", () => {
     expect(sectionFabIcon("imported")).toBeNull();
+  });
+});
+
+describe("fabSuppressed (D-131)", () => {
+  it("shows only when loaded with no form open and the keyboard down", () => {
+    expect(
+      fabSuppressed({ loaded: true, formOpen: false, keyboardUp: false }),
+    ).toBe(false);
+  });
+
+  it("is suppressed before the read loads, with a form open or the keyboard up", () => {
+    expect(
+      fabSuppressed({ loaded: false, formOpen: false, keyboardUp: false }),
+    ).toBe(true);
+    expect(
+      fabSuppressed({ loaded: true, formOpen: true, keyboardUp: false }),
+    ).toBe(true);
+    expect(
+      fabSuppressed({ loaded: true, formOpen: false, keyboardUp: true }),
+    ).toBe(true);
+  });
+});
+
+describe("fabA11yProps", () => {
+  it("a shown FAB is reachable and tappable", () => {
+    expect(fabA11yProps(true)).toEqual({
+      accessible: true,
+      importantForAccessibility: "auto",
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto",
+    });
+  });
+
+  it("a hidden FAB is out of the accessibility tree and takes no touches", () => {
+    expect(fabA11yProps(false)).toEqual({
+      accessible: false,
+      importantForAccessibility: "no-hide-descendants",
+      accessibilityElementsHidden: true,
+      pointerEvents: "none",
+    });
+  });
+});
+
+describe("snapOnPause", () => {
+  it("snaps to the current target, never an in-between value", () => {
+    expect(snapOnPause(0)).toBe(0);
+    expect(snapOnPause(1)).toBe(1);
   });
 });
 
