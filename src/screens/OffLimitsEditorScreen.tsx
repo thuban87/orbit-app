@@ -14,6 +14,10 @@
  *   label and link). Delete sits in the open form (38.9 D-30) and happens at
  *   once with an Undo snackbar naming the person, then a confirming snackbar
  *   (D-69; 38.9 D-39/D-46 via D-19).
+ * - Card edit mode (D-130): each row has a pencil at its top right; the
+ *   pencil or a tap on the row opens its form in the row's place, with Move
+ *   and a red Delete at the form's top (none at rest). While a form is open
+ *   the other rows and the Add are held (`controlsHeld`).
  * - Move goes through `MoveEntrySheet` (D-84, D-85 confirm, D-118 Undo); its
  *   callbacks re-read this list so the entry leaves on a move and comes back
  *   on Undo.
@@ -26,7 +30,7 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md).
  */
 import { useFocusEffect } from "@react-navigation/native";
-import { type RefObject, useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -48,6 +52,7 @@ import {
   KeyboardCenteringProvider,
   useKeyboardCentering,
 } from "@/components/ui";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { ADD_OFF_LIMITS_ITEM } from "@/constants/glossary";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -152,15 +157,23 @@ export function OffLimitsEditorScreen({
     subEditor: { open: form !== null, dirty: formDirty, close: closeForm },
   });
 
-  // D-66 on a D-75 editor: the entry field centres above the keyboard.
-  const scrollRef = useRef<ScrollView>(null);
-  // ScrollView.d.ts types `innerViewRef` as a non-null `RefObject<View>`
-  // (as use-first-error-reveal.ts widens it).
-  const contentRef = useRef<View>(null) as RefObject<View>;
+  // D-66 on a D-75 editor: the entry field centres above the keyboard; the
+  // same ScrollView pair scrolls an `editId` form into view (D-130).
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
   const { centering, bottomSpacer } = useKeyboardCentering({
     scrollRef,
     contentRef,
   });
+  // D-130: an `editId` form opens in place of its row, which may be further
+  // down, so it is scrolled into view once after it mounts. A tap needs no
+  // reveal: the form opens where the row was.
+  const formRef = useRef<View>(null);
+  const revealPendingRef = useRef(false);
+  useEffect(() => {
+    if (!revealPendingRef.current || form?.mode !== "edit") return;
+    revealPendingRef.current = false;
+    reveal(formRef);
+  }, [form, reveal]);
 
   // The reload the controller triggers after each write; a ref so the
   // controller (made once per contact) always calls the current `load`.
@@ -201,6 +214,7 @@ export function OffLimitsEditorScreen({
         const row = rows.find((candidate) => candidate.id === target);
         // Opens it exactly as tapping the row's Edit does.
         if (row) {
+          revealPendingRef.current = true;
           setFormKey((key) => key + 1);
           setFormDirty(false);
           setForm({ mode: "edit", row });
@@ -282,6 +296,28 @@ export function OffLimitsEditorScreen({
   const rows = phase.phase === "loaded" ? phase.data : [];
   const controlsHeld = saving || form !== null;
 
+  /** The open edit form, in card edit mode (D-130). */
+  const renderEditForm = (row: OffLimitsRow) => (
+    <OffLimitsForm
+      key={`form-${formKey}`}
+      testID="off-limits-editor-form"
+      formRef={formRef}
+      initial={row}
+      onSave={save}
+      onCancel={() => requestClose(closeForm, formDirty)}
+      onDelete={() => remove(row)}
+      cardEditMode
+      onMove={() =>
+        requestClose(() => {
+          closeForm();
+          setMoveRow(row);
+        }, formDirty)
+      }
+      onDirtyChange={setFormDirty}
+      busy={saving}
+    />
+  );
+
   return (
     <View style={styles.root}>
       {/* While a save runs the guard holds Back (D-26). */}
@@ -339,87 +375,97 @@ export function OffLimitsEditorScreen({
                   }}
                 />
               ) : null}
-              {rows.map((row) => (
-                <View
-                  key={row.id}
-                  testID={`off-limits-editor-row-${row.id}`}
-                  style={[
-                    styles.row,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  {/* Full text: no line cap. */}
-                  {row.text ? <AppText role="body">{row.text}</AppText> : null}
-                  {row.label ? (
-                    <AppText
-                      role="caption"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {row.label}
-                    </AppText>
-                  ) : null}
-                  {row.url ? (
-                    // D-24: the URL itself, then its Open action.
-                    <>
-                      <AppText
-                        role="caption"
-                        numberOfLines={2}
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {row.url}
-                      </AppText>
-                      <Pressable
-                        accessibilityRole="link"
-                        accessibilityLabel="Open Off Limits link"
-                        hitSlop={8}
-                        onPress={() => openMemoryLink(row.url ?? "")}
-                        style={styles.link}
-                      >
+              {rows.map((row) =>
+                form?.mode === "edit" && form.row.id === row.id ? (
+                  // D-130: the form opens in this row's place.
+                  renderEditForm(form.row)
+                ) : (
+                  <Pressable
+                    key={row.id}
+                    testID={`off-limits-editor-row-${row.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit Off Limits item"
+                    accessibilityState={{ disabled: controlsHeld }}
+                    disabled={controlsHeld}
+                    onPress={() => openForm({ mode: "edit", row })}
+                    style={[
+                      styles.row,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.rowHeader}>
+                      <View style={styles.rowText}>
+                        {/* Full text: no line cap. */}
+                        {row.text ? (
+                          <AppText role="body">{row.text}</AppText>
+                        ) : null}
+                        {row.label ? (
+                          <AppText
+                            role="caption"
+                            style={{ color: colors.textSecondary }}
+                          >
+                            {row.label}
+                          </AppText>
+                        ) : null}
+                      </View>
+                      {/* D-130: the pencil at the row's top right. */}
+                      <Button
+                        role="iconOnly"
+                        icon="edit"
+                        accessibilityLabel="Edit Off Limits item"
+                        disabled={controlsHeld}
+                        onPress={() => openForm({ mode: "edit", row })}
+                      />
+                    </View>
+                    {row.url ? (
+                      // D-24: the URL itself, then its Open action.
+                      <>
                         <AppText
                           role="caption"
-                          numberOfLines={1}
-                          style={{ color: colors.accentText }}
+                          numberOfLines={2}
+                          style={{ color: colors.textSecondary }}
                         >
-                          Open link
+                          {row.url}
                         </AppText>
-                      </Pressable>
-                    </>
-                  ) : null}
-                  <View style={styles.actions}>
-                    <Button
-                      role="secondary"
-                      label="Edit"
-                      accessibilityLabel="Edit Off Limits item"
-                      disabled={controlsHeld}
-                      onPress={() => openForm({ mode: "edit", row })}
-                    />
-                    <Button
-                      role="secondary"
-                      label="Move"
-                      accessibilityLabel="Move Off Limits item"
-                      disabled={controlsHeld}
-                      onPress={() => setMoveRow(row)}
-                    />
-                  </View>
-                </View>
-              ))}
-              {form !== null ? (
+                        <Pressable
+                          accessibilityRole="link"
+                          accessibilityLabel="Open Off Limits link"
+                          hitSlop={8}
+                          onPress={() => openMemoryLink(row.url ?? "")}
+                          style={styles.link}
+                        >
+                          <AppText
+                            role="caption"
+                            numberOfLines={1}
+                            style={{ color: colors.accentText }}
+                          >
+                            Open link
+                          </AppText>
+                        </Pressable>
+                      </>
+                    ) : null}
+                  </Pressable>
+                ),
+              )}
+              {/* An edited row a reload removed keeps its form, at the end. */}
+              {form?.mode === "edit" &&
+              !rows.some((row) => row.id === form.row.id)
+                ? renderEditForm(form.row)
+                : null}
+              {form?.mode === "add" ? (
                 <OffLimitsForm
-                  key={formKey}
+                  key={`form-${formKey}`}
                   testID="off-limits-editor-form"
-                  initial={form.mode === "edit" ? form.row : null}
+                  initial={null}
                   onSave={save}
                   onCancel={() => requestClose(closeForm, formDirty)}
-                  onDelete={
-                    form.mode === "edit" ? () => remove(form.row) : undefined
-                  }
                   onDirtyChange={setFormDirty}
                   busy={saving}
                 />
-              ) : rows.length > 0 ? (
+              ) : form === null && rows.length > 0 ? (
                 <Button
                   testID="off-limits-editor-add"
                   role="primary"
@@ -451,7 +497,6 @@ export function OffLimitsEditorScreen({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { gap: SPACING.md, padding: SPACING.base },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   link: { alignSelf: "flex-start" },
   readState: { minHeight: 88, alignItems: "center", justifyContent: "center" },
   readError: { gap: SPACING.sm, alignItems: "flex-start" },
@@ -461,4 +506,11 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     padding: SPACING.sm,
   },
+  rowHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
+  rowText: { flex: 1, gap: SPACING.xs },
 });

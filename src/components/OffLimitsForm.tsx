@@ -19,6 +19,11 @@
  *   `normalizeEntryText` only at Save (plan 09; convergence c1 F-U2).
  * - No AI control of any kind (D-09, D-10).
  *
+ * - Card edit mode (`cardEditMode`, the Off Limits editor only; D-130): the
+ *   form opens in place of its row, with the stored link's Open link, Move
+ *   (when `onMove` is set) and a red Delete in a row at its top; the bottom
+ *   Delete is not rendered. Other hosts render exactly as before.
+ *
  * The form owns its draft; the host decides when it is open (mount it with a
  * `key` per entry) and unmounts it after a successful save. A failed save
  * leaves it mounted, so the draft is kept. `onDirtyChange` reports whether the draft
@@ -26,8 +31,8 @@
  *
  * Colours via theme tokens only (CLAUDE.md).
  */
-import { useEffect, useRef, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { type Ref, useEffect, useRef, useState } from "react";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { isValidLinkInput, LINK_FIELD_ERROR } from "@/logic/url-validation";
 import {
   canSaveOffLimitsForm,
@@ -38,7 +43,8 @@ import {
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { normaliseLinkUrl } from "./LinksEditor";
-import { Button, EntryTextField, FieldError } from "./ui";
+import { openMemoryLink } from "./MemoryCard";
+import { AppText, Button, EntryTextField, FieldError } from "./ui";
 
 /** What the form opens with: a stored row, or null for a new item. */
 export interface OffLimitsFormInitial {
@@ -70,6 +76,15 @@ export interface OffLimitsFormProps {
   onDirtyChange?: (dirty: boolean) => void;
   /** The host's save is in flight: every control is held (D-26). */
   busy?: boolean;
+  /**
+   * Card edit mode (D-130; the Off Limits editor only): Open link, Move and a
+   * red Delete at the top of the form, no bottom Delete. Absent → unchanged.
+   */
+  cardEditMode?: boolean;
+  /** Card edit mode: Move, which the host routes through its dirty-aware close. */
+  onMove?: () => void;
+  /** Attached to the form's outer View, so a host can scroll it into view. */
+  formRef?: Ref<View>;
   testID?: string;
 }
 
@@ -91,6 +106,9 @@ export function OffLimitsForm({
   onDelete,
   onDirtyChange,
   busy = false,
+  cardEditMode = false,
+  onMove,
+  formRef,
   testID,
 }: OffLimitsFormProps) {
   const { colors } = useTheme();
@@ -142,11 +160,58 @@ export function OffLimitsForm({
   return (
     <View
       testID={testID}
+      ref={formRef}
       style={[
         styles.form,
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
     >
+      {cardEditMode ? (
+        // D-130: the Open link stays visible (D-24); Move and the red Delete
+        // only in edit mode, at the top right of the open card.
+        <View style={styles.cardActions}>
+          {storedUrl ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Open Off Limits link"
+              hitSlop={8}
+              onPress={() => openMemoryLink(storedUrl)}
+              style={styles.link}
+            >
+              <AppText role="caption" style={{ color: colors.accentText }}>
+                Open link
+              </AppText>
+            </Pressable>
+          ) : null}
+          <View style={styles.cardButtons}>
+            {onMove ? (
+              <Button
+                role="secondary"
+                label="Move"
+                accessibilityLabel="Move Off Limits item"
+                disabled={held}
+                onPress={() => {
+                  if (held) return;
+                  onMove();
+                }}
+              />
+            ) : null}
+            {onDelete ? (
+              <Button
+                testID={testID ? `${testID}-delete` : undefined}
+                role="destructive"
+                label="Delete"
+                accessibilityLabel="Delete Off Limits item"
+                disabled={held}
+                onPress={() => {
+                  if (held) return;
+                  onDelete();
+                }}
+              />
+            ) : null}
+          </View>
+        </View>
+      ) : null}
       <EntryTextField
         testID={testID ? `${testID}-text` : undefined}
         accessibilityLabel="Off Limits item"
@@ -203,7 +268,7 @@ export function OffLimitsForm({
           onPress={() => void commit()}
         />
       </View>
-      {onDelete ? (
+      {onDelete && !cardEditMode ? (
         <Button
           testID={testID ? `${testID}-delete` : undefined}
           role="tertiary"
@@ -221,12 +286,27 @@ export function OffLimitsForm({
 
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
+  cardActions: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
+  cardButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "flex-end",
+    marginLeft: "auto",
+  },
   form: {
     borderRadius: SPACING.md,
     borderWidth: StyleSheet.hairlineWidth,
     gap: SPACING.sm,
     padding: SPACING.base,
   },
+  link: { alignSelf: "flex-start" },
   input: {
     borderRadius: SPACING.sm,
     borderWidth: StyleSheet.hairlineWidth,

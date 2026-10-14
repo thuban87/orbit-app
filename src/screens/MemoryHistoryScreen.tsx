@@ -19,6 +19,10 @@
  * - Delete is immediate with Undo, then a confirming snackbar; a linked
  *   entry's interaction and note stay (D-47, D-69). It sits in the open
  *   form, off the row card (38.9 D-30, as the Off Limits editor does).
+ * - Card edit mode (D-130): each row has a pencil at its top right that opens
+ *   its form in the row's place (a linked row's tap still opens its
+ *   interaction, D-107). Move and a red Delete sit at the open form's top,
+ *   never on a resting row; the Open link shows at rest and in edit mode.
  * - Move only on Last Talked About (D-84; F-U12), through `MoveEntrySheet`,
  *   whose callbacks re-read this list (D-118).
  * - Nothing promotes an older entry (D-45). No Allow AI switch: this table has none and
@@ -31,7 +35,7 @@
  */
 import { useFocusEffect } from "@react-navigation/native";
 import {
-  type RefObject,
+  type Ref,
   useCallback,
   useEffect,
   useMemo,
@@ -62,6 +66,7 @@ import {
   isSavableEntry,
   normalizeEntryText,
 } from "@/components/ui/entry-text-logic";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import {
   addCurrentStateEntry,
   type CurrentStateSnapshot,
@@ -136,6 +141,15 @@ interface HistoryEntryFormProps {
   onCancel: () => void;
   /** Edit only: the immediate delete with Undo (D-69). */
   onDelete?: () => void;
+  /**
+   * Edit only (D-130, D-84: Last Talked About): Move, which the host routes
+   * through its dirty-aware close before opening the sheet.
+   */
+  onMove?: () => void;
+  /** Edit only: the stored link, whose Open action stays visible (D-24). */
+  url?: string | null;
+  /** Attached to the form's outer View, so the host can scroll it into view. */
+  formRef?: Ref<View>;
   onDirtyChange: (dirty: boolean) => void;
   testID: string;
 }
@@ -154,6 +168,9 @@ function HistoryEntryForm({
   onSave,
   onCancel,
   onDelete,
+  onMove,
+  url,
+  formRef,
   onDirtyChange,
   testID,
 }: HistoryEntryFormProps) {
@@ -180,11 +197,50 @@ function HistoryEntryForm({
   return (
     <View
       testID={testID}
+      ref={formRef}
       style={[
         styles.form,
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
     >
+      {onDelete ? (
+        // D-130: in edit mode the Open link (D-24), then Move (Last Talked
+        // About only) and the red Delete, at the top right of the open card.
+        <View style={styles.cardActions}>
+          {url ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${title} link`}
+              hitSlop={8}
+              onPress={() => openMemoryLink(url)}
+              style={styles.link}
+            >
+              <AppText role="caption" style={{ color: colors.accentText }}>
+                Open link
+              </AppText>
+            </Pressable>
+          ) : null}
+          <View style={styles.cardButtons}>
+            {onMove ? (
+              <Button
+                role="secondary"
+                label="Move"
+                accessibilityLabel={`Move ${title} entry`}
+                disabled={busy}
+                onPress={onMove}
+              />
+            ) : null}
+            <Button
+              testID={`${testID}-delete`}
+              role="destructive"
+              label="Delete"
+              accessibilityLabel={`Delete ${title} entry`}
+              disabled={busy}
+              onPress={onDelete}
+            />
+          </View>
+        </View>
+      ) : null}
       <EntryTextField
         testID={`${testID}-value`}
         accessibilityLabel={`${title} entry`}
@@ -223,16 +279,6 @@ function HistoryEntryForm({
           onPress={save}
         />
       </View>
-      {onDelete ? (
-        <Button
-          testID={`${testID}-delete`}
-          role="tertiary"
-          label="Delete"
-          accessibilityLabel={`Delete ${title} entry`}
-          disabled={busy}
-          onPress={onDelete}
-        />
-      ) : null}
     </View>
   );
 }
@@ -243,7 +289,6 @@ interface HistoryRowProps {
   held: boolean;
   onOpenLinked: () => void;
   onEdit: () => void;
-  onMove?: () => void;
   testID: string;
 }
 
@@ -254,7 +299,6 @@ function HistoryRow({
   held,
   onOpenLinked,
   onEdit,
-  onMove,
   testID,
 }: HistoryRowProps) {
   const { colors } = useTheme();
@@ -289,7 +333,19 @@ function HistoryRow({
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
     >
-      <AppText role="body">{row.value}</AppText>
+      <View style={styles.rowHeader}>
+        <AppText role="body" style={styles.rowValue}>
+          {row.value}
+        </AppText>
+        {/* D-130: the pencil at the row's top right (linked rows too). */}
+        <Button
+          role="iconOnly"
+          icon="edit"
+          accessibilityLabel={`Edit ${title} entry`}
+          disabled={held}
+          onPress={onEdit}
+        />
+      </View>
       <AppText role="caption" style={{ color: colors.textSecondary }}>
         {dateLabel}
       </AppText>
@@ -319,17 +375,6 @@ function HistoryRow({
             </AppText>
           </Pressable>
         </>
-      ) : null}
-      {onMove ? (
-        <View style={styles.actions}>
-          <Button
-            role="secondary"
-            label="Move"
-            accessibilityLabel={`Move ${title} entry`}
-            disabled={held}
-            onPress={onMove}
-          />
-        </View>
       ) : null}
     </Pressable>
   );
@@ -387,15 +432,23 @@ export function MemoryHistoryScreen({
     subEditor: { open: form !== null, dirty: formDirty, close: closeForm },
   });
 
-  // D-66 on a D-75 editor: the entry field centres above the keyboard.
-  const scrollRef = useRef<ScrollView>(null);
-  // ScrollView.d.ts types `innerViewRef` as a non-null `RefObject<View>`
-  // (as use-first-error-reveal.ts widens it).
-  const contentRef = useRef<View>(null) as RefObject<View>;
+  // D-66 on a D-75 editor: the entry field centres above the keyboard; the
+  // same ScrollView pair scrolls an `editId` form into view (D-130).
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
   const { centering, bottomSpacer } = useKeyboardCentering({
     scrollRef,
     contentRef,
   });
+  // D-130: an `editId` form opens in place of its row, which may be further
+  // down, so it is scrolled into view once after it mounts. A tap needs no
+  // reveal: the form opens where the row was.
+  const formRef = useRef<View>(null);
+  const revealPendingRef = useRef(false);
+  useEffect(() => {
+    if (!revealPendingRef.current || form?.mode !== "edit") return;
+    revealPendingRef.current = false;
+    reveal(formRef);
+  }, [form, reveal]);
 
   /** NEVER rejects: a failure lands in the error phase (D-04). */
   const load = useCallback(async (): Promise<void> => {
@@ -411,6 +464,7 @@ export function MemoryHistoryScreen({
         const row = rows.find((candidate) => candidate.id === target);
         // Opens it exactly as a long-press does.
         if (row) {
+          revealPendingRef.current = true;
           setFormKey((key) => key + 1);
           setFormDirty(false);
           setForm({ mode: "edit", row });
@@ -592,34 +646,43 @@ export function MemoryHistoryScreen({
   const renderRow = (model: HistoryRowModel) => {
     const { row } = model;
     const editing = form?.mode === "edit" && form.row.id === row.id;
-    return (
-      <View key={row.id} style={styles.rowGroup}>
-        <HistoryRow
-          testID={`memory-history-row-${row.id}`}
-          title={title}
-          model={model}
-          held={controlsHeld}
-          onOpenLinked={() => openLinked(row)}
-          onEdit={() => openForm({ mode: "edit", row })}
-          onMove={model.canMove ? () => setMoveRow(row) : undefined}
-        />
-        {editing ? (
-          <HistoryEntryForm
-            key={formKey}
-            testID="memory-history-edit-form"
-            title={title}
-            initialValue={row.value}
-            initialDate={row.entry_date}
-            dateEditable={model.canEditDate}
-            dateLabel={model.dateLabel}
-            busy={saving}
-            onSave={save}
-            onCancel={() => requestClose(closeForm, formDirty)}
-            onDelete={() => remove(row)}
-            onDirtyChange={setFormDirty}
-          />
-        ) : null}
-      </View>
+    // D-130: the edit form renders instead of its row, not under it.
+    return editing ? (
+      <HistoryEntryForm
+        key={`edit-form-${formKey}`}
+        testID="memory-history-edit-form"
+        formRef={formRef}
+        title={title}
+        initialValue={row.value}
+        initialDate={row.entry_date}
+        dateEditable={model.canEditDate}
+        dateLabel={model.dateLabel}
+        busy={saving}
+        onSave={save}
+        onCancel={() => requestClose(closeForm, formDirty)}
+        onDelete={() => remove(row)}
+        url={row.url}
+        onMove={
+          model.canMove
+            ? () =>
+                requestClose(() => {
+                  closeForm();
+                  setMoveRow(row);
+                }, formDirty)
+            : undefined
+        }
+        onDirtyChange={setFormDirty}
+      />
+    ) : (
+      <HistoryRow
+        key={row.id}
+        testID={`memory-history-row-${row.id}`}
+        title={title}
+        model={model}
+        held={controlsHeld}
+        onOpenLinked={() => openLinked(row)}
+        onEdit={() => openForm({ mode: "edit", row })}
+      />
     );
   };
 
@@ -744,6 +807,20 @@ export function MemoryHistoryScreen({
 
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
+  cardActions: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
+  cardButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    justifyContent: "flex-end",
+    marginLeft: "auto",
+  },
   content: { gap: SPACING.md, padding: SPACING.base },
   form: {
     borderRadius: SPACING.md,
@@ -762,5 +839,11 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     padding: SPACING.sm,
   },
-  rowGroup: { gap: SPACING.sm },
+  rowHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: SPACING.sm,
+    justifyContent: "space-between",
+  },
+  rowValue: { flex: 1 },
 });
