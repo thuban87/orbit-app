@@ -18,10 +18,13 @@ import {
   isLiveShareIntent,
   runShareWrite,
   SHARE_CARD_AUTO_CLOSE_MS,
+  SHARE_CARD_TOP_GAP,
   SHARE_CHIP_ORDER,
   SHARE_SECTION_LABELS,
   type ShareCardAction,
   type ShareCardState,
+  shareCardMaxHeight,
+  shareCardNoteScrollY,
   shareCardReducer,
   shareListLocked,
   shareScreenAfterUndo,
@@ -670,5 +673,90 @@ describe("shareListLocked (WR-01; c10)", () => {
   it("is false again on a new share (fresh state)", () => {
     const fresh = { cardMounted: false, writePending: false };
     expect(shareListLocked(fresh)).toBe(false);
+  });
+});
+
+describe("card layout bounds (D-147)", () => {
+  it("keeps the normal spacing below the safe-area top", () => {
+    expect(SHARE_CARD_TOP_GAP).toBe(16);
+  });
+
+  it("caps the card between the safe-area top and its bottom offset", () => {
+    // Pixel 3a-like frame with the keyboard up: 700 dp frame, card lifted 300.
+    expect(
+      shareCardMaxHeight({ frameHeight: 700, bottomOffset: 300, safeTop: 0 }),
+    ).toBe(700 - 300 - SHARE_CARD_TOP_GAP);
+    // A frame that starts under the status bar subtracts the inset too.
+    expect(
+      shareCardMaxHeight({ frameHeight: 760, bottomOffset: 300, safeTop: 24 }),
+    ).toBe(760 - 300 - 24 - SHARE_CARD_TOP_GAP);
+  });
+
+  it("has no cap before the frame is measured and never goes negative", () => {
+    expect(
+      shareCardMaxHeight({ frameHeight: 0, bottomOffset: 32, safeTop: 0 }),
+    ).toBeNull();
+    expect(
+      shareCardMaxHeight({ frameHeight: 200, bottomOffset: 400, safeTop: 0 }),
+    ).toBe(0);
+  });
+
+  const note = { contentHeight: 600, noteTop: 200, noteHeight: 150 };
+
+  it("leaves a note block that is already in view alone", () => {
+    expect(
+      shareCardNoteScrollY({ ...note, scrollY: 0, viewportHeight: 400 }),
+    ).toBeNull();
+    expect(
+      shareCardNoteScrollY({ ...note, scrollY: 100, viewportHeight: 300 }),
+    ).toBeNull();
+  });
+
+  it("scrolls down just enough to show a block below the view", () => {
+    // Block bottom 350, view 0..250 → scroll to 100.
+    expect(
+      shareCardNoteScrollY({ ...note, scrollY: 0, viewportHeight: 250 }),
+    ).toBe(100);
+  });
+
+  it("scrolls up to the block's top when it sits above the view", () => {
+    expect(
+      shareCardNoteScrollY({ ...note, scrollY: 320, viewportHeight: 250 }),
+    ).toBe(200);
+  });
+
+  it("aligns the top of a block taller than the view (first line kept)", () => {
+    expect(
+      shareCardNoteScrollY({ ...note, scrollY: 0, viewportHeight: 100 }),
+    ).toBe(200);
+    expect(
+      shareCardNoteScrollY({ ...note, scrollY: 200, viewportHeight: 100 }),
+    ).toBeNull();
+  });
+
+  it("clamps to the scroll range", () => {
+    expect(
+      shareCardNoteScrollY({
+        scrollY: 0,
+        viewportHeight: 250,
+        contentHeight: 300,
+        noteTop: 200,
+        noteHeight: 150,
+      }),
+    ).toBe(50);
+  });
+
+  it("does nothing before the view or the block has been laid out", () => {
+    expect(
+      shareCardNoteScrollY({ ...note, scrollY: 0, viewportHeight: 0 }),
+    ).toBeNull();
+    expect(
+      shareCardNoteScrollY({
+        ...note,
+        noteHeight: 0,
+        scrollY: 0,
+        viewportHeight: 250,
+      }),
+    ).toBeNull();
   });
 });

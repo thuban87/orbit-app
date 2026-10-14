@@ -244,3 +244,31 @@ describe("CaptureScreen list picker (38.10 D-80, D-82, D-12; c7, c10)", () => {
     );
   });
 });
+
+describe("share card stays below the status bar (38.10 D-147)", () => {
+  const CARD_SOURCE = readFileSync(
+    fileURLToPath(
+      new URL("../components/ShareConfirmationCard.tsx", import.meta.url),
+    ),
+    "utf8",
+  );
+
+  it("the screen caps the card from its measured frame and bottom offset", () => {
+    expect(CAPTURE_SOURCE).toMatch(
+      /shareCardMaxHeight\(\{\s*frameHeight,\s*bottomOffset,\s*safeTop: 0,\s*\}\)/,
+    );
+    expect(CAPTURE_SOURCE).toContain("maxHeight={cardMaxHeight}");
+  });
+
+  it("the card applies the cap and scrolls its body past it", () => {
+    expect(CARD_SOURCE).toContain("maxHeight === null ? null : { maxHeight }");
+    expect(CARD_SOURCE).toMatch(/<ScrollView[\s\S]*?style=\{styles\.body\}/);
+    expect(CARD_SOURCE).toContain('keyboardShouldPersistTaps="handled"');
+    expect(CARD_SOURCE).toMatch(/body: \{ flexGrow: 0, flexShrink: 1 \}/);
+    // The open note block is kept in view through the pure helper.
+    expect(CARD_SOURCE).toContain("shareCardNoteScrollY({");
+    expect(CARD_SOURCE).toMatch(
+      /testID="capture-note-block"[\s\S]*?onLayout=\{onNoteLayout\}/,
+    );
+  });
+});

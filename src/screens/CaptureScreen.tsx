@@ -95,6 +95,7 @@ import {
   type ShareSequence,
   type ShareSnapshot,
   type ShareUndoResult,
+  shareCardMaxHeight,
   shareListLocked,
   shareScreenAfterUndo,
   takeShareSnapshot,
@@ -305,6 +306,14 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   });
   const bottomOffset =
     BOTTOM_SURFACE_MARGIN + (lift > 0 ? lift : insets.bottom);
+  // D-147: the card stops below the safe-area top and its body scrolls. This
+  // root already starts below the status bar (the shell's top-edge
+  // SafeAreaView wraps every tab stack), so the safe-area top is y = 0 here.
+  const cardMaxHeight = shareCardMaxHeight({
+    frameHeight,
+    bottomOffset,
+    safeTop: 0,
+  });
 
   // Cancel the share and return to the source app WITHOUT writing. The Close
   // pill, Done and Back's cancel all use it.
@@ -855,6 +864,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           onDone={cancelCapture}
           onNoteStateChange={onNoteStateChange}
           bottomOffset={bottomOffset}
+          maxHeight={cardMaxHeight}
         />
       ) : null}
     </View>

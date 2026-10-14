@@ -23,6 +23,9 @@
  *   - The visible copy: section labels from the registries (D-89 one label
  *     source), "Saved to <name> · <section>" (D-87), "Created <name> ·
  *     checking in monthly" (D-83) and the Undo snackbars (D-110, D-120).
+ *   - The card's layout bounds (D-147): its height cap below the safe-area
+ *     top (`shareCardMaxHeight`) and the scroll that keeps the open note in
+ *     view (`shareCardNoteScrollY`).
  * =============================================================================
  */
 import type { ShareRowRef, ShareSection } from "@/db/capture-dao";
@@ -30,6 +33,7 @@ import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import type { CaptureInput, CapturePayload } from "@/logic/capture-logic";
 import { resolveCapturePayload } from "@/logic/capture-logic";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
+import { SPACING } from "@/theme/tokens/spacing";
 
 /**
  * How long the confirmation card stays before Orbit returns to the source app
@@ -40,6 +44,12 @@ import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
  * (CLAUDE.md); the owner tunes it at the plan-19 look checkpoint.
  */
 export const SHARE_CARD_AUTO_CLOSE_MS = 5000;
+
+/**
+ * The space kept between the card's top and the safe-area top (D-147): the
+ * card's normal spacing, the same as its side and bottom margins.
+ */
+export const SHARE_CARD_TOP_GAP = SPACING.base;
 
 // --- Sections and copy ---------------------------------------------------------
 
@@ -581,4 +591,64 @@ export function shareScreenAfterUndo<TCard, TSnapshot>(
   state: ShareScreenUndoState<TCard, TSnapshot>,
 ): ShareScreenUndoState<TCard, TSnapshot> {
   return { ...state, card: null, noteOpen: false, noteText: "" };
+}
+
+// --- Card layout bounds (D-147) --------------------------------------------------
+
+/**
+ * The card's height cap (D-147). The card is anchored `bottomOffset` above the
+ * frame's bottom (the keyboard lift or the system bar inset) and grows
+ * upwards, so with the keyboard up and the note open at a large font scale it
+ * used to rise under the status bar. Capped, it stops `SHARE_CARD_TOP_GAP`
+ * below the safe-area top and its body scrolls. `safeTop` is the safe-area top
+ * in the frame's own coordinates (0 when the frame already starts below the
+ * status bar). Null until the frame has been measured (no cap).
+ */
+export function shareCardMaxHeight({
+  frameHeight,
+  bottomOffset,
+  safeTop,
+}: {
+  frameHeight: number;
+  bottomOffset: number;
+  safeTop: number;
+}): number | null {
+  if (frameHeight <= 0) return null;
+  return Math.max(
+    0,
+    Math.round(frameHeight - bottomOffset - safeTop - SHARE_CARD_TOP_GAP),
+  );
+}
+
+/**
+ * Where the card's body should scroll so the open note block (the field and
+ * its Skip / Save note row) is in view (D-147), or null when it already is.
+ * The smallest move wins: a block above the view aligns its top, one below it
+ * aligns its bottom. A block taller than the view aligns its top, so the
+ * field's first line is the part kept. Clamped to the scroll range.
+ */
+export function shareCardNoteScrollY({
+  scrollY,
+  viewportHeight,
+  contentHeight,
+  noteTop,
+  noteHeight,
+}: {
+  scrollY: number;
+  viewportHeight: number;
+  contentHeight: number;
+  noteTop: number;
+  noteHeight: number;
+}): number | null {
+  if (viewportHeight <= 0 || noteHeight <= 0) return null;
+  const noteBottom = noteTop + noteHeight;
+  const fits = noteHeight <= viewportHeight;
+  if (fits && noteTop >= scrollY && noteBottom <= scrollY + viewportHeight) {
+    return null;
+  }
+  const wanted =
+    !fits || noteTop < scrollY ? noteTop : noteBottom - viewportHeight;
+  const maxY = Math.max(0, contentHeight - viewportHeight);
+  const target = Math.round(Math.min(maxY, Math.max(0, wanted)));
+  return target === Math.round(scrollY) ? null : target;
 }

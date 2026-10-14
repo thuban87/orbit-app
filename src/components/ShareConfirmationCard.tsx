@@ -26,6 +26,11 @@
  *     the app is active (c4, c5).
  *   - No RN Modal, no Alert, only `OrbitSwitch` for the switch. Every colour
  *     resolves through `useTheme()` (check:colors).
+ *   - D-147: the card never rises above the safe-area top. The screen passes
+ *     `maxHeight` (`shareCardMaxHeight`); past it the body is a bounded
+ *     ScrollView (content-sized until the cap, the Sheet D-32 pattern) and the
+ *     open note block is kept in view on every layout change
+ *     (`shareCardNoteScrollY`). The scroll offset lives in a ref, never state.
  * =============================================================================
  */
 import {
@@ -39,7 +44,11 @@ import {
 import {
   AppState,
   Keyboard,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -65,10 +74,12 @@ import {
   type ShareUndoResult,
   type ShareUndoTarget,
   type ShareWriteOutcome,
+  shareCardNoteScrollY,
   shareCardReducer,
   undoTarget,
 } from "@/logic/share-card-logic";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 
 /** The screen-owned writes the card asks for; each is seq-guarded by the screen. */
 export interface ShareCardActions {
@@ -109,6 +120,11 @@ export interface ShareConfirmationCardProps {
   onNoteStateChange?: (note: { editing: boolean; text: string }) => void;
   /** Space below the card: the keyboard lift or the system bar inset (I-02, I-16). */
   bottomOffset: number;
+  /**
+   * The card's height cap, so it stays below the safe-area top (D-147,
+   * `shareCardMaxHeight`); null = no cap. Past it the body scrolls.
+   */
+  maxHeight: number | null;
 }
 
 /** Settle a card write from the screen's outcome. A stale result is ignored. */
@@ -137,6 +153,7 @@ export const ShareConfirmationCard = forwardRef<
     onDone,
     onNoteStateChange,
     bottomOffset,
+    maxHeight,
   },
   ref,
 ) {
@@ -265,6 +282,60 @@ export const ShareConfirmationCard = forwardRef<
       .then((outcome) => settle(outcome, dispatch, () => ({ kind: "note" })));
   }, [actions, dispatch]);
 
+  // D-147: keep the open note block in view whenever the body's viewport,
+  // its content or the block itself is laid out again (the keyboard shrinking
+  // the cap, the field growing a line). Refs only; one scrollTo per change.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const noteLayoutRef = useRef<{ top: number; height: number } | null>(null);
+  const revealNote = useCallback(() => {
+    const note = noteLayoutRef.current;
+    if (note === null) return;
+    const y = shareCardNoteScrollY({
+      scrollY: scrollYRef.current,
+      viewportHeight: viewportHeightRef.current,
+      contentHeight: contentHeightRef.current,
+      noteTop: note.top,
+      noteHeight: note.height,
+    });
+    if (y === null) return;
+    scrollYRef.current = y;
+    scrollRef.current?.scrollTo({ y, animated: false });
+  }, []);
+  const onBodyLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      viewportHeightRef.current = event.nativeEvent.layout.height;
+      revealNote();
+    },
+    [revealNote],
+  );
+  const onBodyContentSize = useCallback(
+    (_width: number, height: number) => {
+      contentHeightRef.current = height;
+      revealNote();
+    },
+    [revealNote],
+  );
+  const onBodyScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollYRef.current = event.nativeEvent.contentOffset.y;
+    },
+    [],
+  );
+  const onNoteLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { y, height } = event.nativeEvent.layout;
+      noteLayoutRef.current = { top: y, height };
+      revealNote();
+    },
+    [revealNote],
+  );
+  useEffect(() => {
+    if (!state.noteEditing) noteLayoutRef.current = null;
+  }, [state.noteEditing]);
+
   const busy = state.writePending !== null;
   const locked = busy || state.undone;
   const savedLine = confirmationLabel(contactNames, state.section);
@@ -282,133 +353,152 @@ export const ShareConfirmationCard = forwardRef<
           backgroundColor: colors.surface,
           borderColor: colors.border,
         },
+        maxHeight === null ? null : { maxHeight },
       ]}
     >
-      {createdContactId !== null ? (
+      <ScrollView
+        ref={scrollRef}
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
+        onLayout={onBodyLayout}
+        onContentSizeChange={onBodyContentSize}
+        onScroll={onBodyScroll}
+        scrollEventThrottle={16}
+      >
+        {createdContactId !== null ? (
+          <Text
+            testID="capture-created-label"
+            style={[styles.label, { color: colors.textPrimary }]}
+          >
+            {createdLabel(contactNames[0] ?? "")}
+          </Text>
+        ) : null}
         <Text
-          testID="capture-created-label"
+          testID="capture-confirmation-toast"
+          accessibilityLiveRegion="polite"
           style={[styles.label, { color: colors.textPrimary }]}
         >
-          {createdLabel(contactNames[0] ?? "")}
+          {savedLine}
         </Text>
-      ) : null}
-      <Text
-        testID="capture-confirmation-toast"
-        accessibilityLiveRegion="polite"
-        style={[styles.label, { color: colors.textPrimary }]}
-      >
-        {savedLine}
-      </Text>
 
-      <View style={styles.chips}>
-        {SHARE_CHIP_ORDER.map((section) => {
-          const selected = state.section === section;
-          const tone = chipTone("primary", selected);
-          return (
-            <Pressable
-              key={section}
-              testID={`capture-chip-${section}`}
-              accessibilityRole="button"
-              accessibilityLabel={SHARE_SECTION_LABELS[section]}
-              accessibilityState={{ selected, disabled: locked }}
-              disabled={locked}
-              onPress={() => onChip(section)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: colors[tone.fill],
-                  borderColor: colors[tone.border],
-                  opacity: locked && !selected ? 0.5 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.chipLabel, { color: colors[tone.label] }]}>
-                {SHARE_SECTION_LABELS[section]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+        <View style={styles.chips}>
+          {SHARE_CHIP_ORDER.map((section) => {
+            const selected = state.section === section;
+            const tone = chipTone("primary", selected);
+            return (
+              <Pressable
+                key={section}
+                testID={`capture-chip-${section}`}
+                accessibilityRole="button"
+                accessibilityLabel={SHARE_SECTION_LABELS[section]}
+                accessibilityState={{ selected, disabled: locked }}
+                disabled={locked}
+                onPress={() => onChip(section)}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: colors[tone.fill],
+                    borderColor: colors[tone.border],
+                    opacity: locked && !selected ? 0.5 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.chipLabel, { color: colors[tone.label] }]}>
+                  {SHARE_SECTION_LABELS[section]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-      {state.noteEditing ? (
-        <View style={styles.noteBlock}>
-          {/* D-136 S5: the D-66 wrapping entry field. It wraps to about 3
+        {state.noteEditing ? (
+          <View
+            testID="capture-note-block"
+            style={styles.noteBlock}
+            onLayout={onNoteLayout}
+          >
+            {/* D-136 S5: the D-66 wrapping entry field. It wraps to about 3
               lines and Enter saves (it blurs first, then onSaveNote also
               dismisses the keyboard). Capture has no
               KeyboardCenteringProvider, so it does not centre (D-66 scope). */}
-          <EntryTextField
-            testID="capture-note-input"
-            autoFocus
-            accessibilityLabel="Note"
-            value={state.note}
-            onChangeText={(text) => dispatch({ type: "setNote", text })}
-            placeholder={'Add your words — e.g. "for Dad, he asked about this"'}
-            onSubmit={onSaveNote}
-          />
-          <View style={styles.actions}>
-            <Button
-              testID="capture-note-skip"
-              role="tertiary"
-              label="Skip"
-              accessibilityLabel="Skip note"
-              disabled={busy}
-              onPress={() => {
-                Keyboard.dismiss();
-                dispatch({ type: "noteClosed" });
-              }}
+            <EntryTextField
+              testID="capture-note-input"
+              autoFocus
+              accessibilityLabel="Note"
+              value={state.note}
+              onChangeText={(text) => dispatch({ type: "setNote", text })}
+              placeholder={
+                'Add your words — e.g. "for Dad, he asked about this"'
+              }
+              onSubmit={onSaveNote}
             />
-            <Button
-              testID="capture-note-done"
-              role="tertiary"
-              label="Save note"
-              disabled={busy}
-              onPress={onSaveNote}
-            />
+            <View style={styles.actions}>
+              <Button
+                testID="capture-note-skip"
+                role="tertiary"
+                label="Skip"
+                accessibilityLabel="Skip note"
+                disabled={busy}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  dispatch({ type: "noteClosed" });
+                }}
+              />
+              <Button
+                testID="capture-note-done"
+                role="tertiary"
+                label="Save note"
+                disabled={busy}
+                onPress={onSaveNote}
+              />
+            </View>
           </View>
+        ) : null}
+
+        <View style={styles.aiRow}>
+          <Text style={[styles.aiLabel, { color: colors.textPrimary }]}>
+            {ALLOW_AI}
+          </Text>
+          <OrbitSwitch
+            testID="capture-allow-ai"
+            accessibilityLabel={ALLOW_AI}
+            value={state.aiOn}
+            disabled={state.aiDisabled || locked}
+            busy={state.writePending === "ai"}
+            onValueChange={onToggleAi}
+          />
         </View>
-      ) : null}
 
-      <View style={styles.aiRow}>
-        <Text style={[styles.aiLabel, { color: colors.textPrimary }]}>
-          {ALLOW_AI}
-        </Text>
-        <OrbitSwitch
-          testID="capture-allow-ai"
-          accessibilityLabel={ALLOW_AI}
-          value={state.aiOn}
-          disabled={state.aiDisabled || locked}
-          busy={state.writePending === "ai"}
-          onValueChange={onToggleAi}
-        />
-      </View>
-
-      <View style={styles.actions}>
-        <Button
-          testID="capture-undo"
-          role="tertiary"
-          label="Undo"
-          disabled={locked}
-          onPress={onUndo}
-        />
-        {state.noteEditing ? null : (
-          <>
-            <Button
-              testID="capture-note-affordance"
-              role="tertiary"
-              label={ADD_NOTE}
-              disabled={locked}
-              onPress={() => dispatch({ type: "noteOpened" })}
-            />
-            <Button
-              testID="capture-done"
-              role="primary"
-              label="Done"
-              disabled={busy}
-              onPress={onDone}
-            />
-          </>
-        )}
-      </View>
+        <View style={styles.actions}>
+          <Button
+            testID="capture-undo"
+            role="tertiary"
+            label="Undo"
+            disabled={locked}
+            onPress={onUndo}
+          />
+          {state.noteEditing ? null : (
+            <>
+              <Button
+                testID="capture-note-affordance"
+                role="tertiary"
+                label={ADD_NOTE}
+                disabled={locked}
+                onPress={() => dispatch({ type: "noteOpened" })}
+              />
+              <Button
+                testID="capture-done"
+                role="primary"
+                label="Done"
+                disabled={busy}
+                onPress={onDone}
+              />
+            </>
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 });
@@ -416,12 +506,19 @@ export const ShareConfirmationCard = forwardRef<
 const styles = StyleSheet.create({
   card: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: SPACING.base,
+    right: SPACING.base,
     borderWidth: 1,
     borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    // The scrolling body is clipped to the rounded card (D-147).
+    overflow: "hidden",
+  },
+  // Content-sized until the cap, then shrinks and scrolls (D-147; the Sheet
+  // D-32 pattern).
+  body: { flexGrow: 0, flexShrink: 1 },
+  bodyContent: {
+    padding: SPACING.base,
+    gap: SPACING.md,
   },
   label: {
     fontSize: 15,
