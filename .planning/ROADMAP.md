@@ -1560,7 +1560,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 18/19 plans executed
+**Plans**: 18/25 plans executed (gap plans 20–25 added 2026-10-13, D-139)
 
 Wave 1
 - [x] 38.10-01-PLAN.md — Migration 033 (knowledge homes), shared fuel mapping, registry and tombstone changes
@@ -1599,7 +1599,13 @@ Wave 9 *(blocked on Wave 8 completion)*
 - [x] 38.10-18-PLAN.md — Retirement sweep and permanent no-fuel test
 
 Wave 10 *(blocked on Wave 9 completion)*
-- [ ] 38.10-19-PLAN.md — Final device plan (owner look sign-off, one release build)
+- [ ] 38.10-19-PLAN.md — Final device plan (owner look sign-off, one release build) — Tasks 1–2 done; Task 3 resumes after plan 25
+- [ ] 38.10-20-PLAN.md — G1 card edit mode on the section pages (D-130)
+- [ ] 38.10-21-PLAN.md — G2 Add bar morphs into a bottom-left section FAB, memory-type editors (D-131)
+- [ ] 38.10-22-PLAN.md — G3 section FAB on Key People, Off Limits and history pages (D-131)
+- [ ] 38.10-23-PLAN.md — G4 snackbar restyle: accent notices, warning kind, FAB-aware widths (D-132, D-140)
+- [ ] 38.10-24-PLAN.md — G5 pinned in both + pushpin, Hide hidden, Edit Contact most-recent card, Imported heading (D-133–D-136, D-142)
+- [ ] 38.10-25-PLAN.md — G6 wording + small fixes (D-136, D-137, D-141)
 
 > **Inserted 2026-10-10 (owner).** Schema-bearing (new homes for fuel data). Verify the migration head on disk at plan time (milestone migration rule 2). Any new durable entity raises the backup format question, which is an owner decision. Phase 39's sharing lesson waits on this phase (D-99).
 
@@ -1741,7 +1747,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
-| 38.10 Fuel Retirement, Things to Remember & Sharing | 18/19 | In Progress|  |
+| 38.10 Fuel Retirement, Things to Remember & Sharing | 18/25 | In Progress|  |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
