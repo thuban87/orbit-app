@@ -18,6 +18,12 @@
  *   pencil or a tap on the row opens its form in the row's place, with Move
  *   and a red Delete at the form's top (none at rest). While a form is open
  *   the other rows and the Add are held (`controlsHeld`).
+ * - Section Add FAB (D-131): the solid Add sits at the top of the list,
+ *   above the rows and the empty state, whether or not there are rows; a new
+ *   item's form opens in its place. Scrolled out of view, it morphs into the
+ *   bottom-left FAB (the no-entry icon with a +), whose tap scrolls to the top
+ *   and opens the add form. The empty state is text only (D-68: the top Add is
+ *   the one action).
  * - Move goes through `MoveEntrySheet` (D-84, D-85 confirm, D-118 Undo); its
  *   callbacks re-read this list so the entry leaves on a move and comes back
  *   on Undo.
@@ -31,20 +37,21 @@
  */
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { openMemoryLink } from "@/components/MemoryCard";
 import { MoveEntrySheet } from "@/components/MoveEntrySheet";
 import {
   OffLimitsForm,
   type OffLimitsFormFields,
 } from "@/components/OffLimitsForm";
+import {
+  SectionAddFab,
+  useSectionAddMorph,
+  useSectionFabClearance,
+} from "@/components/SectionAddFab";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { sectionFabIcon } from "@/components/section-add-fab-logic";
 import {
   AppText,
   Button,
@@ -70,6 +77,7 @@ import { newUid } from "@/db/uid";
 import { useContactHeader } from "@/hooks/use-contact-header";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -296,6 +304,21 @@ export function OffLimitsEditorScreen({
   const rows = phase.phase === "loaded" ? phase.data : [];
   const controlsHeld = saving || form !== null;
 
+  // D-131: the top Add morphs into the bottom-left FAB once it scrolls off.
+  const focusedRoute = isFocusedWorkflow(route.name);
+  const morph = useSectionAddMorph({
+    loaded: phase.phase === "loaded",
+    formOpen: form !== null,
+    focusedRoute,
+  });
+  const fabClearance = useSectionFabClearance(focusedRoute);
+  const openAddFromFab = () => {
+    // Held while a save runs or a form is open, as the top Add is.
+    if (savingRef.current || form !== null) return;
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    openForm({ mode: "add" });
+  };
+
   /** The open edit form, in card edit mode (D-130). */
   const renderEditForm = (row: OffLimitsRow) => (
     <OffLimitsForm
@@ -319,7 +342,7 @@ export function OffLimitsEditorScreen({
   );
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={morph.onRootLayout}>
       {/* While a save runs the guard holds Back (D-26). */}
       <ShellAppBar
         variant="child"
@@ -327,10 +350,17 @@ export function OffLimitsEditorScreen({
         person={person}
         backDisabled={saving}
       />
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         innerViewRef={contentRef}
-        contentContainerStyle={styles.content}
+        onLayout={morph.onViewportLayout}
+        onScroll={morph.scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={[
+          styles.content,
+          // The last row scrolls fully above the section FAB.
+          { paddingBottom: fabClearance },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <KeyboardCenteringProvider value={centering}>
@@ -362,17 +392,38 @@ export function OffLimitsEditorScreen({
             </View>
           ) : (
             <>
+              {form?.mode === "add" ? (
+                // D-131: a new item's form opens in the top Add's place.
+                <OffLimitsForm
+                  key={`form-${formKey}`}
+                  testID="off-limits-editor-form"
+                  initial={null}
+                  onSave={save}
+                  onCancel={() => requestClose(closeForm, formDirty)}
+                  onDirtyChange={setFormDirty}
+                  busy={saving}
+                />
+              ) : (
+                // D-131: the solid Add at the top (D-130), the one Add on the
+                // page, with rows or without. Held while a form is open or a
+                // save runs.
+                <View onLayout={morph.onBarLayout}>
+                  <Button
+                    testID="off-limits-editor-add"
+                    role="primary"
+                    label={ADD_OFF_LIMITS_ITEM}
+                    disabled={controlsHeld}
+                    onPress={() => openForm({ mode: "add" })}
+                  />
+                </View>
+              )}
               {rows.length === 0 && form === null ? (
-                // D-68: the empty section's one Add action.
+                // D-68: text only; the top Add is the one action.
                 <EmptyState
                   testID="off-limits-editor-empty"
                   icon="list"
                   heading={`Nothing in ${TITLE} yet`}
                   body="Add a topic to avoid bringing up."
-                  action={{
-                    label: ADD_OFF_LIMITS_ITEM,
-                    onPress: () => openForm({ mode: "add" }),
-                  }}
                 />
               ) : null}
               {rows.map((row) =>
@@ -455,30 +506,11 @@ export function OffLimitsEditorScreen({
               !rows.some((row) => row.id === form.row.id)
                 ? renderEditForm(form.row)
                 : null}
-              {form?.mode === "add" ? (
-                <OffLimitsForm
-                  key={`form-${formKey}`}
-                  testID="off-limits-editor-form"
-                  initial={null}
-                  onSave={save}
-                  onCancel={() => requestClose(closeForm, formDirty)}
-                  onDirtyChange={setFormDirty}
-                  busy={saving}
-                />
-              ) : form === null && rows.length > 0 ? (
-                <Button
-                  testID="off-limits-editor-add"
-                  role="primary"
-                  label={ADD_OFF_LIMITS_ITEM}
-                  disabled={saving}
-                  onPress={() => openForm({ mode: "add" })}
-                />
-              ) : null}
             </>
           )}
         </KeyboardCenteringProvider>
         {bottomSpacer}
-      </ScrollView>
+      </Animated.ScrollView>
       {moveRow !== null ? (
         <MoveEntrySheet
           entryRef={{ table: "off_limits", id: moveRow.id, contactId }}
@@ -490,6 +522,14 @@ export function OffLimitsEditorScreen({
           onClose={() => setMoveRow(null)}
         />
       ) : null}
+      {/* Rendered last, so it floats over the content (D-131). */}
+      <SectionAddFab
+        morph={morph}
+        icon={sectionFabIcon("off_limits")}
+        label={ADD_OFF_LIMITS_ITEM}
+        hint="Scrolls to the top and opens the add form."
+        onPress={openAddFromFab}
+      />
     </View>
   );
 }
