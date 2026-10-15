@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31, 32)
+## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31, 32, 38.10)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -61,6 +61,9 @@ try {
 | `src/db/migrations/009-contact-method-normalization.test.ts` | v8-to-v9 method, child-preservation, and rollback proof. |
 | `src/db/migrations/010-contact-method-label.ts` | Forward-only nullable method-label addition. |
 | `src/db/migrations/017-knowledge-egress-datamove.ts` | Verified copy-then-remove fuel-to-Memory data move. |
+| `src/db/migrations/033-knowledge-homes.ts` | Table rebuild plus a proven multi-destination data move, uid re-mint and table drop; exports `applyMigration033` returning a result struct. |
+| `src/db/legacy-fuel-mapping.ts` | Shared mapping module the migration's frozen literals are pinned against, also used by the backup converter. |
+| `src/backup/v7-v8-migration-equivalence.test.ts` | Proves the migration and the backup converter produce the same rows by uid. |
 | `src/db/migrations/018-custom-field-scope-history.ts` | Additive custom-field metadata and retained-value history. |
 | `src/db/migrations/profile-presentation.ts` | Independent Profile presentation entities and exported schema-version constant. |
 | `src/db/migrations/full-chain.test.ts` | Runs the shared registered migration chain to the imported target version. |
@@ -130,10 +133,20 @@ try {
 9. **Shipping a value-remap migration without lockstepping every literal consumer.** When a migration re-maps stored *values* in place (e.g. migration 025's `good/fine/hard → Positive/Neutral/Negative` and channel remap), a reader still comparing the retired literal silently miscounts. Single-source the map in one module (e.g. `src/db/interaction-vocabulary.ts`), let the migration's CASE arms be frozen literals **test-pinned** equal to that map but never importing it at upgrade time, and ship the migration **plus every live literal comparer** (AI-context, digest, timeline renderer, and the backup serializer) in the **same commit**. Remember the separate writers a schema migration never touches — `restore-apply` writes the table without running the migration, so it must consume the same map on ingest.
 10. **Formatting-only edits to shipped migrations are still edits.** Migrations 006, 009, and 017 have already carried production data transformations; never include them in a broad `biome --write`, cleanup sweep, or style-only commit. Preserve their exact reviewed source and make any new behavior a later numbered step.
 
+11. **A data move must also fix the backup path.** A migration that moves rows between tables leaves older backup files in the old shape. Bump the backup format and add a forward converter that applies the same rules, then add an equivalence test that runs one fixture table through both the migration and the converter and compares rows by uid (38.10: migration 033 and `convertV7ToV8`). Changing one mapping rule later means changing both, the shared module and that test.
+
+12. **Allocate re-minted uids once, before any copy.** When rows from several sources land in one table, uid collisions are possible; allocate every destination uid up front with a collision-complete deterministic scheme (`legacy-<table>-<uid>`, `-2`, `-3` …) and convert tombstones to the allocated uid, or a later copy can collide with an earlier one.
+
+13. **Scope the post-migration foreign-key check to your tables.** `PRAGMA foreign_key_check` with no argument fails on any pre-existing violation anywhere and would brick launch for that user; check only the tables the migration wrote (`PRAGMA foreign_key_check(<table>)`).
+
+14. **Fail on what you cannot map; never guess.** A legacy value no writer can produce (e.g. a BLOB in a text column) should throw a typed integrity error that rolls the step back, not be coerced. Skipped rows (e.g. contentless ones) are counted in the result struct so tests can pin them.
+
+15. **Prove a one-way migration on real older data before release.** Seed the old schema through the old app's own DAOs (a throwaway hook in a `git archive` copy of the pre-migration commit in the scratchpad, never in the repo; RN `Modal` pickers are not drivable by adb), take an automatic backup, then upgrade and query the database with `run-as` on a debug build. Restore the old backup by Merge and by Replace to prove the converter (38.10 plan 19).
+
 ## Smoke Test
 
 ```bash
-npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/017-knowledge-egress-datamove.test.ts src/db/migrations/018-custom-field-scope-history.test.ts src/db/migrations/profile-presentation.test.ts
+npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/033-knowledge-homes.test.ts src/backup/v7-v8-migration-equivalence.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/017-knowledge-egress-datamove.test.ts src/db/migrations/018-custom-field-scope-history.test.ts src/db/migrations/profile-presentation.test.ts
 ```
 
 Expected: the runner and full-chain suites reach the registered target, while representation conversion, verified data moves, and additive schema history checks pass.
