@@ -1,7 +1,7 @@
 # Glossary
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/constants/glossary.ts`, `src/constants/product-labels.ts`, `src/constants/glossary-contract.test.ts`
 
 ## Purpose
@@ -139,9 +139,9 @@ None. The constants are the configuration.
 - **ADR-132:** Focused Rapid-Capture Workflows — names the visible action "Log Interaction".
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — the Rogue band.
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — the canonical terms, the enforcements (Contacts, Log Interaction, Wobbly, Event, Never Contacted, Favorite), the rule that decided terms are not renamed, "Make this an event", and `plural()` (38.9 D-21, D-22, D-41, D-42, D-49, D-56, D-63, D-74, D-75).
-- **Phase 38.10 D-01, D-87, D-90, D-105** (`.planning/phases/38.10-fuel-retirement-things-to-remember/38.10-CONTEXT.md`)
-  — the Things to Remember terms, the Profile entry-sheet wording and the removal of "fuel"
-  (D-01); "Avoid" is not a retired form.
+- **ADR-207:** Knowledge Homes After Fuel — "fuel" removed from code and wording, enforced by `src/no-fuel-contract.test.ts` (D-01).
+- **ADR-214:** AI Permission for the New Knowledge Homes and Compose Research — Compose Research's "Avoid" heading becomes "Off Limits"; the Profile helper "Avoid bringing these up" stays, so "Avoid" is not a retired form (D-87, D-105).
+- **ADR-218:** Things to Remember on the Profile — the Things to Remember terms, entry-sheet wording (Edit, Pin, Unpin, Close) and "Not set" (D-87, D-90).
 
 ## Gotchas
 
@@ -178,3 +178,4 @@ None. The constants are the configuration.
 | 2026-10-11 | 38.9 | KB extraction: the 38.9 decisions are cited as ADR-206. |
 | 2026-10-13 | 38.10 | Things to Remember, Off Limits, Close and Not set added as canonical terms (D-90); the Profile's section registry, entry sheet and custom-field display read them; the contract pins their values (plan 16). |
 | 2026-10-13 | 38.10 | "fuel" retired from code and wording (D-01, D-87), enforced by `src/no-fuel-contract.test.ts` with a migration allowlist rather than by `RETIRED_FORMS` (plan 18). |
+| 2026-10-15 | 38.10 | KB extraction: Decisions cite ADR-207, ADR-214 and ADR-218 in place of the D-ID line. |
