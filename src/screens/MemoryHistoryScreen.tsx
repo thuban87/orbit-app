@@ -381,11 +381,15 @@ function HistoryRow({
         <AppText role="body" style={styles.rowValue}>
           {row.value}
         </AppText>
-        {/* D-130: the pencil at the row's top right (linked rows too). */}
+        {/* D-130: the pencil at the row's top right (linked rows too). An
+            unlinked row's own tap edits, so the row is the one
+            screen-reader stop (the MemoryCard rule); a linked row's tap
+            opens its interaction, so its pencil stays reachable. */}
         <Button
           role="iconOnly"
           icon="edit"
           accessibilityLabel={`Edit ${title} entry`}
+          hiddenFromAccessibility={!linked}
           disabled={held}
           onPress={onEdit}
         />

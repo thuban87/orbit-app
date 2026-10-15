@@ -428,10 +428,13 @@ export function RelationshipEditor({
             {item.person_name}
           </AppText>
           {pinMarker(item)}
+          {/* The row's own tap edits under the same label, so the row is
+              the one screen-reader stop (the MemoryCard rule). */}
           <Button
             role="iconOnly"
             icon="edit"
             accessibilityLabel={`Edit ${item.person_name}`}
+            hiddenFromAccessibility
             disabled={rowsHeld}
             onPress={() => openEdit(item)}
           />

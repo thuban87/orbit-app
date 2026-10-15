@@ -46,6 +46,12 @@ interface CommonButtonProps
   accessibilityHint?: string;
   /** Announces the control as the selected/current choice (38.4 AUD-UIA-020). */
   selected?: boolean;
+  /**
+   * Hides the control from screen readers while it stays visible and
+   * tappable: for a duplicate of an action its parent already announces
+   * (a card's pencil when the card's own tap edits it). Absent → false.
+   */
+  hiddenFromAccessibility?: boolean;
 }
 
 interface LabelButtonProps extends CommonButtonProps {
@@ -73,6 +79,7 @@ export function Button(props: ButtonProps) {
     accessibilityLabel,
     accessibilityHint,
     selected,
+    hiddenFromAccessibility = false,
   } = props;
   const { colors } = useTheme();
   const v = buttonVisual(role);
@@ -100,6 +107,11 @@ export function Button(props: ButtonProps) {
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
+      // Android and iOS each read their own prop for "not a focus stop".
+      importantForAccessibility={
+        hiddenFromAccessibility ? "no-hide-descendants" : undefined
+      }
+      accessibilityElementsHidden={hiddenFromAccessibility || undefined}
       accessibilityState={
         selected === undefined
           ? { disabled: !!disabled }

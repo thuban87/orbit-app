@@ -462,6 +462,8 @@ describe("RelationshipEditor card edit mode (D-130)", () => {
     );
     expect(pencil?.props.role).toBe("iconOnly");
     expect(pencil?.props.accessibilityLabel).toBe("Edit Ria");
+    // The row's own tap edits under the same label: one screen-reader stop.
+    expect(pencil?.props.hiddenFromAccessibility).toBe(true);
     expect(pencil?.props.disabled).toBe(false);
     const press = pencil?.props.onPress;
     if (typeof press !== "function") throw new Error("missing onPress");

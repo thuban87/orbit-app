@@ -488,11 +488,14 @@ export function OffLimitsEditorScreen({
                           </AppText>
                         ) : null}
                       </View>
-                      {/* D-130: the pencil at the row's top right. */}
+                      {/* D-130: the pencil at the row's top right. The row's
+                          own tap edits under the same label, so the row is
+                          the one screen-reader stop (the MemoryCard rule). */}
                       <Button
                         role="iconOnly"
                         icon="edit"
                         accessibilityLabel="Edit Off Limits item"
+                        hiddenFromAccessibility
                         disabled={controlsHeld}
                         onPress={() => openForm({ mode: "edit", row })}
                       />

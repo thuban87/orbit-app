@@ -9,9 +9,11 @@ import {
 import type { MemoryRow } from "@/db/memories-read";
 import {
   HIDE_FROM_PROFILE_ENABLED,
+  isMemoryTypeKey,
   MEMORY_TYPE_REGISTRY,
   PROVISIONAL_MEMORY_LABEL,
 } from "@/db/memory-registry";
+import { sectionEntryNoun } from "@/screens/section-editor-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
@@ -27,6 +29,19 @@ export function memoryTypeLabel(memory: MemoryRow): string {
       ?.displayName ??
     PROVISIONAL_MEMORY_LABEL
   );
+}
+
+/**
+ * The card's Edit label: "Edit " and the section's entry noun ("Edit Memory",
+ * "Edit Gift Idea", "Edit Thought of Them", "Edit Imported Note"; D-137 W14,
+ * D-141), the same noun as the form heading, so the type is never doubled
+ * ("Edit Memory memory"). An unregistered type reads "Edit Memory". PURE.
+ */
+export function memoryEditLabel(memory: MemoryRow): string {
+  const noun = isMemoryTypeKey(memory.type)
+    ? sectionEntryNoun(memory.type)
+    : PROVISIONAL_MEMORY_LABEL;
+  return `Edit ${noun}`;
 }
 
 export function openMemoryLink(url: string): void {
@@ -46,8 +61,9 @@ export interface MemoryCardProps {
   /** Long-press handler (D-107: a linked row's Edit lives here). */
   onLongPress?: () => void;
   /**
-   * Overrides the fixed `Edit … memory` label, e.g. for a linked row whose tap
-   * opens its interaction (D-107; checker cycle 3 W-6). Absent → unchanged.
+   * Overrides the card's `memoryEditLabel` ("Edit Gift Idea"), e.g. for a
+   * linked row whose tap opens its interaction (D-107; checker cycle 3 W-6).
+   * Absent → the Edit label: the card's tap is its edit action.
    */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -68,7 +84,13 @@ export interface MemoryCardProps {
    * card's form. Held with the card (`disabled`). Absent → no pencil.
    */
   onEditPress?: () => void;
-  /** The pencil's label; absent → the card's own `Edit … memory`. */
+  /**
+   * The pencil's label; absent → `memoryEditLabel`. When the pressable card
+   * announces the same label (its own tap edits), the pencil is hidden from
+   * screen readers so the card is the one focus stop; it stays visible and
+   * tappable. A card whose tap does something else (a linked row) keeps the
+   * pencil reachable under its own label.
+   */
   editAccessibilityLabel?: string;
   testID?: string;
 }
@@ -105,6 +127,11 @@ export function MemoryCard({
     onShowOnProfile !== undefined &&
     memory.hidden === 1;
   const dimmed = subdued || canShowOnProfile;
+  const cardLabel = accessibilityLabel ?? memoryEditLabel(memory);
+  const pencilLabel = editAccessibilityLabel ?? memoryEditLabel(memory);
+  // The card announces the pencil's action already: read it once, not twice.
+  const pencilDuplicatesCard =
+    onPress !== undefined && cardLabel === pencilLabel;
   const actions: AccessibilityActionInfo[] = [
     ...(accessibilityActions ?? []),
     ...(canShowOnProfile
@@ -220,10 +247,8 @@ export function MemoryCard({
             <Button
               role="iconOnly"
               icon="edit"
-              accessibilityLabel={
-                editAccessibilityLabel ??
-                `Edit ${memoryTypeLabel(memory)} memory`
-              }
+              accessibilityLabel={pencilLabel}
+              hiddenFromAccessibility={pencilDuplicatesCard}
               disabled={disabled}
               onPress={(event) => {
                 event?.stopPropagation?.();
@@ -295,9 +320,7 @@ export function MemoryCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={
-        accessibilityLabel ?? `Edit ${memoryTypeLabel(memory)} memory`
-      }
+      accessibilityLabel={cardLabel}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
       accessibilityActions={actions.length > 0 ? actions : undefined}

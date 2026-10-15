@@ -262,6 +262,47 @@ describe("card edit mode: the Key People editor (D-130)", () => {
   });
 });
 
+describe("a pencil that repeats its card's own tap is read once (38.10 verification)", () => {
+  const pencilTag = (source: string) =>
+    openingTags(source, "Button").find(
+      (tag) => tag.includes('role="iconOnly"') && tag.includes('icon="edit"'),
+    );
+
+  it("Button hides itself from both platforms' screen readers on request", () => {
+    const button = read("src/components/ui/Button.tsx");
+    expect(button).toContain(
+      'hiddenFromAccessibility ? "no-hide-descendants" : undefined',
+    );
+    expect(button).toContain(
+      "accessibilityElementsHidden={hiddenFromAccessibility || undefined}",
+    );
+  });
+
+  it("Off Limits and Key People rows always edit on tap, so their pencils are hidden", () => {
+    expect(pencilTag(read(OFF_LIMITS))).toMatch(
+      /\bhiddenFromAccessibility(?=[\s/>])/,
+    );
+    expect(pencilTag(read("src/components/RelationshipEditor.tsx"))).toMatch(
+      /\bhiddenFromAccessibility(?=[\s/>])/,
+    );
+  });
+
+  it("history page: only an unlinked row's pencil is hidden (a linked tap opens the interaction, D-107)", () => {
+    const row = functionSource(read(HISTORY), "HistoryRow");
+    expect(pencilTag(row)).toContain("hiddenFromAccessibility={!linked}");
+  });
+
+  it("the memory card hides its pencil only when the card announces the same Edit", () => {
+    const card = read("src/components/MemoryCard.tsx");
+    expect(card).toMatch(
+      /const pencilDuplicatesCard =\s*onPress !== undefined && cardLabel === pencilLabel;/,
+    );
+    expect(pencilTag(card)).toContain(
+      "hiddenFromAccessibility={pencilDuplicatesCard}",
+    );
+  });
+});
+
 describe("an editId opens its form only once (D-107; review IN-02)", () => {
   for (const [name, file] of [
     ["section editors", SECTION],
