@@ -393,7 +393,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-203:** One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection — every Settings switch is `OrbitSwitch`; Settings > Appearance marks the selected accent and star swatch with a ring, gap and check.
 - **ADR-204:** One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay — single choices on shell-hosted screens use `OptionSheet`.
 - **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — shell-hosted date labels (e.g. Recently Deleted) use the shared formatter.
-- **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Settings and Systems labels use plain words ("Reset manual changes").
+- **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Settings and Systems labels use plain words ("Reset Manual Changes").
 - **ADR-189:** Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion — adds the `orrery*` token sub-palette to every theme palette; the Orrery draws no colour that is not one of these tokens, including inside SkSL uniforms.
 
 ## Gotchas
