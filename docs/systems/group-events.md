@@ -146,6 +146,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | Participant cap | None | `src/components/ContactPicker.tsx` | Searchable, virtualized selection. |
 
 ## Decisions
+- **ADR-213:** Moving Entries — participant note locks clamp through the recency writer.
 - **ADR-211:** Linked Interaction Notes Through "Also Save To" — Group Note copies, their lock and detach rules.
 - **[ADR-010: Single-Writer Interaction Recency Spine](../decisions/ADR-010-single-writer-interaction-recency-spine.md)** — governs `src/db/recency-dao.ts`.
 - **[ADR-011: Query-Time Status and Never-Contacted Segregation](../decisions/ADR-011-query-time-status-and-never-contacted-segregation.md)** — governs `src/db/recency-dao.ts`.

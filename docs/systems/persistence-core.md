@@ -182,6 +182,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 ## Decisions
 
+- **ADR-214:** AI Permission for the New Knowledge Homes — migration 033's two AI-default columns.
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — migration 001 establishes the durable first schema.
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — every version step commits atomically.
 - **ADR-156:** Foreground Maintenance Fault Isolation with Per-Pass Dependencies — isolates hook failures while preserving explicit recovery-before-backup ordering within each pass.

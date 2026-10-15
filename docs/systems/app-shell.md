@@ -294,6 +294,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 
 ## Decisions
 
+- **ADR-210:** Dated Last Talked About and Current Location — the `MemoryHistory` route is the history page.
 - **ADR-006:** Theme-Token Architecture — all UI colors resolve through the theme contract.
 - **ADR-001:** Normalized Custom-Field Values — keeps the navigator behind the migration gate and distinguishes its classified integrity failure from generic startup failure.
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — keeps launch-time cleanup inside the ready-gated application shell.

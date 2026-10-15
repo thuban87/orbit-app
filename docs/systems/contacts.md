@@ -203,6 +203,9 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 
 ## Decisions
 
+- **ADR-208:** Migration 033 — purge counts and deletes `off_limits` children with tombstones.
+- **ADR-211:** Linked Interaction Notes — the recency writer saves and propagates linked entries.
+- **ADR-213:** Moving Entries — the recency writer's set-only `note_ai_locked` clamp.
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — establishes contact identity, categories, profile, and durable fixed fields.
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — commits the initial contacts schema atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — makes recency a serialized materialization of the interaction log.

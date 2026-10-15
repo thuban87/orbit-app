@@ -130,6 +130,8 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 
 ## Decisions
 
+- **ADR-211:** Linked Interaction Notes — links and Group Note copy markers travel by uid.
+- **ADR-214:** AI Permission for the New Knowledge Homes — the two new AI defaults travel in the settings snapshot.
 - **D-19 (2026-09-24):** The owner approved a 100 MiB backup ingress ceiling, 30-second no-progress stall deadline, and no total acquisition deadline after the Plan 15 Pixel measurements. Backups larger than 100 MiB, including some Orbit-produced photo-heavy backups, will be rejected until restore is redesigned to use less memory. The measured 101.9 MB preview succeeded on the Pixel; a 123.8 MB preview exhausted its Java heap. This boundary is a resource limit, not a guarantee that every smaller backup will preview on every device.
 
 - **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — defines the Profile presentation graph now carried by format v5.

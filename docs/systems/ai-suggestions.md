@@ -99,6 +99,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 
 ## Decisions
 
+- **ADR-218:** Things to Remember on the Profile — with Hide from Profile off, a previously hidden memory with Allow AI on is Message Focus eligible (D-142).
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — separates SecureStore credentials from exportable SQLite settings.
 - **ADR-050:** Closed AI Prompt Egress Allowlist and Opt-In Field Sharing — makes the projection and sharing flag the disclosure boundary; its ranked-fuel input is superseded by ADR-214.
 - **ADR-051:** Public-HTTPS Custom AI Egress Guard — protects user-controlled Custom destinations at URL and native transport layers.
