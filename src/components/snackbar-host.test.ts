@@ -11,9 +11,12 @@ import { resolvePalette } from "@/theme/theme-presets";
 import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 import { SPACING } from "@/theme/tokens/spacing";
 import {
+  heldSnackbarLayout,
+  latchSnackbarLayout,
   ROOT_SNACKBAR_HOST,
   resolveSnackbarHostVisible,
   SNACKBAR_FAB_GAP,
+  type SnackbarScreenContext,
   snackbarBottomPadding,
   snackbarLayout,
   snackbarPadding,
@@ -230,6 +233,233 @@ describe("snackbarLayout (38.10 D-143, amending D-132's widths)", () => {
       }
     });
   }
+});
+
+describe("held root pill layout (38.10 D-151)", () => {
+  const TAB_BAR = 80;
+  const W = 393;
+  /** A focused section editor: no tab bar, no +, a section FAB mounted. */
+  const focusedSectionEditor = (
+    insetBottom: number,
+  ): SnackbarScreenContext => ({
+    host: ROOT_SNACKBAR_HOST,
+    windowWidth: W,
+    tabBarHeight: TAB_BAR,
+    insetBottom,
+    universalFabMayShow: false,
+    sectionFabMayShow: true,
+  });
+  /** A tab page (a history page carries a section FAB on the + baseline). */
+  const tabPage = (sectionFabMayShow: boolean): SnackbarScreenContext => ({
+    host: ROOT_SNACKBAR_HOST,
+    windowWidth: W,
+    tabBarHeight: TAB_BAR,
+    insetBottom: 24,
+    universalFabMayShow: true,
+    sectionFabMayShow,
+  });
+  const sectionRowTop = (inset: number) => inset + FAB_EDGE_GAP + FAB_SIZE;
+  const plusRowTop = TAB_BAR + FAB_EDGE_GAP + FAB_SIZE;
+
+  it("a focused section editor, FAB hidden at the start: never below the section FAB row (3-button nav and gesture nav)", () => {
+    for (const inset of [0, 24, 48, 64]) {
+      const held = heldSnackbarLayout({
+        ...focusedSectionEditor(inset),
+        universalFab: false,
+        sectionFab: false,
+      });
+      // Content-sized and centred (no FAB shows yet), at today's 112 or
+      // higher when the section FAB's row reaches above it.
+      expect(held.width).toBeUndefined();
+      expect(held.paddingBottom).toBe(
+        Math.max(
+          snackbarBottomPadding(ROOT_SNACKBAR_HOST, inset),
+          sectionRowTop(inset) + SNACKBAR_FAB_GAP,
+        ),
+      );
+      expect(held.paddingBottom - sectionRowTop(inset)).toBeGreaterThanOrEqual(
+        SNACKBAR_FAB_GAP,
+      );
+    }
+    // The case IN-04 names: 3-button navigation (inset 48) puts the section
+    // FAB's top at 120, above the old 112; the held pill clears it.
+    expect(
+      heldSnackbarLayout({
+        ...focusedSectionEditor(48),
+        universalFab: false,
+        sectionFab: false,
+      }).paddingBottom,
+    ).toBe(128);
+  });
+
+  it("a focused section editor, FAB showing at the start: D-143's place, unchanged", () => {
+    for (const inset of [0, 24, 48]) {
+      const ctx = focusedSectionEditor(inset);
+      expect(
+        heldSnackbarLayout({ ...ctx, universalFab: false, sectionFab: true }),
+      ).toEqual(
+        snackbarLayout({ ...ctx, universalFab: false, sectionFab: true }),
+      );
+    }
+  });
+
+  it("a tab page with the + hidden for the keyboard: above the + row it comes back to", () => {
+    for (const sectionFabMayShow of [true, false]) {
+      const held = heldSnackbarLayout({
+        ...tabPage(sectionFabMayShow),
+        universalFab: false,
+        sectionFab: false,
+      });
+      expect(held.width).toBeUndefined();
+      expect(held.paddingBottom).toBe(plusRowTop + SNACKBAR_FAB_GAP);
+    }
+  });
+
+  it("a tab page with the + showing: D-143's place, the section FAB on its baseline", () => {
+    for (const sectionFab of [true, false]) {
+      const ctx = tabPage(true);
+      expect(
+        heldSnackbarLayout({ ...ctx, universalFab: true, sectionFab }),
+      ).toEqual(snackbarLayout({ ...ctx, universalFab: true, sectionFab }));
+    }
+  });
+
+  it("a screen with no FAB that can appear (a focused form without a section FAB): today's place", () => {
+    const ctx: SnackbarScreenContext = {
+      ...focusedSectionEditor(48),
+      sectionFabMayShow: false,
+    };
+    expect(
+      heldSnackbarLayout({ ...ctx, universalFab: false, sectionFab: false }),
+    ).toEqual({
+      alignItems: "center",
+      width: undefined,
+      paddingBottom: snackbarBottomPadding(ROOT_SNACKBAR_HOST, 48),
+    });
+  });
+
+  it("an overlay host is unchanged (no FAB there, D-51)", () => {
+    const ctx = { ...tabPage(true), host: "sheet-1" };
+    expect(
+      heldSnackbarLayout({ ...ctx, universalFab: true, sectionFab: true }),
+    ).toEqual(snackbarLayout({ ...ctx, universalFab: true, sectionFab: true }));
+  });
+
+  // Exhaustive: whatever showed when the message appeared, every FAB that can
+  // show on that screen afterwards stays wholly below the held pill.
+  for (const inset of [0, 24, 48]) {
+    for (const universalFabMayShow of [true, false]) {
+      for (const sectionFabMayShow of [true, false]) {
+        it(`never over a FAB that shows later (inset ${inset}, + ${universalFabMayShow}, section ${sectionFabMayShow})`, () => {
+          const ctx: SnackbarScreenContext = {
+            host: ROOT_SNACKBAR_HOST,
+            windowWidth: W,
+            tabBarHeight: TAB_BAR,
+            insetBottom: inset,
+            universalFabMayShow,
+            sectionFabMayShow,
+          };
+          for (const startPlus of universalFabMayShow
+            ? [true, false]
+            : [false]) {
+            for (const startSection of sectionFabMayShow
+              ? [true, false]
+              : [false]) {
+              const held = heldSnackbarLayout({
+                ...ctx,
+                universalFab: startPlus,
+                sectionFab: startSection,
+              });
+              const rowsThatCanShow: number[] = [];
+              if (universalFabMayShow) rowsThatCanShow.push(plusRowTop);
+              if (sectionFabMayShow) {
+                rowsThatCanShow.push(
+                  universalFabMayShow ? plusRowTop : sectionRowTop(inset),
+                );
+              }
+              for (const top of rowsThatCanShow) {
+                expect(held.paddingBottom - top).toBeGreaterThanOrEqual(
+                  SNACKBAR_FAB_GAP,
+                );
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+
+  it("holds the layout for one message while the section FAB morphs in and out", () => {
+    const message = { kind: "warning", label: "Deleted" };
+    const ctx = focusedSectionEditor(48);
+    const first = latchSnackbarLayout(null, message, {
+      ...ctx,
+      universalFab: false,
+      sectionFab: false,
+    });
+    const scrolled = latchSnackbarLayout(first, message, {
+      ...ctx,
+      universalFab: false,
+      sectionFab: true,
+    });
+    const back = latchSnackbarLayout(scrolled, message, {
+      ...ctx,
+      universalFab: false,
+      sectionFab: false,
+    });
+    expect(scrolled).toBe(first);
+    expect(back).toBe(first);
+    expect(scrolled.layout.paddingBottom).toBe(128);
+  });
+
+  it("holds it while the + hides for the keyboard and comes back", () => {
+    const message = { kind: "success", label: "Saved" };
+    const ctx = tabPage(false);
+    const first = latchSnackbarLayout(null, message, {
+      ...ctx,
+      universalFab: true,
+      sectionFab: false,
+    });
+    expect(
+      latchSnackbarLayout(first, message, {
+        ...ctx,
+        universalFab: false,
+        sectionFab: false,
+      }),
+    ).toBe(first);
+  });
+
+  it("lays out a new or replacing message afresh", () => {
+    const ctx = focusedSectionEditor(48);
+    const first = latchSnackbarLayout(
+      null,
+      { kind: "warning", label: "Deleted" },
+      { ...ctx, universalFab: false, sectionFab: false },
+    );
+    const next = latchSnackbarLayout(
+      first,
+      { kind: "success", label: "Restored" },
+      { ...ctx, universalFab: false, sectionFab: true },
+    );
+    expect(next).not.toBe(first);
+    expect(next.layout.width).toBe(W - 2 * SPACING.base);
+  });
+
+  it("lays out afresh when the message outlives its screen (Save, then Back to a page with the +)", () => {
+    const message = { kind: "success", label: "Saved" };
+    const editor = latchSnackbarLayout(null, message, {
+      ...focusedSectionEditor(24),
+      universalFab: false,
+      sectionFab: false,
+    });
+    const profile = latchSnackbarLayout(editor, message, {
+      ...tabPage(false),
+      universalFab: true,
+      sectionFab: false,
+    });
+    expect(profile).not.toBe(editor);
+    expect(profile.layout.paddingBottom).toBe(plusRowTop + SNACKBAR_FAB_GAP);
+  });
 });
 
 describe("snackbarPadding (O5, D-132)", () => {

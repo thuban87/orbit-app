@@ -1,11 +1,13 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography variant.
+import { useRef } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
 import {
+  latchSnackbarLayout,
   ROOT_SNACKBAR_HOST,
   resolveSnackbarHostVisible,
-  snackbarLayout,
+  type SnackbarLayoutLatch,
   snackbarPadding,
   snackbarPresentation,
 } from "@/components/snackbar-host";
@@ -14,18 +16,21 @@ import {
   fabDialBackgroundA11y,
   selectFabDialOpen,
 } from "@/components/universal-fab-logic";
+import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
+import { useFocusedRouteStore } from "@/stores/focused-route-store";
 import {
   overlayRegistryStore,
   selectTopOverlayId,
 } from "@/stores/overlay-registry-store";
 import {
+  selectSectionFabAvailable,
   selectSectionFabPresent,
   useSectionFabStore,
 } from "@/stores/section-fab-store";
 import { useShellObstacleStore } from "@/stores/shell-obstacle-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { snackbarStore } from "@/stores/snackbar-store";
-import { useMeasuredTabBarHeight } from "@/stores/tab-bar-layout-store";
+import { useShownTabBarHeight } from "@/stores/tab-bar-layout-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -61,11 +66,20 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   // FAB row. UniversalFab publishes its "shell-fab" rect only while it shows;
   // a section FAB registers only while it shows (section-fab-store).
   const windowWidth = useWindowDimensions().width;
-  const tabBarHeight = useMeasuredTabBarHeight();
+  const tabBarHeight = useShownTabBarHeight();
   const universalFab = useShellObstacleStore(
     (s) => s.rects["shell-fab"] !== undefined,
   );
   const sectionFab = useSectionFabStore(selectSectionFabPresent);
+  // D-151: the pill holds one place for a message's life, clear of every FAB
+  // that may appear on this screen meanwhile: the + on any non-focused route
+  // (UniversalFab hides only there and for the keyboard), a section FAB on a
+  // screen that has one.
+  const universalFabMayShow = useFocusedRouteStore(
+    (s) => !isFocusedWorkflow(s.routeName ?? "Home"),
+  );
+  const sectionFabMayShow = useSectionFabStore(selectSectionFabAvailable);
+  const latchRef = useRef<SnackbarLayoutLatch | null>(null);
 
   if (!snackbar || !hostVisible) return null;
   // D-132: a notice is an accent pill and a destructive result the warning
@@ -73,14 +87,20 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   // an alert (D-72).
   const look = snackbarPresentation(snackbar.kind);
   const actionColor = colors[look.actionTone];
-  const layout = snackbarLayout({
+  // Re-latched only for a new message or a new screen, never for a FAB
+  // showing or hiding (D-151).
+  const latch = latchSnackbarLayout(latchRef.current, snackbar, {
     host,
     windowWidth,
     universalFab,
     sectionFab,
     tabBarHeight,
     insetBottom: insets.bottom,
+    universalFabMayShow,
+    sectionFabMayShow,
   });
+  latchRef.current = latch;
+  const layout = latch.layout;
   const hasAction = Boolean(snackbar.action || snackbar.secondaryAction);
 
   return (

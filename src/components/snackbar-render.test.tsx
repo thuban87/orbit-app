@@ -13,6 +13,13 @@ import { THEME_PRESETS } from "@/theme/theme-presets";
 
 const shell = vi.hoisted(() => ({
   dialOpen: false,
+  /** Shown section FAB owners and focused screens that have one (D-151). */
+  sectionShown: false,
+  sectionAvailable: false,
+  plusShown: true,
+  routeName: "Home" as string | undefined,
+  /** The Snackbar's one `useRef` (the D-151 latch), kept across renders. */
+  latchRef: { current: null as unknown },
   snackbar: null as null | {
     kind: "success" | "warning" | "error";
     label: string;
@@ -20,6 +27,10 @@ const shell = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
+  useRef: () => shell.latchRef,
+}));
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
   Text: "Text",
@@ -65,20 +76,33 @@ vi.mock("@/stores/snackbar-store", () => ({
     }) => unknown,
   ) => select({ snackbar: shell.snackbar, dismiss: () => {} }),
 }));
-// The universal + is on screen, so the root pill sits above its row (D-143).
+// By default the universal + is on screen, so the root pill sits above its
+// row (D-143).
 vi.mock("@/stores/shell-obstacle-store", () => ({
   useShellObstacleStore: (
     select: (state: { rects: Record<string, unknown> }) => unknown,
-  ) => select({ rects: { "shell-fab": {} } }),
+  ) => select({ rects: shell.plusShown ? { "shell-fab": {} } : {} }),
 }));
 vi.mock("@/stores/section-fab-store", async (original) => ({
   ...(await original<typeof import("@/stores/section-fab-store")>()),
   useSectionFabStore: (
-    select: (state: { owners: ReadonlySet<string> }) => unknown,
-  ) => select({ owners: new Set<string>() }),
+    select: (state: {
+      owners: ReadonlySet<string>;
+      available: ReadonlySet<string>;
+    }) => unknown,
+  ) =>
+    select({
+      owners: new Set<string>(shell.sectionShown ? ["fab"] : []),
+      available: new Set<string>(shell.sectionAvailable ? ["fab"] : []),
+    }),
+}));
+vi.mock("@/stores/focused-route-store", () => ({
+  useFocusedRouteStore: (
+    select: (state: { routeName: string | undefined }) => unknown,
+  ) => select({ routeName: shell.routeName }),
 }));
 vi.mock("@/stores/tab-bar-layout-store", () => ({
-  useMeasuredTabBarHeight: () => 64,
+  useShownTabBarHeight: () => 64,
 }));
 
 const { Snackbar } = await import("./Snackbar");
@@ -100,6 +124,11 @@ function render(): TestElement {
 describe("root Snackbar while the + dial is open (38.10 review CR-01)", () => {
   beforeEach(() => {
     shell.dialOpen = false;
+    shell.plusShown = true;
+    shell.sectionShown = false;
+    shell.sectionAvailable = false;
+    shell.routeName = "Home";
+    shell.latchRef.current = null;
     shell.snackbar = {
       kind: "success",
       label: "Logged a touchpoint",
@@ -131,5 +160,50 @@ describe("root Snackbar while the + dial is open (38.10 review CR-01)", () => {
       (node) => node.props.accessibilityLabel === "Undo",
     );
     expect(undo?.type).toBe("Pressable");
+  });
+});
+
+describe("root Snackbar holds its place while shown (38.10 D-151)", () => {
+  const bottom = (root: TestElement) =>
+    (root.props.style as { paddingBottom?: number }[])[1]?.paddingBottom;
+
+  beforeEach(() => {
+    shell.dialOpen = false;
+    shell.latchRef.current = null;
+    // A focused section editor: no tab bar and no +, a section FAB mounted
+    // but not yet morphed in.
+    shell.routeName = "SectionEditor";
+    shell.plusShown = false;
+    shell.sectionShown = false;
+    shell.sectionAvailable = true;
+    shell.snackbar = { kind: "warning", label: "Deleted" };
+  });
+
+  it("does not hop when the section button morphs in and out under it", () => {
+    const first = bottom(render());
+    shell.sectionShown = true;
+    expect(bottom(render())).toBe(first);
+    shell.sectionShown = false;
+    expect(bottom(render())).toBe(first);
+  });
+
+  it("a new message is placed afresh", () => {
+    render();
+    shell.sectionShown = true;
+    const held = bottom(render());
+    shell.snackbar = { kind: "success", label: "Restored" };
+    const next = render();
+    expect(bottom(next)).not.toBeUndefined();
+    expect(bottom(next)).not.toBe(held);
+  });
+
+  it("is re-placed above the + when the message outlives its screen", () => {
+    const editor = bottom(render());
+    shell.routeName = "Profile";
+    shell.plusShown = true;
+    shell.sectionAvailable = false;
+    const profile = bottom(render());
+    expect(profile).toBe(64 + 16 + 56 + 8);
+    expect(profile).not.toBe(editor);
   });
 });

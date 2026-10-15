@@ -112,6 +112,121 @@ export function snackbarLayout(input: {
   };
 }
 
+/** What the root host knows about the screen a snackbar shows on (D-151). */
+export interface SnackbarScreenContext {
+  host: string;
+  windowWidth: number;
+  /**
+   * The tab bar's height when it is on screen (`useShownTabBarHeight`): the
+   * universal +'s row sits on it whenever the + shows.
+   */
+  tabBarHeight: number;
+  /** The safe-area bottom inset. */
+  insetBottom: number;
+  /**
+   * The route lets the universal + show (not a focused workflow). It may be
+   * hidden now (the keyboard) and appear while the snackbar is up.
+   */
+  universalFabMayShow: boolean;
+  /**
+   * The focused screen has a section FAB mounted, which the scroll morph can
+   * bring up at any time (`selectSectionFabAvailable`).
+   */
+  sectionFabMayShow: boolean;
+}
+
+/**
+ * The root pill's position for the WHOLE life of a message (38.10 D-151): the
+ * D-143 layout for the FABs showing now, lifted so its bottom edge is never
+ * below `SNACKBAR_FAB_GAP` above any FAB row that may appear on this screen
+ * while it is up. The pill then never hops when the section button morphs in
+ * or out, or when the keyboard closes and the + comes back, and never sits
+ * over a FAB that shows.
+ *
+ * The rows that may appear (the same baselines as `snackbarLayout`):
+ * - the universal + row, `tabBarHeight + FAB_EDGE_GAP`, on any non-focused
+ *   route. A section FAB there shares its baseline (D-149).
+ * - on a focused route (no tab bar, no +), the section FAB row,
+ *   `insetBottom + FAB_EDGE_GAP`, when the screen has one.
+ *
+ * Width is the live D-143 width: full width when a FAB shows now, else
+ * centred and content-sized. Either way the lifted pill clears every row. An
+ * overlay host is unchanged (no FAB there, D-51). PURE.
+ */
+export function heldSnackbarLayout(
+  input: SnackbarScreenContext & {
+    universalFab: boolean;
+    sectionFab: boolean;
+  },
+): SnackbarLayout {
+  const live = snackbarLayout(input);
+  if (input.host !== ROOT_SNACKBAR_HOST) return live;
+  if (!input.universalFabMayShow && !input.sectionFabMayShow) return live;
+  // The highest row that may appear: the + row on a non-focused route (where
+  // a section FAB shares it), else the focused route's section FAB row.
+  const highestRow = snackbarLayout({
+    ...input,
+    universalFab: input.universalFabMayShow,
+    sectionFab: true,
+  });
+  return {
+    ...live,
+    paddingBottom: Math.max(live.paddingBottom, highestRow.paddingBottom),
+  };
+}
+
+/** A root pill layout held for one message on one screen (D-151). */
+export interface SnackbarLayoutLatch {
+  /** The snackbar message it was computed for (compared by identity). */
+  message: object;
+  /** The screen it was computed on (`snackbarScreenKey`). */
+  screenKey: string;
+  layout: SnackbarLayout;
+}
+
+/**
+ * The screen facts a held layout depends on. FAB PRESENCE is deliberately not
+ * part of it: the section button morphing in or out, or the + hiding for the
+ * keyboard, must not move the pill (D-151). PURE.
+ */
+export function snackbarScreenKey(context: SnackbarScreenContext): string {
+  return [
+    context.host,
+    context.windowWidth,
+    context.tabBarHeight,
+    context.insetBottom,
+    context.universalFabMayShow ? "plus" : "no-plus",
+    context.sectionFabMayShow ? "section" : "no-section",
+  ].join("|");
+}
+
+/**
+ * Hold the root pill's layout for a message (38.10 D-151). The previous latch
+ * is kept while the message and the screen are the same, whatever the FABs do
+ * meanwhile; a new or replacing message is laid out afresh. So is a message
+ * that outlives its screen (Save then Back): the next screen has different
+ * buttons, and holding the old place could put the pill over the + there.
+ * PURE.
+ */
+export function latchSnackbarLayout(
+  previous: SnackbarLayoutLatch | null,
+  message: object,
+  input: SnackbarScreenContext & {
+    universalFab: boolean;
+    sectionFab: boolean;
+  },
+): SnackbarLayoutLatch {
+  const screenKey = snackbarScreenKey(input);
+  if (
+    previous !== null &&
+    previous.message === message &&
+    previous.screenKey === screenKey
+  ) {
+    return previous;
+  }
+  return { message, screenKey, layout: heldSnackbarLayout(input) };
+}
+
 /**
  * The pill's side padding (O5, D-132). The label starts `SPACING.base` from
  * the left edge; with no action the same padding closes the right side so the

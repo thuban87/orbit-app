@@ -20,7 +20,9 @@
  *   a save from the screen above) snaps too: duration 0, never a timing on a
  *   hidden screen (review WR-02). Reduced motion snaps it (duration 0).
  * - Presence (D-132): while the FAB is SHOWN on a focused screen it registers
- *   in `section-fab-store`, which the root snackbar reads (plan 23).
+ *   in `section-fab-store`, which the root snackbar reads (plan 23). While it
+ *   is mounted on a focused screen it also registers as AVAILABLE, so the
+ *   root snackbar holds a position clear of it before it appears (D-151).
  * - Look: the universal FAB's (accent fill, `onAccent` glyphs and ring). No
  *   Android elevation on this layer: it animates opacity, and elevation on a
  *   translucent layer paints an opaque inner rect (owner memory).
@@ -101,6 +103,8 @@ export interface SectionAddMorph {
   fabShown: boolean;
   /** The route is a focused workflow (tab bar hidden; the root reaches the window's bottom). */
   focusedRoute: boolean;
+  /** The screen is focused (`useIsFocused`). */
+  isFocused: boolean;
   scrollHandler: ReturnType<typeof useAnimatedScrollHandler>;
   onBarLayout: (event: LayoutChangeEvent) => void;
   onViewportLayout: (event: LayoutChangeEvent) => void;
@@ -259,6 +263,7 @@ export function useSectionAddMorph({
     root,
     fabShown,
     focusedRoute,
+    isFocused,
     scrollHandler,
     onBarLayout,
     onViewportLayout,
@@ -300,6 +305,19 @@ export function SectionAddFab({
 }: SectionAddFabProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const availableId = useId();
+  // D-151 availability: while this screen is focused and the FAB can show, the
+  // root snackbar must sit clear of it even before the scroll morph brings it
+  // up, so it never has to hop. Hosts render this component only when the page
+  // can add, and a null icon (Imported) renders nothing, so it never registers.
+  const available = morph.isFocused && icon !== null;
+  useEffect(() => {
+    if (!available) return;
+    const { registerAvailable, unregisterAvailable } =
+      useSectionFabStore.getState();
+    registerAvailable(availableId);
+    return () => unregisterAvailable(availableId);
+  }, [available, availableId]);
   const fabBottom = sectionFabBottomOffset({
     focused: morph.focusedRoute,
     insetBottom: insets.bottom,

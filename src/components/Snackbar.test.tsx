@@ -44,15 +44,18 @@ describe("Snackbar root geometry (38.10 D-132, D-143; O2, O5)", () => {
     "utf8",
   );
 
-  it("sizes and places the root pill above the FABs that show (D-143)", () => {
-    expect(source).toContain("snackbarLayout(");
+  it("sizes and places the root pill above the FABs that show (D-143), held per message (D-151)", () => {
+    expect(source).toContain("latchSnackbarLayout(latchRef.current, snackbar,");
+    expect(source).toContain("selectSectionFabAvailable");
+    expect(source).toContain("isFocusedWorkflow(");
     expect(source).toContain("selectSectionFabPresent");
     expect(source).toContain('s.rects["shell-fab"] !== undefined');
     expect(source).toContain("useWindowDimensions()");
+    expect(source).toContain("const layout = latch.layout;");
     expect(source).toContain("alignItems: layout.alignItems");
     expect(source).toContain("width: layout.width");
     expect(source).toContain("paddingBottom: layout.paddingBottom");
-    expect(source).toContain("useMeasuredTabBarHeight()");
+    expect(source).toContain("useShownTabBarHeight()");
     expect(source).toContain("insetBottom: insets.bottom");
   });
 

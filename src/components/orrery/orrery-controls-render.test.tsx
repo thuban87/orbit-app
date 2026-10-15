@@ -119,13 +119,23 @@ vi.mock("@/stores/shell-obstacle-store", async (original) => ({
 vi.mock("@/stores/section-fab-store", async (original) => ({
   ...(await original<typeof import("@/stores/section-fab-store")>()),
   useSectionFabStore: (
-    selector: (s: { owners: ReadonlySet<string> }) => unknown,
-  ) => selector({ owners: new Set<string>() }),
+    selector: (s: {
+      owners: ReadonlySet<string>;
+      available: ReadonlySet<string>;
+    }) => unknown,
+  ) => selector({ owners: new Set<string>(), available: new Set<string>() }),
+}));
+// ...holds its place per message on the focused route (38.10 D-151).
+vi.mock("@/stores/focused-route-store", () => ({
+  useFocusedRouteStore: (
+    selector: (s: { routeName: string | undefined }) => unknown,
+  ) => selector({ routeName: undefined }),
 }));
 // ...and sits above the FAB row, off the tab bar's height (38.10 D-143).
 vi.mock("@/stores/tab-bar-layout-store", async (original) => ({
   ...(await original<typeof import("@/stores/tab-bar-layout-store")>()),
   useMeasuredTabBarHeight: () => 0,
+  useShownTabBarHeight: () => 0,
 }));
 vi.mock("@/db/database", () => ({ getExecutor: () => ({}) }));
 vi.mock("@/stores/orrery-preferences-store", () => ({
