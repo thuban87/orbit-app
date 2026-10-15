@@ -1,7 +1,7 @@
 # Contact Knowledge
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-10-13
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
@@ -98,7 +98,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 
 ### Creating and maintaining a Memory
 
-1. `MemoryEditor` keeps draft form state and returns a typed input to its parent; it has no DAO access.
+1. `MemoryEditor` keeps draft form state and returns a typed input to its parent; it has no DAO access. It reports `{open, dirty}` to its host, so Back, Cancel and a section fold prompt "Discard changes?" only for typed text, and a save closes without a prompt (ADR-200). The meaningful date is a native date-picker row with Clear: it is optional, always a full date, has no range limit, and is stored as `YYYY-MM-DD` through `formatLocalDate()`. Memory cards and the Profile memory line show it with the date-only display formatter; an older free-text value shows as written, marked "Not a date", until the user picks or clears (ADR-205).
 2. `addMemory` or `editMemory` validates the registry key and requires a label for `custom`; optional blank metadata normalizes to NULL.
 3. The writer runs inside the shared write transaction, scopes edits to both row and owning contact, and bumps the portable data revision.
 4. Live reads return only rows with `deleted_at IS NULL`, ordered pinned first, then meaningful date, creation time, and ID.
@@ -179,6 +179,9 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-168:** Truthful Read Phases for Import, Review, and Settings Screens — gives MemoryScreen loading and "Couldn't load memories" states and never opens an editor over a failed read.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
+- **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — Memory and key-person drafts guard Back, Cancel and section folds.
+- **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — the meaningful date is picked and stored as `YYYY-MM-DD`; legacy free text stays and is flagged.
+
 ## Gotchas
 
 1. **Profile presentation does not change source semantics.** The coherent Profile snapshot may cap, group, or hide a card, but edits and durable visibility stay with the owning Memory, relationship, current-state, custom-field, or fuel workflow.
@@ -228,4 +231,5 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-23 | 38.2 | Made imported-note creation explicitly AI-off and recovery-safe, and advanced complete-edit knowledge baselines from committed identities. |
 | 2026-09-25 | 38.3 | Memory screen read-error state; editor never opens over a failed read (RG-035): loading, then the editor over successfully read Memories or "Couldn't load memories" with Retry; a failed re-read after a committed restore/delete/AI-permission write shows the read error without undoing or retrying the write. |
 | 2026-09-23 | 38.4 | Memory hosts (`MemoryScreen`, `ThingsToRememberScreen`, `EditContactScreen`, `PostLogNoteEditor`) decide AI availability with `isAiMasterEnabled` (RG-008, D-17; ADR-135); `MemoryEditor` switches are named and themed and its kind picker announces its value (RG-030). The post-log Edit Memory form scrolls at large text and opens the edited memory's form by default (D-72, D-73 b; ADR-174). |
+| 2026-10-11 | 38.9 | A Memory's meaningful date is a native date picker stored as `YYYY-MM-DD` and shown with the date-only formatter (older free text flagged "Not a date"); Memory and key-person drafts are guarded on Back, Cancel and fold (ADR-200, ADR-205). |
 | 2026-10-13 | 38.10 | Code review IN-06: removed the test-only exports `setMemoryAllowAi`, `setCurrentStateValue`, `KNOWLEDGE_GROUP_ORDER` and `getFirstClassDerived`; tests use the live cores. |
