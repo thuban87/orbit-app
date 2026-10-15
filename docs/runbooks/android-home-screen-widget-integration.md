@@ -4,7 +4,7 @@
 
 Use this process when adding or materially changing Orbit's Android home-screen widget. It keeps widget data local, renders RemoteViews from bounded inputs, routes headless writes through existing DAOs, and verifies native configuration on the physical Pixel instead of treating Metro reload as a native test.
 
-## Architecture (Phases 12 and 38.2)
+## Architecture (Phases 12, 38.2 and 38.6)
 
 The registered widget is `OrbitFavourites`. `react-native-android-widget` invokes the module-scope task handler for lifecycle events and clicks; the handler renders an off-screen bitmap or commits a narrowly validated action. Phase 38.2 patches the dependency so light and dark bitmaps are delivered inline with `RemoteViews.setImageViewBitmap`; the library's unauthenticated `RNWidgetImageProvider` is absent from the merged app manifest. The widget has no SQLite table or per-instance configuration: it reads the existing favourites projection in Dashboard Default order.
 
@@ -60,7 +60,7 @@ const widgetPlugin: [string, WithAndroidWidgetsParams] = [
    });
    ```
 
-   Return `null` for a missing/empty payload or encoder error. Never give RemoteViews a `file://` or `http(s)` image source. Keep both light and dark outputs on the patched inline-bitmap path; do not restore provider-backed image URIs.
+   Encode tiles one at a time through `encodeTileThumbs(tiles)`; never use `Promise.all`. Release each rendered `ImageRef` in a `finally`. Return `null` for a missing/empty payload or encoder error. Never give RemoteViews a `file://` or `http(s)` image source. Keep both light and dark outputs on the patched inline-bitmap path; do not restore provider-backed image URIs.
 
 3. **Add a widget action** in `src/services/widget/widget-render.tsx` and route it in `src/services/widget/widget-task-handler.tsx`. Validate all click data before SQLite. A write must call an existing DAO boundary; it must not write `last_contact` directly or run foreground sweep work.
 
@@ -96,6 +96,7 @@ const widgetPlugin: [string, WithAndroidWidgetsParams] = [
 5. **Capacity is device-tunable.** Validate thumbnail size, tile counts, and layout breakpoints on the physical Pixel; an emulator cannot close this performance proof.
 6. **Provider absence is a release artifact property.** Source manifests and patch contents are insufficient evidence; inspect both built APK manifests after clean prebuild, and treat a provider match as a failed security gate.
 7. **Binder pressure does not authorize a silent fallback.** If the largest inline bitmap layout fails, stop and present the owner with the content-reduction versus trusted-host-grant tradeoff.
+8. **Masters are no longer uniform 512 JPEG (38.6, ADR-181).** A source can be a 1024 WebP stored under a `.jpg` name. Decode by content, keep the 88 px output, and keep encodes sequential with each manipulator ref released, or peak decode memory scales with the tile count. A photo value that fails `isStoredPhotoPath` (text left in a photo field) must render initials, never reach the encoder.
 
 ## Smoke Test
 
