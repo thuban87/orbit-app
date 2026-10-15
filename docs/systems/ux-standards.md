@@ -1,7 +1,7 @@
 # UX Standards
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/stores/confirm-store.ts`, `src/components/ui/DialogHost.tsx`, `src/stores/overlay-registry-store.ts`, `src/components/ui/RegisteredModal.tsx`, `src/navigation/discard-keep-guard.ts`, `src/components/ShellAppBar.tsx`, `src/navigation/tab-history.ts`, `src/stores/snackbar-store.ts`, `src/components/ui/` (OrbitSwitch, OptionSheet, FieldError, EmptyState, chip-tone), `src/utils/dates.ts`, `src/utils/plural.ts`
 
 ## Purpose
@@ -60,11 +60,12 @@ a hard delete with explicit confirmation (there is no interaction Trash); Unbind
 Under the rule, **Archive, Restore and Bind act at once** with a snackbar naming the person and
 Undo; **Unbind keeps its confirm** (D-32). 38.11 and 38.12 wire this on their screens.
 
-Holding zones are what make an action reversible today; no new recoverable-delete storage exists
-(D-31): Archived contacts; memories in Recently Deleted for 30 days (ADR-089); key people
-soft-deleted for snackbar Undo only; custom fields with values in Quarantine for 30 days.
-Deleting an interaction, Off Limits item, photo, System or background template is permanent and
-therefore confirmed.
+What makes an action reversible: Archived contacts; custom fields with values in Quarantine for
+30 days; and, since 38.10, the snackbar Undo window for every Things to Remember item (memories of
+every type, key people, Off Limits, Last Talked About and Current Location entries), which delete
+at once with Undo and then permanently (ADR-212; Recently Deleted and 38.9 D-31's holding zones are
+gone). On Add and Edit Contact a Things to Remember delete is held until Save (D-104). Deleting an
+interaction, photo, System or background template is permanent and therefore confirmed.
 
 ## Feedback
 
@@ -86,15 +87,40 @@ Behaviour:
   navigation bar, without the tab-bar and + clearance the root snackbar keeps, and may briefly
   cover a sheet's bottom buttons (D-51). `RegisteredModal` provides the in-window host.
 - Validation errors inside a sheet render inline under the field, not as a snackbar (D-40, D-19).
-- An **error** snackbar (`kind: "error"`) looks distinct from a success one: a `danger` outline
-  and a warning glyph, announced assertively to TalkBack (`accessibilityRole="alert"`). Success
-  keeps the neutral `border` outline and a polite announcement (D-72;
-  `snackbarPresentation()` in `src/components/snackbar-host.ts`).
+- Two looks (38.10 D-132, D-140; ADR-221; `snackbarPresentation()` in
+  `src/components/snackbar-host.ts`): a **notice** (`kind: "success"`), accent fill with `onAccent`
+  text, announced politely; and a **warning** (`kind: "warning"` for destructive results such as
+  deletes and removals, and `kind: "error"` for failures), an inverted `textPrimary` pill with
+  background-coloured text and glyph, AA in every palette. Errors keep `accessibilityRole="alert"`
+  and an assertive announcement (D-72).
+- A **root** snackbar sits full width just above the round buttons, whether only the universal +
+  or also a section Add button shows, with taller padding (D-143). It keeps the position it appeared
+  at for its whole life (D-151) and passes touches through while the + dial is open (gap review
+  CR-01). Overlay hosts keep their placement but share the padding (accepted, D-155).
 
 **Snackbar or notice** (D-27): an error or info message where the user can carry on is an error
 snackbar; one where the user is blocked is a themed one-button **notice**. Every decision is a
 themed confirm. No production `Alert.alert` remains except the snooze Alert in `HomeScreen.tsx`,
 which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces this.
+
+## Entry fields, section pages and keyboard (38.10)
+
+- **Shared entry field (D-66, ADR-220):** `EntryTextField` wraps to about three lines then scrolls,
+  shows Save/Send on the keyboard and saves on Enter, keeps a visible Save, and turns newly typed or
+  pasted line breaks into spaces while keeping stored ones (D-129). On Add/Edit Contact and the
+  section editors it is centred in the height left above the keyboard (`useKeyboardCentering`,
+  `KeyboardCenteringProvider`); Update Contact's editors use it without centring (D-114). It blurs
+  before `onSubmit`, so a closing form never leaves the keyboard up over Save (plan 19 F3). The
+  app-wide rollout is Phase 40's.
+- **Card edit mode (D-130):** on the section pages each card has a pencil; tapping it or the card
+  opens that card's form in place with Move and a red Delete; other cards and the Add are held and
+  dimmed while a form is open, and the empty-state text hides (D-144, D-145). `card-edit-slots.ts`
+  decides where the form renders.
+- **Section Add button (D-131):** the Add sits at the top; scrolled out of view it morphs into a
+  second round button at the bottom left with the page's icon and a small +, driven on the UI thread
+  (`useSectionAddMorph`, `SectionAddFab`) and snapped, never animated, while blurred or backgrounded.
+  `section-fab-store` reports its presence to snackbar placement; pages using it end with
+  `useSectionFabClearance()`.
 
 ## Dialogs
 
@@ -280,7 +306,11 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 - **ADR-175:** header-only Back and the shared header.
 - **ADR-173:** + visibility and end-of-scroll bottom clearance.
 - **ADR-109:** the Profile keeps its own top bar.
-- **ADR-089:** Recently Deleted holds memories for 30 days.
+- **ADR-089:** merge and purge integrity for knowledge (its Recently Deleted half is superseded by ADR-212).
+- **ADR-212:** One Delete Pattern for Things to Remember — at once with Undo, then permanent; held on the contact forms (partly supersedes ADR-199).
+- **ADR-219:** Per-Section Editors — card edit mode and the section Add button.
+- **ADR-220:** Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field.
+- **ADR-221:** Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place (partly supersedes ADR-198).
 - **ADR-001:** custom-field values stay raw TEXT; format only at render.
 
 ## Gotchas
@@ -293,6 +323,9 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
    `testID` or key fails the display-date contract (D-23).
 3. **Undo is per area.** The rules say which actions get Undo; only the area phase that owns a
    screen wires it (D-01, D-10). Do not add Undo to another area's screen in passing.
+5. **Worklets are defined above their callers.** The section-button morph runs worklets on the UI
+   thread; a worklet calling one defined later in the same file is undefined on device under Hermes
+   and vitest cannot catch it.
 4. **Header conversions move contract lists.** Changing a screen's header without updating
    `settings-chrome-contract.test.ts` breaks the single-Back contract (D-07).
 
@@ -316,3 +349,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-11 | 38.9 | Save Writing Style drawn disabled during a section save (115dfa83). |
 | 2026-10-11 | 38.9 | Third fix pass: a held non-Back removal is parked and re-dispatched by `settleHold()` (WR-01, C6-H1); list controls that swap or race the saving draft are held (WR-02); host-accepted Delete / Allow AI and a busy-held `requestClose` (IN-01); post-commit re-reads kept apart from write errors (IN-02). |
 | 2026-10-11 | 38.9 | KB extraction: Decisions cite ADR-198..ADR-206 and ADR-144's partial supersession. |
+| 2026-10-15 | 38.10 | One delete-with-Undo pattern for Things to Remember replaces the holding zones; two snackbar looks (notice and warning, errors included), full-width root placement held in place; shared entry field with keyboard centring; card edit mode and the morphing section Add button (ADR-212, ADR-219..221). |
