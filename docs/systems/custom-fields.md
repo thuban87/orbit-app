@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -125,6 +125,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 2. Crop success crosses back through a serializable request id; the widget stages the resulting local file and writes its relative path into the edit form value.
 3. The pair-keyed UPSERT persists that `TEXT` path on form save. A teardown reconciliation removes staged files not referenced by committed values.
 4. The create form and definition preview have no stable contact id, so custom photo input remains disabled there.
+5. A photo-field value that is not a stored photo path (`isStoredPhotoPath`), such as text kept after a Text→Photo type change, is never resolved as an image. The widget shows initials plus "Photo unavailable" with Change/Remove, and the Profile does not claim "Photo added". The text stays in the data and round-trips through backup as text (ADR-182).
 
 ### Quarantining and permanently removing a field
 
@@ -170,6 +171,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-132:** Focused Rapid Capture Workflows — exposes applicable named fields and the generic Custom Fields path from Update Contact without duplicating definitions.
 - **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
 
+- **ADR-182:** Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos — text in a photo field shows "Photo unavailable" and is backed up as text.
+
 ## Gotchas
 
 1. **Profile grouping is presentation only.** It formats all ten field types and exposes retained history without flattening `field_group`, changing raw TEXT, or introducing another layout nesting level.
@@ -191,6 +194,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 15. **Rapid capture edits values, never definitions.** Update Contact may surface a field by label, but Settings remains the sole definition-editor and slugifier producer.
 16. **Definition sharing expands across its values.** The permission manager presents contact/value review rows but a custom-field enable changes the owning definition's `share_with_ai` state; its impact confirmation must show that fan-out.
 17. **Restore completion is narrow, not repair.** After committing restored definitions, deterministically create only missing `(contact_id, field_def_id)` rows with `NULL` values; do not rewrite existing raw TEXT, infer values, or introduce a migration for legacy cleanup.
+18. **Text in a photo field must never reach an image resolver.** After a Text→Photo change, the raw TEXT stays, which is "type changes never destroy data". Gate every resolver with `isStoredPhotoPath`. Before 38.6, the value crashed Edit Contact and the Profile said "Photo added".
 
 ## Related Systems
 
@@ -218,3 +222,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-09-02 | 36 | Added new-definition AI sharing defaults and contact/value-scoped permission review for field definitions. |
 | 2026-09-23 | 38.2 | Routed rapid and full user edits through one custom-value core so retained prior values and pair identity behave alike; rapid unchanged saves do not write. |
 | 2026-09-23 | 38.4 | The Custom fields create/edit form (`FieldDefForm`) takes a required `bottomClearance` so its last field scrolls clear of the FAB (D-52, OA-E3; ADR-173). |
+| 2026-09-30 | 38.6 | A photo-field value that is not a stored photo path renders as "Photo unavailable" instead of reaching the resolver, and backs up and restores as text (ADR-182, D-31/D-34). |
