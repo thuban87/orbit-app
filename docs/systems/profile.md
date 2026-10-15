@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -74,7 +74,7 @@ Hero Message is decided by `profileHeroActionState(methods, { archived, settings
 
 Message is always rendered — disabled with its reason caption, never hidden. Lifecycle is not an input: a live Unbound contact outside Settings can still open Compose. Call keeps its phone-only rule in every host, and the Contact Methods row's native SMS handoff stays enabled for archived contacts (D-27).
 
-The host is explicit, not inferred from navigation state: `SettingsStack` registers `Profile` through `SettingsProfileHostRoute`, which renders `ContactProfileScreen` with `host="settings"` (the same pattern as the Backup host wrappers). Compose and ComposeResearch are **never registered under Settings** and there is no cross-tab jump to message; `SETTINGS_HOST_EXCLUDED_PROFILE_ROUTES` in `src/navigation/shell-contract.ts` names them, and `settings-routes.test.ts` fails if either is registered. Every other route in `PROFILE_REACHABLE_ROUTES` (including `RecentlyDeleted`) must be registered wherever Profile is hosted.
+The host is explicit, not inferred from navigation state: `SettingsStack` registers `Profile` through `SettingsProfileHostRoute`, which renders `ContactProfileScreen` with `host="settings"` (the same pattern as the Backup host wrappers). Compose and ComposeResearch are **never registered under Settings** and there is no cross-tab jump to message; `SETTINGS_HOST_EXCLUDED_PROFILE_ROUTES` in `src/navigation/shell-contract.ts` names them, and `settings-routes.test.ts` fails if either is registered. Every other route in `PROFILE_REACHABLE_ROUTES` (including the per-section editors `SectionEditor`, `OffLimitsEditor`, `KeyPeopleEditor` and `MemoryHistory`) must be registered wherever Profile is hosted.
 
 The controller never creates a second Profile data writer. Favorite, archive, lifecycle, frequency, and Snooze route through their existing public DAOs/services; after a successful write it reloads the coherent local snapshot. User-triggered call/message/email handoffs use the established interaction-assist service. No read depends on network access.
 
@@ -82,9 +82,20 @@ The controller never creates a second Profile data writer. Favorite, archive, li
 
 The module registry owns persisted semantic IDs, not component names. Relationship Overview auto-packs the six supported facts while preserving source order and text reflow. Every nullable cadence consumer is guarded: an Unbound contact is `Not tracked`; Intensity uses the shared current-calendar-month fallback rather than inventing a cadence. Status, Gravity, and Intensity are derived read models, never stored Profile scores.
 
-Things to Remember is a one-column, source-owned presentation. Its cards emit owner targets for Memory, relationships, current state, normalized custom fields/history, and fuel; Profile does not reinterpret or directly mutate them. Ordinary Off Limits stays local caution content with no sparkle and no inferred permission. There is no Profile AI-draft entry: Compose remains the sole AI-suggestion invocation surface under ADR-079.
+Things to Remember is a one-column, source-owned presentation. Its cards emit owner targets for memories, relationships, current state, Off Limits and normalized custom fields; Profile does not reinterpret them, and its only direct write is Pin/Unpin through the owning writers. Off Limits stays local caution content: fully shown, starting open (it can still be folded, D-127), no sparkle and no inferred permission. There is no Profile AI-draft entry: Compose remains the sole AI-suggestion invocation surface under ADR-079.
 
-Section headings identify their section only. Module bodies own values, empty states, and distinct subsections, so nested renderers never repeat a parent heading or place inferred state beside it. Temporal current-state knowledge renders one Most Recent item and at most five non-current Previous items; full history remains in Memory History. Heading actions open source-owned editors: existing Edit Contact for relationships/custom fields and the scoped Off Limits editor for fuel. Its controller filters reads, forces `off_limits` writes, validates delete IDs against the filtered collection, and reloads controlled items after successful mutations.
+Section headings identify their section only. Module bodies own values, empty states, and distinct subsections, so nested renderers never repeat a parent heading or place inferred state beside it. Temporal current-state knowledge renders the newest-dated entry as Most Recent and at most five Previous items, then "See all (N)" to the history page (ADR-210).
+
+### Things to Remember sections (38.10)
+
+- **Order (D-44):** Pinned, Last Talked About, Key People, Current Location, Memories, Thought of Them, Gift Ideas, Custom Fields, Off Limits, Imported from Contacts App. `thought-of-them` and `gift-ideas` are module ids in `module-registry.ts`; `completeThingsToRememberChildren` inserts any missing child at its factory position at read time (resolve-presentation and the layout editor draft), never writing the saved layout back.
+- **Heading action (D-72):** one per section with entries, from the static `headingActionFor(id)` table: Add for Last Talked About, Thought of Them, Gift Ideas and Memories; a pencil for Current Location, Key People, Off Limits, Custom Fields and Imported; none for Pinned. `childHasEntries` decides emptiness from visible entries.
+- **Empty section (D-68):** "Nothing added yet" and an "Add …" action to that section's add form.
+- **Destinations** (`contact-profile-logic.ts`): separate tables per affordance (heading, empty Add, See all, item Edit) through one `knowledgeNavigateParams` step. Pencils open the section's own editor (`SectionEditor`, `KeyPeopleEditor`, `OffLimitsEditor`, `MemoryHistory`) or Edit Contact for Custom Fields; nothing routes to the retired Things to Remember screen (ADR-219).
+- **Entries:** a memory card's title is its label, else the type's registry name. Tapping an unlinked entry opens its sheet (Edit, Pin, Unpin, Close; a link shows its URL with Open, D-24, D-87); tapping an entry linked to an interaction opens that interaction, with Edit/Pin/Unpin on long-press and the screen-reader actions (D-107). An empty always-show custom field reads "Not set".
+- **Pinned (D-112, D-133):** every pinned memory and key person, no cap, no View all; pinned items also stay in their own section and carry a pushpin icon. Sections show their newest entries ignoring pins: a meaningful date first by that date, then newest added (D-148, D-152).
+- **Counts** use `plural(n, "item")`.
+- **Hide from Profile** is switched off (`HIDE_FROM_PROFILE_ENABLED = false`, D-134): no Hide controls, and every item shows whatever its stored flag (ADR-218).
 
 Unbind remains a confirmed lifecycle action for Bound contacts but lives in the Profile overflow; the meaningful Bind experience remains visible for Unbound contacts. Relationship Overview retains the existing compact/wide preference, then derives only a visual full-row span for compact row orphans. It preserves configured order and semantic size while centering every tile's content.
 
@@ -157,7 +168,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-197:** History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load — `HistorySection` is keyed by contact, and the collapsed-History reveal settles after History's loaded content lays out.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — Profile supplies the origin-aware Message entry into session-only Compose.
 - **ADR-138:** Complete Portable Backup Format v5 — carries the complete Profile presentation graph and staged background bytes by durable parent UID.
-- **ADR-150:** Semantic Profile Hierarchy and Source-Owned Knowledge Editing — assigns heading/body ownership, bounded temporal preview, source-owned edit routes, and overflow Unbind placement.
+- **ADR-150:** Semantic Profile Hierarchy and Source-Owned Knowledge Editing — assigns heading/body ownership, bounded temporal preview and overflow Unbind placement; its heading-action routes and scoped FuelEditor are superseded by ADR-218 and ADR-219.
 - **ADR-151:** Visual-Only Relationship Overview Orphan Packing — fills row-local compact gaps without changing persisted layout semantics.
 - **ADR-165:** In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History — turns History actions into an in-Profile reveal, adds today-following rollover, and settles only the retried relationship selector.
 - **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — disables hero Message for archived contacts and Settings-hosted Profiles, and aligns Settings-hosted child routes.
@@ -169,6 +180,12 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-198:** Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays — Profile prompts are themed confirms; manager sheets register as open overlays.
 - **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — the layout, template and background managers share the "Discard changes?" prompt.
 - **ADR-201:** Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen — the Profile is the exception that keeps its own top bar.
+- **ADR-207:** Knowledge Homes After Fuel — the Profile reads Off Limits from its own table and shows Gift Ideas and Thought of Them as sections.
+- **ADR-210:** Dated Last Talked About and Current Location — newest date is Most Recent; See all (N).
+- **ADR-211:** Linked Interaction Notes — a linked entry opens its interaction.
+- **ADR-218:** Things to Remember on the Profile — order, heading actions, empty Add, Pin, Pinned in both places, Hide switched off (partly supersedes ADR-150).
+- **ADR-219:** Per-Section Editors — every pencil opens its section's own editor.
+- **ADR-221:** Two Snackbar Looks — Pin and Undo snackbars.
 - **ADR-203:** One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection — the layout editor's module switches.
 
 ## Gotchas
@@ -177,7 +194,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 2. **Hero is fixed.** Layout documents may reorder only the semantic body, never avatar, identity, Favorite, Message, Call, or overflow.
 3. **Keep axes independent.** A layout write at Category/global scope must preserve the existing background UID and vice versa.
 4. **Never materialize inheritance.** Missing references diagnose and fall through; Category changes must not copy effective presentation into contact rows.
-5. **No AI inference.** Hidden-from-Profile and Off Limits do not imply privacy, deletion, AI exclusion, or permission.
+5. **No AI inference.** Hidden-from-Profile and Off Limits do not imply privacy, deletion or permission; Off Limits is kept from AI by having no permission column, not by its Profile placement.
 6. **No literal migration number.** Refer to `profilePresentationMigration` and `PROFILE_PRESENTATION_SCHEMA_VERSION`; the ordered registry is authoritative.
 7. **Keep presentation backup atomic.** A v5 change must preserve the settings, templates, parent-keyed assignments, and background bytes together; never add an emitter without its restore writer.
 8. **Resolve before choosing the background host input.** Contact-only checks skip Category and global assignments; pass the fully resolved app-owned URI or `null` for the System fallback.
@@ -186,7 +203,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 11. **Presentation backup is not a path backup.** Restore must use embedded background bytes and UID-keyed staging; source-device image paths never cross the portable boundary.
 12. **Keep Settings global-only.** A Settings default must not become a shortcut to a contact-specific layout or background manager.
 13. **Do not turn heading metadata into content state.** Normal headings have no duplicated values or inferred empty caption; render meaningful state in the semantic body.
-14. **Scoped Off Limits writes stay scoped.** Filtering UI items is insufficient: force the kind and validate deletions at the controller/DAO boundary, then reload the controlled collection.
+14. **Scoped Off Limits writes stay scoped.** The Off Limits editor controller re-reads the contact's rows before every edit, delete and Undo and refuses another contact's id or snapshot (D-11); filtering UI items is not enough.
 15. **Orphan span is not layout persistence.** The computed stretch must not rewrite the compact/wide preference or reorder modules.
 16. **Do not make Message work in Settings by registering Compose there.** Settings-hosted Profiles disable Message by ruling (D-09, D-25, RG-021); registering Compose/ComposeResearch under Settings or adding a cross-tab jump reverses those rulings and is an owner decision.
 17. **History actions never navigate.** Last Interaction and Status → View history reveal the in-Profile History section (D-10). Routing them to Things to Remember, a new History route, or a timeline screen contradicts D-10 and ADR-123. When the layout hides History, omit the actions; never reveal History temporarily or edit the layout (D-11).
@@ -233,3 +250,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-10-09 | 38.8 | Collapsed-History reveal fixed (D-72, G1, gap plan 07): an expanding reveal settles with a second scroll once History's loaded content lays out (`83203b0b`); the Year heatmap and the no-cadence Cycles explanation now report their first layout so the settle also fires there (`9bcb48b7`). Device re-check 11/11 on DEBUG (`ea983264`). This closes the open device-pass item in the row above. The host's History scroll requests take a lead-in so the empty-day note scrolls only just into view (D-73). |
 | 2026-10-09 | 38.8 | KB extraction: Decisions cite ADR-193, ADR-194 and ADR-197, and note ADR-123's partial supersession. |
 | 2026-10-11 | 38.9 | The Profile managers' discard prompts use the shared themed "Discard changes?"; Profile Alerts became themed confirms; the layout editor's switches are `OrbitSwitch`; the Profile stays outside the shared child header (ADR-198, ADR-200, ADR-201, ADR-203). |
+| 2026-10-15 | 38.10 | Things to Remember: Gift Ideas and Thought of Them sections in the D-44 order (saved layouts completed at read time), one heading action per section, empty-section Add, Pin/Unpin from the Profile, Pinned uncapped and also in its section with a pushpin, newest-first sections, linked entries open their interaction, entry sheet Edit/Pin/Unpin/Close, Off Limits from its own table and starting open, "Not set", Hide from Profile switched off; every pencil opens a per-section editor (ADR-207, ADR-210, ADR-211, ADR-218, ADR-219). |
