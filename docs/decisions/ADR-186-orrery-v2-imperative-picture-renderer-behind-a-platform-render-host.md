@@ -88,4 +88,4 @@ We will draw the Orrery with a 2.5D Skia renderer, not true 3D (D-01). It stays 
 - `src/components/orrery/orrery-clock-context.ts` — deleted.
 
 **Depends on:** ADR-077 (Single Canonical Orrery with a Constrained Inspection Camera); ADR-085 (Live Reduced-Motion Signal for Skia Ambient Animation)
-**Required by:** ADR-189 (Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion); ADR-192 (Bounded Warm Resource Cache Across Tab Blur)
+**Required by:** ADR-189 (Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion); ADR-192 (Bounded Warm Resource Cache Across Tab Blur); ADR-191 (Star-Warp System Switch Starting on the Tap, with Lab C's Camera)

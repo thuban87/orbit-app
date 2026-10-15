@@ -71,4 +71,4 @@ This also records three supersessions outside the ADR set:
 - `src/components/orrery/use-orrery-camera.ts` — gesture builders over the pure logic.
 
 **Depends on:** ADR-046 (Query-Time Orrery Placement and Transactional Ring Ordering); ADR-077 (Single Canonical Orrery with a Constrained Inspection Camera)
-**Required by:** ADR-188 (Reticle Focus, Docked Card, Cluster Zoom-In, Tap-Only Focus, and Persistent-Chrome Framing)
+**Required by:** ADR-188 (Reticle Focus, Docked Card, Cluster Zoom-In, Tap-Only Focus, and Persistent-Chrome Framing); ADR-190 (Lit Status Bodies, Star Sun, Moon Bumps, Stack Pips, and Hermes-Safe Initials)
