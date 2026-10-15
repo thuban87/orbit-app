@@ -27,7 +27,7 @@
 // IMPORTANT: ADR-0015 [SUPERSEDED BY ADR-001 (partial)] Lossless Field Changes with Quarantine and Launch-Time Retention Sweep
 // NOTE: ADR-0016 [ACCEPTED] Fixed-First Contact Forms and Atomic Contact Creation
 // NOTE: ADR-0017 [ACCEPTED] Multi-Link Contact Reachability
-// IMPORTANT: ADR-0018 [SUPERSEDED BY ADR-080 (note — Archived list entry points only; gate unchanged)] Archive-Gated Contact Purge with Explicit Fan-Out
+// IMPORTANT: ADR-0018 [SUPERSEDED BY ADR-080 (note — Archived list entry points only; gate unchanged); ADR-217 (partial)] Archive-Gated Contact Purge with Explicit Fan-Out
 // IMPORTANT: ADR-0019 [SUPERSEDED BY ADR-080 (partial — root shell)] Native Stack Contact Lifecycle Navigation
 // NOTE: ADR-0020 [ACCEPTED] Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download
 // IMPORTANT: ADR-0021 [SUPERSEDED BY ADR-181 (partial)] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
@@ -37,17 +37,17 @@
 // NOTE: ADR-0025 [ACCEPTED] Immutable Lifecycle Events in a Unified Timeline
 // NOTE: ADR-0026 [ACCEPTED] Rogue Status for Unresponsive or Far-Overdue Contacts
 // IMPORTANT: ADR-0027 [SUPERSEDED BY ADR-106 (partial — Orrery Gravity display scope and companion context)] Derived Profile-Only Gravity and Intensity
-// NOTE: ADR-0028 [ACCEPTED] Per-Item Conversational Fuel with Fixed Kinds
-// IMPORTANT: ADR-0029 [SUPERSEDED BY ADR-039 (partial)] In-Query Fuel Eligibility and a Shared Ranked Projection
+// IMPORTANT: ADR-0028 [SUPERSEDED BY ADR-207] Per-Item Conversational Fuel with Fixed Kinds
+// IMPORTANT: ADR-0029 [SUPERSEDED BY ADR-039 (partial); ADR-207] In-Query Fuel Eligibility and a Shared Ranked Projection
 // IMPORTANT: ADR-0030 [SUPERSEDED BY ADR-081] Explicit Confirmation of AI-Proposed Fuel
-// IMPORTANT: ADR-0031 [SUPERSEDED BY ADR-032 (partial)] Bound Local Fuel Search without FTS5
-// NOTE: ADR-0032 [ACCEPTED] Flat Dashboard Discovery and In-Query Contact Search
+// IMPORTANT: ADR-0031 [SUPERSEDED BY ADR-032 (partial); ADR-215 (partial)] Bound Local Fuel Search without FTS5
+// IMPORTANT: ADR-0032 [SUPERSEDED BY ADR-215 (partial)] Flat Dashboard Discovery and In-Query Contact Search
 // IMPORTANT: ADR-0033 [SUPERSEDED BY ADR-075] Profile Marking and Shared Drag-Reordered Favourites
 // IMPORTANT: ADR-0034 [SUPERSEDED BY ADR-076 (partial — banner)] Birthday Banner and Re-query Dashboard Freshness
 // IMPORTANT: ADR-0035 [SUPERSEDED BY ADR-061 (partial)] Native SMS Handoff with Guaranteed Clipboard Copy
-// IMPORTANT: ADR-0036 [SUPERSEDED BY ADR-078 (partial — Off Limits visible on the Research side)] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
+// IMPORTANT: ADR-0036 [SUPERSEDED BY ADR-078 (partial — Off Limits visible on the Research side); ADR-214 (partial)] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
 // NOTE: ADR-0037 [ACCEPTED] Text-Only Android Share Intent Integration
-// NOTE: ADR-0038 [ACCEPTED] Contact-Owned Share Capture Fuel
+// IMPORTANT: ADR-0038 [SUPERSEDED BY ADR-216 (partial)] Contact-Owned Share Capture Fuel
 // NOTE: ADR-0039 [ACCEPTED] Pre-Scheduled Inexact Decay Reminders
 // NOTE: ADR-0040 [ACCEPTED] Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing
 // NOTE: ADR-0041 [ACCEPTED] Notification Settings, Privacy Channels, and Birthday Alerts
@@ -59,7 +59,7 @@
 // NOTE: ADR-0047 [ACCEPTED] App-Level Assignable Sun and Themed Self Identity
 // IMPORTANT: ADR-0048 [SUPERSEDED BY ADR-077 (partial — dual view/morph); ADR-189 (partial)] Status-Default Static Orrery with a Single-Canvas Morph
 // NOTE: ADR-0049 [ACCEPTED] BYO-Key AI Configuration and Credential Boundary
-// IMPORTANT: ADR-0050 [SUPERSEDED BY ADR-078 (partial — Off Limits and permitted interaction notes)] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
+// IMPORTANT: ADR-0050 [SUPERSEDED BY ADR-078 (partial — Off Limits and permitted interaction notes); ADR-214 (partial)] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
 // NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
 // IMPORTANT: ADR-0052 [SUPERSEDED BY ADR-079 (partial — acknowledgement and Profile entry)] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
@@ -97,8 +97,8 @@
 // NOTE: ADR-0085 [ACCEPTED] Live Reduced-Motion Signal for Skia Ambient Animation
 // NOTE: ADR-0086 [ACCEPTED] Semantic Icons and Accessible Interaction Primitives
 // IMPORTANT: ADR-0087 [SUPERSEDED BY ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation); ADR-177 (partial — one asset per slot used i
-// NOTE: ADR-0088 [ACCEPTED] Additive Contact-Knowledge Schema and Application-Owned Memory Registry
-// NOTE: ADR-0089 [ACCEPTED] Recoverable Memory Lifecycle and Contact-Operation Integrity
+// IMPORTANT: ADR-0088 [SUPERSEDED BY ADR-207 (partial); ADR-210 (partial)] Additive Contact-Knowledge Schema and Application-Owned Memory Registry
+// IMPORTANT: ADR-0089 [SUPERSEDED BY ADR-212 (partial)] Recoverable Memory Lifecycle and Contact-Operation Integrity
 // NOTE: ADR-0090 [ACCEPTED] Additive Custom-Field Value History and Deferred Contact Scope
 // NOTE: ADR-0091 [ACCEPTED] Imported Contact Notes as AI-Off Typed Memories
 // NOTE: ADR-0092 [ACCEPTED] Durable Shared Dashboard Query State
@@ -109,7 +109,7 @@
 // NOTE: ADR-0097 [ACCEPTED] Scoped Dashboard Search and Dedicated Unbound Retrieval
 // NOTE: ADR-0098 [ACCEPTED] Scan-First, Accessible Dashboard List Rows
 // NOTE: ADR-0099 [ACCEPTED] Durable Global Dashboard Right-Swipe Action
-// NOTE: ADR-0100 [ACCEPTED] Relevance-First, Visibility-Safe Dashboard List Search
+// IMPORTANT: ADR-0100 [SUPERSEDED BY ADR-215 (partial)] Relevance-First, Visibility-Safe Dashboard List Search
 // IMPORTANT: ADR-0101 [SUPERSEDED BY ADR-153 (partial — normal Grid card context row)] Avatar-First Accessible Dashboard Card Renderer
 // NOTE: ADR-0102 [ACCEPTED] Frozen-Universe Dashboard Multi-Select
 // NOTE: ADR-0103 [ACCEPTED] Atomic Composed Dashboard Bulk Mutations
@@ -119,14 +119,14 @@
 // NOTE: ADR-0107 [ACCEPTED] Off Limits Excluded from All AI Egress
 // NOTE: ADR-0108 [ACCEPTED] Durable Independent-Axis Profile Presentation and Inheritance
 // NOTE: ADR-0109 [ACCEPTED] Fixed-Hero Semantic Profile Composition and Focused Accessible Editors
-// NOTE: ADR-0110 [ACCEPTED] Coherent Local Profile Snapshot and Source-Owned Knowledge Projection
+// IMPORTANT: ADR-0110 [SUPERSEDED BY ADR-215 (partial)] Coherent Local Profile Snapshot and Source-Owned Knowledge Projection
 // NOTE: ADR-0111 [ACCEPTED] Cadence-Guarded Profile Metrics and Composed Relationship Actions
 // NOTE: ADR-0112 [ACCEPTED] App-Owned Profile Background Derivatives and Launch Reconciliation
 // IMPORTANT: ADR-0113 [SUPERSEDED BY ADR-177 (partial — the one-asset-per-slot library of eight WebPs; the all-slots picker and cross-package clause were already superseded by Phase 37 D-07 and 38.4
 // NOTE: ADR-0114 [ACCEPTED] Route-Aware App-Wide System Background Composition
 // IMPORTANT: ADR-0115 [SUPERSEDED BY ADR-177 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and
 // NOTE: ADR-0116 [ACCEPTED] Value-Remapped Interaction Vocabulary and Optional Descriptive Duration
-// NOTE: ADR-0117 [ACCEPTED] Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore
+// IMPORTANT: ADR-0117 [SUPERSEDED BY ADR-209 (partial)] Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore
 // NOTE: ADR-0118 [ACCEPTED] Bind/Unbind Immutable Lifecycle Events Without a Migration
 // NOTE: ADR-0119 [ACCEPTED] Reusable Count-Only History Aggregation and Canonical Single-Contact History Read
 // NOTE: ADR-0120 [ACCEPTED] Shared-Window Heatmap and Intensity with Globally-Persisted Lenses
@@ -140,8 +140,8 @@
 // NOTE: ADR-0128 [ACCEPTED] Same-Group Contact Merge Refusal with Remediation
 // NOTE: ADR-0129 [ACCEPTED] Portable Group Identity and History-Preserving Orphan Disposition
 // NOTE: ADR-0130 [ACCEPTED] Durable Scoped Default Interaction Channel
-// NOTE: ADR-0131 [ACCEPTED] Progressive Contact Creation and Complete-Record Editing
-// NOTE: ADR-0132 [ACCEPTED] Focused Rapid Capture Workflows
+// IMPORTANT: ADR-0131 [SUPERSEDED BY ADR-207 (partial)] Progressive Contact Creation and Complete-Record Editing
+// IMPORTANT: ADR-0132 [SUPERSEDED BY ADR-211 (partial)] Focused Rapid Capture Workflows
 // NOTE: ADR-0133 [ACCEPTED] Session-Scoped Compose Modes and Truthful External Handoff
 // NOTE: ADR-0134 [ACCEPTED] Read-Only Compose Research and Permission-Bounded Message Focus
 // NOTE: ADR-0135 [ACCEPTED] Multi-Connection AI Configuration and Fail-Closed Readiness
@@ -159,7 +159,7 @@
 // NOTE: ADR-0147 [ACCEPTED] Derived Digest Composition and Canonical Contacts Drill-Through
 // NOTE: ADR-0148 [ACCEPTED] Portable Your Week Period and Group-Deduplicated Activity Aggregation
 // NOTE: ADR-0149 [ACCEPTED] Orrery-Specific Translucent Overlay Treatment and Icon Controls
-// NOTE: ADR-0150 [ACCEPTED] Semantic Profile Hierarchy and Source-Owned Knowledge Editing
+// IMPORTANT: ADR-0150 [SUPERSEDED BY ADR-218 (partial); ADR-219 (partial)] Semantic Profile Hierarchy and Source-Owned Knowledge Editing
 // NOTE: ADR-0151 [ACCEPTED] Visual-Only Relationship Overview Orphan Packing
 // NOTE: ADR-0152 [ACCEPTED] Vertical History Heatmap and Minute-Precision Timestamps
 // NOTE: ADR-0153 [ACCEPTED] Two-Row Normal Contacts Grid
@@ -207,14 +207,29 @@
 // NOTE: ADR-0195 [ACCEPTED] Jump to Date: a Year-Stepper Month Picker and the Empty-Month State
 // NOTE: ADR-0196 [ACCEPTED] Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates
 // NOTE: ADR-0197 [ACCEPTED] History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load
-// NOTE: ADR-0198 [ACCEPTED] Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays
-// NOTE: ADR-0199 [ACCEPTED] App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State
+// IMPORTANT: ADR-0198 [SUPERSEDED BY ADR-221 (partial)] Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays
+// IMPORTANT: ADR-0199 [SUPERSEDED BY ADR-212 (partial)] App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State
 // NOTE: ADR-0200 [ACCEPTED] Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants
 // NOTE: ADR-0201 [ACCEPTED] Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen
 // NOTE: ADR-0202 [ACCEPTED] History Back Across Tabs and + Forms Over the Current Tab
 // NOTE: ADR-0203 [ACCEPTED] One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection
 // NOTE: ADR-0204 [ACCEPTED] One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay
-// NOTE: ADR-0205 [ACCEPTED] One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates
+// IMPORTANT: ADR-0205 [SUPERSEDED BY ADR-210 (partial)] One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates
 // NOTE: ADR-0206 [ACCEPTED] Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper
+// NOTE: ADR-0207 [ACCEPTED] Knowledge Homes After Fuel — an Off Limits Table, Gift Ideas and Thought of Them Memory Types, and Labels on Every Memory
+// NOTE: ADR-0208 [ACCEPTED] Migration 033 Copies and Verifies Every Fuel Row, Then Drops the Table and Purges Soft-Deleted Knowledge
+// NOTE: ADR-0209 [ACCEPTED] Backup Format 8 Converts v7 Files with the Migration Mapping, and Merge Keeps the Lower Allow AI
+// NOTE: ADR-0210 [ACCEPTED] Dated Last Talked About and Current Location, Where the Newest Date Is Most Recent
+// NOTE: ADR-0211 [ACCEPTED] Linked Interaction Notes Through "Also Save To"
+// NOTE: ADR-0212 [ACCEPTED] One Delete Pattern for Things to Remember — At Once with Undo, Then Permanent
+// NOTE: ADR-0213 [ACCEPTED] Moving Entries Between Things to Remember Sections
+// NOTE: ADR-0214 [ACCEPTED] AI Permission for the New Knowledge Homes, and Compose Research After Fuel
+// NOTE: ADR-0215 [ACCEPTED] Search and Glanceable Surfaces After Fuel
+// NOTE: ADR-0216 [ACCEPTED] A Share Saves at Once to Thought of Them, with an Interactive Confirmation Card and the List Picker
+// NOTE: ADR-0217 [ACCEPTED] Share Undo Also Removes a Contact the Share Created — a Narrow Exception to Archive-Before-Purge
+// NOTE: ADR-0218 [ACCEPTED] Things to Remember on the Profile — Section Order, Heading Actions, Empty Add, Pin, and Hide from Profile Switched Off
+// NOTE: ADR-0219 [ACCEPTED] Per-Section Editors Replace the Things to Remember and Memory Screens, with Card Edit Mode and a Section Add Button
+// NOTE: ADR-0220 [ACCEPTED] Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field
+// NOTE: ADR-0221 [ACCEPTED] Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place
 
-export const ADR_COUNT = 206;
+export const ADR_COUNT = 221;
