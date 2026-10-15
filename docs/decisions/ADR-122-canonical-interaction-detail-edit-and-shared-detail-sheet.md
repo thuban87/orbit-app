@@ -7,7 +7,7 @@
 **Reversibility:** one-way
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** ADR-127 (partial — dormant group-context and edit-scope routing only)
+**Superseded by:** ADR-127 (partial — dormant group-context and edit-scope routing only); ADR-194 (partial)
 
 ## Context
 

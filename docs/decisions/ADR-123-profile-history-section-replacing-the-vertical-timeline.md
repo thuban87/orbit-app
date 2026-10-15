@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-024 (partial — the profile-timeline refinement surface)
-**Superseded by:** None
+**Superseded by:** ADR-193 (partial); ADR-194 (partial)
 
 ## Context
 
