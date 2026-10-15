@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`, `src/db/snooze-dao.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
@@ -43,7 +43,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `note` (`TEXT`, nullable) — local-only free-text touchpoint detail.
 - `events` — immutable archive, restore, snooze, and unsnooze history; these rows never participate in recency.
 - `tombstones` — generic permanent retirement evidence; a merged-away contact has a `contact` tombstone and is not an archived contact.
-- Contact Knowledge owns `memories`, `relationships`, and `current_state_entries`; their contact foreign keys cascade only for permanent contact removal, while contact merge reparents them explicitly.
+- Contact Knowledge owns `memories`, `relationships`, `current_state_entries` and `off_limits`; their contact foreign keys cascade only for permanent contact removal, while contact merge reparents them explicitly.
 
 **Types** (`src/db/contacts-dao.ts` and `src/db/recency-dao.ts`):
 - `CreateContactFullInput` — a new contact, method drafts, optional first interaction, and custom values.
@@ -101,16 +101,17 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 1. Add Contact starts with Identity, Relationship Basics, and Contact Methods; advanced relationship knowledge is behind Show More, duplicate names warn at submit but never block save, and Name is the only required field.
 2. `createContactFull()` opens one shared transaction, inserts the contact, seeds one blank uid-bearing pair for every custom-field definition including quarantined definitions, and composes submitted methods and advanced knowledge through transaction-owned cores.
 3. Today or Pick date uses recency cores to insert a manual, directionless interaction and recompute `last_contact`; “Not yet” writes no interaction and leaves `last_contact` `NULL`.
-4. Edit Contact exposes fixed, custom-field, and direct-access knowledge sections under one form-level Save. Changing `rarely_responds` recomputes recency because it changes the qualifying interaction set.
-5. Contact aggregate saves compose method drafts and knowledge diffs in the same transaction, with one `data_revision` bump; same-contact canonical duplicates collapse with typed feedback while shared methods on different contacts remain legal.
+4. Edit Contact exposes fixed, custom-field, and direct-access knowledge sections under one form-level Save. Add and Edit Contact show Things to Remember inline in the Profile order (Last Talked About, Key People, Current Location, Memories, Thought of Them, Gift Ideas, Custom Fields, Off Limits, and on Edit Contact the Imported note), with solid Add buttons, the shared entry field, an always-visible dated box for Last Talked About and Current Location, and deletes held until Save (ADR-220, ADR-212). Changing `rarely_responds` recomputes recency because it changes the qualifying interaction set.
+5. Contact aggregate saves compose method drafts and knowledge diffs (Off Limits rows in `off_limits`, every memory type, key people, dated current-state entries, Allow AI as draft state) in the same transaction, with one `data_revision` bump; held deletes call the tombstone cores with `bumpRevision: false`; same-contact canonical duplicates collapse with typed feedback while shared methods on different contacts remain legal.
 6. No cadence starts a contact Unbound. Selecting a cadence coordinates Bound state, while a Bound-to-Unbound edit retains any assigned cadence as dormant rather than clearing it.
 
 ### Managing links and lifecycle
 
 1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email live in normalized method rows rather than fixed contact columns.
 2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
-3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly counts and deletes interactions, events, fuel, normalized custom-value pairs, links, field history, and contact-knowledge children before deleting the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
+3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly counts and deletes interactions, events, Off Limits rows, normalized custom-value pairs, links, field history, and contact-knowledge children before deleting the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
+5. `purgeContactCore(exec, contactId, { now, requireArchived = true, bumpRevision = true })` runs the fan-out inside a caller's transaction and returns its post-commit cleanup as a closure; `purgeContact` wraps it with the archive gate on and one bump. Only share Undo of a share-created contact passes `requireArchived: false` (ADR-217). The Delete permanently dialog no longer lists a fuel line, and memory and key-person counts are live rows only (D-87, D-88).
 
 ### Binding and unbinding a relationship
 
@@ -160,7 +161,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 1. Profile has no direct AI-draft action. Message opens Compose with contact identity only; Compose owns every optional Draft with AI invocation under ADR-079.
 2. The entry navigates to Compose with `{ contactId, requestAiSuggestion: true }`; it passes no contact snapshot, prompt, credential, or callback.
-3. Compose consumes the intent and owns all generation state. AI generation, acknowledgement, and draft replacement never write `contacts`, `interactions`, `fuel`, or `last_contact`.
+3. Compose consumes the intent and owns all generation state. AI generation, acknowledgement, and draft replacement never write `contacts`, `interactions`, knowledge rows, or `last_contact`.
 
 ### Snoozing reminders
 
@@ -170,9 +171,9 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 ### Creating a contact during capture
 
-1. The Capture New contact tile validates a non-blank name and calls `createContactFull()` without `firstInteraction`.
-2. The name-only path uses the monthly 30-day interval and leaves `last_contact` `NULL`, so the contact remains never-contacted.
-3. Capture then writes an owned fuel row in a separate acceptable transaction; it does not turn the share into an interaction or prompt for further contact detail.
+1. The share screen's New contact sheet validates a non-blank name; `createContactAndShare` builds a name-only `createContactFullCore` input itself (no first interaction or enrichment can reach it).
+2. The name-only path uses `NEW_CONTACT_DEFAULT_INTERVAL_DAYS` (monthly, 30) and leaves `last_contact` `NULL`, so the contact remains never-contacted.
+3. The contact and its first share are written in one transaction (D-28); the share never becomes an interaction. Undo of that share may remove the contact too while it owns nothing else (ADR-217).
 
 ### Creating or linking an imported contact
 
@@ -185,7 +186,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 1. A user selects a survivor and explicitly resolves genuine scalar, photo, or competing-primary conflicts before confirmation.
 2. `mergeContacts()` resolves method and active-link collisions, reparents compatible contact-owned children, and snapshots a meaningful overwritten or dropped value in `field_history` inside one transaction.
 3. It recomputes `last_contact` through `recency-dao`, deletes the absorbed live contact, and writes a generic contact tombstone. The absorbed identity is not archived or normally restorable.
-4. The same transaction reparents compatible Memory, relationship, and current-state rows before deleting the absorbed contact; it clears would-be relationship self-links and demotes a conflicting current-state row rather than dropping history.
+4. The same transaction reparents compatible Memory, relationship, and current-state rows before deleting the absorbed contact; it reparents `off_limits` rows, and current state needs no demotion since Most Recent follows date order (ADR-210); it clears would-be relationship self-links rather than dropping history.
 5. It also reparents retained custom-field value-history rows to the survivor. An archive-gated purge instead tombstones and explicitly deletes those rows before contact deletion.
 
 ### Participating in Group Events
@@ -209,7 +210,12 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **ADR-001:** Normalized Custom-Field Values — seeds immutable custom-value pairs on contact creation and deletes them during purge.
 - **ADR-016:** Fixed-First Contact Forms and Atomic Contact Creation — composes the form’s multi-table write in one transaction.
 - **ADR-017:** Multi-Link Contact Reachability — stores many ordered web links alongside normalized contact methods.
-- **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — makes permanent deletion a guarded, auditable lifecycle action.
+- **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — makes permanent deletion a guarded, auditable lifecycle action (one exception, ADR-217).
+- **ADR-207:** Knowledge Homes After Fuel — the aggregates write `off_limits` instead of fuel (partly supersedes ADR-131).
+- **ADR-212:** One Delete Pattern — held form deletes become tombstoned hard deletes at Save.
+- **ADR-216:** A Share Saves at Once — atomic create-and-share with the monthly default.
+- **ADR-217:** Share Undo Also Removes a Contact the Share Created.
+- **ADR-220:** Things to Remember Inline on Add and Edit Contact.
 - **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — adds dedicated relative-path writers and photo cleanup to contact lifecycle work.
 - **ADR-023:** Structured Touchpoints and One-Tap Defaults — defines touchpoint axes and explicit one-tap values.
 - **ADR-024:** Editable Touchpoint History and Recomputed Recency — preserves the single writer across refinement and deletion.
@@ -295,7 +301,7 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 24. **Retained custom-field history is a child with evidence.** Edit appends its prior raw value in the contact transaction; merge reparents it and purge tombstones it before deletion.
 25. **A bulk action is not a set-based update.** Calling a public writer inside the batch deadlocks the non-reentrant transaction mutex; compose its core inside `bulk-actions-dao` instead.
 26. **Archive batch state must include its event.** Updating `archived_at` without the immutable archive event breaks the lifecycle timeline.
-27. **Off Limits is a fuel kind, not the whole table.** A complete-edit diff must seed and mutate only `off_limits` rows; other fuel kinds must survive the save.
+27. **Off Limits has its own table.** The complete-edit diff reduces Off Limits drafts to id/label/text/url and writes `off_limits` only, scoped by contact; a legacy `kind` key on a draft is ignored. This used to bite as NEW-1: Add Contact saved Off Limits as AI-eligible topic fuel because the kind was not forced; fixed by the table (ADR-207).
 28. **A failed post-write refresh is not a failed write.** Advance edit baselines and generated child identities from the committed DAO result before refreshing projections, so a safe retry cannot duplicate rows or replay lifecycle events.
 
 - **Archived participation is allowed.** An archive guard or automatic restore prompt on Group Event insertion would reverse the owner-accepted recency behavior.
@@ -308,7 +314,7 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **App shell** — provides the create, profile, edit, and archived navigation routes.
 - **Dashboard** — reads contact projections and owns shared population ordering; it has no favourite-management screen.
 - **Contact methods** — consumes the lightweight phone and archive header for Compose gating.
-- **Capture** — selects or name-only creates a fuel owner while retaining the never-contacted state.
+- **Capture** — selects or name-only creates the owner of a share while retaining the never-contacted state.
 - **Notifications** — derives decay eligibility from contact state and owns the OS schedule.
 - **Widget** — mirrors binary favourite membership and contact-visible fields without storing another configuration record.
 - **AI suggestions** — receives a profile-originated Compose intent but has no contact-write authority.
@@ -348,3 +354,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-09-02 | 33 | Documented owner-accepted archived participation, Group Event parent survival on purge, and lossless same-event merge refusal. |
 | 2026-09-02 | 34 | Made Add Contact progressively disclosed, made no-cadence creation Unbound, and composed complete-edit knowledge diffs in the atomic contact writer. |
 | 2026-09-23 | 38.2 | Recorded full-editor Bind/Unbind events in the contact transaction and advanced Edit Contact knowledge/link baselines from committed write returns, preserving safe retries after partial saves. |
+| 2026-10-15 | 38.10 | Contact aggregates write Off Limits, every memory type, key people and dated current state; inline Things to Remember on Add/Edit Contact with held deletes; `purgeContactCore` runs in a caller's transaction with an archive-gate option used only by share Undo; create-and-share is one transaction; merge reparents Off Limits; no fuel in purge (ADR-207, ADR-212, ADR-216, ADR-217, ADR-220). |
