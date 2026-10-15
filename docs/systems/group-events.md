@@ -1,7 +1,7 @@
 # Group Events
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/group-events-dao.ts`, `src/db/group-events-read.ts`, `src/logic/group-inheritance.ts`, `src/screens/GroupLogScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`
 
 ## Purpose
@@ -125,7 +125,8 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 
 1. Saved participant removal asks Delete interaction / Keep as individual interaction / Cancel. Draft removal needs no persisted lifecycle operation.
 2. `deleteGroupChild` removes only the scoped child through the recency deletion core. `detachParticipant` preserves resolved values and participant note while clearing parent/follow state together.
-3. Confirmed `dissolveGroupEvent` detaches all children, removes parent/shared note, and records the parent’s fetched UID tombstone. Group Note is never copied into child prose.
+3. Confirmed `dissolveGroupEvent` detaches all children, removes parent/shared note, and records the parent’s fetched UID tombstone. Group Note is never copied into child prose. Its dialog, and Delete event's, add "Anything saved to a Things to Remember section stays on each person's Profile." (D-137 W17).
+3a. **Group Note copies (ADR-211).** Group Log's "Also save to" saves a non-blank Group Note to one section for every participant; each copy is linked to that participant's own interaction row (`link_source = 'group_note'`) and is always AI-off with a locked switch (`group_note_copy`, D-98). `updateGroupEventCore` is the single Group Note writer and propagates text and date to the copies. Clearing the Group Note, deleting the event, detaching a participant, dissolving the group or editing one person's copy detaches the copy as an ordinary entry that keeps its text and stays AI-off for good (D-102, D-113, D-117). `addParticipants` gives new participants their copies.
 4. Confirmed `deleteGroupEventAndInteractions` permanently removes linked children through recency cores and then the parent, with tombstones and one revision increment in the same transaction.
 5. A parent with no children remains valid. Contact purge removes its own children, never unrelated Group Event parents.
 6. `convertInteractionToGroupEvent` (the interaction detail's "Make this an event", ADR-206) checks a contact-scoped standalone source in the transaction, creates a title-bearing parent seeded from the original values, and links the original child in place without changing its ID/UID.
@@ -145,6 +146,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | Participant cap | None | `src/components/ContactPicker.tsx` | Searchable, virtualized selection. |
 
 ## Decisions
+- **ADR-211:** Linked Interaction Notes Through "Also Save To" — Group Note copies, their lock and detach rules.
 - **[ADR-010: Single-Writer Interaction Recency Spine](../decisions/ADR-010-single-writer-interaction-recency-spine.md)** — governs `src/db/recency-dao.ts`.
 - **[ADR-011: Query-Time Status and Never-Contacted Segregation](../decisions/ADR-011-query-time-status-and-never-contacted-segregation.md)** — governs `src/db/recency-dao.ts`.
 - **[ADR-016: Fixed-First Contact Forms and Atomic Contact Creation](../decisions/ADR-016-fixed-first-contact-forms-and-atomic-contact-creation.md)** — governs `src/db/recency-dao.ts`.
@@ -179,7 +181,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 1. **Do not nest mutex-owning writers.** Compose recency cores within the one Group Event transaction; the write mutex is non-reentrant.
 2. **Follow state is not value equality.** An explicit override equal to today’s parent value remains detached until Follow event is chosen.
 3. **FK cleanup is incomplete by itself.** SET NULL clears the link only; lifecycle/orphan handling must clear all three follow flags together.
-4. **Group Note has no AI permission equivalent.** It remains parent-only local context under every participant Allow-AI state, including detachment and dissolve.
+4. **Group Note has no AI permission equivalent.** It remains parent-only local context under every participant Allow-AI state, including detachment and dissolve; its Things to Remember copies are locked AI-off by their own origin marker, so the lock survives unlinking.
 5. **Atomic saved additions were repaired.** Initial per-contact transactions could leave a committed prefix on failure. One batch plus awaited picker outcome now preserves rollback and visible retry state.
 6. **Detail units and consent were repaired.** Initial raw seconds/minutes display and static consent were replaced with the shared formatter and stored child permission read-through.
 7. **Do not reconcile a merge collision silently.** Same-event duplicate contacts require typed refusal and explicit membership remediation.
@@ -213,3 +215,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | 2026-09-23 | 38.4 | The Events tab root uses `ShellAppBar variant="root"` with no Back (D-22; ADR-175), and its load error reads "Try opening it again in a moment."; list rows and the detail "When" render through `formatDateTimeMinuteOrFallback` (RG-038 AUD-UIA-018); the group title prompt stays above the keyboard and stacks its actions when they do not fit at the largest text (D-72; ADR-174). |
 | 2026-09-26 | 38.5 | The Events list and detail show the background art: no opaque page fill, content in full `surface` cards (D-54; ADR-179). |
 | 2026-10-11 | 38.9 | User-facing copy says "Event(s)" (Group Log and Dissolve kept; "Make this an event"); Events uses the shared `EmptyState` with "Log an event" / "Clear search" / "Try again"; the Group Log title validates inline; the event forms use the child header over the theme art; Group Log opens over the current tab (ADR-199, ADR-201, ADR-202, ADR-206). |
+| 2026-10-15 | 38.10 | Group Log's "Also save to" gives every participant a linked, AI-locked copy of the Group Note; copies detach on clear, delete, detach, dissolve or their own edit; Dissolve and Delete dialogs say saved entries stay (ADR-211). |
