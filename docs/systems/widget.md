@@ -1,7 +1,7 @@
 # Widget
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -56,7 +56,7 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 1. A lifecycle event or `requestWidgetUpdate` invokes `renderFavourites(widgetInfo)`.
 2. The renderer resolves the device region and opens/migrates SQLite when needed, then `loadWidgetTiles()` calls the Bound-only favourites projection. An Unbound dormant favourite cannot produce a tile.
 3. The tile shaper preserves Dashboard Default order and nullable query-time status; it never recalculates either value.
-4. Each local photo master is downsized and encoded as a base64 `data:` URI. A missing or failed thumbnail falls back to deterministic themed initials rather than blanking the grid.
+4. `encodeTileThumbs` downsizes each local photo master, one tile at a time, and encodes it as a base64 `data:` URI. The master may be a legacy 512 JPEG or a 1024 WebP (ADR-181), and each rendered `ImageRef` is released in a `finally`. A value that is not a stored photo path (`isStoredPhotoPath`), or a missing or failed thumbnail, falls back to deterministic themed initials rather than blanking the grid.
 5. The renderer selects the small mark grid or larger fuel-and-action layout from widget width, then rasterises the RemoteViews tree with palette tokens.
 6. The patched `react-native-android-widget` module passes light and dark bitmaps inline with `RemoteViews.setImageViewBitmap`. Android's AppWidgetService delivers those views only to hosts bound to the widget ID. The library's unauthenticated image ContentProvider is absent from both library manifests, and each render deletes leftover app-private `files/widget_images/*` snapshots. The base64 photo input contract and visible fuel/action content are unchanged.
 
@@ -103,6 +103,7 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — retains the consumed-once Profile entry while rebuilding the screen controller.
 - **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — includes the widget notify in the shared assist post-commit publisher.
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — the widget decodes WebP or JPEG masters of up to 1024 px into its 88 px thumbnail, one tile at a time.
 
 ## Gotchas
 
@@ -145,3 +146,4 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 | 2026-09-23 | 38.2 | Patched `security/AUD-SEC-001` / RG-001: inline light/dark widget bitmaps, removed the exported snapshot provider, and delete stale private snapshots on render; Pixel rendering proof follows in Plan 16. |
 | 2026-09-23 | 38.3 | Assist confirmations notify the widget through the shared post-commit publisher (ADR-164). |
 | 2026-09-23 | 38.4 | Three widget glyphs use `accentText` instead of the accent fill (D-63; ADR-169). Widget action accessible names (RG-032) are untouched and belong to the widget-overhaul phase (D-16), as does the widget contact tap that does not open the Profile (todo `2026-09-28-widget-contact-tap-does-not-open-profile.md`). |
+| 2026-09-30 | 38.6 | Tile thumbnails encode sequentially (`encodeTileThumbs` in `widget-photo.ts`, replacing a `Promise.all`), each manipulator ref is released, masters may be 1024 WebP, and text left in a photo field never reaches the encoder. Thumbnail size and quality unchanged (ADR-181). |
