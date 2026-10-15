@@ -1,7 +1,7 @@
 # AI Suggestions
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsAIScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
@@ -77,7 +77,9 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 4. `AiSuggestionLifecycle` owns the sole controller, 20-second timeout, and stale guard. `generateVariants()` makes three shared-signal provider calls; a failure aborts in-flight siblings.
 5. A successful request presents three unlabeled alternatives on a non-destructive review surface. Only Choose this changes the editor; Try Again replaces the set and Cancel preserves the manual draft.
 6. An explicit request for an Unbound contact remains available. Its relationship context retains the closed projection, but unavailable cadence intensity becomes the fixed neutral aggregate rather than NULL arithmetic or a fabricated cadence.
-7. The context reader serializes only live opt-in Memories, opted-in custom-field values, and the compact latest-three interaction projection whose note is present only when that row's `allow_ai` is on. Off Limits and Group Notes remain outside every AI-bound shape.
+7. The context reader serializes only memories passing `MEMORY_AI_ELIGIBILITY` (live, `allow_ai = 1`, not a Group Note copy, and if note-linked only while the interaction allows AI and is not locked), opted-in custom-field values, and the compact latest-three interaction projection, whose note a SQL `CASE` gate includes only when that row's `allow_ai` is on, `note_ai_locked` is 0 and no AI-off memory is linked to it. A note-linked memory whose note is already among the three recent rows is dropped from the memory list so the text is sent once. There is no fuel or ranked block: Off Limits, Last Talked About, Current Location and Group Notes are outside every AI-bound shape (ADR-214). `countContactPromptItems` (fields + memories + recent rows) feeds Compose's failure diagnostic.
+7a. New items' default permission comes from five `app_settings` defaults: memories, interaction notes, custom fields, and (since 38.10) Gift Ideas and Thought of Them, which start off and travel in the backup settings snapshot. Shares, imports and Group Note copies are always AI-off whatever the default. Settings → AI Data Permissions shows the two new rows with "New items default to Allow AI", lists locked items with their reason and never enables them, and reads "AI can use N items, from M contacts." / "This list: X of Y items · Z of these shared with AI." (D-137 W1c).
+7b. Message Focus (`src/ai/message-focus.ts`) sends a memory's main text only, never its note (D-124); Off Limits can never be selected. With Hide from Profile switched off, a previously hidden memory with Allow AI on is eligible like any other (D-142).
 8. Writing Style and enabled Personalization Context sections are immutable-prompt inputs. The selected model's known capacity is estimated locally; overflow is reported before egress and no permitted content is silently truncated.
 
 ### Custom egress and model catalog
@@ -98,7 +100,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 ## Decisions
 
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — separates SecureStore credentials from exportable SQLite settings.
-- **ADR-050:** Closed AI Prompt Egress Allowlist and Opt-In Field Sharing — makes the projection and sharing flag the disclosure boundary.
+- **ADR-050:** Closed AI Prompt Egress Allowlist and Opt-In Field Sharing — makes the projection and sharing flag the disclosure boundary; its ranked-fuel input is superseded by ADR-214.
 - **ADR-051:** Public-HTTPS Custom AI Egress Guard — protects user-controlled Custom destinations at URL and native transport layers.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — keeps generation editable, acknowledged, cancellable, and non-writing.
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — provides seed/cache model selection and explicit refresh.
@@ -115,6 +117,10 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **ADR-137:** Structured Personalization and Explicit Context Capacity — provides enabled global sections and model-aware no-truncation estimates.
 - **ADR-139:** Loopback-Only OpenRouter Authorization Callback — makes browser authorization local, one-shot, and credential-free outside SecureStore.
 - **ADR-157:** Bounded Native Transfer Ownership — keeps Custom call ownership through one bounded response read and deterministically settles cancellation, overflow, and failure.
+- **ADR-207:** Knowledge Homes After Fuel — Off Limits lives in a table with no AI column.
+- **ADR-211:** Linked Interaction Notes — one switch per linked note; Group Note copies locked off.
+- **ADR-213:** Moving Entries — a move into Off Limits locks the linked note off for good.
+- **ADR-214:** AI Permission for the New Knowledge Homes and Compose Research After Fuel — removes the fuel block, adds the two defaults, main-text-only Message Focus (partly supersedes ADR-050).
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 
@@ -127,7 +133,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 5. **Do not reconstruct a prompt during a request.** The frozen `ResolvedPrompt` object is the identity contract across review and egress.
 6. **The owner accepted one device egress smoke test instead of the original full on-device escape matrix.** Shared JVM/vector tests cover the remaining address cases; keep that limitation visible if the guard changes.
 7. **Never invent cadence for an Unbound contact.** The neutral intensity aggregate is the only permitted representation of unavailable cadence in explicit AI context.
-8. **Memory permission fails closed in SQL.** Do not infer it from a Memory type, source, or visibility flag, and do not claim an eligible projection has reached a provider payload before its prompt serializer consumes it.
+8. **Memory permission fails closed in SQL, on both sides of a link.** A note-linked memory needs its interaction's permission too; a lock (`note_ai_locked`, `group_note_copy`) clamps to 0 and never clears. Do not infer permission from a memory type, section, source or visibility flag, and do not claim an eligible projection has reached a provider payload before its prompt serializer consumes it.
 9. **Off Limits never leaves the device through AI.** It is neither positive context nor an avoidance constraint and can never become Message Focus; changing that is an owner decision under ADR-107.
 10. **Carrying is transmission once resolved.** Interaction notes enter the payload only through the latest-three projection and only when that individual row has `allow_ai=1`.
 11. **Do not weaken the OpenRouter callback.** It must bind loopback only, require the exact state before exchange, and wake the app without code or state in the URI.
@@ -138,7 +144,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 ## Related Systems
 
 - **Custom fields** — exposes only definition-level opted-in values to the context reader.
-- **Contact Knowledge** — supplies explicitly opted-in live Memories through the egress projection.
+- **Contact Knowledge** — supplies explicitly opted-in live memories through the egress projection; owns the Off Limits table AI never reads.
 - **Contact methods** — owns Compose, Copy, and best-effort SMS handoff for a returned draft.
 - **Contacts** — supplies the profile entry and source identity without accepting an AI write.
 - **Persistence core** — applies migration 004 and the SQLite singleton contract.
@@ -160,3 +166,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-09-23 | 38.2 | Bounded Custom transport response bodies, retained call ownership through body consumption, and mapped oversized responses to `invalid_response`. |
 | 2026-09-26 | 38.4 | Truthful AI configuration presentation (RG-008; AUD-ARCH-003, AUD-RN-005, AUD-UIA-013, AUD-UIA-020): Memory hosts use the canonical master, the permission summary separates access totals from the filtered view, and the model picker marks the saved model including manual ids. |
 | 2026-09-27 | 38.4 | AI Data Permissions counts reconcile with the list: a list line states the items shown, their contacts and how many AI can access, and each contact header states its AI-accessible count (D-44, OA-C1). |
+| 2026-10-15 | 38.10 | Fuel retired from AI: no ranked-fuel block or reader; two-sided memory eligibility (linked note permission and locks); recent-note CASE gate checks the lock and linked memories; Gift Ideas / Thought of Them default settings (start off); shares always AI-off; Message Focus sends main text only; AI Data Permissions shows locks and the new count wording (ADR-207, ADR-211, ADR-213, ADR-214). |
