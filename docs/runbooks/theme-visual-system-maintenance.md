@@ -4,7 +4,7 @@
 
 Use this process when adding a curated accent, bundled background slot, semantic theme token, or a complete theme package. It preserves Orbit's local-only appearance system, durable option-ID settings, token-only colour rule, and contrast/accessibility checks.
 
-## Architecture (Phases 23, 31, 31.1, 38.1, 38.4, 38.5)
+## Architecture (Phases 23, 31, 31.1, 38.1, 38.4, 38.5, 38.9)
 
 `app_settings` stores a package plus per-package mode, accent ID, and background ID. `ThemeProvider` resolves the active package and OS appearance, then applies a curated accent tone at render time. Palette hex values live only under `src/theme/`; screens receive resolved semantic tokens through `useTheme()`.
 
@@ -100,7 +100,7 @@ Governing decisions for the 38.4 additions: ADR-169 (Standard-Light glass foregr
 
 ## Native dialogs follow Orbit's mode (D-50)
 
-RN `Alert` confirmations and the Android date/time picker dialogs are native surfaces Orbit does not paint. They take their light or dark look from the activity's night configuration, not from `useTheme()`.
+The Android date/time picker dialogs and the one remaining RN `Alert` (the Contacts snooze prompt, owned by 38.11; every other Alert became a themed dialog in 38.9, ADR-198) are native surfaces Orbit does not paint. They take their light or dark look from the activity's night configuration, not from `useTheme()`.
 
 - **The rule.** The active package's mode *setting* drives the native night mode. `ThemeProvider` calls `useNativeColorSchemeSync(activeMode)` once, with the same `activeMode` its palette resolution uses.
 - **The helper.** `src/theme/native-color-scheme.ts` holds `nativeColorSchemeFor(mode)` (light → `"light"`, dark → `"dark"`, system → `"unspecified"`) and `useNativeColorSchemeSync(mode)`. The hook calls `Appearance.setColorScheme` from an effect keyed on the mode. RN core maps that to `AppCompatDelegate.setDefaultNightMode`. The Expo AppTheme is DayNight and MainActivity handles `uiMode`, so nothing is recreated and no native package is needed.
@@ -166,13 +166,15 @@ RN `Alert` confirmations and the Android date/time picker dialogs are native sur
 
 20. **The swiped List row tint is a step and has a recorded exemption (ADR-179).** `swipeRowTintOpacity` jumps to `SWIPE_ROW_BACKING_OPACITY` (0.5) on the first non-zero translation, because the action panel appears then. Keep it a step, driven on the UI thread. The row's icons and ring crossing the panel glyphs are exempt in `surface.test.ts` ("Swiped see-through List row"); row text is not, so a change to the row or panel layout reruns that geometry pin.
 
+21. **A new package, mode or curated accent must pass the Orbit switch contrast gate (38.9 D-25, ADR-203).** `OrbitSwitch` has no tokens of its own: the off thumb is `textSecondary`, the on track `accent` with an `onAccent` thumb, and the check `accentText` on `onAccent`. `src/components/ui/orbit-switch-logic.test.ts` checks each pair at AA-large in every package × mode (including every curated accent and the Standard Light glass variant). A palette edit that lowers one of them fails there, not in `src/theme`. Tune the palette token; never give the switch a private colour.
+
 ## Smoke Test
 
 ```bash
 python3 scripts/measure-background-extrema.py --self-test
 python3 scripts/measure-background-extrema.py --check
 uv run --no-project --with numpy --with pillow python3 scripts/check-background-art.py --self-test
-npx vitest run src/theme src/navigation/focused-route-classification.test.ts src/stores/theme-store.test.ts
+npx vitest run src/theme src/navigation/focused-route-classification.test.ts src/stores/theme-store.test.ts src/components/ui/orbit-switch-logic.test.ts
 npm run check:colors
 npx tsc --noEmit
 ```
@@ -203,3 +205,4 @@ ADR-084 gives the accent three roles, and every foreground picks one:
 - **2026-09-29 — Phase 38.5 Plan 08 (D-13 step 4, D-15, D-23, D-28, D-36, D-37, D-42..D-44; ADR-177).** The art treatment table is now the owner's signed v3 answer (`SIGNED_V3_BACKINGS`, synced against `38.5-scrim-signoff-v3.json`). `ART_SEE_THROUGH_OPACITY` holds his signed levels: 0.05 for every List row and Contacts card, Galaxy Dark chrome 0.05, Standard Light chrome 0.5 and the Standard Dark count label 0. `TABLE_DRIVEN_COMPONENTS` names the five components, the ⋯ follows the header, and no cell is inverse. Every see-through or none cell is proven over the shipped art. The `listEntry` / `cardEntry` / `artChrome` regimes joined the extrema table, which widened `galaxy-quiet` light `darkestPixel` from `#E4DDF9` to `#E3DDF9`. ADR-177 was written, and the picker line was corrected.
 - **2026-09-29 — Phase 38.5 code-review fixes (IN-03).** Added Pitfall 18: the 38.4 and 38.5 phase directories hold signed test inputs and must not be archived, guarded by `pinned-planning-inputs.test.ts`.
 - **2026-09-26 — Phase 38.5 owner rulings D-46, D-48, D-50, D-52, D-54 (ADR-179; KB extraction).** Added Pitfalls 19 (persistent Galaxy Dark danger strings, `danger-scrim.ts`) and 20 (the swiped-row step and its icon/ring exemption); ADR-179 joins the governing decisions.
+- **2026-10-11 — Phase 38.9 (D-25, D-47; ADR-203, ADR-198).** Pitfall 21: palette changes must pass the Orbit switch contrast gate, added to the Smoke Test. "Native dialogs follow Orbit's mode" now names the date/time pickers and the one remaining snooze Alert.
