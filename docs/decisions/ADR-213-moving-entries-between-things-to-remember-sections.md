@@ -48,4 +48,4 @@ We will let any entry move between Memories, Thought of Them, Gift Ideas, Last T
 - `src/db/migrations/033-knowledge-homes.ts` — `note_ai_locked` and `from_share` columns with CHECKs.
 
 **Depends on:** ADR-207 (Knowledge Homes After Fuel); ADR-211 (Linked Interaction Notes Through "Also Save To")
-**Required by:** None
+**Required by:** ADR-216 (A Share Saves at Once to Thought of Them, with an Interactive Confirmation Card and the List Picker)

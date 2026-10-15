@@ -48,4 +48,4 @@ Add Contact starts with Identity, Relationship Basics, and Contact Methods, with
 - `src/components/ui/AccordionSection.tsx` — supplies controlled disclosure and the validation reveal-and-focus target.
 
 **Depends on:** ADR-016 (Fixed-First Contact Forms and Atomic Contact Creation); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** _None._
+**Required by:** ADR-220 (Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field)

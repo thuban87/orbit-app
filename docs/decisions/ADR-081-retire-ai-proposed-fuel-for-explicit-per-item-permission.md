@@ -57,4 +57,4 @@ Phase 36 must delete it rather than leave it in place.
 - `src/db/memories-read.ts` — later per-item SQL egress projection.
 
 **Depends on:** ADR-030, ADR-078
-**Required by:** ADR-091 (Imported Contact Notes as AI-Off Typed Memories)
+**Required by:** ADR-091 (Imported Contact Notes as AI-Off Typed Memories); ADR-208 (Migration 033 Copies and Verifies Every Fuel Row, Then Drops the Table and Purges Soft-Deleted Knowledge)

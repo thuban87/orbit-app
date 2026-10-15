@@ -49,4 +49,4 @@ Migration 033 (`KNOWLEDGE_HOMES_SCHEMA_VERSION = 33`) moves each fuel row by kin
 - `src/db/purge-dao.ts` — purge counts and deletes the `off_limits` children.
 
 **Depends on:** ADR-207 (Knowledge Homes After Fuel); ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-081 (Retire AI-Proposed Fuel for Explicit Per-Item Permission)
-**Required by:** None
+**Required by:** ADR-209 (Backup Format 8 Converts v7 Files with the Migration Mapping, and Merge Keeps the Lower Allow AI)

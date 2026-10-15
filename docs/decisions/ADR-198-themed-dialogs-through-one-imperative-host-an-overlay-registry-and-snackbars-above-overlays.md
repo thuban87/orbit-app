@@ -61,4 +61,4 @@ Every RN `Modal` goes through `RegisteredModal`, which registers in an overlay r
 - `src/screens/HomeScreen.tsx` — keeps the one snooze `Alert.alert` (D-10).
 
 **Depends on:** ADR-086 (Semantic Icons and Accessible Interaction Primitives); ADR-174 (Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets); ADR-173 (Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance)
-**Required by:** ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State); ADR-200 (Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants); ADR-204 (One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay)
+**Required by:** ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State); ADR-200 (Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants); ADR-204 (One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay); ADR-221 (Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place)

@@ -52,4 +52,4 @@ The system writes share capture immediately as contact-owned `topic` fuel with `
 - `src/screens/CaptureScreen.tsx` — writes on contact selection, supports multi-select and inline name-only creation, and never writes recency.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-028 (Per-Item Conversational Fuel with Fixed Kinds)
-**Required by:** None
+**Required by:** ADR-216 (A Share Saves at Once to Thought of Them, with an Interactive Confirmation Card and the List Picker)

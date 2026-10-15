@@ -55,4 +55,4 @@ We will save a share at once, on the person tap, to Thought of Them with provena
 - `App.tsx` — the resume-prompt gate.
 
 **Depends on:** ADR-207 (Knowledge Homes After Fuel); ADR-213 (Moving Entries Between Things to Remember Sections); ADR-037 (Text-Only Android Share Intent Integration); ADR-038 (Contact-Owned Share Capture Fuel)
-**Required by:** None
+**Required by:** ADR-217 (Share Undo Also Removes a Contact the Share Created — a Narrow Exception to Archive-Before-Purge)

@@ -49,4 +49,4 @@ The system assembles one immutable resolved prompt from only individually permit
 - `src/components/AIComposeContextReview.tsx` — displays Compose contact context from the resolved prompt.
 
 **Depends on:** ADR-079 (On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation); ADR-107 (Off Limits Excluded from All AI Egress)
-**Required by:** None
+**Required by:** ADR-214 (AI Permission for the New Knowledge Homes, and Compose Research After Fuel)

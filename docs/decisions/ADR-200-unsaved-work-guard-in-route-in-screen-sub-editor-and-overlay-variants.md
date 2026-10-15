@@ -63,4 +63,4 @@ Every form with meaningful unsaved changes gets the guard; an untouched form lea
 - `src/navigation/editor-cancel-contract.test.ts` — every editor Cancel goes through `requestClose`.
 
 **Depends on:** ADR-198 (Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays); ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors)
-**Required by:** ADR-201 (Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen)
+**Required by:** ADR-201 (Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen); ADR-219 (Per-Section Editors Replace the Things to Remember and Memory Screens, with Card Edit Mode and a Section Add Button)

@@ -53,4 +53,4 @@ Compose Research is a sibling, read-only projection over populated conversation-
 - `src/screens/ComposeScreen.tsx` — enters Research, displays focus count, and intersects selected items with fresh data before a request.
 
 **Depends on:** ADR-078 (Negative-Constraint Off Limits and Gated Recent-Interaction AI Context); ADR-107 (Off Limits Excluded from All AI Egress)
-**Required by:** _None._
+**Required by:** ADR-214 (AI Permission for the New Knowledge Homes, and Compose Research After Fuel)

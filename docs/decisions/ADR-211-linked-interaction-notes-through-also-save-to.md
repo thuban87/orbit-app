@@ -58,4 +58,4 @@ We will let an interaction note also be saved to one section — Last Talked Abo
 - `src/components/history/HistoryStreamRows.tsx` — section tags on interaction rows.
 
 **Depends on:** ADR-210 (Dated Last Talked About and Current Location); ADR-117 (Per-Interaction Allow-AI Consent Gate); ADR-125 (Three-Field Live Inheritance with Separate Local-Only Group Notes); ADR-132 (Focused Rapid Capture Workflows)
-**Required by:** None
+**Required by:** ADR-213 (Moving Entries Between Things to Remember Sections)

@@ -48,4 +48,4 @@ Off Limits items are **never transmitted to the AI provider in any form** — no
 - `src/screens/ComposeScreen.tsx` — still shows Off Limits as the Research-side "Avoid" group and withholds "Add to AI" from those rows.
 
 **Depends on:** ADR-050 (Closed AI Prompt Egress Allowlist and Opt-In Field Sharing); ADR-078 (Negative-Constraint Off Limits and Gated Recent-Interaction AI Context)
-**Required by:** ADR-134 (Read-Only Compose Research and Permission-Bounded Message Focus); ADR-136 (Permission-Bounded Prompt Assembly and AI Transparency)
+**Required by:** ADR-134 (Read-Only Compose Research and Permission-Bounded Message Focus); ADR-136 (Permission-Bounded Prompt Assembly and AI Transparency); ADR-207 (Knowledge Homes After Fuel — an Off Limits Table, Gift Ideas and Thought of Them Memory Types, and Labels on Every Memory)

@@ -66,4 +66,4 @@ We will remove fuel entirely: no table, writer, reader or wording survives, enfo
 - `src/components/FuelEditor.tsx` — deleted.
 
 **Depends on:** ADR-088 (Additive Contact-Knowledge Schema and Application-Owned Memory Registry); ADR-107 (Off Limits Excluded from All AI Egress)
-**Required by:** None
+**Required by:** ADR-208 (Migration 033 Copies and Verifies Every Fuel Row, Then Drops the Table and Purges Soft-Deleted Knowledge); ADR-213 (Moving Entries Between Things to Remember Sections); ADR-214 (AI Permission for the New Knowledge Homes, and Compose Research After Fuel); ADR-215 (Search and Glanceable Surfaces After Fuel); ADR-216 (A Share Saves at Once to Thought of Them, with an Interactive Confirmation Card and the List Picker); ADR-218 (Things to Remember on the Profile — Section Order, Heading Actions, Empty Add, Pin, and Hide from Profile Switched Off); ADR-220 (Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field)

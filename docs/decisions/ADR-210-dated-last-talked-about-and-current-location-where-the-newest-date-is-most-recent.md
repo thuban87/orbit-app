@@ -51,4 +51,4 @@ We will rebuild `current_state_entries` in migration 033 without `is_current`, a
 - `src/components/ui/EntryDateField.tsx` — the date field with a maximum date.
 
 **Depends on:** ADR-088 (Additive Contact-Knowledge Schema and Application-Owned Memory Registry); ADR-205 (One Date-Only Display Formatter)
-**Required by:** None
+**Required by:** ADR-211 (Linked Interaction Notes Through "Also Save To"); ADR-220 (Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field)

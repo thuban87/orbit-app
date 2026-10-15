@@ -51,4 +51,4 @@ The system uses `expo-share-intent` as a `text/plain`-only Android share target,
 - `src/navigation/linking.ts` — owns ready-gated pending-share navigation to Capture.
 
 **Depends on:** ADR-019 (Native Stack Contact Lifecycle Navigation)
-**Required by:** None
+**Required by:** ADR-216 (A Share Saves at Once to Thought of Them, with an Interactive Confirmation Card and the List Picker)
