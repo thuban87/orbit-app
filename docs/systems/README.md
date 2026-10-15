@@ -19,14 +19,14 @@ Read the relevant system doc *before* making changes to that subsystem.
 | App shell | `app-shell.md` | `navigation/RootNavigator.tsx`, `navigation/types.ts`, `screens/SettingsScreen.tsx`, `theme/` | 04 |
 | Contacts | `contacts.md` | `db/contacts-dao.ts`, `db/contact-read.ts`, `db/contact-lifecycle-dao.ts`, `db/profile-dao.ts`, `db/favourites-dao.ts`, `db/recency-dao.ts`, `db/purge-dao.ts`, `db/tombstones-dao.ts` | 02, 04 |
 | Categories | `categories.md` | `db/categories-dao.ts`, `logic/category-logic.ts`, `screens/CategoryManagementScreen.tsx`, `components/category/CategoryChoiceSheet.tsx` | 37.1 |
-| Contact knowledge | `contact-knowledge.md` | `db/memory-registry.ts`, `db/memories-dao.ts`, `db/memories-read.ts`, `db/relationships-dao.ts`, `db/relationships-read.ts`, `db/current-state-history-dao.ts`, `db/current-state-history-read.ts`, `services/memory-trash-sweep.ts` | 24.1 |
+| Contact knowledge | `contact-knowledge.md` | `db/memory-registry.ts`, `db/memories-dao.ts`, `db/memories-read.ts`, `db/relationships-dao.ts`, `db/relationships-read.ts`, `db/current-state-history-dao.ts`, `db/current-state-history-read.ts`, `db/off-limits-dao.ts`, `db/off-limits-read.ts`, `db/knowledge-move-dao.ts`, `db/linked-entry-dao.ts`, `db/undo-restore.ts` | 24.1 |
 | Status engine | `status-engine.md` | `db/status.ts`, `services/gravity-logic.ts`, `services/intensity-logic.ts`, `db/contact-status-read.ts` | 02 |
 | Contact methods | `contact-methods.md` | `db/contact-methods-dao.ts`, `db/contact-methods-read.ts`, `db/contact-links-dao.ts`; compose/SMS handoff (`screens/ComposeScreen.tsx`) | 18, 18.1, 18.2, 09 |
 | Custom fields | `custom-fields.md` | `db/field-defs-dao.ts`, `db/field-values-dao.ts`, `db/field-ddl.ts`, `db/field-parsers.ts`, `db/field-sort.ts`, `db/field-type-change.ts`, `db/col-name.ts` | 03, 16 |
 | Group Events | `group-events.md` | `db/group-events-dao.ts`, `db/group-events-read.ts`, `logic/group-inheritance.ts` | 33 |
 | Interaction log | `interaction-log.md` | `db/events-dao.ts`, `services/impact.ts`, `db/impact-read.ts`, `db/timeline-read.ts`, `db/log-guards.ts` | 06 |
 | Interaction history & insights | `interaction-history.md` | `db/history-read.ts`, `db/interaction-edit-read.ts`, `services/history/`, `components/history/`, `screens/EditInteractionScreen.tsx` | 32 |
-| Conversational fuel | `conversational-fuel.md` | `db/fuel-dao.ts`, `db/fuel-read.ts`, `services/fuel-age.ts`, `services/fuel-ranking.ts` | 07 |
+| Conversational fuel (**retired 38.10**) | `conversational-fuel.md` | None — its files were deleted in 38.10; route Off Limits, Gift Ideas, Thought of Them and the former fuel kinds to `contact-knowledge.md` and sharing to `capture.md`. Historical record only. | 07 |
 | Photos | `photos.md` | `db/photo-relative-path.ts`, `services/photos/`, `components/Avatar.tsx`, `components/photo-display.ts`, `components/PhotoUnavailableNotice.tsx` | 05 |
 | Contacts (internal Dashboard query subsystem) | `dashboard.md` | `db/dashboard-read.ts`, `logic/dashboard-query-logic.ts`, `screens/HomeScreen.tsx` | 08, 38 |
 | Orrery | `orrery.md` | `db/orrery-read.ts`, `db/ring-seq-dao.ts`, `db/sun-picker-read.ts`, `components/orrery/v2/`, `components/orrery/resources/` | 13 |
