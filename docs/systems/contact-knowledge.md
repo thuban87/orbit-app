@@ -180,6 +180,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 - **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — Memory and key-person drafts guard Back, Cancel and section folds.
+- **ADR-201:** Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen — Things to Remember, Memory history, Recently Deleted and Research use the child header; Research is titled "Research" with the person line.
 - **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — the meaningful date is picked and stored as `YYYY-MM-DD`; legacy free text stays and is flagged.
 
 ## Gotchas
