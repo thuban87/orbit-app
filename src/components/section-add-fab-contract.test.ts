@@ -221,3 +221,14 @@ describe("section Add FAB component (D-131 pause convention, D-132 presence)", (
     expect(fab).not.toMatch(/\belevation\s*:/);
   });
 });
+
+describe("a section with no Add reports no section FAB (D-151)", () => {
+  it("SectionEditorScreen gates the morph's loaded input on canAdd", () => {
+    const source = stripComments(
+      readFileSync(join(ROOT, "src/screens/SectionEditorScreen.tsx"), "utf8"),
+    );
+    expect(source).toMatch(
+      /useSectionAddMorph\(\{\s*loaded:\s*phase\.phase === "loaded" && addable,/,
+    );
+  });
+});

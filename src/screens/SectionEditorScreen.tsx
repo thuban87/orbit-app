@@ -475,8 +475,9 @@ export function SectionEditorScreen({
 
   // D-131: the top Add morphs into the bottom-left FAB once it scrolls off.
   const focusedRoute = isFocusedWorkflow(route.name);
+  // A section with no Add (Imported) has no FAB, so it never reports one.
   const morph = useSectionAddMorph({
-    loaded: phase.phase === "loaded",
+    loaded: phase.phase === "loaded" && addable,
     formOpen: draftState.open,
     focusedRoute,
   });
