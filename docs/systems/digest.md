@@ -1,7 +1,7 @@
 # Digest
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/db/digest-read.ts`, `src/db/up-next-read.ts`, `src/db/your-week-read.ts`, `src/logic/digest-composition.ts`, `src/screens/DigestScreen.tsx`, `src/screens/digest-refresh.ts`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -68,7 +68,7 @@ Digest reads existing state and persists only the portable app-wide period prefe
 ### Composing Up Next and Horizon
 
 1. `readUpNext()` uses the shared status/progress SQL; `digest-composition.ts` applies the deterministic three-person cap.
-2. Horizon independently reads its next-seven-day birthdays, overlooked people, and Never Contacted candidates.
+2. Horizon independently reads its next-seven-day birthdays, overlooked people, and Never Contacted candidates. The birthday tag is display text from the shared date-only formatter with its weekday ("Tue, Oct 13"); `digest-composition.ts` keeps a separate `dateKey` from `formatLocalDate()`, so display text never becomes a key. The group label is the glossary's "Never Contacted" (ADR-205, ADR-206).
 3. Up Next receives first claim on its contacts, then Horizon removes matching overlooked conditions rather than duplicating them.
 4. A scalable Horizon drill calls `setPopulationsAndFilters()` before selecting Contacts, so its persisted count, preview, and destination use the same canonical query state. The opt-in Unbound exception is limited to `not-contacted`.
 
@@ -123,6 +123,9 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 - **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — Your Week day detail shows real contact photos.
 
+- **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — Digest dates (birthday tag, day detail, week heatmap labels) come from the shared formatter; storage keys stay `formatLocalDate()`.
+- **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Horizon's "Never Contacted" label.
+
 ## Gotchas
 
 1. **Do not cache or persist a Digest snapshot.** The screen is a derived local read surface; `your_week_period` is an app preference, not Digest state.
@@ -160,3 +163,4 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | 2026-09-26 | 38.4 | Your Week heatmap fit-to-width (RG-033 AUD-UIA-010, D-13): cells sized from the measured width by `fitHeatmapCell` between `MIN_CELL` 36 / `MAX_CELL` 56, grid centered, nothing rendered until measured; every day visible with no horizontal scroll. |
 | 2026-09-26 | 38.4 | Digest shell and foreground reads skip while the app is backgrounded (38.3 VERIFICATION W2, D-10): the refresh controller's `isVisible` is `isForegroundVisible(isFocusedRef.current, AppState.currentState)` — the synchronous app state, never a lagging React mirror — so a warm notification action's shell tick reads nothing in the background; focus and the post-sweep foreground (resume) read still run. No legacy-data repair (38.2 D-23). |
 | 2026-09-30 | 38.6 | Your Week day detail shows each interaction contact's real photo: `YourWeekDayRow.contactPhoto` is selected in both UNION arms (NULL for Group Events), bind count and index use unchanged (ADR-180, D-14). |
+| 2026-10-11 | 38.9 | Digest dates (Horizon birthday tag with weekday, Your Week day detail and heatmap labels) use the shared date-only formatter, with a separate `dateKey` for storage-form keys; Horizon reads "Never Contacted" (ADR-205, ADR-206). |
