@@ -1,6 +1,6 @@
 # Profile presentation
 
-**Last updated:** 2026-10-08
+**Last updated:** 2026-10-09
 **Updated by phase:** 38.8-history-navigation-ux
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
@@ -151,7 +151,10 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-078:** Off Limits remains a local caution surface and is not an AI/search/dashboard permission proxy.
 - **ADR-079:** Compose is the only suggestion invocation; the Profile AI draft entry is retired.
 - **ADR-081:** Per-item explicit AI permission replaces proposed fuel permission; no implicit permission is inferred here.
-- **ADR-123:** Profile History Section Replacing the Vertical Timeline — mounts the full History & Insights section behind the `interaction-history` renderer seam without migrating layout/collapse state; the knowledge-change edit reuses the screen's existing navigation.
+- **ADR-123:** Profile History Section Replacing the Vertical Timeline — mounts the full History & Insights section behind the `interaction-history` renderer seam without migrating layout/collapse state; the knowledge-change edit reuses the screen's existing navigation. Partially superseded by ADR-193 and ADR-194 (the Rolodex and card/sheet flows); the renderer seam and layout handling stand.
+- **ADR-193:** Activity-First History Stream in Profile, Replacing the Rolodex — the History module renders the stream under the visible title 'History'; the `interaction-history` key and saved layouts are unchanged.
+- **ADR-194:** Heatmap Jump-and-Highlight with No Count Card, and Honest Empty Targets — the host measures heatmap and note targets against the History anchor (`requestHistoryScroll`) to scroll the Profile.
+- **ADR-197:** History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load — `HistorySection` is keyed by contact, and the collapsed-History reveal settles after History's loaded content lays out.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — Profile supplies the origin-aware Message entry into session-only Compose.
 - **ADR-138:** Complete Portable Backup Format v5 — carries the complete Profile presentation graph and staged background bytes by durable parent UID.
 - **ADR-150:** Semantic Profile Hierarchy and Source-Owned Knowledge Editing — assigns heading/body ownership, bounded temporal preview, source-owned edit routes, and overflow Unbind placement.
@@ -223,3 +226,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-30 | 38.6 | Hero photo 224 (`PROFILE_HERO_AVATAR_SIZE`), growing upward; `profileContentTopPadding` keeps the name at the pre-38.6 260 line. The favourite star moves from the hero's utility row into `ProfileAppBar` beside ⋮ (≥44 hit area, Add/Remove Favorites labels). The bar overlays the scroll view (`box-none`) with a threshold-gated scroll scrim, and in-Profile scroll targets are offset by its 56 px height. Tapping a stored photo opens the reusable `PhotoLightbox` as the `"photo"` `ProfileOverlay`: pinch to 4×, double-tap to 2.5×, pan, swipe-down/Back/labelled ✕ close, TalkBack focus on Close. A lost photo shows "Photo unavailable" and has no lightbox (ADR-183, ADR-182). |
 | 2026-10-08 | 38.8 | The History module renders the new History stream (Heatmap, Intensity, Jump to date, stream) instead of the Rolodex and Detail Sheet, under the visible title "History" with the `interaction-history` key and saved layouts unchanged; the host scrolls the Profile to heatmap/Jump targets measured against the History anchor. Device pass: the collapsed-History reveal from Last Interaction / View history can stop short while History is still loading (open, see the 38.8 phase-end report). |
 | 2026-10-09 | 38.8 | Collapsed-History reveal fixed (D-72, G1, gap plan 07): an expanding reveal settles with a second scroll once History's loaded content lays out (`83203b0b`); the Year heatmap and the no-cadence Cycles explanation now report their first layout so the settle also fires there (`9bcb48b7`). Device re-check 11/11 on DEBUG (`ea983264`). This closes the open device-pass item in the row above. The host's History scroll requests take a lead-in so the empty-day note scrolls only just into view (D-73). |
+| 2026-10-09 | 38.8 | KB extraction: Decisions cite ADR-193, ADR-194 and ADR-197, and note ADR-123's partial supersession. |
