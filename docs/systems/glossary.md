@@ -138,9 +138,7 @@ None. The constants are the configuration.
 
 - **ADR-132:** Focused Rapid-Capture Workflows — names the visible action "Log Interaction".
 - **ADR-026:** Rogue Status for Unresponsive or Far-Overdue Contacts — the Rogue band.
-- **Phase 38.9 D-21, D-22, D-41, D-42, D-49, D-56, D-63** (`.planning/phases/38.9-ux-standards/38.9-CONTEXT.md`)
-  — the canonical terms, the enforcements and the rule that decided terms are not renamed.
-  These are extracted to ADRs at milestone close.
+- **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — the canonical terms, the enforcements (Contacts, Log Interaction, Wobbly, Event, Never Contacted, Favorite), the rule that decided terms are not renamed, "Make this an event", and `plural()` (38.9 D-21, D-22, D-41, D-42, D-49, D-56, D-63, D-74, D-75).
 - **Phase 38.10 D-01, D-87, D-90, D-105** (`.planning/phases/38.10-fuel-retirement-things-to-remember/38.10-CONTEXT.md`)
   — the Things to Remember terms, the Profile entry-sheet wording and the removal of "fuel"
   (D-01); "Avoid" is not a retired form.
@@ -177,5 +175,6 @@ None. The constants are the configuration.
 | 2026-10-11 | 38.9 | Created: canonical constants (D-21, D-41), Never Contacted / Favorite / Wobbly / Log Interaction / Contacts enforced app-wide (D-22, D-42, D-49, D-56), retired-form contract. |
 | 2026-10-11 | 38.9 | "Event(s)" as the user-facing noun (D-22); developer wording rewritten in plain words in the converted screens (D-41, D-63); contract extended with both. |
 | 2026-10-11 | 38.9 | "group interaction" retired: the conversion entry and its prompt read "Make this an event" (D-22; fix-pass verification IN-02). |
+| 2026-10-11 | 38.9 | KB extraction: the 38.9 decisions are cited as ADR-206. |
 | 2026-10-13 | 38.10 | Things to Remember, Off Limits, Close and Not set added as canonical terms (D-90); the Profile's section registry, entry sheet and custom-field display read them; the contract pins their values (plan 16). |
 | 2026-10-13 | 38.10 | "fuel" retired from code and wording (D-01, D-87), enforced by `src/no-fuel-contract.test.ts` with a migration allowlist rather than by `RETIRED_FORMS` (plan 18). |
