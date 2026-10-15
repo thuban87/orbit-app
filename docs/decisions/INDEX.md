@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 40 of
-  185 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 43 of
+  192 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -76,9 +76,9 @@ not something you can pattern-match against.
 | 043 | Static Globally Mirrored Favourites Widget | Accepted | 12-home-screen-widget | — | ADR-075 (partial — ordering source only) | — | 3/4 live | `src/db`, `src/services/widget` |
 | 044 | Headless Widget Actions and Dashboard-Rooted Deep Links | Accepted | 12-home-screen-widget | — | ADR-074 (partial) | — | 4 | `src/navigation`, `src/services/widget` |
 | 045 | Event-Driven Widget Refresh and Boot Recovery | Accepted | 12-home-screen-widget | — | — | — | 4 | `plugins`, `src/services/notifications`, `src/services/widget` |
-| 046 | Query-Time Orrery Placement and Transactional Ring Ordering | Accepted | 13-orrery | — | — | — | 4 | `src/db`, `src/logic` |
+| 046 | Query-Time Orrery Placement and Transactional Ring Ordering | Accepted | 13-orrery | — | ADR-187 (partial) | — | 4 | `src/db`, `src/logic` |
 | 047 | App-Level Assignable Sun and Themed Self Identity | Accepted | 13-orrery | — | — | — | 5/6 live | `src/db`, `src/db/migrations`, `src/logic` +1 |
-| 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | ADR-077 (partial — dual view/morph) | — | 4/7 live | `src/components`, `src/navigation`, `src/screens` |
+| 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | ADR-077 (partial — dual view/morph); ADR-189 (partial) | — | 4/7 live | `src/components`, `src/navigation`, `src/screens` |
 | 049 | BYO-Key AI Configuration and Credential Boundary | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/services` |
 | 050 | Closed AI Prompt Egress Allowlist and Opt-In Field Sharing | Accepted | 14-ai-message-suggestions | — | ADR-078 (partial — Off Limits and permitted interaction notes) | — | 5 | `src/ai`, `src/components`, `src/db` |
 | 051 | Public-HTTPS Custom AI Egress Guard | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `modules/orbit-secure-fetch/src`, `src/ai`, `src/ai/__fixtures__` +1 |
@@ -107,7 +107,7 @@ not something you can pattern-match against.
 | 074 | Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe | Accepted | 21-interaction-assist-reach-out | ADR-044 (partial) | — | — | 5 | `src/navigation`, `src/screens`, `src/services/widget` |
 | 075 | Binary Favourite Membership Without a User-Facing Order | Accepted | milestone-2 | ADR-033 (full); ADR-043 (partial — ordering source only) | — | — | 3/6 live | `src/db`, `src/services/widget` |
 | 076 | Population-Reached Birthdays Without a Dashboard Banner | Accepted | milestone-2 | ADR-034 (partial — banner) | — | — | 3/4 live | `src/db`, `src/logic`, `src/screens` |
-| 077 | Single Canonical Orrery with a Constrained Inspection Camera | Accepted | milestone-2 | ADR-048 (partial — dual view/morph) | — | — | 2/4 live | `src/components`, `src/screens` |
+| 077 | Single Canonical Orrery with a Constrained Inspection Camera | Accepted | milestone-2 | ADR-048 (partial — dual view/morph) | ADR-189 (partial) | — | 2/4 live | `src/components`, `src/screens` |
 | 078 | Negative-Constraint Off Limits and Gated Recent-Interaction AI Context | Accepted | milestone-2 | ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side) | ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force) | — | 4/5 live | `src/ai`, `src/db`, `src/screens` |
 | 079 | On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation | Accepted | milestone-2 | ADR-052 (partial — acknowledgement and Profile entry) | — | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | ADR-146 (partial) | — | 3/4 live | `src/navigation`, `src/screens` |
@@ -209,10 +209,17 @@ not something you can pattern-match against.
 | 176 | Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 9/13 live | `assets`, `plugins`, `scripts` +2 |
 | 177 | Mode-Specific Background Art and Signed Per-Combination Art Treatments | Accepted | 38.5-background-art-text-contrast | ADR-115 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and the Contacts/Digest headers, where signed); ADR-087 (partial — one asset per slot used in both modes); ADR-113 (partial — the one-asset-per-slot library of eight WebPs) | — | — | 17 | `scripts`, `src/components`, `src/components/ui` +4 |
 | 178 | Restore Asks Before Replacing an Unavailable Background Id with the Package Default | Accepted | 38.5-background-art-text-contrast | None (replaces the phase's own threat mitigation T-38.5-05-03, a whole-restore abort that no ADR recorded) | — | — | 9 | `src/backup`, `src/db`, `src/screens` |
-| 179 | Owner-Ruled Art Treatments Beyond the Signed Table | Accepted | 38.5-background-art-text-contrast | — | — | — | 15 | `src/components`, `src/components/control-surface`, `src/screens` +2 |
+| 179 | Owner-Ruled Art Treatments Beyond the Signed Table | Accepted | 38.5-background-art-text-contrast | — | ADR-189 (partial) | — | 15 | `src/components`, `src/components/control-surface`, `src/screens` +2 |
 | 180 | Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface | Accepted | 38.6-photo-handling | — | — | — | 23 | `src/backup`, `src/components`, `src/components/digest` +4 |
 | 181 | One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies | Accepted | 38.6-photo-handling | ADR-021 (partial — the one 512×512 JPEG master's size and format die; one master per target, the document directory, identity-derived `.jpg` names and the crash-safe swap and cleanup survive) | — | — | 14/16 live | `src/components/orrery`, `src/screens`, `src/services/backup` +3 |
 | 182 | Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos | Accepted | 38.6-photo-handling | — | — | — | 17 | `src/backup`, `src/components`, `src/components/profile` +6 |
 | 183 | 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox | Accepted | 38.6-photo-handling | — | — | — | 6 | `src/components`, `src/components/orrery`, `src/components/profile` +1 |
 | 184 | Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos | Accepted | 38.6-photo-handling | — | — | — | 5 | `src/components`, `src/components/ui` |
 | 185 | Assist Banner Renders in Flow Above the Tab Navigator | Accepted | 38.6-photo-handling | — | — | — | 7 | `src/components`, `src/navigation`, `src/screens` +1 |
+| 186 | Orrery V2 Imperative Picture Renderer Behind a Platform Render Host | Accepted | 38.7-orrery-v2 | — | — | — | 16/23 live | `patches`, `src/components/orrery`, `src/components/orrery/resources` +3 |
+| 187 | Tilted Strategy-Map Home, Dolly Camera, One Projected Size, and Bodies on Their Rings | Accepted | 38.7-orrery-v2 | ADR-046 (partial — the read-time bounded drift push dies; query-time placement, dense `ring_seq` rank and the guarded reorder transaction survive) | — | — | 9 | `src/components/orrery`, `src/logic` |
+| 188 | Reticle Focus, Docked Card, Cluster Zoom-In, Tap-Only Focus, and Persistent-Chrome Framing | Accepted | 38.7-orrery-v2 | — | — | — | 13 | `src/components/orrery`, `src/components/orrery/v2`, `src/logic` +1 |
+| 189 | Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion | Accepted | 38.7-orrery-v2 | ADR-077 (partial — "the subtle starfield and sun pulse remain the sole ambient animation" dies; one unmountable ambient owner that unmounts on blur or background survives); ADR-048 (partial — the same "sole ambient animation" clause); ADR-179 (partial — "The Orrery keeps its solid background" dies for the in-canvas sky; BackgroundHost art on the Orrery route stays `none` and the rest of ADR-179 stands) | — | — | 11 | `src/components/orrery/v2`, `src/logic`, `src/theme` |
+| 190 | Lit Status Bodies, Star Sun, Moon Bumps, Stack Pips, and Hermes-Safe Initials | Accepted | 38.7-orrery-v2 | — | — | — | 8 | `src/components/orrery`, `src/components/orrery/v2`, `src/logic` |
+| 191 | Star-Warp System Switch Starting on the Tap, with Lab C's Camera | Accepted | 38.7-orrery-v2 | — | — | — | 7 | `src/components/orrery`, `src/components/orrery/v2`, `src/logic` |
+| 192 | Bounded Warm Resource Cache Across Tab Blur | Accepted | 38.7-orrery-v2 | — | — | — | 6 | `src/components/orrery`, `src/components/orrery/resources`, `src/components/orrery/v2` +1 |

@@ -55,9 +55,9 @@
 // IMPORTANT: ADR-0043 [SUPERSEDED BY ADR-075 (partial — ordering source only)] Static Globally Mirrored Favourites Widget
 // IMPORTANT: ADR-0044 [SUPERSEDED BY ADR-074 (partial)] Headless Widget Actions and Dashboard-Rooted Deep Links
 // NOTE: ADR-0045 [ACCEPTED] Event-Driven Widget Refresh and Boot Recovery
-// NOTE: ADR-0046 [ACCEPTED] Query-Time Orrery Placement and Transactional Ring Ordering
+// IMPORTANT: ADR-0046 [SUPERSEDED BY ADR-187 (partial)] Query-Time Orrery Placement and Transactional Ring Ordering
 // NOTE: ADR-0047 [ACCEPTED] App-Level Assignable Sun and Themed Self Identity
-// IMPORTANT: ADR-0048 [SUPERSEDED BY ADR-077 (partial — dual view/morph)] Status-Default Static Orrery with a Single-Canvas Morph
+// IMPORTANT: ADR-0048 [SUPERSEDED BY ADR-077 (partial — dual view/morph); ADR-189 (partial)] Status-Default Static Orrery with a Single-Canvas Morph
 // NOTE: ADR-0049 [ACCEPTED] BYO-Key AI Configuration and Credential Boundary
 // IMPORTANT: ADR-0050 [SUPERSEDED BY ADR-078 (partial — Off Limits and permitted interaction notes)] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
 // NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
@@ -86,7 +86,7 @@
 // NOTE: ADR-0074 [ACCEPTED] Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe
 // NOTE: ADR-0075 [ACCEPTED] Binary Favourite Membership Without a User-Facing Order
 // NOTE: ADR-0076 [ACCEPTED] Population-Reached Birthdays Without a Dashboard Banner
-// NOTE: ADR-0077 [ACCEPTED] Single Canonical Orrery with a Constrained Inspection Camera
+// IMPORTANT: ADR-0077 [SUPERSEDED BY ADR-189 (partial)] Single Canonical Orrery with a Constrained Inspection Camera
 // IMPORTANT: ADR-0078 [SUPERSEDED BY ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force)] Negative-Constraint Off
 // NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
 // IMPORTANT: ADR-0080 [SUPERSEDED BY ADR-146 (partial)] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
@@ -188,12 +188,19 @@
 // NOTE: ADR-0176 [ACCEPTED] Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs
 // NOTE: ADR-0177 [ACCEPTED] Mode-Specific Background Art and Signed Per-Combination Art Treatments
 // NOTE: ADR-0178 [ACCEPTED] Restore Asks Before Replacing an Unavailable Background Id with the Package Default
-// NOTE: ADR-0179 [ACCEPTED] Owner-Ruled Art Treatments Beyond the Signed Table
+// IMPORTANT: ADR-0179 [SUPERSEDED BY ADR-189 (partial)] Owner-Ruled Art Treatments Beyond the Signed Table
 // NOTE: ADR-0180 [ACCEPTED] Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface
 // NOTE: ADR-0181 [ACCEPTED] One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies
 // NOTE: ADR-0182 [ACCEPTED] Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos
 // NOTE: ADR-0183 [ACCEPTED] 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox
 // NOTE: ADR-0184 [ACCEPTED] Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos
 // NOTE: ADR-0185 [ACCEPTED] Assist Banner Renders in Flow Above the Tab Navigator
+// NOTE: ADR-0186 [ACCEPTED] Orrery V2 Imperative Picture Renderer Behind a Platform Render Host
+// NOTE: ADR-0187 [ACCEPTED] Tilted Strategy-Map Home, Dolly Camera, One Projected Size, and Bodies on Their Rings
+// NOTE: ADR-0188 [ACCEPTED] Reticle Focus, Docked Card, Cluster Zoom-In, Tap-Only Focus, and Persistent-Chrome Framing
+// NOTE: ADR-0189 [ACCEPTED] Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion
+// NOTE: ADR-0190 [ACCEPTED] Lit Status Bodies, Star Sun, Moon Bumps, Stack Pips, and Hermes-Safe Initials
+// NOTE: ADR-0191 [ACCEPTED] Star-Warp System Switch Starting on the Tap, with Lab C's Camera
+// NOTE: ADR-0192 [ACCEPTED] Bounded Warm Resource Cache Across Tab Blur
 
-export const ADR_COUNT = 185;
+export const ADR_COUNT = 192;
