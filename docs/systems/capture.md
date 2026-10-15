@@ -1,7 +1,7 @@
 # Capture
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/db/capture-read.ts`, `src/db/capture-dao.ts`, `src/logic/capture-logic.ts`, `src/screens/CaptureScreen.tsx`
 
 ## Purpose
@@ -78,6 +78,10 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 4. Confirmation uses a short timeout before the native finish bridge returns to the app that shared the content.
 5. Each successful capture fuel write publishes a best-effort Widget refresh after the transaction, without changing the no-touchpoint rule.
 
+### Going Back
+
+`CaptureScreen`'s BackHandler always consumes Back and resolves it with `resolveCaptureBack` (`src/screens/capture-back-logic.ts`), innermost surface first: an open New-contact sheet closes (prompting "Discard changes?" if a name is typed), then search closes and clears, then multi-select exits, then a typed note prompts instead of being discarded; only with nothing open or typed does Back cancel the capture and return to the sharing app (ADR-200). Capture keeps its own chrome, outside the shared child header.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -91,6 +95,7 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 - **ADR-038:** Contact-Owned Share Capture Fuel — preserves non-null ownership, canonical URLs, immediate fuel writes, and no-touchpoint semantics.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — refreshes a larger widget fuel line after capture commits.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — keeps inline name-only creation explicitly Bound with a positive cadence.
+- **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — Capture's Back closes the innermost surface first and prompts for typed text.
 
 ## Gotchas
 
@@ -116,3 +121,4 @@ Capture owns no table or migration. It composes existing local SQLite data: `con
 | 2026-08-16 | 10 | Created Android share-sheet capture with local contact selection and fuel writes. |
 | 2026-08-16 | 12 | Added post-capture widget refresh publishing. |
 | 2026-08-27 | 18.2 | Made inline name-only creation explicit about its Bound lifecycle contract. |
+| 2026-10-11 | 38.9 | Back closes the innermost Capture surface first and prompts "Discard changes?" for a typed name or note instead of cancelling the share (D-33, ADR-200). |
