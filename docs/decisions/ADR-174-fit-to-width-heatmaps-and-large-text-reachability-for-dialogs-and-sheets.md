@@ -77,4 +77,4 @@ Destructive confirmations stay non-dismissable (ADR-086), and the resume prompts
 - `src/components/recovery-prompts-large-text-contract.test.ts` — resume prompt contract.
 
 **Depends on:** ADR-086 (Semantic Icons and Accessible Interaction Primitives); ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses); ADR-148 (Portable Your Week Period and Group-Deduplicated Activity Aggregation)
-**Required by:** None
+**Required by:** ADR-198 (Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays)

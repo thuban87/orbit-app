@@ -60,4 +60,4 @@ Every tab root (Contacts, Events, Digest, Orrery, Settings hub) uses `ShellAppBa
 - `src/navigation/tab-root-chrome-contract.test.ts` — tab-root header contract.
 
 **Depends on:** ADR-140 (Navigation-First Settings Directory and Canonical Sub-Routes); ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing); ADR-086 (Semantic Icons and Accessible Interaction Primitives)
-**Required by:** None
+**Required by:** ADR-201 (Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen)

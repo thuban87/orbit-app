@@ -50,4 +50,4 @@ Profile headings identify sections only; semantic module bodies own values, empt
 - `src/navigation/types.ts` — types Profile-origin editor routes.
 
 **Depends on:** ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors); ADR-110 (Coherent Local Profile Snapshot and Source-Owned Knowledge Projection); ADR-123 (Profile History Section Replacing the Vertical Timeline)
-**Required by:** None
+**Required by:** ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State)

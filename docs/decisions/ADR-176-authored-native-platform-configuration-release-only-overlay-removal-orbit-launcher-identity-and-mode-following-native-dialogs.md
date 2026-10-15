@@ -71,4 +71,4 @@ Native dialogs follow Orbit's mode setting (D-50). `useNativeColorSchemeSync` dr
 - `src/theme/native-color-scheme.test.ts` — mapping contract.
 
 **Depends on:** ADR-003 (Read-Contacts on API 37 for Reconcile); ADR-083 (Durable Multi-Package Theme Configuration and Restore-Before-Paint); ADR-007 (Cross-Machine Android Build Pipeline)
-**Required by:** None
+**Required by:** ADR-204 (One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay)

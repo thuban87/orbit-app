@@ -68,4 +68,4 @@ Before 38.5 each background slot shipped one image for both modes, so Galaxy Lig
 - `scripts/check-background-art.py` — the per-pixel art acceptance checker.
 
 **Depends on:** ADR-115 (Visible Mode-Aware Background Surface Composition); ADR-169 (Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract)
-**Required by:** ADR-178 (Restore Asks Before Replacing an Unavailable Background Id with the Package Default); ADR-179 (Owner-Ruled Art Treatments Beyond the Signed Table)
+**Required by:** ADR-178 (Restore Asks Before Replacing an Unavailable Background Id with the Package Default); ADR-179 (Owner-Ruled Art Treatments Beyond the Signed Table); ADR-201 (Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen)

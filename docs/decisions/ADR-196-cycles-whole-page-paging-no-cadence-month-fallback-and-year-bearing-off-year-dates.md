@@ -50,4 +50,4 @@ All four lenses (Cycles, 7 Days, Month, Year) and the 5/10/15/20 presets stay, w
 - `src/components/SegmentedControl.tsx` — the opt-in `compact` density (`COMPACT_SEGMENT`).
 
 **Depends on:** ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses); ADR-165 (In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History)
-**Required by:** None
+**Required by:** ADR-205 (One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates)

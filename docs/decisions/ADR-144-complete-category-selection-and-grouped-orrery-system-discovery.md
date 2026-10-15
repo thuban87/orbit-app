@@ -52,4 +52,4 @@ The system uses one complete local category catalog: normal controls through 12 
 - `src/stores/orrery-system-store.ts` — persists the safe All Contacts fallback for a removed selected Category System.
 
 **Depends on:** ADR-104 (Durable Orrery Preferences and Live System Scope); ADR-142 (User-Owned Categories with Stable Identity and Canonical Ordering)
-**Required by:** None.
+**Required by:** ADR-204 (One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay)

@@ -52,4 +52,4 @@ The system soft-deletes Memories into Recently Deleted and permits permanent rem
 - `src/screens/RecentlyDeletedScreen.tsx` — exposes restore and confirmed permanent Memory deletion.
 
 **Depends on:** ADR-015 (Lossless Field Changes with Quarantine and Launch-Time Retention Sweep); ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-069 (Atomic Tombstone-Backed Orbit Contact Merge)
-**Required by:** _None._
+**Required by:** _None._; ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State); ADR-205 (One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates)

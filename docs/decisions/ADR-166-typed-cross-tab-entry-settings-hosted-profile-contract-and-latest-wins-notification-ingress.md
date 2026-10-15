@@ -56,4 +56,4 @@ All cross-tab navigation goes through `navigateIntoTab(navigator, tab, screen, p
 - `src/navigation/notification-gate.tsx` — cold/warm ingress chronology and `finally` clear.
 
 **Depends on:** ADR-040 (Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing); ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log); ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors); ADR-141 (Explicit-Host Dual-Home Backup Navigation); ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing)
-**Required by:** None
+**Required by:** ADR-202 (History Back Across Tabs and + Forms Over the Current Tab)
