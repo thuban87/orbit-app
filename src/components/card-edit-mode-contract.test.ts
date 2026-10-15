@@ -328,6 +328,57 @@ describe("Add/Edit Contact reveal an inline edit form that opens after its cards
       expect(new Set(refs).size).toBe(count);
     });
   }
+
+  it("Update Contact: Memory, Key People and Off Limits scroll an opened entry's form into view, with card edit mode still off", () => {
+    const file = "src/screens/UpdateContactScreen.tsx";
+    const source = read(file);
+    // The screen owns the reveal and wires its ScrollView for it.
+    expect(source).toContain(
+      "const { scrollRef, contentRef, reveal } = useFirstErrorReveal();",
+    );
+    const [scroll] = openingTags(source, "ScrollView");
+    expect(scroll).toContain("ref={scrollRef}");
+    expect(scroll).toContain("innerViewRef={contentRef}");
+
+    // The in-place Memory and Key People editors reveal through onEditOpen.
+    const editors = [
+      ["MemoryFocusedEditor", "MemoryEditor"],
+      ["KeyPeopleFocusedEditor", "RelationshipEditor"],
+    ] as const;
+    const refs = editors.map(([host, tag]) => {
+      const body = functionSource(source, host);
+      const tags = openingTags(body, tag);
+      expect(tags).toHaveLength(1);
+      const [editor] = tags;
+      expect(editor).not.toMatch(/\bcardEditMode\b/);
+      const ref = /formRef=\{(\w+)\}/.exec(editor)?.[1];
+      expect(ref, editor).toBeDefined();
+      expect(editor).toContain(`onEditOpen={() => reveal(${ref})}`);
+      expect(body).toContain(`const ${ref} = useRef<View>(null);`);
+      return ref;
+    });
+
+    // Off Limits keeps its always-open form after the rows; opening a row
+    // (not the new-item form) reveals it.
+    const offLimits = functionSource(source, "OffLimitsFocusedEditor");
+    const [form] = openingTags(offLimits, "OffLimitsForm");
+    expect(form).toContain("formRef={offLimitsFormRef}");
+    expect(offLimits).toContain("const offLimitsFormRef = useRef<View>(null);");
+    expect(offLimits).toMatch(
+      /const openForm = [\s\S]*?if \(row !== null\) reveal\(offLimitsFormRef\);[\s\S]*?\};/,
+    );
+    expect(new Set([...refs, "offLimitsFormRef"]).size).toBe(3);
+
+    // Each of the three receives the screen's reveal.
+    for (const host of [
+      "MemoryFocusedEditor",
+      "KeyPeopleFocusedEditor",
+      "OffLimitsFocusedEditor",
+    ]) {
+      const [usage] = openingTags(source, host);
+      expect(usage, host).toContain("reveal={reveal}");
+    }
+  });
 });
 
 describe("an editId opens its form only once (D-107; review IN-02)", () => {

@@ -80,6 +80,7 @@ import {
 } from "@/components/RelationshipEditor";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button, EntryDateField } from "@/components/ui";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import {
   getAiPermissionDefaults,
   memoryAiDefaultsMap,
@@ -257,6 +258,14 @@ function useRowSave(rowSave: RowSave) {
   };
   return { saving, setSaving, savingRef: rowSave.ref };
 }
+
+/**
+ * The screen's scroll-into-view (`useFirstErrorReveal`). An entry's edit form
+ * opens after its editor's cards or rows, so opening it scrolls the form into
+ * view and the tap visibly opens something, as on Add/Edit Contact (38.10
+ * verification). Card edit mode stays off here (D-130).
+ */
+type Reveal = ReturnType<typeof useFirstErrorReveal>["reveal"];
 
 /** The Button.tsx disabled look (D-26 "dimmed") for this file's Pressables. */
 const DISABLED_OPACITY = 0.5;
@@ -476,6 +485,7 @@ function KeyPeopleFocusedEditor({
   onDraftStateChange,
   onCancelRequest,
   rowSave,
+  reveal,
 }: {
   contactId: number;
   /** For the snackbars (38.9 D-39/D-46); null while it loads. */
@@ -487,8 +497,11 @@ function KeyPeopleFocusedEditor({
   onDraftStateChange: (state: RelationshipDraftState) => void;
   onCancelRequest: (close: () => void) => void;
   rowSave: RowSave;
+  reveal: Reveal;
 }) {
   const [items, setItems] = useState<RelationshipRow[]>([]);
+  // An Edit's form opens after the rows: scroll it into view.
+  const relationshipFormRef = useRef<View>(null);
   const nameRef = useNameRef(personName);
   const [savedTick, setSavedTick] = useState(0);
   // Synchronous single-flight guard so a double-tap cannot INSERT a duplicate
@@ -628,6 +641,8 @@ function KeyPeopleFocusedEditor({
         onEdit={edit}
         onDelete={remove}
         ref={relationshipRef}
+        formRef={relationshipFormRef}
+        onEditOpen={() => reveal(relationshipFormRef)}
         onDraftStateChange={onDraftStateChange}
         onCancelRequest={onCancelRequest}
         busy={saving}
@@ -662,6 +677,7 @@ function MemoryFocusedEditor({
   onDraftStateChange,
   onCancelRequest,
   rowSave,
+  reveal,
 }: {
   contactId: number;
   title: string;
@@ -674,9 +690,12 @@ function MemoryFocusedEditor({
   onDraftStateChange: (state: MemoryDraftState) => void;
   onCancelRequest: (close: () => void) => void;
   rowSave: RowSave;
+  reveal: Reveal;
 }) {
   const { colors } = useTheme();
   const nameRef = useNameRef(personName);
+  // A card's form opens after the cards: scroll it into view.
+  const memoryFormRef = useRef<View>(null);
   const [phase, setPhase] = useState<ReadPhase<MemoryEditorData>>(readLoading);
   // Only the latest load may publish; unmount invalidates outstanding reads.
   const readAuthority = useMemo(() => createLatestRequestAuthority(), []);
@@ -868,6 +887,8 @@ function MemoryFocusedEditor({
           globalAiEnabled={phase.data.globalAiEnabled}
           aiDefaults={phase.data.aiDefaults}
           ref={memoryRef}
+          formRef={memoryFormRef}
+          onEditOpen={() => reveal(memoryFormRef)}
           onDraftStateChange={onDraftStateChange}
           onCancelRequest={onCancelRequest}
           busy={saving}
@@ -890,6 +911,7 @@ function OffLimitsFocusedEditor({
   onCancel,
   onDirtyChange,
   rowSave,
+  reveal,
 }: {
   contactId: number;
   /** For the snackbars (38.9 D-39/D-46); null while it loads. */
@@ -898,10 +920,13 @@ function OffLimitsFocusedEditor({
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   rowSave: RowSave;
+  reveal: Reveal;
 }) {
   const { colors } = useTheme();
   const nameRef = useNameRef(personName);
   const [items, setItems] = useState<OffLimitsRow[]>([]);
+  // A row's form opens after the rows: scroll it into view.
+  const offLimitsFormRef = useRef<View>(null);
   // The open form: a new item (the default), or one stored row.
   const [editing, setEditing] = useState<OffLimitsRow | null>(null);
   // Remounts the form for each open (it owns its draft).
@@ -955,6 +980,9 @@ function OffLimitsFocusedEditor({
     setFormKey((key) => key + 1);
     setFormDirty(false);
     setEditing(row);
+    // Not for the new-item form (after a delete): only an opened row moves.
+    // The reveal waits a frame, so the re-keyed form has mounted by then.
+    if (row !== null) reveal(offLimitsFormRef);
   };
 
   const save = async (fields: OffLimitsFormFields) => {
@@ -1035,6 +1063,7 @@ function OffLimitsFocusedEditor({
       <OffLimitsForm
         key={formKey}
         testID="update-off-limits-form"
+        formRef={offLimitsFormRef}
         initial={editing}
         onSave={save}
         // The form's Cancel closes the row, as the frame's Cancel does, so
@@ -1452,6 +1481,8 @@ export function UpdateContactScreen({
   route,
 }: RootStackScreenProps<"UpdateContact">) {
   const { colors } = useTheme();
+  // Scrolls an opened entry form into view (the row editors' `reveal`).
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
   const [session, setSession] = useState(() =>
     startSession(route.params?.contactId ?? null),
   );
@@ -1642,6 +1673,7 @@ export function UpdateContactScreen({
             onSaved={onSaved}
             onCancel={requestRowCancel}
             rowSave={rowSave}
+            reveal={reveal}
             relationshipRef={relationshipRef}
             onDraftStateChange={onRelationshipDraftState}
             onCancelRequest={() => requestInnerCancel()}
@@ -1656,6 +1688,7 @@ export function UpdateContactScreen({
             onSaved={onSaved}
             onCancel={requestRowCancel}
             rowSave={rowSave}
+            reveal={reveal}
             memoryRef={memoryRef}
             onDraftStateChange={onMemoryDraftState}
             onCancelRequest={() => requestInnerCancel()}
@@ -1669,6 +1702,7 @@ export function UpdateContactScreen({
             onSaved={onSaved}
             onCancel={requestRowCancel}
             rowSave={rowSave}
+            reveal={reveal}
             onDirtyChange={setActiveRowDirty}
           />
         );
@@ -1735,7 +1769,11 @@ export function UpdateContactScreen({
         person={person}
         backDisabled={rowSaving}
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
+        contentContainerStyle={styles.content}
+      >
         {session.activeRowKey !== null ? (
           renderActiveEditor()
         ) : (
