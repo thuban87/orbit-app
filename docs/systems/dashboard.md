@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -85,10 +85,10 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 ### Building the eligible result universe
 
 1. An empty explicit population set resolves to Active Contacts: non-archived, Bound, status-bearing contacts only.
-2. Explicit Favorites, Birthdays, Not Contacted, Snoozed, and All Contacts selections combine as a deduplicated OR-union beneath the archived-and-Bound scope. All Contacts is Active Contacts plus Not Contacted.
+2. Explicit Favorites, Birthdays, Not Contacted, Snoozed, and All Contacts selections combine as a deduplicated OR-union beneath the archived-and-Bound scope. All Contacts is Active Contacts plus Not Contacted. The population labels come from the glossary constants: the user sees "Favorites" and "Never Contacted", while the persisted population ids (e.g. `favourites`) are unchanged (ADR-206).
 3. SQL-expressible filters combine OR within a family and AND across families. Current snoozes stay in Active and All Contacts, but Needs Attention suppresses them.
 4. `listDashboardPopulation()` orders the result with a population-aware Default or an explicit persisted override, then applies selected Gravity tiers in TypeScript without changing that order.
-5. The returned rows are the sole eligible universe for Dashboard search and empty-state decisions.
+5. The returned rows are the sole eligible universe for Dashboard search and empty-state decisions. A search that finds nothing shows the shared `EmptyState` (icon, the truncated search term, one help line, "Clear search"); hidden never-contacted people are announced as "N never contacted →" (ADR-199, ADR-206).
 
 ### Persisting and restoring query state
 
@@ -148,7 +148,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 
 1. Select Contacts enters an in-memory session with an entry-time frozen eligible-ID universe. While active, the renderer filters refreshed rows to that universe, the normal query controls are replaced, and Select All uses only the snapshot.
 2. Card taps toggle selection, stars remain visible but non-interactive, and Back exits selection before route navigation. Ordinary committed operations retain the session; Archive removes only its committed IDs from both selection and frozen universe.
-3. The replacement control area exposes Quick Log, count-aware detailed logging, explicit favourite and snooze actions, category, Archive, and Frequency as the sole Sensitive Operation. Two or more detailed-log targets navigate with serializable `GroupLog.participantIds`; Group Event behavior remains outside Dashboard.
+3. The replacement control area exposes Quick Log, count-aware detailed logging, explicit favourite and snooze actions, category, Archive, and Frequency as the sole Sensitive Operation. The bulk Frequency sheet shows its validation error inline under the field, and bulk confirms and snackbars count through `plural()` ("Set 1 contact to every N days?") (ADR-199, ADR-206). Two or more detailed-log targets navigate with serializable `GroupLog.participantIds`; Group Event behavior remains outside Dashboard.
 4. Every writer is claimed synchronously before asynchronous work. Committed batches notify widget and shell consumers once, and that single shell tick is also Home's one re-read; failures report without claiming a completed outcome.
 5. Category assignment uses the complete shared chooser, pins Uncategorized after real rows, and re-reads the catalog before calling `bulkSetCategory`; a stale real target fails without partially writing the batch.
 
@@ -227,6 +227,9 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-177:** Mode-Specific Background Art and Signed Per-Combination Art Treatments — the List rows, Card-view cards, count label and Contacts header take their backing from the owner-signed per-combination table.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — active triggers keep the fill with accent border and text; a swiped see-through List row is backed at 50%.
 
+- **ADR-199:** App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State — the no-match empty state, inline bulk-sheet validation, and act-with-Undo for reversible bulk actions.
+- **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — "Never Contacted", "Favorites" and singular-aware counts on Contacts.
+
 ## Gotchas
 
 1. **Do not weaken Active Contacts.** Its archived, Bound, and status-bearing clauses remain separate from the Snoozed and Not Contacted population rules.
@@ -294,3 +297,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-27 | 38.4 | Contacts header count shows the contacts on screen (D-55, OA-E1; supersedes the Phase 26 total-live rule): `dashboardHeaderCount` over the displayed List/Card rows, hidden on error, initial load and zero rows; the live count stays for the empty state. |
 | 2026-09-30 | 38.6 | List photos 72 with 12 padding; Grid photos sized from the card width (48–96) by `grid-card-geometry.ts`, corner star and checkbox 5 dp from the edges with 48×48 targets, two-line names with one height per row (ADR-184). Photos follow the display revision; the `modifiedAt` / `cacheBust` props are gone from `ListRow`, `GridCard`, `ContactCard` and `CardGrid` (ADR-180). |
 | 2026-09-26 | 38.5 | Contacts entries, count label and header follow the signed per-combination art table (ADR-177). Active Population/Filters/Sort triggers are filled with accent border and text (D-46), and a swiped see-through List row is backed at 50% (D-48; ADR-179). |
+| 2026-10-11 | 38.9 | Contacts labels read "Never Contacted" and "Favorites" (ids unchanged); the no-match search shows the shared `EmptyState` with "Clear search"; the bulk Frequency sheet validates inline; counts use `plural()` (ADR-199, ADR-206). |
