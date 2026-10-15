@@ -194,6 +194,24 @@ describe("section Add FAB component (D-131 pause convention, D-132 presence)", (
     }
   });
 
+  it("never starts a timing while paused: duration 0 when blurred or backgrounded (review WR-02)", () => {
+    expect(fab).toContain(
+      "duration: reducedMotion.value || paused.value ? 0 : MORPH_DURATION_MS",
+    );
+    // Mirrored on the UI thread from focus and the foreground, never per frame.
+    expect(fab).toMatch(
+      /paused\.value = next;[\s\S]*?\}\)\(!\(isFocused && appActive\)\);/,
+    );
+    // Declared before applyTarget (its worklet closure captures it) and the
+    // pause effect runs before the suppression effect.
+    expect(fab.indexOf("const paused = useSharedValue(false)")).toBeLessThan(
+      fab.indexOf("const applyTarget"),
+    );
+    expect(fab.indexOf("paused.value = next;")).toBeLessThan(
+      fab.indexOf("suppressedShared.value = next;"),
+    );
+  });
+
   it("registers and unregisters its presence for the snackbar", () => {
     expect(fab).toMatch(/\bregister\(/);
     expect(fab).toMatch(/\bunregister\(/);

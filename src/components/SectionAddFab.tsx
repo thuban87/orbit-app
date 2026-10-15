@@ -15,8 +15,10 @@
  *   screen, while a form is open, while the keyboard is up (mirrors
  *   UniversalFab's keyboard rule) and before the read has loaded.
  * - Pause convention (CLAUDE.md, D-131): on blur or when the app leaves the
- *   foreground the morph is cancelled and snapped to its target. Reduced
- *   motion snaps it (duration 0).
+ *   foreground the morph is cancelled and snapped to its target, and while
+ *   it stays paused any later target change (the global keyboard listeners,
+ *   a save from the screen above) snaps too: duration 0, never a timing on a
+ *   hidden screen (review WR-02). Reduced motion snaps it (duration 0).
  * - Presence (D-132): while the FAB is SHOWN on a focused screen it registers
  *   in `section-fab-store`, which the root snackbar reads (plan 23).
  * - Look: the universal FAB's (accent fill, `onAccent` glyphs and ring). No
@@ -130,6 +132,8 @@ export function useSectionAddMorph({
   const target = useSharedValue(0);
   const scrollY = useSharedValue(0);
   const suppressedShared = useSharedValue(true);
+  // Blurred or backgrounded (the pause convention), mirrored for the UI thread.
+  const paused = useSharedValue(false);
   const bar = useSharedValue<LayoutBox>(EMPTY_BOX);
   const viewport = useSharedValue<LayoutBox>(EMPTY_BOX);
   const root = useSharedValue<LayoutBox>(EMPTY_BOX);
@@ -143,8 +147,9 @@ export function useSectionAddMorph({
     "worklet";
     if (next === target.value) return;
     target.value = next;
+    // Paused (blurred or backgrounded) or reduced motion: snap, never animate.
     progress.value = withTiming(next, {
-      duration: reducedMotion.value ? 0 : MORPH_DURATION_MS,
+      duration: reducedMotion.value || paused.value ? 0 : MORPH_DURATION_MS,
     });
     runOnJS(setFabShown)(next === 1);
   };
@@ -163,6 +168,20 @@ export function useSectionAddMorph({
       );
     },
   });
+
+  // Pause convention: blurred or backgrounded, the morph stops at its target,
+  // and `paused` makes every later target change snap until focus and the
+  // foreground return (WR-02). Declared ABOVE the suppression effect so a
+  // render that both pauses and changes suppression pauses first.
+  useEffect(() => {
+    runOnUI((next: boolean) => {
+      "worklet";
+      paused.value = next;
+      if (!next) return;
+      cancelAnimation(progress);
+      progress.value = snapOnPause(target.value);
+    })(!(isFocused && appActive));
+  }, [isFocused, appActive, paused, progress, target]);
 
   // Suppression is mirrored into a shared value, and the target is
   // re-evaluated from the last scroll position (a form closing while the page
@@ -204,16 +223,6 @@ export function useSectionAddMorph({
     );
     return () => subscription.remove();
   }, []);
-
-  // Pause convention: blurred or backgrounded, the morph stops at its target.
-  useEffect(() => {
-    if (isFocused && appActive) return;
-    runOnUI(() => {
-      "worklet";
-      cancelAnimation(progress);
-      progress.value = snapOnPause(target.value);
-    })();
-  }, [isFocused, appActive, progress, target]);
 
   // D-132 presence: registered only while the FAB is shown on a focused
   // screen; a hide, a blur or an unmount unregisters it.
