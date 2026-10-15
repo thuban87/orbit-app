@@ -228,6 +228,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — active triggers keep the fill with accent border and text; a swiped see-through List row is backed at 50%.
 
 - **ADR-199:** App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State — the no-match empty state, inline bulk-sheet validation, and act-with-Undo for reversible bulk actions.
+- **ADR-198:** Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays — Contacts prompts are themed and errors fired from its sheets show above them; the snooze `Alert` in `HomeScreen.tsx` is the one native Alert left (38.11).
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — "Never Contacted", "Favorites" and singular-aware counts on Contacts.
 
 ## Gotchas
