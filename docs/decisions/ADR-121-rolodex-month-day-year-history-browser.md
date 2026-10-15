@@ -46,6 +46,7 @@ The conventional vertical timeline is replaced by a specialized date browser for
 - `src/components/history/rolodex-logic.ts` — pure `rollDate`/`clampDate`/`clampToToday`, `markerFor`, and `formatDrawerSummary`.
 - `src/components/history/RolodexWheel.tsx` — one gesture-driven roller: shared-offset pan, single depth worklet, reduced-motion, steppers, silhouette markers.
 - `src/components/history/RolodexBrowser.tsx` — three synchronized wheels (Day primary) plus the lifecycle-inclusive drawer; owns the pause-on-blur lifecycle and conditional mount.
+- `docs/archive/history-rolodex/README.md` — where the three files above were archived when ADR-193 superseded this ADR (phase 38.8); anchor added at that extraction by owner ruling, the original paths are kept as the historical record.
 
 **Depends on:** ADR-119 (Reusable Count-Only History Aggregation and Canonical History Read); ADR-085 (Live Reduced-Motion Signal for Skia Ambient Animation); ADR-086 (Semantic Icons and Accessible Interaction Primitives)
 **Required by:** ADR-123 (Profile History Section Replacing the Vertical Timeline); ADR-152 (Vertical History Heatmap and Minute-Precision Timestamps)
