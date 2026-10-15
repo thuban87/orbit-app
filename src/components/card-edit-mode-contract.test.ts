@@ -241,6 +241,19 @@ describe("card edit mode: the Key People editor (D-130)", () => {
   });
 });
 
+describe("an editId opens its form only once (D-107; review IN-02)", () => {
+  for (const [name, file] of [
+    ["section editors", SECTION],
+    ["Key People", KEY_PEOPLE],
+  ] as const) {
+    it(`${name}: a later load clears the initial edit, so a Retry remount reopens nothing`, () => {
+      expect(read(file)).toMatch(
+        /if \(editConsumedRef\.current\) \{\s*setInitialEditId\(undefined\);\s*return;\s*\}/,
+      );
+    });
+  }
+});
+
 describe("held rows are dimmed while a form is open (D-144)", () => {
   // The memory cards' held look: MemoryCard draws a held card at
   // DISABLED_OPACITY 0.5 (D-26). The other three pages reuse that value.

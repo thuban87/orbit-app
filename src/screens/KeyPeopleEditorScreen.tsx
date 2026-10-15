@@ -184,7 +184,13 @@ export function KeyPeopleEditorScreen({
       read: () => listRelationshipsForContact(getExecutor(), contactId),
       publish: setPhase,
       onLoaded: (rows) => {
-        if (editConsumedRef.current) return;
+        // Later loads clear it, as SectionEditor does: a Retry after a failed
+        // re-read remounts the editor, which must not reopen that row's form
+        // unasked (review IN-02).
+        if (editConsumedRef.current) {
+          setInitialEditId(undefined);
+          return;
+        }
         editConsumedRef.current = true;
         setInitialEditId(openEditTarget(editId, rows));
       },
