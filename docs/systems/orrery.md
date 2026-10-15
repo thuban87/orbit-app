@@ -1,8 +1,8 @@
 # Orrery
 
-**Last updated:** 2026-10-05
+**Last updated:** 2026-10-15
 
-**Updated by phase:** 38.7-orrery-v2
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 
 **Evidence:** automated implementation/SQLite/controller tests plus physical-Pixel authoring, management, accessibility and switch-choreography acceptance recorded in [30-UAT](../../.planning/phases/30-orrery-systems/30-UAT.md) and [30-12-DEVICE](../../.planning/phases/30-orrery-systems/30-12-DEVICE.md). V2 (38.7): release measurements against the Day-1 baseline in [38.7-DEVICE-PASS](../../.planning/phases/38.7-orrery-v2/38.7-DEVICE-PASS.md) and [38.7-PHASE-END-REPORT](../../.planning/phases/38.7-orrery-v2/38.7-PHASE-END-REPORT.md).
 
@@ -41,7 +41,7 @@ Settings duplicates only the user-configurable density and satellite controls th
 | `src/screens/SettingsOrreryScreen.tsx` | Exposes the same density and satellite preferences plus Systems management routing without a Settings-only preference model. |
 | `src/stores/orrery-session-store.ts`, `src/logic/orrery-session-logic.ts` | Memory-only route-key-aware Profile Back/background capture and valid-focus restoration. Fresh visits reset Home. |
 | `src/db/ring-seq-dao.ts` | `commitRingReorder(exec, request, now, isCurrent?)` validates lock-time population/order/sun/identities, merges only visible slots, then preserves uniqueness/count/scoped-update guards. |
-| `src/db/orrery-satellites-read.ts`, `src/logic/orrery-satellite-logic.ts` | Current unlinked visible relationship rows belonging to selected System members; subordinate moon placement and discriminated context-only actions. |
+| `src/db/orrery-satellites-read.ts`, `src/logic/orrery-satellite-logic.ts` | Current unlinked visible relationship rows belonging to selected System members (visibility through `resolveRelationshipVisibility`, which shows every row while Hide from Profile is switched off, ADR-218); subordinate moon placement and discriminated context-only actions. |
 | `src/screens/OrreryScreen.tsx` | Local reloads, measured viewport/obstacles, action cancellation, modal versus nonmodal controls, session departure and clock-subtree mounting. |
 | `src/screens/SystemBuilderScreen.tsx`, `src/screens/SystemsManagementScreen.tsx` | Own the focused custom-System authoring HUD and the conventional cross-stack management surface. |
 
@@ -178,6 +178,9 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 - **ADR-191:** Star-Warp System Switch Starting on the Tap, with Lab C's Camera — warp and streaks over the production choreography; lead-in from the tap.
 - **ADR-192:** Bounded Warm Resource Cache Across Tab Blur — CPU-backed warm cache with caps and release triggers; clarifies ADR-170.
 
+- **ADR-218:** Things to Remember on the Profile — while `HIDE_FROM_PROFILE_ENABLED` is false, key people stored as hidden appear as satellites; ADR-105's hidden exclusion returns when the switch does.
+- **ADR-212:** One Delete Pattern — key people are hard-deleted, so a deleted relationship never lingers as a satellite.
+
 ## Deferred seams and evidence limits
 
 The `orrery-overlay` treatment is a controlled-canvas exception to ordinary card composition: it remains translucent in every package/mode combination, preserves the shared 0.92 visibility ceiling, and never changes `CARD_GLASS_OPACITY`. `OrreryContactsSheet` remains a modal `Sheet`, not a floating-overlay consumer.
@@ -205,3 +208,4 @@ The `orrery-overlay` treatment is a controlled-canvas exception to ordinary card
 | 2026-09-30 | 38.6 | Photo bodies draw through `useOrreryPhoto` (`src/components/orrery/use-orrery-photo.ts`). Masters of 512 px or less are drawn as decoded. Larger 1024 WebP masters are read from a ≤512 JPEG copy on disk (`src/services/photos/orrery-derivative-store.ts`, cache dir, keyed by size and mtime, discarded on every photo byte change, chunked launch sweep). An in-memory downsample cache (D-37) was not enough. With the copies (D-41), settled Graphics/GL at 20 s measured +2.9 % / +4.2 %, within the 5 % gate on the physical phone (ADR-181). Banner-time framing squeeze logged (D-42). |
 | 2026-10-05 | 38.7 | Framing is persistent chrome only (owner-directed, CONTEXT D-79). Panels, the cluster group and notices no longer move the map, the switch viewport hold is removed, and the focus card stacks above the controls' touch column. The frame-rate vote is the panel's top rate during motion. |
 | 2026-10-05 | 38.7 | Orrery V2 (phase close, Plan 16): added the V2 renderer, camera and switch section (fixed picture tree and render host, world-plane rings, 62° tilted Home with dolly focal and lens shift, ambient clock with the 30 Hz idle / 120 Hz motion / 0 reduced-motion frame-rate vote, warm cache, cover gate, Lab C switch camera with the tap lead-in, focus framing and card stacking). Corrected the pre-V2 statements: drift, tilt range, native-sibling occlusion, `OrreryCanvas` as clock owner, and tap-to-Profile. Release evidence and the owner's sign-off are in `38.7-PHASE-END-REPORT.md`. |
+| 2026-10-15 | 38.10 | Relationship satellites follow the Hide from Profile switch (off: stored-hidden key people show) and hard-deleted key people (ADR-212, ADR-218). |
