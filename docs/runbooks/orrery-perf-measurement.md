@@ -313,9 +313,10 @@ listed below; the full gate table is in `38.7-PHASE-END-REPORT.md`.
 
 Pitfalls from the final pass:
 
-1. **A warm phone fails G6 on temperature, not on the app.** Start every soak from a phone
-   that has met the §5 cool-down. The 38.7 Size 120 soak started +0.83 °C warm and cooled
-   1.1 °C during the run.
+1. **The §5 cool-down margin is wider than the G6 margin.** The cool-down allows a start
+   within 1.0 °C, while G6 allows only + 0.5 °C at the end and maximum. The 38.7 Size 120 soak
+   started +0.83 °C warm, inside the cool-down rule, and failed G6 although it cooled 1.1 °C
+   during the run. For a G6 judgement, start as close to the baseline start as you can.
 2. **The frame-rate vote changes what presents/s means.** At idle, V2 votes 30 Hz on its
    SurfaceView (60 Hz panel, rendering at 30) and votes the panel's top rate during motion
    (ADR-186). Idle presents/s stay context only.
