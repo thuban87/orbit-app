@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.5-background-art-text-contrast
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -81,7 +81,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 
 ### Merging duplicate Orbit contacts
 
-1. A user begins from profile overflow or a reconciliation duplicate path, chooses a survivor, and resolves genuine scalar, photo, and competing-primary conflicts.
+1. A user begins from profile overflow or a reconciliation duplicate path, chooses a survivor, and resolves genuine scalar, photo, and competing-primary conflicts. The candidate grid and merge-conflict photo choice render each Orbit photo by passing its stored relative path to `Avatar` (`CandidateItem.photo`, `PhotoChoiceOption.photo`), so they follow the display revision. Staging previews keep their own URI with `cachePolicy="none"` (ADR-180).
 2. `mergeContacts()` resolves method and active-link collisions before reparenting compatible children — including any pending `interaction_assists` — to the survivor inside one write transaction, so a later assist confirmation logs against the survivor with no survivor lookup.
 3. The writer preserves field-history snapshots for overwritten or dropped meaningful values, recomputes `last_contact` through the recency core, deletes the absorbed row, and writes a generic contact tombstone.
 4. It reparents knowledge rows before deletion, clears links that would become a self-link, and demotes a colliding current-state value so retained history survives.
@@ -115,6 +115,9 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Reconcile detail "Unlink source" string and the merge impact "{absorbed} will be retired." line sit on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
+
+- **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — the candidate grid, merge conflicts and the keep-Orbit-photo card show Orbit photos.
+- **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — a promoted source photo is mastered by the shared encoder.
 
 ## Gotchas
 
@@ -153,3 +156,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-26 | 38.4 | Review-card accessibility (RG-031 AUD-UIA-008): review cards announce name, advisory chip, evidence and failure copy; expose `selected` while selecting, with a non-border selected glyph; and offer a Select/Deselect action equivalent to long-press. |
 | 2026-09-27 | 38.4 | Resume-check prompt scrolls its body at large text; its Resume label uses `onAccent` (D-49, OA-D3). |
 | 2026-09-26 | 38.5 | In Galaxy Dark, the Reconcile detail "Unlink source" string and the merge impact "{absorbed} will be retired." line sit on an opaque backing over the art (D-50; ADR-179). |
+| 2026-09-30 | 38.6 | Candidate grid and merge-conflict photo choice render Orbit photos through `Avatar` (no screen imports `resolvePhotoUri`); Update from Contacts' "keep Orbit photo" option is a card with the current Orbit photo beside the phone photo (`PhotoChoice` `keepPhoto`, `ScanState.orbitPhoto`); reconcile promotion encodes through `encodeMaster` (ADR-180, ADR-181). |
