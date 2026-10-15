@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -70,7 +70,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
    Each source option has a stable ID. The selected birthday or name reaches the writer exactly, while the reviewed snapshot records the comparable for all linked source options. A null source scalar is rejected as stale and cannot clear an Orbit value.
 4. A batch scan persists only changed contacts as cards in one session. Additive, non-photo selections can use a safe bulk source-values action; conflict and removed cases remain manually reviewed.
    Bulk source-value actions also leave name or birthday fields with multiple source options for explicit detail review; those cards remain partial.
-5. A card remains until all actionable differences resolve. Completion reports durable disposition counts; pending work survives process death and offers Resume or Discard on a later foreground launch.
+5. A card remains until all actionable differences resolve. Completion ("Check complete") reports durable disposition counts; its header Back and system Back act like Done and leave the finished check (`useBackActsAsDone`, ADR-201). Pending work survives process death and offers Resume or Discard on a later foreground launch.
 6. The shared `CandidateCardGrid` review card (Reconcile Grid and Duplicate Review) has an accessible representation equal to what it shows (RG-031, ui-accessibility/AUD-UIA-008). `buildCandidateCardAccessibility` (`src/components/candidate-card-a11y.ts`) labels the card with the person's name, the displayed chip text (reconciliation advisory copy, or the import confidence label), the evidence line, and the per-card failure copy when it is shown. While the grid is selecting, the card exposes `accessibilityState.selected` and a filled/outline `select` glyph, so selection is not shown by border alone. A Select/Deselect custom action calls the same toggle as long-press. Tap keeps its meaning: inspect when not selecting, toggle when selecting. The chip stays advisory, and stable internal IDs are never helper inputs.
 
 ### Handling a missing source
@@ -81,11 +81,11 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 
 ### Merging duplicate Orbit contacts
 
-1. A user begins from profile overflow or a reconciliation duplicate path, chooses a survivor, and resolves genuine scalar, photo, and competing-primary conflicts. The candidate grid and merge-conflict photo choice render each Orbit photo by passing its stored relative path to `Avatar` (`CandidateItem.photo`, `PhotoChoiceOption.photo`), so they follow the display revision. Staging previews keep their own URI with `cachePolicy="none"` (ADR-180).
+1. A user begins from profile overflow or a reconciliation duplicate path, chooses a survivor (Survivor select's second step is a guard sub-editor: Back returns to the picker, ADR-200), and resolves genuine scalar, photo, and competing-primary conflicts. The candidate grid and merge-conflict photo choice render each Orbit photo by passing its stored relative path to `Avatar` (`CandidateItem.photo`, `PhotoChoiceOption.photo`), so they follow the display revision. Staging previews keep their own URI with `cachePolicy="none"` (ADR-180).
 2. `mergeContacts()` resolves method and active-link collisions before reparenting compatible children — including any pending `interaction_assists` — to the survivor inside one write transaction, so a later assist confirmation logs against the survivor with no survivor lookup.
 3. The writer preserves field-history snapshots for overwritten or dropped meaningful values, recomputes `last_contact` through the recency core, deletes the absorbed row, and writes a generic contact tombstone.
 4. It reparents knowledge rows before deletion, clears links that would become a self-link, and demotes a colliding current-state value so retained history survives.
-5. The UI lands on the survivor only after the transaction succeeds; an error leaves both contacts intact.
+5. The merge impact summary is a confirm-or-abandon screen with a ✕ Cancel header, and Merge is a themed destructive confirm (ADR-198, ADR-201). The UI lands on the survivor only after the transaction succeeds; an error leaves both contacts intact.
 
 ### Resolving same-Group-Event merge collisions
 
@@ -118,6 +118,8 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 
 - **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — the candidate grid, merge conflicts and the keep-Orbit-photo card show Orbit photos.
 - **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — a promoted source photo is mastered by the shared encoder.
+- **ADR-198:** Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays — the reconcile and merge prompts are themed confirms, notices or snackbars.
+- **ADR-201:** Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen — the reconcile and merge screens carry the child header; Check complete's Back acts like Done; Merge impact summary uses ✕ Cancel.
 
 ## Gotchas
 
@@ -157,3 +159,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-27 | 38.4 | Resume-check prompt scrolls its body at large text; its Resume label uses `onAccent` (D-49, OA-D3). |
 | 2026-09-26 | 38.5 | In Galaxy Dark, the Reconcile detail "Unlink source" string and the merge impact "{absorbed} will be retired." line sit on an opaque backing over the art (D-50; ADR-179). |
 | 2026-09-30 | 38.6 | Candidate grid and merge-conflict photo choice render Orbit photos through `Avatar` (no screen imports `resolvePhotoUri`); Update from Contacts' "keep Orbit photo" option is a card with the current Orbit photo beside the phone photo (`PhotoChoice` `keepPhoto`, `ScanState.orbitPhoto`); reconcile promotion encodes through `encodeMaster` (ADR-180, ADR-181). |
+| 2026-10-11 | 38.9 | Reconcile and merge screens use the shared child header; Check complete's Back acts like Done (D-73); Merge impact summary has a ✕ Cancel; Survivor select's second step returns to the picker on Back; native alerts became themed confirms (ADR-198, ADR-200, ADR-201). |
