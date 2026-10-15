@@ -281,6 +281,48 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
 
 ---
 
+## 12. Locked gates and how 38.7 closed against them
+
+The owner locked the numeric gates after the Day-1 baseline (2026-10-03, CONTEXT D-63;
+`38.7-BASELINE.md` § Locked gates), then retired the Pixel 3a gates (D-66). The live set is
+the **Pixel 6 Pro**:
+
+- **G1:** pan, pinch and Recenter at a median of ≥ 55 presents/s at Size 120; pan and
+  pinch ≥ 45 presents/s at All Contacts.
+- **G3:** tab return to the first full frame ≤ 1.0 s at Size 120 and All Contacts.
+- **G4:** no `am_anr` and no crash (hard).
+- **G5:** switch stall ≤ 100 ms (Size 5 ↔ 120, Size 120 ↔ All Contacts; hard).
+- **G6:** idle soak ≤ baseline + 0.5 °C, and CPU ≤ baseline × 1.10.
+- **G7:** Graphics/GL ≤ baseline + 5 % at settled and late.
+- **G8:** the owner feels it smooth.
+
+The **Pixel 3a** gets one release smoke check only: Size 120 and All Contacts open, with no
+crash or ANR.
+
+Plan 16 used this method unchanged. Results a later pass must not misread as passes are
+listed below; the full gate table is in `38.7-PHASE-END-REPORT.md`.
+
+- **Accepted by the owner, not passed (D-79):** G3 All Contacts 1.008 s; G5 Size 120 ↔
+  All Contacts 174.7 ms; G7 Graphics/GL growth from the opaque canvas and the base bake.
+  TOTAL PSS fell 26–31 %.
+- **Accepted as a warm-start artefact (D-80 T-1):** the G6 Size 120 temperature. CPU passed
+  (11 % vs 34 %).
+- **Not measured (the owner declined further testing):** the G1 owner touch windows, the
+  G8 recorded-window ratings, the portrait scenario, the D-11 churn set, and a post-fix
+  G1 Recenter number.
+
+Pitfalls from the final pass:
+
+1. **A warm phone fails G6 on temperature, not on the app.** Start every soak from a phone
+   that has met the §5 cool-down. The 38.7 Size 120 soak started +0.83 °C warm and cooled
+   1.1 °C during the run.
+2. **The frame-rate vote changes what presents/s means.** At idle, V2 votes 30 Hz on its
+   SurfaceView (60 Hz panel, rendering at 30) and votes the panel's top rate during motion
+   (ADR-186). Idle presents/s stay context only.
+3. **Animations-on idle CPU has no main baseline.** Main was soaked with animations off. The
+   V2 animations-on figure (about two thirds of a core) is context for the D-80 CPU-1 todo,
+   not a gate.
+
 ## Changelog
 
 - **2026-10-03** — Created (38.7 Plan 01). Method frozen at the first baseline number
@@ -361,3 +403,6 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   clipped centre missed. `select_system` now taps only fully visible group headers (≥ 60 px tall,
   `MIN_HEADER_TAP_PX`) and scrolls otherwise. Navigation only; `selftest.py` 28/28. Known limit: the 3a
   could still not be driven back from All Contacts by the helper (done by hand); see 38.7-SPIKE.md.
+- **2026-10-05** — 38.7 Plan 16 release pass ran the method unchanged. §12 records the locked
+  gates (D-63), the 3a retirement (D-66), the owner acceptances (D-79, D-80) and the
+  unmeasured windows (KB extraction).
