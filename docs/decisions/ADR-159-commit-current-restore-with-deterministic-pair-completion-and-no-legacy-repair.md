@@ -49,4 +49,4 @@ The system stages incoming media first, then reads destination authority, plans 
 - `src/services/photos/background-reconcile-sweep.ts` — protects in-flight staging and rechecks committed references before cleanup.
 
 **Depends on:** ADR-001 (Normalized Custom-Field Values); ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores); ADR-058 (Optional Encrypted Backups and Previewed Local Restoration); ADR-158 (Canonical Photo Ownership Across Masters, Staging, and Derivatives)
-**Required by:** None
+**Required by:** ADR-182 (Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos)

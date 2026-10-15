@@ -74,4 +74,4 @@ The main FAB disk carries a permanent `FAB_BORDER_WIDTH` (2dp) ring in `colors[F
 - `src/navigation/fab-clearance-contract.test.ts` — route-derived clearance contract.
 
 **Depends on:** ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log); ADR-086 (Semantic Icons and Accessible Interaction Primitives); ADR-084 (Four Semantic Theme Palettes, Curated Accents, and Contrast Validation)
-**Required by:** None
+**Required by:** ADR-185 (Assist Banner Renders in Flow Above the Tab Navigator)

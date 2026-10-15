@@ -79,4 +79,4 @@ The History DateDetailSheet, reach-out chooser, archived contacts, merge impact 
 - `src/screens/ImportReviewScreen.tsx` — "might already be in Orbit" choices with avatars.
 
 **Depends on:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup); ADR-022 (Tokenized Deterministic Initials Avatars); ADR-158 (Canonical Photo Ownership Across Masters, Staging, and Derivatives)
-**Required by:** None
+**Required by:** ADR-181 (One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies); ADR-183 (224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox)

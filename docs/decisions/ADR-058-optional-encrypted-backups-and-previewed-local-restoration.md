@@ -51,4 +51,4 @@ The system defaults to readable JSON and offers opt-in AES-256-GCM backups encry
 - `src/screens/RestorePreviewScreen.tsx` — presents the aggregate preview and explicit destructive confirmation.
 
 **Depends on:** ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots).
-**Required by:** ADR-138 (Complete Portable Backup Format v5); ADR-158 (Canonical Photo Ownership Across Masters, Staging, and Derivatives); ADR-159 (Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair)
+**Required by:** ADR-138 (Complete Portable Backup Format v5); ADR-158 (Canonical Photo Ownership Across Masters, Staging, and Derivatives); ADR-159 (Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair); ADR-181 (One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies)

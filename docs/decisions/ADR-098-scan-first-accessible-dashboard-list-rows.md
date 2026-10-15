@@ -52,4 +52,4 @@ The system uses full-width, scan-first three-line Dashboard List rows over the s
 - `src/screens/HomeScreen.tsx` — loads and passes row content without giving the renderer a database read path.
 
 **Depends on:** ADR-075 (Binary Favourite Membership Without a User-Facing Order); ADR-093 (Scoped Composable Dashboard Population and Filter Model); ADR-094 (Eligibility-Scoped Semantic Dashboard Search)
-**Required by:** None
+**Required by:** ADR-184 (Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos)

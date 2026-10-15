@@ -68,4 +68,4 @@ Working memory stays flat (D-11). expo-image surfaces already decode at display 
 - `App.tsx` — registers the Orrery copy launch sweep.
 
 **Depends on:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup); ADR-158 (Canonical Photo Ownership Across Masters, Staging, and Derivatives); ADR-058 (Optional Encrypted Backups and Previewed Local Restoration); ADR-180 (Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface)
-**Required by:** None
+**Required by:** ADR-183 (224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox)

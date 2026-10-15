@@ -46,4 +46,4 @@ The system derives initials and a deterministic swatch index from the name, then
 - `src/stores/photo-cache-bust-store.ts` — changes the cache discriminator after a photo write.
 
 **Depends on:** ADR-006 (Theme-Token Architecture)
-**Required by:** _None._
+**Required by:** ADR-180 (Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface)

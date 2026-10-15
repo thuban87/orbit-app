@@ -49,4 +49,4 @@ The system uses ADR-021 identity-derived canonical filenames under per-path owne
 - `src/services/photos/restore-photo-finalize-sweep.ts` — retries committed photo work at foreground maintenance.
 
 **Depends on:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup); ADR-058 (Optional Encrypted Backups and Previewed Local Restoration)
-**Required by:** ADR-159 (Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair); ADR-161 (Durable Post-Commit Import Recovery and AI-Off Provenance)
+**Required by:** ADR-159 (Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair); ADR-161 (Durable Post-Commit Import Recovery and AI-Off Provenance); ADR-180 (Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface); ADR-181 (One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies); ADR-182 (Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos)

@@ -44,4 +44,4 @@ Normal Contacts Grid cards render only name and recency. `GridCard` keeps its se
 - `src/screens/HomeScreen.tsx` — computes routine line three only for List mode.
 
 **Depends on:** ADR-101 (Avatar-First Accessible Dashboard Card Renderer)
-**Required by:** None
+**Required by:** ADR-184 (Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos)
