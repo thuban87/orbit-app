@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** ADR-078 (partial — Off Limits visible on the Research side)
+**Superseded by:** ADR-078 (partial — Off Limits visible on the Research side); ADR-214 (partial)
 
 ## Context
 

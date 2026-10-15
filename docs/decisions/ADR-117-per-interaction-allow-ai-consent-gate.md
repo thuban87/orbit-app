@@ -7,7 +7,7 @@
 **Reversibility:** one-way
 **Migration:** 025
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-209 (partial)
 
 ## Context
 

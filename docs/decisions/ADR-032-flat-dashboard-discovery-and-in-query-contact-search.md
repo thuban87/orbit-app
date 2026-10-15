@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-031 (partial)
-**Superseded by:** None
+**Superseded by:** ADR-215 (partial)
 
 ## Context
 

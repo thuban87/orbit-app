@@ -7,7 +7,7 @@
 **Reversibility:** costly (inferred: new memory and custom-field dates are written as `YYYY-MM-DD`; older free-text values are kept and flagged, not converted)
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-210 (partial)
 
 ## Context
 
