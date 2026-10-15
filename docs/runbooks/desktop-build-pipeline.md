@@ -202,6 +202,11 @@ npx expo start                                   # Metro bundler on this box (po
 2. **`adb` / `emu-connect` are not in the allow-list** (`.claude/settings.local.json` allows
    `rsync`/`scp`/`ssh` only). Outside YOLO mode they prompt at the human checkpoint; the owner
    approves. Do not silence this by editing settings — owner's call.
+3. **A long-running Metro can serve a stale bundle (38.8-07).** During a device re-check, the
+   Orbit Metro already running on :8082 served a bundle without the plan's new code, so the
+   first runs tested pre-fix code. Before counting any DEBUG re-check, restart Metro with
+   `npx expo start --port 8082 --clear`. Then fetch the dev-client bundle from Metro and grep
+   it for a symbol the change adds (for example `onLaidOut`); a zero count means the bundle is stale.
 
 ## 4. Native share-target verification (Phase 10)
 
