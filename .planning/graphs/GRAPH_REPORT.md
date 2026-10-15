@@ -1,16 +1,16 @@
 # Graph Report - orbit-app  (2026-10-15)
 
 ## Corpus Check
-- 2229 files · ~3,592,834 words
+- 2229 files · ~3,593,557 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 22101 nodes · 48383 edges · 1302 communities (1185 shown, 117 thin omitted)
+- 22111 nodes · 48393 edges · 1296 communities (1176 shown, 120 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 655 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0511f5e9`
+- Built from commit: `c7b14b2c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -1269,14 +1269,10 @@
 - Cross-AI Plan Review — Phase 16 (Custom Field Value Normalization)
 - use-orrery-photo-hook.test.ts
 - shell-app-bar-contract.test.ts
-- snackbar-render.test.tsx
-- restore-result-render.test.tsx
-- notification-nav.ts
 - photo-display-probe.py
 - DropdownFieldWidget.test.tsx
 - editor-cancel-contract.test.ts
 - SettingsInteractionsScreen.test.tsx
-- OrbitShareFinishModule.ts
 - popen_shell
 - dialog-host.test.tsx
 - contact-save-single-flight-contract.test.ts
@@ -1290,8 +1286,6 @@
 - react-native-quick-base64
 - README.md
 - SWITCH_LEAD_BREATH_CAP
-- FakeImage
-- merge-impact-read.ts
 - expo-file-system
 
 ## God Nodes (most connected - your core abstractions)
@@ -1311,33 +1305,33 @@
   App.tsx → src/db/database.ts
 - `AppShell()` --indirect_call--> `key()`  [INFERRED]
   App.tsx → src/theme/art-checker-constants.test.ts
+- `AppShell()` --indirect_call--> `loadAppFonts()`  [INFERRED]
+  App.tsx → src/theme/fonts.ts
 - `ThemedStatusBar()` --calls--> `useTheme()`  [EXTRACTED]
   App.tsx → src/theme/theme-provider.tsx
 - `AIPersonalizationScreen()` --indirect_call--> `section()`  [INFERRED]
   src/screens/AIPersonalizationScreen.tsx → scripts/audit-adr-key-files.ts
-- `CaptureScreen()` --indirect_call--> `section()`  [INFERRED]
-  src/screens/CaptureScreen.tsx → scripts/audit-adr-key-files.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (1302 total, 117 thin omitted)
+## Communities (1296 total, 120 thin omitted)
 
 ### Community 0 - "database.ts"
 Cohesion: 0.11
-Nodes (22): projectMessageFocus(), boundedDataValue(), DEFAULT_STYLE_NOTE, intensityLine(), messageFocusBlock(), personalizationBlocks(), qualityLine(), recentInteractionBlocks() (+14 more)
+Nodes (25): boundedDataValue(), DEFAULT_STYLE_NOTE, intensityLine(), messageFocusBlock(), personalizationBlocks(), qualityLine(), recentInteractionBlocks(), resolvePrompt() (+17 more)
 
 ### Community 1 - "types.ts"
-Cohesion: 0.03
-Nodes (124): MAX_SUPPORTED_BACKUP_FORMAT_VERSION, photoDb(), migrated(), PHOTO, uidFactory(), db(), fs, text (+116 more)
+Cohesion: 0.02
+Nodes (185): RFC-4122, MAX_SUPPORTED_BACKUP_FORMAT_VERSION, photoDb(), migrated(), PHOTO, uidFactory(), db(), fs (+177 more)
 
 ### Community 2 - "field-types.ts"
-Cohesion: 0.38
-Nodes (5): buildCandidateCardAccessibility(), CandidateCardAccessibility, CandidateCardAccessibilityInput, sentence(), base
+Cohesion: 0.05
+Nodes (54): BackupEncryptionBenchmarkHarness(), styles, buildCandidateCardAccessibility(), CandidateCardAccessibility, CandidateCardAccessibilityInput, sentence(), base, isBulkActionAvailable() (+46 more)
 
 ### Community 3 - "001-initial.ts"
 Cohesion: 0.02
-Nodes (189): AlsoSaveToPicker(), AlsoSaveToPickerProps, OPTIONS, styles, groups(), ContactPicker(), ContactPickerBaseProps, ContactPickerLeadingAction (+181 more)
+Nodes (167): AlsoSaveToPickerProps, ContactPicker(), participantDraft(), ParticipantEditDraft, MergeImpactSummary(), styles, ADR-0086, PostLogNoteEditor() (+159 more)
 
 ### Community 4 - "import-session-dao.ts"
 Cohesion: 0.09
@@ -1349,59 +1343,59 @@ Nodes (22): Architecture, Building the eligible result universe, Changelog, Chan
 
 ### Community 6 - "import-session-read.ts"
 Cohesion: 0.03
-Nodes (126): babel, require, native, Node, parseInk, photoCache, readySatellites(), Recorded (+118 more)
+Nodes (143): babel, require, destinationWorld, harness, homeCamera, keysOf(), mountRuntime(), plain (+135 more)
 
 ### Community 7 - "AiService.ts"
-Cohesion: 0.05
-Nodes (40): AiConnection, AiConnectionRow, AIConnectionScreenProps, AIModelPickerScreenProps, AiKeyStore, keyItemName(), inputFor(), makePrompt() (+32 more)
+Cohesion: 0.04
+Nodes (45): AiConnection, AiConnectionRow, ConnectionSwitchState, AIConnectionScreenProps, AIModelPickerScreenProps, AiKeyStore, BoundCustomCredential, createAiKeyStore() (+37 more)
 
 ### Community 8 - "getExecutor"
-Cohesion: 0.06
-Nodes (47): RFC-4122, assertPositiveCadence(), bindContact(), recordLifecycleTransitionCore(), ADR-0025, unbindContact(), archiveContact(), archiveContactCore() (+39 more)
+Cohesion: 0.05
+Nodes (58): resumeImport(), RootNavigation, styles, ResumeReconcilePrompt(), ResumeReconcilePromptProps, RootNavigation, styles, heldSnackbarLayout() (+50 more)
 
 ### Community 9 - "HomeScreen.tsx"
-Cohesion: 0.12
-Nodes (22): IMAGE, asyncStorage, classifyPermissionResult(), ContactsPermissionRequestResult, ContactsPermissionVerdict, clearDeniedPresentation(), ContactsPermissionRequestState, ContactsPermissionResult (+14 more)
+Cohesion: 0.21
+Nodes (16): asyncStorage, classifyPermissionResult(), ContactsPermissionRequestResult, ContactsPermissionVerdict, clearDeniedPresentation(), ContactsPermissionRequestState, ContactsPermissionResult, ContactsPermissionState (+8 more)
 
 ### Community 10 - "OrbitContactPickerModule"
 Cohesion: 0.17
 Nodes (18): ContactPickInProgressException, ContactPickLaunchException, ContactReadException, Any, ByteArray, CodedException, Context, InputStream (+10 more)
 
 ### Community 11 - "encryption.ts"
-Cohesion: 0.09
-Nodes (61): updateAppSettingsCore(), addSystemOverride(), addSystemOverrideCore(), assertDeletedSystemSnapshot(), assertKnownSystemRef(), assertMutableCustomRef(), assertOneChange(), assertOverrideMode() (+53 more)
+Cohesion: 0.03
+Nodes (152): sceneWith(), updateAppSettingsCore(), listActionablePrimaryMethods(), listContactMethodGroups(), getContactStatus(), resolveParticipants(), chain, withMutex() (+144 more)
 
 ### Community 12 - "App.tsx"
 Cohesion: 0.05
-Nodes (53): cameraControlState(), canvasViewport(), controlsRegion(), controlsRestingRect(), FRAMING_CHROME_OBSTACLES, FRAMING_TOP_BAND_OBSTACLES, framingViewport(), northOrientation() (+45 more)
+Nodes (52): cameraControlState(), canvasViewport(), controlsRegion(), controlsRestingRect(), FRAMING_CHROME_OBSTACLES, FRAMING_TOP_BAND_OBSTACLES, framingViewport(), northOrientation() (+44 more)
 
 ### Community 13 - "backup-service.ts"
-Cohesion: 0.06
-Nodes (58): Ladder, swipeRowTintOpacity(), LIST_CELLS, SWIPES, ArtSheetComboSync(), overrides, applyArtDevOverrides(), ART_BACKINGS (+50 more)
+Cohesion: 0.05
+Nodes (67): Ladder, LIST_CELLS, SWIPES, ArtSheetComboSync(), overrides, applyArtDevOverrides(), ART_BACKINGS, ART_COMPONENTS (+59 more)
 
 ### Community 14 - "index.ts"
-Cohesion: 0.08
-Nodes (30): overviewColumnWidth(), overviewTileWidth(), packProfileOverviewPreview(), profileOverviewWidthBasis(), actualOverviewWidth(), actualPack(), LAYOUTS, WINDOWS (+22 more)
+Cohesion: 0.10
+Nodes (22): overviewColumnWidth(), overviewTileWidth(), packProfileOverviewPreview(), profileOverviewWidthBasis(), actualOverviewWidth(), actualPack(), LAYOUTS, WINDOWS (+14 more)
 
 ### Community 15 - "model-catalog-filter.ts"
-Cohesion: 0.11
-Nodes (31): bgKeys(), Bounds, boundsFor(), buildLadders(), buildMappedV2(), Component, COMPONENTS, evaluate() (+23 more)
+Cohesion: 0.13
+Nodes (24): bgKeys(), Bounds, boundsFor(), buildLadders(), buildMappedV2(), Component, COMPONENTS, excluded() (+16 more)
 
 ### Community 16 - "restore-apply.ts"
-Cohesion: 0.02
-Nodes (146): parseBackupManifest(), assertNoLocalOnlyKeys(), buildExportManifest(), buildExportReport(), ExportManifestDeps, ExportManifestReport, FORBIDDEN_KEYS, readManifest() (+138 more)
+Cohesion: 0.06
+Nodes (61): addStoredPath(), applyRestore(), assertCompleteIncomingPairs(), BackgroundFinalizeCandidate, captureRestoreDeletes(), clearReplacedLiveTombstones(), deleteActions(), DeleteCandidate (+53 more)
 
 ### Community 17 - "reconcile-apply.ts"
-Cohesion: 0.02
-Nodes (196): scanWorkletForwardReferences(), EMPTY_IDS, EMPTY_RELATIONS, linear(), NO_RECTS, OrreryLedger, OrreryPerfMarks, orreryTextEligibility() (+188 more)
+Cohesion: 0.01
+Nodes (147): babel, onUI(), require, Worklet, scanWorkletForwardReferences(), routeRetired(), createOrreryGenerationLedger(), EpochState (+139 more)
 
 ### Community 18 - "ReconcileGridScreen.tsx"
 Cohesion: 0.07
 Nodes (46): CustomFieldValue(), CustomFieldValueProps, FieldSpec, presentValue(), styles, draftToFieldFields(), FieldDefDraft, FieldDraftFields (+38 more)
 
 ### Community 19 - "AiSuggestionLifecycle"
-Cohesion: 0.09
-Nodes (22): IPV4_MAPPED_PREFIX, ipv4InCidr(), ipv4IsNonPublic(), ipv6InCidr(), ipv6IsNonPublic(), isNonPublicIpLiteral(), NAT64_PREFIX, NON_PUBLIC_IPV4_CIDRS (+14 more)
+Cohesion: 0.08
+Nodes (53): assertPromptFitsContext(), estimateInputTokens(), estimatePromptContext(), PromptContextEstimate, PromptContextEstimateInput, validWindow(), estimateOpenRouterInputCost(), OpenRouterModel (+45 more)
 
 ### Community 20 - "Logger"
 Cohesion: 0.04
@@ -1440,28 +1434,28 @@ Cohesion: 0.17
 Nodes (11): Android Contact Reconciliation UAT Pipeline, Architecture (Phase 20), Code, Device-to-database evidence chain, File Locations, How to Run Contact Reconciliation UAT, Overview, Pitfalls (+3 more)
 
 ### Community 29 - "contacts-dao.ts"
-Cohesion: 0.04
-Nodes (69): isBulkActionAvailable(), actionLabels, BulkAction, CandidateCardGrid(), CandidateCardGridProps, CandidateItem, styles, ConfidenceChip() (+61 more)
+Cohesion: 0.08
+Nodes (34): progress, setup, classifyImportStop(), importProgressBlocksLeave(), ImportProgressPhase, importProgressRunIdentity(), ImportStopOutcome, nextImportRunKey() (+26 more)
 
 ### Community 30 - "SettingsScreen.tsx"
-Cohesion: 0.12
-Nodes (20): finishActivity(), OrbitShareFinishModule, ShareConfirmationCardHandle, advanceShareSequence(), captureViewPayload(), isLiveShareIntent(), shareCardMaxHeight(), ShareIntentLike (+12 more)
+Cohesion: 0.14
+Nodes (22): finishActivity(), setShareRowsAllowAi(), listCapturePickContacts(), advanceShareSequence(), captureViewPayload(), isLiveShareIntent(), runShareWrite(), shareCardMaxHeight() (+14 more)
 
 ### Community 31 - "localDateTime"
-Cohesion: 0.07
-Nodes (34): ResumeReconcilePrompt(), ResumeReconcilePromptProps, RootNavigation, styles, ContactsProfileNavigator, ContactsProfileOpenPlan, ContactsProfileRootState, focusTab() (+26 more)
+Cohesion: 0.10
+Nodes (23): pickContacts(), resolveEffectivePhoneRegion(), isActiveContactsRow(), ParamlessSettingsRoute, SETTINGS_CONTACTS_SECTION_ORDER, SETTINGS_CONTACTS_SECTIONS, SettingsContactsAction, SettingsContactsActionRow (+15 more)
 
 ### Community 32 - "app-settings-dao.ts"
-Cohesion: 0.03
-Nodes (101): array(), assertLink(), assertPortableSettings(), assertUniqueLinks(), fail(), FORWARD_MIGRATIONS, isBinaryFlag(), isMarker() (+93 more)
+Cohesion: 0.04
+Nodes (78): ACCENT_FIELDS, AppSettings, AppSettingsPatch, AppSettingsRow, assertAccentId(), assertAiProvider(), assertDashboardFilters(), assertDashboardPopulations() (+70 more)
 
 ### Community 33 - "backup-schema.ts"
-Cohesion: 0.12
-Nodes (18): AmbientConsumers, AmbientDriverProps, AmbientFrameClockDriver(), ambientFrameRateVote(), AmbientIntervalController, AmbientIntervalDeps, AmbientIntervalDriver(), ambientNeeded() (+10 more)
+Cohesion: 0.21
+Nodes (12): AmbientConsumers, AmbientDriverProps, AmbientFrameClockDriver(), ambientFrameRateVote(), AmbientIntervalController, AmbientIntervalDeps, AmbientIntervalDriver(), ambientNeeded() (+4 more)
 
 ### Community 34 - "PhotoSourcePicker.tsx"
-Cohesion: 0.09
-Nodes (42): ProfileCollection, ProfileKnowledge, assertNever(), buildKnowledgePresentation(), CHILD_ORDER, childChrome(), childHasEntries(), childTitle() (+34 more)
+Cohesion: 0.12
+Nodes (34): ProfileCollection, ProfileCurrentStateEntry, buildKnowledgePresentation(), CHILD_ORDER, childChrome(), childHasEntries(), childTitle(), countLine() (+26 more)
 
 ### Community 35 - "impact.ts"
 Cohesion: 0.04
@@ -1469,15 +1463,15 @@ Nodes (47): Alternatives Considered, Anti-patterns to avoid, Applicable ASVS Cat
 
 ### Community 36 - "photo-storage.ts"
 Cohesion: 0.07
-Nodes (34): RFC-4180, ArtKind, artKindOf(), ArtSplit, BackingKind, BARE_TEXT_CSV_COLUMNS, BareTextAnalysis, boundName() (+26 more)
+Nodes (36): RFC-4180, ART_COMBINATION_KEYS, ART_TREATMENTS, ArtKind, artKindOf(), ArtSplit, BackingKind, BARE_TEXT_CSV_COLUMNS (+28 more)
 
 ### Community 37 - "notification-schedule.test.ts"
-Cohesion: 0.03
-Nodes (148): newUid(), seedContact(), ADR-0025, makeContact(), uid(), contact(), email(), phone() (+140 more)
+Cohesion: 0.02
+Nodes (219): __reset(), ScheduledRequestDouble, __setScheduled(), BenchmarkResult, nowMs(), runBenchmark(), seedBenchmarkData(), SeedOptions (+211 more)
 
 ### Community 38 - "BackupScreen.tsx"
-Cohesion: 0.07
-Nodes (27): AutomaticBackupDependencies, AutomaticBackupReencryptionDependencies, AutomaticBackupReencryptionResult, BackupPreview, BackupPreviewResult, backupServiceQueue, createAutomaticBackupReencryptionService(), createBackupEncryptionLifecycle() (+19 more)
+Cohesion: 0.04
+Nodes (42): automaticBackupFilename(), AutomaticBackupMetadata, filesToPrune(), isExpiredAutomaticBackup(), isOwnedAutomaticBackup(), shouldRunAutomaticBackup(), now, AutomaticBackupDependencies (+34 more)
 
 ### Community 39 - "NonPublicAddresses"
 Cohesion: 0.14
@@ -1488,20 +1482,20 @@ Cohesion: 0.04
 Nodes (45): Age formatter (pure, local, node-tested), Alternatives Considered, Anti-Patterns to Avoid, Applicable ASVS Categories, Architectural Responsibility Map, Architecture Patterns, Assumptions Log, Code Examples (+37 more)
 
 ### Community 41 - "index.ts"
-Cohesion: 0.06
-Nodes (45): DigestListGroup(), DigestListItem(), DigestListMotionContext, CompactContactRow(), DrillRow(), HorizonDrillTarget, HorizonSection(), HorizonSectionProps (+37 more)
+Cohesion: 0.07
+Nodes (47): Avatar(), AvatarProps, styles, DigestListGroup(), DigestListItem(), DigestListMotionContext, DrillRow(), HorizonDrillTarget (+39 more)
 
 ### Community 42 - "newUid"
-Cohesion: 0.08
-Nodes (27): populateV6(), File, backgroundMocks, blankEventCase(), configuredDestination(), db(), entryOf(), fileOf() (+19 more)
+Cohesion: 0.06
+Nodes (52): parseBackupManifest(), assertNoLocalOnlyKeys(), buildExportManifest(), buildExportReport(), ExportManifestDeps, FORBIDDEN_KEYS, readManifest(), readPhotoOrSkip() (+44 more)
 
 ### Community 43 - "secure-fetch.ts"
-Cohesion: 0.05
-Nodes (44): applyOrreryHostOverride(), defaultOrreryRenderHost(), describeOrreryHost(), DevHostOverrideModule, deviceRatio(), OrreryHostOverride, OrreryRenderHost, OrreryRenderPlatform (+36 more)
+Cohesion: 0.09
+Nodes (27): applyOrreryHostOverride(), defaultOrreryRenderHost(), describeOrreryHost(), DevHostOverrideModule, deviceRatio(), OrreryHostOverride, OrreryRenderHost, OrreryRenderPlatform (+19 more)
 
 ### Community 44 - "phase-17-runtime-integration.test.ts"
-Cohesion: 0.40
-Nodes (4): babel, onUI(), require, Worklet
+Cohesion: 0.09
+Nodes (38): IconProps, ICON_REGISTRY, IconName, IconTone, StatusTone, TAB_ICON, SETTINGS_ROW_ICONS, ADR-0086 (+30 more)
 
 ### Community 45 - "v1 Requirements"
 Cohesion: 0.10
@@ -1513,15 +1507,15 @@ Nodes (26): Architecture, Capturing and cropping a photo, Changelog, Configurati
 
 ### Community 47 - "FuelEditor.tsx"
 Cohesion: 0.02
-Nodes (188): companionAction(), companionRows(), scene(), buildSystemChoiceGroups(), buildSystemChoices(), ExpandedSystemGroups, initialExpandedSystemGroups(), registerSystemSelectorTransient() (+180 more)
+Nodes (167): companionAction(), companionRows(), scene(), buildSystemChoiceGroups(), buildSystemChoices(), ExpandedSystemGroups, initialExpandedSystemGroups(), registerSystemSelectorTransient() (+159 more)
 
 ### Community 48 - "biome.json"
 Cohesion: 0.07
 Nodes (26): source, assist, actions, files, includes, formatter, enabled, indentStyle (+18 more)
 
 ### Community 49 - "ai-context-read.ts"
-Cohesion: 0.13
-Nodes (32): RestoreMode, backupNeedsBackgroundConsent(), ConfirmedRestoreApply, confirmRestoreApply(), createRestoreApplyRun(), createRestoreApplySingleFlight(), createRestorePreviewCache(), initialRestoreApplyState() (+24 more)
+Cohesion: 0.09
+Nodes (44): ExportManifestReport, RestoreMode, BackupManifest, backupAppBarVariant(), BackupHost, restoreReturnLabel(), restoreReturnRouteName(), shouldConsumeSharedBackup() (+36 more)
 
 ### Community 50 - "create-contact-logic.ts"
 Cohesion: 0.07
@@ -1533,51 +1527,51 @@ Nodes (34): 0. ERRATA — superseded by Cycle 1–4 plan-review decisions (autho
 
 ### Community 52 - "dependencies"
 Cohesion: 0.07
-Nodes (27): expo, expo-auth-session, expo-clipboard, expo-constants, expo-document-picker, expo-notifications, expo-sms, expo-status-bar (+19 more)
+Nodes (27): expo-auth-session, expo-clipboard, expo-constants, expo-document-picker, expo-image-manipulator, expo-notifications, expo-sms, expo-status-bar (+19 more)
 
 ### Community 53 - "ComposeScreen.tsx"
-Cohesion: 0.10
-Nodes (37): AiDefaultKey, aiDefaultKeyForMemoryType(), AiPermissionDefaults, AiPermissionLock, AiPermissionReviewFilter, AiPermissionValue, asLock(), assertPermissionValue() (+29 more)
+Cohesion: 0.14
+Nodes (24): AiPermissionLock, AiPermissionReviewFilter, AiPermissionValue, asLock(), assertPermissionValue(), assertRef(), bulkDisableAiPermissions(), bulkEnableAiPermissions() (+16 more)
 
 ### Community 54 - "RestorePreviewScreen.tsx"
 Cohesion: 0.03
-Nodes (139): polarisWorldPoint(), useWorldProps(), clearTracking(), createOrreryGestures(), flashReorderSlot(), GestureSamples, initialSamples(), linearEase() (+131 more)
+Nodes (135): polarisWorldPoint(), clearTracking(), createOrreryGestures(), flashReorderSlot(), GestureSamples, initialSamples(), linearEase(), markTracking() (+127 more)
 
 ### Community 55 - "ContactProfileScreen.tsx"
-Cohesion: 0.06
-Nodes (81): MemoryCardProps, MemoryAiDefaults, clamp01(), fabA11yProps(), fabSuppressed(), fabTargetAfterScroll(), lerp(), morphFrame (+73 more)
+Cohesion: 0.04
+Nodes (174): MemoryAiDefaults, MemoryDraft, MemoryDraftState, MemoryEditorHandle, MemoryEditPatch, errorNotice(), MoveEntrySheet(), undoMove() (+166 more)
 
 ### Community 56 - "contact-import-resume-sweep.ts"
-Cohesion: 0.06
-Nodes (63): rewriteRingSeq(), CustomSystem, assignOrreryTestPortraits(), baseName(), calendarDayDiff(), chunks(), countAllContacts(), defaultOrreryPortraitDeps (+55 more)
+Cohesion: 0.10
+Nodes (23): castMember(), CHANNELS, ORRERY_FIXTURE_PREFERENCES, OrrerySeedPlan, SeedKind, SeedMoon, SeedSystem, SeedTouchpoint (+15 more)
 
 ### Community 57 - "Avatar.tsx"
-Cohesion: 0.08
-Nodes (46): draftToRules(), emptyRuleDraft(), FAMILY_LABELS, isMeaningfulChange(), partitionStoredRulesForBuilder(), RULE_FAMILY_OPTIONS, RuleDraft, rulesToDraft() (+38 more)
+Cohesion: 0.10
+Nodes (32): draftToRules(), emptyRuleDraft(), FAMILY_LABELS, isMeaningfulChange(), partitionStoredRulesForBuilder(), RULE_FAMILY_OPTIONS, RuleDraft, rulesToDraft() (+24 more)
 
 ### Community 58 - "assist-store.ts"
-Cohesion: 0.06
-Nodes (47): ContactMethodGroups, listActionablePrimaryMethods(), listContactMethodGroups(), selectActionablePrimaryMethods(), RogueReason, daysAgo(), PROFILE_HISTORY_MODULE_ID, ProfileHistory (+39 more)
+Cohesion: 0.09
+Nodes (60): ActivityHeatmapProps, addLocalDays(), advanceHistoryDay(), buildLogRoute(), countByCycle(), cyclesNextRef(), cyclesPrevRef(), EffectiveLens (+52 more)
 
 ### Community 59 - "lifecycle-consumer-ledger.test.ts"
-Cohesion: 0.14
-Nodes (16): DropdownFieldWidget(), NumberFieldWidget(), styles, styles, TextAreaFieldWidget(), styles, TextFieldWidget(), styles (+8 more)
+Cohesion: 0.10
+Nodes (26): DropdownFieldWidget(), NumberFieldWidget(), styles, styles, TextAreaFieldWidget(), styles, TextFieldWidget(), styles (+18 more)
 
 ### Community 60 - "CaptureScreen.tsx"
-Cohesion: 0.05
-Nodes (55): allBoxNoneViews, BoxNoneView, DYNAMIC_A11Y_PROPS, findStaticBoxNoneViews(), isViewTag(), SRC, byTestId(), prop() (+47 more)
+Cohesion: 0.08
+Nodes (44): h, Node, root(), analyzeGlassScopeReads(), attribute(), attributeRegion(), childrenRegion(), declarationInStatements() (+36 more)
 
 ### Community 61 - "reconcile-resume-sweep.ts"
-Cohesion: 0.20
-Nodes (18): Category, CropSource, Page, ProfileBackgroundManager(), ProfileBackgroundManagerProps, styles, BackgroundListState, BackgroundManagerState (+10 more)
+Cohesion: 0.09
+Nodes (42): Category, CropSource, Page, ProfileBackgroundManager(), ProfileBackgroundManagerProps, styles, assignGlobalProfileBackgroundTemplate(), deleteProfileBackgroundTemplate() (+34 more)
 
 ### Community 62 - "expo"
 Cohesion: 0.10
 Nodes (20): backgroundColor, foregroundImage, monochromeImage, adaptiveIcon, predictiveBackGestureEnabled, expo, android, icon (+12 more)
 
 ### Community 63 - "model-registry.ts"
-Cohesion: 0.07
-Nodes (38): dateLabel(), fitWeekCell(), styles, weeks(), YourWeekHeatmap(), YourWeekHeatmapProps, cellHitSlop(), CellHitSlopInput (+30 more)
+Cohesion: 0.10
+Nodes (28): dateLabel(), fitWeekCell(), styles, weeks(), YourWeekHeatmap(), YourWeekHeatmapProps, cellHitSlop(), CellHitSlopInput (+20 more)
 
 ### Community 64 - "transaction.ts"
 Cohesion: 0.06
@@ -1592,8 +1586,8 @@ Cohesion: 0.12
 Nodes (15): Architecture, Changelog, Configuration, Data Model, Decisions, Gotchas, How It Works, Key Files (+7 more)
 
 ### Community 67 - "ImportReviewScreen.tsx"
-Cohesion: 0.06
-Nodes (47): buildStreamModel(), compareStreamRecords(), EVENT_LABELS, orderStreamRecords(), sortableAt(), StreamRecord, interaction(), KNOWLEDGE (+39 more)
+Cohesion: 0.07
+Nodes (39): buildStreamModel(), initialStreamState(), orderStreamRecords(), StreamRecord, StreamSource, streamStateOnExpandYear(), interaction(), KNOWLEDGE (+31 more)
 
 ### Community 68 - "recency-dao.ts"
 Cohesion: 0.12
@@ -1604,12 +1598,12 @@ Cohesion: 0.06
 Nodes (33): Agreed concerns (2+ reviewers), Agreed concerns (2+ reviewers), Agreed concerns (2+ reviewers), Consensus Summary, Consensus Summary (Cycle 2), Consensus Summary (Cycle 3), Cross-AI Plan Review — Phase 7 (Conversational Fuel), Cycle 1, Cross-AI Plan Review — Phase 7, Cycle 2 (+25 more)
 
 ### Community 70 - "LegacyContactPickerScreen.tsx"
-Cohesion: 0.09
+Cohesion: 0.08
 Nodes (23): Architecture, Changelog, Configuration, Data Model, Decisions, Deriving gravity and intensity, Detailed ordinary logging, Gotchas (+15 more)
 
 ### Community 71 - "audit-adr-key-files.ts"
-Cohesion: 0.16
-Nodes (17): adrDir, auditAdrKeyFiles(), AuditResult, byBasename, Category, CATEGORY_ORDER, classify(), everExisted() (+9 more)
+Cohesion: 0.15
+Nodes (18): adrDir, auditAdrKeyFiles(), AuditResult, byBasename, Category, CATEGORY_ORDER, classify(), everExisted() (+10 more)
 
 ### Community 72 - "types.ts"
 Cohesion: 0.11
@@ -1621,7 +1615,7 @@ Nodes (34): 20-01 — Migration and atomic merge tracer, 20-02 — Merge conflic
 
 ### Community 74 - "expo-notifications.ts"
 Cohesion: 0.05
-Nodes (41): BakeAction, bakeBaseSnapshot(), BakedBase, BakeInputs, BakeSnapshot, BakeState, bakeUnavailable(), BaseBakeOwner (+33 more)
+Nodes (46): BakeAction, bakeBaseSnapshot(), BakedBase, BakeInputs, BakeSnapshot, BakeState, bakeUnavailable(), BaseBakeOwner (+38 more)
 
 ### Community 75 - "notification-gate.tsx"
 Cohesion: 0.11
@@ -1648,12 +1642,12 @@ Cohesion: 0.12
 Nodes (17): babel-preset-expo, @biomejs/biome, devDependencies, babel-preset-expo, @biomejs/biome, patch-package, tsx, @types/node (+9 more)
 
 ### Community 81 - "AiCloudProviderId"
-Cohesion: 0.29
-Nodes (7): filterPicker(), FilterPickerOptions, matchPickerRow(), orderPickerRows(), PickerOrderRow, pickerRowMarkers, ADR-0075
+Cohesion: 0.12
+Nodes (24): applyPickerExclusions(), clearSelection(), confirmMultiSelection(), MultiSelectConfirmation, orderedSelection(), PickerExclusions, selectionCount(), toggleSelection() (+16 more)
 
 ### Community 82 - "use-read-contacts-permission.ts"
-Cohesion: 0.06
-Nodes (48): revokeBackupExportShare(), shareBackupExport(), ADR-0155, OrbitBackupShareModule, addStoredPath(), canonicalFor(), captureRestoreDeletes(), isSafeColName() (+40 more)
+Cohesion: 0.05
+Nodes (58): canonicalFor(), getPhotoDisplay(), PhotoDisplay, photoDisplayFor(), PhotoDisplayResolvers, PhotoDisplayStrategy, RUNTIME_RESOLVERS, NOT_PATHS (+50 more)
 
 ### Community 83 - "OrbitSecureFetchModuleTest"
 Cohesion: 0.19
@@ -1672,24 +1666,24 @@ Cohesion: 0.06
 Nodes (32): Concerns, Concerns, Concerns, Concerns, Cross-Cutting Invariants Check, Dependency Ordering, Fact-Drift Pass (ADVISORY — not counted toward HIGH/actionable), Final Risk Assessment (+24 more)
 
 ### Community 87 - "reconcile-photo.ts"
-Cohesion: 0.17
-Nodes (13): SETTINGS_REGISTERED_ROUTES, SettingsRegisteredRoute, ParamlessSettingsRoute, SETTINGS_CATEGORY_ORDER, SETTINGS_HUB_ROWS, SettingsCategoryKey, SettingsHubActionEntry, SettingsHubRouteEntry (+5 more)
+Cohesion: 0.07
+Nodes (39): groups(), ContactMethodDraft, ContactMethodType, normalizeContactMethod(), NormalizeContactMethodInput, NormalizedContactMethod, raw(), customConflictDisplayValues() (+31 more)
 
 ### Community 88 - "restore-photo-finalize-sweep.ts"
 Cohesion: 0.14
 Nodes (13): Architecture (Phase 38.7 — Orrery V2), File Locations, How to Add or Change an Orrery Layer, Orrery Visual Layer Pipeline, Overview, Pitfalls, Relationship satellites, Render and lifecycle boundary (+5 more)
 
 ### Community 89 - "widget-linking.ts"
-Cohesion: 0.03
-Nodes (47): defaultOrreryPhotoCacheDeps, Flight, ImageEntry, OrreryImageBacking, OrreryPhotoCache, OrreryPhotoCacheDeps, OrreryPhotoCacheOptions, OrreryPhotoCacheStats (+39 more)
+Cohesion: 0.09
+Nodes (31): BulkAction, BulkActionSurface(), BulkActionSurfaceProps, styles, CardContextMenu(), CardContextMenuProps, MenuAction, styles (+23 more)
 
 ### Community 90 - "saf-storage.ts"
 Cohesion: 0.03
-Nodes (159): CategoryChoiceSheet(), categoryChoiceSheetModel(), CategoryChoiceSheetModelInput, CategoryChoiceSheetProps, categoryNoMatchCopy(), addMethodDraft(), canonicalDuplicateCopy(), choosePrimary() (+151 more)
+Nodes (169): addMethodDraft(), canonicalDuplicateCopy(), choosePrimary(), collapseCanonicalDuplicate(), ContactMethodEditorDraft, discardBlankMethodDrafts(), EMPTY_METHOD_GROUPS, emptyMethodDraft() (+161 more)
 
 ### Community 91 - "PhotoFieldWidget.tsx"
-Cohesion: 0.11
-Nodes (22): AiAvailabilityInput, AiRepairAction, beginConnectionSetup(), connectionCardState(), ConnectionSwitchState, CredentialDraft, CustomConnectionDeps, CustomConnectionInput (+14 more)
+Cohesion: 0.07
+Nodes (40): IPV4_MAPPED_PREFIX, ipv4InCidr(), ipv4IsNonPublic(), ipv6InCidr(), ipv6IsNonPublic(), isNonPublicIpLiteral(), NAT64_PREFIX, NON_PUBLIC_IPV4_CIDRS (+32 more)
 
 ### Community 92 - "contact-lifecycle-effects.ts"
 Cohesion: 0.10
@@ -1724,8 +1718,8 @@ Cohesion: 0.15
 Nodes (11): adrDir, adrStatus, byId, graph, graphPath, Link, [mode, arg], Node (+3 more)
 
 ### Community 100 - "contacts-dao.test.ts"
-Cohesion: 0.11
-Nodes (35): convertV7ToV8(), fail(), legacyRow(), optionalText(), purgeSoftDeleted(), RawManifest, RawRow, RawTombstone (+27 more)
+Cohesion: 0.05
+Nodes (64): convertV7ToV8(), fail(), legacyRow(), optionalText(), purgeSoftDeleted(), RawManifest, RawRow, RawTombstone (+56 more)
 
 ### Community 101 - "notification-ids.ts"
 Cohesion: 0.11
@@ -1756,8 +1750,8 @@ Cohesion: 0.12
 Nodes (15): Architecture, Changelog, Configuration, Data Model, Decisions, Gotchas, Group Event schema and composed writes, How It Works (+7 more)
 
 ### Community 108 - "ConsumedBackupShare"
-Cohesion: 0.08
-Nodes (27): main(), renderSeedModule(), SEED_PATH, CatalogFetch, CatalogFetchResponse, CatalogStorage, isEmptyCatalog(), isModelCatalog() (+19 more)
+Cohesion: 0.10
+Nodes (23): main(), renderSeedModule(), SEED_PATH, CatalogFetch, CatalogFetchResponse, CatalogStorage, isEmptyCatalog(), isModelCatalog() (+15 more)
 
 ### Community 109 - "contact-picker-chunk.test.ts"
 Cohesion: 0.12
@@ -1796,8 +1790,8 @@ Cohesion: 0.17
 Nodes (11): Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31, 32), Code, File Locations, How to Add a SQLite Migration, Migration runner, Overview, Pitfalls, Resolution order (+3 more)
 
 ### Community 117 - "seedFullContact"
-Cohesion: 0.05
-Nodes (69): AXIS_DEFAULT_LABELS, CONTROL_ACTION_LABELS, CONTROL_AXIS_LABELS, FILTER_FAMILY_LABELS, FILTER_OPTION_LABELS, filterFamilyLabel(), filterOptionLabel(), POPULATION_LABELS (+61 more)
+Cohesion: 0.06
+Nodes (61): AXIS_DEFAULT_LABELS, CONTROL_ACTION_LABELS, CONTROL_AXIS_LABELS, FILTER_FAMILY_LABELS, FILTER_OPTION_LABELS, filterFamilyLabel(), filterOptionLabel(), POPULATION_LABELS (+53 more)
 
 ### Community 118 - "birthday-logic.ts"
 Cohesion: 0.15
@@ -1824,12 +1818,12 @@ Cohesion: 0.07
 Nodes (29): 1. Summary, 2. Strengths, 3. Concerns, 4. Suggestions, 5. Risk Assessment, Agreed Concerns, Agreed Strengths, Claude Review (+21 more)
 
 ### Community 124 - "011-contact-lifecycle-schema.test.ts"
-Cohesion: 0.07
-Nodes (43): UnavailableBackupBackground, resolveSunOccupant(), SunOccupant, SunOccupantHeader, SunOccupantInput, sunOccupantIsSelf(), base, backgroundChoicesForPackage() (+35 more)
+Cohesion: 0.10
+Nodes (34): readLocalSettingsModifiedAt(), backgroundsNeedingConsent(), BackupBackgroundKey, daoAccepts(), restoreWritesBackupSettings(), UnavailableBackupBackground, unavailableBackupBackgrounds(), withDefaultBackgrounds() (+26 more)
 
 ### Community 125 - "reconcile-session-read.ts"
-Cohesion: 0.06
-Nodes (51): moonScene(), sceneWith(), getContactStatus(), chain, withMutex(), ImpactRow, readOrreryImpactInputsCore(), ADR-0027 (+43 more)
+Cohesion: 0.22
+Nodes (13): GravityInputsLoader, addFilter(), applyMembershipOverrides(), eligibleIncludedIds(), MappedSystemRules, mapRulesToFilters(), resolveCandidateIds(), ResolvedCustomSystemMembers (+5 more)
 
 ### Community 126 - "index.ts"
 Cohesion: 0.15
@@ -1841,7 +1835,7 @@ Nodes (29): 10. Merge entry (Cluster U), 11. Survivor selection — `SurvivorSel
 
 ### Community 128 - "adr-registry.ts"
 Cohesion: 0.01
-Nodes (384): ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0012, ADR-0013 (+376 more)
+Nodes (394): ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0012, ADR-0013 (+386 more)
 
 ### Community 129 - "3. Data layer"
 Cohesion: 0.29
@@ -1861,19 +1855,19 @@ Nodes (18): Architecture, Capturing shared material, Changelog, Configuration, C
 
 ### Community 133 - "crop-geometry.ts"
 Cohesion: 0.08
-Nodes (48): FilterChip, FilterChipRow(), FilterChipRowProps, styles, AiPermissionCategory, AiPermissionImpact, AiPermissionItem, AiPermissionRef (+40 more)
+Nodes (46): FilterChip, FilterChipRow(), FilterChipRowProps, styles, AiDefaultKey, AiPermissionCategory, AiPermissionDefaults, AiPermissionImpact (+38 more)
 
 ### Community 135 - "7. Visual design"
 Cohesion: 0.33
 Nodes (6): 7. Visual design, [DECIDED] Space theme throughout, [DECIDED] Theme tokens, [DECIDED] Two distinct screens — do not merge them, Rendering, The orrery — settled mechanics
 
 ### Community 136 - "linking.ts"
-Cohesion: 0.06
-Nodes (48): PromptContextOverflowError, asCatalogProvider(), better(), curatedModelsFor(), curatedOpenRouterModels(), EMPTY, filterToFrontier(), FRONTIER_TIERS (+40 more)
+Cohesion: 0.05
+Nodes (53): PromptContextOverflowError, CatalogProvider, asCatalogProvider(), better(), CuratedModelRef, curatedModelsFor(), curatedOpenRouterModels(), EMPTY (+45 more)
 
 ### Community 137 - "File"
-Cohesion: 0.08
-Nodes (52): lastTalkedAboutOf(), firstClassResearchItems(), memoryItemLabel(), memorySectionName(), readComposeResearch(), ADR-0107, currentStateOrderSql(), getCurrentStateHistory() (+44 more)
+Cohesion: 0.11
+Nodes (36): lastTalkedAboutOf(), firstClassResearchItems(), memoryItemLabel(), memorySectionName(), readComposeResearch(), ADR-0107, currentStateOrderSql(), getCurrentStateHistory() (+28 more)
 
 ### Community 138 - "System Docs"
 Cohesion: 0.40
@@ -1884,16 +1878,16 @@ Cohesion: 0.40
 Nodes (5): 4. Port analysis — verified against the repo, not estimated, Delete — Obsidian-only, no mobile analogue, Ports nearly as-is (~900 lines), Rewritten against SQLite (logic shapes reusable, implementation not), Rewritten entirely — UI
 
 ### Community 140 - "package.json"
-Cohesion: 0.06
-Nodes (77): effectivePalette(), MappedRow, ACCENTS, PAIRS, paletteOf(), SkySpecInput, snackbarBottomPadding(), snackbarLayout (+69 more)
+Cohesion: 0.05
+Nodes (79): MappedRow, ACCENTS, PAIRS, SkySpecInput, SnackbarScreenContext, backgroundHostSelection(), BackgroundHost(), BackgroundHostProps (+71 more)
 
 ### Community 141 - "ResumeReconcilePrompt.tsx"
 Cohesion: 0.15
 Nodes (23): BirthdayNotificationCandidate, DecayEligibleCandidate, listBirthdayNotificationCandidates(), listDecayEligibleCandidates(), HeadlessResponsePayload, NotificationData, buildBirthdayRequest(), buildDecayRequest() (+15 more)
 
 ### Community 142 - "sun-picker-read.test.ts"
-Cohesion: 0.03
-Nodes (130): seedFlag(), seedImportRow(), createContactFullCore(), acceptImportSessionWithRows(), AcceptImportSessionWithRowsInput, assertImportLifecycle(), assertOneChange(), assertSessionLifecycle() (+122 more)
+Cohesion: 0.02
+Nodes (176): ResumeImportPromptProps, BulkReviewDbRow, BulkReviewFlag, listBulkReviewFlags(), sourceBirthday(), CreateContactFullInput, AcceptImportSessionWithRowsInput, assertImportLifecycle() (+168 more)
 
 ### Community 143 - "field-type-change.test.ts"
 Cohesion: 0.07
@@ -1944,12 +1938,12 @@ Cohesion: 0.07
 Nodes (26): 10. Pre-commit pending photos can be finalized after a rolled-back or never-started restore, 11. The plan finalizes stale or losing incoming photos even when reconciliation retained local state, 12. Existing sweep code cannot itself find a pending subdirectory, and the proposed new sweep lacks safe target proof, 13. Photo clears and Replace-all omissions leave sensitive old masters on disk, 14. A configured pre-restore backup can be skipped by normal cadence/change eligibility, 15. One failed schedule hook can prevent later schedule recovery on that foreground launch, 16. SecureStore failure can be interpreted as encryption disabled and produce a plaintext backup, 17. Per-file write-new/verify/delete-old is not a crash-consistent passphrase-change protocol (+18 more)
 
 ### Community 161 - "expo-secure-store"
-Cohesion: 0.10
-Nodes (46): ProfileLayoutEditorProps, Category, isTemplatePage(), ProfileTemplateManager(), ProfileTemplateManagerProps, styles, templateLayout(), TemplateNameForm() (+38 more)
+Cohesion: 0.09
+Nodes (49): ProfileLayoutEditorProps, Category, isTemplatePage(), ProfileTemplateManager(), ProfileTemplateManagerProps, styles, templateLayout(), TemplateNameForm() (+41 more)
 
 ### Community 162 - "expo-share-intent"
-Cohesion: 0.15
-Nodes (17): BackgroundFinalizationDependencies, BackgroundFinalizationResult, finalizationTails, finalizeBackgroundRestoreCandidate(), withBackgroundFinalizationLock(), runBackgroundReconciliation(), h, backgroundDerivativeRelPath() (+9 more)
+Cohesion: 0.07
+Nodes (48): entry(), journalPathExistsCore(), SWEEP_IDS, BackgroundFinalizationDependencies, BackgroundFinalizationResult, finalizationTails, finalizeBackgroundRestoreCandidate(), withBackgroundFinalizationLock() (+40 more)
 
 ### Community 163 - "expo-sharing"
 Cohesion: 0.08
@@ -1964,12 +1958,12 @@ Cohesion: 0.08
 Nodes (25): Body-tap navigation (navigationRef + reset), `changes===1` loud-failure guard, Edit-form mute — COPY-ONLY, do not rebuild, File Classification, Filled-accent chip idiom (UI — snooze presets), Launch-sweep hook registration, Local wall-clock dates (never `toISOString`), Metadata (+17 more)
 
 ### Community 166 - "libphonenumber-js"
-Cohesion: 0.04
-Nodes (93): LinkDraft, LinksEditor(), LinksEditorProps, normaliseLinkUrl(), openLinkUrl(), styles, MemoryCard(), memoryEditLabel() (+85 more)
+Cohesion: 0.07
+Nodes (54): AddPlacement, CardEditSlot, cardEditSlots(), CardEditSlotsInput, normaliseLinkUrl(), MemoryCard(), MemoryCardProps, memoryEditLabel() (+46 more)
 
 ### Community 167 - "react"
 Cohesion: 0.03
-Nodes (166): OrreryControlsProps, PreviewFocus, BakeRegistry, drawLabels(), drawPlate(), capPaint(), drawFocusReticle(), drawHeldRing() (+158 more)
+Nodes (185): EMPTY_IDS, EMPTY_RELATIONS, linear(), NO_RECTS, OrreryLedger, OrreryPerfMarks, orreryTextEligibility(), OrreryWorldInner() (+177 more)
 
 ### Community 168 - "react-native-android-widget"
 Cohesion: 0.12
@@ -1992,20 +1986,20 @@ Cohesion: 0.08
 Nodes (24): File Classification, Headless DB bootstrap (H1), `index.ts` + `app.config.ts` (MOD — native enablement), Metadata, No Analog Found, Pattern Assignments, Phase 12: Home Screen Widget - Pattern Map, Pure resolver + thin gate (deep-link) (+16 more)
 
 ### Community 186 - "MAX_SUPPORTED_BACKUP_FORMAT_VERSION"
-Cohesion: 0.09
-Nodes (35): drawSky(), drawSkyGradient(), drawSkyNebula(), drawSkyStars(), drawSkyWash(), inkColor(), skyLayerPlace(), skyNebulaUniforms() (+27 more)
+Cohesion: 0.08
+Nodes (36): drawSky(), drawSkyGradient(), drawSkyNebula(), drawSkyStars(), drawSkyWash(), inkColor(), skyLayerPlace(), skyNebulaUniforms() (+28 more)
 
 ### Community 189 - "ADR Index"
 Cohesion: 0.40
 Nodes (4): ADR Index, Do not machine-read this file, How to use this, Index
 
 ### Community 190 - "computeRingReorder"
-Cohesion: 0.04
-Nodes (81): bulkAddFavourites(), bulkArchive(), bulkQuickLog(), bulkRemoveFavourites(), bulkSetCategory(), bulkSetFrequency(), bulkSnooze(), bulkUnsnooze() (+73 more)
+Cohesion: 0.32
+Nodes (5): BulkActionClaim, BulkActionGate, createBulkActionGate(), DashboardSelectionSessionSnapshot, getCurrentSelectionIds()
 
 ### Community 191 - "fuel-dao.test.ts"
-Cohesion: 0.02
-Nodes (216): styles, AINeedsAttentionProps, styles, Avatar(), AvatarProps, styles, BulkActionSurface(), BulkActionSurfaceProps (+208 more)
+Cohesion: 0.03
+Nodes (167): AIComposeContextReview(), styles, AINeedsAttentionProps, styles, GroupTitlePromptSheet(), GroupTitlePromptSheetProps, styles, ParticipantCard() (+159 more)
 
 ### Community 192 - "File"
 Cohesion: 0.08
@@ -2016,8 +2010,8 @@ Cohesion: 0.08
 Nodes (24): Additive migration, app_settings toggle plumbing, Channel immutability, File Classification, Focus-effect reload with cancelled guard, Metadata, No Analog Found, Notification engine coexistence (do not fold in) (+16 more)
 
 ### Community 194 - "transaction.ts"
-Cohesion: 0.05
-Nodes (62): BulkAction, MenuAction, CardGrid(), CardGridProps, styles, ringVisual, StatusDisplayState, statusGlyph() (+54 more)
+Cohesion: 0.06
+Nodes (53): CardGrid(), CardGridProps, styles, ringVisual, StatusDisplayState, statusGlyph(), ALL_STATES, ContactCard() (+45 more)
 
 ### Community 195 - "recency-dao.test.ts"
 Cohesion: 0.08
@@ -2036,8 +2030,8 @@ Cohesion: 0.08
 Nodes (23): `app.config.ts` (native plugin registration), DAO node-sqlite test harness, Face tile / ＋ tile / confirmation-note surface (screen-local components), File Classification, Fuel writer (NEVER the last_contact DAO), Metadata, No Analog Found, `patches/expo-share-intent+8.0.1.patch` + local `finish()` module — NET-NEW NATIVE (no analog) (+15 more)
 
 ### Community 199 - "survivor-recommendation.ts"
-Cohesion: 0.04
-Nodes (62): AppShell(), styles, ThemedStatusBar(), ResumeImportPromptProps, isMigration006IntegrityError(), BackupCacheSweepFiles, createBackupCacheSweep(), PROCESS_STARTED_AT (+54 more)
+Cohesion: 0.03
+Nodes (71): AppShell(), styles, ThemedStatusBar(), IMAGE, DialogHost(), ADR-0086, isMigration006IntegrityError(), BackupCacheSweepFiles (+63 more)
 
 ### Community 200 - "LinksEditor.tsx"
 Cohesion: 0.10
@@ -2049,7 +2043,7 @@ Nodes (24): Agreed Concerns (2+ lanes), Agreed Strengths (2+ lanes), Claude Revi
 
 ### Community 202 - "contact-read.test.ts"
 Cohesion: 0.12
-Nodes (35): ProfileLayoutEditor(), bucketForParent(), completeBucket(), createAllSectionsPreview(), createProfileLayoutEditorDraft(), EditorBucket, isMeaningfulLayoutChange(), MoveDirection (+27 more)
+Nodes (35): ProfileLayoutEditor(), bucketForParent(), completeBucket(), createProfileLayoutEditorDraft(), EditorBucket, isMeaningfulLayoutChange(), MoveDirection, ProfileLayoutEditorAction (+27 more)
 
 ### Community 203 - "011-contact-lifecycle-schema.test.ts"
 Cohesion: 0.09
@@ -2060,8 +2054,8 @@ Cohesion: 0.11
 Nodes (22): applyBodyNav(), createNotificationIngressChronology(), dataOf(), guardNotificationBodyIntent(), handleColdStartResponse(), handleWarmNotificationResponse(), NotificationContactLookup, NotificationIngressChronology (+14 more)
 
 ### Community 205 - "EditContactScreen.tsx"
-Cohesion: 0.04
-Nodes (125): addLocalDays(), advanceHistoryDay(), buildLogRoute(), countByCycle(), cyclesNextRef(), cyclesPrevRef(), EffectiveLens, historyDayAfterCyclesNext() (+117 more)
+Cohesion: 0.06
+Nodes (73): calendarDaysBetween(), compareStreamRecords(), dayAccessibilityLabel(), dayDateLabel(), dayLabel(), dayNodeKey(), emptyDayNoteText(), emptyMonthNoteText() (+65 more)
 
 ### Community 206 - "imported-contact-dao.ts"
 Cohesion: 0.09
@@ -2088,24 +2082,24 @@ Cohesion: 0.29
 Nodes (7): Concerns, Cross-AI Review: Phase 20 Plans (20-01 through 20-06) — Convergence Cycle 4, Cursor Review (Cycle 4), Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 212 - "field-sweep.test.ts"
-Cohesion: 0.03
-Nodes (89): addNotificationResponseReceivedListener, AndroidImportance, AndroidNotificationVisibility, cancelScheduledNotificationAsync, clearLastNotificationResponseAsync, dismissNotificationAsync, getAllScheduledNotificationsAsync, getLastNotificationResponseAsync (+81 more)
+Cohesion: 0.10
+Nodes (18): addNotificationResponseReceivedListener, AndroidImportance, AndroidNotificationVisibility, cancelScheduledNotificationAsync, clearLastNotificationResponseAsync, dismissNotificationAsync, getAllScheduledNotificationsAsync, getLastNotificationResponseAsync (+10 more)
 
 ### Community 213 - "ReconcileDetailScreen"
-Cohesion: 0.18
-Nodes (18): OpenRouterCatalog, ResolvedAiConnection, AiAffordancePosture, AiAvailability, computeAiAvailability(), isCredentialFailure(), isSelectedConnectionModelAvailable(), selectAiAffordance() (+10 more)
+Cohesion: 0.19
+Nodes (17): OpenRouterCatalog, ResolvedAiConnection, AiAffordancePosture, AiAvailability, computeAiAvailability(), isCredentialFailure(), isSelectedConnectionModelAvailable(), readCredentialPresence() (+9 more)
 
 ### Community 214 - "fail"
-Cohesion: 0.16
-Nodes (14): automaticBackupFilename(), AutomaticBackupMetadata, filesToPrune(), isExpiredAutomaticBackup(), isOwnedAutomaticBackup(), shouldRunAutomaticBackup(), now, createAutomaticBackupService() (+6 more)
+Cohesion: 0.09
+Nodes (33): drawPreviewFocus(), capPaint(), drawFocusReticle(), drawOcclusion(), drawOverlay(), drawPolaris(), drawReorderHold(), drawReticle() (+25 more)
 
 ### Community 215 - "field-type-change.test.ts"
-Cohesion: 0.11
-Nodes (16): createDashboardRefreshScheduler(), dashboardFadeStart(), DashboardReadOutcome, DashboardReadSinks, DashboardRefreshScheduler, DashboardRefreshSource, DEFERRABLE_WHILE_HIDDEN, publishDashboardRead() (+8 more)
+Cohesion: 0.10
+Nodes (17): createDashboardRefreshScheduler(), dashboardFadeStart(), DashboardReadOutcome, DashboardReadSinks, DashboardRefreshScheduler, DashboardRefreshSource, DEFERRABLE_WHILE_HIDDEN, isDashboardVisible() (+9 more)
 
 ### Community 216 - "assist-eligibility.ts"
-Cohesion: 0.04
-Nodes (55): listLinks(), getContactForEdit(), createContactFull(), addDefinition(), makeContact(), name(), uid(), setup() (+47 more)
+Cohesion: 0.06
+Nodes (36): addDefinition(), makeContact(), name(), uid(), readDataRevision(), availableKnowledgeChildren(), computeImpact(), countRows() (+28 more)
 
 ### Community 217 - "NativeGcmCipher"
 Cohesion: 0.09
@@ -2144,8 +2138,8 @@ Cohesion: 0.09
 Nodes (22): Architecture, Changelog, Configuration, Contact Knowledge, Controlling AI eligibility and local search, Creating and maintaining a Memory, Current-state history, Data Model (+14 more)
 
 ### Community 226 - "relationships-dao.ts"
-Cohesion: 0.06
-Nodes (46): backgroundHostSelection(), BackgroundHost(), BackgroundHostProps, styles, ADR-0048, DevButton(), MODES, PACKAGES (+38 more)
+Cohesion: 0.09
+Nodes (29): evaluate(), starSwatchCheckTone, SWATCH_GAP_TOKEN, SWATCH_IDLE_RING_TOKEN, SWATCH_RING_TOKEN, MODES, PACKAGES, BACKGROUND_LABELS (+21 more)
 
 ### Community 227 - "Pattern Assignments"
 Cohesion: 0.10
@@ -2176,16 +2170,16 @@ Cohesion: 0.10
 Nodes (19): Actionable LOW Concerns, Actionable MEDIUM Concerns, Agreed HIGH Concerns, Claude Review, Codex Review, Consensus before final internal revision gate, Consensus before replan, Consensus Summary (+11 more)
 
 ### Community 234 - "FieldDefForm.tsx"
-Cohesion: 0.20
-Nodes (15): openImportSessionEffect(), mountHold(), cleanupDiscardedStagedPhotos(), describeResumable(), ImportStagingFileSystem, nativeImportStagingFs, reconcileOrphanStagedPhotos(), registerImportResumeSweep() (+7 more)
+Cohesion: 0.10
+Nodes (30): assertUniqueRows(), assertUniqueTombstones(), CategoryDependentPlan, ENTITY_POLICIES, EntityPolicy, incompatibleRows(), MergeableEntityType, newestRow() (+22 more)
 
 ### Community 235 - "memories-dao.ts"
-Cohesion: 0.53
-Nodes (4): isFutureLocalDate(), PickDateResult, resolvePickedDate(), NOW
+Cohesion: 0.11
+Nodes (19): createDigestRefreshController(), digestLoadStateOnFail(), digestLoadStateOnPublish(), DigestRefreshController, DigestRefreshDeps, DigestRefreshLoadState, DigestRefreshSource, deferred() (+11 more)
 
 ### Community 236 - "knowledge-search.ts"
-Cohesion: 0.03
-Nodes (131): addMethodPiiFixture(), linkMemory(), logNote(), makeContact(), makeDef(), makeNeverAssignedUnboundContact(), pushOutOfRecent(), ADR-0078 (+123 more)
+Cohesion: 0.02
+Nodes (273): populateV6(), insertContact(), activateAiConnection(), assertOneChange(), setRememberedModel(), upsertAiConnection(), setAiPermissionDefault(), markAiFirstUseDisclosed() (+265 more)
 
 ### Community 237 - "Phase 13 — UI Design Contract (Orrery)"
 Cohesion: 0.11
@@ -2268,8 +2262,8 @@ Cohesion: 0.11
 Nodes (17): A. How Orbit imports a device contact, B. How a contact is "Bound"; changed vs unchanged classification, C. What makes a birthday "unreadable"/flagged, Cross-cutting answers, D. Scenario 5 — applied change vs resume detection, E. Merge flow — initiation, screens, labels, atomic proof, Orientation — where things live, Phase 20 — Contact Reconciliation & Merge — UAT Runbook Research (+9 more)
 
 ### Community 257 - "hydrate-theme-at-boot.ts"
-Cohesion: 0.14
-Nodes (16): collapse(), COMPUTED_CHILD_VARIANTS, hasInBodyBack(), HEADER_CHROME_SETTINGS_CHILDREN, importedScreenFiles(), KEEP_OWN_CHROME, read(), registeredScreenFiles() (+8 more)
+Cohesion: 0.12
+Nodes (23): EditorRow(), SetProfileCollapseOverrideInput, visible(), COLLAPSIBLE_ID_SET, decodeJsonObject(), isRecord(), MODULE_ID_SET, parsePlacementBucket() (+15 more)
 
 ### Community 258 - "Phase 1 Plan 05: FND-01 Cross-Machine Build/Deploy Proof Summary"
 Cohesion: 0.12
@@ -2508,8 +2502,8 @@ Cohesion: 0.12
 Nodes (16): Concerns, Concerns, Cross-AI Plan Review — Phase 19 System Contact Import (Cycle 2), Cycle 2 — Claude (Sonnet 5) Reviewer, Cycle 2 — Verification Coverage (advisory, not counted toward totals), HIGH, LOW, MEDIUM (+8 more)
 
 ### Community 317 - "card-line3-selection.ts"
-Cohesion: 0.04
-Nodes (88): pickContacts(), assertSafeReconcileStagingRelative(), ReconcileSelection, link(), assertOneChange(), createReconcileSessionCore(), CreateReconcileSessionInput, discardSession() (+80 more)
+Cohesion: 0.09
+Nodes (36): link(), getReviewedSnapshots(), isAdditiveOnlySelection(), card(), ReconcileDiffResult, ReconcileFieldDiff, buildReconcileSelections(), ReconcileBulkMode (+28 more)
 
 ### Community 318 - "Phase 2 Plan 02: Migration 1 — the irreversible schema + PRAGMA bootstrap Summary"
 Cohesion: 0.13
@@ -2720,8 +2714,8 @@ Cohesion: 0.14
 Nodes (13): Accent roles: fill, text, on-fill (D-63), Architecture (Phases 23, 31, 31.1, 38.1, 38.4, 38.5), Changelog, File Locations, How to Change the Theme System, Native dialogs follow Orbit's mode (D-50), Overview, Pitfalls (+5 more)
 
 ### Community 370 - "reconcile-session-dao.test.ts"
-Cohesion: 0.04
-Nodes (70): alphaComposite(), BACKGROUND_VEIL_OPACITY, backgroundVeilOpacity(), cardTintOpacity(), chromeScrimOpacity(), MIN_BACKGROUND_CONTRIBUTION, ORRERY_OCCLUSION_DIM, ORRERY_OVERLAY_TINT_OPACITY (+62 more)
+Cohesion: 0.05
+Nodes (68): effectivePalette(), paletteOf(), swipeRowTintOpacity(), SwipeRowTint(), applyAccent(), isKnownAccentId(), resolveAccent(), buildExpected() (+60 more)
 
 ### Community 371 - "Existing Code Insights"
 Cohesion: 0.14
@@ -2784,8 +2778,8 @@ Cohesion: 0.14
 Nodes (13): Accomplishments, Auto-fixed Issues, Decisions Made, Deviations from Plan, Files Created/Modified, Issues Encountered, Known Stubs, Next Phase Readiness (+5 more)
 
 ### Community 386 - "Plan Review — Phase 18.2"
-Cohesion: 0.18
-Nodes (15): sampleBackupProcessPssKb(), readRestoreDocument(), { text, remove, fileSize }, isEncryptedBackupEnvelope(), CANDIDATE_MIB, heapBytes(), measureOne(), MemorySample (+7 more)
+Cohesion: 0.05
+Nodes (56): consumeSharedBackup(), pickBackupDocument(), sampleBackupProcessPssKb(), revokeBackupExportShare(), shareBackupExport(), ADR-0155, OrbitBackupShareModule, recordAutomaticBackupHealthCore() (+48 more)
 
 ### Community 387 - "Phase 19 Plan 03: Import Transform and Atomic Writers Summary"
 Cohesion: 0.14
@@ -2816,8 +2810,8 @@ Cohesion: 0.14
 Nodes (13): Detailed Findings, Files Audited, Long-Text Backstop (held-out check), Phase 21 — UI Review, Pillar 1: Copywriting (4/4), Pillar 2: Visuals (4/4), Pillar 3: Color (3→4/4, no violations), Pillar 4: Typography (3/4) (+5 more)
 
 ### Community 394 - "list-row-selection.ts"
-Cohesion: 0.22
-Nodes (9): 20-01 — Merge tracer, 20-02 — Conflict-resolution UX, 20-03 — Per-contact reconciliation, 20-04 — Bulk reconciliation workspace, 20-05 — Resume and missing-source lifecycle, 20-06 — Bulk-review resolver and phase gate, Claude Review (Cycle 4), Overall risk assessment: HIGH (+1 more)
+Cohesion: 0.09
+Nodes (22): 20-01 — Merge tracer, 20-02 — Conflict-resolution UX, 20-03 — Per-contact reconciliation, 20-04 — Bulk reconciliation workspace, 20-05 — Resume and missing-source lifecycle, 20-06 — Bulk-review resolver and phase gate, Claude Review (Cycle 4), Concerns (+14 more)
 
 ### Community 395 - "Phase 2: Data Foundation & Status Engine - Context"
 Cohesion: 0.15
@@ -2936,8 +2930,8 @@ Cohesion: 0.15
 Nodes (12): Architectural Responsibility Map, Assumptions Log, Don't Hand-Roll, Environment Availability, Metadata, Open Questions, Package Legitimacy Audit, Phase 19: System Contact Import - Research (+4 more)
 
 ### Community 424 - "19-REVIEWS.md"
-Cohesion: 0.08
-Nodes (34): AssistBanner(), logFailure(), questionFor(), styles, AssistConfirmation(), AssistConfirmationProps, styles, markNoteDirty() (+26 more)
+Cohesion: 0.03
+Nodes (94): AssistBanner(), logFailure(), questionFor(), styles, AssistConfirmation(), AssistConfirmationProps, styles, markNoteDirty() (+86 more)
 
 ### Community 425 - "Goal Achievement"
 Cohesion: 0.15
@@ -3128,8 +3122,8 @@ Cohesion: 0.17
 Nodes (11): CR-01: Android picker requests MIME types the Contact Picker does not support, CR-02: Leaving a resolved single-import screen discards its summary row, CR-03: A batch containing only a combined cluster is stranded in setup, CR-04: Editable import birthdays bypass the persistent birthday validation rule, CR-05: Successful imports retain raw staging photos indefinitely, Critical Issues, Narrative Findings (AI reviewer), Phase 19: Code Review Report (+3 more)
 
 ### Community 472 - "Plan-by-plan review"
-Cohesion: 0.17
-Nodes (12): 19-01 — Migration and session DAO, 19-02 — Native Android picker, 19-03 — Mapper and importer DAO, 19-04 — Single-contact tracer, 19-05 — Duplicate evidence, 19-06 — Bulk driver, 19-07 — Duplicate review UI, 19-08 — Completion summary (+4 more)
+Cohesion: 0.11
+Nodes (18): 19-01 — Migration and session DAO, 19-02 — Native Android picker, 19-03 — Mapper and importer DAO, 19-04 — Single-contact tracer, 19-05 — Duplicate evidence, 19-06 — Bulk driver, 19-07 — Duplicate review UI, 19-08 — Completion summary (+10 more)
 
 ### Community 473 - "Cross-AI Plan Review — Phase 19: System Contact Import — CYCLE 3"
 Cohesion: 0.17
@@ -3284,8 +3278,8 @@ Cohesion: 0.18
 Nodes (10): audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117), Manual-Only Verifications, Per-Task Verification Map, Phase 21 — Validation Strategy, Sampling Rate, status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6), Test Infrastructure, Validation Audit — 2026-08-31 (retroactive) (+2 more)
 
 ### Community 511 - "computeContactIntensity"
-Cohesion: 0.05
-Nodes (53): RecentInteractionContext, IntensityChartProps, DAYS_TO_FREQUENCY, intendedCaption(), intendedLabel(), IntensityLineProps, styles, AggregateRow (+45 more)
+Cohesion: 0.07
+Nodes (40): RecentInteractionContext, DAYS_TO_FREQUENCY, intendedCaption(), intendedLabel(), IntensityLineProps, AggregateRow, readInteractionAggregates(), readPromptContext() (+32 more)
 
 ### Community 512 - "Phase KB Manifest: 01"
 Cohesion: 0.20
@@ -3440,8 +3434,8 @@ Cohesion: 0.20
 Nodes (9): Checker Sign-Off, Color, Copywriting Contract, Design System, Phase 21 — UI Design Contract, Registry Safety, Spacing Scale, Typography (+1 more)
 
 ### Community 550 - "contact-picker-order.ts"
-Cohesion: 0.06
-Nodes (46): EditorRow(), CollapsePlacement, ProfileModuleHost(), ProfileModuleHostProps, ProfileSection(), styles, TOP_LEVEL_MODULE_IDS, TopLevelPlacement (+38 more)
+Cohesion: 0.09
+Nodes (26): ProfileModuleHost(), ProfileSection(), TOP_LEVEL_MODULE_IDS, completeHistoryScroll(), createHistoryRevealScroll(), HistoryReveal, HistoryRevealScroll, PROFILE_MODULE_EMPTY_SUMMARIES (+18 more)
 
 ### Community 551 - "Common Pitfalls"
 Cohesion: 0.22
@@ -3540,8 +3534,8 @@ Cohesion: 0.22
 Nodes (8): A working picker already exists on the device, Fix applied — VERIFIED WORKING ON-DEVICE (2026-08-29), Infra / method notes, Phase 19 — Android-17 Contact Picker: Root-Cause Analysis, The orbit-side discrepancy (root-cause candidate), What this unblocks / leaves open, What was actually happening (verified, not inferred), Why the device-state remediation routes are dead (proven, not assumed)
 
 ### Community 575 - "Cross-AI Plan Review — Phase 19: System Contact Import — CYCLE 4"
-Cohesion: 0.22
-Nodes (9): Concerns, Cross-AI Plan Review — Phase 19: System Contact Import — CYCLE 4, Cycle 4 — Codex Review, Cycle 4 Consensus Summary, Cycle 4 — Cursor Review, Risk Assessment, Strengths, Suggestions (+1 more)
+Cohesion: 0.12
+Nodes (15): Agreed Concerns (2+ reviewers — highest priority), Agreed Strengths (2+ reviewers), Codex Review, Concerns, Consensus Summary, Cross-AI Plan Review — Phase 19: System Contact Import, Cross-AI Plan Review — Phase 19: System Contact Import — CYCLE 4, Cycle 4 — Codex Review (+7 more)
 
 ### Community 576 - "Phase 20 Plan 01: Contact Merge Tracer Summary"
 Cohesion: 0.22
@@ -3573,7 +3567,7 @@ Nodes (9): 1. Source-grounding pass (authority = `grep`), 2. Cross-artifact fact
 
 ### Community 583 - "types.ts"
 Cohesion: 0.07
-Nodes (31): CadenceAggregate, IntensityAggregate, PromptContext, PromptPersonalizationSection, PromptWritingStyle, QualityAggregate, ResolvedPrompt, SharedFieldValue (+23 more)
+Nodes (39): ResolvedPrompt, AiDiagnosticEvent, AiDiagnosticInput, AiDiagnosticStatus, AiFailureCategory, AiFailureClassification, AiOperation, BILLING_CODES (+31 more)
 
 ### Community 584 - "Architecture Patterns"
 Cohesion: 0.25
@@ -3920,8 +3914,8 @@ Cohesion: 0.13
 Nodes (27): entries(), appendMemoryEntries(), ContactMethodRow, contactMethodsSql(), ContactRow, contactsSql(), CURRENT_STATE_SECTION_LABELS, CurrentStateRow (+19 more)
 
 ### Community 670 - "Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)"
-Cohesion: 0.05
-Nodes (90): AddPlacement, CardEditSlot, cardEditSlots(), CardEditSlotsInput, blankToNull(), handlers, hooks, nodes() (+82 more)
+Cohesion: 0.15
+Nodes (22): blankToNull(), handlers, hooks, nodes(), render(), TestElement, displayLinkedName(), initialDraft() (+14 more)
 
 ### Community 671 - "Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge"
 Cohesion: 0.10
@@ -3952,12 +3946,12 @@ Cohesion: 0.14
 Nodes (11): Deferred, Out of Scope, Requirements Archive: v1.0 MVP, Requirements: Orbit, Traceability, v2 / Deferred Requirements, Cross-phase constraints (from INDEX.md's constraint log — these cross phase boundaries), Overview (+3 more)
 
 ### Community 678 - "Roadmap: Orbit"
-Cohesion: 0.08
-Nodes (58): bodyAlpha(), bodyLitUniforms(), boundedLayer(), bumpReach(), coronaUniforms(), drawBodies(), drawContactBody(), drawDiscPhoto() (+50 more)
+Cohesion: 0.07
+Nodes (61): PreparedOrreryText, bodyAlpha(), bodyLitUniforms(), boundedLayer(), bumpReach(), coronaUniforms(), drawBodies(), drawContactBody() (+53 more)
 
 ### Community 679 - "FavouriteOptimisticStore"
-Cohesion: 0.07
-Nodes (28): isContactPickerAvailable(), PickContactsOptions, PickedContact, PickedMethod, readAllContacts(), readContactsByLookupKeys(), SelectedReadResult, OrbitContactPickerModule (+20 more)
+Cohesion: 0.12
+Nodes (13): PickContactsOptions, PickedContact, PickedMethod, readAllContacts(), readContactsByLookupKeys(), SelectedReadResult, OrbitContactPickerModule, OrbitContactPickerModule (+5 more)
 
 ### Community 680 - "Code Examples"
 Cohesion: 0.33
@@ -4044,12 +4038,12 @@ Cohesion: 0.33
 Nodes (6): Concerns, Plan 18.2-01 — v11 Lifecycle Schema Migration, Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 701 - "Plan 18.2-03 — Bound-Aware Query Owners"
-Cohesion: 0.18
-Nodes (11): Concerns, Cross-Cutting Findings, Locked Decisions — Implementation Correctness (not reopened), Overall Phase Risk Assessment, Phase 18.2 Bound/Unbound Lifecycle — Cross-AI Plan Review, Phase Overview, Plan 18.2-03 — Bound-Aware Query Owners, Risk Assessment (+3 more)
+Cohesion: 0.33
+Nodes (6): Concerns, Plan 18.2-03 — Bound-Aware Query Owners, Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 702 - "Plan 18.2-04 — Nullable Cadence Impact + Explicit AI"
-Cohesion: 0.33
-Nodes (6): Concerns, Plan 18.2-04 — Nullable Cadence Impact + Explicit AI, Risk Assessment, Strengths, Suggestions, Summary
+Cohesion: 0.18
+Nodes (11): Concerns, Cross-Cutting Findings, Locked Decisions — Implementation Correctness (not reopened), Overall Phase Risk Assessment, Phase 18.2 Bound/Unbound Lifecycle — Cross-AI Plan Review, Phase Overview, Plan 18.2-04 — Nullable Cadence Impact + Explicit AI, Risk Assessment (+3 more)
 
 ### Community 703 - "Plan 18.2-05 — Orrery + Sun Policy"
 Cohesion: 0.33
@@ -4140,7 +4134,7 @@ Cohesion: 0.09
 Nodes (46): a11y_quiet(), adb(), adb_bytes(), android_release(), app_pid(), close_selector_button(), collapsed_groups(), current_system() (+38 more)
 
 ### Community 726 - "orbit-theme-migration.ts"
-Cohesion: 0.09
+Cohesion: 0.11
 Nodes (40): DigestDayDetailProps, beginYourWeekPeriodWrite(), clearDayDetail(), createYourWeekPeriodReader(), directDateCounts(), failDayRead(), initialYourWeekState(), isYourWeekDayInWindow() (+32 more)
 
 ### Community 727 - "Cross-AI Plan Review: Phase 20 — Contact Reconciliation & Merge"
@@ -4180,8 +4174,8 @@ Cohesion: 0.33
 Nodes (5): Accepted risks (low; rationale from the plan `<threat_model>` blocks), Local-first posture, Phase 21 Security Verification — SECURED, Threat register (verified against code), Unregistered flags
 
 ### Community 736 - "timeline-read.test.ts"
-Cohesion: 0.12
-Nodes (27): TestElement, window, classifyCycleBlock(), classifyHeatmapCell(), HeatmapCellFill, placeholder, BucketInteraction, buckets() (+19 more)
+Cohesion: 0.09
+Nodes (36): TestElement, window, classifyCycleBlock(), HeatmapCellFill, placeholder, localNow(), daysAgo(), daysAgo() (+28 more)
 
 ### Community 737 - "Background assets — provenance & license manifest"
 Cohesion: 0.33
@@ -4404,12 +4398,12 @@ Cohesion: 0.40
 Nodes (4): Artifacts this phase produces, RE-CUT NOTE, STRIDE Threat Register, Trust Boundaries
 
 ### Community 792 - "field-type-change.test.ts"
-Cohesion: 0.13
+Cohesion: 0.11
 Nodes (11): App Shell, Architecture, Changelog, Configuration, Data Model, Decisions, Gotchas, Key Files (+3 more)
 
 ### Community 793 - "18.2-02 — Lifecycle DAO and capture"
-Cohesion: 0.40
-Nodes (5): 18.2-02 — Lifecycle DAO and capture, Concerns, Risk assessment, Strengths, Suggestions
+Cohesion: 0.12
+Nodes (23): buildBuiltInRows(), buildChooserRows(), cancelRow(), ChooserContact, ChooserRow, ChooserRowKind, ChooserSession, completeSave() (+15 more)
 
 ### Community 794 - "18.2-04 — Nullable cadence and explicit AI"
 Cohesion: 0.40
@@ -5088,8 +5082,8 @@ Cohesion: 0.50
 Nodes (4): Primary (HIGH confidence — files opened this session), Secondary (MEDIUM confidence), Sources, Tertiary (LOW confidence)
 
 ### Community 963 - "dashboard-session-store.ts"
-Cohesion: 0.03
-Nodes (91): consumeSharedBackup(), pickBackupDocument(), section(), errorNotice(), moveEntryOf(), MoveEntrySheet(), styles, undoMove() (+83 more)
+Cohesion: 0.50
+Nodes (3): SystemManagementRow, allContacts, state
 
 ### Community 967 - "Security Domain"
 Cohesion: 0.67
@@ -5185,15 +5179,15 @@ Nodes (13): ndarray, build(), combo_code(), combo_label(), flip_mock(), hex_rgb(
 
 ### Community 1032 - "expo-file-system"
 Cohesion: 0.07
-Nodes (29): empty, emptyCollection, Node, openMemoryLink, render(), resolve(), cards(), emptyCollection (+21 more)
+Nodes (28): empty, emptyCollection, Node, openMemoryLink, render(), resolve(), cards(), emptyCollection (+20 more)
 
 ### Community 1035 - "expo-sms"
 Cohesion: 0.04
 Nodes (49): Area K — Settings — final findings (finalizer, 2026-10-10), Could not check, Cross-area overlaps (for the cross-cutting pass), Dropped, K-01 · HID · Medium — With "Allow notifications" off, every reminder switch still shows On and nothing says the settings are paused, K-02 · HID · Medium — "Birthday alerts for unbound contacts" stays on and changeable when Birthday alerts is off, K-03 · HID · Medium — The reminder time can be set inside quiet hours with no warning, K-04 · INC · Medium — Settings pages use at least six different header and Back styles (deepens H-08) (+41 more)
 
 ### Community 1036 - "@expo/vector-icons"
-Cohesion: 0.08
-Nodes (36): assertPromptFitsContext(), estimateInputTokens(), estimatePromptContext(), PromptContextEstimateInput, validWindow(), CuratedModelRef, ModelRecommendationReason, estimateOpenRouterInputCost() (+28 more)
+Cohesion: 0.10
+Nodes (29): ModelRecommendationReason, isCachedCatalog(), isPricing(), OpenRouterCatalogFetch, OpenRouterCatalogResponse, OpenRouterCatalogStorage, OpenRouterPricing, optionalString() (+21 more)
 
 ### Community 1037 - "react-native"
 Cohesion: 0.22
@@ -5204,36 +5198,36 @@ Cohesion: 0.04
 Nodes (48): 4.1 Merges across areas, 4.2 Editor matrix — where each fact about a person is edited, 4.3 Themes, 4.4 Top 10 and non-UX links, 4. Cross-cutting mismatches, X-01 · DEAD · High — Back with unsaved changes: five forms ask "Discard changes?", at least ten lose the input silently, X-02 · INC · Medium — Some edits save the moment you tap, inside forms that otherwise wait for Save, X-03 · INC · High — Destructive actions: confirmation, undo, recoverability and visual weight follow no rule (+40 more)
 
 ### Community 1047 - "@shopify/react-native-skia"
-Cohesion: 0.12
+Cohesion: 0.17
 Nodes (11): Architecture, Changelog, Configuration, Contacts, Data Model, Decisions, Gotchas, Key Files (+3 more)
 
 ### Community 1048 - "localDateOffset"
-Cohesion: 0.22
-Nodes (16): applyBackgroundReconcileAction(), assertBackgroundRelative(), assertBackgroundRestorePendingRelative(), assertBackgroundSidecar(), BackgroundRestorePendingEntry, backgroundRestorePendingRelPath(), deleteBackgroundDerivative(), deleteBackgroundRestorePending() (+8 more)
+Cohesion: 0.12
+Nodes (21): CustomIntervalResult, IntervalUnit, parseCustomInterval(), UNIT_FACTORS, FrequencyPicker(), FrequencyPickerProps, PRESET_VALUES, PRESETS (+13 more)
 
 ### Community 1050 - "SafFolderAdapter"
-Cohesion: 0.12
-Nodes (27): applyPopulationPostProcessing(), birthdayPredicate(), composePopulationRead(), countBirthdayPopulation(), countNeverContacted(), FavouriteRow, listBirthdayCandidates(), listDashboardPopulation() (+19 more)
+Cohesion: 0.10
+Nodes (38): applyPopulationPostProcessing(), birthdayPredicate(), composePopulationRead(), count(), countAllContacts(), countArchived(), countBirthdayPopulation(), countFavourites() (+30 more)
 
 ### Community 1052 - "Migration006IntegrityError"
-Cohesion: 0.13
-Nodes (13): applyMemoryPatch(), BuildEditInputDeps, canSave(), collectEditBlockingErrors(), EDIT_FIELD_REVEAL_ORDER, EDIT_SECTION_FIELD_MAP, isNeverContacted(), memoryDraftRowToItem() (+5 more)
+Cohesion: 0.14
+Nodes (18): DashboardResetTarget, resetToDashboardRoot(), resetToDashboardWith(), TabResetState, parseWidgetId(), resolveWidgetUri(), subscribeToWidgetUrls(), WidgetLinkingGate() (+10 more)
 
 ### Community 1053 - "Consensus Summary"
-Cohesion: 0.18
-Nodes (13): AutoCloseTimerDeps, buildAutoCloseCallback(), createAutoCloseTimer(), initialShareCardState(), runShareWrite(), SHARE_CHIP_ORDER, shouldPublishShareResult(), DEFAULT_INTENT (+5 more)
+Cohesion: 0.14
+Nodes (23): AnchoredMenu(), AnchoredMenuItem, placeAnchoredMenu(), countUncategorizedContacts(), CATEGORY_MANAGER_COPY, categoryCountLabel(), CategoryManagementLoadOutcome, CategoryManagementScreen() (+15 more)
 
 ### Community 1054 - "Plan 20-06 — Bulk flagged-item resolver and phase gate"
-Cohesion: 0.10
-Nodes (25): AnchorRect, clampAnchorPosition(), PanelDimensions, panel, viewport, ViewportDimensions, AnchoredPanel(), AnchoredPanelProps (+17 more)
+Cohesion: 0.05
+Nodes (45): AnchorRect, clampAnchorPosition(), PanelDimensions, panel, viewport, ViewportDimensions, AnchoredPanel(), AnchoredPanelProps (+37 more)
 
 ### Community 1056 - "Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions"
-Cohesion: 0.23
-Nodes (13): Line3Candidate, CARD_PROMPTS, CardLine3Selection, compactnessClass(), compareCandidates(), compareWithinTier(), firstCompact(), imminentWindowEnd() (+5 more)
+Cohesion: 0.09
+Nodes (34): compareCandidate(), CurrentStateCandidateRow, currentStateSql(), Line3Candidate, Line3CandidateKind, MemoryCandidateRow, memorySql(), placeholders() (+26 more)
 
 ### Community 1057 - "capture-dao.test.ts"
-Cohesion: 0.15
-Nodes (12): Agreed Concerns (2+ reviewers — highest priority), Agreed Strengths (2+ reviewers), Codex Review, Consensus Summary, Cross-AI Plan Review — Phase 19: System Contact Import, Cross-plan concerns, Cursor Review, Divergent / Additional Findings (single-reviewer, still worth tracking) (+4 more)
+Cohesion: 0.14
+Nodes (17): ResearchItem, assertNever(), customValueDisplayText(), formatCustomFieldValue(), customFieldDisplay(), groupResearchItems(), ResearchGroup, researchItemDisplayValue() (+9 more)
 
 ### Community 1058 - "NativeGcmCipher"
 Cohesion: 0.15
@@ -5241,39 +5235,39 @@ Nodes (19): ACCENT_FOREGROUND_ALLOWLIST, allowed(), AllowEntry, REPO, scanRepo()
 
 ### Community 1059 - "18.2-09 — Backup and restore"
 Cohesion: 0.05
-Nodes (97): journal(), olderFinalizeForContact2(), MergePhotoTransfer, normalizeMergeResolutions(), assertSafeRelative(), deleteJournalEntryCore(), enqueueDeleteIntentCore(), insertFinalizeEntryCore() (+89 more)
+Nodes (95): ContactRow, GroupMergeCollisionError, isEmptyMergeValue(), MergeChoice, MergePhotoTransfer, MethodRow, normalizeMergeResolutions(), ADR-0010 (+87 more)
 
 ### Community 1060 - "orrery-worklet-boundary.test.ts"
-Cohesion: 0.04
-Nodes (131): insertContact(), activateAiConnection(), assertOneChange(), setRememberedModel(), upsertAiConnection(), markAiFirstUseDisclosed(), setInteractionAssistEnabled(), addLink() (+123 more)
+Cohesion: 0.14
+Nodes (28): ProfileOverviewTracer(), assertBackgroundPath(), assertContactExists(), assertUid(), assignContactBackgroundTemplate(), assignContactLayoutTemplate(), assignGlobalProfilePresentation(), assignGlobalProfilePresentationCore() (+20 more)
 
 ### Community 1061 - "settings-region-logic.ts"
-Cohesion: 0.27
-Nodes (8): BOUNDARY_TRIM, BOUNDARY_WS, CaptureInput, CapturePayload, nonBlank(), resolveCapturePayload(), ShareSnapshot, takeShareSnapshot()
+Cohesion: 0.31
+Nodes (7): BOUNDARY_TRIM, BOUNDARY_WS, CaptureInput, CapturePayload, nonBlank(), resolveCapturePayload(), ShareSnapshot
 
 ### Community 1062 - "timeline-read.test.ts"
 Cohesion: 0.05
 Nodes (42): 2. Coverage, 3. Findings by area, 5. Quick wins — every finding with a Proposed fix, 6. Needs investigation — every pinned finding, 7. Known items seen again (new detail only), 999.3 — old Fuel editor for Off Limits; inline Memory / Off Limits inputs on the contact forms, 999.5 — things shared into the app are saved invisibly, 999.6 — moving entries between Things to Remember sections (+34 more)
 
 ### Community 1063 - "NativeQuickCrypto"
-Cohesion: 0.06
-Nodes (24): BackupEncryptionProfile, EncryptedBackupEnvelope, APPROVED_BACKUP_ENCRYPTION_PROFILE, BackupEncryptionBackend, BackupEnvelopeCrypto, BackupEnvelopeCryptoOptions, BackupEnvelopeError, BackupEnvelopeErrorCode (+16 more)
+Cohesion: 0.05
+Nodes (26): BackupEncryptionProfile, EncryptedBackupEnvelope, BackupEncryptionBackend, BackupEnvelopeCrypto, BackupEnvelopeCryptoOptions, BackupEnvelopeError, BackupEnvelopeErrorCode, base64() (+18 more)
 
 ### Community 1064 - "start-contact-import.test.ts"
 Cohesion: 0.10
 Nodes (17): FabNavigateIntent, COLLAPSED, STACK_SOURCE, DIGEST_STACK_ROUTES, EVENTS_STACK_ROUTES, FAB_ROUTES, INITIAL_TAB, PROFILE_REACHABLE_ROUTES (+9 more)
 
 ### Community 1065 - "channels.test.ts"
-Cohesion: 0.30
-Nodes (12): BackgroundCropPoint, BackgroundCropSource, clamp(), clampBackgroundCropSelection(), createInitialBackgroundCropSelection(), describeBackgroundCropSelection(), largestContainedSize(), pinchResizeBackgroundCropSelection() (+4 more)
+Cohesion: 0.15
+Nodes (15): isContactPickerAvailable(), contactImportMode, { isContactPickerAvailable }, PickedImportNavigator, routePickedImport(), AppNavigate, startContactImport(), StartContactImportOptions (+7 more)
 
 ### Community 1066 - "notification-nav.ts"
-Cohesion: 0.07
-Nodes (37): identity, Node, onOpenPhoto, onPhotoLoadErrorChange, render(), resolve(), ProfileHero(), idleSelector() (+29 more)
+Cohesion: 0.04
+Nodes (70): PhotoUnavailableNotice(), identity, Node, onOpenPhoto, onPhotoLoadErrorChange, render(), resolve(), ProfileHero() (+62 more)
 
 ### Community 1067 - "uid"
-Cohesion: 0.14
-Nodes (27): ShareCardActions, ShareConfirmationCard, ShareConfirmationCardProps, styles, ShareRowRef, ShareSection, autoCloseHeld(), canStartCardWrite() (+19 more)
+Cohesion: 0.10
+Nodes (41): ShareCardActions, ShareConfirmationCard, ShareConfirmationCardHandle, ShareConfirmationCardProps, styles, ShareRowRef, ShareSection, autoCloseHeld() (+33 more)
 
 ### Community 1068 - "uid"
 Cohesion: 0.05
@@ -5285,39 +5279,43 @@ Nodes (5): recommendSurvivor(), scoreCandidate(), SurvivorContinuitySignal, Surv
 
 ### Community 1070 - "def"
 Cohesion: 0.09
-Nodes (36): addShareMemoryCore(), applyShareNote(), assertShareContactInterval(), assertShareSection(), assertShareUndoRowsCore(), createContactAndShare(), deleteShareRowsCore(), moveShareRows() (+28 more)
+Nodes (37): addShareMemoryCore(), applyShareNote(), assertShareContactInterval(), assertShareSection(), assertShareUndoRowsCore(), createContactAndShare(), deleteShareRowsCore(), moveShareRows() (+29 more)
 
 ### Community 1071 - "uid"
-Cohesion: 0.14
-Nodes (25): listContactsSummary(), applyAdd(), applyDeselect(), DerivedMemberRow, deriveMemberRows(), MemberCardState, overrideCounts(), OverrideIntent (+17 more)
+Cohesion: 0.11
+Nodes (29): listContactsSummary(), applyAdd(), applyDeselect(), DerivedMemberRow, deriveMemberRows(), MemberCardState, overrideCounts(), OverrideIntent (+21 more)
 
 ### Community 1072 - "uid"
-Cohesion: 0.14
-Nodes (14): 18.2-03 — Query owners, 18.2-09 — Backup and restore, Concerns, Concerns, Cursor Review, Final assessment, Overall summary, Plan Review — Phase 18.2 (+6 more)
+Cohesion: 0.40
+Nodes (5): 18.2-03 — Query owners, Concerns, Risk assessment, Strengths, Suggestions
 
 ### Community 1073 - "seedContact"
 Cohesion: 0.44
 Nodes (6): getInitials(), hashName(), swatchIndex(), loadWidgetTiles(), shapeWidgetTiles(), ADR-0075
 
 ### Community 1074 - "seed"
-Cohesion: 0.29
-Nodes (7): LastSpokeValue, TriStateLastSpokeProps, CreateMemoryInput, CreateOffLimitsInput, CreateRelationshipInput, CreateFormState, EditFormState
+Cohesion: 0.26
+Nodes (14): CategoryChoiceSheet(), categoryChoiceSheetModel(), CategoryChoiceSheetModelInput, CategoryChoiceSheetProps, categoryNoMatchCopy(), buildCategoryChoices(), CategoryChoice, CategoryChoiceRow (+6 more)
 
 ### Community 1075 - "migrateToV12"
 Cohesion: 0.09
 Nodes (15): guard, hooks, navigation, nodes(), prefsHydrate, prefsSave, previewState(), renderBuilder() (+7 more)
 
 ### Community 1076 - "sun-picker-read.ts"
-Cohesion: 0.09
-Nodes (26): ALL_REGISTRATIONS, attributeExpressions(), clearanceViolation(), DELEGATED_SCROLL_COMPONENTS, DEV_ONLY_ROUTES, FAB_BEARING, FAB_CLEARANCE_ALLOWLIST, FOCUSED_ONLY (+18 more)
+Cohesion: 0.06
+Nodes (42): ALL_REGISTRATIONS, attributeExpressions(), clearanceViolation(), DELEGATED_SCROLL_COMPONENTS, DEV_ONLY_ROUTES, FAB_BEARING, FAB_CLEARANCE_ALLOWLIST, FOCUSED_ONLY (+34 more)
 
 ### Community 1079 - "expo-crypto"
 Cohesion: 0.13
 Nodes (33): allowance_check(), _channel(), check_variant(), colours_of(), component_sizes(), composite(), decode(), hex_to_rgb() (+25 more)
 
+### Community 1080 - "expo-image-manipulator"
+Cohesion: 0.21
+Nodes (13): canonicalMethod(), classifyMethodFamily(), classifyReconciliation(), ClassifyReconciliationInput, classifyScalar(), RECONCILE_FIELD_FAMILIES, ReconcileFieldOption, ReconcileOrbitContact (+5 more)
+
 ### Community 1081 - "expo-notifications"
-Cohesion: 0.10
-Nodes (38): attributes(), buildArchived(), buildDense(), buildHistorySeedPlan(), buildLong(), buildNotesOnly(), buildQuietYear(), buildSparse() (+30 more)
+Cohesion: 0.11
+Nodes (37): attributes(), buildArchived(), buildDense(), buildHistorySeedPlan(), buildLong(), buildNotesOnly(), buildQuietYear(), buildSparse() (+29 more)
 
 ### Community 1083 - "expo-status-bar"
 Cohesion: 0.37
@@ -5328,36 +5326,36 @@ Cohesion: 0.05
 Nodes (39): Could not check, D-01 · DEAD · High — "pin", "unpin" and "Hide from Profile" in a Things to Remember item sheet do nothing; they just open an editor screen, D-02 · DEAD · Medium — After Save on Edit Contact, Back shows the stale Edit form again, D-03 · INC · Medium — Identical pencil icons and item "edit" buttons go to different places, never to the item itself, D-04 · DEAD · Medium — "Show hidden" in Memories leaves the Profile, then flips to "Hide hidden" while still showing nothing hidden, D-05 · INC · Medium — Two different Snooze sheets on the same Profile, D-06 · DEAD · Medium — An archived contact's Profile has no Restore, still offers Archive (which errors), Snooze and Unbind, and lets you favourite it, D-07 · HID · Medium — Archive from Profile drops you on the list with no message and no undo; the person just vanishes (+31 more)
 
 ### Community 1085 - "react-native-quick-base64"
-Cohesion: 0.18
-Nodes (18): EditMemoryPatch, EditOffLimitsPatch, EditRelationshipPatch, KnowledgeCollectionDiff, KnowledgeDeleteRef, MemoryProvenance, buildEditInput(), clampLockedAllowAi() (+10 more)
+Cohesion: 0.14
+Nodes (11): allBoxNoneViews, BoxNoneView, DYNAMIC_A11Y_PROPS, findStaticBoxNoneViews(), isViewTag(), SRC, init(), ALLOWLIST (+3 more)
 
 ### Community 1094 - "INTERACTION_READY_PROGRESS"
 Cohesion: 0.11
 Nodes (32): aggregate(), analyse(), analyse_segment(), classify(), classify_tap_clock(), decide_calibration(), evaluate_window(), expected_order() (+24 more)
 
 ### Community 1095 - "Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge"
-Cohesion: 0.07
-Nodes (26): Agreed Concerns (highest priority — 2+ reviewers, orchestrator-verified), Agreed Strengths, Codex Review, Concerns, Concerns, Consensus Summary, Cross-AI Plan Review — Phase 20, Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6) (+18 more)
+Cohesion: 0.29
+Nodes (7): Concerns, Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6), Cursor Review (Cycle 6), Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 1096 - "types.ts"
 Cohesion: 0.15
 Nodes (13): devGlobal, mocks, NEW_QUEUE, OLD_QUEUE, applyUatFault(), armed, armUatFault(), isDevBuild() (+5 more)
 
 ### Community 1097 - "Plan 20-06 — Bulk flagged-item resolver and phase gate"
-Cohesion: 0.04
-Nodes (102): PromptContextEstimate, context(), loadCachedCatalog(), createFileCatalogStorage(), resolveActiveCatalog(), loadCachedOpenRouterCatalog(), AIComposeContextReview(), AIFirstUseDisclosure() (+94 more)
+Cohesion: 0.05
+Nodes (55): AIFirstUseDisclosure(), styles, getActiveConnectionLane(), getAiConnection(), listAiConnections(), mapConnection(), resolveActiveAiConnection(), ORRERY_DENSITIES (+47 more)
 
 ### Community 1098 - "fail"
-Cohesion: 0.08
-Nodes (26): acquireDownsampleSlot(), decodeDerivative(), defaultOrreryImageDeps, disposeQuietly(), downsampleWaiters, downsampleWithManipulator(), everyRequesterCancelled(), generateDerivative() (+18 more)
+Cohesion: 0.20
+Nodes (11): DefaultInteractionChannel, RememberedInteractionChannel, QuickLogChannelPreference, QuickLogInput, QuickLogSnackbar, QuickLogSnackbarAction, QuickLogUndoController, QuickLogUndoRequest (+3 more)
 
 ### Community 1099 - "Plan 20-05 — Durable Resume + Missing-Source/Relink"
 Cohesion: 0.18
 Nodes (14): customFieldValueForTarget(), isPhotoWidgetEnabled(), Node, onChange, render(), resolve(), PhotoFieldWidget(), styles (+6 more)
 
 ### Community 1100 - "compose-research-read.test.ts"
-Cohesion: 0.04
-Nodes (71): hasSharedBackup(), assertBackupDays(), recordAutomaticBackupHealthCore(), reconcileCompletionCounts, GatedReadDeps, loadedData(), readFailed(), ReadGate (+63 more)
+Cohesion: 0.05
+Nodes (51): assertBackupDays(), reconcileCompletionCounts, GatedReadDeps, loadedData(), readFailed(), ReadGate, readLoaded(), readLoading() (+43 more)
 
 ### Community 1101 - "useBottomClearance"
 Cohesion: 0.33
@@ -5368,8 +5366,8 @@ Cohesion: 0.06
 Nodes (35): Area E — Add, Edit and Update Contact — final findings, Could not check, Dropped, E-01 · DEAD · High — Add Contact throws away everything you typed on Back, with no warning, E-02 · DEAD · Medium — Save with an empty name does nothing: no message, no scroll (Add and Edit), E-03 · DEAD · Medium — A birthday can never be removed, and Add Contact can't set one (moved from area C, raw C-14), E-04 · INC · Medium — Add Contact lacks many of the fields Edit Contact has, and Show More can't be collapsed, E-05 · HID · Medium — Choosing "Bound" on Add Contact pre-selects "Custom…" with 0 days and shows a red error at once (+27 more)
 
 ### Community 1103 - "Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge"
-Cohesion: 0.14
-Nodes (23): applyCategoryDeletionFalloutCore(), assertChanges(), categoryById(), CategoryDeletionCounts, CategoryDeletionPreview, CategoryDeletionStage, CategoryManagementRow, countValue() (+15 more)
+Cohesion: 0.05
+Nodes (47): localRows(), tombstones(), applyCategoryDeletionFalloutCore(), assertChanges(), categoryById(), CategoryDeletionCounts, CategoryDeletionPreview, CategoryDeletionStage (+39 more)
 
 ### Community 1104 - "Consensus Summary"
 Cohesion: 0.29
@@ -5380,12 +5378,12 @@ Cohesion: 0.24
 Nodes (5): BoundedBackupCopier, File, InputStream, BoundedBackupCopierTest, File
 
 ### Community 1106 - "Plan 20-05 — Resume and missing-source lifecycle"
-Cohesion: 0.03
-Nodes (136): MoveEntrySheetProps, setShareRowsAllowAi(), applyKnowledgeDiffsCore(), ArchivedContactRow, CustomValueInput, localDateOf(), offLimitsContent(), ADR-0016 (+128 more)
+Cohesion: 0.02
+Nodes (174): addMethodPiiFixture(), linkMemory(), logNote(), makeContact(), makeDef(), makeNeverAssignedUnboundContact(), pushOutOfRecent(), ADR-0078 (+166 more)
 
 ### Community 1107 - "Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions"
-Cohesion: 0.11
-Nodes (17): readYourWeekDateCounts(), readYourWeekDay(), readYourWeekMetrics(), contact(), datesBetween(), fullScanOf(), groupEvent(), interaction() (+9 more)
+Cohesion: 0.21
+Nodes (9): contact(), datesBetween(), fullScanOf(), groupEvent(), interaction(), seedAncientHistory(), seedParityFixture(), WINDOWS (+1 more)
 
 ### Community 1108 - "Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions"
 Cohesion: 0.33
@@ -5396,12 +5394,12 @@ Cohesion: 0.40
 Nodes (4): CategoryChoiceSheet(), Element, expand(), reactMocks
 
 ### Community 1115 - "expo-constants"
-Cohesion: 0.03
-Nodes (109): ScrimPointerEvents, speedDialScrimPointerEvents(), EndpointSelector(), EndpointSelectorProps, styles, PostLogNoteTarget, ReachOutRouter(), ReachOutRouterProps (+101 more)
+Cohesion: 0.04
+Nodes (70): hasSharedBackup(), context(), ScrimPointerEvents, speedDialScrimPointerEvents(), PostLogNoteTarget, createQuickLogUndoController(), dialFocusCycle(), DialFocusLinks (+62 more)
 
 ### Community 1116 - "expo-document-picker"
 Cohesion: 0.05
-Nodes (56): buildDetailRows(), buildGroupContext(), DetailRow, GroupContext, GroupLinkedDetailInput, hasText(), InteractionDetailInput, showSparkle() (+48 more)
+Nodes (52): AlsoSaveToPicker(), OPTIONS, styles, buildDetailRows(), buildGroupContext(), DetailRow, GroupContext, GroupLinkedDetailInput (+44 more)
 
 ### Community 1122 - "react-native-quick-crypto"
 Cohesion: 0.06
@@ -5425,7 +5423,7 @@ Nodes (6): Concerns, Plan 20-04 — Bulk review workspace and durable sessions, 
 
 ### Community 1128 - "digest-logic.ts"
 Cohesion: 0.06
-Nodes (46): isPickableStoredDate(), leadingCalendarDate(), pickerSeedFromStored(), storedFromPickerEvent(), NOW, DAY_TEXT, TestElement, hooks (+38 more)
+Nodes (45): isPickableStoredDate(), leadingCalendarDate(), pickerSeedFromStored(), storedFromPickerEvent(), NOW, DigestDayDetail(), groupEventRowLabel(), renderDayRows() (+37 more)
 
 ### Community 1129 - "OrbitBackupShareModule"
 Cohesion: 0.24
@@ -5436,8 +5434,8 @@ Cohesion: 0.25
 Nodes (4): data, DigestLoadState, mocks, Node
 
 ### Community 1131 - "isBackupShareIntent"
-Cohesion: 0.18
-Nodes (10): BackgroundCropRect, BackgroundDerivativeSize, BackgroundPipelineError, PreparedBackgroundResource, prepareProfileBackground(), PrepareProfileBackgroundArgs, selection, target (+2 more)
+Cohesion: 0.19
+Nodes (11): computeFollowingChildren(), fieldMeta, GroupInheritanceDisplay, GroupInheritanceEvent, InheritedDisplay, isFollowing(), ParticipantDisplay, event (+3 more)
 
 ### Community 1132 - "fit-launcher-icons.py"
 Cohesion: 0.33
@@ -5456,24 +5454,24 @@ Cohesion: 0.33
 Nodes (5): ForwardReference, isWorkletDeclaration(), isWorkletFunction(), load(), TARGETS
 
 ### Community 1137 - "dashboard-selection-store.ts"
-Cohesion: 0.05
-Nodes (47): BenchmarkResult, nowMs(), runBenchmark(), seedBenchmarkData(), SeedOptions, EMPTY_DESTINATIONS, inTxn(), OPTS (+39 more)
+Cohesion: 0.27
+Nodes (11): assertOneChange(), CreateReconcileSessionInput, discardSession(), discardSessionCore(), finalizeSessionIfTerminal(), finalizeSessionIfTerminalCore(), insertReconcileCardCore(), InsertReconcileCardInput (+3 more)
 
 ### Community 1138 - "fire-instant.ts"
 Cohesion: 0.06
 Nodes (31): Could not check, Dropped, G-01 · DEAD · High — Editing an "Imported from Contacts App" memory silently turns it into a plain Memory, even when you change nothing, G-02 · HID · Medium — In the TTR editor, a hidden memory has no "Hidden" badge, and its "Show on Profile" button floats below a different memory, G-03 · INC · Medium — Each kind of item in this area is deleted a different way, G-04 · DEAD · Medium — Android Back from "Edit field" / "New field" leaves Custom Fields altogether and silently drops your changes, G-05 · HID · Medium — The field-type change dialog hides what will happen to existing values, G-06 · HID · Medium — A value that "Needs attention" says so twice, and the Edit it points to shows no problem (+23 more)
 
 ### Community 1139 - "dashboard-controls-responsiveness.test.ts"
-Cohesion: 0.05
-Nodes (38): PhotoSourcePickerProps, PhotoTargetDescriptor, CROP_MIN_BAND, byTestId(), h, layoutSlot(), nodes(), render() (+30 more)
+Cohesion: 0.07
+Nodes (28): PhotoSourcePickerProps, PhotoTargetDescriptor, CROP_MIN_BAND, byTestId(), h, layoutSlot(), nodes(), render() (+20 more)
 
 ### Community 1140 - "widget-mark.test.ts"
-Cohesion: 0.16
-Nodes (19): allocateLabels(), compareRankedLabels(), createRectGrid(), firstGrapheme(), gridCellKey(), gridInsert(), gridSpan(), gridTouches() (+11 more)
+Cohesion: 0.08
+Nodes (43): OrreryControlsProps, drawLabels(), drawPlate(), Call, PLATE, bodyDefocus(), buildFocusSpec(), focusLive() (+35 more)
 
 ### Community 1141 - "Cross-AI Plan Review: Phase 20 — Contact Reconciliation & Merge"
-Cohesion: 0.23
-Nodes (12): getNewestPendingReconcileSessionId(), isReconcileFlowActive(), isReconcileSessionOpen(), openSessions, cleanupDiscardedReconcileStagedPhotos(), describeResumableReconcile(), nativeReconcileStagingFs, reconcileOrphanReconcileStagedPhotos() (+4 more)
+Cohesion: 0.14
+Nodes (23): ReconcileCardStatus, ReconcileSessionStatus, getNewestPendingReconcileSessionId(), getReconcileSessionById(), getResumableReconcileSession(), listReconcileCardIdentities(), listReconcileSessionCards(), mapCard() (+15 more)
 
 ### Community 1142 - "withReleaseOnlyOverlayPermissionRemoval.js"
 Cohesion: 0.29
@@ -5519,24 +5517,24 @@ Cohesion: 0.17
 Nodes (26): _(), _down(), eq(), expand(), _frame(), _frame_backdrop_first(), _frame_background(), _ge() (+18 more)
 
 ### Community 1152 - "Plan 20-01 — Tracer: Migration 013 + `mergeContacts` + Minimal Merge UI"
-Cohesion: 0.50
-Nodes (3): PINNED_FILES, PINNED_PHASE_DIRS, REPO
+Cohesion: 0.20
+Nodes (6): CandidateChoice, CHOICES, IMPORT_CHOICE, nodes(), sheet(), TestElement
 
 ### Community 1153 - "settings-region-logic.ts"
-Cohesion: 0.18
-Nodes (12): FieldChoiceGroup(), FieldChoiceGroupProps, FieldChoiceMode, FieldChoiceOption, initialSelection(), styles, KEEP_ORBIT_PHOTO, KeepOrbitPhoto (+4 more)
+Cohesion: 0.29
+Nodes (9): AllQuietInputs, capGroup(), dayTag(), HasReason, isAllQuiet(), shouldShowEffortful(), splitOverlooked(), WEEKDAY_LABELS (+1 more)
 
 ### Community 1155 - "tab_return.py"
 Cohesion: 0.20
 Nodes (9): fullKnowledge, historyHostNodes(), Node, noEntries, presentation, profileHostNodes(), resolve(), sectionHeaderCaptions() (+1 more)
 
 ### Community 1156 - "SafFolderAdapter"
-Cohesion: 0.21
-Nodes (11): DashboardFilter, DashboardSort, DashboardEmptyInput, DashboardEmptyState, DashboardPopulationCounts, hasActiveDashboardFilters(), selectDashboardEmptyState(), selectPopulationEmptyState() (+3 more)
+Cohesion: 0.20
+Nodes (12): DashboardFilter, DashboardSort, DashboardEmptyInput, DashboardEmptyState, DashboardPopulationCounts, hasActiveDashboardFilters(), selectDashboardEmptyState(), selectPopulationEmptyState() (+4 more)
 
 ### Community 1157 - "expo-constants"
-Cohesion: 0.19
-Nodes (19): clampScale(), clampTranslate(), dismissProgress(), doubleTapTarget(), focalTranslate(), isZoomed(), lightboxScrimOpacity(), maxTranslate() (+11 more)
+Cohesion: 0.07
+Nodes (43): HistoryHighlight(), HistoryHighlightProps, styles, usePhotoDisplay(), clampScale(), clampTranslate(), dismissProgress(), doubleTapTarget() (+35 more)
 
 ### Community 1158 - "log-guards.ts"
 Cohesion: 0.19
@@ -5547,8 +5545,8 @@ Cohesion: 0.40
 Nodes (4): read(), screenSource(), TAB_ROOTS, TabRoot
 
 ### Community 1160 - "DigestRefreshDeps"
-Cohesion: 0.24
-Nodes (15): ringColor(), ringWeight(), fixture, widgetPalette, WidgetTile, ActionButton(), asColor(), asImageSource() (+7 more)
+Cohesion: 0.26
+Nodes (14): ringColor(), ringWeight(), WidgetTile, ActionButton(), asColor(), asImageSource(), Avatar(), EmptyTile() (+6 more)
 
 ### Community 1161 - "import-lifecycle-contract.test.ts"
 Cohesion: 0.33
@@ -5562,6 +5560,10 @@ Nodes (3): Consumer, CONSUMERS, ADR-0152
 Cohesion: 0.40
 Nodes (3): BroadcastReceiver, ChosenShareTargetReceiver, Context
 
+### Community 1164 - "18.2-01 — Lifecycle schema migration"
+Cohesion: 0.24
+Nodes (8): OffLimitsInlineEditor(), OffLimitsInlineEditorProps, hooks, item, nodes(), render(), TestElement, DraftState
+
 ### Community 1165 - "timeline-read.test.ts"
 Cohesion: 0.24
 Nodes (9): listTimeline(), seedContact(), seedEvent(), seedInteraction(), uid(), TimelineEvent, TimelineItem, TimelineRow (+1 more)
@@ -5570,25 +5572,21 @@ Nodes (9): listTimeline(), seedContact(), seedEvent(), seedInteraction(), uid(),
 Cohesion: 0.09
 Nodes (23): Comparisons with sibling areas, Could not check, Dropped, J-01 · HID · High — A message Compose presents as a text is sent as an email, and Compose never says where it is going, J-02 · HID · Medium — After "Yes, log interaction" Compose closes silently, and the banner still asks about an older handoff without saying so, J-03 · HID · Medium — After "Not yet", the reminder disappears until the app is closed and reopened, J-04 · HID · Medium — A typed draft is silently discarded when you start a message to someone else, J-05 · INC · Medium — The two confirmation surfaces mirror their primary button, and an email is logged as "Message" (+15 more)
 
-### Community 1169 - "photo-display.ts"
-Cohesion: 0.14
-Nodes (16): getPhotoDisplay(), PhotoDisplay, photoDisplayFor(), PhotoDisplayResolvers, PhotoDisplayStrategy, RUNTIME_RESOLVERS, NOT_PATHS, resolvers (+8 more)
-
 ### Community 1171 - "LatestRequestAuthority"
-Cohesion: 0.08
-Nodes (31): OrreryDensity, inputs(), polarToXY(), progressToAngle(), shortestAngleDelta(), collidingReferenceIndexes(), DENSITY_PRESETS, deriveOrreryWorld() (+23 more)
+Cohesion: 0.07
+Nodes (40): ringWorld(), OrreryDensity, MissingOrreryCustomSystemError, OrrerySystemMember, inputs(), ringWorld(), polarToXY(), progressToAngle() (+32 more)
 
 ### Community 1172 - "post-log-edit-memory-scroll-contract.test.ts"
 Cohesion: 0.09
 Nodes (22): Area I — Sharing into the app — final findings, Could not check, Dropped, I-01 · HID · High — A cold-start share shows "Resume your check?" over the capture screen; Back can't dismiss it, and both buttons wreck the share or unrelated work, I-02 · VIS · Medium — On the capture screen, the keyboard covers the "New contact" name sheet and the "Add a note" field, buttons included, I-03 · HID · Medium — Sharing into Orbit while you're using it closes Orbit afterwards; reopening loses your place, I-04 · HID · Medium — One tap saves at once, with no Undo; the confirmation and "Add a note" stay for only 1.5 seconds, I-05 · DEAD · Medium — Back throws away a typed note, or an open New-contact sheet, and leaves the app with no warning (+14 more)
 
 ### Community 1177 - "expo"
-Cohesion: 0.06
-Nodes (52): assertOneChange(), ContactMetadataRow, ignoreBulkReviewFlag(), ignoreBulkReviewFlagCore(), IgnoreBulkReviewFlagInput, insertResolutionCore(), resolveBulkReviewFlag(), resolveBulkReviewFlagCore() (+44 more)
+Cohesion: 0.07
+Nodes (43): assertOneChange(), ContactMetadataRow, ignoreBulkReviewFlagCore(), IgnoreBulkReviewFlagInput, insertResolutionCore(), resolveBulkReviewFlag(), resolveBulkReviewFlagCore(), ResolveBulkReviewFlagInput (+35 more)
 
 ### Community 1180 - "18.2-03 — Query owners"
-Cohesion: 0.11
-Nodes (26): disposeQuietly(), basenameOf(), discardOrreryDerivatives(), dropOrreryDerivative(), ExpoFileSystem, findOrreryDerivative(), formatOrrerySignature(), installOrreryDerivative() (+18 more)
+Cohesion: 0.05
+Nodes (55): disposeQuietly(), acquireDownsampleSlot(), decodeDerivative(), defaultOrreryImageDeps, disposeQuietly(), downsampleWaiters, downsampleWithManipulator(), everyRequesterCancelled() (+47 more)
 
 ### Community 1181 - "UX Standards"
 Cohesion: 0.10
@@ -5599,24 +5597,24 @@ Cohesion: 0.10
 Nodes (20): 1. Owner placement rules (owner, 2026-10-10; 39-LEDGER Batches 13–16; 39-CONTEXT D-100, D-102), 2. Totals, 38.10 Fuel retirement, TTR & sharing — 48 findings, 38.11 Profile & contact forms — 28 findings, 38.12 Lifecycle, import & Settings — 71 findings, 38.13 Contacts list, search & Digest — 37 findings, 38.14 Logging, History, Events & Compose — 50 findings, 38.15 Events — plan, create & remind — 1 finding (plus B-23's planning half) (+12 more)
 
 ### Community 1183 - "pending-confirmations-sheet-render.test.tsx"
-Cohesion: 0.03
-Nodes (38): banner, NEWEST, nodes(), render(), TestElement, h, Node, root() (+30 more)
+Cohesion: 0.09
+Nodes (18): banner, NEWEST, nodes(), render(), TestElement, { confirmDiscard }, hooks, live (+10 more)
 
 ### Community 1184 - "C — Digest — final findings"
 Cohesion: 0.10
 Nodes (20): C-01 · HID · Medium — Android Back on Digest goes to the Contacts tab; Back after a Digest link exits the app instead of returning to Digest, C-02 · HID · Medium — + button actions started on Digest open on top of old Contacts-tab history; Back lands on an unrelated screen, C-03 · HID · Medium — Digest links silently replace the user's saved Contacts view and land on a hidden population, C-04 · HID · Medium — Your Week day detail can't be closed; a busy day becomes a very long list, C-05 · INC · Medium — Day-detail entries can't be tapped and show only name and time, C-06 · COPY · Medium — Digest shows raw numeric dates ("2026-10-13", "2026-10-07", "10/07/2026"), C-07 · HID · Low — Heatmap squares have no day labels; the selected square is barely marked, C-08 · INC · Low — Birthday rows have no avatar, unlike every other Digest row (+12 more)
 
 ### Community 1185 - "use-keyboard-centering.ts"
-Cohesion: 0.14
-Nodes (19): activeAfterBlur(), CenteredScrollInput, centeredScrollY(), fieldToCentreOnShow(), FocusableFieldRef, isFocused(), keyboardSpacer(), KeyboardSpacerInput (+11 more)
+Cohesion: 0.16
+Nodes (14): activeAfterBlur(), CenteredScrollInput, centeredScrollY(), fieldToCentreOnShow(), FocusableFieldRef, isFocused(), keyboardSpacer(), KeyboardSpacerInput (+6 more)
 
 ### Community 1186 - "edit-contact-save-coordinator.ts"
-Cohesion: 0.20
-Nodes (18): ContactLinkRow, DraftLink, ContactForEdit, advanceBaseline(), CurrentStateSeed, MemoryDraftRow, OffLimitsDraftRow, RelationshipDraftRow (+10 more)
+Cohesion: 0.29
+Nodes (6): hooks, nodes(), render(), TestElement, ADR-0001, YEAR
 
 ### Community 1187 - "ai-diagnostics.ts"
-Cohesion: 0.16
-Nodes (20): AiDiagnosticEvent, AiDiagnosticInput, AiDiagnosticStatus, AiFailureCategory, AiFailureClassification, BILLING_CODES, buildAiDiagnostic(), classifyAiFailure() (+12 more)
+Cohesion: 0.25
+Nodes (3): CYCLES, DAY_WINDOW, Node
 
 ### Community 1188 - "tab-history.ts"
 Cohesion: 0.15
@@ -5627,16 +5625,16 @@ Cohesion: 0.31
 Nodes (6): SHEET_BODY_FLEX, SHEET_BODY_SCROLLS, SHEET_HEIGHT_PERCENT, SHEET_VARIANTS, SheetKeyboardInput, sheetKeyboardLayout
 
 ### Community 1190 - "ai-generate-variants.ts"
-Cohesion: 0.26
-Nodes (7): editFull(), lockState(), logLinked(), makeContact(), readInteraction(), seedAllowed(), uid()
+Cohesion: 0.29
+Nodes (5): code, dialog, ADR-0086, confirmActionsFit(), ConfirmActionWidths
 
 ### Community 1191 - "Glossary"
 Cohesion: 0.11
 Nodes (18): Adding or changing user-visible copy, Architecture, Canonical terms, Changelog, Configuration, Data Model, Decisions, Developer wording (D-41) (+10 more)
 
 ### Community 1193 - "photo-source-picker-render.test.tsx"
-Cohesion: 0.13
-Nodes (11): { confirm }, { getContactPhotoIdentity }, h, Node, { removeOwnedMaster }, render(), resolve(), { runUrlSubmit } (+3 more)
+Cohesion: 0.12
+Nodes (13): byTestId(), { confirm }, { getContactPhotoIdentity }, h, Node, prop(), { removeOwnedMaster }, render() (+5 more)
 
 ### Community 1194 - "Slice 3: G (Things to Remember), I (Sharing into the app), B (Events tab) vs Phase 39"
 Cohesion: 0.12
@@ -5655,8 +5653,8 @@ Cohesion: 0.20
 Nodes (14): main(), parse_battery(), parse_thermal(), Skin and battery sensors from `dumpsys thermalservice` ("Current     temperature, reading(), setting(), compute(), main() (+6 more)
 
 ### Community 1198 - "assist-eligibility.ts"
-Cohesion: 0.60
-Nodes (4): isAssistEligible(), localDateTimeMs(), PendingAssistForBanner, selectBannerState()
+Cohesion: 0.29
+Nodes (4): handlers, Node, render(), resolve()
 
 ### Community 1199 - "Lab B "Skia Unleashed": evidence audit for the Orrery V2 synthesis"
 Cohesion: 0.13
@@ -5675,16 +5673,16 @@ Cohesion: 0.13
 Nodes (14): Class A detail, Class B detail, Class C / D detail, D-27 / D-25 check: were the "no lesson" calls covering confusing UX?, E-01: Add Contact loses typed work on Back (High), E-02: empty-name Save does nothing (Med), E-13: "Not yet" never looks selected (Med) → amend D-50, F-01: Log Interaction loses typed work on Back (High) (+6 more)
 
 ### Community 1203 - "handoff.test.ts"
-Cohesion: 0.08
-Nodes (31): updateGroupEvent(), createPendingAssist(), InteractionAssistChannel, markAssistFailed(), markAssistLogged(), nonPendingOutcome(), PendingAssistRow, ADR-0071 (+23 more)
+Cohesion: 0.18
+Nodes (11): InteractionAssistChannel, buildMailtoUrl(), encodeMailtoRecipient(), HANDOFF_ERROR_COPY, performReachOut(), ReachOutInput, ReachOutOutcome, exec (+3 more)
 
 ### Community 1204 - "fonts.ts"
 Cohesion: 0.13
 Nodes (14): 1. Theme table, 2. Glossary (X-36 / X-37) vs Phase 39 copy, 3. Dialog / header / Back / destructive standards vs the lesson presenter and new screens, 4. Proposed grouping for fix planning, 5. Non-UX items, 6. Hidden owner calls at theme level, each with a recommendation, 7. Suspected recorded-decision reversals (in the audit's proposed directions), 8. Gaps: 39 triggers or flows this slice depends on that the audit did not verify (+6 more)
 
 ### Community 1205 - "expo"
-Cohesion: 0.38
-Nodes (9): applyPickerExclusions(), clearSelection(), confirmMultiSelection(), MultiSelectConfirmation, orderedSelection(), PickerExclusions, selectionCount(), toggleSelection() (+1 more)
+Cohesion: 0.29
+Nodes (7): Concerns, Cursor Review (Cycle 5), Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge, Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 1206 - "PostLogNoteEditor.close.test.tsx"
 Cohesion: 0.18
@@ -5707,20 +5705,20 @@ Cohesion: 0.23
 Nodes (12): main(), mark(), parse_events(), parse_main(), _pid_of(), threadtime format: date time PID TID level tag: message., report(), main() (+4 more)
 
 ### Community 1211 - "list-row-selection.ts"
-Cohesion: 0.26
-Nodes (11): compareCandidates(), firstStable(), formatLocalDate(), imminentWindowEnd(), isBirthday(), isImminent(), Line3Selection, PROMPTS (+3 more)
+Cohesion: 0.33
+Nodes (6): Agreed Concerns (highest priority — 2+ reviewers, orchestrator-verified), Agreed Strengths, Codex Review, Consensus Summary, Cross-AI Plan Review — Phase 20, Divergent Views (resolved by orchestrator source read)
 
 ### Community 1212 - "orrery-stack-logic.ts"
-Cohesion: 0.24
-Nodes (9): BackupHealth, BackupHealthInput, BackupNudgeInput, BackupNudgeState, manualExportFailureCopy(), resolveBackupHealth(), resolveBackupNudge(), now (+1 more)
+Cohesion: 0.33
+Nodes (6): Concerns, Plan 20-05 — Resume and missing-source lifecycle, Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 1213 - "group-log-save-render.test.tsx"
 Cohesion: 0.18
 Nodes (12): byTestId(), { createGroupEvent }, hooks, navigation, nodes(), picker(), pressSave(), render() (+4 more)
 
 ### Community 1214 - "section-fab-store.ts"
-Cohesion: 0.24
-Nodes (5): BackupPassphraseBackend, createBackupPassphraseStore(), nativeBackend, PendingBackupPassphraseChange, PendingPassphraseChangeReadResult
+Cohesion: 0.33
+Nodes (6): Concerns, Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions, Risk Assessment, Strengths, Suggestions, Summary
 
 ### Community 1215 - "README.md"
 Cohesion: 0.22
@@ -5735,8 +5733,8 @@ Cohesion: 0.15
 Nodes (13): 8. What could not be checked, and why, adb and automation limits (a physical check is needed), App-wide or security settings that must not change, Automation artifacts, not findings, Contact count, It would destroy required data, or needs a restore, It would need a clock change or a notification to fire (device clock is off limits), It would need a database failure (not reachable without changing code) (+5 more)
 
 ### Community 1218 - "move-entry-logic.ts"
-Cohesion: 0.32
-Nodes (11): DroppedFieldName, dropConfirmText(), DROPPED_FIELD_WORDS, forName(), listWords(), MOVE_SECTIONS, movedSnackbar(), moveSectionLabel() (+3 more)
+Cohesion: 0.20
+Nodes (18): moveEntryOf(), MoveEntrySheetProps, styles, DroppedFieldName, KnowledgeEntryRef, KnowledgeMoveEntry, KnowledgeMoveUndo, KnowledgeSection (+10 more)
 
 ### Community 1219 - "orrery-perf-marks.ts"
 Cohesion: 0.33
@@ -5747,8 +5745,8 @@ Cohesion: 0.23
 Nodes (10): alertCallLines(), ALLOWED, files, findRnAlertUses(), isAlertName(), isReactNative(), isRnLoad(), parse() (+2 more)
 
 ### Community 1221 - "glossary.ts"
-Cohesion: 0.25
-Nodes (5): defId(), newDef(), quarantineDaysAgo(), seedContact(), uid()
+Cohesion: 0.47
+Nodes (5): listActiveMemberRows(), mapMemberRow(), RawMemberRow, readMemberRowsByIds(), SystemMemberRow
 
 ### Community 1222 - "photo-surfaces-render.test.tsx"
 Cohesion: 0.23
@@ -5771,16 +5769,16 @@ Cohesion: 0.47
 Nodes (8): headerScrimAlpha(), headerScrimBands(), headerScrimContinuous(), headerScrimInkKey(), headerScrimLayout(), nestedBands(), composite(), seen()
 
 ### Community 1227 - "unbound-read.ts"
-Cohesion: 0.06
-Nodes (41): getContactHeader(), expoExecutor(), openAndMigrate(), UnboundRow, ContactHeaderLine, toContactHeaderLine(), groupResearchItems(), researchItemShowsLabel() (+33 more)
+Cohesion: 0.09
+Nodes (25): controls(), native, Node, resolve(), COPY, createFeedbackRetry(), feedbackCopy(), OrreryFeedbackKind (+17 more)
 
 ### Community 1228 - "duplicate-review-logic.ts"
 Cohesion: 0.35
 Nodes (8): bulkResolveFailureLabel(), duplicateReviewView, DuplicateReviewViewInput, recoverAfterWrite(), RecoverySteps, ResolveOutcome, runBulkResolveThenRecover(), runResolveThenRecover()
 
 ### Community 1229 - "FakeFs"
-Cohesion: 0.47
-Nodes (7): backgroundsNeedingConsent(), BackupBackgroundKey, daoAccepts(), restoreWritesBackupSettings(), unavailableBackupBackgrounds(), withDefaultBackgrounds(), assertBackgroundId()
+Cohesion: 0.40
+Nodes (5): 18.2-09 — Backup and restore, Concerns, Risk assessment, Strengths, Suggestions
 
 ### Community 1230 - "ClockMap"
 Cohesion: 0.36
@@ -5789,10 +5787,6 @@ Nodes (7): ClockMap, Maps host `time.monotonic()` to device CLOCK_MONOTONIC nano
 ### Community 1231 - "photo-library-fixture.py"
 Cohesion: 0.40
 Nodes (9): build_manifest(), encode(), format_versions(), load_sources(), main(), make_master(), master_quality_percent(), A distinct square for this index: crop scale, offset, flip, rotation. (+1 more)
-
-### Community 1232 - "OrrerySpecPublisher"
-Cohesion: 0.39
-Nodes (7): CapturePickRow, listCapturePickContacts(), seedContact(), seedLastTalkedAbout(), seedMemory(), seedOffLimits(), uid()
 
 ### Community 1233 - "orbit-switch-contract.test.ts"
 Cohesion: 0.31
@@ -5826,6 +5820,10 @@ Nodes (8): Class A detail, Class B detail, Class C/D detail, Gaps (39 triggers t
 Cohesion: 0.22
 Nodes (9): 9. How the phone was left, Backups and the passphrase, Build and connection, Checks the owner asked for, Data: the phone runs on the 100-contact subset, Loading the full 1,028-contact backup back, Other notes, Settings (+1 more)
 
+### Community 1241 - "OffLimitsInlineEditor.test.ts"
+Cohesion: 0.60
+Nodes (4): nodes(), render(), TestElement, textOf()
+
 ### Community 1242 - "orrery-worklet-default-params.test.ts"
 Cohesion: 0.36
 Nodes (7): boundNames(), DefaultParamHazard, initializers(), isWorkletFunction(), LITERAL_IDENTIFIERS, referencedIdentifiers(), scanWorkletDefaultParams()
@@ -5842,10 +5840,6 @@ Nodes (5): ALLOWLIST, ROOT, scanned, SRC, ADR-0018
 Cohesion: 0.25
 Nodes (6): FIELD, guard, hooks, nodes(), render(), TestElement
 
-### Community 1246 - "display-date-contract.test.ts"
-Cohesion: 0.22
-Nodes (3): buildBirthdayForStorage(), DISPLAY_FORMATTERS, PRODUCTION_FILES
-
 ### Community 1247 - "fire-instant.ts"
 Cohesion: 0.56
 Nodes (7): allowedSlotForDay(), clampHour(), clampStagger(), inQuietWindow(), nextAllowedFireInstant(), nextGridFireInstant(), nextNudgeDate()
@@ -5855,16 +5849,12 @@ Cohesion: 0.46
 Nodes (7): cold_start(), main(), parse_meminfo(), Per-sample medians across runs; % change and the <= 5 % judgement vs a reference, run(), sample_from(), summarise()
 
 ### Community 1249 - "ai-generate-variants.ts"
-Cohesion: 0.33
-Nodes (6): clamp01(), GenerateOne, generateVariants(), assertLadder(), ADR-0079, variantTemperature()
+Cohesion: 0.08
+Nodes (40): projectMessageFocus(), ModelCatalog, createFileCatalogStorage(), resolveActiveCatalog(), loadCachedOpenRouterCatalog(), resolveMaxOutputTokens(), CATALOG, ContactMethodRow (+32 more)
 
 ### Community 1250 - "discard-keep-guard.test.ts"
-Cohesion: 0.25
-Nodes (5): BeforeRemove, BeforeRemoveEvent, nav, runtime, SubEditor
-
-### Community 1251 - "profile-app-bar-render.test.tsx"
-Cohesion: 0.39
-Nodes (6): BackupEncryptionBenchmarkHarness(), styles, BACKUP_ENCRYPTION_BENCHMARK_CANDIDATES, BackupEncryptionBenchmarkResult, measureBackupEncryptionCandidates(), median()
+Cohesion: 0.60
+Nodes (3): DashboardSelectionStore, selectDashboardSelectionCount(), useDashboardSelectionStore
 
 ### Community 1252 - "save-hold-busy-ref-contract.test.ts"
 Cohesion: 0.32
@@ -5879,12 +5869,8 @@ Cohesion: 0.29
 Nodes (7): Chat notes (2026-10-02, verbatim intent), Orrery V2 — Owner Device Review (primary product evidence), Pass 1, Pixel 3a, Pass 1, Pixel 6 Pro, Pass 2, decisions D1–D30 (as recorded in the field sheet), Rulings given in chat (2026-10-02), Test setup
 
 ### Community 1255 - "Consensus Summary"
-Cohesion: 0.29
-Nodes (6): Agreed Concerns, Agreed Strengths, Codex Review, Consensus Summary, Cross-AI Plan Review — Phase 18.2, Divergent Views
-
-### Community 1256 - "Cross-AI Plan Review: Phase 20 — Contact Reconciliation & Merge"
-Cohesion: 0.29
-Nodes (7): Concerns, Cross-AI Plan Review: Phase 20 — Contact Reconciliation & Merge, Cursor Review, Risk Assessment, Strengths, Suggestions, Summary
+Cohesion: 0.12
+Nodes (15): 18.2-02 — Lifecycle DAO and capture, Agreed Concerns, Agreed Strengths, Codex Review, Concerns, Consensus Summary, Cross-AI Plan Review — Phase 18.2, Cursor Review (+7 more)
 
 ### Community 1257 - "GroupTitlePromptSheet.test.tsx"
 Cohesion: 0.29
@@ -5897,10 +5883,6 @@ Nodes (5): PAGES, read(), ROOT, SectionFabPage, stripComments()
 ### Community 1259 - "6. Lifecycle, accessibility, theme, maintainability, tests"
 Cohesion: 0.33
 Nodes (6): 6. Lifecycle, accessibility, theme, maintainability, tests, Accessibility, Lifecycle, Maintainability, Tests, Theme
-
-### Community 1260 - "Plan 20-02 — Merge with Conflicts + Reusable Choice Widgets"
-Cohesion: 0.32
-Nodes (7): GentleLine, QualityMarkRow, readGentleLine(), readOverlooked(), readRetrospective(), RetrospectiveRow, windowModifier()
 
 ### Community 1261 - "Intake brief — UX-audit fix phases 38.9–38.12 (2026-10-10)"
 Cohesion: 0.33
@@ -5922,17 +5904,9 @@ Nodes (3): read(), ROOT, stripComments()
 Cohesion: 0.40
 Nodes (4): isBanned(), nativePickerLoads(), ROOT, SRC
 
-### Community 1266 - "orbit-switch-logic.ts"
-Cohesion: 0.25
-Nodes (7): resolveSwitchA11yState(), resolveSwitchVisual(), SwitchA11yState, SwitchInput, SwitchVisual, ADR-0084, ADR-0169
-
 ### Community 1267 - "reconcile-snapshot-dao.ts"
 Cohesion: 0.46
 Nodes (8): assertTextValue(), fail(), FIXED_LEGACY_COLUMNS, loadAndValidateDefs(), proveCopy(), quoteSafeColumn(), readLegacyRows(), snapshotOrphanColumn()
-
-### Community 1268 - "systems-members-read.ts"
-Cohesion: 0.33
-Nodes (3): Row, rowsOf(), uids()
 
 ### Community 1269 - "capture-back-logic.ts"
 Cohesion: 0.47
@@ -5942,57 +5916,41 @@ Nodes (4): CaptureBackOutcome, CaptureBackState, resolveCaptureBack(), IDLE
 Cohesion: 0.40
 Nodes (5): History, Method, Orrery Renderer R&D: Synthesis (Prototype D), Reading order, Where the labs live
 
-### Community 1271 - "Cross-AI Plan Review — Phase 16 (Custom Field Value Normalization)"
-Cohesion: 0.33
-Nodes (6): Concerns, Plan 20-03 — Per-contact reconciliation, Risk Assessment, Strengths, Suggestions, Summary
-
 ### Community 1273 - "shell-app-bar-contract.test.ts"
 Cohesion: 0.40
 Nodes (3): BACK_PRESSABLE, CODE, SOURCE
-
-### Community 1274 - "snackbar-render.test.tsx"
-Cohesion: 0.33
-Nodes (6): Concerns, Plan 20-06 — Bulk Review Surface + Phase Verification, Risk Assessment, Strengths, Suggestions, Summary
-
-### Community 1275 - "restore-result-render.test.tsx"
-Cohesion: 0.53
-Nodes (5): entry(), BackgroundReconciliationPlan, planBackgroundReconciliation(), BackgroundReconcileAction, reconcileBackgroundDir()
 
 ### Community 1277 - "photo-display-probe.py"
 Cohesion: 0.83
 Nodes (3): find_bounds(), main(), mean_rgb()
 
 ### Community 1280 - "SettingsInteractionsScreen.test.tsx"
-Cohesion: 0.50
-Nodes (4): files, photoKind(), results, validate()
+Cohesion: 0.11
+Nodes (33): files, photoKind(), results, validate(), array(), assertLink(), assertPortableSettings(), assertUniqueLinks() (+25 more)
 
 ### Community 1282 - "popen_shell"
 Cohesion: 0.67
 Nodes (3): Popen, popen_shell(), A streaming `adb shell` (e.g. getevent); caller terminates it.
 
-### Community 1300 - "merge-impact-read.ts"
-Cohesion: 0.67
-Nodes (3): count(), MergeImpactCounts, readMergeImpactCounts()
-
 ## Knowledge Gaps
-- **10575 isolated node(s):** `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance`, `AndroidNotificationVisibility`, `scheduled` (+10570 more)
+- **10580 isolated node(s):** `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance`, `AndroidNotificationVisibility`, `scheduled` (+10575 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **117 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **120 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `useTheme()` connect `fuel-dao.test.ts` to `settings-region-logic.ts`, `001-initial.ts`, `crop-geometry.ts`, `expo-constants`, `package.json`, `index.ts`, `reconcile-apply.ts`, `ReconcileGridScreen.tsx`, `contacts-dao.ts`, `Plan 20-06 — Bulk flagged-item resolver and phase gate`, `Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)`, `localDateTime`, `expo-secure-store`, `SettingsScreen.tsx`, `libphonenumber-js`, `19-REVIEWS.md`, `index.ts`, `notification-nav.ts`, `uid`, `uid`, `FuelEditor.tsx`, `ai-context-read.ts`, `expo`, `ContactProfileScreen.tsx`, `Avatar.tsx`, `lifecycle-consumer-ledger.test.ts`, `reconcile-resume-sweep.ts`, `computeRingReorder`, `model-registry.ts`, `card-line3-selection.ts`, `006-normalize-custom-field-values.ts`, `transaction.ts`, `ImportReviewScreen.tsx`, `dashboard-session-store.ts`, `survivor-recommendation.ts`, `Plan 20-06 — Bulk flagged-item resolver and phase gate`, `Plan 20-05 — Durable Resume + Missing-Source/Relink`, `compose-research-read.test.ts`, `EditContactScreen.tsx`, `unbound-read.ts`, `orbit-theme-migration.ts`, `saf-storage.ts`, `expo-constants`, `relationships-dao.ts`, `profile-app-bar-render.test.tsx`, `digest-logic.ts`, `seedFullContact`, `011-contact-lifecycle-schema.test.ts`, `computeContactIntensity`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
-- **Why does `section()` connect `dashboard-session-store.ts` to `audit-adr-key-files.ts`, `fix-adr-key-files.ts`, `Plan 20-06 — Bulk flagged-item resolver and phase gate`, `SettingsScreen.tsx`, `Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)`?**
+- **Why does `useTheme()` connect `field-types.ts` to `Plan Review — Phase 18.2`, `001-initial.ts`, `crop-geometry.ts`, `expo-constants`, `getExecutor`, `encryption.ts`, `18.2-01 — Lifecycle schema migration`, `package.json`, `index.ts`, `@expo/vector-icons`, `sun-picker-read.test.ts`, `ReconcileGridScreen.tsx`, `AiSuggestionLifecycle`, `localDateOffset`, `18.2-02 — Lifecycle DAO and capture`, `SafFolderAdapter`, `Consensus Summary`, `Plan 20-06 — Bulk flagged-item resolver and phase gate`, `Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)`, `SettingsScreen.tsx`, `expo-secure-store`, `contacts-dao.ts`, `localDateTime`, `orrery-worklet-boundary.test.ts`, `libphonenumber-js`, `react`, `19-REVIEWS.md`, `index.ts`, `notification-nav.ts`, `uid`, `phase-17-runtime-integration.test.ts`, `uid`, `FuelEditor.tsx`, `ai-context-read.ts`, `ContactProfileScreen.tsx`, `Avatar.tsx`, `lifecycle-consumer-ledger.test.ts`, `reconcile-resume-sweep.ts`, `card-line3-selection.ts`, `model-registry.ts`, `fuel-dao.test.ts`, `006-normalize-custom-field-values.ts`, `transaction.ts`, `move-entry-logic.ts`, `survivor-recommendation.ts`, `Plan 20-06 — Bulk flagged-item resolver and phase gate`, `Plan 20-05 — Durable Resume + Missing-Source/Relink`, `unbound-read.ts`, `EditContactScreen.tsx`, `compose-research-read.test.ts`, `AiCloudProviderId`, `orbit-theme-migration.ts`, `reconcile-photo.ts`, `widget-linking.ts`, `saf-storage.ts`, `expo-constants`, `expo-document-picker`, `ai-generate-variants.ts`, `relationships-dao.ts`, `digest-logic.ts`, `knowledge-search.ts`, `reconcile-session-dao.test.ts`, `seedFullContact`?**
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+- **Why does `SqlExecutor` connect `notification-schedule.test.ts` to `types.ts`, `Plan Review — Phase 18.2`, `001-initial.ts`, `AiService.ts`, `File`, `encryption.ts`, `ResumeReconcilePrompt.tsx`, `sun-picker-read.test.ts`, `timeline-read.test.ts`, `restore-apply.ts`, `ReconcileGridScreen.tsx`, `AiSuggestionLifecycle`, `contacts-dao.ts`, `LatestRequestAuthority`, `expo`, `SafFolderAdapter`, `Cross-AI Review: Phase 20 Plans (20-01 through 20-06) — Convergence Cycle 4`, `Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)`, `pending-confirmations-sheet-render.test.tsx`, `app-settings-dao.ts`, `Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions`, `expo-secure-store`, `18.2-09 — Backup and restore`, `orrery-worklet-boundary.test.ts`, `SettingsScreen.tsx`, `BackupScreen.tsx`, `expo-share-intent`, `channels.test.ts`, `newUid`, `notification-nav.ts`, `def`, `FuelEditor.tsx`, `seedContact`, `handoff.test.ts`, `ComposeScreen.tsx`, `ContactProfileScreen.tsx`, `006-normalize-custom-field-values.ts`, `survivor-recommendation.ts`, `Plan 20-06 — Bulk flagged-item resolver and phase gate`, `unbound-read.ts`, `Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge`, `Plan 20-05 — Resume and missing-source lifecycle`, `notification-read.test.ts`, `Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions`, `ReconcileDetailScreen`, `orbit-theme-migration.ts`, `reconcile-photo.ts`, `assist-eligibility.ts`, `saf-storage.ts`, `contacts-dao.test.ts`, `knowledge-search.ts`, `dashboard-selection-store.ts`, `dashboard-controls-responsiveness.test.ts`, `Cross-AI Plan Review: Phase 20 — Contact Reconciliation & Merge`, `seedFullContact`, `computeContactIntensity`?**
   _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **Why does `SqlExecutor` connect `types.ts` to `001-initial.ts`, `AiService.ts`, `getExecutor`, `File`, `encryption.ts`, `ResumeReconcilePrompt.tsx`, `sun-picker-read.test.ts`, `timeline-read.test.ts`, `restore-apply.ts`, `ReconcileGridScreen.tsx`, `LatestRequestAuthority`, `merge-impact-read.ts`, `expo`, `SafFolderAdapter`, `Cross-AI Review: Phase 20 Plans (20-01 through 20-06) — Convergence Cycle 4`, `Cross-AI Plan Review — Phase 20 Contact Reconciliation & Merge (Cycle 6)`, `SettingsScreen.tsx`, `app-settings-dao.ts`, `expo-secure-store`, `edit-contact-save-coordinator.ts`, `18.2-09 — Backup and restore`, `orrery-worklet-boundary.test.ts`, `notification-schedule.test.ts`, `ai-generate-variants.ts`, `BackupScreen.tsx`, `FavouriteOptimisticStore`, `expo-share-intent`, `newUid`, `def`, `FuelEditor.tsx`, `seedContact`, `handoff.test.ts`, `ComposeScreen.tsx`, `ContactProfileScreen.tsx`, `contact-import-resume-sweep.ts`, `assist-store.ts`, `card-line3-selection.ts`, `computeRingReorder`, `006-normalize-custom-field-values.ts`, `glossary.ts`, `survivor-recommendation.ts`, `Plan 20-06 — Bulk flagged-item resolver and phase gate`, `Cycle 5 (Final) Convergence Review — Phase 20: Contact Reconciliation & Merge`, `OrrerySpecPublisher`, `Plan 20-05 — Resume and missing-source lifecycle`, `notification-read.test.ts`, `field-sweep.test.ts`, `Plan 20-04 — Bulk Check Linked Contacts + Durable Sessions`, `ReconcileDetailScreen`, `fail`, `assist-eligibility.ts`, `relationships-dao.ts`, `FieldDefForm.tsx`, `knowledge-search.ts`, `Plan 20-02 — Merge with Conflicts + Reusable Choice Widgets`, `dashboard-selection-store.ts`, `dashboard-controls-responsiveness.test.ts`, `Cross-AI Plan Review: Phase 20 — Contact Reconciliation & Merge`, `seedFullContact`, `reconcile-session-read.ts`, `computeContactIntensity`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
+- **Why does `section()` connect `audit-adr-key-files.ts` to `Plan Review — Phase 18.2`, `fix-adr-key-files.ts`, `AiSuggestionLifecycle`, `ContactProfileScreen.tsx`, `SettingsScreen.tsx`?**
+  _High betweenness centrality (0.011) - this node is a cross-community bridge._
 - **What connects `styles`, `SchedulableTriggerInputTypes`, `AndroidImportance` to the rest of the system?**
-  _10575 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _10580 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `database.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.11363636363636363 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.11229946524064172 - nodes in this community are weakly interconnected._
 - **Should `types.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.025909776957907093 - nodes in this community are weakly interconnected._
-- **Should `001-initial.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.021287852852385547 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.018657877872379384 - nodes in this community are weakly interconnected._
+- **Should `field-types.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.045134575569358175 - nodes in this community are weakly interconnected._

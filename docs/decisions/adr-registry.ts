@@ -130,9 +130,9 @@
 // NOTE: ADR-0118 [ACCEPTED] Bind/Unbind Immutable Lifecycle Events Without a Migration
 // NOTE: ADR-0119 [ACCEPTED] Reusable Count-Only History Aggregation and Canonical Single-Contact History Read
 // NOTE: ADR-0120 [ACCEPTED] Shared-Window Heatmap and Intensity with Globally-Persisted Lenses
-// NOTE: ADR-0121 [ACCEPTED] Rolodex Month/Day/Year History Browser (Reanimated, No Skia)
-// IMPORTANT: ADR-0122 [SUPERSEDED BY ADR-127 (partial — dormant group-context and edit-scope routing only)] Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Rec
-// NOTE: ADR-0123 [ACCEPTED] Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing
+// IMPORTANT: ADR-0121 [SUPERSEDED BY ADR-193] Rolodex Month/Day/Year History Browser (Reanimated, No Skia)
+// IMPORTANT: ADR-0122 [SUPERSEDED BY ADR-127 (partial — dormant group-context and edit-scope routing only); ADR-194 (partial)] Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet T
+// IMPORTANT: ADR-0123 [SUPERSEDED BY ADR-193 (partial); ADR-194 (partial)] Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing
 // NOTE: ADR-0124 [ACCEPTED] Group Event Parents with Canonical Per-Contact Children
 // NOTE: ADR-0125 [ACCEPTED] Three-Field Live Inheritance with Separate Local-Only Group Notes
 // NOTE: ADR-0126 [ACCEPTED] Explicit Group Lifecycle and Identity-Preserving Conversion
@@ -202,5 +202,10 @@
 // NOTE: ADR-0190 [ACCEPTED] Lit Status Bodies, Star Sun, Moon Bumps, Stack Pips, and Hermes-Safe Initials
 // NOTE: ADR-0191 [ACCEPTED] Star-Warp System Switch Starting on the Tap, with Lab C's Camera
 // NOTE: ADR-0192 [ACCEPTED] Bounded Warm Resource Cache Across Tab Blur
+// NOTE: ADR-0193 [ACCEPTED] Activity-First History Stream in Profile, Replacing the Rolodex
+// NOTE: ADR-0194 [ACCEPTED] Heatmap Jump-and-Highlight with No Count Card, and Honest Empty Targets
+// NOTE: ADR-0195 [ACCEPTED] Jump to Date: a Year-Stepper Month Picker and the Empty-Month State
+// NOTE: ADR-0196 [ACCEPTED] Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates
+// NOTE: ADR-0197 [ACCEPTED] History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load
 
-export const ADR_COUNT = 192;
+export const ADR_COUNT = 197;

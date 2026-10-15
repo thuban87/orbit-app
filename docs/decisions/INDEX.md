@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 43 of
-  192 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 45 of
+  197 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -151,9 +151,9 @@ not something you can pattern-match against.
 | 118 | Bind/Unbind Immutable Lifecycle Events Without a Migration | Accepted | 32-interaction-history-insights | — | — | — | 3 | `src/backup`, `src/db` |
 | 119 | Reusable Count-Only History Aggregation and Canonical Single-Contact History Read | Accepted | 32-interaction-history-insights | — | — | — | 6 | `src/db`, `src/services/history` |
 | 120 | Shared-Window Heatmap and Intensity with Globally-Persisted Lenses | Accepted | 32-interaction-history-insights | — | — | — | 7/8 live | `src/components`, `src/components/history`, `src/db` +1 |
-| 121 | Rolodex Month/Day/Year History Browser (Reanimated, No Skia) | Accepted | 32-interaction-history-insights | — | — | — | 0/3 live | — |
-| 122 | Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer | Accepted | 32-interaction-history-insights | — | ADR-127 (partial — dormant group-context and edit-scope routing only) | — | 7/9 live | `src/components/history`, `src/db`, `src/screens` |
-| 123 | Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing | Accepted | 32-interaction-history-insights | ADR-024 (partial — the profile-timeline refinement surface) | — | — | 7 | `src/components/history`, `src/components/profile`, `src/navigation` +2 |
+| 121 | Rolodex Month/Day/Year History Browser (Reanimated, No Skia) | Accepted | 32-interaction-history-insights | — | ADR-193 | — | 1/4 live | `docs/archive/history-rolodex` |
+| 122 | Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer | Accepted | 32-interaction-history-insights | — | ADR-127 (partial — dormant group-context and edit-scope routing only); ADR-194 (partial) | — | 7/9 live | `src/components/history`, `src/db`, `src/screens` |
+| 123 | Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing | Accepted | 32-interaction-history-insights | ADR-024 (partial — the profile-timeline refinement surface) | ADR-193 (partial); ADR-194 (partial) | — | 7 | `src/components/history`, `src/components/profile`, `src/navigation` +2 |
 | 124 | Group Event Parents with Canonical Per-Contact Children | Accepted | 33-group-interaction-logging | — | — | — | 6 | `src/db`, `src/db/migrations` |
 | 125 | Three-Field Live Inheritance with Separate Local-Only Group Notes | Accepted | 33-group-interaction-logging | — | — | — | 6 | `src/components/group`, `src/db`, `src/db/migrations` +1 |
 | 126 | Explicit Group Lifecycle and Identity-Preserving Conversion | Accepted | 33-group-interaction-logging | — | — | — | 5 | `src/components/group`, `src/components/history`, `src/db` |
@@ -223,3 +223,8 @@ not something you can pattern-match against.
 | 190 | Lit Status Bodies, Star Sun, Moon Bumps, Stack Pips, and Hermes-Safe Initials | Accepted | 38.7-orrery-v2 | — | — | — | 8 | `src/components/orrery`, `src/components/orrery/v2`, `src/logic` |
 | 191 | Star-Warp System Switch Starting on the Tap, with Lab C's Camera | Accepted | 38.7-orrery-v2 | — | — | — | 7 | `src/components/orrery`, `src/components/orrery/v2`, `src/logic` |
 | 192 | Bounded Warm Resource Cache Across Tab Blur | Accepted | 38.7-orrery-v2 | — | — | — | 6 | `src/components/orrery`, `src/components/orrery/resources`, `src/components/orrery/v2` +1 |
+| 193 | Activity-First History Stream in Profile, Replacing the Rolodex | Accepted | 38.8-history-navigation-ux | ADR-121 (Rolodex Month/Day/Year History Browser); ADR-123 (partial — the Heatmap + Intensity + Rolodex composition and its rejection of a conventional timeline; in-Profile mounting, the empty-history predicate, the typed `LogContact` route and knowledge-row navigation survive) | — | — | 8/11 live | `docs/archive/history-rolodex`, `src/components/history`, `src/db` +1 |
+| 194 | Heatmap Jump-and-Highlight with No Count Card, and Honest Empty Targets | Accepted | 38.8-history-navigation-ux | ADR-122 (partial — `DateDetailSheet` as the History record-list surface; `InteractionDetail`, canonical Edit, hard-delete, the recency writer and the family taxonomy survive); ADR-123 (partial — the heatmap cell → context card → sheet and drawer → sheet flows; the record → `InteractionDetail` → Edit/Delete chain survives) | — | — | 7/9 live | `src/components/history`, `src/components/profile`, `src/profile` |
+| 195 | Jump to Date: a Year-Stepper Month Picker and the Empty-Month State | Accepted | 38.8-history-navigation-ux | — | — | — | 5 | `src/components/history` |
+| 196 | Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates | Accepted | 38.8-history-navigation-ux | — | — | — | 5 | `src/components`, `src/components/history` |
+| 197 | History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load | Accepted | 38.8-history-navigation-ux | — | — | — | 5 | `src/components/history`, `src/components/profile`, `src/profile` |
