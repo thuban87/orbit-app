@@ -266,6 +266,15 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 
 ## Decisions
 
+- **ADR-198:** themed dialogs through one imperative host, the overlay registry and snackbars above overlays (D-24, D-27, D-40, D-43, D-51, D-52, D-72).
+- **ADR-199:** the destructive-action, feedback and validation standards and the one empty state (D-19, D-20, D-30..D-32, D-39, D-46, D-71).
+- **ADR-200:** the unsaved-work guard in route, sub-editor and overlay variants (D-13..D-15, D-33, D-34, D-61, D-68).
+- **ADR-201:** the shared child header, chevron Back and person line (D-16, D-17, D-44, D-45, D-58, D-59, D-64, D-69, D-73).
+- **ADR-202:** history Back across tabs and + forms over the current tab (D-18, D-35..D-38, D-50, D-54, D-55).
+- **ADR-203:** the Orbit switch, disabled look, chip tiers and swatch selection (D-25, D-26, D-47, D-60, D-62).
+- **ADR-204:** one themed option sheet replaces every native picker; native date and time pickers stay (D-28, D-29). Partially supersedes ADR-144: categories no longer use a native picker below 13.
+- **ADR-205:** the date-only display formatter and native date pickers (D-23, D-48, D-53, D-57, D-65..D-67, D-70).
+- **ADR-206:** glossary terms, retired forms and the plural helper (D-21, D-22, D-41, D-42, D-49, D-56, D-63, D-74, D-75).
 - **ADR-086:** semantic icons and accessible primitives: destructive confirms are not dismissable.
 - **ADR-174:** dialog and sheet action layout at large text.
 - **ADR-175:** header-only Back and the shared header.
@@ -306,3 +315,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-11 | 38.9 | Second fix-pass part 2: the in-form Cancel and submit hold on Memory, Update Contact (`EditorFrame`, RelationshipEditor), Custom fields (FieldDefForm) and AI Personalization (section editors). |
 | 2026-10-11 | 38.9 | Save Writing Style drawn disabled during a section save (115dfa83). |
 | 2026-10-11 | 38.9 | Third fix pass: a held non-Back removal is parked and re-dispatched by `settleHold()` (WR-01, C6-H1); list controls that swap or race the saving draft are held (WR-02); host-accepted Delete / Allow AI and a busy-held `requestClose` (IN-01); post-commit re-reads kept apart from write errors (IN-02). |
+| 2026-10-11 | 38.9 | KB extraction: Decisions cite ADR-198..ADR-206 and ADR-144's partial supersession. |
