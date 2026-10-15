@@ -494,6 +494,15 @@ export function CreateContactScreen({
   const giftIdeasEditorRef = useRef<MemoryEditorHandle>(null);
   const relationshipEditorRef = useRef<RelationshipEditorHandle>(null);
   const offLimitsEditorRef = useRef<OffLimitsInlineEditorHandle>(null);
+  // Without card edit mode an entry's edit form opens after its section's
+  // cards (D-130 left these hosts unchanged), so opening it scrolls the form
+  // into view, as the section editors reveal an `editId` form (38.10
+  // verification).
+  const memoryFormRef = useRef<View>(null);
+  const thoughtOfThemFormRef = useRef<View>(null);
+  const giftIdeasFormRef = useRef<View>(null);
+  const relationshipFormRef = useRef<View>(null);
+  const offLimitsFormRef = useRef<View>(null);
   const [memoryDraft, setMemoryDraft] =
     useState<MemoryDraftState>(CLOSED_DRAFT);
   const [thoughtOfThemDraft, setThoughtOfThemDraft] =
@@ -908,6 +917,8 @@ export function CreateContactScreen({
                 <RelationshipEditor
                   contactId={0}
                   ref={relationshipEditorRef}
+                  formRef={relationshipFormRef}
+                  onEditOpen={() => reveal(relationshipFormRef)}
                   onDraftStateChange={setRelationshipDraft}
                   onCancelRequest={(close) =>
                     requestClose(close, relationshipDraft.dirty)
@@ -979,6 +990,8 @@ export function CreateContactScreen({
                   testID="create-contact-memories"
                   entryNoun={sectionEntryNoun}
                   ref={memoryEditorRef}
+                  formRef={memoryFormRef}
+                  onEditOpen={() => reveal(memoryFormRef)}
                   onDraftStateChange={setMemoryDraft}
                   onCancelRequest={(close) =>
                     requestClose(close, memoryDraft.dirty)
@@ -1011,6 +1024,8 @@ export function CreateContactScreen({
                   testID="create-contact-thought-of-them"
                   entryNoun={sectionEntryNoun("thought_of_them")}
                   ref={thoughtOfThemEditorRef}
+                  formRef={thoughtOfThemFormRef}
+                  onEditOpen={() => reveal(thoughtOfThemFormRef)}
                   onDraftStateChange={setThoughtOfThemDraft}
                   onCancelRequest={(close) =>
                     requestClose(close, thoughtOfThemDraft.dirty)
@@ -1044,6 +1059,8 @@ export function CreateContactScreen({
                   testID="create-contact-gift-ideas"
                   entryNoun={sectionEntryNoun("gift_idea")}
                   ref={giftIdeasEditorRef}
+                  formRef={giftIdeasFormRef}
+                  onEditOpen={() => reveal(giftIdeasFormRef)}
                   onDraftStateChange={setGiftIdeasDraft}
                   onCancelRequest={(close) =>
                     requestClose(close, giftIdeasDraft.dirty)
@@ -1115,6 +1132,8 @@ export function CreateContactScreen({
               >
                 <OffLimitsInlineEditor
                   ref={offLimitsEditorRef}
+                  formRef={offLimitsFormRef}
+                  onEditOpen={() => reveal(offLimitsFormRef)}
                   onDraftStateChange={setOffLimitsDraft}
                   onCancelRequest={(close) =>
                     requestClose(close, offLimitsDraft.dirty)

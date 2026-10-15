@@ -940,6 +940,62 @@ describe("38.10 plan 13: the reworked editor", () => {
     });
   });
 
+  describe("onEditOpen: the host reveals an edit form that opens after the cards (38.10 verification)", () => {
+    const linked = row({ id: 7, interaction_id: 40, link_source: "note" });
+    const plain = row({ id: 8 });
+
+    it("a card's tap opens its form and asks the host to reveal it, once", () => {
+      const onEditOpen = vi.fn();
+      const [card] = render({ items: [plain], onEditOpen }).filter(
+        (n) => n.type === "MemoryCard",
+      );
+      invoke(card, "onPress");
+      expect(hooks.setters[0]).toBe(plain);
+      expect(onEditOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it("a linked card asks on long-press and on the screen-reader Edit, not on its tap", () => {
+      const onEditOpen = vi.fn();
+      const [card] = render({
+        items: [linked],
+        onOpenLinked: vi.fn(),
+        onEditOpen,
+      }).filter((n) => n.type === "MemoryCard");
+      invoke(card, "onPress");
+      expect(onEditOpen).not.toHaveBeenCalled();
+      invoke(card, "onLongPress");
+      invoke(card, "onAccessibilityAction", {
+        nativeEvent: { actionName: "edit" },
+      });
+      expect(onEditOpen).toHaveBeenCalledTimes(2);
+    });
+
+    it("a held card (save in flight) opens nothing and asks nothing", () => {
+      const onEditOpen = vi.fn();
+      const [card] = render({ items: [plain], onEditOpen, busy: true }).filter(
+        (n) => n.type === "MemoryCard",
+      );
+      invoke(card, "onPress");
+      expect(hooks.setters).toHaveLength(0);
+      expect(onEditOpen).not.toHaveBeenCalled();
+    });
+
+    it("the Add opens its form in the Add's own place and asks nothing", () => {
+      const onEditOpen = vi.fn();
+      const tree = render({
+        items: [plain],
+        onEditOpen,
+        addButton: { label: "Add Memory" },
+      });
+      const add = tree.find(
+        (n) => n.type === "Button" && n.props.label === "Add Memory",
+      );
+      invoke(add, "onPress");
+      expect(hooks.setters.length).toBeGreaterThan(0);
+      expect(onEditOpen).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Show on Profile and Move (D-17, D-84, D-134)", () => {
     it("passes Move to its card, and no Show on Profile while the switch is off", () => {
       const onShowOnProfile = vi.fn();

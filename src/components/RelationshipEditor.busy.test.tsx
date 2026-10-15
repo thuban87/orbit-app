@@ -155,6 +155,34 @@ describe("RelationshipEditor busy holds the list's controls (third fix pass WR-0
     expect(button(tree, "Show on Profile")).toBeUndefined();
   });
 
+  it("Edit opens the row's form and asks the host to reveal it; a held Edit asks nothing (38.10 verification)", () => {
+    const onEditOpen = vi.fn();
+    const renderWith = (busy: boolean) => {
+      hooks.index = 0;
+      hooks.setters = 0;
+      return nodes(
+        RelationshipEditor({
+          contactId: 1,
+          items: [hiddenRow],
+          onAdd: vi.fn(),
+          onEdit: vi.fn(),
+          onDelete: vi.fn(),
+          busy,
+          onEditOpen,
+        }),
+      );
+    };
+    press(renderWith(false), "Edit");
+    // openEdit: setEditing + setDraft.
+    expect(hooks.setters).toBe(2);
+    expect(onEditOpen).toHaveBeenCalledTimes(1);
+    press(renderWith(true), "Edit");
+    expect(hooks.setters).toBe(0);
+    expect(onEditOpen).toHaveBeenCalledTimes(1);
+    press(renderWith(false), "Add Key Person");
+    expect(onEditOpen).toHaveBeenCalledTimes(1);
+  });
+
   it("draws them disabled while busy, and a press changes nothing", () => {
     const tree = render(true, [hiddenRow]);
     for (const label of [...listLabels, "Add Key Person"]) {

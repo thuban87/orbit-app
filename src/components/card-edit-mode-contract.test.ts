@@ -303,6 +303,33 @@ describe("a pencil that repeats its card's own tap is read once (38.10 verificat
   });
 });
 
+describe("Add/Edit Contact reveal an inline edit form that opens after its cards (38.10 verification)", () => {
+  for (const [name, file, count] of [
+    ["Edit Contact", "src/screens/EditContactScreen.tsx", 6],
+    ["Add Contact", "src/screens/CreateContactScreen.tsx", 5],
+  ] as const) {
+    it(`${name}: every inline editor scrolls its own form into view on Edit, with card edit mode still off`, () => {
+      const source = read(file);
+      const tags = [
+        "MemoryEditor",
+        "RelationshipEditor",
+        "OffLimitsInlineEditor",
+      ].flatMap((tag) => openingTags(source, tag));
+      expect(tags).toHaveLength(count);
+      const refs = tags.map((tag) => {
+        expect(tag).not.toMatch(/\bcardEditMode\b/);
+        const ref = /formRef=\{(\w+)\}/.exec(tag)?.[1];
+        expect(ref, tag).toBeDefined();
+        expect(tag).toContain(`onEditOpen={() => reveal(${ref})}`);
+        expect(source).toContain(`const ${ref} = useRef<View>(null);`);
+        return ref;
+      });
+      // One form ref per section: two open forms never share a target.
+      expect(new Set(refs).size).toBe(count);
+    });
+  }
+});
+
 describe("an editId opens its form only once (D-107; review IN-02)", () => {
   for (const [name, file] of [
     ["section editors", SECTION],

@@ -201,6 +201,13 @@ export interface MemoryEditorProps {
   /** Attached to the open form's outer View, so a host can scroll it into view. */
   formRef?: Ref<View>;
   /**
+   * Called when an existing entry's form opens (its card's tap, long-press or
+   * screen-reader Edit). A host whose form opens after the cards (Add/Edit
+   * Contact, no card edit mode) scrolls `formRef` into view from here, so the
+   * tap visibly opens something. Absent → nothing.
+   */
+  onEditOpen?: () => void;
+  /**
    * Where the Add sits (D-131; the section editors). "top": the add slot comes
    * first and the editor renders NO Add of its own (the host renders the bar
    * and calls `openNew()` on the handle); a new entry's form opens in that
@@ -571,6 +578,7 @@ export function MemoryEditor({
   busy = false,
   cardEditMode = false,
   formRef,
+  onEditOpen,
   addPlacement = "end",
   entryNoun,
   ref,
@@ -615,6 +623,8 @@ export function MemoryEditor({
     setDraft(opened);
     setBaseline(opened);
     setAllowAiTouched(false);
+    // The host's reveal waits a frame, so the form has mounted by then.
+    onEditOpen?.();
   };
   const close = () => {
     setEditing(null);

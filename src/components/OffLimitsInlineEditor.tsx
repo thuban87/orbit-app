@@ -18,6 +18,8 @@
  *   through the host's KeyboardCenteringProvider), plus an optional label.
  *   Its Link field is off here, so a stored link is kept as it is.
  * - The section ends with a solid "Add Off Limits Item" (D-67, D-87).
+ * - An edit form opens after the rows, so an Edit asks the host to scroll it
+ *   into view (`formRef`, `onEditOpen`; 38.10 verification).
  * - The open form reports `{ open, dirty }` for the host's Back guard and
  *   section fold (38.9 D-13, D-14, D-68), and Cancel follows the Back rule
  *   through `onCancelRequest` (D-61).
@@ -73,6 +75,14 @@ export interface OffLimitsInlineEditorProps {
   onCancelRequest?: (close: () => void) => void;
   /** The form's save is in flight: every control is held (D-26). */
   busy?: boolean;
+  /** Attached to the open form's outer View, so a host can scroll it into view. */
+  formRef?: Ref<View>;
+  /**
+   * Called when an existing row's form opens. The form opens after the rows,
+   * so the host scrolls `formRef` into view from here and the Edit visibly
+   * opens something. Absent → nothing.
+   */
+  onEditOpen?: () => void;
   ref?: Ref<OffLimitsInlineEditorHandle>;
   testID?: string;
 }
@@ -89,6 +99,8 @@ export function OffLimitsInlineEditor({
   onDraftStateChange,
   onCancelRequest,
   busy = false,
+  formRef,
+  onEditOpen,
   ref,
   testID,
 }: OffLimitsInlineEditorProps) {
@@ -122,6 +134,8 @@ export function OffLimitsInlineEditor({
     openCountRef.current += 1;
     setDirty(false);
     setForm({ item, key: openCountRef.current });
+    // The host's reveal waits a frame, so the form has mounted by then.
+    if (item !== null) onEditOpen?.();
   };
 
   const editing = form?.item ?? null;
@@ -176,6 +190,7 @@ export function OffLimitsInlineEditor({
         <OffLimitsForm
           key={form.key}
           testID={testID ? `${testID}-form` : undefined}
+          formRef={formRef}
           initial={editing}
           showLink={false}
           busy={busy}

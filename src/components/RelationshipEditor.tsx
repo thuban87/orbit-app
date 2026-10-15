@@ -88,6 +88,12 @@ export interface RelationshipEditorProps {
   /** Attached to the open form's outer View, so a host can scroll it into view. */
   formRef?: Ref<View>;
   /**
+   * Called when an existing row's form opens. A host whose form opens after
+   * the rows (Add/Edit Contact, no card edit mode) scrolls `formRef` into
+   * view from here, so the Edit visibly opens something. Absent → nothing.
+   */
+  onEditOpen?: () => void;
+  /**
    * Where the Add sits (D-131; the Key People editor). "top": the add slot
    * comes first and the editor renders NO Add of its own (the host renders
    * the bar and calls `openNew()` on the handle); a new key person's form
@@ -234,6 +240,7 @@ export function RelationshipEditor({
   initiallyEditingId,
   cardEditMode = false,
   formRef,
+  onEditOpen,
   addPlacement = "end",
   ref,
 }: RelationshipEditorProps) {
@@ -313,6 +320,8 @@ export function RelationshipEditor({
     if (busy) return; // held while the host saves (WR-02)
     setEditing(item);
     setDraft(initialDraft(item));
+    // The host's reveal waits a frame, so the form has mounted by then.
+    onEditOpen?.();
   };
   const update = <K extends keyof RelationshipDraft>(
     key: K,
