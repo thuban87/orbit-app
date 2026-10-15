@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -95,7 +95,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 1. The user opens Custom Fields from Settings and creates or edits a definition.
 2. `FieldDefForm` derives a label slug from the full definition list, including quarantined definitions, then assigns the definition UID, display order, and local timestamps.
 3. `createField()` accepts global definitions only and seeds a blank pair row for every contact in one shared transaction. Contact-scoped creation is deliberately deferred until durable ownership and owner-purge behavior arrive together.
-4. Rename changes only the visible label; curation, option, order, AI sharing, quarantine, and restore changes each serialize through the same write boundary.
+4. The editor is an in-screen sub-editor of the Custom Fields screen: header, system and gesture Back close it first, and its Cancel goes through the same dirty-aware close, so typed changes prompt "Discard changes?" and an untouched form closes at once (ADR-200). The editor ends its scroll with the shared bottom clearance so the + never covers "Create field" at the end of scroll (ADR-202).
+5. Rename changes only the visible label; curation, option, order, AI sharing, quarantine, and restore changes each serialize through the same write boundary.
 
 ### Choosing AI-sharing consent
 
@@ -114,7 +115,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 
 ### Interpreting values and changing a type
 
-1. `FieldValueInput` dispatches to one controlled widget for the definition type; all widgets emit TEXT-compatible values.
+1. `FieldValueInput` dispatches to one controlled widget for the definition type; all widgets emit TEXT-compatible values. The `date` widget (`DateFieldWidget`) is a native date-picker row with Clear: a pick writes `YYYY-MM-DD` through `formatLocalDate()`, Clear emits `""`, the value shows through the date-only display formatter, a stored value that fails the date parser shows as written with "Not a date", and the widget never emits on render, so an existing value is never rewritten (ADR-205). The `dropdown` widget (`DropdownFieldWidget`, e.g. "Met via") opens the themed `OptionSheet`; a stored value outside the options stays listed first and selected (ADR-204).
 2. Parsers validate and canonicalize clean values only at read time. `CustomFieldValue` presents a tap-to-fix affordance when a parser fails or a dropdown value is no longer in its options.
 3. Before a type or dropdown-option edit, the screen runs a read-only preflight and displays the clean-versus-flagged summary.
 4. Applying a type change snapshots non-null values to `field_history` and updates definition metadata in one transaction. It never rewrites normalized value bytes or identities.
@@ -173,6 +174,10 @@ Migration 006 stores current values as normalized rows. Field type determines in
 
 - **ADR-182:** Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos — text in a photo field shows "Photo unavailable" and is backed up as text.
 
+- **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — the definition editor is a guarded sub-editor; Back and Cancel prompt only for typed changes.
+- **ADR-204:** One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay — dropdown fields choose through the themed sheet and never rewrite an out-of-list value.
+- **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — the Date widget is a native picker writing `YYYY-MM-DD`; storage stays raw TEXT and existing values are never rewritten.
+
 ## Gotchas
 
 1. **Profile grouping is presentation only.** It formats all ten field types and exposes retained history without flattening `field_group`, changing raw TEXT, or introducing another layout nesting level.
@@ -223,3 +228,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-09-23 | 38.2 | Routed rapid and full user edits through one custom-value core so retained prior values and pair identity behave alike; rapid unchanged saves do not write. |
 | 2026-09-23 | 38.4 | The Custom fields create/edit form (`FieldDefForm`) takes a required `bottomClearance` so its last field scrolls clear of the FAB (D-52, OA-E3; ADR-173). |
 | 2026-09-30 | 38.6 | A photo-field value that is not a stored photo path renders as "Photo unavailable" instead of reaching the resolver, and backs up and restores as text (ADR-182, D-31/D-34). |
+| 2026-10-11 | 38.9 | The Date widget is a native date picker writing `YYYY-MM-DD` and showing "Not a date" for an unparseable stored value; dropdowns use the themed option sheet; the definition editor is a guarded sub-editor with end-of-scroll clearance. Storage and invariants unchanged (ADR-200, ADR-202, ADR-204, ADR-205). |
