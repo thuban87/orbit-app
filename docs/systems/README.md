@@ -29,7 +29,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Conversational fuel | `conversational-fuel.md` | `db/fuel-dao.ts`, `db/fuel-read.ts`, `services/fuel-age.ts`, `services/fuel-ranking.ts` | 07 |
 | Photos | `photos.md` | `db/photo-relative-path.ts`, `services/photos/`, `components/Avatar.tsx`, `components/photo-display.ts`, `components/PhotoUnavailableNotice.tsx` | 05 |
 | Contacts (internal Dashboard query subsystem) | `dashboard.md` | `db/dashboard-read.ts`, `logic/dashboard-query-logic.ts`, `screens/HomeScreen.tsx` | 08, 38 |
-| Orrery | `orrery.md` | `db/orrery-read.ts`, `db/ring-seq-dao.ts`, `db/sun-picker-read.ts` | 13 |
+| Orrery | `orrery.md` | `db/orrery-read.ts`, `db/ring-seq-dao.ts`, `db/sun-picker-read.ts`, `components/orrery/v2/`, `components/orrery/resources/` | 13 |
 | Capture | `capture.md` | `db/capture-dao.ts`, `db/capture-read.ts` | 10 |
 | Notifications | `notifications.md` | `db/notification-read.ts`, `db/snooze-dao.ts`, `services/notifications/` | 11 |
 | Widget | `widget.md` | `services/widget/` | 12 |
