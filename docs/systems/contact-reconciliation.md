@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -27,7 +27,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
   - `reviewed_value` (`TEXT`, nullable) — narrow source-memory value used only to suppress an unchanged re-nag.
 - `bulk_review_resolutions` — durable `fixed` or `ignored` dispositions for import rows with unreadable birthdays.
 - `tombstones` — existing generic contact retirement evidence; merge writes one for its absorbed identity instead of archiving it.
-- `memories`, `relationships`, and `current_state_entries` — contact-owned knowledge rows that merge reparents explicitly before retiring the absorbed identity.
+- `memories`, `relationships`, `current_state_entries` and `off_limits` — contact-owned knowledge rows that merge reparents explicitly before retiring the absorbed identity.
 
 **Types** (`src/logic/reconcile-diff.ts`, `src/db/merge-dao.ts`):
 - `ReconcileDiffResult` — classified five-family source comparison and actionable options.
@@ -84,7 +84,8 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 1. A user begins from profile overflow or a reconciliation duplicate path, chooses a survivor (Survivor select's second step is a guard sub-editor: Back returns to the picker, ADR-200), and resolves genuine scalar, photo, and competing-primary conflicts. The candidate grid and merge-conflict photo choice render each Orbit photo by passing its stored relative path to `Avatar` (`CandidateItem.photo`, `PhotoChoiceOption.photo`), so they follow the display revision. Staging previews keep their own URI with `cachePolicy="none"` (ADR-180).
 2. `mergeContacts()` resolves method and active-link collisions before reparenting compatible children — including any pending `interaction_assists` — to the survivor inside one write transaction, so a later assist confirmation logs against the survivor with no survivor lookup.
 3. The writer preserves field-history snapshots for overwritten or dropped meaningful values, recomputes `last_contact` through the recency core, deletes the absorbed row, and writes a generic contact tombstone.
-4. It reparents knowledge rows before deletion, clears links that would become a self-link, and demotes a colliding current-state value so retained history survives.
+4. It reparents knowledge rows (including `off_limits`) before deletion and clears links that would become a self-link. Current state needs no demotion step: Most Recent follows date order (ADR-210). Interaction links stay same-contact.
+4a. The merge review counts come from `readMergeImpactCounts` (`src/db/merge-impact-read.ts`: interactions, events, methods, external links); the fuel-items line is gone (D-87).
 5. The merge impact summary is a confirm-or-abandon screen with a ✕ Cancel header, and Merge is a themed destructive confirm (ADR-198, ADR-201). The UI lands on the survivor only after the transaction succeeds; an error leaves both contacts intact.
 
 ### Resolving same-Group-Event merge collisions
@@ -102,6 +103,8 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 
 ## Decisions
 
+- **ADR-207:** Knowledge Homes After Fuel — Off Limits rows reparent with the other knowledge.
+- **ADR-210:** Dated Last Talked About and Current Location — no demotion on merge.
 - **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — gates current-source reads behind an in-context permission request.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — defines bounded one-way reconciliation and resumable review.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — defines explicit atomic consolidation and absorbed-contact retirement.
@@ -160,3 +163,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-26 | 38.5 | In Galaxy Dark, the Reconcile detail "Unlink source" string and the merge impact "{absorbed} will be retired." line sit on an opaque backing over the art (D-50; ADR-179). |
 | 2026-09-30 | 38.6 | Candidate grid and merge-conflict photo choice render Orbit photos through `Avatar` (no screen imports `resolvePhotoUri`); Update from Contacts' "keep Orbit photo" option is a card with the current Orbit photo beside the phone photo (`PhotoChoice` `keepPhoto`, `ScanState.orbitPhoto`); reconcile promotion encodes through `encodeMaster` (ADR-180, ADR-181). |
 | 2026-10-11 | 38.9 | Reconcile and merge screens use the shared child header; Check complete's Back acts like Done (D-73); Merge impact summary has a ✕ Cancel; Survivor select's second step returns to the picker on Back; native alerts became themed confirms (ADR-198, ADR-200, ADR-201). |
+| 2026-10-15 | 38.10 | Merge reparents Off Limits rows; no current-state demotion; the review screen's counts come from `readMergeImpactCounts` without a fuel line (ADR-207, ADR-210). |
