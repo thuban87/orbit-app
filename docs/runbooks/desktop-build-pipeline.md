@@ -207,6 +207,11 @@ npx expo start                                   # Metro bundler on this box (po
    first runs tested pre-fix code. Before counting any DEBUG re-check, restart Metro with
    `npx expo start --port 8082 --clear`. Then fetch the dev-client bundle from Metro and grep
    it for a symbol the change adds (for example `onLaidOut`); a zero count means the bundle is stale.
+4. **adb-injected input does not drive TalkBack (38.9-17).** With TalkBack enabled on the test
+   phone, `adb shell input tap` activates controls directly and `dumpsys accessibility` reports no
+   accessibility-focused window, so focus-on-open and spoken output cannot be observed by an agent.
+   Check accessible names from the `uiautomator dump` tree (`content-desc`) instead, and put spoken
+   TalkBack checks on the owner's checklist. Restore the phone's accessibility services afterwards.
 
 ## 4. Native share-target verification (Phase 10)
 
