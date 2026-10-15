@@ -740,14 +740,20 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     transform: [{ translateY: (1 - resultProgress.value) * SPACING.xs }],
   }));
 
+  // The toggle reads and flips a ref, so two taps before a re-render still
+  // alternate, and the session-store write stays in this handler. It must
+  // never move into a `setSearchExpanded` updater: React runs updaters while
+  // rendering HomeScreen, and writing the store HomeScreen subscribes to from
+  // there is a state update during render.
+  const searchExpandedRef = useRef(searchExpanded);
   const onToggleSearch = useCallback(() => {
-    setSearchExpanded((expanded) => {
-      // Collapsing drops the active query so the list returns to the full
-      // population — a collapsed search must never leave the list silently
-      // filtered with no visible input or indicator (WR-02).
-      if (expanded) setSearchText("");
-      return !expanded;
-    });
+    const expanded = searchExpandedRef.current;
+    searchExpandedRef.current = !expanded;
+    // Collapsing drops the active query so the list returns to the full
+    // population — a collapsed search must never leave the list silently
+    // filtered with no visible input or indicator (WR-02).
+    if (expanded) setSearchText("");
+    setSearchExpanded(!expanded);
   }, [setSearchText]);
 
   const onClearSearch = useCallback(() => {
