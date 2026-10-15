@@ -161,8 +161,9 @@ export function fabA11yProps(shown: boolean): {
  * The section FAB's bottom offset inside its screen root. On a focused route
  * the tab bar is hidden and the root reaches the window's bottom, so the FAB
  * clears the system inset; on a tab page the root ends at the in-flow tab
- * bar's top, which already accounts for the inset (so `tabBarHeight` does not
- * add here, unlike the shell-level universal FAB's offset).
+ * bar's top, which already accounts for the inset (so the tab bar's height
+ * does not add here, unlike the shell-level universal FAB's offset, and the
+ * FAB does not subscribe to it).
  */
 export function sectionFabBottomOffset({
   focused,
@@ -170,7 +171,6 @@ export function sectionFabBottomOffset({
 }: {
   focused: boolean;
   insetBottom: number;
-  tabBarHeight?: number;
 }): number {
   return focused ? insetBottom + FAB_EDGE_GAP : FAB_EDGE_GAP;
 }

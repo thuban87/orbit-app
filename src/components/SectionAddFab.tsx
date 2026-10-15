@@ -53,7 +53,6 @@ import { AppText } from "@/components/ui/AppText";
 import { buttonVisual } from "@/components/ui/button-roles";
 import { FAB_SIDE_INSET, FAB_SIZE } from "@/navigation/use-bottom-clearance";
 import { useSectionFabStore } from "@/stores/section-fab-store";
-import { useMeasuredTabBarHeight } from "@/stores/tab-bar-layout-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
@@ -301,11 +300,9 @@ export function SectionAddFab({
 }: SectionAddFabProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useMeasuredTabBarHeight();
   const fabBottom = sectionFabBottomOffset({
     focused: morph.focusedRoute,
     insetBottom: insets.bottom,
-    tabBarHeight,
   });
   // The bar is a primary Button: its corner radius is the morph's start.
   const barRadius = RADII[buttonVisual("primary").radiusToken];

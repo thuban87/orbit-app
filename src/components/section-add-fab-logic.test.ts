@@ -128,23 +128,15 @@ describe("morphFrame (D-131)", () => {
 
 describe("sectionFabBottomOffset / sectionFabClearance", () => {
   it("clears the system inset on a focused route", () => {
-    expect(
-      sectionFabBottomOffset({
-        focused: true,
-        insetBottom: 24,
-        tabBarHeight: 80,
-      }),
-    ).toBe(24 + FAB_EDGE_GAP);
+    expect(sectionFabBottomOffset({ focused: true, insetBottom: 24 })).toBe(
+      24 + FAB_EDGE_GAP,
+    );
   });
 
   it("sits FAB_EDGE_GAP above the in-flow tab bar on a tab page", () => {
-    expect(
-      sectionFabBottomOffset({
-        focused: false,
-        insetBottom: 24,
-        tabBarHeight: 80,
-      }),
-    ).toBe(FAB_EDGE_GAP);
+    expect(sectionFabBottomOffset({ focused: false, insetBottom: 24 })).toBe(
+      FAB_EDGE_GAP,
+    );
   });
 
   it("lets the last entry scroll fully above the FAB", () => {
