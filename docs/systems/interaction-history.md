@@ -1,7 +1,7 @@
 # Interaction History & Insights
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/history-read.ts`, `src/db/interaction-edit-read.ts`, `src/services/history/` (`window.ts`, `buckets.ts`, `cycles.ts`, `intensity-window.ts`), `src/components/history/`, `src/screens/EditInteractionScreen.tsx`, `src/screens/edit-interaction-logic.ts`
 
 ## Purpose
@@ -110,7 +110,7 @@ Covered explicit-timestamp consumers (visible text **and** accessibility labels)
 1. Below Intensity sits a single **Jump to date** button, then the stream (D-32). Records are newest first, grouped year → month header → day label, and only dates with records render (D-14, D-15). Day labels read Today / Yesterday / weekday, month and day with a comma ("Fri, Oct 2"; ADR-205); accessible labels carry the full date with the year (D-33).
 2. Only the current year is expanded. Each older year with records is a collapsed row "<year> · <n> interaction(s)" (interaction rows only, singular/plural) that expands on tap (D-34, D-35). A current year with no records still shows its header with "Nothing logged in <year> yet" (D-36).
 3. An expanded year shows its newest `STREAM_INITIAL_VISIBLE` records, then **Show older** adds `STREAM_CHUNK` more; a chunk boundary never splits a day, and the button disappears when the year is fully shown (D-39).
-4. Rows: an interaction row shows the channel icon and label, minute time, direction / No reply / quality, up to two lines of note and, for a group-linked child, the group-event label; it opens `InteractionDetail` (D-16, D-41, D-42). Lifecycle rows are muted and read-only (D-40). Knowledge rows keep the pencil + field + value look and open `MemoryHistory` (D-43). No long-press, sparkle, duration or day counts (D-44..D-47). Equal timestamps order interactions, then lifecycle, then knowledge, then id descending.
+4. Rows: an interaction row shows the channel icon and label, minute time, direction / No reply / quality, up to two lines of note and, for a group-linked child, the group-event label; it opens `InteractionDetail` (D-16, D-41, D-42). Lifecycle rows are muted and read-only (D-40). An interaction whose note is also saved to a section carries that section's tag in its row label (once per section, through `alsoSaveToLabel`), and the linked entry is not shown again as a knowledge row (ADR-211). Knowledge rows (unlinked Last Talked About / Current Location entries, ordered by `sortAt`, showing `timeAt` only where stored) keep the pencil + field + value look and open `MemoryHistory` (D-43). No long-press, sparkle, duration or day counts (D-44..D-47). Equal timestamps order interactions, then lifecycle, then knowledge, then id descending.
 5. Stream state (open years, loaded chunks) is transient: each new Profile visit starts fresh (D-62).
 
 ### Jump to date (38.8)
@@ -170,6 +170,8 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 
 ## Decisions
 
+- **ADR-210:** Dated Last Talked About and Current Location — knowledge rows order by entry date.
+- **ADR-211:** Linked Interaction Notes Through "Also Save To" — one History row tagged with the section.
 - **ADR-119:** Reusable Count-Only History Aggregation and Canonical History Read — the pure aggregation seam and single-contact read serving every surface; heatmap counts resolve from `interactions` rows only; the group-link seam is inert.
 - **ADR-120:** Shared-Window Heatmap and Intensity with Globally-Persisted Lenses — the static count-only heatmap, window-aligned intensity, structural current-cycle marking, and durable `app_settings` lens/preset with per-palette tokens.
 - **ADR-121:** Rolodex Month/Day/Year History Browser — **superseded in full by ADR-193** (38.8); the wheels are archived in `docs/archive/history-rolodex/`. Historical record only.
@@ -249,3 +251,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-10-09 | 38.8 | Gap plan 07: the collapsed-History reveal now settles under the app bar after History loads (D-72, G1): a pending settle scroll on History's loaded content (`83203b0b`), and `ActivityHeatmap` reports the first layout of the Year grid and the no-cadence Cycles explanation (`9bcb48b7`), which the first fix missed. The empty-day/span note scrolls just into view when off screen (D-73, G2). Day-lens cell labels and the empty-day note carry the year off the current year (D-74); the 7 Days title stays without one (D-75). Gotcha 15 updated from open to fixed. |
 | 2026-10-09 | 38.8 | KB extraction: Decisions cite ADR-193..ADR-197; ADR-121 is marked superseded in full and ADR-122/ADR-123 in part; Gotcha 1 no longer mentions the retired wheel math. |
 | 2026-10-11 | 38.9 | Day labels and the empty-day note use the shared date formatter with a comma ("Fri, Oct 2", "Nothing logged on Tue, Oct 5"; D-53, D-57); the no-history state is the shared `EmptyState`; the conversion entry reads "Make this an event" (D-75); ADR-199, ADR-205, ADR-206. |
+| 2026-10-15 | 38.10 | Interaction rows carry the section tag of a linked note; linked entries are skipped as knowledge rows; knowledge rows order by the entry's date (`sortAt`), with no current flag (ADR-210, ADR-211). |
