@@ -1528,7 +1528,7 @@ Plans:
 **Goal**: One set of shared rules and components that the later fix phases and Phase 39 apply instead of inventing their own: one dialog system, one header and Back style, a guard before Back discards typed work, one rule for destructive actions, consistent feedback after actions, and one glossary of user-facing terms.
 **Depends on**: Phase 38.8
 **Requirements**: None formal. Owner decisions to come from this phase's dossier (phase-dossier skill).
-**Success Criteria**: The must_haves of plans 38.10-01…19 (decisions D-01–D-111 in 38.10-CONTEXT, 94/94 covered).
+**Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (orchestrator's reading of owner ruling R1, 39-LEDGER Batch 14; not owner wording): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: 17/17 plans complete (sequential, waves 1–17; `parallelization: false`) — verified 2026-10-11
@@ -1557,10 +1557,10 @@ Plans:
 **Goal**: Fuel is removed from the app. Each former fuel kind (Recent, Topic, Fact, Gift Idea, Off Limits) gets its own place on the Profile, a share goes to a person and a chosen Things to Remember section, and new shares carry a per-item "Allow AI" switch that starts off.
 **Depends on**: Phase 38.9
 **Requirements**: None formal. Owner direction 2026-10-09/10 (39-LEDGER Batch 10: "rip fuel out of the app root and stem"; Batch 13 P1 and Q3 → 39-CONTEXT D-99). Owner decisions to come from this phase's dossier.
-**Success Criteria**: Defined at planning from this phase's CONTEXT.
+**Success Criteria**: The must_haves of plans 38.10-01…25 (decisions D-01–D-153 in 38.10-CONTEXT).
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 18/25 plans executed (gap plans 20–25 added 2026-10-13, D-139)
+**Plans**: 25/25 plans executed (gap plans 20–25 added 2026-10-13, D-139); verification human_needed 2026-10-15
 
 Wave 1
 - [x] 38.10-01-PLAN.md — Migration 033 (knowledge homes), shared fuel mapping, registry and tombstone changes
@@ -1599,7 +1599,7 @@ Wave 9 *(blocked on Wave 8 completion)*
 - [x] 38.10-18-PLAN.md — Retirement sweep and permanent no-fuel test
 
 Wave 10 *(blocked on Wave 9 completion)*
-- [ ] 38.10-19-PLAN.md — Final device plan (owner look sign-off, one release build) — Tasks 1–2 done; Task 3 resumes after plan 25
+- [x] 38.10-19-PLAN.md — Final device plan (owner look sign-off; release builds 81f3e611 and da31acab, D-153)
 - [x] 38.10-20-PLAN.md — G1 card edit mode on the section pages (D-130)
 - [x] 38.10-21-PLAN.md — G2 Add bar morphs into a bottom-left section FAB, memory-type editors (D-131)
 - [x] 38.10-22-PLAN.md — G3 section FAB on Key People, Off Limits and history pages (D-131)
@@ -1747,7 +1747,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
-| 38.10 Fuel Retirement, Things to Remember & Sharing | 18/25 | In Progress|  |
+| 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Verifying|  |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
