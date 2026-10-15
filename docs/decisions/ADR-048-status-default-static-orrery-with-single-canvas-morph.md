@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** ADR-077 (partial — dual view/morph)
+**Superseded by:** ADR-077 (partial — dual view/morph); ADR-189 (partial)
 
 ## Context
 

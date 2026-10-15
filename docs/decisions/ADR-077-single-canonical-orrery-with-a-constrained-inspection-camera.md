@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-048 (partial — dual view/morph)
-**Superseded by:** None
+**Superseded by:** ADR-189 (partial)
 
 ## Context
 
@@ -48,4 +48,4 @@ The Orrery has one canonical, unnamed spatial visualization centred on relations
 - `src/components/SegmentedControl.tsx` — retired with its only consumer; provided the Status / Relationship selector.
 
 **Depends on:** ADR-046 (Query-Time Orrery Placement and Transactional Ring Ordering); ADR-047 (App-Level Assignable Sun and Themed Self Identity)
-**Required by:** ADR-085 (Live Reduced-Motion Signal for Skia Ambient Animation)
+**Required by:** ADR-085 (Live Reduced-Motion Signal for Skia Ambient Animation); ADR-186 (Orrery V2 Imperative Picture Renderer Behind a Platform Render Host); ADR-187 (Tilted Strategy-Map Home, Dolly Camera, One Projected Size, and Bodies on Their Rings); ADR-192 (Bounded Warm Resource Cache Across Tab Blur)
