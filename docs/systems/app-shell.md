@@ -77,8 +77,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/ReconcileGridScreen.tsx` | Provides the Settings-launched linked-contact review workspace. |
 | `src/screens/ReconcileDetailScreen.tsx` | Provides per-contact reconciliation and missing-source actions. |
 | `src/screens/SurvivorSelectScreen.tsx` | Provides the explicit duplicate-contact merge entry. |
-| `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, Orrery star/muted values, and the History `heatmapScale`/`heatmapCellEmpty`/`markerInteraction`/`markerLifecycle` tokens. |
-| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, Orrery, and per-palette History heatmap/marker values. |
+| `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, Orrery star/muted values, the Orrery V2 `orrery*` sub-palette (sky base/horizon, nebula, sky stars, the order-stable `orrerySystemHues`, grid, ring light, pulse, rim, glow, reticle, instrument, warp, occlusion; ADR-189), and the History `heatmapScale`/`heatmapCellEmpty`/`markerInteraction`/`markerLifecycle` tokens. |
+| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, Orrery (with the `orrery*` sub-palette in all four palettes; reticle and instrument follow the accent through `applyAccent`), and per-palette History heatmap/marker values. |
 | `src/theme/hydrate-theme-at-boot.ts` | Safely imports legacy theme state and returns the SQLite-backed boot selection. |
 | `src/components/icons/icon-registry.ts` | Maps semantic icon names and variants to the replaceable base icon family. |
 | `src/components/ui/` | Hosts AppText, Button, and standardized overlay primitives for consuming screens. `Sheet` `compact`/`detail` bodies scroll inside their percent cap (40%/60%) at large text, so every action stays reachable; a consumer that owns its own ScrollView sets `scrollBody` to false; `expanded` (fixed 92%, `flex: 1` body) is unchanged (D-32). |
@@ -382,6 +382,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 - **ADR-176:** Authored Native Platform Configuration — release-only `SYSTEM_ALERT_WINDOW` removal, Orbit launcher artwork, and native dialogs following Orbit's mode setting.
 - **ADR-185:** Assist Banner Renders in Flow Above the Tab Navigator — `RootNavigator` mounts the banner in flow, so no screen's top bar is covered, and window obstacles re-measure through `shell-offset-store`.
+- **ADR-189:** Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion — adds the `orrery*` token sub-palette to every theme palette; the Orrery draws no colour that is not one of these tokens, including inside SkSL uniforms.
 
 ## Gotchas
 
@@ -520,5 +521,6 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 | 2026-09-26 | 38.5 | Owner rulings after the signed table (ADR-179): active triggers filled with accent border and text (D-46); a swiped see-through List row backed at 50% (D-48); four persistent Galaxy Dark danger strings on an opaque backing (D-50); the Events tab shows the art with full cards (D-54). Picker tiles size the art explicitly, with the Aurora tile anchored on the ribbon (D-52, bug fix). |
 | 2026-09-30 | 38.6 | The assist banner renders in flow at the top of the navigator's safe-area column (mounted by `RootNavigator`, no longer an absolute overlay from `App.tsx`), so a pending "Did you reach …?" question pushes every screen down instead of covering its app bar (D-38). |
 | 2026-09-30 | 38.6 | Review WR5-01: the in-flow assist banner publishes its height to `shell-offset-store`; `useWindowMeasurement` treats it as a re-measure trigger, so window obstacles (the Orrery System selector and view-options triggers, the camera controls) re-measure when the banner appears, grows or leaves. |
+| 2026-10-05 | 38.7 | The theme palettes gained the Orrery V2 `orrery*` sub-palette (14 tokens, all four palettes; ADR-189). Blend family follows the resolved theme mode, never token luminance. |
 | 2026-10-08 | 38.8 | The `Sheet` `scrollBody={false}` opt-out list no longer includes History's retired `DateDetailSheet` (now OrreryContactsSheet and ProfileRelationshipSheets); History knowledge-row edits still need `MemoryHistory` in every Profile-hosting stack. |
 | 2026-10-11 | 38.9 | "Applying destructive emphasis" now points to the app-wide UX standards (`ux-standards.md`: destructive-action, feedback, dialog, guard, header/Back, states, dates and count rules). |
