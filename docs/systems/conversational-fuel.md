@@ -1,8 +1,18 @@
-# Conversational Fuel
+# Conversational Fuel (retired)
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Status:** Retired in phase 38.10. Nothing below describes the running app.
 **Owners:** `src/db/fuel-dao.ts`, `src/db/fuel-read.ts`, `src/services/fuel-ranking.ts`, `src/services/fuel-age.ts`
+
+
+> **Retired.** Phase 38.10 removed fuel entirely: no `fuel` table, writer, reader or wording remains, and
+> `src/no-fuel-contract.test.ts` keeps it that way (ADR-207). Migration 033 moved every row to its new
+> home and dropped the table (ADR-208): Off Limits → the `off_limits` table; gift → Gift Ideas; topic →
+> Thought of Them; recent → Last Talked About; fact → Memories. Read `contact-knowledge.md` for those
+> homes, `capture.md` for sharing, `ai-suggestions.md` for AI context and `dashboard.md` for search. The
+> rest of this file is the historical record of the subsystem as it stood before 38.10; its owning
+> files are deleted. ADR-028 and ADR-029 are superseded by ADR-207.
 
 ## Purpose
 
@@ -103,6 +113,8 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 
 ## Decisions
 
+- **ADR-207:** Knowledge Homes After Fuel — retires fuel and supersedes ADR-028 and ADR-029.
+- **ADR-208:** Migration 033 — copies, verifies and drops the fuel table.
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — provides the migration-1 table boundary that contains fuel.
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — governs the already-shipped migration that creates the fuel table.
 - **ADR-010:** Single-Writer Interaction Recency Spine — shares the initial schema while fuel intentionally leaves interaction recency untouched.
@@ -161,3 +173,4 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | 2026-09-03 | 24.2 | Retired legacy AI-proposal and topic/share fuel through verified carry-over to Memories. |
 | 2026-09-02 | 31 | Added a narrow local Profile projection for Off Limits while preserving every ranked, search, and AI exclusion. |
 | 2026-09-02 | 36 | Removed the inert legacy AI-proposal confirmation UI; explicit Memory permission remains the sole AI consent model. |
+| 2026-10-15 | 38.10 | Retired: the table, DAO, reads, ranking, editor and wording removed; rows moved by migration 033 (ADR-207, ADR-208). The body is kept as history. |
