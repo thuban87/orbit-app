@@ -79,6 +79,13 @@ Migration 016 added `memories`, `relationships` and `current_state_entries`; mig
 
 The Profile reads every source in one snapshot (`profile-knowledge-read.ts`, see `profile.md`). Each section has its own editor: Memories, Thought of Them, Gift Ideas and Imported → `SectionEditorScreen`; Key People → `KeyPeopleEditorScreen`; Off Limits → `OffLimitsEditorScreen`; Last Talked About and Current Location → `MemoryHistoryScreen`; Custom Fields → Edit Contact (ADR-219). Each editor uses a gated read with loading and Retry (ADR-168), applies the 38.9 standards, and reloads after a write. On these pages each card has a pencil that opens its form in place with Move and Delete; the Add sits at the top and morphs into a bottom-left section button when scrolled away (ADR-219).
 
+### Reading Compose Research
+
+1. Compose opens a sibling Research screen that calls `readComposeResearch()` locally on focus; it owns no writer.
+2. The read composes populated, visible memories (every type, grouped by section name; a label becomes the item's label line), key people, current-state entries (with their date), first-class fields, custom fields (toggles read Yes/No through the Profile formatter) and Off Limits into `ResearchItem` records. Grouping uses a first-seen map by group id, not consecutive runs (D-29).
+3. Each item carries the source-owned `aiEligible` result: a memory is eligible only if it is in `listAiEligibleMemories`; custom fields follow `share_with_ai`; key people, first-class values, current state and Off Limits never are.
+4. Off Limits renders under an "Off Limits" heading (formerly "Avoid"; the Profile helper "Avoid bringing these up" stays); an item with no label shows its text once (D-87, D-105, D-111). Contact frequency reads "Every 30 days"; the empty state reads "Nothing to remember yet" (D-125, D-126).
+
 ### Creating and maintaining a Memory
 
 1. `MemoryEditor` keeps the draft (text, label, type, note, link, meaningful date, Allow AI) and has no DAO access; it reports `{open, dirty}` so Back and Cancel prompt only for typed text (ADR-200). The meaningful date is a native picker with Clear, stored as `YYYY-MM-DD` (ADR-205). A link must be a valid http(s) URL (`url-validation.ts`).
