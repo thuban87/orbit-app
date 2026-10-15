@@ -1,7 +1,7 @@
 # Widget
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -12,15 +12,15 @@ The Widget system gives Orbit a local Android home-screen shortcut board for bin
 
 ### Data Model
 
-The widget owns no table, migration, or per-instance state. It reads the Dashboard Favorites population projection, which carries a nullable derived status, eligible fuel, and a relative photo path.
+The widget owns no table, migration, or per-instance state. It reads the Dashboard Favorites population projection, which carries a nullable derived status and a relative photo path. It reads no contact knowledge.
 
 **Tables:**
 - `contacts` — supplies favourite membership, identity, photo reference, and the recency inputs to derived status.
-- `fuel` — supplies the eligible per-contact line shown only in the larger layout.
+- The larger layout shows no knowledge line: the fuel line was removed with fuel, and the widget-overhaul phase decides any replacement (D-59; todo `2026-10-12-widget-knowledge-line-after-fuel.md`). Off Limits never appears on the widget (D-10).
 - `interactions` — receives a full widget-sourced touchpoint when the user marks contacted.
 
 **Types** (`src/services/widget/widget-data.ts`):
-- `WidgetTile` — local render projection containing the Dashboard-ordered contact, nullable status, deterministic initials/swatch, photo reference, and fuel line.
+- `WidgetTile` — local render projection containing the Dashboard-ordered contact, nullable status, deterministic initials/swatch, and photo reference.
 
 ### Store, Service & DAO Layer
 
@@ -57,7 +57,7 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 2. The renderer resolves the device region and opens/migrates SQLite when needed, then `loadWidgetTiles()` calls the Bound-only favourites projection. An Unbound dormant favourite cannot produce a tile.
 3. The tile shaper preserves Dashboard Default order and nullable query-time status; it never recalculates either value.
 4. `encodeTileThumbs` downsizes each local photo master, one tile at a time, and encodes it as a base64 `data:` URI. The master may be a legacy 512 JPEG or a 1024 WebP (ADR-181), and each rendered `ImageRef` is released in a `finally`. A value that is not a stored photo path (`isStoredPhotoPath`), or a missing or failed thumbnail, falls back to deterministic themed initials rather than blanking the grid.
-5. The renderer selects the small mark grid or larger fuel-and-action layout from widget width, then rasterises the RemoteViews tree with palette tokens.
+5. The renderer selects the small mark grid or larger action layout from widget width, then rasterises the RemoteViews tree with palette tokens.
 6. The patched `react-native-android-widget` module passes light and dark bitmaps inline with `RemoteViews.setImageViewBitmap`. Android's AppWidgetService delivers those views only to hosts bound to the widget ID. The library's unauthenticated image ContentProvider is absent from both library manifests, and each render deletes leftover app-private `files/widget_images/*` snapshots. The base64 photo input contract and visible fuel/action content are unchanged.
 
 ### Marking and opening a contact
@@ -94,6 +94,7 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — event/launch/boot refresh replaces polling.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — makes the widget's possible first-open pass device-region migration input.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — excludes Unbound favourites and fails stale active actions closed.
+- **ADR-215:** Search and Glanceable Surfaces After Fuel — the large tile shows no knowledge line.
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — replaces the larger `Message` action with `Contact → orbit://reach`, deep-linking the shared router with a fail-safe lifecycle guard.
 - **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — preserves strict widget-link behavior while changing only the Dashboard reset shape.
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — requires Favorites population Default ordering.
@@ -147,3 +148,4 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 | 2026-09-23 | 38.3 | Assist confirmations notify the widget through the shared post-commit publisher (ADR-164). |
 | 2026-09-23 | 38.4 | Three widget glyphs use `accentText` instead of the accent fill (D-63; ADR-169). Widget action accessible names (RG-032) are untouched and belong to the widget-overhaul phase (D-16), as does the widget contact tap that does not open the Profile (todo `2026-09-28-widget-contact-tap-does-not-open-profile.md`). |
 | 2026-09-30 | 38.6 | Tile thumbnails encode sequentially (`encodeTileThumbs` in `widget-photo.ts`, replacing a `Promise.all`), each manipulator ref is released, masters may be 1024 WebP, and text left in a photo field never reaches the encoder. Thumbnail size and quality unchanged (ADR-181). |
+| 2026-10-15 | 38.10 | Removed the large tile's fuel line; the widget reads no knowledge, and capture no longer refreshes it (ADR-215). |
