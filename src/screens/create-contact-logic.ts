@@ -592,6 +592,36 @@ export function offLimitsFormDraft(row?: {
   return { text: row?.text ?? "", label: row?.label ?? "" };
 }
 
+/** An open Off Limits form's typed fields, carried across a remount (WR-01). */
+export interface OffLimitsCarriedDraft {
+  draft: OffLimitsFormDraft;
+  /** The Link field as typed. */
+  url: string;
+}
+
+/**
+ * Where an Off Limits form starts (38.10 review WR-01). `baseline` is always
+ * what the row stores, so dirty is measured against the stored value. The
+ * typed fields start from `carried` when the host remounts this same open's
+ * form (the Off Limits editor moves an edit form below its list when a reload
+ * drops the row), else from the stored row. PURE.
+ */
+export function offLimitsFormOpening(
+  initial: {
+    text?: string | null;
+    label?: string | null;
+    url?: string | null;
+  } | null,
+  carried?: OffLimitsCarriedDraft,
+): { baseline: OffLimitsFormDraft; draft: OffLimitsFormDraft; url: string } {
+  const baseline = offLimitsFormDraft(initial ?? undefined);
+  return {
+    baseline,
+    draft: carried?.draft ?? baseline,
+    url: carried?.url ?? initial?.url ?? "",
+  };
+}
+
 /**
  * Whether the open Off Limits form differs from what it opened with (38.9
  * D-14): text compares after the save-time normalising, so typed-then-erased

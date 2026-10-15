@@ -128,6 +128,27 @@ describe("card edit mode: the Off Limits editor (D-130)", () => {
     expect(add).toContain('role="primary"');
   });
 
+  it("an edited row a reload removed keeps its form, and its draft, after the list (review WR-01)", () => {
+    expect(screen).toMatch(
+      /form\?\.mode === "edit" &&\s*!rows\.some\(\(row\) => row\.id === form\.row\.id\)\s*\?\s*renderEditForm\(form\.row\)/,
+    );
+    // Moving below the list remounts the form; this open's draft carries.
+    const [edit] = openingTags(screen, "OffLimitsForm").filter((tag) =>
+      /\bcardEditMode\b/.test(tag),
+    );
+    expect(edit).toContain("initialDraft={draft}");
+    expect(edit).toContain("onDraftChange=");
+    expect(screen).toContain("draftRef.current?.formKey === formKey");
+    expect(screen).toContain("draftRef.current = { formKey, ...carried };");
+    // The form starts from the carried typing, dirty against the stored row.
+    expect(form).toContain(
+      "useState(() => offLimitsFormOpening(initial, initialDraft))",
+    );
+    expect(form).toContain("useState(opening.draft)");
+    expect(form).toContain("isOffLimitsFormDirty(baseline, draft)");
+    expect(form).toMatch(/onDraftChangeRef\.current\?\.\(\{ draft, url \}\)/);
+  });
+
   it("OffLimitsForm draws Move and a destructive Delete only in card edit mode", () => {
     const buttons = openingTags(form, "Button");
     expect(buttons.some((tag) => tag.includes('role="destructive"'))).toBe(

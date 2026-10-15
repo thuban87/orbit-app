@@ -17,7 +17,9 @@
  * - Card edit mode (D-130): each row has a pencil at its top right; the
  *   pencil or a tap on the row opens its form in the row's place, with Move
  *   and a red Delete at the form's top (none at rest). While a form is open
- *   the other rows and the Add are held (`controlsHeld`).
+ *   the other rows and the Add are held (`controlsHeld`). An edited row a
+ *   reload removed keeps its form, with its typed draft, after the list
+ *   (review WR-01, as the history page does).
  * - Section Add FAB (D-131): the solid Add sits at the top of the list,
  *   above the rows and the empty state, whether or not there are rows; a new
  *   item's form opens in its place. Scrolled out of view, it morphs into the
@@ -79,6 +81,7 @@ import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import type { RootStackScreenProps } from "@/navigation/types";
+import type { OffLimitsCarriedDraft } from "@/screens/create-contact-logic";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -101,6 +104,11 @@ const TITLE = "Off Limits";
 
 /** The open form: a new item, or one stored row. */
 type FormTarget = { mode: "add" } | { mode: "edit"; row: OffLimitsRow };
+
+/** The open form's latest typed draft, tagged with the open it belongs to. */
+interface FormDraft extends OffLimitsCarriedDraft {
+  formKey: number;
+}
 
 const ERROR_LABELS: Record<OffLimitsEditorOp, string> = {
   add: "Couldn't save. Please try again.",
@@ -144,6 +152,10 @@ export function OffLimitsEditorScreen({
   const [formDirty, setFormDirty] = useState(false);
   // Remounts the form for each open (it owns its draft).
   const [formKey, setFormKey] = useState(0);
+  // WR-01: an edit form whose row a reload removed moves below the list (and
+  // back, if an Undo returns the row), which remounts it; this carries that
+  // open's typed draft across.
+  const draftRef = useRef<FormDraft | null>(null);
   const openForm = (target: FormTarget) => {
     setFormKey((key) => key + 1);
     setFormDirty(false);
@@ -323,26 +335,35 @@ export function OffLimitsEditorScreen({
   };
 
   /** The open edit form, in card edit mode (D-130). */
-  const renderEditForm = (row: OffLimitsRow) => (
-    <OffLimitsForm
-      key={`form-${formKey}`}
-      testID="off-limits-editor-form"
-      formRef={formRef}
-      initial={row}
-      onSave={save}
-      onCancel={() => requestClose(closeForm, formDirty)}
-      onDelete={() => remove(row)}
-      cardEditMode
-      onMove={() =>
-        requestClose(() => {
-          closeForm();
-          setMoveRow(row);
-        }, formDirty)
-      }
-      onDirtyChange={setFormDirty}
-      busy={saving}
-    />
-  );
+  const renderEditForm = (row: OffLimitsRow) => {
+    // Only this open's draft: a new open has a new formKey.
+    const draft =
+      draftRef.current?.formKey === formKey ? draftRef.current : undefined;
+    return (
+      <OffLimitsForm
+        key={`form-${formKey}`}
+        testID="off-limits-editor-form"
+        formRef={formRef}
+        initial={row}
+        onSave={save}
+        onCancel={() => requestClose(closeForm, formDirty)}
+        onDelete={() => remove(row)}
+        cardEditMode
+        onMove={() =>
+          requestClose(() => {
+            closeForm();
+            setMoveRow(row);
+          }, formDirty)
+        }
+        onDirtyChange={setFormDirty}
+        initialDraft={draft}
+        onDraftChange={(carried) => {
+          draftRef.current = { formKey, ...carried };
+        }}
+        busy={saving}
+      />
+    );
+  };
 
   return (
     <View style={styles.root} onLayout={morph.onRootLayout}>

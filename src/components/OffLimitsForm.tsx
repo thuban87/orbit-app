@@ -38,7 +38,8 @@ import {
   canSaveOffLimitsForm,
   isOffLimitsFormDirty,
   normalizeOffLimitsForm,
-  offLimitsFormDraft,
+  type OffLimitsCarriedDraft,
+  offLimitsFormOpening,
 } from "@/screens/create-contact-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -85,6 +86,15 @@ export interface OffLimitsFormProps {
   onMove?: () => void;
   /** Attached to the form's outer View, so a host can scroll it into view. */
   formRef?: Ref<View>;
+  /**
+   * The typed fields to start from when the host remounts this same open's
+   * form (38.10 review WR-01: the Off Limits editor moves an edit form below
+   * its list when a reload drops the row). Dirty is still measured against
+   * `initial`. Absent → the form opens on `initial`, as before.
+   */
+  initialDraft?: OffLimitsCarriedDraft;
+  /** Reports every typed change, so a remount can restore it (WR-01). */
+  onDraftChange?: (carried: OffLimitsCarriedDraft) => void;
   testID?: string;
 }
 
@@ -109,13 +119,16 @@ export function OffLimitsForm({
   cardEditMode = false,
   onMove,
   formRef,
+  initialDraft,
+  onDraftChange,
   testID,
 }: OffLimitsFormProps) {
   const { colors } = useTheme();
-  const [baseline] = useState(() => offLimitsFormDraft(initial ?? undefined));
-  const [draft, setDraft] = useState(baseline);
+  const [opening] = useState(() => offLimitsFormOpening(initial, initialDraft));
+  const baseline = opening.baseline;
+  const [draft, setDraft] = useState(opening.draft);
   const storedUrl = initial?.url ?? null;
-  const [url, setUrl] = useState(storedUrl ?? "");
+  const [url, setUrl] = useState(opening.url);
   // Single-flight Save (G-15): the ref drops a second tap in the same frame;
   // the state holds the controls while an async save runs.
   const savingRef = useRef(false);
@@ -135,6 +148,11 @@ export function OffLimitsForm({
   useEffect(() => {
     onDirtyChangeRef.current?.(dirty);
   }, [dirty]);
+  const onDraftChangeRef = useRef(onDraftChange);
+  onDraftChangeRef.current = onDraftChange;
+  useEffect(() => {
+    onDraftChangeRef.current?.({ draft, url });
+  }, [draft, url]);
 
   const commit = async () => {
     if (held || !savable || savingRef.current) return;

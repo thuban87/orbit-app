@@ -29,6 +29,7 @@ import {
   isOffLimitsFormDirty,
   normalizeOffLimitsForm,
   offLimitsFormDraft,
+  offLimitsFormOpening,
   partitionMemoryRows,
   pickCreateSubEditor,
   removeDraftItem,
@@ -762,5 +763,51 @@ describe("inline Off Limits form rules (D-66, D-67, D-104)", () => {
       text: "Politics",
       label: null,
     });
+  });
+});
+
+describe("offLimitsFormOpening: an edit form remounted below the list (38.10 review WR-01)", () => {
+  const stored = { text: "Politics", label: "Work", url: "https://a.example" };
+
+  it("opens on the stored row when nothing is carried", () => {
+    expect(offLimitsFormOpening(stored)).toEqual({
+      baseline: { text: "Politics", label: "Work" },
+      draft: { text: "Politics", label: "Work" },
+      url: "https://a.example",
+    });
+    expect(offLimitsFormOpening(null)).toEqual({
+      baseline: { text: "", label: "" },
+      draft: { text: "", label: "" },
+      url: "",
+    });
+  });
+
+  it("starts from the carried typing, keeping the stored value as the baseline", () => {
+    const opening = offLimitsFormOpening(stored, {
+      draft: { text: "Politics and the election", label: "Work" },
+      url: "https://b.example",
+    });
+    expect(opening.baseline).toEqual({ text: "Politics", label: "Work" });
+    expect(opening.draft.text).toBe("Politics and the election");
+    expect(opening.url).toBe("https://b.example");
+    // Dirty is still measured against what the row stores.
+    expect(isOffLimitsFormDirty(opening.baseline, opening.draft)).toBe(true);
+  });
+
+  it("a carried draft equal to the stored value reads as untouched", () => {
+    const opening = offLimitsFormOpening(stored, {
+      draft: { text: "Politics ", label: "Work" },
+      url: "https://a.example",
+    });
+    expect(isOffLimitsFormDirty(opening.baseline, opening.draft)).toBe(false);
+  });
+
+  it("keeps a carried blank link (the user cleared it)", () => {
+    expect(
+      offLimitsFormOpening(stored, {
+        draft: { text: "Politics", label: "Work" },
+        url: "",
+      }).url,
+    ).toBe("");
   });
 });
