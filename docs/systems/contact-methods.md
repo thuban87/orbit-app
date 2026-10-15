@@ -1,7 +1,7 @@
 # Contact Methods
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
@@ -35,7 +35,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 | Logic | `src/logic/compose-logic.ts` | Resolves the actionable-primary/SMS capability matrix. |
 | AI lifecycle | `src/logic/ai-suggestion-logic.ts` | Owns cancellable three-suggestion requests without a first-send acknowledgement gate. |
 | Contact read | `src/db/contact-read.ts` | Supplies the scalar-free lightweight header and archive state. |
-| Fuel read | `src/db/fuel-read.ts` | Supplies the ranked projection whose SQL excludes off-limits, unconfirmed-AI, and blank rows. |
+| Research read | `src/db/compose-research-read.ts` | Supplies the populated Things to Remember count and the normalized Research items, with source-owned AI eligibility. |
 | Link DAO | `src/db/contact-links-dao.ts` | Owns ordered link create, edit, and merge-safe removal. |
 
 ### Key Files
@@ -49,7 +49,7 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 | `src/db/contact-methods-read.ts` | Ordered method-group and actionable-primary read boundary. |
 | `src/logic/ai-suggestion-logic.ts` | Timeout, cancellation, stale-result, and non-destructive three-suggestion lifecycle. |
 | `src/db/contact-read.ts` | Lightweight scalar-free contact header and archive gate. |
-| `src/db/fuel-read.ts` | Structural eligible-fuel boundary consumed unchanged by Compose. |
+| `src/db/compose-research-read.ts` | Research count and items; Off Limits is never AI-eligible. |
 | `src/navigation/types.ts` | Serializable Compose-route parameter contract. |
 | `src/navigation/RootNavigator.tsx` | Additive native-stack Compose registration. |
 | `src/screens/ContactProfileScreen.tsx` | Initial Message entry point. |
@@ -84,7 +84,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 ### Entering Compose from a reminder
 
 1. A decay notification body tap resets navigation onto Dashboard and `Compose { contactId }`.
-2. Compose still performs its normal self-fetch and archive/phone gates; notification content carries no fuel snapshot.
+2. Compose still performs its normal self-fetch and archive/phone gates; notification content carries no knowledge snapshot.
 3. Back retains the same Dashboard destination as every other Compose entry point.
 
 ### Reconciling contact links
@@ -112,6 +112,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 
 ## Decisions
 
+- **ADR-214:** AI Permission for the New Knowledge Homes and Compose Research After Fuel — Compose no longer renders ranked-fuel rows (partly supersedes ADR-036).
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — native SMS is best effort while Copy is always available.
 - **ADR-036:** Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails — route reuse, structural fuel exclusions, archive gate, and Home-directed Back behavior.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — adds the decay reminder as a deterministic Compose entry point.
@@ -135,9 +136,9 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 
 1. **Do not construct an `sms:` URI.** `expo-sms` performs native recipient/body marshalling; a hand-built URI can corrupt the draft and has unreliable capability detection.
 2. **Compose is not a touchpoint.** Do not write an interaction or `last_contact` after Send or Copy because Android cannot reliably confirm that the user sent the message. Send now creates a pending Interaction Assist and hands off; the interaction is written only if the user later confirms the assist banner.
-3. **Use `getRankedFuel()`, not the editor read or a UI filter.** The compose surface is transmittable, so its privacy exclusion belongs in SQL.
+3. **Read knowledge through `readComposeResearch()`, not an editor read or a UI filter.** Compose shows no ranked rows since 38.10; its transmittable path (Message Focus) relies on the read's SQL-derived `aiEligible`, so privacy is decided at the read boundary (ADR-214).
 4. **Native handoff needs a release rebuild.** `expo-sms` and `expo-clipboard` autolink without an app-config plugin, but a Metro reload cannot verify them.
-5. **Notification bodies are not fuel previews.** A reminder opens Compose for live fuel instead of freezing fuel text into the OS shade.
+5. **Notification bodies are not knowledge previews.** A reminder opens Compose for live data instead of freezing remembered text into the OS shade.
 6. **An AI result is not proof of contact.** Generation, acknowledgement, Cancel, replacement confirmation, Send, and Copy must not create a touchpoint or alter `last_contact`.
 7. **Do not overwrite a non-empty draft silently.** The result-time confirmation protects user text even when the request began from an empty-state expectation.
 8. **Remove links with a tombstone.** The compositional edit-form diff path must use the same caller-supplied timestamp and transaction as standalone removal.
@@ -151,7 +152,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 ## Related Systems
 
 - **Contacts** — owns the aggregate create/edit transaction and scalar-free archive gate.
-- **Conversational fuel** — supplies the eligible reference rows without exposing private material.
+- **Contact knowledge** — supplies Compose Research through `readComposeResearch()` (fuel retired in 38.10).
 - **App shell** — owns the typed stack registration and dashboard Home destination.
 - **AI suggestions** — provides the privacy-bounded context, provider request, and exact-prompt acknowledgement that Compose owns as its draft flow.
 - **Backup & Restore** — exports link identity and applies it only beneath a surviving contact.
@@ -174,3 +175,4 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 | 2026-09-02 | 31 | Added snapshot-compatible Profile method reads, separate Message/Call capability, and Compose-only AI invocation. |
 | 2026-09-02 | 35 | Added mode-aware Text/Email Compose resolution, explicit primary selection, and encoded email handoff. |
 | 2026-09-23 | 38.2 | Made contact edits return committed child identities and advance post-save method baselines before any projection refresh. |
+| 2026-10-15 | 38.10 | Compose no longer reads ranked fuel; its knowledge comes from Compose Research (`readComposeResearch`) and the prompt-item count feeds the failure diagnostic (ADR-214). |
