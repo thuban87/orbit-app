@@ -80,6 +80,7 @@ by this map and must be verified against their phase CONTEXT before extraction.
 | 38.5 | `38.5-background-art-text-contrast` | `milestone-2/phase-38.5-background-art-text-contrast-dossier.md` | dossier + context-dxx | Inserted phase for text-on-art contrast: slot × mode background art (12 images), the owner-signed per-combination art-treatment table (sign-off v2 → v3), bare-text proofs, and the post-table owner rulings (code review, UAT). `38.5-CONTEXT.md` names this dossier as authoritative and mirrors D-01…D-54 (D-38..D-41 skipped) plus a discussion log. ADR-177 was written in-phase by plan 08. |
 | 38.6 | `38.6-photo-handling` | `milestone-2/phase-38.6-photo-handling-dossier.md` | dossier + context-dxx | Inserted phase for photo sync, sizes and the Profile lightbox (promotes backlog 999.1). The dossier is the authoritative contract; `38.6-CONTEXT.md` mirrors D-01…D-42 (discuss, post-research, execution, review and device-pass rulings) plus a discussion log. No ledger. |
 | 38.7 | `38.7-orrery-v2` | `milestone-2/phase-38.7-orrery-v2-dossier.md` | dossier + context-dxx | Inserted phase for Orrery V2 (renderer, camera and visual language from the renderer labs A/B/C). The dossier is authoritative and carries dated rulings through phase close; `38.7-CONTEXT.md` mirrors D-01…D-81 (field sheet, chat rulings, derived, codex review, plan checkpoints, Plan 16 and phase close). No ledger, no DISCUSSION-LOG. `38.7-PHASE-END-REPORT.md` `## KB handoff` lists ADR candidates and supersessions. |
+| 38.8 | `38.8-history-navigation-ux` | `38.8-CONTEXT.md` (the CONTEXT is the dossier) + `38.8-LEDGER.md` | context-dxx (dossier-grade CONTEXT + ledger) | Inserted phase replacing the Profile History Rolodex with an activity-first stream (phase-dossier skill). `38.8-CONTEXT.md` carries D-01…D-75 (D-01..D-09 CARRIED; D-64+ dated plan-phase, review and sign-off rulings) and a `<supersessions>` block; `38.8-LEDGER.md` supplies questions, verbatim answers, alternatives and revisions. The DISCUSSION-LOG is a stub. `38.8-PHASE-END-REPORT.md` `## KB handoff` lists the supersessions. |
 
 Dossiers originally inventoried when this map was created:
 
@@ -102,7 +103,7 @@ Also in that dir (not phase dossiers): `orbit-ui-ux-master-handoff-v0.5.docx`,
 
 - **No milestone-1 entries remain unresolved.** Every milestone-1 phase has an identified
   authoritative source, confirmed by reading dossier openings and phase CONTEXT files.
-- The broader milestone-2 row backfill is deferred; phases 38.2, 38.3, 38.4, 38.5, 38.6 and 38.7 are mapped exactly above.
+- The broader milestone-2 row backfill is deferred; phases 38.2, 38.3, 38.4, 38.5, 38.6, 38.7 and 38.8 are mapped exactly above.
 - Phases **01** and **09** deliberately have **no dossier** (scaffold = HANDOFF §4; compose =
   the explicitly-unowned cross-phase surface). Treat CONTEXT prose as authoritative there.
 - Phase **16** has **no dossier**; its authority is `context-dxx` + ADR-001 (migration 006).
