@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.5-background-art-text-contrast
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -64,6 +64,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/components/ListRow.tsx` | Renders the scan-first, tokenized, accessible List row. |
 | `src/components/GridCard.tsx` | Renders the avatar-first Card View row with status, context/search, favourite, and selection semantics. |
 | `src/components/CardGrid.tsx` | Owns the keyed responsive virtualized Card View renderer. |
+| `src/components/grid-card-geometry.ts` | Pure Grid geometry: column count, card width, width-derived photo size and corner-control clearance. |
 | `src/components/CardContextMenu.tsx` | Renders the fixed safe per-contact Card View action sheet. |
 | `src/components/BulkActionSurface.tsx` | Renders explicit selection-mode bulk actions and the frequency-only sensitive subsurface. |
 | `src/components/list-row-content.ts` | Formats local-calendar recency, row narration, and search explanations. |
@@ -126,7 +127,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 ### Rendering and acting from a List row
 
 1. `HomeScreen` loads the shared Dashboard rows, batches line-three candidates for their IDs, and passes the selected deterministic context into `ListRow`; the row does not issue its own database reads.
-2. A normal row shows name, local-calendar recency plus category, and the selected context or a stable completeness prompt. Its same-weight tokenized border and decorative glyph communicate a real status; null status is neutral and glyph-less, while a current snooze uses the neutral snooze presentation without mutating domain status.
+2. The row's avatar is 72 dp (`LIST_AVATAR_SIZE`) with 12 dp padding (`LIST_ROW_PADDING`), and its `minHeight` counts padding and border (ADR-184). A normal row shows name, local-calendar recency plus category, and the selected context or a stable completeness prompt. Its same-weight tokenized border and decorative glyph communicate a real status; null status is neutral and glyph-less, while a current snooze uses the neutral snooze presentation without mutating domain status.
 3. The Favourite star is binary membership. The screen keeps an optimistic per-contact overlay while a write is pending, records every successful durable settlement into the base row, and reveals that committed membership if a newer write fails.
 4. A closed row opens Profile. A partially open row closes first. Right swipe and its accessibility action read the global action only at commitment, then run shared Quick Log or navigate to Log Contact; left swipe and its accessibility action route to Edit Contact. Only one row remains open.
    - The row's backing comes from the signed art-treatment table (ADR-177): `full`, see-through at the signed level, or `none`. While a see-through row's swipe translation is non-zero, its tint steps to `SWIPE_ROW_BACKING_OPACITY` (0.5) so the Log/Edit action panel does not show through the row text (ADR-179). `HomeScreen` mirrors the `ReanimatedSwipeable` translation into the row's shared value; the tint is driven on the UI thread, never by React state.
@@ -137,7 +138,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 ### Rendering and acting from a Card
 
 1. `HomeScreen` passes the same shared rows, local read time, candidates, and search descriptors to `CardGrid`; Card View does not issue a renderer-specific query.
-2. `CardGrid` remounts its keyed `FlatList` when width or font scale changes the responsive column count. In normal mode `GridCard` presents name and recency only; it uses a status ring plus glyph, neutralizes the ring with a snooze glyph when snoozed, and suppresses the glyph for a never-contacted row.
+2. `CardGrid` remounts its keyed `FlatList` when width or font scale changes the responsive column count (`gridColumnCount`, 2–5 columns). It memoises one `gridCardGeometry` per width and font scale and passes it to every `GridCard` (ADR-184). The photo is sized from the card width, clamped to 48–96 dp. `avatarTop` is solved so the round photo clears the corner glyphs. The favourite star and selection checkbox are absolute 48×48 boxes whose glyphs sit 5 dp from the card edges, with no hitSlop. Names wrap to two lines greedily (`numberOfLines={2}`, simple break). Each row shares one height through FlatList row stretch, card `flexGrow`, `GlassSurface` `contentStyle` and a bottom-pinned secondary block, so a wrapped row reserves line 2 and rows without a wrap keep their natural height. In normal mode `GridCard` presents name and recency only; it uses a status ring plus glyph, neutralizes the ring with a snooze glyph when snoozed, and suppresses the glyph for a never-contacted row.
 3. The Card star uses the host-owned optimistic binary favourite path. Search may render its own third-line match explanation; ordinary List retains the selected context/excerpt path, while normal Grid does not.
 4. A normal tap opens Profile. Long-press and equivalent accessibility actions expose the fixed per-contact action menu; Card View does not copy List swipe gestures.
 5. `GridCard`'s card takes its backing from the signed art-treatment table through `GlassSurface treatment="contact-entry"` (ADR-177).
@@ -171,6 +172,10 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | `DASHBOARD_SORT_MODES` | `default`, name, recency, status modes | `src/logic/dashboard-query-logic.ts` | Closed persisted sort vocabulary. |
 | `CONTACT_FREQUENCY_BANDS` | weekly ≤7, monthly ≤31, quarterly ≤91, yearly thereafter | `src/logic/dashboard-query-logic.ts` | Dashboard contact-frequency filter boundaries. |
 | Birthday window | 30 days | `src/db/dashboard-read.ts` | Limits the Birthdays population. |
+| `LIST_AVATAR_SIZE` / `LIST_ROW_PADDING` | 72 / 12 | `src/components/ListRow.tsx` | List photo size and row padding (signed, D-36). |
+| `GRID_AVATAR_MIN` / `GRID_AVATAR_MAX` | 48 / 96 | `src/components/grid-card-geometry.ts` | Clamp for the width-derived Grid photo. |
+| `GRID_CARD_PADDING` / `GRID_RING_INSET` | 8 / 4 | `src/components/grid-card-geometry.ts` | Card padding and status-ring gap. |
+| `GRID_CORNER_INSET` / `GRID_CORNER_HIT` / `GRID_CORNER_OPTICAL_OFFSET` | 5 / 48 / 0 | `src/components/grid-card-geometry.ts` | Corner glyph inset, hit box and optical nudge. |
 | `RIGHT_SWIPE_ACTIONS` | `quick-log`, `log-contact` | `src/logic/dashboard-query-logic.ts` | Closes the durable List right-swipe preference vocabulary. |
 
 ## Decisions
@@ -217,6 +222,8 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 - **ADR-172:** Contacts Header Counts the Contacts on Screen — the header shows the active view's displayed rows; `countLiveContacts` serves only the empty state.
 - **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
+- **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — List and Grid photos follow every photo write; the `modifiedAt` prop chain is removed.
+- **ADR-184:** Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos — List and Grid photo sizes, corner controls and row-uniform name height.
 - **ADR-177:** Mode-Specific Background Art and Signed Per-Combination Art Treatments — the List rows, Card-view cards, count label and Contacts header take their backing from the owner-signed per-combination table.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — active triggers keep the fill with accent border and text; a swiped see-through List row is backed at 50%.
 
@@ -243,6 +250,8 @@ The Group Events header and redundant overflow entries navigate to the local rev
 19. **Home refresh has one owner — the refresh scheduler.** Never call a Home state setter from a read outside `publishDashboardRead`, never put `appActive`, `isFocused`, `reducedMotion` or `resultProgress` back into `reload`'s dependency list (a structural test pins this), never add a private `AppState` read listener (resume is the post-sweep foreground tick, D-14), and never follow a bulk `bumpShellRefresh()` with a direct `reload` (RG-022, D-23).
 20. **A `box-none` shell overlay whose accessibility props toggle must be `collapsable={false}` (D-33, GAP-G2).** Fabric flattens a View whose only view-forming props are its toggling a11y props (`pointerEvents: box-none` alone does not form a view). When the node forms a view again, Android re-creates it WITHOUT the unchanged `box-none`, so the new view defaults to `auto` and becomes a full-screen touch sink. The universal FAB's dial container did this on every dial close: the Contacts controls, list, every tab and Profile scrolling went dead until a cold start, and only the FAB still answered. That was the owner's "Contacts freeze" (`38.4-G2-INVESTIGATION.md`). The rule is pinned by `src/components/control-surface/dashboard-controls-responsiveness.test.ts` for every static `box-none` View with toggling a11y props (UniversalFab dial, Snackbar, AssistBanner). The Contacts controls path itself (store write → scheduler read → publish) was cleared on the device.
 21. **The swiped-row tint is a step, not a ramp (ADR-179).** `ReanimatedSwipeable` shows the action panel on the first non-zero translation, and the row text (74 px in) already sits over the 96 px panel at small translations, so a ramp would leave text over the panel below the proven 0.5. The row's trailing icons and ring cross the panel glyphs in motion and fail there at 0.5; that is an owner-accepted exemption for icons and the ring only, recorded in `src/theme/tokens/surface.test.ts` ("Swiped see-through List row"). Any new row text must stay clear of the panel glyphs.
+22. **Do not hard-code the Grid photo size.** A 3-column card at 360 dp is about 104 dp wide, so a fixed 96 photo plus its ring does not fit. Size from `gridCardGeometry`, and sweep widths 320–1024 and font scales 1.0–2.0 in `grid-card-geometry.test.ts`. Grid columns at a font scale of exactly 1.4 are an open follow-up (S13).
+23. **Row-uniform height uses flex, not text measurement.** A spacing `marginTop: auto` collapses to 0 in a row's tallest card, so the name → secondary gap is a `SPACING.xs` `paddingTop` on the pinned secondary block.
 
 ## Related Systems
 
@@ -283,4 +292,5 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-26 | 38.4 | Favourite toggle publishes through the scheduler (38.3 REVIEW A-WR-05 / VERIFICATION W4, D-10): new non-deferrable `favourite` source requested after the write commits, so a stale in-flight read cannot revert the star and population counts are re-read; `dashboardFadeStart` settles favourite reads at fade start 1 (no list re-fade); `isDashboardVisible` now delegates to the shared `isForegroundVisible` (W2). No legacy-data repair (38.2 D-23). |
 | 2026-09-27 | 38.4 | Contacts controls freeze fixed (D-33, GAP-G2): the root cause was the FAB dial container re-forming as a full-screen touch sink after the dial closed, not the controls. `collapsable={false}` on the static `box-none` shell overlays (UniversalFab dial, Snackbar, AssistBanner), pinned by a source contract. |
 | 2026-09-27 | 38.4 | Contacts header count shows the contacts on screen (D-55, OA-E1; supersedes the Phase 26 total-live rule): `dashboardHeaderCount` over the displayed List/Card rows, hidden on error, initial load and zero rows; the live count stays for the empty state. |
+| 2026-09-30 | 38.6 | List photos 72 with 12 padding; Grid photos sized from the card width (48–96) by `grid-card-geometry.ts`, corner star and checkbox 5 dp from the edges with 48×48 targets, two-line names with one height per row (ADR-184). Photos follow the display revision; the `modifiedAt` / `cacheBust` props are gone from `ListRow`, `GridCard`, `ContactCard` and `CardGrid` (ADR-180). |
 | 2026-09-26 | 38.5 | Contacts entries, count label and header follow the signed per-combination art table (ADR-177). Active Population/Filters/Sort triggers are filled with accent border and text (D-46), and a swiped see-through List row is backed at 50% (D-48; ADR-179). |
