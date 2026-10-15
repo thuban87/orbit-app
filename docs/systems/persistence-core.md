@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -20,7 +20,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `contacts` — the primary person record and maintained recency summary.
 - `interactions` — dated contact touchpoints, optionally linked to a Group Event through a nullable parent reference and three follow flags.
 - `group_events` — UID-bearing encounter parents with shared Channel, Tone, Duration, and distinct Group Note; the parent itself never counts as a contact interaction.
-- `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
+- `contact_links`, `events`, `custom_field_defs`, `field_history` — durable supporting data introduced in the first schema. The first schema's `fuel` table was dropped by migration 033 (ADR-208).
+- `off_limits` — migration-033 Off Limits rows with no AI permission column (ADR-207).
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
 - `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 030 adds the validated portable `your_week_period` choice; it never contains an API key, passphrase, or palette hex.
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
@@ -70,7 +71,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/028-compose-message-mode.ts` | Adds validated Compose default/remembered message-mode settings without a new entity table. |
 | Migration | `src/db/migrations/030-your-week-period.ts` | Adds the validated portable Rolling 7 Days / Calendar Week setting. |
 | Migration | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Adds `occurred_at` indexes on `interactions` and `group_events` so Your Week reads SEARCH the period. |
-| Migration | `src/db/migrations/032-import-batch-cadence.ts` | Adds the nullable positive-integer `import_sessions.batch_interval_days` so a bulk import's Bound batch cadence survives resume (38.4 D-57); the current schema head (`TARGET_VERSION = IMPORT_BATCH_CADENCE_SCHEMA_VERSION`, 32). |
+| Migration | `src/db/migrations/032-import-batch-cadence.ts` | Adds the nullable positive-integer `import_sessions.batch_interval_days` so a bulk import's Bound batch cadence survives resume (38.4 D-57); schema head 32 until 38.10. |
+| Migration | `src/db/migrations/033-knowledge-homes.ts` | Adds `off_limits`, memory interaction links and `group_note_copy`, `interactions.note_ai_locked`, two AI-default settings; rebuilds `current_state_entries` dated with no current flag; moves every fuel row by kind with a per-row proof; drops `fuel`; purges soft-deleted knowledge; the current schema head (`TARGET_VERSION = KNOWLEDGE_HOMES_SCHEMA_VERSION`, 33). |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -112,6 +114,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/030-your-week-period.ts` | Adds `your_week_period` additively with a safe Rolling 7 Days default. |
 | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Plain additive `CREATE INDEX idx_interactions_occurred_at` / `idx_group_events_occurred_at` (no existence guard; no row read or rewritten; no backup-format change — indexes are not portable data). |
 | `src/db/migrations/032-import-batch-cadence.ts` | Plain additive `ALTER TABLE import_sessions ADD COLUMN batch_interval_days INTEGER CHECK (NULL or positive integer)`; no row read or rewritten, so existing sessions read Unbound with no cadence; no backup-format change — import sessions are local-only and not backup data (migration 012). The Bound ⇒ cadence pairing is enforced by the session writer, not a cross-column CHECK. |
+| `src/db/migrations/033-knowledge-homes.ts` | One-way knowledge-homes migration (ADR-208): uids re-minted collision-complete before any copy; each copied row proven by uid; contentless non-Off-Limits rows skipped and counted; `PRAGMA foreign_key_check(<table>)` scoped to its own tables so an unrelated old violation cannot brick launch; exports `applyMigration033` returning a result struct for tests. Shares its mapping with `src/db/legacy-fuel-mapping.ts`, pinned by a test that runs both on the same seeds. |
 | `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
@@ -152,6 +155,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 26. Migration 024 adds independent Profile layout/background templates, Category/contact presentation rows, and nullable global template UIDs. The database target imports the migration's exported version instead of repeating a numeric literal.
 27. Migration 029 adds non-secret multi-lane AI settings, the `ai_connections` table, and ordered `personalization_sections`. The active lane is durable text rather than a local row ID; credentials remain outside SQLite in SecureStore.
 28. Migration 030 additively adds the checked `your_week_period` singleton setting with a Rolling 7 Days default. It carries a user preference only; Digest activity remains derived from canonical tables.
+29. Migration 033 (ADR-207, ADR-208, ADR-210) gives the retired fuel kinds their homes: it creates `off_limits`, adds memory links and the Group-Note-copy marker (with `CHECK (group_note_copy = 0 OR allow_ai = 0)`), adds `interactions.note_ai_locked` (`CHECK (note_ai_locked = 0 OR allow_ai = 0)`) and the Gift Ideas / Thought of Them AI defaults (`DEFAULT 0`), and rebuilds `current_state_entries` with `entry_date NOT NULL`, `entry_time`, `url`, links and markers and no `is_current`, proving the rebuild row by row. It then purges soft-deleted memories and key people with tombstones, converts `custom` memories to `general` keeping the label, copies and proves each fuel row into its home AI-off, converts fuel tombstones, drops `fuel`, and runs scoped foreign-key checks. A non-text legacy value fails the whole step as `Migration033IntegrityError`.
 
 ### Running launch maintenance
 
@@ -174,7 +178,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
 | `SWEEP_HOOK_TIMEOUT_MS` | `60000` | `src/services/launch-sweep.ts` | Per-hook launch-sweep wait budget (D-30); sized for a normal automatic backup. |
-| `TARGET_VERSION` | `32` (`IMPORT_BATCH_CADENCE_SCHEMA_VERSION`) | `src/db/database.ts` | Current registered schema head, including the import batch cadence (migration 032). |
+| `TARGET_VERSION` | `33` (`KNOWLEDGE_HOMES_SCHEMA_VERSION`) | `src/db/database.ts` | Current registered schema head, including the knowledge homes (migration 033). |
 
 ## Decisions
 
@@ -190,7 +194,13 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-001:** Normalized Custom-Field Values — migration 006 atomically establishes normalized custom-field pairs.
 - **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — superseded by ADR-001.
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — partially superseded; launch maintenance still retires stale fields safely.
-- **ADR-028:** Per-Item Conversational Fuel with Fixed Kinds — uses the migration-001 schema contract for durable fuel rows.
+- **ADR-028:** Per-Item Conversational Fuel with Fixed Kinds — used the migration-001 fuel table; superseded by ADR-207.
+- **ADR-207:** Knowledge Homes After Fuel — the Off Limits table and memory types migration 033 creates.
+- **ADR-208:** Migration 033 Copies and Verifies Every Fuel Row, Then Drops the Table and Purges Soft-Deleted Knowledge.
+- **ADR-210:** Dated Last Talked About and Current Location — the `current_state_entries` rebuild.
+- **ADR-211:** Linked Interaction Notes — the link columns and unique link indexes.
+- **ADR-212:** One Delete Pattern — the soft-deleted purge; no trash sweep.
+- **ADR-213:** Moving Entries — `note_ai_locked` and `from_share`.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — uses migration 002 for durable, backup-native local notification policy.
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — uses migration 003 for validated, app-level Orrery sun preferences.
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — uses migration 004 for exportable non-secret AI settings and excludes keys from SQLite.
@@ -251,7 +261,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 16. **Reconciliation snapshots are not a sync journal.** They retain only the source value needed to suppress an unchanged reviewed discrepancy.
 17. **Store theme IDs, not colours.** Accent and background values are validated option IDs or NULL; palette hex resolution belongs in the theme layer, never in SQLite.
 18. **Migration 016 is additive-only.** Do not use it to reshape fuel, change custom-field tables, or introduce a user-writable Memory-type table.
-19. **Retention remains a launch hook.** The Memory and relationship trash sweep rechecks staleness in its own transaction; do not replace it with a timer or nest a writer transaction.
+19. **No trash sweep remains.** The Memory and relationship trash sweep was removed in 38.10 with Recently Deleted (ADR-212); retention work that remains (field quarantine, history) still runs as launch hooks, never timers.
 20. **A data move must prove each source row before removal.** Count equality is insufficient; re-read the mapped destination and let an integrity failure roll the version step back.
 21. **Dashboard preference defaults are semantic.** Keep `dashboard_sort='default'` rather than persisting a resolved population order, and validate JSON axes before query construction.
 22. **Orrery camera state is never an app setting.** Migration 021 stores only density, satellite visibility, and last-System; camera pose and focus stay in navigation-session memory.
@@ -291,6 +301,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
+| 2026-10-15 | 38.10 | Added migration 033 (schema head 33, `KNOWLEDGE_HOMES_SCHEMA_VERSION`): Off Limits table, dated current state without a current flag, memory and interaction links and locks, two AI defaults, the proven fuel move, the `fuel` drop and the soft-deleted purge; the trash-sweep launch hook is gone (ADR-207, ADR-208, ADR-210..213). |
 | 2026-09-27 | 38.4 | Added migration 032 (schema head 32, `IMPORT_BATCH_CADENCE_SCHEMA_VERSION`): additive nullable positive-integer `import_sessions.batch_interval_days` for the bulk-import Bound batch cadence (D-57, OA-E2); no shipped migration edited, no row rewritten, no backup-format change. Also corrected the stale `TARGET_VERSION` configuration row (it still read 30). |
 | 2026-09-26 | 38.4 | Added migration 031 (schema head 31): additive `idx_interactions_occurred_at` and `idx_group_events_occurred_at` so Your Week reads are period-bounded (RG-028, performance/AUD-PERF-004, D-18); no shipped migration edited, no stored value rewritten. |
 | 2026-09-26 | 38.3 | Bounded each launch-sweep hook with `SWEEP_HOOK_TIMEOUT_MS` so a hung hook no longer wedges later sweeps or the foreground tick; a still-running hook is skipped, never re-run (review A-WR-02, owner ruling D-30). |
