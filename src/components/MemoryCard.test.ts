@@ -133,7 +133,7 @@ describe("MemoryCard host props (D-107, D-17, D-84; plan 13)", () => {
 
   it("a card without the new props reads its Edit label and has no actions", () => {
     const card = MemoryCard({ memory, onPress: vi.fn() }) as unknown as Element;
-    expect(card.props.accessibilityLabel).toBe("Edit Memory");
+    expect(card.props.accessibilityLabel).toBe("Edit Memory: Trip");
     expect(card.props.accessibilityActions).toBeUndefined();
     expect(card.props.onLongPress).toBeUndefined();
     const tree = nodes(card);
@@ -258,11 +258,11 @@ describe("MemoryCard pencil (D-130)", () => {
     const tree = nodes(MemoryCard({ memory, onPress: vi.fn(), onEditPress }));
     const button = pencil(tree);
     expect(button?.props.role).toBe("iconOnly");
-    expect(button?.props.accessibilityLabel).toBe("Edit Gift Idea");
+    expect(button?.props.accessibilityLabel).toBe("Edit Gift Idea: Kayak");
     expect(button?.props.disabled).toBe(false);
     // After the markers (Pinned, sparkle) in the header.
     const order = tree.map((n) => n.props.accessibilityLabel);
-    expect(order.lastIndexOf("Edit Gift Idea")).toBeGreaterThan(
+    expect(order.lastIndexOf("Edit Gift Idea: Kayak")).toBeGreaterThan(
       order.indexOf("Shared with AI"),
     );
     const stopPropagation = vi.fn();
@@ -300,8 +300,8 @@ describe("MemoryCard pencil (D-130)", () => {
       onEditPress,
     }) as unknown as Element;
     const button = pencil(nodes(card));
-    expect(card.props.accessibilityLabel).toBe("Edit Gift Idea");
-    expect(button?.props.accessibilityLabel).toBe("Edit Gift Idea");
+    expect(card.props.accessibilityLabel).toBe("Edit Gift Idea: Kayak");
+    expect(button?.props.accessibilityLabel).toBe("Edit Gift Idea: Kayak");
     expect(button?.props.hiddenFromAccessibility).toBe(true);
     const onPress = button?.props.onPress;
     if (typeof onPress !== "function") throw new Error("missing onPress");
@@ -317,7 +317,7 @@ describe("MemoryCard pencil (D-130)", () => {
       accessibilityLabel: "Open the interaction for this Gift Ideas entry",
     }) as unknown as Element;
     const button = pencil(nodes(card));
-    expect(button?.props.accessibilityLabel).toBe("Edit Gift Idea");
+    expect(button?.props.accessibilityLabel).toBe("Edit Gift Idea: Kayak");
     expect(button?.props.hiddenFromAccessibility).toBe(false);
   });
 
@@ -341,7 +341,7 @@ describe("memoryEditLabel (the section's entry noun; D-137 W14, D-141)", () => {
     expect(memoryEditLabel(row(type))).toBe(label);
   });
 
-  it("never doubles the noun, and a custom label does not change it", () => {
+  it("never doubles the noun, and names the entry by its label, else its text", () => {
     for (const type of [
       "general",
       "gift_idea",
@@ -350,6 +350,15 @@ describe("memoryEditLabel (the section's entry noun; D-137 W14, D-141)", () => {
     ]) {
       expect(memoryEditLabel(row(type))).not.toMatch(/ memory$/);
     }
-    expect(memoryEditLabel(row("gift_idea", "Kayak"))).toBe("Edit Gift Idea");
+    expect(memoryEditLabel(row("gift_idea", "Kayak"))).toBe(
+      "Edit Gift Idea: Kayak",
+    );
+    expect(
+      memoryEditLabel({
+        type: "gift_idea",
+        custom_label: " ",
+        value: "Headphones ",
+      } as unknown as MemoryRow),
+    ).toBe("Edit Gift Idea: Headphones");
   });
 });

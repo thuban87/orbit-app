@@ -16,6 +16,7 @@ import {
 import { sectionEntryNoun } from "@/screens/section-editor-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { firstNonBlank } from "@/utils/blank-text";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { Icon } from "./icons/Icon";
 import { normaliseLinkUrl } from "./LinksEditor";
@@ -41,7 +42,10 @@ export function memoryEditLabel(memory: MemoryRow): string {
   const noun = isMemoryTypeKey(memory.type)
     ? sectionEntryNoun(memory.type)
     : PROVISIONAL_MEMORY_LABEL;
-  return `Edit ${noun}`;
+  // The entry's own label (or its text) keeps same-type cards apart for a
+  // screen reader, as the card's visible title does.
+  const name = firstNonBlank(memory.custom_label, memory.value);
+  return name ? `Edit ${noun}: ${name.trim()}` : `Edit ${noun}`;
 }
 
 export function openMemoryLink(url: string): void {
