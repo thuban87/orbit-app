@@ -1,7 +1,7 @@
 # Photos
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-05
+**Updated by phase:** 38.7-orrery-v2
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/db/photo-relative-path.ts`, `src/components/Avatar.tsx`, `src/components/photo-display.ts`, `src/components/PhotoUnavailableNotice.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -52,7 +52,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | `src/services/photos/master-encode.ts` | `MASTER_MAX_EDGE`, `MASTER_QUALITY`, `encodeMaster`. |
 | `src/services/photos/legacy-image-disk-cache-sweep.ts` | Clears the legacy expo-image disk cache once, behind a device-local AsyncStorage flag. |
 | `src/services/photos/photo-writer-contract.test.ts` | Source-scan contract: the sole revision publisher, the raw byte writers, and the plain `resolvePhotoUri` importers. |
-| `src/components/orrery/use-orrery-photo.ts` | Orrery photo loader: masters ≤512 pass through; larger ones read their on-disk copy. |
+| `src/components/orrery/use-orrery-photo.ts` | Orrery photo loader (`ORRERY_TEXTURE_MAX`): masters ≤512 pass through; larger ones read their on-disk copy. It is no longer a hook. |
+| `src/components/orrery/resources/orrery-photo-cache.ts` | The Orrery's one photo-decode path: one SkImage per photo key, hard image/byte caps, ledger-gated disposal, display-revision invalidation. |
 | `src/services/photos/orrery-derivative-store.ts` | Orrery copy store, its discard hook, and its chunked launch sweep. |
 | `src/services/photos/derivative-cache.ts` | Retires generated cache copies and sweeps prior-process orphans within guarded cache namespaces. |
 | `src/services/widget/widget-photo.ts` | Downscales a local master to a transient base64 widget thumbnail. |
@@ -92,7 +93,9 @@ A reference whose file is missing is never cleared automatically (ADR-182). `set
 
 ### Drawing photos in the Orrery
 
-`useOrreryPhoto` reads a master's header. A master of 512 px or less is drawn as decoded. A larger master is read from its on-disk copy, `<cache>/orrery-photo/<basename>/<size>-<mtime>.jpg`. A missing copy is made once, one at a time, and installed atomically. The install re-checks the master's signature and display revision, and drops the copy if the photo changed meanwhile. SkImages are disposed after commit. A chunked launch sweep removes copies whose master is gone or changed (ADR-181).
+`orreryPhotoCache` (`src/components/orrery/resources/orrery-photo-cache.ts`) is the only path that decodes an Orrery photo. It decodes each photo key once and shares the SkImage across every body and owner. It counts `ORRERY_PHOTO_CACHE_MAX_IMAGES` 120 and `ORRERY_PHOTO_CACHE_MAX_BYTES` 96 MiB before a decode starts, at most `ORRERY_PHOTO_CACHE_CONCURRENCY` 2 at a time. A display-revision bump (`subscribePhotoCacheBust`) invalidates the key. It loads through `use-orrery-photo.ts`: the loader reads the master's header, passes a master of 512 px or less through as decoded, and reads a larger one from its on-disk copy, `<cache>/orrery-photo/<basename>/<size>-<mtime>.jpg`. A missing copy is made once, one at a time, and installed atomically. The install re-checks the master's signature and display revision, and drops the copy if the photo changed meanwhile. A chunked launch sweep removes copies whose master is gone or changed (ADR-181).
+
+An SkImage is disposed only after every V2 picture layer that recorded it acknowledges a newer generation (`orrery-generation-ledger`, ADR-186), not after a React commit. Decoded derivatives survive an ordinary Orrery tab blur in the bounded warm cache and are released on background (ADR-192). The star sun never loads its occupant's photo (ADR-190).
 
 ### Rendering a widget thumbnail
 
@@ -170,6 +173,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | `MASTER_MAX_EDGE` | `1024` | `src/services/photos/master-encode.ts` | Largest master edge; smaller sources keep their size. |
 | `MASTER_QUALITY` | `0.8` (lossy WebP) | `src/services/photos/master-encode.ts` | Signed for parity with the old q0.75 JPEG (D-36); 1.0 would mean lossless WebP. |
 | `ORRERY_TEXTURE_MAX` | `512` | `src/components/orrery/use-orrery-photo.ts` | Largest photo texture the Orrery decodes. |
+| `ORRERY_PHOTO_CACHE_MAX_IMAGES` / `_MAX_BYTES` | `120` / `96 MiB` | `src/components/orrery/resources/orrery-photo-cache.ts` | Hard caps on decoded Orrery photos, counted before a decode. |
 | `ORRERY_DERIVATIVE_DIR` | `orrery-photo` | `src/services/photos/orrery-derivative-store.ts` | Cache-dir namespace for Orrery copies. |
 | Widget thumbnail | `88px`, quality `0.6` | `src/services/widget/widget-photo.ts` | Bounds transient RemoteViews thumbnail work. |
 | Picker camera/mic permissions | `false` | `app.config.ts` | Keeps camera and microphone permissions out of the picker configuration. |
@@ -195,6 +199,8 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **ADR-182:** Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos — "Photo unavailable" instead of a cleared reference.
 - **ADR-183:** 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox — the reusable `PhotoLightbox`.
 - **ADR-185:** Assist Banner Renders in Flow Above the Tab Navigator — Crop Photo sizes its canvas to the space below the banner.
+- **ADR-186:** Orrery V2 Imperative Picture Renderer Behind a Platform Render Host — Orrery photos decode once per key in `orreryPhotoCache` and are disposed only after the generation ledger clears them.
+- **ADR-192:** Bounded Warm Resource Cache Across Tab Blur — decoded Orrery photo derivatives stay warm across a tab blur, within caps, released on background.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Photo source picker "Remove photo" string sits on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
 
 ## Gotchas
@@ -247,3 +253,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-09-26 | 38.5 | In Galaxy Dark, the Photo source picker "Remove photo" string sits on an opaque backing over the art (D-50; ADR-179). |
 | 2026-09-30 | 38.6 | Display revisions published only by the ownership layer replace the dead `cacheKey` scheme (ADR-180); one square WebP master up to 1024 px for every writer, mixed with legacy 512 JPEG under `.jpg` names; Orrery cache copies keep its texture memory flat (ADR-181); missing photos keep their reference and show "Photo unavailable" (ADR-182); sequential widget tile encode. |
 | 2026-09-30 | 38.6 | Review WR5-02: Crop Photo sizes its canvas to the measured space left under the in-flow assist banner (D-38) so the Cancel / Use photo footer is never pushed off-screen; bands shrink before the square, and a resize keeps the framed crop. The banner stays app-global. |
+| 2026-10-05 | 38.7 | Orrery photos decode once per key through `orreryPhotoCache` with hard caps and generation-ledger disposal (ADR-186); the `useOrreryPhoto` hook is gone and the loader is a plain function. Derivatives stay warm across a tab blur (ADR-192); the star sun never paints its occupant's photo (ADR-190). |
