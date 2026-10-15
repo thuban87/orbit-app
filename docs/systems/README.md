@@ -27,7 +27,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Interaction log | `interaction-log.md` | `db/events-dao.ts`, `services/impact.ts`, `db/impact-read.ts`, `db/timeline-read.ts`, `db/log-guards.ts` | 06 |
 | Interaction history & insights | `interaction-history.md` | `db/history-read.ts`, `db/interaction-edit-read.ts`, `services/history/`, `components/history/`, `screens/EditInteractionScreen.tsx` | 32 |
 | Conversational fuel | `conversational-fuel.md` | `db/fuel-dao.ts`, `db/fuel-read.ts`, `services/fuel-age.ts`, `services/fuel-ranking.ts` | 07 |
-| Photos | `photos.md` | `db/photo-dao.ts`, `db/photo-relative-path.ts`, `services/photos/` | 05 |
+| Photos | `photos.md` | `db/photo-relative-path.ts`, `services/photos/`, `components/Avatar.tsx`, `components/photo-display.ts`, `components/PhotoUnavailableNotice.tsx` | 05 |
 | Contacts (internal Dashboard query subsystem) | `dashboard.md` | `db/dashboard-read.ts`, `logic/dashboard-query-logic.ts`, `screens/HomeScreen.tsx` | 08, 38 |
 | Orrery | `orrery.md` | `db/orrery-read.ts`, `db/ring-seq-dao.ts`, `db/sun-picker-read.ts` | 13 |
 | Capture | `capture.md` | `db/capture-dao.ts`, `db/capture-read.ts` | 10 |
