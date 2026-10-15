@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -77,6 +77,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 4. The manual export service deletes a staged file if validation, sharing availability, or the share handoff fails. A handed-off staging file remains available to the receiver until the first foreground sweep at least 24 hours after creation, or until the next manual export starts, whichever comes first (D-13). These operations touch only `cache/backup-exports/orbit-backup-*.json`, never the user-selected SAF backup folder or any external backup.
 4. The normalized method graph retains nullable labels and canonical regions; v1 scalar endpoint data forward-migrates to deterministic legacy method UIDs rather than reintroducing a scalar authority.
 4. When automatic backup is configured, `registerBackupSweep()` checks cadence and `data_revision` at a foreground launch, writes and verifies a new SAF file, records success, then prunes eligible owned copies.
+   The schedule's interval and retention day counts save on change, with no Save button (D-34, ADR-200): `BackupSettingsScreen` forwards blur, submit and leave events to one `createBackupDayController`, which writes a valid count once when the field is left (also when the app goes to the background, `subscribeBackgroundLeaveFlush`). An invalid count shows its inline error ("Enter a whole number from 1 to 3650 days.") and is not saved. Turning off encryption, Replace-all restore and the readable-or-encrypted export choice are themed confirms; the destructive ones cannot be dismissed (ADR-198).
 
 ### Encrypting a backup
 
@@ -165,6 +166,8 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — photo bytes grow about 2.5–3×; the 8 MiB encrypted cap stays (about 145 photo contacts), and over-cap failures say "too large".
 - **ADR-182:** Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos — the optional `photoSkipped` marker, and a restore never removes a photo for a marked row.
 - **ADR-178:** Restore Asks Before Replacing an Unavailable Background Id with the Package Default — asks once, only when the backup's settings will be written, then maps the id to the package default before the strict DAO; Cancel writes nothing.
+- **ADR-198:** Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays — backup and restore prompts are themed; destructive ones are non-dismissable.
+- **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — the Backup schedule saves on change instead of guarding an explicit Save.
 
 ## Gotchas
 
@@ -248,3 +251,4 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | 2026-09-30 | 38.6 | Over-cap encrypted backups say "too large" (D-39; the 8 MiB cap, format and schema unchanged): `BackupEnvelopeError("too-large")`, a `too-large` outcome for the manual export and the automatic/pre-restore snapshots, a device-local diagnostic that drives a "Your backup is too large" health card, and `pre-restore-snapshot-too-large` for Replace-all. |
 | 2026-09-30 | 38.6 | Review WR5-03 (enforces D-39): a re-encrypting passphrase change over an over-cap source returns `too-large` with "too large" copy (passphrase unchanged, future-only still offered) instead of "Reconnect the folder"; the journal is dropped when no replacement exists yet. |
 Category relationships are portable by UID, never local integer ID. Format 6 adds category tombstones with a minimal v5→v6 version relabel. Merge maps a winning deleted category only to Uncategorized and suppresses only dependents proven to reference that UID. Replace-all removes destination-only categories through the canonical fallout transaction, restores the exact incoming order—including an empty taxonomy—clears tombstones for all live restored entities after insertion, and never replays migration-001 seeds.
+| 2026-10-11 | 38.9 | Backup schedule day counts save on change (on leave and on app background); the "Save schedule" button is gone; backup and restore prompts are themed confirms (ADR-198, ADR-200). |
