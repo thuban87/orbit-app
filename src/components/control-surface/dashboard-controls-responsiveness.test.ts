@@ -130,7 +130,24 @@ describe("G2: box-none overlays never re-form as touch sinks (D-33)", () => {
   it("the scan sees the shell overlays it guards", () => {
     const files = new Set(allBoxNoneViews.map((view) => view.file));
     expect(files).toContain(join("components", "UniversalFab.tsx"));
-    expect(files).toContain(join("components", "Snackbar.tsx"));
+    expect(files).toContain(join("components", "AssistBanner.tsx"));
+  });
+
+  it("the root Snackbar switches pointerEvents with the dial state it hides on, and stays a permanent native view", () => {
+    // 38.10 review CR-01: the Snackbar's pointerEvents now changes with
+    // `fabDialOpen`, the same state its accessibility props toggle on, so a
+    // re-formed view always receives an explicit value (out of this rule's
+    // scope, see the header). It keeps `collapsable={false}` regardless.
+    const text = readFileSync(join(SRC, "components", "Snackbar.tsx"), "utf8");
+    const root = text.slice(
+      text.indexOf("<View", text.lastIndexOf("return (")),
+      text.indexOf("{...fabDialBackgroundA11y(fabDialOpen)}"),
+    );
+    expect(root).toContain("collapsable={false}");
+    expect(root).toContain('pointerEvents={fabDialOpen ? "none" : "box-none"}');
+    expect(
+      findStaticBoxNoneViews(join(SRC, "components", "Snackbar.tsx"), text),
+    ).toEqual([]);
   });
 
   it("every static box-none View with toggling accessibility props is collapsable={false}", () => {
