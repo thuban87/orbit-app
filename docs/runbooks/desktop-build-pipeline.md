@@ -212,6 +212,14 @@ npx expo start                                   # Metro bundler on this box (po
    accessibility-focused window, so focus-on-open and spoken output cannot be observed by an agent.
    Check accessible names from the `uiautomator dump` tree (`content-desc`) instead, and put spoken
    TalkBack checks on the owner's checklist. Restore the phone's accessibility services afterwards.
+5. **The §1e `grep -q 'Orbit'` assertion no longer matches (38.10-19).** The app now opens on the
+   Digest tab, so the "Orbit" title the FND-01 check greps for is not on the first screen and the
+   PRIMARY assertion prints nothing even on a good install. Until §1e is rewritten, judge the launch
+   from the `screencap` (themed shell, no red "could not connect" screen) and from a `uiautomator`
+   grep for text visible on the opening screen.
+6. **RN `Modal` pickers are not reliably drivable by adb (38.10-19).** To seed data through an old
+   picker-heavy UI, use a throwaway hook in a `git archive` copy of that commit in the scratchpad
+   (never the repo), served by Metro on :8082; see `sqlite-migration-pipeline.md` Pitfall 15.
 
 ## 4. Native share-target verification (Phase 10)
 
