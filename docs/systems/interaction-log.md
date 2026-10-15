@@ -1,7 +1,7 @@
 # Interaction Log
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`, `src/db/interaction-vocabulary.ts`
 
 ## Purpose
@@ -89,7 +89,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 1. The universal FAB and Dashboard List right-swipe action both select the current Profile contact or canonical picker as needed, then run `runQuickLog()` with established outbound, connected, manual defaults and the resolved ordinary Channel preference.
 2. The shared command shows success, Undo, and Add Note only after `recordTouchpoint()` resolves. Undo calls `deleteTouchpoint()` with both the interaction and contact IDs; Add Note opens a post-log editor bound to the committed row; a failed write or undo shows retryable feedback rather than a false success.
-   - The post-log editor (`src/components/PostLogNoteEditor.tsx`) publishes the shell refresh tick (`bumpShellRefresh()`) after each of its own writes commits — the note save, and the Memory create / edit / delete / restore / Allow-AI writes — so a visible Profile, History or Dashboard re-reads (38.3 D-21). It never publishes on a no-op, missing-interaction or failed write. Only a rejected Memory write is a failed save (`commitThenReReadMemory`): once `addMemory` / `editMemory` resolves, a failed publish or post-commit re-read never shows "Couldn't save" or re-offers "Create Memory Instead"; a missing re-read row closes the editor (38.3 review B-CR-01, D-04).
+   - The post-log editor, the Add Note sheet (`src/components/PostLogNoteEditor.tsx`), saves the note and, through its "Also save to" chip row (`AlsoSaveToPicker`, one section or None), a linked entry in Last Talked About, Gift Ideas, Thought of Them or Memories in the same transaction (`saveNoteWithLinkedEntry`; ADR-211). "Create Memory Instead" is gone (D-42). The sheet sizes to fit and keeps its chips and Cancel/Save visible with the keyboard up (D-136 O4, D-146). A save shows "Added note for <name>" plus the section. It publishes the shell refresh tick after a committed write only (38.3 D-21).
 3. The command publishes browse and widget refreshes only after a committed write or delete. Its single-flight guards prevent a rapid tap or swipe from creating or deleting more than one row.
 
 ### Detailed ordinary logging
@@ -97,6 +97,8 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 1. Log Interaction accepts a preselected contact and optional History date, otherwise it uses the canonical picker. It initializes the ordinary Channel from the durable preference.
 2. Its scoped chooser offers Message, Call, and In Person. Message and Call default Direction to Outbound with Connected on; In Person defaults Direction to Mutual and hides Connected.
 3. Tone is optional and remains `NULL` when unset. Allow AI sits with Note, starts off, and Duration is available only under More Options; the save routes through the sole recency writer.
+4. A non-blank note can also be saved to one section with "Also save to" (`recordTouchpointWithLinkedEntry`): the entry is linked, takes the interaction's date and time and its Allow AI (ADR-211). A blank note always takes the plain path (`effectiveAlsoSaveTo`). Every save shows "Logged <channel> with <name>", plus ", also saved to <section>".
+5. Editing a linked note on Edit Interaction or Edit Participant propagates to the entry (`propagateInteractionEditCore`); clearing it while linked is refused inline ("This note is also saved to <Section>, so it can't be empty…"). A note whose entry moved into Off Limits is locked AI-off for good (`note_ai_locked`; the switch shows why; `editTouchpointFullCore` never clears the lock and clamps `allow_ai` to 0; ADR-213).
 
 ### Quick Logging and archiving a Dashboard selection
 
@@ -160,6 +162,8 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 
 ## Decisions
 
+- **ADR-211:** Linked Interaction Notes Through "Also Save To" — linked entries from Log Interaction, the Add Note sheet and Group Log (partly supersedes ADR-132).
+- **ADR-213:** Moving Entries Between Things to Remember Sections — `note_ai_locked` on a note whose entry moved into Off Limits.
 - **ADR-010:** Single-Writer Interaction Recency Spine — supplies the one maintained recency write path used by touchpoint mutations.
 - **ADR-023:** Structured Touchpoints and One-Tap Defaults — preserves independent interaction axes and explicit fast-path defaults.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — exposes the established fast path from the shell with commit-only feedback and canonical Undo.
@@ -233,7 +237,8 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 16. **`allow_ai` defaults OFF and restore is fail-closed on both paths.** A fresh insert takes the column `DEFAULT 0`; the merge/update arm must explicitly set `allow_ai=0` (SQLite's `DEFAULT` fires only on fresh INSERT). Never ship a serializer that could restore an interaction more AI-permissive than the backup.
 17. **`duration` is descriptive only.** Persist canonical seconds, present minutes/hours, show it only when present, and never feed it into Status, Gravity, or Intensity.
 18. **Bind/unbind events write inside the cadence transaction.** The producer composes `recordEventCore()` within the existing bind/unbind transaction (non-reentrant mutex), never after it, and the events are immutable like every other lifecycle event.
-19. **Quick Log remains immediate.** A post-log note or Memory must never turn it into a pre-submit form; post-log content is either the interaction note or a Memory, never both.
+19. **Quick Log remains immediate.** The Add Note sheet must never turn it into a pre-submit form. Post-log content is the interaction note, optionally linked to one section (ADR-211; ADR-132's "note or Memory, never both" is superseded).
+19a. **One writer for linked text.** An entry-side edit of a note-linked entry goes through `editInteractionNoteCore`, never a direct entry write.
 20. **Allow AI remains default off.** Group Note never routes through the interaction toggle, and an omitted Tone stays `NULL`, not Neutral.
 21. **Changing the type default is not a bulk grant.** It affects a new interaction note only; existing rows change only through their explicit editor or permission review.
 22. **Do not replay a committed lifecycle transition after a read failure.** The bind/unbind write and immutable event commit together; post-save baselines advance from that committed return before any refresh can fail.
@@ -272,3 +277,4 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-26 | 38.3 | Post-Log "Create Memory Instead" and Memory edit treat a resolved write as terminal: a failed post-commit re-read no longer reports "Couldn't save" or invites a duplicate Memory (review B-CR-01, D-04). |
 | 2026-09-23 | 38.4 | Touchpoint refine form: the selected duration chip is filled with the accent and labelled with `onAccent` (`durationChipTone`, D-30; ADR-169), chips meet `MIN_TOUCH_TARGET`, and the date/time value renders through the shared minute formatter (RG-030, RG-038). The post-log note editor scrolls at large text (D-72; ADR-174). |
 | 2026-10-11 | 38.9 | Deleted the unrendered `TimelineRow` component; its `EVENT_LABELS` map moved unchanged to `history-stream-logic.ts` (review IN-05). |
+| 2026-10-15 | 38.10 | "Also save to" on Log Interaction and the Add Note sheet saves a linked entry in one transaction; Create Memory Instead removed; notes moved into Off Limits lock AI off; success snackbars name the person and section (ADR-211, ADR-213). |
