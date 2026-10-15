@@ -1,7 +1,7 @@
 # Notifications
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -120,7 +120,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 ## Decisions
 
-- **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reconciles generic, per-contact reminders without exact alarms or frozen fuel.
+- **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reconciles generic, per-contact reminders without exact alarms or frozen knowledge text.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — keeps action writes DAO-owned and makes navigation deterministic.
 - **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — preserves the notification Dashboard fallback through the nested tab tree.
 - **ADR-146:** Digest-Centered Five-Tab Shell and Semantic Root Routing — updates Digest responses to the current semantic root while retaining ready-gated routing.
@@ -136,7 +136,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 ## Gotchas
 
-1. **Never put ranked fuel into a scheduled body.** Android freezes request content; name-only generic copy avoids stale fuel and lock-screen disclosure.
+1. **Never put contact knowledge into a scheduled body.** Android freezes request content; name-only generic copy avoids stale text and lock-screen disclosure. Off Limits in particular never appears in a notification (38.10 D-10).
 2. **Do not re-derive the rogue cutoff or birthday parser.** The decay predicate imports status constants and birthday scheduling reuses `daysUntilBirthday()`.
 3. **Use local wall-clock dates.** Stored snooze values are bare local dates; UTC conversion or `toISOString()` produces near-midnight errors.
 4. **Do not bypass the action handler.** Raw writes break the recency single-writer and exactly-once guarantees.
@@ -180,3 +180,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-09-23 | 38.2 | Matched Android DATE trigger readback, kept decay re-nags on the stateless weekly grid, returned reconcile failure counts, and retired presented reminders after purge or during orphan sweeps. |
 | 2026-09-25 | 38.3 | Cold/warm body-tap chronology (RG-042, react-native/AUD-RN-012, reliability-testing/AUD-REL-012): a warm body tap drops a pending cold result, and the cold clear runs even on failure. |
 | 2026-09-23 | 38.4 | Settings Notifications keeps only the header Back; its in-body Back is removed (RG-037, D-15; ADR-175). |
+| 2026-10-15 | 38.10 | Reworded the no-fuel-in-bodies rule for the retired fuel store: no contact knowledge, and never Off Limits, in a scheduled body. |
