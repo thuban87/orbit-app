@@ -381,6 +381,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 - **ADR-176:** Authored Native Platform Configuration — release-only `SYSTEM_ALERT_WINDOW` removal, Orbit launcher artwork, and native dialogs following Orbit's mode setting.
+- **ADR-185:** Assist Banner Renders in Flow Above the Tab Navigator — `RootNavigator` mounts the banner in flow, so no screen's top bar is covered, and window obstacles re-measure through `shell-offset-store`.
 
 ## Gotchas
 
