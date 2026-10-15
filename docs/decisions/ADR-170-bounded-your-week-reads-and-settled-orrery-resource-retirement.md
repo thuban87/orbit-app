@@ -52,4 +52,4 @@ Orrery resources are retired once a transition settles. The `finish` worklet run
 - `src/components/orrery/orrery-worklet-order.test.ts` — worklet define-before-use guard.
 
 **Depends on:** ADR-148 (Portable Your Week Period and Group-Deduplicated Activity Aggregation); ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** None
+**Required by:** ADR-191 (Star-Warp System Switch Starting on the Tap, with Lab C's Camera); ADR-192 (Bounded Warm Resource Cache Across Tab Blur)

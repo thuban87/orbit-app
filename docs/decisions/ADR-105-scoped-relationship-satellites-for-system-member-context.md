@@ -47,4 +47,4 @@ The Orrery renders only visible, unlinked structured relationships of current Sy
 - `src/components/orrery/OrreryFocusContext.tsx` — presents optional parent relationship context without replacing contact identity.
 
 **Depends on:** ADR-088 (Additive Contact-Knowledge Schema and Application-Owned Memory Registry); ADR-104 (Durable Orrery Preferences and Live System Scope)
-**Required by:** _None._
+**Required by:** ADR-190 (Lit Status Bodies, Star Sun, Moon Bumps, Stack Pips, and Hermes-Safe Initials)

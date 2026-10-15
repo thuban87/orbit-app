@@ -50,4 +50,4 @@ The system uses an opt-in, package-specific `orrery-overlay` treatment on the ex
 - `src/components/orrery/OrreryViewOptions.tsx` — applies the overlay treatment to view options.
 
 **Depends on:** ADR-115 (Visible Mode-Aware Background Surface Composition)
-**Required by:** None
+**Required by:** ADR-188 (Reticle Focus, Docked Card, Cluster Zoom-In, Tap-Only Focus, and Persistent-Chrome Framing)

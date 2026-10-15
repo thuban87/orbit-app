@@ -57,4 +57,4 @@ The system uses one fixed shell-level `BackgroundHost` behind transparent naviga
 - `src/screens/SystemBuilderScreen.tsx` — retains the owner-approved opaque authoring canvas.
 
 **Depends on:** ADR-087 (Bundled Background Presets and Package-Specific Surface Treatment); ADR-113 (Persistent Shared System Background Selection)
-**Required by:** ADR-115 (Visible Mode-Aware Background Surface Composition)
+**Required by:** ADR-115 (Visible Mode-Aware Background Surface Composition); ADR-189 (Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion)
