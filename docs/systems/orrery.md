@@ -119,7 +119,7 @@ Blur or backgrounding holds the current progress and unmounts the canvas consume
 
 ## V2 renderer, camera and switch (38.7)
 
-Phase 38.7 replaced the declarative Skia renderer with Orrery V2. The data, Systems, preferences and persistence above are unchanged. Owner rulings are CONTEXT D-63..D-79 and the dossier `docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md`; ADRs for the reversals are written at KB extraction (`38.7-PHASE-END-REPORT.md` `## KB handoff`).
+Phase 38.7 replaced the declarative Skia renderer with Orrery V2. The data, Systems, preferences and persistence above are unchanged. Owner rulings are CONTEXT D-01..D-81 and the dossier `docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md`; the decisions are ADR-186 (renderer and host), ADR-187 (camera, Home, bodies on rings), ADR-188 (focus and framing), ADR-189 (sky and pulses), ADR-190 (bodies, sun, moons), ADR-191 (switch) and ADR-192 (warm cache).
 
 **Renderer and host.** `OrreryV2Canvas` draws a small, fixed list of `<Picture>` layers for any System size: the sky, the base (rings and the plane grid), stars, orbit pulses, the switch effects, bodies behind the sun, the sun, bodies in front, labels, and the overlay (Polaris, reorder outline, focus reticle). Each picture is recorded on the UI thread from SharedValue specs that JS publishes (`scene-specs.ts`); React state never carries a frame. Rings are drawn in world space under the camera's exact plane homography by an analytic SkSL line on cached annulus strips, never stroked under perspective. Bodies are lit status shaders (sun-lit faces, Lab B rim and glow, decay/rogue wash-out); the sun is always Lab A's star, never the occupant's photo. Far zoom shows a moon bump that splits into moons on the frame's own zoom; stack pips sit opposite it. `render-host.ts` holds the platform choices behind one seam (`resolveOrreryRenderHost`). Android uses an opaque SurfaceView canvas, the frame-clock ambient driver, a GPU-offscreen base bake and world-plane rings (D-64). iOS and web have seam values but no build (D-46).
 
@@ -140,7 +140,9 @@ Phase 38.7 replaced the declarative Skia renderer with Orrery V2. The data, Syst
 **Gotchas.**
 - **Never drive a V2 frame from React state or capture scene objects in a worklet.** The capture allowlist test and the worklet forward-reference guard both apply to `src/components/orrery/v2/`.
 - **A V2 perf claim needs a physical phone and a release build** (`docs/runbooks/orrery-perf-measurement.md`). DEBUG numbers are context only. Graphics/GL memory is higher than the pre-V2 renderer (opaque canvas buffers plus the base bake; owner-accepted, D-79), while total PSS is lower.
-- **Idle cost with animations on is high** (about two thirds of one core on the 6 Pro release; pulses, the lit shader and the sky are the suspects). It is unruled context, not a gate.
+- **Idle cost with animations on is high** (about two thirds of one core on the 6 Pro release; pulses, the lit shader and the sky are the suspects). The owner sent it to a profiling todo (D-80 CPU-1, `.planning/todos/pending/2026-10-05-orrery-idle-cpu-animations-on.md`); it is not a gate.
+- **Emoji words win the initials pick.** "Mia 🌸 Nguyễn" draws "M…": `orreryInitials` takes the first grapheme of the first two words, and the emoji is wider than the disc. Open todo (D-80 EMO-1): skip non-letter words.
+- **Never add a transient surface to `framingViewport`.** Panels, the cluster group, the focus card and notices are deliberately not framing obstacles (ADR-188); adding one back brings back the map jump.
 
 ## Snapshot contention and Phase 40 handoff
 
@@ -154,9 +156,11 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 
 - **ADR-149:** Orrery-Specific Translucent Overlay Treatment and Icon Controls — gives floating Orrery surfaces an AA-proven semantic `GlassSurface` treatment and separates Contacts, Recenter, and Center North into accessible icon controls.
 
-- **ADR-046:** Query-Time Orrery Placement and Transactional Ring Ordering — keeps placement derived and rank writes guarded; Phase 29 narrows a reorder to validated visible System slots while preserving the complete order.
+- **ADR-046:** Query-Time Orrery Placement and Transactional Ring Ordering — keeps placement derived and rank writes guarded; Phase 29 narrows a reorder to validated visible System slots while preserving the complete order. Its read-time drift is superseded by ADR-187 (partial).
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — keeps global sun identity independent of System membership.
-- **ADR-077:** Single Canonical Orrery with a Constrained Inspection Camera — supplies the single status world and bounded camera model.
+- **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — historical; superseded in part by ADR-077 (dual view) and ADR-189 (sole ambient animation).
+- **ADR-077:** Single Canonical Orrery with a Constrained Inspection Camera — supplies the single status world, bounded camera model and the one unmountable ambient clock; its "sole ambient animation" clause is superseded by ADR-189 (partial).
+- **ADR-085:** Live Reduced-Motion Signal for Skia Ambient Animation — every V2 ambient motion reads the live SharedValue and stops under it.
 - **ADR-104:** Durable Orrery Preferences and Live System Scope — adds validated migration-021 preferences and coherent live System snapshots.
 - **ADR-105:** Scoped Relationship Satellites for System-Member Context — renders unlinked relationship moons only as optional, subordinate member context.
 - **ADR-106:** Derived Orrery Gravity Visual Mass and Accessible Context — permits bounded derived Gravity body mass and companion context while partially superseding ADR-027's display restriction.
@@ -166,6 +170,13 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 - **ADR-170:** Bounded Your Week Reads and Settled Orrery Resource Retirement — range-bounded `occurred_at` predicates on migration-031 indexes; settled Orrery switches drop departed resources.
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 - **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — the Orrery never decodes a master larger than 512 px. Its photo textures stay within the 5 % memory gate measured against the 512 JPEG baseline (D-11).
+- **ADR-186:** Orrery V2 Imperative Picture Renderer Behind a Platform Render Host — fixed picture tree, world-plane rings, `render-host` seam, one text/photo path with ledger disposal, 30 Hz ambient clock and the native frame-rate vote.
+- **ADR-187:** Tilted Strategy-Map Home, Dolly Camera, One Projected Size, and Bodies on Their Rings — 62° Home with flat one word away, dolly focal, one `projectedBodyRadius`, no drift.
+- **ADR-188:** Reticle Focus, Docked Card, Cluster Zoom-In, Tap-Only Focus, and Persistent-Chrome Framing — a tap only focuses; framing comes from persistent chrome only.
+- **ADR-189:** Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion — painted sky with a `systemRefId` tint, Lab B rings and pulses, the `orrery*` token sub-palette.
+- **ADR-190:** Lit Status Bodies, Star Sun, Moon Bumps, Stack Pips, and Hermes-Safe Initials — status from rim, glow and wash-out; moon bump splits on zoom.
+- **ADR-191:** Star-Warp System Switch Starting on the Tap, with Lab C's Camera — warp and streaks over the production choreography; lead-in from the tap.
+- **ADR-192:** Bounded Warm Resource Cache Across Tab Blur — CPU-backed warm cache with caps and release triggers; clarifies ADR-170.
 
 ## Deferred seams and evidence limits
 
