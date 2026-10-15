@@ -1,7 +1,7 @@
 # Digest
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
 **Owners:** `src/db/digest-read.ts`, `src/db/up-next-read.ts`, `src/db/your-week-read.ts`, `src/logic/digest-composition.ts`, `src/screens/DigestScreen.tsx`, `src/screens/digest-refresh.ts`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -80,7 +80,7 @@ Digest reads existing state and persists only the portable app-wide period prefe
    - the original `date(occurred_at)` residual (`BETWEEN date(?) AND date(?)`, or `= date(?)` for one day), which keeps results exact — e.g. a malformed value the string range admits but `date()` rejects stays excluded.
 
    Every bound is a `?` parameter. Results are identical to the pre-38.4 reads for every stored form a live writer produces (`YYYY-MM-DD HH:MM:SS` via `rejectFutureOccurredAt`), plus date-only, `T`-separated, fractional-second, and malformed values; `src/db/your-week-read.test.ts` proves this against the legacy predicates as an oracle, alongside EXPLAIN QUERY PLAN and growing-history fixtures. **Accepted edge (not repaired, 38.2 D-23):** a timezone-suffixed `occurred_at` — reachable only through a hand-crafted backup, since `restore-apply.ts` writes backup strings without format validation — can fall outside the string range where `date()` would have shifted it across a UTC day, so it may drop out of a Your Week window it previously appeared in.
-3. A heatmap selection expands `DigestDayDetail` beneath the heatmap. The visual language and count classification reuse the Profile History helpers without adding rotary or long-range navigation.
+3. A heatmap selection expands `DigestDayDetail` beneath the heatmap. Each interaction row shows the contact's real photo (`contactPhoto`, selected as `c.photo` in the interaction arm of `YOUR_WEEK_DAY_SQL` and `NULL` in the Group Event arm), or initials without one (ADR-180). The visual language and count classification reuse the Profile History helpers without adding rotary or long-range navigation.
    The grid fits its measured width (38.4 RG-033, `ui-accessibility/AUD-UIA-010`, D-13). A full-width wrapper measures the available width with `onLayout`. `fitHeatmapCell` then picks the cell edge `min(MAX_CELL, floor((width − 6·gap) / 7))`, and the grid is centered. Cells are whole dp, so seven cells plus six gaps never exceed the width, and nothing renders until the width is measured. `MAX_CELL` stops cells ballooning on wide screens. `MIN_CELL` is the design floor for supported (≥320dp) widths, not a clamp: on a narrower width the cells keep shrinking so every day stays visible, with no horizontal scroll.
 4. Settings and the in-context toggle both write the same validated portable `your_week_period` setting; Horizon birthdays and weekly notification cadence do not use it.
 5. On each `refreshSignal`, Your Week keeps the chosen period and re-windows to the current local day (D-15). No timer detects the new day (D-22). A selected day survives while it is still a real day in the new window, including across a tab return (D-26), and is re-read; otherwise it clears.
@@ -121,6 +121,7 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 - **ADR-170:** Bounded Your Week Reads and Settled Orrery Resource Retirement — range-bounded `occurred_at` predicates on migration-031 indexes; settled Orrery switches drop departed resources.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
+- **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — Your Week day detail shows real contact photos.
 
 ## Gotchas
 
@@ -158,3 +159,4 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | 2026-09-26 | 38.4 | Bounded Your Week reads via occurred_at indexes (RG-028, performance/AUD-PERF-004): migration 031 adds `idx_interactions_occurred_at` / `idx_group_events_occurred_at`; metrics, date counts, and day detail use a half-open range plus the retained `date()` residual with oracle-proven identical results; no Digest cache (ADR-148, D-18). |
 | 2026-09-26 | 38.4 | Your Week heatmap fit-to-width (RG-033 AUD-UIA-010, D-13): cells sized from the measured width by `fitHeatmapCell` between `MIN_CELL` 36 / `MAX_CELL` 56, grid centered, nothing rendered until measured; every day visible with no horizontal scroll. |
 | 2026-09-26 | 38.4 | Digest shell and foreground reads skip while the app is backgrounded (38.3 VERIFICATION W2, D-10): the refresh controller's `isVisible` is `isForegroundVisible(isFocusedRef.current, AppState.currentState)` — the synchronous app state, never a lagging React mirror — so a warm notification action's shell tick reads nothing in the background; focus and the post-sweep foreground (resume) read still run. No legacy-data repair (38.2 D-23). |
+| 2026-09-30 | 38.6 | Your Week day detail shows each interaction contact's real photo: `YourWeekDayRow.contactPhoto` is selected in both UNION arms (NULL for Group Events), bind count and index use unchanged (ADR-180, D-14). |
