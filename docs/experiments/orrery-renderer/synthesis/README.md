@@ -21,13 +21,13 @@ This is the independent evaluation of the three Orrery renderer labs. It records
 
 ## Where the labs live
 
-| Lab | Worktree | Branch | Package |
+| Lab | Archive tag | Former branch | Package |
 |---|---|---|---|
-| A: Production Skia | `~/projects/orbit-orrery-lab-a` | `experiment/orrery-skia-production` | `docs/experiments/orrery-renderer/lab-a-production-skia/` |
-| B: Skia Unleashed | `~/projects/orbit-orrery-lab-b` | `experiment/orrery-skia-unleashed` | `docs/experiments/orrery-renderer/lab-b-skia-unleashed/` |
-| C: True 3D | `~/projects/orbit-orrery-lab-c` | `experiment/orrery-3d` | `docs/experiments/orrery-renderer/lab-c/` |
+| A: Production Skia | `archive/orrery-lab-a` | `experiment/orrery-skia-production` | `docs/experiments/orrery-renderer/lab-a-production-skia/` |
+| B: Skia Unleashed | `archive/orrery-lab-b` | `experiment/orrery-skia-unleashed` | `docs/experiments/orrery-renderer/lab-b-skia-unleashed/` |
+| C: True 3D | `archive/orrery-lab-c` | `experiment/orrery-3d` | `docs/experiments/orrery-renderer/lab-c/` |
 
-- **The branches are local and unpushed.** They are the only copy of the lab code and evidence that this synthesis cites. Keep them until V2 ships.
+- **Archived 2026-10-14.** The worktrees and branches were removed after V2 shipped; each lab's final commit is kept as the annotated tag above. Paths written `A:`, `B:` or `C:` in these files resolve against that tag: `git show archive/orrery-lab-a:<path>` prints one file, `git restore --source=archive/orrery-lab-a -- <path>` copies files into the checkout, and `git worktree add ../lab-a-peek archive/orrery-lab-a` gives a temporary full checkout.
 - None is to be merged.
 - The shared lab brief is `docs/orrery-investigation/ORRERY-EXPERIMENT-CONTRACT.md`.
 
@@ -40,3 +40,4 @@ This is the independent evaluation of the three Orrery renderer labs. It records
 ## History
 
 - **2026-10-02:** written (Claude). Codex review pending.
+- **2026-10-14:** labs archived as tags `archive/orrery-lab-a/b/c`; the table and branch note now point at the tags.
