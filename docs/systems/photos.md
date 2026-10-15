@@ -1,8 +1,8 @@
 # Photos
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.5-background-art-text-contrast
-**Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/components/Avatar.tsx`, `src/components/PhotoSourcePicker.tsx`
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
+**Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/db/photo-relative-path.ts`, `src/components/Avatar.tsx`, `src/components/photo-display.ts`, `src/components/PhotoUnavailableNotice.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
 
@@ -12,7 +12,7 @@ The photos system captures, persists, renders, and removes contact, self-record,
 
 ### Data Model
 
-SQLite stores only relative filenames; the photo bytes live in the app document directory. There is no server, remote image reference, thumbnail pair, or original-image retention.
+SQLite stores only relative filenames; the photo bytes live in the app document directory. There is no server, remote image reference, stored thumbnail pair, or original-image retention. The one stored master is a square image up to 1024 px: new masters are lossy WebP, older ones are 512 JPEG, and both sit under identity-derived `.jpg` names (readers decode by content). The Orrery's small copies live in the evictable cache directory and are never backed up (ADR-181).
 
 **Tables:**
 - `contacts` — its nullable `photo` (`TEXT`) holds a relative `avatars/contact-<id>.jpg` path.
@@ -30,10 +30,13 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 |---|---|---|
 | Capture UI | `src/components/PhotoSourcePicker.tsx` | Starts library or pasted-URL acquisition and presents add/change/remove controls. |
 | Crop UI | `src/screens/CropPhotoScreen.tsx` | Uses Skia and Reanimated shared values for a themed square crop. |
-| Pipeline | `src/services/photos/photo-pipeline.ts` | Crops the original source, produces the 512px JPEG, and returns a relative path. |
+| Pipeline | `src/services/photos/photo-pipeline.ts` | Crops the original source, encodes the master through `encodeMaster`, and returns a relative path. |
+| Master encoder | `src/services/photos/master-encode.ts` | The one master encoder for every writer: square lossy WebP, edge min(source, 1024), never upscaled. |
+| Display source | `src/components/photo-display.ts` | Builds the `file://…?v=<revision>` display source `Avatar` renders (revision-query strategy). |
 | Storage | `src/services/photos/photo-storage.ts` | Validates paths, derives names, persists masters, deletes files, and reconciles interrupted writes. |
-| Canonical owner | `src/services/photos/owned-master.ts` | Locks each master path, settles older journal work before writes, and applies reference-safe delete intents. |
-| Pure path builders | `src/db/photo-relative-path.ts` | Derives ADR-021 filenames without importing native file APIs. |
+| Canonical owner | `src/services/photos/owned-master.ts` | Locks each master path, settles older journal work before writes, applies reference-safe delete intents, and is the sole publisher of display revisions (`notifyPhotoBytesChanged`). |
+| Pure path builders | `src/db/photo-relative-path.ts` | Derives ADR-021 filenames without importing native file APIs; `isStoredPhotoPath` tells a stored path from text left in a photo field. |
+| Orrery copies | `src/services/photos/orrery-derivative-store.ts` | Keeps a ≤512 JPEG copy per large master under `<cache>/orrery-photo/`, keyed by the master's size and mtime. |
 | URL service | `src/services/photos/url-image.ts` | Downloads a user-pasted HTTPS image once on the write path. |
 | Contact/profile DAOs | `src/db/contacts-dao.ts`, `src/db/profile-dao.ts` | Persist or clear the contact and self relative path with one-row guards. |
 | Merge owner | `src/services/photos/merge-photo-rehome.ts` | Stages absorbed bytes, commits survivor-derived references and journal entries, then finalizes under the same path locks. |
@@ -45,7 +48,12 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | File | Role |
 |---|---|
 | `src/services/photos/photo-storage.ts` | The relative-path and crash-safe file-lifecycle chokepoint. |
-| `src/services/photos/photo-pipeline.ts` | Crops and encodes the single JPEG master. |
+| `src/services/photos/photo-pipeline.ts` | Crops and encodes the single master through `encodeMaster`. |
+| `src/services/photos/master-encode.ts` | `MASTER_MAX_EDGE`, `MASTER_QUALITY`, `encodeMaster`. |
+| `src/services/photos/legacy-image-disk-cache-sweep.ts` | Clears the legacy expo-image disk cache once, behind a device-local AsyncStorage flag. |
+| `src/services/photos/photo-writer-contract.test.ts` | Source-scan contract: the sole revision publisher, the raw byte writers, and the plain `resolvePhotoUri` importers. |
+| `src/components/orrery/use-orrery-photo.ts` | Orrery photo loader: masters ≤512 pass through; larger ones read their on-disk copy. |
+| `src/services/photos/orrery-derivative-store.ts` | Orrery copy store, its discard hook, and its chunked launch sweep. |
 | `src/services/photos/derivative-cache.ts` | Retires generated cache copies and sweeps prior-process orphans within guarded cache namespaces. |
 | `src/services/widget/widget-photo.ts` | Downscales a local master to a transient base64 widget thumbnail. |
 | `src/services/photos/background-storage.ts` | Owns staged replacement and safe cleanup for shared Profile background derivatives. |
@@ -56,7 +64,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | `src/services/photos/restore-photo-finalize-sweep.ts` | Drains committed restore-photo finalization and deletion entries. |
 | `src/services/import/import-photo.ts` | Converts durable import staging into a post-commit contact master and isolates failure. |
 | `src/services/photos/reconcile-photo.ts` | Stages current source photos, hashes staged bytes, and promotes a chosen image after reconciliation commit. |
-| `src/components/Avatar.tsx` | Renders a local master or the themed initials fallback. |
+| `src/components/Avatar.tsx` | Renders the display-revision source with a memory-only cache, or the themed initials fallback. |
+| `src/components/PhotoUnavailableNotice.tsx` | "Photo unavailable" notice and load-failure hook for the Profile hero and the photo editor. |
 | `src/components/PhotoSourcePicker.tsx` | Reusable source and lifecycle controls for all photo targets. |
 | `src/screens/CropPhotoScreen.tsx` | Registers the Skia crop screen. |
 
@@ -67,19 +76,28 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 1. On an edit-only photo surface, `PhotoSourcePicker` opens the system library with no camera path or permission prompt, or accepts a user-pasted HTTPS image URL.
 2. A selected or downloaded source is cache-resident and opens `CropPhotoScreen` with a serializable target descriptor.
 3. The screen drives pan and pinch with Reanimated shared values, derives a clamped source-pixel square, and gives it to `persistCroppedMaster()`. The canvas sits in a shrinkable slot (`crop-photo-layout.ts`): with room to spare it is the original full-width square with 96 dp dim bands, and when the in-flow assist banner or a short screen takes height, the bands shrink (to 16 dp) and then the square, so Cancel and Use photo stay on screen. A square resized after framing scales the pan with it, keeping the same crop.
-4. The pipeline crops the original source, resizes it to a 512×512 JPEG at approximately 0.75 quality, and returns the persisted relative filename.
+4. The pipeline crops the original source and `encodeMaster` saves one square lossy WebP at quality 0.8. Its edge is the crop's size capped at 1024; a smaller crop keeps its own size. The persisted relative filename is returned.
 
 ### Persisting and rendering the master
 
 1. `owned-master` acquires the canonical path lock and settles every older journal row before a new write. `photo-storage` then copies the cache output through a temporary-file and `.bak` swap; it never pre-deletes the existing master.
 2. Contact and profile DAOs store the relative filename; custom fields retain the same derivable value through the existing guarded value writer.
-3. `Avatar` resolves the relative path to a local `file://` URI. It renders with `expo-image`, or falls back to initials when the value is absent or the load fails.
-4. A photo-write revision changes the image cache discriminator after set, clear, or replace.
+3. `Avatar` asks `usePhotoDisplay` for its source: the local `file://` URI plus `?v=<revision>`, with `cachePolicy="memory"` and a revision-keyed `recyclingKey`. It falls back to initials when the value is absent, is not a stored photo path, or fails to load.
+4. Every canonical byte change goes through `owned-master.ts`, which calls `notifyPhotoBytesChanged`. That covers persist, restore/merge finalize, a confirmed delete, `.bak` recovery, and (from `restore-apply.ts`) the Replace-all cleanup delete. The call bumps the in-process display revision, so every mounted avatar reloads at once. It also discards the path's Orrery copies. The display revision is separate from the authorization generation, and filenames never change (ADR-180).
+5. Surfaces that show an existing Orbit contact pass the stored relative path to `Avatar`, never a pre-resolved URI, so they follow the revision. Staging previews (import, reconcile) render their own URI with `cachePolicy="none"`.
+
+### Missing photo files
+
+A reference whose file is missing is never cleared automatically (ADR-182). `settleRowLocked` checks the canonical file before it retires a missing-pending finalize row and keeps the reference. The Profile hero and the photo editor (Edit Contact, Settings self photo, custom photo field) show "Photo unavailable" with Change/Remove, and smaller photos show plain initials. A photo-field value that is not a stored photo path (text kept after a Text→Photo change) is treated the same way. `isStoredPhotoPath` stops it before any resolver, the Orrery loader or the widget.
+
+### Drawing photos in the Orrery
+
+`useOrreryPhoto` reads a master's header. A master of 512 px or less is drawn as decoded. A larger master is read from its on-disk copy, `<cache>/orrery-photo/<basename>/<size>-<mtime>.jpg`. A missing copy is made once, one at a time, and installed atomically. The install re-checks the master's signature and display revision, and drops the copy if the photo changed meanwhile. SkImages are disposed after commit. A chunked launch sweep removes copies whose master is gone or changed (ADR-181).
 
 ### Rendering a widget thumbnail
 
 1. The Widget renderer passes the stored contact-relative path to `encodeWidgetThumb()`.
-2. The encoder resolves the existing 512px local master and downsizes it to a bounded JPEG. Installed `expo-image-manipulator` writes a temporary `cache/ImageManipulator/` file even for `base64: true`; the encoder discards it after reading base64 and returns only a `data:` URI. It writes no table row or persistent thumbnail.
+2. The encoder resolves the local master (512 JPEG or up to 1024 WebP) and downsizes it to a bounded JPEG. `encodeTileThumbs` encodes tiles one at a time and releases each rendered ref. Installed `expo-image-manipulator` writes a temporary `cache/ImageManipulator/` file even for `base64: true`; the encoder discards it after reading base64 and returns only a `data:` URI. It writes no table row or persistent thumbnail.
 3. A missing, evicted, corrupt, or non-base64 result returns `null`; that tile renders deterministic initials instead of a `file://`, network, or broken image source.
 4. Contact photo set and clear paths publish a best-effort widget refresh only after their own persistence succeeds.
 
@@ -123,7 +141,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 ### Importing a selected contact photo
 
 1. Contact Import moves an accepted picker-cache copy into private flat `import-staging/` before it commits the durable session snapshot.
-2. After the imported contact transaction succeeds, `import-photo.ts` resolves that relative staging path, produces the ordinary Orbit master, and writes the contact photo reference.
+2. After the imported contact transaction succeeds, `import-photo.ts` resolves that relative staging path, produces the ordinary Orbit master through `encodeMaster` (centre-squared, at the picker thumbnail's own size), and writes the contact photo reference.
 3. Success retires the row reference before best-effort deletion of raw staging. A mastering failure leaves the contact imported and retains the staged input for Retry.
 
 ### Reconciling a linked-contact photo
@@ -149,15 +167,17 @@ The path lock is process-local. Crash safety comes from settling old journal row
 
 | Constant | Value | File | Purpose |
 |---|---|---|---|
-| Master size | `512 × 512` | `src/services/photos/photo-pipeline.ts` | Bounds storage, image decode, and later consumer cost. |
-| JPEG quality | approximately `0.75` | `src/services/photos/photo-pipeline.ts` | Balances photo clarity and bounded master size. |
+| `MASTER_MAX_EDGE` | `1024` | `src/services/photos/master-encode.ts` | Largest master edge; smaller sources keep their size. |
+| `MASTER_QUALITY` | `0.8` (lossy WebP) | `src/services/photos/master-encode.ts` | Signed for parity with the old q0.75 JPEG (D-36); 1.0 would mean lossless WebP. |
+| `ORRERY_TEXTURE_MAX` | `512` | `src/components/orrery/use-orrery-photo.ts` | Largest photo texture the Orrery decodes. |
+| `ORRERY_DERIVATIVE_DIR` | `orrery-photo` | `src/services/photos/orrery-derivative-store.ts` | Cache-dir namespace for Orrery copies. |
 | Widget thumbnail | `88px`, quality `0.6` | `src/services/widget/widget-photo.ts` | Bounds transient RemoteViews thumbnail work. |
 | Picker camera/mic permissions | `false` | `app.config.ts` | Keeps camera and microphone permissions out of the picker configuration. |
 
 ## Decisions
 
 - **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — both write sources converge on one local crop pipeline.
-- **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — defines the master, path, replacement, and deletion contract.
+- **ADR-021:** Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup — defines the master, path, replacement, and deletion contract (its 512 JPEG size is superseded by ADR-181).
 - **ADR-022:** Tokenized Deterministic Initials Avatars — defines the themed no-photo fallback.
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses local photo masters without widget state.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — embeds photo bytes in complete portable snapshots.
@@ -170,6 +190,11 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **ADR-157:** Bounded Native Transfer Ownership — assigns byte, time, and cleanup bounds to native photo acquisition, export, and staging boundaries.
 - **ADR-158:** Canonical Photo Ownership Across Masters, Staging, and Derivatives — gives each photo namespace one explicit owner and retirement rule.
 - **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — finalizes only journal-authorized bytes owned by the committed restore state.
+- **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — the ownership layer publishes a display revision that `Avatar` puts in the URI.
+- **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — replaces ADR-021's 512 JPEG size; the Orrery reads small cache copies.
+- **ADR-182:** Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos — "Photo unavailable" instead of a cleared reference.
+- **ADR-183:** 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox — the reusable `PhotoLightbox`.
+- **ADR-185:** Assist Banner Renders in Flow Above the Tab Navigator — Crop Photo sizes its canvas to the space below the banner.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Photo source picker "Remove photo" string sits on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
 
 ## Gotchas
@@ -178,7 +203,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 2. **Do not pre-delete a master before replacing it.** Native moves can be delete-then-rename, so the temporary-and-backup swap plus launch reconciliation is load-bearing.
 3. **Purge journals paths before deleting database rows.** Filenames stay derivable from contact identity; intents include quarantined and type-changed definitions, while the post-commit adapter and foreground drain apply reference checks.
 4. **Custom photo fields have a cancel-path tradeoff.** Their stable canonical file can change before the form commits its value; backing out can retain changed bytes beneath the previous reference. The documented safe posture favors a bounded leak or changed file over deleting a possibly committed file.
-5. **Treat image cache replacement carefully across restart.** A same-second replace at a stable path has a narrow stale-decode risk after the in-memory revision resets.
+5. **The `cacheKey` scheme never worked on Android, so a display revision replaced it.** expo-image hands `file://` sources to Glide before it reads `cacheKey`, so replaced photos stayed stale on the Profile and Contacts page until 38.6. The fix is the `?v=<revision>` display URI plus a memory-only cache, and a one-time legacy disk-cache clear. Never reintroduce a `cacheBust`/`modifiedAt` prop chain.
 6. **Widget images are base64 only.** RemoteViews must not receive `file://` masters or an `http(s)` source; a failed encode is an initials fallback, not a grid failure.
 7. **Never restore a serialized path verbatim.** It belongs to another sandbox; use the embedded bytes and a newly derived canonical master.
 8. **Only committed journal rows may finalize restore files.** A process interruption before the database commit must not create a visible master or delete an existing one.
@@ -189,6 +214,10 @@ The path lock is process-local. Crash safety comes from settling old journal row
 13. **Canonical masters have one owner.** New writes, recovery, removal, and sidecar reconciliation acquire the same path lock. Delete intents are idempotent and delete only when no live contact, profile, custom-field value, or pending finalize references the exact path.
 14. **Every transient native copy needs a named owner and terminal cleanup.** Picker copies, downloads, ImageManipulator outputs, staging files, and derivatives retire at their owning operation's success/failure boundary, with a guarded cold-start sweep only as a crash backstop.
 15. **Never broaden a cleanup namespace to repair old aliases.** Restore and merge act on current canonical ownership and committed journal evidence; uncertain or pre-fix paths prefer a bounded leak over deleting potentially live bytes.
+16. **Only `owned-master.ts` publishes a display revision.** A byte writer that bypasses it leaves stale avatars, and `photo-writer-contract.test.ts` fails on any other caller of the store bump or a new raw `persistMaster`/`deletePhoto` importer.
+17. **The `.jpg` extension does not tell you the format.** New masters are WebP bytes under the unchanged `.jpg` names, and older ones are JPEG. Never branch on the extension or assume 512 px.
+18. **Never let the Orrery decode a 1024 master.** The manipulator decodes through Glide into hardware bitmaps that are freed only at GC. The in-memory downsample cache (D-37) still measured +23 % graphics at 20 s. Only the on-disk copy (D-41) passes the 5 % memory gate.
+19. **Never clear a reference because its file is missing.** Show "Photo unavailable" instead. A text value in a photo field must pass `isStoredPhotoPath` before any resolver; reaching one used to crash Edit Contact.
 
 ## Related Systems
 
@@ -196,6 +225,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **Custom fields** — stores custom photo paths through its guarded values flow.
 - **App shell** — owns the crop route, settings entry, theme tokens, and launch registration.
 - **Widget** — derives a transient base64 thumbnail from the existing bounded master.
+- **Orrery** — draws photo bodies from ≤512 textures through `useOrreryPhoto` and the on-disk copy store.
 - **Backup & Restore** — embeds image bytes and uses journal-backed staged restoration to recreate local masters.
 - **Contact Import** — stages selected-contact photos privately and masters them only after the contact commit.
 - **Contact Reconciliation** — uses separate private staging and post-commit promotion for source-photo review.
@@ -215,4 +245,5 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-09-24 | 38.2 | Re-homed merged photos to survivor-derived masters and journaled purge/definition deletion for all derived paths. |
 | 2026-09-24 | 38.2 | Corrected the widget thumbnail description against installed native ImageManipulator behavior and added guarded derivative/picker-copy retirement with a cold-start orphan sweep (`data-privacy/AUD-DPI-011`, RG-013). |
 | 2026-09-26 | 38.5 | In Galaxy Dark, the Photo source picker "Remove photo" string sits on an opaque backing over the art (D-50; ADR-179). |
+| 2026-09-30 | 38.6 | Display revisions published only by the ownership layer replace the dead `cacheKey` scheme (ADR-180); one square WebP master up to 1024 px for every writer, mixed with legacy 512 JPEG under `.jpg` names; Orrery cache copies keep its texture memory flat (ADR-181); missing photos keep their reference and show "Photo unavailable" (ADR-182); sequential widget tile encode. |
 | 2026-09-30 | 38.6 | Review WR5-02: Crop Photo sizes its canvas to the measured space left under the in-flow assist banner (D-38) so the Cancel / Use photo footer is never pushed off-screen; bands shrink before the square, and a resize keeps the framed crop. The banner stays app-global. |
