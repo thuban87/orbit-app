@@ -1,7 +1,7 @@
 # Contact Import
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.5-background-art-text-contrast
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
 **Owners:** `modules/orbit-contact-picker/`, `src/db/import-session-dao.ts`, `src/db/imported-contact-dao.ts`, `src/services/import/`, `src/screens/ImportReviewScreen.tsx`
 
 ## Purpose
@@ -86,7 +86,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 
 1. One accepted row opens `ImportReviewScreen`, where the user can choose Bound or Unbound, category, selected/primary methods, birthday, and photo before writing. The Bound choice and its frequency are honoured: `commitSingleImport()` passes the reviewed lifecycle to `importContactRecord()`, which takes the lifecycle as an explicit, validated parameter. Before 38.4 the seam forced Unbound and silently dropped a Bound choice (D-57 finding; Phase 19 Cluster D, ADR-066).
 2. The DAO rejects an invalid non-null birthday before opening its transaction; the screen keeps invalid raw input visible and disables Import. The mapper accepts supported year-less and unambiguous slash formats, while still-unreadable values remain flagged rather than coerced.
-3. A deterministic active external link resolves as already in Orbit. Advisory matches require an explicit Link to Existing, Import as New, or Skip choice and never overwrite an existing name.
+3. A deterministic active external link resolves as already in Orbit. Advisory matches require an explicit Link to Existing, Import as New, or Skip choice and never overwrite an existing name. The "might already be in Orbit" choices and Duplicate review's "Choose an existing contact" sheet show each existing contact's Orbit photo. Both use `resolveExistingContactChoices` (`src/screens/existing-contact-choices.ts`, input order, gone contacts dropped) and the `ExistingContactChoice` components (ADR-180, D-25 F-1).
 4. A successful new-contact create preserves a raw Note as an `imported`, import-provenance Memory with stored AI permission off, regardless of the general new-Memory default. The per-item toggle is the opt-in path. An already-linked outcome deliberately writes no Note.
 
 ### Processing bulk work and recovery
@@ -106,7 +106,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 
 ### Handling photos and source consolidation
 
-1. After an imported contact commits, `import-photo.ts` converts the staged source into Orbit's usual master photo and sets the contact photo path.
+1. After an imported contact commits, `import-photo.ts` converts the staged source into Orbit's usual master photo through `encodeMaster` and sets the contact photo path. The result is a square lossy WebP, centre-squared and never upscaled, so a picker thumbnail stays thumbnail-sized (ADR-181, D-22). Retry uses the same encoder.
 2. On success, the row's staging reference is retired before best-effort raw-file deletion. A failed or interrupted photo leaves the contact imported and its staged input live for photo-only Retry, including after relaunch. Retry checks the contact UID, row ownership, existing photo and canonical generation under the photo path lock before writing. Purge retires the contact's import workflow copies in its transaction.
 3. Before a bulk driver starts, source rows sharing a canonical phone or email may be shown in `ConsolidationPrompt`; only an explicit Combine into one creates one contact with multiple external links.
 4. Consolidation chooses the first non-blank imported Note and writes it atomically with the combined new contact; it never uses provider metadata to enable AI.
@@ -140,6 +140,9 @@ Category choices use the canonical ordered catalog and switch to the complete se
 - **ADR-171:** Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session — Bound/Unbound batch choice on the session (migration 032), lifecycle lock, single run; partially supersedes ADR-066.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Bulk Import setup "Discard" string sits on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
+
+- **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — the existing-contact choices show Orbit photos.
+- **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — imported photos are mastered by the shared encoder at thumbnail size.
 
 ## Gotchas
 
@@ -196,3 +199,4 @@ Category choices use the canonical ordered catalog and switch to the complete se
 | 2026-09-28 | 38.4 | One bulk import pass per session (D-74, owner): Import Progress blocks Back while a pass runs (plain notice "Still importing. You can go back when it finishes."), so setup's Continue can no longer start a second pass over the same rows; an in-memory run guard makes `runImportBatch` refuse a concurrent pass, ImportProgress follows a pass already in flight, and the stopped setup's Discard refuses while one runs. No schema change. |
 | 2026-09-28 | 38.4 | Bulk setup holds Back while its Import or Combine is starting (`useImportLeaveGuard` `isBusy`), so an instant Back no longer discards the session under the starting run ("Import stopped", nothing imported); found in the D-74 device pass. |
 | 2026-09-26 | 38.5 | In Galaxy Dark, the Bulk Import setup "Discard" string sits on an opaque backing over the art (D-50; ADR-179). |
+| 2026-09-30 | 38.6 | Imported and retried photos encode through the shared `encodeMaster` (square WebP, never upscaled; picker thumbnails stay small); existing-contact choices on Import review and Duplicate review show the Orbit photo (ADR-180, ADR-181). |
