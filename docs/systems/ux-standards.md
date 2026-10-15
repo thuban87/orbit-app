@@ -323,11 +323,11 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
    `testID` or key fails the display-date contract (D-23).
 3. **Undo is per area.** The rules say which actions get Undo; only the area phase that owns a
    screen wires it (D-01, D-10). Do not add Undo to another area's screen in passing.
+4. **Header conversions move contract lists.** Changing a screen's header without updating
+   `settings-chrome-contract.test.ts` breaks the single-Back contract (D-07).
 5. **Worklets are defined above their callers.** The section-button morph runs worklets on the UI
    thread; a worklet calling one defined later in the same file is undefined on device under Hermes
    and vitest cannot catch it.
-4. **Header conversions move contract lists.** Changing a screen's header without updating
-   `settings-chrome-contract.test.ts` breaks the single-Back contract (D-07).
 
 ## Related Systems
 
