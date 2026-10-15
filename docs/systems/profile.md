@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-10-09
-**Updated by phase:** 38.8-history-navigation-ux
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -33,7 +33,7 @@ The stable migration object is `profilePresentationMigration`; `src/db/database.
 3. `resolveProfilePresentation()` resolves independent axes and records dangling template diagnostics without rewriting durable UIDs.
 4. The screen keeps `ProfileHero` structurally fixed and passes the snapshot plus resolved presentation to `ProfileModuleHost`.
 5. The module host renders semantic IDs (`relationship-overview`, `things-to-remember`, `contact-methods`, `interaction-history`), writes collapse only through the public presentation DAO, then publishes DAO readback.
-6. Layout/template/background managers and relationship sheets are topmost overlays. Their dismissal leaves the underlying Profile inert; ordinary Back otherwise remains the originating native-stack Back path.
+6. Layout/template/background managers and relationship sheets are topmost overlays. Their dismissal leaves the underlying Profile inert; ordinary Back otherwise remains the originating native-stack Back path. A manager with unsaved changes asks through the shared themed "Discard changes?" prompt (`confirmDiscard`, "Your unsaved changes will be lost."), not a per-editor native Alert (ADR-200); Reset presentation, Unbind and Delete background template are themed destructive confirms (ADR-198). The Profile keeps its own top bar; it is the one pushed screen outside the shared child header (ADR-201, ADR-109).
 
 ### Key files
 
@@ -98,7 +98,7 @@ Tiles are then **sized** from the preview card's own measured width with the sam
 
 **Hidden by D-47 (owner, 2026-09-27; OA-B2).** The editor no longer shows the live preview: its only mount in `ProfileLayoutEditor.tsx` is gated by the top-of-file flag `PROFILE_LAYOUT_PREVIEW_VISIBLE = false`. `ProfileLayoutPreview` stays exported and the geometry above stays covered by its unit tests; flipping the flag to `true` restores the preview. Dragging and Move up/down are unchanged.
 
-The editor's per-module visibility switch uses the themed `trackColor`/`thumbColor` tokens and keeps its "Show {module}" accessible name (RG-030 `ui-accessibility/AUD-UIA-003`).
+The editor's per-module visibility switch is the shared `OrbitSwitch` (ADR-203) and keeps its "Show {module}" accessible name (RG-030 `ui-accessibility/AUD-UIA-003`).
 
 Interaction History renders the full History & Insights section (Heatmap, Intensity, Jump to date and the History stream; since 38.8 the stream replaces the Rolodex and the date Detail Sheet) behind the stable `interaction-history` semantic key via `ProfileModuleHost.renderHistory()`; its visible title is "History" on the Profile and in the layout editor (38.8 D-60), and the key, saved layouts and collapse state are unchanged. `HistorySection` is keyed by the contact so its stream state starts fresh per contact (D-62), and `ProfileModuleHost` measures heatmap/Jump targets against the History anchor to scroll the Profile to them (`requestHistoryScroll`). Knowledge-change rows in the stream route back through the screen's existing knowledge navigation via a threaded `onOpenKnowledgeChange`. See `interaction-history.md`.
 
@@ -166,6 +166,11 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-182:** Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos — the hero shows "Photo unavailable" for a lost photo or a text value.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
+- **ADR-198:** Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays — Profile prompts are themed confirms; manager sheets register as open overlays.
+- **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — the layout, template and background managers share the "Discard changes?" prompt.
+- **ADR-201:** Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen — the Profile is the exception that keeps its own top bar.
+- **ADR-203:** One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection — the layout editor's module switches.
+
 ## Gotchas
 
 1. **Use one aggregate read.** Do not add component-owned SQL or a second ranking/metric read; refresh the controller snapshot after committed writes.
@@ -227,3 +232,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-10-08 | 38.8 | The History module renders the new History stream (Heatmap, Intensity, Jump to date, stream) instead of the Rolodex and Detail Sheet, under the visible title "History" with the `interaction-history` key and saved layouts unchanged; the host scrolls the Profile to heatmap/Jump targets measured against the History anchor. Device pass: the collapsed-History reveal from Last Interaction / View history can stop short while History is still loading (open, see the 38.8 phase-end report). |
 | 2026-10-09 | 38.8 | Collapsed-History reveal fixed (D-72, G1, gap plan 07): an expanding reveal settles with a second scroll once History's loaded content lays out (`83203b0b`); the Year heatmap and the no-cadence Cycles explanation now report their first layout so the settle also fires there (`9bcb48b7`). Device re-check 11/11 on DEBUG (`ea983264`). This closes the open device-pass item in the row above. The host's History scroll requests take a lead-in so the empty-day note scrolls only just into view (D-73). |
 | 2026-10-09 | 38.8 | KB extraction: Decisions cite ADR-193, ADR-194 and ADR-197, and note ADR-123's partial supersession. |
+| 2026-10-11 | 38.9 | The Profile managers' discard prompts use the shared themed "Discard changes?"; Profile Alerts became themed confirms; the layout editor's switches are `OrbitSwitch`; the Profile stays outside the shared child header (ADR-198, ADR-200, ADR-201, ADR-203). |
