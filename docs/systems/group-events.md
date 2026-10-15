@@ -1,7 +1,7 @@
 # Group Events
 
-**Last updated:** 2026-09-26
-**Updated by phase:** 38.5-background-art-text-contrast
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/db/group-events-dao.ts`, `src/db/group-events-read.ts`, `src/logic/group-inheritance.ts`, `src/screens/GroupLogScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`
 
 ## Purpose
@@ -79,7 +79,7 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 
 ### Event-first capture
 
-1. Universal FAB → Group Log opens `GroupLogScreen`; Dashboard multi-select can preload `participantIds` into the same form.
+1. Universal FAB → Group Log opens `GroupLogScreen` over the tab the user is on (it is registered in every tab stack, ADR-202); Dashboard multi-select can preload `participantIds` into the same form. Saving with a blank title shows the inline error under Title and scrolls to it, separate from the save error (ADR-199). Group Log, Edit Group Event and Edit participant use the shared child header (Edit participant with the person line) and show the theme art instead of an opaque page fill; their discard guard is the themed "Discard changes?" (ADR-200, ADR-201).
 2. The draft requires title/date/time but permits no participants. Channel starts In Person; Tone and Duration are unset regardless of the ordinary channel preference.
 3. The shared multi-select picker gathers contacts; archived contacts appear through explicit search and snoozed contacts remain selectable. No product participant cap exists.
 4. `toGroupParticipantInputs` mints distinct child UIDs; Save calls `createGroupEvent` once with a distinct parent UID.
@@ -107,7 +107,7 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 
 ### Browsing, inspecting, and choosing edit scope
 
-1. The Events root opens `GroupEventsScreen`. `listGroupEvents` sorts newest occurrence first with a deterministic ID tie-break.
+1. The Events root opens `GroupEventsScreen`. `listGroupEvents` sorts newest occurrence first with a deterministic ID tie-break. Its empty, no-match and load-failure states are the shared `EmptyState` with one action each: "Log an event" (opens Group Log), "Clear search", "Try again" (ADR-199).
 2. `searchGroupEvents` binds an escaped literal LIKE term against title and participant name; EXISTS prevents duplicate parent rows.
 3. Detail shows shared fields and compact participant cards. Card tap opens that child’s canonical Interaction Detail with its own note plus distinctly labeled Group Note.
 4. `buildGroupEventDetailInteraction` preserves the stored child Allow-AI state; duration display uses `formatDurationLabel` through the Detail helper.
@@ -128,7 +128,7 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 3. Confirmed `dissolveGroupEvent` detaches all children, removes parent/shared note, and records the parent’s fetched UID tombstone. Group Note is never copied into child prose.
 4. Confirmed `deleteGroupEventAndInteractions` permanently removes linked children through recency cores and then the parent, with tombstones and one revision increment in the same transaction.
 5. A parent with no children remains valid. Contact purge removes its own children, never unrelated Group Event parents.
-6. `convertInteractionToGroupEvent` checks a contact-scoped standalone source in the transaction, creates a title-bearing parent seeded from the original values, and links the original child in place without changing its ID/UID.
+6. `convertInteractionToGroupEvent` (the interaction detail's "Make this an event", ADR-206) checks a contact-scoped standalone source in the transaction, creates a title-bearing parent seeded from the original values, and links the original child in place without changing its ID/UID.
 
 ### Portable identity handoff
 
@@ -170,6 +170,10 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Events list and detail show the background art, with their content in full `surface` cards.
 
+- **ADR-199:** App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State — Events empty states and the Group Log title error.
+- **ADR-201:** Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen — the event forms use the child header and show the theme art.
+- **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — "Event(s)" is the user-facing noun; Group Log and Dissolve stay; "group interaction" is retired.
+
 ## Gotchas
 
 1. **Do not nest mutex-owning writers.** Compose recency cores within the one Group Event transaction; the write mutex is non-reentrant.
@@ -208,3 +212,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | 2026-09-26 | 38.3 | Edit Group Event clears its failure caption when a later participant add, remove, edit or save starts, so a stale "not saved" never sits beside a fresh success (review A-WR-04). |
 | 2026-09-23 | 38.4 | The Events tab root uses `ShellAppBar variant="root"` with no Back (D-22; ADR-175), and its load error reads "Try opening it again in a moment."; list rows and the detail "When" render through `formatDateTimeMinuteOrFallback` (RG-038 AUD-UIA-018); the group title prompt stays above the keyboard and stacks its actions when they do not fit at the largest text (D-72; ADR-174). |
 | 2026-09-26 | 38.5 | The Events list and detail show the background art: no opaque page fill, content in full `surface` cards (D-54; ADR-179). |
+| 2026-10-11 | 38.9 | User-facing copy says "Event(s)" (Group Log and Dissolve kept; "Make this an event"); Events uses the shared `EmptyState` with "Log an event" / "Clear search" / "Try again"; the Group Log title validates inline; the event forms use the child header over the theme art; Group Log opens over the current tab (ADR-199, ADR-201, ADR-202, ADR-206). |
