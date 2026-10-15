@@ -53,7 +53,8 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   const snackbar = snackbarStore((state) => state.snackbar);
   const dismiss = snackbarStore((state) => state.dismiss);
   const topOverlayId = overlayRegistryStore(selectTopOverlayId);
-  // Hidden from accessibility while the FAB dial is open (D-31, D-42 A).
+  // Hidden from accessibility, and from touch, while the FAB dial is open
+  // (D-31, D-42 A).
   const fabDialOpen = shellTransientStore(selectFabDialOpen);
   const hostVisible = resolveSnackbarHostVisible(host, topOverlayId);
   // D-143: with a FAB on screen the root pill is full width, just above the
@@ -88,7 +89,11 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
       // props never flattens and re-creates this full-screen overlay without
       // its `box-none` (a re-created view defaults to `auto` = touch sink).
       collapsable={false}
-      pointerEvents="box-none"
+      // D-143 puts the root pill over the open dial's rows (it renders after
+      // UniversalFab in App.tsx), so while the dial is open the whole host is
+      // touch-transparent: a tap on "Add Contact" must reach the dial, never
+      // the pill's Undo. The pill stays where it is (its look is unchanged).
+      pointerEvents={fabDialOpen ? "none" : "box-none"}
       style={[
         styles.overlay,
         {

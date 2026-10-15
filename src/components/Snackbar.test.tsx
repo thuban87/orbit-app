@@ -62,7 +62,10 @@ describe("Snackbar root geometry (38.10 D-132, D-143; O2, O5)", () => {
   });
 
   it("keeps only the pill touchable and lets the label wrap", () => {
-    expect(source).toContain('pointerEvents="box-none"');
+    // Review CR-01: touch-transparent while the + dial is open.
+    expect(source).toContain(
+      'pointerEvents={fabDialOpen ? "none" : "box-none"}',
+    );
     expect(source).not.toContain("numberOfLines");
   });
 

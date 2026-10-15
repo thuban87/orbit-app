@@ -193,7 +193,13 @@ describe("App.tsx shell overlays outside the tab navigator (D-42 A)", () => {
         const main = render.slice(render.lastIndexOf("\n  return ("));
         const root = openerAt(main, main.indexOf("<View"));
         expect(root).toContain("{...fabDialBackgroundA11y(fabDialOpen)}");
-        expect(root).toContain('pointerEvents="box-none"');
+        // The root Snackbar also stops taking touches while the dial is
+        // open: D-143 puts its pill over the dial rows (review CR-01).
+        expect(root).toContain(
+          name === "Snackbar"
+            ? 'pointerEvents={fabDialOpen ? "none" : "box-none"}'
+            : 'pointerEvents="box-none"',
+        );
         expect(root).not.toMatch(/\baccessible\b(?!ity)/);
       });
     });
