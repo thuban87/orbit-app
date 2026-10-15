@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 45 of
-  197 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 46 of
+  206 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -174,7 +174,7 @@ not something you can pattern-match against.
 | 141 | Explicit-Host Dual-Home Backup Navigation | Accepted | 37-settings-personalization | — | ADR-146 (partial) | — | 5/6 live | `src/navigation/tabs`, `src/screens` |
 | 142 | User-Owned Categories with Stable Identity and Canonical Ordering | Accepted | 37.1-category-management | — | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
 | 143 | Lock-Time-Revalidated Atomic Category Deletion and System Fallout | Accepted | 37.1-category-management | — | — | — | 6 | `src/db`, `src/logic` |
-| 144 | Complete Category Selection and Grouped Orrery System Discovery | Accepted | 37.1-category-management | — | — | — | 8 | `src/components/category`, `src/components/orrery`, `src/logic` +2 |
+| 144 | Complete Category Selection and Grouped Orrery System Discovery | Accepted | 37.1-category-management | — | ADR-204 (partial) | — | 8 | `src/components/category`, `src/components/orrery`, `src/logic` +2 |
 | 145 | Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore | Accepted | 37.1-category-management | ADR-063 (partial) | ADR-148 (partial) | — | 6 | `src/backup`, `src/db` |
 | 146 | Digest-Centered Five-Tab Shell and Semantic Root Routing | Accepted | 38-your-week | ADR-080 (partial); ADR-141 (partial) | — | — | 6 | `src/components`, `src/navigation`, `src/navigation/tabs` |
 | 147 | Derived Digest Composition and Canonical Contacts Drill-Through | Accepted | 38-your-week | ADR-054 (partial); ADR-062 (partial) | — | — | 7 | `src/components/digest`, `src/db`, `src/logic` +1 |
@@ -228,3 +228,12 @@ not something you can pattern-match against.
 | 195 | Jump to Date: a Year-Stepper Month Picker and the Empty-Month State | Accepted | 38.8-history-navigation-ux | — | — | — | 5 | `src/components/history` |
 | 196 | Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates | Accepted | 38.8-history-navigation-ux | — | — | — | 5 | `src/components`, `src/components/history` |
 | 197 | History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load | Accepted | 38.8-history-navigation-ux | — | — | — | 5 | `src/components/history`, `src/components/profile`, `src/profile` |
+| 198 | Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays | Accepted | 38.9-ux-standards | — | — | — | 11/12 live | `src`, `src/components`, `src/components/ui` +2 |
+| 199 | App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State | Accepted | 38.9-ux-standards | — | — | — | 15 | `src/components`, `src/components/history`, `src/components/ui` +2 |
+| 200 | Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants | Accepted | 38.9-ux-standards | — | — | — | 18/19 live | `src/components`, `src/navigation`, `src/screens` |
+| 201 | Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen | Accepted | 38.9-ux-standards | — | — | — | 17 | `src/components`, `src/hooks`, `src/navigation` +1 |
+| 202 | History Back Across Tabs and + Forms Over the Current Tab | Accepted | 38.9-ux-standards | — | — | — | 15 | `src/components`, `src/navigation`, `src/navigation/tabs` +1 |
+| 203 | One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection | Accepted | 38.9-ux-standards | — | — | — | 9 | `src/components`, `src/components/icons`, `src/components/ui` +1 |
+| 204 | One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay | Accepted | 38.9-ux-standards | ADR-144 (partial — the native picker for catalogs of 12 or fewer categories dies; the searchable sheet at 13+, the complete catalog, canonical ordering, the NULL Uncategorized policy and the grouped Orrery System selector survive) | — | — | 13 | `src/components`, `src/components/category`, `src/components/field-widgets` +3 |
+| 205 | One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates | Accepted | 38.9-ux-standards | — | — | — | 10/11 live | `src/components`, `src/components/digest`, `src/components/field-widgets` +4 |
+| 206 | Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper | Accepted | 38.9-ux-standards | — | — | — | 10 | `src/components/control-surface`, `src/components/group`, `src/components/history` +5 |

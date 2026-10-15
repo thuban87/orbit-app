@@ -153,7 +153,7 @@
 // IMPORTANT: ADR-0141 [SUPERSEDED BY ADR-146 (partial)] Explicit-Host Dual-Home Backup Navigation
 // NOTE: ADR-0142 [ACCEPTED] User-Owned Categories with Stable Identity and Canonical Ordering
 // NOTE: ADR-0143 [ACCEPTED] Lock-Time-Revalidated Atomic Category Deletion and System Fallout
-// NOTE: ADR-0144 [ACCEPTED] Complete Category Selection and Grouped Orrery System Discovery
+// IMPORTANT: ADR-0144 [SUPERSEDED BY ADR-204 (partial)] Complete Category Selection and Grouped Orrery System Discovery
 // IMPORTANT: ADR-0145 [SUPERSEDED BY ADR-148 (partial)] Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore
 // NOTE: ADR-0146 [ACCEPTED] Digest-Centered Five-Tab Shell and Semantic Root Routing
 // NOTE: ADR-0147 [ACCEPTED] Derived Digest Composition and Canonical Contacts Drill-Through
@@ -207,5 +207,14 @@
 // NOTE: ADR-0195 [ACCEPTED] Jump to Date: a Year-Stepper Month Picker and the Empty-Month State
 // NOTE: ADR-0196 [ACCEPTED] Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates
 // NOTE: ADR-0197 [ACCEPTED] History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load
+// NOTE: ADR-0198 [ACCEPTED] Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays
+// NOTE: ADR-0199 [ACCEPTED] App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State
+// NOTE: ADR-0200 [ACCEPTED] Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants
+// NOTE: ADR-0201 [ACCEPTED] Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen
+// NOTE: ADR-0202 [ACCEPTED] History Back Across Tabs and + Forms Over the Current Tab
+// NOTE: ADR-0203 [ACCEPTED] One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection
+// NOTE: ADR-0204 [ACCEPTED] One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay
+// NOTE: ADR-0205 [ACCEPTED] One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates
+// NOTE: ADR-0206 [ACCEPTED] Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper
 
-export const ADR_COUNT = 197;
+export const ADR_COUNT = 206;
