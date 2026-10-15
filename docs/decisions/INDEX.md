@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 39 of
-  179 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 40 of
+  185 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -51,24 +51,24 @@ not something you can pattern-match against.
 | 018 | Archive-Gated Contact Purge with Explicit Fan-Out | Accepted | 04-contact-crud-lifecycle | — | ADR-080 (note — Archived list entry points only; gate unchanged) | — | 5 | `src/db`, `src/screens`, `src/theme` |
 | 019 | Native Stack Contact Lifecycle Navigation | Accepted | 04-contact-crud-lifecycle | — | ADR-080 (partial — root shell) | — | 3/4 live | `src/navigation`, `src/screens` |
 | 020 | Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/screens`, `src/services/photos` |
-| 021 | Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup | Accepted | 05-photos | — | — | — | 7 | `src/components/field-widgets`, `src/db`, `src/services/photos` |
+| 021 | Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup | Accepted | 05-photos | — | ADR-181 (partial) | — | 7 | `src/components/field-widgets`, `src/db`, `src/services/photos` |
 | 022 | Tokenized Deterministic Initials Avatars | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/stores`, `src/theme` |
 | 023 | Structured Touchpoints and One-Tap Defaults | Accepted | 06-interaction-log-status-impact | — | ADR-116 (partial — the stored channel/quality value vocabulary; the structured-touchpoint architecture, one-tap defaults, and `unspecified` channel remain in force) | — | 4 | `src/components`, `src/db`, `src/screens` |
-| 024 | Editable Touchpoint History and Recomputed Recency | Accepted | 06-interaction-log-status-impact | — | ADR-123 (partial — the newest-first profile timeline as the interaction-refinement surface is replaced by the History section, Interaction Detail, and Edit Interaction route; recency-recompute, same-day-row, past/future, and permanent-deletion behavior remain in force) | — | 5 | `src/components`, `src/db`, `src/screens` |
-| 025 | Immutable Lifecycle Events in a Unified Timeline | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/components`, `src/db` |
+| 024 | Editable Touchpoint History and Recomputed Recency | Accepted | 06-interaction-log-status-impact | — | ADR-123 (partial — the newest-first profile timeline as the interaction-refinement surface is replaced by the History section, Interaction Detail, and Edit Interaction route; recency-recompute, same-day-row, past/future, and permanent-deletion behavior remain in force) | — | 4/5 live | `src/components`, `src/db`, `src/screens` |
+| 025 | Immutable Lifecycle Events in a Unified Timeline | Accepted | 06-interaction-log-status-impact | — | — | — | 4/5 live | `src/db` |
 | 026 | Rogue Status for Unresponsive or Far-Overdue Contacts | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |
 | 027 | Derived Profile-Only Gravity and Intensity | Accepted | 06-interaction-log-status-impact | — | ADR-106 (partial — Orrery Gravity display scope and companion context) | — | 6 | `src/components`, `src/db`, `src/services` |
-| 028 | Per-Item Conversational Fuel with Fixed Kinds | Accepted | 07-conversational-fuel | — | — | — | 5 | `src/components`, `src/db`, `src/db/migrations` +1 |
-| 029 | In-Query Fuel Eligibility and a Shared Ranked Projection | Accepted | 07-conversational-fuel | — | ADR-039 (partial) | — | 5 | `src/components`, `src/db`, `src/screens` +1 |
-| 030 | Explicit Confirmation of AI-Proposed Fuel | Accepted | 07-conversational-fuel | — | ADR-081 | — | 4 | `src/components`, `src/db`, `src/screens` |
-| 031 | Bound Local Fuel Search without FTS5 | Accepted | 07-conversational-fuel | — | ADR-032 (partial) | — | 3/6 live | `src/db`, `src/navigation` |
-| 032 | Flat Dashboard Discovery and In-Query Contact Search | Accepted | 08-dashboard-never-contacted-screen | ADR-031 (partial) | — | — | 4/7 live | `src/db`, `src/navigation`, `src/screens` |
+| 028 | Per-Item Conversational Fuel with Fixed Kinds | Accepted | 07-conversational-fuel | — | — | — | 2/5 live | `src/db/migrations`, `src/screens` |
+| 029 | In-Query Fuel Eligibility and a Shared Ranked Projection | Accepted | 07-conversational-fuel | — | ADR-039 (partial) | — | 1/5 live | `src/screens` |
+| 030 | Explicit Confirmation of AI-Proposed Fuel | Accepted | 07-conversational-fuel | — | ADR-081 | — | 1/4 live | `src/screens` |
+| 031 | Bound Local Fuel Search without FTS5 | Accepted | 07-conversational-fuel | — | ADR-032 (partial) | — | 1/6 live | `src/navigation` |
+| 032 | Flat Dashboard Discovery and In-Query Contact Search | Accepted | 08-dashboard-never-contacted-screen | ADR-031 (partial) | — | — | 3/7 live | `src/db`, `src/navigation`, `src/screens` |
 | 033 | Profile Marking and Shared Drag-Reordered Favourites | Accepted | 08-dashboard-never-contacted-screen | — | ADR-075 | — | 4/6 live | `src/components`, `src/db`, `src/screens` |
 | 034 | Birthday Banner and Re-query Dashboard Freshness | Accepted | 08-dashboard-never-contacted-screen | — | ADR-076 (partial — banner) | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 035 | Native SMS Handoff with Guaranteed Clipboard Copy | Accepted | 09-compose-screen-sms-handoff | — | ADR-061 (partial) | — | 3 | `src/db`, `src/logic`, `src/screens` |
 | 036 | Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails | Accepted | 09-compose-screen-sms-handoff | — | ADR-078 (partial — Off Limits visible on the Research side) | — | 5 | `src/db`, `src/navigation`, `src/screens` |
 | 037 | Text-Only Android Share Intent Integration | Accepted | 10-share-sheet-capture | — | — | — | 3 | `modules/orbit-share-finish/android/src/main/java/expo/modules/orbitsharefinish`, `patches`, `src/navigation` |
-| 038 | Contact-Owned Share Capture Fuel | Accepted | 10-share-sheet-capture | — | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
+| 038 | Contact-Owned Share Capture Fuel | Accepted | 10-share-sheet-capture | — | — | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 039 | Pre-Scheduled Inexact Decay Reminders | Accepted | 11-actionable-notifications | ADR-029 (partial) | — | — | 5 | `src/db`, `src/services/notifications` |
 | 040 | Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing | Accepted | 11-actionable-notifications | — | — | — | 6 | `src/db`, `src/navigation`, `src/services/notifications` |
 | 041 | Notification Settings, Privacy Channels, and Birthday Alerts | Accepted | 11-actionable-notifications | — | — | — | 5/6 live | `src/db`, `src/db/migrations`, `src/services/notifications` |
@@ -78,7 +78,7 @@ not something you can pattern-match against.
 | 045 | Event-Driven Widget Refresh and Boot Recovery | Accepted | 12-home-screen-widget | — | — | — | 4 | `plugins`, `src/services/notifications`, `src/services/widget` |
 | 046 | Query-Time Orrery Placement and Transactional Ring Ordering | Accepted | 13-orrery | — | — | — | 4 | `src/db`, `src/logic` |
 | 047 | App-Level Assignable Sun and Themed Self Identity | Accepted | 13-orrery | — | — | — | 5/6 live | `src/db`, `src/db/migrations`, `src/logic` +1 |
-| 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | ADR-077 (partial — dual view/morph) | — | 7 | `src/components`, `src/components/orrery`, `src/navigation` +1 |
+| 048 | Status-Default Static Orrery with a Single-Canvas Morph | Accepted | 13-orrery | — | ADR-077 (partial — dual view/morph) | — | 4/7 live | `src/components`, `src/navigation`, `src/screens` |
 | 049 | BYO-Key AI Configuration and Credential Boundary | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/services` |
 | 050 | Closed AI Prompt Egress Allowlist and Opt-In Field Sharing | Accepted | 14-ai-message-suggestions | — | ADR-078 (partial — Off Limits and permitted interaction notes) | — | 5 | `src/ai`, `src/components`, `src/db` |
 | 051 | Public-HTTPS Custom AI Egress Guard | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `modules/orbit-secure-fetch/src`, `src/ai`, `src/ai/__fixtures__` +1 |
@@ -107,19 +107,19 @@ not something you can pattern-match against.
 | 074 | Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe | Accepted | 21-interaction-assist-reach-out | ADR-044 (partial) | — | — | 5 | `src/navigation`, `src/screens`, `src/services/widget` |
 | 075 | Binary Favourite Membership Without a User-Facing Order | Accepted | milestone-2 | ADR-033 (full); ADR-043 (partial — ordering source only) | — | — | 3/6 live | `src/db`, `src/services/widget` |
 | 076 | Population-Reached Birthdays Without a Dashboard Banner | Accepted | milestone-2 | ADR-034 (partial — banner) | — | — | 3/4 live | `src/db`, `src/logic`, `src/screens` |
-| 077 | Single Canonical Orrery with a Constrained Inspection Camera | Accepted | milestone-2 | ADR-048 (partial — dual view/morph) | — | — | 4 | `src/components`, `src/components/orrery`, `src/screens` |
-| 078 | Negative-Constraint Off Limits and Gated Recent-Interaction AI Context | Accepted | milestone-2 | ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side) | ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force) | — | 5 | `src/ai`, `src/db`, `src/screens` |
+| 077 | Single Canonical Orrery with a Constrained Inspection Camera | Accepted | milestone-2 | ADR-048 (partial — dual view/morph) | — | — | 2/4 live | `src/components`, `src/screens` |
+| 078 | Negative-Constraint Off Limits and Gated Recent-Interaction AI Context | Accepted | milestone-2 | ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side) | ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force) | — | 4/5 live | `src/ai`, `src/db`, `src/screens` |
 | 079 | On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation | Accepted | milestone-2 | ADR-052 (partial — acknowledgement and Profile entry) | — | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | ADR-146 (partial) | — | 3/4 live | `src/navigation`, `src/screens` |
 | 081 | Retire AI-Proposed Fuel for Explicit Per-Item Permission | Accepted | 24.2-contact-knowledge-egress-search-types | ADR-030 | — | — | 2 | `src/db`, `src/db/migrations` |
 | 082 | Universal Capture FAB, Canonical Picker, and Truthful Quick Log | Accepted | 22-app-shell-navigation | — | ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow) | — | 6 | `src/components`, `src/db` |
 | 083 | Durable Multi-Package Theme Configuration and Restore-Before-Paint | Accepted | 23-theme-visual-system | ADR-006 (partial) | — | — | 7 | `src/backup`, `src/db`, `src/db/migrations` +2 |
 | 084 | Four Semantic Theme Palettes, Curated Accents, and Contrast Validation | Accepted | 23-theme-visual-system | — | — | — | 5/6 live | `src/theme` |
-| 085 | Live Reduced-Motion Signal for Skia Ambient Animation | Accepted | 23-theme-visual-system | — | — | — | 4 | `src/components/orrery`, `src/theme`, `src/theme/tokens` |
+| 085 | Live Reduced-Motion Signal for Skia Ambient Animation | Accepted | 23-theme-visual-system | — | — | — | 2/4 live | `src/theme`, `src/theme/tokens` |
 | 086 | Semantic Icons and Accessible Interaction Primitives | Accepted | 23-theme-visual-system | — | — | — | 8 | `src/components`, `src/components/icons`, `src/components/ui` +1 |
 | 087 | Bundled Background Presets and Package-Specific Surface Treatment | Accepted | 23-theme-visual-system | — | ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation); ADR-177 (partial — one asset per slot used in both modes) | — | 6 | `assets/backgrounds`, `src/components/ui`, `src/components/ui/__dev__` +2 |
 | 088 | Additive Contact-Knowledge Schema and Application-Owned Memory Registry | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 10 | `src/db`, `src/db/migrations` |
-| 089 | Recoverable Memory Lifecycle and Contact-Operation Integrity | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 7 | `src/db`, `src/screens`, `src/services` |
+| 089 | Recoverable Memory Lifecycle and Contact-Operation Integrity | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 5/7 live | `src/db` |
 | 090 | Additive Custom-Field Value History and Deferred Contact Scope | Accepted | 24.2-contact-knowledge-egress-search-types | — | — | — | 7 | `src/db`, `src/db/migrations` |
 | 091 | Imported Contact Notes as AI-Off Typed Memories | Accepted | 24.2-contact-knowledge-egress-search-types | — | — | — | 7 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker`, `src/db` +1 |
 | 092 | Durable Shared Dashboard Query State | Accepted | 25-dashboard-data-state-foundation | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +2 |
@@ -137,7 +137,7 @@ not something you can pattern-match against.
 | 104 | Durable Orrery Preferences and Live System Scope | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/logic` +1 |
 | 105 | Scoped Relationship Satellites for System-Member Context | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 4 | `src/components/orrery`, `src/db`, `src/logic` |
 | 106 | Derived Orrery Gravity Visual Mass and Accessible Context | Accepted | 29-orrery-camera-scale-exploration | ADR-027 (partial — profile-only presentation and rejected Orrery encoding clauses) | — | — | 5 | `src/components/orrery`, `src/db`, `src/logic` +1 |
-| 107 | Off Limits Excluded from All AI Egress | Accepted | 35-messaging-ai-compose | ADR-078 (partial — Off Limits AI egress only; ADR-078's gated recent-interaction-note carry and absolute Group Notes ban remain in force) | — | — | 5 | `src/ai`, `src/db`, `src/screens` |
+| 107 | Off Limits Excluded from All AI Egress | Accepted | 35-messaging-ai-compose | ADR-078 (partial — Off Limits AI egress only; ADR-078's gated recent-interaction-note carry and absolute Group Notes ban remain in force) | — | — | 4/5 live | `src/ai`, `src/db`, `src/screens` |
 | 108 | Durable Independent-Axis Profile Presentation and Inheritance | Accepted | 31-profile-experience | — | — | — | 10 | `src/db`, `src/db/migrations`, `src/profile` |
 | 109 | Fixed-Hero Semantic Profile Composition and Focused Accessible Editors | Accepted | 31-profile-experience | — | — | — | 10 | `src/components/profile`, `src/components/ui`, `src/navigation` +2 |
 | 110 | Coherent Local Profile Snapshot and Source-Owned Knowledge Projection | Accepted | 31-profile-experience | — | — | — | 10 | `src/components/profile`, `src/db`, `src/profile` |
@@ -150,9 +150,9 @@ not something you can pattern-match against.
 | 117 | Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore | Accepted | 32-interaction-history-insights | — | — | — | 9 | `src/backup`, `src/components`, `src/components/history` +3 |
 | 118 | Bind/Unbind Immutable Lifecycle Events Without a Migration | Accepted | 32-interaction-history-insights | — | — | — | 3 | `src/backup`, `src/db` |
 | 119 | Reusable Count-Only History Aggregation and Canonical Single-Contact History Read | Accepted | 32-interaction-history-insights | — | — | — | 6 | `src/db`, `src/services/history` |
-| 120 | Shared-Window Heatmap and Intensity with Globally-Persisted Lenses | Accepted | 32-interaction-history-insights | — | — | — | 8 | `src/components`, `src/components/history`, `src/db` +1 |
-| 121 | Rolodex Month/Day/Year History Browser (Reanimated, No Skia) | Accepted | 32-interaction-history-insights | — | — | — | 3 | `src/components/history` |
-| 122 | Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer | Accepted | 32-interaction-history-insights | — | ADR-127 (partial — dormant group-context and edit-scope routing only) | — | 9 | `src/components`, `src/components/history`, `src/db` +1 |
+| 120 | Shared-Window Heatmap and Intensity with Globally-Persisted Lenses | Accepted | 32-interaction-history-insights | — | — | — | 7/8 live | `src/components`, `src/components/history`, `src/db` +1 |
+| 121 | Rolodex Month/Day/Year History Browser (Reanimated, No Skia) | Accepted | 32-interaction-history-insights | — | — | — | 0/3 live | — |
+| 122 | Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer | Accepted | 32-interaction-history-insights | — | ADR-127 (partial — dormant group-context and edit-scope routing only) | — | 7/9 live | `src/components/history`, `src/db`, `src/screens` |
 | 123 | Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing | Accepted | 32-interaction-history-insights | ADR-024 (partial — the profile-timeline refinement surface) | — | — | 7 | `src/components/history`, `src/components/profile`, `src/navigation` +2 |
 | 124 | Group Event Parents with Canonical Per-Contact Children | Accepted | 33-group-interaction-logging | — | — | — | 6 | `src/db`, `src/db/migrations` |
 | 125 | Three-Field Live Inheritance with Separate Local-Only Group Notes | Accepted | 33-group-interaction-logging | — | — | — | 6 | `src/components/group`, `src/db`, `src/db/migrations` +1 |
@@ -161,8 +161,8 @@ not something you can pattern-match against.
 | 128 | Same-Group Contact Merge Refusal with Remediation | Accepted | 33-group-interaction-logging | — | — | — | 3 | `src/components`, `src/db`, `src/db/migrations` |
 | 129 | Portable Group Identity and History-Preserving Orphan Disposition | Accepted | 33-group-interaction-logging | — | — | — | 4 | `.planning/phases/33-group-interaction-logging`, `src/backup`, `src/db` |
 | 130 | Durable Scoped Default Interaction Channel | Accepted | 34-rapid-capture-update-flows | — | — | — | 4 | `src/backup`, `src/db`, `src/db/migrations` +1 |
-| 131 | Progressive Contact Creation and Complete-Record Editing | Accepted | 34-rapid-capture-update-flows | — | — | — | 6 | `src/components/ui`, `src/db`, `src/screens` |
-| 132 | Focused Rapid Capture Workflows | Accepted | 34-rapid-capture-update-flows | ADR-082 (partial — the visible “Log Contact” action name and its placeholder workflow) | — | — | 8 | `src/components`, `src/screens`, `src/services` |
+| 131 | Progressive Contact Creation and Complete-Record Editing | Accepted | 34-rapid-capture-update-flows | — | — | — | 5/6 live | `src/components/ui`, `src/db`, `src/screens` |
+| 132 | Focused Rapid Capture Workflows | Accepted | 34-rapid-capture-update-flows | ADR-082 (partial — the visible “Log Contact” action name and its placeholder workflow) | — | — | 7/8 live | `src/components`, `src/screens`, `src/services` |
 | 133 | Session-Scoped Compose Modes and Truthful External Handoff | Accepted | 35-messaging-ai-compose | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/logic` +3 |
 | 134 | Read-Only Compose Research and Permission-Bounded Message Focus | Accepted | 35-messaging-ai-compose | — | — | — | 7 | `src/ai`, `src/db`, `src/screens` +1 |
 | 135 | Multi-Connection AI Configuration and Fail-Closed Readiness | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/logic` +1 |
@@ -171,7 +171,7 @@ not something you can pattern-match against.
 | 138 | Complete Portable Backup Format v5 | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/backup`, `src/services/photos` |
 | 139 | Loopback-Only OpenRouter Authorization Callback | Accepted | 36-ai-configuration-prompting | — | — | — | 4 | `modules/orbit-openrouter-loopback/android/src/main/java/expo/modules/orbitopenrouterloopback`, `modules/orbit-openrouter-loopback/src`, `src/ai` +1 |
 | 140 | Navigation-First Settings Directory and Canonical Sub-Routes | Accepted | 37-settings-personalization | — | — | — | 5 | `src/navigation`, `src/navigation/tabs`, `src/screens` |
-| 141 | Explicit-Host Dual-Home Backup Navigation | Accepted | 37-settings-personalization | — | ADR-146 (partial) | — | 6 | `src/navigation/tabs`, `src/screens` |
+| 141 | Explicit-Host Dual-Home Backup Navigation | Accepted | 37-settings-personalization | — | ADR-146 (partial) | — | 5/6 live | `src/navigation/tabs`, `src/screens` |
 | 142 | User-Owned Categories with Stable Identity and Canonical Ordering | Accepted | 37.1-category-management | — | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
 | 143 | Lock-Time-Revalidated Atomic Category Deletion and System Fallout | Accepted | 37.1-category-management | — | — | — | 6 | `src/db`, `src/logic` |
 | 144 | Complete Category Selection and Grouped Orrery System Discovery | Accepted | 37.1-category-management | — | — | — | 8 | `src/components/category`, `src/components/orrery`, `src/logic` +2 |
@@ -198,7 +198,7 @@ not something you can pattern-match against.
 | 165 | In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 11 | `src/components/history`, `src/components/profile`, `src/profile` +1 |
 | 166 | Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 12 | `src/components`, `src/components/profile`, `src/navigation` +3 |
 | 167 | Committed Participant Writes Preserve the Parent Draft and Never Replay | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 5 | `src/logic`, `src/screens` |
-| 168 | Truthful Read Phases for Import, Review, and Settings Screens | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 14 | `src/logic`, `src/screens`, `src/utils` |
+| 168 | Truthful Read Phases for Import, Review, and Settings Screens | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 13/14 live | `src/logic`, `src/screens`, `src/utils` |
 | 169 | Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 26 | `scripts`, `src/components`, `src/components/ui` +4 |
 | 170 | Bounded Your Week Reads and Settled Orrery Resource Retirement | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 7 | `src/components/orrery`, `src/db`, `src/db/migrations` +1 |
 | 171 | Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session | Accepted | 38.4-audit-remediation-ui-performance-release | ADR-066 (partial: bulk "only a batch category override" and the Import Complete bridge to Unbound contacts) | — | — | 21 | `src/db`, `src/db/migrations`, `src/screens` +1 |
@@ -210,3 +210,9 @@ not something you can pattern-match against.
 | 177 | Mode-Specific Background Art and Signed Per-Combination Art Treatments | Accepted | 38.5-background-art-text-contrast | ADR-115 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and the Contacts/Digest headers, where signed); ADR-087 (partial — one asset per slot used in both modes); ADR-113 (partial — the one-asset-per-slot library of eight WebPs) | — | — | 17 | `scripts`, `src/components`, `src/components/ui` +4 |
 | 178 | Restore Asks Before Replacing an Unavailable Background Id with the Package Default | Accepted | 38.5-background-art-text-contrast | None (replaces the phase's own threat mitigation T-38.5-05-03, a whole-restore abort that no ADR recorded) | — | — | 9 | `src/backup`, `src/db`, `src/screens` |
 | 179 | Owner-Ruled Art Treatments Beyond the Signed Table | Accepted | 38.5-background-art-text-contrast | — | — | — | 15 | `src/components`, `src/components/control-surface`, `src/screens` +2 |
+| 180 | Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface | Accepted | 38.6-photo-handling | — | — | — | 23 | `src/backup`, `src/components`, `src/components/digest` +4 |
+| 181 | One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies | Accepted | 38.6-photo-handling | ADR-021 (partial — the one 512×512 JPEG master's size and format die; one master per target, the document directory, identity-derived `.jpg` names and the crash-safe swap and cleanup survive) | — | — | 14/16 live | `src/components/orrery`, `src/screens`, `src/services/backup` +3 |
+| 182 | Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos | Accepted | 38.6-photo-handling | — | — | — | 17 | `src/backup`, `src/components`, `src/components/profile` +6 |
+| 183 | 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox | Accepted | 38.6-photo-handling | — | — | — | 6 | `src/components`, `src/components/orrery`, `src/components/profile` +1 |
+| 184 | Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos | Accepted | 38.6-photo-handling | — | — | — | 5 | `src/components`, `src/components/ui` |
+| 185 | Assist Banner Renders in Flow Above the Tab Navigator | Accepted | 38.6-photo-handling | — | — | — | 7 | `src/components`, `src/navigation`, `src/screens` +1 |

@@ -30,7 +30,7 @@
 // IMPORTANT: ADR-0018 [SUPERSEDED BY ADR-080 (note — Archived list entry points only; gate unchanged)] Archive-Gated Contact Purge with Explicit Fan-Out
 // IMPORTANT: ADR-0019 [SUPERSEDED BY ADR-080 (partial — root shell)] Native Stack Contact Lifecycle Navigation
 // NOTE: ADR-0020 [ACCEPTED] Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download
-// NOTE: ADR-0021 [ACCEPTED] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
+// IMPORTANT: ADR-0021 [SUPERSEDED BY ADR-181 (partial)] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
 // NOTE: ADR-0022 [ACCEPTED] Tokenized Deterministic Initials Avatars
 // IMPORTANT: ADR-0023 [SUPERSEDED BY ADR-116 (partial — the stored channel/quality value vocabulary; the structured-touchpoint architecture, one-tap defaults, and `unspecified` channel remain in forc
 // IMPORTANT: ADR-0024 [SUPERSEDED BY ADR-123 (partial — the newest-first profile timeline as the interaction-refinement surface is replaced by the History section, Interaction Detail, and Edit Intera
@@ -189,5 +189,11 @@
 // NOTE: ADR-0177 [ACCEPTED] Mode-Specific Background Art and Signed Per-Combination Art Treatments
 // NOTE: ADR-0178 [ACCEPTED] Restore Asks Before Replacing an Unavailable Background Id with the Package Default
 // NOTE: ADR-0179 [ACCEPTED] Owner-Ruled Art Treatments Beyond the Signed Table
+// NOTE: ADR-0180 [ACCEPTED] Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface
+// NOTE: ADR-0181 [ACCEPTED] One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies
+// NOTE: ADR-0182 [ACCEPTED] Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos
+// NOTE: ADR-0183 [ACCEPTED] 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox
+// NOTE: ADR-0184 [ACCEPTED] Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos
+// NOTE: ADR-0185 [ACCEPTED] Assist Banner Renders in Flow Above the Tab Navigator
 
-export const ADR_COUNT = 179;
+export const ADR_COUNT = 185;
