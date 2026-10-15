@@ -52,7 +52,7 @@ The weekly digest is the model for a policy-gated singleton request. `digest-sch
 
 ## How to Add a Local Notification Kind
 
-1. **Declare stable IDs and generic copy** in `src/services/notifications/notification-ids.ts`. Use a unique namespace and only include content safe to freeze into the OS request. Never copy ranked fuel, notes, or other live contact detail into a scheduled body.
+1. **Declare stable IDs and generic copy** in `src/services/notifications/notification-ids.ts`. Use a unique namespace and only include content safe to freeze into the OS request. Never copy Things to Remember content (Off Limits above all), notes, or other live contact detail into a scheduled body.
 
 2. **Create a versioned channel** in `src/services/notifications/channels.ts` before a scheduler can mint requests:
 
