@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -49,9 +49,12 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/components/ui/ChromeScrim.tsx` | Protects text and controls drawn directly over visible artwork. |
 | `src/navigation/tabs/` | Owns the native-stack registrations for each persistent tab. |
 | `src/navigation/types.ts` | Typed tab and stack contracts, including semantic placeholder routes. |
-| `src/screens/ThingsToRememberScreen.tsx` | Contact-knowledge surface reached from either contact-profile stack. |
-| `src/screens/RecentlyDeletedScreen.tsx` | Typed Memory recovery and confirmed permanent-delete destination. |
-| `src/screens/MemoryHistoryScreen.tsx` | Typed retained-current-state history destination. |
+| `src/screens/SectionEditorScreen.tsx` | `SectionEditor { contactId, type, editId? }`: the per-section editor for memory types. |
+| `src/screens/KeyPeopleEditorScreen.tsx` | `KeyPeopleEditor { contactId, editId? }`. |
+| `src/screens/OffLimitsEditorScreen.tsx` | `OffLimitsEditor { contactId, editId? }`. |
+| `src/screens/MemoryHistoryScreen.tsx` | `MemoryHistory { …, openAdd?, editId? }`: the Last Talked About / Current Location history page. |
+| `src/screens/MemoryAddScreen.tsx` | The `Memory { contactId, type?, origin? }` route: + → Memory's add form. |
+| `src/stores/section-fab-store.ts` | Whether a section Add button is showing, read by root snackbar placement. |
 | `src/navigation/reset-intents.ts` | Builds typed semantic tab-root reset states. |
 | `src/navigation/tab-entry.ts` | `navigateIntoTab` — the single cross-tab nested entry; always sends `initial: false` so a not-yet-mounted tab keeps its semantic root. `openProfileInContactsTab` pushes a new Profile onto a mounted Contacts stack (ADR-202). |
 | `src/navigation/tab-history.ts` | History Back helpers: the launch-tab fallback and `switchTabWithoutHistory` (ADR-202). |
@@ -249,14 +252,14 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 
 1. Profile overflow offers `Update from Contacts` for an actively linked person and `Merge with another contact`; Settings offers `Check linked contacts` and flagged-item review.
 2. The navigator registers typed reconciliation grid, detail, completion, survivor selection, and merge-conflict routes. Screens fetch durable session or contact data instead of receiving source payloads in route state.
-3. `App.tsx` registers the foreground reconciliation resume sweep after database readiness. If import and reconciliation work are both resumable, the import prompt takes precedence so app-root sheets do not overlap.
+3. `App.tsx` registers the foreground reconciliation resume sweep after database readiness. If import and reconciliation work are both resumable, the import prompt takes precedence so app-root sheets do not overlap. `AppShell` resolves the active prompt once with `resolveActiveResumePrompt(import, reconcile, { suppressed })`; both prompts are suppressed while a share is pending or Capture is focused, on cold and warm starts (D-23, ADR-216).
 
 ### Opening contact knowledge
 
-1. A contact profile in either the Dashboard or Orrery stack opens `ThingsToRemember` with a serializable contact ID.
-2. Both stacks also register typed `RecentlyDeleted` and `MemoryHistory` destinations, preserving native Back behavior for their origin. The Settings stack additionally registers `ThingsToRemember` and `MemoryHistory` so a Settings-originated Profile (Archived → Profile) can resolve a History Detail Sheet knowledge-change edit.
+1. A Profile opens each Things to Remember section's own editor: `SectionEditor` (Memories, Thought of Them, Gift Ideas, Imported), `KeyPeopleEditor`, `OffLimitsEditor`, `MemoryHistory` (Last Talked About, Current Location) or `EditContact` for custom fields (ADR-219). The Things to Remember, Recently Deleted and Memory screens are retired.
+2. All five stacks register these routes (they are in `PROFILE_REACHABLE_ROUTES`, enforced by `shell-contract.test.ts`), so every Profile host resolves them. `editId` opens one entry's form once per navigation; `openAdd` opens the history page's add form.
 3. Each destination self-fetches its local SQLite projection; route parameters carry no Memory content or callbacks.
-4. Profile heading actions preserve source ownership: relationships and custom fields open existing `EditContact` routes, while Off Limits opens the typed `OffLimitsEditor { contactId }` route. Dashboard, Orrery, Digest, Events, and Settings Profile hosts register the destinations required by their Profile origins.
+4. + → Memory pushes `Memory` onto the current tab's stack (`navigateIntoTab` with the current tab), so after a save `MemoryAddScreen` goes back to where the user started and shows "Memory saved for <name>" with Open Profile, which `push`es so another contact's Profile lower in the stack is never popped to (D-64).
 
 ### Navigating interaction history
 
@@ -359,7 +362,11 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — mounts the app-global non-modal assist banner, the Settings toggle, and the ready-gated assist launch-sweep hook.
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — adds the `orbit://reach/<id>` widget bridge and the consumed-once `openReachOut` Profile param with a stale-target Dashboard fail-safe.
 - **ADR-088:** Additive Contact-Knowledge Schema and Application-Owned Memory Registry — adds typed contact-knowledge routes in both profile-owning stacks.
-- **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — exposes the guarded Recently Deleted recovery destination.
+- **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — its Recently Deleted destination is retired by ADR-212.
+- **ADR-212:** One Delete Pattern for Things to Remember — no Recently Deleted route.
+- **ADR-216:** A Share Saves at Once — the resume-prompt gate during a share.
+- **ADR-219:** Per-Section Editors Replace the Things to Remember and Memory Screens — the section routes in every stack.
+- **ADR-221:** Two Snackbar Looks — root snackbar placement above the round buttons.
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — retires the shell's Manage favourites route and Settings entry.
 - **ADR-076:** Population-Reached Birthdays Without a Dashboard Banner — removes the Dashboard banner without changing local refresh ownership.
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — retires the Never Contacted route and leaves its next visible control to Dashboard work.
@@ -392,7 +399,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-202:** History Back Across Tabs and + Forms Over the Current Tab — `backBehavior="history"`, the Digest exit fallback, + routes in every stack and ComposeResearch as a focused route.
 - **ADR-203:** One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection — every Settings switch is `OrbitSwitch`; Settings > Appearance marks the selected accent and star swatch with a ring, gap and check.
 - **ADR-204:** One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay — single choices on shell-hosted screens use `OptionSheet`.
-- **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — shell-hosted date labels (e.g. Recently Deleted) use the shared formatter.
+- **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — shell-hosted date labels use the shared formatter.
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Settings and Systems labels use plain words ("Reset Manual Changes").
 - **ADR-189:** Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion — adds the `orrery*` token sub-palette to every theme palette; the Orrery draws no colour that is not one of these tokens, including inside SkSL uniforms.
 
@@ -473,7 +480,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **Interaction Assist & Reach Out** — mounts the app-global assist banner, the Settings toggle, the assist launch-sweep, and the `orbit://reach` widget bridge with its consumed-once Profile param.
 - **Persistence core** — owns migration 015 and the validated durable settings selection consumed before navigation mounts.
 - **Orrery** — consumes the theme tokens and shared motion/accessibility contract while retaining its specialized canvas treatment.
-- **Contact Knowledge** — supplies profile-reached Things to Remember, Recently Deleted, and retained-history screens in both contact stacks.
+- **Contact Knowledge** — supplies the profile-reached per-section editors and the history page in every Profile-hosting stack.
 
 ## Changelog
 
@@ -538,3 +545,4 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 | 2026-10-08 | 38.8 | The `Sheet` `scrollBody={false}` opt-out list no longer includes History's retired `DateDetailSheet` (now OrreryContactsSheet and ProfileRelationshipSheets); History knowledge-row edits still need `MemoryHistory` in every Profile-hosting stack. |
 | 2026-10-11 | 38.9 | "Applying destructive emphasis" now points to the app-wide UX standards (`ux-standards.md`: destructive-action, feedback, dialog, guard, header/Back, states, dates and count rules). |
 | 2026-10-11 | 38.9 | KB extraction: history Back across tabs with the Digest exit fallback, + forms in every tab stack, the child header on every pushed screen, and the dialog host / overlay registry mounts; Decisions cite ADR-198..ADR-202; new gotcha on untracked tab switches. |
+| 2026-10-15 | 38.10 | Things to Remember, Recently Deleted and Memory screens retired; `SectionEditor`, `KeyPeopleEditor`, `OffLimitsEditor` and `MemoryHistory` registered in all five stacks; `Memory` is the add form on the current tab; resume prompts suppressed during a share; `section-fab-store` feeds root snackbar placement (ADR-212, ADR-216, ADR-219, ADR-221). |
