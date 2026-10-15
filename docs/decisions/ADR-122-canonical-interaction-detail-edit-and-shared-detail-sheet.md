@@ -56,4 +56,4 @@ Heatmap and Rolodex reuse one `DateDetailSheet` that interleaves interactions, r
 - `src/components/TimelineRow.tsx` — exports `EVENT_LABELS` (extended with `bind→Bound`/`unbind→Unbound`) consumed by the sheet.
 
 **Depends on:** ADR-024 (Editable Touchpoint History and Recomputed Recency); ADR-010 (Single-Writer Interaction Recency Spine); ADR-119 (Reusable Count-Only History Aggregation and Canonical History Read); ADR-025 (Immutable Lifecycle Events in a Unified Timeline)
-**Required by:** ADR-123 (Profile History Section Replacing the Vertical Timeline); ADR-127
+**Required by:** ADR-123 (Profile History Section Replacing the Vertical Timeline); ADR-127; ADR-193 (Activity-First History Stream in Profile, Replacing the Rolodex); ADR-194 (Heatmap Jump-and-Highlight with No Count Card, and Honest Empty Targets); ADR-197 (History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load)

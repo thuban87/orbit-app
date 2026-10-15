@@ -54,4 +54,4 @@ A tap on a day cell with records scrolls the stream to that day, opening its yea
 - `src/components/history/HeatmapContextCard.tsx` — retired (empty-day role taken by the note).
 
 **Depends on:** ADR-193 (Activity-First History Stream in Profile, Replacing the Rolodex); ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses); ADR-122 (Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet)
-**Required by:** None
+**Required by:** ADR-195 (Jump to Date: a Year-Stepper Month Picker and the Empty-Month State)

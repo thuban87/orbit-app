@@ -61,4 +61,4 @@ History browsing is an activity-first chronological stream of the contact's actu
 - `docs/archive/history-rolodex/README.md` — the archive's reference note and tool exclusions.
 
 **Depends on:** ADR-119 (Reusable Count-Only History Aggregation and Canonical History Read); ADR-122 (Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet); ADR-165 (In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History)
-**Required by:** None
+**Required by:** ADR-194 (Heatmap Jump-and-Highlight with No Count Card, and Honest Empty Targets); ADR-195 (Jump to Date: a Year-Stepper Month Picker and the Empty-Month State); ADR-197 (History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load)

@@ -55,4 +55,4 @@ History actions never navigate: Last Interaction and View history close any open
 - `src/profile/relationship-sheet-model.ts` — `history` route only when History is available.
 
 **Depends on:** ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors); ADR-110 (Coherent Local Profile Snapshot and Source-Owned Knowledge Projection); ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses); ADR-123 (Profile History Section Replacing the Vertical Timeline); ADR-162 (Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority)
-**Required by:** None
+**Required by:** ADR-193 (Activity-First History Stream in Profile, Replacing the Rolodex); ADR-196 (Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates); ADR-197 (History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load)
