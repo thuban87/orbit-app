@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -17,8 +17,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 **Tables:**
 - `contacts` — supplies lifecycle, cadence, recency, category, birthday, snooze, favourite, and status inputs.
 - `app_settings` — holds the List/Card preference, explicit population set, filter object, literal sort sentinel, and the global right-swipe action.
-- `categories`, `contact_methods`, `memories`, `relationships`, `custom_field_defs`, `custom_field_values` — supply user-facing semantic search entries.
-- `fuel` — continues to supply the legacy dashboard projection's eligible card line while the new query foundation is wired by later render phases.
+- `categories`, `contact_methods`, `memories` (including Gift Ideas and Thought of Them), `relationships`, `current_state_entries` (every Last Talked About and Current Location entry), `off_limits` (label and text), `custom_field_defs`, `custom_field_values` — supply user-facing semantic search entries; each hit names its section (ADR-215). The retired `fuel` table no longer feeds any Dashboard read.
 
 **Types** (`src/logic/dashboard-query-logic.ts`):
 - `DashboardQueryState` — the one renderer-independent durable state object.
@@ -58,7 +57,8 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/db/knowledge-search-read.ts` | Builds the eligible-ID-scoped semantic corpus. |
 | `src/services/knowledge-search.ts` | Provides bounded matcher and coverage-aware ranking. |
 | `src/logic/dashboard-search-match.ts` | Builds semantic labels, highlights, snippets, and overflow copy. |
-| `src/db/dashboard-search-read.ts` | Composes relevance-ranked semantic matches with deterministic name/fuel fallbacks for List search. |
+| `src/db/dashboard-search-read.ts` | Composes relevance-ranked semantic matches with a deterministic name-only fallback for List search. |
+| `src/db/sql-like.ts` | `escapeLike` for `?`-bound `LIKE` patterns. |
 | `src/db/dashboard-knowledge-read.ts` | Reads visibility-safe, bounded candidates for List's adaptive third line. |
 | `src/logic/list-row-selection.ts` | Selects deterministic third-line context or a stable gentle prompt. |
 | `src/components/ListRow.tsx` | Renders the scan-first, tokenized, accessible List row. |
@@ -131,7 +131,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 3. The Favourite star is binary membership. The screen keeps an optimistic per-contact overlay while a write is pending, records every successful durable settlement into the base row, and reveals that committed membership if a newer write fails.
 4. A closed row opens Profile. A partially open row closes first. Right swipe and its accessibility action read the global action only at commitment, then run shared Quick Log or navigate to Log Contact; left swipe and its accessibility action route to Edit Contact. Only one row remains open.
    - The row's backing comes from the signed art-treatment table (ADR-177): `full`, see-through at the signed level, or `none`. While a see-through row's swipe translation is non-zero, its tint steps to `SWIPE_ROW_BACKING_OPACITY` (0.5) so the Log/Edit action panel does not show through the row text (ADR-179). `HomeScreen` mirrors the `ReanimatedSwipeable` translation into the row's shared value; the tint is driven on the UI thread, never by React state.
-5. Search keeps identity on line one and replaces normal secondary content with a compact match explanation and strongest highlighted descriptor. Relevance-ranked corpus matches stay in scorer order; name-only and fuel-only fallbacks append in Dashboard order.
+5. Search keeps identity on line one and replaces normal secondary content with a compact match explanation and strongest highlighted descriptor. Relevance-ranked corpus matches stay in scorer order; name-only fallbacks append in Dashboard order and show the match count alone, with no snippet. Descriptor ranks: identity 1, Key People 2, Last Talked About 3, Current Location 4, Memory/custom field 5, Thought of Them 6, Gift Ideas 7, Off Limits 8, Note 9. Off Limits text appears in snippets (D-58); a memory hidden by its stored flag is searched while Hide from Profile is switched off (ADR-218).
 6. The row's accessible description is the identity summary (name, category, recency, favourite, status) followed by the context the row actually renders (RG-031, ui-accessibility/AUD-UIA-007). In search, that context is the match explanation plus the displayed snippet in quotes (`buildSearchRowContext`). Outside search, it is the adaptive line-three text. When no context is shown, the description is the unchanged identity summary. Text the row does not display is never passed as context.
 7. Row text resolves `fontFamily` through `resolveFontFamily` (`src/theme/tokens/typography.ts`), which AppText uses too. The result is always a key `fonts.ts` registers (`Inter-Regular`, `Inter-SemiBold`, `SpaceGrotesk-SemiBold`), never the bare semantic family (RG-031, ui-accessibility/AUD-UIA-015).
 
@@ -181,6 +181,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 ## Decisions
 
 - **ADR-011:** Query-Time Status and Never-Contacted Segregation — keeps Active Contacts status-bearing only.
+- **ADR-215:** Search and Glanceable Surfaces After Fuel — the search corpus and card line after fuel (partly supersedes ADR-031, ADR-032, ADR-100).
 - **ADR-031:** Bound Local Fuel Search without FTS5 — prohibits an indexed Dashboard search replacement.
 - **ADR-032:** Flat Dashboard Discovery and In-Query Contact Search — establishes Dashboard local discovery; its legacy surface is superseded where ADR-093 documents the shared model.
 - **ADR-033:** Profile Marking and Shared Drag-Reordered Favourites — superseded by ADR-075 for user-facing favourite order.
@@ -245,7 +246,9 @@ The Group Events header and redundant overflow entries navigate to the local rev
 10. **Long filter content must scroll.** The panel cap is deliberate, but clipping lower filter families or Clear filters makes the live controls unreachable.
 11. **Keep List status presentation separate from status state.** Snooze changes the row to neutral plus a snooze glyph; it does not rewrite `status` or create an Unknown status.
 12. **Timestamp text is untrusted at the renderer boundary.** Local-date parsing rejects rollover values; malformed recency renders neutral copy and malformed snoozes are inactive.
-13. **Do not re-sort scored List corpus results.** Dashboard order is a tie-breaker for corpus matches and the append order only for name/fuel fallbacks.
+13. **Do not re-sort scored List corpus results.** Dashboard order is a tie-breaker for corpus matches and the append order only for name-only fallbacks.
+13a. **Section labels come from the registries, not a DB read.** Search hit labels use the Title Case names in `PROFILE_MODULE_REGISTRY` and `MEMORY_TYPE_REGISTRY`; `list-row-content` stays node-pure.
+13b. **The card knowledge line leaves out Gift Ideas.** `dashboard-knowledge-read` excludes `birthday` and `gift_idea` and includes Thought of Them, shares included (D-94); each field's Most Recent comes from `currentStateOrderSql('cse')`.
 14. **A stale Favourite write can still be durable.** Every successful settlement updates the base membership, even if a newer optimistic intent remains over it.
 15. **Do not re-seed selection after entry.** The store membership guard and render-side frozen-universe filter both matter; only a committed archive removes IDs.
 16. **Do not use public single-contact writers inside a batch.** They own their own transaction; Dashboard bulk actions call the composed DAO instead.
@@ -299,3 +302,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-30 | 38.6 | List photos 72 with 12 padding; Grid photos sized from the card width (48–96) by `grid-card-geometry.ts`, corner star and checkbox 5 dp from the edges with 48×48 targets, two-line names with one height per row (ADR-184). Photos follow the display revision; the `modifiedAt` / `cacheBust` props are gone from `ListRow`, `GridCard`, `ContactCard` and `CardGrid` (ADR-180). |
 | 2026-09-26 | 38.5 | Contacts entries, count label and header follow the signed per-combination art table (ADR-177). Active Population/Filters/Sort triggers are filled with accent border and text (D-46), and a swiped see-through List row is backed at 50% (D-48; ADR-179). |
 | 2026-10-11 | 38.9 | Contacts labels read "Never Contacted" and "Favorites" (ids unchanged); the no-match search shows the shared `EmptyState` with "Clear search"; the bulk Frequency sheet validates inline; counts use `plural()` (ADR-199, ADR-206). |
+| 2026-10-15 | 38.10 | Fuel search and fuel card lines removed; the search corpus adds Off Limits (with snippet), every Last Talked About / Current Location entry, Gift Ideas and Thought of Them with section-named hits; name-only fallback has no snippet; the card line leaves out Gift Ideas (ADR-215, ADR-218). |
