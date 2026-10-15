@@ -68,8 +68,9 @@ export type ValidatedRestoreCandidate =
  * The format version a backup file was written in, read from the raw (and,
  * if encrypted, decrypted) object before `parseBackupManifest` converts it
  * forward (38.10 D-136 O14). A missing version is 1, the parser's own
- * default. Only called after the parse has validated the whole file, so a bad
- * version has already failed (T-38.10-61). Display only.
+ * default. It runs just before that parse, but its value is used only when
+ * the parse succeeds: a bad version throws there, before any preview is
+ * built (T-38.10-61). Display only.
  */
 function sourceFormatVersion(raw: unknown): number {
   const version =
@@ -105,7 +106,8 @@ export function loadBackupForRestore(input: {
       raw = JSON.parse(new TextDecoder().decode(decrypted));
       encrypted = true;
     }
-    // Read before the forward conversion (D-136 O14; display only).
+    // Read before the forward conversion (D-136 O14; display only); used
+    // only if the parse below succeeds.
     const fileVersion = sourceFormatVersion(raw);
     const manifest = parseBackupManifest(raw);
     const rows = [
