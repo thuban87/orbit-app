@@ -1,7 +1,7 @@
 # Interaction Assist & Reach Out
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-30
+**Updated by phase:** 38.6-photo-handling
 **Owners:** `src/services/assist-commit.ts`, `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
 
 ## Purpose
@@ -71,10 +71,10 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 
 ### Returning and confirming
 
-1. On a real background→active return, `assist-store` re-queries the eligible queue; `AssistBanner` (mounted app-wide in `App.tsx`) surfaces the newest eligible assist and a "{N} more pending" count.
+1. On a real background→active return, `assist-store` re-queries the eligible queue; `AssistBanner` (mounted once, in flow, by `RootNavigator`; ADR-185) surfaces the newest eligible assist, with the contact's photo (40 dp), and a "{N} more pending" count.
 2. `AssistConfirmation` offers, for Call: **Yes** (`connected=1`), **No answer** (`connected=0`, still logs), **Don't log**; for Text/Email: **Yes**, **Don't log**. An optional Notes expander (default closed) rides on any confirmation that writes an interaction.
 3. **Yes / No answer** call `markAssistLogged`, which re-reads the assist row **inside** one transaction, inserts a single outbound interaction at `handoff_at` via `insertInteractionCore`, recomputes recency via `recomputeLastContactCore` (the sole `last_contact` writer), then flips the assist to `logged`. It resolves an outcome: `logged`, `already-logged` (a harmless repeat confirm) or `closed` (the assist was dismissed, expired, failed or gone, so nothing was written). `runAssistAction` maps `closed` to its own result: the surface shows "Already closed" copy, refreshes only the queue, and Compose does not take its "logged" exit. **Don't log** calls `markAssistDismissed` — no interaction. (See ADR-071; the write path composes the cores from `src/db/data-revision-dao.ts`.)
-4. The banner exposes `PendingConfirmationsSheet` for multiple pending items; resolving the last one leaves the sheet in a calm empty state.
+4. The banner exposes `PendingConfirmationsSheet` for multiple pending items. Each question has a 40 dp contact avatar from `contact_photo`, which `listEligiblePendingAssists` selects for archived contacts too (ADR-180). resolving the last one leaves the sheet in a calm empty state.
 5. **One publication and failure contract (38.3 RG-023).** Banner, sheet and Compose all run the write through `runAssistAction` in `src/services/assist-commit.ts`. A committed confirmation publishes widget notify, the shell refresh tick and an assist-queue refresh; a dismissal refreshes the queue only. A write failure shows an Alert and leaves the assist pending; a publication failure after the commit is logged, never reported as a failed log.
 
 ### Lifecycle housekeeping
@@ -105,6 +105,8 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 - **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — routes every confirm/dismiss through `runAssistAction` with one post-commit publisher, latched surfaces, surfaced failures, and a `closed` outcome.
 - **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
+- **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — the banner and Pending confirmations show contact photos.
+- **ADR-185:** Assist Banner Renders in Flow Above the Tab Navigator — the banner never covers a screen's top bar.
 
 ## Gotchas
 
@@ -141,3 +143,4 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | 2026-09-25 | 38.3 | Shared assist publisher + RN-013 failure handling (RG-023): banner, pending sheet and Compose share `assist-commit.ts` (latched runner, widget + queue + shell-tick publication that never reports a post-commit failure, Alert on write failure with typed clock-rollback copy); the queue refresh is latest-request gated. |
 | 2026-09-23 | 38.4 | While the FAB speed dial is open, the AssistBanner is hidden from accessibility, and its root is `collapsable={false}` so Fabric cannot re-form it as a touch sink (D-42 A, D-33/GAP-G2; ADR-173). The pending-confirmations sheet was checked at maximum text and kept as an RN `Modal` with explicit-action exits; its minor large-text findings are in todo `2026-09-28-pending-confirmations-sheet-large-text.md` (D-49). |
 | 2026-09-30 | 38.6 | The banner renders in flow at the top of the navigator's safe-area column instead of as an absolute overlay, so it no longer covers other screens' app bars (D-38). |
+| 2026-09-30 | 38.6 | Pending confirmations rows and the banner show the contact's photo (`EligiblePendingAssist.contact_photo`, `PENDING_AVATAR_SIZE` / `ASSIST_BANNER_AVATAR_SIZE` 40); the question rows carry one accessible label (ADR-180, D-14/D-25). |
