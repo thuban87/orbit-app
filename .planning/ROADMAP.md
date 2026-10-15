@@ -165,7 +165,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language** (INSERTED) - A Skia 2.5D Orrery V2 from the Orrery renderer R&D labs: a tilted strategy-map Home, a new imperative renderer, a painted sky, thin sun-lit orbits with subtle pulses, rim-lit status bodies, Lab A's star sun, moon bumps, reticle focus with a docked card, a star-warp System switch, plus five production Orrery defect fixes. Dossier accepted after codex review (D-01..D-58); complete (2026-10-05).
 - [x] **Phase 38.8: History Navigation UX** (INSERTED) - Completed 2026-10-09: 7/7 plans (incl. gap plan 07: G1/G2/YEARS) + deep code review (1 blocker, 3 warnings, fixed); verification passed 76/76; owner look-and-feel sign-off on the Pixel and his Moto; final release orbit-38.8-release-2026-10-09.apk (arm64). Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
 - [x] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; 17/17 plans (completed 2026-10-11)
-- [ ] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6 (share reminders → 38.16); dossier accepted 2026-10-12
+- [x] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6 (share reminders → 38.16); dossier accepted 2026-10-12 (completed 2026-10-15)
 - [ ] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile, Add/Edit/Update Contact audit fixes + new-contact defaults and not-contacted status; dossier pending (split 2026-10-10)
 - [ ] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes; dossier pending
 - [ ] **Phase 38.13: Contacts List, Search & Digest UX** (INSERTED) - Contacts tab, search and Digest audit fixes + list perf investigation, D-95, D-98; dossier pending
@@ -1560,7 +1560,7 @@ Plans:
 **Success Criteria**: The must_haves of plans 38.10-01…25 (decisions D-01–D-153 in 38.10-CONTEXT).
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: fuel retirement; the audit's Things to Remember (G) and sharing (I) areas and the memory findings in Profile/forms (themes X-15, X-17); absorbs backlog 999.3, 999.5 and 999.6. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 25/25 plans executed (gap plans 20–25 added 2026-10-13, D-139); verification human_needed 2026-10-15
+**Plans**: 25/25 plans executed (gap plans 20–25 added 2026-10-13, D-139); verified 2026-10-15 (38.10-VERIFICATION.md passed)
 
 Wave 1
 - [x] 38.10-01-PLAN.md — Migration 033 (knowledge homes), shared fuel mapping, registry and tombstone changes
@@ -1747,7 +1747,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 | 38.7 Orrery V2 — Renderer, Camera & Visual Language | 16/16 | In Progress|  |
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
-| 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Verifying|  |
+| 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
 | 38.11 Everyday Screens UX | 0/TBD | Not started | - |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
