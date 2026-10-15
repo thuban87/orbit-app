@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-15
+**Updated by phase:** 38.10-fuel-retirement-things-to-remember
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -12,14 +12,14 @@ Backup & Restore gives Orbit a user-controlled, local loss barrier while Android
 
 ### Data Model
 
-The backup manifest is a versioned wire model separate from SQLite's schema version. Format 7 carries the complete non-secret preference inventory, including `yourWeekPeriod`, plus typed knowledge, Systems, Group Events, Profile presentation/templates, AI connection metadata, personalization, tombstones, and embedded photo/background bytes; it excludes API keys, OAuth credentials, passphrases, destructive-operation `field_history`, local source paths, and derived OS schedules.
+The backup manifest is a versioned wire model separate from SQLite's schema version. Format 8 (38.10, ADR-209) carries `offLimits[]` and no `fuel[]`, plus everything format 7 carried: the complete non-secret preference inventory, including `yourWeekPeriod`, plus typed knowledge, Systems, Group Events, Profile presentation/templates, AI connection metadata, personalization, tombstones, and embedded photo/background bytes; it excludes API keys, OAuth credentials, passphrases, destructive-operation `field_history`, local source paths, and derived OS schedules.
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
 - `app_settings` — stores portable preferences plus device-local automatic-backup configuration, revision, health, and encryption-flag state. Format v7 emits the complete portable allowlist, including `yourWeekPeriod`; transient `interaction_assists` rows remain device-local and excluded.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
 - `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
-- `memories`, `relationships`, `current_state_entries`, and `custom_field_value_history` — portable typed knowledge rows, including soft deletion, explicit AI permission, and retained prior field values.
+- `memories`, `relationships`, `current_state_entries`, `off_limits` and `custom_field_value_history` — portable typed knowledge rows with explicit AI permission and retained prior field values. Format 8 adds interaction links (`interactionUid`, `linkSource`), the `groupNoteCopy`, `fromShare` and `noteAiLocked` markers (optional on the wire, read as 0 when absent, always exported) and dated current state (`entryDate`, `entryTime`, `url`); soft-delete stamps are not on the wire.
 - `systems`, `system_rules`, `system_overrides`, `system_prefs`, `group_events`, profile template/presentation tables, `ai_connections`, and `personalization_sections` — v5 portable entities whose integer relationships are rebuilt from UIDs on restore. AI connection rows never contain credentials.
 
 **Types** (`src/backup/types.ts`):
@@ -100,6 +100,9 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 7. The ordinary default and remembered interaction-channel settings use camelCase manifest keys. They are accepted and validated at the restore boundary; Phase 34 declares them without emitting them or changing the backup format.
 8. The Compose default and remembered message-mode settings are likewise allowlisted and validated as a declaration only. Phase 35 does not emit them or bump the backup format; the coordinated wire change belongs to Phase 36.
 9. A v6 manifest forwards to v7 with `yourWeekPeriod: 'rolling-7-days'`; native v7 manifests validate the bounded setting before restore applies it.
+9a. A v7 manifest forwards to v8 through `convertV7ToV8` (`src/backup/v7-legacy-conversion.ts`, `FORWARD_MIGRATIONS[7]`) with migration 033's rules: fuel rows to their homes AI-off, contentless rows skipped, labelled Recent as "label: text", fuel tombstones tripled, `custom` → `general`, soft-deleted knowledge to tombstones, collision-complete uid re-mint, and the two new AI defaults at 0. `v7-v8-migration-equivalence.test.ts` proves migration and converter agree by uid. The v8 validator also checks link shape, lock markers and 0/1 `allowAi`, so a malformed file fails as a parse error, not a CHECK failure mid-restore.
+9b. Format-8 restore adds an `off_limits` entity, a retained-lock pass (D-103), an ordered link pass with a link-slot release (so the partial UNIQUE link indexes cannot roll a restore back) and a linked-pair post-pass that leaves `modified_at` unchanged. On a Merge conflict memories and interactions keep `MIN(local, incoming)` `allow_ai`; a row new to the phone keeps the backup's value; lock and Group-Note-copy markers still force 0; markers are sticky (MAX) (D-123). A winning format-8 memory or key-person row clears a local soft-delete stamp.
+9c. The restore preview shows the file's own format version (read from the raw file before forward conversion; D-136 O14).
 10. Background ids (38.5 D-47, refined by D-49; ADR-178). The schema accepts a `galaxyBackground` / `standardBackground` that is null or a bounded printable string; anything else is a damaged file. An active or retired id restores unchanged. An id the DAO would reject (for example a slot from a later version) is unavailable. The question is asked only when the restore will write the backup's settings (D-49, RA-a): always for Replace-all, and for Merge only when the backup's settings are newer than this phone's (`app_settings.modified_at`). A Merge whose backup settings are older or the same age skips them, so it shows no notice and no question, and proceeds with the phone's settings untouched. When it applies, `RestorePreviewScreen` shows a notice and, at apply, asks "A background selected in this backup is no longer available. Switch to the default background instead?" For Merge that is its own Continue/Cancel dialog; for Replace-all the notice rides inside the existing Replace-all confirmation, so each path shows one dialog. Cancel writes nothing. Continue calls `applyRestore(..., { unavailableBackgrounds: "use-default" })`, whose settings mapping (`src/backup/restore-backgrounds.ts`) writes the package default before the DAO. Without that option `applyRestore` returns `unavailable-background` before any snapshot, staging or write, when (and only when) its settings would be written. One shared helper, `backgroundsNeedingConsent` over `restoreWritesBackupSettings` (`src/backup/restore-backgrounds.ts`), decides both the flow's question and `applyRestore`'s gate and settings write, and `applyRestore` re-decides consent inside its transaction from that transaction's own settings read. The DAO stays strict. No backup-format change (D-34).
 
 ### Filled-action foregrounds
@@ -116,7 +119,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 
 | Constant | Value | File | Purpose |
 |---|---|---|---|
-| `BACKUP_FORMAT_VERSION` | `7` | `src/backup/types.ts` | Portable manifest compatibility version. |
+| `BACKUP_FORMAT_VERSION` | `8` | `src/backup/types.ts` | Portable manifest compatibility version. |
 | `BACKUP_ENVELOPE_VERSION` | `1` | `src/backup/types.ts` | Encrypted-container compatibility version. |
 | PBKDF2 iterations | `600000` | `src/services/backup/encryption.ts` | Approved passphrase derivation cost. |
 | Backup days | `1..3650`, defaults `1` / `7` | `src/db/app-settings-dao.ts` | Automatic cadence and retention bounds. |
@@ -142,7 +145,10 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — allowlists seven future-portable theme keys without changing the current format-3 wire shape.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — makes retained prior values a mergeable, tombstoned portable entity.
 - **ADR-116:** Value-Remapped Interaction Vocabulary and Optional Descriptive Duration — restore-apply remaps legacy `quality`/`channel` values on ingest through the single shared map, so a pre-Phase-32 backup cannot re-open the vocabulary miscount.
-- **ADR-117:** Per-Interaction Allow-AI Consent Gate — restore is fail-closed for `allow_ai` on both paths (fresh insert via `DEFAULT 0`, merge/update via an explicit `allow_ai=0`), so no restored backup leaves an interaction more AI-permissive.
+- **ADR-209:** Backup Format 8 Converts v7 Files with the Migration Mapping, and Merge Keeps the Lower Allow AI — supersedes ADR-117's restore text.
+- **ADR-208:** Migration 033 — the mapping the v7 converter shares.
+- **ADR-212:** One Delete Pattern — soft-delete stamps leave the wire; deletes travel as tombstones.
+- **ADR-117:** Per-Interaction Allow-AI Consent Gate (restore half superseded by ADR-209) — restore is fail-closed for `allow_ai` on both paths (fresh insert via `DEFAULT 0`, merge/update via an explicit `allow_ai=0`), so no restored backup leaves an interaction more AI-permissive.
 - **ADR-092:** Durable Shared Dashboard Query State — allowlists future-portable Dashboard preferences without changing the current wire format.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — allowlists the future-portable action key without an in-phase format change.
 - **ADR-130:** Durable Scoped Default Interaction Channel — declares validated camelCase restore keys without an in-phase wire-format bump.
@@ -187,7 +193,8 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 14. **Restore keys use manifest names, not SQLite column names.** `defaultInteractionChannel` and `rememberedInteractionChannel` pass through the typed settings map; snake_case column names would not update the intended setting.
 14. **Group Event deletion remains durable.** v5 carries parent tombstones, while an interaction whose Group Event no longer survives is retained as ordinary contact history with a NULL parent.
 15. **Profile presentation and background bytes are v5 entities.** `profile_contact_presentation` and `profile_category_presentation` are keyed by parent UID, preserve template assignments/freeform/collapse state, and restore background bytes through staged, UID-derived `profile-backgrounds/<uid>.jpg` files.
-16. **Restore is a separate interaction writer.** `restore-apply` writes `interactions` without going through migration 025, so it must consume the same `interaction-vocabulary.ts` remap and force `allow_ai=0` on its merge arm; otherwise the restore backdoor re-opens the vocabulary miscount or a stale AI-permissive row (SQLite's column `DEFAULT` fires only on fresh INSERT, not `ON CONFLICT` update).
+16. **Restore is a separate interaction writer.** `restore-apply` writes `interactions` without going through migration 025, so it must consume the same `interaction-vocabulary.ts` remap and must never raise `allow_ai`: its merge arm keeps `MIN(local, incoming)` and a lock forces 0 (ADR-209; the older "force `allow_ai=0` on merge" rule in ADR-117 is superseded). SQLite's column `DEFAULT` fires only on fresh INSERT, and every `SET` right-hand side reads the pre-update row, so a marker-dependent clamp must be computed from the merged marker in SQL.
+16a. **Keep the v7 converter and migration 033 in step.** Any change to one mapping rule changes both, the shared `legacy-fuel-mapping.ts` and the equivalence test (CR-01 changed all four).
 17. **Allowlisting is not emission.** A key in `PORTABLE_SETTINGS_KEYS` can be accepted and validated before its format-specific export/restore projection exists; do not mistake the Phase-35 Compose declaration for a format bump.
 18. **AI connection metadata is portable but credentials are not.** A restored lane can remain selected yet must resolve Needs Attention until its device-local SecureStore credential is supplied.
 19. **Do not infer the Backup host from navigator state.** The Settings mount remains explicit so restore return, app-bar chrome, and shared-backup consumption cannot drift.
@@ -252,3 +259,4 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | 2026-09-30 | 38.6 | Review WR5-03 (enforces D-39): a re-encrypting passphrase change over an over-cap source returns `too-large` with "too large" copy (passphrase unchanged, future-only still offered) instead of "Reconnect the folder"; the journal is dropped when no replacement exists yet. |
 Category relationships are portable by UID, never local integer ID. Format 6 adds category tombstones with a minimal v5→v6 version relabel. Merge maps a winning deleted category only to Uncategorized and suppresses only dependents proven to reference that UID. Replace-all removes destination-only categories through the canonical fallout transaction, restores the exact incoming order—including an empty taxonomy—clears tombstones for all live restored entities after insertion, and never replays migration-001 seeds.
 | 2026-10-11 | 38.9 | Backup schedule day counts save on change (on leave and on app background); the "Save schedule" button is gone; backup and restore prompts are themed confirms (ADR-198, ADR-200). |
+| 2026-10-15 | 38.10 | Format 8: `offLimits[]` replaces `fuel[]`; links, markers and dated current state on the wire; no soft-delete stamps; v7 files convert with migration 033's mapping (equivalence-tested); Merge keeps the lower `allow_ai`; restore preview shows the file's own version (ADR-208, ADR-209, ADR-212). |
