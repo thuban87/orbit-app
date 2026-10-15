@@ -1,7 +1,7 @@
 # Categories
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-10-11
+**Updated by phase:** 38.9-ux-standards
 **Owners:** `src/db/categories-dao.ts`, `src/logic/category-logic.ts`, `src/screens/CategoryManagementScreen.tsx`
 
 ## Purpose
@@ -27,7 +27,7 @@ Migration 001 alone seeds the original four rows on a new database. They become 
 | Validation/model | `src/logic/category-logic.ts` | Trim/NFC/case-insensitive name rules, canonical ordering, 12/13 search threshold, optional Uncategorized row, and stale-ID resolution. |
 | DAO | `src/db/categories-dao.ts` | Canonical list/create/rename/reorder, deletion preview fingerprint, atomic fallout, tombstone, and one revision bump. |
 | Manager | `src/screens/CategoryManagementScreen.tsx` | Add, rename, reorder, and two-stage delete UI with committed-state refresh. |
-| Shared chooser | `src/components/category/CategoryChoiceSheet.tsx` | Complete bounded searchable selection for catalogs of 13 or more rows. |
+| Shared chooser | `src/components/category/CategoryChoiceSheet.tsx` | Complete bounded category selection at every catalog size; a thin wrapper over the app-wide `OptionSheet` that shows search at 13 or more rows. |
 | Shell refresh | `src/stores/shell-refresh-store.ts` | Publishes committed taxonomy changes to mounted consumers. |
 
 ### Identity and Consumer Matrix
@@ -62,7 +62,7 @@ Migration 001 alone seeds the original four rows on a new database. They become 
 
 ### Selecting categories
 
-Ordinary consumers keep their established native picker through 12 real categories and use the shared expanded searchable Sheet at 13+. Search filters only visible rows; it never truncates the catalog or clears a hidden selection. System Builder always exposes the complete UID-backed category set. Profile assignment is real-category-only; contact, import, and Dashboard policies may explicitly include Uncategorized.
+Every consumer opens the shared category sheet (`CategoryChoiceSheet` over `OptionSheet`, opened from an `OptionSelectRow`) at every catalog size; search appears at 13+ (ADR-204). No native picker remains. Search filters only visible rows; it never truncates the catalog or clears a hidden selection. System Builder always exposes the complete UID-backed category set. Profile assignment is real-category-only; contact, import, and Dashboard policies may explicitly include Uncategorized.
 
 ### Backup and restore
 
@@ -72,7 +72,7 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 
 | Constant | Value | File | Purpose |
 |---|---:|---|---|
-| `CATEGORY_SEARCH_THRESHOLD` | 12 | `src/logic/category-logic.ts` | Native picker through 12; complete searchable Sheet at 13+. |
+| `CATEGORY_SEARCH_THRESHOLD` | 12 | `src/logic/category-logic.ts` | Search shows in the category sheet at 13+ rows; it no longer switches native versus themed (ADR-204). |
 | `BACKUP_FORMAT_VERSION` | 6 | `src/backup/types.ts` | Carries category tombstones. |
 | `TARGET_VERSION` | 29 | `src/db/database.ts` | Category management adds no migration. |
 
@@ -81,7 +81,8 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 - Phase 37.1 owner-approved dossier — single-category membership, zero-category validity, stable identity, dynamic deletion, complete selectors, and exact restore.
 - **ADR-142:** User-Owned Categories with Stable Identity and Canonical Ordering — makes Categories a mutable, ordered, UID-safe user taxonomy.
 - **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — requires previewed, parent-last, revision-once deletion with complete local repair.
-- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — defines complete local selection and the constrained Orrery selector grouping.
+- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — defines complete local selection and the constrained Orrery selector grouping. *Partially superseded by ADR-204:* the native picker through 12 categories is gone.
+- **ADR-204:** One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay — category choice uses the themed sheet at every size; the threshold now controls only search.
 - **ADR-145:** Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore — adds deletion evidence and exact portable taxonomy restoration.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — category deletion evidence uses the existing generic mechanism.
 - **ADR-057/058:** Versioned atomic backup and restore — category rows and dependents are validated before mutation and applied transactionally.
@@ -114,3 +115,4 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 |---|---|---|
 | 2026-09-17 | 37.1 | Documented the canonical mutable taxonomy, identity matrix, atomic all-status deletion fallout, complete selectors, tombstone merge, and exact replace-all contracts. |
 | 2026-09-23 | 38.4 | `CategoryChoiceSheet` lists every category again: its uid exclusion no longer drops categories without an internal id (D-72; pre-existing since 37.1). |
+| 2026-10-11 | 38.9 | Category choice uses the themed sheet at every catalog size (`CategoryChoiceSheet` wraps the app-wide `OptionSheet`); the native picker below 13 is gone and `CATEGORY_SEARCH_THRESHOLD` controls only search (ADR-204, partially superseding ADR-144). |
