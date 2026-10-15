@@ -159,8 +159,13 @@ describe("card edit mode: the history page (D-130)", () => {
       screen.indexOf("return (\n    <View style={styles.root}>"),
     );
     expect(renderRow).toMatch(
-      /return editing \? \(\s*<HistoryEntryForm[\s\S]*\) : \(\s*<HistoryRow/,
+      /return editing \? \(\s*renderEditForm\(model\)\s*\) : \(\s*<HistoryRow/,
     );
+    const renderEditForm = screen.slice(
+      screen.indexOf("const renderEditForm"),
+      screen.indexOf("const renderRow"),
+    );
+    expect(renderEditForm).toMatch(/return \(\s*<HistoryEntryForm/);
     expect(
       openingTags(entryForm, "Button").some((tag) =>
         tag.includes('role="destructive"'),
@@ -175,6 +180,25 @@ describe("card edit mode: the history page (D-130)", () => {
       tag.includes('testID="memory-history-add"'),
     );
     expect(add).toContain('role="primary"');
+  });
+
+  it("an edited row a reload removed keeps its form, and its draft, after the list (review WR-01)", () => {
+    expect(screen).toContain(
+      "{orphanedEdit !== null ? renderEditForm(orphanedEdit) : null}",
+    );
+    expect(screen).toMatch(
+      /orphanedEditRow\(\s*form\?\.mode === "edit" \? form\.row : null,\s*phase\.phase === "loaded" \? phase\.data : null,\s*\)/,
+    );
+    // Moving below the list remounts the form; this open's draft carries.
+    const [form] = openingTags(screen, "HistoryEntryForm").filter((tag) =>
+      tag.includes('testID="memory-history-edit-form"'),
+    );
+    expect(form).toContain("initialDraft={draft}");
+    expect(form).toContain("onDraftChange=");
+    expect(screen).toContain("draftRef.current?.formKey === formKey");
+    expect(entryForm).toMatch(
+      /useState\(initialDraft\?\.value \?\? initialValue\)/,
+    );
   });
 });
 
@@ -263,8 +287,8 @@ describe("the empty state hides while the add form is open (D-145)", () => {
     });
   }
 
-  it("history page: the empty state gives way to the add form", () => {
+  it("history page: the empty state gives way to any open form", () => {
     const source = read(HISTORY);
-    expect(source).toMatch(/form\?\.mode === "add" \? null : \(\s*<EmptyState/);
+    expect(source).toMatch(/form !== null \? null : \(\s*<EmptyState/);
   });
 });

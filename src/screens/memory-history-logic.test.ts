@@ -26,10 +26,12 @@ import {
   historyFabSection,
   historyRestoredSnackbar,
   historyRowDate,
+  historyRowModel,
   historyTitle,
   isPickableEntryDate,
   maxPickableDate,
   memorySavedLabel,
+  orphanedEditRow,
   returnsToSameProfile,
   rowPressAction,
 } from "./memory-history-logic";
@@ -175,6 +177,43 @@ describe("groupHistoryRows: Most Recent is a full row (convergence c10)", () => 
   it("names the groups as the Profile does", () => {
     expect(HISTORY_MOST_RECENT).toBe("Most Recent");
     expect(HISTORY_PREVIOUS).toBe("Previous");
+  });
+
+  it("builds each row's model through historyRowModel", () => {
+    const groups = groupHistoryRows(rows, "last_talked_about", TODAY);
+    expect(groups.previous[0]).toEqual(
+      historyRowModel(rows[1], "last_talked_about", TODAY),
+    );
+  });
+});
+
+describe("orphanedEditRow: a reload drops the edited row (38.10 review WR-01)", () => {
+  const edited = row(2, { value: "the stored value" });
+
+  it("is null while the edited row is still listed (its form is in place)", () => {
+    expect(orphanedEditRow(edited, [row(3), row(2), row(1)])).toBeNull();
+  });
+
+  it("keeps the edited row when the reload no longer lists it", () => {
+    expect(orphanedEditRow(edited, [row(3), row(1)])).toBe(edited);
+  });
+
+  it("keeps it when the reload leaves the page empty (it was the last entry)", () => {
+    expect(orphanedEditRow(edited, [])).toBe(edited);
+  });
+
+  it("is null with no edit open, or before the first load", () => {
+    expect(orphanedEditRow(null, [row(1)])).toBeNull();
+    expect(orphanedEditRow(edited, null)).toBeNull();
+  });
+
+  it("models the kept row as the page would have (linked date stays locked)", () => {
+    const linked = row(5, { interaction_id: 40, link_source: "note" });
+    const kept = orphanedEditRow(linked, [row(3)]);
+    expect(kept).not.toBeNull();
+    expect(
+      historyRowModel(kept ?? linked, "last_talked_about", TODAY),
+    ).toMatchObject({ canEditDate: false, canMove: true });
   });
 });
 

@@ -140,6 +140,38 @@ export interface HistoryGroups {
   rows: CurrentStateEntryRow[];
 }
 
+/** One row's model: the same for Most Recent, Previous and an orphaned form. */
+export function historyRowModel(
+  row: CurrentStateEntryRow,
+  fieldKey: CurrentStateFieldKey,
+  now?: Date,
+): HistoryRowModel {
+  return {
+    row,
+    dateLabel: historyRowDate(row, now),
+    pressAction: rowPressAction(row),
+    canEditDate: canEditDate(row),
+    canMove: canMoveFrom(fieldKey),
+  };
+}
+
+/**
+ * The open edit form's row when a reload no longer lists it (38.10 review
+ * WR-01): deleted or moved from another screen, a restore, or a merge. The
+ * page then renders that form after the list, so a typed draft never
+ * disappears and Back/Cancel still close a form the user can see (the Off
+ * Limits editor and `cardEditSlots` do the same). Null while nothing is being
+ * edited, before the first load, or while the row is still listed (its form
+ * renders in its place, D-130).
+ */
+export function orphanedEditRow<T extends { id: number }>(
+  editing: T | null,
+  rows: readonly T[] | null,
+): T | null {
+  if (editing === null || rows === null) return null;
+  return rows.some((row) => row.id === editing.id) ? null : editing;
+}
+
 /**
  * Split rows already in the SQL order (D-45, D-51) into Most Recent and
  * Previous. The order is never re-derived here, so it lives in one place.
@@ -149,13 +181,8 @@ export function groupHistoryRows(
   fieldKey: CurrentStateFieldKey,
   now?: Date,
 ): HistoryGroups {
-  const model = (row: CurrentStateEntryRow): HistoryRowModel => ({
-    row,
-    dateLabel: historyRowDate(row, now),
-    pressAction: rowPressAction(row),
-    canEditDate: canEditDate(row),
-    canMove: canMoveFrom(fieldKey),
-  });
+  const model = (row: CurrentStateEntryRow): HistoryRowModel =>
+    historyRowModel(row, fieldKey, now);
   const [first, ...rest] = rows;
   return {
     mostRecent: first === undefined ? null : model(first),

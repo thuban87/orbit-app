@@ -31,6 +31,8 @@
  *   its form in the row's place (a linked row's tap still opens its
  *   interaction, D-107). Move and a red Delete sit at the open form's top,
  *   never on a resting row; the Open link shows at rest and in edit mode.
+ *   An edited row a reload removed keeps its form, with its draft, after the
+ *   list (review WR-01, as the other three page types do).
  * - Move only on Last Talked About (D-84; F-U12), through `MoveEntrySheet`,
  *   whose callbacks re-read this list (D-118).
  * - Nothing promotes an older entry (D-45). No Allow AI switch: this table has none and
@@ -112,9 +114,11 @@ import {
   historyDeletedSnackbar,
   historyFabSection,
   historyRestoredSnackbar,
+  historyRowModel,
   historyTitle,
   isPickableEntryDate,
   maxPickableDate,
+  orphanedEditRow,
 } from "./memory-history-logic";
 import {
   addedSnackbar,
@@ -129,6 +133,13 @@ const EDIT_ACTION = "edit";
 
 /** The open form: a new entry, or one stored row. */
 type FormTarget = { mode: "add" } | { mode: "edit"; row: CurrentStateEntryRow };
+
+/** The open form's latest typed draft, tagged with the open it belongs to. */
+interface FormDraft {
+  formKey: number;
+  value: string;
+  entryDate: string;
+}
 
 function errorNotice(label: string): void {
   showSnackbar({
@@ -165,6 +176,14 @@ interface HistoryEntryFormProps {
   /** Attached to the form's outer View, so the host can scroll it into view. */
   formRef?: Ref<View>;
   onDirtyChange: (dirty: boolean) => void;
+  /**
+   * The draft to start from when this open's form remounts (WR-01: its row
+   * left the list on a reload, so the form moved below it). Dirty is still
+   * measured against `initialValue` / `initialDate`.
+   */
+  initialDraft?: { value: string; entryDate: string };
+  /** Reports every draft change, so a remount can restore it (WR-01). */
+  onDraftChange?: (value: string, entryDate: string) => void;
   testID: string;
 }
 
@@ -186,11 +205,15 @@ function HistoryEntryForm({
   url,
   formRef,
   onDirtyChange,
+  initialDraft,
+  onDraftChange,
   testID,
 }: HistoryEntryFormProps) {
   const { colors } = useTheme();
-  const [value, setValue] = useState(initialValue);
-  const [entryDate, setEntryDate] = useState(initialDate);
+  const [value, setValue] = useState(initialDraft?.value ?? initialValue);
+  const [entryDate, setEntryDate] = useState(
+    initialDraft?.entryDate ?? initialDate,
+  );
   const dirty = value !== initialValue || entryDate !== initialDate;
   const savable =
     !busy &&
@@ -202,6 +225,11 @@ function HistoryEntryForm({
   useEffect(() => {
     onDirtyChangeRef.current(dirty);
   }, [dirty]);
+  const onDraftChangeRef = useRef(onDraftChange);
+  onDraftChangeRef.current = onDraftChange;
+  useEffect(() => {
+    onDraftChangeRef.current?.(value, entryDate);
+  }, [value, entryDate]);
 
   const save = () => {
     if (!savable) return;
@@ -426,6 +454,9 @@ export function MemoryHistoryScreen({
   const [formDirty, setFormDirty] = useState(false);
   // Remounts the form for each open (it owns its draft).
   const [formKey, setFormKey] = useState(0);
+  // WR-01: an edit form whose row a reload removed moves below the list,
+  // which remounts it; this carries that open's typed draft across.
+  const draftRef = useRef<FormDraft | null>(null);
   const openForm = (target: FormTarget) => {
     setFormKey((key) => key + 1);
     setFormDirty(false);
@@ -659,6 +690,15 @@ export function MemoryHistoryScreen({
       phase.phase === "loaded" ? groupHistoryRows(phase.data, fieldKey) : null,
     [phase, fieldKey],
   );
+  // WR-01: an edited row a reload removed (deleted or moved elsewhere, a
+  // restore, a merge) keeps its form, after the list, as Off Limits does.
+  const orphanedEdit = useMemo(() => {
+    const row = orphanedEditRow(
+      form?.mode === "edit" ? form.row : null,
+      phase.phase === "loaded" ? phase.data : null,
+    );
+    return row === null ? null : historyRowModel(row, fieldKey);
+  }, [form, phase, fieldKey]);
   const controlsHeld = saving || form !== null;
 
   // D-131: the top Add morphs into the bottom-left FAB once it scrolls off.
@@ -676,11 +716,12 @@ export function MemoryHistoryScreen({
     openForm({ mode: "add" });
   };
 
-  const renderRow = (model: HistoryRowModel) => {
+  const renderEditForm = (model: HistoryRowModel) => {
     const { row } = model;
-    const editing = form?.mode === "edit" && form.row.id === row.id;
-    // D-130: the edit form renders instead of its row, not under it.
-    return editing ? (
+    // Only this open's draft: a new open has a new formKey.
+    const draft =
+      draftRef.current?.formKey === formKey ? draftRef.current : undefined;
+    return (
       <HistoryEntryForm
         key={`edit-form-${formKey}`}
         testID="memory-history-edit-form"
@@ -705,7 +746,20 @@ export function MemoryHistoryScreen({
             : undefined
         }
         onDirtyChange={setFormDirty}
+        initialDraft={draft}
+        onDraftChange={(value, entryDate) => {
+          draftRef.current = { formKey, value, entryDate };
+        }}
       />
+    );
+  };
+
+  const renderRow = (model: HistoryRowModel) => {
+    const { row } = model;
+    const editing = form?.mode === "edit" && form.row.id === row.id;
+    // D-130: the edit form renders instead of its row, not under it.
+    return editing ? (
+      renderEditForm(model)
     ) : (
       <HistoryRow
         key={row.id}
@@ -791,7 +845,9 @@ export function MemoryHistoryScreen({
                 </View>
               )}
               {groups === null || groups.mostRecent === null ? (
-                form?.mode === "add" ? null : (
+                // D-145: no empty state under an open form (the add form, or
+                // the last entry's form after a reload removed it, WR-01).
+                form !== null ? null : (
                   // D-68: text only; the top Add is the one action.
                   <EmptyState
                     testID="memory-history-empty"
@@ -818,6 +874,8 @@ export function MemoryHistoryScreen({
                   ) : null}
                 </>
               )}
+              {/* An edited row a reload removed keeps its form, at the end. */}
+              {orphanedEdit !== null ? renderEditForm(orphanedEdit) : null}
             </>
           )}
         </KeyboardCenteringProvider>
