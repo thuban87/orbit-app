@@ -145,6 +145,8 @@ None. The constants are the configuration.
 - **ADR-207:** Knowledge Homes After Fuel — "fuel" removed from code and wording, enforced by `src/no-fuel-contract.test.ts` (D-01).
 - **ADR-214:** AI Permission for the New Knowledge Homes and Compose Research — Compose Research's "Avoid" heading becomes "Off Limits"; the Profile helper "Avoid bringing these up" stays, so "Avoid" is not a retired form (D-87, D-105).
 - **ADR-218:** Things to Remember on the Profile — the Things to Remember terms, entry-sheet wording (Edit, Pin, Unpin, Close) and "Not set" (D-87, D-90).
+- **ADR-226:** Archive Becomes the Bin — `BIN`, `MOVE_TO_BIN`; "Archived contact(s)" retired.
+- **ADR-228:** Truthful Relationship Overview — "Never Contacted" on the Profile; `RARELY_RESPONDS`.
 
 ## Gotchas
 
@@ -184,3 +186,4 @@ None. The constants are the configuration.
 | 2026-10-15 | 38.10 | KB extraction: Decisions cite ADR-207, ADR-214 and ADR-218 in place of the D-ID line. |
 | 2026-10-16 | 38.11 | "Bin" and "Move to Bin" added as canonical terms; "Archive" is renamed "Bin" in user-visible text, internal names unchanged; "Archived contact(s)" / "Archived Contact(s)" added to the retired forms (D-69, D-70; plan 12). |
 | 2026-10-16 | 38.11 | "Rarely Responds" added as a canonical term (one Title Case spelling on the Edit Contact toggle and the Profile sheets, pinned by the glossary contract); the Bin entry follows D-93's "hidden from your lists". |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-226, ADR-228. |
