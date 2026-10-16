@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -231,6 +231,8 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-199:** App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State — the no-match empty state, inline bulk-sheet validation, and act-with-Undo for reversible bulk actions.
 - **ADR-198:** Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays — Contacts prompts are themed and errors fired from its sheets show above them; no native Alert remains; 38.11 replaced the card snooze Alert with the shared snooze sheet.
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — "Never Contacted", "Favorites" and singular-aware counts on Contacts.
+- **ADR-226:** Archive Becomes the Bin — bulk Move to Bin confirms (destructive) and reports "Moved N contacts to the Bin".
+- **ADR-227:** One Snooze Sheet — card and bulk snooze open the shared SnoozeSheet; bulk Unsnooze lives in the sheet and reads `readCurrentlySnoozedIds`.
 
 ## Gotchas
 
@@ -308,3 +310,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-10-16 | 38.11 | Code review WR-01: bulk Move to Bin reconciles the reminder schedule after the write commits, so binned people's scheduled reminders stop. |
 | 2026-10-16 | 38.11 | Code review IN-01: `readCurrentlySnoozedIds` documented as `countSnoozed`'s date predicate without its bound filter (behaviour unchanged). |
 | 2026-10-16 | 38.11 | Code review IN-06: the card and bulk snooze sheets keep their title and Unsnooze row while animating closed (`useRetainedWhileClosing`); visibility and writes still read the live target. |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-226, ADR-227. |
