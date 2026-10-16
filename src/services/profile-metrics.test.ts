@@ -72,32 +72,116 @@ describe("resolveProfileIntensityWindow", () => {
 });
 
 describe("Profile Overview metric models", () => {
-  it("marks Unbound and never-contacted Status as Not tracked", () => {
-    const unbound = resolveProfileStatus({
-      trackingEnabled: 0,
-      intervalDays: 30,
-      status: null,
-      progress: null,
-      lastContact: "2026-08-01 12:00:00",
-      rarelyResponds: 0,
-      rogueReason: null,
-    });
-    const neverContacted = resolveProfileStatus({
-      trackingEnabled: 1,
-      intervalDays: 30,
-      status: null,
-      progress: null,
-      lastContact: null,
-      rarelyResponds: 0,
-      rogueReason: null,
-    });
+  // 38.11 D-05, D-23, D-24: each unavailable reason is distinct.
+  const STATUS_BASE = {
+    trackingEnabled: 1,
+    intervalDays: 30 as number | null,
+    status: null,
+    progress: null,
+    lastContact: null as string | null,
+    rarelyResponds: 0,
+    rogueReason: null,
+    archived: false,
+  } as const;
+  const CONTACTED = {
+    status: "wobble",
+    progress: 0.9,
+    lastContact: "2026-08-13 09:00:00",
+  } as const;
 
-    expect(unbound).toEqual({
+  it("gives a Bound, never-contacted contact Never Contacted with no progress (D-05, D-06, D-08)", () => {
+    const status = resolveProfileStatus(STATUS_BASE);
+    expect(status).toEqual({
+      available: false,
+      label: "Never Contacted",
+      context: "Orbit Status starts after your first logged interaction.",
+      reason: "not-contacted",
+    });
+    expect(status).not.toHaveProperty("visualValue");
+    expect(status).not.toHaveProperty("factors");
+  });
+
+  it("gives an Unbound contact with a frequency an Unbound reason, not a set-frequency ask (D-24)", () => {
+    const status = resolveProfileStatus({
+      ...STATUS_BASE,
+      trackingEnabled: 0,
+      lastContact: "2026-08-01 12:00:00",
+    });
+    expect(status).toEqual({
+      available: false,
+      label: "Not tracked",
+      context:
+        "Unbound contacts aren't tracked. Bind this contact to see Orbit Status.",
+      reason: "unbound",
+    });
+    expect(status).not.toHaveProperty("visualValue");
+  });
+
+  it("asks an Unbound contact with no frequency to set one and bind (D-24)", () => {
+    const status = resolveProfileStatus({
+      ...STATUS_BASE,
+      trackingEnabled: 0,
+      intervalDays: null,
+    });
+    expect(status).toEqual({
+      available: false,
+      label: "Not tracked",
+      context:
+        "Set a contact frequency and bind this contact to see Orbit Status.",
+      reason: "unbound",
+    });
+    expect(status).not.toHaveProperty("visualValue");
+  });
+
+  it("asks a Bound contact with no frequency to set one (D-23)", () => {
+    for (const intervalDays of [null, 0]) {
+      const status = resolveProfileStatus({
+        ...STATUS_BASE,
+        intervalDays,
+        lastContact: "2026-08-01 12:00:00",
+      });
+      expect(status).toEqual({
+        available: false,
+        label: "Not tracked",
+        context: "Set a contact frequency to see Orbit Status.",
+        reason: "no-frequency",
+      });
+      expect(status).not.toHaveProperty("visualValue");
+    }
+  });
+
+  it("keeps today's literal for an archived contact that is unavailable, never contacted included (D-23)", () => {
+    const archivedNeverContacted = resolveProfileStatus({
+      ...STATUS_BASE,
+      archived: true,
+    });
+    const archivedUnbound = resolveProfileStatus({
+      ...STATUS_BASE,
+      archived: true,
+      trackingEnabled: 0,
+      lastContact: "2026-08-01 12:00:00",
+    });
+    const todays = {
       available: false,
       label: "Not tracked",
       context: "Set a contact frequency to see Orbit Status.",
+      reason: "archived",
+    };
+    expect(archivedNeverContacted).toEqual(todays);
+    expect(archivedNeverContacted.label).not.toBe("Never Contacted");
+    expect(archivedUnbound).toEqual(todays);
+    expect(archivedUnbound).not.toHaveProperty("visualValue");
+  });
+
+  it("keeps an archived, Bound, contacted contact available with its status (D-23)", () => {
+    const live = resolveProfileStatus({ ...STATUS_BASE, ...CONTACTED });
+    const archived = resolveProfileStatus({
+      ...STATUS_BASE,
+      ...CONTACTED,
+      archived: true,
     });
-    expect(neverContacted).toEqual(unbound);
+    expect(archived.available).toBe(true);
+    expect(archived).toEqual(live);
   });
 
   it("exposes only canonical Status factors and no editable value", () => {
@@ -109,6 +193,7 @@ describe("Profile Overview metric models", () => {
       lastContact: "2026-08-13 09:00:00",
       rarelyResponds: 1,
       rogueReason: null,
+      archived: false,
     });
 
     expect(status).toEqual({

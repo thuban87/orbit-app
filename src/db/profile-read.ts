@@ -183,6 +183,7 @@ export function readProfileSnapshot(
           lastContact: status.last_contact,
           rarelyResponds: status.rarely_responds,
           rogueReason: status.reason,
+          archived: header.archived_at !== null,
         }),
         gravity: resolveProfileGravity(
           hasHistory ? computeContactGravity(impactInputs, options.now) : null,

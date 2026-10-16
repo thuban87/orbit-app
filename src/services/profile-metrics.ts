@@ -9,6 +9,7 @@
  * calendar-month contract that Phase 32 can consume directly.
  */
 
+import { NEVER_CONTACTED } from "@/constants/glossary";
 import type { ProfileStatus, RogueReason } from "@/db/contact-status-read";
 import type { ImpactInputs } from "@/db/impact-read";
 import type { GravityResult } from "@/services/gravity-logic";
@@ -40,13 +41,50 @@ export interface ProfileStatusInput {
   readonly lastContact: string | null;
   readonly rarelyResponds: number;
   readonly rogueReason: RogueReason;
+  /**
+   * The contact is archived. Consulted only inside the unavailable branch so an
+   * archived contact keeps exactly its pre-38.11 result (38.11 D-23; 38.12 owns
+   * the archived arm).
+   */
+  readonly archived: boolean;
 }
+
+/**
+ * Why the Profile's Orbit Status is unavailable (38.11 D-05, D-23, D-24).
+ * Classified in the D-23 order after the archived check: Unbound, then no
+ * frequency, then not contacted.
+ */
+export type ProfileStatusUnavailableReason =
+  | "archived"
+  | "unbound"
+  | "no-frequency"
+  | "not-contacted";
+
+/** Unavailable Status label for archived, Unbound and no-frequency contacts. */
+export const STATUS_NOT_TRACKED = "Not tracked";
+
+/**
+ * Pre-38.11 unavailable context. Still the archived result (D-23) and the
+ * Bound-without-frequency reason.
+ */
+export const STATUS_CONTEXT_SET_FREQUENCY =
+  "Set a contact frequency to see Orbit Status.";
+/** Unbound with a frequency (D-24): the frequency exists, binding is missing. */
+export const STATUS_CONTEXT_UNBOUND =
+  "Unbound contacts aren't tracked. Bind this contact to see Orbit Status.";
+/** Unbound with no frequency (D-24): both are missing. */
+export const STATUS_CONTEXT_UNBOUND_NO_FREQUENCY =
+  "Set a contact frequency and bind this contact to see Orbit Status.";
+/** Bound with a frequency and no interaction yet (D-05). */
+export const STATUS_CONTEXT_NOT_CONTACTED =
+  "Orbit Status starts after your first logged interaction.";
 
 export type ProfileStatusMetric =
   | {
       readonly available: false;
-      readonly label: "Not tracked";
-      readonly context: "Set a contact frequency to see Orbit Status.";
+      readonly label: typeof STATUS_NOT_TRACKED | typeof NEVER_CONTACTED;
+      readonly context: string;
+      readonly reason: ProfileStatusUnavailableReason;
     }
   | {
       readonly available: true;
@@ -149,10 +187,72 @@ export function resolveProfileIntensityWindow(
   };
 }
 
+type UnavailableProfileStatusMetric = Extract<
+  ProfileStatusMetric,
+  { available: false }
+>;
+
+/**
+ * Classify an unavailable Status (38.11 D-23, D-24, D-05). Archived first, with
+ * exactly the pre-38.11 literal (D-23); then Unbound, no frequency, not
+ * contacted. Not contacted is display-only: no progress, no bucket, the clock
+ * does not start (D-05, D-06); `getContactStatus` is untouched (D-20).
+ */
+function unavailableProfileStatus(
+  input: ProfileStatusInput,
+): UnavailableProfileStatusMetric {
+  const hasFrequency = input.intervalDays !== null && input.intervalDays > 0;
+  if (input.archived) {
+    return {
+      available: false,
+      label: STATUS_NOT_TRACKED,
+      context: STATUS_CONTEXT_SET_FREQUENCY,
+      reason: "archived",
+    };
+  }
+  if (input.trackingEnabled !== 1) {
+    return {
+      available: false,
+      label: STATUS_NOT_TRACKED,
+      context: hasFrequency
+        ? STATUS_CONTEXT_UNBOUND
+        : STATUS_CONTEXT_UNBOUND_NO_FREQUENCY,
+      reason: "unbound",
+    };
+  }
+  if (!hasFrequency) {
+    return {
+      available: false,
+      label: STATUS_NOT_TRACKED,
+      context: STATUS_CONTEXT_SET_FREQUENCY,
+      reason: "no-frequency",
+    };
+  }
+  if (input.lastContact === null) {
+    return {
+      available: false,
+      label: NEVER_CONTACTED,
+      context: STATUS_CONTEXT_NOT_CONTACTED,
+      reason: "not-contacted",
+    };
+  }
+  // Bound, a frequency and a last contact, yet no canonical status/progress:
+  // keep today's literal (no reachable path is known; closest reason).
+  return {
+    available: false,
+    label: STATUS_NOT_TRACKED,
+    context: STATUS_CONTEXT_SET_FREQUENCY,
+    reason: "no-frequency",
+  };
+}
+
 /** Present canonical query-time Status without adding inputs or editability. */
 export function resolveProfileStatus(
   input: ProfileStatusInput,
 ): ProfileStatusMetric {
+  // The gate is unchanged from pre-38.11. `archived` is never consulted before
+  // the available return: an archived, Bound, contacted contact keeps its
+  // status (38.11 D-23).
   if (
     input.trackingEnabled !== 1 ||
     input.intervalDays === null ||
@@ -161,11 +261,7 @@ export function resolveProfileStatus(
     input.progress === null ||
     input.lastContact === null
   ) {
-    return {
-      available: false,
-      label: "Not tracked",
-      context: "Set a contact frequency to see Orbit Status.",
-    };
+    return unavailableProfileStatus(input);
   }
 
   const elapsedDays = Math.round(input.progress * input.intervalDays);

@@ -217,24 +217,49 @@ describe("relationship explanations", () => {
     expect(status("not a timestamp")).toBe("Last interaction: Unknown time");
   });
 
-  it("uses cadence-safe unavailable Status copy", () => {
+  it("uses cadence-safe unavailable Status copy for each reason (38.11 D-23, D-24)", () => {
     expect(
       relationshipExplanation({
         kind: "status",
         metric: {
           available: false,
           label: "Not tracked",
-          context: "Set a contact frequency to see Orbit Status.",
+          context:
+            "Unbound contacts aren't tracked. Bind this contact to see Orbit Status.",
+          reason: "unbound",
         },
         insightsAvailable: false,
         historyAvailable: true,
       }),
-    ).toEqual({
+    ).toMatchObject({
       title: "Orbit Status",
       summary: "Not tracked",
-      details: ["Set a contact frequency to see Orbit Status."],
+      details: [
+        "Unbound contacts aren't tracked. Bind this contact to see Orbit Status.",
+      ],
       routes: ["history"],
     });
+  });
+
+  it("shows Never Contacted with its context and no progress factors (38.11 D-05)", () => {
+    const explanation = relationshipExplanation({
+      kind: "status",
+      metric: {
+        available: false,
+        label: "Never Contacted",
+        context: "Orbit Status starts after your first logged interaction.",
+        reason: "not-contacted",
+      },
+      insightsAvailable: true,
+      historyAvailable: true,
+    });
+    expect(explanation).toMatchObject({
+      title: "Orbit Status",
+      summary: "Never Contacted",
+      details: ["Orbit Status starts after your first logged interaction."],
+      routes: ["history"],
+    });
+    expect(explanation.details.join(" ")).not.toMatch(/progress/i);
   });
 
   // 38.3 RG-021 (D-11): when the Profile layout omits History, the Status
@@ -256,6 +281,7 @@ describe("relationship explanations", () => {
     available: false,
     label: "Not tracked",
     context: "Set a contact frequency to see Orbit Status.",
+    reason: "no-frequency",
   };
 
   it("omits the History route when History is not available (D-11)", () => {

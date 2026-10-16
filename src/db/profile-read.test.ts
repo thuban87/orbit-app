@@ -65,6 +65,51 @@ describe("coherent local Profile snapshot", () => {
     expect(snapshot?.history.status).toBe("ready");
   });
 
+  it("reads a Bound, every-30-days contact with no interaction as Never Contacted (38.11 D-05)", async () => {
+    const contactId = await contact();
+    const snapshot = await readProfileSnapshot(exec, contactId, OPTIONS);
+    expect(snapshot?.metrics.status).toMatchObject({
+      available: false,
+      label: "Never Contacted",
+      reason: "not-contacted",
+    });
+  });
+
+  it("keeps an archived, Bound, contacted contact's Status available (38.11 D-23)", async () => {
+    const contactId = await contact();
+    await exec.runAsync(
+      `INSERT INTO interactions
+         (uid, contact_id, occurred_at, recorded_at, channel, direction,
+          connected, source, modified_at)
+       VALUES (?, ?, '2026-09-01 09:00:00', ?, 'call', 'outbound', 1, 'manual', ?)`,
+      [uid(), contactId, NOW, NOW],
+    );
+    await exec.runAsync(
+      `UPDATE contacts
+          SET last_contact = '2026-09-01 09:00:00', archived_at = ?
+        WHERE id = ?`,
+      [NOW, contactId],
+    );
+    const snapshot = await readProfileSnapshot(exec, contactId, OPTIONS);
+    expect(snapshot?.identity.archivedAt).toBe(NOW);
+    expect(snapshot?.metrics.status.available).toBe(true);
+  });
+
+  it("gives an archived, never-contacted contact today's Not tracked result (38.11 D-23)", async () => {
+    const contactId = await contact();
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      contactId,
+    ]);
+    const snapshot = await readProfileSnapshot(exec, contactId, OPTIONS);
+    expect(snapshot?.metrics.status).toEqual({
+      available: false,
+      label: "Not tracked",
+      context: "Set a contact frequency to see Orbit Status.",
+      reason: "archived",
+    });
+  });
+
   it("returns null for a missing contact rather than an empty section-shaped snapshot", async () => {
     expect(await readProfileSnapshot(exec, 999999, OPTIONS)).toBeNull();
   });
