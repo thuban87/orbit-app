@@ -3,15 +3,29 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
+import {
+  INVALID_INTERVAL_MESSAGE,
+  parseCustomInterval,
+} from "@/components/frequency-picker-logic";
 import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { FieldError } from "@/components/ui/FieldError";
 import { Sheet } from "@/components/ui/Sheet";
 import type { ProfileSnapshot } from "@/db/profile-read";
 import type { SnoozePreset } from "@/db/snooze-dao";
 import {
+  CUSTOM_FREQUENCY_LABEL,
+  customFrequencyApplyState,
   FREQUENCY_CHOICES,
+  frequencySheetSelection,
   type RelationshipSheetState,
   relationshipExplanation,
   relationshipSheetReducer,
@@ -72,6 +86,11 @@ export function ProfileRelationshipSheets({
   );
   const [customDate, setCustomDate] = useState(todayLocal);
   const [customOpen, setCustomOpen] = useState(false);
+  // 38.11 D-54: the Frequency sheet's Custom… days box. Touched is set on the
+  // first typing so the error shows only after the user types (D-36).
+  const [customDaysOpen, setCustomDaysOpen] = useState(false);
+  const [customDaysRaw, setCustomDaysRaw] = useState("");
+  const [customDaysTouched, setCustomDaysTouched] = useState(false);
 
   // Synchronous mirror of both selector states, so the runner's pending checks
   // never read a stale render. Every selector state change goes through
@@ -121,6 +140,14 @@ export function ProfileRelationshipSheets({
     }));
   }, [snapshot.identity.intervalDays, snapshot.identity.snoozeUntil]);
 
+  // A fresh sheet starts with the Custom… box closed (it reopens prefilled).
+  useEffect(() => {
+    if (active !== "frequency") {
+      setCustomDaysOpen(false);
+      setCustomDaysTouched(false);
+    }
+  }, [active]);
+
   const close = () => {
     if (
       selectors.current.frequency.pending ||
@@ -141,6 +168,22 @@ export function ProfileRelationshipSheets({
 
   const saveFrequency = (days: number) =>
     runner.submit("frequency", days, () => onSetFrequency(days));
+
+  const frequencySelection = frequencySheetSelection(frequency.draft);
+  const customDays = customFrequencyApplyState(
+    parseCustomInterval(customDaysRaw, "days"),
+    customDaysTouched,
+  );
+  const openCustomDays = () => {
+    if (customDaysOpen) return;
+    setCustomDaysRaw(
+      frequencySelection.kind === "custom"
+        ? String(frequencySelection.days)
+        : "",
+    );
+    setCustomDaysTouched(false);
+    setCustomDaysOpen(true);
+  };
 
   const saveSnooze = (operation: Operation, draft: string | null) =>
     runner.submit("snooze", draft, operation);
@@ -173,7 +216,10 @@ export function ProfileRelationshipSheets({
       variant={explanation ? "detail" : "compact"}
       scrollBody={false}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {explanation ? (
           <>
             <AppText role="heading" accessibilityRole="header">
@@ -240,6 +286,93 @@ export function ProfileRelationshipSheets({
                 ) : null}
               </Pressable>
             ))}
+            {/* 38.11 D-54 (amends D-14): presets apply on tap; the Custom…
+                row reveals a days box applied with Apply, through the same
+                runner, so pending, error and Retry match the presets. */}
+            <Pressable
+              testID="profile-frequency-custom"
+              accessibilityRole="button"
+              accessibilityLabel={
+                frequencySelection.kind === "custom"
+                  ? `Custom frequency, every ${frequencySelection.days} days`
+                  : "Custom frequency"
+              }
+              accessibilityState={{
+                selected: frequencySelection.kind === "custom",
+                expanded: customDaysOpen,
+                disabled: frequency.pending,
+              }}
+              disabled={frequency.pending}
+              onPress={openCustomDays}
+              style={[
+                styles.choice,
+                styles.frequencyChoice,
+                {
+                  borderColor:
+                    frequencySelection.kind === "custom"
+                      ? colors.accent
+                      : colors.border,
+                },
+              ]}
+            >
+              <View style={styles.frequencyLabel}>
+                <AppText role="body">{CUSTOM_FREQUENCY_LABEL}</AppText>
+                {frequencySelection.kind === "custom" ? (
+                  // D-11: "Every N days" wording.
+                  <AppText role="caption">
+                    {`Every ${frequencySelection.days} ${frequencySelection.days === 1 ? "day" : "days"}`}
+                  </AppText>
+                ) : null}
+              </View>
+              {frequencySelection.kind === "custom" ? (
+                <Icon name="select" state="active" tone="accentText" />
+              ) : null}
+            </Pressable>
+            {customDaysOpen ? (
+              <View style={styles.customDays}>
+                <View style={styles.customDaysRow}>
+                  <TextInput
+                    testID="profile-frequency-custom-days"
+                    accessibilityLabel="Custom frequency in days"
+                    value={customDaysRaw}
+                    editable={!frequency.pending}
+                    onChangeText={(text) => {
+                      setCustomDaysTouched(true);
+                      setCustomDaysRaw(text);
+                    }}
+                    keyboardType="number-pad"
+                    placeholder="Days"
+                    placeholderTextColor={colors.textPlaceholder}
+                    style={[
+                      styles.customDaysInput,
+                      {
+                        color: colors.textPrimary,
+                        backgroundColor: colors.surface,
+                        borderColor: customDays.showError
+                          ? colors.danger
+                          : colors.border,
+                      },
+                    ]}
+                  />
+                  <Button
+                    role="primary"
+                    label="Apply"
+                    disabled={!customDays.canApply || frequency.pending}
+                    onPress={() => {
+                      if (customDays.days !== null) {
+                        void saveFrequency(customDays.days);
+                      }
+                    }}
+                  />
+                </View>
+                <FieldError
+                  testID="profile-frequency-custom-error"
+                  message={
+                    customDays.showError ? INVALID_INTERVAL_MESSAGE : null
+                  }
+                />
+              </View>
+            ) : null}
             {frequency.error ? (
               <AppText role="caption">{frequency.error}</AppText>
             ) : null}
@@ -348,5 +481,19 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   frequencyLabel: { flexShrink: 1 },
+  customDays: { gap: SPACING.xs },
+  customDaysRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  customDaysInput: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: RADII.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
   close: { marginTop: SPACING.sm },
 });

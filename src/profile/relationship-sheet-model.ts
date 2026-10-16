@@ -1,3 +1,7 @@
+import {
+  type CustomIntervalResult,
+  shouldShowCustomError,
+} from "@/components/frequency-picker-logic";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import { GRAVITY_TIERS } from "@/services/impact";
@@ -131,6 +135,49 @@ export const FREQUENCY_CHOICES = Object.entries(FREQUENCY_DAYS).map(
     accessibilityLabel: `${label}, every ${days} ${days === 1 ? "day" : "days"}`,
   }),
 );
+
+/** The Profile Frequency sheet's custom row (38.11 D-54). */
+export const CUSTOM_FREQUENCY_LABEL = "Custom…";
+
+export type FrequencySheetSelection =
+  | { kind: "preset"; days: number }
+  | { kind: "custom"; days: number }
+  | { kind: "none" };
+
+/**
+ * Which Frequency sheet row is selected (38.11 D-54): the matching preset, the
+ * Custom… row for any other positive value (e.g. 45 days), or none.
+ */
+export function frequencySheetSelection(
+  intervalDays: number | null,
+): FrequencySheetSelection {
+  if (intervalDays === null || intervalDays <= 0) return { kind: "none" };
+  return FREQUENCY_CHOICES.some((choice) => choice.days === intervalDays)
+    ? { kind: "preset", days: intervalDays }
+    : { kind: "custom", days: intervalDays };
+}
+
+/**
+ * The Custom… days box's Apply state (38.11 D-54). Apply is enabled only for a
+ * positive whole number of days (`parseCustomInterval(raw, "days")`, T-38.11-06);
+ * the error shows only after the user types (D-36, the 38.9 validation rule).
+ */
+export function customFrequencyApplyState(
+  parsed: CustomIntervalResult,
+  touched: boolean,
+): { canApply: boolean; days: number | null; showError: boolean } {
+  const canApply = parsed.valid && parsed.intervalDays !== null;
+  return {
+    canApply,
+    days: canApply ? parsed.intervalDays : null,
+    showError: shouldShowCustomError({
+      valid: parsed.valid,
+      touched,
+      forced: false,
+      afterTyping: true,
+    }),
+  };
+}
 
 export const SNOOZE_CHOICES = [
   {

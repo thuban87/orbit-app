@@ -85,7 +85,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 
 ## Gotchas
 
-1. **Profile never fabricates cadence.** Unbound Status is `Not tracked`; its activity view uses a separately labelled current-calendar-month window rather than changing status arithmetic.
+1. **Profile never fabricates cadence.** The Profile's unavailable Status carries a reason (`archived` / `unbound` / `no-frequency` / `not-contacted`). Unbound and no-frequency contacts read `Not tracked` with an honest context line (Unbound with a frequency is asked to bind; Unbound with none is asked to set one and bind). A Bound contact with a frequency and no interaction reads `Never Contacted` with no progress and no status bucket. An archived contact keeps its previous result: available stays available, unavailable keeps the old `Not tracked` / set-a-frequency line. `getContactStatus` is unchanged. The Unbound activity view uses a separately labelled current-calendar-month window rather than changing status arithmetic.
 
 1. **Convert only the current time to local date.** `last_contact` is stored as a local wall-clock string; converting it with `localtime` again day-shifts late-night values.
 2. **Apply the never-contacted predicate.** The raw status CASE is not a substitute for `last_contact IS NOT NULL` in normal-population reads.
@@ -109,3 +109,4 @@ Status is a query-time projection over the contacts and interactions schema; no 
 | 2026-08-16 | 12 | Added the shared dashboard/widget status-ring vocabulary and refresh-bounded widget presentation. |
 | 2026-08-27 | 18.2 | Required Bound positive-cadence state for all status and progress projections. |
 | 2026-09-02 | 31 | Added truthful Profile explanations and guarded Bound/Unbound relationship presentation without a new Health score. |
+| 2026-10-16 | 38.11 | Profile Status unavailable reasons: Bound never-contacted reads Never Contacted (no progress or bucket), Unbound and no-frequency read Not tracked with honest context, archived keeps its previous result; `getContactStatus` unchanged (D-05, D-20, D-23, D-24). |
