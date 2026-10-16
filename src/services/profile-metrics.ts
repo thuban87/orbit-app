@@ -100,11 +100,15 @@ export type ProfileStatusMetric =
       };
     };
 
+/** Gravity with no interactions (38.11 D-74; copy tunable). */
+export const GRAVITY_EMPTY_LABEL = "No interactions yet";
+export const GRAVITY_EMPTY_CONTEXT = "Gravity builds as you log interactions.";
+
 export type ProfileGravityMetric =
   | {
       readonly available: false;
-      readonly label: "Not available yet";
-      readonly context: "Gravity is derived from interaction history.";
+      readonly label: typeof GRAVITY_EMPTY_LABEL;
+      readonly context: typeof GRAVITY_EMPTY_CONTEXT;
     }
   | {
       readonly available: true;
@@ -288,8 +292,8 @@ export function resolveProfileGravity(
   if (gravity === null || interactionCount === 0) {
     return {
       available: false,
-      label: "Not available yet",
-      context: "Gravity is derived from interaction history.",
+      label: GRAVITY_EMPTY_LABEL,
+      context: GRAVITY_EMPTY_CONTEXT,
     };
   }
   return {

@@ -4,10 +4,12 @@ import { Avatar } from "@/components/Avatar";
 import { PhotoUnavailableNotice } from "@/components/PhotoUnavailableNotice";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import type { ProfileIdentity } from "@/db/profile-read";
 import {
   type ProfileHeroMessageContext,
   profileHeroActionState,
+  savedMethodKinds,
 } from "@/profile/relationship-sheet-model";
 import {
   PROFILE_HERO_AVATAR_SIZE,
@@ -18,6 +20,7 @@ import { SPACING } from "@/theme/tokens/spacing";
 export function ProfileHero({
   identity,
   actionableMethods,
+  methodGroups,
   messageContext,
   photoOpenable = true,
   onPhotoLoadErrorChange,
@@ -27,6 +30,12 @@ export function ProfileHero({
 }: {
   identity: ProfileIdentity;
   actionableMethods: Parameters<typeof profileHeroActionState>[0];
+  /**
+   * Every saved method, actionable or not (`snapshot.methods`), so a disabled
+   * Message/Call says "no number" or "a number that can't be used" truthfully
+   * (38.11 D-27).
+   */
+  methodGroups: ContactMethodGroups;
   /**
    * Archive state and host for Message eligibility (D-09, D-25). A blocked
    * Message still renders — disabled, with its reason caption — never hidden.
@@ -45,7 +54,11 @@ export function ProfileHero({
   onMessage: () => void;
   onCall: () => void;
 }) {
-  const actions = profileHeroActionState(actionableMethods, messageContext);
+  const actions = profileHeroActionState(
+    actionableMethods,
+    messageContext,
+    savedMethodKinds(methodGroups),
+  );
   return (
     <View testID="profile-hero" style={styles.root}>
       {identity.photo != null ? (

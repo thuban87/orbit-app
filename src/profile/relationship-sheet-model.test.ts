@@ -158,9 +158,9 @@ describe("Hero reasons tell missing from unusable methods", () => {
 
   it("reads the saved kinds from the method groups", () => {
     expect(savedMethodKinds({ phone: [], email: [] })).toEqual(NONE);
-    expect(
-      savedMethodKinds({ phone: [{} as never], email: [] }),
-    ).toEqual(UNUSABLE_PHONE);
+    expect(savedMethodKinds({ phone: [{} as never], email: [] })).toEqual(
+      UNUSABLE_PHONE,
+    );
     expect(
       savedMethodKinds({ phone: [], email: [{} as never, {} as never] }),
     ).toEqual(UNUSABLE_EMAIL);

@@ -225,7 +225,9 @@ describe("ProfileHero 'Photo unavailable' (38.6 D-23)", () => {
 describe("ProfileHero unusable-method reasons (38.11 D-27)", () => {
   const captions = (nodes: Node[]) =>
     nodes
-      .filter((node) => node.type === "AppText" && node.props.role === "caption")
+      .filter(
+        (node) => node.type === "AppText" && node.props.role === "caption",
+      )
       .map((node) => node.props.children);
 
   it("says a saved phone number can't be used, for Call and Message", () => {

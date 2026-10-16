@@ -725,6 +725,7 @@ export function ContactProfileScreen({
               <ProfileHero
                 identity={snapshot.identity}
                 actionableMethods={snapshot.actionableMethods}
+                methodGroups={snapshot.methods}
                 messageContext={{
                   archived: snapshot.identity.archivedAt !== null,
                   settingsHosted: host === "settings",

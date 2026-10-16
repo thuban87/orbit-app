@@ -79,7 +79,8 @@ export async function readProfileHistory(
         : {
             kind: "latest",
             lastContact: latest,
-            text: `Last interaction ${formatDateTimeMinuteOrFallback(latest)}`,
+            // 38.11 D-75: the date alone; the tile label says Last Interaction.
+            text: formatDateTimeMinuteOrFallback(latest),
           },
     entries,
     viewAll: { moduleId: PROFILE_HISTORY_MODULE_ID, contactId },

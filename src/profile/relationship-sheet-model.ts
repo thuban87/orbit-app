@@ -1,4 +1,6 @@
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
+import type { ContactMethodGroups } from "@/db/contact-methods-read";
+import { GRAVITY_TIERS } from "@/services/impact";
 import type {
   ProfileGravityMetric,
   ProfileIntensityMetric,
@@ -10,6 +12,8 @@ import { plural } from "@/utils/plural";
 
 export type RelationshipExplanation = {
   title: string;
+  /** Plain explanation of the term, shown first under the title (38.11 D-75). */
+  definition: string;
   summary: string;
   details: string[];
   routes?: Array<"history" | "insights">;
@@ -29,6 +33,34 @@ export type RelationshipExplanationInput =
   | { kind: "gravity"; metric: ProfileGravityMetric }
   | { kind: "intensity"; metric: ProfileIntensityMetric };
 
+function gravityTierList(): string {
+  const names = GRAVITY_TIERS.map(
+    (tier) => `${tier.name.charAt(0).toUpperCase()}${tier.name.slice(1)}`,
+  );
+  return names.length < 2
+    ? names.join("")
+    : `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
+}
+
+/**
+ * Plain explanations of the stat terms (38.11 D-75): Orbit Status about one
+ * line, Intensity a little more, Gravity the most. Each claim is checked
+ * against the code: Status progress is elapsed / frequency
+ * (`resolveProfileStatus`); Intensity counts outbound or mutual rows in one
+ * contact frequency for Bound contacts, else the calendar month
+ * (`resolveProfileIntensityWindow`, `intensity-logic.ts`); Gravity is a sum of
+ * recency weights that decay toward a floor, shown as a tier, connected-only
+ * for Rarely Responds (`impact.ts`, `gravity-logic.ts`). Copy is reviewed by
+ * the owner at the device check (38.11-14).
+ */
+export const RELATIONSHIP_DEFINITIONS = {
+  status:
+    "Orbit Status shows how far along you are toward your contact frequency since you last spoke.",
+  gravity: `Gravity is how much shared history you have with this person. Every logged interaction adds to it, and recent ones weigh more than old ones, so it grows as you keep in touch and fades slowly when you don't. Old history never fades away completely. It shows as a tier (${gravityTierList()}), not a score. For people marked Rarely Responds, only interactions that connected count.`,
+  intensity:
+    "Intensity counts the times you reached out recently: within one contact frequency (the last 30 days for Monthly), or this calendar month when the contact is Unbound or has no frequency. With a frequency, reaching out once in that time reads as At pace and more often reads as Active. Interactions they started don't count.",
+} as const;
+
 export function relationshipExplanation(
   input: RelationshipExplanationInput,
 ): RelationshipExplanation {
@@ -37,6 +69,7 @@ export function relationshipExplanation(
     if (!input.metric.available) {
       return {
         title: "Orbit Status",
+        definition: RELATIONSHIP_DEFINITIONS.status,
         summary: input.metric.label,
         details: [input.metric.context],
         routes: history,
@@ -54,6 +87,7 @@ export function relationshipExplanation(
     }
     return {
       title: "Orbit Status",
+      definition: RELATIONSHIP_DEFINITIONS.status,
       summary: input.metric.label,
       details,
       routes: input.insightsAvailable ? [...history, "insights"] : history,
@@ -63,6 +97,7 @@ export function relationshipExplanation(
     return input.metric.available
       ? {
           title: "Gravity",
+          definition: RELATIONSHIP_DEFINITIONS.gravity,
           summary: input.metric.label,
           details: [
             plural(input.metric.factors.interactionCount, "interaction"),
@@ -72,12 +107,14 @@ export function relationshipExplanation(
         }
       : {
           title: "Gravity",
+          definition: RELATIONSHIP_DEFINITIONS.gravity,
           summary: input.metric.label,
           details: [input.metric.context],
         };
   }
   return {
     title: "Intensity",
+    definition: RELATIONSHIP_DEFINITIONS.intensity,
     summary: input.metric.label,
     details: [
       input.metric.window.label,
@@ -208,11 +245,54 @@ export interface ProfileHeroMessageContext {
 }
 
 /**
+ * Which method kinds the contact has saved at all, actionable or not (38.11
+ * D-27). With `actionableMethods` it tells "no number" from "a number that
+ * can't be used".
+ */
+export interface SavedMethodKinds {
+  phone: boolean;
+  email: boolean;
+}
+
+export function savedMethodKinds(
+  groups: ContactMethodGroups,
+): SavedMethodKinds {
+  return { phone: groups.phone.length > 0, email: groups.email.length > 0 };
+}
+
+const CALL_NO_PHONE_REASON = "Add a phone number to call this contact.";
+const CALL_UNUSABLE_PHONE_REASON =
+  "This phone number can't be used to call. Check it in Edit Contact.";
+const MESSAGE_NO_METHOD_REASON =
+  "Add a phone number or email to message this contact.";
+
+/**
+ * Message reason when nothing is actionable, naming only the kinds the contact
+ * actually has (38.11 D-27, T-20). Copy drafts; the owner reviews at 38.11-14.
+ */
+function messageUnusableReason(phone: boolean, email: boolean): string {
+  if (phone && email) {
+    return "This contact's number and email can't be used to message. Check them in Edit Contact.";
+  }
+  if (phone) {
+    return "This contact's number can't be used to message. Check it in Edit Contact.";
+  }
+  if (email) {
+    return "This contact's email can't be used to message. Check it in Edit Contact.";
+  }
+  return MESSAGE_NO_METHOD_REASON;
+}
+
+/**
  * Fixed hero action capability. Message is disabled (never hidden) for an
  * archived contact in every host (D-09) and for any Settings-hosted Profile
  * (D-25), evaluated in that order, before method availability — RG-021 keeps
  * archived messaging prohibited and Compose unregistered under Settings. Call
  * follows the phone rule only; archive/host never change it (D-27).
+ *
+ * 38.11 D-27 (ADR-109): `methods` keeps its actionable-primary semantics; a
+ * kind counts as saved-but-unusable when `saved` says it exists (or a
+ * non-actionable row was passed) and nothing of that kind is actionable.
  */
 export function profileHeroActionState(
   methods: {
@@ -220,15 +300,18 @@ export function profileHeroActionState(
     email: ContactMethodRow | null;
   },
   context: ProfileHeroMessageContext,
+  saved: SavedMethodKinds = { phone: false, email: false },
 ) {
   const phone = methods.phone?.is_actionable === 1;
   const email = methods.email?.is_actionable === 1;
+  const unusablePhone = !phone && (saved.phone || methods.phone !== null);
+  const unusableEmail = !email && (saved.email || methods.email !== null);
   const messageBlockedReason = context.archived
     ? PROFILE_MESSAGE_ARCHIVED_REASON
     : context.settingsHosted
       ? PROFILE_MESSAGE_SETTINGS_HOST_REASON
       : !phone && !email
-        ? "Add a phone number or email to message this contact."
+        ? messageUnusableReason(unusablePhone, unusableEmail)
         : null;
   return {
     message:
@@ -244,7 +327,9 @@ export function profileHeroActionState(
       : {
           enabled: false as const,
           route: null,
-          reason: "Add a phone number to call this contact.",
+          reason: unusablePhone
+            ? CALL_UNUSABLE_PHONE_REASON
+            : CALL_NO_PHONE_REASON,
         },
   };
 }

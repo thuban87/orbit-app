@@ -179,6 +179,8 @@ export function ProfileRelationshipSheets({
             <AppText role="heading" accessibilityRole="header">
               {explanation.title}
             </AppText>
+            {/* 38.11 D-75: the plain explanation of the term comes first. */}
+            <AppText role="body">{explanation.definition}</AppText>
             <AppText role="body">{explanation.summary}</AppText>
             {explanation.details.map((detail) => (
               <AppText key={detail} role="body">
