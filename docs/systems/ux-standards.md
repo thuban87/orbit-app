@@ -1,7 +1,7 @@
 # UX Standards
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/stores/confirm-store.ts`, `src/components/ui/DialogHost.tsx`, `src/stores/overlay-registry-store.ts`, `src/components/ui/RegisteredModal.tsx`, `src/navigation/discard-keep-guard.ts`, `src/components/ShellAppBar.tsx`, `src/navigation/tab-history.ts`, `src/stores/snackbar-store.ts`, `src/components/ui/` (OrbitSwitch, OptionSheet, FieldError, EmptyState, chip-tone), `src/utils/dates.ts`, `src/utils/plural.ts`
 
 ## Purpose
@@ -65,7 +65,7 @@ and, once the write succeeds, a "Moved {name} to the Bin" snackbar names the per
 plain entry with its confirm unchanged (38.11 D-68), and Move to Bin is the red entry with the
 warning glyph. 38.11 and 38.12 wire this on their screens.
 
-What makes an action reversible: Archived contacts; custom fields with values in Quarantine for
+What makes an action reversible: contacts in the Bin (internally archived); custom fields with values in Quarantine for
 30 days; and, since 38.10, the snackbar Undo window for every Things to Remember item (memories of
 every type, key people, Off Limits, Last Talked About and Current Location entries), which delete
 at once with Undo and then permanently (ADR-212; Recently Deleted and 38.9 D-31's holding zones are
@@ -80,9 +80,9 @@ confirming snackbar. Areas apply this to their own writes.
 
 Snackbar copy (D-46): verb first, then whom.
 
-- "Logged Message with Ann", "Archived Ann Lee".
+- "Logged Message with Ann", "Moved Ann Lee to the Bin".
 - The Undo confirmation names what was undone, e.g. "Log removed".
-- Counts go through the plural helper: "Archived 1 contact", "Archived 3 contacts" (D-21).
+- Counts go through the plural helper: "Moved 1 contact to the Bin", "Moved 3 contacts to the Bin" (D-21).
 
 Behaviour:
 
@@ -318,6 +318,10 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 - **ADR-220:** Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field.
 - **ADR-221:** Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place (partly supersedes ADR-198).
 - **ADR-001:** custom-field values stay raw TEXT; format only at render.
+- **ADR-222:** Add Contact Opens Bound, Monthly and Not Yet — Bound/Unbound chips use the primary chip tier.
+- **ADR-223:** Birthday, Social Battery, Links and a Held Photo on Add Contact — `choose()`, the three-way themed dialog.
+- **ADR-226:** Archive Becomes the Bin — Move to Bin is the one reversible lifecycle action that confirms instead of offering Undo.
+- **ADR-227:** One Snooze Sheet — one shared snooze sheet; the last native Alert is gone.
 
 ## Gotchas
 
@@ -359,3 +363,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-16 | 38.11 | Update Contact retired (D-62): its row-save slot, `EditorFrame` Cancel hold and uncentred entry fields leave the guarded-screen lists (now 11); Edit Contact is the single contact form, and the code is kept in `docs/archive/update-contact/`. |
 | 2026-10-16 | 38.11 | No native Alert remains: the Contacts card snooze opens the shared snooze sheet (`SnoozeSheet`, D-45), and the no-native-alert contract now pins zero production `Alert.alert` calls. Single-contact snooze and unsnooze show one person-naming snackbar with Undo (38.9 D-39). |
 | 2026-10-16 | 38.11 | Move to Bin asks first with the themed destructive confirm and shows no Undo (D-71, superseding 38.9 D-32 for this action); Restore and Bind keep act-at-once with Undo; the Profile ⋯ Unbind entry loses its red look and keeps its confirm (D-68). |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-222, ADR-223, ADR-226, ADR-227; reversible-action and snackbar examples use the Bin wording. |
