@@ -9,7 +9,7 @@ import {
   parseAndCanonicalizeProfileLayout,
   serializeProfileLayout,
 } from "./presentation-schema";
-import { completeThingsToRememberChildren } from "./resolve-presentation";
+import { completeProfileLayoutChildren } from "./resolve-presentation";
 import type {
   ProfileLayoutDocument,
   ProfileModulePlacement,
@@ -69,9 +69,10 @@ function completeBucket(
 export function createProfileLayoutEditorDraft(
   value: unknown,
 ): ProfileLayoutDocument {
-  // A newer Things to Remember section goes where the Profile shows it (D-44),
-  // not at the end, so the editor preview matches the Profile.
-  const parsed = completeThingsToRememberChildren(
+  // A newer Overview tile or Things to Remember section goes where the Profile
+  // shows it (38.10 D-44, 38.11 D-80), not at the end, so the editor preview
+  // matches the Profile. completeBucket then only fills the top level.
+  const parsed = completeProfileLayoutChildren(
     parseAndCanonicalizeProfileLayout(value),
   );
   return parseAndCanonicalizeProfileLayout({

@@ -133,3 +133,66 @@ describe("RelationshipOverview Gravity tile (38.11 D-74)", () => {
     );
   });
 });
+
+// 38.11 D-53/D-55: the Birthday tile shows the stored birthday through the
+// 38.9 date standard, opens its sheet, and is absent (not a gap) when unset.
+describe("RelationshipOverview Birthday tile (38.11 D-53, D-55)", () => {
+  const withBirthdayModule = [
+    { id: "contact-frequency", visible: true, expanded: false, size: "1x1" },
+    { id: "birthday", visible: true, expanded: false, size: "1x1" },
+    { id: "snooze", visible: true, expanded: false, size: "1x1" },
+  ] as unknown as ProfileLayoutDocument["overview"];
+
+  function render(birthday: string | null, onOpenSheet = vi.fn()) {
+    return all(
+      resolve(
+        RelationshipOverview({
+          snapshot: {
+            ...snapshot,
+            identity: { ...snapshot.identity, birthday },
+          } as ProfileSnapshot,
+          modules: withBirthdayModule,
+          onOpenSheet,
+        }),
+      ),
+    ).filter((node) =>
+      String(node.props.testID ?? "").startsWith("profile-overview-"),
+    );
+  }
+
+  it("shows the year when it is known and opens the Birthday sheet", () => {
+    const onOpenSheet = vi.fn();
+    const tiles = render("1990-05-03", onOpenSheet);
+    const birthday = tiles.find(
+      (node) => node.props.testID === "profile-overview-birthday",
+    );
+    expect(birthday?.type).toBe("Pressable");
+    expect(birthday?.props.accessibilityLabel).toBe("Birthday. May 3, 1990");
+    (birthday?.props.onPress as (() => void) | undefined)?.();
+    expect(onOpenSheet).toHaveBeenCalledWith("birthday");
+    // Factory order: after Contact Frequency, before Snooze (D-80).
+    expect(tiles.map((node) => node.props.testID)).toEqual([
+      "profile-overview-contact-frequency",
+      "profile-overview-birthday",
+      "profile-overview-snooze",
+    ]);
+  });
+
+  it("shows the month and day alone when the year is unknown", () => {
+    const birthday = render("12-31").find(
+      (node) => node.props.testID === "profile-overview-birthday",
+    );
+    expect(birthday?.props.accessibilityLabel).toBe("Birthday. Dec 31");
+  });
+
+  it("renders no birthday tile when no birthday is set, and the grid repacks", () => {
+    const tiles = render(null);
+    expect(
+      tiles.find((node) => node.props.testID === "profile-overview-birthday"),
+    ).toBeUndefined();
+    expect(tiles.map((node) => node.props.testID)).toEqual([
+      "profile-overview-contact-frequency",
+      "profile-overview-snooze",
+    ]);
+  });
+});

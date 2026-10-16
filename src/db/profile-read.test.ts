@@ -65,6 +65,22 @@ describe("coherent local Profile snapshot", () => {
     expect(snapshot?.history.status).toBe("ready");
   });
 
+  it("carries the stored birthday on the identity, null when unset (38.11 D-53)", async () => {
+    const withBirthday = await contact("Bea");
+    const without = await contact("Nobirthday");
+    await exec.runAsync("UPDATE contacts SET birthday = ? WHERE id = ?", [
+      "02-29",
+      withBirthday,
+    ]);
+    expect(
+      (await readProfileSnapshot(exec, withBirthday, OPTIONS))?.identity
+        .birthday,
+    ).toBe("02-29");
+    expect(
+      (await readProfileSnapshot(exec, without, OPTIONS))?.identity.birthday,
+    ).toBeNull();
+  });
+
   it("reads a Bound, every-30-days contact with no interaction as Never Contacted (38.11 D-05)", async () => {
     const contactId = await contact();
     const snapshot = await readProfileSnapshot(exec, contactId, OPTIONS);

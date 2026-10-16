@@ -153,6 +153,8 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     // The additive favourite_rank field (Plan 06): a non-favourite reads null.
     expect(header?.favourite_rank).toBeNull();
     expect(header?.trackingEnabled).toBe(1);
+    // The additive birthday field (38.11 D-53): a contact without one reads null.
+    expect(header?.birthday).toBeNull();
     // v9 retired scalar phone/email. The read exposes neither phantom property.
     expect(header).not.toHaveProperty("phone");
     expect(header).not.toHaveProperty("email");
@@ -178,6 +180,21 @@ describe("getContactHeader — by-id light read (archived-reachable by design)",
     expect(header?.trackingEnabled).toBe(0);
     expect(header).not.toHaveProperty("phone");
     expect(header).not.toHaveProperty("email");
+  });
+
+  it("returns the stored birthday, year known or unknown (38.11 D-53)", async () => {
+    const known = await makeContact("Known");
+    const unknown = await makeContact("Unknown");
+    await exec.runAsync("UPDATE contacts SET birthday = ? WHERE id = ?", [
+      "1990-05-03",
+      known,
+    ]);
+    await exec.runAsync("UPDATE contacts SET birthday = ? WHERE id = ?", [
+      "12-31",
+      unknown,
+    ]);
+    expect((await getContactHeader(exec, known))?.birthday).toBe("1990-05-03");
+    expect((await getContactHeader(exec, unknown))?.birthday).toBe("12-31");
   });
 
   it("returns null for a missing id", async () => {

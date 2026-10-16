@@ -147,9 +147,11 @@ describe("Digest day detail uses the weekday display form (D-48)", () => {
 // 38.10-18: the retired Things to Remember screen was the fifth.) 38.11-04: Edit
 // Contact's birthday trigger moved into the shared BirthdayField (Add and Edit
 // both render it), so the component is the site and the Edit screen is not.
+// 38.11-08: the Profile's Birthday tile (38.11 D-53) is a site.
 describe("stored-birthday display sites (D-70)", () => {
   const BIRTHDAY_SITES = [
     "src/components/BirthdayField.tsx",
+    "src/components/profile/RelationshipOverview.tsx",
     "src/screens/MergeConflictsScreen.tsx",
     // Research's caption logic moved into a node-testable helper (38.9-16).
     "src/screens/compose-research-logic.ts",

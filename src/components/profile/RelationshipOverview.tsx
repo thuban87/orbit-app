@@ -15,13 +15,17 @@ import type { ProfileLayoutDocument } from "@/profile/types";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { formatDisplayDateOrFallback } from "@/utils/dates";
+import {
+  formatDisplayDateOrFallback,
+  formatStoredBirthdayForDisplay,
+} from "@/utils/dates";
 
 export type RelationshipSheetId =
   | "status"
   | "gravity"
   | "intensity"
   | "frequency"
+  | "birthday"
   | "snooze";
 
 function frequencyLabel(days: number | null): string {
@@ -49,7 +53,13 @@ export function RelationshipOverview({
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
   const [width, setWidth] = useState(0);
-  const visible = modules.filter((module) => module.visible);
+  const birthday = snapshot.identity.birthday;
+  // D-55: the Birthday tile shows only when a birthday is set; dropping it
+  // before the packer repacks the grid with no gap.
+  const visible = modules.filter(
+    (module) =>
+      module.visible && (module.id !== "birthday" || Boolean(birthday)),
+  );
   const packed = useMemo(
     () => packOverviewModules(visible, { width, fontScale }),
     [fontScale, visible, width],
@@ -92,6 +102,11 @@ export function RelationshipOverview({
           ? undefined
           : "Inactive while Unbound",
     },
+    birthday: {
+      label: "Birthday",
+      // 38.9 date standard (D-53): the year shows when it is known.
+      value: birthday ? formatStoredBirthdayForDisplay(birthday) : "",
+    },
     snooze: {
       label: "Snooze",
       value: snapshot.identity.snoozeUntil
@@ -109,6 +124,7 @@ export function RelationshipOverview({
     intensity: () => onOpenSheet("intensity"),
     "last-interaction": onOpenHistory,
     "contact-frequency": () => onOpenSheet("frequency"),
+    birthday: () => onOpenSheet("birthday"),
     snooze: () => onOpenSheet("snooze"),
   };
 

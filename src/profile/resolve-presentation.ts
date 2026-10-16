@@ -11,23 +11,28 @@ import type {
   ProfilePresentationInputs,
 } from "./types";
 
+type CompletableBucket = "overview" | "thingsToRemember";
+
 /**
- * Read-time completion of a saved layout (D-44). A layout saved before a
- * Things to Remember section existed (Thought of Them and Gift Ideas, 38.10)
- * lacks its id; each missing child is inserted at its factory position, just
- * after the nearest earlier factory child the layout has, with its factory
- * flags. The user's own order and flags are kept. Nothing is written back, so
- * no migration is needed.
+ * Read-time completion of one bucket of a saved layout. A layout saved before
+ * a module existed lacks its id; each missing factory module is inserted at
+ * its factory position, just after the nearest earlier factory module the
+ * layout has, with its factory flags (and size). The user's own order and
+ * flags are kept. Nothing is written back, so no migration is needed.
+ * 38.10 introduced this for Thought of Them and Gift Ideas (D-44); 38.11 uses
+ * it for the Birthday overview tile (D-53, D-80).
  */
-export function completeThingsToRememberChildren(
+function completeBucketAtFactoryPositions(
   document: ProfileLayoutDocument,
+  bucket: CompletableBucket,
 ): ProfileLayoutDocument {
-  const factory = FACTORY_PROFILE_LAYOUT.thingsToRemember;
-  const result = document.thingsToRemember.map((placement) => ({
-    ...placement,
-  }));
-  const present = new Set(result.map((placement) => placement.id));
+  const factory = FACTORY_PROFILE_LAYOUT[bucket] as readonly {
+    id: string;
+  }[];
+  const current = document[bucket] as readonly { id: string }[];
+  const present = new Set(current.map((placement) => placement.id));
   if (factory.every((placement) => present.has(placement.id))) return document;
+  const result = current.map((placement) => ({ ...placement }));
   factory.forEach((placement, factoryIndex) => {
     if (present.has(placement.id)) return;
     let insertAt = 0;
@@ -43,7 +48,23 @@ export function completeThingsToRememberChildren(
     result.splice(insertAt, 0, { ...placement });
     present.add(placement.id);
   });
-  return { ...document, thingsToRemember: result };
+  return { ...document, [bucket]: result } as ProfileLayoutDocument;
+}
+
+/**
+ * Read-time completion of the Overview tiles and the Things to Remember
+ * sections, each missing module at its factory position. The Profile and the
+ * layout editor both use this, so they place a new module identically
+ * (38.11 D-53, D-80; RESEARCH Pitfall 6). Returns the same object when
+ * nothing is missing.
+ */
+export function completeProfileLayoutChildren(
+  document: ProfileLayoutDocument,
+): ProfileLayoutDocument {
+  return completeBucketAtFactoryPositions(
+    completeBucketAtFactoryPositions(document, "overview"),
+    "thingsToRemember",
+  );
 }
 
 export function resolveProfilePresentation(
@@ -89,7 +110,7 @@ export function resolveProfilePresentation(
   };
   layout = {
     ...layout,
-    document: completeThingsToRememberChildren(layout.document),
+    document: completeProfileLayoutChildren(layout.document),
   };
 
   let background: ProfilePresentation["background"] | null = null;

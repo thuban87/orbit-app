@@ -21,6 +21,8 @@ export const PROFILE_OVERVIEW_MODULE_IDS = [
   "intensity",
   "last-interaction",
   "contact-frequency",
+  // 38.11 D-53/D-80: the Birthday tile sits after Contact Frequency.
+  "birthday",
   "snooze",
 ] as const;
 
@@ -67,6 +69,7 @@ export const PROFILE_MODULE_PARENT: Readonly<
   intensity: "relationship-overview",
   "last-interaction": "relationship-overview",
   "contact-frequency": "relationship-overview",
+  birthday: "relationship-overview",
   snooze: "relationship-overview",
   "pinned-featured": "things-to-remember",
   "last-talked-about": "things-to-remember",

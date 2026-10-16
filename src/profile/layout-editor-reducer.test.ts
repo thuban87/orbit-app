@@ -8,6 +8,7 @@ import {
   profileLayoutEditorReducer,
 } from "./layout-editor-reducer";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
+import { resolveProfilePresentation } from "./resolve-presentation";
 
 function reduce(actions: readonly ProfileLayoutEditorAction[]) {
   return actions.reduce(profileLayoutEditorReducer, FACTORY_PROFILE_LAYOUT);
@@ -29,6 +30,7 @@ describe("Profile layout editor reducer", () => {
       { type: "move", id: "snooze", direction: "up" },
       { type: "move", id: "snooze", direction: "up" },
       { type: "move", id: "snooze", direction: "up" },
+      { type: "move", id: "snooze", direction: "up" },
     ]);
 
     expect(JSON.stringify(named)).toBe(JSON.stringify(drag));
@@ -39,6 +41,7 @@ describe("Profile layout editor reducer", () => {
       "intensity",
       "last-interaction",
       "contact-frequency",
+      "birthday",
     ]);
   });
 
@@ -76,7 +79,7 @@ describe("Profile layout editor reducer", () => {
     const draft = createProfileLayoutEditorDraft(incomplete);
 
     expect(draft.topLevel).toHaveLength(4);
-    expect(draft.overview).toHaveLength(6);
+    expect(draft.overview).toHaveLength(7);
     expect(draft.thingsToRemember).toHaveLength(10);
     // A layout saved before Thought of Them and Gift Ideas gets them at their
     // D-44 places, as the Profile shows them, not at the end.
@@ -88,6 +91,46 @@ describe("Profile layout editor reducer", () => {
     });
     expect(pre3810.thingsToRemember).toEqual(
       FACTORY_PROFILE_LAYOUT.thingsToRemember,
+    );
+    // A layout saved before the Birthday tile gets it right after Contact
+    // Frequency (38.11 D-80), exactly where the Profile shows it, not at the end.
+    const factoryOverview = FACTORY_PROFILE_LAYOUT.overview;
+    const userOverview = [
+      ...factoryOverview.filter((p) => p.id === "snooze"),
+      ...factoryOverview.filter(
+        (p) => p.id !== "snooze" && p.id !== "birthday",
+      ),
+    ];
+    expect(userOverview.map((p) => p.id)).not.toContain("birthday");
+    const pre3811 = {
+      ...FACTORY_PROFILE_LAYOUT,
+      overview: userOverview,
+    };
+    const editorDraft = createProfileLayoutEditorDraft(pre3811);
+    expect(editorDraft.overview.map((p) => p.id)).toEqual([
+      "snooze",
+      "orbit-status",
+      "gravity",
+      "intensity",
+      "last-interaction",
+      "contact-frequency",
+      "birthday",
+    ]);
+    expect(editorDraft.overview).toEqual(
+      resolveProfilePresentation({
+        factoryLayout: FACTORY_PROFILE_LAYOUT,
+        themeBackground: "theme:galaxy",
+        layoutTemplates: [],
+        backgroundTemplates: [],
+        global: { layoutTemplateUid: null, backgroundTemplateUid: null },
+        category: null,
+        contact: {
+          layoutTemplateUid: null,
+          freeformLayout: pre3811,
+          backgroundTemplateUid: null,
+          collapse: {},
+        },
+      }).layout.document.overview,
     );
     expect(
       createAllSectionsPreview(

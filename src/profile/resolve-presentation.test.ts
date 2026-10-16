@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
 import {
-  completeThingsToRememberChildren,
+  completeProfileLayoutChildren,
   resolveProfilePresentation,
 } from "./resolve-presentation";
 import type { ProfilePresentationInputs } from "./types";
@@ -181,6 +181,117 @@ describe("resolveProfilePresentation", () => {
     expect(saved.thingsToRemember).toHaveLength(8);
   });
 
+  it("completes a saved overview that predates Birthday right after Contact Frequency (D-80)", () => {
+    const saved = {
+      ...FACTORY_PROFILE_LAYOUT,
+      // A user-ordered overview saved before 38.11: Snooze first, Gravity hidden.
+      overview: [
+        {
+          id: "snooze" as const,
+          visible: true,
+          expanded: false,
+          size: "1x1" as const,
+        },
+        {
+          id: "orbit-status" as const,
+          visible: true,
+          expanded: false,
+          size: "2x1" as const,
+        },
+        {
+          id: "gravity" as const,
+          visible: false,
+          expanded: false,
+          size: "1x1" as const,
+        },
+        {
+          id: "intensity" as const,
+          visible: true,
+          expanded: false,
+          size: "2x1" as const,
+        },
+        {
+          id: "contact-frequency" as const,
+          visible: true,
+          expanded: false,
+          size: "1x1" as const,
+        },
+        {
+          id: "last-interaction" as const,
+          visible: true,
+          expanded: false,
+          size: "1x1" as const,
+        },
+      ],
+    };
+    const input = base();
+    input.contact.freeformLayout = saved;
+    const resolved = resolveProfilePresentation(input).layout.document;
+    expect(resolved.overview.map((p) => p.id)).toEqual([
+      "snooze",
+      "orbit-status",
+      "gravity",
+      "intensity",
+      "contact-frequency",
+      "birthday",
+      "last-interaction",
+    ]);
+    expect(resolved.overview.find((p) => p.id === "birthday")).toEqual({
+      id: "birthday",
+      visible: true,
+      expanded: false,
+      size: "1x1",
+    });
+    // The user's own flags and sizes are kept; nothing is written back.
+    expect(resolved.overview.find((p) => p.id === "gravity")?.visible).toBe(
+      false,
+    );
+    expect(
+      resolved.overview.find((p) => p.id === "last-interaction")?.size,
+    ).toBe("1x1");
+    expect(saved.overview).toHaveLength(6);
+  });
+
+  it("puts Birthday after the nearest earlier factory tile when Contact Frequency is absent", () => {
+    const saved = {
+      ...FACTORY_PROFILE_LAYOUT,
+      overview: [
+        {
+          id: "last-interaction" as const,
+          visible: true,
+          expanded: false,
+          size: "2x1" as const,
+        },
+        {
+          id: "snooze" as const,
+          visible: true,
+          expanded: false,
+          size: "1x1" as const,
+        },
+        {
+          id: "orbit-status" as const,
+          visible: true,
+          expanded: false,
+          size: "2x1" as const,
+        },
+      ],
+    };
+    const completed = completeProfileLayoutChildren(saved).overview.map(
+      (p) => p.id,
+    );
+    // gravity/intensity follow orbit-status; contact-frequency then birthday
+    // follow last-interaction (the nearest earlier factory tile present).
+    expect(completed).toEqual([
+      "last-interaction",
+      "contact-frequency",
+      "birthday",
+      "snooze",
+      "orbit-status",
+      "gravity",
+      "intensity",
+    ]);
+  });
+
   it("completes a template layout too, and leaves a complete layout unchanged", () => {
     const old = {
       ...FACTORY_PROFILE_LAYOUT,
@@ -196,7 +307,7 @@ describe("resolveProfilePresentation", () => {
     expect(resolved.layout.document.thingsToRemember).toEqual(
       FACTORY_PROFILE_LAYOUT.thingsToRemember,
     );
-    expect(completeThingsToRememberChildren(FACTORY_PROFILE_LAYOUT)).toBe(
+    expect(completeProfileLayoutChildren(FACTORY_PROFILE_LAYOUT)).toBe(
       FACTORY_PROFILE_LAYOUT,
     );
   });

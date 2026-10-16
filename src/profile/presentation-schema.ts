@@ -133,6 +133,8 @@ export const FACTORY_PROFILE_LAYOUT: ProfileLayoutDocument = {
     placement("intensity", false, "2x1"),
     placement("last-interaction", false, "2x1"),
     placement("contact-frequency", false, "1x1"),
+    // 38.11 D-80: right after Contact Frequency, before Snooze.
+    placement("birthday", false, "1x1"),
     placement("snooze", false, "1x1"),
   ] as Array<
     ProfileModulePlacement & {

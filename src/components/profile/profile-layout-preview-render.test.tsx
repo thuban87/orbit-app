@@ -117,7 +117,8 @@ describe("ProfileLayoutPreview geometry (RG-033 ui-accessibility/AUD-UIA-021)", 
     measuredWidth = 360 - 2 * SPACING.lg - 4 - 2 * SPACING.base; // 276
     const nodes = render();
     const rendered = tiles(nodes);
-    expect(rendered).toHaveLength(6);
+    // Seven factory tiles since the Birthday tile (38.11 D-53, D-80).
+    expect(rendered).toHaveLength(7);
     for (const tile of rendered) {
       expect(flatStyle(tile.props.style).width).toBe(measuredWidth);
     }
@@ -135,15 +136,17 @@ describe("ProfileLayoutPreview geometry (RG-033 ui-accessibility/AUD-UIA-021)", 
       ]),
     );
     // Factory: status 2x1 | gravity 1x1 (orphan → stretched) | intensity 2x1 |
-    // last-interaction 2x1 | frequency 1x1 + snooze 1x1.
+    // last-interaction 2x1 | frequency 1x1 + birthday 1x1 | snooze 1x1 (orphan
+    // → stretched). Birthday sits after Contact Frequency (38.11 D-80).
     expect(byId.get("orbit-status")).toBe(overviewTileWidth(2, column));
     expect(byId.get("gravity")).toBe(overviewTileWidth(2, column));
     expect(byId.get("contact-frequency")).toBe(overviewTileWidth(1, column));
-    expect(byId.get("snooze")).toBe(overviewTileWidth(1, column));
+    expect(byId.get("birthday")).toBe(overviewTileWidth(1, column));
+    expect(byId.get("snooze")).toBe(overviewTileWidth(2, column));
     const rows = nodes.filter((node) =>
       String(node.props.testID ?? "").startsWith("profile-layout-preview-row-"),
     );
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     for (const row of rows) {
       expect(flatStyle(row.props.style).gap).toBe(SPACING.sm);
     }

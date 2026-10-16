@@ -41,6 +41,8 @@ export interface ProfileIdentity {
   intervalDays: number | null;
   rarelyResponds: number;
   snoozeUntil: string | null;
+  /** Stored birthday (`YYYY-MM-DD` / `MM-DD`) or null (38.11 D-53). */
+  birthday: string | null;
 }
 
 export type ProfileSectionResult<T> =
@@ -171,6 +173,7 @@ export function readProfileSnapshot(
         intervalDays: header.intervalDays,
         rarelyResponds: header.rarely_responds,
         snoozeUntil: header.snooze_until,
+        birthday: header.birthday,
       },
       presentation,
       impactInputs,

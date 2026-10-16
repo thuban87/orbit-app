@@ -64,6 +64,7 @@ const identity: ProfileIdentity = {
   intervalDays: 30,
   rarelyResponds: 0,
   snoozeUntil: null,
+  birthday: null,
 };
 
 const onOpenPhoto = vi.fn();

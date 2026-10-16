@@ -81,6 +81,14 @@ export const PROFILE_MODULE_REGISTRY: Readonly<
     collapsible: false,
     supportedSizes: ["1x1"],
   },
+  // 38.11 D-53: shown only when the person has a birthday (D-55).
+  birthday: {
+    id: "birthday",
+    label: "Birthday",
+    parent: "relationship-overview",
+    collapsible: false,
+    supportedSizes: ["1x1"],
+  },
   snooze: {
     id: "snooze",
     label: "Snooze",

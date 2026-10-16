@@ -104,6 +104,14 @@ export function getContactHeader(
    * `new Date(str)`, which reintroduces the forbidden UTC evening off-by-one).
    */
   snooze_until: string | null;
+  /**
+   * Stored birthday (`YYYY-MM-DD`, or `MM-DD` when the year is unknown), or
+   * null — the Profile's Birthday tile and sheet read it (38.11 D-53, D-59).
+   * PURELY ADDITIVE widening, same idiom as snooze_until above: every other
+   * caller reads this seek field-wise. Display it only through
+   * `formatStoredBirthdayForDisplay` (38.9 date standard).
+   */
+  birthday: string | null;
 } | null> {
   return exec.getFirstAsync<{
     id: number;
@@ -116,8 +124,9 @@ export function getContactHeader(
     trackingEnabled: number;
     intervalDays: number | null;
     snooze_until: string | null;
+    birthday: string | null;
   }>(
-    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, tracking_enabled AS trackingEnabled, interval_days AS intervalDays, snooze_until FROM contacts WHERE id = ?",
+    "SELECT id, name, rarely_responds, archived_at, photo, modified_at, favourite_rank, tracking_enabled AS trackingEnabled, interval_days AS intervalDays, snooze_until, birthday FROM contacts WHERE id = ?",
     [contactId],
   );
 }
