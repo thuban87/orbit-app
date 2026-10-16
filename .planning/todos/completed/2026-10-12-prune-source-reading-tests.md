@@ -31,3 +31,7 @@ Deleting or rewriting a screen breaks these tests even when nothing user-visible
 - Keep the data-layer tests (migrations, backup/restore, DAO invariants). There is no remote repair for user databases (CLAUDE.md "SQLite migrations"), so these earn their size.
 - Consider a lightweight standing rule for new tests (what kind to write and when). Any such rule is the owner's decision.
 - Scope estimate: about 1–2 plans, based on the 110-file count. The per-file triage depth is not estimated.
+
+## Moved to backlog 999.8 (backlog cleanup, owner-approved 2026-10-16)
+
+Not done. Plan-sized; now ROADMAP Backlog "Phase 999.8: Prune source-reading and count-pinning tests".

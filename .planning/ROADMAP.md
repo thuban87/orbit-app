@@ -1813,20 +1813,12 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 
 *Backlog 999.1 (profile photos) promoted to Phase 38.6 on 2026-09-29.*
 
+*Backlog 999.3 (inline knowledge inputs), 999.5 (shared items section; its reminder half is Phase 38.16) and 999.6 (move entries between sections) were absorbed into Phase 38.10, completed 2026-10-15; collapsed in the backlog cleanup on 2026-10-16 (owner). Full text: tag `argus-fixture-baseline`.*
+
 ### Phase 999.2: Markdown export format (BACKLOG)
 
 **Goal:** Offer Markdown as an export-format option alongside the current single plaintext JSON export (Phase 16). Owner request from the Phase 15 discuss (2026-08-23); it was meant to be raised at Phase 16 planning but never was. Changing the export format revises Phase 16's `[DECIDED]` JSON-only export, so it needs an owner discuss before planning.
 **Source:** owner request 2026-08-23 (recorded in `.planning/phases/15-weekly-digest/15-CONTEXT.md` `<deferred>`); added to the backlog on the owner's instruction 2026-10-09.
-**Plans:** 0 plans (not planned)
-
-### Phase 999.3: Inline knowledge inputs on the contact forms (BACKLOG)
-
-**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative.
-
-**Goal:** Make Memories and Off Limits work like the rest of the Create/Edit Contact form: fields you fill in right there, instead of the outlier editors that behave like a separate page. Retire the old Fuel editor along the way. Owner request (2026-10-09): "Those will need to be corrected to be form fields you can fill in there rather than get directed to another page."
-**Current state (code, `main @ 19caf50c`; confirm on device at discuss):** Create/Edit Contact host `MemoryEditor` (`CreateContactScreen.tsx:716`, `EditContactScreen.tsx:1599`) and the old `FuelEditor` for Off Limits (with a misleading Kind picker). Profile → Off Limits opens a separate `OffLimitsEditor` route. Fuel itself is still live: Off Limits entries are `fuel` rows with `kind = 'off_limits'`, and Android Share → Capture writes `fuel` (`CaptureScreen.tsx:273`). ADR-081 (migration 017) retired AI-proposed fuel and also copied the share-capture topic fuel existing at that time into share-provenance, AI-off Memories; `CaptureScreen` was never changed, so later shares went back into `fuel` (corrected 2026-10-10, UX-audit triage slice 3).
-**Overlaps:** `.planning/todos/pending/2026-09-27-retire-old-fuel-editor.md` (38.4 D-54) covers the Off Limits / Fuel-editor half; fold it in here. Touches ADR-131 (form composition) and ADR-150 (Off Limits editor choice); superseding either is an owner decision.
-**Source:** owner, Phase 39 interrogation 2026-10-09 (out of Phase 39 scope by owner ruling).
 **Plans:** 0 plans (not planned)
 
 ### Phase 999.4: App name through one constant everywhere (BACKLOG)
@@ -1835,25 +1827,27 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 **Source:** owner, Phase 39 interrogation 2026-10-09 (Phase 39 D-79/D-90; onboarding copy already uses `APP_NAME`).
 **Plans:** 0 plans (not planned)
 
-### Phase 999.5: Shared items get their own Things to Remember section, with optional reminders (BACKLOG)
+### Phase 999.7: Widget overhaul (BACKLOG)
 
-**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative. **The reminder half moved to Phase 38.16 (owner, 2026-10-12; 38.10 D-73).**
+**Goal:** A dedicated pass over the home-screen widget, which the owner dislikes in several ways (owner, 2026-09-25). Carries every item already deferred to "the widget-overhaul phase":
+- RG-001 remaining checks — max-size resize and a visible explicit refresh (38.2 owner disposition; also 38.3 UAT-023a widget leg).
+- RG-032 widget action accessible names, a hard requirement (38.4 D-16).
+- Tapping a contact on the widget does not open their Profile (38.4 owner checklist 9c, 2026-09-28; `src/navigation/widget-linking.ts`).
+- Widget/notification tap while a guarded save is held, then Cancel, replays the jump without "Discard changes?" (38.9-REVIEW-FIXES-4 CR-01; owner 2026-10-11: obscure, revisit here). Fix if wanted: re-dispatch a fresh action copy (`discard-keep-guard.ts:261/:303`).
+- Large tile lost its knowledge line when fuel was retired (38.10 D-59): decide whether it shows one again, and from what (latest Last Talked About, newest Thought of Them / Gift Ideas, or nothing). Off Limits must never appear on the widget (38.10 D-10); ordering by pin was rejected (03-fuel :250 / ADR-029 :23). Owner (38.10 Q-12): "Nothing for now … please add this so we know to include it." Files: `src/services/widget/widget-data.ts`, `widget-render.tsx`.
 
-**Goal:** Things shared into the app from other Android apps land somewhere visible and fitting. Owner, 2026-10-09: a text block that "made me think of my niece" was shared to her contact and "currently it doesn't show anywhere. I don't really want that to show in memories though, it's not a memory, it's just something that made me think of them."
-
-- A new Things to Remember section for these items (working name "Made Me Think of Them"; name to be decided).
-- After sharing and choosing the contact, offer "Add a reminder about this?" leading into reminder setup (owner's example: an article found at 2 a.m., reminded two days later at 8 a.m. to send before her soccer game).
-- After choosing the contact, a second choice of where to save it, defaulting to the new section (it may sometimes be a Memory).
-- Must not write to `fuel` (owner: fuel is being removed root and stem; see 999.3). Memories are their own `memories` table (`src/db/memories-dao.ts:111`).
-
-**Current state (`main @ c2c0d191`):** Share → Capture writes `fuel` `kind: "topic"`, `source: "share"` (`CaptureScreen.tsx:273-276`); the Profile reads only `off_limits` fuel (`src/db/profile-knowledge-read.ts:259-266`), so captures are invisible on the Profile. Changes Phase 34's capture design (owner decision at discuss). Likely a new table/migration and backup-format impact.
-**Source:** owner, Phase 39 interrogation 2026-10-09 (Phase 39 Q-51). Wanted before Phase 39 executes if possible, so the Memory lesson teaches the final behaviour.
+Widgets need the custom dev client and native `RemoteViews`; no text input is possible in a widget (CLAUDE.md).
+**Source:** owner 2026-09-25 (STATE carried-forward); todos `2026-09-28-widget-contact-tap-does-not-open-profile`, `2026-10-11-widget-tap-during-held-save`, `2026-10-12-widget-knowledge-line-after-fuel` merged here in the backlog cleanup (owner-approved 2026-10-16).
 **Plans:** 0 plans (not planned)
 
-### Phase 999.6: Move an entry between Things to Remember sections (BACKLOG)
+### Phase 999.8: Prune source-reading and count-pinning tests (BACKLOG)
 
-**Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative.
+**Goal:** Cut test plumbing that breaks on harmless edits while keeping behaviour coverage. At 2026-10-12, `src` held about 159k lines of tests against about 177k of app code (618 test files); 110 files read source as text (`readFileSync`) and assert on wording, anchors or site counts (e.g. the RG-029 inventory test pins 61 snippets; the placeholder test has an "at least N sites" floor). In 38.10 they produced most plan-check findings from cycle 3 on.
+- Triage the 110 source-reading tests: retire those that pin text/anchors/counts without protecting behaviour; replace real guarantees with behaviour/render tests or a lint rule (e.g. `placeholderTextColor` must be the theme token).
+- Retire the RG-029 inventory test and its `.planning` inventory (`38.4-RG029-INVENTORY.md`) unless a behaviour check replaces it.
+- Keep data-layer tests (migrations, backup/restore, DAO invariants) — there is no remote repair for user databases (CLAUDE.md "SQLite migrations").
+- Any standing rule for new tests is the owner's decision.
 
-**Goal:** Tap an entry and move it to the section it really belongs in (owner's example: a Memory that is really a "Last talked about" item). Owner, 2026-10-09: "It looks like we have a watered down version of this already, I just tried to move a memory and it allows me to move them to 'Imported from Contacts App' and 'Custom' which appears to create a new custom field." Needs data-format reconciliation between sections (memories, current-state fields, custom fields, the 999.5 section). Out of Phase 39 scope.
-**Source:** owner, Phase 39 interrogation 2026-10-09.
+Scope estimate: about 1–2 plans, counting the 110 files; per-file triage depth not estimated.
+**Source:** owner, 38.10 plan-phase 2026-10-12: "We clearly have been doing way too many tests though and I want to clamp down on this a bit. … I'll probably add that to the milestone 3 items." Todo `2026-10-12-prune-source-reading-tests` moved here in the backlog cleanup (owner-approved 2026-10-16); milestone placement is the owner's.
 **Plans:** 0 plans (not planned)

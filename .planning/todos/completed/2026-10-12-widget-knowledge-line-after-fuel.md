@@ -18,3 +18,7 @@ Phase 38.10 retires `fuel`. The widget's large tile showed one ranked fuel line 
 ## For the widget-overhaul phase
 
 Decide whether the large tile shows a knowledge line again, and from what: latest Last Talked About, newest Thought of Them / Gift Ideas, or nothing. Off Limits must never appear on the widget (38.10 D-10). Ordering by pin was rejected in 03-fuel :250 / ADR-029 :23. File paths verified 2026-10-12.
+
+## Moved to backlog 999.7 (backlog cleanup, owner-approved 2026-10-16)
+
+Not done. Merged into ROADMAP Backlog "Phase 999.7: Widget overhaul", which now carries this item.

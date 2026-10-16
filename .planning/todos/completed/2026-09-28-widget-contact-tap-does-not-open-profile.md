@@ -18,3 +18,7 @@ Profile.
 ## Solution
 
 Fold into the planned widget-overhaul phase (with RG-001 max-resize/visible refresh and RG-032 widget action names).
+
+## Moved to backlog 999.7 (backlog cleanup, owner-approved 2026-10-16)
+
+Not done. Merged into ROADMAP Backlog "Phase 999.7: Widget overhaul", which now carries this item.
