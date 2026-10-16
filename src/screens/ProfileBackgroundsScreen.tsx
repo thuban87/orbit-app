@@ -279,6 +279,7 @@ export function ProfileBackgroundsScreen() {
                 key={template.uid}
                 density="dense"
                 style={styles.card}
+                contentStyle={styles.cardRow}
               >
                 <Image
                   source={{ uri: resolveBackgroundUri(template.imagePath) }}
@@ -410,12 +411,10 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   flex: { flex: 1 },
-  card: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.sm,
-    padding: SPACING.sm,
-  },
+  card: { padding: SPACING.sm },
+  // Row layout goes on the content wrapper: GlassSurface lays children out in
+  // an inner View, so a row style on the outer `style` stacked them (38.11-11).
+  cardRow: { alignItems: "center", flexDirection: "row", gap: SPACING.sm },
   cardText: { flex: 1, gap: SPACING.xs },
   thumbnail: { borderRadius: RADII.md, height: 56, width: 84 },
   createRoot: { flex: 1, gap: SPACING.sm },
