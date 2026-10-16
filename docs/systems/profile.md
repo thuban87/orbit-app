@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -195,6 +195,14 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-219:** Per-Section Editors — every pencil opens its section's own editor.
 - **ADR-221:** Two Snackbar Looks — Pin and Undo snackbars.
 - **ADR-203:** One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection — the layout editor's module switches.
+- **ADR-224:** One Contact Form and a Four-Action + — Edit Contact's save returns to the originating Profile; the Profile ends with the margin above the +.
+- **ADR-225:** Profile Top: Edit Contact, Compose, Name in a Solid Top Bar, Slimmer ⋯ — the Hero's Edit Contact / Compose / Call actions, the top-bar name with a solid bar, and the ⋯ list.
+- **ADR-226:** Archive Becomes the Bin — ⋯ Move to Bin confirms first, with no Undo.
+- **ADR-227:** One Snooze Sheet — the Overview Snooze tile and ⋯ Snooze… open the shared SnoozeSheet.
+- **ADR-228:** Truthful Relationship Overview — status reasons, Gravity empty state, sheet definitions and the Custom… frequency row.
+- **ADR-229:** Birthday on the Profile — the Birthday tile and its save-on-pick sheet.
+- **ADR-230:** Settings Page for Profile Backgrounds — the choose-only Background sheet and the Settings Profile Backgrounds page.
+- **ADR-231:** Open/Closed Sections, Layout Tools in the Sheets, All-Default Reset Row — own-layout saves keep open/closed choices; Save as template and Reset live in the sheets; Reset writes an all-default row.
 
 ## Gotchas
 
@@ -274,3 +282,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-10-16 | 38.11 | Code review IN-08: the layout template Preview lists each visible module by its registry label, without raw ids or tile sizes (`templatePreviewLines`). |
 | 2026-10-16 | 38.11 | D-89: editing a template's layout from the Templates sheet opens the layout editor directly (`ProfileLayoutEditor` `startInEditor`), skipping the contact-specific Profile Layout first page. |
 | 2026-10-16 | 38.11 | Device review (38.11-14): the Hero's message button reads "Compose" (D-91); the top bar scrim is solid while the name shows (D-92); both Move to Bin confirms say "hidden from your lists" and the bulk one is destructive (D-93); the Templates Assign page shows "{name} currently uses {layout}." from the live props, so it updates after an assign (the two-line "Set for this contact: freeform layout" / "currently has its own layout" captions are removed). |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-224–ADR-231. |
