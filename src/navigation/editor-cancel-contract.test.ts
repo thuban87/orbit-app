@@ -77,55 +77,10 @@ describe("+ → Memory: Back and Cancel close the draft first (G-12; D-14, D-61)
   });
 });
 
-describe("Update Contact: every editor Cancel follows the Back rule (E-09; D-14, D-61)", () => {
-  const screen = read("src/screens/UpdateContactScreen.tsx");
+describe("RelationshipEditor form Cancel (E-09; D-14, D-61)", () => {
+  // The Update Contact block that hosted this check was retired with the
+  // screen (38.11 D-62; archived in docs/archive/update-contact/).
   const relationship = read("src/components/RelationshipEditor.tsx");
-
-  it("guards with a sub-editor over the open row", () => {
-    expect(screen).toMatch(
-      /useDiscardKeepGuard\(\{[\s\S]*?hasUnsavedChanges:\s*false[\s\S]*?subEditor:\s*\{[\s\S]*?open:\s*session\.activeRowKey\s*!=\s*null/,
-    );
-    expect(screen).toMatch(/target:\s*"innermost"/);
-  });
-
-  it("no editor Cancel is a bare close", () => {
-    // The screen no longer has a raw row-cancel handler.
-    expect(screen).not.toMatch(/const onCancel = /);
-    const render = functionBody(screen, "renderActiveEditor");
-    const editorCancels = render.match(/onCancel=\{[^}]*\}/g) ?? [];
-    // Eight row editors since the in-place Memory editor (38.10 D-115).
-    expect(editorCancels.length).toBeGreaterThanOrEqual(7);
-    for (const cancel of editorCancels) {
-      expect(cancel).toBe("onCancel={requestRowCancel}");
-    }
-    expect(screen).not.toMatch(/\(\) => setSelected\(null\)/);
-    expect(screen).not.toMatch(/onCancel=\{\(\) => setSession/);
-    // cancelRow is reached only through closeLevel.
-    const cancelRowCalls = screen.match(/cancelRow\(/g) ?? [];
-    expect(cancelRowCalls).toHaveLength(1);
-    expect(functionBody(screen, "closeLevel")).toContain("cancelRow(");
-  });
-
-  it("row and inner Cancels route through requestClose", () => {
-    expect(functionBody(screen, "requestRowCancel")).toMatch(
-      /requestClose\([\s\S]*?target:\s*"row"/,
-    );
-    expect(functionBody(screen, "requestInnerCancel")).toMatch(
-      /requestClose\([\s\S]*?target:\s*"innermost"/,
-    );
-    expect(screen).toMatch(/onCancelRequest=\{onCancelRequest\}/);
-  });
-
-  it("successful saves close directly with no prompt", () => {
-    expect(screen).toMatch(
-      /const onSaved = \(\) => \{[\s\S]*?completeSave[\s\S]*?\};/,
-    );
-    const onSaved = screen.slice(
-      screen.indexOf("const onSaved = () =>"),
-      screen.indexOf("};", screen.indexOf("const onSaved = () =>")),
-    );
-    expect(onSaved).not.toMatch(/requestClose|confirmDiscard/);
-  });
 
   it("RelationshipEditor's form Cancel calls onCancelRequest when given; commit closes directly", () => {
     expect(relationship).not.toMatch(/onPress=\{close\}/);
