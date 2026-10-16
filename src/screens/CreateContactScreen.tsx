@@ -91,6 +91,7 @@ import {
   OptionSelectRow,
   useKeyboardCentering,
 } from "@/components/ui";
+import { chipTone } from "@/components/ui/chip-tone";
 import {
   clearFieldError,
   type FieldErrors,
@@ -776,6 +777,9 @@ export function CreateContactScreen({
                 {([true, false] as const).map((enabled) => {
                   const selected = trackingEnabled === enabled;
                   const label = enabled ? "Bound" : "Unbound";
+                  // Top-level choice: the primary (solid) chip tier (38.11
+                  // D-85, ADR-203); the frequency chips stay the sub tier.
+                  const tone = chipTone("primary", selected);
                   return (
                     <Pressable
                       key={label}
@@ -799,20 +803,14 @@ export function CreateContactScreen({
                       style={[
                         styles.lifecycleChoice,
                         {
-                          borderColor: selected ? colors.accent : colors.border,
-                          backgroundColor: selected
-                            ? colors.accent
-                            : colors.surface,
+                          borderColor: colors[tone.border],
+                          backgroundColor: colors[tone.fill],
                         },
                       ]}
                     >
                       <AppText
                         role="label"
-                        style={{
-                          color: selected
-                            ? colors.onAccent
-                            : colors.textPrimary,
-                        }}
+                        style={{ color: colors[tone.label] }}
                       >
                         {label}
                       </AppText>
@@ -834,6 +832,10 @@ export function CreateContactScreen({
                 </AppText>
                 <FrequencyPicker
                   testID="create-contact-frequency"
+                  // Add / Edit only: the Custom… error waits for typing or a
+                  // blocked Save, and is the field's one message (D-36).
+                  errorAfterTyping
+                  errorForced={fieldErrors.frequency !== undefined}
                   // The seed carries a cadence and nothing clears it, so this
                   // is never null; the fallback is a preset, never an invalid
                   // custom entry (38.11 D-22, E-05).

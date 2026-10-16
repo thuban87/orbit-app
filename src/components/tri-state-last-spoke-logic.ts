@@ -63,3 +63,52 @@ export function resolvePickedDate(
     message: null,
   };
 }
+
+/** The palette token keys one Last-spoke segment draws with. */
+export interface LastSpokeSegmentTone {
+  background: "surface" | "accent";
+  border: "border" | "borderStrong" | "accent";
+  text: "textPrimary" | "textSecondary" | "onAccent";
+}
+
+/**
+ * The colours of one segment (38.11 D-04, D-44, D-25). A selected segment —
+ * "Not yet" included — gets the solid accent fill with an `onAccent` label.
+ * Unselected, "Not yet" stays muted (textSecondary on a borderStrong outline;
+ * deliberately not `danger`, it is a valid choice) and Today / Pick date sit on
+ * the plain surface. Token keys only, so the control reads `colors[tone.*]`.
+ */
+export function lastSpokeSegmentTone(
+  kind: LastSpokeValue["kind"],
+  selected: boolean,
+): LastSpokeSegmentTone {
+  if (selected) {
+    return { background: "accent", border: "accent", text: "onAccent" };
+  }
+  if (kind === "not-yet") {
+    return {
+      background: "surface",
+      border: "borderStrong",
+      text: "textSecondary",
+    };
+  }
+  return { background: "surface", border: "border", text: "textPrimary" };
+}
+
+/**
+ * The Pick date picker's `maximumDate` (38.11 D-31): the last millisecond of
+ * today's LOCAL day, built from local date parts (never a UTC slice), so all
+ * of today stays pickable and no future day is. `resolvePickedDate` still
+ * rejects a future day as the after-the-fact defence.
+ */
+export function lastSpokeMaxDate(now: Date = new Date()): Date {
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+}

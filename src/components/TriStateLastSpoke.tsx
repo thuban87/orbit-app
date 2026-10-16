@@ -4,16 +4,18 @@
  *
  * PURELY CONTROLLED: the selected segment derives from the `value` prop; this
  * component holds NO internal default that overrides it. Each consumer seeds
- * its own initial state — CreateContactScreen (Plan 04) passes { kind: "today" },
- * the edit form's never-contacted path (Plan 06) passes { kind: "not-yet" }.
+ * its own initial state — Add Contact and Edit Contact's never-contacted path
+ * both start at { kind: "not-yet" } (38.11 D-01).
  *
- * "Not yet" stays visually muted (textSecondary text + borderStrong border),
- * NEVER accent-filled, so the backlog case reads honestly — muting is
- * deliberately not `danger` (Not-yet is a valid, non-error choice). "Pick date"
- * opens the native datetimepicker; a future date is rejected at entry with the
- * locked copy in `colors.danger` and the prior selection is kept. Dates format
- * through formatLocalDate (never toISOString) — validation lives in the tested
- * pure module tri-state-last-spoke-logic.ts. Every colour via useTheme().
+ * A selected segment, "Not yet" included, gets the selected accent treatment,
+ * so the user's choice reads as chosen on Add and Edit alike (38.11 D-04,
+ * D-44). Unselected, "Not yet" stays muted (textSecondary text + borderStrong
+ * border) — deliberately not `danger` (Not-yet is a valid, non-error choice).
+ * "Pick date" opens the native datetimepicker capped at today (D-31); a future
+ * date is still rejected at entry with the locked copy in `colors.danger` and
+ * the prior selection is kept. Dates format through formatLocalDate (never
+ * toISOString) — the tones, the cap and validation live in the tested pure
+ * module tri-state-last-spoke-logic.ts. Every colour via useTheme().
  *
  * Accessibility (38.4 RG-030, ui-accessibility/AUD-UIA-005): the "Pick date"
  * segment exposes the chosen date as its accessibility value (the same string
@@ -31,6 +33,8 @@ import { parseDate } from "@/types";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
 import {
   type LastSpokeValue,
+  lastSpokeMaxDate,
+  lastSpokeSegmentTone,
   resolvePickedDate,
 } from "./tri-state-last-spoke-logic";
 
@@ -99,27 +103,15 @@ export function TriStateLastSpoke({
     }
   }
 
-  // Segment style: selected Today/Pick-date get accent fill; "Not yet" is muted
-  // even when selected; unselected segments sit on surface with a plain border.
+  // Segment style: any selected segment, "Not yet" included, gets the accent
+  // fill; an unselected "Not yet" stays muted; other unselected segments sit on
+  // surface with a plain border (D-04, D-44, D-25).
   function segmentColors(kind: LastSpokeValue["kind"], selected: boolean) {
-    if (kind === "not-yet") {
-      return {
-        background: colors.surface,
-        border: colors.borderStrong,
-        text: colors.textSecondary,
-      };
-    }
-    if (selected) {
-      return {
-        background: colors.accent,
-        border: colors.accent,
-        text: colors.onAccent,
-      };
-    }
+    const tone = lastSpokeSegmentTone(kind, selected);
     return {
-      background: colors.surface,
-      border: colors.border,
-      text: colors.textPrimary,
+      background: colors[tone.background],
+      border: colors[tone.border],
+      text: colors[tone.text],
     };
   }
 
@@ -203,6 +195,7 @@ export function TriStateLastSpoke({
           testID={`${testID}-picker`}
           value={pickerSeed}
           mode="date"
+          maximumDate={lastSpokeMaxDate()}
           onChange={onPickerChange}
         />
       ) : null}

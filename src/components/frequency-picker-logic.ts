@@ -50,3 +50,35 @@ export function parseCustomInterval(
   }
   return { valid: true, intervalDays: n * UNIT_FACTORS[unit] };
 }
+
+/** Inputs to the one show-error rule for the Custom… box. */
+export interface CustomErrorInput {
+  /** The custom entry parses (`parseCustomInterval(...).valid`). */
+  valid: boolean;
+  /** The user has typed in the box since entering custom mode. */
+  touched: boolean;
+  /** A blocked Save asked the field to show its error (host-driven). */
+  forced: boolean;
+  /** The host opted into the after-typing timing (Add and Edit only). */
+  afterTyping: boolean;
+}
+
+/**
+ * Whether the Custom… box shows its error. One predicate drives BOTH error
+ * signals — the caption and the box's danger border (38.11 D-36, review U-03).
+ *
+ * Default timing (`afterTyping` false — every host that does not opt in):
+ * exactly `!valid`, today's behaviour (T-07). Opt-in timing (Add and Edit
+ * Contact): an invalid entry shows only once the user has typed in the box or
+ * a blocked Save forces it (38.9 validation rule: errors after the user types).
+ */
+export function shouldShowCustomError({
+  valid,
+  touched,
+  forced,
+  afterTyping,
+}: CustomErrorInput): boolean {
+  if (valid) return false;
+  if (!afterTyping) return true;
+  return touched || forced;
+}

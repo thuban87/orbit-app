@@ -22,6 +22,7 @@ import {
   INVALID_INTERVAL_MESSAGE,
   type IntervalUnit,
   parseCustomInterval,
+  shouldShowCustomError,
 } from "./frequency-picker-logic";
 
 interface FrequencyPickerProps {
@@ -51,6 +52,19 @@ interface FrequencyPickerProps {
    * disabled (38.4 D-64, a locked bulk batch lifecycle). Off by default.
    */
   disabled?: boolean;
+  /**
+   * Opt-in error timing (38.11 D-36; Add and Edit Contact only): the Custom…
+   * box shows its error only after the user types in it (or `errorForced`).
+   * Off by default, so every other host keeps today's always-show timing
+   * (T-07).
+   */
+  errorAfterTyping?: boolean;
+  /**
+   * A blocked Save asks the field to show its error now, typed or not (the
+   * host's own reveal). The picker's message is the field's one error source
+   * (D-36): the host renders no second message for frequency.
+   */
+  errorForced?: boolean;
 }
 
 const PRESETS = Object.entries(FREQUENCY_DAYS) as [Frequency, number][];
@@ -70,6 +84,8 @@ export function FrequencyPicker({
   label = "Contact frequency",
   testID = "frequency-picker",
   disabled = false,
+  errorAfterTyping = false,
+  errorForced = false,
 }: FrequencyPickerProps) {
   const { colors } = useTheme();
 
@@ -82,9 +98,20 @@ export function FrequencyPicker({
     PRESET_VALUES.includes(value) ? "" : String(value),
   );
   const [unit, setUnit] = useState<IntervalUnit>("days");
+  // Set on the first typing in the Custom… box; reset when the user leaves
+  // custom mode (D-36). Only read when the host opts into `errorAfterTyping`.
+  const [customTouched, setCustomTouched] = useState(false);
 
   const custom = parseCustomInterval(customRaw, unit);
   const valid = customMode ? custom.valid : true;
+  // ONE show-error value drives the caption AND the danger border (review
+  // U-03); without the opt-in it equals `!custom.valid`, as before (T-07).
+  const showError = shouldShowCustomError({
+    valid: custom.valid,
+    touched: customTouched,
+    forced: errorForced,
+    afterTyping: errorAfterTyping,
+  });
 
   // Surface validity to the parent (mount + on every change) so Save can block.
   useEffect(() => {
@@ -101,6 +128,7 @@ export function FrequencyPicker({
 
   function selectPreset(days: number) {
     setCustomMode(false);
+    setCustomTouched(false);
     onChange(days);
   }
 
@@ -113,6 +141,7 @@ export function FrequencyPicker({
   }
 
   function changeCustomText(text: string) {
+    setCustomTouched(true);
     setCustomRaw(text);
     const parsed = parseCustomInterval(text, unit);
     if (parsed.valid && parsed.intervalDays !== null) {
@@ -203,7 +232,7 @@ export function FrequencyPicker({
                 {
                   color: colors.textPrimary,
                   backgroundColor: colors.surface,
-                  borderColor: custom.valid ? colors.border : colors.danger,
+                  borderColor: showError ? colors.danger : colors.border,
                 },
               ]}
             />
@@ -240,7 +269,7 @@ export function FrequencyPicker({
             </View>
           </View>
 
-          {custom.valid ? null : (
+          {showError ? (
             <Text
               testID={`${testID}-error`}
               accessibilityLabel={INVALID_INTERVAL_MESSAGE}
@@ -248,7 +277,7 @@ export function FrequencyPicker({
             >
               {INVALID_INTERVAL_MESSAGE}
             </Text>
-          )}
+          ) : null}
         </View>
       ) : null}
     </View>
