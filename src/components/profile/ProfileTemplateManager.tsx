@@ -36,22 +36,25 @@ import {
   createTemplateManagerListLoadState,
   createTemplateManagerState,
   describeAssignmentKind,
+  describeCurrentLayout,
   describeTemplateAssignment,
+  effectiveLayoutTemplateUid,
   finishTemplateManagerListLoad,
   managerBackIntent,
   openTemplateManagerPage,
+  type ProfileLayoutSource,
   popTemplateManagerPage,
   retainTemplateFailure,
   setTemplateDraft,
   setTemplateUsage,
   settleTemplateOperation,
   type TemplateManagerState,
+  templateLayoutForDisplay,
   templateLayoutForNewTemplate,
 } from "@/profile/template-manager-model";
 import type {
   ProfileLayoutDocument,
   ProfilePresentationInputs,
-  ProfilePresentationSource,
 } from "@/profile/types";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
@@ -63,13 +66,11 @@ export interface ProfileTemplateManagerProps {
   visible: boolean;
   contactId: number;
   contactName: string;
-  /** Current resolved Layout source, named for the user rather than raw IDs. */
-  effectiveSource: string;
-  /** Resolved source remains explicit so inherited and override rows never merge. */
-  effectiveLayoutSource: Extract<
-    ProfilePresentationSource,
-    "contact-template" | "contact-freeform" | "category" | "global" | "factory"
-  >;
+  /**
+   * Resolved source remains explicit so inherited and override rows never
+   * merge. Shown to the user only through `describeCurrentLayout` (38.11-13).
+   */
+  effectiveLayoutSource: ProfileLayoutSource;
   /** The contact's current freeform layout, if any, for Save Current Layout. */
   freeformLayout: ProfileLayoutDocument | null;
   /** An unsaved canonical editor draft, preferred over any persisted freeform layout. */
@@ -90,6 +91,7 @@ function usageText(usage: ProfileTemplateUsage | undefined): string {
   return `${usage.total} assignment${usage.total === 1 ? "" : "s"} · ${usage.global} global · ${usage.categories} Category · ${usage.contacts} contact`;
 }
 
+/** The stored layout as saved; Rename writes it back unchanged. */
 function templateLayout(row: ProfileLayoutTemplateRow): ProfileLayoutDocument {
   return parseAndCanonicalizeProfileLayout(row.layoutJson);
 }
@@ -107,7 +109,6 @@ export function ProfileTemplateManager({
   visible,
   contactId,
   contactName,
-  effectiveSource,
   effectiveLayoutSource,
   freeformLayout,
   pendingTemplateLayout = null,
@@ -356,9 +357,24 @@ export function ProfileTemplateManager({
   const deleteTemplate = deleteUid
     ? templates.find((template) => template.uid === deleteUid)
     : null;
+  // 38.11-13: the current layout in plain words, with the template's name
+  // when it resolved from one (never the raw source id).
+  const currentTemplateUid = effectiveLayoutTemplateUid(
+    effectiveLayoutSource,
+    presentation,
+  );
+  const currentTemplateName =
+    currentTemplateUid === null
+      ? null
+      : (templates.find((template) => template.uid === currentTemplateUid)
+          ?.name ?? null);
+  const currentLayout = describeCurrentLayout(
+    effectiveLayoutSource,
+    currentTemplateName,
+  );
   const assignmentDescription = describeTemplateAssignment({
     source: effectiveLayoutSource,
-    templateName: effectiveSource,
+    templateName: currentTemplateName,
   });
 
   return (
@@ -388,7 +404,7 @@ export function ProfileTemplateManager({
           {activePage.kind === "list" ? (
             <ScrollView contentContainerStyle={styles.content}>
               <AppText role="body">
-                {contactName} currently uses {effectiveSource}. Templates change
+                {contactName} currently uses {currentLayout}. Templates change
                 every Profile assigned to them.
               </AppText>
               {currentLayoutForNewTemplate ? (
@@ -544,7 +560,9 @@ export function ProfileTemplateManager({
                   setEditingLayout({
                     uid: activeTemplate.uid,
                     name: activeTemplate.name,
-                    layout: templateLayout(activeTemplate),
+                    // Completed at read time like the Profile's own editor;
+                    // written only by an explicit Save (38.11-13).
+                    layout: templateLayoutForDisplay(activeTemplate.layoutJson),
                   })
                 }
               />
@@ -689,7 +707,7 @@ export function ProfileTemplateManager({
           visible
           contactId={contactId}
           contactName={contactName}
-          effectiveSource={editingLayout.name}
+          currentLayout={currentLayout}
           layout={editingLayout.layout}
           onRequestClose={() => setEditingLayout(null)}
           onSaveDraft={async (layout) => {
@@ -743,7 +761,9 @@ function TemplateNameForm({
 }
 
 function TemplatePreview({ template }: { template: ProfileLayoutTemplateRow }) {
-  const layout = templateLayout(template);
+  // 38.11-08 deferred item: a pre-38.11 template previews with its Birthday
+  // tile (read-time completion, nothing written back).
+  const layout = templateLayoutForDisplay(template.layoutJson);
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <AppText role="heading">Preview {template.name}</AppText>

@@ -1,4 +1,6 @@
 import type { ProfileTemplateUsage } from "@/db/profile-presentation-read";
+import { parseAndCanonicalizeProfileLayout } from "./presentation-schema";
+import { completeProfileLayoutChildren } from "./resolve-presentation";
 import type {
   ProfileLayoutDocument,
   ProfilePresentationInputs,
@@ -86,27 +88,79 @@ export type ProfileLayoutSource = Extract<
   "contact-template" | "contact-freeform" | "category" | "global" | "factory"
 >;
 
-/** RED stub (38.11-13 Task 4): replaced in the GREEN commit. */
+/**
+ * Plain words for the layout a Profile currently uses, for "{name} currently
+ * uses …" (38.11-13; the 38.11-05 deferred item). Never a raw source id. A
+ * template's name is used when the caller has it, else a generic phrase.
+ * Exhaustive: a new source value fails tsc here.
+ */
 export function describeCurrentLayout(
   source: ProfileLayoutSource,
-  _templateName: string | null,
+  templateName: string | null,
 ): string {
-  return source;
+  switch (source) {
+    case "contact-freeform":
+      return "their own layout";
+    case "contact-template":
+      return templateName
+        ? `the ${templateName} template`
+        : "a layout template";
+    case "category":
+      return templateName
+        ? `the ${templateName} template from their Category`
+        : "their Category's layout template";
+    case "global":
+      return templateName
+        ? `the ${templateName} template set for all Profiles`
+        : "the layout template set for all Profiles";
+    case "factory":
+      return "the default layout";
+    default: {
+      const unreachable: never = source;
+      return unreachable;
+    }
+  }
 }
 
-/** RED stub (38.11-13 Task 4): replaced in the GREEN commit. */
+/**
+ * The uid of the layout template a resolved source came from, read from the
+ * same assignment the resolver used (`resolveProfilePresentation`); null for
+ * the person's own layout and the factory default.
+ */
 export function effectiveLayoutTemplateUid(
-  _source: ProfileLayoutSource,
-  _inputs: Pick<ProfilePresentationInputs, "contact" | "category" | "global">,
+  source: ProfileLayoutSource,
+  inputs: Pick<ProfilePresentationInputs, "contact" | "category" | "global">,
 ): string | null {
-  return null;
+  switch (source) {
+    case "contact-template":
+      return inputs.contact.layoutTemplateUid;
+    case "category":
+      return inputs.category?.layoutTemplateUid ?? null;
+    case "global":
+      return inputs.global.layoutTemplateUid;
+    case "contact-freeform":
+    case "factory":
+      return null;
+    default: {
+      const unreachable: never = source;
+      return unreachable;
+    }
+  }
 }
 
-/** RED stub (38.11-13 Task 4): replaced in the GREEN commit. */
+/**
+ * A stored template's layout for display and editing, completed at read time
+ * with any module added since it was saved (the Birthday tile, 38.10's Things
+ * to Remember sections) at its factory position, as the Profile and its layout
+ * editor do (38.11 D-53, D-80). Nothing is written back; Rename keeps the raw
+ * stored layout.
+ */
 export function templateLayoutForDisplay(
   layoutJson: unknown,
 ): ProfileLayoutDocument {
-  return layoutJson as ProfileLayoutDocument;
+  return completeProfileLayoutChildren(
+    parseAndCanonicalizeProfileLayout(layoutJson),
+  );
 }
 
 /** Assignment labels name the durable source, never infer it from visual selection. */

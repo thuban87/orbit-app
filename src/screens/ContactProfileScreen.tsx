@@ -47,6 +47,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import type { KnowledgeEntryLink } from "@/profile/knowledge-presentation";
 import { resolveProfilePresentation } from "@/profile/resolve-presentation";
+import { describeCurrentLayout } from "@/profile/template-manager-model";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import {
   closeTopmostProfileOverlay,
@@ -1019,7 +1020,11 @@ export function ContactProfileScreen({
               visible={overlay === "layout"}
               contactId={contactId}
               contactName={snapshot.identity.name}
-              effectiveSource={presentation.layout.source}
+              // 38.11-13: plain words, never the raw source id.
+              currentLayout={describeCurrentLayout(
+                presentation.layout.source,
+                null,
+              )}
               layout={presentation.layout.document}
               onRequestClose={closeOverlay}
               onCommitted={() => void load()}
@@ -1034,7 +1039,6 @@ export function ContactProfileScreen({
               visible={overlay === "templates"}
               contactId={contactId}
               contactName={snapshot.identity.name}
-              effectiveSource={presentation.layout.source}
               effectiveLayoutSource={presentation.layout.source}
               freeformLayout={freeformLayout}
               pendingTemplateLayout={pendingTemplateLayout}

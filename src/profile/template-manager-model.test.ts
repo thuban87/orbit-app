@@ -273,3 +273,34 @@ describe("templateLayoutForDisplay (38.11-13)", () => {
     );
   });
 });
+
+describe("the layout sheets never show a raw source id (38.11-13)", () => {
+  const read = (path: string) =>
+    readFileSync(new URL(path, import.meta.url), "utf8");
+
+  it("both 'currently uses' lines interpolate the plain-word phrase", () => {
+    for (const path of [
+      "../components/profile/ProfileLayoutEditor.tsx",
+      "../components/profile/ProfileTemplateManager.tsx",
+    ]) {
+      const source = read(path);
+      expect(source).toContain("currently uses {currentLayout}.");
+      expect(source).not.toContain("effectiveSource");
+    }
+  });
+
+  it("the Profile passes plain words to the editor and the raw source only as a discriminator", () => {
+    const profile = read("../screens/ContactProfileScreen.tsx");
+    expect(profile).toContain("currentLayout={describeCurrentLayout(");
+    expect(profile).not.toContain("effectiveSource=");
+    const manager = read("../components/profile/ProfileTemplateManager.tsx");
+    expect(manager).toContain("templateName: currentTemplateName");
+    // Preview and template editing complete the layout; Rename stays raw.
+    expect(manager).toContain(
+      "const layout = templateLayoutForDisplay(template.layoutJson);",
+    );
+    expect(manager).toContain(
+      "layout: templateLayoutForDisplay(activeTemplate.layoutJson),",
+    );
+  });
+});

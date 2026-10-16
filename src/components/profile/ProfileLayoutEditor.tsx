@@ -60,8 +60,11 @@ export interface ProfileLayoutEditorProps {
   visible: boolean;
   contactId: number;
   contactName: string;
-  /** The resolved source label, e.g. Default or a Category/template name. */
-  effectiveSource: string;
+  /**
+   * Plain words for the person's current layout (`describeCurrentLayout`),
+   * never a raw source id such as "contact-freeform" (38.11-13).
+   */
+  currentLayout: string;
   layout: unknown;
   onRequestClose: () => void;
   /**
@@ -299,7 +302,7 @@ export function ProfileLayoutEditor({
   visible,
   contactId,
   contactName,
-  effectiveSource,
+  currentLayout,
   layout,
   onRequestClose,
   onCommitted,
@@ -420,7 +423,7 @@ export function ProfileLayoutEditor({
         <View style={styles.chooser}>
           <AppText role="heading">Profile Layout</AppText>
           <AppText role="body">
-            {contactName} currently uses {effectiveSource}.
+            {contactName} currently uses {currentLayout}.
           </AppText>
           <AppText role="caption">
             Editing creates a contact-specific layout only after you save.
