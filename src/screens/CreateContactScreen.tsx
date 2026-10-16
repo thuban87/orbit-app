@@ -1,10 +1,12 @@
 /**
- * CreateContactScreen (CRUD-01 / CRUD-02) — the lean create form. Fixed block
- * (Name → Category → Frequency → Last-spoke → Phone) FIRST, the `show_on_new`
- * custom block AFTER it, never interleaved (06-crud Cluster A). Save assembles a
- * single `createContactFull` call (one transaction), warns on a duplicate live
- * name, and `navigation.replace`s to the new contact's Profile so Back does not
- * return to the form. Started from the Settings tab (`host="settings"`), Save
+ * CreateContactScreen (CRUD-01 / CRUD-02) — the create form, as accordion
+ * sections (38.11 D-02, D-03, D-48): Identity (Photo above Name, then
+ * Category), Relationship Basics (Last spoke, Bound/Unbound, Frequency) and
+ * Contact Methods; Show More reveals Birthday, social battery & links, the
+ * Things to Remember sections, the `show_on_new` Custom Fields and Off Limits.
+ * Save assembles a single `createContactFull` call (one transaction), warns on
+ * a duplicate live name, and `navigation.replace`s to the new contact's
+ * Profile so Back does not return to the form. Started from the Settings tab (`host="settings"`), Save
  * instead pops the Settings stack back to where the user started and opens the
  * new Profile in the Contacts tab (D-50), where its Message action is live.
  *
