@@ -153,7 +153,8 @@ const CATEGORY_PATHS: readonly CategoryPath[] = [
     role: "bounded category layout assignment",
   },
   {
-    file: "src/components/profile/ProfileBackgroundManager.tsx",
+    // 38.11 D-58: moved here from the Profile's background sheet.
+    file: "src/screens/ProfileBackgroundsScreen.tsx",
     identity: "id",
     role: "bounded category background assignment",
   },

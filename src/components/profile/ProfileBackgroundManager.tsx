@@ -1,19 +1,25 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button semantic roles are domain props.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
-import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import { Sheet } from "@/components/ui/Sheet";
 import { getExecutor, localDateTime } from "@/db/database";
 import { assignContactBackgroundTemplate } from "@/db/profile-presentation-dao";
+import type { RootStackParamList } from "@/navigation/types";
 import {
+  assignContactBackground,
+  type ContactBackgroundWriter,
+  isContactBackground,
   resolveBackgroundListState,
   shouldResetBackgroundManagerViewOnOpen,
 } from "@/profile/background-manager-model";
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -26,70 +32,66 @@ import { useProfileBackgroundLibrary } from "./use-profile-background-library";
 
 const LOG_SCOPE = "profile-background-manager";
 
-type Page = "list" | "assign";
-
-function clearCategoryAccessibilityLabel(category: { name: string }): string {
-  return `Clear ${category.name} background`;
-}
+/** `list`: the saved backgrounds; `created`: the choices after a new one is named. */
+type Page = "list" | "created";
 
 export interface ProfileBackgroundManagerProps {
   visible: boolean;
   contactId: number;
   contactName: string;
+  /** This person's own background (null when they inherit one); marks the current card. */
+  contactBackgroundTemplateUid: string | null;
   onRequestClose: () => void;
   onCommitted?: () => void;
 }
 
 /**
- * Profile-owned background template management. Picker bytes are copied into the
- * app-owned namespace before a template row references them; Cancel and failure
- * never mutate the previously committed selection or its bytes.
+ * The Profile's Background sheet: choosing a background for this person only
+ * (38.11 D-58.2-4). Global and Category backgrounds and Delete live on the
+ * Settings Profile Backgrounds page, which "Manage global backgrounds" opens
+ * (the route is registered in every Profile-hosting stack, 38.11-06). Each
+ * saved-background card's Assign applies it to this person at once with a
+ * confirming snackbar (RESEARCH A2, "this plan only"); the card in use is
+ * marked selected. Choose photo stays (D-79): after the new background is
+ * named the sheet offers only Use for {name} and Not now.
  *
- * The crop and name steps are the shared `ProfileBackgroundCreateFlow` (its
- * state hook lives here, outside the sheet, so an unsaved crop survives the
- * sheet hiding), and the list/delete/global/category operations are the shared
- * `useProfileBackgroundLibrary`; the Settings Profile Backgrounds page uses
- * both too (38.11 D-58.1, D-79).
+ * Picker bytes are copied into the app-owned namespace before a template row
+ * references them; Cancel and failure never mutate the previously committed
+ * selection or its bytes. The crop and name steps are the shared
+ * `ProfileBackgroundCreateFlow` (its state hook lives here, outside the sheet,
+ * so an unsaved crop survives the sheet hiding), and the list is the shared
+ * `useProfileBackgroundLibrary`.
  */
 export function ProfileBackgroundManager({
   visible,
   contactId,
   contactName,
+  contactBackgroundTemplateUid,
   onRequestClose,
   onCommitted,
 }: ProfileBackgroundManagerProps) {
   const { colors } = useTheme();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [page, setPage] = useState<Page>("list");
-  // The shared list/delete/global/category operations (38.11 D-58.1), also
-  // used by the Settings Profile Backgrounds page.
-  const {
-    templates,
-    categories,
-    listLoading,
-    listError,
-    refresh,
-    deleteTemplate,
-    assignGlobal,
-    assignCategory,
-  } = useProfileBackgroundLibrary({ active: visible, onCommitted });
+  const { templates, listLoading, listError, refresh } =
+    useProfileBackgroundLibrary({ active: visible, onCommitted });
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [categoryPickerMode, setCategoryPickerMode] = useState<
-    "assign" | "clear" | null
-  >(null);
+  // One write at a time (a double tap must not write twice).
+  const busyRef = useRef(false);
   const wasVisibleRef = useRef(false);
 
-  // The shared crop-and-name flow; a save goes on to this sheet's assign page.
+  // The shared crop-and-name flow; a save goes on to the `created` page.
   const flow = useProfileBackgroundCreateFlow({
     defaultName: `${contactName}'s background`,
     onSaved: async (uid) => {
       setSelectedUid(uid);
-      setPage("assign");
+      setPage("created");
       await refresh();
       onCommitted?.();
     },
   });
-  const { reset: resetFlow, setError } = flow;
+  const { reset: resetFlow } = flow;
   const managerState = flow.state;
 
   useEffect(() => {
@@ -108,60 +110,49 @@ export function ProfileBackgroundManager({
     void refresh();
   }, [managerState, refresh, resetFlow, visible]);
 
-  const assign = useCallback(
-    async (
-      scope:
-        | "global"
-        | "clear-global"
-        | "category"
-        | "clear-category"
-        | "contact"
-        | "inherit",
-      categoryId?: number,
-    ) => {
-      const needsSelectedTemplate =
-        scope === "global" || scope === "category" || scope === "contact";
-      if ((needsSelectedTemplate && !selectedUid) || saving) return;
-      setSaving(true);
-      try {
-        if (scope === "global" || scope === "clear-global") {
-          await assignGlobal(scope === "clear-global" ? null : selectedUid);
-        } else if (
-          (scope === "category" || scope === "clear-category") &&
-          categoryId !== undefined
-        ) {
-          await assignCategory(
-            categoryId,
-            scope === "clear-category" ? null : selectedUid,
-          );
-        } else {
-          await assignContactBackgroundTemplate(getExecutor(), {
-            contactId,
-            templateUid: scope === "inherit" ? null : selectedUid,
-            now: localDateTime(),
-          });
-          await refresh();
-        }
-        onCommitted?.();
-        setPage("list");
-      } catch (error) {
-        Logger.error(LOG_SCOPE, "background assignment failed", error);
-        setError("Couldn't save your changes. Nothing was applied. Try again.");
-      } finally {
-        setSaving(false);
-      }
-    },
-    [
-      assignCategory,
-      assignGlobal,
-      contactId,
+  // Contact-scoped writes only (38.11 D-58.3): this person's own background.
+  // Built from `contactId` and the screen's `onCommitted`, never sheet state.
+  const writer = useMemo<ContactBackgroundWriter>(
+    () => ({
+      write: (templateUid) =>
+        assignContactBackgroundTemplate(getExecutor(), {
+          contactId,
+          templateUid,
+          now: localDateTime(),
+        }),
       onCommitted,
-      refresh,
-      saving,
-      selectedUid,
-      setError,
-    ],
+      notify: showSnackbar,
+      logError: (message, error) => Logger.error(LOG_SCOPE, message, error),
+    }),
+    [contactId, onCommitted],
   );
+
+  const assignToContact = useCallback(
+    async (templateUid: string) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      try {
+        await assignContactBackground(writer, { templateUid, contactName });
+      } finally {
+        busyRef.current = false;
+      }
+      setPage("list");
+      setSelectedUid(null);
+    },
+    [contactName, writer],
+  );
+
+  // The Settings page manages global and Category backgrounds and Delete
+  // (38.11 D-58.2); it is registered in every stack that hosts a Profile.
+  const manageGlobalBackgrounds = () => {
+    onRequestClose();
+    navigation.navigate("ProfileBackgrounds");
+  };
+
+  const notNow = () => {
+    setPage("list");
+    setSelectedUid(null);
+  };
 
   // The shared themed discard prompt (D-13, D-52), via the flow's guarded exit.
   const closeOrGuard = () => flow.requestCancel(onRequestClose);
@@ -175,83 +166,73 @@ export function ProfileBackgroundManager({
   });
 
   return (
-    <>
-      <Sheet visible={visible} onRequestClose={closeOrGuard} variant="expanded">
-        <View style={styles.root} accessibilityViewIsModal>
-          {flow.step !== "crop" ? (
-            <View style={styles.heading}>
-              <AppText role="heading">Profile backgrounds</AppText>
-              <Button role="secondary" label="Back" onPress={closeOrGuard} />
-            </View>
-          ) : null}
-          {flow.step !== "crop" && managerState.error ? (
-            <AppText style={{ color: colors.danger }}>
-              {managerState.error}
+    <Sheet visible={visible} onRequestClose={closeOrGuard} variant="expanded">
+      <View style={styles.root} accessibilityViewIsModal>
+        {flow.step !== "crop" ? (
+          <View style={styles.heading}>
+            <AppText role="heading">Profile backgrounds</AppText>
+            <Button role="secondary" label="Back" onPress={closeOrGuard} />
+          </View>
+        ) : null}
+        {flow.step !== "crop" && managerState.error ? (
+          <AppText style={{ color: colors.danger }}>
+            {managerState.error}
+          </AppText>
+        ) : null}
+        {page === "list" && flow.step === "idle" ? (
+          <ScrollView
+            style={styles.workspace}
+            contentContainerStyle={styles.content}
+          >
+            <AppText role="body">
+              Background templates are separate from layout templates.
             </AppText>
-          ) : null}
-          {page === "list" && flow.step === "idle" ? (
-            <ScrollView
-              style={styles.workspace}
-              contentContainerStyle={styles.content}
-            >
+            <Button
+              role="primary"
+              label="Choose photo"
+              onPress={() => void flow.chooseImage()}
+            />
+            <Button
+              role="secondary"
+              label="Manage global backgrounds"
+              onPress={manageGlobalBackgrounds}
+            />
+            {listState.kind === "loading" ? (
+              <AppText role="body">Loading backgrounds…</AppText>
+            ) : null}
+            {listState.kind === "empty" ? (
               <AppText role="body">
-                Background templates are separate from layout templates.
+                No saved backgrounds yet. Choose a photo to create one.
               </AppText>
-              <Button
-                role="primary"
-                label="Choose photo"
-                onPress={() => void flow.chooseImage()}
-              />
-              <AppText role="label">Background assignment</AppText>
-              <AppText role="body">
-                Clear an assignment to use the next available Category, global,
-                or active theme background. Layout choices stay unchanged.
-              </AppText>
-              <Button
-                role="secondary"
-                label="Clear global background"
-                onPress={() => void assign("clear-global")}
-              />
-              {categories.length === 0 ? (
-                <AppText role="body">No categories available</AppText>
-              ) : (
+            ) : null}
+            {listState.kind === "error" ? (
+              <>
+                <AppText style={{ color: colors.danger }}>
+                  {listState.message}
+                </AppText>
                 <Button
                   role="secondary"
-                  label="Clear category background"
-                  onPress={() => setCategoryPickerMode("clear")}
+                  label="Retry"
+                  onPress={() => void refresh()}
                 />
-              )}
-              <Button
-                role="secondary"
-                label={`Inherit Category, global, or theme background for ${contactName}`}
-                onPress={() => void assign("inherit")}
-              />
-              {listState.kind === "loading" ? (
-                <AppText role="body">Loading backgrounds…</AppText>
-              ) : null}
-              {listState.kind === "empty" ? (
-                <AppText role="body">
-                  No saved backgrounds yet. Choose a photo to create one.
-                </AppText>
-              ) : null}
-              {listState.kind === "error" ? (
-                <>
-                  <AppText style={{ color: colors.danger }}>
-                    {listState.message}
-                  </AppText>
-                  <Button
-                    role="secondary"
-                    label="Retry"
-                    onPress={() => void refresh()}
-                  />
-                </>
-              ) : null}
-              {listState.kind === "populated"
-                ? templates.map((template) => (
+              </>
+            ) : null}
+            {listState.kind === "populated"
+              ? templates.map((template) => {
+                  const current = isContactBackground(
+                    template.uid,
+                    contactBackgroundTemplateUid,
+                  );
+                  // D-58.4: two columns by two rows — the picture on the
+                  // left spanning both rows; the name top-right and Assign
+                  // bottom-right, centred. No Delete (D-58.3).
+                  return (
                     <GlassSurface
                       key={template.uid}
                       density="dense"
-                      style={styles.row}
+                      selected={current}
+                      style={styles.card}
+                      contentStyle={styles.cardContent}
                     >
                       <Image
                         source={{
@@ -259,90 +240,44 @@ export function ProfileBackgroundManager({
                         }}
                         style={styles.thumbnail}
                       />
-                      <View style={styles.rowText}>
-                        <AppText role="label">{template.name}</AppText>
+                      <View style={styles.cardRight}>
+                        <AppText role="label" style={styles.cardName}>
+                          {template.name}
+                        </AppText>
                         <Button
                           role="tertiary"
                           label="Assign"
-                          onPress={() => {
-                            setSelectedUid(template.uid);
-                            setPage("assign");
-                          }}
-                        />
-                        <Button
-                          role="tertiary"
-                          label="Delete"
-                          onPress={() => void deleteTemplate(template)}
+                          accessibilityLabel={`Assign ${template.name} to ${contactName}`}
+                          accessibilityHint={
+                            current ? "Current background" : undefined
+                          }
+                          selected={current}
+                          onPress={() => void assignToContact(template.uid)}
                         />
                       </View>
                     </GlassSurface>
-                  ))
-                : null}
-            </ScrollView>
-          ) : null}
-          <ProfileBackgroundCreateFlow flow={flow} onCancel={closeOrGuard} />
-          {page === "assign" && flow.step === "idle" && selected ? (
-            <ScrollView
-              style={styles.workspace}
-              contentContainerStyle={styles.content}
-            >
-              <AppText role="heading">Assign {selected.name}</AppText>
-              <Button
-                role="secondary"
-                label="Set as global default"
-                onPress={() => void assign("global")}
-              />
-              <AppText role="label">Set for this category</AppText>
-              {categories.length === 0 ? (
-                <AppText role="body">No categories available</AppText>
-              ) : (
-                <Button
-                  role="tertiary"
-                  label="Choose category"
-                  onPress={() => setCategoryPickerMode("assign")}
-                />
-              )}
-              <Button
-                role="primary"
-                label={`Use for ${contactName}`}
-                onPress={() => void assign("contact")}
-              />
-              <Button
-                role="secondary"
-                label={`Use inherited background for ${contactName}`}
-                onPress={() => void assign("inherit")}
-              />
-            </ScrollView>
-          ) : null}
-        </View>
-      </Sheet>
-      <CategoryChoiceSheet
-        visible={categoryPickerMode !== null}
-        categories={categories}
-        selectedId={null}
-        allowUncategorized={false}
-        getAccessibilityLabel={
-          categoryPickerMode === "clear"
-            ? clearCategoryAccessibilityLabel
-            : (category) => `Assign background to ${category.name}`
-        }
-        title={
-          categoryPickerMode === "clear"
-            ? "Clear category background"
-            : "Assign background to category"
-        }
-        onRequestClose={() => setCategoryPickerMode(null)}
-        onSelect={(categoryId) => {
-          const mode = categoryPickerMode;
-          setCategoryPickerMode(null);
-          if (categoryId !== null && mode)
-            void assign(
-              mode === "clear" ? "clear-category" : "category",
-              categoryId,
-            );
-        }}
-      />
-    </>
+                  );
+                })
+              : null}
+          </ScrollView>
+        ) : null}
+        <ProfileBackgroundCreateFlow flow={flow} onCancel={closeOrGuard} />
+        {page === "created" && flow.step === "idle" && selected ? (
+          <ScrollView
+            style={styles.workspace}
+            contentContainerStyle={styles.content}
+          >
+            <AppText role="heading">Assign {selected.name}</AppText>
+            <Button
+              role="primary"
+              label={`Use for ${contactName}`}
+              onPress={() => void assignToContact(selected.uid)}
+            />
+            <Button role="tertiary" label="Not now" onPress={notNow} />
+          </ScrollView>
+        ) : null}
+      </View>
+    </Sheet>
   );
 }
 
@@ -356,12 +291,17 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   content: { gap: SPACING.sm, paddingBottom: SPACING.xl },
-  row: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.sm,
-    padding: SPACING.sm,
+  card: { padding: SPACING.sm },
+  // The row lives on the surface's content wrapper: GlassSurface lays its
+  // children out inside that wrapper, so a row on `style` would not apply.
+  cardContent: { alignItems: "stretch", flexDirection: "row", gap: SPACING.sm },
+  // The picture spans both rows of the card (D-58.4).
+  thumbnail: {
+    alignSelf: "stretch",
+    borderRadius: RADII.md,
+    minHeight: 64,
+    width: 96,
   },
-  rowText: { flex: 1, gap: SPACING.xs },
-  thumbnail: { borderRadius: RADII.md, height: 56, width: 84 },
+  cardRight: { alignItems: "center", flex: 1, justifyContent: "center" },
+  cardName: { textAlign: "center" },
 });

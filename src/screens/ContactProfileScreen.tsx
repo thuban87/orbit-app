@@ -1017,6 +1017,9 @@ export function ContactProfileScreen({
               visible={overlay === "background"}
               contactId={contactId}
               contactName={snapshot.identity.name}
+              contactBackgroundTemplateUid={
+                snapshot.presentation.contact.backgroundTemplateUid
+              }
               onRequestClose={closeOverlay}
               onCommitted={() => void load()}
             />

@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  assignContactBackground,
+  BACKGROUND_SAVE_ERROR,
+  backgroundSetLabel,
   beginBackgroundPreparation,
   cancelBackgroundPreparation,
   createBackgroundManagerState,
   deleteBackgroundTemplateAndRefresh,
   finishBackgroundPreparation,
+  isContactBackground,
   requestBackgroundManagerDismissal,
   resolveBackgroundListState,
   retryBackgroundPreparation,
@@ -144,5 +148,58 @@ describe("background manager model", () => {
       }),
     ).rejects.toThrow("transaction failed");
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("marks only the person's own background as the current card (38.11 D-58.4)", () => {
+    expect(isContactBackground("bg-1", "bg-1")).toBe(true);
+    expect(isContactBackground("bg-1", "bg-2")).toBe(false);
+    // Inheriting a Category or global background marks no card.
+    expect(isContactBackground("bg-1", null)).toBe(false);
+  });
+
+  it("Assign writes this person's background, reloads, then confirms (38.11 D-58.3)", async () => {
+    const events: string[] = [];
+    const ok = await assignContactBackground(
+      {
+        write: async (uid) => {
+          events.push(`write:${uid}`);
+        },
+        onCommitted: () => events.push("committed"),
+        notify: (message) => events.push(`${message.kind}:${message.label}`),
+        logError: () => events.push("log"),
+      },
+      { templateUid: "bg-1", contactName: "Ann Lee" },
+    );
+    expect(ok).toBe(true);
+    expect(events).toEqual([
+      "write:bg-1",
+      "committed",
+      "success:Background set for Ann Lee",
+    ]);
+    expect(backgroundSetLabel("Ann Lee")).toBe("Background set for Ann Lee");
+  });
+
+  it("a failed Assign shows the error snackbar and does not reload", async () => {
+    const onCommitted = vi.fn();
+    const notify = vi.fn();
+    const logError = vi.fn();
+    const ok = await assignContactBackground(
+      {
+        write: async () => {
+          throw new Error("transaction failed");
+        },
+        onCommitted,
+        notify,
+        logError,
+      },
+      { templateUid: "bg-1", contactName: "Ann Lee" },
+    );
+    expect(ok).toBe(false);
+    expect(onCommitted).not.toHaveBeenCalled();
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith({
+      kind: "error",
+      label: BACKGROUND_SAVE_ERROR,
+    });
   });
 });

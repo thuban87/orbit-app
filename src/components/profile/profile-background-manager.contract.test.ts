@@ -38,17 +38,79 @@ describe("ProfileBackgroundManager crop workspace contract", () => {
     expect(manager).toContain("flow.requestCancel(onRequestClose)");
   });
 
-  it("keeps global/category clear and contact inheritance reachable without a selected template", () => {
+  it("is choose-only: no global/category controls, no Delete, and a link to the Settings page (38.11 D-58.2-3)", () => {
     const source = read(MANAGER);
+    const flat = collapse(source);
 
-    expect(source).toContain('label="Clear global background"');
-    expect(source).toContain("Clear ${category.name} background");
-    expect(source).toContain(
-      "Inherit Category, global, or theme background for ${contactName}",
+    // Global and Category management live on the Settings page (D-58.1).
+    expect(source).not.toContain("Clear global background");
+    expect(source).not.toContain("Clear category background");
+    expect(source).not.toContain("Set as global default");
+    expect(source).not.toContain("<CategoryChoiceSheet");
+    expect(source).not.toMatch(/assignGlobal|assignCategory/);
+    // Cards have no Delete (D-58.3).
+    expect(source).not.toContain('label="Delete"');
+    expect(source).not.toMatch(
+      /deleteTemplate|deleteProfileBackgroundTemplate/,
     );
-    expect(source).toContain('scope === "clear-global" ? null : selectedUid');
-    expect(source).toContain('scope === "clear-category" ? null : selectedUid');
-    expect(source).toContain('scope === "inherit" ? null : selectedUid');
+    // "Manage global backgrounds" closes the sheet, then opens the page.
+    expect(source).toContain('label="Manage global backgrounds"');
+    expect(flat).toContain(
+      'onRequestClose(); navigation.navigate("ProfileBackgrounds");',
+    );
+    // Choose photo stays (D-79).
+    expect(source).toContain('label="Choose photo"');
+  });
+
+  it("Assign applies to this person only; the current card is marked selected (38.11 D-58.3-4)", () => {
+    const flat = collapse(read(MANAGER));
+
+    // The only writer in the sheet is the contact-scoped one.
+    expect(flat).toContain(
+      "assignContactBackgroundTemplate(getExecutor(), { contactId, templateUid, now: localDateTime(), })",
+    );
+    expect(flat).toContain(
+      "await assignContactBackground(writer, { templateUid, contactName })",
+    );
+    expect(flat).toContain('label="Assign"');
+    expect(flat).toContain(
+      "isContactBackground( template.uid, contactBackgroundTemplateUid, )",
+    );
+    expect(flat).toContain("selected={current}");
+  });
+
+  it("cards are two columns: the picture spanning both rows, name above Assign, centred (D-58.4)", () => {
+    const flat = collapse(read(MANAGER));
+
+    // The row is on the surface's content wrapper, where the children live.
+    expect(flat).toContain("contentStyle={styles.cardContent}");
+    expect(flat).toContain(
+      'cardContent: { alignItems: "stretch", flexDirection: "row"',
+    );
+    expect(flat).toMatch(/thumbnail: \{ alignSelf: "stretch"/);
+    expect(flat).toContain(
+      'cardRight: { alignItems: "center", flex: 1, justifyContent: "center" }',
+    );
+    // Image, then the right column holding the name and Assign.
+    const image = flat.indexOf("style={styles.thumbnail}");
+    const right = flat.indexOf("style={styles.cardRight}", image);
+    const name = flat.indexOf("{template.name}", right);
+    const assign = flat.indexOf('label="Assign"', name);
+    expect(image).toBeGreaterThan(-1);
+    expect(right).toBeGreaterThan(image);
+    expect(name).toBeGreaterThan(right);
+    expect(assign).toBeGreaterThan(name);
+  });
+
+  it("after a new background is named, offers only Use for {name} and Not now (D-79, D-58.3)", () => {
+    const flat = collapse(read(MANAGER));
+    const at = flat.indexOf('page === "created"');
+    expect(at).toBeGreaterThan(-1);
+    const created = flat.slice(at, flat.indexOf("</ScrollView>", at));
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a source sample.
+    expect(created).toContain("label={`Use for ${contactName}`}");
+    expect(created).toContain('label="Not now"');
+    expect(created.match(/<Button\b/g)).toHaveLength(2);
   });
 
   it("returns a clean reopened manager to the list before exposing assignment controls", () => {
