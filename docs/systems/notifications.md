@@ -1,7 +1,7 @@
 # Notifications
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -133,6 +133,8 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-162:** Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority — has warm Mark/Snooze publish the shell tick after a committed write.
 - **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — drops a stale cold body result once a warm body tap is accepted, and clears the cold response in a `finally`.
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
+- **ADR-227:** One Snooze Sheet — bulk Unsnooze writes events only for the selected people who are snoozed; single-contact Unsnooze still writes on every invocation.
+- **ADR-229:** Birthday on the Profile — Birthday saves from the Profile and Add Contact reschedule reminders.
 
 ## Gotchas
 
@@ -149,6 +151,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 11. **Recheck lifecycle at delivered ingress.** A notification can outlive an Unbind; Mark may record real history, but stale decay Compose and Snooze actions must not revive cadence work.
 12. **Do not restore flat or obsolete root routes in a notification response.** The response gate must use the shared nested semantic reset builders after the shell transition.
 13. **Pending UI is not event deduplication.** Repeated explicit Snooze/Unsnooze invocations remain auditable; only an accidental concurrent press is suppressed in the Profile sheet.
+    The one exception is bulk Unsnooze: the shared snooze sheet clears and records events only for the selected people `readCurrentlySnoozedIds` finds snoozed when it opens, so a never-snoozed person gets no unsnooze event (38.11 D-82, ADR-227). Bulk Snooze still writes for every selected person.
 14. **Keep the permission row independent.** OS delivery permission is distinct from Orbit's durable master toggle and must be read fresh when the category receives focus.
 15. **Keep DEV probes out of production ownership.** Phase-38 UAT uses `digest:uat:*` identifiers and never cancels `digest:weekly`; repeated probes must clean every matching DEV request.
 16. **Normalize Android DATE-trigger readback.** Android may return an absent notification title as `null` while Orbit's request uses `undefined`; compare their normalized forms or every foreground pass will replace an unchanged request.
@@ -181,3 +184,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-09-25 | 38.3 | Cold/warm body-tap chronology (RG-042, react-native/AUD-RN-012, reliability-testing/AUD-REL-012): a warm body tap drops a pending cold result, and the cold clear runs even on failure. |
 | 2026-09-23 | 38.4 | Settings Notifications keeps only the header Back; its in-body Back is removed (RG-037, D-15; ADR-175). |
 | 2026-10-15 | 38.10 | Reworded the no-fuel-in-bodies rule for the retired fuel store: no contact knowledge, and never Off Limits, in a scheduled body. |
+| 2026-10-16 | 38.11 | Bulk Unsnooze clears and records events only for the selected people who are snoozed (D-82); Profile birthday saves reschedule reminders (D-59). KB extraction: Decisions link ADR-227, ADR-229. |
