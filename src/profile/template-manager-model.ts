@@ -1,5 +1,9 @@
 import type { ProfileTemplateUsage } from "@/db/profile-presentation-read";
-import type { ProfileLayoutDocument, ProfilePresentationSource } from "./types";
+import type {
+  ProfileLayoutDocument,
+  ProfilePresentationInputs,
+  ProfilePresentationSource,
+} from "./types";
 
 export type TemplateManagerPage =
   | { kind: "list" }
@@ -74,6 +78,35 @@ export function templateLayoutForNewTemplate(input: {
   freeformLayout: ProfileLayoutDocument | null;
 }): ProfileLayoutDocument | null {
   return input.pendingTemplateLayout ?? input.freeformLayout;
+}
+
+/** The resolved layout sources a Profile can show (`ProfilePresentation.layout.source`). */
+export type ProfileLayoutSource = Extract<
+  ProfilePresentationSource,
+  "contact-template" | "contact-freeform" | "category" | "global" | "factory"
+>;
+
+/** RED stub (38.11-13 Task 4): replaced in the GREEN commit. */
+export function describeCurrentLayout(
+  source: ProfileLayoutSource,
+  _templateName: string | null,
+): string {
+  return source;
+}
+
+/** RED stub (38.11-13 Task 4): replaced in the GREEN commit. */
+export function effectiveLayoutTemplateUid(
+  _source: ProfileLayoutSource,
+  _inputs: Pick<ProfilePresentationInputs, "contact" | "category" | "global">,
+): string | null {
+  return null;
+}
+
+/** RED stub (38.11-13 Task 4): replaced in the GREEN commit. */
+export function templateLayoutForDisplay(
+  layoutJson: unknown,
+): ProfileLayoutDocument {
+  return layoutJson as ProfileLayoutDocument;
 }
 
 /** Assignment labels name the durable source, never infer it from visual selection. */

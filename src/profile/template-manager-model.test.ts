@@ -3,20 +3,25 @@ import { describe, expect, it } from "vitest";
 import { profileLayoutEditorReducer } from "./layout-editor-reducer";
 import { createLayoutTemplateIntent } from "./layout-editor-session";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
+import { completeProfileLayoutChildren } from "./resolve-presentation";
 import {
   beginTemplateManagerListLoad,
   beginTemplateOperation,
   createTemplateManagerListLoadState,
   createTemplateManagerState,
   describeAssignmentKind,
+  describeCurrentLayout,
   describeTemplateAssignment,
+  effectiveLayoutTemplateUid,
   finishTemplateManagerListLoad,
   managerBackIntent,
   openTemplateManagerPage,
+  type ProfileLayoutSource,
   retainTemplateFailure,
   setTemplateDraft,
   setTemplateUsage,
   settleTemplateOperation,
+  templateLayoutForDisplay,
   templateLayoutForNewTemplate,
 } from "./template-manager-model";
 
@@ -168,5 +173,103 @@ describe("Profile template manager model", () => {
         freeformLayout: null,
       }),
     ).toBeNull();
+  });
+});
+
+// 38.11-13 Task 4 (38.11-05 deferred item): the "currently uses" line names
+// the layout in plain words, never a raw source id like "contact-freeform".
+describe("describeCurrentLayout (38.11-13)", () => {
+  const SOURCES: readonly ProfileLayoutSource[] = [
+    "contact-template",
+    "contact-freeform",
+    "category",
+    "global",
+    "factory",
+  ];
+
+  it("maps every source to plain words with no internal id", () => {
+    for (const source of SOURCES) {
+      for (const name of [null, "Work"]) {
+        const text = describeCurrentLayout(source, name);
+        expect(text.length).toBeGreaterThan(0);
+        expect(text).not.toContain(source);
+        // No hyphenated internal id (contact-freeform, contact-template …).
+        expect(text).not.toMatch(/[a-z]+-[a-z]+/);
+      }
+    }
+  });
+
+  it("uses the words the plan names, and the template name when known", () => {
+    expect(describeCurrentLayout("contact-freeform", null)).toBe(
+      "their own layout",
+    );
+    expect(describeCurrentLayout("factory", null)).toBe("the default layout");
+    expect(describeCurrentLayout("contact-template", null)).toBe(
+      "a layout template",
+    );
+    expect(describeCurrentLayout("contact-template", "Work")).toBe(
+      "the Work template",
+    );
+    expect(describeCurrentLayout("category", "Family")).toBe(
+      "the Family template from their Category",
+    );
+    expect(describeCurrentLayout("category", null)).toBe(
+      "their Category's layout template",
+    );
+    expect(describeCurrentLayout("global", "Simple")).toBe(
+      "the Simple template set for all Profiles",
+    );
+    expect(describeCurrentLayout("global", null)).toBe(
+      "the layout template set for all Profiles",
+    );
+  });
+
+  it("finds the uid of the template a source resolved from", () => {
+    const inputs = {
+      contact: {
+        layoutTemplateUid: "c",
+        backgroundTemplateUid: null,
+        freeformLayout: null,
+        collapse: {},
+      },
+      category: { layoutTemplateUid: "k", backgroundTemplateUid: null },
+      global: { layoutTemplateUid: "g", backgroundTemplateUid: null },
+    } as Parameters<typeof effectiveLayoutTemplateUid>[1];
+    expect(effectiveLayoutTemplateUid("contact-template", inputs)).toBe("c");
+    expect(effectiveLayoutTemplateUid("category", inputs)).toBe("k");
+    expect(effectiveLayoutTemplateUid("global", inputs)).toBe("g");
+    expect(effectiveLayoutTemplateUid("contact-freeform", inputs)).toBeNull();
+    expect(effectiveLayoutTemplateUid("factory", inputs)).toBeNull();
+    expect(
+      effectiveLayoutTemplateUid("category", { ...inputs, category: null }),
+    ).toBeNull();
+  });
+});
+
+// 38.11-13 Task 4 (38.11-08 deferred item): a template saved before 38.11
+// lacks the Birthday tile; its display completes it at read time only.
+describe("templateLayoutForDisplay (38.11-13)", () => {
+  const withoutBirthday = {
+    ...FACTORY_PROFILE_LAYOUT,
+    overview: FACTORY_PROFILE_LAYOUT.overview.filter(
+      (placement) => placement.id !== "birthday",
+    ),
+  };
+
+  it("previews a pre-38.11 template with Birthday in its default position", () => {
+    const stored = JSON.stringify(withoutBirthday);
+    const layout = templateLayoutForDisplay(stored);
+    const ids = layout.overview.map((placement) => placement.id);
+    expect(ids).toEqual(
+      FACTORY_PROFILE_LAYOUT.overview.map((placement) => placement.id),
+    );
+    expect(ids.indexOf("birthday")).toBe(ids.indexOf("contact-frequency") + 1);
+    expect(layout).toEqual(
+      completeProfileLayoutChildren(withoutBirthday as never),
+    );
+    // Read time only: the stored JSON is not rewritten.
+    expect(JSON.parse(stored).overview).toHaveLength(
+      withoutBirthday.overview.length,
+    );
   });
 });
