@@ -248,9 +248,10 @@ export function dateFromLocalDateString(ymd: string): Date {
 }
 
 /**
- * The birthday picker's maximum date (U-08; "this plan only", following the
- * D-31 Last-spoke cap): the last millisecond of today's local day, so all of
- * today is pickable and no later day is.
+ * The birthday picker's maximum date (38.11 D-86: birthday pickers stop at
+ * today on Add Contact, Edit Contact and the Profile Birthday sheet): the last
+ * millisecond of today's local day, so all of today is pickable and no later
+ * day is.
  */
 export function birthdayPickerMaxDate(todayLocal: string): Date {
   const today = dateFromLocalDateString(todayLocal);

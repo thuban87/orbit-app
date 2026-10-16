@@ -6,9 +6,9 @@
  * A trigger showing the birthday ("Jun 2, 1990", or "Jun 2" when the year is
  * unknown — `formatStoredBirthdayForDisplay`, the 38.9 date standard) or "Set
  * birthday"; a Year unknown switch; and Clear when a birthday is set (D-49).
- * The native picker is capped at today (review U-08; "this plan only",
- * following the D-31 Last-spoke cap) and opens where `dateRowSeed` says
- * (W-02), so every month/day stays reachable under the cap.
+ * The native picker is capped at today on Add, Edit and the Profile Birthday
+ * sheet (38.11 D-86) and opens where `dateRowSeed` says (W-02), so every
+ * month/day stays reachable under the cap.
  *
  * Year unknown OFF never keeps the 2000 placeholder (D-61): it opens the
  * picker on the year-ask seed; a pick stores that full date, a cancel leaves

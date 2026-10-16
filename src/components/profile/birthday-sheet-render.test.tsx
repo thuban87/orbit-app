@@ -256,7 +256,7 @@ describe("BirthdaySheet (38.11 D-56, D-59)", () => {
     });
   });
 
-  it("caps the picker at today (review U-08)", () => {
+  it("caps the picker at today (D-86)", () => {
     const { nodes } = render("12-31", {
       picker: { purpose: "date", seed: "2000-12-31" },
     });
@@ -416,7 +416,7 @@ describe("BirthdaySheet Year unknown (38.11 D-61; 38.9 D-30)", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("OFF on 12-31 asks on last year's date, never a future one (review U-08)", () => {
+  it("OFF on 12-31 asks on last year's date, never a future one (D-86)", () => {
     const { nodes } = render("12-31");
     call(
       byTestId(nodes, "profile-birthday-year-unknown"),

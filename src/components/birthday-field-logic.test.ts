@@ -303,7 +303,7 @@ describe("dateRowSeed — where Set birthday / the date trigger opens (W-02)", (
   });
 });
 
-describe("birthdayPickerMaxDate — the picker stops at today (U-08; D-31 precedent)", () => {
+describe("birthdayPickerMaxDate — the picker stops at today (D-86)", () => {
   it("is the last millisecond of today's local day", () => {
     const max = birthdayPickerMaxDate(TODAY);
     expect(max.getFullYear()).toBe(2026);
