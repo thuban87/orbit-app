@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`, `src/db/snooze-dao.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
@@ -275,6 +275,14 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **[ADR-123: Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing](../decisions/ADR-123-profile-history-section-replacing-the-vertical-timeline.md)** — governs `src/screens/ContactProfileScreen.tsx`.
 - **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/purge-dao.ts`, `src/db/recency-dao.ts`.
 - **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/merge-dao.ts`.
+- **ADR-222:** Add Contact Opens Bound, Monthly and Not Yet — the create seed: Bound, Monthly, Not yet.
+- **ADR-223:** Birthday, Social Battery, Links and a Held Photo on Add Contact — birthday, social battery and links in the one create transaction; held photo; Open existing on a duplicate name.
+- **ADR-224:** One Contact Form and a Four-Action + — Edit Contact is the only contact form; its save exit.
+- **ADR-225:** Profile Top: Edit Contact, Compose, Name in a Solid Top Bar, Slimmer ⋯ — the Profile's Edit Contact button and plain Unbind entry.
+- **ADR-226:** Archive Becomes the Bin — user-facing Archive is the Bin; Move to Bin confirms; internal names unchanged.
+- **ADR-227:** One Snooze Sheet — bulk Snooze writes every selected id; bulk Unsnooze only the snoozed subset.
+- **ADR-229:** Birthday on the Profile — `setContactBirthday` and the shared BirthdayField.
+- **ADR-231:** Open/Closed Sections, Layout Tools in the Sheets, All-Default Reset Row — Reset's all-default presentation row and share Undo's ownership rule.
 
 ## Gotchas
 
@@ -365,3 +373,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-10-16 | 38.11 | "Archive" reads "Bin" in user-visible text: Settings → Bin with Restore and Delete permanently, "Move to Bin" for the action; the Bin never empties itself. Internal names (`archived_at`, the archive core and DAOs, the `Archived` route, the `archive` event) are unchanged (D-69, D-70). |
 | 2026-10-16 | 38.11 | Code review WR-04 / D-88: Add and Edit Contact's link rows with a label but no URL show the warn-only caption "Add a link or this row won't be saved."; Save is never blocked and the row is still dropped. |
 | 2026-10-16 | 38.11 | Device review (38.11-14): Add Contact's Birthday control has no Clear (`showClear={false}`; Edit Contact and the Profile Birthday sheet keep it, D-49, D-59); Settings → Bin rows show the full name above the buttons; the bulk Move to Bin confirm shares the Profile's "hidden from your lists" body and destructive confirm (D-93). |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-222–ADR-227, ADR-229, ADR-231. |
