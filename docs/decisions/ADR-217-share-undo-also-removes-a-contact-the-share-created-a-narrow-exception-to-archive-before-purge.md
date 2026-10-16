@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-018 (partial — "a direct DAO caller cannot bypass the lifecycle guard" gains one exception, share Undo of a share-created contact; archive-first purge from Settings → Archived contacts survives everywhere else)
-**Superseded by:** None
+**Superseded by:** ADR-231 (partial)
 
 ## Context
 

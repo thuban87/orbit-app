@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow)
+**Superseded by:** ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow); ADR-224 (partial)
 
 ## Context
 
