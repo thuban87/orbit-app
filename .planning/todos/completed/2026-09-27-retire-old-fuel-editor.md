@@ -73,3 +73,7 @@ Plan it as its own phase or plan once the owner schedules it:
 3. Once nothing renders `FuelEditor`, retire it and move the draft types the off-limits modules import.
 4. Write the ADR that supersedes ADR-150's editor choice and the relevant part of ADR-131.
 5. Test-first. Pin with a contract that no Off Limits host imports `FuelEditor`, and keep the mixed-kind safety test green.
+
+## Resolved 38.10 (backlog cleanup, owner-approved 2026-10-16)
+
+`src/components/FuelEditor.tsx` no longer exists. 38.10-14 replaced it on Add/Edit Contact with an inline Off Limits list (shared D-66 field), and 38.10-18 removed the last fuel code (`src/no-fuel-contract.test.ts`). Checked on `main @ ad0b0162`.

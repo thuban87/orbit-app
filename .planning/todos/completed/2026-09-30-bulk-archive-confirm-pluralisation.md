@@ -17,3 +17,7 @@ The bulk-action confirm title is built as `` `Archive ${bulkConfirm.ids.length} 
 ## Solution
 
 Singular/plural copy for both titles ("Archive 1 contact?" / "Archive N contacts?"; "Log 1 interaction?"), with a render test for n = 1 and n = 2.
+
+## Resolved (backlog cleanup, owner-approved 2026-10-16)
+
+Both bulk titles are pluralised: `HomeScreen.tsx:2336` (`Log ${plural(…, "interaction")}?`) and `:2338` (`bulkBinConfirmation(n).title`). Flagged as already fixed in 38.11-14-SUMMARY and 38.11-VERIFICATION. Checked on `main @ ad0b0162`.

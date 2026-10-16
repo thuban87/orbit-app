@@ -21,3 +21,7 @@ Back leaves normally, but it is a confusing dead end.
 
 Make Import complete's Back leave the whole import flow (as Done already does), or have the setup screen leave on its
 own when the session has nothing pending. Keep the D-73/D-74 stopped-import and single-run behaviour intact.
+
+## Resolved 38.9 (backlog cleanup, owner-approved 2026-10-16)
+
+Header and system Back on Import complete now act like Done (38.9 D-73, review WR-07): `useBackActsAsDone(done)` at `src/screens/ImportCompleteScreen.tsx:206`. Checked on `main @ ad0b0162`.
