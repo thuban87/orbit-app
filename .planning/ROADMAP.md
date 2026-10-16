@@ -166,7 +166,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.8: History Navigation UX** (INSERTED) - Completed 2026-10-09: 7/7 plans (incl. gap plan 07: G1/G2/YEARS) + deep code review (1 blocker, 3 warnings, fixed); verification passed 76/76; owner look-and-feel sign-off on the Pixel and his Moto; final release orbit-38.8-release-2026-10-09.apk (arm64). Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
 - [x] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; 17/17 plans (completed 2026-10-11)
 - [x] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6 (share reminders → 38.16); dossier accepted 2026-10-12 (completed 2026-10-15)
-- [ ] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile, Add/Edit/Update Contact audit fixes + new-contact defaults and not-contacted status; dossier pending (split 2026-10-10)
+- [ ] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile and contact-form audit fixes + new-contact defaults and not-contacted status; one Edit Contact form (Update Contact retired), slimmer + and ⋯, Archive → Bin, one snooze sheet, Birthday tile, Profile backgrounds rework; dossier accepted 2026-10-16
 - [ ] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes; dossier pending
 - [ ] **Phase 38.13: Contacts List, Search & Digest UX** (INSERTED) - Contacts tab, search and Digest audit fixes + list perf investigation, D-95, D-98; dossier pending
 - [ ] **Phase 38.14: Logging, History, Events & Compose UX** (INSERTED) - Logging forms, History, Group Events and Compose audit fixes + one "Did you send it?" (D-76); dossier pending
@@ -1615,7 +1615,8 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Depends on**: Phase 38.10
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas D and E (plus H-23), minus items owned by 38.9 or 38.10; plus Phase 39's prerequisite fixes D-50/D-51/D-87/D-94 and D-77 (39-CONTEXT D-102). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.11-WORKPAPER-audit-intake.md`.
+**Scope source**: `38.11-CONTEXT.md` (dossier accepted 2026-10-16; D-01–D-78, provenance `38.11-LEDGER.md`). Audit areas D and E (plus H-23) and Phase 39's D-50/D-51/D-87/D-94/D-77, grown by owner decisions: Update Contact retired into one Edit Contact form, Memory off the +, ⋯ reshaped with an Edit Contact button on the Profile, Archive renamed Bin, one snooze sheet (incl. the Contacts-list snooze from 38.13), Birthday tile, Photo/Birthday/Links on Add, Profile backgrounds rework with a Settings page. Intake: `38.11-WORKPAPER-audit-intake.md`.
+**Dossier size estimate**: about 9–13½ plans by area (38.11 D-76; the owner kept everything in this phase).
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–10 plans — rough estimate from finding titles plus the triage's per-area ranges; recurring-problem sweeps and recorded-decision reversals are not counted.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13).
 **Plans**: TBD
@@ -1630,7 +1631,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas H and K, the custom-field and category management findings, and Phase 39's possible-match fix D-75 (39-CONTEXT D-102), minus items owned by earlier phases. Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 11–16 plans — rough estimate from finding titles plus the triage's per-area range; includes a possible Settings page-layout sweep (K-05) and the favourites-in-backups format bump (K-22); site counts not taken.
-**Coordination**: shares Profile files with 38.11 (not-contacted status code, ⋯ menu, merge entry) and the snooze sheets with 38.14 (X-20); none blocks this phase.
+**Coordination**: shares Profile files with 38.11 (not-contacted status code, ⋯ menu, merge entry) and builds on 38.11's shared snooze sheet (38.11 D-45; X-20). 38.11 renames Archive to "Bin" app-wide and makes Move to Bin a confirm without Undo (38.11 D-69, D-71) — see "Notes from 38.11" in this phase's workpaper. None blocks this phase.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: TBD
 
@@ -1640,7 +1641,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Depends on**: Phase 38.12
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`.
+**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`. A-14 and the bulk snooze sheet moved to 38.11 (38.11 D-45) — see "Notes from 38.11" in the workpaper.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 6–9 plans — rough estimate; the perf fix depends on what the investigation finds.
 **Plans**: TBD
 
@@ -1660,7 +1661,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Depends on**: Phase 38.14
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Origin: audit B-23 (report :700). Reverses recorded decisions: phase-12 dossier :196/:388 `[DECIDED]` "Future Group Events are not supported as planned social events in this phase" (deferred :484) and phase-38 dossier :154/:160 — to be named in its dossier. Also owns B-24 and the Events tab header/empty-state copy (owner, 2026-10-10: not designed in 38.14 only to change here). Needs a Phase 39 tutorial journey (owner, 2026-10-10).
+**Scope source**: TBD — dossier via the phase-dossier skill. Origin: audit B-23 (report :700). Reverses recorded decisions: phase-12 dossier :196/:388 `[DECIDED]` "Future Group Events are not supported as planned social events in this phase" (deferred :484) and phase-38 dossier :154/:160 — to be named in its dossier. Also owns B-24 and the Events tab header/empty-state copy (owner, 2026-10-10: not designed in 38.14 only to change here). Needs a Phase 39 tutorial journey (owner, 2026-10-10). **Carried from 38.11 (D-72, owner 2026-10-15):** Group Log leaves the universal + and lives on the Events tab — this phase removes the + action when it builds the tab's create button (the Contacts 2+ → Group Log path stays) and fixes the empty-state copy that promises "Group Log on any contact" (`GroupEventsScreen.tsx`). Supersedes ADR-082 :18 / phase-01 amended dossier :34-38 / phase-12 :315-317 (partial) — name them in its dossier.
 **Starting size**: set at its dossier (new feature; not estimated).
 **Plans**: TBD
 

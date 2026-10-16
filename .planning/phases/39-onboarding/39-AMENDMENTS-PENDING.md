@@ -69,9 +69,18 @@ The original 38.11 "Everyday Screens" was split by seam, and a new feature phase
 | R-4 | Phase 39 now depends on **38.15**, and the fix phases are 38.9–38.14 | 39 roadmap "Before planning" note and goal text ("Phases 38.9–38.12") | Wording of the range | Verify |
 | R-5 | New feature phase **38.15 Events — Plan, Create & Remind** (audit B-23): future group events, an Events-tab create entry, reminders; owner wants a tutorial journey for it | D-26 (Group Events small moment, "no advanced management"); **D-29 ("no event-reminder tutorial")**; D-12 Orient copy if Events changes meaning | 39 gains an Events journey; D-29's "no event-reminder tutorial" would be reversed (owner said a journey is needed — confirm scope at 39) | Verify |
 
-## 38.11 — Profile & Contact Forms UX
+## 38.11 — Profile & Contact Forms UX (`38.11-CONTEXT.md`, accepted 2026-10-16)
 
-_(none yet)_
+| # | 38.11 decision | Touches in 39 | What would change | Status |
+|---|---|---|---|---|
+| 1 | D-01–D-05 — 39's D-50/D-51/D-87/D-94/D-77 built here; D-44 extends D-94's selected "Not yet" to Edit Contact; D-23 not-contacted status label "Never Contacted" (context line copy set at 38.11 planning) | D-100/D-102 table, frame 03 (Add Contact), D-14 / frame B (Prepare), D-77 copy | Nothing to rewrite; confirm they landed and use the final status copy | Verify |
+| 2 | D-62 — Update Contact is retired (one Edit Contact form); it leaves the + | D-17 (+ lesson lists Update Contact), D-68, any frame drawing the + menu | Drop Update Contact from the + lesson and frames | Verify |
+| 3 | D-66 — Memory is removed from the + (memories still added from Profile sections, Edit/Add Contact, the post-Quick-Log step and sharing) | D-17, D-23 (Memory lesson at first deliberate Memory creation), D-97, 38.10 row 1 above (the + → Memory retarget is now moot) | Memory lesson triggers only from the remaining paths; the + lesson drops Memory | Verify |
+| 4 | D-72 — Group Log leaves the + for the Events tab (decided in 38.11, built in 38.15) | D-17, D-26 and its trigger table (`39-CONTEXT.md:289` cites the + and bulk Log) | Group Log lesson triggers from the Events tab and Contacts 2+ only; the + lesson = Add Contact, Quick Log, Log Interaction | Verify |
+| 5 | D-63 — full-width "Edit Contact" button above the Profile's top buttons; D-47 — "Message" renamed "Compose Message" | D-14 / frame B (Prepare), D-15 Reach Out lesson copy and frames that name the Profile's Message button | Frames and copy show Edit Contact + Compose Message / Call | Verify |
+| 6 | D-69 / D-71 — "Archive" renamed "Bin" (Move to Bin with a confirm; Settings → Bin) | Any lesson copy, frame or journey rule that says "archive" | Wording → Bin | Verify |
+| 7 | D-53/D-55 — Birthday tile in Relationship Overview; D-74 — Gravity reads "No interactions yet"; D-75 — the Status/Gravity/Intensity sheets explain their terms | D-14 / frame B (Relationship Overview on Prepare) | Frame B tile set and Prepare copy match | Verify |
+| 8 | D-64/D-65/D-68 — ⋯ becomes Snooze… · Unbind contact (plain) · Move to Bin · Profile Layout · Background; Edit, Save as template and Reset leave ⋯ | Any frame or lesson that draws the Profile ⋯ menu | Match the new list | Verify |
 
 ## 38.12 — Lifecycle, Import & Settings UX
 
