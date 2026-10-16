@@ -205,6 +205,7 @@ import {
   memoryRowToDraftRow,
   type OffLimitsDraftRow,
   type RelationshipDraftRow,
+  resolveEditSaveExit,
   resolveErrorSection,
   seedEditState,
 } from "./edit-contact-logic";
@@ -1166,7 +1167,15 @@ export function EditContactScreen({
         return;
       }
       bypassRef.current = true;
-      navigation.navigate("Profile", { contactId });
+      // Return to the Profile this Edit came from: go back to this contact's
+      // Profile or Compose, else replace Edit with the Profile, so no second
+      // Profile is pushed and no finished Edit stays in the stack (D-26, D-13).
+      const exit = resolveEditSaveExit(navigation.getState(), contactId);
+      if (exit.kind === "go-back") {
+        navigation.goBack();
+      } else {
+        navigation.replace(exit.name, exit.params);
+      }
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save contact", err);
       showSnackbar({
@@ -1651,7 +1660,16 @@ export function EditContactScreen({
                 )
               }
               onUpdate={(uid, patch) =>
-                setField("methods", updateMethodDraft(form.methods, uid, patch))
+                // The warning follows the typing live (D-30; warn only, D-17).
+                setField(
+                  "methods",
+                  updateMethodDraft(
+                    form.methods,
+                    uid,
+                    patch,
+                    effectivePhoneRegion,
+                  ),
+                )
               }
               onRemove={(uid) =>
                 setField("methods", removeMethodDraft(form.methods, uid))

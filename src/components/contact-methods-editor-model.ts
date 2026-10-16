@@ -2,7 +2,10 @@ import type {
   ContactMethodDraft,
   ContactMethodRow,
 } from "@/db/contact-methods-dao";
-import type { ContactMethodType } from "@/logic/contact-method-normalization";
+import {
+  type ContactMethodType,
+  normalizeContactMethod,
+} from "@/logic/contact-method-normalization";
 
 export type MethodLabel = "Mobile" | "Home" | "Work" | "Main" | "Other";
 
@@ -117,13 +120,37 @@ export function addMethodDraft(
   return { ...groups, [type]: [...groups[type], emptyMethodDraft(type, uid)] };
 }
 
+/**
+ * Apply a patch to one draft row. When the host passes its effective phone
+ * region (saved override, else device region) and the patch changes `value`,
+ * the row's `isActionable` is recomputed through the one normalization
+ * boundary, so the "can't be used yet" warning follows the typing live (38.11
+ * D-30). A blank value clears it to undefined (no warning on an empty row).
+ * Warn only: nothing here blocks Save (D-17; ADR-059). Hosts that omit the
+ * region keep the row's stored warning, as before.
+ */
 export function updateMethodDraft(
   groups: MethodGroups,
   uid: string,
   patch: Partial<Omit<ContactMethodEditorDraft, "uid" | "type" | "id">>,
+  effectivePhoneRegion?: string | null,
 ): MethodGroups {
-  const update = (draft: ContactMethodEditorDraft) =>
-    draft.uid === uid ? { ...draft, ...patch } : draft;
+  const recompute =
+    effectivePhoneRegion !== undefined && patch.value !== undefined;
+  const update = (draft: ContactMethodEditorDraft) => {
+    if (draft.uid !== uid) return draft;
+    const next = { ...draft, ...patch };
+    if (!recompute) return next;
+    next.isActionable =
+      next.value.trim().length === 0
+        ? undefined
+        : normalizeContactMethod({
+            type: next.type,
+            value: next.value,
+            defaultPhoneRegion: effectivePhoneRegion,
+          }).isActionable;
+    return next;
+  };
   return { phone: groups.phone.map(update), email: groups.email.map(update) };
 }
 

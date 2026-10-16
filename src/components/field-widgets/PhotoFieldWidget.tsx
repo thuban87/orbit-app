@@ -26,6 +26,9 @@
  *
  * On the create form / def preview (no contactId) it stays a minimal DISABLED
  * placeholder — a photo needs a persisted contact to derive its stable filename.
+ *
+ * The preview Avatar gets no name (38.11 D-35): with no photo it shows the
+ * neutral swatch, not initials of the field's label.
  */
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
@@ -81,10 +84,14 @@ export function PhotoFieldWidget({
   if (enabled) {
     return (
       <View testID={testID}>
+        {/* The field's label is not a person's name: an empty field shows
+            the Avatar's neutral swatch with no glyph, never the label's
+            initials (38.11 D-35). Text in the field keeps the 38.6 D-34
+            notice, Change and Remove. */}
         <PhotoSourcePicker
           target={{ kind: "customField", contactId, colName }}
           photo={value}
-          name={label}
+          name=""
           onValueChange={onChange}
         />
       </View>

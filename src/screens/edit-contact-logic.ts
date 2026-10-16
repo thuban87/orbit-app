@@ -706,3 +706,49 @@ export function buildEditInput(
 
   return input;
 }
+
+// =============================================================================
+// SAVE EXIT (38.11 D-26, follows D-13).
+// =============================================================================
+
+/** The slice of a stack navigation state the save exit reads. */
+export interface EditExitNavState {
+  routes: ReadonlyArray<{ name: string; params?: object | undefined }>;
+  index: number;
+}
+
+/** Where a saved Edit Contact goes. */
+export type EditSaveExit =
+  | { kind: "go-back" }
+  | { kind: "replace"; name: "Profile"; params: { contactId: number } };
+
+/** Routes an Edit can return to when they belong to the edited contact. */
+const EDIT_RETURN_ROUTES: ReadonlySet<string> = new Set(["Profile", "Compose"]);
+
+/**
+ * Where Edit Contact's Save lands (38.11 D-26, D-13). Go back when the route
+ * before Edit is this contact's Profile or Compose (Compose re-reads on
+ * focus); otherwise replace the finished Edit with this contact's Profile. No
+ * path pushes a second Profile or leaves the Edit form under one, so a later
+ * Bin/archive `goBack` from that Profile cannot land on a stale Edit. Never
+ * `popTo`: it matches the nearest route by name regardless of params and can
+ * land on another contact's Profile (StackRouter, RESEARCH section 8). PURE.
+ */
+export function resolveEditSaveExit(
+  state: EditExitNavState | undefined,
+  contactId: number,
+): EditSaveExit {
+  const previous = state ? state.routes[state.index - 1] : undefined;
+  const previousContactId =
+    previous?.params && "contactId" in previous.params
+      ? (previous.params as { contactId?: unknown }).contactId
+      : undefined;
+  if (
+    previous &&
+    EDIT_RETURN_ROUTES.has(previous.name) &&
+    previousContactId === contactId
+  ) {
+    return { kind: "go-back" };
+  }
+  return { kind: "replace", name: "Profile", params: { contactId } };
+}

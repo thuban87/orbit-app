@@ -868,7 +868,10 @@ export function CreateContactScreen({
                 setMethods((current) => addMethodDraft(current, type, newUid()))
               }
               onUpdate={(uid, patch) =>
-                setMethods((current) => updateMethodDraft(current, uid, patch))
+                // The warning follows the typing live (D-30; warn only, D-17).
+                setMethods((current) =>
+                  updateMethodDraft(current, uid, patch, effectivePhoneRegion),
+                )
               }
               onRemove={(uid) =>
                 setMethods((current) => removeMethodDraft(current, uid))
