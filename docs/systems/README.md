@@ -17,7 +17,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 |-----------|------|----------------------|-----------------|
 | Persistence core | `persistence-core.md` | `db/database.ts`, `db/migrations/`, `db/transaction.ts`, `db/mutex.ts`, `db/uid.ts`, `db/queries.ts` | 02 |
 | App shell | `app-shell.md` | `navigation/RootNavigator.tsx`, `navigation/types.ts`, `screens/SettingsScreen.tsx`, `theme/` | 04 |
-| Contacts | `contacts.md` | `db/contacts-dao.ts`, `db/contact-read.ts`, `db/contact-lifecycle-dao.ts`, `db/profile-dao.ts`, `db/favourites-dao.ts`, `db/recency-dao.ts`, `db/purge-dao.ts`, `db/tombstones-dao.ts` | 02, 04 |
+| Contacts | `contacts.md` | `db/contacts-dao.ts`, `db/contact-read.ts`, `db/contact-lifecycle-dao.ts`, `db/profile-dao.ts`, `db/favourites-dao.ts`, `db/recency-dao.ts`, `db/purge-dao.ts`, `db/tombstones-dao.ts`, `components/BirthdayField.tsx`, `components/birthday-field-logic.ts` | 02, 04 |
 | Categories | `categories.md` | `db/categories-dao.ts`, `logic/category-logic.ts`, `screens/CategoryManagementScreen.tsx`, `components/category/CategoryChoiceSheet.tsx` | 37.1 |
 | Contact knowledge | `contact-knowledge.md` | `db/memory-registry.ts`, `db/memories-dao.ts`, `db/memories-read.ts`, `db/relationships-dao.ts`, `db/relationships-read.ts`, `db/current-state-history-dao.ts`, `db/current-state-history-read.ts`, `db/off-limits-dao.ts`, `db/off-limits-read.ts`, `db/knowledge-move-dao.ts`, `db/linked-entry-dao.ts`, `db/undo-restore.ts` | 24.1 |
 | Status engine | `status-engine.md` | `db/status.ts`, `services/gravity-logic.ts`, `services/intensity-logic.ts`, `db/contact-status-read.ts` | 02 |
@@ -33,7 +33,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Capture | `capture.md` | `db/capture-dao.ts`, `db/capture-read.ts` | 10 |
 | Notifications | `notifications.md` | `db/notification-read.ts`, `db/snooze-dao.ts`, `services/notifications/` | 11 |
 | Widget | `widget.md` | `services/widget/` | 12 |
-| Profile presentation | `profile.md` | `screens/ContactProfileScreen.tsx`, `db/profile-read.ts`, `db/profile-presentation-*.ts`, `profile/`, `components/profile/` | 31 |
+| Profile presentation | `profile.md` | `screens/ContactProfileScreen.tsx`, `screens/ProfileBackgroundsScreen.tsx`, `db/profile-read.ts`, `db/profile-presentation-*.ts`, `profile/`, `components/profile/`, `components/SnoozeSheet.tsx` | 31 |
 | AI suggestions | `ai-suggestions.md` | `ai/`, `services/AiService.ts`, `services/ai-key-store.ts`, `db/ai-context-read.ts`, `db/app-settings-dao.ts`, `logic/ai-suggestion-logic.ts`, `screens/SettingsScreen.tsx`, `screens/ComposeScreen.tsx` (sole user-configured network path) | 14 |
 | Digest | `digest.md` | `db/digest-read.ts`, `db/up-next-read.ts`, `db/your-week-read.ts`, `logic/digest-composition.ts` | 15, 38 |
 | Backup & restore | `backup-restore.md` | `services/backup/`, `services/backup-sweep.ts`, `db/restore-photo-journal-dao.ts`, `db/app-settings-dao.ts`, `db/data-revision-dao.ts` | 17 |
