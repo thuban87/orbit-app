@@ -24,16 +24,24 @@ function deferred<T>() {
 }
 
 describe("UNIVERSAL_FAB_ACTIONS", () => {
-  it("locks the six shell actions to their prescribed order and labels", () => {
-    expect(UNIVERSAL_FAB_ACTIONS).toHaveLength(6);
+  // 38.11 D-62 (Update Contact retired) and D-66 (Memory left the +); Group
+  // Log stays until 38.15 (D-72).
+  it("locks the four shell actions to their prescribed order and labels", () => {
+    expect(UNIVERSAL_FAB_ACTIONS).toHaveLength(4);
     expect(UNIVERSAL_FAB_ACTIONS).toEqual([
       { id: "AddContact", label: "Add Contact" },
       { id: "QuickLog", label: "Quick Log" },
       { id: "LogContact", label: "Log Interaction" },
       { id: "GroupLog", label: "Group Log" },
-      { id: "UpdateContact", label: "Update Contact" },
-      { id: "Memory", label: "Memory" },
     ]);
+  });
+
+  it("offers neither Update Contact nor Memory (D-62, D-66)", () => {
+    const labels: readonly string[] = UNIVERSAL_FAB_ACTIONS.map(
+      (action) => action.label,
+    );
+    expect(labels).not.toContain("Update Contact");
+    expect(labels).not.toContain("Memory");
   });
 });
 
@@ -85,11 +93,9 @@ describe("resolveFabTarget", () => {
     expect(
       resolveFabTarget("GroupLog", { originContactId: null, tab }),
     ).toMatchObject({ kind: "navigate", tab });
-    for (const actionId of ["LogContact", "UpdateContact", "Memory"] as const) {
-      expect(
-        resolveFabTarget(actionId, { originContactId: 3, tab }),
-      ).toMatchObject({ kind: "navigate", tab });
-    }
+    expect(
+      resolveFabTarget("LogContact", { originContactId: 3, tab }),
+    ).toMatchObject({ kind: "navigate", tab });
   });
 
   it("always routes Group Log directly, regardless of profile origin", () => {
@@ -112,26 +118,27 @@ describe("resolveFabTarget", () => {
     });
   });
 
-  it("preselects contact-specific actions from Profile and otherwise requests the picker", () => {
-    for (const actionId of ["LogContact", "UpdateContact", "Memory"] as const) {
-      expect(
-        resolveFabTarget(actionId, { originContactId: 19, tab: "SettingsTab" }),
-      ).toEqual({
-        kind: "navigate",
+  it("preselects Log Interaction from Profile and otherwise requests the picker", () => {
+    expect(
+      resolveFabTarget("LogContact", {
+        originContactId: 19,
         tab: "SettingsTab",
-        screen: actionId,
-        params: { contactId: 19 },
-      });
-      expect(
-        resolveFabTarget(actionId, {
-          originContactId: null,
-          tab: "SettingsTab",
-        }),
-      ).toEqual({
-        kind: "pick-then",
-        screen: actionId,
-      });
-    }
+      }),
+    ).toEqual({
+      kind: "navigate",
+      tab: "SettingsTab",
+      screen: "LogContact",
+      params: { contactId: 19 },
+    });
+    expect(
+      resolveFabTarget("LogContact", {
+        originContactId: null,
+        tab: "SettingsTab",
+      }),
+    ).toEqual({
+      kind: "pick-then",
+      screen: "LogContact",
+    });
   });
 
   it("keeps Quick Log's contact context for its picker/write seam", () => {

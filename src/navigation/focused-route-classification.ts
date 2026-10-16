@@ -28,7 +28,6 @@ const FOCUSED_WORKFLOW_ROUTES = new Set<string>([
   "GroupLog",
   "EditGroupEvent",
   "EditParticipant",
-  "UpdateContact",
   "Memory",
   // D-68 (owner, 2026-09-27): authoring and editing workflows, so the FAB and
   // tab bar hide here too.
@@ -77,7 +76,6 @@ const ROUTE_DENSITY: Readonly<Record<string, SurfaceDensity>> = {
   SystemsManagement: "dense",
   LogContact: "dense",
   GroupLog: "dense",
-  UpdateContact: "dense",
   Memory: "dense",
   SectionEditor: "dense",
   KeyPeopleEditor: "dense",

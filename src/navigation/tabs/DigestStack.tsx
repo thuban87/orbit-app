@@ -21,7 +21,6 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
-import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import { DIGEST_STACK_ROUTES } from "../shell-contract";
 import type { DigestStackParamList } from "../types";
 
@@ -40,7 +39,7 @@ const DIGEST_ROUTE_COMPONENTS = {
   // The universal + forms open over this tab (D-38, FAB_ROUTES).
   Create: CreateContactScreen,
   GroupLog: GroupLogScreen,
-  UpdateContact: UpdateContactScreen,
+  // The Profile's add-memory form; it left the + in 38.11 (D-66).
   Memory: MemoryAddScreen,
   Edit: EditContactScreen,
   EditInteraction: EditInteractionScreen,

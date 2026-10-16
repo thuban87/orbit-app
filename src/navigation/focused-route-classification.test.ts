@@ -29,7 +29,6 @@ const focusedRoutes = [
   "GroupLog",
   "EditGroupEvent",
   "EditParticipant",
-  "UpdateContact",
   "Memory",
   // D-68 (owner, 2026-09-27): System Builder and Edit Interaction hide the
   // FAB and tab bar like the other focused workflows.
@@ -107,7 +106,6 @@ const routeDensities = [
   ["SystemsManagement", "dense"],
   ["LogContact", "dense"],
   ["GroupLog", "dense"],
-  ["UpdateContact", "dense"],
   ["Memory", "dense"],
   ["SectionEditor", "dense"],
   ["KeyPeopleEditor", "dense"],

@@ -23,7 +23,6 @@ import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
-import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import type { DashboardStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<DashboardStackParamList>();
@@ -41,7 +40,7 @@ export function DashboardStack() {
       />
       <Stack.Screen name="LogContact" component={LogInteractionScreen} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
-      <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
+      {/* The Profile's add-memory form; it left the + in 38.11 (D-66). */}
       <Stack.Screen name="Memory" component={MemoryAddScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />

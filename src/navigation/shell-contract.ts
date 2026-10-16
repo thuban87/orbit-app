@@ -19,7 +19,6 @@ export const DIGEST_STACK_ROUTES = [
   "LogContact",
   "Create",
   "GroupLog",
-  "UpdateContact",
   "Memory",
   "Edit",
   "EditInteraction",
@@ -44,7 +43,6 @@ export const EVENTS_STACK_ROUTES = [
   "LogContact",
   "Create",
   "GroupLog",
-  "UpdateContact",
   "Memory",
   "Edit",
   "EditInteraction",
@@ -72,6 +70,9 @@ export const PROFILE_REACHABLE_ROUTES = [
   "Compose",
   "ComposeResearch",
   "LogContact",
+  // 38.11 D-66: Memory left the + but the Profile's add-memory heading actions
+  // still open it, so every Profile-hosting stack keeps registering it.
+  "Memory",
   "Edit",
   "EditInteraction",
   "MemoryHistory",
@@ -104,11 +105,7 @@ export const SETTINGS_HOST_EXCLUDED_PROFILE_ROUTES = [
  * before saving returns to that tab's screen; completion destinations are
  * unchanged (D-08). `shell-contract.test.ts` asserts every stack registers each
  * entry and that this list covers every + navigate target at the type level.
+ * 38.11: Update Contact retired (D-62) and Memory moved to
+ * PROFILE_REACHABLE_ROUTES (D-66).
  */
-export const FAB_ROUTES = [
-  "Create",
-  "GroupLog",
-  "LogContact",
-  "UpdateContact",
-  "Memory",
-] as const;
+export const FAB_ROUTES = ["Create", "GroupLog", "LogContact"] as const;

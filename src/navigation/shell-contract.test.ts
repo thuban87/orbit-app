@@ -66,14 +66,12 @@ const LITERAL_STACKS = [
 
 describe("+ forms over the current tab (D-38)", () => {
   it("lists exactly the + navigate targets", () => {
-    expect([...FAB_ROUTES]).toEqual([
-      "Create",
-      "GroupLog",
-      "LogContact",
-      "UpdateContact",
-      "Memory",
-    ]);
+    // 38.11: Update Contact retired (D-62); Memory moved to
+    // PROFILE_REACHABLE_ROUTES (D-66).
+    expect([...FAB_ROUTES]).toEqual(["Create", "GroupLog", "LogContact"]);
   });
+  // The retired Update Contact route (D-62) has no param-list key in
+  // types.ts, so registering it in any stack fails `tsc --noEmit`.
 
   it.each(FAB_ROUTES)("registers + route %s in Digest and Events", (route) => {
     expect(DIGEST_STACK_ROUTES).toContain(route);
@@ -151,5 +149,31 @@ describe("the Key People and Off Limits editor routes (38.10 D-75, D-08, D-107)"
         /OffLimitsEditor: \{ contactId: number; editId\?: number \};/g,
       ),
     ).toHaveLength(5);
+  });
+});
+
+/**
+ * 38.11 D-66: Memory left the + but the Profile's add-memory heading actions
+ * still navigate to it (contact-profile-logic `addMemory`), so it is
+ * Profile-reachable and every one of the five stacks must register it, or the
+ * add-memory buttons become silent no-ops in release (RG-021).
+ */
+describe("the Memory add route stays registered in all five stacks (D-66)", () => {
+  it("is Profile-reachable and not a + route", () => {
+    expect(PROFILE_REACHABLE_ROUTES).toContain("Memory");
+    expect(FAB_ROUTES as readonly string[]).not.toContain("Memory");
+  });
+
+  it("is registered in Digest and Events", () => {
+    expect(DIGEST_STACK_ROUTES).toContain("Memory");
+    expect(EVENTS_STACK_ROUTES).toContain("Memory");
+  });
+
+  it.each(LITERAL_STACKS)("%s registers Memory", (file) => {
+    expect(
+      stackSource(file).includes(
+        '<Stack.Screen name="Memory" component={MemoryAddScreen} />',
+      ),
+    ).toBe(true);
   });
 });

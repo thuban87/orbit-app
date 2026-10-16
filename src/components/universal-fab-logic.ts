@@ -20,13 +20,17 @@ import type { ThemePalette } from "@/theme/theme-types";
 export const FAB_BORDER_WIDTH = 2;
 export const FAB_BORDER_COLOR_KEY = "onAccent" satisfies keyof ThemePalette;
 
+/**
+ * The + actions (38.11 D-62, D-66): Update Contact retired (Edit Contact is the
+ * single contact form) and Memory left the + (memories are added from the
+ * Profile sections, Add/Edit Contact, the post-Quick-Log step and sharing).
+ * Group Log stays until 38.15 (D-72).
+ */
 export type UniversalFabActionId =
   | "AddContact"
   | "QuickLog"
   | "LogContact"
-  | "GroupLog"
-  | "UpdateContact"
-  | "Memory";
+  | "GroupLog";
 
 export interface UniversalFabAction {
   id: UniversalFabActionId;
@@ -38,8 +42,6 @@ export const UNIVERSAL_FAB_ACTIONS = Object.freeze([
   { id: "QuickLog", label: "Quick Log" },
   { id: "LogContact", label: "Log Interaction" },
   { id: "GroupLog", label: "Group Log" },
-  { id: "UpdateContact", label: "Update Contact" },
-  { id: "Memory", label: "Memory" },
 ] as const satisfies readonly UniversalFabAction[]);
 
 /**
@@ -134,13 +136,13 @@ export type FabTab = keyof TabParamList;
 export type FabNavigateIntent = {
   kind: "navigate";
   tab: FabTab;
-  screen: "Create" | "GroupLog" | "LogContact" | "UpdateContact" | "Memory";
+  screen: "Create" | "GroupLog" | "LogContact";
   params?: { contactId: number };
 };
 
 export type FabPickThenIntent = {
   kind: "pick-then";
-  screen: "LogContact" | "UpdateContact" | "Memory";
+  screen: "LogContact";
 };
 
 export type FabQuickLogIntent = {
@@ -202,8 +204,6 @@ export function resolveFabTarget(
       // Group Log owns its own participant workflow; it never preselects here.
       return { kind: "navigate", tab, screen: "GroupLog" };
     case "LogContact":
-    case "UpdateContact":
-    case "Memory":
       return originContactId === null
         ? { kind: "pick-then", screen: actionId }
         : {

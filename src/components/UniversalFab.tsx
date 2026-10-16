@@ -78,15 +78,13 @@ const ACTION_ACCESSIBILITY_LABELS: Record<
   QuickLog: { accessibilityLabel: "Quick Log" },
   LogContact: { accessibilityLabel: "Log Interaction" },
   GroupLog: { accessibilityLabel: "Group Log" },
-  UpdateContact: { accessibilityLabel: "Update Contact" },
-  Memory: { accessibilityLabel: "Memory" },
 };
 
 type PickerFlow =
   | { kind: "quick-log" }
   | {
       kind: "navigate";
-      screen: "LogContact" | "UpdateContact" | "Memory";
+      screen: "LogContact";
       /** The tab the + was opened on; the form opens over it (D-38). */
       tab: FabTab;
     };

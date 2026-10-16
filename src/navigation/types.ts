@@ -64,10 +64,10 @@ export type DashboardStackParamList = {
     interactionId: number;
     contactId: number;
   };
-  UpdateContact: { contactId?: number } | undefined;
   /**
-   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
-   * name is kept). `type` presets the type; `origin` is declared only.
+   * The Memory add form (38.10 plan 17 makes it MemoryAddScreen; the name is
+   * kept). Opened from the Profile's add-memory actions; it left the + in
+   * 38.11 (D-66). `type` presets the type; `origin` is declared only.
    */
   Memory: {
     contactId: number;
@@ -192,10 +192,10 @@ export type OrreryStackParamList = {
    */
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
-  UpdateContact: { contactId?: number } | undefined;
   /**
-   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
-   * name is kept). `type` presets the type; `origin` is declared only.
+   * The Memory add form (38.10 plan 17 makes it MemoryAddScreen; the name is
+   * kept). Opened from the Profile's add-memory actions; it left the + in
+   * 38.11 (D-66). `type` presets the type; `origin` is declared only.
    */
   Memory: {
     contactId: number;
@@ -296,10 +296,10 @@ export type DigestStackParamList = {
    */
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
-  UpdateContact: { contactId?: number } | undefined;
   /**
-   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
-   * name is kept). `type` presets the type; `origin` is declared only.
+   * The Memory add form (38.10 plan 17 makes it MemoryAddScreen; the name is
+   * kept). Opened from the Profile's add-memory actions; it left the + in
+   * 38.11 (D-66). `type` presets the type; `origin` is declared only.
    */
   Memory: {
     contactId: number;
@@ -360,10 +360,10 @@ export type EventsStackParamList = {
    */
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
-  UpdateContact: { contactId?: number } | undefined;
   /**
-   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
-   * name is kept). `type` presets the type; `origin` is declared only.
+   * The Memory add form (38.10 plan 17 makes it MemoryAddScreen; the name is
+   * kept). Opened from the Profile's add-memory actions; it left the + in
+   * 38.11 (D-66). `type` presets the type; `origin` is declared only.
    */
   Memory: {
     contactId: number;
@@ -482,10 +482,10 @@ export type SettingsStackParamList = {
    */
   Create: undefined;
   GroupLog: { participantIds?: number[] } | undefined;
-  UpdateContact: { contactId?: number } | undefined;
   /**
-   * The + → Memory add form (38.10 plan 17 makes it MemoryAddScreen; the
-   * name is kept). `type` presets the type; `origin` is declared only.
+   * The Memory add form (38.10 plan 17 makes it MemoryAddScreen; the name is
+   * kept). Opened from the Profile's add-memory actions; it left the + in
+   * 38.11 (D-66). `type` presets the type; `origin` is declared only.
    */
   Memory: {
     contactId: number;

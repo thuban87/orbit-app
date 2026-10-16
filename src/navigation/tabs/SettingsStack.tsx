@@ -49,7 +49,6 @@ import { SettingsOrreryScreen } from "@/screens/SettingsOrreryScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
-import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import type {
   RootStackScreenProps,
   SettingsScreenProps,
@@ -248,7 +247,7 @@ export function SettingsStack() {
       {/* The universal + forms open over this tab (D-38, FAB_ROUTES). */}
       <Stack.Screen name="Create" component={SettingsCreateHostRoute} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
-      <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
+      {/* The Profile's add-memory form; it left the + in 38.11 (D-66). */}
       <Stack.Screen name="Memory" component={MemoryAddScreen} />
       {/* Knowledge-change edit routes (review cycle-2 HIGH): the History
           detail-sheet's knowledge-change edit reuses ContactProfileScreen's nav
