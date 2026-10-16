@@ -12,7 +12,8 @@
  *    the user-facing noun) and, in the files it converts only, the D-41
  *    developer wording ("Follows event", "overridden", "participant record",
  *    "Sensitive Operations", "Tombstones", "Related rows", "Format version",
- *    "cadence", "override(s)").
+ *    "cadence", "override(s)"). 38.11-12 adds "Archived contact(s)" /
+ *    "Archived Contact(s)" (D-69: the user-facing name is "Bin").
  * 2. Every decided term keeps its value (D-41 rename guard).
  * 3. Persisted / OS-registered identifiers keep their spelling (D-49, D-12):
  *    population id `favourites`, widget provider `OrbitFavourites`, deep link
@@ -72,6 +73,11 @@ const RETIRED_FORMS: readonly RetiredForm[] = [
   { form: "group event", case: "lowercase" },
   // D-22: the conversion entry and its prompt say "event" (verification IN-02).
   { form: "group interaction", case: "lowercase" },
+  // 38.11 D-69: archived people are "the Bin" to the user (Settings → Bin).
+  // Internal ids (`archived_at`, the `Archived` route, the `archive` event)
+  // are not phrases, so these exact forms never catch them.
+  { form: "Archived contact", case: "capitalised" },
+  { form: "Archived Contact", case: "capitalised" },
 ];
 
 /**

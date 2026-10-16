@@ -360,7 +360,7 @@ export function ContactPickerList({
             const markers = pickerRowMarkers(item);
             const markerLabels = [
               markers.snoozed ? "Snoozed" : null,
-              markers.archived ? "Archived" : null,
+              markers.archived ? "In Bin" : null,
             ].filter((label): label is string => label !== null);
             const accessibilityLabel = [
               item.name,

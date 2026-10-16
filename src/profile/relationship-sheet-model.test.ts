@@ -260,7 +260,10 @@ describe("Hero Message eligibility by archive state and host", () => {
   });
 
   it("uses distinct, non-empty reason copy", () => {
-    expect(PROFILE_MESSAGE_ARCHIVED_REASON.length).toBeGreaterThan(0);
+    // "Bin" is the user-facing name for archive (38.11 D-69).
+    expect(PROFILE_MESSAGE_ARCHIVED_REASON).toBe(
+      "Contacts in the Bin can't be messaged.",
+    );
     expect(PROFILE_MESSAGE_SETTINGS_HOST_REASON.length).toBeGreaterThan(0);
     expect(PROFILE_MESSAGE_ARCHIVED_REASON).not.toBe(
       PROFILE_MESSAGE_SETTINGS_HOST_REASON,

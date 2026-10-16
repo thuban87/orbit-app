@@ -163,7 +163,7 @@ export function ManageMembersGrid({
               accessibilityState={{ checked: selected, disabled: archived }}
               accessibilityLabel={
                 archived
-                  ? `${displayName(item)} — Archived (unavailable)`
+                  ? `${displayName(item)} — In Bin (unavailable)`
                   : displayName(item)
               }
               disabled={archived}
@@ -185,7 +185,7 @@ export function ManageMembersGrid({
               />
               <AppText style={styles.cardName} numberOfLines={2}>
                 {archived
-                  ? `${displayName(item)} — Archived (unavailable)`
+                  ? `${displayName(item)} — In Bin (unavailable)`
                   : displayName(item)}
               </AppText>
               {tag ? (

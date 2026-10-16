@@ -46,10 +46,11 @@ import {
  * Human-readable label for each lifecycle event type: the single shared label
  * map the History stream's lifecycle row (`HistoryStreamRows`) renders. Moved
  * here from the retired, unrendered `TimelineRow` component (38.9 review
- * IN-05); the labels are unchanged.
+ * IN-05). The `archive` event reads "Moved to Bin" (38.11 D-69); the event
+ * type keeps its name.
  */
 export const EVENT_LABELS: Record<string, string> = {
-  archive: "Archived",
+  archive: "Moved to Bin",
   restore: "Restored",
   snooze: "Snoozed",
   unsnooze: "Unsnoozed",

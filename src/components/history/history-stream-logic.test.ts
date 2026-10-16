@@ -22,6 +22,7 @@ import {
   dayDateLabel,
   dayLabel,
   dayNodeKey,
+  EVENT_LABELS,
   emptyDayNoteText,
   emptyMonthNoteText,
   emptySpanNoteText,
@@ -1867,5 +1868,12 @@ describe("recordDay (D-31)", () => {
     expect(
       recordDay(buildStreamModel(source({}), TODAY), "interaction-7"),
     ).toBe(null);
+  });
+});
+
+describe("EVENT_LABELS — Bin wording (38.11 D-69)", () => {
+  it("labels the archive event as Moved to Bin; the event type keeps its name", () => {
+    expect(EVENT_LABELS.archive).toBe("Moved to Bin");
+    expect(EVENT_LABELS.restore).toBe("Restored");
   });
 });

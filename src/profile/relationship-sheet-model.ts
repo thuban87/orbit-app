@@ -316,9 +316,9 @@ export function relationshipSheetReducer<T>(
   };
 }
 
-/** Hero Message reason for an archived contact, in any Profile host (D-09). */
+/** Hero Message reason for an archived contact, in any Profile host (D-09; "Bin" wording 38.11 D-69). */
 export const PROFILE_MESSAGE_ARCHIVED_REASON =
-  "Archived contacts can't be messaged.";
+  "Contacts in the Bin can't be messaged.";
 
 /**
  * Hero Message reason for a Profile hosted in the Settings stack (D-25): Compose

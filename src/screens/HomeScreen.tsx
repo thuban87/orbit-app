@@ -98,6 +98,7 @@ import { FieldError } from "@/components/ui/FieldError";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
+import { MOVE_TO_BIN } from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
 import {
   bulkAddFavourites,
@@ -1138,11 +1139,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         .then(() => {
           // Archive is reversible, but it must disappear from this frozen universe.
           removeFromUniverse(ids);
-          commitBulkOutcome(`Archived ${plural(ids.length, "contact")}`);
+          commitBulkOutcome(
+            `Moved ${plural(ids.length, "contact")} to the Bin`,
+          );
         })
         .catch((writeError: unknown) => {
           releaseBulkAction(claim);
-          reportBulkFailure("archive contacts", writeError, () => {
+          reportBulkFailure("move contacts to the Bin", writeError, () => {
             performBulkArchive(ids);
           });
         })
@@ -1797,7 +1800,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         ) : null}
         {counts.archived > 0 ? (
           <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-            {`${counts.archived} archived`}
+            {`${counts.archived} in the Bin`}
           </Text>
         ) : null}
       </View>
@@ -2314,19 +2317,19 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           bulkConfirm?.kind === "quick-log"
             ? `Log ${plural(bulkConfirm.ids.length, "interaction")}?`
             : bulkConfirm?.kind === "archive"
-              ? `Archive ${plural(bulkConfirm.ids.length, "contact")}?`
+              ? `Move ${plural(bulkConfirm.ids.length, "contact")} to the Bin?`
               : "Change Contact Frequency?"
         }
         message={
           bulkConfirm?.kind === "archive"
-            ? "Archived contacts leave Contacts. You can restore them from Archived Contacts."
+            ? "They'll be hidden everywhere. You can restore them, or delete them permanently, from Settings → Bin."
             : bulkConfirm?.kind === "frequency"
               ? `Set ${bulkConfirm.ids.length === 1 ? "" : "all "}${plural(bulkConfirm.ids.length, "contact")} to every ${plural(bulkConfirm.intervalDays, "day")}?`
               : undefined
         }
         confirmLabel={
           bulkConfirm?.kind === "archive"
-            ? "Archive"
+            ? MOVE_TO_BIN
             : bulkConfirm?.kind === "frequency"
               ? "Change frequency"
               : "Log interactions"

@@ -69,6 +69,7 @@ The contract fails if any of these returns to a user-visible literal in `src/` o
 | "Dashboard(s)", "dashboard(s)" | Contacts | D-22 |
 | "Group Event(s)", "group event(s)", "Group event(s)" | Event(s) ("Edit Event", "Dissolve this event?") | D-22 |
 | "group interaction(s)", "Group interaction(s)" | event ("Make this an event") | D-22 |
+| "Archived contact(s)", "Archived Contact(s)" | Bin ("Settings → Bin", "Move to Bin") | 38.11 D-69 |
 
 ### "fuel" (38.10 D-01, D-87)
 
@@ -180,4 +181,4 @@ None. The constants are the configuration.
 | 2026-10-13 | 38.10 | Things to Remember, Off Limits, Close and Not set added as canonical terms (D-90); the Profile's section registry, entry sheet and custom-field display read them; the contract pins their values (plan 16). |
 | 2026-10-13 | 38.10 | "fuel" retired from code and wording (D-01, D-87), enforced by `src/no-fuel-contract.test.ts` with a migration allowlist rather than by `RETIRED_FORMS` (plan 18). |
 | 2026-10-15 | 38.10 | KB extraction: Decisions cite ADR-207, ADR-214 and ADR-218 in place of the D-ID line. |
-| 2026-10-16 | 38.11 | "Bin" and "Move to Bin" added as canonical terms; "Archive" is renamed "Bin" in user-visible text, internal names unchanged (D-69, D-70; plan 12). |
+| 2026-10-16 | 38.11 | "Bin" and "Move to Bin" added as canonical terms; "Archive" is renamed "Bin" in user-visible text, internal names unchanged; "Archived contact(s)" / "Archived Contact(s)" added to the retired forms (D-69, D-70; plan 12). |

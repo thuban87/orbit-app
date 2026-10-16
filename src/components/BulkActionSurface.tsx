@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
 import { Sheet } from "@/components/ui/Sheet";
+import { MOVE_TO_BIN } from "@/constants/glossary";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
@@ -77,7 +78,8 @@ export function BulkActionSurface({
       icon: "category",
       onPress: onSetCategory,
     },
-    { id: "archive", label: "Archive", icon: "archive", onPress: onArchive },
+    // "Move to Bin" is the user-facing name for archive (38.11 D-69).
+    { id: "archive", label: MOVE_TO_BIN, icon: "archive", onPress: onArchive },
   ];
 
   return (
