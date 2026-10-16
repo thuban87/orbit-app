@@ -57,3 +57,6 @@ docs/dossier/milestone-2/audit/prior-runs/
 
 # Local untracked workspace (build artifacts, screenshots, scratch) — never committed
 /untracked/
+
+# Python bytecode from dev scripts (regenerated on run)
+__pycache__/
