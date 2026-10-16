@@ -166,7 +166,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 ### Snoozing reminders
 
-1. The edit form exposes the durable Mute reminders policy, while the profile exposes 3-day, 1-week, and 1-month snooze actions plus Clear.
+1. The edit form exposes the durable Mute reminders policy, while the profile's Snooze tile and ⋯ Snooze… open the shared snooze sheet (3 days, 1 week, 1 month, Choose date from tomorrow, Unsnooze when snoozed); the Contacts card and bulk snooze use the same sheet (38.11 D-45, D-37, D-64).
 2. `snoozeContact()` writes `snooze_until` with SQLite local-date arithmetic and records an immutable `snooze` event in the same transaction; Clear writes `NULL` and an `unsnooze` event.
 3. Neither path writes `last_contact`. The notification scheduler re-reads the committed contact state and cancels or re-arms the derived OS reminder.
 
@@ -361,3 +361,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-10-15 | 38.10 | Contact aggregates write Off Limits, every memory type, key people and dated current state; inline Things to Remember on Add/Edit Contact with held deletes; `purgeContactCore` runs in a caller's transaction with an archive-gate option used only by share Undo; create-and-share is one transaction; merge reparents Off Limits; no fuel in purge (ADR-207, ADR-212, ADR-216, ADR-217, ADR-220). |
 | 2026-10-16 | 38.11 | Add Contact writes birthday, social battery and links in the one create transaction (`addLinksCore`, D-48); Add and Edit share one Birthday control where switching Year unknown off asks for the year and Edit can clear a birthday (D-49, D-61). |
 | 2026-10-16 | 38.11 | The Profile's Birthday sheet writes through the single-column `setContactBirthday` (validated before the transaction, one bump), then reschedules notifications and refreshes the widget (D-59). |
+| 2026-10-16 | 38.11 | Snooze runs through one shared sheet from the Profile tile, the Profile ⋯, the Contacts card and bulk (D-45); Choose date starts tomorrow (D-37). Custom dates are validated as future local dates before any write by the shared `assertFutureLocalSnoozeDate`, used by the Profile writer and the new `bulkSnoozeUntil`. |

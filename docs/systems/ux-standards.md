@@ -100,8 +100,8 @@ Behaviour:
 
 **Snackbar or notice** (D-27): an error or info message where the user can carry on is an error
 snackbar; one where the user is blocked is a themed one-button **notice**. Every decision is a
-themed confirm. No production `Alert.alert` remains except the snooze Alert in `HomeScreen.tsx`,
-which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces this.
+themed confirm. No production `Alert.alert` remains; 38.11 replaced the last one, the Contacts card
+snooze, with the shared snooze sheet (D-45); `src/no-native-alert-contract.test.ts` enforces this.
 
 ## Entry fields, section pages and keyboard (38.10)
 
@@ -352,3 +352,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-11 | 38.9 | KB extraction: Decisions cite ADR-198..ADR-206 and ADR-144's partial supersession. |
 | 2026-10-15 | 38.10 | One delete-with-Undo pattern for Things to Remember replaces the holding zones; two snackbar looks (notice and warning, errors included), full-width root placement held in place; shared entry field with keyboard centring; card edit mode and the morphing section Add button (ADR-212, ADR-219..221). |
 | 2026-10-16 | 38.11 | Update Contact retired (D-62): its row-save slot, `EditorFrame` Cancel hold and uncentred entry fields leave the guarded-screen lists (now 11); Edit Contact is the single contact form, and the code is kept in `docs/archive/update-contact/`. |
+| 2026-10-16 | 38.11 | No native Alert remains: the Contacts card snooze opens the shared snooze sheet (`SnoozeSheet`, D-45), and the no-native-alert contract now pins zero production `Alert.alert` calls. Single-contact snooze and unsnooze show one person-naming snackbar with Undo (38.9 D-39). |
