@@ -625,7 +625,10 @@ export function ContactProfileScreen({
   // 38.11 D-69, D-71 (review U-04): Move to Bin asks first — `runMoveToBin`
   // calls `confirm({ ...binConfirmation(name), destructive: true })` — then
   // archives. The raw write rejects on failure, so the success snackbar can
-  // only follow a write that resolved. No Undo snackbar (D-71).
+  // only follow a write that resolved. No Undo snackbar (D-71). Review WR-01:
+  // after the write resolves the widget refreshes and the schedule reconciles
+  // (its population is live contacts only), so a binned person's reminders
+  // stop firing.
   const moveToBin = useCallback(
     (name: string) =>
       runMoveToBin({
@@ -633,6 +636,16 @@ export function ContactProfileScreen({
         confirm,
         archive: () =>
           archiveContact(getExecutor(), contactId, localDateTime()),
+        afterArchive: () => {
+          notifyWidgetDataChanged();
+          void reconcileSchedule(getExecutor()).catch((cause) =>
+            Logger.error(
+              LOG_SCOPE,
+              "failed to reconcile after Move to Bin",
+              cause,
+            ),
+          );
+        },
         closeOverlay,
         goBack: () => navigation.goBack(),
         showSnackbar,

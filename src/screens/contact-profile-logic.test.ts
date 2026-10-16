@@ -738,6 +738,7 @@ describe("integrated Profile controller contracts", () => {
           calls.push("archive");
           await options.write();
         }),
+        afterArchive: vi.fn(() => calls.push("afterArchive")),
         closeOverlay: vi.fn(() => calls.push("closeOverlay")),
         goBack: vi.fn(() => calls.push("goBack")),
         showSnackbar: vi.fn(() => calls.push("snackbar")),
@@ -764,7 +765,25 @@ describe("integrated Profile controller contracts", () => {
       await expect(runMoveToBin(deps)).resolves.toBe("cancelled");
       expect(calls).toEqual(["confirm"]);
       expect(deps.archive).not.toHaveBeenCalled();
+      expect(deps.afterArchive).not.toHaveBeenCalled();
       expect(deps.showSnackbar).not.toHaveBeenCalled();
+    });
+
+    it("still leaves the Profile when the follow-up side effects throw", async () => {
+      const { calls, deps } = harness({
+        confirmed: true,
+        write: async () => {},
+      });
+      deps.afterArchive.mockImplementation(() => {
+        throw new Error("widget bridge gone");
+      });
+      await expect(runMoveToBin(deps)).resolves.toBe("moved");
+      expect(calls).toContain("goBack");
+      expect(deps.showSnackbar).toHaveBeenCalledWith({
+        kind: "warning",
+        label: "Moved Alex to the Bin",
+      });
+      expect(deps.logError).toHaveBeenCalledTimes(1);
     });
 
     it("shows only the error snackbar and stays when the write rejects", async () => {
@@ -777,6 +796,8 @@ describe("integrated Profile controller contracts", () => {
       });
       await expect(runMoveToBin(deps)).resolves.toBe("failed");
       expect(calls).toEqual(["confirm", "archive", "snackbar"]);
+      // Review WR-01: no widget refresh or reminder reconcile after a failure.
+      expect(deps.afterArchive).not.toHaveBeenCalled();
       expect(deps.goBack).not.toHaveBeenCalled();
       expect(deps.closeOverlay).not.toHaveBeenCalled();
       expect(deps.showSnackbar).toHaveBeenCalledTimes(1);
@@ -793,9 +814,12 @@ describe("integrated Profile controller contracts", () => {
         write: async () => {},
       });
       await expect(runMoveToBin(deps)).resolves.toBe("moved");
+      // Review WR-01: the widget refresh and reminder reconcile follow the
+      // resolved write, before the Profile closes.
       expect(calls).toEqual([
         "confirm",
         "archive",
+        "afterArchive",
         "closeOverlay",
         "goBack",
         "snackbar",

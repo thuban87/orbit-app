@@ -1142,6 +1142,15 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           commitBulkOutcome(
             `Moved ${plural(ids.length, "contact")} to the Bin`,
           );
+          // Review WR-01: the schedule's population is live contacts only, so
+          // binned people's scheduled reminders must be cancelled now.
+          void reconcileSchedule(getExecutor()).catch((scheduleError) =>
+            Logger.error(
+              LOG_SCOPE,
+              "failed to reconcile after bulk Move to Bin",
+              scheduleError,
+            ),
+          );
         })
         .catch((writeError: unknown) => {
           releaseBulkAction(claim);

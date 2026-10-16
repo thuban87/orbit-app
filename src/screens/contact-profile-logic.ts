@@ -708,6 +708,9 @@ export const MOVE_TO_BIN_FAILED = "Couldn't move to the Bin. Try again.";
  * action). A failed write shows only the error snackbar and stays put.
  * The snackbar's warning look is a taste call for this plan only; the owner
  * sees it at the 38.11-14 checkpoint (ADR-221 two looks).
+ * `afterArchive` (review WR-01) runs the widget refresh and reminder
+ * reconcile once the write has resolved — never after a failed write. A throw
+ * from it is logged and does not undo the move or hide the snackbar.
  */
 export async function runMoveToBin(input: {
   name: string;
@@ -719,6 +722,7 @@ export async function runMoveToBin(input: {
     destructive?: boolean;
   }) => Promise<boolean>;
   archive: () => Promise<void>;
+  afterArchive?: () => void;
   closeOverlay: () => void;
   goBack: () => void;
   showSnackbar: (message: {
@@ -738,6 +742,11 @@ export async function runMoveToBin(input: {
     input.logError?.(cause);
     input.showSnackbar({ kind: "error", label: MOVE_TO_BIN_FAILED });
     return "failed";
+  }
+  try {
+    input.afterArchive?.();
+  } catch (cause) {
+    input.logError?.(cause);
   }
   input.closeOverlay();
   input.goBack();
