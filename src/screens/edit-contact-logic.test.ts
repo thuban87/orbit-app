@@ -169,6 +169,8 @@ describe("seedEditState", () => {
     expect(s.socialBattery).toBe("Charger");
     expect(s.birthdayInput).toBe("2000-07-04");
     expect(s.birthdayYearUnknown).toBe(true);
+    // 38.11 D-61 (V-10): a stored MM-DD seeds a placeholder year.
+    expect(s.birthdayYearIsPlaceholder).toBe(true);
     expect(s.methods).toEqual({ phone: [], email: [] });
     expect(s.rarelyResponds).toBe(1);
     expect(s.remindersOff).toBe(1);

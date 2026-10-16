@@ -49,9 +49,6 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -62,6 +59,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { BirthdayField } from "@/components/BirthdayField";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
@@ -181,8 +179,8 @@ import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
-import { FREQUENCY_DAYS, parseDate } from "@/types";
-import { formatLocalDate, formatStoredBirthdayForDisplay } from "@/utils/dates";
+import { FREQUENCY_DAYS } from "@/types";
+import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import { buildLinksForDiff } from "./contact-link-drafts";
@@ -427,7 +425,6 @@ export function EditContactScreen({
   // the ONLY case that shows the last-spoke control (owner ruling — see header).
   const [neverContacted, setNeverContacted] = useState(false);
   const [initialTrackingEnabled, setInitialTrackingEnabled] = useState(true);
-  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   // The synchronous save guard (verification IN-04): `saving` is render state
   // for the disabled look; this ref is what makes Save single-flight, so a
@@ -1164,14 +1161,6 @@ export function EditContactScreen({
     }
   }
 
-  function onBirthdayChange(event: DateTimePickerEvent, date?: Date) {
-    setShowBirthdayPicker(false);
-    if (event.type !== "set" || !date) {
-      return; // Android cancel/dismiss — keep the prior value.
-    }
-    setField("birthdayInput", formatLocalDate(date));
-  }
-
   const hasUnsavedChanges =
     form !== null &&
     (seedInputRef.current !==
@@ -1283,18 +1272,6 @@ export function EditContactScreen({
     );
   }
 
-  // Display only (38.9 D-70, D-23): the same string the label always used,
-  // shown as "Jun 2, 2026" (year always shown when known) or "Jun 2" when the
-  // year is unknown. The stored input and `buildBirthdayForStorage` are unchanged.
-  const birthdayLabel = form.birthdayInput
-    ? formatStoredBirthdayForDisplay(
-        form.birthdayYearUnknown
-          ? form.birthdayInput.slice(5) // MM-DD (year hidden)
-          : form.birthdayInput,
-      )
-    : "Set birthday";
-  const birthdaySeed =
-    (form.birthdayInput ? parseDate(form.birthdayInput) : null) ?? new Date();
   // One memory draft list, split into its sections every render (convergence
   // c3, Claude C-02; D-116). The rows keep their ids, so each section's
   // add / edit / delete still edits the single list by id. The adapter
@@ -1400,58 +1377,30 @@ export function EditContactScreen({
               />
             </View>
 
-            {/* Birthday: native date picker + a "Year unknown" toggle (the native
-            picker has no month/day-only mode, so year-optional is app logic —
-            MM-DD when unknown, YYYY-MM-DD when known; Pitfall 7). */}
-            <View style={styles.field}>
-              <AppText role="label" style={{ color: colors.textSecondary }}>
-                Birthday
-              </AppText>
-              <Pressable
-                testID="edit-contact-birthday"
-                accessibilityRole="button"
-                accessibilityLabel="Birthday"
-                onPress={() => setShowBirthdayPicker(true)}
-                style={[
-                  styles.input,
-                  styles.birthdayTrigger,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <AppText
-                  role="body"
-                  style={{
-                    color: form.birthdayInput
-                      ? colors.textPrimary
-                      : colors.textSecondary,
-                  }}
-                >
-                  {birthdayLabel}
-                </AppText>
-              </Pressable>
-              <View style={styles.toggleRow}>
-                <AppText role="label" style={{ color: colors.textPrimary }}>
-                  Year unknown
-                </AppText>
-                <OrbitSwitch
-                  testID="edit-contact-birthday-year-unknown"
-                  accessibilityLabel="Year unknown"
-                  value={form.birthdayYearUnknown}
-                  onValueChange={(v) => setField("birthdayYearUnknown", v)}
-                />
-              </View>
-              {showBirthdayPicker ? (
-                <DateTimePicker
-                  testID="edit-contact-birthday-picker"
-                  value={birthdaySeed}
-                  mode="date"
-                  onChange={onBirthdayChange}
-                />
-              ) : null}
-            </View>
+            {/* Birthday: the shared control (38.11 D-49 Clear, D-61 Year
+            unknown asks for the year). Storage stays MM-DD when the year is
+            unknown, YYYY-MM-DD when known (Pitfall 7). */}
+            <BirthdayField
+              testID="edit-contact-birthday"
+              value={{
+                input: form.birthdayInput,
+                yearUnknown: form.birthdayYearUnknown,
+                yearIsPlaceholder:
+                  form.birthdayYearIsPlaceholder ?? form.birthdayYearUnknown,
+              }}
+              onChange={(next) =>
+                setForm((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        birthdayInput: next.input,
+                        birthdayYearUnknown: next.yearUnknown,
+                        birthdayYearIsPlaceholder: next.yearIsPlaceholder,
+                      }
+                    : prev,
+                )
+              }
+            />
 
             <View style={styles.field}>
               <AppText role="label" style={{ color: colors.textSecondary }}>
@@ -2103,10 +2052,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
-  },
-  birthdayTrigger: {
-    minHeight: 44,
-    justifyContent: "center",
   },
   toggleRow: {
     flexDirection: "row",

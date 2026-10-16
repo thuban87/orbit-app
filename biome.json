@@ -36,6 +36,7 @@
   "overrides": [
     {
       "includes": [
+        "src/components/BirthdayField.tsx",
         "src/components/MemoryCard.tsx",
         "src/components/MemoryEditor.tsx",
         "src/components/PostLogNoteEditor.tsx",

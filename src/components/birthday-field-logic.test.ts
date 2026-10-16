@@ -18,8 +18,8 @@ import {
   birthdayPickerMaxDate,
   birthdayStorage,
   clearBirthday,
-  dateRowSeed,
   dateFromLocalDateString,
+  dateRowSeed,
   EMPTY_BIRTHDAY_FIELD_STATE,
   pickerResult,
   yearAskSeed,
@@ -35,13 +35,15 @@ const TODAY = "2026-10-16";
 
 /** Unwrap a step that must be a plain state change. */
 function stateOf(step: BirthdayFieldStep): BirthdayFieldState {
-  if (step.kind !== "state") throw new Error(`expected state, got ${step.kind}`);
+  if (step.kind !== "state")
+    throw new Error(`expected state, got ${step.kind}`);
   return step.state;
 }
 
 /** Unwrap a step that must ask for the year. */
 function seedOf(step: BirthdayFieldStep): string {
-  if (step.kind !== "ask-year") throw new Error(`expected ask, got ${step.kind}`);
+  if (step.kind !== "ask-year")
+    throw new Error(`expected ask, got ${step.kind}`);
   return step.seed;
 }
 
@@ -89,21 +91,22 @@ describe("yearAskSeed — most recent occurrence on or before today (U-08, T-05)
         todays.push(`${year}-${md}`);
       }
     }
+    const failures: string[] = [];
     for (const today of todays) {
       for (const md of monthDays) {
         const seed = yearAskSeed(md, today);
-        expect(seed <= today).toBe(true);
-        expect(seed.slice(5)).toBe(md);
-        // Always a real calendar date (never 1 March for 02-29).
-        expect(buildBirthdayForStorage(seed, false)).toBe(seed);
         const year = Number(seed.slice(0, 4));
-        if (md === "02-29") {
-          expect(year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)).toBe(
-            true,
-          );
-        }
+        // Never after today; same month/day (never 1 March for 02-29); a
+        // 02-29 seed lands in a real leap year.
+        const ok =
+          seed <= today &&
+          seed.slice(5) === md &&
+          (md !== "02-29" ||
+            (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)));
+        if (!ok) failures.push(`${md}@${today} -> ${seed}`);
       }
     }
+    expect(failures).toEqual([]);
   });
 });
 
@@ -244,9 +247,7 @@ describe("yearIsPlaceholder tracking (V-10)", () => {
 
   it("a dismissed date picker changes nothing", () => {
     const loaded = loadForEdit("1990-05-04");
-    expect(pickerResult(loaded, "date", { type: "dismissed" })).toEqual(
-      loaded,
-    );
+    expect(pickerResult(loaded, "date", { type: "dismissed" })).toEqual(loaded);
   });
 
   it("birthdayFieldStateFromStored mirrors parseBirthdayForForm", () => {
@@ -347,25 +348,23 @@ describe("display value", () => {
 describe("02-29 round trips on both consumers (T-05)", () => {
   it("Edit: stored 02-29 → OFF → ask 2024-02-29 → set → stored 2024-02-29", () => {
     const loaded = loadForEdit("02-29");
-    expect(seedOf(yearUnknownChanged(loaded, false, TODAY))).toBe(
-      "2024-02-29",
-    );
+    expect(seedOf(yearUnknownChanged(loaded, false, TODAY))).toBe("2024-02-29");
     const set = pickerResult(loaded, "year", {
       type: "set",
       date: "2024-02-29",
     });
-    expect(
-      buildBirthdayForStorage(set.input, set.yearUnknown),
-    ).toBe("2024-02-29");
+    expect(buildBirthdayForStorage(set.input, set.yearUnknown)).toBe(
+      "2024-02-29",
+    );
   });
 
   it("Edit: stored 02-29 → OFF → dismissed → still stores 02-29", () => {
     const loaded = loadForEdit("02-29");
     const dismissed = pickerResult(loaded, "year", { type: "dismissed" });
     expect(dismissed.yearUnknown).toBe(true);
-    expect(buildBirthdayForStorage(dismissed.input, dismissed.yearUnknown)).toBe(
-      "02-29",
-    );
+    expect(
+      buildBirthdayForStorage(dismissed.input, dismissed.yearUnknown),
+    ).toBe("02-29");
   });
 
   it("Add: Year unknown on, pick 29 Feb, then OFF → same seed; set stores it; dismissed keeps 02-29", () => {

@@ -230,6 +230,12 @@ export interface EditFormState {
   birthdayInput: string | null;
   /** When on, the birthday stores as `MM-DD` (the picker's year is ignored). */
   birthdayYearUnknown: boolean;
+  /**
+   * Whether `birthdayInput`'s year is only a placeholder (38.11 D-61, review
+   * V-10; the shared Birthday control's `yearIsPlaceholder`). Seeded true for a
+   * stored `MM-DD`. Display/control state only — never stored.
+   */
+  birthdayYearIsPlaceholder?: boolean;
   /** Ordered local method drafts, seeded from the normalized read boundary. */
   methods: MethodGroups;
   /** 0/1 — the "Rarely responds" toggle. */
@@ -322,6 +328,7 @@ export function seedEditState(result: ContactForEdit): EditFormState {
     socialBattery: c.social_battery,
     birthdayInput,
     birthdayYearUnknown,
+    birthdayYearIsPlaceholder: birthdayYearUnknown,
     methods: seedMethodGroups(result.methods),
     rarelyResponds: c.rarely_responds,
     remindersOff: c.reminders_off,

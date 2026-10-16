@@ -51,6 +51,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { BirthdayField } from "@/components/BirthdayField";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
@@ -945,6 +946,21 @@ export function CreateContactScreen({
                   setSectionExpanded("personal", next)
                 }
               >
+                {/* The shared Birthday control (D-61: Year unknown off asks
+                for the year; Clear, D-49). */}
+                <BirthdayField
+                  testID="create-contact-birthday"
+                  value={{
+                    input: birthdayInput,
+                    yearUnknown: birthdayYearUnknown,
+                    yearIsPlaceholder: birthdayYearIsPlaceholder,
+                  }}
+                  onChange={(next) => {
+                    setBirthdayInput(next.input);
+                    setBirthdayYearUnknown(next.yearUnknown);
+                    setBirthdayYearIsPlaceholder(next.yearIsPlaceholder);
+                  }}
+                />
                 <View style={styles.field}>
                   <AppText role="label" style={{ color: colors.textSecondary }}>
                     Social battery
