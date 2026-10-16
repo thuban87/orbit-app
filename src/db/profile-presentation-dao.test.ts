@@ -17,6 +17,7 @@ import {
   deleteProfileBackgroundTemplate,
   deleteProfileLayoutTemplate,
   readProfileCollapseOverride,
+  resetContactLayoutPresentation,
   resetProfilePresentation,
   setContactFreeformLayout,
   setProfileCollapseOverride,
@@ -439,6 +440,105 @@ describe("Profile presentation mutation API", () => {
       });
       expect(await readProfileCollapseOverride(exec, contactId)).toEqual({});
       expect(await revision()).toBe(before + 1);
+    });
+  });
+
+  /**
+   * 38.11 D-65 (layout half): Reset in Profile Layout clears the layout and the
+   * open/closed sections and keeps the background; presentation-only (ADR-108).
+   */
+  describe("resetContactLayoutPresentation (D-65)", () => {
+    const revision = async () =>
+      (
+        await exec.getFirstAsync<{ data_revision: number }>(
+          "SELECT data_revision FROM app_settings WHERE id=1",
+        )
+      )?.data_revision ?? 0;
+    const row = () =>
+      exec.getFirstAsync<{
+        layout_template_uid: string | null;
+        freeform_layout_json: string | null;
+        background_template_uid: string | null;
+        collapse_json: string;
+      }>(
+        "SELECT layout_template_uid,freeform_layout_json,background_template_uid,collapse_json FROM profile_contact_presentation WHERE contact_id=?",
+        [contactId],
+      );
+
+    it("clears the layout and open/closed sections and keeps the background, with one bump", async () => {
+      await createProfileLayoutTemplate(exec, {
+        uid: "layout",
+        name: "Layout",
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+      await createProfileBackgroundTemplate(exec, {
+        uid: "bg",
+        name: "Background",
+        imagePath: "profile-backgrounds/bg.jpg",
+        now: NOW,
+      });
+      await assignContactLayoutTemplate(exec, {
+        contactId,
+        templateUid: "layout",
+        now: NOW,
+      });
+      await assignContactBackgroundTemplate(exec, {
+        contactId,
+        templateUid: "bg",
+        now: NOW,
+      });
+      await setProfileCollapseOverride(exec, {
+        contactId,
+        moduleId: "memories",
+        expanded: false,
+        now: NOW,
+      });
+      await exec.runAsync(
+        "UPDATE contacts SET favourite_rank=1,snooze_until='2026-09-20' WHERE id=?",
+        [contactId],
+      );
+      const before = await revision();
+      await resetContactLayoutPresentation(exec, { contactId, now: NOW });
+      expect(await row()).toEqual({
+        layout_template_uid: null,
+        freeform_layout_json: null,
+        background_template_uid: "bg",
+        collapse_json: "{}",
+      });
+      expect(await revision()).toBe(before + 1);
+      expect(
+        await exec.getFirstAsync(
+          "SELECT favourite_rank,snooze_until FROM contacts WHERE id=?",
+          [contactId],
+        ),
+      ).toEqual({ favourite_rank: 1, snooze_until: "2026-09-20" });
+    });
+
+    it("clears a freeform layout and leaves no presentation row when there is no background", async () => {
+      await setContactFreeformLayout(exec, {
+        contactId,
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+      await setProfileCollapseOverride(exec, {
+        contactId,
+        moduleId: "interaction-history",
+        expanded: true,
+        now: NOW,
+      });
+      const before = await revision();
+      await resetContactLayoutPresentation(exec, { contactId, now: NOW });
+      expect(await row()).toBeNull();
+      expect(await revision()).toBe(before + 1);
+    });
+
+    it("rejects a missing contact without bumping", async () => {
+      const before = await revision();
+      await expect(
+        resetContactLayoutPresentation(exec, { contactId: 99999, now: NOW }),
+      ).rejects.toThrow(/missing/);
+      expect(await revision()).toBe(before);
     });
   });
 
