@@ -1,71 +1,32 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button semantic roles are domain props.
 
-import * as ImagePicker from "expo-image-picker";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Image, ScrollView, StyleSheet, View } from "react-native";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
-import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { getExecutor, localDateTime } from "@/db/database";
+import { assignContactBackgroundTemplate } from "@/db/profile-presentation-dao";
 import {
-  assignContactBackgroundTemplate,
-  createProfileBackgroundTemplate,
-} from "@/db/profile-presentation-dao";
-import { newUid } from "@/db/uid";
-import { confirmDiscard } from "@/navigation/discard-keep-guard";
-import {
-  type BackgroundManagerState,
-  beginBackgroundPreparation,
-  cancelBackgroundPreparation,
-  createBackgroundManagerState,
-  finishBackgroundPreparation,
-  requestBackgroundManagerDismissal,
   resolveBackgroundListState,
   shouldResetBackgroundManagerViewOnOpen,
 } from "@/profile/background-manager-model";
-import {
-  clampBackgroundCropSelection,
-  createInitialBackgroundCropSelection,
-  describeBackgroundCropSelection,
-  pinchResizeBackgroundCropSelection,
-  translateBackgroundCropSelection,
-} from "@/services/photos/background-crop-geometry";
-import { prepareProfileBackground } from "@/services/photos/background-pipeline";
-import {
-  backgroundDerivativeRelPath,
-  deleteBackgroundDerivative,
-  persistBackgroundDerivative,
-  resolveBackgroundUri,
-} from "@/services/photos/background-storage";
-import { renderBackgroundDerivative } from "@/services/photos/manipulator-derivatives";
-import { profileBackgroundTarget } from "@/services/photos/profile-background-target";
+import { resolveBackgroundUri } from "@/services/photos/background-storage";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import {
+  ProfileBackgroundCreateFlow,
+  useProfileBackgroundCreateFlow,
+} from "./ProfileBackgroundCreateFlow";
 import { useProfileBackgroundLibrary } from "./use-profile-background-library";
 
 const LOG_SCOPE = "profile-background-manager";
-const MAX_ZOOM = 8;
 
-type Page = "list" | "crop" | "name" | "assign";
-type CropSource = { uri: string; width: number; height: number };
+type Page = "list" | "assign";
 
 function clearCategoryAccessibilityLabel(category: { name: string }): string {
   return `Clear ${category.name} background`;
@@ -83,6 +44,12 @@ export interface ProfileBackgroundManagerProps {
  * Profile-owned background template management. Picker bytes are copied into the
  * app-owned namespace before a template row references them; Cancel and failure
  * never mutate the previously committed selection or its bytes.
+ *
+ * The crop and name steps are the shared `ProfileBackgroundCreateFlow` (its
+ * state hook lives here, outside the sheet, so an unsaved crop survives the
+ * sheet hiding), and the list/delete/global/category operations are the shared
+ * `useProfileBackgroundLibrary`; the Settings Profile Backgrounds page uses
+ * both too (38.11 D-58.1, D-79).
  */
 export function ProfileBackgroundManager({
   visible,
@@ -92,17 +59,6 @@ export function ProfileBackgroundManager({
   onCommitted,
 }: ProfileBackgroundManagerProps) {
   const { colors } = useTheme();
-  const { height: viewportHeight, width: viewportWidth } =
-    useWindowDimensions();
-  const cropTarget = useMemo(
-    () =>
-      profileBackgroundTarget({ width: viewportWidth, height: viewportHeight }),
-    [viewportHeight, viewportWidth],
-  );
-  const [cropSpace, setCropSpace] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
   const [page, setPage] = useState<Page>("list");
   // The shared list/delete/global/category operations (38.11 D-58.1), also
   // used by the Settings Profile Backgrounds page.
@@ -117,42 +73,24 @@ export function ProfileBackgroundManager({
     assignCategory,
   } = useProfileBackgroundLibrary({ active: visible, onCommitted });
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
-  const [source, setSource] = useState<CropSource | null>(null);
-  const [templateName, setTemplateName] = useState("");
-  const [managerState, setManagerState] = useState<BackgroundManagerState>(() =>
-    createBackgroundManagerState(null),
-  );
   const [saving, setSaving] = useState(false);
-  const [cropStatus, setCropStatus] = useState("");
-  const [fineTuneOpen, setFineTuneOpen] = useState(false);
   const [categoryPickerMode, setCategoryPickerMode] = useState<
     "assign" | "clear" | null
   >(null);
-  const tokenCounter = useRef(0);
-  const activeTokenRef = useRef<string | null>(null);
-  // Latest state for the async discard prompt: a crop that finishes while the
-  // prompt is open must still have its pending file deleted on Discard.
-  const managerStateRef = useRef(managerState);
-  managerStateRef.current = managerState;
   const wasVisibleRef = useRef(false);
 
-  const displayScale = useSharedValue(1);
-  const displayOffsetX = useSharedValue(0);
-  const displayOffsetY = useSharedValue(0);
-  const sourceWidth = useSharedValue(1);
-  const sourceHeight = useSharedValue(1);
-  const selectionX = useSharedValue(0);
-  const selectionY = useSharedValue(0);
-  const selectionWidth = useSharedValue(1);
-  const selectionHeight = useSharedValue(1);
-  const startX = useSharedValue(0);
-  const startY = useSharedValue(0);
-  const startWidth = useSharedValue(1);
-  const startHeight = useSharedValue(1);
-  const pinchFocalX = useSharedValue(0);
-  const pinchFocalY = useSharedValue(0);
-  const pinchRatioX = useSharedValue(0.5);
-  const pinchRatioY = useSharedValue(0.5);
+  // The shared crop-and-name flow; a save goes on to this sheet's assign page.
+  const flow = useProfileBackgroundCreateFlow({
+    defaultName: `${contactName}'s background`,
+    onSaved: async (uid) => {
+      setSelectedUid(uid);
+      setPage("assign");
+      await refresh();
+      onCommitted?.();
+    },
+  });
+  const { reset: resetFlow, setError } = flow;
+  const managerState = flow.state;
 
   useEffect(() => {
     if (!visible) {
@@ -163,304 +101,12 @@ export function ProfileBackgroundManager({
     wasVisibleRef.current = true;
     if (!opening) return;
     if (shouldResetBackgroundManagerViewOnOpen(managerState)) {
-      activeTokenRef.current = null;
-      setManagerState((current) => cancelBackgroundPreparation(current));
+      resetFlow();
       setPage("list");
       setSelectedUid(null);
-      setSource(null);
-      setTemplateName("");
-      setCropStatus("");
-      setFineTuneOpen(false);
     }
     void refresh();
-  }, [managerState, refresh, visible]);
-
-  const profileAspect = cropTarget.preview.width / cropTarget.preview.height;
-  const publishStatus = useCallback(
-    (x: number, y: number, width: number, height: number) => {
-      if (source)
-        setCropStatus(
-          describeBackgroundCropSelection(
-            { originX: x, originY: y, width, height },
-            source,
-          ),
-        );
-    },
-    [source],
-  );
-  useEffect(() => {
-    if (!source) return;
-    const initial = createInitialBackgroundCropSelection(source, profileAspect);
-    sourceWidth.value = source.width;
-    sourceHeight.value = source.height;
-    selectionX.value = initial.originX;
-    selectionY.value = initial.originY;
-    selectionWidth.value = initial.width;
-    selectionHeight.value = initial.height;
-    setFineTuneOpen(false);
-    publishStatus(
-      initial.originX,
-      initial.originY,
-      initial.width,
-      initial.height,
-    );
-  }, [
-    profileAspect,
-    publishStatus,
-    selectionHeight,
-    selectionWidth,
-    selectionX,
-    selectionY,
-    source,
-    sourceHeight,
-    sourceWidth,
-  ]);
-  useEffect(() => {
-    if (!source || !cropSpace) return;
-    const scale = Math.min(
-      cropSpace.width / source.width,
-      cropSpace.height / source.height,
-    );
-    displayScale.value = scale;
-    displayOffsetX.value = (cropSpace.width - source.width * scale) / 2;
-    displayOffsetY.value = (cropSpace.height - source.height * scale) / 2;
-  }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, source]);
-  const clampSelection = () => {
-    "worklet";
-    const maxWidth = Math.min(
-      sourceWidth.value,
-      sourceHeight.value * profileAspect,
-    );
-    const width = Math.max(
-      maxWidth / MAX_ZOOM,
-      Math.min(selectionWidth.value, maxWidth),
-    );
-    selectionWidth.value = width;
-    selectionHeight.value = width / profileAspect;
-    selectionX.value = Math.max(
-      0,
-      Math.min(selectionX.value, sourceWidth.value - width),
-    );
-    selectionY.value = Math.max(
-      0,
-      Math.min(selectionY.value, sourceHeight.value - selectionHeight.value),
-    );
-  };
-  const pan = Gesture.Pan()
-    .onStart(() => {
-      startX.value = selectionX.value;
-      startY.value = selectionY.value;
-    })
-    .onUpdate((event) => {
-      selectionX.value = startX.value + event.translationX / displayScale.value;
-      selectionY.value = startY.value + event.translationY / displayScale.value;
-      const maxX = Math.max(0, sourceWidth.value - selectionWidth.value);
-      selectionX.value = Math.max(0, Math.min(selectionX.value, maxX));
-      selectionY.value = Math.max(
-        0,
-        Math.min(selectionY.value, sourceHeight.value - selectionHeight.value),
-      );
-    })
-    .onFinalize(() =>
-      runOnJS(publishStatus)(
-        selectionX.value,
-        selectionY.value,
-        selectionWidth.value,
-        selectionHeight.value,
-      ),
-    );
-  const pinch = Gesture.Pinch()
-    .onStart((event) => {
-      startWidth.value = selectionWidth.value;
-      startHeight.value = selectionHeight.value;
-      startX.value = selectionX.value;
-      startY.value = selectionY.value;
-      pinchFocalX.value =
-        (event.focalX - displayOffsetX.value) / displayScale.value;
-      pinchFocalY.value =
-        (event.focalY - displayOffsetY.value) / displayScale.value;
-      pinchRatioX.value = (pinchFocalX.value - startX.value) / startWidth.value;
-      pinchRatioY.value =
-        (pinchFocalY.value - startY.value) / startHeight.value;
-    })
-    .onUpdate((event) => {
-      const width = startWidth.value / event.scale;
-      const focalX = pinchFocalX.value;
-      const focalY = pinchFocalY.value;
-      selectionWidth.value = width;
-      selectionHeight.value = width / profileAspect;
-      selectionX.value = focalX - width * pinchRatioX.value;
-      selectionY.value = focalY - selectionHeight.value * pinchRatioY.value;
-      clampSelection();
-    })
-    .onFinalize(() =>
-      runOnJS(publishStatus)(
-        selectionX.value,
-        selectionY.value,
-        selectionWidth.value,
-        selectionHeight.value,
-      ),
-    );
-  const sourceImageStyle = useAnimatedStyle(() => ({
-    height: sourceHeight.value * displayScale.value,
-    left: displayOffsetX.value,
-    top: displayOffsetY.value,
-    width: sourceWidth.value * displayScale.value,
-  }));
-  const selectionStyle = useAnimatedStyle(() => ({
-    height: selectionHeight.value * displayScale.value,
-    left: displayOffsetX.value + selectionX.value * displayScale.value,
-    top: displayOffsetY.value + selectionY.value * displayScale.value,
-    width: selectionWidth.value * displayScale.value,
-  }));
-  const maskTopStyle = useAnimatedStyle(() => ({
-    height: displayOffsetY.value + selectionY.value * displayScale.value,
-  }));
-  const maskBottomStyle = useAnimatedStyle(() => ({
-    top:
-      displayOffsetY.value +
-      (selectionY.value + selectionHeight.value) * displayScale.value,
-  }));
-  const maskLeftStyle = useAnimatedStyle(() => ({
-    height: selectionHeight.value * displayScale.value,
-    top: displayOffsetY.value + selectionY.value * displayScale.value,
-    width: displayOffsetX.value + selectionX.value * displayScale.value,
-  }));
-  const maskRightStyle = useAnimatedStyle(() => ({
-    height: selectionHeight.value * displayScale.value,
-    left:
-      displayOffsetX.value +
-      (selectionX.value + selectionWidth.value) * displayScale.value,
-    top: displayOffsetY.value + selectionY.value * displayScale.value,
-  }));
-
-  const chooseImage = useCallback(async () => {
-    try {
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: false,
-        quality: 1,
-      });
-      const asset = picked.canceled ? null : picked.assets[0];
-      if (!asset?.uri || !asset.width || !asset.height) return;
-      const token = `background-${++tokenCounter.current}`;
-      activeTokenRef.current = token;
-      setSource({ uri: asset.uri, width: asset.width, height: asset.height });
-      setManagerState((state) => beginBackgroundPreparation(state, token));
-      setPage("crop");
-    } catch (error) {
-      Logger.error(LOG_SCOPE, "background picker failed", error);
-      setManagerState((state) => ({
-        ...state,
-        error: "Couldn't open your photos. Please try again.",
-      }));
-    }
-  }, []);
-
-  const prepareCrop = useCallback(async () => {
-    if (!source || saving) return;
-    const token = activeTokenRef.current;
-    if (!token) return;
-    setSaving(true);
-    const uid = newUid();
-    const relativePath = backgroundDerivativeRelPath(uid);
-    try {
-      const prepared = await prepareProfileBackground({
-        rawUri: source.uri,
-        selection: clampBackgroundCropSelection(
-          {
-            originX: selectionX.value,
-            originY: selectionY.value,
-            width: selectionWidth.value,
-            height: selectionHeight.value,
-          },
-          source,
-          profileAspect,
-        ),
-        output: cropTarget.output,
-        // Releases the rendered image and its context once saved (D-11, WR-02).
-        cropAndResize: renderBackgroundDerivative,
-        persist: (preparedUri) =>
-          persistBackgroundDerivative(preparedUri, relativePath),
-      });
-      if (activeTokenRef.current !== token) {
-        deleteBackgroundDerivative(prepared.relativePath);
-        return;
-      }
-      activeTokenRef.current = null;
-      setManagerState((state) => {
-        return finishBackgroundPreparation(state, token, {
-          ok: true,
-          relativePath: prepared.relativePath,
-        });
-      });
-      setSource(null);
-      setTemplateName(`${contactName}'s background`);
-      setPage("name");
-    } catch (error) {
-      Logger.error(LOG_SCOPE, "background processing failed", error);
-      if (activeTokenRef.current !== token) return;
-      activeTokenRef.current = null;
-      setManagerState((state) =>
-        finishBackgroundPreparation(state, token, {
-          ok: false,
-          message:
-            "Couldn't prepare that image. Choose another image or try again.",
-        }),
-      );
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    contactName,
-    cropTarget.output,
-    profileAspect,
-    saving,
-    selectionHeight,
-    selectionWidth,
-    selectionX,
-    selectionY,
-    source,
-  ]);
-
-  const retryCrop = useCallback(() => {
-    if (!source || saving) return;
-    const token = `background-${++tokenCounter.current}`;
-    activeTokenRef.current = token;
-    setManagerState((state) => beginBackgroundPreparation(state, token));
-    void prepareCrop();
-  }, [prepareCrop, saving, source]);
-
-  const saveTemplate = useCallback(async () => {
-    const imagePath = managerState.pendingPath;
-    if (!imagePath || saving) return;
-    setSaving(true);
-    try {
-      const uid = imagePath.slice(
-        "profile-backgrounds/".length,
-        -".jpg".length,
-      );
-      await createProfileBackgroundTemplate(getExecutor(), {
-        uid,
-        name: templateName,
-        imagePath,
-        now: localDateTime(),
-      });
-      setManagerState(createBackgroundManagerState(imagePath));
-      setSelectedUid(uid);
-      setPage("assign");
-      await refresh();
-      onCommitted?.();
-    } catch (error) {
-      Logger.error(LOG_SCOPE, "background template write failed", error);
-      setManagerState((state) => ({
-        ...state,
-        error: "Couldn't save your changes. Nothing was applied. Try again.",
-      }));
-    } finally {
-      setSaving(false);
-    }
-  }, [managerState.pendingPath, onCommitted, refresh, saving, templateName]);
+  }, [managerState, refresh, resetFlow, visible]);
 
   const assign = useCallback(
     async (
@@ -500,10 +146,7 @@ export function ProfileBackgroundManager({
         setPage("list");
       } catch (error) {
         Logger.error(LOG_SCOPE, "background assignment failed", error);
-        setManagerState((state) => ({
-          ...state,
-          error: "Couldn't save your changes. Nothing was applied. Try again.",
-        }));
+        setError("Couldn't save your changes. Nothing was applied. Try again.");
       } finally {
         setSaving(false);
       }
@@ -516,26 +159,12 @@ export function ProfileBackgroundManager({
       refresh,
       saving,
       selectedUid,
+      setError,
     ],
   );
 
-  const closeOrGuard = () => {
-    if (requestBackgroundManagerDismissal(managerState).kind === "close") {
-      onRequestClose();
-      return;
-    }
-    // The shared themed discard prompt (D-13, D-52).
-    void confirmDiscard().then((discard) => {
-      if (!discard) return;
-      const latest = managerStateRef.current;
-      if (latest.pendingPath) deleteBackgroundDerivative(latest.pendingPath);
-      activeTokenRef.current = null;
-      setManagerState(cancelBackgroundPreparation(latest));
-      setSource(null);
-      setPage("list");
-      onRequestClose();
-    });
-  };
+  // The shared themed discard prompt (D-13, D-52), via the flow's guarded exit.
+  const closeOrGuard = () => flow.requestCancel(onRequestClose);
 
   const selected =
     templates.find((template) => template.uid === selectedUid) ?? null;
@@ -549,18 +178,18 @@ export function ProfileBackgroundManager({
     <>
       <Sheet visible={visible} onRequestClose={closeOrGuard} variant="expanded">
         <View style={styles.root} accessibilityViewIsModal>
-          {page !== "crop" ? (
+          {flow.step !== "crop" ? (
             <View style={styles.heading}>
               <AppText role="heading">Profile backgrounds</AppText>
               <Button role="secondary" label="Back" onPress={closeOrGuard} />
             </View>
           ) : null}
-          {page !== "crop" && managerState.error ? (
+          {flow.step !== "crop" && managerState.error ? (
             <AppText style={{ color: colors.danger }}>
               {managerState.error}
             </AppText>
           ) : null}
-          {page === "list" ? (
+          {page === "list" && flow.step === "idle" ? (
             <ScrollView
               style={styles.workspace}
               contentContainerStyle={styles.content}
@@ -571,7 +200,7 @@ export function ProfileBackgroundManager({
               <Button
                 role="primary"
                 label="Choose photo"
-                onPress={() => void chooseImage()}
+                onPress={() => void flow.chooseImage()}
               />
               <AppText role="label">Background assignment</AppText>
               <AppText role="body">
@@ -651,379 +280,8 @@ export function ProfileBackgroundManager({
                 : null}
             </ScrollView>
           ) : null}
-          {page === "crop" && source ? (
-            <View style={styles.cropEditor}>
-              <GlassSurface density="dense" style={styles.cropTopOverlay}>
-                <View style={styles.heading}>
-                  <AppText role="heading">Crop background</AppText>
-                  <Button
-                    role="secondary"
-                    label="Back"
-                    onPress={closeOrGuard}
-                  />
-                </View>
-                <AppText role="body">
-                  Drag to reposition. Pinch or use the controls to zoom.
-                </AppText>
-              </GlassSurface>
-              <View
-                style={styles.cropPreviewSpace}
-                onLayout={({ nativeEvent }) => {
-                  const { width, height } = nativeEvent.layout;
-                  setCropSpace((current) =>
-                    current?.width === width && current.height === height
-                      ? current
-                      : { width, height },
-                  );
-                }}
-              >
-                {cropSpace ? (
-                  <View
-                    style={[
-                      styles.cropViewport,
-                      { height: cropSpace.height, width: "100%" },
-                    ]}
-                  >
-                    <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
-                      <Animated.View style={styles.cropTouchSurface}>
-                        <Animated.Image
-                          source={{ uri: source.uri }}
-                          style={[styles.containedSource, sourceImageStyle]}
-                          resizeMode="stretch"
-                        />
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.cropMask,
-                            styles.cropMaskTop,
-                            { backgroundColor: colors.background },
-                            maskTopStyle,
-                          ]}
-                        />
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.cropMask,
-                            styles.cropMaskBottom,
-                            { backgroundColor: colors.background },
-                            maskBottomStyle,
-                          ]}
-                        />
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.cropMask,
-                            styles.cropMaskLeft,
-                            { backgroundColor: colors.background },
-                            maskLeftStyle,
-                          ]}
-                        />
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.cropMask,
-                            styles.cropMaskRight,
-                            { backgroundColor: colors.background },
-                            maskRightStyle,
-                          ]}
-                        />
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.cropSelection,
-                            { borderColor: colors.accent },
-                            selectionStyle,
-                          ]}
-                        />
-                      </Animated.View>
-                    </GestureDetector>
-                  </View>
-                ) : null}
-              </View>
-              <GlassSurface density="dense" style={styles.cropBottomOverlay}>
-                {managerState.error ? (
-                  <ScopedPalette>
-                    {(scoped) => (
-                      <AppText style={{ color: scoped.danger }}>
-                        {managerState.error}
-                      </AppText>
-                    )}
-                  </ScopedPalette>
-                ) : null}
-                <AppText accessibilityLiveRegion="polite" role="body">
-                  {cropStatus}
-                </AppText>
-                {fineTuneOpen ? (
-                  <View style={styles.fineTuneControls}>
-                    <Button
-                      role="tertiary"
-                      label="Reset"
-                      accessibilityLabel="Reset crop"
-                      onPress={() => {
-                        if (!source) return;
-                        const next = createInitialBackgroundCropSelection(
-                          source,
-                          profileAspect,
-                        );
-                        selectionX.value = next.originX;
-                        selectionY.value = next.originY;
-                        selectionWidth.value = next.width;
-                        selectionHeight.value = next.height;
-                        publishStatus(
-                          next.originX,
-                          next.originY,
-                          next.width,
-                          next.height,
-                        );
-                      }}
-                    />
-                    <Button
-                      role="tertiary"
-                      label="Zoom in"
-                      accessibilityLabel="Zoom in"
-                      onPress={() =>
-                        source &&
-                        (() => {
-                          const next = pinchResizeBackgroundCropSelection(
-                            {
-                              originX: selectionX.value,
-                              originY: selectionY.value,
-                              width: selectionWidth.value,
-                              height: selectionHeight.value,
-                            },
-                            source,
-                            profileAspect,
-                            {
-                              x: selectionX.value + selectionWidth.value / 2,
-                              y: selectionY.value + selectionHeight.value / 2,
-                            },
-                            1.15,
-                          );
-                          selectionX.value = next.originX;
-                          selectionY.value = next.originY;
-                          selectionWidth.value = next.width;
-                          selectionHeight.value = next.height;
-                          publishStatus(
-                            next.originX,
-                            next.originY,
-                            next.width,
-                            next.height,
-                          );
-                        })()
-                      }
-                    />
-                    <Button
-                      role="tertiary"
-                      label="Zoom out"
-                      accessibilityLabel="Zoom out"
-                      onPress={() =>
-                        source &&
-                        (() => {
-                          const next = pinchResizeBackgroundCropSelection(
-                            {
-                              originX: selectionX.value,
-                              originY: selectionY.value,
-                              width: selectionWidth.value,
-                              height: selectionHeight.value,
-                            },
-                            source,
-                            profileAspect,
-                            {
-                              x: selectionX.value + selectionWidth.value / 2,
-                              y: selectionY.value + selectionHeight.value / 2,
-                            },
-                            1 / 1.15,
-                          );
-                          selectionX.value = next.originX;
-                          selectionY.value = next.originY;
-                          selectionWidth.value = next.width;
-                          selectionHeight.value = next.height;
-                          publishStatus(
-                            next.originX,
-                            next.originY,
-                            next.width,
-                            next.height,
-                          );
-                        })()
-                      }
-                    />
-                    <Button
-                      role="tertiary"
-                      label="Move left"
-                      accessibilityLabel="Move left"
-                      onPress={() =>
-                        source &&
-                        (() => {
-                          const next = translateBackgroundCropSelection(
-                            {
-                              originX: selectionX.value,
-                              originY: selectionY.value,
-                              width: selectionWidth.value,
-                              height: selectionHeight.value,
-                            },
-                            source,
-                            -24,
-                            0,
-                          );
-                          selectionX.value = next.originX;
-                          selectionY.value = next.originY;
-                          publishStatus(
-                            next.originX,
-                            next.originY,
-                            next.width,
-                            next.height,
-                          );
-                        })()
-                      }
-                    />
-                    <Button
-                      role="tertiary"
-                      label="Move right"
-                      accessibilityLabel="Move right"
-                      onPress={() =>
-                        source &&
-                        (() => {
-                          const next = translateBackgroundCropSelection(
-                            {
-                              originX: selectionX.value,
-                              originY: selectionY.value,
-                              width: selectionWidth.value,
-                              height: selectionHeight.value,
-                            },
-                            source,
-                            24,
-                            0,
-                          );
-                          selectionX.value = next.originX;
-                          selectionY.value = next.originY;
-                          publishStatus(
-                            next.originX,
-                            next.originY,
-                            next.width,
-                            next.height,
-                          );
-                        })()
-                      }
-                    />
-                    <Button
-                      role="tertiary"
-                      label="Move up"
-                      accessibilityLabel="Move up"
-                      onPress={() =>
-                        source &&
-                        (() => {
-                          const next = translateBackgroundCropSelection(
-                            {
-                              originX: selectionX.value,
-                              originY: selectionY.value,
-                              width: selectionWidth.value,
-                              height: selectionHeight.value,
-                            },
-                            source,
-                            0,
-                            -24,
-                          );
-                          selectionX.value = next.originX;
-                          selectionY.value = next.originY;
-                          publishStatus(
-                            next.originX,
-                            next.originY,
-                            next.width,
-                            next.height,
-                          );
-                        })()
-                      }
-                    />
-                    <Button
-                      role="tertiary"
-                      label="Move down"
-                      accessibilityLabel="Move down"
-                      onPress={() =>
-                        source &&
-                        (() => {
-                          const next = translateBackgroundCropSelection(
-                            {
-                              originX: selectionX.value,
-                              originY: selectionY.value,
-                              width: selectionWidth.value,
-                              height: selectionHeight.value,
-                            },
-                            source,
-                            0,
-                            24,
-                          );
-                          selectionX.value = next.originX;
-                          selectionY.value = next.originY;
-                          publishStatus(
-                            next.originX,
-                            next.originY,
-                            next.width,
-                            next.height,
-                          );
-                        })()
-                      }
-                    />
-                  </View>
-                ) : null}
-                <View style={styles.cropActions}>
-                  <Button
-                    role="secondary"
-                    label="Cancel"
-                    onPress={closeOrGuard}
-                  />
-                  <Button
-                    role="tertiary"
-                    label="Fine tune"
-                    onPress={() => setFineTuneOpen((open) => !open)}
-                  />
-                  {managerState.error ? (
-                    <Button
-                      role="secondary"
-                      label="Retry"
-                      disabled={saving}
-                      onPress={retryCrop}
-                    />
-                  ) : null}
-                  <Button
-                    role="primary"
-                    label={saving ? "Preparing…" : "Use background"}
-                    disabled={saving}
-                    onPress={() => void prepareCrop()}
-                  />
-                </View>
-              </GlassSurface>
-            </View>
-          ) : null}
-          {page === "name" ? (
-            <ScrollView
-              style={styles.workspace}
-              contentContainerStyle={styles.content}
-            >
-              <AppText role="body">
-                Name this reusable background template.
-              </AppText>
-              <TextInput
-                accessibilityLabel="Background template name"
-                value={templateName}
-                onChangeText={setTemplateName}
-                style={[
-                  styles.input,
-                  {
-                    color: colors.textPrimary,
-                    borderColor: colors.border,
-                    backgroundColor: colors.background,
-                  },
-                ]}
-              />
-              <Button
-                role="primary"
-                label={saving ? "Saving…" : "Save background template"}
-                disabled={saving || !templateName.trim()}
-                onPress={() => void saveTemplate()}
-              />
-            </ScrollView>
-          ) : null}
-          {page === "assign" && selected ? (
+          <ProfileBackgroundCreateFlow flow={flow} onCancel={closeOrGuard} />
+          {page === "assign" && flow.step === "idle" && selected ? (
             <ScrollView
               style={styles.workspace}
               contentContainerStyle={styles.content}
@@ -1106,49 +364,4 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: SPACING.xs },
   thumbnail: { borderRadius: RADII.md, height: 56, width: 84 },
-  cropViewport: {
-    alignSelf: "center",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  cropTouchSurface: { flex: 1, width: "100%" },
-  containedSource: { position: "absolute" },
-  cropMask: { opacity: 0.62, position: "absolute" },
-  cropMaskTop: { left: 0, right: 0, top: 0 },
-  cropMaskBottom: { bottom: 0, left: 0, right: 0 },
-  cropMaskLeft: { left: 0 },
-  cropMaskRight: { right: 0 },
-  cropSelection: { borderWidth: 2, position: "absolute" },
-  cropEditor: {
-    flex: 1,
-    overflow: "hidden",
-  },
-  cropTopOverlay: {
-    padding: SPACING.sm,
-  },
-  cropPreviewSpace: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 0,
-  },
-  cropBottomOverlay: {
-    padding: SPACING.sm,
-  },
-  cropControlRow: { gap: SPACING.xs, paddingRight: SPACING.sm },
-  fineTuneControls: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },
-  cropActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    justifyContent: "space-between",
-  },
-  input: {
-    borderRadius: RADII.md,
-    borderWidth: 1,
-    minHeight: 44,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
 });
