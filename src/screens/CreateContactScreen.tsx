@@ -34,6 +34,12 @@
  * Claude C-04). Allow AI reads the real AI master and the per-type defaults
  * (D-27, D-92). Every entry field centres above the keyboard (D-66).
  *
+ * 38.11 D-48: Show More first reveals one open "Birthday, social battery &
+ * links" section, below Contact Methods. Its values ride the same single
+ * `createContactFull` transaction (links through the non-bumping
+ * `addLinksCore`), and a birthday set here is scheduled at once
+ * (`reconcileSchedule` after the create).
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -57,6 +63,7 @@ import {
 } from "@/components/contact-methods-editor-model";
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import {
   type MemoryAiDefaults,
   type MemoryDraft,
@@ -89,6 +96,7 @@ import {
   FieldError,
   KeyboardCenteringProvider,
   OptionSelectRow,
+  OptionSheet,
   useKeyboardCentering,
 } from "@/components/ui";
 import { chipTone } from "@/components/ui/chip-tone";
@@ -129,6 +137,8 @@ import { navigationRef } from "@/navigation/linking";
 import { openProfileInContactsTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
+import { reconcileSchedule } from "@/services/notifications/notification-schedule";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -154,6 +164,7 @@ import {
   removeDraftItem,
   replaceDraftItem,
   resolveErrorSection,
+  SOCIAL_BATTERY_SHEET_OPTIONS,
 } from "./create-contact-logic";
 import type { OffLimitsDraftRow } from "./edit-contact-logic";
 import { sectionEntryNoun, sectionTitle } from "./section-editor-logic";
@@ -319,6 +330,9 @@ export function CreateContactScreen({
     identity: true,
     relationship: true,
     methods: false,
+    // 38.11 D-48: the Birthday, social battery & links section is the first
+    // thing Show More reveals, and it starts open (this plan only).
+    personal: true,
     lastTalked: false,
     keyPeople: false,
     currentLocation: false,
@@ -401,6 +415,21 @@ export function CreateContactScreen({
   const [offLimitsDrafts, setOffLimitsDrafts] = useState<OffLimitsDraftRow[]>(
     [],
   );
+  // 38.11 D-48: Birthday, Social battery and Links, saved by the same create.
+  const [birthdayInput, setBirthdayInput] = useState<string | null>(
+    seed.birthdayInput,
+  );
+  const [birthdayYearUnknown, setBirthdayYearUnknown] = useState(
+    seed.birthdayYearUnknown,
+  );
+  const [birthdayYearIsPlaceholder, setBirthdayYearIsPlaceholder] = useState(
+    seed.birthdayYearIsPlaceholder,
+  );
+  const [socialBattery, setSocialBattery] = useState<string | null>(
+    seed.socialBattery,
+  );
+  const [socialBatterySheetOpen, setSocialBatterySheetOpen] = useState(false);
+  const [links, setLinks] = useState<LinkDraft[]>(seed.links);
   // The real AI master (D-27) and the per-type new-item defaults (D-13,
   // D-92), as Edit Contact reads them. Until they load the switch stays off.
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
@@ -466,6 +495,11 @@ export function CreateContactScreen({
       currentLocation,
       currentLocationDate,
       offLimits: offLimitsDrafts,
+      birthdayInput,
+      birthdayYearUnknown,
+      birthdayYearIsPlaceholder,
+      socialBattery,
+      links,
     }),
     [
       name,
@@ -483,6 +517,11 @@ export function CreateContactScreen({
       currentLocation,
       currentLocationDate,
       offLimitsDrafts,
+      birthdayInput,
+      birthdayYearUnknown,
+      birthdayYearIsPlaceholder,
+      socialBattery,
+      links,
     ],
   );
 
@@ -650,6 +689,15 @@ export function CreateContactScreen({
         },
       );
       const { contactId } = await createContactFull(exec, input);
+      if (input.birthday != null) {
+        // A birthday set on Add gets its reminder scheduled now, not at the
+        // next launch sweep, as Edit does after a metadata save (38.11 D-48;
+        // RESEARCH R6). Fire-and-forget: the contact is already saved.
+        void reconcileSchedule(exec).catch((error) =>
+          Logger.error(LOG_SCOPE, "reconcile after create failed", error),
+        );
+        notifyWidgetDataChanged();
+      }
       // Saved: leave for the new Profile without a prompt (D-08, Pitfall 6).
       bypassRef.current = true;
       if (host === "settings") {
@@ -885,6 +933,64 @@ export function CreateContactScreen({
           {/* -- Show More: reveals the advanced enrichment sections (dossier §D). -- */}
           {showMore ? (
             <>
+              {/* 38.11 D-48 (ledger Q-17): Birthday, Social battery and Links
+              are revealed by Show More, below Contact Methods, never inside
+              the first three sections. One open section, first in the reveal
+              (arrangement this plan only; owner checkpoint (a) at 38.11-14). */}
+              <AccordionSection
+                sectionId="personal"
+                title="Birthday, social battery & links"
+                expanded={expandedSections.personal}
+                onExpandedChange={(next) =>
+                  setSectionExpanded("personal", next)
+                }
+              >
+                <View style={styles.field}>
+                  <AppText role="label" style={{ color: colors.textSecondary }}>
+                    Social battery
+                  </AppText>
+                  <OptionSelectRow
+                    testID="create-contact-social-battery"
+                    label="Social battery"
+                    currentLabel={socialBattery ?? "No selection"}
+                    onPress={() => setSocialBatterySheetOpen(true)}
+                  />
+                  <OptionSheet
+                    visible={socialBatterySheetOpen}
+                    title="Social battery"
+                    options={SOCIAL_BATTERY_SHEET_OPTIONS}
+                    selected={socialBattery}
+                    onSelect={setSocialBattery}
+                    onRequestClose={() => setSocialBatterySheetOpen(false)}
+                  />
+                </View>
+                <View style={styles.field}>
+                  <AppText role="label" style={{ color: colors.textSecondary }}>
+                    Links
+                  </AppText>
+                  <LinksEditor
+                    testID="create-contact-links"
+                    links={links}
+                    onAdd={() =>
+                      setLinks((prev) => [
+                        ...prev,
+                        { uid: newUid(), url: "", label: null },
+                      ])
+                    }
+                    onUpdate={(index, patch) =>
+                      setLinks((prev) =>
+                        prev.map((row, i) =>
+                          i === index ? { ...row, ...patch } : row,
+                        ),
+                      )
+                    }
+                    onRemove={(index) =>
+                      setLinks((prev) => prev.filter((_, i) => i !== index))
+                    }
+                  />
+                </View>
+              </AccordionSection>
+
               {/* Last Talked About: an always-visible "add an entry" row
               (D-65, D-119). Enter only closes the keyboard (D-121); the form's
               Save records the entry with its capped date (D-101). */}

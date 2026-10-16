@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   addLink,
+  addLinksCore,
   applyLinkDiff,
   type ContactLinkRow,
   listLinks,
@@ -31,6 +32,7 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-15 12:00:00";
@@ -341,5 +343,71 @@ describe("applyLinkDiff — one atomic seeded-vs-current diff", () => {
     const after = await listLinks(exec, cid);
     expect(after.map((l) => l.url)).toEqual(["https://real"]);
     expect(await linkTombstones()).toEqual([]);
+  });
+});
+
+// 38.11 D-48 — the composition core for Add Contact's create transaction.
+describe("addLinksCore — non-bumping append for composition", () => {
+  async function revision(): Promise<number> {
+    const row = await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id = 1",
+    );
+    return row?.data_revision ?? 0;
+  }
+
+  it("appends in array order after existing links and never bumps data_revision", async () => {
+    const contactId = await makeContact();
+    await addLink(exec, {
+      uid: uid(),
+      contactId,
+      url: "https://first.example",
+      label: null,
+      now: NOW,
+    });
+    const before = await revision();
+    const ids = await inWriteTransaction(exec, () =>
+      addLinksCore(exec, {
+        contactId,
+        links: [
+          { uid: "core-a", url: "https://a.example", label: "A" },
+          { uid: "core-b", url: "https://b.example", label: null },
+        ],
+        now: NOW,
+      }),
+    );
+    expect(ids).toHaveLength(2);
+    const links = await listLinks(exec, contactId);
+    expect(links.map((l) => [l.uid, l.display_order])).toEqual([
+      [links[0].uid, 0],
+      ["core-a", 1],
+      ["core-b", 2],
+    ]);
+    expect(await revision()).toBe(before);
+  });
+
+  it("propagates a UNIQUE uid clash so the caller's transaction rolls every link back", async () => {
+    const contactId = await makeContact();
+    await expect(
+      inWriteTransaction(exec, () =>
+        addLinksCore(exec, {
+          contactId,
+          links: [
+            { uid: "same", url: "https://a.example", label: null },
+            { uid: "same", url: "https://b.example", label: null },
+          ],
+          now: NOW,
+        }),
+      ),
+    ).rejects.toThrow();
+    expect(await listLinks(exec, contactId)).toEqual([]);
+  });
+
+  it("an empty list writes nothing", async () => {
+    const contactId = await makeContact();
+    const ids = await inWriteTransaction(exec, () =>
+      addLinksCore(exec, { contactId, links: [], now: NOW }),
+    );
+    expect(ids).toEqual([]);
+    expect(await listLinks(exec, contactId)).toEqual([]);
   });
 });

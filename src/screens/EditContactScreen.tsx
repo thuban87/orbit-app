@@ -132,7 +132,7 @@ import {
   memoryAiDefaultsMap,
 } from "@/db/ai-permissions-dao";
 import { getAppSettings } from "@/db/app-settings-dao";
-import type { ContactLinkRow, DraftLink } from "@/db/contact-links-dao";
+import type { ContactLinkRow } from "@/db/contact-links-dao";
 import {
   getContactForEdit,
   getContactHeader,
@@ -185,9 +185,11 @@ import { FREQUENCY_DAYS, parseDate } from "@/types";
 import { formatLocalDate, formatStoredBirthdayForDisplay } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
+import { buildLinksForDiff } from "./contact-link-drafts";
 import {
   partitionMemoryRows,
   pickCreateSubEditor,
+  SOCIAL_BATTERY_SHEET_OPTIONS,
 } from "./create-contact-logic";
 import { mostRecentEntryCard } from "./edit-contact-display";
 import {
@@ -237,16 +239,6 @@ function dismissKeyboard(): void {
   Keyboard.dismiss();
 }
 
-/** The social-battery options (D-28 option sheet). "No selection" = null → stored NULL. */
-const SOCIAL_BATTERY_OPTIONS = ["Charger", "Neutral", "Drain"] as const;
-const SOCIAL_BATTERY_SHEET_OPTIONS: ReadonlyArray<{
-  value: string | null;
-  label: string;
-}> = [
-  { value: null, label: "No selection" },
-  ...SOCIAL_BATTERY_OPTIONS.map((o) => ({ value: o, label: o })),
-];
-
 /**
  * Themed confirm so the duplicate-name warning reads as ONE gate; Back/scrim
  * resolves false, as Cancel does (D-27).
@@ -268,23 +260,6 @@ function toLinkDrafts(links: ContactLinkRow[]): LinkDraft[] {
     url: l.url,
     label: l.label,
   }));
-}
-
-/**
- * Shape the draft for `applyLinkDiff`: trim url/label, empty label → null, and
- * DROP blank-url rows (an added-then-untyped row, or a cleared existing link).
- * Dropping a cleared existing (id-bearing) row makes the diff DELETE it — the
- * intuitive "empty the URL to remove the link" behaviour.
- */
-function buildLinksForDiff(draft: LinkDraft[]): DraftLink[] {
-  return draft
-    .map((l) => ({
-      id: l.id,
-      uid: l.uid,
-      url: l.url.trim(),
-      label: l.label && l.label.trim().length > 0 ? l.label.trim() : null,
-    }))
-    .filter((l) => l.url.length > 0);
 }
 
 // =============================================================================

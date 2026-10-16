@@ -36,10 +36,16 @@
  *      permanently 'stable'; enforced at the DAO chokepoint, defence-in-depth
  *      behind the UI). Both are local `YYYY-MM-DD HH:MM:SS` strings, so a lexical
  *      `>` comparison is a correct chronological future-date check.
+ *   3. A non-null `birthday` must pass `isValidStoredBirthday` (`MM-DD` or a
+ *      real `YYYY-MM-DD`; 38.11 D-48) — the single birthday validator.
  *
- * CRUD-01 LEAN SET: the create INSERT carries `phone` (the previously-dropped
- * field). `email` / `social_battery` / `birthday` are INTENTIONALLY create-
- * excluded (edit-only per 06-crud Cluster A) — the omission is deliberate.
+ * CREATE COLUMNS: scalar phone/email were retired by migration 009 (methods are
+ * normalized rows). `birthday` and `social_battery` ARE written by the create
+ * INSERT since 38.11 D-48 (Add Contact offers them behind Show More; this
+ * supersedes the old "edit-only per 06-crud Cluster A" exclusion), and the
+ * form's links join the SAME create transaction through `addLinksCore`. All are
+ * optional, so import / capture / consolidation callers that omit them are
+ * unchanged.
  *
  * SECURITY (T-16-04): every runtime value is `?`-bound. Normalized values carry
  * a numeric `fieldDefId`; no custom SQL identifier reaches this composer.
@@ -48,6 +54,7 @@
  */
 
 import { recordLifecycleTransitionCore } from "@/db/contact-lifecycle-dao";
+import { addLinksCore } from "@/db/contact-links-dao";
 import {
   applyContactMethodDiffCore,
   type ContactMethodDraft,
@@ -106,6 +113,7 @@ import {
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { isValidStoredBirthday } from "@/logic/birthday-logic";
 
 /** One normalized custom-field value to write for a contact-definition pair. */
 export interface CustomValueInput {
@@ -201,6 +209,16 @@ export interface CreateContactFullInput {
   currentStateEntries?: CreateCurrentStateInput[];
   /** Off Limits entries (always Off Limits, D-11). */
   offLimits?: CreateOffLimitsInput[];
+  /**
+   * 38.11 D-48 — Add Contact's Show More fields, all OPTIONAL (omitted → NULL /
+   * no links, so every other create caller is unchanged). `birthday` is the
+   * stored shape (`MM-DD` year unknown, `YYYY-MM-DD` known), validated before
+   * any transaction opens. `links` are written inside the create transaction,
+   * in array order (display_order 0, 1, …), each with a caller-minted uid.
+   */
+  birthday?: string | null;
+  socialBattery?: string | null;
+  links?: Array<{ uid: string; url: string; label: string | null }>;
 }
 
 /** The local `YYYY-MM-DD` of a local wall-clock `now` (never a UTC slice). */
@@ -256,6 +274,12 @@ export function createContactFull(
       ),
     );
   }
+  // GUARD 3 (38.11 D-48): a birthday must be a real stored birthday shape.
+  if (input.birthday != null && !isValidStoredBirthday(input.birthday)) {
+    return Promise.reject(
+      new Error(`birthday is not a valid stored birthday (${input.birthday})`),
+    );
+  }
 
   return inWriteTransaction(exec, () => createContactFullCore(exec, input));
 }
@@ -275,12 +299,13 @@ export async function createContactFullCore(
   methodSaveResult: ContactMethodSaveResult | null;
 }> {
   const trackingEnabled = input.trackingEnabled ?? true;
-  // Contact row — scalar phone/email were retired by migration 009.
+  // Contact row — scalar phone/email were retired by migration 009; birthday
+  // and social battery are optional create columns (38.11 D-48).
   const contactResult = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, category_id, interval_days, tracking_enabled, rarely_responds,
-        created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        birthday, social_battery, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.uid,
       input.name,
@@ -288,6 +313,8 @@ export async function createContactFullCore(
       input.intervalDays,
       trackingEnabled ? 1 : 0,
       input.rarelyResponds ?? 0,
+      input.birthday ?? null,
+      input.socialBattery ?? null,
       input.now,
       input.now,
     ],
@@ -394,9 +421,20 @@ export async function createContactFullCore(
           // The aggregate owns the single bump (below); suppress the sub-bump.
           bumpRevision: false,
         });
+  // Links (38.11 D-48) — the non-bumping, non-mutexed core, so they commit or
+  // roll back with the contact. NEVER `applyLinkDiff` / `addLink` here: each
+  // opens its own transaction (non-reentrant mutex → permanent hang) and bumps.
+  if (input.links && input.links.length > 0) {
+    await addLinksCore(exec, {
+      contactId,
+      links: input.links,
+      now: input.now,
+    });
+  }
+
   // createContactFullCore is the SOLE `data_revision` bumper for the composed
-  // create: the contact INSERT is always a change and the method core ran with
-  // its bump suppressed, so a knowledge-only / unchanged-method create still
+  // create: the contact INSERT is always a change and the method and link cores
+  // ran without bumping, so a knowledge-only / unchanged-method create still
   // advances backup-freshness by EXACTLY 1 and no path double-bumps (Review
   // cycle-3 MEDIUM). The composed create calls NO tombstone-writing core, so no
   // inner bump can happen here.

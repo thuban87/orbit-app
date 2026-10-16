@@ -848,3 +848,138 @@ describe("offLimitsFormOpening: an edit form remounted below the list (38.10 rev
     ).toBe("");
   });
 });
+
+// =============================================================================
+// 38.11 D-48 — Birthday, Social battery and Links on Add Contact (Show More).
+// =============================================================================
+describe("Add Contact birthday, social battery and links (38.11 D-48)", () => {
+  const baseline = createFormSeedSignature(createFormSeedState());
+  const dirty = (s: CreateFormState) =>
+    isCreateFormDirty(baseline, createFormSeedSignature(s));
+
+  it("the seed holds no birthday, no social battery and no links", () => {
+    expect(createFormSeedState()).toMatchObject({
+      birthdayInput: null,
+      birthdayYearUnknown: false,
+      birthdayYearIsPlaceholder: false,
+      socialBattery: null,
+      links: [],
+    });
+  });
+
+  it("a name-only save omits birthday, socialBattery and links entirely", () => {
+    const out = buildCreateInput(
+      { ...createFormSeedState(), name: "Ann" },
+      deps(),
+    );
+    expect("birthday" in out).toBe(false);
+    expect("socialBattery" in out).toBe(false);
+    expect("links" in out).toBe(false);
+  });
+
+  it("a known-year birthday stores YYYY-MM-DD", () => {
+    const out = buildCreateInput(
+      state({ birthdayInput: "1990-05-04", birthdayYearUnknown: false }),
+      deps(),
+    );
+    expect(out.birthday).toBe("1990-05-04");
+  });
+
+  it("a year-unknown birthday stores MM-DD (02-29 kept)", () => {
+    const out = buildCreateInput(
+      state({ birthdayInput: "2000-02-29", birthdayYearUnknown: true }),
+      deps(),
+    );
+    expect(out.birthday).toBe("02-29");
+  });
+
+  it("Year unknown on with no date set stores nothing", () => {
+    const out = buildCreateInput(
+      state({ birthdayInput: null, birthdayYearUnknown: true }),
+      deps(),
+    );
+    expect("birthday" in out).toBe(false);
+  });
+
+  it("a social battery choice is carried; no selection is omitted", () => {
+    expect(
+      buildCreateInput(state({ socialBattery: "Charger" }), deps())
+        .socialBattery,
+    ).toBe("Charger");
+    expect(
+      "socialBattery" in
+        buildCreateInput(state({ socialBattery: null }), deps()),
+    ).toBe(false);
+  });
+
+  it("links are shaped by the shared rules: trimmed, empty label → null, blank rows dropped, order kept", () => {
+    const out = buildCreateInput(
+      state({
+        links: [
+          { uid: "l1", url: "  https://a.example ", label: " Site " },
+          { uid: "l2", url: "", label: "no url" },
+          { uid: "l3", url: "b.example", label: "  " },
+        ],
+      }),
+      deps(),
+    );
+    expect(out.links).toEqual([
+      { uid: "l1", url: "https://a.example", label: "Site" },
+      { uid: "l3", url: "b.example", label: null },
+    ]);
+  });
+
+  it("only blank link rows → links omitted", () => {
+    const out = buildCreateInput(
+      state({ links: [{ uid: "l1", url: "   ", label: null }] }),
+      deps(),
+    );
+    expect("links" in out).toBe(false);
+  });
+
+  it("an untouched seed with the new fields is not dirty (D-09), even when they are absent", () => {
+    expect(dirty(createFormSeedState())).toBe(false);
+    const {
+      birthdayInput: _b,
+      birthdayYearUnknown: _y,
+      birthdayYearIsPlaceholder: _p,
+      socialBattery: _s,
+      links: _l,
+      ...withoutNewFields
+    } = createFormSeedState();
+    expect(dirty(withoutNewFields)).toBe(false);
+  });
+
+  it("an added but untyped link row is not dirty; a typed link makes the form dirty", () => {
+    const seed = createFormSeedState();
+    expect(
+      dirty({ ...seed, links: [{ uid: "new", url: "", label: null }] }),
+    ).toBe(false);
+    expect(
+      dirty({
+        ...seed,
+        links: [{ uid: "new", url: "a.example", label: null }],
+      }),
+    ).toBe(true);
+    expect(
+      dirty({ ...seed, links: [{ uid: "new", url: "", label: "Blog" }] }),
+    ).toBe(true);
+  });
+
+  it("a birthday or a social battery makes the form dirty", () => {
+    const seed = createFormSeedState();
+    expect(dirty({ ...seed, birthdayInput: "1990-05-04" })).toBe(true);
+    expect(dirty({ ...seed, socialBattery: "Drain" })).toBe(true);
+  });
+
+  it("flipping Year unknown with no date set is not dirty (nothing would be stored)", () => {
+    const seed = createFormSeedState();
+    expect(
+      dirty({
+        ...seed,
+        birthdayYearUnknown: true,
+        birthdayYearIsPlaceholder: true,
+      }),
+    ).toBe(false);
+  });
+});

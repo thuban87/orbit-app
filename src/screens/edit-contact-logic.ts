@@ -31,6 +31,10 @@
  */
 
 import {
+  buildBirthdayForStorage,
+  parseBirthdayForForm,
+} from "@/components/birthday-field-logic";
+import {
   type MethodGroups,
   seedMethodGroups,
   toMethodDrafts,
@@ -290,39 +294,13 @@ export function isNeverContacted(result: ContactForEdit): boolean {
   return result.contact.last_contact == null;
 }
 
-/**
- * Split a STORED birthday into the picker's full-date input + the year-unknown
- * flag (RESEARCH Pitfall 7, distinguished by string length). A `MM-DD` (5-char)
- * value is year-unknown; it seeds the picker with a leap-safe placeholder year
- * (2000) so 02-29 round-trips. A `YYYY-MM-DD` value keeps its year. Null → unset.
- */
-export function parseBirthdayForForm(stored: string | null): {
-  birthdayInput: string | null;
-  birthdayYearUnknown: boolean;
-} {
-  if (stored == null || stored.length === 0) {
-    return { birthdayInput: null, birthdayYearUnknown: false };
-  }
-  if (stored.length === 5) {
-    return { birthdayInput: `2000-${stored}`, birthdayYearUnknown: true };
-  }
-  return { birthdayInput: stored.slice(0, 10), birthdayYearUnknown: false };
-}
-
-/**
- * The value written to `contacts.birthday`: `MM-DD` when the year is unknown,
- * `YYYY-MM-DD` when known (Pitfall 7). Null when unset.
- */
-export function buildBirthdayForStorage(
-  birthdayInput: string | null,
-  yearUnknown: boolean,
-): string | null {
-  if (birthdayInput == null || birthdayInput.length === 0) {
-    return null;
-  }
-  const full = birthdayInput.slice(0, 10);
-  return yearUnknown ? full.slice(5) : full;
-}
+// The birthday storage helpers moved to the shared Birthday control's logic
+// (38.11 D-61) so Add Contact can use them without an import cycle; they are
+// re-exported here unchanged for every existing importer.
+export {
+  buildBirthdayForStorage,
+  parseBirthdayForForm,
+} from "@/components/birthday-field-logic";
 
 /**
  * Seed the edit form from `getContactForEdit`: the fixed columns, the toggles

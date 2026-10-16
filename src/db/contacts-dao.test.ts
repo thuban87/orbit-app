@@ -8,7 +8,8 @@
  *     recompute (last_contact = the interaction's occurred_at; source='manual',
  *     direction=null — never outbound);
  *   - `phone` round-trips to `contacts.phone` (the CRUD-01 dropped-phone guard);
- *     email/social_battery/birthday stay create-excluded (edit-only);
+ *   - birthday, social battery and links join the one create transaction
+ *     (38.11 D-48): one bump, full rollback on a link failure;
  *   - the "not yet / don't know" path writes a contact-only row (last_contact
  *     NULL, 0 interactions);
  *   - a create + custom values COMPLETES (does not hang) writing both values
@@ -2207,6 +2208,148 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
       methodNormalization: { effectivePhoneRegion: "US" },
       memories: [{ type: "general", value: "also an enrichment field" }],
     });
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+});
+
+// =============================================================================
+// 38.11 D-48 — Add Contact's birthday, social battery and links are written by
+// the ONE create transaction (ADR-016 composition; one data_revision bump).
+// =============================================================================
+describe("createContactFull — birthday, social battery and links (38.11 D-48)", () => {
+  async function linkRows(): Promise<
+    Array<{
+      contact_id: number;
+      uid: string;
+      url: string;
+      label: string | null;
+      display_order: number;
+    }>
+  > {
+    return exec.getAllAsync(
+      `SELECT contact_id, uid, url, label, display_order
+         FROM contact_links ORDER BY contact_id, display_order`,
+    );
+  }
+
+  it("stores birthday, social battery and two ordered links with exactly one bump", async () => {
+    const before = await readDataRevision(exec);
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Full record",
+      intervalDays: 30,
+      now: NOW,
+      birthday: "1990-05-04",
+      socialBattery: "Charger",
+      links: [
+        { uid: "link-a", url: "https://a.example", label: "Site" },
+        { uid: "link-b", url: "https://b.example", label: null },
+      ],
+    });
+
+    const m = await metadata(contactId);
+    expect(m?.birthday).toBe("1990-05-04");
+    expect(m?.social_battery).toBe("Charger");
+    expect(await linkRows()).toEqual([
+      {
+        contact_id: contactId,
+        uid: "link-a",
+        url: "https://a.example",
+        label: "Site",
+        display_order: 0,
+      },
+      {
+        contact_id: contactId,
+        uid: "link-b",
+        url: "https://b.example",
+        label: null,
+        display_order: 1,
+      },
+    ]);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("stores a year-unknown MM-DD birthday as given", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Leap",
+      intervalDays: 30,
+      now: NOW,
+      birthday: "02-29",
+    });
+    expect((await metadata(contactId))?.birthday).toBe("02-29");
+  });
+
+  it("rolls the whole create back when the second link reuses the first link's uid (UNIQUE)", async () => {
+    const before = await readDataRevision(exec);
+    await expect(
+      createContactFull(exec, {
+        uid: uid(),
+        name: "Doomed links",
+        intervalDays: 30,
+        now: NOW,
+        birthday: "1990-05-04",
+        socialBattery: "Drain",
+        memories: [{ type: "general", value: "rolled back too" }],
+        links: [
+          { uid: "dup-link", url: "https://a.example", label: null },
+          { uid: "dup-link", url: "https://b.example", label: null },
+        ],
+      }),
+    ).rejects.toThrow();
+
+    expect(await contactCount()).toBe(0);
+    expect(await linkRows()).toEqual([]);
+    const memoryRows = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM memories",
+    );
+    expect(memoryRows?.n).toBe(0);
+    expect(await readDataRevision(exec)).toBe(before);
+  });
+
+  it.each(["2021-02-30", "2021-02-29", "13-01", "garbage"])(
+    "rejects an invalid birthday (%s) before any transaction opens",
+    async (bad) => {
+      const before = await readDataRevision(exec);
+      await expect(
+        createContactFull(exec, {
+          uid: uid(),
+          name: "Bad birthday",
+          intervalDays: 30,
+          now: NOW,
+          birthday: bad,
+        }),
+      ).rejects.toThrow(/birthday/);
+      expect(await contactCount()).toBe(0);
+      expect(await readDataRevision(exec)).toBe(before);
+    },
+  );
+
+  it("an existing caller shape with none of the new fields creates as before (NULLs, no links)", async () => {
+    const before = await readDataRevision(exec);
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Legacy shape",
+      intervalDays: 14,
+      now: NOW,
+    });
+    const m = await metadata(contactId);
+    expect(m?.birthday).toBeNull();
+    expect(m?.social_battery).toBeNull();
+    expect(await linkRows()).toEqual([]);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("an empty links array writes no links and still bumps once", async () => {
+    const before = await readDataRevision(exec);
+    await createContactFull(exec, {
+      uid: uid(),
+      name: "No links",
+      intervalDays: 14,
+      now: NOW,
+      links: [],
+    });
+    expect(await linkRows()).toEqual([]);
     expect(await readDataRevision(exec)).toBe(before + 1);
   });
 });

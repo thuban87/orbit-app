@@ -116,6 +116,38 @@ async function addLinkCore(
   return result.lastInsertRowId;
 }
 
+/**
+ * Append several links for one contact, in array order, through `addLinkCore`
+ * (38.11 D-48: Add Contact's links join the single create transaction). A core:
+ * it opens NO transaction and NEVER bumps `data_revision` — the composing
+ * caller (`createContactFullCore`) owns the one BEGIN and the one bump. A
+ * throw on any link (e.g. a UNIQUE uid clash) propagates so the caller's
+ * transaction rolls back every link and the contact together. Returns the new
+ * row ids in input order.
+ */
+export async function addLinksCore(
+  exec: SqlExecutor,
+  params: {
+    contactId: number;
+    links: ReadonlyArray<{ uid: string; url: string; label: string | null }>;
+    now: string;
+  },
+): Promise<number[]> {
+  const ids: number[] = [];
+  for (const link of params.links) {
+    ids.push(
+      await addLinkCore(exec, {
+        uid: link.uid,
+        contactId: params.contactId,
+        url: link.url,
+        label: link.label,
+        now: params.now,
+      }),
+    );
+  }
+  return ids;
+}
+
 /** UPDATE url/label for the matching (id, contact_id) + assertOneChange. */
 async function updateLinkCore(
   exec: SqlExecutor,

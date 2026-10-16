@@ -21,11 +21,13 @@
  * (formatLocalDate, never toISOString).
  */
 
+import { buildBirthdayForStorage } from "@/components/birthday-field-logic";
 import {
   emptyMethodDraft,
   type MethodGroups,
   toMethodDrafts,
 } from "@/components/contact-methods-editor-model";
+import type { LinkDraft } from "@/components/LinksEditor";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {
   isSavableEntry,
@@ -40,6 +42,7 @@ import type {
   CreateRelationshipInput,
 } from "@/db/contacts-dao";
 import { newUid } from "@/db/uid";
+import { buildLinksForDiff } from "./contact-link-drafts";
 
 /** The create form's controlled state (the screen owns the React state). */
 export interface CreateFormState {
@@ -75,7 +78,32 @@ export interface CreateFormState {
   currentLocationDate?: string;
   /** Off Limits drafts — always written as Off Limits (D-11; NEW-1). */
   offLimits?: CreateOffLimitsInput[];
+  /**
+   * 38.11 D-48 — Birthday, Social battery and Links behind Show More, all
+   * OPTIONAL. The birthday is the shared Birthday control's state: the FULL
+   * `YYYY-MM-DD` input (null when unset), the Year unknown flag, and whether
+   * the input's year is only a placeholder (D-61; the control's
+   * `yearIsPlaceholder`). Storage goes through `buildBirthdayForStorage`.
+   */
+  birthdayInput?: string | null;
+  birthdayYearUnknown?: boolean;
+  birthdayYearIsPlaceholder?: boolean;
+  /** Charger / Neutral / Drain, or null for no selection. */
+  socialBattery?: string | null;
+  /** The LinksEditor draft (new rows only — no ids on Add). */
+  links?: LinkDraft[];
 }
+
+/** The social-battery options (D-28 option sheet), shared by Add and Edit. */
+export const SOCIAL_BATTERY_OPTIONS = ["Charger", "Neutral", "Drain"] as const;
+/** The sheet rows: "No selection" = null → stored NULL, then each option. */
+export const SOCIAL_BATTERY_SHEET_OPTIONS: ReadonlyArray<{
+  value: string | null;
+  label: string;
+}> = [
+  { value: null, label: "No selection" },
+  ...SOCIAL_BATTERY_OPTIONS.map((o) => ({ value: o, label: o })),
+];
 
 /** Caller-supplied non-deterministic inputs, so the builder stays pure/testable. */
 export interface BuildCreateInputDeps {
@@ -340,6 +368,21 @@ export function buildCreateInput(
   const offLimits = (state.offLimits ?? []).map(offLimitsContent);
   if (offLimits.length > 0) input.offLimits = offLimits;
 
+  // 38.11 D-48 — written by the same create transaction; each is omitted when
+  // empty so a name-only create stays lean.
+  const birthday = buildBirthdayForStorage(
+    state.birthdayInput ?? null,
+    state.birthdayYearUnknown ?? false,
+  );
+  if (birthday !== null) input.birthday = birthday;
+  if (state.socialBattery != null) input.socialBattery = state.socialBattery;
+  const links = buildLinksForDiff(state.links ?? []).map((link) => ({
+    uid: link.uid,
+    url: link.url,
+    label: link.label,
+  }));
+  if (links.length > 0) input.links = links;
+
   return input;
 }
 
@@ -367,6 +410,11 @@ export type CreateFormSeedState = CreateFormState &
       | "lastTalkedAbout"
       | "currentLocation"
       | "offLimits"
+      | "birthdayInput"
+      | "birthdayYearUnknown"
+      | "birthdayYearIsPlaceholder"
+      | "socialBattery"
+      | "links"
     >
   >;
 
@@ -376,8 +424,9 @@ export type CreateFormSeedState = CreateFormState &
  * new-contact default, D-10) and Last spoke "Not yet", so a name-only save
  * writes a Bound contact with no interaction (D-06). One empty phone row (its
  * uid is generated; the signature ignores it), no email, no custom values, no
- * enrichment drafts. The dirty check compares against this seed, so these
- * defaults are never unsaved work (D-09).
+ * enrichment drafts, and no birthday, social battery or links (38.11 D-48).
+ * The dirty check compares against this seed, so these defaults are never
+ * unsaved work (D-09).
  */
 export function createFormSeedState(): CreateFormSeedState {
   return {
@@ -394,6 +443,11 @@ export function createFormSeedState(): CreateFormSeedState {
     lastTalkedAbout: "",
     currentLocation: "",
     offLimits: [],
+    birthdayInput: null,
+    birthdayYearUnknown: false,
+    birthdayYearIsPlaceholder: false,
+    socialBattery: null,
+    links: [],
   };
 }
 
@@ -416,12 +470,35 @@ function stableStringify(value: unknown): string {
  * A stable signature of the form for the dirty check: method-draft uids are
  * stripped (generated row ids are not user changes) and the asynchronously
  * resolved phone region is not part of `CreateFormState`, so it never counts.
+ *
+ * 38.11 D-48 / D-09: the birthday counts by what it would STORE (so flipping
+ * Year unknown with no date set is not unsaved work), and a link row counts
+ * only once its URL or label holds text (an added, untyped row is not work;
+ * link uids are generated, so they are stripped like method uids).
  */
 export function createFormSeedSignature(state: CreateFormState): string {
   const stripUid = (drafts: MethodGroups["phone"]) =>
     drafts.map(({ uid: _uid, ...rest }) => rest);
+  const {
+    birthdayInput,
+    birthdayYearUnknown,
+    birthdayYearIsPlaceholder: _placeholder,
+    links,
+    ...rest
+  } = state;
   return stableStringify({
-    ...state,
+    ...rest,
+    birthday: buildBirthdayForStorage(
+      birthdayInput ?? null,
+      birthdayYearUnknown ?? false,
+    ),
+    socialBattery: state.socialBattery ?? null,
+    links: (links ?? [])
+      .map((link) => ({
+        url: link.url.trim(),
+        label: link.label?.trim() ?? "",
+      }))
+      .filter((link) => link.url.length > 0 || link.label.length > 0),
     trackingEnabled: state.trackingEnabled ?? true,
     memories: state.memories ?? [],
     relationships: state.relationships ?? [],
