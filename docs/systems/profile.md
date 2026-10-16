@@ -72,8 +72,8 @@ The hero photo is 224 dp (`PROFILE_HERO_AVATAR_SIZE` in `src/screens/contact-pro
 
 Hero Message is decided by `profileHeroActionState(methods, { archived, settingsHosted })` in `src/profile/relationship-sheet-model.ts`, checked in this order:
 
-1. **Archived contact, in any host → disabled** with "Archived contacts can't be messaged." (owner ruling D-09). Messaging an archived contact stays prohibited.
-2. **Profile hosted in the Settings stack → disabled** with "Open this contact from Contacts to send a message." (owner ruling D-25). This covers the archived Profile (Settings → Contacts → Archived → Profile) and a live participant Profile reached inside Settings through a group event.
+1. **Archived contact (in the Bin), in any host → disabled** with "Contacts in the Bin can't be messaged." (owner ruling D-09; wording 38.11 D-69). Messaging an archived contact stays prohibited.
+2. **Profile hosted in the Settings stack → disabled** with "Open this contact from Contacts to send a message." (owner ruling D-25). This covers the archived Profile (Settings → Contacts → Bin → Profile) and a live participant Profile reached inside Settings through a group event.
 3. **No actionable phone or email → disabled** with the existing add-a-method reason.
 
 Message is always rendered — disabled with its reason caption, never hidden. Lifecycle is not an input: a live Unbound contact outside Settings can still open Compose. Call keeps its phone-only rule in every host, and the Contact Methods row's native SMS handoff stays enabled for archived contacts (D-27).
