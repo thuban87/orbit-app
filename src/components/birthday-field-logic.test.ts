@@ -287,6 +287,19 @@ describe("dateRowSeed — where Set birthday / the date trigger opens (W-02)", (
     expect(dateRowSeed(EMPTY_BIRTHDAY_FIELD_STATE, TODAY)).toBe(TODAY);
   });
 
+  // Review IN-07 / D-86: a future stored birthday (import or restore) would
+  // open above the picker's maximumDate, which Android clamps silently.
+  it("clamps a future stored birthday to today, never above the cap (D-86)", () => {
+    expect(dateRowSeed(loadForEdit("2030-05-04"), TODAY)).toBe(TODAY);
+    expect(
+      dateRowSeed(
+        { input: "2030-05-04", yearUnknown: true, yearIsPlaceholder: false },
+        TODAY,
+      ),
+    ).toBe(TODAY);
+    expect(dateRowSeed(loadForEdit(TODAY), TODAY)).toBe(TODAY);
+  });
+
   it("on Add with Year unknown on, 25 December and 29 February are pickable under the today cap", () => {
     const seed = dateRowSeed(
       { input: null, yearUnknown: true, yearIsPlaceholder: false },

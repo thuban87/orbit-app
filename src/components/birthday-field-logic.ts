@@ -176,14 +176,17 @@ export function yearOffSeed(
  * must open where every month/day is reachable: Year unknown with no input
  * opens on 2000 plus today's month/day (a leap year, so 29 February is
  * pickable); Year unknown with an input opens on it (already a 2000
- * placeholder, or the kept real date); otherwise the input, or today.
+ * placeholder, or the kept real date); otherwise the input, or today. A
+ * future stored date (import or restore) opens on today instead, never above
+ * the D-86 cap (review IN-07). `YYYY-MM-DD` strings compare chronologically.
  */
 export function dateRowSeed(
   state: BirthdayFieldState,
   todayLocal: string,
 ): string {
   if (state.input != null && state.input.length >= 10) {
-    return state.input.slice(0, 10);
+    const input = state.input.slice(0, 10);
+    return input > todayLocal ? todayLocal : input;
   }
   return state.yearUnknown ? `2000-${todayLocal.slice(5, 10)}` : todayLocal;
 }
