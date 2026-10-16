@@ -15,6 +15,7 @@ import {
   assignContactBackground,
   type ContactBackgroundWriter,
   isContactBackground,
+  resetContactBackground,
   resolveBackgroundListState,
   shouldResetBackgroundManagerViewOnOpen,
 } from "@/profile/background-manager-model";
@@ -53,7 +54,8 @@ export interface ProfileBackgroundManagerProps {
  * saved-background card's Assign applies it to this person at once with a
  * confirming snackbar (RESEARCH A2, "this plan only"); the card in use is
  * marked selected. Choose photo stays (D-79): after the new background is
- * named the sheet offers only Use for {name} and Not now.
+ * named the sheet offers only Use for {name} and Not now. "Reset to default"
+ * (D-65) clears this person's own background, at once with Undo.
  *
  * Picker bytes are copied into the app-owned namespace before a template row
  * references them; Cancel and failure never mutate the previously committed
@@ -142,6 +144,24 @@ export function ProfileBackgroundManager({
     [contactName, writer],
   );
 
+  // Reset to default (38.11 D-65, background half): clears only this
+  // person's own background, at once with Undo (38.9 D-30). The previous uid
+  // is captured before the write. The snackbar "Background reset to default"
+  // carries Undo, which re-assigns it through the same contact-scoped writer
+  // and then shows "Background restored" (copy and logic in
+  // `resetContactBackground`). Layout and open/closed sections stay (ADR-108).
+  const resetToDefault = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await resetContactBackground(writer, {
+        previousUid: contactBackgroundTemplateUid,
+      });
+    } finally {
+      busyRef.current = false;
+    }
+  };
+
   // The Settings page manages global and Category backgrounds and Delete
   // (38.11 D-58.2); it is registered in every stack that hosts a Profile.
   const manageGlobalBackgrounds = () => {
@@ -157,6 +177,7 @@ export function ProfileBackgroundManager({
   // The shared themed discard prompt (D-13, D-52), via the flow's guarded exit.
   const closeOrGuard = () => flow.requestCancel(onRequestClose);
 
+  const hasContactBackground = contactBackgroundTemplateUid !== null;
   const selected =
     templates.find((template) => template.uid === selectedUid) ?? null;
   const listState = resolveBackgroundListState({
@@ -170,8 +191,16 @@ export function ProfileBackgroundManager({
       <View style={styles.root} accessibilityViewIsModal>
         {flow.step !== "crop" ? (
           <View style={styles.heading}>
-            <AppText role="heading">Profile backgrounds</AppText>
-            <Button role="secondary" label="Back" onPress={closeOrGuard} />
+            {/* The 38.9 header Back (38.11 D-43): icon-only chevron, 44dp. */}
+            <Button
+              role="iconOnly"
+              icon="back"
+              accessibilityLabel="Back"
+              onPress={closeOrGuard}
+            />
+            <AppText role="heading" style={styles.headingTitle}>
+              Profile backgrounds
+            </AppText>
           </View>
         ) : null}
         {flow.step !== "crop" && managerState.error ? (
@@ -192,6 +221,14 @@ export function ProfileBackgroundManager({
               label="Choose photo"
               onPress={() => void flow.chooseImage()}
             />
+            {hasContactBackground ? (
+              <Button
+                role="secondary"
+                label="Reset to default"
+                accessibilityLabel={`Reset ${contactName}'s background to default`}
+                onPress={() => void resetToDefault()}
+              />
+            ) : null}
             <Button
               role="secondary"
               label="Manage global backgrounds"
@@ -287,9 +324,9 @@ const styles = StyleSheet.create({
   heading: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between",
     gap: SPACING.sm,
   },
+  headingTitle: { flex: 1 },
   content: { gap: SPACING.sm, paddingBottom: SPACING.xl },
   card: { padding: SPACING.sm },
   // The row lives on the surface's content wrapper: GlassSurface lays its

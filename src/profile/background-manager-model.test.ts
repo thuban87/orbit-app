@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SnackbarMessage } from "@/stores/snackbar-store";
 import {
   assignContactBackground,
+  BACKGROUND_RESET_LABEL,
+  BACKGROUND_RESTORE_ERROR,
+  BACKGROUND_RESTORED_LABEL,
   BACKGROUND_SAVE_ERROR,
   backgroundSetLabel,
   beginBackgroundPreparation,
@@ -10,6 +14,7 @@ import {
   finishBackgroundPreparation,
   isContactBackground,
   requestBackgroundManagerDismissal,
+  resetContactBackground,
   resolveBackgroundListState,
   retryBackgroundPreparation,
   shouldResetBackgroundManagerViewOnOpen,
@@ -201,5 +206,96 @@ describe("background manager model", () => {
       kind: "error",
       label: BACKGROUND_SAVE_ERROR,
     });
+  });
+
+  /** A writer that records every call, for the reset and Undo cases. */
+  function recordingWriter(
+    failOn: (uid: string | null) => boolean = () => false,
+  ) {
+    const events: string[] = [];
+    const messages: SnackbarMessage[] = [];
+    return {
+      events,
+      messages,
+      writer: {
+        write: async (uid: string | null) => {
+          events.push(`write:${uid}`);
+          if (failOn(uid)) throw new Error("transaction failed");
+        },
+        onCommitted: () => events.push("committed"),
+        notify: (message: SnackbarMessage) => {
+          messages.push(message);
+          events.push(`${message.kind}:${message.label}`);
+        },
+        logError: (message: string) => events.push(`log:${message}`),
+      },
+    };
+  }
+
+  /** Lets the Undo's fire-and-forget write settle. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("Reset to default clears only this person's background, at once with Undo (38.11 D-65; 38.9 D-30)", async () => {
+    const { events, messages, writer } = recordingWriter();
+    expect(await resetContactBackground(writer, { previousUid: "bg-1" })).toBe(
+      true,
+    );
+    expect(events).toEqual([
+      "write:null",
+      "committed",
+      `warning:${BACKGROUND_RESET_LABEL}`,
+    ]);
+    expect(BACKGROUND_RESET_LABEL).toBe("Background reset to default");
+    const undo = messages[0]?.action;
+    expect(undo?.label).toBe("Undo");
+    expect(undo?.accessibilityLabel).toBe("Undo background reset");
+
+    // Undo re-assigns the captured previous background, reloads, then confirms (38.9 D-39).
+    undo?.onPress();
+    await settle();
+    expect(events.slice(3)).toEqual([
+      "write:bg-1",
+      "committed",
+      `success:${BACKGROUND_RESTORED_LABEL}`,
+    ]);
+    expect(BACKGROUND_RESTORED_LABEL).toBe("Background restored");
+  });
+
+  it("a failed Undo shows the restore error and does not reload", async () => {
+    const { events, messages, writer } = recordingWriter(
+      (uid) => uid === "bg-1",
+    );
+    await resetContactBackground(writer, { previousUid: "bg-1" });
+    messages[0]?.action?.onPress();
+    await settle();
+    expect(events.slice(3)).toEqual([
+      "write:bg-1",
+      "log:background reset undo failed",
+      `error:${BACKGROUND_RESTORE_ERROR}`,
+    ]);
+    expect(BACKGROUND_RESTORE_ERROR).toBe(
+      "Couldn't restore the background. Try again.",
+    );
+  });
+
+  it("a failed reset shows an error snackbar with no Undo and does not reload", async () => {
+    const { events, messages, writer } = recordingWriter((uid) => uid === null);
+    expect(await resetContactBackground(writer, { previousUid: "bg-1" })).toBe(
+      false,
+    );
+    expect(events).toEqual([
+      "write:null",
+      "log:background reset failed",
+      `error:${BACKGROUND_SAVE_ERROR}`,
+    ]);
+    expect(messages[0]?.action).toBeUndefined();
+  });
+
+  it("does nothing when the person has no background of their own", async () => {
+    const { events, writer } = recordingWriter();
+    expect(await resetContactBackground(writer, { previousUid: null })).toBe(
+      false,
+    );
+    expect(events).toEqual([]);
   });
 });

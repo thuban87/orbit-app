@@ -192,3 +192,58 @@ export async function assignContactBackground(
   });
   return true;
 }
+
+export const BACKGROUND_RESET_LABEL = "Background reset to default";
+export const BACKGROUND_RESTORED_LABEL = "Background restored";
+export const BACKGROUND_RESTORE_ERROR =
+  "Couldn't restore the background. Try again.";
+
+/**
+ * Reset to default in the Profile's Background sheet (38.11 D-65, background
+ * half): clears only this person's own background, so they fall back to their
+ * Category, global or theme background. Their layout and open/closed sections
+ * are untouched (presentation-only, ADR-108). The background stays in the
+ * library, so it is reversible: it acts at once and the snackbar carries Undo
+ * (38.9 D-30). Undo writes `previousUid` back through the same contact-scoped
+ * `write`, reloads, and confirms with its own snackbar (38.9 D-39); an Undo
+ * failure shows an error snackbar. A reset failure shows an error snackbar
+ * with no Undo. The Undo closure holds only `writer` and `previousUid`, so it
+ * still works after the sheet closes. Resolves true when the reset was written.
+ */
+export async function resetContactBackground(
+  writer: ContactBackgroundWriter,
+  input: { previousUid: string | null },
+): Promise<boolean> {
+  const { previousUid } = input;
+  if (previousUid === null) return false;
+  try {
+    await writer.write(null);
+  } catch (error) {
+    writer.logError("background reset failed", error);
+    writer.notify({ kind: "error", label: BACKGROUND_SAVE_ERROR });
+    return false;
+  }
+  writer.onCommitted?.();
+  writer.notify({
+    kind: "warning",
+    label: BACKGROUND_RESET_LABEL,
+    action: {
+      label: "Undo",
+      accessibilityLabel: "Undo background reset",
+      onPress: () => {
+        void (async () => {
+          try {
+            await writer.write(previousUid);
+          } catch (error) {
+            writer.logError("background reset undo failed", error);
+            writer.notify({ kind: "error", label: BACKGROUND_RESTORE_ERROR });
+            return;
+          }
+          writer.onCommitted?.();
+          writer.notify({ kind: "success", label: BACKGROUND_RESTORED_LABEL });
+        })();
+      },
+    },
+  });
+  return true;
+}

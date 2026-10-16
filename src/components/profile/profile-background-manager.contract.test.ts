@@ -10,6 +10,7 @@ const MANAGER = "ProfileBackgroundManager.tsx";
 // 38.11 D-58.1, D-79: the crop workspace moved into the shared create flow.
 const CREATE_FLOW = "ProfileBackgroundCreateFlow.tsx";
 const SETTINGS_PAGE = "../../screens/ProfileBackgroundsScreen.tsx";
+const MODEL = "../../profile/background-manager-model.ts";
 
 describe("ProfileBackgroundManager crop workspace contract", () => {
   it("uses the measured crop workspace for the contained source and full gesture surface", () => {
@@ -111,6 +112,54 @@ describe("ProfileBackgroundManager crop workspace contract", () => {
     expect(created).toContain("label={`Use for ${contactName}`}");
     expect(created).toContain('label="Not now"');
     expect(created.match(/<Button\b/g)).toHaveLength(2);
+  });
+
+  it("Reset to default clears only this person's background, with Undo through the same writer (38.11 D-65; 38.9 D-30, D-39; review U-06)", () => {
+    const manager = collapse(read(MANAGER));
+    const model = collapse(read(MODEL));
+
+    // Shown only when the person has their own background.
+    expect(manager).toContain(
+      "const hasContactBackground = contactBackgroundTemplateUid !== null",
+    );
+    expect(manager).toMatch(
+      /\{hasContactBackground \? \( <Button role="secondary" label="Reset to default"/,
+    );
+    // The previous uid is captured from the prop before the write.
+    expect(manager).toContain(
+      "await resetContactBackground(writer, { previousUid: contactBackgroundTemplateUid, })",
+    );
+    // The writer is contact-scoped: assignContactBackgroundTemplate for this
+    // contact only, so Undo re-assigns the captured uid through it.
+    expect(manager).toContain(
+      "write: (templateUid) => assignContactBackgroundTemplate(getExecutor(), { contactId, templateUid,",
+    );
+    expect(manager).not.toContain("resetProfilePresentation");
+    // The snackbar carries Undo, which writes previousUid back, then "Background restored".
+    expect(model).toContain("await writer.write(null)");
+    expect(model).toContain(
+      'label: BACKGROUND_RESET_LABEL, action: { label: "Undo"',
+    );
+    expect(model).toContain("await writer.write(previousUid)");
+    expect(model).toContain(
+      'export const BACKGROUND_RESET_LABEL = "Background reset to default"',
+    );
+    expect(model).toContain(
+      'export const BACKGROUND_RESTORED_LABEL = "Background restored"',
+    );
+    // The old inherit actions are gone; Reset replaces them.
+    expect(manager).not.toMatch(/Use inherited background|Inherit Category/);
+  });
+
+  it("the sheet header Back is the icon-only chevron before the heading, guarded (D-43)", () => {
+    const manager = collapse(read(MANAGER));
+    expect(manager).not.toMatch(/\blabel="Back"/);
+    const back = manager.indexOf(
+      '<Button role="iconOnly" icon="back" accessibilityLabel="Back" onPress={closeOrGuard} />',
+    );
+    const title = manager.indexOf("Profile backgrounds </AppText>");
+    expect(back).toBeGreaterThan(-1);
+    expect(title).toBeGreaterThan(back);
   });
 
   it("returns a clean reopened manager to the list before exposing assignment controls", () => {
