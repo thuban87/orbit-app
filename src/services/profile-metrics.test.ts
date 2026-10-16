@@ -101,6 +101,26 @@ describe("Profile Overview metric models", () => {
     expect(status).not.toHaveProperty("factors");
   });
 
+  // 38.11 D-87 (review WR-03): a Rarely Responds contact's last_contact
+  // counts only connected interactions, so it may have logged ones already.
+  it("gives a Bound Rarely Responds contact with no connected interaction its own line (D-87)", () => {
+    expect(resolveProfileStatus({ ...STATUS_BASE, rarelyResponds: 1 })).toEqual(
+      {
+        available: false,
+        label: "Never Contacted",
+        context:
+          "Orbit Status starts after your first interaction that connects.",
+        reason: "not-contacted",
+      },
+    );
+  });
+
+  it("keeps the logged-interaction line for everyone else (D-87)", () => {
+    expect(
+      resolveProfileStatus({ ...STATUS_BASE, rarelyResponds: 0 }).context,
+    ).toBe("Orbit Status starts after your first logged interaction.");
+  });
+
   it("gives an Unbound contact with a frequency an Unbound reason, not a set-frequency ask (D-24)", () => {
     const status = resolveProfileStatus({
       ...STATUS_BASE,

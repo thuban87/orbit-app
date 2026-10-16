@@ -78,6 +78,13 @@ export const STATUS_CONTEXT_UNBOUND_NO_FREQUENCY =
 /** Bound with a frequency and no interaction yet (D-05). */
 export const STATUS_CONTEXT_NOT_CONTACTED =
   "Orbit Status starts after your first logged interaction.";
+/**
+ * Bound, a frequency, Rarely Responds and no connected interaction (38.11
+ * D-87). Its `last_contact` counts only interactions that connected
+ * (`recency-dao`), so logged ones may already exist.
+ */
+export const STATUS_CONTEXT_NOT_CONTACTED_RARELY_RESPONDS =
+  "Orbit Status starts after your first interaction that connects.";
 
 export type ProfileStatusMetric =
   | {
@@ -236,7 +243,10 @@ function unavailableProfileStatus(
     return {
       available: false,
       label: NEVER_CONTACTED,
-      context: STATUS_CONTEXT_NOT_CONTACTED,
+      context:
+        input.rarelyResponds === 1
+          ? STATUS_CONTEXT_NOT_CONTACTED_RARELY_RESPONDS
+          : STATUS_CONTEXT_NOT_CONTACTED,
       reason: "not-contacted",
     };
   }
