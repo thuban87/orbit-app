@@ -1630,12 +1630,12 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Dossier size estimate**: about 9–13½ plans by area (38.11 D-76; the owner kept everything in this phase).
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–10 plans — rough estimate from finding titles plus the triage's per-area ranges; recurring-problem sweeps and recorded-decision reversals are not counted.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13).
-**Plans**: 14 plans in 7 waves (planned 2026-10-16)
+**Plans**: 1/14 plans executed in 7 waves (planned 2026-10-16)
 
 Plans:
 **Wave 1**
 
-- [ ] 38.11-01-PLAN.md — New-contact defaults (Bound, Monthly, Not yet), form fixes, Edit save returns to its Profile (W1)
+- [x] 38.11-01-PLAN.md — New-contact defaults (Bound, Monthly, Not yet), form fixes, Edit save returns to its Profile (W1)
 - [ ] 38.11-02-PLAN.md — Update Contact retired and archived, Memory off the +, + clearance, history placeholder (W1)
 - [ ] 38.11-03-PLAN.md — Never Contacted status, honest reasons, stat explanations, Custom... frequency (W1)
 
@@ -1798,7 +1798,7 @@ Plans:
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
-| 38.11 Everyday Screens UX | 0/TBD | Not started | - |
+| 38.11 Everyday Screens UX | 1/14 | In Progress|  |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
