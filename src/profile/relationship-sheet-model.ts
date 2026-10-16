@@ -4,6 +4,7 @@ import {
 } from "@/components/frequency-picker-logic";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
+import type { SnoozePreset } from "@/db/snooze-dao";
 import { GRAVITY_TIERS } from "@/services/impact";
 import type {
   ProfileGravityMetric,
@@ -11,7 +12,11 @@ import type {
   ProfileStatusMetric,
 } from "@/services/profile-metrics";
 import { FREQUENCY_DAYS } from "@/types";
-import { formatDateTimeMinuteOrFallback, formatLocalDate } from "@/utils/dates";
+import {
+  formatDateTimeMinuteOrFallback,
+  formatDisplayDateOrFallback,
+  formatLocalDate,
+} from "@/utils/dates";
 import { plural } from "@/utils/plural";
 
 export type RelationshipExplanation = {
@@ -221,6 +226,47 @@ export function validateCustomSnoozeDate(
     }
   }
   return { valid: false, error: "Choose a future date." };
+}
+
+/**
+ * The custom snooze date's default and earliest pickable value (38.11 D-37):
+ * tomorrow, the first date `validateCustomSnoozeDate` accepts. Local date
+ * parts only, never a UTC slice; `Date` rolls the month and year over.
+ */
+export function snoozeCustomDateDefault(todayLocal: string): string {
+  const [year, month, day] = todayLocal.slice(0, 10).split("-").map(Number);
+  return formatLocalDate(new Date(year, month - 1, day + 1));
+}
+
+/** What a single-contact snooze operation did (38.11 review V-03). */
+export type SnoozeOutcome =
+  | { kind: "preset"; preset: SnoozePreset }
+  | { kind: "until"; until: string }
+  | { kind: "unsnooze" };
+
+/**
+ * The single-contact snooze confirmation (38.9 D-39 feedback rule, D-46 copy:
+ * verb first, then whom). A preset's end date is resolved in SQLite, so the
+ * copy names the preset; Choose date names the date. Draft copy, "this plan
+ * only" (38.11-10); the owner sees it at the 38.11-14 snooze checkpoint.
+ */
+export function snoozeConfirmationLabel(
+  name: string,
+  outcome: SnoozeOutcome,
+): string {
+  if (outcome.kind === "unsnooze") return `Unsnoozed ${name}`;
+  if (outcome.kind === "until") {
+    return `Snoozed ${name} until ${formatDisplayDateOrFallback(outcome.until)}`;
+  }
+  const choice = SNOOZE_CHOICES.find(
+    (entry) => entry.kind === "preset" && entry.preset === outcome.preset,
+  );
+  return `Snoozed ${name} for ${choice?.label ?? outcome.preset}`;
+}
+
+/** Undo's confirmation after a single-contact snooze change (draft copy). */
+export function snoozeUndoneLabel(name: string): string {
+  return `Snooze undone for ${name}`;
 }
 
 export interface RelationshipSheetState<T> {

@@ -1,7 +1,4 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import { useEffect, useRef, useState } from "react";
 import {
   Pressable,
@@ -20,125 +17,102 @@ import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
 import { Sheet } from "@/components/ui/Sheet";
 import type { ProfileSnapshot } from "@/db/profile-read";
-import type { SnoozePreset } from "@/db/snooze-dao";
 import {
   CUSTOM_FREQUENCY_LABEL,
   customFrequencyApplyState,
   FREQUENCY_CHOICES,
   frequencySheetSelection,
+  type RelationshipSheetAction,
   type RelationshipSheetState,
   relationshipExplanation,
   relationshipSheetReducer,
-  SNOOZE_CHOICES,
-  validateCustomSnoozeDate,
 } from "@/profile/relationship-sheet-model";
 import {
   createRelationshipSheetRunner,
-  type RelationshipSelector,
-  type RelationshipSelectorValues,
   type RelationshipSheetRunner,
 } from "@/profile/relationship-sheet-runner";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { formatLocalDate } from "@/utils/dates";
 import type { RelationshipSheetId } from "./RelationshipOverview";
 
-type Operation = () => Promise<void>;
-type SelectorState<O extends RelationshipSelector> = RelationshipSheetState<
-  RelationshipSelectorValues[O]
->;
-type SelectorStates = { [O in RelationshipSelector]: SelectorState<O> };
+type FrequencyState = RelationshipSheetState<number | null>;
 
 function idleSelector<T>(value: T): RelationshipSheetState<T> {
   return { committed: value, draft: value, pending: false, error: null };
 }
 
+/**
+ * The Overview's Contact Frequency sheet and the stat explanations. The Snooze
+ * tile opens the shared `SnoozeSheet` instead (38.11 D-45, 38.11-10), hosted
+ * beside this component in `ProfileModuleHost`.
+ */
 export function ProfileRelationshipSheets({
   active,
   snapshot,
-  todayLocal,
   onClose,
   onOpenHistory,
   onOpenInsights,
   onSetFrequency,
-  onSnooze,
-  onUnsnooze,
 }: {
   active: RelationshipSheetId | null;
   snapshot: ProfileSnapshot;
-  todayLocal: string;
   onClose: () => void;
   onOpenHistory?: () => void;
   onOpenInsights?: () => void;
   onSetFrequency: (days: number) => Promise<void>;
-  onSnooze: (
-    request: { preset: SnoozePreset } | { until: string },
-  ) => Promise<void>;
-  onUnsnooze: () => Promise<void>;
 }) {
   const { colors } = useTheme();
   const [frequency, setFrequency] = useState(() =>
     idleSelector(snapshot.identity.intervalDays),
   );
-  const [snooze, setSnooze] = useState(() =>
-    idleSelector(snapshot.identity.snoozeUntil),
-  );
-  const [customDate, setCustomDate] = useState(todayLocal);
-  const [customOpen, setCustomOpen] = useState(false);
   // 38.11 D-54: the Frequency sheet's Custom… days box. Touched is set on the
   // first typing so the error shows only after the user types (D-36).
   const [customDaysOpen, setCustomDaysOpen] = useState(false);
   const [customDaysRaw, setCustomDaysRaw] = useState("");
   const [customDaysTouched, setCustomDaysTouched] = useState(false);
 
-  // Synchronous mirror of both selector states, so the runner's pending checks
-  // never read a stale render. Every selector state change goes through
-  // `applySelector`, which updates the mirror and the rendered state together.
-  const selectors = useRef<SelectorStates>({ frequency, snooze });
-  const applySelector = <O extends RelationshipSelector>(
-    owner: O,
-    update: (state: SelectorState<O>) => SelectorState<O>,
+  // Synchronous mirror of the selector state, so the runner's pending checks
+  // never read a stale render. Every state change goes through
+  // `applyFrequency`, which updates the mirror and the rendered state together.
+  const frequencyRef = useRef<FrequencyState>(frequency);
+  const applyFrequency = (
+    update: (state: FrequencyState) => FrequencyState,
   ) => {
-    const next = update(selectors.current[owner]);
-    selectors.current = { ...selectors.current, [owner]: next };
-    if (owner === "frequency") {
-      setFrequency(next as SelectorStates["frequency"]);
-    } else {
-      setSnooze(next as SelectorStates["snooze"]);
-    }
+    const next = update(frequencyRef.current);
+    frequencyRef.current = next;
+    setFrequency(next);
   };
   const latestOnClose = useRef(onClose);
   latestOnClose.current = onClose;
 
-  // 38.3 RG-025 (D-24): saveFrequency, saveSnooze and Retry all settle through
-  // one owner-scoped runner — a Retry settles only the selector that failed.
+  // 38.3 RG-025 (D-24): saveFrequency and Retry settle through the shared
+  // runner. Only the "frequency" owner is submitted here; the snooze selector
+  // settles inside `SnoozeSheet` (38.11-10).
   const runnerRef = useRef<RelationshipSheetRunner | null>(null);
   if (runnerRef.current === null) {
     runnerRef.current = createRelationshipSheetRunner({
-      dispatch: (owner, action) =>
-        applySelector(owner, (state) =>
-          relationshipSheetReducer(state, action),
+      dispatch: (_owner, action) =>
+        applyFrequency((state) =>
+          relationshipSheetReducer(
+            state,
+            action as RelationshipSheetAction<number | null>,
+          ),
         ),
-      isPending: (owner) => selectors.current[owner].pending,
+      isPending: () => frequencyRef.current.pending,
       onClose: () => latestOnClose.current(),
     });
   }
   const runner = runnerRef.current;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: applySelector only writes the mirror + state setters; the effect is keyed on the snapshot values.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: applyFrequency only writes the mirror + state setter; the effect is keyed on the snapshot value.
   useEffect(() => {
-    applySelector("frequency", (state) => ({
+    applyFrequency((state) => ({
       ...state,
       committed: snapshot.identity.intervalDays,
       draft: snapshot.identity.intervalDays,
     }));
-    applySelector("snooze", (state) => ({
-      ...state,
-      committed: snapshot.identity.snoozeUntil,
-      draft: snapshot.identity.snoozeUntil,
-    }));
-  }, [snapshot.identity.intervalDays, snapshot.identity.snoozeUntil]);
+  }, [snapshot.identity.intervalDays]);
 
   // A fresh sheet starts with the Custom… box closed (it reopens prefilled).
   useEffect(() => {
@@ -149,20 +123,11 @@ export function ProfileRelationshipSheets({
   }, [active]);
 
   const close = () => {
-    if (
-      selectors.current.frequency.pending ||
-      selectors.current.snooze.pending
-    ) {
-      return;
-    }
-    applySelector("frequency", (state) =>
-      relationshipSheetReducer(state, { type: "dismiss" }),
-    );
-    applySelector("snooze", (state) =>
+    if (frequencyRef.current.pending) return;
+    applyFrequency((state) =>
       relationshipSheetReducer(state, { type: "dismiss" }),
     );
     runner.clear();
-    setCustomOpen(false);
     onClose();
   };
 
@@ -184,9 +149,6 @@ export function ProfileRelationshipSheets({
     setCustomDaysTouched(false);
     setCustomDaysOpen(true);
   };
-
-  const saveSnooze = (operation: Operation, draft: string | null) =>
-    runner.submit("snooze", draft, operation);
 
   const explanation =
     active === "status"
@@ -378,79 +340,7 @@ export function ProfileRelationshipSheets({
             ) : null}
           </>
         ) : null}
-        {active === "snooze" ? (
-          <>
-            <AppText role="heading" accessibilityRole="header">
-              Snooze
-            </AppText>
-            {SNOOZE_CHOICES.map((choice) => (
-              <Pressable
-                key={choice.kind === "preset" ? choice.preset : choice.kind}
-                accessibilityRole="button"
-                accessibilityLabel={choice.accessibilityLabel}
-                accessibilityState={{ disabled: snooze.pending }}
-                disabled={snooze.pending}
-                onPress={() => {
-                  if (choice.kind === "preset") {
-                    void saveSnooze(
-                      () => onSnooze({ preset: choice.preset }),
-                      choice.preset,
-                    );
-                  } else {
-                    setCustomOpen(true);
-                  }
-                }}
-                style={[styles.choice, { borderColor: colors.border }]}
-              >
-                <AppText role="body">{choice.label}</AppText>
-              </Pressable>
-            ))}
-            {customOpen ? (
-              <>
-                <DateTimePicker
-                  value={new Date(`${customDate}T12:00:00`)}
-                  minimumDate={new Date(`${todayLocal}T12:00:00`)}
-                  onChange={(event: DateTimePickerEvent, date?: Date) => {
-                    if (event.type === "set" && date) {
-                      setCustomDate(formatLocalDate(date));
-                    }
-                  }}
-                />
-                <Button
-                  role="primary"
-                  label="Set snooze"
-                  disabled={
-                    !validateCustomSnoozeDate(customDate, todayLocal).valid ||
-                    snooze.pending
-                  }
-                  onPress={() =>
-                    void saveSnooze(
-                      () => onSnooze({ until: customDate }),
-                      customDate,
-                    )
-                  }
-                />
-                <Button
-                  role="tertiary"
-                  label="Cancel snooze"
-                  onPress={() => setCustomOpen(false)}
-                />
-              </>
-            ) : null}
-            {snapshot.identity.snoozeUntil ? (
-              <Button
-                role="secondary"
-                label="Unsnooze"
-                disabled={snooze.pending}
-                onPress={() => void saveSnooze(onUnsnooze, null)}
-              />
-            ) : null}
-            {snooze.error ? (
-              <AppText role="caption">{snooze.error}</AppText>
-            ) : null}
-          </>
-        ) : null}
-        {(frequency.error || snooze.error) && runner.canRetry() ? (
+        {frequency.error && runner.canRetry() ? (
           <Button
             role="secondary"
             label="Retry"

@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { HistorySection } from "@/components/history/HistorySection";
 import { Icon } from "@/components/icons/Icon";
+import { SnoozeSheet } from "@/components/SnoozeSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -42,6 +43,7 @@ import type {
 } from "@/profile/persisted-contract";
 import type { ProfilePresentation } from "@/profile/types";
 import { SPACING } from "@/theme/tokens/spacing";
+import { isSnoozed } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { BirthdaySheet } from "./BirthdaySheet";
 import { ProfileRelationshipSheets } from "./ProfileRelationshipSheets";
@@ -291,6 +293,12 @@ export function ProfileModuleHost({
     [presentation.layout.document.thingsToRemember],
   );
   const closeRelationshipSheet = () => setActiveSheet(null);
+  // 38.11 D-45 (review W-01): the shared snooze sheet gets the EFFECTIVE end —
+  // an expired `snooze_until` reads as not snoozed.
+  const rawSnoozeUntil = snapshot.identity.snoozeUntil ?? null;
+  const effectiveSnoozeUntil = isSnoozed(rawSnoozeUntil, todayLocal)
+    ? rawSnoozeUntil
+    : null;
 
   // 38.3 RG-021 (D-10, D-11, D-28): Last Interaction and Status → View history
   // reveal the in-Profile History section. Offered only when the layout shows
@@ -619,16 +627,38 @@ export function ProfileModuleHost({
         );
       })}
       <ProfileRelationshipSheets
-        // The Birthday tile opens its own sheet (38.11 D-56), below.
-        active={activeSheet === "birthday" ? null : activeSheet}
+        // The Birthday and Snooze tiles open their own sheets (38.11 D-56,
+        // D-45), below.
+        active={
+          activeSheet === "birthday" || activeSheet === "snooze"
+            ? null
+            : activeSheet
+        }
         snapshot={snapshot}
-        todayLocal={todayLocal}
         onClose={closeRelationshipSheet}
         onOpenHistory={openHistory}
         onOpenInsights={onOpenInsights ? openInsights : undefined}
         onSetFrequency={onSetFrequency}
-        onSnooze={onSnooze}
+      />
+      <SnoozeSheet
+        // 38.11 D-45 (review T-06): the Overview tile's sheet stays hosted
+        // here; the ⋯ "Snooze…" entry renders the same component from the
+        // screen, wired to the same onSnooze / onUnsnooze.
+        visible={activeSheet === "snooze"}
+        title={`Snooze ${snapshot.identity.name}`}
+        snoozedUntil={effectiveSnoozeUntil}
+        showUnsnooze={effectiveSnoozeUntil !== null}
+        todayLocal={todayLocal}
+        onPreset={(preset) => onSnooze({ preset })}
+        onUntil={(until) => onSnooze({ until })}
         onUnsnooze={onUnsnooze}
+        confirmName={snapshot.identity.name}
+        onRestore={(previousUntil) =>
+          previousUntil === null
+            ? onUnsnooze()
+            : onSnooze({ until: previousUntil })
+        }
+        onClose={closeRelationshipSheet}
       />
       <BirthdaySheet
         visible={activeSheet === "birthday"}

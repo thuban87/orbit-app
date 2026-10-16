@@ -22,6 +22,7 @@ import { ProfileModuleHost } from "@/components/profile/ProfileModuleHost";
 import { ProfileTemplateManager } from "@/components/profile/ProfileTemplateManager";
 import type { KnowledgeActionIntent } from "@/components/profile/ThingsToRemember";
 import { ReachOutRouter } from "@/components/ReachOutRouter";
+import { SnoozeSheet } from "@/components/SnoozeSheet";
 import { AppText } from "@/components/ui/AppText";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
 import { Button } from "@/components/ui/Button";
@@ -869,7 +870,6 @@ export function ContactProfileScreen({
               <View style={styles.menu}>
                 <AppText role="heading">Profile actions</AppText>
                 {profileOverflowEntries({
-                  snoozed,
                   bound: lifecycle.kind === "bound",
                   hasFreeformLayout: freeformLayout !== null,
                   hasContactPresentationOverride,
@@ -887,8 +887,8 @@ export function ContactProfileScreen({
                   }
                   const labels = {
                     edit: "Edit Contact",
-                    snooze: "Snooze",
-                    unsnooze: "Unsnooze",
+                    // 38.11 D-64: one entry; Unsnooze lives in the sheet.
+                    snooze: "Snooze…",
                     unbind: "Unbind contact",
                     archive: "Archive",
                     layout: "Profile Layout",
@@ -904,9 +904,6 @@ export function ContactProfileScreen({
                         return;
                       case "snooze":
                         setOverlay("snooze");
-                        return;
-                      case "unsnooze":
-                        void unsnooze().then(closeOverlay);
                         return;
                       case "unbind": {
                         const confirmation = unbindConfirmation(
@@ -967,27 +964,24 @@ export function ContactProfileScreen({
                 })}
               </View>
             </Sheet>
-            <Sheet
+            <SnoozeSheet
+              // 38.11 D-45, D-64 (review T-06, X-01): the ⋯ "Snooze…" entry
+              // opens the same sheet as the Overview tile, wired to the same
+              // snooze / unsnooze callbacks; Undo maps onto them too.
               visible={overlay === "snooze"}
-              onRequestClose={closeOverlay}
-              variant="compact"
-            >
-              <View style={styles.menu}>
-                <AppText role="heading">Snooze reminders</AppText>
-                {(["3d", "1w", "1m"] as const).map((preset) => (
-                  <Button
-                    key={preset}
-                    role="secondary"
-                    label={
-                      { "3d": "3 days", "1w": "1 week", "1m": "1 month" }[
-                        preset
-                      ]
-                    }
-                    onPress={() => void snooze({ preset }).then(closeOverlay)}
-                  />
-                ))}
-              </View>
-            </Sheet>
+              title={`Snooze ${snapshot.identity.name}`}
+              snoozedUntil={snoozed ? snapshot.identity.snoozeUntil : null}
+              showUnsnooze={snoozed}
+              todayLocal={todayLocal}
+              onPreset={(preset) => snooze({ preset })}
+              onUntil={(until) => snooze({ until })}
+              onUnsnooze={unsnooze}
+              confirmName={snapshot.identity.name}
+              onRestore={(previousUntil) =>
+                previousUntil ? snooze({ until: previousUntil }) : unsnooze()
+              }
+              onClose={closeOverlay}
+            />
             <ProfileLayoutEditor
               visible={overlay === "layout"}
               contactId={contactId}

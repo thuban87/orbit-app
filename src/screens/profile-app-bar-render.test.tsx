@@ -32,6 +32,7 @@ vi.mock("@/components/ui/Sheet", () => ({}));
 vi.mock("@/components/FrequencyPicker", () => ({}));
 vi.mock("@/components/PhotoLightbox", () => ({}));
 vi.mock("@/components/ReachOutRouter", () => ({}));
+vi.mock("@/components/SnoozeSheet", () => ({}));
 vi.mock("@/components/profile/ProfileBackgroundManager", () => ({}));
 vi.mock("@/components/profile/ProfileHero", () => ({}));
 vi.mock("@/components/profile/ProfileLayoutEditor", () => ({}));

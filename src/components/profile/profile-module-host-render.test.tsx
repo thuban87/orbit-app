@@ -52,6 +52,7 @@ vi.mock("./ProfileRelationshipSheets", () => ({
   ProfileRelationshipSheets: "ProfileRelationshipSheets",
 }));
 vi.mock("./BirthdaySheet", () => ({ BirthdaySheet: "BirthdaySheet" }));
+vi.mock("@/components/SnoozeSheet", () => ({ SnoozeSheet: "SnoozeSheet" }));
 vi.mock("./RelationshipOverview", () => ({
   RelationshipOverview: "RelationshipOverview",
 }));
@@ -776,13 +777,114 @@ describe("ProfileModuleHost Birthday sheet (38.11 D-56, D-59)", () => {
   });
 
   it("keeps the Birthday sheet closed for the other sheet ids", () => {
-    const { nodes } = birthdayHostNodes("snooze");
+    const { nodes } = birthdayHostNodes("frequency");
     expect(
       nodes.find((node) => node.type === "BirthdaySheet")?.props.visible,
     ).toBe(false);
     expect(
       nodes.find((node) => node.type === "ProfileRelationshipSheets")?.props
         .active,
-    ).toBe("snooze");
+    ).toBe("frequency");
+  });
+});
+
+// 38.11 D-45 (review T-06, W-01, X-02): the Overview Snooze tile opens the
+// shared SnoozeSheet hosted here, never a snooze section in
+// ProfileRelationshipSheets; it gets the EFFECTIVE snooze end.
+describe("ProfileModuleHost Snooze sheet (38.11 D-45)", () => {
+  /** The host's useState order: collapse, pending, failed, activeSheet. */
+  const ACTIVE_SHEET_SLOT = 3;
+  const TODAY = "2026-09-19";
+
+  function snoozeHostNodes(
+    activeSheet: string | null,
+    snoozeUntil: string | null,
+  ) {
+    const onSnooze = vi.fn(async () => {});
+    const onUnsnooze = vi.fn(async () => {});
+    hooks.index = 0;
+    hooks.seed.clear();
+    hooks.seed.set(ACTIVE_SHEET_SLOT, activeSheet);
+    try {
+      const nodes = all(
+        resolve(
+          ProfileModuleHost({
+            snapshot: {
+              identity: { id: 7, name: "Ada", snoozeUntil },
+              knowledge: { status: "ready", data: {} },
+              history: { status: "ready", data: {} },
+            } as unknown as ProfileSnapshot,
+            presentation,
+            todayLocal: TODAY,
+            historyRevision: 0,
+            onRequestScrollTo: vi.fn(),
+            onSetFrequency: vi.fn(async () => {}),
+            onSnooze,
+            onUnsnooze,
+            onSaveBirthday: vi.fn(async () => {}),
+            onKnowledgeAction: vi.fn(),
+            onKnowledgeViewAll: vi.fn(),
+            onOpenValueHistory: vi.fn(),
+            onOpenKnowledgeChange: vi.fn(),
+            onContactMethodAction: vi.fn(),
+          }),
+        ),
+      );
+      const sheet = nodes.find((node) => node.type === "SnoozeSheet");
+      if (!sheet) throw new Error("SnoozeSheet is missing");
+      return { nodes, sheet, onSnooze, onUnsnooze };
+    } finally {
+      hooks.seed.clear();
+    }
+  }
+
+  it("renders SnoozeSheet for the snooze id, wired to the host's snooze callbacks", async () => {
+    const { nodes, sheet, onSnooze, onUnsnooze } = snoozeHostNodes(
+      "snooze",
+      "2026-09-25",
+    );
+    expect(sheet.props.visible).toBe(true);
+    expect(sheet.props.title).toBe("Snooze Ada");
+    expect(sheet.props.confirmName).toBe("Ada");
+    expect(sheet.props.snoozedUntil).toBe("2026-09-25");
+    expect(sheet.props.showUnsnooze).toBe(true);
+    expect(sheet.props.todayLocal).toBe(TODAY);
+    expect(sheet.props.onUnsnooze).toBe(onUnsnooze);
+    expect(sheet.props.onClose).toBeTypeOf("function");
+    // ProfileRelationshipSheets never receives the "snooze" id.
+    expect(
+      nodes.find((node) => node.type === "ProfileRelationshipSheets")?.props
+        .active,
+    ).toBeNull();
+
+    const props = sheet.props as {
+      onPreset: (preset: "1w") => Promise<void>;
+      onUntil: (until: string) => Promise<void>;
+      onRestore: (previous: string | null) => Promise<void>;
+    };
+    await props.onPreset("1w");
+    expect(onSnooze).toHaveBeenLastCalledWith({ preset: "1w" });
+    await props.onUntil("2026-09-30");
+    expect(onSnooze).toHaveBeenLastCalledWith({ until: "2026-09-30" });
+    // Undo maps onto the same callbacks, with no expiry logic of its own.
+    await props.onRestore("2026-09-25");
+    expect(onSnooze).toHaveBeenLastCalledWith({ until: "2026-09-25" });
+    await props.onRestore(null);
+    expect(onUnsnooze).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the snooze sheet closed for other sheet ids", () => {
+    expect(snoozeHostNodes("frequency", null).sheet.props.visible).toBe(false);
+    expect(snoozeHostNodes(null, null).sheet.props.visible).toBe(false);
+  });
+
+  it("passes an expired snooze as not snoozed (review W-01, X-02)", () => {
+    const { sheet } = snoozeHostNodes("snooze", "2026-09-18");
+    expect(sheet.props.snoozedUntil).toBeNull();
+    expect(sheet.props.showUnsnooze).toBe(false);
+    // Ending today is not snoozed either (the countSnoozed predicate).
+    const today = snoozeHostNodes("snooze", TODAY).sheet;
+    expect(today.props.snoozedUntil).toBeNull();
+    expect(today.props.showUnsnooze).toBe(false);
   });
 });

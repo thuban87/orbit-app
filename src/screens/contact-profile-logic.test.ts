@@ -647,7 +647,6 @@ describe("integrated Profile controller contracts", () => {
   it("keeps the required overflow ordering and only exposes conditional presentation actions", () => {
     expect(
       profileOverflowEntries({
-        snoozed: false,
         bound: true,
         hasFreeformLayout: true,
         hasContactPresentationOverride: true,
@@ -665,14 +664,14 @@ describe("integrated Profile controller contracts", () => {
     ]);
     expect(
       profileOverflowEntries({
-        snoozed: true,
         bound: false,
         hasFreeformLayout: false,
         hasContactPresentationOverride: false,
       }),
     ).toEqual([
+      // 38.11 D-64: "snooze" in both states; never an instant "unsnooze".
       "edit",
-      "unsnooze",
+      "snooze",
       "archive",
       "separator",
       "layout",

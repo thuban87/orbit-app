@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseCustomInterval } from "@/components/frequency-picker-logic";
 import type { ProfileStatusMetric } from "@/services/profile-metrics";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import {
   CUSTOM_FREQUENCY_LABEL,
   customFrequencyApplyState,
@@ -14,6 +15,8 @@ import {
   relationshipSheetReducer,
   SNOOZE_CHOICES,
   savedMethodKinds,
+  snoozeConfirmationLabel,
+  snoozeCustomDateDefault,
   validateCustomSnoozeDate,
 } from "./relationship-sheet-model";
 
@@ -609,6 +612,39 @@ describe("frequency and snooze choices", () => {
         error: "Choose a future date.",
       });
     }
+  });
+
+  // 38.11 D-37: the custom date defaults to and starts at tomorrow, the first
+  // date validateCustomSnoozeDate accepts.
+  it("defaults the custom snooze date to tomorrow, rolling month and year (D-37)", () => {
+    expect(snoozeCustomDateDefault("2026-10-16")).toBe("2026-10-17");
+    expect(snoozeCustomDateDefault("2026-10-31")).toBe("2026-11-01");
+    expect(snoozeCustomDateDefault("2026-12-31")).toBe("2027-01-01");
+    expect(snoozeCustomDateDefault("2028-02-28")).toBe("2028-02-29");
+    for (const today of ["2026-10-16", "2026-12-31", "2028-02-28"]) {
+      expect(
+        validateCustomSnoozeDate(snoozeCustomDateDefault(today), today),
+      ).toEqual({ valid: true });
+    }
+  });
+
+  // 38.9 D-39/D-46 (review V-03): one person-naming confirmation, verb first.
+  it("words the single-contact snooze confirmation per outcome", () => {
+    expect(
+      snoozeConfirmationLabel("Alex", { kind: "preset", preset: "3d" }),
+    ).toBe("Snoozed Alex for 3 days");
+    expect(
+      snoozeConfirmationLabel("Alex", { kind: "preset", preset: "1w" }),
+    ).toBe("Snoozed Alex for 1 week");
+    expect(
+      snoozeConfirmationLabel("Alex", { kind: "preset", preset: "1m" }),
+    ).toBe("Snoozed Alex for 1 month");
+    expect(
+      snoozeConfirmationLabel("Alex", { kind: "until", until: "2026-10-20" }),
+    ).toBe(`Snoozed Alex until ${formatDisplayDateOrFallback("2026-10-20")}`);
+    expect(snoozeConfirmationLabel("Alex", { kind: "unsnooze" })).toBe(
+      "Unsnoozed Alex",
+    );
   });
 });
 
