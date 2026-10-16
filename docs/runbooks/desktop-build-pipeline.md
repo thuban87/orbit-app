@@ -207,11 +207,22 @@ npx expo start                                   # Metro bundler on this box (po
    first runs tested pre-fix code. Before counting any DEBUG re-check, restart Metro with
    `npx expo start --port 8082 --clear`. Then fetch the dev-client bundle from Metro and grep
    it for a symbol the change adds (for example `onLaidOut`); a zero count means the bundle is stale.
-4. **adb-injected input does not drive TalkBack (38.9-17).** With TalkBack enabled on the test
-   phone, `adb shell input tap` activates controls directly and `dumpsys accessibility` reports no
-   accessibility-focused window, so focus-on-open and spoken output cannot be observed by an agent.
-   Check accessible names from the `uiautomator dump` tree (`content-desc`) instead, and put spoken
-   TalkBack checks on the owner's checklist. Restore the phone's accessibility services afterwards.
+4. **adb-injected input does not drive TalkBack (38.9-17), but its speech can be read (38.11-14).**
+   With TalkBack enabled on the test phone, `adb shell input tap` activates controls directly and
+   `dumpsys accessibility` reports no accessibility-focused window. An injected swipe arrives as a
+   plain touch, and Alt/Search+arrow key combinations are ignored, so swipe order and focus-on-open
+   cannot be driven by an agent: check accessible names and tree order from the `uiautomator dump`
+   tree (`content-desc`) and put swipe-order checks on the owner's checklist.
+   **What TalkBack says can be observed:**
+   1. Note the current values of `enabled_accessibility_services` and `accessibility_enabled`
+      (`adb shell settings get secure …`).
+   2. Turn TalkBack on through those secure settings.
+   3. In TalkBack's own Developer settings, set Log output level to VERBOSE.
+   4. Trigger the action with an adb tap and read logcat for `SpeechControllerImpl: Speaking fragment text …`.
+      This shows whether an announcement is spoken once or twice. Activation by adb tap takes the
+      same announcement path as a TalkBack double-tap.
+   Afterwards put everything back: log level ERROR, TalkBack removed from the services, and
+   `accessibility_enabled` as found (other services such as LastPass as found).
 5. **The §1e `grep -q 'Orbit'` assertion no longer matches (38.10-19).** The app now opens on the
    Digest tab, so the "Orbit" title the FND-01 check greps for is not on the first screen and the
    PRIMARY assertion prints nothing even on a good install. Until §1e is rewritten, judge the launch
