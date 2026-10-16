@@ -92,6 +92,7 @@ import {
 } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getLinkedInteractionRefCore } from "@/db/linked-entry-dao";
+import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import { useContactHeader } from "@/hooks/use-contact-header";
 import { linkedEntryRoute } from "@/logic/linked-entry-route";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
@@ -184,8 +185,20 @@ interface HistoryEntryFormProps {
   initialDraft?: { value: string; entryDate: string };
   /** Reports every draft change, so a remount can restore it (WR-01). */
   onDraftChange?: (value: string, entryDate: string) => void;
+  /** The add form's hint text (38.11 D-42); the edit form has none. */
+  placeholder?: string;
   testID: string;
 }
+
+/**
+ * The add field's hint text per page (38.11 D-42), the same wording as Add
+ * Contact's Last Talked About and Current Location fields.
+ */
+const HISTORY_ADD_PLACEHOLDER: Readonly<Record<CurrentStateFieldKey, string>> =
+  {
+    last_talked_about: "What did you last talk about?",
+    current_location: "Where are they now?",
+  };
 
 /**
  * One add or edit form. It owns its draft; the host mounts it with a `key`
@@ -207,6 +220,7 @@ function HistoryEntryForm({
   onDirtyChange,
   initialDraft,
   onDraftChange,
+  placeholder,
   testID,
 }: HistoryEntryFormProps) {
   const { colors } = useTheme();
@@ -287,6 +301,7 @@ function HistoryEntryForm({
         testID={`${testID}-value`}
         accessibilityLabel={`${title} entry`}
         value={value}
+        placeholder={placeholder}
         onChangeText={setValue}
         onSubmit={save}
         returnKeyType="done"
@@ -826,6 +841,7 @@ export function MemoryHistoryScreen({
                   key={formKey}
                   testID="memory-history-add-form"
                   title={title}
+                  placeholder={HISTORY_ADD_PLACEHOLDER[fieldKey]}
                   initialValue=""
                   initialDate={maxPickableDate()}
                   dateEditable

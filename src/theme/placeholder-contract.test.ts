@@ -115,8 +115,11 @@ describe("placeholder token contract (RG-029, D-24)", () => {
     // OffLimitsForm added 2. 38.10-09 had held a transitional floor of 43
     // while those plans ran. 62 since 38.10-25 (2026-10-14, D-136 S5): the
     // share confirmation card's note moved to the shared EntryTextField
-    // (already counted once), so its own site is gone (-1).
-    expect(sites.length).toBeGreaterThanOrEqual(62);
+    // (already counted once), so its own site is gone (-1). 61 since 38.11-02
+    // (2026-10-16): Update Contact moved to docs/archive (D-62, -1); the
+    // history page's new add-field placeholder (D-42) goes through the shared
+    // EntryTextField, already counted once (+0).
+    expect(sites.length).toBeGreaterThanOrEqual(61);
   });
 
   it("every placeholderTextColor uses colors.textPlaceholder", () => {
