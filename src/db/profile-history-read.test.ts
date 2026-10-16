@@ -78,7 +78,8 @@ describe("bounded interim Profile history", () => {
     expect(result.summary).toEqual({
       kind: "latest",
       lastContact: "2026-09-01 09:00:00",
-      text: "Last interaction Sep 1, 2026, 9:00 AM",
+      // 38.11 D-75: the tile label already says Last Interaction.
+      text: "Sep 1, 2026, 9:00 AM",
     });
     expect(result.entries).toEqual([
       {
@@ -104,7 +105,7 @@ describe("bounded interim Profile history", () => {
     expect(result.summary).toEqual({
       kind: "latest",
       lastContact: "not a timestamp",
-      text: "Last interaction Unknown time",
+      text: "Unknown time",
     });
   });
 

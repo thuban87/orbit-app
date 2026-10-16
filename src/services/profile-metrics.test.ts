@@ -215,11 +215,11 @@ describe("Profile Overview metric models", () => {
     expect(status).not.toHaveProperty("intensity");
   });
 
-  it("keeps Gravity derived and gives empty history a truthful unavailable model", () => {
+  it("keeps Gravity derived and gives empty history a plain unavailable model (38.11 D-74)", () => {
     expect(resolveProfileGravity(null, 0)).toEqual({
       available: false,
-      label: "Not available yet",
-      context: "Gravity is derived from interaction history.",
+      label: "No interactions yet",
+      context: "Gravity builds as you log interactions.",
     });
 
     const gravity = resolveProfileGravity(

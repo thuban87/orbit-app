@@ -6,6 +6,7 @@
  */
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import type { ProfileIdentity } from "@/db/profile-read";
 import {
   PROFILE_HERO_AVATAR_SIZE,
@@ -72,6 +73,7 @@ const onPhotoLoadErrorChange = vi.fn();
 function render(
   overrides: Partial<ProfileIdentity> = {},
   photoOpenable?: boolean,
+  methodGroups: ContactMethodGroups = { phone: [], email: [] },
 ) {
   return all(
     resolve(
@@ -80,6 +82,7 @@ function render(
         photoOpenable,
         onPhotoLoadErrorChange,
         actionableMethods: { phone: null, email: null },
+        methodGroups,
         messageContext: { archived: false, settingsHosted: false },
         onOpenPhoto,
         onMessage: () => {},
@@ -215,5 +218,31 @@ describe("ProfileHero 'Photo unavailable' (38.6 D-23)", () => {
     expect(
       nodes.some((node) => node.props.testID === "photo-unavailable"),
     ).toBe(false);
+  });
+});
+
+// 38.11 D-27: the Hero derives "saved but unusable" from the method groups.
+describe("ProfileHero unusable-method reasons (38.11 D-27)", () => {
+  const captions = (nodes: Node[]) =>
+    nodes
+      .filter((node) => node.type === "AppText" && node.props.role === "caption")
+      .map((node) => node.props.children);
+
+  it("says a saved phone number can't be used, for Call and Message", () => {
+    const nodes = render({}, true, {
+      phone: [{ is_actionable: 0 } as never],
+      email: [],
+    });
+    expect(captions(nodes)).toEqual([
+      "This contact's number can't be used to message. Check it in Edit Contact.",
+      "This phone number can't be used to call. Check it in Edit Contact.",
+    ]);
+  });
+
+  it("keeps the add-a-method reasons when nothing is saved", () => {
+    expect(captions(render({}, true))).toEqual([
+      "Add a phone number or email to message this contact.",
+      "Add a phone number to call this contact.",
+    ]);
   });
 });

@@ -5,9 +5,11 @@ import {
   PROFILE_MESSAGE_ARCHIVED_REASON,
   PROFILE_MESSAGE_SETTINGS_HOST_REASON,
   profileHeroActionState,
+  RELATIONSHIP_DEFINITIONS,
   relationshipExplanation,
   relationshipSheetReducer,
   SNOOZE_CHOICES,
+  savedMethodKinds,
   validateCustomSnoozeDate,
 } from "./relationship-sheet-model";
 
@@ -39,6 +41,8 @@ describe("fixed Hero action capability", () => {
         reason: "Add a phone number to call this contact.",
       },
     });
+    // 38.11 D-27: a saved phone that is not actionable is an unusable number,
+    // not a missing one.
     expect(
       profileHeroActionState(
         {
@@ -51,14 +55,115 @@ describe("fixed Hero action capability", () => {
       message: {
         enabled: false,
         route: null,
-        reason: "Add a phone number or email to message this contact.",
+        reason:
+          "This contact's number can't be used to message. Check it in Edit Contact.",
       },
       call: {
         enabled: false,
         route: null,
-        reason: "Add a phone number to call this contact.",
+        reason:
+          "This phone number can't be used to call. Check it in Edit Contact.",
       },
     });
+  });
+});
+
+// 38.11 D-27 (ADR-109): "no number" versus "a number that can't be used",
+// naming only the method kinds the contact actually has (T-20).
+describe("Hero reasons tell missing from unusable methods", () => {
+  const NONE = { phone: false, email: false } as const;
+  const UNUSABLE_PHONE = { phone: true, email: false } as const;
+  const UNUSABLE_EMAIL = { phone: false, email: true } as const;
+  const UNUSABLE_BOTH = { phone: true, email: true } as const;
+
+  it("asks to add a phone number when there is no phone", () => {
+    expect(profileHeroActionState(NO_METHODS, STANDARD, NONE).call).toEqual(
+      CALL_DISABLED,
+    );
+  });
+
+  it("says a saved phone number can't be used to call", () => {
+    expect(
+      profileHeroActionState(NO_METHODS, STANDARD, UNUSABLE_PHONE).call,
+    ).toEqual({
+      enabled: false,
+      route: null,
+      reason:
+        "This phone number can't be used to call. Check it in Edit Contact.",
+    });
+  });
+
+  it("asks to add a phone number or email when there are no methods", () => {
+    expect(
+      profileHeroActionState(NO_METHODS, STANDARD, NONE).message.reason,
+    ).toBe("Add a phone number or email to message this contact.");
+  });
+
+  it("names only the number when only an unusable phone exists", () => {
+    expect(
+      profileHeroActionState(NO_METHODS, STANDARD, UNUSABLE_PHONE).message
+        .reason,
+    ).toBe(
+      "This contact's number can't be used to message. Check it in Edit Contact.",
+    );
+  });
+
+  it("names only the email when only an unusable email exists, never a number", () => {
+    const reason = profileHeroActionState(NO_METHODS, STANDARD, UNUSABLE_EMAIL)
+      .message.reason;
+    expect(reason).toBe(
+      "This contact's email can't be used to message. Check it in Edit Contact.",
+    );
+    expect(reason).not.toContain("number");
+    expect(
+      profileHeroActionState(NO_METHODS, STANDARD, UNUSABLE_EMAIL).call,
+    ).toEqual(CALL_DISABLED);
+  });
+
+  it("names both when an unusable phone and an unusable email exist", () => {
+    expect(
+      profileHeroActionState(NO_METHODS, STANDARD, UNUSABLE_BOTH).message
+        .reason,
+    ).toBe(
+      "This contact's number and email can't be used to message. Check them in Edit Contact.",
+    );
+  });
+
+  it("keeps Message enabled when any method is usable", () => {
+    expect(
+      profileHeroActionState(
+        { phone: null, email: { is_actionable: 1 } as never },
+        STANDARD,
+        UNUSABLE_PHONE,
+      ).message,
+    ).toEqual({ enabled: true, route: "compose", reason: null });
+  });
+
+  it("keeps the archived and Settings-host reasons first", () => {
+    expect(
+      profileHeroActionState(
+        NO_METHODS,
+        { archived: true, settingsHosted: false },
+        UNUSABLE_PHONE,
+      ).message.reason,
+    ).toBe(PROFILE_MESSAGE_ARCHIVED_REASON);
+    expect(
+      profileHeroActionState(
+        NO_METHODS,
+        { archived: false, settingsHosted: true },
+        UNUSABLE_BOTH,
+      ).message.reason,
+    ).toBe(PROFILE_MESSAGE_SETTINGS_HOST_REASON);
+  });
+
+  it("reads the saved kinds from the method groups", () => {
+    expect(savedMethodKinds({ phone: [], email: [] })).toEqual(NONE);
+    expect(
+      savedMethodKinds({ phone: [{} as never], email: [] }),
+    ).toEqual(UNUSABLE_PHONE);
+    expect(
+      savedMethodKinds({ phone: [], email: [{} as never, {} as never] }),
+    ).toEqual(UNUSABLE_EMAIL);
   });
 });
 
@@ -179,6 +284,7 @@ describe("relationship explanations", () => {
       }),
     ).toEqual({
       title: "Orbit Status",
+      definition: RELATIONSHIP_DEFINITIONS.status,
       summary: "Wobbly",
       details: [
         "Last interaction: Aug 13, 2026, 9:00 AM",
@@ -377,6 +483,68 @@ describe("relationship explanations", () => {
     ]);
     expect(gravity).not.toHaveProperty("editable");
     expect(intensity).not.toHaveProperty("editable");
+  });
+
+  // 38.11 D-75: each stat sheet opens with a plain explanation of the term.
+  it("defines Orbit Status, Gravity and Intensity in plain words (D-75)", () => {
+    expect(RELATIONSHIP_DEFINITIONS).toEqual({
+      status:
+        "Orbit Status shows how far along you are toward your contact frequency since you last spoke.",
+      gravity:
+        "Gravity is how much shared history you have with this person. Every logged interaction adds to it, and recent ones weigh more than old ones, so it grows as you keep in touch and fades slowly when you don't. Old history never fades away completely. It shows as a tier (Thin, Building, Solid or Deep), not a score. For people marked Rarely Responds, only interactions that connected count.",
+      intensity:
+        "Intensity counts the times you reached out recently: within one contact frequency (the last 30 days for Monthly), or this calendar month when the contact is Unbound or has no frequency. With a frequency, reaching out once in that time reads as At pace and more often reads as Active. Interactions they started don't count.",
+    });
+    // Status about one line, Intensity a little more, Gravity the most.
+    expect(RELATIONSHIP_DEFINITIONS.status.length).toBeLessThan(
+      RELATIONSHIP_DEFINITIONS.intensity.length,
+    );
+    expect(RELATIONSHIP_DEFINITIONS.intensity.length).toBeLessThan(
+      RELATIONSHIP_DEFINITIONS.gravity.length,
+    );
+  });
+
+  it("puts the definition on every stat sheet, available or not (D-75)", () => {
+    expect(
+      relationshipExplanation({
+        kind: "status",
+        metric: UNAVAILABLE_STATUS,
+        insightsAvailable: false,
+        historyAvailable: false,
+      }).definition,
+    ).toBe(RELATIONSHIP_DEFINITIONS.status);
+    expect(
+      relationshipExplanation({
+        kind: "gravity",
+        metric: {
+          available: false,
+          label: "No interactions yet",
+          context: "Gravity builds as you log interactions.",
+        },
+      }),
+    ).toEqual({
+      title: "Gravity",
+      definition: RELATIONSHIP_DEFINITIONS.gravity,
+      summary: "No interactions yet",
+      details: ["Gravity builds as you log interactions."],
+    });
+    expect(
+      relationshipExplanation({
+        kind: "intensity",
+        metric: {
+          available: true,
+          label: "No activity",
+          visualValue: 0,
+          context: "0× this period vs 30-day contact frequency.",
+          window: { kind: "cadence", days: 30, label: "30 days" },
+          cadenceRelative: true,
+          currentCount: 0,
+          intendedPerPeriod: 1,
+          multiple: 0,
+          trailingAvgGapDays: null,
+        },
+      }).definition,
+    ).toBe(RELATIONSHIP_DEFINITIONS.intensity);
   });
 });
 

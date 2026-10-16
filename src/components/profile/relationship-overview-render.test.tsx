@@ -56,15 +56,23 @@ const snapshot = {
   identity: { intervalDays: 30, trackingEnabled: 1, snoozeUntil: null },
   metrics: {
     status: { label: "Steady", context: "6 of 30 days" },
-    gravity: { available: false, label: "Unknown", context: "No history" },
+    gravity: {
+      available: false,
+      label: "No interactions yet",
+      context: "Gravity builds as you log interactions.",
+    },
     intensity: { label: "Quiet", window: { label: "This month" } },
   },
-  history: { status: "ready", data: { summary: { text: "2 days ago" } } },
+  history: {
+    status: "ready",
+    data: { summary: { text: "Sep 1, 2026, 9:00 AM" } },
+  },
 } as unknown as ProfileSnapshot;
 
 const modules = [
   { id: "orbit-status", visible: true, expanded: false, size: "2x1" },
   { id: "last-interaction", visible: true, expanded: false, size: "2x1" },
+  { id: "gravity", visible: true, expanded: false, size: "1x1" },
 ] as unknown as ProfileLayoutDocument["overview"];
 
 function tile(onOpenHistory?: () => void): Node | undefined {
@@ -96,7 +104,10 @@ describe("RelationshipOverview Last Interaction tile", () => {
     expect(node?.type).toBe("View");
     expect(node?.props.accessibilityRole).toBeUndefined();
     expect(node?.props.onPress).toBeUndefined();
-    expect(node?.props.accessibilityLabel).toBe("Last Interaction. 2 days ago");
+    // 38.11 D-75: the value is the date alone, never "Last interaction …".
+    expect(node?.props.accessibilityLabel).toBe(
+      "Last Interaction. Sep 1, 2026, 9:00 AM",
+    );
   });
 
   it("keeps the other tiles as sheet buttons either way", () => {
@@ -107,5 +118,18 @@ describe("RelationshipOverview Last Interaction tile", () => {
     ).find((node) => node.props.testID === "profile-overview-orbit-status");
     expect(status?.type).toBe("Pressable");
     expect(status?.props.accessibilityRole).toBe("button");
+  });
+});
+
+describe("RelationshipOverview Gravity tile (38.11 D-74)", () => {
+  it("reads No interactions yet with the plain context line", () => {
+    const gravity = all(
+      resolve(
+        RelationshipOverview({ snapshot, modules, onOpenSheet: vi.fn() }),
+      ),
+    ).find((node) => node.props.testID === "profile-overview-gravity");
+    expect(gravity?.props.accessibilityLabel).toBe(
+      "Gravity. No interactions yet. Gravity builds as you log interactions.",
+    );
   });
 });
