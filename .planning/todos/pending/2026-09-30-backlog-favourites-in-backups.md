@@ -1,6 +1,6 @@
 ---
 created: 2026-09-30T21:00:00.000Z
-title: "[BACKLOG] Carry favourites (and their order) in backups"
+title: "Carry favourites (and their order) in backups"
 area: backup
 severity: minor
 files:

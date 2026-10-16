@@ -2,7 +2,7 @@
 created: 2026-10-16
 source: 38.11-DEVICE-PASS.md finding F-06 (38.11-14 device pass) — pre-existing, routed to the backlog (no phase yet) by the orchestrator (planner call), 2026-10-16
 area: photos
-target_phase: none (backlog)
+target_phase: none
 files:
   - src/components/profile/ProfileBackgroundCreateFlow.tsx
   - src/services/photos/master-encode.ts
