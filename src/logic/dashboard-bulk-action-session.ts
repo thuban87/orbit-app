@@ -64,3 +64,14 @@ export function createBulkActionGate(
     },
   };
 }
+
+/** 38.11 D-45 bulk snooze sheet adapter (RED stub; GREEN implements it). */
+export async function runClaimedBulkWrite<T>(_deps: {
+  takeHeldClaim: () => BulkActionClaim | null;
+  acquire: () => BulkActionClaim | null;
+  consume: (claim: BulkActionClaim) => boolean;
+  release: (claim: BulkActionClaim) => void;
+  write: () => Promise<T>;
+}): Promise<T> {
+  throw new Error("runClaimedBulkWrite: not implemented");
+}

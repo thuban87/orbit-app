@@ -9,6 +9,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { bulkSnooze, bulkUnsnooze } from "@/db/bulk-actions-dao";
 import {
   type BirthdayCandidate,
   countAllContacts,
@@ -27,6 +28,7 @@ import {
   listDashboardSearch,
   listDashboardSearchEligible,
   listFavourites,
+  readCurrentlySnoozedIds,
 } from "@/db/dashboard-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -1015,5 +1017,81 @@ describe("listBirthdayCandidates", () => {
     const rows: BirthdayCandidate[] = await listBirthdayCandidates(exec);
     expect(ids(rows)).toEqual([withBday]);
     expect(rows[0]?.birthday).toBe("1990-03-14");
+  });
+});
+
+// 38.11 D-82 (review V-01): the bulk snooze sheet reads which selected people
+// are snoozed from the database (the countSnoozed predicate), not from the
+// on-screen rows, which can drop them.
+describe("readCurrentlySnoozedIds", () => {
+  it("returns only the ids snoozed past today; expired, today and NULL do not count", async () => {
+    const future = await seedContact({
+      name: "Future",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(4),
+    });
+    const today = await seedContact({
+      name: "Today",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(0),
+    });
+    const past = await seedContact({
+      name: "Past",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(-3),
+    });
+    const never = await seedContact({ name: "Never", lastContact: STABLE() });
+    const archived = await seedContact({
+      name: "Archived",
+      lastContact: STABLE(),
+      snoozeUntil: localDateOffset(4),
+      archivedAt: NOW,
+    });
+
+    expect(
+      await readCurrentlySnoozedIds(exec, [future, today, past, never]),
+    ).toEqual([future]);
+    expect(await readCurrentlySnoozedIds(exec, [archived])).toEqual([]);
+  });
+
+  it("returns [] for an empty id list without querying", async () => {
+    const spy = { calls: 0 };
+    const counting: SqlExecutor = {
+      ...exec,
+      getAllAsync: async <T>(sql: string, params?: unknown[]) => {
+        spy.calls += 1;
+        return exec.getAllAsync<T>(sql, params);
+      },
+    };
+    expect(await readCurrentlySnoozedIds(counting, [])).toEqual([]);
+    expect(spy.calls).toBe(0);
+  });
+
+  it("finds people a bulk snooze just dropped from a filtered list, and bulk Unsnooze clears them (V-01)", async () => {
+    const a = await seedContact({ name: "A", lastContact: ROGUE() });
+    const b = await seedContact({ name: "B", lastContact: ROGUE() });
+    const needsAttention: DashboardQueryState = {
+      viewMode: "list",
+      populations: [],
+      filters: { "needs-attention": ["on"] },
+      sort: "default",
+    };
+    expect(
+      ids(await listDashboardPopulation(exec, needsAttention, NOW)),
+    ).toEqual(expect.arrayContaining([a, b]));
+
+    await bulkSnooze(exec, [a, b], "1w", NOW);
+    // The post-commit re-read no longer shows them (Needs Attention
+    // suppresses snoozes), while the selection still holds their ids.
+    const reread = ids(
+      await listDashboardPopulation(exec, needsAttention, NOW),
+    );
+    expect(reread).not.toContain(a);
+    expect(reread).not.toContain(b);
+
+    const snoozedIds = await readCurrentlySnoozedIds(exec, [a, b]);
+    expect(snoozedIds).toEqual([a, b]);
+    await bulkUnsnooze(exec, snoozedIds, NOW);
+    expect(await readCurrentlySnoozedIds(exec, [a, b])).toEqual([]);
   });
 });

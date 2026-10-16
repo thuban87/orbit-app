@@ -11,10 +11,12 @@ import {
   bulkSetCategory,
   bulkSetFrequency,
   bulkSnooze,
+  bulkSnoozeUntil,
   bulkUnsnooze,
   undoBulkQuickLog,
 } from "@/db/bulk-actions-dao";
 import { createContactFull } from "@/db/contacts-dao";
+import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -269,6 +271,43 @@ describe("other bulk action composers", () => {
       { type: "unsnooze" },
       { type: "unsnooze" },
     ]);
+  });
+
+  // 38.11 D-45: bulk Choose date writes one validated local date.
+  it("snoozes until a custom future local date with one revision bump", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const before = await readDataRevision(exec);
+    await bulkSnoozeUntil(exec, ids, "2026-09-07", NOW);
+    expect(
+      await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id"),
+    ).toEqual([{ snooze_until: "2026-09-07" }, { snooze_until: "2026-09-07" }]);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+    expect(
+      await exec.getAllAsync("SELECT type FROM events ORDER BY id"),
+    ).toEqual([{ type: "snooze" }, { type: "snooze" }]);
+  });
+
+  it("rejects a today, past or malformed custom date before any write", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const before = await readDataRevision(exec);
+    for (const until of ["2026-09-06", "2026-09-01", "2026-02-30", "soon"]) {
+      await expect(bulkSnoozeUntil(exec, ids, until, NOW)).rejects.toThrow(
+        /future local date/,
+      );
+    }
+    expect(
+      await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id"),
+    ).toEqual([{ snooze_until: null }, { snooze_until: null }]);
+    expect(await count("events")).toBe(0);
+    expect(await readDataRevision(exec)).toBe(before);
+  });
+
+  it("resolves an empty custom-date batch without writing", async () => {
+    const before = await readDataRevision(exec);
+    await expect(
+      bulkSnoozeUntil(exec, [], "2026-09-07", NOW),
+    ).resolves.toBeUndefined();
+    expect(await readDataRevision(exec)).toBe(before);
   });
 
   it("resolves one local snooze target for an entire bulk batch", async () => {

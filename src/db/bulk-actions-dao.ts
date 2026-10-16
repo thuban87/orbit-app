@@ -146,6 +146,16 @@ export function bulkSnooze(
   );
 }
 
+/** 38.11 D-45: bulk Choose date (RED stub; implemented in the GREEN commit). */
+export function bulkSnoozeUntil(
+  _exec: SqlExecutor,
+  _ids: number[],
+  _until: string,
+  _now: string,
+): Promise<void> {
+  return Promise.reject(new Error("bulkSnoozeUntil: not implemented"));
+}
+
 export function bulkUnsnooze(
   exec: SqlExecutor,
   ids: number[],

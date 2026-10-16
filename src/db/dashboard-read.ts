@@ -537,6 +537,14 @@ export function countSnoozed(exec: SqlExecutor): Promise<number> {
   );
 }
 
+/** 38.11 D-82 (RED stub; implemented in the GREEN commit). */
+export async function readCurrentlySnoozedIds(
+  _exec: SqlExecutor,
+  _ids: readonly number[],
+): Promise<number[]> {
+  throw new Error("readCurrentlySnoozedIds: not implemented");
+}
+
 /** Bound, non-archived favourite membership count for Dashboard empty states. */
 export function countFavourites(exec: SqlExecutor): Promise<number> {
   return count(

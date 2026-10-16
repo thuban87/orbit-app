@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  type BulkActionClaim,
   createBulkActionGate,
   getCurrentSelectionIds,
+  runClaimedBulkWrite,
 } from "@/logic/dashboard-bulk-action-session";
 
 function deferred<T>() {
@@ -147,5 +149,109 @@ describe("getCurrentSelectionIds", () => {
     const currentIds = getCurrentSelectionIds(selection, selection.sessionId);
     if (currentIds) bulkSetCategory(currentIds);
     expect(bulkSetCategory).toHaveBeenCalledExactlyOnceWith([3, 4]);
+  });
+});
+
+// 38.11 D-45 (review U-01, V-02): the bulk snooze sheet's React-free adapter.
+// HomeScreen passes its held input claim (read at call time), the gate's
+// acquire/consume/release wrappers and the write over the captured ids.
+describe("runClaimedBulkWrite", () => {
+  function harness(gate = createBulkActionGate()) {
+    const held: { current: BulkActionClaim | null } = { current: null };
+    const acquire = vi.fn(() => {
+      const claim = gate.tryAcquire();
+      if (claim) held.current = claim;
+      return claim;
+    });
+    const consume = vi.fn((claim: BulkActionClaim) => {
+      const ok = gate.consume(claim);
+      if (ok && held.current === claim) held.current = null;
+      return ok;
+    });
+    const release = vi.fn((claim: BulkActionClaim) => {
+      if (held.current === claim) held.current = null;
+      gate.release(claim);
+    });
+    const deps = {
+      takeHeldClaim: () => held.current,
+      acquire,
+      consume,
+      release,
+    };
+    return { gate, held, acquire, consume, release, deps };
+  }
+
+  it("consumes the held claim, awaits the write and releases after it settles", async () => {
+    const h = harness();
+    const claimA = h.acquire();
+    h.acquire.mockClear();
+    const write = deferred<string>();
+    const run = runClaimedBulkWrite({ ...h.deps, write: () => write.promise });
+
+    expect(h.acquire).not.toHaveBeenCalled();
+    expect(h.consume).toHaveBeenCalledExactlyOnceWith(claimA);
+    expect(h.gate.pending).toBe(true);
+    expect(h.release).not.toHaveBeenCalled();
+
+    write.resolve("done");
+    await expect(run).resolves.toBe("done");
+    expect(h.release).toHaveBeenCalledExactlyOnceWith(claimA);
+    expect(h.gate.pending).toBe(false);
+  });
+
+  it("acquires a fresh claim when none is held", async () => {
+    const h = harness();
+    const write = vi.fn(async () => "ok");
+    await expect(runClaimedBulkWrite({ ...h.deps, write })).resolves.toBe("ok");
+    expect(h.acquire).toHaveBeenCalledOnce();
+    expect(write).toHaveBeenCalledOnce();
+    expect(h.gate.pending).toBe(false);
+  });
+
+  it("rejects without writing when no claim can be acquired or consumed", async () => {
+    const busy = harness();
+    // Another operation owns the gate: nothing to acquire.
+    busy.gate.tryAcquire();
+    const write = vi.fn(async () => {});
+    await expect(
+      runClaimedBulkWrite({ ...busy.deps, write }),
+    ).rejects.toThrow();
+    expect(write).not.toHaveBeenCalled();
+
+    const stale = harness();
+    const claim = stale.acquire();
+    if (!claim) throw new Error("no claim");
+    stale.gate.consume(claim); // already consumed by its one writer
+    await expect(
+      runClaimedBulkWrite({ ...stale.deps, write }),
+    ).rejects.toThrow();
+    expect(write).not.toHaveBeenCalled();
+    // The in-flight writer keeps its claim.
+    expect(stale.gate.pending).toBe(true);
+  });
+
+  it("rejects with the write's error, leaves the gate free, and a second call takes a fresh claim", async () => {
+    const h = harness();
+    const claimA = h.acquire();
+    const write = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error("disk"))
+      .mockResolvedValueOnce(undefined);
+
+    await expect(runClaimedBulkWrite({ ...h.deps, write })).rejects.toThrow(
+      "disk",
+    );
+    expect(h.gate.pending).toBe(false);
+    expect(h.held.current).toBeNull();
+
+    h.acquire.mockClear();
+    await expect(
+      runClaimedBulkWrite({ ...h.deps, write }),
+    ).resolves.toBeUndefined();
+    expect(h.acquire).toHaveBeenCalledOnce();
+    const claimB = h.consume.mock.calls.at(-1)?.[0];
+    expect(claimB).not.toBe(claimA);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(h.gate.pending).toBe(false);
   });
 });

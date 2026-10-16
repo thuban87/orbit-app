@@ -68,6 +68,11 @@ vi.mock("@/utils/logger", () => ({
 const { showSnackbar } = vi.hoisted(() => ({ showSnackbar: vi.fn() }));
 vi.mock("@/stores/snackbar-store", () => ({ showSnackbar }));
 
+import {
+  type BulkActionClaim,
+  createBulkActionGate,
+  runClaimedBulkWrite,
+} from "@/logic/dashboard-bulk-action-session";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { SnoozeSheet } from "./SnoozeSheet";
 
@@ -465,5 +470,128 @@ describe("SnoozeSheet confirmation and Undo (38.9 D-39; review V-03, W-01, Y-01)
       kind: "error",
       label: "Couldn't undo the snooze change for Alex. Try again.",
     });
+  });
+});
+
+// 38.11 D-45 bulk entry (review U-01, V-02): HomeScreen's bulk sheet adopts
+// the shared sheet's settlement. A harness parent holds a REAL gate, the held
+// input claim (claim A, taken when the sheet opened) and the ids captured at
+// open; each render hands the sheet a NEW onPreset that runs
+// runClaimedBulkWrite, reading the held claim at call time.
+describe("SnoozeSheet bulk settlement (review U-01, V-02)", () => {
+  it("keeps a failed bulk write open, frees the gate, and Retry takes a fresh claim over the same ids", async () => {
+    const gate = createBulkActionGate();
+    const tryAcquire = vi.spyOn(gate, "tryAcquire");
+    const held: { current: BulkActionClaim | null } = { current: null };
+    const acquire = () => {
+      const claim = gate.tryAcquire();
+      if (claim) held.current = claim;
+      return claim;
+    };
+    const consumed: BulkActionClaim[] = [];
+    const consume = (claim: BulkActionClaim) => {
+      const ok = gate.consume(claim);
+      if (ok) {
+        consumed.push(claim);
+        if (held.current === claim) held.current = null;
+      }
+      return ok;
+    };
+    const release = (claim: BulkActionClaim) => {
+      if (held.current === claim) held.current = null;
+      gate.release(claim);
+    };
+    // The sheet opens: claim A is held and the selection's ids captured.
+    const claimA = acquire();
+    const captured = [3, 5, 8];
+    const write = vi
+      .fn<(ids: number[]) => Promise<void>>()
+      .mockRejectedValueOnce(new Error("disk"))
+      .mockResolvedValueOnce(undefined);
+    const outcome = vi.fn();
+    const makeOnPreset = () => (_preset: "3d" | "1w" | "1m") =>
+      runClaimedBulkWrite({
+        takeHeldClaim: () => held.current,
+        acquire,
+        consume,
+        release,
+        write: () => write(captured),
+      }).then(() => outcome(`Snoozed ${captured.length} contacts`));
+
+    const sheet = mount({
+      title: "Snooze 3 contacts",
+      onPreset: makeOnPreset(),
+    });
+    sheet.press("snooze-sheet-1w");
+    await flush();
+
+    expect(sheet.onClose).not.toHaveBeenCalled();
+    expect(textOf(sheet.byTestId("snooze-sheet-error"))).toBe(ERROR_COPY);
+    expect(sheet.byTestId("snooze-sheet-retry")).toBeDefined();
+    expect(gate.pending).toBe(false);
+    expect(outcome).not.toHaveBeenCalled();
+    expect(consumed).toEqual([claimA]);
+
+    // The parent re-renders with a new onPreset identity; the runner keeps
+    // the first operation for Retry.
+    sheet.render({ onPreset: makeOnPreset() });
+    tryAcquire.mockClear();
+    sheet.press("snooze-sheet-retry");
+    await flush();
+
+    expect(tryAcquire).toHaveBeenCalledOnce();
+    const claimB = consumed.at(-1);
+    expect(claimB).toBeDefined();
+    expect(claimB).not.toBe(claimA);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(write.mock.calls.map((call) => call[0])).toEqual([
+      captured,
+      captured,
+    ]);
+    expect(outcome).toHaveBeenCalledExactlyOnceWith("Snoozed 3 contacts");
+    expect(sheet.onClose).toHaveBeenCalledOnce();
+    expect(gate.pending).toBe(false);
+    // Bulk passes no confirmName: the sheet adds no snackbar of its own.
+    expect(showSnackbar).not.toHaveBeenCalled();
+  });
+
+  // D-82 (review W-03): bulk Unsnooze writes and counts only the people the
+  // database said were snoozed when the sheet opened.
+  it("unsnoozes and counts only the snoozed subset captured at open", async () => {
+    const gate = createBulkActionGate();
+    const held: { current: BulkActionClaim | null } = {
+      current: gate.tryAcquire(),
+    };
+    const ids = [3, 5, 8];
+    const snoozedIds = [5];
+    const unsnooze = vi.fn(async (_ids: number[]) => {});
+    const outcome = vi.fn();
+    const sheet = mount({
+      title: "Snooze 3 contacts",
+      showUnsnooze: snoozedIds.length > 0,
+      onUnsnooze: () =>
+        runClaimedBulkWrite({
+          takeHeldClaim: () => held.current,
+          acquire: () => gate.tryAcquire(),
+          consume: (claim) => {
+            const ok = gate.consume(claim);
+            if (ok && held.current === claim) held.current = null;
+            return ok;
+          },
+          release: (claim) => gate.release(claim),
+          write: () => unsnooze(snoozedIds),
+        }).then(() =>
+          outcome(
+            `Unsnoozed ${snoozedIds.length} ${snoozedIds.length === 1 ? "contact" : "contacts"}`,
+          ),
+        ),
+    });
+    expect(ids).toHaveLength(3);
+    sheet.press("snooze-sheet-unsnooze");
+    await flush();
+    expect(unsnooze).toHaveBeenCalledExactlyOnceWith([5]);
+    expect(outcome).toHaveBeenCalledExactlyOnceWith("Unsnoozed 1 contact");
+    expect(sheet.onClose).toHaveBeenCalledOnce();
+    expect(gate.pending).toBe(false);
   });
 });

@@ -1,9 +1,9 @@
 /**
- * 38.9 D-27 (with D-10): no production file reaches React Native's `Alert` API
- * except `src/screens/HomeScreen.tsx`, whose one snooze dialog stays native
- * until 38.11 owns it. Every other decision is a themed `confirm()`, every
- * blocking message a themed `notice()`, and everything else a snackbar
- * (`src/stores/confirm-store.ts`, `src/stores/snackbar-store.ts`).
+ * 38.9 D-27 (with D-10): no production file reaches React Native's `Alert`
+ * API. 38.11 replaced the last one, the Contacts card snooze dialog, with the
+ * shared snooze sheet (38.11 D-45). Every decision is a themed `confirm()`,
+ * every blocking message a themed `notice()`, and everything else a snackbar
+ * or a sheet (`src/stores/confirm-store.ts`, `src/stores/snackbar-store.ts`).
  *
  * The scan parses each production file with the TypeScript compiler, so
  * comments and strings never count (RESEARCH Pitfall 4), and it catches every
@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = join(__dirname, "..");
 const SRC = join(ROOT, "src");
-const ALLOWED = ["src", "screens", "HomeScreen.tsx"].join("/");
+const HOME = ["src", "screens", "HomeScreen.tsx"].join("/");
 
 function productionFiles(dir: string): string[] {
   const out: string[] = [];
@@ -170,38 +170,37 @@ function alertCallLines(file: string, text: string): number[] {
 const files = [...productionFiles(SRC), join(ROOT, "App.tsx")];
 const rel = (file: string) => relative(ROOT, file).split(sep).join("/");
 
-describe("no native Alert outside the snooze dialog (38.9 D-27, D-10)", () => {
+describe("no native Alert anywhere in production code (38.9 D-27; 38.11 D-45)", () => {
   it("scans the whole app", () => {
     expect(files.length).toBeGreaterThan(300);
-    expect(files.map(rel)).toContain(ALLOWED);
+    expect(files.map(rel)).toContain(HOME);
     expect(files.map(rel)).toContain("App.tsx");
   });
 
-  it("no production file other than HomeScreen.tsx reaches React Native's Alert", () => {
-    const offenders = files
-      .filter((file) => rel(file) !== ALLOWED)
-      .flatMap((file) => {
-        const text = readFileSync(file, "utf8");
-        // Every form names both; skip the parse for files that cannot match.
-        if (!text.includes("react-native") || !text.includes("Alert")) {
-          return [];
-        }
-        return findRnAlertUses(file, text).map((hit) => `${rel(file)}:${hit}`);
-      });
+  it("no production file reaches React Native's Alert", () => {
+    const offenders = files.flatMap((file) => {
+      const text = readFileSync(file, "utf8");
+      // Every form names both; skip the parse for files that cannot match.
+      if (!text.includes("react-native") || !text.includes("Alert")) {
+        return [];
+      }
+      return findRnAlertUses(file, text).map((hit) => `${rel(file)}:${hit}`);
+    });
     expect(
       offenders,
       "use confirm()/notice() (src/stores/confirm-store.ts) or showSnackbar() instead",
     ).toEqual([]);
   }, 30_000);
 
-  it("HomeScreen keeps exactly one Alert.alert call: the snooze (D-10)", () => {
-    const home = join(ROOT, ALLOWED);
-    const text = readFileSync(home, "utf8");
-    expect(alertCallLines(home, text)).toHaveLength(1);
-    expect(text).toMatch(/Alert\.alert\(\s*"Snooze contact"/);
-    expect(findRnAlertUses(home, text)).toEqual([
-      expect.stringMatching(/named import$/),
-    ]);
+  it("no production file calls Alert.alert, HomeScreen included (38.11 D-45)", () => {
+    const calls = files.flatMap((file) => {
+      const text = readFileSync(file, "utf8");
+      if (!text.includes("Alert")) return [];
+      return alertCallLines(file, text).map((line) => `${rel(file)}:${line}`);
+    });
+    expect(calls).toEqual([]);
+    const home = join(ROOT, HOME);
+    expect(findRnAlertUses(home, readFileSync(home, "utf8"))).toEqual([]);
   });
 });
 
