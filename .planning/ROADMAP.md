@@ -166,7 +166,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.8: History Navigation UX** (INSERTED) - Completed 2026-10-09: 7/7 plans (incl. gap plan 07: G1/G2/YEARS) + deep code review (1 blocker, 3 warnings, fixed); verification passed 76/76; owner look-and-feel sign-off on the Pixel and his Moto; final release orbit-38.8-release-2026-10-09.apk (arm64). Replace the Profile History Rolodex date wheels with an activity-first stream of the contact's actual records, inside the existing History section. Records are newest first, grouped by year, month and day, with collapsed older years and Show older. A month/year Jump to date. A heatmap tap jumps to that day or cycle and highlights it. Honest empty states. The section is renamed "History", and the Rolodex is archived as reference. Dossier accepted (D-01..D-63); ready for planning.
 - [x] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; 17/17 plans (completed 2026-10-11)
 - [x] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6 (share reminders → 38.16); dossier accepted 2026-10-12 (completed 2026-10-15)
-- [ ] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile and contact-form audit fixes + new-contact defaults and not-contacted status; one Edit Contact form (Update Contact retired), slimmer + and ⋯, Archive → Bin, one snooze sheet, Birthday tile, Profile backgrounds rework; dossier accepted 2026-10-16
+- [x] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile and contact-form audit fixes + new-contact defaults and not-contacted status; one Edit Contact form (Update Contact retired), slimmer + and ⋯, Archive → Bin, one snooze sheet, Birthday tile, Profile backgrounds rework; dossier accepted 2026-10-16
 - [ ] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes; dossier pending
 - [ ] **Phase 38.13: Contacts List, Search & Digest UX** (INSERTED) - Contacts tab, search and Digest audit fixes + list perf investigation, D-95, D-98; dossier pending
 - [ ] **Phase 38.14: Logging, History, Events & Compose UX** (INSERTED) - Logging forms, History, Group Events and Compose audit fixes + one "Did you send it?" (D-76); dossier pending
@@ -1798,7 +1798,7 @@ Plans:
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
-| 38.11 Everyday Screens UX | 14/14 | In Progress|  |
+| 38.11 Everyday Screens UX | 14/14 | Complete| 2026-10-16 |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
