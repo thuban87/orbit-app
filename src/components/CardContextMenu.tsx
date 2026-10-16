@@ -2,7 +2,7 @@
  * Presentational per-contact action sheet for Dashboard Card View. Navigation
  * and writes are deliberately supplied by the HomeScreen host.
  */
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
