@@ -25,9 +25,9 @@
 // IMPORTANT: ADR-0013 [SUPERSEDED BY ADR-001] Runtime Two-Table Custom Fields with Whitelist-Constructed DDL
 // IMPORTANT: ADR-0014 [SUPERSEDED BY ADR-001 (partial)] Read-Time Custom-Field Type Semantics and a Single Sort Expression
 // IMPORTANT: ADR-0015 [SUPERSEDED BY ADR-001 (partial)] Lossless Field Changes with Quarantine and Launch-Time Retention Sweep
-// NOTE: ADR-0016 [ACCEPTED] Fixed-First Contact Forms and Atomic Contact Creation
+// IMPORTANT: ADR-0016 [SUPERSEDED BY ADR-222 (partial); ADR-223 (partial)] Fixed-First Contact Forms and Atomic Contact Creation
 // NOTE: ADR-0017 [ACCEPTED] Multi-Link Contact Reachability
-// IMPORTANT: ADR-0018 [SUPERSEDED BY ADR-080 (note — Archived list entry points only; gate unchanged); ADR-217 (partial)] Archive-Gated Contact Purge with Explicit Fan-Out
+// IMPORTANT: ADR-0018 [SUPERSEDED BY ADR-080 (note — Archived list entry points only; gate unchanged); ADR-217 (partial); ADR-226 (note — user-facing term "Archive" becomes "Bin"; gate unchanged)] Ar
 // IMPORTANT: ADR-0019 [SUPERSEDED BY ADR-080 (partial — root shell)] Native Stack Contact Lifecycle Navigation
 // NOTE: ADR-0020 [ACCEPTED] Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download
 // IMPORTANT: ADR-0021 [SUPERSEDED BY ADR-181 (partial)] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
@@ -91,7 +91,7 @@
 // NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
 // IMPORTANT: ADR-0080 [SUPERSEDED BY ADR-146 (partial)] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
 // NOTE: ADR-0081 [ACCEPTED] Retire AI-Proposed Fuel for Explicit Per-Item Permission
-// IMPORTANT: ADR-0082 [SUPERSEDED BY ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow)] Universal Capture FAB, Canonical Picker, and Truthful Quick Log
+// IMPORTANT: ADR-0082 [SUPERSEDED BY ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow); ADR-224 (partial)] Universal Capture FAB, Canonical Picker, and Truthful Q
 // NOTE: ADR-0083 [ACCEPTED] Durable Multi-Package Theme Configuration and Restore-Before-Paint
 // NOTE: ADR-0084 [ACCEPTED] Four Semantic Theme Palettes, Curated Accents, and Contrast Validation
 // NOTE: ADR-0085 [ACCEPTED] Live Reduced-Motion Signal for Skia Ambient Animation
@@ -112,13 +112,13 @@
 // IMPORTANT: ADR-0100 [SUPERSEDED BY ADR-215 (partial)] Relevance-First, Visibility-Safe Dashboard List Search
 // IMPORTANT: ADR-0101 [SUPERSEDED BY ADR-153 (partial — normal Grid card context row)] Avatar-First Accessible Dashboard Card Renderer
 // NOTE: ADR-0102 [ACCEPTED] Frozen-Universe Dashboard Multi-Select
-// NOTE: ADR-0103 [ACCEPTED] Atomic Composed Dashboard Bulk Mutations
+// IMPORTANT: ADR-0103 [SUPERSEDED BY ADR-227 (partial)] Atomic Composed Dashboard Bulk Mutations
 // NOTE: ADR-0104 [ACCEPTED] Durable Orrery Preferences and Live System Scope
 // NOTE: ADR-0105 [ACCEPTED] Scoped Relationship Satellites for System-Member Context
 // NOTE: ADR-0106 [ACCEPTED] Derived Orrery Gravity Visual Mass and Accessible Context
 // NOTE: ADR-0107 [ACCEPTED] Off Limits Excluded from All AI Egress
-// NOTE: ADR-0108 [ACCEPTED] Durable Independent-Axis Profile Presentation and Inheritance
-// NOTE: ADR-0109 [ACCEPTED] Fixed-Hero Semantic Profile Composition and Focused Accessible Editors
+// IMPORTANT: ADR-0108 [SUPERSEDED BY ADR-231 (partial)] Durable Independent-Axis Profile Presentation and Inheritance
+// IMPORTANT: ADR-0109 [SUPERSEDED BY ADR-225 (partial)] Fixed-Hero Semantic Profile Composition and Focused Accessible Editors
 // IMPORTANT: ADR-0110 [SUPERSEDED BY ADR-215 (partial)] Coherent Local Profile Snapshot and Source-Owned Knowledge Projection
 // NOTE: ADR-0111 [ACCEPTED] Cadence-Guarded Profile Metrics and Composed Relationship Actions
 // NOTE: ADR-0112 [ACCEPTED] App-Owned Profile Background Derivatives and Launch Reconciliation
@@ -140,8 +140,8 @@
 // NOTE: ADR-0128 [ACCEPTED] Same-Group Contact Merge Refusal with Remediation
 // NOTE: ADR-0129 [ACCEPTED] Portable Group Identity and History-Preserving Orphan Disposition
 // NOTE: ADR-0130 [ACCEPTED] Durable Scoped Default Interaction Channel
-// IMPORTANT: ADR-0131 [SUPERSEDED BY ADR-207 (partial)] Progressive Contact Creation and Complete-Record Editing
-// IMPORTANT: ADR-0132 [SUPERSEDED BY ADR-211 (partial)] Focused Rapid Capture Workflows
+// IMPORTANT: ADR-0131 [SUPERSEDED BY ADR-207 (partial); ADR-222 (partial); ADR-223 (partial)] Progressive Contact Creation and Complete-Record Editing
+// IMPORTANT: ADR-0132 [SUPERSEDED BY ADR-211 (partial); ADR-224 (partial)] Focused Rapid Capture Workflows
 // NOTE: ADR-0133 [ACCEPTED] Session-Scoped Compose Modes and Truthful External Handoff
 // NOTE: ADR-0134 [ACCEPTED] Read-Only Compose Research and Permission-Bounded Message Focus
 // NOTE: ADR-0135 [ACCEPTED] Multi-Connection AI Configuration and Fail-Closed Readiness
@@ -208,7 +208,7 @@
 // NOTE: ADR-0196 [ACCEPTED] Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates
 // NOTE: ADR-0197 [ACCEPTED] History Stream Keeps Its Place, Starts Fresh per Visit, and the Reveal Settles After Load
 // IMPORTANT: ADR-0198 [SUPERSEDED BY ADR-221 (partial)] Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays
-// IMPORTANT: ADR-0199 [SUPERSEDED BY ADR-212 (partial)] App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State
+// IMPORTANT: ADR-0199 [SUPERSEDED BY ADR-212 (partial); ADR-226 (partial)] App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State
 // NOTE: ADR-0200 [ACCEPTED] Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants
 // NOTE: ADR-0201 [ACCEPTED] Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen
 // NOTE: ADR-0202 [ACCEPTED] History Back Across Tabs and + Forms Over the Current Tab
@@ -226,10 +226,20 @@
 // NOTE: ADR-0214 [ACCEPTED] AI Permission for the New Knowledge Homes, and Compose Research After Fuel
 // NOTE: ADR-0215 [ACCEPTED] Search and Glanceable Surfaces After Fuel
 // NOTE: ADR-0216 [ACCEPTED] A Share Saves at Once to Thought of Them, with an Interactive Confirmation Card and the List Picker
-// NOTE: ADR-0217 [ACCEPTED] Share Undo Also Removes a Contact the Share Created — a Narrow Exception to Archive-Before-Purge
+// IMPORTANT: ADR-0217 [SUPERSEDED BY ADR-231 (partial)] Share Undo Also Removes a Contact the Share Created — a Narrow Exception to Archive-Before-Purge
 // NOTE: ADR-0218 [ACCEPTED] Things to Remember on the Profile — Section Order, Heading Actions, Empty Add, Pin, and Hide from Profile Switched Off
 // NOTE: ADR-0219 [ACCEPTED] Per-Section Editors Replace the Things to Remember and Memory Screens, with Card Edit Mode and a Section Add Button
 // NOTE: ADR-0220 [ACCEPTED] Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field
 // NOTE: ADR-0221 [ACCEPTED] Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place
+// NOTE: ADR-0222 [ACCEPTED] Add Contact Opens Bound, Monthly and Not Yet, with Relationship Basics Open
+// NOTE: ADR-0223 [ACCEPTED] Birthday, Social Battery, Links and a Held Photo on Add Contact, and Open Existing on a Duplicate Name
+// NOTE: ADR-0224 [ACCEPTED] One Contact Form — Update Contact Retired to the Archive, and a Four-Action +
+// NOTE: ADR-0225 [ACCEPTED] Profile Top — a Full-Width Edit Contact Button, a "Compose" Label, the Name in a Solid Top Bar, and a Slimmer ⋯
+// NOTE: ADR-0226 [ACCEPTED] Archive Becomes the Bin, and Move to Bin Confirms First with No Undo
+// NOTE: ADR-0227 [ACCEPTED] One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar
+// NOTE: ADR-0228 [ACCEPTED] Truthful Relationship Overview — Never Contacted, Honest Unbound Reasons, Plain Definitions and a Custom Frequency Row
+// NOTE: ADR-0229 [ACCEPTED] Birthday on the Profile — an Overview Tile, a Save-on-Pick Sheet, and One Birthday Control That Asks for the Year
+// NOTE: ADR-0230 [ACCEPTED] A Settings Page for Profile Backgrounds and a Choose-Only Background Sheet
+// NOTE: ADR-0231 [ACCEPTED] Open/Closed Sections Survive Own-Layout Edits, Layout Tools Move into the Sheets, and Reset Writes an All-Default Row
 
-export const ADR_COUNT = 221;
+export const ADR_COUNT = 231;
