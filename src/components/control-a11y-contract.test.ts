@@ -1,5 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import {
+  isFutureLocalDate,
+  lastSpokeMaxDate,
+  lastSpokeSegmentTone,
+} from "@/components/tri-state-last-spoke-logic";
+import { formatLocalDate } from "@/utils/dates";
 
 /**
  * Source contract for the shared editor-control accessibility treatment
@@ -180,10 +186,55 @@ describe("Last-spoke tri-state date segment (AUD-UIA-005)", () => {
     expect(tri).toMatch(/segment: \{[^}]*minHeight: MIN_TOUCH_TARGET/);
   });
 
-  it("keeps the intentionally muted Not-yet treatment", () => {
-    expect(tri).toMatch(
-      /kind === "not-yet"\) \{\s*return \{\s*background: colors\.surface,\s*border: colors\.borderStrong,\s*text: colors\.textSecondary,/,
-    );
+  // 38.11 D-04, D-44, D-25: "Not yet" is muted only while unselected; once
+  // chosen it reads selected like Today and Pick date (Add and Edit share it).
+  it("mutes Not yet only while it is not selected", () => {
+    expect(lastSpokeSegmentTone("not-yet", false)).toEqual({
+      background: "surface",
+      border: "borderStrong",
+      text: "textSecondary",
+    });
+  });
+
+  it("gives a selected Not yet the same selected colours as Today and Pick date", () => {
+    const selected = {
+      background: "accent",
+      border: "accent",
+      text: "onAccent",
+    };
+    expect(lastSpokeSegmentTone("not-yet", true)).toEqual(selected);
+    expect(lastSpokeSegmentTone("today", true)).toEqual(selected);
+    expect(lastSpokeSegmentTone("date", true)).toEqual(selected);
+  });
+
+  it("keeps unselected Today and Pick date on the plain surface", () => {
+    const plain = {
+      background: "surface",
+      border: "border",
+      text: "textPrimary",
+    };
+    expect(lastSpokeSegmentTone("today", false)).toEqual(plain);
+    expect(lastSpokeSegmentTone("date", false)).toEqual(plain);
+  });
+
+  it("draws every segment through the shared tone helper", () => {
+    expect(tri).toMatch(/lastSpokeSegmentTone\(kind, selected\)/);
+    expect(tri).not.toMatch(/colors\.borderStrong/);
+  });
+
+  // 38.11 D-31: the Pick date picker cannot reach a future day.
+  it("caps the Pick date picker at today", () => {
+    const picker = elementRegions(tri, "DateTimePicker")[0];
+    expect(picker).toContain("maximumDate={lastSpokeMaxDate()}");
+  });
+
+  it("lastSpokeMaxDate is the end of today's local day, never tomorrow", () => {
+    const now = new Date(2026, 9, 16, 21, 30, 0);
+    const max = lastSpokeMaxDate(now);
+    expect(formatLocalDate(max)).toBe("2026-10-16");
+    expect(isFutureLocalDate(max, now)).toBe(false);
+    // The whole of today stays pickable.
+    expect(max.getTime()).toBeGreaterThanOrEqual(now.getTime());
   });
 });
 
