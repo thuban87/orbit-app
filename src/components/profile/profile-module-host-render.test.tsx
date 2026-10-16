@@ -6,13 +6,25 @@ import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import type { ProfilePresentation } from "@/profile/types";
 import { ProfileModuleHost } from "./ProfileModuleHost";
 
+// `useState` returns its initial value unless a test seeds a slot (call order
+// within one render, counted from `hooks.index`; the Birthday sheet case
+// resets it and seeds the host's activeSheet slot).
+const hooks = vi.hoisted(() => ({
+  index: 0,
+  seed: new Map<number, unknown>(),
+  initial: [] as unknown[],
+}));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useCallback: <T,>(callback: T) => callback,
   useEffect: () => {},
   useMemo: <T,>(factory: () => T) => factory(),
   useRef: <T,>(value: T) => ({ current: value }),
-  useState: <T,>(value: T) => [value, vi.fn()] as const,
+  useState: (value: unknown) => {
+    const slot = hooks.index++;
+    hooks.initial[slot] = value;
+    return [hooks.seed.has(slot) ? hooks.seed.get(slot) : value, vi.fn()];
+  },
 }));
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
@@ -39,6 +51,7 @@ vi.mock("@/db/profile-presentation-dao", () => ({
 vi.mock("./ProfileRelationshipSheets", () => ({
   ProfileRelationshipSheets: "ProfileRelationshipSheets",
 }));
+vi.mock("./BirthdaySheet", () => ({ BirthdaySheet: "BirthdaySheet" }));
 vi.mock("./RelationshipOverview", () => ({
   RelationshipOverview: "RelationshipOverview",
 }));
@@ -113,6 +126,7 @@ function sectionHeaderCaptions(
         onSetFrequency: vi.fn(async () => {}),
         onSnooze: vi.fn(async () => {}),
         onUnsnooze: vi.fn(async () => {}),
+        onSaveBirthday: vi.fn(async () => {}),
         onKnowledgeAction: vi.fn(),
         onKnowledgeViewAll: vi.fn(),
         onOpenValueHistory: vi.fn(),
@@ -179,6 +193,7 @@ function profileHostNodes(
         onSetFrequency: vi.fn(async () => {}),
         onSnooze: vi.fn(async () => {}),
         onUnsnooze: vi.fn(async () => {}),
+        onSaveBirthday: vi.fn(async () => {}),
         onKnowledgeAction,
         onKnowledgeViewAll: vi.fn(),
         onOpenValueHistory: vi.fn(),
@@ -342,6 +357,8 @@ describe("ProfileModuleHost section-header captions", () => {
           onSetFrequency: vi.fn(async () => {}),
           onSnooze: vi.fn(async () => {}),
           onUnsnooze: vi.fn(async () => {}),
+          onSaveBirthday: vi.fn(async () => {}),
+          onSaveBirthday: vi.fn(async () => {}),
           onKnowledgeAction: vi.fn(),
           onKnowledgeViewAll: vi.fn(),
           onOpenValueHistory: vi.fn(),
@@ -398,6 +415,8 @@ describe("ProfileModuleHost History reveal", () => {
           onSetFrequency: vi.fn(async () => {}),
           onSnooze: vi.fn(async () => {}),
           onUnsnooze: vi.fn(async () => {}),
+          onSaveBirthday: vi.fn(async () => {}),
+          onSaveBirthday: vi.fn(async () => {}),
           onKnowledgeAction: vi.fn(),
           onKnowledgeViewAll: vi.fn(),
           onOpenValueHistory: vi.fn(),
@@ -646,6 +665,8 @@ describe("ProfileModuleHost History reveal", () => {
           onSetFrequency: vi.fn(async () => {}),
           onSnooze: vi.fn(async () => {}),
           onUnsnooze: vi.fn(async () => {}),
+          onSaveBirthday: vi.fn(async () => {}),
+          onSaveBirthday: vi.fn(async () => {}),
           onKnowledgeAction: vi.fn(),
           onKnowledgeViewAll: vi.fn(),
           onOpenValueHistory: vi.fn(),
@@ -694,5 +715,77 @@ describe("ProfileModuleHost History reveal", () => {
     request(target, () => false, stale);
     expect(stale).not.toHaveBeenCalled();
     expect(onRequestScrollTo).not.toHaveBeenCalled();
+  });
+});
+
+// 38.11 D-56/D-59 (review T-06): the Overview's sheets live in the host; the
+// "birthday" sheet id opens the Birthday sheet, never ProfileRelationshipSheets.
+describe("ProfileModuleHost Birthday sheet (38.11 D-56, D-59)", () => {
+  /** The host's useState order: collapse, pending, failed, activeSheet. */
+  const ACTIVE_SHEET_SLOT = 3;
+
+  function birthdayHostNodes(activeSheet: string | null) {
+    const onSaveBirthday = vi.fn(async () => {});
+    hooks.index = 0;
+    hooks.seed.clear();
+    hooks.seed.set(ACTIVE_SHEET_SLOT, activeSheet);
+    try {
+      const nodes = all(
+        resolve(
+          ProfileModuleHost({
+            snapshot: {
+              identity: { id: 7, name: "Ada", birthday: "1990-05-03" },
+              knowledge: { status: "ready", data: {} },
+              history: { status: "ready", data: {} },
+            } as unknown as ProfileSnapshot,
+            presentation,
+            todayLocal: "2026-09-19",
+            historyRevision: 0,
+            onRequestScrollTo: vi.fn(),
+            onSetFrequency: vi.fn(async () => {}),
+            onSnooze: vi.fn(async () => {}),
+            onUnsnooze: vi.fn(async () => {}),
+            onSaveBirthday,
+            onKnowledgeAction: vi.fn(),
+            onKnowledgeViewAll: vi.fn(),
+            onOpenValueHistory: vi.fn(),
+            onOpenKnowledgeChange: vi.fn(),
+            onContactMethodAction: vi.fn(),
+          }),
+        ),
+      );
+      return { nodes, onSaveBirthday };
+    } finally {
+      hooks.seed.clear();
+    }
+  }
+
+  it("pins the activeSheet slot", () => {
+    birthdayHostNodes(null);
+    expect(hooks.initial[ACTIVE_SHEET_SLOT]).toBeNull();
+  });
+
+  it("renders the Birthday sheet for the birthday id with the host's save and stored birthday", () => {
+    const { nodes, onSaveBirthday } = birthdayHostNodes("birthday");
+    const sheet = nodes.find((node) => node.type === "BirthdaySheet");
+    expect(sheet?.props.visible).toBe(true);
+    expect(sheet?.props.birthday).toBe("1990-05-03");
+    expect(sheet?.props.onSave).toBe(onSaveBirthday);
+    expect(sheet?.props.onClose).toBeTypeOf("function");
+    const relationship = nodes.find(
+      (node) => node.type === "ProfileRelationshipSheets",
+    );
+    expect(relationship?.props.active).toBeNull();
+  });
+
+  it("keeps the Birthday sheet closed for the other sheet ids", () => {
+    const { nodes } = birthdayHostNodes("snooze");
+    expect(
+      nodes.find((node) => node.type === "BirthdaySheet")?.props.visible,
+    ).toBe(false);
+    expect(
+      nodes.find((node) => node.type === "ProfileRelationshipSheets")?.props
+        .active,
+    ).toBe("snooze");
   });
 });

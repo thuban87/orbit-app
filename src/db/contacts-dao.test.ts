@@ -33,6 +33,7 @@ import {
   createContactFull,
   listArchived,
   restoreContact,
+  setContactBirthday,
   setContactCategoryCore,
   setContactFrequencyCore,
   updateContactFull,
@@ -2351,5 +2352,113 @@ describe("createContactFull — birthday, social battery and links (38.11 D-48)"
     });
     expect(await linkRows()).toEqual([]);
     expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+});
+
+// =============================================================================
+// 38.11-08 — the Profile Birthday sheet's single-column writer (D-59, D-61).
+// One transaction, `?`-bound UPDATE of birthday + modified_at only, a
+// changes===1 guard, exactly one data_revision bump; an invalid value is
+// rejected before BEGIN. Never routed through updateContactMetadataCore.
+// =============================================================================
+describe("setContactBirthday — Profile Birthday sheet writer (38.11 D-59)", () => {
+  const SHEET_NOW = "2026-10-16 09:30:00";
+
+  async function makeBirthdayContact(birthday?: string): Promise<number> {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Birthday person",
+      intervalDays: 30,
+      now: NOW,
+      socialBattery: "Charger",
+      ...(birthday ? { birthday } : {}),
+    });
+    return contactId;
+  }
+
+  function countingBegins(): { exec: SqlExecutor; begins: () => number } {
+    let begins = 0;
+    const counted: SqlExecutor = {
+      ...exec,
+      execAsync: (sql: string) => {
+        if (/^\s*BEGIN/i.test(sql)) begins += 1;
+        return exec.execAsync(sql);
+      },
+    };
+    return { exec: counted, begins: () => begins };
+  }
+
+  it("sets a year-known birthday, bumps modified_at and data_revision exactly once", async () => {
+    const contactId = await makeBirthdayContact();
+    const before = await readDataRevision(exec);
+    await setContactBirthday(exec, {
+      contactId,
+      birthday: "1990-05-03",
+      now: SHEET_NOW,
+    });
+    const m = await metadata(contactId);
+    expect(m?.birthday).toBe("1990-05-03");
+    // Only birthday changed among the metadata columns.
+    expect(m?.social_battery).toBe("Charger");
+    expect(m?.name).toBe("Birthday person");
+    const row = await exec.getFirstAsync<{ modified_at: string }>(
+      "SELECT modified_at FROM contacts WHERE id = ?",
+      [contactId],
+    );
+    expect(row?.modified_at).toBe(SHEET_NOW);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("stores a year-unknown MM-DD birthday as given", async () => {
+    const contactId = await makeBirthdayContact("1990-05-03");
+    await setContactBirthday(exec, {
+      contactId,
+      birthday: "05-03",
+      now: SHEET_NOW,
+    });
+    expect((await metadata(contactId))?.birthday).toBe("05-03");
+  });
+
+  it("clears the birthday with null in one bump", async () => {
+    const contactId = await makeBirthdayContact("02-29");
+    const before = await readDataRevision(exec);
+    await setContactBirthday(exec, {
+      contactId,
+      birthday: null,
+      now: SHEET_NOW,
+    });
+    expect((await metadata(contactId))?.birthday).toBeNull();
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it.each(["2021-02-29", "2021-02-30", "13-01", "2000", "garbage", ""])(
+    "rejects an invalid birthday (%j) before any transaction opens",
+    async (bad) => {
+      const contactId = await makeBirthdayContact("1990-05-03");
+      const before = await readDataRevision(exec);
+      const counted = countingBegins();
+      await expect(
+        setContactBirthday(counted.exec, {
+          contactId,
+          birthday: bad,
+          now: SHEET_NOW,
+        }),
+      ).rejects.toThrow(/birthday/);
+      expect(counted.begins()).toBe(0);
+      expect((await metadata(contactId))?.birthday).toBe("1990-05-03");
+      expect(await readDataRevision(exec)).toBe(before);
+    },
+  );
+
+  it("throws (rolls back) when no contact matches and bumps nothing", async () => {
+    const before = await readDataRevision(exec);
+    await expect(
+      setContactBirthday(exec, {
+        contactId: 9999,
+        birthday: "1990-05-03",
+        now: SHEET_NOW,
+      }),
+    ).rejects.toThrow(/no contact matched/);
+    expect(await readDataRevision(exec)).toBe(before);
   });
 });
