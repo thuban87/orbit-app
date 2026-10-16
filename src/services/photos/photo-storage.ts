@@ -280,17 +280,31 @@ export function listReconcileStagingPhotos(): Array<{
   });
 }
 
-/** List every Add Contact held-photo staging file for the orphan sweep. */
+/**
+ * List every Add Contact held-photo staging file for the orphan sweep. An
+ * entry whose name is not a create-staging path is skipped and logged, never
+ * returned, so one stray file cannot abort the whole sweep pass and nothing
+ * unrecognised is ever deleted (38.11 review IN-09).
+ */
 export function listCreateStagingPhotos(): Array<{
   relative: string;
   isStageTmpOrphan: boolean;
 }> {
   const directory = new Directory(Paths.document, CREATE_STAGING_DIR);
   if (!directory.exists) return [];
-  return directory.list().map((entry) => {
+  return directory.list().flatMap((entry) => {
     const relative = `${CREATE_STAGING_DIR}/${entry.name}`;
-    assertSafeCreateStagingRelative(relative);
-    return { relative, isStageTmpOrphan: relative.endsWith(".stage-tmp") };
+    try {
+      assertSafeCreateStagingRelative(relative);
+    } catch (error) {
+      Logger.error(
+        LOG_SCOPE,
+        "skipped unrecognised create staging entry",
+        error,
+      );
+      return [];
+    }
+    return [{ relative, isStageTmpOrphan: relative.endsWith(".stage-tmp") }];
   });
 }
 

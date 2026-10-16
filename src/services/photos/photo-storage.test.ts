@@ -449,6 +449,17 @@ describe("create staging — Add Contact's held photo (38.11 D-77)", () => {
     expect(listCreateStagingPhotos()).toEqual([]);
   });
 
+  // Review IN-09: one stray file must not abort the whole sweep pass. It is
+  // skipped (and logged), never deleted, so nothing unrecognised is removed.
+  it("lists the valid held photos and skips a stray entry instead of throwing", async () => {
+    const relative = createStagingRelPath("session", "pick");
+    await stageCreatePhoto("file:///cache/encoded.jpg", relative);
+    h.exists.add("file:///doc/create-staging/notes.txt");
+    expect(listCreateStagingPhotos()).toEqual([
+      { relative, isStageTmpOrphan: false },
+    ]);
+  });
+
   it("guards every entry point against a non-create-staging path", async () => {
     const outside = "avatars/contact-1.jpg";
     await expect(stageCreatePhoto("file:///x.jpg", outside)).rejects.toThrow();
