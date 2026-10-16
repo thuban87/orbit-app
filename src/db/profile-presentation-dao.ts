@@ -467,6 +467,43 @@ export function assignContactBackgroundTemplate(
   });
 }
 
+/**
+ * Reset in Profile Layout (38.11 D-65, layout half): clears the person's
+ * layout (template or their own) and every open/closed choice, and keeps
+ * their background. Presentation-only (ADR-108): no contact or relationship
+ * data is touched. With no background left the row says nothing, so it is
+ * deleted rather than kept as an all-default row. One revision bump.
+ */
+export function resetContactLayoutPresentation(
+  exec: SqlExecutor,
+  input: { contactId: number; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await assertContactExists(exec, input.contactId);
+    const current = await exec.getFirstAsync<{
+      background_template_uid: string | null;
+    }>(
+      "SELECT background_template_uid FROM profile_contact_presentation WHERE contact_id=?",
+      [input.contactId],
+    );
+    if (current?.background_template_uid) {
+      await upsertContactPresentation(exec, {
+        contactId: input.contactId,
+        layoutTemplateUid: null,
+        freeformLayoutJson: null,
+        clearCollapse: true,
+        now: input.now,
+      });
+    } else {
+      await exec.runAsync(
+        "DELETE FROM profile_contact_presentation WHERE contact_id=?",
+        [input.contactId],
+      );
+    }
+    await bumpDataRevisionCore(exec);
+  });
+}
+
 export function resetProfilePresentation(
   exec: SqlExecutor,
   contactId: number,

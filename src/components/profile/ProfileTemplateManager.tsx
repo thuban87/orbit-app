@@ -366,8 +366,16 @@ export function ProfileTemplateManager({
       <Sheet visible={visible} onRequestClose={closeOrBack} variant="expanded">
         <View style={styles.root} accessibilityViewIsModal>
           <View style={styles.heading}>
-            <AppText role="heading">Profile layout templates</AppText>
-            <Button role="secondary" label="Back" onPress={closeOrBack} />
+            {/* The 38.9 header Back (38.11 D-43): icon-only chevron, 44dp. */}
+            <Button
+              role="iconOnly"
+              icon="back"
+              accessibilityLabel="Back"
+              onPress={closeOrBack}
+            />
+            <AppText role="heading" style={styles.headingTitle}>
+              Profile layout templates
+            </AppText>
           </View>
           {state.error ? (
             <AppText
@@ -769,9 +777,9 @@ const styles = StyleSheet.create({
   heading: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between",
     gap: SPACING.sm,
   },
+  headingTitle: { flex: 1 },
   content: { gap: SPACING.sm, paddingBottom: SPACING.xl },
   templateRow: { gap: SPACING.xs, padding: SPACING.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },

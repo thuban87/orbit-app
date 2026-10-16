@@ -332,6 +332,15 @@ export function ContactProfileScreen({
         Object.keys(snapshot.presentation.contact.collapse).length > 0),
   );
 
+  // The layout axis alone (38.11 D-65): Reset in Profile Layout shows when the
+  // person has a layout template, their own layout or an open/closed override.
+  const hasContactLayoutOverride = Boolean(
+    snapshot &&
+      (snapshot.presentation.contact.layoutTemplateUid !== null ||
+        snapshot.presentation.contact.freeformLayout !== null ||
+        Object.keys(snapshot.presentation.contact.collapse).length > 0),
+  );
+
   const closeOverlay = useCallback(
     () => setOverlay((current) => closeTopmostProfileOverlay(current)),
     [],
@@ -971,6 +980,7 @@ export function ContactProfileScreen({
                 setOverlay("templates");
               }}
               onManageTemplates={() => setOverlay("templates")}
+              hasLayoutOverride={hasContactLayoutOverride}
             />
             <ProfileTemplateManager
               visible={overlay === "templates"}

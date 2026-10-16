@@ -20,7 +20,10 @@ import { OrbitSwitch } from "@/components/ui/OrbitSwitch";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { getExecutor, localDateTime } from "@/db/database";
-import { setContactFreeformLayout } from "@/db/profile-presentation-dao";
+import {
+  resetContactLayoutPresentation,
+  setContactFreeformLayout,
+} from "@/db/profile-presentation-dao";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
   changedDefaultExpandedIds,
@@ -40,6 +43,7 @@ import type {
   ProfileLayoutDocument,
   ProfileModulePlacement,
 } from "@/profile/types";
+import { confirm } from "@/stores/confirm-store";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -60,8 +64,17 @@ export interface ProfileLayoutEditorProps {
   effectiveSource: string;
   layout: unknown;
   onRequestClose: () => void;
-  /** Reload the screen's resolved presentation after the DAO's atomic save succeeds. */
-  onCommitted?: (layout: ProfileLayoutDocument) => void;
+  /**
+   * Reload the screen's resolved presentation after the DAO's atomic save
+   * succeeds. A Reset passes no layout (the resolved default replaces it).
+   */
+  onCommitted?: (layout?: ProfileLayoutDocument) => void;
+  /**
+   * The person has their own layout choice to reset: a layout template, their
+   * own layout, or any open/closed section override (38.11 D-65). Shows
+   * "Reset to default" on the chooser. Absent (template editing) → hidden.
+   */
+  hasLayoutOverride?: boolean;
   /** Plan 08 owns template creation; this component only hands it a draft intent. */
   onSaveAsTemplate?: (layout: ProfileLayoutDocument) => void;
   /** Opens the shared template library without first creating a freeform layout. */
@@ -196,6 +209,11 @@ function ReorderableBucket({
         <EditorRow placement={item} dispatch={dispatch} />
       )}
       scrollable={false}
+      // D-29: the outer ScrollViewContainer is the only scroll container. A
+      // nested FlatList with scrollEnabled false skips React Native's "nested
+      // VirtualizedList" warning; drag still disables/restores the container's
+      // scroll on its own (ReorderableListCore setScrollEnabled).
+      scrollEnabled={false}
     />
   );
 }
@@ -288,6 +306,7 @@ export function ProfileLayoutEditor({
   onSaveAsTemplate,
   onManageTemplates,
   onSaveDraft,
+  hasLayoutOverride = false,
 }: ProfileLayoutEditorProps) {
   const [initial, setInitial] = useState(() =>
     createProfileLayoutEditorDraft(layout),
@@ -361,6 +380,36 @@ export function ProfileLayoutEditor({
     setSaving(false);
   };
 
+  // Reset in Profile Layout (38.11 D-65, layout half). It discards the
+  // person's layout and open/closed choices with no Undo, so it asks first
+  // with the themed destructive confirm (38.9 D-30). Presentation-only
+  // (ADR-108): the background and contact details stay.
+  const resetLayout = async () => {
+    if (saving) return;
+    const ok = await confirm({
+      title: `Reset ${contactName}'s layout?`,
+      message:
+        "This puts the Profile sections back to the default layout and clears which sections are open. The background and contact details stay unchanged.",
+      confirmLabel: "Reset layout",
+      destructive: true,
+    });
+    if (!ok) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await resetContactLayoutPresentation(getExecutor(), {
+        contactId,
+        now: localDateTime(),
+      });
+      setSaving(false);
+      onCommitted?.();
+      onRequestClose();
+    } catch {
+      setSaving(false);
+      setSaveError("Couldn't reset this layout. Try again.");
+    }
+  };
+
   return (
     <Sheet
       visible={visible}
@@ -379,7 +428,10 @@ export function ProfileLayoutEditor({
           <Button
             role="primary"
             label="Edit layout"
-            onPress={() => setPage("editor")}
+            onPress={() => {
+              setSaveError(null);
+              setPage("editor");
+            }}
           />
           {onManageTemplates ? (
             <Button
@@ -387,6 +439,19 @@ export function ProfileLayoutEditor({
               label="Layout templates"
               onPress={onManageTemplates}
             />
+          ) : null}
+          {hasLayoutOverride ? (
+            <Button
+              role="secondary"
+              label="Reset to default"
+              disabled={saving}
+              onPress={() => void resetLayout()}
+            />
+          ) : null}
+          {saveError ? (
+            <AppText role="caption" accessibilityLiveRegion="polite">
+              {saveError}
+            </AppText>
           ) : null}
           <Button role="secondary" label="Close" onPress={closeOrGuard} />
         </View>

@@ -43,3 +43,23 @@ describe("shared Profile layout-template library contract", () => {
     expect(manager).toContain("onPress={() => void loadList()}");
   });
 });
+
+/**
+ * 38.11 D-43: the templates sheet header uses the 38.9 header Back, an
+ * icon-only chevron labelled "Back" placed before the heading, not a text
+ * "Back" button.
+ */
+describe("Profile layout templates sheet header (D-43)", () => {
+  it("uses the icon-only Back chevron before the heading", () => {
+    const manager = source("ProfileTemplateManager.tsx");
+    expect(manager).not.toContain('label="Back"');
+    const back = manager.indexOf('icon="back"');
+    expect(back).toBeGreaterThan(-1);
+    const button = manager.slice(manager.lastIndexOf("<Button", back), back);
+    expect(button).toContain('role="iconOnly"');
+    const close = manager.indexOf("/>", back);
+    expect(manager.slice(back, close)).toContain('accessibilityLabel="Back"');
+    expect(manager.slice(back, close)).toContain("onPress={closeOrBack}");
+    expect(back).toBeLessThan(manager.indexOf("Profile layout templates"));
+  });
+});
