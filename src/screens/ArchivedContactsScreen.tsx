@@ -255,10 +255,10 @@ export function ArchivedContactsScreen() {
                   }
                   style={styles.rowNameButton}
                 >
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.rowName, { color: colors.textPrimary }]}
-                  >
+                  {/* 38.11-14 D7: the full name on its own line above the
+                      buttons, never truncated (it was cut to a few letters
+                      beside them at font 1.15). */}
+                  <Text style={[styles.rowName, { color: colors.textPrimary }]}>
                     {contact.name}
                   </Text>
                 </Pressable>
@@ -325,16 +325,14 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    alignItems: "stretch",
     borderWidth: 1,
     borderRadius: 10,
     padding: 12,
     gap: 10,
   },
   rowNameButton: {
-    flex: 1,
     justifyContent: "center",
     minHeight: 44,
   },
@@ -344,6 +342,7 @@ const styles = StyleSheet.create({
   },
   rowActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   actionBtn: {

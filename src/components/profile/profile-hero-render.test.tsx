@@ -257,12 +257,12 @@ describe("ProfileHero unusable-method reasons (38.11 D-27)", () => {
   });
 });
 
-// 38.11 D-63, D-47 (D-46: Compose behaviour unchanged).
-describe("ProfileHero top actions (38.11 D-63, D-47)", () => {
+// 38.11 D-63, D-47, D-91 (D-46: Compose behaviour unchanged).
+describe("ProfileHero top actions (38.11 D-63, D-47, D-91)", () => {
   const block = (nodes: Node[]) =>
     nodes.find((node) => node.props.testID === "profile-hero-actions");
 
-  it("puts a full-width Edit Contact above the Compose Message and Call pair", () => {
+  it("puts a full-width Edit Contact above the Compose and Call pair", () => {
     const nodes = render();
     const root = nodes.find((node) => node.props.testID === "profile-hero");
     const actions = block(nodes);
@@ -281,7 +281,8 @@ describe("ProfileHero top actions (38.11 D-63, D-47)", () => {
     const labels = (pair?.children ?? []).map(
       (column) => column.children[0]?.props.label,
     );
-    expect(labels).toEqual(["Compose Message", "Call"]);
+    // D-91: one word, so it stays on one line beside Call.
+    expect(labels).toEqual(["Compose", "Call"]);
     expect(pair?.props.style).toMatchObject({
       flexDirection: "row",
       flexWrap: "wrap",
@@ -298,7 +299,7 @@ describe("ProfileHero top actions (38.11 D-63, D-47)", () => {
     expect(onMessage).not.toHaveBeenCalled();
   });
 
-  it("labels the top Message button Compose Message, naming the person", () => {
+  it("labels the top Message button Compose, naming the person (D-91)", () => {
     const nodes = all(
       resolve(
         ProfileHero({
@@ -317,8 +318,7 @@ describe("ProfileHero top actions (38.11 D-63, D-47)", () => {
       ),
     );
     const compose = nodes.find(
-      (node) =>
-        node.type === "Button" && node.props.label === "Compose Message",
+      (node) => node.type === "Button" && node.props.label === "Compose",
     );
     expect(compose?.props.disabled).toBe(false);
     expect(compose?.props.accessibilityLabel).toBe("Compose a message to Alex");
@@ -330,16 +330,21 @@ describe("ProfileHero top actions (38.11 D-63, D-47)", () => {
         (node) => node.type === "Button" && node.props.label === "Message",
       ),
     ).toBe(false);
+    expect(
+      nodes.some(
+        (node) =>
+          node.type === "Button" && node.props.label === "Compose Message",
+      ),
+    ).toBe(false);
   });
 
-  it("names the reason when Compose Message is unavailable", () => {
+  it("names the reason when Compose is unavailable", () => {
     const compose = render().find(
-      (node) =>
-        node.type === "Button" && node.props.label === "Compose Message",
+      (node) => node.type === "Button" && node.props.label === "Compose",
     );
     expect(compose?.props.disabled).toBe(true);
     expect(compose?.props.accessibilityLabel).toBe(
-      "Compose Message unavailable. Add a phone number or email to message this contact.",
+      "Compose unavailable. Add a phone number or email to message this contact.",
     );
   });
 });

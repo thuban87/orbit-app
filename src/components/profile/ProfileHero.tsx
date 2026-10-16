@@ -135,8 +135,10 @@ export function ProfileHero({
           <PhotoUnavailableNotice />
         ) : null}
       </View>
-      {/* 38.11 D-63: a full-width Edit Contact above the Compose Message and
-          Call pair, about twice their width; D-47 renames Message. */}
+      {/* 38.11 D-63: a full-width Edit Contact above the Compose and Call
+          pair, about twice their width. D-91 (amends D-47) labels Message
+          "Compose": one word, so it stays on one line and the Button centres
+          it, where "Compose Message" wrapped left-aligned at font 1.15. */}
       <View testID="profile-hero-actions" style={styles.actionBlock}>
         <Button
           role="secondary"
@@ -148,11 +150,11 @@ export function ProfileHero({
           <View style={styles.action}>
             <Button
               role="primary"
-              label="Compose Message"
+              label="Compose"
               accessibilityLabel={
                 actions.message.enabled
                   ? `Compose a message to ${identity.name}`
-                  : `Compose Message unavailable. ${actions.message.reason}`
+                  : `Compose unavailable. ${actions.message.reason}`
               }
               disabled={!actions.message.enabled}
               onPress={onMessage}

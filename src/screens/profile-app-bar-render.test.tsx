@@ -188,6 +188,21 @@ describe("ProfileAppBar (38.6 D-17)", () => {
     expect(style.backgroundColor).toBe(THEME_PRESETS.galaxy.dark.background);
     expect(style.opacity).toBe(PROFILE_APP_BAR_SCRIM_OPACITY);
   });
+
+  it("makes the scrim solid while the name shows in the bar (38.11 D-92)", () => {
+    const scrimOf = (nodes: Node[]) =>
+      all(nodes).find((node) => node.props.testID === "profile-app-bar-scrim");
+    const solid = scrimOf(render({ scrolled: true, title: "Alex Example" }));
+    const style = flatStyle(solid?.props.style);
+    expect(style.opacity).toBe(1);
+    expect(style.backgroundColor).toBe(THEME_PRESETS.galaxy.dark.background);
+    expect(solid?.props.pointerEvents).toBe("none");
+    // Dropping the name goes back to the signed-off 0.92 (38.6 D-36).
+    const plain = scrimOf(render({ scrolled: true, title: null }));
+    expect(flatStyle(plain?.props.style).opacity).toBe(
+      PROFILE_APP_BAR_SCRIM_OPACITY,
+    );
+  });
 });
 
 describe("ProfileAppBar name after scrolling (38.11 D-57)", () => {

@@ -17,6 +17,7 @@ import {
   sectionPinUndoneSnackbar,
 } from "@/screens/section-editor-logic";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
+import { plural } from "@/utils/plural";
 import { isAppBackgrounded } from "@/utils/screen-visibility";
 
 export type ProfileMethodType = "phone" | "email";
@@ -371,6 +372,13 @@ export const PROFILE_APP_BAR_SCROLL_SCRIM = true;
 /** Opacity of the app-bar scrim over `colors.background`. */
 export const PROFILE_APP_BAR_SCRIM_OPACITY = 0.92;
 
+/**
+ * 38.11 D-92 (amends 38.6 D-36, partial): the scrim is fully opaque while the
+ * person's name shows in the bar (D-57), so scrolled text never shows through
+ * behind the name; otherwise it keeps the signed-off 0.92.
+ */
+export const PROFILE_APP_BAR_SCRIM_OPACITY_WITH_NAME = 1;
+
 /** Scroll offset (dp) past which the app-bar scrim shows. */
 export const PROFILE_APP_BAR_SCRIM_THRESHOLD = 8;
 
@@ -501,6 +509,16 @@ export function profileErrorPlacement(
 ): "top" | "below-hero" | null {
   if (!error) return null;
   return hasContent ? "below-hero" : "top";
+}
+
+/**
+ * The app-bar scrim's opacity: solid while the bar shows the name (38.11
+ * D-92), else the signed-off 0.92 (38.6 D-36).
+ */
+export function profileAppBarScrimOpacity(showsName: boolean): number {
+  return showsName
+    ? PROFILE_APP_BAR_SCRIM_OPACITY_WITH_NAME
+    : PROFILE_APP_BAR_SCRIM_OPACITY;
 }
 
 /** Whether content has scrolled far enough under the bar to show its scrim. */
@@ -679,8 +697,17 @@ export function unbindConfirmation(name: string): {
 }
 
 /**
- * The Move to Bin confirm (38.11 D-71 example wording; D-69 terms). The screen
- * adds `destructive: true` (themed, not dismissable; 38.9 D-30, ADR-086).
+ * The body of both Move to Bin confirms, the Profile's and the Contacts bulk
+ * one (38.11 D-71 example wording; D-93: "hidden from your lists", not
+ * "hidden everywhere").
+ */
+export const MOVE_TO_BIN_CONFIRM_MESSAGE =
+  "They'll be hidden from your lists. You can restore them, or delete them permanently, from Settings → Bin.";
+
+/**
+ * The Move to Bin confirm (38.11 D-71 example wording, D-93; D-69 terms). The
+ * screen adds `destructive: true` (themed, not dismissable; 38.9 D-30,
+ * ADR-086).
  */
 export function binConfirmation(name: string): {
   title: string;
@@ -690,10 +717,27 @@ export function binConfirmation(name: string): {
 } {
   return {
     title: `Move ${name} to the Bin?`,
-    message:
-      "They'll be hidden everywhere. You can restore them, or delete them permanently, from Settings → Bin.",
+    message: MOVE_TO_BIN_CONFIRM_MESSAGE,
     cancelLabel: "Cancel",
     confirmLabel: MOVE_TO_BIN,
+  };
+}
+
+/**
+ * The Contacts bulk Move to Bin confirm: the same body as the Profile's (D-93)
+ * and the same destructive (red) confirm (38.9 D-30 destructive standard).
+ */
+export function bulkBinConfirmation(count: number): {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  destructive: true;
+} {
+  return {
+    title: `Move ${plural(count, "contact")} to the Bin?`,
+    message: MOVE_TO_BIN_CONFIRM_MESSAGE,
+    confirmLabel: MOVE_TO_BIN,
+    destructive: true,
   };
 }
 

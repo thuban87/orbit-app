@@ -58,12 +58,12 @@ import {
   type HeroNameLayoutPart,
   knowledgeNavigateParams,
   PROFILE_APP_BAR,
-  PROFILE_APP_BAR_SCRIM_OPACITY,
   PROFILE_APP_BAR_SCROLL_SCRIM,
   type ProfileKnowledgeDestination,
   type ProfileOverlay,
   pinSnackbar,
   pinUndoneSnackbar,
+  profileAppBarScrimOpacity,
   profileAppBarScrolled,
   profileAppBarShowsName,
   profileErrorPlacement,
@@ -142,14 +142,18 @@ export function ProfileAppBar({
   const { colors } = useTheme();
   return (
     <View pointerEvents="box-none" style={styles.appBar}>
-      {scrolled ? (
+      {/* 38.11 D-92: solid while the name shows (the name implies the bar
+          is scrolled; it also forces the scrim on), else 0.92 (38.6 D-36). */}
+      {scrolled || title !== null ? (
         <View
           testID="profile-app-bar-scrim"
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            styles.appBarScrim,
-            { backgroundColor: colors.background },
+            {
+              backgroundColor: colors.background,
+              opacity: profileAppBarScrimOpacity(title !== null),
+            },
           ]}
         />
       ) : null}
@@ -1108,7 +1112,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: SPACING.base,
   },
-  appBarScrim: { opacity: PROFILE_APP_BAR_SCRIM_OPACITY },
   appBarEnd: { alignItems: "center", flexDirection: "row" },
   // Between Back and the star; shrinks and ellipsizes on a long name.
   appBarTitle: { flex: 1, marginHorizontal: SPACING.sm },

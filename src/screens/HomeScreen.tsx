@@ -98,7 +98,6 @@ import { FieldError } from "@/components/ui/FieldError";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
-import { MOVE_TO_BIN } from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
 import {
   bulkAddFavourites,
@@ -163,6 +162,7 @@ import { navigationRef } from "@/navigation/linking";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { DashboardScreenProps, TabParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { bulkBinConfirmation } from "@/screens/contact-profile-logic";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
 import {
   createDashboardRefreshScheduler,
@@ -2326,6 +2326,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           </Text>
         </Pressable>
       </Sheet>
+      {/* 38.11 D-93 / 38.9 D-30: the bulk Move to Bin confirm shares the
+          Profile's body and its destructive (red) confirm. */}
       <ConfirmDialog
         visible={bulkConfirm !== null}
         onRequestClose={dismissBulkConfirm}
@@ -2333,24 +2335,24 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           bulkConfirm?.kind === "quick-log"
             ? `Log ${plural(bulkConfirm.ids.length, "interaction")}?`
             : bulkConfirm?.kind === "archive"
-              ? `Move ${plural(bulkConfirm.ids.length, "contact")} to the Bin?`
+              ? bulkBinConfirmation(bulkConfirm.ids.length).title
               : "Change Contact Frequency?"
         }
         message={
           bulkConfirm?.kind === "archive"
-            ? "They'll be hidden everywhere. You can restore them, or delete them permanently, from Settings → Bin."
+            ? bulkBinConfirmation(bulkConfirm.ids.length).message
             : bulkConfirm?.kind === "frequency"
               ? `Set ${bulkConfirm.ids.length === 1 ? "" : "all "}${plural(bulkConfirm.ids.length, "contact")} to every ${plural(bulkConfirm.intervalDays, "day")}?`
               : undefined
         }
         confirmLabel={
           bulkConfirm?.kind === "archive"
-            ? MOVE_TO_BIN
+            ? bulkBinConfirmation(bulkConfirm.ids.length).confirmLabel
             : bulkConfirm?.kind === "frequency"
               ? "Change frequency"
               : "Log interactions"
         }
-        destructive={false}
+        destructive={bulkConfirm?.kind === "archive"}
         onConfirm={onBulkConfirm}
         onCancel={dismissBulkConfirm}
       />

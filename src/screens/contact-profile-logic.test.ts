@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { MemoryRow } from "@/db/memories-read";
@@ -5,6 +7,7 @@ import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import {
   binConfirmation,
+  bulkBinConfirmation,
   canStartLifecycleTransition,
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
@@ -14,8 +17,10 @@ import {
   editDestination,
   heroNameBottomInContent,
   knowledgeNavigateParams,
+  MOVE_TO_BIN_CONFIRM_MESSAGE,
   PROFILE_APP_BAR,
   PROFILE_APP_BAR_SCRIM_OPACITY,
+  PROFILE_APP_BAR_SCRIM_OPACITY_WITH_NAME,
   PROFILE_APP_BAR_SCRIM_THRESHOLD,
   PROFILE_APP_BAR_SCROLL_SCRIM,
   PROFILE_HERO_AVATAR_SIZE,
@@ -25,6 +30,7 @@ import {
   pinUndoneSnackbar,
   profileAppBarGlyphClearance,
   profileAppBarHitBoxClearance,
+  profileAppBarScrimOpacity,
   profileAppBarScrolled,
   profileAppBarShowsName,
   profileContentTopPadding,
@@ -673,9 +679,15 @@ describe("integrated Profile controller contracts", () => {
       expect(tracker.set("hero", 60, 400)).toBe(338);
     });
 
-    it("keeps the signed-off scrim unchanged (38.6 D-36, 38.11 D-57)", () => {
+    it("keeps the signed-off scrim unchanged without the name (38.6 D-36, 38.11 D-57)", () => {
       expect(PROFILE_APP_BAR_SCRIM_OPACITY).toBe(0.92);
       expect(PROFILE_APP_BAR_SCRIM_THRESHOLD).toBe(8);
+      expect(profileAppBarScrimOpacity(false)).toBe(0.92);
+    });
+
+    it("makes the scrim solid while the bar shows the name (38.11 D-92)", () => {
+      expect(PROFILE_APP_BAR_SCRIM_OPACITY_WITH_NAME).toBe(1);
+      expect(profileAppBarScrimOpacity(true)).toBe(1);
     });
 
     it("keeps a refresh error off the overlay bar and the D-04 lines (WR-04)", () => {
@@ -713,14 +725,35 @@ describe("integrated Profile controller contracts", () => {
   });
 
   describe("Move to Bin (38.11 D-69, D-71; review U-04)", () => {
-    it("asks first with the D-71 copy", () => {
+    it("asks first with the D-71 copy, hidden from your lists (D-93)", () => {
       expect(binConfirmation("Alex")).toEqual({
         title: "Move Alex to the Bin?",
         message:
-          "They'll be hidden everywhere. You can restore them, or delete them permanently, from Settings → Bin.",
+          "They'll be hidden from your lists. You can restore them, or delete them permanently, from Settings → Bin.",
         cancelLabel: "Cancel",
         confirmLabel: "Move to Bin",
       });
+    });
+
+    it("gives the bulk confirm the same body and a destructive confirm (D-93; 38.9 D-30)", () => {
+      expect(bulkBinConfirmation(1)).toEqual({
+        title: "Move 1 contact to the Bin?",
+        message: MOVE_TO_BIN_CONFIRM_MESSAGE,
+        confirmLabel: "Move to Bin",
+        destructive: true,
+      });
+      expect(bulkBinConfirmation(3).title).toBe("Move 3 contacts to the Bin?");
+      expect(binConfirmation("Alex").message).toBe(MOVE_TO_BIN_CONFIRM_MESSAGE);
+      expect(MOVE_TO_BIN_CONFIRM_MESSAGE).not.toContain("everywhere");
+    });
+
+    it("the Contacts bulk confirm reads the shared helper and is destructive for the Bin", () => {
+      const home = readFileSync(join(__dirname, "HomeScreen.tsx"), "utf8");
+      expect(home).toContain(
+        "bulkBinConfirmation(bulkConfirm.ids.length).message",
+      );
+      expect(home).toContain('destructive={bulkConfirm?.kind === "archive"}');
+      expect(home).not.toContain("hidden everywhere");
     });
 
     function harness(options: {
