@@ -127,9 +127,9 @@ The Profile reads every source in one snapshot (`profile-knowledge-read.ts`, see
 2. `listAiEligibleMemories()` applies `MEMORY_AI_ELIGIBILITY` in SQL. Off Limits, Last Talked About and Current Location never reach an AI read.
 3. The search corpus covers names, methods, category, searchable memory types, key people, every current-state entry and Off Limits label and text, each hit naming its section (ADR-215).
 
-### Rapid Update Contact editing
+### Rapid Update Contact editing (retired)
 
-Update Contact offers focused editors for Memories (an in-place editor with a type picker of Memory, Gift Ideas and Thought of Them, D-115), Key People, Last Talked About, Current Location (dated entries), Off Limits (`OffLimitsForm` through the editor controller) and custom fields, returning to the chooser after each save. Current-state writes never create an interaction or change `last_contact`.
+Update Contact, which offered focused editors for Memories, Key People, Last Talked About, Current Location, Off Limits and custom fields from the universal +, was retired in 38.11 (D-62); its code is kept as reference in `docs/archive/update-contact/`. Edit Contact is the single contact form; the Profile sections' own editors and add actions cover the same knowledge (memories are added from the Profile sections, Add/Edit Contact, the post-Quick-Log step and sharing, D-66). Current-state writes still never create an interaction or change `last_contact`.
 
 ### Importing contact notes
 
@@ -231,3 +231,4 @@ A selected Android contact note becomes an `imported` memory with `provenance='i
 | 2026-10-11 | 38.9 | A Memory's meaningful date is a native date picker stored as `YYYY-MM-DD`; Memory and key-person drafts are guarded on Back, Cancel and fold (ADR-200, ADR-205). |
 | 2026-10-13 | 38.10 | Code review IN-06: removed the test-only exports `setMemoryAllowAi`, `setCurrentStateValue`, `KNOWLEDGE_GROUP_ORDER` and `getFirstClassDerived`; tests use the live cores. |
 | 2026-10-15 | 38.10 | Fuel retired: Off Limits table, Gift Ideas / Thought of Them types, labels on every memory, dated current state with no current flag, linked "Also save to" entries, one delete-with-Undo pattern (Recently Deleted and the trash sweep removed), moves between sections, per-section editors, Hide from Profile switched off (ADR-207..215, ADR-218..220). |
+| 2026-10-16 | 38.11 | Update Contact retired (D-62) and its rapid knowledge editors archived in `docs/archive/update-contact/`; Memory left the universal + but stays reachable from the Profile in all five stacks (D-66). |

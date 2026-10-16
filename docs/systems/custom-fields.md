@@ -143,8 +143,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 
 ### Updating a field from rapid capture
 
-1. Update Contact surfaces applicable existing definitions by their user-facing labels and also retains a generic Custom Fields entry for less-prominent definitions.
-2. Both paths edit the same normalized value row through the established field-value input and DAO boundary; they do not create a second schema or definition authoring path.
+1. Update Contact, which surfaced applicable definitions by label plus a generic Custom Fields entry, was retired in 38.11 (D-62); its code is kept as reference in `docs/archive/update-contact/`. Edit Contact is the single contact form, and custom-field values are edited there.
+2. Every value edit goes through the established field-value input and DAO boundary; no path creates a second schema or definition authoring path.
 
 ## Configuration
 
@@ -196,7 +196,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 12. **Quarantine is not deletion.** Only permanent removal creates tombstones; `field_history` remains excluded from portable restore.
 13. **Do not reuse `field_history` as value history.** It is a 30-day destructive-operation trace; `custom_field_value_history` is portable prior-value state.
 14. **Contact scope is not ready for UI creation.** Directly-present contact definitions are guarded on write, but Phase 31 owns durable ownership and owner-purge semantics.
-15. **Rapid capture edits values, never definitions.** Update Contact may surface a field by label, but Settings remains the sole definition-editor and slugifier producer.
+15. **Contact forms edit values, never definitions.** Edit Contact edits a field's value (Update Contact, which surfaced fields by label, was retired in 38.11, D-62); Settings remains the sole definition-editor and slugifier producer.
 16. **Definition sharing expands across its values.** The permission manager presents contact/value review rows but a custom-field enable changes the owning definition's `share_with_ai` state; its impact confirmation must show that fan-out.
 17. **Restore completion is narrow, not repair.** After committing restored definitions, deterministically create only missing `(contact_id, field_def_id)` rows with `NULL` values; do not rewrite existing raw TEXT, infer values, or introduce a migration for legacy cleanup.
 18. **Text in a photo field must never reach an image resolver.** After a Text→Photo change, the raw TEXT stays, which is "type changes never destroy data". Gate every resolver with `isStoredPhotoPath`. Before 38.6, the value crashed Edit Contact and the Profile said "Photo added".
@@ -229,3 +229,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-09-23 | 38.4 | The Custom fields create/edit form (`FieldDefForm`) takes a required `bottomClearance` so its last field scrolls clear of the FAB (D-52, OA-E3; ADR-173). |
 | 2026-09-30 | 38.6 | A photo-field value that is not a stored photo path renders as "Photo unavailable" instead of reaching the resolver, and backs up and restores as text (ADR-182, D-31/D-34). |
 | 2026-10-11 | 38.9 | The Date widget is a native date picker writing `YYYY-MM-DD` and showing "Not a date" for an unparseable stored value; dropdowns use the themed option sheet; the definition editor is a guarded sub-editor with end-of-scroll clearance. Storage and invariants unchanged (ADR-200, ADR-202, ADR-204, ADR-205). |
+| 2026-10-16 | 38.11 | Update Contact retired (D-62): Edit Contact is the single contact form for custom-field values; the rapid-capture discovery path is archived in `docs/archive/update-contact/`. |

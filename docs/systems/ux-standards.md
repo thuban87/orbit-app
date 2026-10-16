@@ -109,7 +109,8 @@ which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces t
   shows Save/Send on the keyboard and saves on Enter, keeps a visible Save, and turns newly typed or
   pasted line breaks into spaces while keeping stored ones (D-129). On Add/Edit Contact and the
   section editors it is centred in the height left above the keyboard (`useKeyboardCentering`,
-  `KeyboardCenteringProvider`); Update Contact's editors use it without centring (D-114). It blurs
+  `KeyboardCenteringProvider`); Update Contact's editors used it without centring (D-114) until
+  Update Contact was retired in 38.11 (D-62). It blurs
   before `onSubmit`, so a closing form never leaves the keyboard up over Save (plan 19 F3). The
   app-wide rollout is Phase 40's.
 - **Card edit mode (D-130):** on the section pages each card has a pencil; tapping it or the card
@@ -164,9 +165,8 @@ which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces t
   stored On.
 - On a guarded screen, a save in flight holds every removal with no prompt (`busyRef` on
   `useDiscardKeepGuard`): "Discard changes?" is never offered for a save that will still commit.
-  The save's own navigation sets the bypass first, so it still leaves (D-13, D-14). All 12
-  guarded screens with a save use it: Create and Edit Contact, Update Contact (one row-save slot
-  shared by its row editors), Memory, Custom fields, AI Personalization (one slot shared by the
+  The save's own navigation sets the bypass first, so it still leaves (D-13, D-14). All 11
+  guarded screens with a save use it: Create and Edit Contact, Memory, Custom fields, AI Personalization (one slot shared by the
   Writing Style and section saves), System builder, Log interaction, Group log, Edit
   interaction, Edit group event and Edit participant. The hold also covers a confirm inside the
   save (Duplicate name, Change field type / options).
@@ -180,10 +180,11 @@ which 38.11 owns (D-10, D-27); `src/no-native-alert-contract.test.ts` enforces t
   held, so a Cancel in the same frame as Save neither closes nor prompts.
 - In-form holds: while the host's save runs, the open form's own Cancel and submit are held and
   drawn disabled (D-26): MemoryEditor (`busy`, also Delete, Restore, the memory cards and Add
-  memory; Allow AI is announced busy, never drawn Off), Update Contact's `EditorFrame`
-  (`cancelDisabled`), RelationshipEditor (`busy`, also Edit, Delete, Show on Profile and Add key
+  memory; Allow AI is announced busy, never drawn Off), RelationshipEditor (`busy`, also Edit, Delete, Show on Profile and Add key
   person), FieldDefForm (`busy`), and AI Personalization's section editors plus each section's
-  options (Rename / edit, Replace from file, Delete section) and Save Writing Style. A list
+  options (Rename / edit, Replace from file, Delete section) and Save Writing Style. (Update
+  Contact's row-save slot and `EditorFrame` hold were retired with the screen in 38.11, D-62; the
+  code is kept as reference in `docs/archive/update-contact/`.) A list
   control that would swap the draft being saved is held too, so a failed save never loses the
   typed edit. A host that drops an action during its save (MemoryEditor's `onDelete` /
   `onSetAllowAi` returning `false`) gets no local close or flip.
@@ -350,3 +351,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-11 | 38.9 | Third fix pass: a held non-Back removal is parked and re-dispatched by `settleHold()` (WR-01, C6-H1); list controls that swap or race the saving draft are held (WR-02); host-accepted Delete / Allow AI and a busy-held `requestClose` (IN-01); post-commit re-reads kept apart from write errors (IN-02). |
 | 2026-10-11 | 38.9 | KB extraction: Decisions cite ADR-198..ADR-206 and ADR-144's partial supersession. |
 | 2026-10-15 | 38.10 | One delete-with-Undo pattern for Things to Remember replaces the holding zones; two snackbar looks (notice and warning, errors included), full-width root placement held in place; shared entry field with keyboard centring; card edit mode and the morphing section Add button (ADR-212, ADR-219..221). |
+| 2026-10-16 | 38.11 | Update Contact retired (D-62): its row-save slot, `EditorFrame` Cancel hold and uncentred entry fields leave the guarded-screen lists (now 11); Edit Contact is the single contact form, and the code is kept in `docs/archive/update-contact/`. |
