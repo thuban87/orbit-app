@@ -1,4 +1,5 @@
 import type { ProfileTemplateUsage } from "@/db/profile-presentation-read";
+import { PROFILE_MODULE_REGISTRY } from "./module-registry";
 import { parseAndCanonicalizeProfileLayout } from "./presentation-schema";
 import { completeProfileLayoutChildren } from "./resolve-presentation";
 import type {
@@ -161,6 +162,27 @@ export function templateLayoutForDisplay(
   return completeProfileLayoutChildren(
     parseAndCanonicalizeProfileLayout(layoutJson),
   );
+}
+
+/**
+ * The template Preview's lines (review IN-08, a 38.11-13 deferred item): each
+ * visible module by its registry label, in layout order, never its raw id and
+ * without the tile size, like the "currently uses" line 38.11-13 fixed.
+ */
+export function templatePreviewLines(layout: ProfileLayoutDocument): {
+  topLevel: string[];
+  overview: string[];
+  thingsToRemember: string[];
+} {
+  const labels = (items: ProfileLayoutDocument["topLevel"]) =>
+    items
+      .filter((item) => item.visible)
+      .map((item) => PROFILE_MODULE_REGISTRY[item.id].label);
+  return {
+    topLevel: labels(layout.topLevel),
+    overview: labels(layout.overview),
+    thingsToRemember: labels(layout.thingsToRemember),
+  };
 }
 
 /** Assignment labels name the durable source, never infer it from visual selection. */

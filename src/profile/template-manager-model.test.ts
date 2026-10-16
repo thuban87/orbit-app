@@ -23,6 +23,7 @@ import {
   settleTemplateOperation,
   templateLayoutForDisplay,
   templateLayoutForNewTemplate,
+  templatePreviewLines,
 } from "./template-manager-model";
 
 describe("Profile template manager model", () => {
@@ -296,11 +297,48 @@ describe("the layout sheets never show a raw source id (38.11-13)", () => {
     const manager = read("../components/profile/ProfileTemplateManager.tsx");
     expect(manager).toContain("templateName: currentTemplateName");
     // Preview and template editing complete the layout; Rename stays raw.
-    expect(manager).toContain(
-      "const layout = templateLayoutForDisplay(template.layoutJson);",
+    // The Preview reads labels through templatePreviewLines (review IN-08).
+    expect(manager).toMatch(
+      /templatePreviewLines\(\s*templateLayoutForDisplay\(template\.layoutJson\)/,
     );
     expect(manager).toContain(
       "layout: templateLayoutForDisplay(activeTemplate.layoutJson),",
     );
+  });
+});
+
+/**
+ * Review IN-08 (38.11-13 deferred item): the template Preview names each
+ * visible module by its label, never its raw id, and drops the tile size.
+ */
+describe("templatePreviewLines (review IN-08)", () => {
+  it("lists visible modules by label, in layout order, with no ids or sizes", () => {
+    const layout = profileLayoutEditorReducer(FACTORY_PROFILE_LAYOUT, {
+      type: "set-visible",
+      id: "gravity",
+      visible: false,
+    });
+    const lines = templatePreviewLines(layout);
+    expect(lines.topLevel).toEqual([
+      "Relationship Overview",
+      "Things to Remember",
+      "Contact Methods",
+      "History",
+    ]);
+    expect(lines.overview).toEqual([
+      "Orbit Status",
+      "Intensity",
+      "Last Interaction",
+      "Contact Frequency",
+      "Birthday",
+      "Snooze",
+    ]);
+    expect(lines.thingsToRemember[0]).toBe("Pinned / Featured");
+    const all = [
+      ...lines.topLevel,
+      ...lines.overview,
+      ...lines.thingsToRemember,
+    ].join(" ");
+    expect(all).not.toMatch(/[a-z]+-[a-z]+|1x1|2x1/);
   });
 });

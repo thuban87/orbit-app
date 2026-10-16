@@ -51,6 +51,7 @@ import {
   type TemplateManagerState,
   templateLayoutForDisplay,
   templateLayoutForNewTemplate,
+  templatePreviewLines,
 } from "@/profile/template-manager-model";
 import type {
   ProfileLayoutDocument,
@@ -762,32 +763,25 @@ function TemplateNameForm({
 
 function TemplatePreview({ template }: { template: ProfileLayoutTemplateRow }) {
   // 38.11-08 deferred item: a pre-38.11 template previews with its Birthday
-  // tile (read-time completion, nothing written back).
-  const layout = templateLayoutForDisplay(template.layoutJson);
+  // tile (read-time completion, nothing written back). Review IN-08: modules
+  // read by label, never raw id or size (`templatePreviewLines`).
+  const lines = templatePreviewLines(
+    templateLayoutForDisplay(template.layoutJson),
+  );
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <AppText role="heading">Preview {template.name}</AppText>
       <AppText role="caption">
-        Fixed Hero ·{" "}
-        {layout.topLevel
-          .filter((item) => item.visible)
-          .map((item) => item.id)
-          .join(" · ")}
+        Fixed Hero · {lines.topLevel.join(" · ")}
       </AppText>
       <AppText role="label">Relationship Overview</AppText>
-      {layout.overview
-        .filter((item) => item.visible)
-        .map((item) => (
-          <AppText key={item.id}>
-            {item.id} · {item.size}
-          </AppText>
-        ))}
+      {lines.overview.map((label) => (
+        <AppText key={label}>{label}</AppText>
+      ))}
       <AppText role="label">Things to Remember</AppText>
-      {layout.thingsToRemember
-        .filter((item) => item.visible)
-        .map((item) => (
-          <AppText key={item.id}>{item.id}</AppText>
-        ))}
+      {lines.thingsToRemember.map((label) => (
+        <AppText key={label}>{label}</AppText>
+      ))}
     </ScrollView>
   );
 }
