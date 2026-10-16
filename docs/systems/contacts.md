@@ -83,7 +83,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/merge-dao.ts` | Atomically consolidates two live contacts, reparents compatible children, and tombstones the absorbed identity. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
-| `src/screens/ArchivedContactsScreen.tsx` | Restore and impact-summary purge surface. |
+| `src/screens/ArchivedContactsScreen.tsx` | The Bin (Settings → Bin; route id `Archived`): restore and impact-summary purge surface. |
 | `src/screens/CaptureScreen.tsx` | Uses the existing name-only contact create path when a shared item has no owner yet. |
 | `src/screens/ContactProfileScreen.tsx` | Provides the configured-provider AI draft entry without making a contact write. |
 
@@ -109,7 +109,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 ### Managing links and lifecycle
 
 1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email live in normalized method rows rather than fixed contact columns.
-2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Archived contacts home.
+2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Bin (Settings → Bin), the user-facing name for archived contacts since 38.11 (D-69); the profile action that archives is "Move to Bin".
 3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly counts and deletes interactions, events, Off Limits rows, normalized custom-value pairs, links, field history, and contact-knowledge children before deleting the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
 5. `purgeContactCore(exec, contactId, { now, requireArchived = true, bumpRevision = true })` runs the fan-out inside a caller's transaction and returns its post-commit cleanup as a closure; `purgeContact` wraps it with the archive gate on and one bump. Only share Undo of a share-created contact passes `requireArchived: false` (ADR-217). The Delete permanently dialog no longer lists a fuel line, and memory and key-person counts are live rows only (D-87, D-88).
@@ -143,7 +143,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 1. A Dashboard selection passes selected IDs to `bulk-actions-dao`; each non-empty operation opens one outer transaction, invokes the relevant non-mutexed contact core per ID, and bumps data revision once.
 2. Category and frequency writes update only their named contact column and `modified_at`; category targets are revalidated against the current canonical catalog before the batch writer runs, and Uncategorized is stored as `NULL`. Frequency rejects non-positive or fractional values before the transaction. Favourite operations remain explicit add or remove membership, never rank ordering.
-3. Archive composes the same guarded archive core and immutable event as the single-contact lifecycle path. It is recoverable; permanent deletion remains archive-gated in the Archived Contacts surface.
+3. Archive composes the same guarded archive core and immutable event as the single-contact lifecycle path. It is recoverable; permanent deletion remains archive-gated in the Bin (Settings → Bin). The bulk action reads "Move to Bin".
 4. Snooze resolves one SQLite-local target date for a whole batch. All selected IDs are passed to each action, including Unbound or never-contacted contacts, matching the single-contact command boundary.
 
 ### Selecting a contact for a shell action
@@ -362,3 +362,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-10-16 | 38.11 | Add Contact writes birthday, social battery and links in the one create transaction (`addLinksCore`, D-48); Add and Edit share one Birthday control where switching Year unknown off asks for the year and Edit can clear a birthday (D-49, D-61). |
 | 2026-10-16 | 38.11 | The Profile's Birthday sheet writes through the single-column `setContactBirthday` (validated before the transaction, one bump), then reschedules notifications and refreshes the widget (D-59). |
 | 2026-10-16 | 38.11 | Snooze runs through one shared sheet from the Profile tile, the Profile ⋯, the Contacts card and bulk (D-45); Choose date starts tomorrow (D-37). Custom dates are validated as future local dates before any write by the shared `assertFutureLocalSnoozeDate`, used by the Profile writer and the new `bulkSnoozeUntil`. |
+| 2026-10-16 | 38.11 | "Archive" reads "Bin" in user-visible text: Settings → Bin with Restore and Delete permanently, "Move to Bin" for the action; the Bin never empties itself. Internal names (`archived_at`, the archive core and DAOs, the `Archived` route, the `archive` event) are unchanged (D-69, D-70). |

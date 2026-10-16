@@ -652,6 +652,13 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
     expect(sheet).not.toContain('label="Done"');
   });
 
+  it("pins the Bin terms (38.11 D-69)", () => {
+    expect({ BIN: glossary.BIN, MOVE_TO_BIN: glossary.MOVE_TO_BIN }).toEqual({
+      BIN: "Bin",
+      MOVE_TO_BIN: "Move to Bin",
+    });
+  });
+
   it("pins the Add/Edit Contact section Add labels (38.10 D-67, D-87, D-119)", () => {
     expect({
       ADD_OFF_LIMITS_ITEM: glossary.ADD_OFF_LIMITS_ITEM,

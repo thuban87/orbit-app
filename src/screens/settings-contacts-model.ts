@@ -1,3 +1,4 @@
+import { BIN } from "@/constants/glossary";
 import type { SettingsStackParamList } from "@/navigation/types";
 
 /**
@@ -194,8 +195,9 @@ export const SETTINGS_CONTACTS_SECTIONS: ReadonlyArray<SettingsContactsSection> 
         {
           kind: "route",
           key: "archived",
-          title: "Archived contacts",
-          subtitle: "People you've moved out of your active orbit.",
+          title: BIN,
+          subtitle:
+            "People you've moved to the Bin. Restore them or delete them permanently.",
           route: "Archived",
         },
       ],

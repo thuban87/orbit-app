@@ -1,7 +1,7 @@
 # Glossary
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/constants/glossary.ts`, `src/constants/product-labels.ts`, `src/constants/glossary-contract.test.ts`
 
 ## Purpose
@@ -46,6 +46,7 @@ identifiers keep their own spelling (see Gotchas).
 | Orbit participation | `ORBIT_PARTICIPATION` | The Bound/Unbound choice when adding or importing contacts. |
 | Interaction Assist | `INTERACTION_ASSIST` | The pending "did you reach them?" confirmation after a hand-off. |
 | Quarantine | `QUARANTINE` | Removing a custom field that still holds values, recoverable for a period before it is deleted. |
+| Bin / Move to Bin | `BIN`, `MOVE_TO_BIN` | Where people go before permanent deletion (Settings → Bin), and the action that puts them there. They are hidden everywhere else, can be restored, and stay until restored or deleted permanently: the Bin never empties itself. Replaces "Archive" / "Archived contacts" in user-visible text; the internal name stays archive (`archived_at`, the archive DAOs, the `Archived` route, the `archive` event type) (38.11 D-69, D-70). |
 | Things to Remember | `THINGS_TO_REMEMBER` | The Profile section that holds what to remember about a person: Pinned, Last Talked About, Key People, Current Location, Memories, Thought of Them, Gift Ideas, Custom Fields, Off Limits and Imported from Contacts App (38.10 D-44, D-90). |
 | Off Limits | `OFF_LIMITS` | Topics to avoid bringing up with a person. Shown in full on the Profile and in Compose Research, never sent to AI (38.10 D-09, D-10, D-90). The Profile helper "Avoid bringing these up" stays (D-105). |
 | Close | `CLOSE` | The button that closes a detail sheet, such as the Profile entry sheet (38.10 D-87, D-90). |
@@ -179,3 +180,4 @@ None. The constants are the configuration.
 | 2026-10-13 | 38.10 | Things to Remember, Off Limits, Close and Not set added as canonical terms (D-90); the Profile's section registry, entry sheet and custom-field display read them; the contract pins their values (plan 16). |
 | 2026-10-13 | 38.10 | "fuel" retired from code and wording (D-01, D-87), enforced by `src/no-fuel-contract.test.ts` with a migration allowlist rather than by `RETIRED_FORMS` (plan 18). |
 | 2026-10-15 | 38.10 | KB extraction: Decisions cite ADR-207, ADR-214 and ADR-218 in place of the D-ID line. |
+| 2026-10-16 | 38.11 | "Bin" and "Move to Bin" added as canonical terms; "Archive" is renamed "Bin" in user-visible text, internal names unchanged (D-69, D-70; plan 12). |

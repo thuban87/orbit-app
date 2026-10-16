@@ -1,5 +1,5 @@
 import type { OverflowAction } from "@/components/OverflowMenu";
-import { EVENTS } from "@/constants/glossary";
+import { BIN, EVENTS } from "@/constants/glossary";
 
 /** The navigation surface used by Dashboard's fixed overflow destinations. */
 export interface DashboardOverflowNavigation {
@@ -36,7 +36,7 @@ export function buildDashboardOverflowActions({
       testID: "dashboard-unbound-overflow-entry",
     },
     {
-      label: "Archived Contacts",
+      label: BIN,
       onPress: () => navigation.navigate("Archived"),
       testID: "dashboard-archived-overflow-entry",
     },

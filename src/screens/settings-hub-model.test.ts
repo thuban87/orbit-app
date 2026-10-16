@@ -177,7 +177,7 @@ describe("Settings hub row anatomy (RG-037 AUD-UIA-017, D-15)", () => {
       ["Appearance", "Theme, mode, accent, and background"],
       [
         "Contacts & Relationships",
-        "Contact sources, custom fields, and archived people",
+        "Contact sources, custom fields, and the Bin",
       ],
       [
         "Interactions",

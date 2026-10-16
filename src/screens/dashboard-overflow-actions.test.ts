@@ -17,7 +17,7 @@ describe("buildDashboardOverflowActions", () => {
     expect(actions.map(({ label }) => label)).toEqual([
       "Events",
       "Unbound Contacts",
-      "Archived Contacts",
+      "Bin",
       "Select Contacts",
       "Reset Contacts View",
     ]);

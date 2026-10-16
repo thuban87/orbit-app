@@ -94,7 +94,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     kind: "route",
     key: "contacts",
     title: "Contacts & Relationships",
-    subtitle: "Contact sources, custom fields, and archived people",
+    subtitle: "Contact sources, custom fields, and the Bin",
     icon: "contacts",
     route: "SettingsContacts",
   },

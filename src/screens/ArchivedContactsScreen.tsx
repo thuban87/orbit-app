@@ -1,13 +1,14 @@
 /**
- * ArchivedContactsScreen (CRUD-05) — the Settings → Archived contacts home, the
- * reversible half of the two-stage lifecycle. Lists archived contacts (via
+ * ArchivedContactsScreen (CRUD-05) — the Settings → Bin home (user-facing
+ * "Bin" since 38.11 D-69; the route id `Archived` and the `archived_at` names
+ * stay), the reversible half of the two-stage lifecycle. Lists archived contacts (via
  * `listArchived`, the sole `archived_at IS NOT NULL` inverse read), STATES its
  * count when opened (no badge lives on the Settings row — CONTEXT Area 1), and
  * offers per-row Restore.
  *
  * Restore (`restoreContact`) nulls `archived_at` and reloads — the contact
- * returns to every live surface. Retention is INDEFINITE (UI-SPEC empty-state
- * copy "kept here until you delete them permanently"): there is NO auto-purge
+ * returns to every live surface. Retention is INDEFINITE (38.11 D-70: the Bin
+ * never empties itself; the empty-state copy says so): there is NO auto-purge
  * sweep this phase. The irreversible purge — "Delete permanently" (danger) — is
  * added per row in Plan 09; its slot is marked below.
  *
@@ -48,9 +49,9 @@ import { plural } from "@/utils/plural";
 
 const LOG_SCOPE = "archived-contacts";
 
-/** "1 archived contact" / "N archived contacts" (the shared helper, D-21). */
+/** "1 contact in the Bin" / "N contacts in the Bin" (the shared helper, D-21; 38.11 D-69). */
 function countLabel(n: number): string {
-  return plural(n, "archived contact");
+  return `${plural(n, "contact")} in the Bin`;
 }
 
 /**
@@ -101,7 +102,7 @@ export function ArchivedContactsScreen() {
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load archived contacts", err);
       void notice({
-        title: "Couldn't load archived contacts",
+        title: "Couldn't load the Bin",
         message: "Please go back and retry.",
       });
     }
@@ -191,7 +192,7 @@ export function ArchivedContactsScreen() {
 
   return (
     <View testID="archived-contacts-screen" style={{ flex: 1 }}>
-      <ShellAppBar variant="child" title="Archived" />
+      <ShellAppBar variant="child" title="Bin" />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -204,15 +205,15 @@ export function ArchivedContactsScreen() {
               <Text
                 style={[styles.emptyHeading, { color: colors.textPrimary }]}
               >
-                No archived contacts
+                The Bin is empty
               </Text>
               <ScopedPalette>
                 {(scoped) => (
                   <Text
                     style={[styles.emptyBody, { color: scoped.textSecondary }]}
                   >
-                    Contacts you archive are kept here until you delete them
-                    permanently.
+                    People you move to the Bin stay here until you restore them
+                    or delete them permanently.
                   </Text>
                 )}
               </ScopedPalette>

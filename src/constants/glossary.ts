@@ -40,6 +40,14 @@ export const ORBIT_PARTICIPATION = "Orbit participation";
 export const INTERACTION_ASSIST = "Interaction Assist";
 export const QUARANTINE = "Quarantine";
 
+// The Bin (38.11 D-69, D-70). "Archive" is renamed "Bin" everywhere
+// user-facing; internal names (`archived_at`, DAO names, the `Archived`
+// route, the `archive` event type) stay.
+/** Where people go before permanent deletion; never empties itself (D-69, D-70). */
+export const BIN = "Bin";
+/** The action that moves people to the Bin (D-69). */
+export const MOVE_TO_BIN = "Move to Bin";
+
 // Things to Remember on the Profile (38.10 D-90, D-87).
 /** Topics to avoid bringing up with a person, shown in full on the Profile (D-90, D-10). */
 export const OFF_LIMITS = "Off Limits";
