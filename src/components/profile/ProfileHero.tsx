@@ -1,5 +1,10 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { PhotoUnavailableNotice } from "@/components/PhotoUnavailableNotice";
 import { AppText } from "@/components/ui/AppText";
@@ -12,6 +17,7 @@ import {
   savedMethodKinds,
 } from "@/profile/relationship-sheet-model";
 import {
+  type HeroNameLayoutPart,
   PROFILE_HERO_AVATAR_SIZE,
   PROFILE_HERO_GAP,
 } from "@/screens/contact-profile-logic";
@@ -28,6 +34,7 @@ export function ProfileHero({
   onEdit,
   onMessage,
   onCall,
+  onNameLayout,
 }: {
   identity: ProfileIdentity;
   actionableMethods: Parameters<typeof profileHeroActionState>[0];
@@ -57,14 +64,24 @@ export function ProfileHero({
   /** Opens Compose (38.11 D-47 label; D-46 behaviour unchanged). */
   onMessage: () => void;
   onCall: () => void;
+  /**
+   * Reports the layouts that place the name (38.11 D-57): the Hero root,
+   * the identity View and the name, each relative to its parent. The screen
+   * sums them into scroll-content coordinates (`createHeroNameTracker`).
+   */
+  onNameLayout?: (part: HeroNameLayoutPart, y: number, height: number) => void;
 }) {
+  const report =
+    (part: HeroNameLayoutPart) =>
+    ({ nativeEvent }: LayoutChangeEvent) =>
+      onNameLayout?.(part, nativeEvent.layout.y, nativeEvent.layout.height);
   const actions = profileHeroActionState(
     actionableMethods,
     messageContext,
     savedMethodKinds(methodGroups),
   );
   return (
-    <View testID="profile-hero" style={styles.root}>
+    <View testID="profile-hero" style={styles.root} onLayout={report("hero")}>
       {identity.photo != null ? (
         // WR-06: the same wrapper whether or not the photo loads, so the Avatar
         // is never remounted (a remount would reset its load error and flip
@@ -100,8 +117,13 @@ export function ProfileHero({
           size={PROFILE_HERO_AVATAR_SIZE}
         />
       )}
-      <View style={styles.identity}>
-        <AppText role="display" accessibilityRole="header" style={styles.name}>
+      <View style={styles.identity} onLayout={report("identity")}>
+        <AppText
+          role="display"
+          accessibilityRole="header"
+          style={styles.name}
+          onLayout={report("name")}
+        >
           {identity.name}
         </AppText>
         {identity.categoryName ? (

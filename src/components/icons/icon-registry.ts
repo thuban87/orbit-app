@@ -52,6 +52,8 @@ export const ICON_REGISTRY = {
   "your-week": { outline: "calendar-outline", filled: "calendar" },
   "group-events": { outline: "people-outline", filled: "people" },
   "chevron-down": { outline: "chevron-down", filled: "chevron-down" },
+  // 38.11 D-28: an open Profile section's chevron.
+  "chevron-up": { outline: "chevron-up", filled: "chevron-up" },
   recenter: { outline: "locate-outline", filled: "locate" },
   north: { outline: "compass-outline", filled: "compass" },
 

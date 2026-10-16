@@ -125,8 +125,9 @@ function ProfileSection({
               <AppText role="caption">{errorMessage}</AppText>
             ) : null}
           </View>
+          {/* 38.11 D-28: an open section's chevron points up. */}
           <Icon
-            name="chevron-down"
+            name={state.expanded ? "chevron-up" : "chevron-down"}
             state={state.expanded ? "active" : "default"}
           />
         </Pressable>

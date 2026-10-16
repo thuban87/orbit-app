@@ -508,22 +508,63 @@ export function profileAppBarScrolled(scrollY: number): boolean {
   return scrollY > PROFILE_APP_BAR_SCRIM_THRESHOLD;
 }
 
-/** RED stub (38.11-13 Task 3): replaced in the GREEN commit. */
-export function heroNameBottomInContent(_input: {
+/**
+ * The hero name's bottom edge in scroll-content coordinates (the space
+ * `contentOffset.y` uses; 38.11 D-57, review T-11). Each `onLayout` y is
+ * relative to its parent: the Hero root to the scroll content, the identity
+ * View to the Hero root, the name to the identity View, so the offsets sum.
+ */
+export function heroNameBottomInContent(input: {
   heroY: number;
   identityY: number;
   nameY: number;
   nameHeight: number;
 }): number {
-  return 0;
+  return input.heroY + input.identityY + input.nameY + input.nameHeight;
 }
 
-/** RED stub (38.11-13 Task 3): replaced in the GREEN commit. */
+/** The three Hero layouts that place the name (see heroNameBottomInContent). */
+export type HeroNameLayoutPart = "hero" | "identity" | "name";
+
+/**
+ * Collects the Hero's name layouts as they arrive (any order) and returns the
+ * name's bottom in scroll-content coordinates once all three are known, else
+ * null. Pure bookkeeping; the screen keeps one per mount.
+ */
+export function createHeroNameTracker(): {
+  set(part: HeroNameLayoutPart, y: number, height: number): number | null;
+} {
+  let heroY: number | null = null;
+  let identityY: number | null = null;
+  let name: { y: number; height: number } | null = null;
+  return {
+    set(part, y, height) {
+      if (part === "hero") heroY = y;
+      else if (part === "identity") identityY = y;
+      else name = { y, height };
+      if (heroY === null || identityY === null || name === null) return null;
+      return heroNameBottomInContent({
+        heroY,
+        identityY,
+        nameY: name.y,
+        nameHeight: name.height,
+      });
+    },
+  };
+}
+
+/**
+ * 38.11 D-57: the Profile top bar shows the person's name once the hero name's
+ * bottom edge has passed under the bar. False while the name has not been laid
+ * out. The screen keeps a boolean that changes only on a crossing (never per
+ * frame), like the scrim flag.
+ */
 export function profileAppBarShowsName(
-  _scrollY: number,
-  _nameBottomY: number | null,
+  scrollY: number,
+  nameBottomY: number | null,
 ): boolean {
-  return false;
+  if (nameBottomY === null || !Number.isFinite(nameBottomY)) return false;
+  return scrollY + PROFILE_APP_BAR.height >= nameBottomY;
 }
 
 /**

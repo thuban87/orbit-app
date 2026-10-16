@@ -9,6 +9,7 @@ import {
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
   consumeProfileReachOutIntent,
+  createHeroNameTracker,
   createProfileSnapshotLoader,
   editDestination,
   heroNameBottomInContent,
@@ -661,6 +662,15 @@ describe("integrated Profile controller contracts", () => {
       expect(
         profileAppBarShowsName(bottom - PROFILE_APP_BAR.height, bottom),
       ).toBe(true);
+    });
+
+    it("tracks the three Hero layouts in any order and reports the bottom once all are known", () => {
+      const tracker = createHeroNameTracker();
+      expect(tracker.set("name", 4, 34)).toBeNull();
+      expect(tracker.set("identity", 240, 80)).toBeNull();
+      expect(tracker.set("hero", 20, 400)).toBe(298);
+      // A later relayout (e.g. a refresh error above the hero) updates it.
+      expect(tracker.set("hero", 60, 400)).toBe(338);
     });
 
     it("keeps the signed-off scrim unchanged (38.6 D-36, 38.11 D-57)", () => {

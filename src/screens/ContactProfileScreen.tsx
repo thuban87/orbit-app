@@ -51,8 +51,10 @@ import type { ProfileLayoutDocument } from "@/profile/types";
 import {
   closeTopmostProfileOverlay,
   consumeProfileReachOutIntent,
+  createHeroNameTracker,
   createProfileSnapshotLoader,
   editDestination,
+  type HeroNameLayoutPart,
   knowledgeNavigateParams,
   PROFILE_APP_BAR,
   PROFILE_APP_BAR_SCRIM_OPACITY,
@@ -62,6 +64,7 @@ import {
   pinSnackbar,
   pinUndoneSnackbar,
   profileAppBarScrolled,
+  profileAppBarShowsName,
   profileErrorPlacement,
   profileKnowledgeCollectionDestination,
   profileKnowledgeDestination,
@@ -116,6 +119,7 @@ export function ProfileAppBar({
   favourite,
   favouriteDisabled,
   scrolled,
+  title = null,
   onBack,
   onToggleFavourite,
   onOpenOverflow,
@@ -125,7 +129,10 @@ export function ProfileAppBar({
   favouriteDisabled: boolean;
   /** Content is scrolled under the bar (drives the token scrim). */
   scrolled: boolean;
-  /** RED stub (38.11-13 Task 3): not rendered yet. */
+  /**
+   * The person's name once the hero name has scrolled under the bar (38.11
+   * D-57); null hides it.
+   */
   title?: string | null;
   onBack: () => void;
   onToggleFavourite: () => void;
@@ -151,6 +158,18 @@ export function ProfileAppBar({
         accessibilityLabel="Back"
         onPress={onBack}
       />
+      {title !== null ? (
+        <AppText
+          testID="profile-app-bar-title"
+          role="heading"
+          accessibilityRole="header"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={styles.appBarTitle}
+        >
+          {title}
+        </AppText>
+      ) : null}
       <View style={styles.appBarEnd}>
         <Pressable
           accessibilityRole="button"
@@ -210,14 +229,42 @@ export function ContactProfileScreen({
   // under it. State changes only on a threshold crossing, never per frame.
   const [barScrolled, setBarScrolled] = useState(false);
   const barScrolledRef = useRef(false);
+  // 38.11 D-57: the bar shows the name once the hero name scrolls under it.
+  // The same threshold-boolean pattern: state changes only on a crossing.
+  const [barShowsName, setBarShowsName] = useState(false);
+  const barShowsNameRef = useRef(false);
+  const scrollYRef = useRef(0);
+  const nameBottomRef = useRef<number | null>(null);
+  const [heroNameTracker] = useState(createHeroNameTracker);
+  const updateBarName = useCallback(() => {
+    const next = profileAppBarShowsName(
+      scrollYRef.current,
+      nameBottomRef.current,
+    );
+    if (next === barShowsNameRef.current) return;
+    barShowsNameRef.current = next;
+    setBarShowsName(next);
+  }, []);
+  const onHeroNameLayout = useCallback(
+    (part: HeroNameLayoutPart, y: number, height: number) => {
+      nameBottomRef.current = heroNameTracker.set(part, y, height);
+      updateBarName();
+    },
+    [heroNameTracker, updateBarName],
+  );
+  // Wired unconditionally (review T-17): the name threshold does not depend on
+  // the scrim flag; only the scrim stays behind PROFILE_APP_BAR_SCROLL_SCRIM.
   const onContentScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const next = profileAppBarScrolled(event.nativeEvent.contentOffset.y);
+      const y = event.nativeEvent.contentOffset.y;
+      scrollYRef.current = y;
+      updateBarName();
+      const next = profileAppBarScrolled(y);
       if (next === barScrolledRef.current) return;
       barScrolledRef.current = next;
       setBarScrolled(next);
     },
-    [],
+    [updateBarName],
   );
 
   // The Profile is the single invalidation owner for its two projections
@@ -725,6 +772,7 @@ export function ContactProfileScreen({
             favourite={snapshot.identity.favouriteRank !== null}
             favouriteDisabled={pendingFavourite || lifecycle.kind !== "bound"}
             scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}
+            title={barShowsName ? snapshot.identity.name : null}
             onBack={() => navigation.goBack()}
             onToggleFavourite={() => void toggleFavourite()}
             onOpenOverflow={() => setOverlay("overflow")}
@@ -740,7 +788,7 @@ export function ContactProfileScreen({
           // Modal window; without "handled" its responder capture swallows
           // the first tap on their buttons while the keyboard is up (D-72).
           keyboardShouldPersistTaps="handled"
-          onScroll={PROFILE_APP_BAR_SCROLL_SCRIM ? onContentScroll : undefined}
+          onScroll={onContentScroll}
           scrollEventThrottle={16}
           contentContainerStyle={[
             styles.content,
@@ -767,6 +815,7 @@ export function ContactProfileScreen({
                 }}
                 photoOpenable={!heroPhotoFailed}
                 onPhotoLoadErrorChange={setHeroPhotoFailed}
+                onNameLayout={onHeroNameLayout}
                 onOpenPhoto={() => setOverlay("photo")}
                 // 38.11 D-63: Edit Contact moved from ⋯ to the Hero.
                 onEdit={() => navigation.navigate("Edit", { contactId })}
@@ -1044,6 +1093,8 @@ const styles = StyleSheet.create({
   },
   appBarScrim: { opacity: PROFILE_APP_BAR_SCRIM_OPACITY },
   appBarEnd: { alignItems: "center", flexDirection: "row" },
+  // Between Back and the star; shrinks and ellipsizes on a long name.
+  appBarTitle: { flex: 1, marginHorizontal: SPACING.sm },
   appBarStar: {
     minWidth: PROFILE_APP_BAR.touchTarget,
     minHeight: PROFILE_APP_BAR.touchTarget,
