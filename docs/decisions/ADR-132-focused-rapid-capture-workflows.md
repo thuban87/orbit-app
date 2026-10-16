@@ -50,4 +50,4 @@ The visible action and canonical detailed form are named **Log Interaction**. Qu
 - `src/components/universal-fab-logic.ts` — supplies the final visible “Log Interaction” action label.
 
 **Depends on:** ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log); ADR-116 (Value-Remapped Interaction Vocabulary and Optional Descriptive Duration); ADR-117 (Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore); ADR-123 (Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing)
-**Required by:** _None._; ADR-206 (Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper); ADR-211 (Linked Interaction Notes Through "Also Save To")
+**Required by:** _None._; ADR-206 (Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper); ADR-211 (Linked Interaction Notes Through "Also Save To"); ADR-224 (One Contact Form — Update Contact Retired to the Archive, and a Four-Action +)

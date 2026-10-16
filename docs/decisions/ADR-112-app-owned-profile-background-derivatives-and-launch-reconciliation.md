@@ -64,4 +64,4 @@ A database-aware reconciliation sweep runs after migration readiness at launch/f
 - `assets/backgrounds/README.md` — records bundled-art provenance and declared brightness bounds.
 
 **Depends on:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup); ADR-087 (Bundled Background Presets and Package-Specific Surface Treatment); ADR-108 (Durable Independent-Axis Profile Presentation and Inheritance)
-**Required by:** None
+**Required by:** ADR-230 (A Settings Page for Profile Backgrounds and a Choose-Only Background Sheet)

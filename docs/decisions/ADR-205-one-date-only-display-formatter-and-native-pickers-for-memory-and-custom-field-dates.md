@@ -55,4 +55,4 @@ The system uses one date-only display formatter in `src/utils/dates.ts`, beside 
 - `src/screens/RecentlyDeletedScreen.tsx` — deleted-on dates.
 
 **Depends on:** ADR-001 (Normalized Custom-Field Values); ADR-089 (Recoverable Memory Lifecycle and Contact-Operation Integrity); ADR-194 (Heatmap Jump-and-Highlight with No Count Card, and Honest Empty Targets); ADR-196 (Cycles Whole-Page Paging, No-Cadence Month Fallback, and Year-Bearing Off-Year Dates); ADR-204 (One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay)
-**Required by:** ADR-210 (Dated Last Talked About and Current Location, Where the Newest Date Is Most Recent)
+**Required by:** ADR-210 (Dated Last Talked About and Current Location, Where the Newest Date Is Most Recent); ADR-229 (Birthday on the Profile — an Overview Tile, a Save-on-Pick Sheet, and One Birthday Control That Asks for the Year)

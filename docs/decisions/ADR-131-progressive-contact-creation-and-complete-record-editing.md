@@ -48,4 +48,4 @@ Add Contact starts with Identity, Relationship Basics, and Contact Methods, with
 - `src/components/ui/AccordionSection.tsx` — supplies controlled disclosure and the validation reveal-and-focus target.
 
 **Depends on:** ADR-016 (Fixed-First Contact Forms and Atomic Contact Creation); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** ADR-220 (Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field)
+**Required by:** ADR-220 (Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field); ADR-222 (Add Contact Opens Bound, Monthly and Not Yet, with Relationship Basics Open); ADR-223 (Birthday, Social Battery, Links and a Held Photo on Add Contact, and Open Existing on a Duplicate Name); ADR-224 (One Contact Form — Update Contact Retired to the Archive, and a Four-Action +)

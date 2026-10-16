@@ -60,4 +60,4 @@ Profile frequency and Snooze controls call public composed writers. Frequency pr
 - `src/profile/relationship-sheet-model.ts` — models pending, failure, retry, and dismissal behavior.
 
 **Depends on:** ADR-025 (Immutable Lifecycle Events in a Unified Timeline); ADR-027 (Derived Profile-Only Gravity and Intensity); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment)
-**Required by:** None
+**Required by:** ADR-227 (One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar); ADR-228 (Truthful Relationship Overview — Never Contacted, Honest Unbound Reasons, Plain Definitions and a Custom Frequency Row)

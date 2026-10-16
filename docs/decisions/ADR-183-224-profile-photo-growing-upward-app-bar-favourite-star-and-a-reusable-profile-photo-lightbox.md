@@ -62,4 +62,4 @@ Gesture math lives in worklets in `photo-lightbox-logic.ts`. A contact with no p
 - `src/components/orrery/orrery-worklet-order.test.ts` — worklet-order guard covering the lightbox files.
 
 **Depends on:** ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors); ADR-180 (Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface); ADR-181 (One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies)
-**Required by:** None
+**Required by:** ADR-225 (Profile Top — a Full-Width Edit Contact Button, a "Compose" Label, the Name in a Solid Top Bar, and a Slimmer ⋯)

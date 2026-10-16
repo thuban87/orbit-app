@@ -49,4 +49,4 @@ The system uses a lean, fixed-first create form followed by eligible custom fiel
 - `src/components/FrequencyPicker.tsx` — maps presets and a validated custom interval to `interval_days`.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL).
-**Required by:** ADR-131 (Progressive Contact Creation and Complete-Record Editing).
+**Required by:** ADR-131 (Progressive Contact Creation and Complete-Record Editing); ADR-222 (Add Contact Opens Bound, Monthly and Not Yet, with Relationship Basics Open); ADR-223 (Birthday, Social Battery, Links and a Held Photo on Add Contact, and Open Existing on a Duplicate Name)

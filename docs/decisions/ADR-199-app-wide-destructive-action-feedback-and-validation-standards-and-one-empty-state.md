@@ -66,4 +66,4 @@ Destructive actions were confirmed, undone or done silently case by case; many w
 - `src/stores/snackbar-store.ts` — `showSnackbar` and the 6000 ms duration.
 
 **Depends on:** ADR-086 (Semantic Icons and Accessible Interaction Primitives); ADR-089 (Recoverable Memory Lifecycle and Contact-Operation Integrity); ADR-150 (Semantic Profile Hierarchy and Source-Owned Knowledge Editing); ADR-198 (Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays)
-**Required by:** ADR-212 (One Delete Pattern for Things to Remember — At Once with Undo, Then Permanent); ADR-221 (Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place)
+**Required by:** ADR-212 (One Delete Pattern for Things to Remember — At Once with Undo, Then Permanent); ADR-221 (Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place); ADR-226 (Archive Becomes the Bin, and Move to Bin Confirms First with No Undo); ADR-227 (One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar)

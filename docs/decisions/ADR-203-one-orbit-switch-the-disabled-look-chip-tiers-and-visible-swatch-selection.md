@@ -52,4 +52,4 @@ Every switch is `OrbitSwitch` (D-25, D-47, look SW-C): off is an outlined `borde
 - `src/components/icons/icon-registry.ts` — the semantic `check` glyph.
 
 **Depends on:** ADR-084 (Four Semantic Theme Palettes, Curated Accents, and Contrast Validation); ADR-086 (Semantic Icons and Accessible Interaction Primitives)
-**Required by:** None
+**Required by:** ADR-222 (Add Contact Opens Bound, Monthly and Not Yet, with Relationship Basics Open)

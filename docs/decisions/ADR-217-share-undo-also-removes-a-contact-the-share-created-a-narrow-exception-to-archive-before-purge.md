@@ -45,4 +45,4 @@ We will let Undo on a share that also created its contact remove both the share 
 - `src/no-fuel-contract.test.ts` — the single `requireArchived: false` check.
 
 **Depends on:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-216 (A Share Saves at Once to Thought of Them)
-**Required by:** None
+**Required by:** ADR-231 (Open/Closed Sections Survive Own-Layout Edits, Layout Tools Move into the Sheets, and Reset Writes an All-Default Row)
