@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -177,6 +177,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-200:** Unsaved-Work Guard in Route, In-Screen Sub-Editor and Overlay Variants — the definition editor is a guarded sub-editor; Back and Cancel prompt only for typed changes.
 - **ADR-204:** One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay — dropdown fields choose through the themed sheet and never rewrite an out-of-list value.
 - **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — the Date widget is a native picker writing `YYYY-MM-DD`; storage stays raw TEXT and existing values are never rewritten.
+- **ADR-224:** One Contact Form and a Four-Action + — Update Contact's named and generic custom-field rows retired; Edit Contact edits values.
 
 ## Gotchas
 
@@ -230,3 +231,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-09-30 | 38.6 | A photo-field value that is not a stored photo path renders as "Photo unavailable" instead of reaching the resolver, and backs up and restores as text (ADR-182, D-31/D-34). |
 | 2026-10-11 | 38.9 | The Date widget is a native date picker writing `YYYY-MM-DD` and showing "Not a date" for an unparseable stored value; dropdowns use the themed option sheet; the definition editor is a guarded sub-editor with end-of-scroll clearance. Storage and invariants unchanged (ADR-200, ADR-202, ADR-204, ADR-205). |
 | 2026-10-16 | 38.11 | Update Contact retired (D-62): Edit Contact is the single contact form for custom-field values; the rapid-capture discovery path is archived in `docs/archive/update-contact/`. |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-224. |
