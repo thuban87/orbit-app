@@ -83,7 +83,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/merge-dao.ts` | Atomically consolidates two live contacts, reparents compatible children, and tombstones the absorbed identity. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
-| `src/screens/ArchivedContactsScreen.tsx` | The Bin (Settings → Bin; route id `Archived`): restore and impact-summary purge surface. |
+| `src/screens/ArchivedContactsScreen.tsx` | The Bin (Settings → Bin; route id `Archived`): restore and impact-summary purge surface. Each row shows the full name on its own line above Restore and Delete permanently (38.11-14 D7). |
 | `src/screens/CaptureScreen.tsx` | Uses the existing name-only contact create path when a shared item has no owner yet. |
 | `src/screens/ContactProfileScreen.tsx` | Provides the configured-provider AI draft entry without making a contact write. |
 
@@ -364,3 +364,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-10-16 | 38.11 | Snooze runs through one shared sheet from the Profile tile, the Profile ⋯, the Contacts card and bulk (D-45); Choose date starts tomorrow (D-37). Custom dates are validated as future local dates before any write by the shared `assertFutureLocalSnoozeDate`, used by the Profile writer and the new `bulkSnoozeUntil`. |
 | 2026-10-16 | 38.11 | "Archive" reads "Bin" in user-visible text: Settings → Bin with Restore and Delete permanently, "Move to Bin" for the action; the Bin never empties itself. Internal names (`archived_at`, the archive core and DAOs, the `Archived` route, the `archive` event) are unchanged (D-69, D-70). |
 | 2026-10-16 | 38.11 | Code review WR-04 / D-88: Add and Edit Contact's link rows with a label but no URL show the warn-only caption "Add a link or this row won't be saved."; Save is never blocked and the row is still dropped. |
+| 2026-10-16 | 38.11 | Device review (38.11-14): Add Contact's Birthday control has no Clear (`showClear={false}`; Edit Contact and the Profile Birthday sheet keep it, D-49, D-59); Settings → Bin rows show the full name above the buttons; the bulk Move to Bin confirm shares the Profile's "hidden from your lists" body and destructive confirm (D-93). |
