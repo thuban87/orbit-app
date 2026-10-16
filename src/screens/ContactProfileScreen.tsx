@@ -27,6 +27,7 @@ import { AppText } from "@/components/ui/AppText";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
+import { MOVE_TO_BIN } from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { archiveContact, setContactBirthday } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -34,7 +35,6 @@ import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { deriveReachRoutes } from "@/db/interaction-assist-read";
 import { getLinkedInteractionRefCore } from "@/db/linked-entry-dao";
 import { editMemory } from "@/db/memories-dao";
-import { resetProfilePresentation } from "@/db/profile-presentation-dao";
 import { type ProfileSnapshot, readProfileSnapshot } from "@/db/profile-read";
 import {
   setProfileContactFrequency,
@@ -71,6 +71,7 @@ import {
   profileScrollA11yOffset,
   profileScrollContentTopPadding,
   profileScrollTargetY,
+  runMoveToBin,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
 } from "@/screens/contact-profile-logic";
@@ -326,14 +327,6 @@ export function ContactProfileScreen({
     presentation?.layout.source === "contact-freeform"
       ? presentation.layout.document
       : null;
-  const hasContactPresentationOverride = Boolean(
-    snapshot &&
-      (snapshot.presentation.contact.layoutTemplateUid !== null ||
-        snapshot.presentation.contact.freeformLayout !== null ||
-        snapshot.presentation.contact.backgroundTemplateUid !== null ||
-        Object.keys(snapshot.presentation.contact.collapse).length > 0),
-  );
-
   // The layout axis alone (38.11 D-65): Reset in Profile Layout shows when the
   // person has a layout template, their own layout or an open/closed override.
   const hasContactLayoutOverride = Boolean(
@@ -579,19 +572,29 @@ export function ContactProfileScreen({
     [contactId],
   );
 
-  const archive = useCallback(async () => {
-    try {
-      await archiveContact(getExecutor(), contactId, localDateTime());
-      closeOverlay();
-      navigation.goBack();
-    } catch (cause) {
-      Logger.error(LOG_SCOPE, "failed to archive Profile contact", cause);
-      showSnackbar({
-        kind: "error",
-        label: "Couldn't archive. Please try again.",
-      });
-    }
-  }, [closeOverlay, contactId, navigation]);
+  // 38.11 D-69, D-71 (review U-04): Move to Bin asks first — `runMoveToBin`
+  // calls `confirm({ ...binConfirmation(name), destructive: true })` — then
+  // archives. The raw write rejects on failure, so the success snackbar can
+  // only follow a write that resolved. No Undo snackbar (D-71).
+  const moveToBin = useCallback(
+    (name: string) =>
+      runMoveToBin({
+        name,
+        confirm,
+        archive: () =>
+          archiveContact(getExecutor(), contactId, localDateTime()),
+        closeOverlay,
+        goBack: () => navigation.goBack(),
+        showSnackbar,
+        logError: (cause) =>
+          Logger.error(
+            LOG_SCOPE,
+            "failed to move Profile contact to the Bin",
+            cause,
+          ),
+      }),
+    [closeOverlay, contactId, navigation],
+  );
 
   const setFrequency = useCallback(
     (intervalDays: number) =>
@@ -864,17 +867,16 @@ export function ContactProfileScreen({
             <Sheet
               visible={overlay === "overflow"}
               onRequestClose={closeOverlay}
-              // The Profile action list can contain eight entries. It needs the
-              // expanded sheet so the bottom presentation actions stay reachable
-              // on a physical phone without clipping below the safe area.
+              // The Profile action list (up to six entries, 38.11 D-65) keeps
+              // the expanded sheet so the bottom presentation actions stay
+              // reachable on a physical phone without clipping below the safe
+              // area, including at large font sizes.
               variant="expanded"
             >
               <View style={styles.menu}>
                 <AppText role="heading">Profile actions</AppText>
                 {profileOverflowEntries({
                   bound: lifecycle.kind === "bound",
-                  hasFreeformLayout: freeformLayout !== null,
-                  hasContactPresentationOverride,
                 }).map((entry) => {
                   if (entry === "separator") {
                     return (
@@ -887,23 +889,19 @@ export function ContactProfileScreen({
                       />
                     );
                   }
+                  // 38.11 D-63/D-65: Edit Contact is on the Hero; Save as
+                  // template and Reset live in the Layout and Background sheets.
                   const labels = {
-                    edit: "Edit Contact",
                     // 38.11 D-64: one entry; Unsnooze lives in the sheet.
                     snooze: "Snooze…",
                     unbind: "Unbind contact",
-                    archive: "Archive",
+                    // 38.11 D-69: Archive reads Move to Bin.
+                    archive: MOVE_TO_BIN,
                     layout: "Profile Layout",
                     background: "Background",
-                    "save-layout-template": "Save Current Layout as Template",
-                    reset: "Reset",
                   } as const;
                   const onPress = () => {
                     switch (entry) {
-                      case "edit":
-                        closeOverlay();
-                        navigation.navigate("Edit", { contactId });
-                        return;
                       case "snooze":
                         setOverlay("snooze");
                         return;
@@ -925,7 +923,7 @@ export function ContactProfileScreen({
                         return;
                       }
                       case "archive":
-                        void archive();
+                        void moveToBin(snapshot.identity.name);
                         return;
                       case "layout":
                         setOverlay("layout");
@@ -933,32 +931,14 @@ export function ContactProfileScreen({
                       case "background":
                         setOverlay("background");
                         return;
-                      case "save-layout-template":
-                        setOverlay("templates");
-                        return;
-                      case "reset":
-                        void confirm({
-                          title: "Reset Profile presentation?",
-                          message:
-                            "This clears only this contact’s layout, collapse, and custom backgrounds. Contact data stays unchanged.",
-                          confirmLabel: "Reset",
-                          destructive: true,
-                        }).then((ok) => {
-                          if (!ok) return;
-                          void commitAndReload(() =>
-                            resetProfilePresentation(
-                              getExecutor(),
-                              contactId,
-                              localDateTime(),
-                            ),
-                          ).then(closeOverlay);
-                        });
                     }
                   };
                   return (
                     <Button
                       key={entry}
-                      role={entry === "unbind" ? "destructive" : "secondary"}
+                      // 38.11 D-68: Unbind is plain (its confirm stays);
+                      // D-69: Move to Bin is red with the warning glyph.
+                      role={entry === "archive" ? "destructive" : "secondary"}
                       label={labels[entry]}
                       onPress={onPress}
                     />

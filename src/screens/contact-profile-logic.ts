@@ -1,3 +1,4 @@
+import { MOVE_TO_BIN } from "@/constants/glossary";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import {
@@ -332,16 +333,18 @@ export type ProfileOverlay =
   | "photo"
   | null;
 
+/**
+ * The Profile ⋯ entries (38.11 D-63, D-64, D-65, D-68, D-69): Edit Contact
+ * moved to the Hero, and Save as template / Reset moved into the Profile Layout
+ * and Background sheets. `"archive"` is the internal name of Move to Bin.
+ */
 export type ProfileOverflowEntry =
-  | "edit"
   | "snooze"
   | "unbind"
   | "archive"
   | "separator"
   | "layout"
-  | "background"
-  | "save-layout-template"
-  | "reset";
+  | "background";
 
 /** One compact Profile app-bar row and the shared minimum icon target. */
 export const PROFILE_APP_BAR = Object.freeze({ height: 56, touchTarget: 44 });
@@ -521,11 +524,8 @@ export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
 /** Keep the product-mandated overflow order independent from view rendering. */
 export function profileOverflowEntries(input: {
   bound: boolean;
-  hasFreeformLayout?: boolean;
-  hasContactPresentationOverride?: boolean;
 }): ProfileOverflowEntry[] {
   return [
-    "edit",
     // 38.11 D-64: one "Snooze…" entry in both states; it opens the shared
     // snooze sheet, where Unsnooze lives.
     "snooze",
@@ -534,8 +534,6 @@ export function profileOverflowEntries(input: {
     "separator",
     "layout",
     "background",
-    ...(input.hasFreeformLayout ? (["save-layout-template"] as const) : []),
-    ...(input.hasContactPresentationOverride ? (["reset"] as const) : []),
   ];
 }
 
@@ -621,18 +619,38 @@ export function unbindConfirmation(name: string): {
   };
 }
 
-/** RED stub (38.11-13 Task 2): replaced in the GREEN commit. */
-export function binConfirmation(_name: string): {
+/**
+ * The Move to Bin confirm (38.11 D-71 example wording; D-69 terms). The screen
+ * adds `destructive: true` (themed, not dismissable; 38.9 D-30, ADR-086).
+ */
+export function binConfirmation(name: string): {
   title: string;
   message: string;
   cancelLabel: string;
   confirmLabel: string;
 } {
-  return { title: "", message: "", cancelLabel: "", confirmLabel: "" };
+  return {
+    title: `Move ${name} to the Bin?`,
+    message:
+      "They'll be hidden everywhere. You can restore them, or delete them permanently, from Settings → Bin.",
+    cancelLabel: "Cancel",
+    confirmLabel: MOVE_TO_BIN,
+  };
 }
 
-/** RED stub (38.11-13 Task 2): replaced in the GREEN commit. */
-export async function runMoveToBin(_input: {
+/** The Move to Bin error snackbar (38.11 D-69 wording). */
+export const MOVE_TO_BIN_FAILED = "Couldn't move to the Bin. Try again.";
+
+/**
+ * The Profile ⋯ Move to Bin flow (38.11 D-69, D-71; review U-04): ask with the
+ * themed destructive confirm, then run the raw archive write, which REJECTS on
+ * failure. Only after it resolves does the Profile close and the "Moved {name}
+ * to the Bin" snackbar show — no Undo (D-71, superseding 38.9 D-32 for this
+ * action). A failed write shows only the error snackbar and stays put.
+ * The snackbar's warning look is a taste call for this plan only; the owner
+ * sees it at the 38.11-14 checkpoint (ADR-221 two looks).
+ */
+export async function runMoveToBin(input: {
   name: string;
   confirm: (request: {
     title: string;
@@ -650,7 +668,25 @@ export async function runMoveToBin(_input: {
   }) => void;
   logError?: (cause: unknown) => void;
 }): Promise<"cancelled" | "moved" | "failed"> {
-  return "cancelled";
+  const confirmed = await input.confirm({
+    ...binConfirmation(input.name),
+    destructive: true,
+  });
+  if (!confirmed) return "cancelled";
+  try {
+    await input.archive();
+  } catch (cause) {
+    input.logError?.(cause);
+    input.showSnackbar({ kind: "error", label: MOVE_TO_BIN_FAILED });
+    return "failed";
+  }
+  input.closeOverlay();
+  input.goBack();
+  input.showSnackbar({
+    kind: "warning",
+    label: `Moved ${input.name} to the Bin`,
+  });
+  return "moved";
 }
 
 export function canStartLifecycleTransition(input: {

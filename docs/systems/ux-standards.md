@@ -57,8 +57,13 @@ The rule (D-30):
 Carve-outs that hold (D-09): Purge keeps its impact-summary confirm; deleting an interaction stays
 a hard delete with explicit confirmation (there is no interaction Trash); Unbind stays confirmed.
 
-Under the rule, **Archive, Restore and Bind act at once** with a snackbar naming the person and
-Undo; **Unbind keeps its confirm** (D-32). 38.11 and 38.12 wire this on their screens.
+Under the rule, **Restore and Bind act at once** with a snackbar naming the person and Undo, and
+**Unbind keeps its confirm** (D-32). **Move to Bin (internally Archive) now asks first** with the
+themed destructive confirm and shows no Undo: the Profile ⋯ confirm reads "Move {name} to the Bin?"
+and, once the write succeeds, a "Moved {name} to the Bin" snackbar names the person with no action
+(38.11 D-69, D-71, superseding 38.9 D-32 for Move to Bin only). In the Profile ⋯ menu Unbind is a
+plain entry with its confirm unchanged (38.11 D-68), and Move to Bin is the red entry with the
+warning glyph. 38.11 and 38.12 wire this on their screens.
 
 What makes an action reversible: Archived contacts; custom fields with values in Quarantine for
 30 days; and, since 38.10, the snackbar Undo window for every Things to Remember item (memories of
@@ -353,3 +358,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-15 | 38.10 | One delete-with-Undo pattern for Things to Remember replaces the holding zones; two snackbar looks (notice and warning, errors included), full-width root placement held in place; shared entry field with keyboard centring; card edit mode and the morphing section Add button (ADR-212, ADR-219..221). |
 | 2026-10-16 | 38.11 | Update Contact retired (D-62): its row-save slot, `EditorFrame` Cancel hold and uncentred entry fields leave the guarded-screen lists (now 11); Edit Contact is the single contact form, and the code is kept in `docs/archive/update-contact/`. |
 | 2026-10-16 | 38.11 | No native Alert remains: the Contacts card snooze opens the shared snooze sheet (`SnoozeSheet`, D-45), and the no-native-alert contract now pins zero production `Alert.alert` calls. Single-contact snooze and unsnooze show one person-naming snackbar with Undo (38.9 D-39). |
+| 2026-10-16 | 38.11 | Move to Bin asks first with the themed destructive confirm and shows no Undo (D-71, superseding 38.9 D-32 for this action); Restore and Bind keep act-at-once with Undo; the Profile ⋯ Unbind entry loses its red look and keeps its confirm (D-68). |
