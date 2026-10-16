@@ -508,6 +508,24 @@ export function profileAppBarScrolled(scrollY: number): boolean {
   return scrollY > PROFILE_APP_BAR_SCRIM_THRESHOLD;
 }
 
+/** RED stub (38.11-13 Task 3): replaced in the GREEN commit. */
+export function heroNameBottomInContent(_input: {
+  heroY: number;
+  identityY: number;
+  nameY: number;
+  nameHeight: number;
+}): number {
+  return 0;
+}
+
+/** RED stub (38.11-13 Task 3): replaced in the GREEN commit. */
+export function profileAppBarShowsName(
+  _scrollY: number,
+  _nameBottomY: number | null,
+): boolean {
+  return false;
+}
+
 /**
  * An in-Profile scroll target (e.g. History reveal) lands below the overlay
  * app bar instead of underneath it.

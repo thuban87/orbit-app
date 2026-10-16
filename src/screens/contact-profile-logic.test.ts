@@ -11,6 +11,7 @@ import {
   consumeProfileReachOutIntent,
   createProfileSnapshotLoader,
   editDestination,
+  heroNameBottomInContent,
   knowledgeNavigateParams,
   PROFILE_APP_BAR,
   PROFILE_APP_BAR_SCRIM_OPACITY,
@@ -24,6 +25,7 @@ import {
   profileAppBarGlyphClearance,
   profileAppBarHitBoxClearance,
   profileAppBarScrolled,
+  profileAppBarShowsName,
   profileContentTopPadding,
   profileErrorPlacement,
   profileKnowledgeCollectionDestination,
@@ -629,6 +631,41 @@ describe("integrated Profile controller contracts", () => {
       expect(profileAppBarScrolled(PROFILE_APP_BAR_SCRIM_THRESHOLD + 1)).toBe(
         true,
       );
+    });
+
+    it("shows the name in the bar only once the hero name's bottom passes under it (38.11 D-57)", () => {
+      const nameBottom = 300;
+      const edge = nameBottom - PROFILE_APP_BAR.height;
+      expect(profileAppBarShowsName(0, nameBottom)).toBe(false);
+      expect(profileAppBarShowsName(edge - 1, nameBottom)).toBe(false);
+      expect(profileAppBarShowsName(edge, nameBottom)).toBe(true);
+      expect(profileAppBarShowsName(edge + 200, nameBottom)).toBe(true);
+      // Unknown geometry (not laid out yet): never show the name.
+      expect(profileAppBarShowsName(5000, null)).toBe(false);
+      expect(profileAppBarShowsName(5000, Number.NaN)).toBe(false);
+    });
+
+    it("measures the name's bottom in scroll-content coordinates, not its local layout (review T-11)", () => {
+      // Hero at y 20 in the scroll content (its top padding); the identity
+      // View sits below the 224 photo plus the 16 gap; the name is its first
+      // line, then a nonzero offset proves every term is summed.
+      const parts = { heroY: 20, identityY: 240, nameY: 4, nameHeight: 34 };
+      const bottom = heroNameBottomInContent(parts);
+      expect(bottom).toBe(20 + 240 + 4 + 34);
+      // The name's own onLayout bottom (relative to the identity View) is not it.
+      expect(bottom).not.toBe(parts.nameY + parts.nameHeight);
+      // It feeds the bar: hidden until the bar's bottom edge reaches it.
+      expect(
+        profileAppBarShowsName(bottom - PROFILE_APP_BAR.height - 1, bottom),
+      ).toBe(false);
+      expect(
+        profileAppBarShowsName(bottom - PROFILE_APP_BAR.height, bottom),
+      ).toBe(true);
+    });
+
+    it("keeps the signed-off scrim unchanged (38.6 D-36, 38.11 D-57)", () => {
+      expect(PROFILE_APP_BAR_SCRIM_OPACITY).toBe(0.92);
+      expect(PROFILE_APP_BAR_SCRIM_THRESHOLD).toBe(8);
     });
 
     it("keeps a refresh error off the overlay bar and the D-04 lines (WR-04)", () => {

@@ -888,3 +888,41 @@ describe("ProfileModuleHost Snooze sheet (38.11 D-45)", () => {
     expect(today.props.showUnsnooze).toBe(false);
   });
 });
+
+// 38.11 D-28: an open section's chevron points up; a closed one points down.
+describe("ProfileModuleHost section chevrons (38.11 D-28)", () => {
+  function chevrons(expanded: boolean) {
+    const hostPresentation = {
+      collapse: {},
+      layout: {
+        document: {
+          topLevel: [{ id: "things-to-remember", visible: true, expanded }],
+          thingsToRemember: [],
+        },
+      },
+    } as unknown as ProfilePresentation;
+    return profileHostNodes(vi.fn(), hostPresentation)
+      .filter(
+        (node) =>
+          node.type === "Pressable" &&
+          typeof (node.props.accessibilityState as { expanded?: unknown })
+            ?.expanded === "boolean",
+      )
+      .map((toggle) => ({
+        expanded: (toggle.props.accessibilityState as { expanded: boolean })
+          .expanded,
+        icon: all(toggle.children).find((node) => node.type === "Icon")?.props
+          .name,
+      }));
+  }
+
+  it("points up when the section is open", () => {
+    expect(chevrons(true)).toEqual([{ expanded: true, icon: "chevron-up" }]);
+  });
+
+  it("points down when the section is closed", () => {
+    expect(chevrons(false)).toEqual([
+      { expanded: false, icon: "chevron-down" },
+    ]);
+  });
+});

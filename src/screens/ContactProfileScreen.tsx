@@ -125,6 +125,8 @@ export function ProfileAppBar({
   favouriteDisabled: boolean;
   /** Content is scrolled under the bar (drives the token scrim). */
   scrolled: boolean;
+  /** RED stub (38.11-13 Task 3): not rendered yet. */
+  title?: string | null;
   onBack: () => void;
   onToggleFavourite: () => void;
   onOpenOverflow: () => void;

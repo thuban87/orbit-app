@@ -112,6 +112,7 @@ function render(
     favourite: boolean;
     favouriteDisabled: boolean;
     scrolled: boolean;
+    title: string | null;
   }> = {},
 ) {
   return resolve(
@@ -186,6 +187,59 @@ describe("ProfileAppBar (38.6 D-17)", () => {
     const style = flatStyle(scrim?.props.style);
     expect(style.backgroundColor).toBe(THEME_PRESETS.galaxy.dark.background);
     expect(style.opacity).toBe(PROFILE_APP_BAR_SCRIM_OPACITY);
+  });
+});
+
+describe("ProfileAppBar name after scrolling (38.11 D-57)", () => {
+  const titleOf = (nodes: Node[]) =>
+    all(nodes).find((node) => node.props.testID === "profile-app-bar-title");
+
+  it("shows no name until the screen passes one", () => {
+    expect(titleOf(render())).toBeUndefined();
+    expect(titleOf(render({ title: null }))).toBeUndefined();
+  });
+
+  it("renders the name in one ellipsized header line between Back and the star", () => {
+    const nodes = render({ title: "Alex Example", scrolled: true });
+    const title = titleOf(nodes);
+    expect(title?.type).toBe("AppText");
+    expect(title?.props).toMatchObject({
+      numberOfLines: 1,
+      ellipsizeMode: "tail",
+      accessibilityRole: "header",
+      role: "heading",
+      children: "Alex Example",
+    });
+    // No colour override: AppText's theme text colour applies.
+    expect(flatStyle(title?.props.style).color).toBeUndefined();
+    const [bar] = nodes;
+    const order = bar.children.map(
+      (node) => node.props.testID ?? node.props.accessibilityLabel ?? node.type,
+    );
+    expect(order).toEqual([
+      "profile-app-bar-scrim",
+      "Back",
+      "profile-app-bar-title",
+      "View",
+    ]);
+  });
+});
+
+describe("Profile scroll wiring (review T-17)", () => {
+  const source = readFileSync(
+    join(__dirname, "ContactProfileScreen.tsx"),
+    "utf8",
+  );
+
+  it("wires the scroll handler unconditionally; only the scrim stays behind the flag", () => {
+    expect(source).not.toContain("onScroll={PROFILE_APP_BAR_SCROLL_SCRIM");
+    expect(source).toContain("onScroll={onContentScroll}");
+    expect(source).toContain(
+      "scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}",
+    );
+    expect(source).toContain(
+      "title={barShowsName ? snapshot.identity.name : null}",
+    );
   });
 });
 
