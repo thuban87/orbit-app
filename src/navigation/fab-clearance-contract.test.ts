@@ -30,7 +30,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SPACING } from "@/theme/tokens/spacing";
 import { isFocusedWorkflow } from "./focused-route-classification";
-import { FAB_EDGE_GAP, FAB_SIZE } from "./use-bottom-clearance";
+import {
+  bottomClearanceFor,
+  FAB_CLEARANCE_MARGIN,
+  FAB_EDGE_GAP,
+  FAB_SIZE,
+} from "./use-bottom-clearance";
 
 const ROOT = process.cwd();
 
@@ -383,6 +388,40 @@ describe("FAB clearance: geometry tokens (D-52)", () => {
     expect(FAB_EDGE_GAP).toBe(SPACING.base);
     expect(read("src/navigation/use-bottom-clearance.ts")).toMatch(
       /FAB_EDGE_GAP\s*=\s*SPACING\.base/,
+    );
+  });
+});
+
+/**
+ * 38.11 D-41: the last control on a FAB-bearing scroll screen ends a tunable
+ * margin above the + instead of touching its top edge (the Profile's Off
+ * Limits heading pencil, Settings → AI Data Permissions' "Interaction notes"
+ * switch). One margin inside the shared clearance moves every such screen.
+ */
+describe("FAB clearance: margin above the + (38.11 D-41)", () => {
+  it("is the SPACING.base token, declared as a tunable", () => {
+    expect(FAB_CLEARANCE_MARGIN).toBe(SPACING.base);
+    expect(read("src/navigation/use-bottom-clearance.ts")).toMatch(
+      /export const FAB_CLEARANCE_MARGIN\s*=\s*SPACING\.base/,
+    );
+  });
+
+  it("ends scroll content the margin above the + top edge", () => {
+    expect(bottomClearanceFor(80, true)).toBe(
+      80 + FAB_SIZE + FAB_EDGE_GAP + FAB_CLEARANCE_MARGIN,
+    );
+    expect(bottomClearanceFor(80, true)).toBe(80 + 56 + 16 + 16);
+    expect(bottomClearanceFor(0, true)).toBe(88);
+  });
+
+  it("reserves only the tab bar when the screen opts out of the FAB", () => {
+    expect(bottomClearanceFor(80, false)).toBe(80);
+    expect(bottomClearanceFor(0, false)).toBe(0);
+  });
+
+  it("useBottomClearance returns the pure helper's value", () => {
+    expect(read("src/navigation/use-bottom-clearance.ts")).toMatch(
+      /return bottomClearanceFor\(\s*useMeasuredTabBarHeight\(\),\s*extraForFab,?\s*\)/,
     );
   });
 });
