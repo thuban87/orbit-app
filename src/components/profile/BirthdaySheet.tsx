@@ -149,12 +149,7 @@ export function BirthdaySheet({
   };
 
   return (
-    <Sheet
-      visible={visible}
-      onRequestClose={close}
-      variant="compact"
-      scrollBody={false}
-    >
+    <Sheet visible={visible} onRequestClose={close} variant="compact">
       <View style={styles.content}>
         <AppText role="heading" accessibilityRole="header">
           Birthday

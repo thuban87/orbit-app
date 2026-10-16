@@ -51,6 +51,7 @@ vi.mock("@/services/contact-lifecycle-effects", () => ({}));
 vi.mock("@/services/notifications/notification-schedule", () => ({}));
 vi.mock("@/services/photos/background-storage", () => ({}));
 vi.mock("@/services/reach-out/handoff", () => ({}));
+vi.mock("@/services/widget/widget-refresh", () => ({}));
 vi.mock("@/stores/confirm-store", () => ({ confirm: vi.fn() }));
 vi.mock("@/stores/shell-refresh-store", () => ({}));
 vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
