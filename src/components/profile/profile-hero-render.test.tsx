@@ -68,6 +68,8 @@ const identity: ProfileIdentity = {
 };
 
 const onOpenPhoto = vi.fn();
+const onEdit = vi.fn();
+const onMessage = vi.fn();
 
 const onPhotoLoadErrorChange = vi.fn();
 
@@ -86,14 +88,19 @@ function render(
         methodGroups,
         messageContext: { archived: false, settingsHosted: false },
         onOpenPhoto,
-        onMessage: () => {},
+        onEdit,
+        onMessage,
         onCall: () => {},
       }),
     ),
   );
 }
 
-beforeEach(() => onOpenPhoto.mockReset());
+beforeEach(() => {
+  onOpenPhoto.mockReset();
+  onEdit.mockReset();
+  onMessage.mockReset();
+});
 
 describe("ProfileHero layout (38.6 D-04/D-17)", () => {
   it("renders the photo at PROFILE_HERO_AVATAR_SIZE with the hero gap", () => {
@@ -247,5 +254,92 @@ describe("ProfileHero unusable-method reasons (38.11 D-27)", () => {
       "Add a phone number or email to message this contact.",
       "Add a phone number to call this contact.",
     ]);
+  });
+});
+
+// 38.11 D-63, D-47 (D-46: Compose behaviour unchanged).
+describe("ProfileHero top actions (38.11 D-63, D-47)", () => {
+  const block = (nodes: Node[]) =>
+    nodes.find((node) => node.props.testID === "profile-hero-actions");
+
+  it("puts a full-width Edit Contact above the Compose Message and Call pair", () => {
+    const nodes = render();
+    const root = nodes.find((node) => node.props.testID === "profile-hero");
+    const actions = block(nodes);
+    // The action block is the Hero's last child, after photo and identity.
+    expect(root?.children.at(-1)).toBe(actions);
+    const [edit, pair] = actions?.children ?? [];
+    expect(edit?.type).toBe("Button");
+    expect(edit?.props).toMatchObject({
+      role: "secondary",
+      label: "Edit Contact",
+      accessibilityLabel: "Edit Alex",
+    });
+    // The Edit button spans the block: it is a direct child of a stretched
+    // column, while each of the pair sits in a half-width wrap column.
+    expect(actions?.props.style).toMatchObject({ alignSelf: "stretch" });
+    const labels = (pair?.children ?? []).map(
+      (column) => column.children[0]?.props.label,
+    );
+    expect(labels).toEqual(["Compose Message", "Call"]);
+    expect(pair?.props.style).toMatchObject({
+      flexDirection: "row",
+      flexWrap: "wrap",
+    });
+  });
+
+  it("opens Edit Contact on press", () => {
+    const edit = render().find(
+      (node) => node.type === "Button" && node.props.label === "Edit Contact",
+    );
+    const pressEdit = edit?.props.onPress as () => void;
+    pressEdit();
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onMessage).not.toHaveBeenCalled();
+  });
+
+  it("labels the top Message button Compose Message, naming the person", () => {
+    const nodes = all(
+      resolve(
+        ProfileHero({
+          identity,
+          actionableMethods: {
+            phone: { is_actionable: 1, canonical_value: "+15550100" } as never,
+            email: null,
+          },
+          methodGroups: { phone: [{ is_actionable: 1 } as never], email: [] },
+          messageContext: { archived: false, settingsHosted: false },
+          onOpenPhoto,
+          onEdit,
+          onMessage,
+          onCall: () => {},
+        }),
+      ),
+    );
+    const compose = nodes.find(
+      (node) =>
+        node.type === "Button" && node.props.label === "Compose Message",
+    );
+    expect(compose?.props.disabled).toBe(false);
+    expect(compose?.props.accessibilityLabel).toBe("Compose a message to Alex");
+    const pressCompose = compose?.props.onPress as () => void;
+    pressCompose();
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    expect(
+      nodes.some(
+        (node) => node.type === "Button" && node.props.label === "Message",
+      ),
+    ).toBe(false);
+  });
+
+  it("names the reason when Compose Message is unavailable", () => {
+    const compose = render().find(
+      (node) =>
+        node.type === "Button" && node.props.label === "Compose Message",
+    );
+    expect(compose?.props.disabled).toBe(true);
+    expect(compose?.props.accessibilityLabel).toBe(
+      "Compose Message unavailable. Add a phone number or email to message this contact.",
+    );
   });
 });

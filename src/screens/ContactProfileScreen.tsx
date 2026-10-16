@@ -763,6 +763,8 @@ export function ContactProfileScreen({
                 photoOpenable={!heroPhotoFailed}
                 onPhotoLoadErrorChange={setHeroPhotoFailed}
                 onOpenPhoto={() => setOverlay("photo")}
+                // 38.11 D-63: Edit Contact moved from ⋯ to the Hero.
+                onEdit={() => navigation.navigate("Edit", { contactId })}
                 onMessage={() =>
                   navigation.navigate("Compose", {
                     contactId,

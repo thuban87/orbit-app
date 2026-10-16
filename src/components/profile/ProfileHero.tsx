@@ -25,6 +25,7 @@ export function ProfileHero({
   photoOpenable = true,
   onPhotoLoadErrorChange,
   onOpenPhoto,
+  onEdit,
   onMessage,
   onCall,
 }: {
@@ -51,6 +52,9 @@ export function ProfileHero({
   onPhotoLoadErrorChange?: (errored: boolean) => void;
   /** Opens the photo lightbox (38.6 D-03/D-15); only reachable with a loadable photo. */
   onOpenPhoto: () => void;
+  /** Opens Edit Contact (38.11 D-63: the Hero's full-width top action). */
+  onEdit: () => void;
+  /** Opens Compose (38.11 D-47 label; D-46 behaviour unchanged). */
   onMessage: () => void;
   onCall: () => void;
 }) {
@@ -109,38 +113,48 @@ export function ProfileHero({
           <PhotoUnavailableNotice />
         ) : null}
       </View>
-      <View style={styles.actions}>
-        <View style={styles.action}>
-          <Button
-            role="primary"
-            label="Message"
-            accessibilityLabel={
-              actions.message.enabled
-                ? `Message ${identity.name}`
-                : `Message unavailable. ${actions.message.reason}`
-            }
-            disabled={!actions.message.enabled}
-            onPress={onMessage}
-          />
-          {actions.message.reason ? (
-            <AppText role="caption">{actions.message.reason}</AppText>
-          ) : null}
-        </View>
-        <View style={styles.action}>
-          <Button
-            role="secondary"
-            label="Call"
-            accessibilityLabel={
-              actions.call.enabled
-                ? `Call ${identity.name}`
-                : `Call unavailable. ${actions.call.reason}`
-            }
-            disabled={!actions.call.enabled}
-            onPress={onCall}
-          />
-          {actions.call.reason ? (
-            <AppText role="caption">{actions.call.reason}</AppText>
-          ) : null}
+      {/* 38.11 D-63: a full-width Edit Contact above the Compose Message and
+          Call pair, about twice their width; D-47 renames Message. */}
+      <View testID="profile-hero-actions" style={styles.actionBlock}>
+        <Button
+          role="secondary"
+          label="Edit Contact"
+          accessibilityLabel={`Edit ${identity.name}`}
+          onPress={onEdit}
+        />
+        <View style={styles.actions}>
+          <View style={styles.action}>
+            <Button
+              role="primary"
+              label="Compose Message"
+              accessibilityLabel={
+                actions.message.enabled
+                  ? `Compose a message to ${identity.name}`
+                  : `Compose Message unavailable. ${actions.message.reason}`
+              }
+              disabled={!actions.message.enabled}
+              onPress={onMessage}
+            />
+            {actions.message.reason ? (
+              <AppText role="caption">{actions.message.reason}</AppText>
+            ) : null}
+          </View>
+          <View style={styles.action}>
+            <Button
+              role="secondary"
+              label="Call"
+              accessibilityLabel={
+                actions.call.enabled
+                  ? `Call ${identity.name}`
+                  : `Call unavailable. ${actions.call.reason}`
+              }
+              disabled={!actions.call.enabled}
+              onPress={onCall}
+            />
+            {actions.call.reason ? (
+              <AppText role="caption">{actions.call.reason}</AppText>
+            ) : null}
+          </View>
         </View>
       </View>
     </View>
@@ -153,8 +167,10 @@ const styles = StyleSheet.create({
   root: { alignItems: "center", gap: PROFILE_HERO_GAP },
   identity: { alignItems: "center", gap: SPACING.xs },
   name: { textAlign: "center" },
+  // The Edit button spans the block; the pair below keeps two columns and
+  // wraps to one at large font sizes (ADR-109 stable geometry).
+  actionBlock: { alignSelf: "stretch", gap: SPACING.sm },
   actions: {
-    alignSelf: "stretch",
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.sm,
