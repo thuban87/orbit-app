@@ -137,6 +137,7 @@ import {
 import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
 import { countUnbound } from "@/db/unbound-read";
+import { useRetainedWhileClosing } from "@/hooks/use-retained-while-closing";
 import {
   type BulkActionClaim,
   createBulkActionGate,
@@ -565,6 +566,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     name: string;
     snoozeUntil: string | null;
   } | null>(null);
+  // Review IN-06: both snooze sheets render their title and Unsnooze row from
+  // the last target while they animate closed (onClose nulls the live state
+  // first). `visible` and every write still read the live state.
+  const cardSnoozeShown = useRetainedWhileClosing(cardSnooze);
+  const snoozePickerShown = useRetainedWhileClosing(snoozePicker);
   const [categoryPicker, setCategoryPicker] = useState<{
     claim: BulkActionClaim;
     sessionId: number;
@@ -1683,8 +1689,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // The card sheet's EFFECTIVE snooze end (review W-01): an expired
   // `snooze_until` reads as not snoozed.
   const cardSnoozeUntil =
-    cardSnooze !== null && isSnoozed(cardSnooze.snoozeUntil, listNow)
-      ? cardSnooze.snoozeUntil
+    cardSnoozeShown !== null && isSnoozed(cardSnoozeShown.snoozeUntil, listNow)
+      ? cardSnoozeShown.snoozeUntil
       : null;
   const todayLocal = formatLocalDate(new Date());
   const emptyState = selectDashboardEmptyState({
@@ -2122,10 +2128,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       />
       <SnoozeSheet
         // 38.11 D-45/D-81 (review V-07, W-01, X-01): the card's sheet renders
-        // from the captured `cardSnooze` only; the effective end treats an
-        // expired snooze as not snoozed.
+        // from the captured `cardSnooze` only (its last value while closing,
+        // review IN-06); the effective end treats an expired snooze as not
+        // snoozed.
         visible={cardSnooze !== null}
-        title={`Snooze ${cardSnooze?.name ?? ""}`}
+        title={`Snooze ${cardSnoozeShown?.name ?? ""}`}
         snoozedUntil={cardSnoozeUntil}
         showUnsnooze={cardSnoozeUntil !== null}
         todayLocal={todayLocal}
@@ -2156,9 +2163,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         // and unsnoozes exactly those people. Bulk keeps its count snackbar,
         // so no confirmName.
         visible={snoozePicker !== null}
-        title={`Snooze ${plural(snoozePicker?.ids.length ?? 0, "contact")}`}
+        title={`Snooze ${plural(snoozePickerShown?.ids.length ?? 0, "contact")}`}
         snoozedUntil={null}
-        showUnsnooze={(snoozePicker?.snoozedIds.length ?? 0) > 0}
+        showUnsnooze={(snoozePickerShown?.snoozedIds.length ?? 0) > 0}
         todayLocal={todayLocal}
         onPreset={(preset) => {
           const picker = snoozePicker;

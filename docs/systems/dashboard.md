@@ -307,3 +307,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-10-16 | 38.11 | Archive reads "Bin" to the user (D-69): the bulk bar's "Move to Bin" with its confirm "Move N contacts to the Bin?" and snackbar, the overflow's "Bin" entry (route `Archived` unchanged), and the empty-state pointer "N in the Bin". Behaviour is unchanged. |
 | 2026-10-16 | 38.11 | Code review WR-01: bulk Move to Bin reconciles the reminder schedule after the write commits, so binned people's scheduled reminders stop. |
 | 2026-10-16 | 38.11 | Code review IN-01: `readCurrentlySnoozedIds` documented as `countSnoozed`'s date predicate without its bound filter (behaviour unchanged). |
+| 2026-10-16 | 38.11 | Code review IN-06: the card and bulk snooze sheets keep their title and Unsnooze row while animating closed (`useRetainedWhileClosing`); visibility and writes still read the live target. |
