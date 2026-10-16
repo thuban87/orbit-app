@@ -538,8 +538,10 @@ export function countSnoozed(exec: SqlExecutor): Promise<number> {
 }
 
 /**
- * The subset of `ids` that is currently snoozed (38.11 D-82, review V-01): the
- * `countSnoozed` predicate, so an expired `snooze_until` does not count. The
+ * The subset of `ids` that is currently snoozed (38.11 D-82, review V-01):
+ * `countSnoozed`'s date predicate (live, snooze in the future), so an expired
+ * `snooze_until` does not count — but not its bound filter, so a selected
+ * snoozed Unbound person counts too: the user selected them (review IN-01). The
  * bulk snooze sheet reads this when it opens instead of trusting on-screen
  * rows, which a filter or search can drop the selected people from. Every id
  * is bound as `?`; an empty list returns [] without a query.
