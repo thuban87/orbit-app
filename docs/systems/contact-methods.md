@@ -1,7 +1,7 @@
 # Contact Methods
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
@@ -70,7 +70,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 ### Writing and selecting methods
 
 1. Create and edit forms submit ordered method drafts to the contact aggregate writer, which composes the method DAO inside the outer contact transaction.
-2. The normalizer retains nonblank invalid values as non-actionable, canonicalizes valid phones and conservative emails, and records a phone's canonicalization region without auto-rewriting it later.
+2. The normalizer retains nonblank invalid values as non-actionable, canonicalizes valid phones and conservative emails, and records a phone's canonicalization region without auto-rewriting it later. On Add and Edit Contact, `updateMethodDraft` (`src/components/contact-methods-editor-model.ts`) recomputes `isActionable` for each draft row as the user types, using the effective phone region, so the "can't be used" warning is live; it never blocks Save (38.11 D-30, ADR-059). A link row with a label but no URL shows a warn-only caption and is dropped on save (D-88).
 3. The DAO clears a changing primary before promotion, promotes the next ordered row when a primary is removed, and returns same-contact canonical collisions as typed feedback; shared canonical values across contacts remain legal.
 4. Profile displays stored formatted values, labels, extensions, and invalid helpers. It does not reparse raw input; Compose receives only the read owner's actionable primary destination.
 
@@ -129,6 +129,14 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 - **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — returns committed method identities to the editor so post-save baselines cannot retain draft-only UIDs.
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — composes normalized method reads into one local Profile snapshot.
+- **ADR-223:** Birthday, Social Battery, Links and a Held Photo on Add Contact — links join the create transaction (`addLinksCore`); label-only link rows warn.
+- **ADR-224:** One Contact Form and a Four-Action + — Edit Contact as the one form.
+- **ADR-225:** Profile Top: Edit Contact, Compose, Name in a Solid Top Bar, Slimmer ⋯ — the Hero tells "no number" from "a saved number that can't be used".
+- **ADR-226:** Archive Becomes the Bin — Bin wording on the Hero reason.
+- **ADR-227:** One Snooze Sheet — snooze sheet hosts on screens this doc lists.
+- **ADR-229:** Birthday on the Profile — the Profile Birthday sheet.
+- **ADR-230:** Settings Page for Profile Backgrounds — the Profile Backgrounds page.
+- **ADR-231:** Open/Closed Sections, Layout Tools in the Sheets, All-Default Reset Row — Profile layout and background resets.
 
 ## Gotchas
 
@@ -176,3 +184,4 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 | 2026-09-02 | 35 | Added mode-aware Text/Email Compose resolution, explicit primary selection, and encoded email handoff. |
 | 2026-09-23 | 38.2 | Made contact edits return committed child identities and advance post-save method baselines before any projection refresh. |
 | 2026-10-15 | 38.10 | Compose no longer reads ranked fuel; its knowledge comes from Compose Research (`readComposeResearch`) and the prompt-item count feeds the failure diagnostic (ADR-214). |
+| 2026-10-16 | 38.11 | Draft contact-method rows recompute their warning live with the effective phone region (D-30, warn only); label-only link rows warn (D-88). KB extraction: Decisions link ADR-223–ADR-227, ADR-229–ADR-231. |
