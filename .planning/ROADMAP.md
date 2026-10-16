@@ -1619,7 +1619,23 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Dossier size estimate**: about 9–13½ plans by area (38.11 D-76; the owner kept everything in this phase).
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–10 plans — rough estimate from finding titles plus the triage's per-area ranges; recurring-problem sweeps and recorded-decision reversals are not counted.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13).
-**Plans**: TBD
+**Plans**: 14 plans in 7 waves (planned 2026-10-16)
+
+Plans:
+- [ ] 38.11-01-PLAN.md — New-contact defaults (Bound, Monthly, Not yet), form fixes, Edit save returns to its Profile (W1)
+- [ ] 38.11-02-PLAN.md — Update Contact retired and archived, Memory off the +, + clearance, history placeholder (W1)
+- [ ] 38.11-03-PLAN.md — Never Contacted status, honest reasons, stat explanations, Custom... frequency (W1)
+- [ ] 38.11-04-PLAN.md — Add Contact Birthday / Social battery / Links in the one create save; Year unknown; Birthday Clear (W2)
+- [ ] 38.11-05-PLAN.md — Layout editor: open/closed survives, Save as template and Reset in Layout (W2)
+- [ ] 38.11-06-PLAN.md — Settings -> Profile Backgrounds page; shared crop flow (W2)
+- [ ] 38.11-07-PLAN.md — Photo on Add Contact: held, promoted after save, swept on discard (W3)
+- [ ] 38.11-08-PLAN.md — Birthday tile and Birthday sheet (W3)
+- [ ] 38.11-09-PLAN.md — Duplicate name "Open existing" (W4)
+- [ ] 38.11-10-PLAN.md — One snooze sheet for all four entries (W4)
+- [ ] 38.11-11-PLAN.md — Background sheet: choose-only compact cards, Manage, Reset (W5)
+- [ ] 38.11-12-PLAN.md — Archive -> Bin wording app-wide (W5)
+- [ ] 38.11-13-PLAN.md — Profile top (Edit Contact, Compose Message), ⋯ with confirmed Move to Bin, name in top bar (W6)
+- [ ] 38.11-14-PLAN.md — Device pass, owner checkpoints, one release build (W7)
 
 > **Split 2026-10-10 (owner).** The original 38.11 "Everyday Screens" (areas A–F, J; estimated about 16–22 plans) was split by seam: Profile and contact forms stay here; Contacts list/search/Digest → 38.13; logging/History/Events/Compose → 38.14. The B-23 Events planning feature was never part of the remediation and is its own phase, 38.15.
 
