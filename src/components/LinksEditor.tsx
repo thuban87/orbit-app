@@ -31,6 +31,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import {
+  LINK_MISSING_URL_CAPTION,
+  linkRowMissingUrl,
+} from "@/components/links-editor-logic";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -150,6 +154,18 @@ export function LinksEditor({
               placeholderTextColor={colors.textPlaceholder}
               style={inputStyle}
             />
+            {/* 38.11 D-88: warn only — Save is never blocked and the row is
+            still dropped. Same danger-caption look as the contact-method
+            "can't be used yet" warning. */}
+            {linkRowMissingUrl(link) ? (
+              <Text
+                testID={`links-editor-missing-url-${index}`}
+                accessibilityLiveRegion="polite"
+                style={[styles.helper, { color: colors.danger }]}
+              >
+                {LINK_MISSING_URL_CAPTION}
+              </Text>
+            ) : null}
             <View style={styles.rowActions}>
               <Pressable
                 testID={`links-editor-open-${index}`}
@@ -250,5 +266,9 @@ const styles = StyleSheet.create({
   addBtn: {
     minHeight: 44,
     justifyContent: "center",
+  },
+  helper: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
