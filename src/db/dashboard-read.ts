@@ -537,12 +537,28 @@ export function countSnoozed(exec: SqlExecutor): Promise<number> {
   );
 }
 
-/** 38.11 D-82 (RED stub; implemented in the GREEN commit). */
+/**
+ * The subset of `ids` that is currently snoozed (38.11 D-82, review V-01): the
+ * `countSnoozed` predicate, so an expired `snooze_until` does not count. The
+ * bulk snooze sheet reads this when it opens instead of trusting on-screen
+ * rows, which a filter or search can drop the selected people from. Every id
+ * is bound as `?`; an empty list returns [] without a query.
+ */
 export async function readCurrentlySnoozedIds(
-  _exec: SqlExecutor,
-  _ids: readonly number[],
+  exec: SqlExecutor,
+  ids: readonly number[],
 ): Promise<number[]> {
-  throw new Error("readCurrentlySnoozedIds: not implemented");
+  if (ids.length === 0) return [];
+  const rows = await exec.getAllAsync<{ id: number }>(
+    `SELECT id FROM contacts
+      WHERE id IN (${ids.map(() => "?").join(", ")})
+        AND archived_at IS NULL
+        AND snooze_until IS NOT NULL
+        AND date(snooze_until) > date('now','localtime')
+      ORDER BY id`,
+    [...ids],
+  );
+  return rows.map((row) => row.id);
 }
 
 /** Bound, non-archived favourite membership count for Dashboard empty states. */

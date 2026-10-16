@@ -17,14 +17,14 @@ export interface CardContextMenuProps {
   contactId: number | null;
   name: string;
   isFavourite: boolean;
-  isSnoozed: boolean;
   onViewProfile: () => void;
   onQuickLog: () => void;
   onLogInteraction: () => void;
   onMessage: () => void;
   onEditContact: () => void;
   onToggleFavourite: () => void;
-  onToggleSnooze: () => void;
+  /** Opens the shared snooze sheet for this contact (38.11 D-45, D-81). */
+  onOpenSnooze: () => void;
   onSelect: () => void;
   onRequestClose: () => void;
 }
@@ -41,14 +41,13 @@ export function CardContextMenu({
   contactId,
   name,
   isFavourite,
-  isSnoozed,
   onViewProfile,
   onQuickLog,
   onLogInteraction,
   onMessage,
   onEditContact,
   onToggleFavourite,
-  onToggleSnooze,
+  onOpenSnooze,
   onSelect,
   onRequestClose,
 }: CardContextMenuProps) {
@@ -80,11 +79,13 @@ export function CardContextMenu({
       icon: "favorite",
       onPress: onToggleFavourite,
     },
+    // 38.11 D-64 entry shape, D-81: "Snooze…" in both states; the shared
+    // sheet holds Unsnooze. Never a one-tap unsnooze here.
     {
       id: "snooze",
-      label: isSnoozed ? "Unsnooze" : "Snooze",
+      label: "Snooze…",
       icon: "snooze",
-      onPress: onToggleSnooze,
+      onPress: onOpenSnooze,
     },
     { id: "select", label: "Select", icon: "select", onPress: onSelect },
   ];

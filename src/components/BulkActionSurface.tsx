@@ -19,8 +19,8 @@ export interface BulkActionSurfaceProps {
   onLogInteraction: () => void;
   onAddFavourites: () => void;
   onRemoveFavourites: () => void;
+  /** Opens the shared snooze sheet, the one bulk snooze/unsnooze hub (D-82). */
   onSnooze: () => void;
-  onUnsnooze: () => void;
   onSetCategory: () => void;
   onArchive: () => void;
   onChangeFrequency: () => void;
@@ -42,7 +42,6 @@ export function BulkActionSurface({
   onAddFavourites,
   onRemoveFavourites,
   onSnooze,
-  onUnsnooze,
   onSetCategory,
   onArchive,
   onChangeFrequency,
@@ -72,12 +71,6 @@ export function BulkActionSurface({
       onPress: onRemoveFavourites,
     },
     { id: "snooze", label: "Snooze", icon: "snooze", onPress: onSnooze },
-    {
-      id: "unsnooze",
-      label: "Unsnooze",
-      icon: "snooze",
-      onPress: onUnsnooze,
-    },
     {
       id: "set-category",
       label: "Set Category",

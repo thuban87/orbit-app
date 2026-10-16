@@ -47,7 +47,6 @@ import {
 } from "react";
 import {
   AccessibilityInfo,
-  Alert,
   AppState,
   BackHandler,
   FlatList,
@@ -91,6 +90,7 @@ import {
 } from "@/components/PostLogNoteEditor";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { SnoozeSheet } from "@/components/SnoozeSheet";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -107,6 +107,7 @@ import {
   bulkSetCategory,
   bulkSetFrequency,
   bulkSnooze,
+  bulkSnoozeUntil,
   bulkUnsnooze,
   undoBulkQuickLog,
 } from "@/db/bulk-actions-dao";
@@ -123,18 +124,23 @@ import {
   type DashboardRow,
   listDashboardPopulation,
   listDashboardSearch,
+  readCurrentlySnoozedIds,
 } from "@/db/dashboard-read";
 import { composeDashboardSearch } from "@/db/dashboard-search-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
+import {
+  snoozeProfileContact,
+  unsnoozeProfileContact,
+} from "@/db/profile-relationship-actions";
 import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
-import { clearSnooze, type SnoozePreset, snoozeContact } from "@/db/snooze-dao";
 import { newUid } from "@/db/uid";
 import { countUnbound } from "@/db/unbound-read";
 import {
   type BulkActionClaim,
   createBulkActionGate,
   getCurrentSelectionIds,
+  runClaimedBulkWrite,
 } from "@/logic/dashboard-bulk-action-session";
 import {
   type DashboardPopulationCounts,
@@ -184,7 +190,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
-import { isSnoozed, parseLocalMs } from "@/utils/dates";
+import { formatLocalDate, isSnoozed, parseLocalMs } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { plural, pluralWord } from "@/utils/plural";
 
@@ -206,11 +212,6 @@ const VIEW_TOGGLE_OPTIONS: {
 
 const LOG_SCOPE = "dashboard-home";
 const SWIPE_ACTION_WIDTH = 96;
-const CARD_SNOOZE_PRESETS: { preset: SnoozePreset; label: string }[] = [
-  { preset: "3d", label: "3 days" },
-  { preset: "1w", label: "1 week" },
-  { preset: "1m", label: "1 month" },
-];
 
 type DashboardContactActionTarget = "LogContact" | "Edit";
 type BulkConfirmAction = { claim: BulkActionClaim } & (
@@ -547,9 +548,21 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(
     null,
   );
+  // 38.11 D-45/D-82: the bulk snooze sheet's ids (the selection) and the
+  // currently snoozed subset, both captured when it opens. The bulk claim is
+  // never stored here: it lives in `bulkActionInputClaimRef` and every write
+  // reads it at call time (review V-02).
   const [snoozePicker, setSnoozePicker] = useState<{
-    claim: BulkActionClaim;
     ids: number[];
+    snoozedIds: number[];
+  } | null>(null);
+  // 38.11 D-45/D-81 (review V-07): the card snooze sheet's target, captured
+  // when the card menu entry is tapped (the menu then closes itself and nulls
+  // its own contact).
+  const [cardSnooze, setCardSnooze] = useState<{
+    contactId: number;
+    name: string;
+    snoozeUntil: string | null;
   } | null>(null);
   const [categoryPicker, setCategoryPicker] = useState<{
     claim: BulkActionClaim;
@@ -1273,6 +1286,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     tryAcquireBulkAction,
   ]);
 
+  // 38.11 D-82 (review V-01): the bulk bar's Snooze always opens the shared
+  // sheet. Which selected people are snoozed is read from the database for
+  // the ids captured now, never from on-screen rows (a filter or search can
+  // drop them while the selection keeps their ids).
   const onBulkOpenSnoozePicker = useCallback(() => {
     const claim = tryAcquireBulkAction();
     if (!claim) return;
@@ -1281,42 +1298,63 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    setSnoozePicker({ claim, ids });
-  }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
-
-  const onBulkUnsnooze = useCallback(() => {
-    const claim = tryAcquireBulkAction();
-    if (!claim) return;
-    const ids = [...selectedIds];
-    if (ids.length === 0) {
-      releaseBulkAction(claim);
-      return;
-    }
-    if (!consumeBulkAction(claim)) return;
-    void bulkUnsnooze(getExecutor(), ids, localDateTime())
-      .then(async () => {
-        commitBulkOutcome(`Unsnoozed ${plural(ids.length, "contact")}`);
-        await reconcileSchedule(getExecutor()).catch((scheduleError) =>
-          Logger.error(
-            LOG_SCOPE,
-            "failed to reconcile after bulk unsnooze",
-            scheduleError,
-          ),
-        );
+    void readCurrentlySnoozedIds(getExecutor(), ids)
+      .then((snoozedIds) => {
+        // The selection ended during the read: nothing opens.
+        if (bulkActionInputClaimRef.current !== claim) return;
+        setSnoozePicker({ ids, snoozedIds });
       })
-      .catch((writeError: unknown) => {
+      .catch((readError: unknown) => {
         releaseBulkAction(claim);
-        reportBulkFailure("unsnooze contacts", writeError, onBulkUnsnooze);
-      })
-      .finally(() => releaseBulkAction(claim));
-  }, [
-    commitBulkOutcome,
-    consumeBulkAction,
-    releaseBulkAction,
-    reportBulkFailure,
-    selectedIds,
-    tryAcquireBulkAction,
-  ]);
+        reportBulkFailure("open snooze", readError);
+      });
+  }, [releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
+
+  // 38.11 D-45 (review U-01, V-02): one bulk snooze/unsnooze write under the
+  // shared sheet's settlement. The sheet stays open while it runs; success
+  // reports the count and the sheet closes itself; a failure is logged and
+  // rethrown so the sheet shows its error and Retry (no failure snackbar).
+  // The claim is read at call time, so a Retry takes a fresh one.
+  const runBulkSnoozeWrite = useCallback(
+    (
+      operation: "snooze" | "unsnooze",
+      label: string,
+      write: () => Promise<void>,
+    ) =>
+      runClaimedBulkWrite({
+        takeHeldClaim: () => bulkActionInputClaimRef.current,
+        acquire: tryAcquireBulkAction,
+        consume: consumeBulkAction,
+        release: releaseBulkAction,
+        write,
+      }).then(
+        () => {
+          commitBulkOutcome(label);
+          void reconcileSchedule(getExecutor()).catch((scheduleError) =>
+            Logger.error(
+              LOG_SCOPE,
+              `failed to reconcile after bulk ${operation}`,
+              scheduleError,
+            ),
+          );
+        },
+        (writeError: unknown) => {
+          Logger.error(LOG_SCOPE, `failed to bulk ${operation}`, writeError);
+          throw writeError;
+        },
+      ),
+    [
+      commitBulkOutcome,
+      consumeBulkAction,
+      releaseBulkAction,
+      tryAcquireBulkAction,
+    ],
+  );
+
+  const closeBulkSnoozePicker = useCallback(() => {
+    setSnoozePicker(null);
+    releaseBulkInputClaim();
+  }, [releaseBulkInputClaim]);
 
   const onBulkOpenCategoryPicker = useCallback(() => {
     const claim = tryAcquireBulkAction();
@@ -1478,89 +1516,66 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     reload("snooze");
   }, [reload]);
 
-  const snoozeContactWithPreset = useCallback(
-    async (contactId: number, preset: SnoozePreset) => {
-      try {
-        await snoozeContact(getExecutor(), {
-          contactId,
-          uid: newUid(),
-          preset,
-          now: localDateTime(),
-        });
-        refreshAfterSnooze();
-        void reconcileSchedule(getExecutor()).catch((scheduleError) =>
-          Logger.error(
-            LOG_SCOPE,
-            "failed to reconcile after card snooze",
-            scheduleError,
-          ),
-        );
-      } catch (snoozeError) {
-        Logger.error(LOG_SCOPE, "failed to snooze card contact", snoozeError);
-        showSnackbar({
-          kind: "error",
-          label: "Couldn't snooze contact. Try again.",
-          action: {
-            label: "Retry",
-            accessibilityLabel: "Retry snoozing contact",
-            onPress: () => {
-              void snoozeContactWithPreset(contactId, preset);
-            },
-          },
-        });
-      }
+  // 38.11 D-45/D-81: the card's snooze goes through the shared sheet in both
+  // states, writing through the Profile's snooze actions. A rejection reaches
+  // the sheet (error + Retry); the list refreshes and reminders reconcile
+  // after a committed write.
+  const afterCardSnoozeWrite = useCallback(
+    (operation: "snooze" | "unsnooze") => {
+      refreshAfterSnooze();
+      void reconcileSchedule(getExecutor()).catch((scheduleError) =>
+        Logger.error(
+          LOG_SCOPE,
+          `failed to reconcile after card ${operation}`,
+          scheduleError,
+        ),
+      );
     },
     [refreshAfterSnooze],
   );
-
-  const toggleCardSnooze = useCallback(
-    (contactId: number, currentlySnoozed: boolean) => {
-      if (currentlySnoozed) {
-        void clearSnooze(getExecutor(), {
+  const snoozeCardContact = useCallback(
+    async (
+      contactId: number,
+      request: { preset: "3d" | "1w" | "1m" } | { until: string },
+    ) => {
+      try {
+        await snoozeProfileContact(getExecutor(), {
           contactId,
-          uid: newUid(),
           now: localDateTime(),
-        })
-          .then(() => {
-            refreshAfterSnooze();
-            return reconcileSchedule(getExecutor()).catch((scheduleError) =>
-              Logger.error(
-                LOG_SCOPE,
-                "failed to reconcile after card unsnooze",
-                scheduleError,
-              ),
-            );
-          })
-          .catch((snoozeError: unknown) => {
-            Logger.error(
-              LOG_SCOPE,
-              "failed to unsnooze card contact",
-              snoozeError,
-            );
-            showSnackbar({
-              kind: "error",
-              label: "Couldn't unsnooze contact. Try again.",
-              action: {
-                label: "Retry",
-                accessibilityLabel: "Retry unsnoozing contact",
-                onPress: () => toggleCardSnooze(contactId, true),
-              },
-            });
-          });
-        return;
+          ...request,
+        });
+      } catch (snoozeError) {
+        Logger.error(LOG_SCOPE, "failed to snooze card contact", snoozeError);
+        throw snoozeError;
       }
-
-      Alert.alert("Snooze contact", "Choose how long to pause reminders.", [
-        ...CARD_SNOOZE_PRESETS.map(({ label, preset }) => ({
-          text: label,
-          onPress: () => {
-            void snoozeContactWithPreset(contactId, preset);
-          },
-        })),
-        { text: "Cancel", style: "cancel" as const },
-      ]);
+      afterCardSnoozeWrite("snooze");
     },
-    [snoozeContactWithPreset, refreshAfterSnooze],
+    [afterCardSnoozeWrite],
+  );
+  const unsnoozeCardContact = useCallback(
+    async (contactId: number) => {
+      try {
+        await unsnoozeProfileContact(getExecutor(), {
+          contactId,
+          now: localDateTime(),
+        });
+      } catch (snoozeError) {
+        Logger.error(LOG_SCOPE, "failed to unsnooze card contact", snoozeError);
+        throw snoozeError;
+      }
+      afterCardSnoozeWrite("unsnooze");
+    },
+    [afterCardSnoozeWrite],
+  );
+  // Undo for the card's confirmation (review X-01): bound to the contact id
+  // it was built with, never re-reading `cardSnooze`, which onClose has
+  // nulled by then. The expiry re-check lives in the sheet (Y-01).
+  const restoreCardSnooze = useCallback(
+    (contactId: number) => (previousUntil: string | null) =>
+      previousUntil === null
+        ? unsnoozeCardContact(contactId)
+        : snoozeCardContact(contactId, { until: previousUntil }),
+    [snoozeCardContact, unsnoozeCardContact],
   );
 
   const enterCardSelection = useCallback(
@@ -1653,9 +1668,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     contextMenuContact !== null &&
     (favouriteOverlay.get(contextMenuContact.id) ??
       contextMenuContact.favourite_rank !== null);
-  const contextMenuIsSnoozed =
-    contextMenuContact !== null &&
-    isSnoozed(contextMenuContact.snooze_until, listNow);
+  // The card sheet's EFFECTIVE snooze end (review W-01): an expired
+  // `snooze_until` reads as not snoozed.
+  const cardSnoozeUntil =
+    cardSnooze !== null && isSnoozed(cardSnooze.snoozeUntil, listNow)
+      ? cardSnooze.snoozeUntil
+      : null;
+  const todayLocal = formatLocalDate(new Date());
   const emptyState = selectDashboardEmptyState({
     live: counts.live,
     neverContacted: counts.neverContacted,
@@ -1874,7 +1893,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             onAddFavourites={onBulkAddFavourites}
             onRemoveFavourites={onBulkRemoveFavourites}
             onSnooze={onBulkOpenSnoozePicker}
-            onUnsnooze={onBulkUnsnooze}
             onSetCategory={onBulkOpenCategoryPicker}
             onArchive={onBulkArchive}
             onChangeFrequency={onBulkOpenFrequencyPicker}
@@ -2056,7 +2074,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         contactId={contextMenuContact?.id ?? null}
         name={contextMenuContact?.name ?? ""}
         isFavourite={contextMenuIsFavourite}
-        isSnoozed={contextMenuIsSnoozed}
         onViewProfile={() => {
           if (contextMenuContact) goToProfile(contextMenuContact.id);
         }}
@@ -2077,9 +2094,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             toggleFavourite(contextMenuContact.id, !contextMenuIsFavourite);
           }
         }}
-        onToggleSnooze={() => {
+        onOpenSnooze={() => {
           if (contextMenuContact) {
-            toggleCardSnooze(contextMenuContact.id, contextMenuIsSnoozed);
+            setCardSnooze({
+              contactId: contextMenuContact.id,
+              name: contextMenuContact.name,
+              snoozeUntil: contextMenuContact.snooze_until,
+            });
           }
         }}
         onSelect={() => {
@@ -2087,61 +2108,85 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         }}
         onRequestClose={() => setContextMenuContactId(null)}
       />
-      <Sheet
+      <SnoozeSheet
+        // 38.11 D-45/D-81 (review V-07, W-01, X-01): the card's sheet renders
+        // from the captured `cardSnooze` only; the effective end treats an
+        // expired snooze as not snoozed.
+        visible={cardSnooze !== null}
+        title={`Snooze ${cardSnooze?.name ?? ""}`}
+        snoozedUntil={cardSnoozeUntil}
+        showUnsnooze={cardSnoozeUntil !== null}
+        todayLocal={todayLocal}
+        onPreset={(preset) =>
+          cardSnooze
+            ? snoozeCardContact(cardSnooze.contactId, { preset })
+            : Promise.reject(new Error("no card snooze target"))
+        }
+        onUntil={(until) =>
+          cardSnooze
+            ? snoozeCardContact(cardSnooze.contactId, { until })
+            : Promise.reject(new Error("no card snooze target"))
+        }
+        onUnsnooze={() =>
+          cardSnooze
+            ? unsnoozeCardContact(cardSnooze.contactId)
+            : Promise.reject(new Error("no card snooze target"))
+        }
+        confirmName={cardSnooze?.name}
+        onRestore={
+          cardSnooze ? restoreCardSnooze(cardSnooze.contactId) : undefined
+        }
+        onClose={() => setCardSnooze(null)}
+      />
+      <SnoozeSheet
+        // 38.11 D-45/D-82 (review U-01, V-08): the bulk bar's Snooze; it
+        // shows Unsnooze when the database said a selected person is snoozed,
+        // and unsnoozes exactly those people. Bulk keeps its count snackbar,
+        // so no confirmName.
         visible={snoozePicker !== null}
-        onRequestClose={() => {
-          setSnoozePicker(null);
-          releaseBulkInputClaim();
+        title={`Snooze ${plural(snoozePicker?.ids.length ?? 0, "contact")}`}
+        snoozedUntil={null}
+        showUnsnooze={(snoozePicker?.snoozedIds.length ?? 0) > 0}
+        todayLocal={todayLocal}
+        onPreset={(preset) => {
+          const picker = snoozePicker;
+          if (!picker) return Promise.reject(new Error("no bulk selection"));
+          return runBulkSnoozeWrite(
+            "snooze",
+            `Snoozed ${plural(picker.ids.length, "contact")}`,
+            () =>
+              bulkSnooze(getExecutor(), picker.ids, preset, localDateTime()),
+          );
         }}
-        variant="compact"
-      >
-        <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
-          Snooze contacts
-        </Text>
-        {CARD_SNOOZE_PRESETS.map(({ preset, label }) => (
-          <Pressable
-            key={preset}
-            testID={`bulk-snooze-preset-${preset}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Snooze ${plural(snoozePicker?.ids.length ?? 0, "contact")} for ${label}`}
-            onPress={() => {
-              const picker = snoozePicker;
-              if (!picker || !consumeBulkAction(picker.claim)) return;
-              const ids = picker.ids;
-              setSnoozePicker(null);
-              void bulkSnooze(getExecutor(), ids, preset, localDateTime())
-                .then(async () => {
-                  commitBulkOutcome(`Snoozed ${plural(ids.length, "contact")}`);
-                  await reconcileSchedule(getExecutor()).catch(
-                    (scheduleError) =>
-                      Logger.error(
-                        LOG_SCOPE,
-                        "failed to reconcile after bulk snooze",
-                        scheduleError,
-                      ),
-                  );
-                })
-                .catch((writeError: unknown) => {
-                  releaseBulkAction(picker.claim);
-                  reportBulkFailure(
-                    "snooze contacts",
-                    writeError,
-                    onBulkOpenSnoozePicker,
-                  );
-                })
-                .finally(() => releaseBulkAction(picker.claim));
-            }}
-            style={[styles.bulkPickerRow, { borderColor: colors.border }]}
-          >
-            <Icon name="snooze" size="md" tone="textPrimary" />
-            <Text
-              style={[styles.bulkPickerLabel, { color: colors.textPrimary }]}
-            >
-              {label}
-            </Text>
-          </Pressable>
-        ))}
-      </Sheet>
+        onUntil={(until) => {
+          const picker = snoozePicker;
+          if (!picker) return Promise.reject(new Error("no bulk selection"));
+          return runBulkSnoozeWrite(
+            "snooze",
+            `Snoozed ${plural(picker.ids.length, "contact")}`,
+            () =>
+              bulkSnoozeUntil(
+                getExecutor(),
+                picker.ids,
+                until,
+                localDateTime(),
+              ),
+          );
+        }}
+        onUnsnooze={() => {
+          const picker = snoozePicker;
+          if (!picker) return Promise.reject(new Error("no bulk selection"));
+          // Only the currently snoozed people (D-82; review W-03), which also
+          // keeps clearSnoozeCore from recording false unsnooze events.
+          const snoozedIds = picker.snoozedIds;
+          return runBulkSnoozeWrite(
+            "unsnooze",
+            `Unsnoozed ${plural(snoozedIds.length, "contact")}`,
+            () => bulkUnsnooze(getExecutor(), snoozedIds, localDateTime()),
+          );
+        }}
+        onClose={closeBulkSnoozePicker}
+      />
       <CategoryChoiceSheet
         visible={categoryPicker !== null}
         categories={categoryPicker?.categories ?? []}
@@ -2408,13 +2453,6 @@ const styles = StyleSheet.create({
     ),
     fontSize: TYPOGRAPHY.label.size,
     marginBottom: SPACING.sm,
-  },
-  bulkPickerRow: {
-    alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: SPACING.md,
-    minHeight: 44,
   },
   bulkPickerLabel: {
     fontFamily: resolveFontFamily(

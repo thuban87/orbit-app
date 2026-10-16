@@ -12,6 +12,7 @@
 import { setContactFrequencyCore } from "@/db/contacts-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import {
+  assertFutureLocalSnoozeDate,
   clearSnoozeCore,
   resolveSnoozeUntil,
   type SnoozePreset,
@@ -20,7 +21,6 @@ import {
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
-import { formatLocalDate, parseLocalMs } from "@/utils/dates";
 
 export interface SetProfileContactFrequencyInput {
   readonly contactId: number;
@@ -80,22 +80,6 @@ function assertPositiveFrequency(intervalDays: number): void {
   }
 }
 
-function assertFutureLocalDate(until: string, now: string): void {
-  const match = until.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    throw new Error(`snoozeProfileContact: until must be a future local date`);
-  }
-  const date = new Date(
-    Number(match[1]),
-    Number(match[2]) - 1,
-    Number(match[3]),
-  );
-  const today = formatLocalDate(new Date(parseLocalMs(now)));
-  if (formatLocalDate(date) !== until || until <= today) {
-    throw new Error(`snoozeProfileContact: until must be a future local date`);
-  }
-}
-
 /** Apply the canonical scalar cadence writer and one revision publication. */
 export function setProfileContactFrequency(
   exec: SqlExecutor,
@@ -128,7 +112,7 @@ export function snoozeProfileContact(
 ): Promise<void> {
   if (input.until !== undefined) {
     try {
-      assertFutureLocalDate(input.until, input.now);
+      assertFutureLocalSnoozeDate(input.until, input.now);
     } catch (error) {
       return Promise.reject(error);
     }

@@ -65,13 +65,41 @@ export function createBulkActionGate(
   };
 }
 
-/** 38.11 D-45 bulk snooze sheet adapter (RED stub; GREEN implements it). */
-export async function runClaimedBulkWrite<T>(_deps: {
+export interface ClaimedBulkWriteDeps<T> {
+  /** The claim held since the sheet opened, read at CALL time (or null). */
   takeHeldClaim: () => BulkActionClaim | null;
   acquire: () => BulkActionClaim | null;
   consume: (claim: BulkActionClaim) => boolean;
   release: (claim: BulkActionClaim) => void;
   write: () => Promise<T>;
-}): Promise<T> {
-  throw new Error("runClaimedBulkWrite: not implemented");
+}
+
+/**
+ * The React-free bulk-sheet adapter (38.11 D-45; review U-01, V-02). The shared
+ * snooze sheet keeps the submitted operation and Retry re-runs that same
+ * closure, so the operation never closes over a claim value: each call reads
+ * the held claim at call time, else acquires a fresh one; consumes it (no
+ * write without a consumed claim); awaits the write; releases the claim when
+ * it settles. A rejected write rejects the returned promise with the gate
+ * free, so the sheet shows its error and a Retry takes a fresh claim.
+ */
+export async function runClaimedBulkWrite<T>({
+  takeHeldClaim,
+  acquire,
+  consume,
+  release,
+  write,
+}: ClaimedBulkWriteDeps<T>): Promise<T> {
+  const claim = takeHeldClaim() ?? acquire();
+  if (!claim) throw new Error("runClaimedBulkWrite: a bulk action is running");
+  // A claim that cannot be consumed belongs to a writer already in flight;
+  // releasing it here would free the gate under that writer.
+  if (!consume(claim)) {
+    throw new Error("runClaimedBulkWrite: the bulk claim is already in use");
+  }
+  try {
+    return await write();
+  } finally {
+    release(claim);
+  }
 }

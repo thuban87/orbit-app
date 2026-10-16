@@ -35,6 +35,7 @@ import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { recordEventCore } from "@/db/events-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { formatLocalDate, parseLocalMs } from "@/utils/dates";
 
 /** The in-app snooze presets (profile) and the headless action's fixed length. */
 export type SnoozePreset = "3d" | "1w" | "1m";
@@ -49,6 +50,27 @@ export const PRESET_MODIFIERS: Record<SnoozePreset, string> = {
   "1w": "+7 days",
   "1m": "+1 month",
 };
+
+/**
+ * Reject a custom snooze end that is not a real local `YYYY-MM-DD` strictly
+ * after the local date of `now` (the Profile and bulk Choose date writers,
+ * 38.11 D-37/D-45). Callers run it BEFORE any transaction.
+ */
+export function assertFutureLocalSnoozeDate(until: string, now: string): void {
+  const match = until.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    throw new Error("snooze: until must be a future local date");
+  }
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
+  const today = formatLocalDate(new Date(parseLocalMs(now)));
+  if (formatLocalDate(date) !== until || until <= today) {
+    throw new Error("snooze: until must be a future local date");
+  }
+}
 
 /** Snooze a contact until a preset-derived local date. */
 export interface SnoozeContactInput {

@@ -20,6 +20,7 @@ import {
   recomputeLastContactCore,
 } from "@/db/recency-dao";
 import {
+  assertFutureLocalSnoozeDate,
   clearSnoozeCore,
   resolveSnoozeUntil,
   type SnoozePreset,
@@ -146,14 +147,35 @@ export function bulkSnooze(
   );
 }
 
-/** 38.11 D-45: bulk Choose date (RED stub; implemented in the GREEN commit). */
+/**
+ * Bulk Choose date (38.11 D-45): snooze every id until one custom local date.
+ * The date is validated as a future local date (the same check as the Profile
+ * writer) BEFORE the transaction; then `snoozeContactCore` per id and one
+ * revision bump, mirroring `bulkSnooze`.
+ */
 export function bulkSnoozeUntil(
-  _exec: SqlExecutor,
-  _ids: number[],
-  _until: string,
-  _now: string,
+  exec: SqlExecutor,
+  ids: number[],
+  until: string,
+  now: string,
 ): Promise<void> {
-  return Promise.reject(new Error("bulkSnoozeUntil: not implemented"));
+  try {
+    assertFutureLocalSnoozeDate(until, now);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  if (ids.length === 0) return Promise.resolve();
+  return inWriteTransaction(exec, async () => {
+    for (const contactId of ids) {
+      await snoozeContactCore(exec, {
+        contactId,
+        uid: newUid(),
+        until,
+        now,
+      });
+    }
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 export function bulkUnsnooze(
