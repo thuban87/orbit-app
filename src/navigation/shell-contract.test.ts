@@ -64,6 +64,37 @@ const LITERAL_STACKS = [
   "SettingsStack.tsx",
 ] as const;
 
+/**
+ * Every Profile-reachable route resolves in the two literal Profile-hosting
+ * stacks that have no route array (RG-021; 38.11 T-13). Digest and Events are
+ * checked by the generic array test above, and Settings by
+ * `settings-routes.test.ts` (minus its messaging exclusions), so with this
+ * check all five hosts are asserted for every PROFILE_REACHABLE_ROUTES entry.
+ */
+describe("Profile-reachable routes in Dashboard and Orrery (RG-021)", () => {
+  const profileHosts = LITERAL_STACKS.filter(
+    (file) => file === "DashboardStack.tsx" || file === "OrreryStack.tsx",
+  );
+
+  it("checks both literal non-Settings stacks", () => {
+    expect([...profileHosts]).toEqual([
+      "DashboardStack.tsx",
+      "OrreryStack.tsx",
+    ]);
+  });
+
+  it.each(
+    profileHosts.flatMap((file) =>
+      PROFILE_REACHABLE_ROUTES.map((route) => [file, route] as const),
+    ),
+  )("%s registers Profile-reachable route %s", (file, route) => {
+    expect(
+      stackSource(file).includes(`<Stack.Screen name="${route}"`),
+      `expected <Stack.Screen name="${route}"> in ${file}`,
+    ).toBe(true);
+  });
+});
+
 describe("+ forms over the current tab (D-38)", () => {
   it("lists exactly the + navigate targets", () => {
     // 38.11: Update Contact retired (D-62); Memory moved to
@@ -155,25 +186,35 @@ describe("the Key People and Off Limits editor routes (38.10 D-75, D-08, D-107)"
 /**
  * 38.11 D-66: Memory left the + but the Profile's add-memory heading actions
  * still navigate to it (contact-profile-logic `addMemory`), so it is
- * Profile-reachable and every one of the five stacks must register it, or the
- * add-memory buttons become silent no-ops in release (RG-021).
+ * Profile-reachable, and the generic Profile-reachable checks (Digest/Events
+ * above, Dashboard/Orrery above, Settings in `settings-routes.test.ts`) keep it
+ * registered in all five stacks, or the add-memory buttons become silent
+ * no-ops in release (RG-021).
  */
 describe("the Memory add route stays registered in all five stacks (D-66)", () => {
   it("is Profile-reachable and not a + route", () => {
     expect(PROFILE_REACHABLE_ROUTES).toContain("Memory");
     expect(FAB_ROUTES as readonly string[]).not.toContain("Memory");
   });
+});
 
-  it("is registered in Digest and Events", () => {
-    expect(DIGEST_STACK_ROUTES).toContain("Memory");
-    expect(EVENTS_STACK_ROUTES).toContain("Memory");
+/**
+ * 38.11 D-58.1: the Profile's background sheet opens the Settings Profile
+ * Backgrounds page from whichever tab hosts the Profile, so the page is
+ * Profile-reachable (the generic checks then assert all five hosts).
+ */
+describe("the Profile Backgrounds page is Profile-reachable (D-58.1)", () => {
+  it("is in PROFILE_REACHABLE_ROUTES and both route arrays", () => {
+    expect(PROFILE_REACHABLE_ROUTES).toContain("ProfileBackgrounds");
+    expect(DIGEST_STACK_ROUTES).toContain("ProfileBackgrounds");
+    expect(EVENTS_STACK_ROUTES).toContain("ProfileBackgrounds");
   });
 
-  it.each(LITERAL_STACKS)("%s registers Memory", (file) => {
-    expect(
-      stackSource(file).includes(
-        '<Stack.Screen name="Memory" component={MemoryAddScreen} />',
-      ),
-    ).toBe(true);
+  it("has a key in all five stack param lists", () => {
+    const types = readFileSync(
+      join(process.cwd(), "src", "navigation", "types.ts"),
+      "utf8",
+    );
+    expect(types.match(/ProfileBackgrounds: undefined;/g)).toHaveLength(5);
   });
 });

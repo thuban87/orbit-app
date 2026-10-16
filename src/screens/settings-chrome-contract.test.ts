@@ -77,6 +77,8 @@ const HEADER_CHROME_SETTINGS_CHILDREN = [
   "src/screens/SettingsInteractionsScreen.tsx",
   "src/screens/SettingsNotificationsScreen.tsx",
   "src/screens/SettingsOrreryScreen.tsx",
+  // 38.11 D-58.1: the Profile Backgrounds page (reached from Appearance, D-84).
+  "src/screens/ProfileBackgroundsScreen.tsx",
 ] as const;
 
 function read(path: string): string {

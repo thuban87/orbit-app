@@ -22,20 +22,11 @@ import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
-import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
-  assignCategoryProfilePresentation,
   assignContactBackgroundTemplate,
-  assignGlobalProfileBackgroundTemplate,
   createProfileBackgroundTemplate,
-  deleteProfileBackgroundTemplate,
 } from "@/db/profile-presentation-dao";
-import {
-  listProfileBackgroundTemplates,
-  type ProfileBackgroundTemplateRow,
-  readCategoryProfilePresentation,
-} from "@/db/profile-presentation-read";
 import { newUid } from "@/db/uid";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
@@ -43,7 +34,6 @@ import {
   beginBackgroundPreparation,
   cancelBackgroundPreparation,
   createBackgroundManagerState,
-  deleteBackgroundTemplateAndRefresh,
   finishBackgroundPreparation,
   requestBackgroundManagerDismissal,
   resolveBackgroundListState,
@@ -65,19 +55,17 @@ import {
 } from "@/services/photos/background-storage";
 import { renderBackgroundDerivative } from "@/services/photos/manipulator-derivatives";
 import { profileBackgroundTarget } from "@/services/photos/profile-background-target";
-import { confirm } from "@/stores/confirm-store";
-import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { useProfileBackgroundLibrary } from "./use-profile-background-library";
 
 const LOG_SCOPE = "profile-background-manager";
 const MAX_ZOOM = 8;
 
 type Page = "list" | "crop" | "name" | "assign";
 type CropSource = { uri: string; width: number; height: number };
-type Category = { id: number; uid?: string; name: string };
 
 function clearCategoryAccessibilityLabel(category: { name: string }): string {
   return `Clear ${category.name} background`;
@@ -116,10 +104,18 @@ export function ProfileBackgroundManager({
     height: number;
   } | null>(null);
   const [page, setPage] = useState<Page>("list");
-  const [templates, setTemplates] = useState<ProfileBackgroundTemplateRow[]>(
-    [],
-  );
-  const [categories, setCategories] = useState<Category[]>([]);
+  // The shared list/delete/global/category operations (38.11 D-58.1), also
+  // used by the Settings Profile Backgrounds page.
+  const {
+    templates,
+    categories,
+    listLoading,
+    listError,
+    refresh,
+    deleteTemplate,
+    assignGlobal,
+    assignCategory,
+  } = useProfileBackgroundLibrary({ active: visible, onCommitted });
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [source, setSource] = useState<CropSource | null>(null);
   const [templateName, setTemplateName] = useState("");
@@ -127,8 +123,6 @@ export function ProfileBackgroundManager({
     createBackgroundManagerState(null),
   );
   const [saving, setSaving] = useState(false);
-  const [listLoading, setListLoading] = useState(false);
-  const [listError, setListError] = useState<string | null>(null);
   const [cropStatus, setCropStatus] = useState("");
   const [fineTuneOpen, setFineTuneOpen] = useState(false);
   const [categoryPickerMode, setCategoryPickerMode] = useState<
@@ -159,27 +153,6 @@ export function ProfileBackgroundManager({
   const pinchFocalY = useSharedValue(0);
   const pinchRatioX = useSharedValue(0.5);
   const pinchRatioY = useSharedValue(0.5);
-
-  const refresh = useCallback(async () => {
-    setListLoading(true);
-    setListError(null);
-    try {
-      const [nextTemplates, nextCategories] = await Promise.all([
-        listProfileBackgroundTemplates(getExecutor()),
-        listCategories(getExecutor()),
-      ]);
-      setTemplates(nextTemplates);
-      setCategories(nextCategories);
-    } catch (error) {
-      Logger.error(LOG_SCOPE, "failed to load background templates", error);
-      setListError("Couldn't load background templates. Try again.");
-    } finally {
-      setListLoading(false);
-    }
-  }, []);
-  useShellRefresh(() => {
-    if (visible) void refresh();
-  });
 
   useEffect(() => {
     if (!visible) {
@@ -505,35 +478,24 @@ export function ProfileBackgroundManager({
       if ((needsSelectedTemplate && !selectedUid) || saving) return;
       setSaving(true);
       try {
-        const now = localDateTime();
         if (scope === "global" || scope === "clear-global") {
-          await assignGlobalProfileBackgroundTemplate(getExecutor(), {
-            templateUid: scope === "clear-global" ? null : selectedUid,
-            now,
-          });
+          await assignGlobal(scope === "clear-global" ? null : selectedUid);
         } else if (
           (scope === "category" || scope === "clear-category") &&
           categoryId !== undefined
         ) {
-          const current = await readCategoryProfilePresentation(
-            getExecutor(),
+          await assignCategory(
             categoryId,
+            scope === "clear-category" ? null : selectedUid,
           );
-          await assignCategoryProfilePresentation(getExecutor(), {
-            categoryId,
-            layoutTemplateUid: current.layoutTemplateUid,
-            backgroundTemplateUid:
-              scope === "clear-category" ? null : selectedUid,
-            now,
-          });
         } else {
           await assignContactBackgroundTemplate(getExecutor(), {
             contactId,
             templateUid: scope === "inherit" ? null : selectedUid,
-            now,
+            now: localDateTime(),
           });
+          await refresh();
         }
-        await refresh();
         onCommitted?.();
         setPage("list");
       } catch (error) {
@@ -546,7 +508,15 @@ export function ProfileBackgroundManager({
         setSaving(false);
       }
     },
-    [contactId, onCommitted, refresh, saving, selectedUid],
+    [
+      assignCategory,
+      assignGlobal,
+      contactId,
+      onCommitted,
+      refresh,
+      saving,
+      selectedUid,
+    ],
   );
 
   const closeOrGuard = () => {
@@ -673,42 +643,7 @@ export function ProfileBackgroundManager({
                         <Button
                           role="tertiary"
                           label="Delete"
-                          onPress={() =>
-                            void confirm({
-                              title: "Delete background template?",
-                              message:
-                                "Profiles using it will fall back to their Category or default background. Contact information will not change.",
-                              confirmLabel: "Delete template",
-                              destructive: true,
-                            }).then((ok) => {
-                              if (!ok) return;
-                              void (async () => {
-                                try {
-                                  await deleteBackgroundTemplateAndRefresh({
-                                    removeTemplate: () =>
-                                      deleteProfileBackgroundTemplate(
-                                        getExecutor(),
-                                        template.uid,
-                                        localDateTime(),
-                                      ),
-                                    removeDerivative:
-                                      deleteBackgroundDerivative,
-                                    refresh,
-                                    onCommitted,
-                                  });
-                                } catch (error) {
-                                  Logger.error(
-                                    LOG_SCOPE,
-                                    "failed to delete background template",
-                                    error,
-                                  );
-                                  setListError(
-                                    "Couldn't delete that background. Try again.",
-                                  );
-                                }
-                              })();
-                            })
-                          }
+                          onPress={() => void deleteTemplate(template)}
                         />
                       </View>
                     </GlassSurface>

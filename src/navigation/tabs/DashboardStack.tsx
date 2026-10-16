@@ -20,6 +20,7 @@ import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
+import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
@@ -61,6 +62,11 @@ export function DashboardStack() {
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />
       <Stack.Screen name="MergeImpactSummary" component={MergeImpactSummary} />
+      {/* Profile-reachable Settings page (38.11 D-58.1, RG-021). */}
+      <Stack.Screen
+        name="ProfileBackgrounds"
+        component={ProfileBackgroundsScreen}
+      />
     </Stack.Navigator>
   );
 }

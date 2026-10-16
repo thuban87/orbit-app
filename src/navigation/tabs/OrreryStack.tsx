@@ -20,6 +20,7 @@ import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
+import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
@@ -84,6 +85,11 @@ export function OrreryStack() {
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />
       <Stack.Screen name="MergeImpactSummary" component={MergeImpactSummary} />
+      {/* Profile-reachable Settings page (38.11 D-58.1, RG-021). */}
+      <Stack.Screen
+        name="ProfileBackgrounds"
+        component={ProfileBackgroundsScreen}
+      />
     </Stack.Navigator>
   );
 }

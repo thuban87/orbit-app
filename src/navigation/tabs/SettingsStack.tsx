@@ -32,6 +32,7 @@ import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
+import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
@@ -196,6 +197,12 @@ export function SettingsStack() {
       <Stack.Screen
         name="SettingsAppearance"
         component={SettingsAppearanceRoute}
+      />
+      {/* Appearance's "Default profile background" row opens it (38.11 D-84);
+          also Profile-reachable (D-58.1, RG-021). */}
+      <Stack.Screen
+        name="ProfileBackgrounds"
+        component={ProfileBackgroundsScreen}
       />
       <Stack.Screen name="SettingsContacts" component={SettingsContactsRoute} />
       <Stack.Screen

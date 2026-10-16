@@ -60,6 +60,10 @@ export const SETTINGS_REGISTERED_ROUTES = [
   // The About Orbit category route (Plan 08, §K) — a basic leaf (product name +
   // semantic version only); its <Stack.Screen> is registered in SettingsStack.tsx.
   "SettingsAbout",
+  // Profile Backgrounds (38.11 D-58.1, D-84): global, Category and saved
+  // backgrounds; Appearance's "Default profile background" row opens it. Also
+  // Profile-reachable, so every Profile-hosting stack registers it (RG-021).
+  "ProfileBackgrounds",
 ] as const;
 
 export type SettingsRegisteredRoute =

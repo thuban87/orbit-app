@@ -297,11 +297,13 @@ export function SettingsAppearanceScreen() {
   const [nameError, setNameError] = useState<string | null>(null);
 
   // Global default profile layout/background (D-05): the app_settings PREFs
-  // (`profile_layout_template_uid` / `profile_background_template_uid`),
-  // DISTINCT from the per-contact managers (which stay reachable only from a
-  // contact's profile — not linked here). NULL = "Default / None" (no global
-  // override → factory/inherited). Choices come from the template lists, which
-  // resolve async, so loading + error states are explicit.
+  // (`profile_layout_template_uid` / `profile_background_template_uid`).
+  // NULL = "Default / None" (no global override → factory/inherited). The
+  // layout default is chosen here; the background row only shows the current
+  // global background and opens the Profile Backgrounds page, the one control
+  // that sets it (38.11 D-84, amending 37 D-05 in part; D-58.1). Choices come
+  // from the template lists, which resolve async, so loading + error states
+  // are explicit.
   const [globalLayoutUid, setGlobalLayoutUid] = useState<string | null>(null);
   const [globalBackgroundUid, setGlobalBackgroundUid] = useState<string | null>(
     null,
@@ -314,9 +316,9 @@ export function SettingsAppearanceScreen() {
   >([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
-  const [openTemplatePicker, setOpenTemplatePicker] = useState<
-    "layout" | "background" | null
-  >(null);
+  const [openTemplatePicker, setOpenTemplatePicker] = useState<"layout" | null>(
+    null,
+  );
 
   // Reload the self record so a photo set/removed on the crop screen refreshes
   // when it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
@@ -384,17 +386,16 @@ export function SettingsAppearanceScreen() {
     }
   }, [selfNameDraft, reloadProfile]);
 
-  // Write the GLOBAL default for an axis via updateAppSettings (D-05). A null uid
-  // is the "Default / None" clear — both keys are nullable, so this returns the
-  // no-global-override state (falls back to factory/inherited).
-  const onSelectGlobalTemplate = useCallback(
-    async (axis: "layout" | "background", uid: string | null) => {
+  // Write the GLOBAL default layout via updateAppSettings (D-05). A null uid is
+  // the "Default / None" clear — the key is nullable, so this returns the
+  // no-global-override state (falls back to factory/inherited). The global
+  // background is set on the Profile Backgrounds page (38.11 D-84).
+  const onSelectGlobalLayout = useCallback(
+    async (uid: string | null) => {
       try {
         await updateAppSettings(
           getExecutor(),
-          axis === "layout"
-            ? { profileLayoutTemplateUid: uid }
-            : { profileBackgroundTemplateUid: uid },
+          { profileLayoutTemplateUid: uid },
           localDateTime(),
         );
         setOpenTemplatePicker(null);
@@ -1116,10 +1117,10 @@ export function SettingsAppearanceScreen() {
         </View>
 
         {/* Profile Defaults (D-05) — the GLOBAL default profile layout/background
-            (app_settings PREFs), distinct from the per-contact managers (which
-            stay reachable only from a contact's profile and are NOT linked here).
-            A NULL value is "Default / None": no global override, so a contact
-            without a stronger override falls back to factory/inherited. */}
+            (app_settings PREFs). A NULL value is "Default / None": no global
+            override, so a contact without a stronger override falls back to
+            factory/inherited. The background row opens the Profile Backgrounds
+            page, the one control for the global background (38.11 D-84). */}
         <View testID="settings-profile-defaults-section" style={styles.section}>
           <Text
             accessibilityRole="header"
@@ -1193,7 +1194,7 @@ export function SettingsAppearanceScreen() {
                   backgroundTemplates.find((t) => t.uid === globalBackgroundUid)
                     ?.name ?? "Default / None"
                 }`}
-                onPress={() => setOpenTemplatePicker("background")}
+                onPress={() => navigation.navigate("ProfileBackgrounds")}
                 style={[
                   styles.row,
                   {
@@ -1215,14 +1216,14 @@ export function SettingsAppearanceScreen() {
                   </Text>
                 </View>
                 <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                  Used for any contact that doesn't have its own background.
+                  Global, category and saved backgrounds
                 </Text>
               </Pressable>
             </>
           )}
 
-          {/* Shared picker: "Default / None" (writes null) first, then every
-              template for the open axis. */}
+          {/* Layout picker: "Default / None" (writes null) first, then every
+              layout template. */}
           <RegisteredModal
             visible={openTemplatePicker !== null}
             transparent
@@ -1258,10 +1259,7 @@ export function SettingsAppearanceScreen() {
                   data={
                     [
                       { uid: null, name: "Default / None" },
-                      ...(openTemplatePicker === "layout"
-                        ? layoutTemplates
-                        : backgroundTemplates
-                      ).map((t) => ({
+                      ...layoutTemplates.map((t) => ({
                         uid: t.uid as string | null,
                         name: t.name,
                       })),
@@ -1269,25 +1267,14 @@ export function SettingsAppearanceScreen() {
                   }
                   keyExtractor={(item) => item.uid ?? "default-none"}
                   renderItem={({ item }) => {
-                    const currentUid =
-                      openTemplatePicker === "layout"
-                        ? globalLayoutUid
-                        : globalBackgroundUid;
-                    const isSelected = item.uid === currentUid;
+                    const isSelected = item.uid === globalLayoutUid;
                     return (
                       <Pressable
                         testID={`settings-profile-default-option-${item.uid ?? "default-none"}`}
                         accessibilityRole="button"
                         accessibilityLabel={item.name}
                         accessibilityState={{ selected: isSelected }}
-                        onPress={() => {
-                          if (openTemplatePicker !== null) {
-                            void onSelectGlobalTemplate(
-                              openTemplatePicker,
-                              item.uid,
-                            );
-                          }
-                        }}
+                        onPress={() => void onSelectGlobalLayout(item.uid)}
                         style={[styles.option, { borderColor: colors.border }]}
                       >
                         <Text

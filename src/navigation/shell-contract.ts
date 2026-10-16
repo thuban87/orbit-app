@@ -30,6 +30,8 @@ export const DIGEST_STACK_ROUTES = [
   "SurvivorSelect",
   "MergeConflicts",
   "MergeImpactSummary",
+  // 38.11 D-58.1: the Profile background sheet opens the Settings page.
+  "ProfileBackgrounds",
 ] as const;
 
 export const EVENTS_STACK_ROUTES = [
@@ -54,6 +56,8 @@ export const EVENTS_STACK_ROUTES = [
   "SurvivorSelect",
   "MergeConflicts",
   "MergeImpactSummary",
+  // 38.11 D-58.1: the Profile background sheet opens the Settings page.
+  "ProfileBackgrounds",
 ] as const;
 
 /**
@@ -83,6 +87,8 @@ export const PROFILE_REACHABLE_ROUTES = [
   "SurvivorSelect",
   "MergeConflicts",
   "MergeImpactSummary",
+  // 38.11 D-58.1: the Profile background sheet opens the Settings page.
+  "ProfileBackgrounds",
 ] as const;
 
 /**

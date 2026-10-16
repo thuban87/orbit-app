@@ -19,6 +19,7 @@ import { MemoryAddScreen } from "@/screens/MemoryAddScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
+import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { EVENTS_STACK_ROUTES } from "../shell-contract";
@@ -51,6 +52,8 @@ const EVENTS_ROUTE_COMPONENTS = {
   SurvivorSelect: SurvivorSelectScreen,
   MergeConflicts: MergeConflictsScreen,
   MergeImpactSummary,
+  // 38.11 D-58.1: Profile-reachable Settings page (RG-021).
+  ProfileBackgrounds: ProfileBackgroundsScreen,
 } as const satisfies Record<EventsRouteName, ComponentType<never>>;
 
 export function EventsStack() {

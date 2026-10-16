@@ -82,3 +82,43 @@ describe("Settings-hosted Profile route family", () => {
     },
   );
 });
+
+/**
+ * 38.11 D-84 (owner, "One control"; amends 37 D-05 in part): Settings →
+ * Appearance's existing "Default profile background" row opens the Profile
+ * Backgrounds page instead of its own picker, no second row is added, and the
+ * shared picker now serves the layout default only.
+ */
+describe("Appearance opens Profile Backgrounds (D-84)", () => {
+  const appearance = readFileSync(
+    join(process.cwd(), "src", "screens", "SettingsAppearanceScreen.tsx"),
+    "utf8",
+  ).replace(/\s+/g, " ");
+
+  it("registers the page in Settings", () => {
+    expect(SETTINGS_REGISTERED_ROUTES).toContain("ProfileBackgrounds");
+    expect(isRegistered("ProfileBackgrounds")).toBe(true);
+  });
+
+  it("the existing background row navigates to the page", () => {
+    const row = appearance.slice(
+      appearance.indexOf('testID="settings-profile-default-background-row"'),
+    );
+    const rowEnd = row.indexOf("</Pressable>");
+    expect(rowEnd).toBeGreaterThan(0);
+    const rowSource = row.slice(0, rowEnd);
+    expect(rowSource).toContain('navigation.navigate("ProfileBackgrounds")');
+    expect(rowSource).toContain("Default profile background");
+  });
+
+  it("adds no second Profile Backgrounds entry and the picker serves layout only", () => {
+    expect(appearance.match(/navigate\("ProfileBackgrounds"\)/g)).toHaveLength(
+      1,
+    );
+    expect(appearance).not.toContain('setOpenTemplatePicker("background")');
+    expect(appearance).toContain('useState<"layout" | null>');
+    expect(appearance).toContain(
+      'testID="settings-profile-default-layout-row"',
+    );
+  });
+});

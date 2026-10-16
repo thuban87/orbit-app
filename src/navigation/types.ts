@@ -167,6 +167,8 @@ export type DashboardStackParamList = {
   Orrery: undefined;
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
+  /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
+  ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -250,6 +252,8 @@ export type OrreryStackParamList = {
   };
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
+  /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
+  ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -334,6 +338,8 @@ export type DigestStackParamList = {
   };
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
+  /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
+  ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -398,6 +404,8 @@ export type EventsStackParamList = {
   };
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
+  /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
+  ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -553,6 +561,8 @@ export type SettingsStackParamList = {
   BulkReview: undefined;
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
+  /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
+  ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
