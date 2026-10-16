@@ -102,12 +102,18 @@ import { deleteMemoryNow } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
 import {
+  resetContactLayoutPresentation,
+  setContactFreeformLayout,
+  setProfileCollapseOverride,
+} from "@/db/profile-presentation-dao";
+import {
   createContactWithInteraction,
   recordTouchpoint,
 } from "@/db/recency-dao";
 import { deleteRelationshipNow } from "@/db/relationships-dao";
 import type { SqlExecutor } from "@/db/types";
 import { computeAiAvailability } from "@/logic/ai-availability";
+import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
 import { FakePhotoFs } from "@/services/photos/__testkit__/fake-photo-fs";
 import { persistOwnedMaster } from "@/services/photos/owned-master";
 import { drainRestorePhotoJournal } from "@/services/photos/restore-photo-finalize-sweep";
@@ -4276,5 +4282,52 @@ describe("knowledge links and AI permission on restore (Phase 38.10)", () => {
         group_note_copy: 0,
       });
     });
+  });
+});
+
+/**
+ * Review WR-02 (38.11 D-65): Profile Layout's "Reset to default" leaves an
+ * all-default presentation row with a newer modified_at instead of deleting
+ * the row, so a merge restore of an older backup loses LWW to the Reset
+ * rather than inserting the old layout back.
+ */
+it("a merge restore of an older backup does not bring back a reset Profile layout (review WR-02)", async () => {
+  const exec = await db();
+  const { contactId } = await exec
+    .runAsync(
+      "INSERT INTO contacts(uid,name,interval_days,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["reset-contact", "Ann", 30, NOW, NOW],
+    )
+    .then((result) => ({ contactId: result.lastInsertRowId }));
+  await setContactFreeformLayout(exec, {
+    contactId,
+    layout: FACTORY_PROFILE_LAYOUT,
+    now: NOW,
+  });
+  await setProfileCollapseOverride(exec, {
+    contactId,
+    moduleId: "memories",
+    expanded: false,
+    now: NOW,
+  });
+  const backup = await buildExportManifest(exec, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "AQID",
+  });
+  await resetContactLayoutPresentation(exec, {
+    contactId,
+    now: "2026-08-26 09:00:00",
+  });
+
+  expect((await applyRestore(exec, backup, "merge")).status).toBe("applied");
+  expect(
+    await exec.getFirstAsync(
+      "SELECT layout_template_uid AS layoutTemplateUid,freeform_layout_json AS freeformLayoutJson,collapse_json AS collapseJson FROM profile_contact_presentation WHERE contact_id=?",
+      [contactId],
+    ),
+  ).toEqual({
+    layoutTemplateUid: null,
+    freeformLayoutJson: null,
+    collapseJson: "{}",
   });
 });

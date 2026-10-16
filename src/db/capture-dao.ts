@@ -516,12 +516,14 @@ export function undoShareRows(
 /**
  * How a contact-owned column counts against removing a share-created contact
  * (D-106 as clarified by D-109). `blocks`: any row blocks. `creation-artefact`:
- * rows the app made with the contact count only while unchanged. Each entry
- * carries one literal `?`-bound query that returns a row exactly when the
- * column blocks the permanent delete.
+ * rows the app made with the contact count only while unchanged.
+ * `blocks-unless-default`: a row blocks only while it holds a non-default
+ * value; an all-default row reads exactly like no row. Each entry carries one
+ * literal `?`-bound query that returns a row exactly when the column blocks
+ * the permanent delete.
  */
 export interface ShareUndoOwnershipRule {
-  disposition: "blocks" | "creation-artefact";
+  disposition: "blocks" | "creation-artefact" | "blocks-unless-default";
   blockingSql: string;
 }
 
@@ -606,10 +608,22 @@ export const SHARE_UNDO_OWNERSHIP: Readonly<
   "interactions.contact_id": blocksIfAnyRow("interactions", "contact_id"),
   "memories.contact_id": blocksIfAnyRow("memories", "contact_id"),
   "off_limits.contact_id": blocksIfAnyRow("off_limits", "contact_id"),
-  "profile_contact_presentation.contact_id": blocksIfAnyRow(
-    "profile_contact_presentation",
-    "contact_id",
-  ),
+  // Review WR-02 / IN-02: both Profile "Reset to default" writers keep an
+  // all-default row (stamped now, so a merge restore cannot resurrect the old
+  // presentation) instead of deleting it. Such a row holds nothing the user
+  // added and reads exactly like no row, so only a row with a layout, a
+  // background or an open/closed choice blocks.
+  "profile_contact_presentation.contact_id": {
+    disposition: "blocks-unless-default",
+    blockingSql: `SELECT 1 AS hit
+                    FROM profile_contact_presentation
+                   WHERE contact_id = ?
+                     AND NOT (layout_template_uid IS NULL
+                              AND freeform_layout_json IS NULL
+                              AND background_template_uid IS NULL
+                              AND collapse_json = '{}')
+                   LIMIT 1`,
+  },
   "reconciliation_session_cards.contact_id": blocksIfAnyRow(
     "reconciliation_session_cards",
     "contact_id",

@@ -34,6 +34,7 @@ import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
 import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 
 const NOW = "2026-09-09 12:00:00";
+const LATER = "2026-09-10 08:00:00";
 let exec: SqlExecutor;
 let contactId: number;
 
@@ -276,7 +277,7 @@ describe("Profile presentation mutation API", () => {
     ).toBe(false);
   });
 
-  it("clears collapse on an explicit layout switch and reset deletes only contact presentation", async () => {
+  it("clears collapse on an explicit layout switch and reset clears only contact presentation", async () => {
     await createProfileLayoutTemplate(exec, {
       uid: "layout",
       name: "Layout",
@@ -299,19 +300,27 @@ describe("Profile presentation mutation API", () => {
       "UPDATE contacts SET favourite_rank=1,snooze_until='2026-09-20' WHERE id=?",
       [contactId],
     );
-    await resetProfilePresentation(exec, contactId, NOW);
+    await resetProfilePresentation(exec, contactId, LATER);
     expect(
       await exec.getFirstAsync(
         "SELECT favourite_rank,snooze_until FROM contacts WHERE id=?",
         [contactId],
       ),
     ).toEqual({ favourite_rank: 1, snooze_until: "2026-09-20" });
+    // Review WR-02: an all-default row stamped now, not a delete, so a merge
+    // restore of an older row cannot bring the old presentation back.
     expect(
       await exec.getFirstAsync(
-        "SELECT contact_id FROM profile_contact_presentation WHERE contact_id=?",
+        "SELECT layout_template_uid,freeform_layout_json,background_template_uid,collapse_json,modified_at FROM profile_contact_presentation WHERE contact_id=?",
         [contactId],
       ),
-    ).toBeNull();
+    ).toEqual({
+      layout_template_uid: null,
+      freeform_layout_json: null,
+      background_template_uid: null,
+      collapse_json: "{}",
+      modified_at: LATER,
+    });
   });
 
   /**
@@ -515,7 +524,10 @@ describe("Profile presentation mutation API", () => {
       ).toEqual({ favourite_rank: 1, snooze_until: "2026-09-20" });
     });
 
-    it("clears a freeform layout and leaves no presentation row when there is no background", async () => {
+    // Review WR-02: the Reset keeps an all-default row with a newer
+    // modified_at rather than deleting it, so a merge restore of an older
+    // backup loses LWW to the Reset (restore-apply.test.ts pins that).
+    it("clears a freeform layout to an all-default row stamped now when there is no background", async () => {
       await setContactFreeformLayout(exec, {
         contactId,
         layout: FACTORY_PROFILE_LAYOUT,
@@ -528,8 +540,19 @@ describe("Profile presentation mutation API", () => {
         now: NOW,
       });
       const before = await revision();
-      await resetContactLayoutPresentation(exec, { contactId, now: NOW });
-      expect(await row()).toBeNull();
+      await resetContactLayoutPresentation(exec, { contactId, now: LATER });
+      expect(await row()).toEqual({
+        layout_template_uid: null,
+        freeform_layout_json: null,
+        background_template_uid: null,
+        collapse_json: "{}",
+      });
+      expect(
+        await exec.getFirstAsync(
+          "SELECT created_at,modified_at FROM profile_contact_presentation WHERE contact_id=?",
+          [contactId],
+        ),
+      ).toEqual({ created_at: NOW, modified_at: LATER });
       expect(await revision()).toBe(before + 1);
     });
 

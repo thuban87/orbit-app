@@ -109,7 +109,7 @@ Capture owns no table or migration. It writes into the Things to Remember homes 
 6. **Keep inline capture Bound** with the shared monthly default.
 7. **Blur before closing a focused field.** Save note, Skip and the New-contact sheet unmounted a focused field without a blur, so Android kept the keyboard and the next share's list was cut off; fixed by `Keyboard.dismiss()` before the field closes (plan 19, F1/F2).
 8. **A share right after the previous card closes can be lost.** Within about 0.5 s of a card closing, a new share opens Digest and is dropped (release build, 2 of 8 tries); accepted as known (D-150).
-9. **Classify every new contact-owned table for share Undo.** `SHARE_UNDO_OWNERSHIP` is checked against `pragma_foreign_key_list`; an unclassified table fails the test (ADR-217).
+9. **Classify every new contact-owned table for share Undo.** `SHARE_UNDO_OWNERSHIP` is checked against `pragma_foreign_key_list`; an unclassified table fails the test (ADR-217). `profile_contact_presentation` blocks only while a row holds a layout, a background or an open/closed choice; the all-default row a Profile "Reset to default" leaves reads exactly like no row and does not block (38.11 review WR-02).
 
 ## Related Systems
 
@@ -127,3 +127,4 @@ Capture owns no table or migration. It writes into the Things to Remember homes 
 | 2026-08-27 | 18.2 | Made inline name-only creation explicit about its Bound lifecycle contract. |
 | 2026-10-11 | 38.9 | Back closes the innermost Capture surface first and prompts "Discard changes?" for a typed name or note instead of cancelling the share (D-33, ADR-200). |
 | 2026-10-15 | 38.10 | Shares save at once to Thought of Them AI-off; interactive confirmation card (chips, Undo, Add note, Allow AI); list picker with search; share-recency over every home; atomic inline create with the monthly default; share Undo may remove a share-created contact; resume prompts suppressed during a share; no widget refresh (ADR-213..217, ADR-221). |
+| 2026-10-16 | 38.11 | Share Undo: an all-default `profile_contact_presentation` row (left by a Profile "Reset to default") no longer blocks removing a share-created contact; any layout, background or open/closed choice still blocks (review WR-02/IN-02). |

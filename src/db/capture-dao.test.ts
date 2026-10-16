@@ -1127,6 +1127,15 @@ describe("undoCreateContactAndShare: removes the share and the created contact (
       },
     ],
     [
+      "a Profile presentation override",
+      (id) =>
+        exec.runAsync(
+          `INSERT INTO profile_contact_presentation (contact_id, collapse_json, created_at, modified_at)
+           VALUES (?, '{"memories":false}', ?, ?)`,
+          [id, LATER, LATER],
+        ),
+    ],
+    [
       "the orrery sun reference",
       (id) =>
         exec.runAsync(
@@ -1175,6 +1184,28 @@ describe("undoCreateContactAndShare: removes the share and the created contact (
       expect(await tombstoneCount("contact")).toBe(0);
     });
   }
+
+  // Review WR-02 / IN-02: a Profile "Reset to default" leaves an all-default
+  // presentation row (no layout, background or open/closed choice). It holds
+  // nothing the user added, reads exactly like no row, and so does not block.
+  it("removes the contact when its only presentation row is all-default after a Reset", async () => {
+    const { contactId, rows } = await createContactAndShare(
+      exec,
+      NEW_CONTACT,
+      LINK_SHARE,
+      NOW,
+    );
+    await exec.runAsync(
+      `INSERT INTO profile_contact_presentation (contact_id, layout_template_uid,
+         freeform_layout_json, background_template_uid, collapse_json, created_at, modified_at)
+       VALUES (?, NULL, NULL, NULL, '{}', ?, ?)`,
+      [contactId, LATER, LATER],
+    );
+    await expect(
+      undoCreateContactAndShare(exec, contactId, rows, LATER),
+    ).resolves.toEqual({ contactRemoved: true });
+    expect(await contactExists(contactId)).toBe(false);
+  });
 
   it("keeps the contact when a field with history off was filled then cleared (c6)", async () => {
     const def = await addGlobalDef("nickname");
