@@ -109,6 +109,9 @@ describe("Appearance opens Profile Backgrounds (D-84)", () => {
     const rowSource = row.slice(0, rowEnd);
     expect(rowSource).toContain('navigation.navigate("ProfileBackgrounds")');
     expect(rowSource).toContain("Default profile background");
+    // 38.11-14 E4: unset reads "None", like the page it opens.
+    expect(rowSource).toContain('?.name ?? "None"');
+    expect(rowSource).not.toContain("Default / None");
   });
 
   it("adds no second Profile Backgrounds entry and the picker serves layout only", () => {

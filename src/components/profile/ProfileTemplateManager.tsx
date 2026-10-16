@@ -35,9 +35,7 @@ import {
   clearTemplateDraft,
   createTemplateManagerListLoadState,
   createTemplateManagerState,
-  describeAssignmentKind,
   describeCurrentLayout,
-  describeTemplateAssignment,
   effectiveLayoutTemplateUid,
   finishTemplateManagerListLoad,
   managerBackIntent,
@@ -373,10 +371,6 @@ export function ProfileTemplateManager({
     effectiveLayoutSource,
     currentTemplateName,
   );
-  const assignmentDescription = describeTemplateAssignment({
-    source: effectiveLayoutSource,
-    templateName: currentTemplateName,
-  });
 
   return (
     <>
@@ -618,9 +612,11 @@ export function ProfileTemplateManager({
           {activePage.kind === "assignment" && activeTemplate ? (
             <View style={styles.content}>
               <AppText role="heading">Assign {activeTemplate.name}</AppText>
-              <AppText role="body">{assignmentDescription.text}</AppText>
-              <AppText role="caption">
-                {describeAssignmentKind(assignmentDescription.kind)}
+              {/* 38.11-14 L4: the list page's plain-words line, from the
+                  same props; onCommitted reloads the Profile after an assign,
+                  so it never keeps the pre-assign text. */}
+              <AppText role="body">
+                {contactName} currently uses {currentLayout}.
               </AppText>
               <Button
                 role="secondary"

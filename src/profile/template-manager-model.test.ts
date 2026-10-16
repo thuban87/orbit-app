@@ -9,9 +9,7 @@ import {
   beginTemplateOperation,
   createTemplateManagerListLoadState,
   createTemplateManagerState,
-  describeAssignmentKind,
   describeCurrentLayout,
-  describeTemplateAssignment,
   effectiveLayoutTemplateUid,
   finishTemplateManagerListLoad,
   managerBackIntent,
@@ -96,45 +94,7 @@ describe("Profile template manager model", () => {
     expect(pending.usage.weekday).toMatchObject({ stale: true, total: 6 });
   });
 
-  it("keeps inherited and contact override assignment states distinct", () => {
-    expect(
-      describeTemplateAssignment({
-        source: "category",
-        templateName: "Friends",
-      }),
-    ).toEqual({
-      kind: "inherited",
-      text: "Inherited from Category template Friends",
-    });
-    expect(
-      describeTemplateAssignment({
-        source: "contact-template",
-        templateName: "Weekend",
-      }),
-    ).toEqual({ kind: "override", text: "Set for this contact: Weekend" });
-    expect(
-      describeTemplateAssignment({
-        source: "contact-freeform",
-        templateName: null,
-      }),
-    ).toEqual({
-      kind: "override",
-      text: "Set for this contact: freeform layout",
-    });
-  });
-
-  it("maps the assignment kind to display words; the caption never shows the raw kind (C5-L10)", () => {
-    for (const kind of ["inherited", "override"] as const) {
-      const caption = describeAssignmentKind(kind);
-      expect(caption).not.toMatch(/\b(inherited|override)\b\.?$/);
-      expect(caption).not.toMatch(/\boverride\b/i);
-    }
-    expect(describeAssignmentKind("override")).toBe(
-      "This contact currently has its own layout.",
-    );
-    expect(describeAssignmentKind("inherited")).toBe(
-      "This contact currently uses an inherited layout.",
-    );
+  it("the Assign page names the current layout in plain words, from live props (38.11-14 L4)", () => {
     const manager = readFileSync(
       new URL(
         "../components/profile/ProfileTemplateManager.tsx",
@@ -142,10 +102,23 @@ describe("Profile template manager model", () => {
       ),
       "utf8",
     );
-    expect(manager).toContain(
-      "{describeAssignmentKind(assignmentDescription.kind)}",
+    const assignPage = manager.slice(
+      manager.indexOf('activePage.kind === "assignment"'),
     );
-    expect(manager).not.toContain("currently {assignmentDescription.kind}");
+    expect(assignPage).toContain(
+      "{contactName} currently uses {currentLayout}.",
+    );
+    // The retired two-line wording ("Set for this contact: freeform layout",
+    // "This contact currently has its own layout.") is gone.
+    expect(manager).not.toContain('freeform layout"');
+    expect(manager).not.toContain("currently has its own layout");
+    expect(manager).not.toContain("assignmentDescription");
+    expect(describeCurrentLayout("contact-freeform", null)).toBe(
+      "their own layout",
+    );
+    expect(describeCurrentLayout("contact-template", "Weekend")).toBe(
+      "the Weekend template",
+    );
   });
 
   it("carries an edited unsaved layout into template creation without a freeform fallback", () => {
@@ -295,7 +268,8 @@ describe("the layout sheets never show a raw source id (38.11-13)", () => {
     expect(profile).toContain("currentLayout={describeCurrentLayout(");
     expect(profile).not.toContain("effectiveSource=");
     const manager = read("../components/profile/ProfileTemplateManager.tsx");
-    expect(manager).toContain("templateName: currentTemplateName");
+    // The template's name feeds the plain-words line (38.11-14 L4).
+    expect(manager).toContain("currentTemplateName,\n  );");
     // Preview and template editing complete the layout; Rename stays raw.
     // The Preview reads labels through templatePreviewLines (review IN-08).
     expect(manager).toMatch(

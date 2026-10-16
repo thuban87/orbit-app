@@ -1192,7 +1192,7 @@ export function SettingsAppearanceScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Default profile background, ${
                   backgroundTemplates.find((t) => t.uid === globalBackgroundUid)
-                    ?.name ?? "Default / None"
+                    ?.name ?? "None"
                 }`}
                 onPress={() => navigation.navigate("ProfileBackgrounds")}
                 style={[
@@ -1209,10 +1209,12 @@ export function SettingsAppearanceScreen() {
                   >
                     Default profile background
                   </Text>
+                  {/* 38.11-14 E4: "None" when unset, as the Profile
+                      Backgrounds page this row opens says (D-84). */}
                   <Text style={[styles.rowValue, { color: colors.accentText }]}>
                     {backgroundTemplates.find(
                       (t) => t.uid === globalBackgroundUid,
-                    )?.name ?? "Default / None"}
+                    )?.name ?? "None"}
                   </Text>
                 </View>
                 <Text style={[styles.helper, { color: colors.textSecondary }]}>

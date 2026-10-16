@@ -35,23 +35,6 @@ export interface TemplateManagerState {
   error: string | null;
 }
 
-export interface TemplateAssignmentDescription {
-  kind: "inherited" | "override";
-  text: string;
-}
-
-/**
- * The "currently" caption for an assignment. `kind` is a discriminator, never
- * copy: it is mapped to display words here (D-41, D-63; review C5-L10).
- */
-export function describeAssignmentKind(
-  kind: TemplateAssignmentDescription["kind"],
-): string {
-  return kind === "override"
-    ? "This contact currently has its own layout."
-    : "This contact currently uses an inherited layout.";
-}
-
 /** List loading has its own recovery path; mutation failures retain their page and draft. */
 export interface TemplateManagerListLoadState {
   loading: boolean;
@@ -183,38 +166,6 @@ export function templatePreviewLines(layout: ProfileLayoutDocument): {
     overview: labels(layout.overview),
     thingsToRemember: labels(layout.thingsToRemember),
   };
-}
-
-/** Assignment labels name the durable source, never infer it from visual selection. */
-export function describeTemplateAssignment(input: {
-  source: Extract<
-    ProfilePresentationSource,
-    "contact-template" | "contact-freeform" | "category" | "global" | "factory"
-  >;
-  templateName: string | null;
-}): TemplateAssignmentDescription {
-  if (input.source === "contact-template") {
-    return {
-      kind: "override",
-      text: `Set for this contact: ${input.templateName ?? "saved template"}`,
-    };
-  }
-  if (input.source === "contact-freeform") {
-    return { kind: "override", text: "Set for this contact: freeform layout" };
-  }
-  if (input.source === "category") {
-    return {
-      kind: "inherited",
-      text: `Inherited from Category template ${input.templateName ?? "layout"}`,
-    };
-  }
-  if (input.source === "global") {
-    return {
-      kind: "inherited",
-      text: `Inherited from global template ${input.templateName ?? "layout"}`,
-    };
-  }
-  return { kind: "inherited", text: "Inherited from factory layout" };
 }
 
 export type TemplateManagerBackIntent =
