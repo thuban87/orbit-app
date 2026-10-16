@@ -1630,7 +1630,7 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Dossier size estimate**: about 9–13½ plans by area (38.11 D-76; the owner kept everything in this phase).
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–10 plans — rough estimate from finding titles plus the triage's per-area ranges; recurring-problem sweeps and recorded-decision reversals are not counted.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13).
-**Plans**: 10/14 plans executed in 7 waves (planned 2026-10-16)
+**Plans**: 11/14 plans executed in 7 waves (planned 2026-10-16)
 
 Plans:
 **Wave 1**
@@ -1657,7 +1657,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 38.11-11-PLAN.md — Background sheet: choose-only compact cards, Manage, Reset (W5)
+- [x] 38.11-11-PLAN.md — Background sheet: choose-only compact cards, Manage, Reset (W5)
 - [ ] 38.11-12-PLAN.md — Archive -> Bin wording app-wide (W5)
 
 **Wave 6** *(blocked on Wave 5 completion)*
@@ -1798,7 +1798,7 @@ Plans:
 | 38.8 History Navigation UX | 7/7 | In Progress|  |
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
-| 38.11 Everyday Screens UX | 10/14 | In Progress|  |
+| 38.11 Everyday Screens UX | 11/14 | In Progress|  |
 | 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
