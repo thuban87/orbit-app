@@ -520,6 +520,30 @@ export function isCreateFormDirty(
   return seedSignature !== currentSignature;
 }
 
+/**
+ * Unsaved work on Add Contact (38.11 D-77): the seed-signature dirt (D-09) or a
+ * held photo. A form whose only change is a held photo still asks before
+ * discarding, because discarding deletes the held image.
+ */
+export function createFormHasUnsavedWork(
+  signatureDirty: boolean,
+  heldPhoto: string | null,
+): boolean {
+  return signatureDirty || heldPhoto != null;
+}
+
+/**
+ * The held photo the unmount cleanup must delete (D-77), read from the screen's
+ * `heldPhotoRef.current`, never from state captured by an empty-deps effect
+ * (which would always be the first render's null). Save clears the ref before
+ * promoting, so a promoted or failed photo is never deleted twice.
+ */
+export function heldPhotoToDiscardOnUnmount(
+  heldPhotoRefCurrent: string | null,
+): string | null {
+  return heldPhotoRefCurrent ?? null;
+}
+
 /** An in-section editor's reported draft state (MemoryEditor / RelationshipEditor / the inline Off Limits editor). */
 export interface DraftState {
   open: boolean;

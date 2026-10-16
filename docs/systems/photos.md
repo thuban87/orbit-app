@@ -65,6 +65,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | `src/services/photos/restore-photo-finalize-sweep.ts` | Drains committed restore-photo finalization and deletion entries. |
 | `src/services/import/import-photo.ts` | Converts durable import staging into a post-commit contact master and isolates failure. |
 | `src/services/photos/reconcile-photo.ts` | Stages current source photos, hashes staged bytes, and promotes a chosen image after reconciliation commit. |
+| `src/services/photos/create-photo.ts` | `promoteCreatePhoto`: stores Add Contact's held photo after the create commits; a failure keeps the contact and never throws. |
+| `src/services/photos/create-staging-sweep.ts` | Launch/foreground sweep that deletes every `create-staging/` file no open Add Contact form owns. |
 | `src/components/Avatar.tsx` | Renders the display-revision source with a memory-only cache, or the themed initials fallback. |
 | `src/components/PhotoUnavailableNotice.tsx` | "Photo unavailable" notice and load-failure hook for the Profile hero and the photo editor. |
 | `src/components/PhotoSourcePicker.tsx` | Reusable source and lifecycle controls for all photo targets. |
@@ -153,6 +155,15 @@ The path lock is process-local. Crash safety comes from settling old journal row
 2. The detail view offers the staged source photo for a deliberate choice; it never supplies a picker-cache URI to the regular Avatar path.
 3. Once the selected data transaction commits, `promoteReconcilePhoto()` produces the usual master and writes the photo reference. A promotion failure leaves the photo snapshot unwritten so it is offered again on a later scan.
 
+### Holding a photo on Add Contact
+
+1. Add Contact has no contact id before Save, so its Photo control (in Identity, beside Name) holds the picked photo in the guarded `create-staging/` namespace (`SAFE_CREATE_STAGING_RELATIVE`). Each pick gets its own file, `create-<session>-<pick>.jpg`: the form's session token plus a fresh pick token, both from `newUid()`. A re-pick never reuses a path, so no stale preview can show.
+2. `PhotoSourcePicker` runs in hold mode: Add/Change and the paste-URL path open `CropPhotoScreen` with `hold: { stagingRel }` route params instead of a target. Hold mode is a route-param branch, not a fourth `PhotoTargetDescriptor` kind.
+3. CropPhoto's hold mode encodes the crop (`encodeMaster`), stages it at that path, discards the cache derivative and publishes the crop result on the path. It takes no canonical lock and writes no database row. The picker consumes the result when the form is focused again, then deletes the file it replaced.
+4. The held preview is resolved directly with `resolveCreateStagingUri` and drawn as an `expo-image` `Image` (no cache). It never goes through `Avatar` or the "Photo unavailable" check (see gotcha 9).
+5. After `createContactFull` commits, `promoteCreatePhoto()` stores the held file through the normal path: `persistOwnedMaster` onto `avatars/contact-<id>.jpg` (refused unless the id still has the new contact's uid), then `setContactPhotoForUid` and the widget notify. The staging file is deleted whatever happens. On failure the contact is kept and the user sees "Contact saved, but the photo wasn't added. Add it from Edit Contact."; the new Profile still opens. No photo bytes are written inside the create transaction.
+6. Cleanup: Remove (same confirm as Edit) and a re-pick delete the held file at once. A held photo counts as unsaved work, so Back asks before discarding; leaving the form without saving deletes the held file on unmount. The form holds a staging session while mounted, and the launch/foreground sweep (`create-staging-sweep.ts`) deletes every `create-staging/` file whose session is not active. Nothing in the database references this namespace, which is why that sweep is safe; keep it create-only.
+
 ### Storing a Profile background
 
 1. The Profile cropper computes a bounded selection at the rendered Profile aspect and produces one JPEG derivative with a 2048-pixel maximum long edge.
@@ -213,7 +224,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 6. **Widget images are base64 only.** RemoteViews must not receive `file://` masters or an `http(s)` source; a failed encode is an initials fallback, not a grid failure.
 7. **Never restore a serialized path verbatim.** It belongs to another sandbox; use the embedded bytes and a newly derived canonical master.
 8. **Only committed journal rows may finalize restore files.** A process interruption before the database commit must not create a visible master or delete an existing one.
-9. **Do not pass import staging to `Avatar`.** It is preview-only and outside Avatar's canonical master namespace; resolve it directly in import UI.
+9. **Do not pass import staging to `Avatar`.** It is preview-only and outside Avatar's canonical master namespace; resolve it directly in import UI. The same holds for Add Contact's `create-staging/` held photo.
 10. **Guard WebCrypto in Hermes.** Reconciliation photo hashing must fall back to RNQC when `globalThis.crypto` is unavailable; the original unguarded digest blocked photo-bearing scans before its Phase-20 fix.
 11. **A Profile background is shared template data.** Never apply the avatar pipeline's single-owner deletion assumption; re-read every live template reference first.
 12. **Background restore is not contact-photo journaling.** Its UID-derived pending/finalization path must retain the incoming bytes until the committed template owns the candidate.
@@ -254,3 +265,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-09-30 | 38.6 | Display revisions published only by the ownership layer replace the dead `cacheKey` scheme (ADR-180); one square WebP master up to 1024 px for every writer, mixed with legacy 512 JPEG under `.jpg` names; Orrery cache copies keep its texture memory flat (ADR-181); missing photos keep their reference and show "Photo unavailable" (ADR-182); sequential widget tile encode. |
 | 2026-09-30 | 38.6 | Review WR5-02: Crop Photo sizes its canvas to the measured space left under the in-flow assist banner (D-38) so the Cancel / Use photo footer is never pushed off-screen; bands shrink before the square, and a resize keeps the framed crop. The banner stays app-global. |
 | 2026-10-05 | 38.7 | Orrery photos decode once per key through `orreryPhotoCache` with hard caps and generation-ledger disposal (ADR-186); the `useOrreryPhoto` hook is gone and the loader is a plain function. Derivatives stay warm across a tab blur (ADR-192); the star sun never paints its occupant's photo (ADR-190). |
+| 2026-10-16 | 38.11 | Add Contact offers Photo (D-77): a held photo in the guarded `create-staging/` namespace (one file per pick), CropPhoto and PhotoSourcePicker hold modes, post-commit `promoteCreatePhoto` that keeps the contact on failure, and cleanup on Remove, re-pick, unmount and a session-aware launch/foreground sweep. |

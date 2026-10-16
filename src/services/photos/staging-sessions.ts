@@ -30,6 +30,10 @@ function matches(relative: string, token: string): boolean {
     return path.endsWith(`-${token}.jpg`);
   if (path.startsWith("profile-backgrounds/_restore_pending/"))
     return path.endsWith(`/${token}.jpg`);
+  // Add Contact's held photo (38.11 D-77): `create-<session>-<pick>.jpg`. Its
+  // tokens are hyphen-free (`newCreateStagingToken`), so the prefix is exact.
+  if (path.startsWith("create-staging/"))
+    return path.startsWith(`create-staging/create-${token}-`);
   return false;
 }
 export function pendingBelongsToActiveSession(relative: string): boolean {

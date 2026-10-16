@@ -52,6 +52,7 @@ import {
 // runs NOTHING else (no reconcile, no sweep).
 import { ensureChannels } from "@/services/notifications/channels";
 import { ensureNotificationCategories } from "@/services/notifications/notification-actions";
+import { registerCreateStagingSweep } from "@/services/photos/create-staging-sweep";
 import { resolveActiveResumePrompt } from "@/services/resume-prompt-precedence";
 import "@/services/notifications/headless-task";
 import { registerDigestScheduleSweep } from "@/services/notifications/digest-schedule";
@@ -154,6 +155,8 @@ let widgetSweepRegistered = false;
 // other launch hooks so Strict Mode/remounts cannot double-prompt a session.
 let importResumeSweepRegistered = false;
 let reconcileResumeSweepRegistered = false;
+// One-shot guard for the Add Contact held-photo orphan sweep (38.11 D-77).
+let createStagingSweepRegistered = false;
 let interactionAssistSweepRegistered = false;
 
 function AppShell() {
@@ -342,6 +345,12 @@ function AppShell() {
     if (!reconcileResumeSweepRegistered) {
       registerReconcileResumeSweep(setResumableReconcile, { getExecutor });
       reconcileResumeSweepRegistered = true;
+    }
+    // Add Contact's held photos (38.11 D-77): deletes every create-staging file
+    // no open form owns (a discarded form, an app kill). Same once-only guard.
+    if (!createStagingSweepRegistered) {
+      registerCreateStagingSweep();
+      createStagingSweepRegistered = true;
     }
 
     // item 6 / A1: AWAIT channels + the action category into existence BEFORE the

@@ -44,7 +44,11 @@
  * durable `create-staging/` file (PhotoSourcePicker hold mode) until Save; after
  * the create commits it is stored through the normal photo path
  * (`promoteCreatePhoto`). A failed promote keeps the contact, says the photo
- * wasn't added and still opens the new Profile.
+ * wasn't added and still opens the new Profile. The form holds a staging
+ * session while mounted, so the launch/foreground sweep never takes its held
+ * file; leaving without saving deletes it on unmount (read through
+ * `heldPhotoRef`), and a held photo counts as unsaved work for the discard
+ * guard.
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
@@ -150,6 +154,11 @@ import {
   newCreateStagingToken,
   promoteCreatePhoto,
 } from "@/services/photos/create-photo";
+import { deleteCreateStaging } from "@/services/photos/photo-storage";
+import {
+  beginStagingSession,
+  endStagingSession,
+} from "@/services/photos/staging-sessions";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -167,9 +176,11 @@ import {
   collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
+  createFormHasUnsavedWork,
   createFormSeedSignature,
   createFormSeedState,
   type DraftItem,
+  heldPhotoToDiscardOnUnmount,
   isCreateFormDirty,
   partitionMemoryRows,
   pickCreateSubEditor,
@@ -450,6 +461,33 @@ export function CreateContactScreen({
   // staging session token, minted once per form from newUid().
   const [photoSessionToken] = useState(newCreateStagingToken);
   const [heldPhoto, setHeldPhoto] = useState<string | null>(null);
+  // The unmount cleanup below has empty deps, so it reads the held path from
+  // this ref, never from `heldPhoto` (which it would capture as the first
+  // render's null; review T-18, as Edit reads committedValuesRef). Every change
+  // goes through updateHeldPhoto so the ref and the state never disagree.
+  const heldPhotoRef = useRef<string | null>(null);
+  const updateHeldPhoto = useCallback((relative: string | null) => {
+    heldPhotoRef.current = relative;
+    setHeldPhoto(relative);
+  }, []);
+  useEffect(() => {
+    // The form owns its staging session while mounted, so the launch /
+    // foreground sweep (e.g. on return from the system photo picker) keeps
+    // its held file.
+    beginStagingSession(photoSessionToken);
+    return () => {
+      const discard = heldPhotoToDiscardOnUnmount(heldPhotoRef.current);
+      heldPhotoRef.current = null;
+      if (discard) {
+        try {
+          deleteCreateStaging(discard);
+        } catch (error) {
+          Logger.error(LOG_SCOPE, "held photo cleanup failed", error);
+        }
+      }
+      endStagingSession(photoSessionToken);
+    };
+  }, [photoSessionToken]);
   // The real AI master (D-27) and the per-type new-item defaults (D-13,
   // D-92), as Edit Contact reads them. Until they load the switch stays off.
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
@@ -588,9 +626,13 @@ export function CreateContactScreen({
     thoughtOfThem: thoughtOfThemDraft,
   });
   const { requestClose, settleHold } = useDiscardKeepGuard({
-    hasUnsavedChanges: isCreateFormDirty(
-      CREATE_FORM_SEED_SIGNATURE,
-      createFormSeedSignature(formState),
+    // A held photo alone is unsaved work: Discard deletes it (D-77).
+    hasUnsavedChanges: createFormHasUnsavedWork(
+      isCreateFormDirty(
+        CREATE_FORM_SEED_SIGNATURE,
+        createFormSeedSignature(formState),
+      ),
+      heldPhoto,
     ),
     bypassRef,
     // A save in flight holds every exit, with no prompt (fix-pass WR-02).
@@ -711,9 +753,10 @@ export function CreateContactScreen({
       const { contactId } = await createContactFull(exec, input);
       // D-77: the held photo is stored only now that the contact exists, outside
       // the create transaction. It never throws; a failure keeps the contact.
-      const held = heldPhoto;
+      const held = heldPhotoRef.current;
       if (held) {
-        setHeldPhoto(null);
+        // Cleared first: the promote deletes the file, so unmount must not.
+        updateHeldPhoto(null);
         const promoted = await promoteCreatePhoto({
           exec,
           contactId,
@@ -789,7 +832,7 @@ export function CreateContactScreen({
                 hold={{
                   sessionToken: photoSessionToken,
                   heldRelative: heldPhoto,
-                  onHeldChange: setHeldPhoto,
+                  onHeldChange: updateHeldPhoto,
                 }}
                 name={name}
               />

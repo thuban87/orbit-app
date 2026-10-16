@@ -111,6 +111,10 @@ const CREATE_STAGING_IMPORTERS = [
   "src/components/PhotoSourcePicker.tsx",
   // Post-commit promote: reads the held file into the owned persist, then deletes it.
   "src/services/photos/create-photo.ts",
+  // Launch/foreground orphan sweep: lists the namespace, deletes files no live form owns.
+  "src/services/photos/create-staging-sweep.ts",
+  // Add Contact unmount: deletes a held photo that was never promoted.
+  "src/screens/CreateContactScreen.tsx",
 ];
 
 /** Files allowed to import the plain, revision-less photo URI resolver. */
