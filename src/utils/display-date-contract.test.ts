@@ -144,10 +144,12 @@ describe("Digest day detail uses the weekday display form (D-48)", () => {
 
 // D-70 / D-23 (reviews C6-L4, C7-L2): the stored-birthday displays use the
 // birthday formatter, render only; the values behind them stay raw. (Four since
-// 38.10-18: the retired Things to Remember screen was the fifth.)
+// 38.10-18: the retired Things to Remember screen was the fifth.) 38.11-04: Edit
+// Contact's birthday trigger moved into the shared BirthdayField (Add and Edit
+// both render it), so the component is the site and the Edit screen is not.
 describe("stored-birthday display sites (D-70)", () => {
   const BIRTHDAY_SITES = [
-    "src/screens/EditContactScreen.tsx",
+    "src/components/BirthdayField.tsx",
     "src/screens/MergeConflictsScreen.tsx",
     // Research's caption logic moved into a node-testable helper (38.9-16).
     "src/screens/compose-research-logic.ts",
