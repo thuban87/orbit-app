@@ -10,6 +10,30 @@ import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
+/**
+ * CropPhoto's serializable params, shared by every stack that hosts it. Either
+ * a stored-photo target (contact, profile or custom field), or a HOLD crop for
+ * Add Contact (38.11 D-77): the encoded crop is staged at `hold.stagingRel` in
+ * the `create-staging/` namespace, with no canonical lock and no DB write,
+ * because the contact does not exist yet. Hold mode is a route-param branch,
+ * not a fourth `PhotoTargetDescriptor` kind (RESEARCH section 1 R3).
+ */
+export type CropPhotoParams =
+  | {
+      rawUri: string;
+      target: PhotoTargetDescriptor;
+      requestId?: string;
+      contactUid?: string;
+      hold?: undefined;
+    }
+  | {
+      rawUri: string;
+      hold: { stagingRel: string };
+      target?: undefined;
+      requestId?: undefined;
+      contactUid?: undefined;
+    };
+
 /** Serializable Profile route state shared by every stack that can open it. */
 export type ProfileRouteParams = {
   contactId: number;
@@ -107,12 +131,7 @@ export type DashboardStackParamList = {
    * published crop-success to the awaiting field. NO callback params (native-stack
    * serialization + deep-link safety); contact/profile leave `requestId` undefined.
    */
-  CropPhoto: {
-    rawUri: string;
-    target: PhotoTargetDescriptor;
-    requestId?: string;
-    contactUid?: string;
-  };
+  CropPhoto: CropPhotoParams;
   /** Dedicated neutral browse surface for live contacts outside the active orbit. */
   UnboundContacts: undefined;
   /**
@@ -244,12 +263,7 @@ export type OrreryStackParamList = {
   /** The read-only Things to Remember Research sibling of Compose — registered
    *  here too because Compose is hosted in the Orrery stack (COMP-08). */
   ComposeResearch: { contactId: number };
-  CropPhoto: {
-    rawUri: string;
-    target: PhotoTargetDescriptor;
-    requestId?: string;
-    contactUid?: string;
-  };
+  CropPhoto: CropPhotoParams;
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
@@ -330,12 +344,7 @@ export type DigestStackParamList = {
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
-  CropPhoto: {
-    rawUri: string;
-    target: PhotoTargetDescriptor;
-    requestId?: string;
-    contactUid?: string;
-  };
+  CropPhoto: CropPhotoParams;
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
@@ -396,12 +405,7 @@ export type EventsStackParamList = {
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
-  CropPhoto: {
-    rawUri: string;
-    target: PhotoTargetDescriptor;
-    requestId?: string;
-    contactUid?: string;
-  };
+  CropPhoto: CropPhotoParams;
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
@@ -541,12 +545,7 @@ export type SettingsStackParamList = {
     interactionId: number;
     contactId: number;
   };
-  CropPhoto: {
-    rawUri: string;
-    target: PhotoTargetDescriptor;
-    requestId?: string;
-    contactUid?: string;
-  };
+  CropPhoto: CropPhotoParams;
   LegacyContactPicker: undefined;
   ImportReview: { sessionId: number };
   BulkImportSetup: { sessionId: number };

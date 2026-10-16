@@ -15,7 +15,11 @@
  *   - import the plain (revision-less) photo URI resolver;
  *   - import the display URI resolver (`resolvePhotoDisplayUri`, only via
  *     `photo-display.ts`, so no surface builds a display URI with the wrong
- *     cache policy).
+ *     cache policy);
+ *   - import Add Contact's held-photo staging namespace (`create-staging/`,
+ *     38.11 D-77): a non-canonical staging area like the reconcile namespace,
+ *     pinned so it stays create-only (RESEARCH A3: the orphan sweep may delete
+ *     every file in it that no live form owns).
  *
  * It checks WHO may touch these symbols — it does not prove that each
  * byte-changing branch notifies. That positive coverage (every persist,
@@ -84,6 +88,29 @@ const RAW_WRITER_IMPORTERS = [
   "src/services/import/import-photo-retry.ts",
   // Default remove/exists for owned delete intents + the replace-all cleanup delete (notifies after).
   "src/backup/restore-apply.ts",
+];
+
+/** photo-storage exports that write, read or resolve the create-staging namespace. */
+const CREATE_STAGING_SYMBOLS = [
+  "createStagingRelPath",
+  "stageCreatePhoto",
+  "listCreateStagingPhotos",
+  "deleteCreateStaging",
+  "resolveCreateStagingUri",
+] as const;
+
+/**
+ * Files allowed to import the create-staging namespace (38.11 D-77). Each is
+ * non-canonical staging, never a stored photo path, so none of it needs the
+ * path lock or publishes a display revision.
+ */
+const CREATE_STAGING_IMPORTERS = [
+  // Hold-mode crop: stages the encoded crop (and removes a failed partial).
+  "src/screens/CropPhotoScreen.tsx",
+  // Hold-mode picker: builds the per-pick path, previews it, deletes a replaced or removed file.
+  "src/components/PhotoSourcePicker.tsx",
+  // Post-commit promote: reads the held file into the owned persist, then deletes it.
+  "src/services/photos/create-photo.ts",
 ];
 
 /** Files allowed to import the plain, revision-less photo URI resolver. */
@@ -315,6 +342,12 @@ function importsDisplayResolver(file: string, source: string): boolean {
 function importsPlainResolver(file: string, source: string): boolean {
   return (
     importedSymbols(file, source, PHOTO_STORAGE, [PLAIN_RESOLVER]).length > 0
+  );
+}
+function importsCreateStaging(file: string, source: string): boolean {
+  return (
+    importedSymbols(file, source, PHOTO_STORAGE, CREATE_STAGING_SYMBOLS)
+      .length > 0
   );
 }
 function mixesExpoImageWithPlainResolver(
@@ -704,6 +737,12 @@ describe("photo writer contract (src/, tests excluded)", {
           mixesExpoImageWithPlainResolver(file, source),
       ),
     ).toEqual([]);
+  });
+
+  it("create-staging importers are exactly the allowlist (38.11 D-77)", () => {
+    expect(matching(importsCreateStaging)).toEqual(
+      [...CREATE_STAGING_IMPORTERS].sort(),
+    );
   });
 
   it("plain-resolver importers are exactly the allowlist", () => {

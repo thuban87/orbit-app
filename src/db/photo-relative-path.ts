@@ -42,6 +42,16 @@ export const SAFE_RECONCILE_STAGING_RELATIVE =
   /^reconcile-staging\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
 
 /**
+ * Add Contact's held photo (38.11 D-77) owns its own durable staging namespace.
+ * One flat file per pick, named `create-<session>-<pick>.jpg` from two
+ * `[A-Za-z0-9_-]` tokens, so a re-pick never reuses a path. Only `.jpg` (the
+ * crop always encodes a master) plus the `.stage-tmp` write name. Never a
+ * canonical path: nothing in the database references this namespace.
+ */
+export const SAFE_CREATE_STAGING_RELATIVE =
+  /^create-staging\/create-[A-Za-z0-9_-]+\.jpg(?:\.stage-tmp)?$/;
+
+/**
  * True when `value` is a stored photo path (`avatars/<name>.<ext>`, the
  * SAFE_RELATIVE shape) — the one predicate `assertSafeRelative` also uses.
  * Read surfaces call it before any image resolver: a custom photo field can
@@ -113,6 +123,19 @@ export function assertSafeReconcileStagingRelative(relative: string): void {
   ) {
     throw new Error(
       `unsafe reconcile staging photo path: ${JSON.stringify(relative)}`,
+    );
+  }
+}
+
+/** Throw unless an Add Contact held-photo staging path is safe (38.11 D-77). */
+export function assertSafeCreateStagingRelative(relative: string): void {
+  if (
+    typeof relative !== "string" ||
+    relative.includes("\0") ||
+    !SAFE_CREATE_STAGING_RELATIVE.test(relative)
+  ) {
+    throw new Error(
+      `unsafe create staging photo path: ${JSON.stringify(relative)}`,
     );
   }
 }

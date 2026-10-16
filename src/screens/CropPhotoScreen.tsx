@@ -16,6 +16,13 @@
  * Every branch then `goBack()`s; mounted avatars already refreshed from the
  * display revision the owned persist published for the canonical path.
  *
+ * HOLD MODE (38.11 D-77): Add Contact has no contact yet, so its crop arrives
+ * with `hold: { stagingRel }` instead of a target. "Use photo" then encodes the
+ * crop, stages it at that `create-staging/` path, discards the cache derivative
+ * and publishes the crop result on `stagingRel` for the waiting picker. No
+ * canonical lock and no DB write; the photo is promoted after the create
+ * commits (`promoteCreatePhoto`).
+ *
  * RENDER-LOOP RULE (CLAUDE.md, non-negotiable): the pan/zoom transform is driven
  * ONLY by Reanimated SHARED VALUES, read into Skia via `useDerivedValue`. React
  * state/effects are used solely for the ONE-TIME geometry init (allowed) — never
@@ -73,15 +80,21 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { setProfilePhoto } from "@/db/profile-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
+import type { CropRect } from "@/services/photos/crop-geometry";
 import { cropRectFromTransform } from "@/services/photos/crop-geometry";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { renderPreviewDownscale } from "@/services/photos/manipulator-derivatives";
+import { encodeMaster } from "@/services/photos/master-encode";
 import { withCanonicalPathLock } from "@/services/photos/owned-master";
 import {
   PhotoPipelineError,
   persistCroppedMaster,
 } from "@/services/photos/photo-pipeline";
-import { relPathForTarget } from "@/services/photos/photo-storage";
+import {
+  deleteCreateStaging,
+  relPathForTarget,
+  stageCreatePhoto,
+} from "@/services/photos/photo-storage";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { publishCropResult } from "@/stores/photo-result-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -102,6 +115,36 @@ const DECODE_FALLBACK_MS = 2500;
 /** Max edge for the decode-failure downscale fallback. */
 const DOWNSCALE_MAX_EDGE = 2048;
 
+/**
+ * Hold mode (D-77): encode the crop and stage it at `stagingRel`. An encode
+ * failure is a PhotoPipelineError (the "couldn't be used" copy); a failed stage
+ * removes whatever partial file it left. The cache derivative is always
+ * discarded.
+ */
+async function holdCroppedPhoto(
+  sourceUri: string,
+  cropRect: CropRect,
+  stagingRel: string,
+): Promise<void> {
+  let encoded: string;
+  try {
+    encoded = await encodeMaster(sourceUri, cropRect);
+  } catch (error) {
+    throw new PhotoPipelineError("That image couldn't be used.", {
+      cause: error,
+    });
+  }
+  try {
+    await stageCreatePhoto(encoded, stagingRel);
+  } catch (error) {
+    deleteCreateStaging(`${stagingRel}.stage-tmp`);
+    deleteCreateStaging(stagingRel);
+    throw error;
+  } finally {
+    discardDerivative(encoded);
+  }
+}
+
 /** The static geometry captured at one-time init, read by the confirm handler. */
 interface CropGeom {
   viewport: number;
@@ -115,7 +158,7 @@ export function CropPhotoScreen({
   route,
 }: RootStackScreenProps<"CropPhoto">) {
   const { colors } = useTheme();
-  const { rawUri, target } = route.params;
+  const { rawUri, target, hold } = route.params;
   const { width: screenW } = useWindowDimensions();
 
   // The square viewport side + its placement in the canvas. Before the canvas
@@ -317,6 +360,14 @@ export function CropPhotoScreen({
         ty: ty.value,
       });
       // Crop the SAME uri the preview decoded (rawUri, or the A4 downscale).
+      if (hold) {
+        // D-77 hold mode: stage only; the picker consumes the result on focus.
+        await holdCroppedPhoto(sourceUri, cropRect, hold.stagingRel);
+        publishCropResult(hold.stagingRel, true);
+        navigation.goBack();
+        return;
+      }
+      if (!target) throw new Error("photo target missing");
       const exec = getExecutor();
       const capturedUid = route.params.contactUid;
       if (target.kind !== "profile" && !capturedUid)
@@ -380,6 +431,7 @@ export function CropPhotoScreen({
     busy,
     sourceUri,
     target,
+    hold,
     navigation,
     scale,
     tx,

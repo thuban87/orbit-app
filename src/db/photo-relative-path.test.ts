@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertSafeCreateStagingRelative,
   assertSafeRelative,
   assertSafeRestorePendingRelative,
   contactPhotoRelPath,
   customFieldPhotoRelPath,
   profilePhotoRelPath,
   restorePendingRelPath,
+  SAFE_CREATE_STAGING_RELATIVE,
 } from "@/db/photo-relative-path";
 
 describe("restore pending photo paths", () => {
@@ -36,6 +38,47 @@ describe("restore pending photo paths", () => {
     ]) {
       expect(() => assertSafeRelative(value)).toThrow();
       expect(() => assertSafeRestorePendingRelative(value)).toThrow();
+    }
+  });
+});
+
+describe("Add Contact held-photo staging paths (38.11 D-77)", () => {
+  const held = "create-staging/create-session1-pick2.jpg";
+
+  it("accepts a flat create-<session>-<pick>.jpg and its .stage-tmp", () => {
+    expect(SAFE_CREATE_STAGING_RELATIVE.test(held)).toBe(true);
+    expect(() => assertSafeCreateStagingRelative(held)).not.toThrow();
+    expect(() =>
+      assertSafeCreateStagingRelative(`${held}.stage-tmp`),
+    ).not.toThrow();
+    expect(() =>
+      assertSafeCreateStagingRelative("create-staging/create-a_b-C-9.jpg"),
+    ).not.toThrow();
+  });
+
+  it("is never a canonical photo path", () => {
+    expect(() => assertSafeRelative(held)).toThrow();
+  });
+
+  it("rejects traversal, nested folders, other namespaces and other extensions", () => {
+    for (const value of [
+      "create-staging/../avatars/contact-1.jpg",
+      "create-staging/create-..-x.jpg",
+      "create-staging/sub/create-a-b.jpg",
+      "/create-staging/create-a-b.jpg",
+      "create-staging/import-a-b.jpg",
+      "create-staging/a-b.jpg",
+      "reconcile-staging/create-a-b.jpg",
+      "import-staging/create-a-b.jpg",
+      "avatars/create-a-b.jpg",
+      "create-staging/create-a-b.png",
+      "create-staging/create-a-b.webp",
+      "create-staging/create-a-b.jpg.tmp",
+      "create-staging/create-a-b.jpg\0tail",
+      "create-staging\\create-a-b.jpg",
+      "",
+    ]) {
+      expect(() => assertSafeCreateStagingRelative(value), value).toThrow();
     }
   });
 });

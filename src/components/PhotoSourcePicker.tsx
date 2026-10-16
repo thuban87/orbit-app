@@ -20,11 +20,22 @@
  * edit form's guarded upsert on Save (the widget wires `onValueChange` to its
  * `onChange(null)`).
  *
+ * HOLD MODE (38.11 D-77): Add Contact has no contact yet, so it passes `hold`
+ * instead of a target. Add/Change and the paste-URL path mint a fresh pick
+ * token, build a `create-staging/` path and open CropPhoto in hold mode; on
+ * focus the picker consumes the crop result for that path, reports it through
+ * `onHeldChange` and deletes the previously held file. The held file is not a
+ * stored photo path, so its preview is an `expo-image` `Image` fed by
+ * `resolveCreateStagingUri` (never `Avatar`, never the "Photo unavailable"
+ * check). Remove asks the same confirm, deletes the held file and reports
+ * `null`.
+ *
  * All colours via `useTheme().colors.*` (check:colors); 44px touch targets; copy
  * verbatim from the 05-UI-SPEC Copywriting Contract.
  */
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -50,20 +61,27 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { isUnusablePhotoReference } from "@/db/photo-relative-path";
 import { clearProfilePhotoCore } from "@/db/profile-dao";
 import type { RootStackParamList } from "@/navigation/types";
+import { newCreateStagingToken } from "@/services/photos/create-photo";
 import {
   enqueueRemovalIntentOwned,
   removeOwnedMaster,
 } from "@/services/photos/owned-master";
 import {
   contactPhotoRelPath,
+  createStagingRelPath,
   customFieldPhotoRelPath,
+  deleteCreateStaging,
   type PhotoTargetDescriptor,
   profilePhotoRelPath,
+  resolveCreateStagingUri,
 } from "@/services/photos/photo-storage";
 import { isImageUrl } from "@/services/photos/url-image";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { confirm } from "@/stores/confirm-store";
-import { markPhotoStaged } from "@/stores/photo-result-store";
+import {
+  consumeCropResult,
+  markPhotoStaged,
+} from "@/stores/photo-result-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
@@ -74,7 +92,7 @@ const LOG_SCOPE = "photo-source-picker";
 /** The preview avatar diameter in the edit surface. */
 const PREVIEW_SIZE = 96;
 
-interface PhotoSourcePickerProps {
+interface PhotoTargetProps {
   /** Which record this affordance edits — drives the derivable paths + Remove. */
   target: PhotoTargetDescriptor;
   /** The current stored RELATIVE photo path, or null for the no-photo state. */
@@ -86,6 +104,24 @@ interface PhotoSourcePickerProps {
   /** The customField target clears its form value on Remove via this callback. */
   onValueChange?: (value: string | null) => void;
 }
+
+/** Add Contact's held photo (38.11 D-77): no contact exists yet. */
+export interface PhotoHold {
+  /** The open form's staging session token (`[A-Za-z0-9_-]`). */
+  sessionToken: string;
+  /** The held `create-staging/…` path, or null when nothing is held. */
+  heldRelative: string | null;
+  /** Reports a newly held path, or null after Remove. */
+  onHeldChange: (relative: string | null) => void;
+}
+
+interface PhotoHoldProps {
+  hold: PhotoHold;
+  /** Display name — seeds the initials preview while nothing is held. */
+  name: string;
+}
+
+export type PhotoSourcePickerProps = PhotoTargetProps | PhotoHoldProps;
 
 /** The URL field's validation message (D-40: inline under the field). */
 const INVALID_URL_MESSAGE =
@@ -105,18 +141,29 @@ function confirmRemovePhoto(): Promise<boolean> {
   });
 }
 
+/** The held preview URI, or null (initials) if the path is somehow unsafe. */
+function safeHeldUri(relative: string): string | null {
+  try {
+    return resolveCreateStagingUri(relative);
+  } catch (err) {
+    Logger.error(LOG_SCOPE, "held photo path refused", err);
+    return null;
+  }
+}
+
 /** A failure the user can carry on from: an error snackbar (D-27). */
 function showPhotoError(label: string) {
   showSnackbar({ kind: "error", label });
 }
 
-export function PhotoSourcePicker({
-  target,
-  photo,
-  name,
-  onChanged,
-  onValueChange,
-}: PhotoSourcePickerProps) {
+export function PhotoSourcePicker(props: PhotoSourcePickerProps) {
+  const hold = "hold" in props ? props.hold : null;
+  const targetProps = "hold" in props ? null : props;
+  const target = targetProps?.target ?? null;
+  const photo = hold ? hold.heldRelative : (targetProps?.photo ?? null);
+  const { name } = props;
+  const onChanged = targetProps?.onChanged;
+  const onValueChange = targetProps?.onValueChange;
   const theme = useTheme();
   const { colors } = theme;
   const removeScrim = persistentDangerScrim(theme);
@@ -141,9 +188,44 @@ export function PhotoSourcePicker({
   useEffect(() => abortUrl, [abortUrl]);
   useFocusEffect(useCallback(() => abortUrl, [abortUrl]));
 
+  // Hold mode (D-77): the staging path handed to the crop screen, consumed
+  // once when this screen is focused again.
+  const pendingHoldRef = useRef<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hold) return;
+      const pending = pendingHoldRef.current;
+      if (!pending) return;
+      pendingHoldRef.current = null;
+      const result = consumeCropResult(pending);
+      if (!result?.success) return;
+      const previous = hold.heldRelative;
+      hold.onHeldChange(pending);
+      if (previous && previous !== pending) {
+        try {
+          deleteCreateStaging(previous);
+        } catch (err) {
+          Logger.error(LOG_SCOPE, "failed to delete replaced held photo", err);
+        }
+      }
+    }, [hold]),
+  );
+
+  /** Hold mode: a fresh staging path for one pick (never reused). */
+  const nextHoldPath = useCallback((): string => {
+    if (!hold) throw new Error("photo hold missing");
+    const relative = createStagingRelPath(
+      hold.sessionToken,
+      newCreateStagingToken(),
+    );
+    pendingHoldRef.current = relative;
+    return relative;
+  }, [hold]);
+
   // Stable recycling identity for the preview Avatar across the three kinds.
-  const avatarId =
-    target.kind === "contact"
+  const avatarId = !target
+    ? "create-held"
+    : target.kind === "contact"
       ? target.contactId
       : target.kind === "profile"
         ? "profile"
@@ -153,6 +235,22 @@ export function PhotoSourcePicker({
   // customField pick threads its derivable cv- relPath as the requestId.
   const pickFromLibrary = useCallback(async () => {
     try {
+      if (hold) {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsEditing: false,
+          quality: 1,
+        });
+        if (result.canceled) return;
+        const rawUri = result.assets[0]?.uri;
+        if (!rawUri) return;
+        navigation.navigate("CropPhoto", {
+          rawUri,
+          hold: { stagingRel: nextHoldPath() },
+        });
+        return;
+      }
+      if (!target) throw new Error("photo target missing");
       const contactUid =
         target.kind === "profile"
           ? undefined
@@ -185,7 +283,7 @@ export function PhotoSourcePicker({
       Logger.error(LOG_SCOPE, "failed to launch photo library", err);
       showPhotoError("Couldn't open your photos. Please try again.");
     }
-  }, [navigation, target]);
+  }, [navigation, target, hold, nextHoldPath]);
 
   // Remove: confirm, then switch on kind — clear the right store + delete the
   // correct derivable file inline (best-effort). Never derefs a missing contactId.
@@ -194,6 +292,13 @@ export function PhotoSourcePicker({
       return;
     }
     try {
+      if (hold) {
+        // Nothing is saved yet: delete the held file and forget it (D-77).
+        if (hold.heldRelative) deleteCreateStaging(hold.heldRelative);
+        hold.onHeldChange(null);
+        return;
+      }
+      if (!target) throw new Error("photo target missing");
       const exec = getExecutor();
       const now = localDateTime();
       switch (target.kind) {
@@ -229,7 +334,7 @@ export function PhotoSourcePicker({
       Logger.error(LOG_SCOPE, "failed to remove photo", err);
       showPhotoError("Couldn't remove the photo. Please try again.");
     }
-  }, [target, onChanged, onValueChange]);
+  }, [target, hold, onChanged, onValueChange]);
 
   // Add from URL: validate https-only up front, download ONCE to cache, then
   // hand the raw cache uri to the SAME crop→pipeline flow a picked image uses —
@@ -251,26 +356,32 @@ export function PhotoSourcePicker({
     urlController.current = controller;
     try {
       const contactUid =
-        target.kind === "profile"
+        !target || target.kind === "profile"
           ? undefined
           : ((await getContactPhotoIdentity(getExecutor(), target.contactId)) ??
             undefined);
-      if (target.kind !== "profile" && !contactUid)
+      if (!hold && !target) throw new Error("photo target missing");
+      if (target && target.kind !== "profile" && !contactUid)
         throw new Error("contact photo target missing");
       if (controller.signal.aborted) return;
       const result = await runUrlSubmit({
         url,
         signal: controller.signal,
         navigate: (rawUri) =>
-          navigation.navigate("CropPhoto", {
-            rawUri,
-            target,
-            contactUid,
-            requestId:
-              target.kind === "customField"
-                ? customFieldPhotoRelPath(target.contactId, target.colName)
-                : undefined,
-          }),
+          target
+            ? navigation.navigate("CropPhoto", {
+                rawUri,
+                target,
+                contactUid,
+                requestId:
+                  target.kind === "customField"
+                    ? customFieldPhotoRelPath(target.contactId, target.colName)
+                    : undefined,
+              })
+            : navigation.navigate("CropPhoto", {
+                rawUri,
+                hold: { stagingRel: nextHoldPath() },
+              }),
       });
       if (result.status === "aborted") return;
       if (result.status === "error") throw result.cause;
@@ -305,24 +416,47 @@ export function PhotoSourcePicker({
       if (urlController.current === controller) urlController.current = null;
       if (!controller.signal.aborted) setSubmittingUrl(false);
     }
-  }, [submittingUrl, urlText, navigation, target, abortUrl]);
+  }, [
+    submittingUrl,
+    urlText,
+    navigation,
+    target,
+    hold,
+    nextHoldPath,
+    abortUrl,
+  ]);
 
   const hasPhoto = photo != null;
+  // Hold mode: the held file is a staging path, not a stored photo path, so it
+  // is resolved here and drawn as a plain Image (D-77), and the D-34 check
+  // below never applies to it.
+  const heldUri = hold?.heldRelative ? safeHeldUri(hold.heldRelative) : null;
   // D-34: a value that is not a stored photo path (text left in a custom photo
   // field) is never resolved: the preview shows initials, the notice shows at
   // once, and Change / Remove stay available. The value itself is untouched.
-  const unusable = isUnusablePhotoReference(photo);
-  const showUnavailable = hasPhoto && (photoFailed || unusable);
+  const unusable = hold ? false : isUnusablePhotoReference(photo);
+  const showUnavailable = !hold && hasPhoto && (photoFailed || unusable);
 
   return (
     <View style={styles.root}>
-      <Avatar
-        photo={unusable ? null : photo}
-        name={name}
-        contactId={avatarId}
-        size={PREVIEW_SIZE}
-        onLoadErrorChange={onPhotoLoadErrorChange}
-      />
+      {heldUri ? (
+        // A fresh path per pick, so no cached decode can be stale; never cached.
+        <Image
+          testID="photo-source-held-preview"
+          source={{ uri: heldUri }}
+          contentFit="cover"
+          cachePolicy="none"
+          style={[styles.heldPreview, { backgroundColor: colors.surface }]}
+        />
+      ) : (
+        <Avatar
+          photo={hold || unusable ? null : photo}
+          name={name}
+          contactId={avatarId}
+          size={PREVIEW_SIZE}
+          onLoadErrorChange={onPhotoLoadErrorChange}
+        />
+      )}
 
       <View style={styles.actions}>
         {showUnavailable ? <PhotoUnavailableNotice /> : null}
@@ -423,6 +557,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
+  },
+  heldPreview: {
+    width: PREVIEW_SIZE,
+    height: PREVIEW_SIZE,
+    borderRadius: PREVIEW_SIZE / 2,
   },
   actions: {
     flex: 1,

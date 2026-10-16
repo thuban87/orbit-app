@@ -110,11 +110,14 @@ vi.mock("expo-file-system", () => {
 
 import {
   contactPhotoRelPath,
+  createStagingRelPath,
   customFieldPhotoRelPath,
+  deleteCreateStaging,
   deleteImportStaging,
   deletePhoto,
   deleteRestorePending,
   importStagingRelPath,
+  listCreateStagingPhotos,
   listImportStagingPhotos,
   listRestorePendingPhotos,
   type PhotoTargetDescriptor,
@@ -126,12 +129,14 @@ import {
   profilePhotoRelPath,
   reconcilePhotoDir,
   relPathForTarget,
+  resolveCreateStagingUri,
   resolveImportStagingUri,
   resolvePhotoDisplayUri,
   resolvePhotoUri,
   resolvePhotoUriFromDocumentUri,
   resolveRestorePendingUri,
   restorePendingRelPath,
+  stageCreatePhoto,
   stageImportPhoto,
   stageRestorePending,
   stageRestorePendingBase64,
@@ -396,6 +401,63 @@ describe("import staging — flat durable picker-cache namespace", () => {
     deleteImportStaging(relative);
     expect(h.ops).toContain(`delete file:///doc/${relative}`);
     expect(listImportStagingPhotos()).toEqual([]);
+  });
+});
+
+describe("create staging — Add Contact's held photo (38.11 D-77)", () => {
+  it("builds create-staging/create-<session>-<pick>.jpg from two tokens", () => {
+    expect(createStagingRelPath("session_1", "pick-2")).toBe(
+      "create-staging/create-session_1-pick-2.jpg",
+    );
+    // A re-pick with a fresh pick token never reuses the path.
+    expect(createStagingRelPath("s", "a")).not.toBe(
+      createStagingRelPath("s", "b"),
+    );
+  });
+
+  it("rejects a token outside [A-Za-z0-9_-] before building any path", () => {
+    for (const [session, pick] of [
+      ["../x", "p"],
+      ["s", "../x"],
+      ["s/t", "p"],
+      ["s", "p.jpg"],
+      ["", "p"],
+      ["s", ""],
+      ["s", "p\0"],
+    ]) {
+      expect(() => createStagingRelPath(session, pick)).toThrow(
+        "unsafe create staging token",
+      );
+    }
+  });
+
+  it("stages, lists, resolves, and deletes a held photo", async () => {
+    const relative = createStagingRelPath("session", "pick");
+    await stageCreatePhoto("file:///cache/encoded.jpg", relative);
+    expect(h.ops).toContain(
+      `copy file:///cache/encoded.jpg -> file:///doc/${relative}.stage-tmp`,
+    );
+    expect(h.ops).toContain(
+      `move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`,
+    );
+    expect(resolveCreateStagingUri(relative)).toBe(`file:///doc/${relative}`);
+    expect(listCreateStagingPhotos()).toEqual([
+      { relative, isStageTmpOrphan: false },
+    ]);
+    deleteCreateStaging(relative);
+    expect(h.ops).toContain(`delete file:///doc/${relative}`);
+    expect(listCreateStagingPhotos()).toEqual([]);
+  });
+
+  it("guards every entry point against a non-create-staging path", async () => {
+    const outside = "avatars/contact-1.jpg";
+    await expect(stageCreatePhoto("file:///x.jpg", outside)).rejects.toThrow();
+    expect(() => resolveCreateStagingUri(outside)).toThrow();
+    expect(() => deleteCreateStaging(outside)).toThrow();
+    expect(() =>
+      resolveCreateStagingUri("create-staging/../avatars/contact-1.jpg"),
+    ).toThrow();
+    expect(h.ops).toEqual([]);
   });
 });
 

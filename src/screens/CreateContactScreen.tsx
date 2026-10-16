@@ -40,6 +40,12 @@
  * `addLinksCore`), and a birthday set here is scheduled at once
  * (`reconcileSchedule` after the create).
  *
+ * 38.11 D-77: Identity offers Photo beside Name. The cropped photo is held in a
+ * durable `create-staging/` file (PhotoSourcePicker hold mode) until Save; after
+ * the create commits it is stored through the normal photo path
+ * (`promoteCreatePhoto`). A failed promote keeps the contact, says the photo
+ * wasn't added and still opens the new Profile.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -79,6 +85,7 @@ import {
   type OffLimitsInlineFields,
   type OffLimitsInlineItem,
 } from "@/components/OffLimitsInlineEditor";
+import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import {
   type RelationshipDraft,
   type RelationshipDraftState,
@@ -139,6 +146,10 @@ import { openProfileInContactsTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
+import {
+  newCreateStagingToken,
+  promoteCreatePhoto,
+} from "@/services/photos/create-photo";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -171,6 +182,10 @@ import type { OffLimitsDraftRow } from "./edit-contact-logic";
 import { sectionEntryNoun, sectionTitle } from "./section-editor-logic";
 
 const LOG_SCOPE = "create-contact";
+
+/** D-77: a photo that could not be stored after the save (Claude's discretion copy). */
+const PHOTO_NOT_ADDED =
+  "Contact saved, but the photo wasn't added. Add it from Edit Contact.";
 
 /**
  * The duplicate-name warning as ONE themed gate (D-27): Cancel, Back or a scrim
@@ -431,6 +446,10 @@ export function CreateContactScreen({
   );
   const [socialBatterySheetOpen, setSocialBatterySheetOpen] = useState(false);
   const [links, setLinks] = useState<LinkDraft[]>(seed.links);
+  // 38.11 D-77: the held photo (a `create-staging/` path) and this form's
+  // staging session token, minted once per form from newUid().
+  const [photoSessionToken] = useState(newCreateStagingToken);
+  const [heldPhoto, setHeldPhoto] = useState<string | null>(null);
   // The real AI master (D-27) and the per-type new-item defaults (D-13,
   // D-92), as Edit Contact reads them. Until they load the switch stays off.
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
@@ -690,6 +709,22 @@ export function CreateContactScreen({
         },
       );
       const { contactId } = await createContactFull(exec, input);
+      // D-77: the held photo is stored only now that the contact exists, outside
+      // the create transaction. It never throws; a failure keeps the contact.
+      const held = heldPhoto;
+      if (held) {
+        setHeldPhoto(null);
+        const promoted = await promoteCreatePhoto({
+          exec,
+          contactId,
+          contactUid: input.uid,
+          stagedRelative: held,
+          now: localDateTime(),
+        });
+        if (!promoted.ok) {
+          showSnackbar({ kind: "error", label: PHOTO_NOT_ADDED });
+        }
+      }
       if (input.birthday != null) {
         // A birthday set on Add gets its reminder scheduled now, not at the
         // next launch sweep, as Edit does after a metadata save (38.11 D-48;
@@ -744,6 +779,22 @@ export function CreateContactScreen({
             onExpandedChange={(next) => setSectionExpanded("identity", next)}
             containerRef={registerSectionRef("identity")}
           >
+            {/* Photo beside Name (D-77; placement as Edit Contact's Identity).
+                Held until Save, then stored through the normal photo path. */}
+            <View style={styles.field}>
+              <AppText role="label" style={{ color: colors.textSecondary }}>
+                Photo
+              </AppText>
+              <PhotoSourcePicker
+                hold={{
+                  sessionToken: photoSessionToken,
+                  heldRelative: heldPhoto,
+                  onHeldChange: setHeldPhoto,
+                }}
+                name={name}
+              />
+            </View>
+
             <View ref={nameFieldRef} style={styles.field}>
               <AppText role="label" style={{ color: colors.textSecondary }}>
                 Name

@@ -40,6 +40,7 @@
  */
 import { Directory, File, Paths } from "expo-file-system";
 import {
+  assertSafeCreateStagingRelative,
   assertSafeImportStagingRelative,
   assertSafeReconcileStagingRelative,
   assertSafeRelative,
@@ -68,6 +69,8 @@ const AVATARS_DIR = "avatars";
 const RESTORE_PENDING_DIR = `${AVATARS_DIR}/_restore_pending`;
 const IMPORT_STAGING_DIR = "import-staging";
 const RECONCILE_STAGING_DIR = "reconcile-staging";
+/** Add Contact's held photo before the contact exists (38.11 D-77). */
+const CREATE_STAGING_DIR = "create-staging";
 
 /**
  * The photo write target. Each maps to a `contactId`-derivable (or fixed, for
@@ -105,6 +108,27 @@ export function reconcileStagingRelPath(token: string): string {
   }
   const relative = `${RECONCILE_STAGING_DIR}/reconcile-${token}.jpg`;
   assertSafeReconcileStagingRelative(relative);
+  return relative;
+}
+
+/**
+ * A flat durable staging name for one Add Contact photo pick (38.11 D-77):
+ * `create-staging/create-<session>-<pick>.jpg`. The session token ties the
+ * file to the open form (the sweep keeps an active session's files); the pick
+ * token is fresh per pick, so a re-pick never reuses a path.
+ */
+export function createStagingRelPath(
+  sessionToken: string,
+  pickToken: string,
+): string {
+  if (
+    !/^[A-Za-z0-9_-]+$/.test(sessionToken) ||
+    !/^[A-Za-z0-9_-]+$/.test(pickToken)
+  ) {
+    throw new Error("unsafe create staging token");
+  }
+  const relative = `${CREATE_STAGING_DIR}/create-${sessionToken}-${pickToken}.jpg`;
+  assertSafeCreateStagingRelative(relative);
   return relative;
 }
 
@@ -163,6 +187,27 @@ export async function stageReconcilePhoto(
     idempotent: true,
   });
   await new File(cacheUri).copy(new File(Paths.document, tmpRelative), {
+    overwrite: true,
+  });
+  await new File(Paths.document, tmpRelative).move(
+    new File(Paths.document, relative),
+    { overwrite: true },
+  );
+}
+
+/** Copy an encoded crop into Add Contact's durable held-photo staging (D-77). */
+export async function stageCreatePhoto(
+  srcUri: string,
+  relative: string,
+): Promise<void> {
+  assertSafeCreateStagingRelative(relative);
+  const tmpRelative = `${relative}.stage-tmp`;
+  assertSafeCreateStagingRelative(tmpRelative);
+  new Directory(Paths.document, CREATE_STAGING_DIR).create({
+    intermediates: true,
+    idempotent: true,
+  });
+  await new File(srcUri).copy(new File(Paths.document, tmpRelative), {
     overwrite: true,
   });
   await new File(Paths.document, tmpRelative).move(
@@ -235,6 +280,20 @@ export function listReconcileStagingPhotos(): Array<{
   });
 }
 
+/** List every Add Contact held-photo staging file for the orphan sweep. */
+export function listCreateStagingPhotos(): Array<{
+  relative: string;
+  isStageTmpOrphan: boolean;
+}> {
+  const directory = new Directory(Paths.document, CREATE_STAGING_DIR);
+  if (!directory.exists) return [];
+  return directory.list().map((entry) => {
+    const relative = `${CREATE_STAGING_DIR}/${entry.name}`;
+    assertSafeCreateStagingRelative(relative);
+    return { relative, isStageTmpOrphan: relative.endsWith(".stage-tmp") };
+  });
+}
+
 /** Best-effort cleanup for recovery-only files. */
 export function deleteRestorePending(relative: string): void {
   assertSafeRestorePendingRelative(relative);
@@ -262,6 +321,16 @@ export function deleteReconcileStaging(relative: string): void {
     new File(Paths.document, relative).delete();
   } catch (error) {
     Logger.error(LOG_SCOPE, "reconcile staging cleanup failed", error);
+  }
+}
+
+/** Best-effort cleanup for a discarded, removed or promoted held photo. */
+export function deleteCreateStaging(relative: string): void {
+  assertSafeCreateStagingRelative(relative);
+  try {
+    new File(Paths.document, relative).delete();
+  } catch (error) {
+    Logger.error(LOG_SCOPE, "create staging cleanup failed", error);
   }
 }
 
@@ -342,6 +411,19 @@ export function resolveImportStagingUri(relative: string): string {
 /** Preview-only resolver; reconciliation staging is never a canonical photo path. */
 export function resolveReconcileStagingUri(relative: string): string {
   assertSafeReconcileStagingRelative(relative);
+  const base = Paths.document.uri.endsWith("/")
+    ? Paths.document.uri
+    : `${Paths.document.uri}/`;
+  return `${base}${relative}`;
+}
+
+/**
+ * Resolver for Add Contact's held photo (D-77): the hold-mode preview `Image`
+ * and the post-commit promote read it. Never a canonical photo path, so it is
+ * never handed to `Avatar`.
+ */
+export function resolveCreateStagingUri(relative: string): string {
+  assertSafeCreateStagingRelative(relative);
   const base = Paths.document.uri.endsWith("/")
     ? Paths.document.uri
     : `${Paths.document.uri}/`;

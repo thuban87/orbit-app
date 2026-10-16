@@ -50,11 +50,21 @@ vi.mock("react-native", () => ({
   TextInput: "TextInput",
   View: "View",
 }));
-vi.mock("@react-navigation/native", () => ({
-  useFocusEffect: () => {},
-  useNavigation: () => ({ navigate: vi.fn() }),
+const nav = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  focusEffects: [] as Array<() => unknown>,
 }));
-vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: vi.fn() }));
+vi.mock("@react-navigation/native", () => ({
+  useFocusEffect: (effect: () => unknown) => {
+    nav.focusEffects.push(effect);
+  },
+  useNavigation: () => ({ navigate: nav.navigate }),
+}));
+const { launchImageLibraryAsync } = vi.hoisted(() => ({
+  launchImageLibraryAsync: vi.fn(),
+}));
+vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync }));
+vi.mock("expo-image", () => ({ Image: "Image" }));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("@/components/PhotoUnavailableNotice", () => ({
   PhotoUnavailableNotice: "PhotoUnavailableNotice",
@@ -86,11 +96,21 @@ vi.mock("@/services/photos/owned-master", () => ({
   enqueueRemovalIntentOwned: vi.fn(),
   removeOwnedMaster,
 }));
+const { deleteCreateStaging } = vi.hoisted(() => ({
+  deleteCreateStaging: vi.fn(),
+}));
 vi.mock("@/services/photos/photo-storage", () => ({
   contactPhotoRelPath: (id: number) => `avatars/contact-${id}.jpg`,
+  createStagingRelPath: (session: string, pick: string) =>
+    `create-staging/create-${session}-${pick}.jpg`,
   customFieldPhotoRelPath: (id: number, col: string) =>
     `avatars/cv-${id}-${col}.jpg`,
+  deleteCreateStaging,
   profilePhotoRelPath: () => "avatars/profile.jpg",
+  resolveCreateStagingUri: (relative: string) => `file:///resolved/${relative}`,
+}));
+vi.mock("@/services/photos/create-photo", () => ({
+  newCreateStagingToken: () => "pick1",
 }));
 const url = vi.hoisted(() => ({ valid: true }));
 vi.mock("@/services/photos/url-image", () => ({
@@ -99,14 +119,26 @@ vi.mock("@/services/photos/url-image", () => ({
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: vi.fn(),
 }));
-vi.mock("@/stores/photo-result-store", () => ({ markPhotoStaged: vi.fn() }));
+const { consumeCropResult } = vi.hoisted(() => ({
+  consumeCropResult: vi.fn(),
+}));
+vi.mock("@/stores/photo-result-store", () => ({
+  consumeCropResult,
+  markPhotoStaged: vi.fn(),
+}));
 vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
 vi.mock("@/theme/danger-scrim", () => ({ persistentDangerScrim: () => null }));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
 
-import { PhotoSourcePicker } from "./PhotoSourcePicker";
+import { type PhotoHold, PhotoSourcePicker } from "./PhotoSourcePicker";
+
+/** The stored-photo target branch of the props (not Add Contact's hold). */
+type PickerTarget = Extract<
+  Parameters<typeof PhotoSourcePicker>[0],
+  { target: unknown }
+>["target"];
 
 interface Node {
   readonly type: string;
@@ -135,7 +167,7 @@ function resolve(node: ReactNode): Node[] {
 
 function render(
   photo: string | null,
-  target: Parameters<typeof PhotoSourcePicker>[0]["target"] = {
+  target: PickerTarget = {
     kind: "contact",
     contactId: 7,
   },
@@ -160,6 +192,11 @@ const testIds = (node: Node | undefined) =>
   (node?.children ?? []).map((child) => child.props.testID ?? child.type);
 
 beforeEach(() => {
+  nav.focusEffects = [];
+  nav.navigate.mockReset();
+  launchImageLibraryAsync.mockReset();
+  deleteCreateStaging.mockReset();
+  consumeCropResult.mockReset();
   h.failed = false;
   h.setFailed.mockReset();
   for (const spy of h.setters) spy?.mockClear();
@@ -350,6 +387,161 @@ describe("PhotoSourcePicker feedback (38.9 D-27, D-30, D-40)", () => {
       kind: "error",
       label:
         "Couldn't fetch that image. Check your connection or try a different link.",
+    });
+  });
+});
+
+describe("PhotoSourcePicker hold mode on Add Contact (38.11 D-77)", () => {
+  const HELD = "create-staging/create-form1-pickA.jpg";
+
+  function renderHold(
+    heldRelative: string | null,
+    onHeldChange: (relative: string | null) => void = vi.fn(),
+  ) {
+    h.index = 0;
+    h.seed = new Map();
+    nav.focusEffects = [];
+    const hold: PhotoHold = {
+      sessionToken: "form1",
+      heldRelative,
+      onHeldChange,
+    };
+    const [root] = resolve(PhotoSourcePicker({ hold, name: "Ada" }));
+    return root;
+  }
+
+  it("previews the held file as an Image from resolveCreateStagingUri, with Change and Remove and no notice", () => {
+    h.failed = true;
+    const root = renderHold(HELD);
+    const preview = root?.children[0];
+    expect(preview?.type).toBe("Image");
+    expect(preview?.props.source).toEqual({
+      uri: `file:///resolved/${HELD}`,
+    });
+    expect(preview?.props.cachePolicy).toBe("none");
+    expect(all(root ? [root] : []).some((n) => n.type === "Avatar")).toBe(
+      false,
+    );
+    expect(testIds(actionsOf(root))).toEqual([
+      "photo-source-add-change",
+      "photo-source-remove",
+    ]);
+    expect(actionsOf(root)?.children[0]?.props.accessibilityLabel).toBe(
+      "Change photo",
+    );
+  });
+
+  it("with nothing held shows the initials preview, Add photo, no Remove, and needs no contact", async () => {
+    const root = renderHold(null);
+    expect(root?.children[0]?.type).toBe("Avatar");
+    expect(root?.children[0]?.props.photo).toBeNull();
+    expect(testIds(actionsOf(root))).toEqual([
+      "photo-source-add-change",
+      "photo-source-paste-url",
+    ]);
+    launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///cache/picked.jpg" }],
+    });
+    prop<() => void>(root, "photo-source-add-change", "onPress")();
+    await flush();
+    expect(getContactPhotoIdentity).not.toHaveBeenCalled();
+    expect(showSnackbar).not.toHaveBeenCalled();
+    expect(nav.navigate).toHaveBeenCalledWith("CropPhoto", {
+      rawUri: "file:///cache/picked.jpg",
+      hold: { stagingRel: "create-staging/create-form1-pick1.jpg" },
+    });
+  });
+
+  it("Remove confirms with the same themed destructive gate, then deletes the held file and reports null", async () => {
+    const onHeldChange = vi.fn();
+    confirm.mockResolvedValueOnce(true);
+    const root = renderHold(HELD, onHeldChange);
+    prop<() => void>(root, "photo-source-remove", "onPress")();
+    await flush();
+    expect(confirm.mock.calls[0][0]).toMatchObject({
+      title: "Remove photo?",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    expect(deleteCreateStaging).toHaveBeenCalledWith(HELD);
+    expect(onHeldChange).toHaveBeenCalledWith(null);
+    expect(removeOwnedMaster).not.toHaveBeenCalled();
+  });
+
+  it("Remove cancelled keeps the held file", async () => {
+    const onHeldChange = vi.fn();
+    confirm.mockResolvedValueOnce(false);
+    const root = renderHold(HELD, onHeldChange);
+    prop<() => void>(root, "photo-source-remove", "onPress")();
+    await flush();
+    expect(deleteCreateStaging).not.toHaveBeenCalled();
+    expect(onHeldChange).not.toHaveBeenCalled();
+  });
+
+  it("on focus consumes the crop for the pending path once, reports it and deletes the replaced file", async () => {
+    const onHeldChange = vi.fn();
+    const root = renderHold(HELD, onHeldChange);
+    launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///cache/picked.jpg" }],
+    });
+    prop<() => void>(root, "photo-source-add-change", "onPress")();
+    await flush();
+    const next = "create-staging/create-form1-pick1.jpg";
+    consumeCropResult.mockReturnValueOnce({ requestId: next, success: true });
+    for (const effect of nav.focusEffects) effect();
+    expect(consumeCropResult).toHaveBeenCalledWith(next);
+    expect(onHeldChange).toHaveBeenCalledWith(next);
+    expect(deleteCreateStaging).toHaveBeenCalledWith(HELD);
+    // A second focus consumes nothing more.
+    for (const effect of nav.focusEffects) effect();
+    expect(consumeCropResult).toHaveBeenCalledTimes(1);
+  });
+
+  it("a cancelled crop changes nothing on focus", async () => {
+    const onHeldChange = vi.fn();
+    const root = renderHold(HELD, onHeldChange);
+    launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///cache/picked.jpg" }],
+    });
+    prop<() => void>(root, "photo-source-add-change", "onPress")();
+    await flush();
+    consumeCropResult.mockReturnValueOnce(null);
+    for (const effect of nav.focusEffects) effect();
+    expect(onHeldChange).not.toHaveBeenCalled();
+    expect(deleteCreateStaging).not.toHaveBeenCalled();
+  });
+
+  it("the paste-URL path also crops into a fresh held path", async () => {
+    runUrlSubmit.mockImplementationOnce(
+      async ({ navigate }: { navigate: (uri: string) => void }) => {
+        navigate("file:///cache/photo-dl/x.jpg");
+        return { status: "ok" };
+      },
+    );
+    h.index = 0;
+    h.seed = new Map<number, unknown>([
+      [SLOT.urlEntryOpen, true],
+      [SLOT.urlText, "https://example.com/a.jpg"],
+    ]);
+    const [root] = resolve(
+      PhotoSourcePicker({
+        hold: {
+          sessionToken: "form1",
+          heldRelative: null,
+          onHeldChange: vi.fn(),
+        },
+        name: "Ada",
+      }),
+    );
+    prop<() => void>(root, "photo-source-url-submit", "onPress")();
+    await flush();
+    expect(getContactPhotoIdentity).not.toHaveBeenCalled();
+    expect(nav.navigate).toHaveBeenCalledWith("CropPhoto", {
+      rawUri: "file:///cache/photo-dl/x.jpg",
+      hold: { stagingRel: "create-staging/create-form1-pick1.jpg" },
     });
   });
 });
