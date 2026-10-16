@@ -9,6 +9,7 @@ import {
   firstBlockingField,
   toFieldErrors,
 } from "@/components/ui/field-error-logic";
+import { NEW_CONTACT_DEFAULT_INTERVAL_DAYS } from "@/constants/new-contact-defaults";
 import { resolveCategorySelection } from "@/logic/category-logic";
 import {
   addDraftItem,
@@ -444,15 +445,15 @@ describe("Add Contact dirty check against the seed (D-15, E-01)", () => {
     expect(dirty(createFormSeedState())).toBe(false);
   });
 
-  it("seeds the documented defaults", () => {
+  it("seeds Bound, Monthly and Last spoke Not yet (D-01, D-02, D-22)", () => {
     const seed = createFormSeedState();
     expect(seed).toMatchObject({
       name: "",
       categoryId: null,
-      intervalDays: null,
+      intervalDays: NEW_CONTACT_DEFAULT_INTERVAL_DAYS,
       intervalValid: true,
-      trackingEnabled: false,
-      lastSpoke: { kind: "today" },
+      trackingEnabled: true,
+      lastSpoke: { kind: "not-yet" },
       values: {},
       memories: [],
       relationships: [],
@@ -501,13 +502,49 @@ describe("Add Contact dirty check against the seed (D-15, E-01)", () => {
     expect(dirty({ ...createFormSeedState(), categoryId: 3 })).toBe(true);
   });
 
-  it("binding then unbinding with no cadence returns to clean", () => {
+  it("unbinding is dirty; binding again returns to clean (D-09)", () => {
     const seed = createFormSeedState();
-    expect(
-      dirty({ ...seed, trackingEnabled: true, intervalValid: false }),
-    ).toBe(true);
-    const back = coordinateBoundToggle({ intervalDays: null }, false);
-    expect(dirty({ ...seed, ...back })).toBe(false);
+    const unbound = coordinateBoundToggle(seed, false);
+    expect(dirty({ ...seed, ...unbound })).toBe(true);
+    const rebound = coordinateBoundToggle(unbound, true);
+    expect(dirty({ ...seed, ...rebound })).toBe(false);
+  });
+
+  it("the seed signature survives a round trip unchanged (not dirty)", () => {
+    const seed = createFormSeedState();
+    const roundTripped = JSON.parse(JSON.stringify(seed)) as typeof seed;
+    expect(createFormSeedSignature(roundTripped)).toBe(
+      createFormSeedSignature(seed),
+    );
+    expect(dirty(roundTripped)).toBe(false);
+  });
+});
+
+describe("Add Contact new-contact defaults (D-01, D-02, D-22; 39 D-50, D-51)", () => {
+  it("Bound -> Unbound -> Bound keeps Monthly and rebinds valid (E-05)", () => {
+    const seed = createFormSeedState();
+    const unbound = coordinateBoundToggle(seed, false);
+    expect(unbound).toEqual({
+      trackingEnabled: false,
+      intervalDays: 30,
+      intervalValid: true,
+    });
+    const rebound = coordinateBoundToggle(unbound, true);
+    expect(rebound).toEqual({
+      trackingEnabled: true,
+      intervalDays: 30,
+      intervalValid: true,
+    });
+  });
+
+  it("a name-only save from the seed is Bound every 30 days with no first interaction (D-06)", () => {
+    const seed = createFormSeedState();
+    expect(canSave({ ...seed, name: "Ann" })).toBe(true);
+    const out = buildCreateInput({ ...seed, name: "Ann" }, deps());
+    expect(out.trackingEnabled).toBe(true);
+    expect(out.intervalDays).toBe(30);
+    expect(out.firstInteraction).toBeUndefined();
+    expect("firstInteraction" in out).toBe(false);
   });
 });
 

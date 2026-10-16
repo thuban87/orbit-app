@@ -15,9 +15,12 @@
  * this file is the RN shell + navigation, device-UAT at the phase gate.
  *
  * CRUD-01 fix: the typed Phone is carried into the create input (previously
- * collected but dropped). Frequency defaults to Monthly (30) so a name-only save
- * succeeds — the DAO hard-rejects a non-positive interval, and an invalid custom
- * entry blocks Save before it can reach the DAO.
+ * collected but dropped). A new contact defaults to Bound with Monthly
+ * (`NEW_CONTACT_DEFAULT_INTERVAL_DAYS`) and Last spoke "Not yet", with
+ * Relationship Basics open so all three are visible (38.11 D-01, D-02, D-03):
+ * a name-only save writes a Bound contact and no interaction. The DAO
+ * hard-rejects a non-positive interval, and an invalid custom entry blocks Save
+ * before it can reach the DAO.
  *
  * 38.10 plan 14 (D-05, D-65, D-67, D-119): behind Show More the Things to
  * Remember sections are filled in on the form itself, in the same set and
@@ -101,6 +104,7 @@ import {
   ADD_OFF_LIMITS_ITEM,
   ADD_THOUGHT_OF_THEM,
 } from "@/constants/glossary";
+import { NEW_CONTACT_DEFAULT_INTERVAL_DAYS } from "@/constants/new-contact-defaults";
 import {
   getAiPermissionDefaults,
   memoryAiDefaultsMap,
@@ -278,10 +282,11 @@ export function CreateContactScreen({
   const [name, setName] = useState(seed.name);
   const [categoryId, setCategoryId] = useState<number | null>(seed.categoryId);
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
-  // A contact created without touching cadence is Unbound (trackingEnabled=false)
-  // with no cadence (intervalDays=null) — NOT the prior Monthly + Bound default
-  // (CAPT-03, dossier §F). Unbound never gates Save on cadence, so intervalValid
-  // starts true. Binding turns the gate on via coordinateBoundToggle.
+  // A contact created without touching cadence is Bound with Monthly
+  // (NEW_CONTACT_DEFAULT_INTERVAL_DAYS) selected (38.11 D-02, D-22), so
+  // intervalValid starts true. Unbinding keeps that cadence dormant and binding
+  // again rebinds it valid (coordinateBoundToggle; D-12 still gates a bind with
+  // no cadence).
   const [intervalDays, setIntervalDays] = useState<number | null>(
     seed.intervalDays,
   );
@@ -302,15 +307,16 @@ export function CreateContactScreen({
   // second tap can neither run its own save nor re-enable Save early.
   const savingRef = useRef(false);
 
-  // CONTROLLED accordion disclosure. Identity opens by default (the fewest-taps
-  // create path); the parent owns which sections are open so a blocked Save can
-  // reveal the erroring section (CAPT-14, Task 4). Advanced enrichment lives
-  // behind Show More (Task 3).
+  // CONTROLLED accordion disclosure. Identity and Relationship Basics open by
+  // default, so Last spoke, Orbit participation and Frequency are visible on
+  // open (38.11 D-03); the parent owns which sections are open so a blocked
+  // Save can reveal the erroring section (CAPT-14). Advanced enrichment lives
+  // behind Show More.
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({
     identity: true,
-    relationship: false,
+    relationship: true,
     methods: false,
     lastTalked: false,
     keyPeople: false,
@@ -828,7 +834,10 @@ export function CreateContactScreen({
                 </AppText>
                 <FrequencyPicker
                   testID="create-contact-frequency"
-                  value={intervalDays ?? 0}
+                  // The seed carries a cadence and nothing clears it, so this
+                  // is never null; the fallback is a preset, never an invalid
+                  // custom entry (38.11 D-22, E-05).
+                  value={intervalDays ?? NEW_CONTACT_DEFAULT_INTERVAL_DAYS}
                   onChange={(v) => {
                     // Selecting a cadence turns Bound on (CAPT-03).
                     const next = coordinateCadenceSelection(v);

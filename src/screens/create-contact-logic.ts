@@ -31,6 +31,7 @@ import {
   isSavableEntry,
   normalizeEntryText,
 } from "@/components/ui/entry-text-logic";
+import { NEW_CONTACT_DEFAULT_INTERVAL_DAYS } from "@/constants/new-contact-defaults";
 import type {
   CreateContactFullInput,
   CreateCurrentStateInput,
@@ -350,10 +351,9 @@ export function buildCreateInput(
 // so the guard is on from the first render: a name typed before categories or
 // the form data load is dirty, a failed load leaves the guard on, and a
 // category-catalog refresh (which can only clear a pick that no longer exists,
-// moving `categoryId` toward its null seed) never makes the form dirty. A later
-// phase that adds an asynchronously resolved default (38.11 D-50/D-51) must
-// update this seed and the field together, touching the field only while it is
-// untouched.
+// moving `categoryId` toward its null seed) never makes the form dirty. The
+// Bound + Monthly + Not yet defaults (38.11 D-01, D-02) are synchronous seed
+// values, so they are never dirty (D-09).
 // =============================================================================
 
 /** The seed form state: what an untouched Add Contact holds. */
@@ -371,18 +371,22 @@ export type CreateFormSeedState = CreateFormState &
   >;
 
 /**
- * The Add Contact seeds. Unbound with no cadence (CAPT-03), last spoke today,
- * one empty phone row (its uid is generated; the signature ignores it), no
- * email, no custom values, no enrichment drafts.
+ * The Add Contact seeds (38.11 D-01, D-02, D-22; Phase 39 D-50, D-51): Bound
+ * with Monthly selected (`NEW_CONTACT_DEFAULT_INTERVAL_DAYS`, the single
+ * new-contact default, D-10) and Last spoke "Not yet", so a name-only save
+ * writes a Bound contact with no interaction (D-06). One empty phone row (its
+ * uid is generated; the signature ignores it), no email, no custom values, no
+ * enrichment drafts. The dirty check compares against this seed, so these
+ * defaults are never unsaved work (D-09).
  */
 export function createFormSeedState(): CreateFormSeedState {
   return {
     name: "",
     categoryId: null,
-    intervalDays: null,
+    intervalDays: NEW_CONTACT_DEFAULT_INTERVAL_DAYS,
     intervalValid: true,
-    trackingEnabled: false,
-    lastSpoke: { kind: "today" },
+    trackingEnabled: true,
+    lastSpoke: { kind: "not-yet" },
     methods: { phone: [emptyMethodDraft("phone", newUid())], email: [] },
     values: {},
     memories: [],

@@ -51,6 +51,10 @@ import { listRelationshipsForContact } from "@/db/relationships-read";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
+import {
+  buildCreateInput,
+  createFormSeedState,
+} from "@/screens/create-contact-logic";
 
 const NOW = "2026-08-14 12:00:00";
 
@@ -476,6 +480,29 @@ describe("createContactFull — 'not yet / don't know' path", () => {
       now: NOW,
     });
     expect(interactionId).toBeNull();
+    expect(await lastContact(contactId)).toBeNull();
+    expect(await interactionCount(contactId)).toBe(0);
+  });
+});
+
+describe("createContactFull — Add Contact default save (38.11 D-01, D-02, D-06)", () => {
+  it("a name-only save from the form seed writes a Bound, every-30-days contact with no interaction", async () => {
+    const input = buildCreateInput(
+      { ...createFormSeedState(), name: "Ann" },
+      {
+        now: NOW,
+        contactUid: uid(),
+        interactionUid: uid(),
+        createDefs: [],
+        effectivePhoneRegion: "US",
+      },
+    );
+    const { contactId, interactionId } = await createContactFull(exec, input);
+    expect(interactionId).toBeNull();
+    expect(await metadata(contactId)).toMatchObject({
+      tracking_enabled: 1,
+      interval_days: 30,
+    });
     expect(await lastContact(contactId)).toBeNull();
     expect(await interactionCount(contactId)).toBe(0);
   });
