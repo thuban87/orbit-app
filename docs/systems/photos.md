@@ -1,7 +1,7 @@
 # Photos
 
-**Last updated:** 2026-10-05
-**Updated by phase:** 38.7-orrery-v2
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/db/photo-relative-path.ts`, `src/components/Avatar.tsx`, `src/components/photo-display.ts`, `src/components/PhotoUnavailableNotice.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -213,6 +213,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **ADR-186:** Orrery V2 Imperative Picture Renderer Behind a Platform Render Host — Orrery photos decode once per key in `orreryPhotoCache` and are disposed only after the generation ledger clears them.
 - **ADR-192:** Bounded Warm Resource Cache Across Tab Blur — decoded Orrery photo derivatives stay warm across a tab blur, within caps, released on background.
 - **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Photo source picker "Remove photo" string sits on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
+- **ADR-223:** Birthday, Social Battery, Links and a Held Photo on Add Contact — the `create-staging/` namespace, `promoteCreatePhoto` and the launch sweep.
 
 ## Gotchas
 
@@ -268,3 +269,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-10-16 | 38.11 | Add Contact offers Photo (D-77): a held photo in the guarded `create-staging/` namespace (one file per pick), CropPhoto and PhotoSourcePicker hold modes, post-commit `promoteCreatePhoto` that keeps the contact on failure, and cleanup on Remove, re-pick, unmount and a session-aware launch/foreground sweep. |
 | 2026-10-16 | 38.11 | Code review IN-03/IN-09: the hold-mode picker keeps its pending crop path until the result arrives (a late result is consumed on the next focus) and Add Contact memoises its `hold` prop; `listCreateStagingPhotos` skips and logs a stray entry instead of throwing. |
 | 2026-10-16 | 38.11 | Device review (38.11-14 A8): the held Add Contact photo's Remove confirm reads "Remove this photo? It hasn't been saved yet."; the saved-photo confirm is unchanged. |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-223. |
