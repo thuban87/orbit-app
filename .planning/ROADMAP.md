@@ -1532,6 +1532,7 @@ Plans:
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope (orchestrator's reading of owner ruling R1, 39-LEDGER Batch 14; not owner wording): the audit's standard-setting themes (top-10 items X-01, X-03, X-04, X-26, X-36/X-37, plus feedback and selected-state themes). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: 17/17 plans complete (sequential, waves 1–17; `parallelization: false`) — verified 2026-10-11
+
 - [x] 38.9-01 — Overlay and dialog foundation: overlay registry, RegisteredModal + in-window snackbar, confirm/notice host, ConfirmDialog D-43/D-52
 - [x] 38.9-02 — Form guards: Add Contact, Log Interaction, Memory, AI Writing Style; sub-editor guard on Update Contact and Custom fields
 - [x] 38.9-03 — Guard on the pending-confirmation note overlay; Capture Back order (D-33); per-field Backup schedule save (D-34)
@@ -1563,15 +1564,19 @@ Plans:
 **Plans**: 25/25 plans executed (gap plans 20–25 added 2026-10-13, D-139); verified 2026-10-15 (38.10-VERIFICATION.md passed)
 
 Wave 1
+
 - [x] 38.10-01-PLAN.md — Migration 033 (knowledge homes), shared fuel mapping, registry and tombstone changes
 
 Wave 2 *(blocked on Wave 1 completion)*
+
 - [x] 38.10-02-PLAN.md — Knowledge DAOs: Off Limits DAO, delete with Undo, per-type AI defaults, two new settings, fuel shims
 
 Wave 3 *(blocked on Wave 2 completion)*
+
 - [x] 38.10-03-PLAN.md — Last Talked About / Current Location by date, Profile and Dashboard reads, move DAO
 
 Wave 4 *(blocked on Wave 3 completion)*
+
 - [x] 38.10-04-PLAN.md — Backup v8, v7 conversion, export/restore, migration-vs-converter equivalence
 - [x] 38.10-05-PLAN.md — Merge, purge, inline SQL moved into DAOs
 - [x] 38.10-06-PLAN.md — AI context gated on both sides of a linked note, prompt clean-up, Compose Research
@@ -1579,26 +1584,32 @@ Wave 4 *(blocked on Wave 3 completion)*
 - [x] 38.10-08-PLAN.md — Sharing data layer and resume-prompt gate
 
 Wave 5 *(blocked on Wave 4 completion)*
+
 - [x] 38.10-09-PLAN.md — Contact-form data layer and the shared entry field (D-66)
 - [x] 38.10-10-PLAN.md — Linked notes data (Also save to, Group Log copies, History tags)
 - [x] 38.10-11-PLAN.md — Share screen UI
 
 Wave 6 *(blocked on Wave 5 completion)*
+
 - [x] 38.10-12-PLAN.md — Logging UI: Also save to on Log Interaction, Add Note and Group Log
 - [x] 38.10-13-PLAN.md — Section editors for the memory types, memory editor rework, move UI, routes
 
 Wave 7 *(blocked on Wave 6 completion)*
+
 - [x] 38.10-14-PLAN.md — Add/Edit Contact inline sections
 - [x] 38.10-15-PLAN.md — Off Limits editor and Key People editor
 
 Wave 8 *(blocked on Wave 7 completion)*
+
 - [x] 38.10-16-PLAN.md — Profile Things to Remember
 - [x] 38.10-17-PLAN.md — History page, + → Memory Add form, Update Contact
 
 Wave 9 *(blocked on Wave 8 completion)*
+
 - [x] 38.10-18-PLAN.md — Retirement sweep and permanent no-fuel test
 
 Wave 10 *(blocked on Wave 9 completion)*
+
 - [x] 38.10-19-PLAN.md — Final device plan (owner look sign-off; release builds 81f3e611 and da31acab, D-153)
 - [x] 38.10-20-PLAN.md — G1 card edit mode on the section pages (D-130)
 - [x] 38.10-21-PLAN.md — G2 Add bar morphs into a bottom-left section FAB, memory-type editors (D-131)
@@ -1622,19 +1633,39 @@ Wave 10 *(blocked on Wave 9 completion)*
 **Plans**: 14 plans in 7 waves (planned 2026-10-16)
 
 Plans:
+**Wave 1**
+
 - [ ] 38.11-01-PLAN.md — New-contact defaults (Bound, Monthly, Not yet), form fixes, Edit save returns to its Profile (W1)
 - [ ] 38.11-02-PLAN.md — Update Contact retired and archived, Memory off the +, + clearance, history placeholder (W1)
 - [ ] 38.11-03-PLAN.md — Never Contacted status, honest reasons, stat explanations, Custom... frequency (W1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 38.11-04-PLAN.md — Add Contact Birthday / Social battery / Links in the one create save; Year unknown; Birthday Clear (W2)
 - [ ] 38.11-05-PLAN.md — Layout editor: open/closed survives, Save as template and Reset in Layout (W2)
 - [ ] 38.11-06-PLAN.md — Settings -> Profile Backgrounds page; shared crop flow (W2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 38.11-07-PLAN.md — Photo on Add Contact: held, promoted after save, swept on discard (W3)
 - [ ] 38.11-08-PLAN.md — Birthday tile and Birthday sheet (W3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 38.11-09-PLAN.md — Duplicate name "Open existing" (W4)
 - [ ] 38.11-10-PLAN.md — One snooze sheet for all four entries (W4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 38.11-11-PLAN.md — Background sheet: choose-only compact cards, Manage, Reset (W5)
 - [ ] 38.11-12-PLAN.md — Archive -> Bin wording app-wide (W5)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 38.11-13-PLAN.md — Profile top (Edit Contact, Compose Message), ⋯ with confirmed Move to Bin, name in top bar (W6)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 38.11-14-PLAN.md — Device pass, owner checkpoints, one release build (W7)
 
 > **Split 2026-10-10 (owner).** The original 38.11 "Everyday Screens" (areas A–F, J; estimated about 16–22 plans) was split by seam: Profile and contact forms stay here; Contacts list/search/Digest → 38.13; logging/History/Events/Compose → 38.14. The B-23 Events planning feature was never part of the remediation and is its own phase, 38.15.
@@ -1690,6 +1721,7 @@ Plans:
 **Requirements**: None formal. Owner decisions to come from this phase's dossier (phase-dossier skill).
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Origin: work cut from 38.10 to hold its size (owner, 2026-10-12; `38.10-CONTEXT.md` D-73, D-74, D-76; provenance in `38.10-LEDGER.md` Batch 15–16).
+
 - **Share reminders** (backlog 999.5, reminder half; owner wording in the 999.5 entry below): after a share, offer "Add a reminder about this?" leading into reminder setup.
   - Builds on 38.10's share flow: a tap saves the share to Thought of Them at once, then a confirmation card offers section chips, Undo, Add note and an Allow AI switch (38.10 D-77, D-78). The reminder offer most likely joins that card; placement is this phase's decision.
   - Reuse 38.15's reminder entity and scheduling rather than building a second system (38.10 D-73). 38.15's dossier is still pending, so this phase's design waits on it.
@@ -1702,6 +1734,7 @@ Plans:
   - **Recorded decisions in play:** ADR-037 :18 decides plain `finish()` and rejected "`BackHandler.exitApp()` or task removal"; 10-capture dossier Cluster 2 (`docs/dossier/10-capture.md:98-108`) [DECIDED] return to the source app after a share, and [REJECTED] "Staying in Orbit on the profile". Returning to Orbit's own previous screen in the warm case partly revives that rejected option; cold shares keep returning to the source app unless the owner rules otherwise. Both are to be named in the dossier.
   - 38.10 kept today's behaviour and preserves 38.9 D-33's Capture Back order (38.10 D-74, D-19).
 - **Phase 39:** placed before 39 (owner, 2026-10-12) so the sharing lesson (39-CONTEXT D-93, D-99) can teach the final behaviour; whether it teaches reminders is 39's call. Record effects in `39-AMENDMENTS-PENDING.md`.
+
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 3–4 plans — rough estimate from 38.10's scoping (reminders ≈ 2–3, warm share ≈ 1). Basis: 38.10 N-14. Not counted: anything 38.15's reminder design forces, and a reminder-text-in-notification change if the owner wants it.
 **Plans**: TBD
 
@@ -1807,10 +1840,12 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 **Absorbed into Phase 38.10 (owner, 2026-10-10).** Kept here for its owner wording and history; Phase 38.10's dossier is now authoritative. **The reminder half moved to Phase 38.16 (owner, 2026-10-12; 38.10 D-73).**
 
 **Goal:** Things shared into the app from other Android apps land somewhere visible and fitting. Owner, 2026-10-09: a text block that "made me think of my niece" was shared to her contact and "currently it doesn't show anywhere. I don't really want that to show in memories though, it's not a memory, it's just something that made me think of them."
+
 - A new Things to Remember section for these items (working name "Made Me Think of Them"; name to be decided).
 - After sharing and choosing the contact, offer "Add a reminder about this?" leading into reminder setup (owner's example: an article found at 2 a.m., reminded two days later at 8 a.m. to send before her soccer game).
 - After choosing the contact, a second choice of where to save it, defaulting to the new section (it may sometimes be a Memory).
 - Must not write to `fuel` (owner: fuel is being removed root and stem; see 999.3). Memories are their own `memories` table (`src/db/memories-dao.ts:111`).
+
 **Current state (`main @ c2c0d191`):** Share → Capture writes `fuel` `kind: "topic"`, `source: "share"` (`CaptureScreen.tsx:273-276`); the Profile reads only `off_limits` fuel (`src/db/profile-knowledge-read.ts:259-266`), so captures are invisible on the Profile. Changes Phase 34's capture design (owner decision at discuss). Likely a new table/migration and backup-format impact.
 **Source:** owner, Phase 39 interrogation 2026-10-09 (Phase 39 Q-51). Wanted before Phase 39 executes if possible, so the Memory lesson teaches the final behaviour.
 **Plans:** 0 plans (not planned)
