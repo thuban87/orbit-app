@@ -178,3 +178,27 @@ describe("Edit Contact photo field with text in it (38.6 D-34)", () => {
     expect(onLoadErrorChange).toHaveBeenLastCalledWith(true);
   });
 });
+
+describe("an empty Photo custom field shows a neutral placeholder (38.11 D-35)", () => {
+  it("draws the neutral avatar with no initials of the field label", () => {
+    const nodes = render(null);
+    const avatar = byTestId(nodes, "avatar-initials");
+    expect(avatar).toBeDefined();
+    // No glyph at all: the label "Dog" must not become a "D".
+    expect(all(avatar?.children ?? []).some((n) => n.type === "Text")).toBe(
+      false,
+    );
+    expect(avatar?.props.accessibilityLabel).toBe("Contact avatar");
+    expect(byTestId(nodes, "photo-unavailable")).toBeUndefined();
+  });
+
+  it("text in the field still shows Photo unavailable, Change and Remove (38.6 D-34)", () => {
+    const nodes = render("Rex");
+    const avatar = byTestId(nodes, "avatar-initials");
+    expect(all(avatar?.children ?? []).some((n) => n.type === "Text")).toBe(
+      false,
+    );
+    expect(byTestId(nodes, "photo-unavailable")).toBeDefined();
+    expect(byTestId(nodes, "photo-source-remove")).toBeDefined();
+  });
+});

@@ -22,6 +22,7 @@ import {
   memoryRowToDraftRow,
   type OffLimitsDraftRow,
   parseBirthdayForForm,
+  resolveEditSaveExit,
   resolveErrorSection,
   seedEditState,
 } from "./edit-contact-logic";
@@ -832,5 +833,93 @@ describe("Last Talked About / Current Location rows start blank (38.10 plan 14; 
       (first.currentStateEntries?.length ?? 0) +
       (second.currentStateEntries?.length ?? 0);
     expect(total).toBe(1);
+  });
+});
+
+describe("resolveEditSaveExit: Edit save returns to the Profile it came from (D-26, D-13)", () => {
+  type Route = { name: string; params?: { contactId?: number } };
+  const stack = (...routes: Route[]) => ({
+    routes: routes.map((route, i) => ({ key: `k${i}`, ...route })),
+    index: routes.length - 1,
+  });
+
+  /** Apply the exit to a stack, as goBack / replace would. */
+  function applyExit(
+    state: ReturnType<typeof stack>,
+    exit: ReturnType<typeof resolveEditSaveExit>,
+  ): Route[] {
+    const routes = state.routes.slice(0, state.index + 1);
+    if (exit.kind === "go-back") return routes.slice(0, -1);
+    return [...routes.slice(0, -1), { name: exit.name, params: exit.params }];
+  }
+
+  it("Profile(c) -> Edit(c) goes back", () => {
+    const state = stack(
+      { name: "Home" },
+      { name: "Profile", params: { contactId: 7 } },
+      { name: "Edit", params: { contactId: 7 } },
+    );
+    expect(resolveEditSaveExit(state, 7)).toEqual({ kind: "go-back" });
+  });
+
+  it("Profile(c) -> Compose(c) -> Edit(c) goes back to Compose", () => {
+    const state = stack(
+      { name: "Profile", params: { contactId: 7 } },
+      { name: "Compose", params: { contactId: 7 } },
+      { name: "Edit", params: { contactId: 7 } },
+    );
+    expect(resolveEditSaveExit(state, 7)).toEqual({ kind: "go-back" });
+  });
+
+  it("Home -> Edit(c) replaces Edit with Profile(c)", () => {
+    const state = stack(
+      { name: "Home" },
+      { name: "Edit", params: { contactId: 7 } },
+    );
+    expect(resolveEditSaveExit(state, 7)).toEqual({
+      kind: "replace",
+      name: "Profile",
+      params: { contactId: 7 },
+    });
+  });
+
+  it("Profile(other) -> Edit(c) replaces with Profile(c), never another contact's Profile", () => {
+    const state = stack(
+      { name: "Profile", params: { contactId: 9 } },
+      { name: "Edit", params: { contactId: 7 } },
+    );
+    expect(resolveEditSaveExit(state, 7)).toEqual({
+      kind: "replace",
+      name: "Profile",
+      params: { contactId: 7 },
+    });
+  });
+
+  it("after the exit no Edit route is left under the Profile (a later Bin/archive goBack cannot land on it)", () => {
+    for (const state of [
+      stack(
+        { name: "Profile", params: { contactId: 7 } },
+        { name: "Edit", params: { contactId: 7 } },
+      ),
+      stack({ name: "Home" }, { name: "Edit", params: { contactId: 7 } }),
+    ]) {
+      const after = applyExit(state, resolveEditSaveExit(state, 7));
+      expect(after.some((route) => route.name === "Edit")).toBe(false);
+      expect(after.at(-1)).toMatchObject({
+        name: "Profile",
+        params: { contactId: 7 },
+      });
+    }
+  });
+
+  it("a missing or empty state replaces with the Profile", () => {
+    expect(resolveEditSaveExit(undefined, 7)).toEqual({
+      kind: "replace",
+      name: "Profile",
+      params: { contactId: 7 },
+    });
+    expect(resolveEditSaveExit({ routes: [], index: 0 }, 7)).toMatchObject({
+      kind: "replace",
+    });
   });
 });

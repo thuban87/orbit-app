@@ -13,6 +13,7 @@ import {
   removeMethodDraft,
   resolveEffectivePhoneRegion,
   toMethodDrafts,
+  updateMethodDraft,
 } from "./contact-methods-editor-model";
 
 function groups(): MethodGroups {
@@ -151,5 +152,75 @@ describe("method label option sheet rule (38.9 D-28)", () => {
   it("stores the picked standard label, and an empty label for Other", () => {
     expect(nextMethodLabel("Pager", "Home")).toBe("Home");
     expect(nextMethodLabel("Mobile", "Other")).toBe("");
+  });
+});
+
+describe("updateMethodDraft recomputes the live warning (38.11 D-30; warn only, D-17)", () => {
+  const phone = (g: MethodGroups, uid: string) =>
+    [...g.phone, ...g.email].find((row) => row.uid === uid);
+
+  it("typing an unusable phone number marks the row not actionable", () => {
+    const next = updateMethodDraft(groups(), "p1", { value: "12" }, "US");
+    expect(phone(next, "p1")?.isActionable).toBe(false);
+  });
+
+  it("a valid E.164 number is actionable", () => {
+    const next = updateMethodDraft(
+      groups(),
+      "p1",
+      { value: "+1 415 555 2671" },
+      "US",
+    );
+    expect(phone(next, "p1")?.isActionable).toBe(true);
+  });
+
+  it("a national number uses the effective region", () => {
+    const next = updateMethodDraft(
+      groups(),
+      "p2",
+      { value: "(415) 555-2671" },
+      "US",
+    );
+    expect(phone(next, "p2")?.isActionable).toBe(true);
+    const noRegion = updateMethodDraft(
+      groups(),
+      "p2",
+      { value: "(415) 555-2671" },
+      null,
+    );
+    expect(phone(noRegion, "p2")?.isActionable).toBe(false);
+  });
+
+  it("clearing the value removes the warning (undefined, not false)", () => {
+    const typed = updateMethodDraft(groups(), "p1", { value: "12" }, "US");
+    const cleared = updateMethodDraft(typed, "p1", { value: "   " }, "US");
+    expect(phone(cleared, "p1")?.isActionable).toBeUndefined();
+  });
+
+  it("an email row recomputes too", () => {
+    const bad = updateMethodDraft(groups(), "e1", { value: "nope@" }, "US");
+    expect(phone(bad, "e1")?.isActionable).toBe(false);
+    const good = updateMethodDraft(bad, "e1", { value: "b@example.org" }, "US");
+    expect(phone(good, "e1")?.isActionable).toBe(true);
+  });
+
+  it("a patch without a value (label, extension) leaves the warning as it was", () => {
+    const typed = updateMethodDraft(groups(), "p1", { value: "12" }, "US");
+    const relabelled = updateMethodDraft(typed, "p1", { label: "Home" }, "US");
+    expect(phone(relabelled, "p1")?.isActionable).toBe(false);
+  });
+
+  it("without a region argument the row keeps its stored warning (other hosts unchanged)", () => {
+    const seeded: MethodGroups = {
+      phone: [{ ...groups().phone[0], isActionable: true }],
+      email: [],
+    };
+    const next = updateMethodDraft(seeded, "p1", { value: "12" });
+    expect(phone(next, "p1")?.isActionable).toBe(true);
+  });
+
+  it("never blocks the save path: an unusable draft still reaches the DAO input", () => {
+    const typed = updateMethodDraft(groups(), "p1", { value: "12" }, "US");
+    expect(toMethodDrafts(typed).map((draft) => draft.value)).toContain("12");
   });
 });
