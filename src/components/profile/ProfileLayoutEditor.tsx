@@ -23,6 +23,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { setContactFreeformLayout } from "@/db/profile-presentation-dao";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
+  changedDefaultExpandedIds,
   createAllSectionsPreview,
   createProfileLayoutEditorDraft,
   type ProfileLayoutEditorAction,
@@ -130,24 +131,6 @@ function EditorRow({
           accessibilityLabel={`Move ${definition.label} down`}
           onPress={() => move("down")}
         />
-        {definition.collapsible ? (
-          <Button
-            role="tertiary"
-            label={
-              placement.expanded
-                ? "Expanded by default"
-                : "Collapsed by default"
-            }
-            accessibilityLabel={`${placement.expanded ? "Collapse" : "Expand"} ${definition.label} by default`}
-            onPress={() =>
-              dispatch({
-                type: "set-expanded",
-                id: placement.id,
-                expanded: !placement.expanded,
-              })
-            }
-          />
-        ) : null}
         {supportsSize ? (
           <Button
             role="tertiary"
@@ -165,6 +148,21 @@ function EditorRow({
           />
         ) : null}
       </View>
+      {definition.collapsible ? (
+        // A setting, not an action (38.11 D-60): a labelled switch row.
+        <View style={styles.settingRow}>
+          <AppText role="body" style={styles.settingLabel}>
+            Open by default
+          </AppText>
+          <OrbitSwitch
+            value={placement.expanded}
+            onValueChange={(expanded) =>
+              dispatch({ type: "set-expanded", id: placement.id, expanded })
+            }
+            accessibilityLabel={`Open ${definition.label} by default`}
+          />
+        </View>
+      ) : null}
       <ScopedPalette>
         {(scoped) => (
           <AppText role="caption" style={{ color: scoped.textSecondary }}>
@@ -349,6 +347,9 @@ export function ProfileLayoutEditor({
               contactId,
               layout: nextLayout,
               now: localDateTime(),
+              // D-83: only the sections whose default changed lose the
+              // person's open/closed choice; every other choice survives.
+              clearCollapseFor: changedDefaultExpandedIds(initial, draft),
             }),
     });
     if (result.ok) {
@@ -460,6 +461,8 @@ const styles = StyleSheet.create({
   rowHeading: { alignItems: "center", flexDirection: "row", gap: SPACING.sm },
   rowLabel: { flex: 1, gap: SPACING.xs },
   rowControls: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },
+  settingRow: { alignItems: "center", flexDirection: "row", gap: SPACING.sm },
+  settingLabel: { flex: 1 },
   dragHandle: {
     alignItems: "center",
     justifyContent: "center",

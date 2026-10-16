@@ -337,6 +337,8 @@ async function upsertContactPresentation(
     freeformLayoutJson?: string | null;
     backgroundTemplateUid?: string | null;
     clearCollapse?: boolean;
+    /** An explicit collapse map JSON; `clearCollapse` wins over it. */
+    collapseJson?: string;
   },
 ): Promise<void> {
   await assertContactExists(exec, input.contactId);
@@ -363,7 +365,7 @@ async function upsertContactPresentation(
       : input.backgroundTemplateUid;
   const collapseJson = input.clearCollapse
     ? "{}"
-    : (current?.collapse_json ?? "{}");
+    : (input.collapseJson ?? current?.collapse_json ?? "{}");
   await exec.runAsync(
     `INSERT INTO profile_contact_presentation(
        contact_id,layout_template_uid,freeform_layout_json,background_template_uid,
@@ -413,26 +415,38 @@ export function assignContactLayoutTemplate(
   });
 }
 
+/**
+ * Saves a person's own (freeform) layout. Their open/closed choices survive
+ * the save, except for the sections in `clearCollapseFor`: the sections whose
+ * "Open by default" changed in this save, whose choice clears so the new
+ * default shows (38.11 D-83, amending D-60). This holds whether they already
+ * had their own layout or were on a template; switching to a different
+ * template (`assignContactLayoutTemplate`) still clears every choice
+ * (ADR-108 :18). One transaction, one revision bump.
+ */
 export function setContactFreeformLayout(
   exec: SqlExecutor,
-  input: { contactId: number; layout: unknown; now: string },
+  input: {
+    contactId: number;
+    layout: unknown;
+    now: string;
+    clearCollapseFor?: readonly ProfileCollapsibleModuleId[];
+  },
 ): Promise<void> {
   const layoutJson = serializeProfileLayout(input.layout);
+  const clearCollapseFor = input.clearCollapseFor ?? [];
   return inWriteTransaction(exec, async () => {
-    const current = await exec.getFirstAsync<{
-      layout_template_uid: string | null;
-      freeform_layout_json: string | null;
-    }>(
-      "SELECT layout_template_uid,freeform_layout_json FROM profile_contact_presentation WHERE contact_id=?",
-      [input.contactId],
-    );
+    let collapseJson: string | undefined;
+    if (clearCollapseFor.length > 0) {
+      const current = await readProfileCollapseOverride(exec, input.contactId);
+      for (const id of clearCollapseFor) delete current[id];
+      collapseJson = JSON.stringify(parseProfileCollapseMap(current));
+    }
     await upsertContactPresentation(exec, {
       contactId: input.contactId,
       layoutTemplateUid: null,
       freeformLayoutJson: layoutJson,
-      clearCollapse:
-        current?.layout_template_uid !== null ||
-        current?.freeform_layout_json !== layoutJson,
+      collapseJson,
       now: input.now,
     });
     await bumpDataRevisionCore(exec);

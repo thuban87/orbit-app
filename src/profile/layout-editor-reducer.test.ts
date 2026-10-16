@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  changedDefaultExpandedIds,
   createAllSectionsPreview,
   createProfileLayoutEditorDraft,
   isMeaningfulLayoutChange,
@@ -147,5 +148,53 @@ describe("Profile layout editor reducer", () => {
 
     expect(isMeaningfulLayoutChange(before, afterNoOp)).toBe(false);
     expect(isMeaningfulLayoutChange(before, afterChange)).toBe(true);
+  });
+});
+
+/**
+ * 38.11 D-83 (amends D-60): an own-layout save clears the person's open/closed
+ * choice only for sections whose "Open by default" changed in that save.
+ */
+describe("changedDefaultExpandedIds (D-83)", () => {
+  it("lists nothing when sections only moved or changed visibility", () => {
+    const draft = reduce([
+      { type: "move", id: "memories", direction: "up" },
+      { type: "reorder", parent: "profile", id: "contact-methods", toIndex: 0 },
+      { type: "set-visible", id: "key-people", visible: false },
+      { type: "set-size", id: "orbit-status", size: "1x1" },
+    ]);
+    expect(changedDefaultExpandedIds(FACTORY_PROFILE_LAYOUT, draft)).toEqual(
+      [],
+    );
+  });
+
+  it("lists the one section whose default flipped", () => {
+    const draft = reduce([
+      { type: "move", id: "memories", direction: "up" },
+      { type: "set-expanded", id: "memories", expanded: false },
+    ]);
+    expect(changedDefaultExpandedIds(FACTORY_PROFILE_LAYOUT, draft)).toEqual([
+      "memories",
+    ]);
+  });
+
+  it("lists flipped sections across different buckets", () => {
+    const draft = reduce([
+      { type: "set-expanded", id: "interaction-history", expanded: true },
+      { type: "set-expanded", id: "gift-ideas", expanded: false },
+    ]);
+    expect(
+      [...changedDefaultExpandedIds(FACTORY_PROFILE_LAYOUT, draft)].sort(),
+    ).toEqual(["gift-ideas", "interaction-history"]);
+  });
+
+  it("lists nothing when a default is flipped and flipped back", () => {
+    const draft = reduce([
+      { type: "set-expanded", id: "memories", expanded: false },
+      { type: "set-expanded", id: "memories", expanded: true },
+    ]);
+    expect(changedDefaultExpandedIds(FACTORY_PROFILE_LAYOUT, draft)).toEqual(
+      [],
+    );
   });
 });

@@ -59,3 +59,26 @@ describe("ProfileLayoutEditor live preview flag (D-47)", () => {
     expect(editorSource()).toContain("export function ProfileLayoutPreview");
   });
 });
+
+/**
+ * 38.11 D-60 / D-83: the per-section open/closed control reads as a setting
+ * (a labelled switch), and an own-layout save clears only the open/closed
+ * choices of sections whose default changed.
+ */
+describe("ProfileLayoutEditor open-by-default setting (D-60, D-83)", () => {
+  it("renders a labelled Open by default switch, not an action button", () => {
+    const source = editorSource();
+    expect(source).toContain("Open by default");
+    expect(source).toContain(
+      "accessibilityLabel={`Open ${definition.label} by default`}",
+    );
+    expect(source).not.toContain("Expanded by default");
+    expect(source).not.toContain("Collapsed by default");
+  });
+
+  it("passes the changed-default sections to the own-layout save", () => {
+    expect(editorSource()).toContain(
+      "clearCollapseFor: changedDefaultExpandedIds(initial, draft)",
+    );
+  });
+});

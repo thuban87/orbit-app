@@ -313,6 +313,135 @@ describe("Profile presentation mutation API", () => {
     ).toBeNull();
   });
 
+  /**
+   * 38.11 D-83 (amends D-60): an own-layout save keeps every open/closed
+   * choice except the sections whose "Open by default" changed in that save;
+   * a template switch (above) still clears all (ADR-108 :18).
+   */
+  describe("own-layout save keeps open/closed choices (D-83)", () => {
+    const revision = async () =>
+      (
+        await exec.getFirstAsync<{ data_revision: number }>(
+          "SELECT data_revision FROM app_settings WHERE id=1",
+        )
+      )?.data_revision ?? 0;
+    const changedLayout = {
+      ...FACTORY_PROFILE_LAYOUT,
+      topLevel: [...FACTORY_PROFILE_LAYOUT.topLevel].reverse(),
+    };
+    const seedCollapse = async () => {
+      await setProfileCollapseOverride(exec, {
+        contactId,
+        moduleId: "memories",
+        expanded: false,
+        now: NOW,
+      });
+      await setProfileCollapseOverride(exec, {
+        contactId,
+        moduleId: "interaction-history",
+        expanded: true,
+        now: NOW,
+      });
+    };
+
+    it("keeps unrelated choices when a freeform layout changes", async () => {
+      await setContactFreeformLayout(exec, {
+        contactId,
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+      await seedCollapse();
+      const before = await revision();
+      await setContactFreeformLayout(exec, {
+        contactId,
+        layout: changedLayout,
+        now: NOW,
+        clearCollapseFor: [],
+      });
+      expect(await readProfileCollapseOverride(exec, contactId)).toEqual({
+        memories: false,
+        "interaction-history": true,
+      });
+      expect(await revision()).toBe(before + 1);
+    });
+
+    it("clears only the section whose default changed", async () => {
+      await setContactFreeformLayout(exec, {
+        contactId,
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+      await seedCollapse();
+      const before = await revision();
+      await setContactFreeformLayout(exec, {
+        contactId,
+        layout: changedLayout,
+        now: NOW,
+        clearCollapseFor: ["memories"],
+      });
+      expect(await readProfileCollapseOverride(exec, contactId)).toEqual({
+        "interaction-history": true,
+      });
+      expect(await revision()).toBe(before + 1);
+    });
+
+    it("keeps unrelated choices when a template becomes a contact-specific layout", async () => {
+      await createProfileLayoutTemplate(exec, {
+        uid: "layout",
+        name: "Layout",
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+      await assignContactLayoutTemplate(exec, {
+        contactId,
+        templateUid: "layout",
+        now: NOW,
+      });
+      await seedCollapse();
+      const before = await revision();
+      await setContactFreeformLayout(exec, {
+        contactId,
+        layout: changedLayout,
+        now: NOW,
+        clearCollapseFor: [],
+      });
+      expect(await readProfileCollapseOverride(exec, contactId)).toEqual({
+        memories: false,
+        "interaction-history": true,
+      });
+      expect(
+        await exec.getFirstAsync(
+          "SELECT layout_template_uid FROM profile_contact_presentation WHERE contact_id=?",
+          [contactId],
+        ),
+      ).toEqual({ layout_template_uid: null });
+      expect(await revision()).toBe(before + 1);
+    });
+
+    it("still clears every choice on a switch to a different template", async () => {
+      await createProfileLayoutTemplate(exec, {
+        uid: "other",
+        name: "Other",
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+      await setContactFreeformLayout(exec, {
+        contactId,
+        layout: FACTORY_PROFILE_LAYOUT,
+        now: NOW,
+      });
+      await seedCollapse();
+      const before = await revision();
+      await assignContactLayoutTemplate(exec, {
+        contactId,
+        templateUid: "other",
+        now: NOW,
+      });
+      expect(await readProfileCollapseOverride(exec, contactId)).toEqual({});
+      expect(await revision()).toBe(before + 1);
+    });
+  });
+
   it("assigns a selected second contact only a layout-template override", async () => {
     const categoryId = (
       await exec.runAsync(

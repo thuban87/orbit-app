@@ -1,5 +1,6 @@
 import { PROFILE_MODULE_REGISTRY } from "./module-registry";
 import type {
+  ProfileCollapsibleModuleId,
   ProfileModuleId,
   ProfileModuleParentId,
 } from "./persisted-contract";
@@ -16,6 +17,11 @@ import type {
 } from "./types";
 
 type EditorBucket = "topLevel" | "overview" | "thingsToRemember";
+const EDITOR_BUCKETS: readonly EditorBucket[] = [
+  "topLevel",
+  "overview",
+  "thingsToRemember",
+];
 type MoveDirection = "up" | "down";
 
 export type ProfileLayoutEditorAction =
@@ -197,6 +203,39 @@ export function createAllSectionsPreview(
       visible: true,
     })),
   });
+}
+
+/**
+ * The collapsible sections whose "Open by default" differs between the layout
+ * the editor opened with and the draft being saved, across all three buckets
+ * (38.11 D-83, amending D-60). A section that only moved, changed visibility
+ * or kept its default is not listed. Saving a person's own layout clears their
+ * open/closed choice for exactly these sections so the new default shows; a
+ * surviving choice would hide it (`collapse[id] ?? defaultExpanded`).
+ */
+export function changedDefaultExpandedIds(
+  initial: ProfileLayoutDocument,
+  draft: ProfileLayoutDocument,
+): ProfileCollapsibleModuleId[] {
+  const before = createProfileLayoutEditorDraft(initial);
+  const after = createProfileLayoutEditorDraft(draft);
+  const opened = new Map<ProfileModuleId, boolean>();
+  for (const bucket of EDITOR_BUCKETS) {
+    for (const placement of before[bucket] as ProfileModulePlacement[]) {
+      opened.set(placement.id, placement.expanded);
+    }
+  }
+  const changed: ProfileCollapsibleModuleId[] = [];
+  for (const bucket of EDITOR_BUCKETS) {
+    for (const placement of after[bucket] as ProfileModulePlacement[]) {
+      if (!PROFILE_MODULE_REGISTRY[placement.id].collapsible) continue;
+      const was = opened.get(placement.id);
+      if (was !== undefined && was !== placement.expanded) {
+        changed.push(placement.id as ProfileCollapsibleModuleId);
+      }
+    }
+  }
+  return changed;
 }
 
 export function isMeaningfulLayoutChange(
