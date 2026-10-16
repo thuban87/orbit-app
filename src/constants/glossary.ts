@@ -39,6 +39,12 @@ export const UNBOUND = "Unbound";
 export const ORBIT_PARTICIPATION = "Orbit participation";
 export const INTERACTION_ASSIST = "Interaction Assist";
 export const QUARANTINE = "Quarantine";
+/**
+ * The per-person policy where only connected interactions count (38.11-14
+ * B11): one Title Case spelling on the Edit Contact toggle and the Profile
+ * sheets, as the Status/Gravity sheets and 38.11 D-87 already wrote it.
+ */
+export const RARELY_RESPONDS = "Rarely Responds";
 
 // The Bin (38.11 D-69, D-70). "Archive" is renamed "Bin" everywhere
 // user-facing; internal names (`archived_at`, DAO names, the `Archived`

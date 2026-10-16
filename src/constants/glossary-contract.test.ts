@@ -658,6 +658,25 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
     expect(sheet).not.toContain('label="Done"');
   });
 
+  it("pins Rarely Responds and every user-visible site reads it (38.11-14 B11)", () => {
+    expect(glossary.RARELY_RESPONDS).toBe("Rarely Responds");
+    const edit = read("src/screens/EditContactScreen.tsx");
+    expect(edit).toContain("{RARELY_RESPONDS}");
+    expect(edit).toContain("accessibilityLabel={RARELY_RESPONDS}");
+    const sheets = read("src/profile/relationship-sheet-model.ts");
+    // The import plus the Gravity definition and the Status detail line.
+    expect(sheets.split("RARELY_RESPONDS").length - 1).toBe(3);
+    // The retired sentence-case spelling stays out of production copy.
+    for (const path of [
+      "src/screens/EditContactScreen.tsx",
+      "src/profile/relationship-sheet-model.ts",
+    ]) {
+      expect(read(path)).not.toMatch(
+        /"Rarely responds"|>\s*Rarely responds\s*</,
+      );
+    }
+  });
+
   it("pins the Bin terms (38.11 D-69)", () => {
     expect({ BIN: glossary.BIN, MOVE_TO_BIN: glossary.MOVE_TO_BIN }).toEqual({
       BIN: "Bin",

@@ -308,6 +308,7 @@ describe("PhotoSourcePicker feedback (38.9 D-27, D-30, D-40)", () => {
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(confirm.mock.calls[0][0]).toMatchObject({
       title: "Remove photo?",
+      message: "This deletes the photo from this device and can't be undone.",
       confirmLabel: "Remove",
       destructive: true,
     });
@@ -459,8 +460,10 @@ describe("PhotoSourcePicker hold mode on Add Contact (38.11 D-77)", () => {
     const root = renderHold(HELD, onHeldChange);
     prop<() => void>(root, "photo-source-remove", "onPress")();
     await flush();
+    // 38.11-14 A8: the held photo was never saved, so the copy says so.
     expect(confirm.mock.calls[0][0]).toMatchObject({
-      title: "Remove photo?",
+      title: "Remove this photo?",
+      message: "It hasn't been saved yet.",
       confirmLabel: "Remove",
       destructive: true,
     });

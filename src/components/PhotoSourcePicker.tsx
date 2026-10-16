@@ -132,10 +132,14 @@ const INVALID_URL_MESSAGE =
  * resolves false, Remove resolves true. Destructive, so it is not dismissable
  * by Back or a scrim tap (ADR-086); the native dialog it replaces was.
  */
-function confirmRemovePhoto(): Promise<boolean> {
+function confirmRemovePhoto(held: boolean): Promise<boolean> {
+  // 38.11-14 A8: a held Add Contact photo was never saved, so the confirm
+  // says that instead of "deletes the photo from this device" (D-77).
   return confirm({
-    title: "Remove photo?",
-    message: "This deletes the photo from this device and can't be undone.",
+    title: held ? "Remove this photo?" : "Remove photo?",
+    message: held
+      ? "It hasn't been saved yet."
+      : "This deletes the photo from this device and can't be undone.",
     confirmLabel: "Remove",
     destructive: true,
   });
@@ -292,7 +296,7 @@ export function PhotoSourcePicker(props: PhotoSourcePickerProps) {
   // Remove: confirm, then switch on kind — clear the right store + delete the
   // correct derivable file inline (best-effort). Never derefs a missing contactId.
   const removePhoto = useCallback(async () => {
-    if (!(await confirmRemovePhoto())) {
+    if (!(await confirmRemovePhoto(hold !== null))) {
       return;
     }
     try {

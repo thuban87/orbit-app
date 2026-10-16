@@ -5,7 +5,9 @@
  *
  * A trigger showing the birthday ("Jun 2, 1990", or "Jun 2" when the year is
  * unknown — `formatStoredBirthdayForDisplay`, the 38.9 date standard) or "Set
- * birthday"; a Year unknown switch; and Clear when a birthday is set (D-49).
+ * birthday"; a Year unknown switch; and Clear when a birthday is set (D-49:
+ * Clear is an Edit control, so Add Contact passes `showClear={false}`;
+ * 38.11-14 A7).
  * The native picker is capped at today on Add, Edit and the Profile Birthday
  * sheet (38.11 D-86) and opens where `dateRowSeed` says (W-02), so every
  * month/day stays reachable under the cap.
@@ -49,6 +51,11 @@ export interface BirthdayFieldProps {
   testID: string;
   /** Hide the "Birthday" label when the host already titles the field. */
   showLabel?: boolean;
+  /**
+   * Offer Clear once a birthday is set (default true). Add Contact turns it
+   * off; Edit Contact (D-49) and the Profile Birthday sheet (D-59) keep it.
+   */
+  showClear?: boolean;
 }
 
 /** The open picker: why it opened and the local `YYYY-MM-DD` it opens on. */
@@ -62,6 +69,7 @@ export function BirthdayField({
   onChange,
   testID,
   showLabel = true,
+  showClear = true,
 }: BirthdayFieldProps) {
   const { colors } = useTheme();
   const [picker, setPicker] = useState<OpenPicker | null>(null);
@@ -136,7 +144,7 @@ export function BirthdayField({
           onValueChange={onYearUnknownChange}
         />
       </View>
-      {value.input !== null ? (
+      {showClear && value.input !== null ? (
         <View style={styles.clearRow}>
           <Button
             testID={`${testID}-clear`}

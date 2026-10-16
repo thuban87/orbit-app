@@ -238,7 +238,7 @@ export interface EditFormState {
   birthdayYearIsPlaceholder?: boolean;
   /** Ordered local method drafts, seeded from the normalized read boundary. */
   methods: MethodGroups;
-  /** 0/1 — the "Rarely responds" toggle. */
+  /** 0/1 — the "Rarely Responds" toggle. */
   rarelyResponds: number;
   /** 0/1 — the "Turn off reminders" toggle. */
   remindersOff: number;

@@ -2,6 +2,7 @@ import {
   type CustomIntervalResult,
   shouldShowCustomError,
 } from "@/components/frequency-picker-logic";
+import { RARELY_RESPONDS } from "@/constants/glossary";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import type { SnoozePreset } from "@/db/snooze-dao";
@@ -65,7 +66,7 @@ function gravityTierList(): string {
 export const RELATIONSHIP_DEFINITIONS = {
   status:
     "Orbit Status shows how far along you are toward your contact frequency since you last spoke.",
-  gravity: `Gravity is how much shared history you have with this person. Every logged interaction adds to it, and recent ones weigh more than old ones, so it grows as you keep in touch and fades slowly when you don't. Old history never fades away completely. It shows as a tier (${gravityTierList()}), not a score. For people marked Rarely Responds, only interactions that connected count.`,
+  gravity: `Gravity is how much shared history you have with this person. Every logged interaction adds to it, and recent ones weigh more than old ones, so it grows as you keep in touch and fades slowly when you don't. Old history never fades away completely. It shows as a tier (${gravityTierList()}), not a score. For people marked ${RARELY_RESPONDS}, only interactions that connected count.`,
   intensity:
     "Intensity counts the times you reached out recently: within one contact frequency (the last 30 days for Monthly), or this calendar month when the contact is Unbound or has no frequency. With a frequency, reaching out once in that time reads as At pace and more often reads as Active. Interactions they started don't count.",
 } as const;
@@ -91,7 +92,7 @@ export function relationshipExplanation(
     ];
     if (input.metric.factors.rarelyResponds) {
       details.push(
-        "Rarely Responds: only connected interactions reset the orbit",
+        `${RARELY_RESPONDS}: only connected interactions reset the orbit`,
       );
     }
     return {

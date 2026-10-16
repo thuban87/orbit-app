@@ -1083,9 +1083,11 @@ export function CreateContactScreen({
                 }
               >
                 {/* The shared Birthday control (D-61: Year unknown off asks
-                for the year; Clear, D-49). */}
+                for the year). No Clear here: D-49 gives Clear to Edit
+                Contact (38.11-14 A7). */}
                 <BirthdayField
                   testID="create-contact-birthday"
+                  showClear={false}
                   value={{
                     input: birthdayInput,
                     yearUnknown: birthdayYearUnknown,

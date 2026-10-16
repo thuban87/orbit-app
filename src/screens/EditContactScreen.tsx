@@ -124,6 +124,7 @@ import {
   ADD_MEMORY,
   ADD_OFF_LIMITS_ITEM,
   ADD_THOUGHT_OF_THEM,
+  RARELY_RESPONDS,
 } from "@/constants/glossary";
 import {
   getAiPermissionDefaults,
@@ -1427,11 +1428,11 @@ export function EditContactScreen({
             <View style={styles.field}>
               <View style={styles.toggleRow}>
                 <AppText role="label" style={{ color: colors.textPrimary }}>
-                  Rarely responds
+                  {RARELY_RESPONDS}
                 </AppText>
                 <OrbitSwitch
                   testID="edit-contact-rarely-responds"
-                  accessibilityLabel="Rarely responds"
+                  accessibilityLabel={RARELY_RESPONDS}
                   value={form.rarelyResponds === 1}
                   onValueChange={(v) => setField("rarelyResponds", v ? 1 : 0)}
                 />
