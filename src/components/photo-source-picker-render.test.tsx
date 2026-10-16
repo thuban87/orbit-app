@@ -514,6 +514,29 @@ describe("PhotoSourcePicker hold mode on Add Contact (38.11 D-77)", () => {
     expect(deleteCreateStaging).not.toHaveBeenCalled();
   });
 
+  // Review IN-03: Back during "Use photo" refocuses the form before the crop
+  // publishes. The pending path must survive that empty focus so the late
+  // result is still consumed (and never orphaned) on the next one.
+  it("keeps the pending path through a focus with no result yet, then consumes the late crop", async () => {
+    const onHeldChange = vi.fn();
+    const root = renderHold(HELD, onHeldChange);
+    launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///cache/picked.jpg" }],
+    });
+    prop<() => void>(root, "photo-source-add-change", "onPress")();
+    await flush();
+    const next = "create-staging/create-form1-pick1.jpg";
+    consumeCropResult.mockReturnValueOnce(null);
+    for (const effect of nav.focusEffects) effect();
+    expect(onHeldChange).not.toHaveBeenCalled();
+    consumeCropResult.mockReturnValueOnce({ requestId: next, success: true });
+    for (const effect of nav.focusEffects) effect();
+    expect(consumeCropResult).toHaveBeenNthCalledWith(2, next);
+    expect(onHeldChange).toHaveBeenCalledWith(next);
+    expect(deleteCreateStaging).toHaveBeenCalledWith(HELD);
+  });
+
   it("the paste-URL path also crops into a fresh held path", async () => {
     runUrlSubmit.mockImplementationOnce(
       async ({ navigate }: { navigate: (uri: string) => void }) => {

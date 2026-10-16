@@ -91,7 +91,10 @@ import {
   type OffLimitsInlineFields,
   type OffLimitsInlineItem,
 } from "@/components/OffLimitsInlineEditor";
-import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
+import {
+  type PhotoHold,
+  PhotoSourcePicker,
+} from "@/components/PhotoSourcePicker";
 import {
   type RelationshipDraft,
   type RelationshipDraftState,
@@ -465,6 +468,16 @@ export function CreateContactScreen({
     heldPhotoRef.current = relative;
     setHeldPhoto(relative);
   }, []);
+  // Review IN-03: one stable hold object per held value, so the picker's focus
+  // effect (keyed on `hold`) is not torn down and re-run on every keystroke.
+  const photoHold: PhotoHold = useMemo(
+    () => ({
+      sessionToken: photoSessionToken,
+      heldRelative: heldPhoto,
+      onHeldChange: updateHeldPhoto,
+    }),
+    [photoSessionToken, heldPhoto, updateHeldPhoto],
+  );
   useEffect(() => {
     // The form owns its staging session while mounted, so the launch /
     // foreground sweep (e.g. on return from the system photo picker) keeps
@@ -864,14 +877,7 @@ export function CreateContactScreen({
               <AppText role="label" style={{ color: colors.textSecondary }}>
                 Photo
               </AppText>
-              <PhotoSourcePicker
-                hold={{
-                  sessionToken: photoSessionToken,
-                  heldRelative: heldPhoto,
-                  onHeldChange: updateHeldPhoto,
-                }}
-                name={name}
-              />
+              <PhotoSourcePicker hold={photoHold} name={name} />
             </View>
 
             <View ref={nameFieldRef} style={styles.field}>

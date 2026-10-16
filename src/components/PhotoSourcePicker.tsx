@@ -189,16 +189,20 @@ export function PhotoSourcePicker(props: PhotoSourcePickerProps) {
   useFocusEffect(useCallback(() => abortUrl, [abortUrl]));
 
   // Hold mode (D-77): the staging path handed to the crop screen, consumed
-  // once when this screen is focused again.
+  // once when this screen is focused again. Review IN-03: the path is kept
+  // until its result arrives — Back during "Use photo" refocuses this screen
+  // before the crop publishes, and the late result is consumed on the next
+  // focus instead of being orphaned. A new pick replaces the path.
   const pendingHoldRef = useRef<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       if (!hold) return;
       const pending = pendingHoldRef.current;
       if (!pending) return;
-      pendingHoldRef.current = null;
       const result = consumeCropResult(pending);
-      if (!result?.success) return;
+      if (!result) return;
+      pendingHoldRef.current = null;
+      if (!result.success) return;
       const previous = hold.heldRelative;
       hold.onHeldChange(pending);
       if (previous && previous !== pending) {
