@@ -1,7 +1,7 @@
 # Status Engine
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/db/status.ts`, `src/db/contact-status-read.ts`, `src/db/queries.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -82,6 +82,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes lifecycle and non-null cadence prerequisites for status.
 
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — guards nullable cadence and leaves Status derived from its established inputs.
+- **ADR-228:** Truthful Relationship Overview — Profile-only unavailable reasons; `getContactStatus` unchanged.
 
 ## Gotchas
 
@@ -110,3 +111,4 @@ Status is a query-time projection over the contacts and interactions schema; no 
 | 2026-08-27 | 18.2 | Required Bound positive-cadence state for all status and progress projections. |
 | 2026-09-02 | 31 | Added truthful Profile explanations and guarded Bound/Unbound relationship presentation without a new Health score. |
 | 2026-10-16 | 38.11 | Profile Status unavailable reasons: Bound never-contacted reads Never Contacted (no progress or bucket), Unbound and no-frequency read Not tracked with honest context, archived keeps its previous result; `getContactStatus` unchanged (D-05, D-20, D-23, D-24). |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-228. |
