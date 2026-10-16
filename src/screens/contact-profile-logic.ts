@@ -521,8 +521,8 @@ export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
 /** Keep the product-mandated overflow order independent from view rendering. */
 export function profileOverflowEntries(input: {
   bound: boolean;
-  hasFreeformLayout: boolean;
-  hasContactPresentationOverride: boolean;
+  hasFreeformLayout?: boolean;
+  hasContactPresentationOverride?: boolean;
 }): ProfileOverflowEntry[] {
   return [
     "edit",
@@ -619,6 +619,38 @@ export function unbindConfirmation(name: string): {
     message:
       "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved reminder schedule stay.",
   };
+}
+
+/** RED stub (38.11-13 Task 2): replaced in the GREEN commit. */
+export function binConfirmation(_name: string): {
+  title: string;
+  message: string;
+  cancelLabel: string;
+  confirmLabel: string;
+} {
+  return { title: "", message: "", cancelLabel: "", confirmLabel: "" };
+}
+
+/** RED stub (38.11-13 Task 2): replaced in the GREEN commit. */
+export async function runMoveToBin(_input: {
+  name: string;
+  confirm: (request: {
+    title: string;
+    message?: string;
+    cancelLabel?: string;
+    confirmLabel: string;
+    destructive?: boolean;
+  }) => Promise<boolean>;
+  archive: () => Promise<void>;
+  closeOverlay: () => void;
+  goBack: () => void;
+  showSnackbar: (message: {
+    kind: "success" | "warning" | "error";
+    label: string;
+  }) => void;
+  logError?: (cause: unknown) => void;
+}): Promise<"cancelled" | "moved" | "failed"> {
+  return "cancelled";
 }
 
 export function canStartLifecycleTransition(input: {

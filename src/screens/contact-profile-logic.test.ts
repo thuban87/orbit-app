@@ -4,6 +4,7 @@ import type { MemoryRow } from "@/db/memories-read";
 import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import {
+  binConfirmation,
   canStartLifecycleTransition,
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
@@ -35,6 +36,7 @@ import {
   profileScrollA11yOffset,
   profileScrollContentTopPadding,
   profileScrollTargetY,
+  runMoveToBin,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
 } from "@/screens/contact-profile-logic";
@@ -644,39 +646,121 @@ describe("integrated Profile controller contracts", () => {
     });
   });
 
-  it("keeps the required overflow ordering and only exposes conditional presentation actions", () => {
-    expect(
-      profileOverflowEntries({
-        bound: true,
-        hasFreeformLayout: true,
-        hasContactPresentationOverride: true,
-      }),
-    ).toEqual([
-      "edit",
+  it("keeps the final ⋯ order: Snooze…, Unbind, Move to Bin, then Layout and Background (38.11 D-63, D-64, D-65)", () => {
+    expect(profileOverflowEntries({ bound: true })).toEqual([
       "snooze",
       "unbind",
       "archive",
       "separator",
       "layout",
       "background",
-      "save-layout-template",
-      "reset",
     ]);
-    expect(
-      profileOverflowEntries({
-        bound: false,
-        hasFreeformLayout: false,
-        hasContactPresentationOverride: false,
-      }),
-    ).toEqual([
+    expect(profileOverflowEntries({ bound: false })).toEqual([
       // 38.11 D-64: "snooze" in both states; never an instant "unsnooze".
-      "edit",
       "snooze",
       "archive",
       "separator",
       "layout",
       "background",
     ]);
+  });
+
+  describe("Move to Bin (38.11 D-69, D-71; review U-04)", () => {
+    it("asks first with the D-71 copy", () => {
+      expect(binConfirmation("Alex")).toEqual({
+        title: "Move Alex to the Bin?",
+        message:
+          "They'll be hidden everywhere. You can restore them, or delete them permanently, from Settings → Bin.",
+        cancelLabel: "Cancel",
+        confirmLabel: "Move to Bin",
+      });
+    });
+
+    function harness(options: {
+      confirmed: boolean;
+      write: () => Promise<void>;
+    }) {
+      const calls: string[] = [];
+      const deps = {
+        name: "Alex",
+        confirm: vi.fn(async () => {
+          calls.push("confirm");
+          return options.confirmed;
+        }),
+        archive: vi.fn(async () => {
+          calls.push("archive");
+          await options.write();
+        }),
+        closeOverlay: vi.fn(() => calls.push("closeOverlay")),
+        goBack: vi.fn(() => calls.push("goBack")),
+        showSnackbar: vi.fn(() => calls.push("snackbar")),
+        logError: vi.fn(),
+      };
+      return { calls, deps };
+    }
+
+    it("asks with the themed destructive confirm", async () => {
+      const { deps } = harness({ confirmed: false, write: async () => {} });
+      await runMoveToBin(deps);
+      expect(deps.confirm).toHaveBeenCalledTimes(1);
+      expect(deps.confirm).toHaveBeenCalledWith({
+        ...binConfirmation("Alex"),
+        destructive: true,
+      });
+    });
+
+    it("does nothing else when the confirm is cancelled", async () => {
+      const { calls, deps } = harness({
+        confirmed: false,
+        write: async () => {},
+      });
+      await expect(runMoveToBin(deps)).resolves.toBe("cancelled");
+      expect(calls).toEqual(["confirm"]);
+      expect(deps.archive).not.toHaveBeenCalled();
+      expect(deps.showSnackbar).not.toHaveBeenCalled();
+    });
+
+    it("shows only the error snackbar and stays when the write rejects", async () => {
+      const cause = new Error("disk full");
+      const { calls, deps } = harness({
+        confirmed: true,
+        write: async () => {
+          throw cause;
+        },
+      });
+      await expect(runMoveToBin(deps)).resolves.toBe("failed");
+      expect(calls).toEqual(["confirm", "archive", "snackbar"]);
+      expect(deps.goBack).not.toHaveBeenCalled();
+      expect(deps.closeOverlay).not.toHaveBeenCalled();
+      expect(deps.showSnackbar).toHaveBeenCalledTimes(1);
+      expect(deps.showSnackbar).toHaveBeenCalledWith({
+        kind: "error",
+        label: "Couldn't move to the Bin. Try again.",
+      });
+      expect(deps.logError).toHaveBeenCalledWith(cause);
+    });
+
+    it("leaves the Profile, then names the person, only after the write resolves", async () => {
+      const { calls, deps } = harness({
+        confirmed: true,
+        write: async () => {},
+      });
+      await expect(runMoveToBin(deps)).resolves.toBe("moved");
+      expect(calls).toEqual([
+        "confirm",
+        "archive",
+        "closeOverlay",
+        "goBack",
+        "snackbar",
+      ]);
+      expect(deps.showSnackbar).toHaveBeenCalledTimes(1);
+      // D-71: no Undo; the warning look is "this plan only" (owner checks it
+      // at 38.11-14).
+      expect(deps.showSnackbar).toHaveBeenCalledWith({
+        kind: "warning",
+        label: "Moved Alex to the Bin",
+      });
+    });
   });
 
   it("closes only the topmost overlay before ordinary native-stack Back", () => {
