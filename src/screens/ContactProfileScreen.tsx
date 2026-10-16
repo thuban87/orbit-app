@@ -27,7 +27,7 @@ import { BackgroundHost } from "@/components/ui/BackgroundHost";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { getAppSettings } from "@/db/app-settings-dao";
-import { archiveContact } from "@/db/contacts-dao";
+import { archiveContact, setContactBirthday } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { deriveReachRoutes } from "@/db/interaction-assist-read";
@@ -80,6 +80,7 @@ import {
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
 import { performReachOut } from "@/services/reach-out/handoff";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { confirm } from "@/stores/confirm-store";
 import {
   useForegroundRefresh,
@@ -628,6 +629,25 @@ export function ContactProfileScreen({
       Logger.error(LOG_SCOPE, "failed to reconcile unsnooze", cause),
     );
   }, [commitAndReload, contactId]);
+  // The Birthday sheet (38.11 D-59): one single-column write, then the
+  // birthday notification and the widget follow it. A rejection reaches the
+  // sheet, which stays open and shows the error.
+  const saveBirthday = useCallback(
+    async (birthday: string | null) => {
+      await commitAndReload(() =>
+        setContactBirthday(getExecutor(), {
+          contactId,
+          birthday,
+          now: localDateTime(),
+        }),
+      );
+      void reconcileSchedule(getExecutor()).catch((cause) =>
+        Logger.error(LOG_SCOPE, "failed to reconcile birthday", cause),
+      );
+      notifyWidgetDataChanged();
+    },
+    [commitAndReload, contactId],
+  );
 
   const transitionLifecycle = useCallback(
     async (direction: "bind" | "unbind") => {
@@ -807,6 +827,7 @@ export function ContactProfileScreen({
                 onSetFrequency={setFrequency}
                 onSnooze={snooze}
                 onUnsnooze={unsnooze}
+                onSaveBirthday={saveBirthday}
                 onKnowledgeAction={routeKnowledgeAction}
                 // View all, "See all (N)" and Show hidden have their own
                 // destinations (D-75, D-52, D-53); Show hidden is a retarget

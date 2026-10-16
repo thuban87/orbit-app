@@ -1218,3 +1218,61 @@ export function clearContactPhoto(
 ): Promise<void> {
   return inWriteTransaction(exec, () => clearContactPhotoCore(exec, id, now));
 }
+
+// =============================================================================
+// BIRTHDAY (38.11 D-59, D-61) — the Profile Birthday sheet's single-column
+// writer. Modelled on setContactPhoto: ONE `inWriteTransaction`, a `?`-bound
+// UPDATE of `birthday` + `modified_at` only, a `changes===1` loud-failure guard
+// and exactly one data_revision bump. It is NOT routed through
+// `updateContactMetadataCore`, which rewrites every metadata column (RESEARCH
+// §4). Other writers of `contacts.birthday`: the create INSERT,
+// `updateContactMetadataCore` (Edit, bulk review, reconcile), import /
+// consolidation, merge and restore.
+// =============================================================================
+
+export interface SetContactBirthdayInput {
+  contactId: number;
+  /** `YYYY-MM-DD` (year known), `MM-DD` (year unknown), or null to clear. */
+  birthday: string | null;
+  now: string;
+}
+
+function invalidBirthday(birthday: string): Error {
+  return new Error(`birthday is not a valid stored birthday (${birthday})`);
+}
+
+/** Non-mutexed birthday writer for callers that already own the transaction. */
+export async function setContactBirthdayCore(
+  exec: SqlExecutor,
+  input: SetContactBirthdayInput,
+): Promise<void> {
+  // Defense-in-depth: the wrapper rejects before BEGIN; a direct core caller
+  // still cannot store an invalid shape. `async`, so this is a rejection.
+  if (input.birthday !== null && !isValidStoredBirthday(input.birthday)) {
+    throw invalidBirthday(input.birthday);
+  }
+  const result = await exec.runAsync(
+    "UPDATE contacts SET birthday = ?, modified_at = ? WHERE id = ?",
+    [input.birthday, input.now, input.contactId],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `setContactBirthday: no contact matched id=${input.contactId} (changed ${result.changes})`,
+    );
+  }
+  await bumpDataRevisionCore(exec);
+}
+
+/**
+ * Set (or clear, with null) a contact's birthday. An invalid value is rejected
+ * before any transaction opens; a missing contact throws and rolls back.
+ */
+export function setContactBirthday(
+  exec: SqlExecutor,
+  input: SetContactBirthdayInput,
+): Promise<void> {
+  if (input.birthday !== null && !isValidStoredBirthday(input.birthday)) {
+    return Promise.reject(invalidBirthday(input.birthday));
+  }
+  return inWriteTransaction(exec, () => setContactBirthdayCore(exec, input));
+}

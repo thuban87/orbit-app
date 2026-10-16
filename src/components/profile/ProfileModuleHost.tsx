@@ -43,6 +43,7 @@ import type {
 import type { ProfilePresentation } from "@/profile/types";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { BirthdaySheet } from "./BirthdaySheet";
 import { ProfileRelationshipSheets } from "./ProfileRelationshipSheets";
 import {
   RelationshipOverview,
@@ -166,6 +167,11 @@ export interface ProfileModuleHostProps {
     request: { preset: "3d" | "1w" | "1m" } | { until: string },
   ) => Promise<void>;
   onUnsnooze: () => Promise<void>;
+  /**
+   * Saves the birthday from the Birthday sheet (38.11 D-59): null clears.
+   * Rejects on failure so the sheet keeps itself open and shows the error.
+   */
+  onSaveBirthday: (birthday: string | null) => Promise<void>;
   /** Screen-owned routing into the source-specific knowledge editors and histories. */
   onKnowledgeAction: (intent: KnowledgeActionIntent) => void;
   /**
@@ -210,6 +216,7 @@ export function ProfileModuleHost({
   onSetFrequency,
   onSnooze,
   onUnsnooze,
+  onSaveBirthday,
   onKnowledgeAction,
   onKnowledgeViewAll,
   onOpenLinked,
@@ -612,7 +619,8 @@ export function ProfileModuleHost({
         );
       })}
       <ProfileRelationshipSheets
-        active={activeSheet}
+        // The Birthday tile opens its own sheet (38.11 D-56), below.
+        active={activeSheet === "birthday" ? null : activeSheet}
         snapshot={snapshot}
         todayLocal={todayLocal}
         onClose={closeRelationshipSheet}
@@ -621,6 +629,12 @@ export function ProfileModuleHost({
         onSetFrequency={onSetFrequency}
         onSnooze={onSnooze}
         onUnsnooze={onUnsnooze}
+      />
+      <BirthdaySheet
+        visible={activeSheet === "birthday"}
+        birthday={snapshot.identity.birthday}
+        onSave={onSaveBirthday}
+        onClose={closeRelationshipSheet}
       />
     </View>
   );
