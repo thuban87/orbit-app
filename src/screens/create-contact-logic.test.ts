@@ -23,9 +23,11 @@ import {
   collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
+  createFormHasUnsavedWork,
   createFormSeedSignature,
   createFormSeedState,
   firstInteractionOccurredAt,
+  heldPhotoToDiscardOnUnmount,
   isCreateFormDirty,
   isOffLimitsFormDirty,
   normalizeOffLimitsForm,
@@ -981,5 +983,31 @@ describe("Add Contact birthday, social battery and links (38.11 D-48)", () => {
         birthdayYearIsPlaceholder: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe("held photo on Add Contact (38.11 D-77)", () => {
+  const held = "create-staging/create-form-pick.jpg";
+
+  it("a held photo alone is unsaved work, so Back asks before discarding", () => {
+    expect(createFormHasUnsavedWork(false, held)).toBe(true);
+    expect(createFormHasUnsavedWork(true, null)).toBe(true);
+    expect(createFormHasUnsavedWork(true, held)).toBe(true);
+    expect(createFormHasUnsavedWork(false, null)).toBe(false);
+  });
+
+  it("unmount deletes a held, unpromoted photo", () => {
+    expect(heldPhotoToDiscardOnUnmount(held)).toBe(held);
+  });
+
+  it("unmount deletes nothing once the photo was promoted or the promote failed (ref cleared)", () => {
+    const heldPhotoRef = { current: held as string | null };
+    // Save clears the ref before promoting, so cleanup never repeats.
+    heldPhotoRef.current = null;
+    expect(heldPhotoToDiscardOnUnmount(heldPhotoRef.current)).toBeNull();
+  });
+
+  it("unmount deletes nothing when no photo was held", () => {
+    expect(heldPhotoToDiscardOnUnmount(null)).toBeNull();
   });
 });
