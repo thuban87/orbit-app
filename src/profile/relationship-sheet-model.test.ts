@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { parseCustomInterval } from "@/components/frequency-picker-logic";
 import type { ProfileStatusMetric } from "@/services/profile-metrics";
 import {
+  CUSTOM_FREQUENCY_LABEL,
+  customFrequencyApplyState,
   FREQUENCY_CHOICES,
+  frequencySheetSelection,
   PROFILE_MESSAGE_ARCHIVED_REASON,
   PROFILE_MESSAGE_SETTINGS_HOST_REASON,
   profileHeroActionState,
@@ -603,6 +607,53 @@ describe("frequency and snooze choices", () => {
       expect(validateCustomSnoozeDate(value, "2026-09-09")).toEqual({
         valid: false,
         error: "Choose a future date.",
+      });
+    }
+  });
+});
+
+// 38.11 D-54 (amends D-14): presets still apply on tap; a Custom… row with a
+// days box and Apply; a non-preset value shows as the selected Custom row.
+describe("Profile Frequency sheet Custom… row (D-54)", () => {
+  it("selects the matching preset", () => {
+    expect(frequencySheetSelection(30)).toEqual({ kind: "preset", days: 30 });
+    expect(frequencySheetSelection(365)).toEqual({
+      kind: "preset",
+      days: 365,
+    });
+  });
+
+  it("selects Custom for a non-preset value such as 45", () => {
+    expect(frequencySheetSelection(45)).toEqual({ kind: "custom", days: 45 });
+  });
+
+  it("selects nothing when no frequency is set", () => {
+    expect(frequencySheetSelection(null)).toEqual({ kind: "none" });
+    expect(frequencySheetSelection(0)).toEqual({ kind: "none" });
+  });
+
+  it("labels the row with the typographic ellipsis", () => {
+    expect(CUSTOM_FREQUENCY_LABEL).toBe("Custom…");
+  });
+
+  it("enables Apply for a positive whole number of days", () => {
+    expect(
+      customFrequencyApplyState(parseCustomInterval("45", "days"), true),
+    ).toEqual({ canApply: true, days: 45, showError: false });
+  });
+
+  it("disables Apply for 0, letters or blank, and shows the error only after typing", () => {
+    for (const raw of ["0", "abc", "", "1.5", "-3"]) {
+      const parsed = parseCustomInterval(raw, "days");
+      expect(customFrequencyApplyState(parsed, false)).toEqual({
+        canApply: false,
+        days: null,
+        showError: false,
+      });
+      expect(customFrequencyApplyState(parsed, true)).toEqual({
+        canApply: false,
+        days: null,
+        showError: true,
       });
     }
   });
