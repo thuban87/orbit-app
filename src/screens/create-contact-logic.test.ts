@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MethodGroups } from "@/components/contact-methods-editor-model";
 import {
   addMethodDraft,
@@ -26,6 +26,8 @@ import {
   createFormHasUnsavedWork,
   createFormSeedSignature,
   createFormSeedState,
+  duplicateNameOutcome,
+  duplicateNamePrompt,
   firstInteractionOccurredAt,
   heldPhotoToDiscardOnUnmount,
   isCreateFormDirty,
@@ -33,6 +35,7 @@ import {
   normalizeOffLimitsForm,
   offLimitsFormDraft,
   offLimitsFormOpening,
+  openExistingContact,
   partitionMemoryRows,
   pickCreateSubEditor,
   removeDraftItem,
@@ -1010,4 +1013,111 @@ describe("held photo on Add Contact (38.11 D-77)", () => {
   it("unmount deletes nothing when no photo was held", () => {
     expect(heldPhotoToDiscardOnUnmount(null)).toBeNull();
   });
+});
+
+describe("duplicate-name Open existing (38.11 D-73, D-18, D-09)", () => {
+  it("builds the three-way prompt with the plan copy", () => {
+    expect(duplicateNamePrompt("Ann")).toEqual({
+      title: "Duplicate name",
+      message: "You already have a contact named Ann.",
+      confirmLabel: "Save anyway",
+      secondaryLabel: "Open existing",
+      dismissable: true,
+    });
+  });
+
+  it("maps each choice to its outcome; Open existing takes the first id", () => {
+    expect(duplicateNameOutcome("secondary", [7, 9])).toEqual({
+      kind: "open",
+      contactId: 7,
+    });
+    expect(duplicateNameOutcome("confirm", [7, 9])).toEqual({ kind: "save" });
+    expect(duplicateNameOutcome("cancel", [7, 9])).toEqual({ kind: "cancel" });
+    expect(duplicateNameOutcome("secondary", [])).toEqual({ kind: "cancel" });
+  });
+
+  function fakes({
+    host,
+    dirty,
+    discard,
+  }: {
+    host: "settings" | undefined;
+    dirty: boolean;
+    discard: boolean;
+  }) {
+    const calls: string[] = [];
+    const deps = {
+      host,
+      contactId: 7,
+      dirty,
+      confirmDiscard: vi.fn(async () => {
+        calls.push("confirmDiscard");
+        return discard;
+      }),
+      setBypass: vi.fn(() => calls.push("setBypass")),
+      goBack: vi.fn(() => calls.push("goBack")),
+      replaceWithProfile: vi.fn((id: number) =>
+        calls.push(`replaceWithProfile:${id}`),
+      ),
+      openInContactsTab: vi.fn((id: number) =>
+        calls.push(`openInContactsTab:${id}`),
+      ),
+    };
+    return { deps, calls };
+  }
+
+  it("dirty + Discard on a Contacts host: bypass, then replace with the Profile", async () => {
+    const { deps, calls } = fakes({
+      host: undefined,
+      dirty: true,
+      discard: true,
+    });
+    await expect(openExistingContact(deps)).resolves.toBe("opened");
+    expect(calls).toEqual([
+      "confirmDiscard",
+      "setBypass",
+      "replaceWithProfile:7",
+    ]);
+  });
+
+  it("dirty + Discard on the Settings host: bypass, goBack, then open in the Contacts tab", async () => {
+    const { deps, calls } = fakes({
+      host: "settings",
+      dirty: true,
+      discard: true,
+    });
+    await expect(openExistingContact(deps)).resolves.toBe("opened");
+    expect(calls).toEqual([
+      "confirmDiscard",
+      "setBypass",
+      "goBack",
+      "openInContactsTab:7",
+    ]);
+  });
+
+  it.each([undefined, "settings"] as const)(
+    "dirty + Keep editing (host %s): no bypass and no navigation of any kind",
+    async (host) => {
+      const { deps, calls } = fakes({ host, dirty: true, discard: false });
+      await expect(openExistingContact(deps)).resolves.toBe("stayed");
+      expect(calls).toEqual(["confirmDiscard"]);
+      expect(deps.setBypass).not.toHaveBeenCalled();
+      expect(deps.goBack).not.toHaveBeenCalled();
+      expect(deps.replaceWithProfile).not.toHaveBeenCalled();
+      expect(deps.openInContactsTab).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [undefined, ["setBypass", "replaceWithProfile:7"]],
+    ["settings", ["setBypass", "goBack", "openInContactsTab:7"]],
+  ] as const)(
+    "a clean form (host %s) opens with no prompt",
+    async (host, expected) => {
+      const { deps, calls } = fakes({ host, dirty: false, discard: false });
+      await expect(openExistingContact(deps)).resolves.toBe("opened");
+      expect(deps.confirmDiscard).not.toHaveBeenCalled();
+      expect(calls).toEqual(expected);
+    },
+  );
 });

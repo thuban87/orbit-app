@@ -36,9 +36,11 @@ function handleSaveBody(path: string): string {
 }
 
 describe.each([
-  "src/screens/CreateContactScreen.tsx",
-  "src/screens/EditContactScreen.tsx",
-])("%s Save is single-flight (verification IN-04)", (path) => {
+  // Create's duplicate-name prompt is the three-way choose() (38.11 D-73);
+  // Edit keeps its two-way confirmDuplicate.
+  ["src/screens/CreateContactScreen.tsx", "choose("],
+  ["src/screens/EditContactScreen.tsx", "confirmDuplicate("],
+])("%s Save is single-flight (verification IN-04)", (path, duplicatePrompt) => {
   const body = handleSaveBody(path);
 
   it("never guards on the render-closure `saving` state", () => {
@@ -52,7 +54,9 @@ describe.each([
     const claim = body.indexOf("if (!beginInFlight(savingRef)) return;");
     expect(claim).toBeGreaterThan(-1);
     expect(claim).toBeLessThan(body.indexOf("await "));
-    expect(claim).toBeLessThan(body.indexOf("confirmDuplicate("));
+    const prompt = body.indexOf(duplicatePrompt);
+    expect(prompt, `${path}: ${duplicatePrompt} not found`).toBeGreaterThan(-1);
+    expect(claim).toBeLessThan(prompt);
   });
 
   it("releases the ref only in the finally", () => {
@@ -64,6 +68,25 @@ describe.each([
   it("settles the guard's hold after the release, so a parked RESET is not lost (third fix pass WR-01)", () => {
     const release = body.indexOf("endInFlight(savingRef)");
     expect(body.indexOf("settleHold();", release)).toBeGreaterThan(release);
+  });
+});
+
+describe("src/screens/CreateContactScreen.tsx Open existing waits for the release (38.11 D-73; review T-08)", () => {
+  const body = handleSaveBody("src/screens/CreateContactScreen.tsx");
+
+  it("opens the existing person only after the finally, never while the ref is held", () => {
+    const finallyAt = body.lastIndexOf("} finally {");
+    const release = body.indexOf("endInFlight(savingRef)");
+    const open = body.indexOf("openExistingContact(");
+    expect(open).toBeGreaterThan(-1);
+    expect(body.split("openExistingContact(")).toHaveLength(2);
+    expect(open).toBeGreaterThan(finallyAt);
+    expect(open).toBeGreaterThan(release);
+    // After the finally block has closed: the first `}` that ends it at the
+    // try's indentation comes before the call.
+    const finallyEnd = body.indexOf("\n    }\n", finallyAt);
+    expect(finallyEnd).toBeGreaterThan(release);
+    expect(open).toBeGreaterThan(finallyEnd);
   });
 });
 

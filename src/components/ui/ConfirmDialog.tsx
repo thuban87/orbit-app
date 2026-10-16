@@ -22,6 +22,9 @@
  * title; the "Discard changes?" prompt turns it off and keeps the ⚠ on its
  * button only (D-52). `variant="notice"` is the one-button notice: a single
  * Primary acknowledge button in the same actions container (D-24, D-27).
+ * `secondaryLabel` + `onSecondary` add a third, secondary-role choice between
+ * Cancel and confirm (the `choose()` three-way dialog, 38.11 D-73); the three
+ * share the same fit-or-stack layout.
  *
  * Large text (RG-034 / ui-accessibility/AUD-UIA-011, confirmed on device at
  * font_scale 2.0 on ≈320dp and ≈349dp): the choices are first laid out in a
@@ -70,6 +73,12 @@ export interface ConfirmDialogProps extends OverlayLifecycle {
   /** Defaults to `onRequestClose`. */
   onCancel?: () => void;
   /**
+   * A third, secondary-role choice (38.11 D-73). Rendered only with
+   * `onSecondary`, and never on a notice.
+   */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+  /**
    * When true the confirm is a Destructive Button (warning glyph + onDanger) and
    * the dialog requires an explicit choice — no scrim/Back dismissal.
    */
@@ -98,6 +107,8 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   onConfirm,
   onCancel,
+  secondaryLabel,
+  onSecondary,
   destructive = false,
   confirmDisabled = false,
   dismissable,
@@ -157,9 +168,11 @@ export function ConfirmDialog({
           notice={variant === "notice"}
           cancelLabel={cancelLabel}
           confirmLabel={confirmLabel}
+          secondaryLabel={onSecondary ? secondaryLabel : undefined}
           destructive={destructive}
           confirmDisabled={confirmDisabled}
           onCancel={cancel}
+          onSecondary={onSecondary}
           onConfirm={onConfirm}
         />
       </View>
@@ -170,7 +183,8 @@ export function ConfirmDialog({
 type ActionsLayout = "measuring" | "row" | "stacked";
 
 /**
- * The two explicit choices. Rendered inside the overlay, so it remounts (and
+ * The explicit choices (two, or three with `secondaryLabel` + `onSecondary`,
+ * 38.11 D-73). Rendered inside the overlay, so it remounts (and
  * re-measures) every time the dialog opens. Exported for other overlays with a
  * Cancel + confirm pair that must stack at large text (38.4 D-72:
  * GroupTitlePromptSheet). `notice` renders the one-button notice: a single
@@ -182,28 +196,43 @@ export function ConfirmActions({
   notice = false,
   cancelLabel,
   confirmLabel,
+  secondaryLabel,
   destructive,
   confirmDisabled,
   cancelDisabled = false,
   onCancel,
+  onSecondary,
   onConfirm,
 }: {
   notice?: boolean;
   cancelLabel: string;
   confirmLabel: string;
+  /** A third, secondary-role choice; drawn only with `onSecondary`. */
+  secondaryLabel?: string;
   destructive: boolean;
   confirmDisabled: boolean;
   cancelDisabled?: boolean;
   onCancel: () => void;
+  onSecondary?: () => void;
   onConfirm: () => void;
 }) {
   const [layout, setLayout] = useState<ActionsLayout>("measuring");
-  const widths = useRef({ row: 0, cancel: 0, confirm: 0 });
+  const widths = useRef({ row: 0, cancel: 0, confirm: 0, secondary: 0 });
+  const hasSecondary =
+    secondaryLabel !== undefined && onSecondary !== undefined;
   const measure =
-    (key: "row" | "cancel" | "confirm") => (event: LayoutChangeEvent) => {
+    (key: "row" | "cancel" | "confirm" | "secondary") =>
+    (event: LayoutChangeEvent) => {
       if (layout !== "measuring") return;
       widths.current[key] = event.nativeEvent.layout.width;
-      const fit = confirmActionsFit({ ...widths.current, gap: SPACING.sm });
+      const { row, cancel, confirm, secondary } = widths.current;
+      const fit = confirmActionsFit({
+        row,
+        cancel,
+        confirm,
+        secondary: hasSecondary ? secondary : undefined,
+        gap: SPACING.sm,
+      });
       if (fit !== null) setLayout(fit ? "row" : "stacked");
     };
   const stacked = layout === "stacked";
@@ -244,6 +273,15 @@ export function ConfirmActions({
           onPress={onCancel}
         />
       </View>
+      {hasSecondary ? (
+        <View style={actionStyle} onLayout={measure("secondary")}>
+          <Button
+            role="secondary"
+            label={secondaryLabel}
+            onPress={onSecondary}
+          />
+        </View>
+      ) : null}
       <View style={actionStyle} onLayout={measure("confirm")}>
         <Button
           role={destructive ? "destructive" : "primary"}

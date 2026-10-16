@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  choose,
   confirm,
   confirmStore,
   effectiveDismissable,
@@ -245,5 +246,86 @@ describe("identical requests show one dialog; only the first caller gets the ans
       confirmLabel: "Discard changes",
     });
     expect(confirmStore.getState().queue).toHaveLength(2);
+  });
+});
+
+describe("choose() — three-way themed choice (38.11 D-73, ADR-198)", () => {
+  const duplicate = {
+    title: "Duplicate name",
+    message: "You already have a contact named Ann.",
+    confirmLabel: "Save anyway",
+    secondaryLabel: "Open existing",
+  };
+
+  it.each([
+    ["confirm", "confirm"],
+    ["secondary", "secondary"],
+    ["cancel", "cancel"],
+  ] as const)(
+    "resolves %s when that button is chosen",
+    async (choice, expected) => {
+      const result = choose(duplicate);
+      expect(head()?.kind).toBe("choice");
+      confirmStore.getState().chooseCurrent(choice);
+      await expect(result).resolves.toBe(expected);
+      expect(confirmStore.getState().queue).toEqual([]);
+    },
+  );
+
+  it("Back/scrim resolves cancel when dismissable (the default)", async () => {
+    const result = choose(duplicate);
+    confirmStore.getState().dismissCurrent();
+    await expect(result).resolves.toBe("cancel");
+    expect(confirmStore.getState().queue).toEqual([]);
+  });
+
+  it("Back/scrim is a no-op for a choice created with dismissable:false", () => {
+    void choose({ ...duplicate, dismissable: false });
+    confirmStore.getState().dismissCurrent();
+    expect(confirmStore.getState().queue).toHaveLength(1);
+  });
+
+  it("an identical pending choice adds no dialog and resolves cancel at once", async () => {
+    const first = choose(duplicate);
+    const second = choose({ ...duplicate });
+    expect(confirmStore.getState().queue).toHaveLength(1);
+    await expect(second).resolves.toBe("cancel");
+    confirmStore.getState().chooseCurrent("secondary");
+    await expect(first).resolves.toBe("secondary");
+  });
+
+  it("a choice differing in its secondary label still queues; a confirm with the same copy does not match", () => {
+    void choose(duplicate);
+    void choose({ ...duplicate, secondaryLabel: "Open Ann" });
+    void confirm({
+      title: duplicate.title,
+      message: duplicate.message,
+      confirmLabel: duplicate.confirmLabel,
+    });
+    expect(confirmStore.getState().queue).toHaveLength(3);
+  });
+
+  it("joins the same FIFO: it waits behind a confirm and a stale id cannot resolve it", async () => {
+    const first = confirm({ title: "First", confirmLabel: "OK" });
+    const choice = choose(duplicate);
+    const firstId = head()?.id;
+    // chooseCurrent never resolves a non-choice head.
+    confirmStore.getState().chooseCurrent("secondary");
+    expect(head()?.kind).toBe("confirm");
+    confirmStore.getState().resolveCurrent(true, firstId);
+    await expect(first).resolves.toBe(true);
+    confirmStore.getState().chooseCurrent("confirm", firstId);
+    expect(head()?.kind).toBe("choice");
+    confirmStore.getState().chooseCurrent("secondary", head()?.id);
+    await expect(choice).resolves.toBe("secondary");
+  });
+
+  it("resolveCurrent maps true to confirm and false to cancel on a choice head", async () => {
+    const yes = choose(duplicate);
+    confirmStore.getState().resolveCurrent(true);
+    await expect(yes).resolves.toBe("confirm");
+    const no = choose(duplicate);
+    confirmStore.getState().resolveCurrent(false);
+    await expect(no).resolves.toBe("cancel");
   });
 });

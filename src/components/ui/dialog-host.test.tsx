@@ -14,7 +14,7 @@ vi.mock("@/stores/confirm-store", async (original) => {
 });
 vi.mock("./ConfirmDialog", () => ({ ConfirmDialog: "ConfirmDialog" }));
 
-const { confirm, confirmStore, notice } = await import(
+const { choose, confirm, confirmStore, notice } = await import(
   "@/stores/confirm-store"
 );
 const { DialogHost } = await import("./DialogHost");
@@ -22,6 +22,7 @@ const { DialogHost } = await import("./DialogHost");
 type DialogProps = Record<string, unknown> & {
   onConfirm: () => void;
   onCancel?: () => void;
+  onSecondary?: () => void;
   onRequestClose: () => void;
 };
 const render = () => DialogHost() as ReactElement<DialogProps> | null;
@@ -78,5 +79,56 @@ describe("DialogHost (D-24)", () => {
     });
     element?.props.onRequestClose();
     await expect(result).resolves.toBeUndefined();
+  });
+
+  describe("a choose() entry renders the three-way dialog (38.11 D-73)", () => {
+    const request = {
+      title: "Duplicate name",
+      message: "You already have a contact named Ann.",
+      confirmLabel: "Save anyway",
+      secondaryLabel: "Open existing",
+    };
+
+    it("passes the secondary label and keys the dialog by id", () => {
+      void choose(request);
+      const head = confirmStore.getState().queue[0];
+      const element = render();
+      expect(element?.key).toBe(String(head.id));
+      expect(element?.props).toMatchObject({
+        visible: true,
+        title: "Duplicate name",
+        message: "You already have a contact named Ann.",
+        confirmLabel: "Save anyway",
+        secondaryLabel: "Open existing",
+      });
+      expect(element?.props.variant).toBeUndefined();
+    });
+
+    it.each([
+      ["onConfirm", "confirm"],
+      ["onSecondary", "secondary"],
+      ["onCancel", "cancel"],
+      ["onRequestClose", "cancel"],
+    ] as const)("%s resolves %s", async (handler, expected) => {
+      const result = choose(request);
+      const element = render();
+      expect(element).not.toBeNull();
+      ((element as ReactElement<DialogProps>).props[handler] as () => void)();
+      await expect(result).resolves.toBe(expected);
+      expect(confirmStore.getState().queue).toEqual([]);
+    });
+
+    it("a stale secondary press cannot resolve the request behind it", async () => {
+      const first = choose(request);
+      const second = confirm({ title: "Second", confirmLabel: "OK" });
+      const dialog = render();
+      dialog?.props.onSecondary?.();
+      dialog?.props.onSecondary?.();
+      dialog?.props.onConfirm();
+      await expect(first).resolves.toBe("secondary");
+      expect(render()?.props.title).toBe("Second");
+      render()?.props.onCancel?.();
+      await expect(second).resolves.toBe(false);
+    });
   });
 });

@@ -17,30 +17,45 @@ import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /**
- * Is `name` already used by a LIVE contact (the create/edit duplicate warning)?
+ * The ids of LIVE contacts already using `name` (the create/edit duplicate
+ * warning; Add Contact's "Open existing", 38.11 D-73).
  *
  * `COLLATE NOCASE` makes "chris" match "Chris" — symmetric with how a user reads
  * the warning (Pitfall 6). `archived_at IS NULL` restricts to live contacts (an
  * archived same-name row does not block reuse — mirrors STATUS_SCAN's live
  * filter). `id != ?` excludes the row itself on EDIT; on CREATE pass no
  * `excludeId` and the bound `-1` makes the self-exclusion a no-op (no row has
- * id -1). Returns whether any other live row already holds the name.
+ * id -1). Ordered by name, then id, so "the first" match is stable (D-73: the
+ * first by name if several). Duplicates only warn, never block (D-18).
+ */
+export async function findDuplicateNameIds(
+  exec: SqlExecutor,
+  name: string,
+  excludeId?: number,
+): Promise<number[]> {
+  const rows = await exec.getAllAsync<{ id: number }>(
+    `SELECT id
+       FROM contacts
+      WHERE name = ? COLLATE NOCASE
+        AND archived_at IS NULL
+        AND id != ?
+      ORDER BY name COLLATE NOCASE, id`,
+    [name, excludeId ?? -1],
+  );
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Is `name` already used by a LIVE contact? The boolean form of
+ * `findDuplicateNameIds` (same predicate), kept so Edit Contact's check can
+ * never silently become a truthy empty array.
  */
 export async function isDuplicateName(
   exec: SqlExecutor,
   name: string,
   excludeId?: number,
 ): Promise<boolean> {
-  const row = await exec.getFirstAsync<{ one: number }>(
-    `SELECT 1 AS one
-       FROM contacts
-      WHERE name = ? COLLATE NOCASE
-        AND archived_at IS NULL
-        AND id != ?
-      LIMIT 1`,
-    [name, excludeId ?? -1],
-  );
-  return row !== null;
+  return (await findDuplicateNameIds(exec, name, excludeId)).length > 0;
 }
 
 /**

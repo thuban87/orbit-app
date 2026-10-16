@@ -25,6 +25,12 @@ import { create } from "zustand";
  * twice. Once that dialog settles, the same request opens a new one. The
  * shared "Discard changes?" prompt (`discard` marker) is never matched; it is
  * single-flight on its own.
+ *
+ * Three-way choice (38.11 D-73, ADR-198 one imperative family): `choose({...})`
+ * shows the same dialog with a third, secondary button and resolves
+ * `"confirm"`, `"secondary"` or `"cancel"`. Back/scrim resolves `"cancel"`
+ * when dismissable (default true), and an identical pending choice resolves
+ * `"cancel"` at once, matching `confirm()`'s stay-and-do-nothing duplicate.
  */
 
 export interface ConfirmRequest {
@@ -52,6 +58,22 @@ export interface NoticeRequest {
   acknowledgeLabel?: string;
 }
 
+/** What a three-way `choose()` resolves to. */
+export type ChoiceResult = "confirm" | "secondary" | "cancel";
+
+export interface ChooseRequest {
+  title: string;
+  message?: string;
+  /** The Primary choice; resolves "confirm". */
+  confirmLabel: string;
+  /** The third, secondary-role choice; resolves "secondary". */
+  secondaryLabel: string;
+  /** Defaults to "Cancel"; resolves "cancel". */
+  cancelLabel?: string;
+  /** Back/scrim dismissal resolving "cancel" (default true). */
+  dismissable?: boolean;
+}
+
 interface ConfirmEntryBase {
   id: number;
   resolve: (value: boolean) => void;
@@ -73,12 +95,23 @@ export interface NoticeQueueEntry extends ConfirmEntryBase {
   request: NoticeRequest;
 }
 
-export type ConfirmEntry = ConfirmQueueEntry | NoticeQueueEntry;
+export interface ChoiceQueueEntry {
+  id: number;
+  kind: "choice";
+  request: ChooseRequest;
+  resolve: (value: ChoiceResult) => void;
+}
+
+export type ConfirmEntry =
+  | ConfirmQueueEntry
+  | NoticeQueueEntry
+  | ChoiceQueueEntry;
 
 /** A queue entry before the store assigns its id. */
 export type NewConfirmEntry =
   | Omit<ConfirmQueueEntry, "id">
-  | Omit<NoticeQueueEntry, "id">;
+  | Omit<NoticeQueueEntry, "id">
+  | Omit<ChoiceQueueEntry, "id">;
 
 interface ConfirmStoreState {
   queue: ConfirmEntry[];
@@ -86,12 +119,19 @@ interface ConfirmStoreState {
   enqueue: (entry: NewConfirmEntry) => number;
   /**
    * Resolves the head of the queue with `value` and removes it. When `id` is
-   * given and is not the head (a stale double-tap), nothing happens.
+   * given and is not the head (a stale double-tap), nothing happens. A choice
+   * head maps `true` to "confirm" and `false` to "cancel".
    */
   resolveCurrent: (value: boolean, id?: number) => void;
   /**
-   * Back / scrim path: resolves a dismissable confirm `false` and a notice as
-   * acknowledged; a no-op for a non-dismissable confirm. `id` as above.
+   * Resolves a choice head with `choice` and removes it. A no-op when the head
+   * is not a choice, or when `id` is given and is not the head.
+   */
+  chooseCurrent: (choice: ChoiceResult, id?: number) => void;
+  /**
+   * Back / scrim path: resolves a dismissable confirm `false`, a dismissable
+   * choice "cancel" and a notice as acknowledged; a no-op for a non-dismissable
+   * confirm or choice. `id` as above.
    */
   dismissCurrent: (id?: number) => void;
 }
@@ -129,7 +169,18 @@ export const confirmStore = create<ConfirmStoreState>()((set, get) => ({
     if (id !== undefined && head.id !== id) return;
     // Remove first so a resolution that enqueues a follow-up lands behind.
     set((state) => ({ queue: state.queue.slice(1) }));
+    if (head.kind === "choice") {
+      head.resolve(value ? "confirm" : "cancel");
+      return;
+    }
     head.resolve(value);
+  },
+  chooseCurrent: (choice, id) => {
+    const head = get().queue[0];
+    if (head?.kind !== "choice") return;
+    if (id !== undefined && head.id !== id) return;
+    set((state) => ({ queue: state.queue.slice(1) }));
+    head.resolve(choice);
   },
   dismissCurrent: (id) => {
     const head = get().queue[0];
@@ -137,6 +188,13 @@ export const confirmStore = create<ConfirmStoreState>()((set, get) => ({
     if (id !== undefined && head.id !== id) return;
     if (head.kind === "notice") {
       get().resolveCurrent(true, head.id);
+      return;
+    }
+    if (head.kind === "choice") {
+      if (!effectiveDismissable({ dismissable: head.request.dismissable })) {
+        return;
+      }
+      get().chooseCurrent("cancel", head.id);
       return;
     }
     if (!effectiveDismissable(head.request)) return;
@@ -166,6 +224,17 @@ function noticeIdentity(request: NoticeRequest) {
   ];
 }
 
+function choiceIdentity(request: ChooseRequest) {
+  return [
+    request.title,
+    request.message ?? "",
+    request.confirmLabel,
+    request.secondaryLabel,
+    request.cancelLabel ?? "Cancel",
+    effectiveDismissable({ dismissable: request.dismissable }),
+  ];
+}
+
 const sameIdentity = (a: unknown[], b: unknown[]) =>
   a.length === b.length && a.every((value, index) => value === b[index]);
 
@@ -173,7 +242,8 @@ const sameIdentity = (a: unknown[], b: unknown[]) =>
 function hasPending(
   entry:
     | { kind: "confirm"; request: ConfirmRequest }
-    | { kind: "notice"; request: NoticeRequest },
+    | { kind: "notice"; request: NoticeRequest }
+    | { kind: "choice"; request: ChooseRequest },
 ): boolean {
   return confirmStore.getState().queue.some((queued) => {
     if (queued.kind === "confirm" && entry.kind === "confirm") {
@@ -189,6 +259,12 @@ function hasPending(
       return sameIdentity(
         noticeIdentity(queued.request),
         noticeIdentity(entry.request),
+      );
+    }
+    if (queued.kind === "choice" && entry.kind === "choice") {
+      return sameIdentity(
+        choiceIdentity(queued.request),
+        choiceIdentity(entry.request),
       );
     }
     return false;
@@ -218,5 +294,20 @@ export function notice(request: NoticeRequest): Promise<void> {
       request,
       resolve: () => resolve(),
     });
+  });
+}
+
+/**
+ * Themed three-way choice (38.11 D-73): Cancel, a secondary choice and a
+ * Primary confirm in the one shared dialog. Resolves "confirm", "secondary" or
+ * "cancel"; Back/scrim resolves "cancel" when dismissable. A duplicate of a
+ * pending identical choice resolves "cancel" at once (WR-01).
+ */
+export function choose(request: ChooseRequest): Promise<ChoiceResult> {
+  if (hasPending({ kind: "choice", request })) {
+    return Promise.resolve("cancel");
+  }
+  return new Promise<ChoiceResult>((resolve) => {
+    confirmStore.getState().enqueue({ kind: "choice", request, resolve });
   });
 }

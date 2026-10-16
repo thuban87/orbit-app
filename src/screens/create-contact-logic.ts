@@ -42,6 +42,7 @@ import type {
   CreateRelationshipInput,
 } from "@/db/contacts-dao";
 import { newUid } from "@/db/uid";
+import type { ChoiceResult, ChooseRequest } from "@/stores/confirm-store";
 import { buildLinksForDiff } from "./contact-link-drafts";
 
 /** The create form's controlled state (the screen owns the React state). */
@@ -768,4 +769,81 @@ export function normalizeOffLimitsForm(draft: OffLimitsFormDraft): {
     text: text.length > 0 ? text : null,
     label: label.length > 0 ? label : null,
   };
+}
+
+/**
+ * The duplicate-name prompt on Add Contact (38.11 D-73; copy at Claude's
+ * discretion): Open existing · Save anyway · Cancel, Back/scrim = Cancel.
+ * Duplicates still only warn (D-18). PURE.
+ */
+export function duplicateNamePrompt(name: string): ChooseRequest {
+  return {
+    title: "Duplicate name",
+    message: `You already have a contact named ${name}.`,
+    confirmLabel: "Save anyway",
+    secondaryLabel: "Open existing",
+    dismissable: true,
+  };
+}
+
+export type DuplicateNameOutcome =
+  | { kind: "save" }
+  | { kind: "cancel" }
+  | { kind: "open"; contactId: number };
+
+/**
+ * What a duplicate-name choice does (38.11 D-73): "confirm" (Save anyway)
+ * saves, "secondary" (Open existing) opens the first matching id (ids arrive
+ * ordered by name, then id), "cancel" writes nothing. "secondary" with no ids
+ * is a cancel. PURE.
+ */
+export function duplicateNameOutcome(
+  choice: ChoiceResult,
+  ids: readonly number[],
+): DuplicateNameOutcome {
+  if (choice === "confirm") return { kind: "save" };
+  if (choice === "secondary" && ids.length > 0) {
+    return { kind: "open", contactId: ids[0] };
+  }
+  return { kind: "cancel" };
+}
+
+export interface OpenExistingContactDeps {
+  /** "settings" when Add Contact was opened from the Settings tab (D-50). */
+  host: "settings" | undefined;
+  contactId: number;
+  /** The form's unsaved work, as the discard guard sees it (D-09). */
+  dirty: boolean;
+  /** The shared "Discard changes?" prompt: true = Discard, false = Keep editing. */
+  confirmDiscard: () => Promise<boolean>;
+  /** Sets the guard's bypass so the confirmed exit is not prompted twice. */
+  setBypass: () => void;
+  goBack: () => void;
+  replaceWithProfile: (contactId: number) => void;
+  openInContactsTab: (contactId: number) => void;
+}
+
+/**
+ * "Open existing" from the duplicate-name prompt (38.11 D-73 "behind the
+ * discard guard"; D-09; review T-08). Called only after the save's in-flight
+ * hold is released. A dirty form asks "Discard changes?" first: Keep editing
+ * stays on the form with no navigation of any kind. On Discard, or when the
+ * form is clean, the bypass is set so the guard does not prompt a second time,
+ * then the existing person opens: Contacts-style hosts replace Add with their
+ * Profile; the Settings host returns to Settings and opens the Profile in the
+ * Contacts tab (mirrors the save's exit, D-50). A held photo is deleted by the
+ * form's unmount cleanup (D-77).
+ */
+export async function openExistingContact(
+  deps: OpenExistingContactDeps,
+): Promise<"opened" | "stayed"> {
+  if (deps.dirty && !(await deps.confirmDiscard())) return "stayed";
+  deps.setBypass();
+  if (deps.host === "settings") {
+    deps.goBack();
+    deps.openInContactsTab(deps.contactId);
+  } else {
+    deps.replaceWithProfile(deps.contactId);
+  }
+  return "opened";
 }

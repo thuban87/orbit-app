@@ -14,6 +14,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
+  findDuplicateNameIds,
   getContactForEdit,
   getContactHeader,
   isDuplicateName,
@@ -121,6 +122,32 @@ describe("isDuplicateName — live, case-insensitive, self-excluding (Pitfall 6)
 
   it("returns false when no contact has the name", async () => {
     expect(await isDuplicateName(exec, "Nobody")).toBe(false);
+  });
+});
+
+describe("findDuplicateNameIds — live same-name ids, name then id order (38.11 D-73)", () => {
+  it("returns every live same-name id in name-then-id order", async () => {
+    const a = await makeContact("Chris");
+    const b = await makeContact("chris");
+    const c = await makeContact("CHRIS");
+    await makeContact("Someone Else");
+    expect(await findDuplicateNameIds(exec, "chris")).toEqual([a, b, c]);
+  });
+
+  it("excludes archived contacts", async () => {
+    await makeContact("Archie", { archived: true });
+    const live = await makeContact("Archie");
+    expect(await findDuplicateNameIds(exec, "Archie")).toEqual([live]);
+  });
+
+  it("excludes excludeId (edit self-exclusion)", async () => {
+    const self = await makeContact("Solo");
+    const other = await makeContact("Solo");
+    expect(await findDuplicateNameIds(exec, "Solo", self)).toEqual([other]);
+  });
+
+  it("returns [] when no live contact has the name", async () => {
+    expect(await findDuplicateNameIds(exec, "Nobody")).toEqual([]);
   });
 });
 

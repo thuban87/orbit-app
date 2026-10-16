@@ -123,6 +123,36 @@ describe("confirmActionsFit", () => {
     ).toBe(false);
   });
 
+  it("counts a third, secondary choice and its gap (38.11 D-73)", () => {
+    expect(
+      confirmActionsFit({
+        cancel: 200,
+        secondary: 300,
+        confirm: 300,
+        row: 840,
+        gap: 20,
+      }),
+    ).toBe(true);
+    expect(
+      confirmActionsFit({
+        cancel: 200,
+        secondary: 300,
+        confirm: 300,
+        row: 830,
+        gap: 20,
+      }),
+    ).toBe(false);
+    expect(
+      confirmActionsFit({
+        cancel: 200,
+        secondary: 0,
+        confirm: 300,
+        row: 840,
+        gap: 20,
+      }),
+    ).toBeNull();
+  });
+
   it("does not decide before every width is measured", () => {
     expect(
       confirmActionsFit({ cancel: 0, confirm: 581, row: 848, gap: 22 }),

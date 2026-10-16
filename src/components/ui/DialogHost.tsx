@@ -8,6 +8,10 @@
  * decides row vs stacked once per mount, so each queued request must mount a
  * fresh dialog to re-measure its own labels.
  *
+ * A `choose()` entry (38.11 D-73) renders the same dialog with its third,
+ * secondary choice; each button resolves its own choice through
+ * `chooseCurrent`, and Back/scrim resolve "cancel" when dismissable.
+ *
  * Every resolution is bound to the request's id, so a stale double-tap on a
  * dialog that has just closed can never resolve the request queued behind it.
  * Back/scrim go through `dismissCurrent`, which is a no-op for a destructive or
@@ -19,6 +23,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 export function DialogHost() {
   const current = confirmStore((state) => state.queue[0]);
   const resolveCurrent = confirmStore((state) => state.resolveCurrent);
+  const chooseCurrent = confirmStore((state) => state.chooseCurrent);
   const dismissCurrent = confirmStore((state) => state.dismissCurrent);
 
   if (!current) return null;
@@ -35,6 +40,33 @@ export function DialogHost() {
         message={message}
         confirmLabel={acknowledgeLabel}
         onConfirm={() => resolveCurrent(true, id)}
+        onRequestClose={() => dismissCurrent(id)}
+      />
+    );
+  }
+
+  if (current.kind === "choice") {
+    const {
+      title,
+      message,
+      confirmLabel,
+      secondaryLabel,
+      cancelLabel,
+      dismissable,
+    } = current.request;
+    return (
+      <ConfirmDialog
+        key={id}
+        visible
+        title={title}
+        message={message}
+        confirmLabel={confirmLabel}
+        secondaryLabel={secondaryLabel}
+        cancelLabel={cancelLabel}
+        dismissable={dismissable}
+        onConfirm={() => chooseCurrent("confirm", id)}
+        onSecondary={() => chooseCurrent("secondary", id)}
+        onCancel={() => chooseCurrent("cancel", id)}
         onRequestClose={() => dismissCurrent(id)}
       />
     );

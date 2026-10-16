@@ -131,7 +131,7 @@ import {
   memoryAiDefaultsMap,
 } from "@/db/ai-permissions-dao";
 import { getAppSettings } from "@/db/app-settings-dao";
-import { isDuplicateName, listCategories } from "@/db/contact-read";
+import { findDuplicateNameIds, listCategories } from "@/db/contact-read";
 import { createContactFull } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
@@ -144,7 +144,10 @@ import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh"
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { resolveCategorySelection } from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
-import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import {
+  confirmDiscard,
+  useDiscardKeepGuard,
+} from "@/navigation/discard-keep-guard";
 import { navigationRef } from "@/navigation/linking";
 import { openProfileInContactsTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -160,7 +163,7 @@ import {
   endStagingSession,
 } from "@/services/photos/staging-sessions";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
-import { confirm, notice } from "@/stores/confirm-store";
+import { choose, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { formatLocalDate } from "@/utils/dates";
@@ -180,8 +183,11 @@ import {
   createFormSeedSignature,
   createFormSeedState,
   type DraftItem,
+  duplicateNameOutcome,
+  duplicateNamePrompt,
   heldPhotoToDiscardOnUnmount,
   isCreateFormDirty,
+  openExistingContact,
   partitionMemoryRows,
   pickCreateSubEditor,
   removeDraftItem,
@@ -197,19 +203,6 @@ const LOG_SCOPE = "create-contact";
 /** D-77: a photo that could not be stored after the save (Claude's discretion copy). */
 const PHOTO_NOT_ADDED =
   "Contact saved, but the photo wasn't added. Add it from Edit Contact.";
-
-/**
- * The duplicate-name warning as ONE themed gate (D-27): Cancel, Back or a scrim
- * tap resolve false (nothing is written); "Save anyway" resolves true.
- */
-function confirmDuplicate(name: string): Promise<boolean> {
-  return confirm({
-    title: "Duplicate name",
-    message: `You already have a ${name} — save anyway?`,
-    confirmLabel: "Save anyway",
-    dismissable: true,
-  });
-}
 
 /**
  * The clean baseline for the unsaved-work guard (D-15): built from the seed
@@ -625,15 +618,16 @@ export function CreateContactScreen({
     giftIdeas: giftIdeasDraft,
     thoughtOfThem: thoughtOfThemDraft,
   });
-  const { requestClose, settleHold } = useDiscardKeepGuard({
-    // A held photo alone is unsaved work: Discard deletes it (D-77).
-    hasUnsavedChanges: createFormHasUnsavedWork(
-      isCreateFormDirty(
-        CREATE_FORM_SEED_SIGNATURE,
-        createFormSeedSignature(formState),
-      ),
-      heldPhoto,
+  // A held photo alone is unsaved work: Discard deletes it (D-77).
+  const hasUnsavedWork = createFormHasUnsavedWork(
+    isCreateFormDirty(
+      CREATE_FORM_SEED_SIGNATURE,
+      createFormSeedSignature(formState),
     ),
+    heldPhoto,
+  );
+  const { requestClose, settleHold } = useDiscardKeepGuard({
+    hasUnsavedChanges: hasUnsavedWork,
     bypassRef,
     // A save in flight holds every exit, with no prompt (fix-pass WR-02).
     busyRef: savingRef,
@@ -722,6 +716,9 @@ export function CreateContactScreen({
       return;
     }
     const trimmed = name.trim();
+    // Set when the duplicate-name prompt's Open existing is chosen (D-73); the
+    // jump runs after the finally, once the in-flight hold is released.
+    let openExistingId: number | null = null;
     // Claimed before the first await, so it covers the duplicate-name confirm.
     if (!beginInFlight(savingRef)) return;
     setSaving(true);
@@ -734,58 +731,71 @@ export function CreateContactScreen({
       );
       setCategories(currentCategories);
       if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
-      // Duplicate-name warning fires on save (non-blocking, "save anyway").
-      if (await isDuplicateName(exec, trimmed)) {
-        if (!(await confirmDuplicate(trimmed))) {
-          return; // Cancel — nothing is written.
-        }
+      // Duplicate-name warning fires on save (non-blocking, D-18): Open
+      // existing · Save anyway · Cancel (D-73).
+      const duplicateIds = await findDuplicateNameIds(exec, trimmed);
+      const outcome =
+        duplicateIds.length > 0
+          ? duplicateNameOutcome(
+              await choose(duplicateNamePrompt(trimmed)),
+              duplicateIds,
+            )
+          : ({ kind: "save" } as const);
+      if (outcome.kind === "cancel") {
+        return; // Cancel — nothing is written.
       }
-      const input = buildCreateInput(
-        { ...formState, categoryId: currentCategoryId },
-        {
-          now: localDateTime(),
-          contactUid: newUid(),
-          interactionUid: newUid(),
-          createDefs,
-          effectivePhoneRegion,
-        },
-      );
-      const { contactId } = await createContactFull(exec, input);
-      // D-77: the held photo is stored only now that the contact exists, outside
-      // the create transaction. It never throws; a failure keeps the contact.
-      const held = heldPhotoRef.current;
-      if (held) {
-        // Cleared first: the promote deletes the file, so unmount must not.
-        updateHeldPhoto(null);
-        const promoted = await promoteCreatePhoto({
-          exec,
-          contactId,
-          contactUid: input.uid,
-          stagedRelative: held,
-          now: localDateTime(),
-        });
-        if (!promoted.ok) {
-          showSnackbar({ kind: "error", label: PHOTO_NOT_ADDED });
-        }
-      }
-      if (input.birthday != null) {
-        // A birthday set on Add gets its reminder scheduled now, not at the
-        // next launch sweep, as Edit does after a metadata save (38.11 D-48;
-        // RESEARCH R6). Fire-and-forget: the contact is already saved.
-        void reconcileSchedule(exec).catch((error) =>
-          Logger.error(LOG_SCOPE, "reconcile after create failed", error),
-        );
-        notifyWidgetDataChanged();
-      }
-      // Saved: leave for the new Profile without a prompt (D-08, Pitfall 6).
-      bypassRef.current = true;
-      if (host === "settings") {
-        // D-50: the Settings stack returns to where the user started, and the
-        // new person opens in the Contacts tab.
-        navigation.goBack();
-        openProfileInContactsTab(navigationRef.current, contactId);
+      if (outcome.kind === "open") {
+        // Nothing is written; the jump waits for the finally (review T-08).
+        openExistingId = outcome.contactId;
       } else {
-        navigation.replace("Profile", { contactId });
+        const input = buildCreateInput(
+          { ...formState, categoryId: currentCategoryId },
+          {
+            now: localDateTime(),
+            contactUid: newUid(),
+            interactionUid: newUid(),
+            createDefs,
+            effectivePhoneRegion,
+          },
+        );
+        const { contactId } = await createContactFull(exec, input);
+        // D-77: the held photo is stored only now that the contact exists,
+        // outside the create transaction. It never throws; a failure keeps the
+        // contact.
+        const held = heldPhotoRef.current;
+        if (held) {
+          // Cleared first: the promote deletes the file, so unmount must not.
+          updateHeldPhoto(null);
+          const promoted = await promoteCreatePhoto({
+            exec,
+            contactId,
+            contactUid: input.uid,
+            stagedRelative: held,
+            now: localDateTime(),
+          });
+          if (!promoted.ok) {
+            showSnackbar({ kind: "error", label: PHOTO_NOT_ADDED });
+          }
+        }
+        if (input.birthday != null) {
+          // A birthday set on Add gets its reminder scheduled now, not at the
+          // next launch sweep, as Edit does after a metadata save (38.11 D-48;
+          // RESEARCH R6). Fire-and-forget: the contact is already saved.
+          void reconcileSchedule(exec).catch((error) =>
+            Logger.error(LOG_SCOPE, "reconcile after create failed", error),
+          );
+          notifyWidgetDataChanged();
+        }
+        // Saved: leave for the new Profile without a prompt (D-08, Pitfall 6).
+        bypassRef.current = true;
+        if (host === "settings") {
+          // D-50: the Settings stack returns to where the user started, and
+          // the new person opens in the Contacts tab.
+          navigation.goBack();
+          openProfileInContactsTab(navigationRef.current, contactId);
+        } else {
+          navigation.replace("Profile", { contactId });
+        }
       }
     } catch (err) {
       bypassRef.current = false;
@@ -798,6 +808,30 @@ export function CreateContactScreen({
       endInFlight(savingRef);
       settleHold();
       setSaving(false);
+    }
+    if (openExistingId !== null) {
+      // D-73 "behind the discard guard": the save's hold is released, so the
+      // form's unsaved work asks "Discard changes?" first (D-09). An open
+      // sub-editor's typed draft counts too, as the guard's non-Back rule does.
+      try {
+        await openExistingContact({
+          host,
+          contactId: openExistingId,
+          dirty: hasUnsavedWork || (pickedDraft.open && pickedDraft.dirty),
+          confirmDiscard,
+          setBypass: () => {
+            bypassRef.current = true;
+          },
+          goBack: () => navigation.goBack(),
+          replaceWithProfile: (contactId) =>
+            navigation.replace("Profile", { contactId }),
+          openInContactsTab: (contactId) =>
+            openProfileInContactsTab(navigationRef.current, contactId),
+        });
+      } catch (err) {
+        bypassRef.current = false;
+        Logger.error(LOG_SCOPE, "failed to open the existing contact", err);
+      }
     }
   }
 
