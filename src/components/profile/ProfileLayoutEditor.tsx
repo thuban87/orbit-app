@@ -84,6 +84,13 @@ export interface ProfileLayoutEditorProps {
   onManageTemplates?: () => void;
   /** A canonical manager may save the same draft as a reusable template. */
   onSaveDraft?: (layout: ProfileLayoutDocument) => Promise<void>;
+  /**
+   * Open on the editor itself, skipping the Profile Layout first page (38.11
+   * D-89). The Templates sheet sets it when editing a template's layout, so
+   * the contact-specific "Editing creates a contact-specific layout…" line
+   * never shows for a template.
+   */
+  startInEditor?: boolean;
 }
 
 function RowDragHandle({ label }: { label: string }) {
@@ -310,7 +317,9 @@ export function ProfileLayoutEditor({
   onManageTemplates,
   onSaveDraft,
   hasLayoutOverride = false,
+  startInEditor = false,
 }: ProfileLayoutEditorProps) {
+  const firstPage: EditorPage = startInEditor ? "editor" : "chooser";
   const [initial, setInitial] = useState(() =>
     createProfileLayoutEditorDraft(layout),
   );
@@ -319,7 +328,7 @@ export function ProfileLayoutEditor({
     layout,
     createProfileLayoutEditorDraft,
   );
-  const [page, setPage] = useState<EditorPage>("chooser");
+  const [page, setPage] = useState<EditorPage>(firstPage);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const wasVisible = useRef(false);
@@ -333,9 +342,9 @@ export function ProfileLayoutEditor({
     wasVisible.current = true;
     setInitial(fresh);
     dispatch({ type: "reset", layout: fresh });
-    setPage("chooser");
+    setPage(firstPage);
     setSaveError(null);
-  }, [layout, visible]);
+  }, [firstPage, layout, visible]);
 
   const closeOrGuard = () => {
     switch (requestLayoutEditorDismissal({ initial, draft, saving })) {

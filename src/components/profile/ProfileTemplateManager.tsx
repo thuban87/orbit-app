@@ -706,6 +706,9 @@ export function ProfileTemplateManager({
       {editingLayout ? (
         <ProfileLayoutEditor
           visible
+          // D-89: a template's layout opens straight in the editor, never on
+          // the contact-specific Profile Layout first page.
+          startInEditor
           contactId={contactId}
           contactName={contactName}
           currentLayout={currentLayout}
