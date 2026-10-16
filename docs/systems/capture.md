@@ -1,7 +1,7 @@
 # Capture
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `src/db/capture-read.ts`, `src/db/capture-dao.ts`, `src/logic/capture-logic.ts`, `src/logic/share-card-logic.ts`, `src/screens/CaptureScreen.tsx`, `src/components/ShareConfirmationCard.tsx`
 
 ## Purpose
@@ -98,6 +98,8 @@ Capture owns no table or migration. It writes into the Things to Remember homes 
 - **ADR-216:** A Share Saves at Once to Thought of Them, with an Interactive Confirmation Card and the List Picker.
 - **ADR-217:** Share Undo Also Removes a Contact the Share Created.
 - **ADR-221:** Two Snackbar Looks — share Undo snackbars use the warning look.
+- **ADR-222:** Add Contact Opens Bound, Monthly and Not Yet — the create seed that Capture shares through `NEW_CONTACT_DEFAULT_INTERVAL_DAYS`.
+- **ADR-231:** Open/Closed Sections, Layout Tools in the Sheets, All-Default Reset Row — an all-default presentation row no longer blocks share Undo (`blocks-unless-default`).
 
 ## Gotchas
 
@@ -128,3 +130,4 @@ Capture owns no table or migration. It writes into the Things to Remember homes 
 | 2026-10-11 | 38.9 | Back closes the innermost Capture surface first and prompts "Discard changes?" for a typed name or note instead of cancelling the share (D-33, ADR-200). |
 | 2026-10-15 | 38.10 | Shares save at once to Thought of Them AI-off; interactive confirmation card (chips, Undo, Add note, Allow AI); list picker with search; share-recency over every home; atomic inline create with the monthly default; share Undo may remove a share-created contact; resume prompts suppressed during a share; no widget refresh (ADR-213..217, ADR-221). |
 | 2026-10-16 | 38.11 | Share Undo: an all-default `profile_contact_presentation` row (left by a Profile "Reset to default") no longer blocks removing a share-created contact; any layout, background or open/closed choice still blocks (review WR-02/IN-02). |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-222, ADR-231. |
