@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-16
+**Updated by phase:** 38.11-everyday-screens-ux
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -403,6 +403,12 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — shell-hosted date labels use the shared formatter.
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Settings and Systems labels use plain words ("Reset Manual Changes").
 - **ADR-189:** Painted Per-System Sky and Ambient Orbit Pulses as Permitted Non-Data Motion — adds the `orrery*` token sub-palette to every theme palette; the Orrery draws no colour that is not one of these tokens, including inside SkSL uniforms.
+- **ADR-223:** Birthday, Social Battery, Links and a Held Photo on Add Contact — Add Contact's held-photo staging sweep registered in `App.tsx`.
+- **ADR-224:** One Contact Form and a Four-Action + — the four-action +, the retired UpdateContact route, and `FAB_CLEARANCE_MARGIN`.
+- **ADR-225:** Profile Top: Edit Contact, Compose, Name in a Solid Top Bar, Slimmer ⋯ — the Profile top bar and ⋯.
+- **ADR-226:** Archive Becomes the Bin — Settings → Bin.
+- **ADR-227:** One Snooze Sheet — the shared snooze sheet hosts.
+- **ADR-230:** Settings Page for Profile Backgrounds — the `ProfileBackgrounds` route in all five Profile-hosting stacks.
 
 ## Gotchas
 
@@ -548,3 +554,4 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 | 2026-10-11 | 38.9 | KB extraction: history Back across tabs with the Digest exit fallback, + forms in every tab stack, the child header on every pushed screen, and the dialog host / overlay registry mounts; Decisions cite ADR-198..ADR-202; new gotcha on untracked tab switches. |
 | 2026-10-15 | 38.10 | Things to Remember, Recently Deleted and Memory screens retired; `SectionEditor`, `KeyPeopleEditor`, `OffLimitsEditor` and `MemoryHistory` registered in all five stacks; `Memory` is the add form on the current tab; resume prompts suppressed during a share; `section-fab-store` feeds root snackbar placement (ADR-212, ADR-216, ADR-219, ADR-221). |
 | 2026-10-16 | 38.11 | The + has four actions (Add Contact, Quick Log, Log Interaction, Group Log); Update Contact retired to `docs/archive/update-contact/` (D-62); Memory left the + and is Profile-reachable in all five stacks (D-66); FAB clearance margin `FAB_CLEARANCE_MARGIN` (D-41). |
+| 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-223–ADR-227, ADR-230. |
