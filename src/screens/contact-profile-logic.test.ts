@@ -9,7 +9,6 @@ import {
   binConfirmation,
   binnedProfileBanner,
   bulkBinConfirmation,
-  canStartLifecycleTransition,
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
   consumeProfileReachOutIntent,
@@ -50,6 +49,7 @@ import {
   runMoveToBin,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
+  unboundStarExplanation,
 } from "@/screens/contact-profile-logic";
 
 const phone: ContactMethodRow = {
@@ -172,7 +172,6 @@ describe("profileLifecycleView", () => {
       kind: "bound",
       showCadenceTreatment: true,
       showFrequencyPicker: false,
-      bindEnabled: false,
     });
   });
 
@@ -183,7 +182,6 @@ describe("profileLifecycleView", () => {
       kind: "unbound-dormant",
       showCadenceTreatment: false,
       showFrequencyPicker: false,
-      bindEnabled: true,
     });
   });
 
@@ -194,7 +192,6 @@ describe("profileLifecycleView", () => {
       kind: "unbound-never-assigned",
       showCadenceTreatment: false,
       showFrequencyPicker: true,
-      bindEnabled: false,
     });
   });
 });
@@ -206,18 +203,6 @@ describe("profile lifecycle actions", () => {
       message:
         "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved reminder schedule stay.",
     });
-  });
-
-  it("allows only one lifecycle transition at a time and requires a bindable cadence", () => {
-    expect(
-      canStartLifecycleTransition({ pending: false, bindEnabled: true }),
-    ).toBe(true);
-    expect(
-      canStartLifecycleTransition({ pending: true, bindEnabled: true }),
-    ).toBe(false);
-    expect(
-      canStartLifecycleTransition({ pending: false, bindEnabled: false }),
-    ).toBe(false);
   });
 });
 
@@ -761,6 +746,27 @@ describe("integrated Profile controller contracts", () => {
           onPress: "none",
         });
       }
+    });
+
+    it("draws an Unbound person's star off and dimmed, a tap explains, the rank is kept (38.12 D-36, D-21)", () => {
+      for (const favouriteRank of [0, 5, null]) {
+        expect(
+          profileStarView({
+            favouriteRank,
+            bound: false,
+            archived: false,
+            pending: false,
+          }),
+        ).toEqual({
+          favourite: false,
+          disabled: false,
+          unavailable: true,
+          onPress: "explain",
+        });
+      }
+      expect(unboundStarExplanation("Alex")).toBe(
+        "Bind Alex to make them a Favorite.",
+      );
     });
 
     it("fills a live Bound person's star from the rank and toggles it", () => {

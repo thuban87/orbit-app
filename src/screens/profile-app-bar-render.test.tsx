@@ -63,8 +63,12 @@ vi.mock("@/theme", () => ({
 }));
 
 const { ProfileAppBar } = await import("./ContactProfileScreen");
-const { PROFILE_APP_BAR, PROFILE_APP_BAR_SCRIM_OPACITY, profileStarView } =
-  await import("./contact-profile-logic");
+const {
+  PROFILE_APP_BAR,
+  PROFILE_APP_BAR_SCRIM_OPACITY,
+  profileStarView,
+  unboundStarExplanation,
+} = await import("./contact-profile-logic");
 
 interface Node {
   readonly type: string;
@@ -111,6 +115,7 @@ function render(
     favourite: boolean;
     favouriteDisabled: boolean;
     favouriteUnavailable: boolean;
+    favouriteHint: string;
     scrolled: boolean;
     title: string | null;
   }> = {},
@@ -183,6 +188,33 @@ describe("ProfileAppBar (38.6 D-17)", () => {
     expect(star?.props.disabled).toBe(true);
     expect(star?.children[0]?.props.state).toBe("default");
     expect(flatStyle(star?.props.style).opacity).toBe(0.5);
+  });
+
+  it("draws an Unbound person's star off and dimmed even with a dormant rank; a press reaches the explanation (38.12 D-36)", () => {
+    const view = profileStarView({
+      favouriteRank: 2,
+      bound: false,
+      archived: false,
+      pending: false,
+    });
+    const star = all(
+      render({
+        favourite: view.favourite,
+        favouriteDisabled: view.disabled,
+        favouriteUnavailable: view.unavailable,
+        favouriteHint: unboundStarExplanation("Alex"),
+      }),
+    ).find(isStar);
+    expect(star?.children[0]?.props.state).toBe("default");
+    expect(flatStyle(star?.props.style).opacity).toBe(0.5);
+    expect(star?.props.accessibilityHint).toBe(
+      "Bind Alex to make them a Favorite.",
+    );
+    // Pressable, so the tap can explain; the screen writes nothing for it.
+    expect(star?.props.disabled).toBe(false);
+    handlers.onToggleFavourite.mockClear();
+    (star?.props.onPress as () => void)();
+    expect(handlers.onToggleFavourite).toHaveBeenCalledTimes(1);
   });
 
   it("overlays the content and passes touches through its empty area", () => {

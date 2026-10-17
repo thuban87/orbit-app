@@ -243,3 +243,57 @@ describe("RelationshipOverview Snooze tile (38.12 D-37, D-96)", () => {
     }
   });
 });
+
+// 38.12 D-94: no Snooze tile while Unbound or in the Bin; it returns on Bind.
+// The stored snooze is left as data.
+describe("RelationshipOverview Snooze tile by participation (38.12 D-94)", () => {
+  const snoozeModule = [
+    { id: "snooze", visible: true, expanded: false, size: "1x1" },
+    { id: "orbit-status", visible: true, expanded: false, size: "2x1" },
+  ] as unknown as ProfileLayoutDocument["overview"];
+
+  function tiles(identity: {
+    trackingEnabled: number;
+    archivedAt: string | null;
+  }): string[] {
+    return all(
+      resolve(
+        RelationshipOverview({
+          snapshot: {
+            ...snapshot,
+            identity: {
+              ...snapshot.identity,
+              ...identity,
+              snoozeUntil: "2099-01-01",
+            },
+          } as ProfileSnapshot,
+          modules: snoozeModule,
+          onOpenSheet: vi.fn(),
+          todayLocal: "2026-10-17",
+        }),
+      ),
+    )
+      .map((node) => String(node.props.testID ?? ""))
+      .filter((id) => id.startsWith("profile-overview-"));
+  }
+
+  it("hides the tile for an Unbound contact, even with a stored snooze", () => {
+    expect(tiles({ trackingEnabled: 0, archivedAt: null })).toEqual([
+      "profile-overview-orbit-status",
+    ]);
+  });
+
+  it("hides the tile for a binned contact, Bound or Unbound", () => {
+    for (const trackingEnabled of [1, 0]) {
+      expect(
+        tiles({ trackingEnabled, archivedAt: "2026-10-01 09:00:00" }),
+      ).not.toContain("profile-overview-snooze");
+    }
+  });
+
+  it("shows the tile for a live Bound contact", () => {
+    expect(tiles({ trackingEnabled: 1, archivedAt: null })).toContain(
+      "profile-overview-snooze",
+    );
+  });
+});
