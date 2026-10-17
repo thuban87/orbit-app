@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.12
 current_phase_name: People Lifecycle, Import & Settings UX (INSERTED)
 status: executing
-stopped_at: Completed 38.12-16-PLAN.md
-last_updated: "2026-10-17T23:16:00.000Z"
+stopped_at: Completed 38.12-17-PLAN.md
+last_updated: "2026-10-17T23:45:00.000Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 38.12 execution started
-state_head: c277963f
+state_head: 65c16e52
 progress:
   total_phases: 38
   completed_phases: 25
   total_plans: 365
-  completed_plans: 351
+  completed_plans: 352
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -475,6 +475,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.12 P13 | 18 min | 4 tasks | 14 files |
 | Phase 38.12 P14 | 18 min | 2 tasks | 13 files |
 | Phase 38.12 P16 | 21 min | 3 tasks | 16 files |
+| Phase 38.12 P17 | 23 min | 3 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -1059,6 +1060,8 @@ Foundational decisions affecting current work:
 - [Phase 38.12]: 38.12-14: Orbit Center = shared Sheet + ContactPickerList over listSunCandidates (now PickerContactRow-shaped) with a You row and Cancel; default layout = OptionSheet 'Default Profile layout'; Your name joins useKeyboardCentering, save shows 'Saved your name' snackbar; RG-029 M41-M43 obsolete (done 41); Appearance keeps four sections, 'Your profile' -> 'You'
 - [Phase 38.12]: 38.12-16: AI sections = ScrollViewContainer + NestedReorderableList, drag handle + anchored ⋯ (Rename / edit, Replace from file, Move up/down, Delete section last); reorder optimistic + single-flight; Writing Style choices are presets + a Custom segment, guidance box only while a choice is custom (caption 'X is set to use custom guidance:'), estimate counts guidance only when sent; section switches held via busy + handler guard (disabled draws Off); SegmentedControl gains optional disabled
 - [Phase 38.12]: 38.12-16: AI Data Permissions excludes photo fields and clamps a photo def's share_with_ai to 0; default captions 'New items start with Allow AI on/off.'; filter-empty copy 'No items match this filter.'; AI Preview plain titles, contact card first with exact blocks, explicit no-contact state (EXAMPLE_PREVIEW_CONTEXT in settings-ai-logic); AI children on plain SettingsSectionCard
+- [Phase 38.12]: 38.12-17: runAutomaticBackupNow (services/backup/backup-now.ts) is the one write-verify-health path; the sweep keeps only its gate; Back up now (stale/too-large) or Choose a folder (not-configured/lost-folder, shared chooseAutomaticBackupFolder) on the warning card, single-flight + snackbar + health reload; hero link always 'Backup settings' (matches the page title, D-64); export = choose() with Cancel; passphrase eye toggle; registry icons backup-export/restore/privacy + show/hide-secret
+- [Phase 38.12]: 38.12-17: folder name derived from the tree URI at display time (backupFolderDisplayName, fallback 'your backup folder'); hero kept count = owned automatic files listed after the card draws (null until listed, 0 when none); Backup settings scrolls to route.params.section; folder/schedule as SettingsRows, Encryption in a SettingsSectionCard; RG-029 M12/M13 obsolete, M16 re-anchored (done 39). Deferred to owner: Drive tree URIs hold opaque ids, so Drive folder names need a native display-name lookup
 
 ### Pending Todos
 
