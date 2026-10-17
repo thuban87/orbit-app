@@ -3,9 +3,13 @@
  * The shared snooze sheet (38.11 D-45): one sheet, modelled on the Profile
  * card sheet, for the Profile Overview Snooze tile, the Profile ⋯ "Snooze…"
  * entry, the Contacts card snooze and Contacts bulk snooze. It offers the
- * three presets, Choose date, Unsnooze when allowed, and Close (D-15). The
- * custom date defaults to and starts at tomorrow, and Cancel collapses the
- * date picker (D-37).
+ * three presets, "Until I turn it off" (38.12 D-96: the indefinite snooze,
+ * written as `INDEFINITE_SNOOZE_UNTIL` through `onUntil`, so Undo and every
+ * reader treat it like a dated snooze, D-98), Choose date, Unsnooze when
+ * allowed, and Close (D-15). The custom date defaults to and starts at
+ * tomorrow, is capped at ten years so it never equals the sentinel (38.12-01
+ * only), and Cancel collapses the date picker (D-37). Every snooze-end display
+ * goes through `snoozeUntilLabel`, so no surface prints the year 9999.
  *
  * It owns no DAO. Each choice calls the host's `onPreset` / `onUntil` /
  * `onUnsnooze`, which reject on failure. The sheet settles them through the
@@ -42,7 +46,7 @@ import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import type { SnoozePreset } from "@/db/snooze-dao";
+import { INDEFINITE_SNOOZE_UNTIL, type SnoozePreset } from "@/db/snooze-dao";
 import {
   type RelationshipSheetAction,
   type RelationshipSheetState,
@@ -51,7 +55,9 @@ import {
   type SnoozeOutcome,
   snoozeConfirmationLabel,
   snoozeCustomDateDefault,
+  snoozeCustomDateMaximum,
   snoozeUndoneLabel,
+  snoozeUntilLabel,
   validateCustomSnoozeDate,
 } from "@/profile/relationship-sheet-model";
 import {
@@ -246,6 +252,7 @@ export function SnoozeSheet({
   };
 
   const minimumDate = snoozeCustomDateDefault(todayLocal);
+  const maximumDate = snoozeCustomDateMaximum(todayLocal);
   const customValid = validateCustomSnoozeDate(customDate, todayLocal).valid;
   const customDisplay = formatDisplayDateOrFallback(customDate);
 
@@ -271,11 +278,11 @@ export function SnoozeSheet({
         </AppText>
         {snoozedUntil ? (
           <AppText role="body" testID="snooze-sheet-current">
-            {`Snoozed until ${formatDisplayDateOrFallback(snoozedUntil)}`}
+            {`Snoozed ${snoozeUntilLabel(snoozedUntil)}`}
           </AppText>
         ) : null}
         {SNOOZE_CHOICES.map((choice) => {
-          const id = choice.kind === "preset" ? choice.preset : "custom";
+          const id = choice.kind === "preset" ? choice.preset : choice.kind;
           return (
             <Pressable
               key={id}
@@ -291,6 +298,9 @@ export function SnoozeSheet({
                 if (choice.kind === "preset") {
                   const preset = choice.preset;
                   submit(() => onPreset(preset), { kind: "preset", preset });
+                } else if (choice.kind === "indefinite") {
+                  const until = INDEFINITE_SNOOZE_UNTIL;
+                  submit(() => onUntil(until), { kind: "until", until });
                 } else if (!customOpen) {
                   openCustom();
                 }
@@ -346,6 +356,7 @@ export function SnoozeSheet({
             value={pickerDate(customDate)}
             mode="date"
             minimumDate={pickerDate(minimumDate)}
+            maximumDate={pickerDate(maximumDate)}
             onChange={onPickerChange}
           />
         ) : null}

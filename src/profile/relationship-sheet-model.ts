@@ -5,7 +5,7 @@ import {
 import { RARELY_RESPONDS } from "@/constants/glossary";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
-import type { SnoozePreset } from "@/db/snooze-dao";
+import { isIndefiniteSnooze, type SnoozePreset } from "@/db/snooze-dao";
 import { GRAVITY_TIERS } from "@/services/impact";
 import type {
   ProfileGravityMetric,
@@ -205,6 +205,15 @@ export const SNOOZE_CHOICES = [
     accessibilityLabel: "Snooze for 1 month",
   },
   {
+    // 38.12 D-96: the indefinite snooze, submitted through the existing
+    // `onUntil(INDEFINITE_SNOOZE_UNTIL)` path so Undo, single-flight and the
+    // confirmation are unchanged. Placed after the presets and before the
+    // custom date (38.12-01 only).
+    kind: "indefinite" as const,
+    label: "Until I turn it off",
+    accessibilityLabel: "Snooze until I turn it off",
+  },
+  {
     kind: "custom" as const,
     label: "Choose date",
     accessibilityLabel: "Choose a custom snooze date",
@@ -239,6 +248,32 @@ export function snoozeCustomDateDefault(todayLocal: string): string {
   return formatLocalDate(new Date(year, month - 1, day + 1));
 }
 
+/**
+ * The custom date picker's latest pickable date (38.12-01 only): ten years
+ * after today, so a picked date can never equal `INDEFINITE_SNOOZE_UNTIL`.
+ * Local date parts only, never a UTC slice.
+ */
+export const SNOOZE_CUSTOM_MAX_YEARS = 10;
+
+export function snoozeCustomDateMaximum(todayLocal: string): string {
+  const [year, month, day] = todayLocal.slice(0, 10).split("-").map(Number);
+  return formatLocalDate(
+    new Date(year + SNOOZE_CUSTOM_MAX_YEARS, month - 1, day),
+  );
+}
+
+/**
+ * The one display of a snooze end (38.12 D-96; RESEARCH §1 rows 13-15): the
+ * indefinite sentinel reads "until you turn it off", never the year 9999; a
+ * date reads "until <display date>". Every snooze-end display (Overview tile,
+ * sheet header, confirmation) goes through here.
+ */
+export function snoozeUntilLabel(until: string): string {
+  return isIndefiniteSnooze(until)
+    ? "until you turn it off"
+    : `until ${formatDisplayDateOrFallback(until)}`;
+}
+
 /** What a single-contact snooze operation did (38.11 review V-03). */
 export type SnoozeOutcome =
   | { kind: "preset"; preset: SnoozePreset }
@@ -257,7 +292,7 @@ export function snoozeConfirmationLabel(
 ): string {
   if (outcome.kind === "unsnooze") return `Unsnoozed ${name}`;
   if (outcome.kind === "until") {
-    return `Snoozed ${name} until ${formatDisplayDateOrFallback(outcome.until)}`;
+    return `Snoozed ${name} ${snoozeUntilLabel(outcome.until)}`;
   }
   const choice = SNOOZE_CHOICES.find(
     (entry) => entry.kind === "preset" && entry.preset === outcome.preset,

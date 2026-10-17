@@ -1441,23 +1441,9 @@ export function EditContactScreen({
                 Attempts to reach out won't reset their orbit
               </AppText>
             </View>
-
-            <View style={styles.field}>
-              <View style={styles.toggleRow}>
-                <AppText role="label" style={{ color: colors.textPrimary }}>
-                  Mute reminders
-                </AppText>
-                <OrbitSwitch
-                  testID="edit-contact-reminders-off"
-                  accessibilityLabel="Mute reminders"
-                  value={form.remindersOff === 1}
-                  onValueChange={(v) => setField("remindersOff", v ? 1 : 0)}
-                />
-              </View>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Keep them in Orbit, but never get reminders about them.
-              </AppText>
-            </View>
+            {/* 38.12 D-96: the per-person mute switch is gone; a mute
+            is now Snooze → "Until I turn it off". `remindersOff` stays in the
+            form state as a pass-through (UpdateContactFullInput requires it). */}
           </AccordionSection>
 
           {/* -- Relationship Basics: Bound/Unbound + Frequency + (never-contacted)

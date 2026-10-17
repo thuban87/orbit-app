@@ -9,15 +9,18 @@ import {
 import { AppText } from "@/components/ui/AppText";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { ProfileSnapshot } from "@/db/profile-read";
+import { isIndefiniteSnooze } from "@/db/snooze-dao";
 import { packOverviewModules } from "@/profile/pack-overview";
 import type { ProfileOverviewModuleId } from "@/profile/persisted-contract";
+import { snoozeUntilLabel } from "@/profile/relationship-sheet-model";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import {
-  formatDisplayDateOrFallback,
+  formatLocalDate,
   formatStoredBirthdayForDisplay,
+  isSnoozed,
 } from "@/utils/dates";
 
 export type RelationshipSheetId =
@@ -27,6 +30,22 @@ export type RelationshipSheetId =
   | "frequency"
   | "birthday"
   | "snooze";
+
+/**
+ * The Snooze tile's value (38.12 D-37, D-96): the EFFECTIVE snooze, like the
+ * ⋯ menu and the sheet (`ProfileModuleHost` passes `isSnoozed(raw, today)`),
+ * so an expired `snooze_until` reads "Not snoozed"; an indefinite snooze reads
+ * "Snoozed · until you turn it off". Display only (38.9 D-48): the stored
+ * YYYY-MM-DD stays raw.
+ */
+function snoozeTileValue(snoozeUntil: string | null, todayLocal: string) {
+  if (snoozeUntil === null || !isSnoozed(snoozeUntil, todayLocal)) {
+    return "Not snoozed";
+  }
+  return isIndefiniteSnooze(snoozeUntil)
+    ? `Snoozed · ${snoozeUntilLabel(snoozeUntil)}`
+    : `Snoozed ${snoozeUntilLabel(snoozeUntil)}`;
+}
 
 function frequencyLabel(days: number | null): string {
   return days === null
@@ -39,6 +58,7 @@ export function RelationshipOverview({
   modules,
   onOpenSheet,
   onOpenHistory,
+  todayLocal = formatLocalDate(new Date()),
 }: {
   snapshot: ProfileSnapshot;
   modules: ProfileLayoutDocument["overview"];
@@ -49,6 +69,8 @@ export function RelationshipOverview({
    * with no tap action and no button semantics (D-11).
    */
   onOpenHistory?: () => void;
+  /** Today as a local `YYYY-MM-DD`, for the effective snooze (D-37). */
+  todayLocal?: string;
 }) {
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -109,13 +131,7 @@ export function RelationshipOverview({
     },
     snooze: {
       label: "Snooze",
-      value: snapshot.identity.snoozeUntil
-        ? // Display only (38.9 D-48): the stored YYYY-MM-DD stays raw.
-          `Snoozed until ${formatDisplayDateOrFallback(
-            snapshot.identity.snoozeUntil,
-            snapshot.identity.snoozeUntil,
-          )}`
-        : "Not snoozed",
+      value: snoozeTileValue(snapshot.identity.snoozeUntil ?? null, todayLocal),
     },
   };
   const action: Record<ProfileOverviewModuleId, (() => void) | undefined> = {

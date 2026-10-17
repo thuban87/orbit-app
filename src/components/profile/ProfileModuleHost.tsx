@@ -556,6 +556,7 @@ export function ProfileModuleHost({
                 modules={presentation.layout.document.overview}
                 onOpenSheet={setActiveSheet}
                 onOpenHistory={openHistory}
+                todayLocal={todayLocal}
               />
             </ProfileSection>
           );
