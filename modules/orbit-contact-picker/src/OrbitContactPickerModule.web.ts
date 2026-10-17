@@ -21,7 +21,10 @@ class OrbitContactPickerModule extends NativeModule<Record<never, never>> {
     return [];
   }
 
-  async readContactsByLookupKeys(_: string[]): Promise<PickedContact[]> {
+  async readContactsByLookupKeys(
+    _: string[],
+    _preferFullSize: boolean,
+  ): Promise<PickedContact[]> {
     return [];
   }
 }

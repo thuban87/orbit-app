@@ -9,7 +9,11 @@ declare class OrbitContactPickerModule extends NativeModule<
   pickContacts(options: PickContactsOptions): Promise<PickedContact[]>;
   readAllContacts(): Promise<PickedContact[]>;
   listContactsSummary(): Promise<ContactSummary[]>;
-  readContactsByLookupKeys(lookupKeys: string[]): Promise<PickedContact[]>;
+  /** D-137: preferFullSize is true only on import reads. */
+  readContactsByLookupKeys(
+    lookupKeys: string[],
+    preferFullSize: boolean,
+  ): Promise<PickedContact[]>;
 }
 
 export default requireNativeModule<OrbitContactPickerModule>(

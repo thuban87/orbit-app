@@ -44,11 +44,27 @@ internal class ContactReadException :
 private data class MutablePickedContact(
   val lookupKey: String,
   var displayName: String? = null,
-  val methods: MutableList<Map<String, String>> = mutableListOf(),
+  val methods: MutableList<Map<String, Any?>> = mutableListOf(),
   var birthday: String? = null,
   var note: String? = null,
   var photoTempUri: String? = null,
-)
+  // D-133: the thumbnail copy, only when photoTempUri holds the full-size copy.
+  var thumbnailTempUri: String? = null,
+  // D-132: SHA-256 of the thumbnail bytes (else full-size); stable across D-118.
+  var photoFingerprint: String? = null,
+) {
+  /** The one bridge shape every reader returns (photoFingerprint + thumbnailTempUri included). */
+  fun toBridgeMap(): Map<String, Any?> = mapOf(
+    "lookupKey" to lookupKey,
+    "displayName" to displayName,
+    "methods" to methods,
+    "birthday" to birthday,
+    "note" to note,
+    "photoTempUri" to photoTempUri,
+    "thumbnailTempUri" to thumbnailTempUri,
+    "photoFingerprint" to photoFingerprint,
+  )
+}
 
 private data class MutableContactSummary(
   val lookupKey: String,
@@ -133,9 +149,11 @@ class OrbitContactPickerModule : Module() {
       }
     }
 
-    AsyncFunction("readContactsByLookupKeys") { lookupKeys: List<String>, promise: Promise ->
+    // D-137: preferFullSize is true only on import reads; Check linked contacts
+    // passes false and keeps today's thumbnail-first bytes.
+    AsyncFunction("readContactsByLookupKeys") { lookupKeys: List<String>, preferFullSize: Boolean, promise: Promise ->
       try {
-        promise.resolve(readContactsByLookupKeys(lookupKeys))
+        promise.resolve(readContactsByLookupKeys(lookupKeys, preferFullSize))
       } catch (_: Exception) {
         // A provider error is distinct from a selected contact that disappeared.
         promise.reject(ContactReadException())
@@ -202,26 +220,14 @@ class OrbitContactPickerModule : Module() {
           ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
             // A provider can expose several Note rows; preserve the first non-blank value.
             contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
-          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
-            if (contact.photoTempUri == null) {
-              contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
-                ?: copyContactPhotoToCache(lookupKey)
-            }
-          }
+          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE ->
+            // Picker sessions are import-only: full-size first (D-118, D-137).
+            readPhotoRow(contact, cursor.blobAt(data15Column), preferFullSize = true)
         }
       }
     }
 
-    return contacts.values.map { contact ->
-      mapOf(
-        "lookupKey" to contact.lookupKey,
-        "displayName" to contact.displayName,
-        "methods" to contact.methods,
-        "birthday" to contact.birthday,
-        "note" to contact.note,
-        "photoTempUri" to contact.photoTempUri,
-      )
-    }
+    return contacts.values.map { contact -> contact.toBridgeMap() }
   }
 
   /**
@@ -282,26 +288,14 @@ class OrbitContactPickerModule : Module() {
           ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
             // A provider can expose several Note rows; preserve the first non-blank value.
             contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
-          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
-            if (contact.photoTempUri == null) {
-              contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
-                ?: copyContactPhotoToCache(lookupKey)
-            }
-          }
+          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE ->
+            // No production caller; keeps today's thumbnail-first bytes (D-137).
+            readPhotoRow(contact, cursor.blobAt(data15Column), preferFullSize = false)
         }
       }
     }
 
-    return contacts.values.map { contact ->
-      mapOf(
-        "lookupKey" to contact.lookupKey,
-        "displayName" to contact.displayName,
-        "methods" to contact.methods,
-        "birthday" to contact.birthday,
-        "note" to contact.note,
-        "photoTempUri" to contact.photoTempUri,
-      )
-    }
+    return contacts.values.map { contact -> contact.toBridgeMap() }
   }
 
   /**
@@ -376,7 +370,10 @@ class OrbitContactPickerModule : Module() {
    * Contacts query keeps selected name-only contacts in the result; the Data
    * query adds methods, birthday, and only then a staged full photo.
    */
-  private fun readContactsByLookupKeys(lookupKeys: List<String>): List<Map<String, Any?>> {
+  private fun readContactsByLookupKeys(
+    lookupKeys: List<String>,
+    preferFullSize: Boolean,
+  ): List<Map<String, Any?>> {
     if (lookupKeys.isEmpty()) return emptyList()
 
     val contacts = linkedMapOf<String, MutablePickedContact>()
@@ -448,26 +445,65 @@ class OrbitContactPickerModule : Module() {
           ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
             // A provider can expose several Note rows; preserve the first non-blank value.
             contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
-          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
-            if (contact.photoTempUri == null) {
-              contact.photoTempUri = cursor.blobAt(data15Column)?.let(::copyPhotoToCache)
-                ?: copyContactPhotoToCache(lookupKey)
-            }
-          }
+          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE ->
+            readPhotoRow(contact, cursor.blobAt(data15Column), preferFullSize)
         }
       }
     }
 
-    return contacts.values.map { contact ->
-      mapOf(
-        "lookupKey" to contact.lookupKey,
-        "displayName" to contact.displayName,
-        "methods" to contact.methods,
-        "birthday" to contact.birthday,
-        "note" to contact.note,
-        "photoTempUri" to contact.photoTempUri,
-      )
+    return contacts.values.map { contact -> contact.toBridgeMap() }
+  }
+
+  /**
+   * One Photo row → the contact's photo copies and fingerprint, for all three
+   * readers. The first Photo row that yields a copy wins.
+   *
+   * preferFullSize = true (import, D-118/D-135/D-137): the full-size lookup-URI
+   * read first, the DATA15 thumbnail as fallback; when the full-size copy is
+   * used, the thumbnail is also copied separately for "Import with smaller
+   * photos" (D-133). Without READ_CONTACTS (API-37 picker) the lookup read
+   * fails inside copyContactPhotoToCache and the thumbnail is used.
+   *
+   * preferFullSize = false (Check linked contacts, D-137): today's
+   * thumbnail-first bytes, full-size only when there is no thumbnail.
+   *
+   * Never resized here: every master still goes through encodeMaster, which
+   * never upscales (ADR-181).
+   *
+   * The fingerprint (D-132) hashes the thumbnail bytes when present, else the
+   * full-size copy, on every path, so it does not change when import switches
+   * from thumbnail to full-size bytes.
+   */
+  private fun readPhotoRow(
+    contact: MutablePickedContact,
+    data15: ByteArray?,
+    preferFullSize: Boolean,
+  ) {
+    if (contact.photoTempUri != null) return
+    val thumbBytes = data15?.takeIf { it.isNotEmpty() }
+    var fullCopy: String? = null
+    if (preferFullSize) {
+      fullCopy = copyContactPhotoToCache(contact.lookupKey)
+      contact.photoTempUri = fullCopy ?: thumbBytes?.let(::copyPhotoToCache)
+      contact.thumbnailTempUri =
+        if (fullCopy != null) thumbBytes?.let(::copyPhotoToCache) else null
+    } else {
+      val thumbCopy = thumbBytes?.let(::copyPhotoToCache)
+      if (thumbCopy == null) fullCopy = copyContactPhotoToCache(contact.lookupKey)
+      contact.photoTempUri = thumbCopy ?: fullCopy
+      contact.thumbnailTempUri = null
     }
+    contact.photoFingerprint = when {
+      thumbBytes != null -> photoFingerprint(thumbBytes)
+      fullCopy != null -> fingerprintCacheCopy(fullCopy)
+      else -> null
+    }
+  }
+
+  private fun fingerprintCacheCopy(fileUri: String): String? = try {
+    Uri.parse(fileUri).path?.let { path -> File(path).inputStream().use { stream -> photoFingerprint(stream) } }
+  } catch (_: Exception) {
+    null
   }
 
   private fun copyContactPhotoToCache(lookupKey: String): String? = try {

@@ -91,18 +91,37 @@ export function listContactsSummary(): Promise<ContactSummary[]> {
   return OrbitContactPickerModule.listContactsSummary();
 }
 
+export interface ReadContactsOptions {
+  /**
+   * D-137: full-size photos are import-only. Import reads pass true (full-size
+   * first, thumbnail copy handed over separately); the default false keeps
+   * today's thumbnail-first bytes for Check linked contacts. photoFingerprint
+   * is emitted either way (D-132).
+   */
+  readonly preferFullSize?: boolean;
+}
+
+export interface ReadAllContactsOptions extends ReadContactsOptions {
+  /** Keys per native provider read; defaults to CONTACT_LOOKUP_KEY_CHUNK_LIMIT. */
+  readonly chunkLimit?: number;
+}
+
 /** Read one bounded provider chunk; an empty chunk must never query the provider. */
 export function readContactsByLookupKeys(
   lookupKeys: readonly string[],
+  options?: ReadContactsOptions,
 ): Promise<PickedContact[]> {
   if (lookupKeys.length === 0) return Promise.resolve([]);
-  return OrbitContactPickerModule.readContactsByLookupKeys([...lookupKeys]);
+  return OrbitContactPickerModule.readContactsByLookupKeys(
+    [...lookupKeys],
+    options?.preferFullSize ?? false,
+  );
 }
 
 export function readAllContacts(): Promise<PickedContact[]>;
 export function readAllContacts(
   lookupKeys: readonly string[],
-  chunkLimit?: number,
+  options?: ReadAllContactsOptions,
 ): Promise<SelectedReadResult>;
 /**
  * The legacy no-argument path remains backwards-compatible for non-browse
@@ -110,7 +129,7 @@ export function readAllContacts(
  */
 export async function readAllContacts(
   lookupKeys?: readonly string[],
-  chunkLimit = CONTACT_LOOKUP_KEY_CHUNK_LIMIT,
+  options?: ReadAllContactsOptions,
 ): Promise<PickedContact[] | SelectedReadResult> {
   if (lookupKeys === undefined)
     return OrbitContactPickerModule.readAllContacts();
@@ -120,17 +139,21 @@ export async function readAllContacts(
   const selectedOrder = [...new Set(lookupKeys)];
   if (selectedOrder.length === 0) return { contacts: [], omittedCount: 0 };
 
+  const chunkLimit = options?.chunkLimit ?? CONTACT_LOOKUP_KEY_CHUNK_LIMIT;
+  const preferFullSize = options?.preferFullSize ?? false;
   const completedChunks: PickedContact[][] = [];
   try {
     for (const chunk of chunkLookupKeys(selectedOrder, chunkLimit)) {
-      completedChunks.push(await readContactsByLookupKeys(chunk));
+      completedChunks.push(
+        await readContactsByLookupKeys(chunk, { preferFullSize }),
+      );
     }
   } catch (error) {
     // A completed chunk can have already copied a full contact photo into cache.
     // Best-effort cleanup preserves the original provider failure for the caller.
     for (const photoUri of completedChunks
       .flat()
-      .map((contact) => contact.photoTempUri)
+      .flatMap((contact) => [contact.photoTempUri, contact.thumbnailTempUri])
       .filter((uri): uri is string => uri != null)) {
       try {
         new File(photoUri).delete();
