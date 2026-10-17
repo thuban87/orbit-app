@@ -494,3 +494,67 @@ describe("review list eligibility and locks (ADR-136; D-86, D-102, D-103)", () =
     expect(await allowOf("memories", restored.id)).toBe(0);
   });
 });
+
+describe("photo-type custom fields stay out of AI Data Permissions (38.12 D-129, D-138; convergence c3 D-4)", () => {
+  async function seedTextAndPhoto() {
+    const casey = await seedContact("Casey");
+    const defs: Record<string, number> = {};
+    for (const [label, type, value] of [
+      ["Hometown", "text", "Madison"],
+      ["Portrait", "photo", "file:///photos/casey.jpg"],
+    ] as const) {
+      const def = await exec.runAsync(
+        `INSERT INTO custom_field_defs
+           (uid,col_name,label,type,display_order,share_with_ai,created_at,modified_at)
+         VALUES (?,?,?,?,0,0,?,?)`,
+        [uid(), label.toLowerCase(), label, type, NOW, NOW],
+      );
+      defs[type] = def.lastInsertRowId;
+      await exec.runAsync(
+        `INSERT INTO custom_field_values
+           (uid,contact_id,field_def_id,value,created_at,modified_at)
+         VALUES (?,?,?,?,?,?)`,
+        [uid(), casey, def.lastInsertRowId, value, NOW, NOW],
+      );
+    }
+    return defs as { text: number; photo: number };
+  }
+
+  it("the custom-field review list holds the text value and never the photo value", async () => {
+    await seedTextAndPhoto();
+    const items = await listAiPermissionItems(exec, {
+      category: "custom-field",
+    });
+    expect(items.map((item) => [item.label, item.value])).toEqual([
+      ["Hometown", "Madison"],
+    ]);
+    const all = await listAiPermissionItems(exec, {});
+    expect(all.some((item) => item.label === "Portrait")).toBe(false);
+  });
+
+  it("enabling a photo definition through the bulk writer leaves share_with_ai at 0", async () => {
+    const defs = await seedTextAndPhoto();
+    const refs: AiPermissionRef[] = [
+      { category: "custom-field", id: defs.text },
+      { category: "custom-field", id: defs.photo },
+    ];
+    await bulkEnableAiPermissions(exec, refs, NOW);
+    const rows = await exec.getAllAsync<{ type: string; share: number }>(
+      "SELECT type, share_with_ai AS share FROM custom_field_defs WHERE id IN (?, ?) ORDER BY id",
+      [defs.text, defs.photo],
+    );
+    expect(rows).toEqual([
+      { type: "text", share: 1 },
+      { type: "photo", share: 0 },
+    ]);
+  });
+
+  it("the enable impact never counts a photo definition", async () => {
+    const defs = await seedTextAndPhoto();
+    await expect(
+      getBulkPermissionImpact(exec, [
+        { category: "custom-field", id: defs.photo },
+      ]),
+    ).resolves.toEqual({ contacts: 0, items: 0 });
+  });
+});

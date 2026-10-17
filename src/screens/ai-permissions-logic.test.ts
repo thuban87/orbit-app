@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AiPermissionItem } from "@/db/ai-permissions-dao";
 import {
   buildPermissionSummaryCopy,
+  defaultRowCaption,
   filterAiPermissionItems,
   groupAiPermissionItems,
   isPermissionFilterActive,
@@ -183,7 +184,7 @@ describe("buildPermissionSummaryCopy", () => {
     });
     expect(copy.accessLine).toBe("AI can use 2 items, from 2 contacts.");
     expect(copy.listLine).toBe("This list: 0 of 3 items.");
-    expect(copy.emptyLine).toBe("No information matches these filters.");
+    expect(copy.emptyLine).toBe("No items match this filter.");
   });
 
   it("prints no count at all when the load failed", () => {
@@ -642,5 +643,47 @@ describe("locked items in the review list (38.10 D-102, D-103)", () => {
     expect(permissionItemA11yLabel(OFF_LIMITS_NOTE)).toBe(
       "Interaction note: Private, Disabled, AI can't access. Moved to Off Limits, so AI stays off.",
     );
+  });
+});
+
+describe("filter-empty copy is its own (38.12 D-88; 38.4 #17)", () => {
+  const disabledOnly = ITEMS.filter((item) => item.enabled === 0);
+
+  it("a filter that hides every item says so, even when AI can access nothing", () => {
+    // Items exist (all disabled); a type filter with Enabled only OFF hides them.
+    const copy = buildPermissionSummaryCopy({
+      allItems: disabledOnly,
+      filteredItems: [],
+      enabledOnly: false,
+      loadFailed: false,
+    });
+    expect(copy.emptyLine).toBe("No items match this filter.");
+    expect(copy.emptyLine).toBe(PERMISSION_NO_MATCH_COPY);
+  });
+
+  it("the empty-library copy shows only with no items at all, or Enabled only with none enabled", () => {
+    expect(
+      buildPermissionSummaryCopy({
+        allItems: [],
+        filteredItems: [],
+        enabledOnly: false,
+        loadFailed: false,
+      }).emptyLine,
+    ).toBe("AI can't access any contact information yet.");
+    expect(
+      buildPermissionSummaryCopy({
+        allItems: disabledOnly,
+        filteredItems: [],
+        enabledOnly: true,
+        loadFailed: false,
+      }).emptyLine,
+    ).toBe("AI can't access any contact information yet.");
+  });
+});
+
+describe("default-row captions follow their switches (38.12 D-88, D-28)", () => {
+  it("names the state the switch sets for new items", () => {
+    expect(defaultRowCaption(true)).toBe("New items start with Allow AI on.");
+    expect(defaultRowCaption(false)).toBe("New items start with Allow AI off.");
   });
 });

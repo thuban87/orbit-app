@@ -105,3 +105,46 @@ describe("AI permissions labels carry count and access state (Lane D WR-03)", ()
     expect(screen).not.toMatch(/accessibilityLabel=\{`\$\{item\.label\}/);
   });
 });
+
+describe("AI permissions defaults and review link (38.12 D-86, D-88, D-28)", () => {
+  it("every default row's caption follows its switch", () => {
+    expect(screen).toContain(
+      "<DefaultRowCaption text={defaultRowCaption(defaults[row.key] === 1)} />",
+    );
+    // No fixed caption text on the rows.
+    expect(screen).not.toMatch(/caption: "New items default/);
+  });
+
+  it("lists all five default rows, including 38.10's Gift Ideas and Thought of Them", () => {
+    for (const key of [
+      'defaultKey: "memory"',
+      'defaultKey: "gift_idea"',
+      'defaultKey: "thought_of_them"',
+      'defaultKey: "interaction-note"',
+      'defaultKey: "custom-field"',
+    ]) {
+      expect(screen, key).toContain(key);
+    }
+  });
+
+  it("Review existing… scrolls the page to the review list", () => {
+    expect(screen).toContain("const scrollRef = useRef<ScrollView>(null);");
+    expect(screen).toContain("const reviewY = useRef(0);");
+    expect(screen).toMatch(
+      /onLayout=\{\(event\) => \{\s*reviewY\.current = event\.nativeEvent\.layout\.y;/,
+    );
+    const link = screen.slice(
+      screen.indexOf(
+        "accessibilityLabel={`Review existing $" + "{row.label}`}",
+      ),
+    );
+    expect(link.slice(0, link.indexOf("</Pressable>"))).toMatch(
+      /scrollRef\.current\?\.scrollTo\(\{\s*y: reviewY\.current/,
+    );
+  });
+
+  it("draws its section cards with the shared Settings section card (D-119)", () => {
+    expect(screen).toContain("<SettingsSectionCard");
+    expect(screen).not.toContain("<GlassSurface");
+  });
+});

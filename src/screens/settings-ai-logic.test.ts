@@ -13,13 +13,16 @@ import { SEED_CATALOG } from "@/ai/model-registry";
 import { resolvePrompt, STATIC_INSTRUCTION } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import {
+  AI_PREVIEW_COPY,
   buildAiSettingsPatch,
   buildContactPromptReview,
   buildInspectorViewState,
+  buildPreviewContactCard,
   buildProviderAckViewState,
   buildWholePromptPreview,
   describeAiDataPath,
   discoverModelsForField,
+  previewSectionTitle,
   shouldShowFirstUseDisclosure,
   validateEndpointForSave,
 } from "@/screens/settings-ai-logic";
@@ -372,5 +375,101 @@ describe("first-use AI disclosure", () => {
         disclosed: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe("AI Preview reads in plain words (38.12 D-89, D-88)", () => {
+  const RICH: PromptContext = {
+    ...EMPTY_CONTEXT,
+    sharedFields: [{ label: "City", value: "Madison" }],
+    sharedMemories: [{ label: "Trip", value: "Coast" }],
+    writingStyle: {
+      tone: "custom",
+      length: "concise",
+      directness: "gentle",
+      freeform: "Warm",
+    },
+    personalizationSections: [
+      {
+        uid: "s-1",
+        title: "Me",
+        body: "I garden.",
+        enabled: true,
+        displayOrder: 0,
+      },
+    ],
+  };
+
+  it("section titles are plain words, never the payload's delimiter names", () => {
+    const whole = buildWholePromptPreview(resolvePrompt("", RICH));
+    const titles = whole.sections.map((section) => section.title);
+    expect(titles).toContain("About this person");
+    expect(titles).toContain("Your style");
+    expect(titles).toContain("Memory 1");
+    expect(titles).toContain("Your context 1");
+    expect(titles[0]).toBe("Orbit's instructions");
+    for (const title of titles) {
+      expect(title, title).not.toMatch(/^[A-Z0-9 ]+$/);
+      expect(title).not.toMatch(/contract/i);
+    }
+  });
+
+  it("plain titles change nothing sent: every section is still an exact slice of the payload", () => {
+    const resolved = resolvePrompt("Be kind.", RICH);
+    const whole = buildWholePromptPreview(resolved);
+    expect(whole.display).toBe(resolved.payload);
+    expect(whole.raw).toBe(resolved.payload);
+    for (const section of whole.sections) {
+      expect(resolved.payload).toContain(section.content);
+    }
+  });
+
+  it("maps each payload block to a plain title, with a readable fallback", () => {
+    expect(previewSectionTitle("CONTACT CONTEXT")).toBe("About this person");
+    expect(previewSectionTitle("WRITING STYLE")).toBe("Your style");
+    expect(previewSectionTitle("SHARED MEMORY 2")).toBe("Memory 2");
+    expect(previewSectionTitle("RECENT INTERACTION 3")).toBe(
+      "Recent interaction 3",
+    );
+    expect(previewSectionTitle("PERSONALIZATION CONTEXT 4")).toBe(
+      "Your context 4",
+    );
+    expect(previewSectionTitle("MESSAGE FOCUS")).toBe("What to focus on");
+    expect(previewSectionTitle("SOMETHING NEW")).toBe("Something new");
+  });
+
+  it("with no contact chosen the card says so instead of hiding by name", () => {
+    const card = buildPreviewContactCard(
+      null,
+      resolvePrompt("", EMPTY_CONTEXT),
+    );
+    expect(card).toEqual({
+      kind: "none",
+      message: AI_PREVIEW_COPY.noContact,
+    });
+  });
+
+  it("a contact literally named 'Example contact' still gets its card", () => {
+    const context = { ...RICH, contactName: "Example contact" };
+    const card = buildPreviewContactCard(context, resolvePrompt("", context));
+    expect(card.kind).toBe("contact");
+    if (card.kind !== "contact") return;
+    expect(card.heading).toBe("Sharing 2 items with AI about Example contact");
+  });
+
+  it("the contact card carries the contact's context, byte-for-byte from the payload", () => {
+    const resolved = resolvePrompt("", RICH);
+    const card = buildPreviewContactCard(RICH, resolved);
+    if (card.kind !== "contact") throw new Error("no contact card");
+    expect(card.display).toContain("===== DATA: CONTACT CONTEXT =====");
+    expect(card.display).toContain("Madison");
+    expect(card.display).toBe(buildContactPromptReview(resolved, RICH).display);
+    for (const block of card.display.split("\n\n")) {
+      expect(resolved.payload).toContain(block);
+    }
+  });
+
+  it("the page copy says where the contact's part appears", () => {
+    expect(AI_PREVIEW_COPY.contactIntro).toMatch(/first/i);
   });
 });
