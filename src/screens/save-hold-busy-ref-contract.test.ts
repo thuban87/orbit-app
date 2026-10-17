@@ -305,6 +305,31 @@ describe("AIPersonalizationScreen holds the section editors while a save runs", 
     }
   });
 
+  // 38.12 D-88: every personalization control locks while a save runs.
+  it("holds the Writing Style choices, guidance and list actions while a save runs", () => {
+    const rows = source.match(/<StyleRow\n[\s\S]*?\/>/g) ?? [];
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(row).toContain("disabled={sectionFormBusy}");
+    const styleAt = source.indexOf("function StyleRow<");
+    const style = blockFrom(
+      source,
+      source.indexOf("}: StyleRowProps<V>) {", styleAt) + 21,
+      "StyleRow",
+    );
+    expect(style).toMatch(/<SegmentedControl[\s\S]*?disabled=\{disabled\}/);
+    expect(source).toContain("editable={!sectionFormBusy}");
+    for (const label of [
+      'label="Import .txt / .md"',
+      'label="Add / paste section"',
+    ]) {
+      const at = source.indexOf(label);
+      expect(at, label).toBeGreaterThan(-1);
+      expect(source.slice(at, source.indexOf("/>", at)), label).toMatch(
+        /disabled=\{(?:sectionFormBusy|listBusy)\}/,
+      );
+    }
+  });
+
   it("SectionEditor passes busy through to the form it renders", () => {
     const body = componentBody("SectionEditor");
     expect(body).toMatch(/<NewSectionEditor[\s\S]*?busy=\{busy\}[\s\S]*?\/>/);

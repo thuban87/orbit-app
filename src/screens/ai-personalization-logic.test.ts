@@ -9,6 +9,7 @@ import {
   applyStyleLoad,
   applyStyleSave,
   createEstimateDebouncer,
+  customGuidanceCaption,
   formatEstimateCaption,
   hasSectionDraftChanges,
   initialStyleSync,
@@ -355,6 +356,24 @@ describe("the estimate counts guidance only when it is sent (38.12 D-127)", () =
         ),
       ).toBe("My guidance\nTitle first\nBody first");
     }
+  });
+
+  it("the guidance caption names the custom choices, or is absent", () => {
+    expect(customGuidanceCaption(STYLE)).toBeNull();
+    expect(customGuidanceCaption({ ...STYLE, tone: "custom" })).toBe(
+      "Tone is set to use custom guidance:",
+    );
+    expect(
+      customGuidanceCaption({ ...STYLE, tone: "custom", length: "custom" }),
+    ).toBe("Tone and Length are set to use custom guidance:");
+    expect(
+      customGuidanceCaption({
+        ...STYLE,
+        tone: "custom",
+        length: "custom",
+        directness: "custom",
+      }),
+    ).toBe("Tone, Length and Directness are set to use custom guidance:");
   });
 
   it("usesCustomGuidance is true only with a custom choice", () => {

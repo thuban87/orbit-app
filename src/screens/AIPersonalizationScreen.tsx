@@ -86,6 +86,7 @@ import {
   applyStyleLoad,
   applyStyleSave,
   createEstimateDebouncer,
+  customGuidanceCaption,
   formatEstimateCaption,
   hasSectionDraftChanges,
   initialStyleSync,
@@ -95,6 +96,7 @@ import {
   personalizationEstimateSource,
   reorderSectionUids,
   type StyleSyncState,
+  usesCustomGuidance,
 } from "./ai-personalization-logic";
 
 const LOG_SCOPE = "ai-personalization";
@@ -111,26 +113,33 @@ const DEFAULT_STYLE: WritingStyle = {
   freeform: "",
 };
 
+/**
+ * Each Writing Style choice offers its presets plus Custom (38.12 D-87): a
+ * custom choice is its own selected segment, so no preset reads as selected
+ * beside it.
+ */
+const CUSTOM_OPTION = { label: "Custom", value: "custom" } as const;
+
 const TONE_OPTIONS = [
   { label: "Casual", value: "casual" },
   { label: "Balanced", value: "balanced" },
   { label: "Polished", value: "polished" },
-] satisfies Array<{ label: string; value: Exclude<WritingTone, "custom"> }>;
+  CUSTOM_OPTION,
+] satisfies Array<{ label: string; value: WritingTone }>;
 
 const LENGTH_OPTIONS = [
   { label: "Concise", value: "concise" },
   { label: "Normal", value: "normal" },
   { label: "Detailed", value: "detailed" },
-] satisfies Array<{ label: string; value: Exclude<WritingLength, "custom"> }>;
+  CUSTOM_OPTION,
+] satisfies Array<{ label: string; value: WritingLength }>;
 
 const DIRECTNESS_OPTIONS = [
   { label: "Gentle", value: "gentle" },
   { label: "Balanced", value: "balanced" },
   { label: "Direct", value: "direct" },
-] satisfies Array<{
-  label: string;
-  value: Exclude<WritingDirectness, "custom">;
-}>;
+  CUSTOM_OPTION,
+] satisfies Array<{ label: string; value: WritingDirectness }>;
 
 interface ActiveEstimateModel {
   lane: AiCloudProviderId;
@@ -613,69 +622,58 @@ export function AIPersonalizationScreen({
           <AppText role="heading">Writing Style</AppText>
           <StyleRow
             label="Tone"
-            custom={style.tone === "custom"}
             options={TONE_OPTIONS}
-            value={style.tone === "custom" ? "balanced" : style.tone}
+            value={style.tone}
+            disabled={sectionFormBusy}
             onChange={(tone) => setStyle((current) => ({ ...current, tone }))}
-            onToggleCustom={() =>
-              setStyle((current) => ({
-                ...current,
-                tone: current.tone === "custom" ? "balanced" : "custom",
-              }))
-            }
           />
           <StyleRow
             label="Length"
-            custom={style.length === "custom"}
             options={LENGTH_OPTIONS}
-            value={style.length === "custom" ? "normal" : style.length}
+            value={style.length}
+            disabled={sectionFormBusy}
             onChange={(length) =>
               setStyle((current) => ({ ...current, length }))
-            }
-            onToggleCustom={() =>
-              setStyle((current) => ({
-                ...current,
-                length: current.length === "custom" ? "normal" : "custom",
-              }))
             }
           />
           <StyleRow
             label="Directness"
-            custom={style.directness === "custom"}
             options={DIRECTNESS_OPTIONS}
-            value={
-              style.directness === "custom" ? "balanced" : style.directness
-            }
+            value={style.directness}
+            disabled={sectionFormBusy}
             onChange={(directness) =>
               setStyle((current) => ({ ...current, directness }))
             }
-            onToggleCustom={() =>
-              setStyle((current) => ({
-                ...current,
-                directness:
-                  current.directness === "custom" ? "balanced" : "custom",
-              }))
-            }
           />
-          <AppText role="label">Custom guidance</AppText>
-          <TextInput
-            accessibilityLabel="Custom Writing Style guidance"
-            multiline
-            placeholder="Optional guidance in your own words"
-            placeholderTextColor={colors.textPlaceholder}
-            value={style.freeform}
-            onChangeText={(freeform) =>
-              setStyle((current) => ({ ...current, freeform }))
-            }
-            style={[
-              styles.bodyInput,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
+          {/* The guidance is sent only while a choice is Custom (D-127), so
+              its box shows only then; hiding it keeps the stored text. */}
+          {usesCustomGuidance(style) ? (
+            <View style={styles.styleRow}>
+              <AppText role="label">Custom guidance</AppText>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                {customGuidanceCaption(style)}
+              </AppText>
+              <TextInput
+                accessibilityLabel="Custom Writing Style guidance"
+                multiline
+                editable={!sectionFormBusy}
+                placeholder="Optional guidance in your own words"
+                placeholderTextColor={colors.textPlaceholder}
+                value={style.freeform}
+                onChangeText={(freeform) =>
+                  setStyle((current) => ({ ...current, freeform }))
+                }
+                style={[
+                  styles.bodyInput,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+              />
+            </View>
+          ) : null}
           <Button
             role="primary"
             label={savingStyle ? "Saving…" : "Save Writing Style"}
@@ -693,7 +691,11 @@ export function AIPersonalizationScreen({
             <Button
               role="secondary"
               label="Import .txt / .md"
-              onPress={() => void importFile()}
+              disabled={listBusy}
+              onPress={() => {
+                if (savingRef.current) return;
+                void importFile();
+              }}
             />
           </View>
           <AppText role="caption" style={{ color: colors.textSecondary }}>
@@ -776,6 +778,7 @@ export function AIPersonalizationScreen({
             <Button
               role="primary"
               label="Add / paste section"
+              disabled={sectionFormBusy}
               onPress={() => setAdding(true)}
             />
           )}
@@ -838,20 +841,20 @@ export function AIPersonalizationScreen({
 
 interface StyleRowProps<V extends string> {
   label: string;
-  custom: boolean;
+  /** The presets plus Custom (D-87). */
   options: Array<{ label: string; value: V }>;
   value: V;
   onChange: (value: V) => void;
-  onToggleCustom: () => void;
+  /** A save is in flight: the choice is held (D-88). */
+  disabled: boolean;
 }
 
 function StyleRow<V extends string>({
   label,
-  custom,
   options,
   value,
   onChange,
-  onToggleCustom,
+  disabled,
 }: StyleRowProps<V>) {
   return (
     <View style={styles.styleRow}>
@@ -861,11 +864,7 @@ function StyleRow<V extends string>({
         options={options}
         value={value}
         onChange={onChange}
-      />
-      <Button
-        role="tertiary"
-        label={custom ? `Use ${label} controls` : "Use custom guidance instead"}
-        onPress={onToggleCustom}
+        disabled={disabled}
       />
     </View>
   );
@@ -1032,6 +1031,7 @@ function NewSectionEditor({
       <AppText role="label">New personalization section</AppText>
       <TextInput
         accessibilityLabel="Section title"
+        editable={!busy}
         placeholder="Section title"
         placeholderTextColor={colors.textPlaceholder}
         value={title}
@@ -1047,6 +1047,7 @@ function NewSectionEditor({
       />
       <TextInput
         accessibilityLabel="Section text"
+        editable={!busy}
         multiline
         placeholder="Paste or type context"
         placeholderTextColor={colors.textPlaceholder}

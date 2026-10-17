@@ -605,3 +605,30 @@ describe("personalization controls lock while a save runs (38.12 D-88)", () => {
       ).toBe(true);
   });
 });
+
+describe("the section forms hold their text while a save runs (38.12 D-88)", () => {
+  it("the new-section form's fields and buttons are held while busy", () => {
+    const tree = render({
+      sections: SECTIONS,
+      adding: true,
+      savingStyle: true,
+    });
+    const form = tree.find(
+      (node) =>
+        typeof node.type === "function" &&
+        (node.type as { name?: string }).name === "NewSectionEditor",
+    );
+    if (!form) throw new Error("no NewSectionEditor");
+    expect(form.props.busy).toBe(true);
+    const formTree = nodes(
+      (form.type as (props: Record<string, unknown>) => ReactNode)(form.props),
+    );
+    for (const label of ["Section title", "Section text"]) {
+      const input = formTree.find(
+        (node) =>
+          node.type === "TextInput" && node.props.accessibilityLabel === label,
+      );
+      expect(input?.props.editable, label).toBe(false);
+    }
+  });
+});

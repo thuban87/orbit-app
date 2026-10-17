@@ -68,7 +68,15 @@ export interface SegmentedControlProps<V extends string> {
    * currently used only by the History lens row (38.8 D-24).
    */
   density?: "regular" | "compact";
+  /**
+   * Hold every segment (a save in flight, 38.12 D-88): presses are ignored, the
+   * row dims and each segment announces disabled. Absent → false.
+   */
+  disabled?: boolean;
 }
+
+/** Opacity of a held row (the shared switch's disabled dim, D-26). */
+export const SEGMENTED_DISABLED_OPACITY = 0.5;
 
 export function SegmentedControl<V extends string>({
   options,
@@ -76,6 +84,7 @@ export function SegmentedControl<V extends string>({
   onChange,
   testID = "orrery-view-toggle",
   density = "regular",
+  disabled = false,
 }: SegmentedControlProps<V>) {
   const { colors } = useTheme();
   const compact = density === "compact";
@@ -83,7 +92,11 @@ export function SegmentedControl<V extends string>({
   return (
     <View
       testID={testID}
-      style={[styles.row, compact ? { gap: COMPACT_SEGMENT.gap } : null]}
+      style={[
+        styles.row,
+        compact ? { gap: COMPACT_SEGMENT.gap } : null,
+        disabled ? { opacity: SEGMENTED_DISABLED_OPACITY } : null,
+      ]}
     >
       {options.map((option) => {
         const isActive = option.value === value;
@@ -92,9 +105,13 @@ export function SegmentedControl<V extends string>({
             key={option.value}
             testID={`${testID}-${option.value}`}
             accessibilityRole="button"
-            accessibilityState={{ selected: isActive }}
+            accessibilityState={{ selected: isActive, disabled }}
             accessibilityLabel={option.label}
-            onPress={() => onChange(option.value)}
+            disabled={disabled}
+            onPress={() => {
+              if (disabled) return;
+              onChange(option.value);
+            }}
             style={[
               styles.segment,
               compact

@@ -38,13 +38,26 @@ export function createEstimateDebouncer(
   };
 }
 
-/** Text measured by the Personalization Context estimate (enabled rows only). */
+/**
+ * Whether any Writing Style choice (tone, length, directness) is "custom". The
+ * custom guidance text is sent only then (38.12 D-127, the gate in
+ * `resolvePrompt`'s Writing Style block), so the page shows its box only then
+ * and the estimate counts it only then.
+ */
+export function usesCustomGuidance(style: WritingStyle): boolean {
+  return [style.tone, style.length, style.directness].includes("custom");
+}
+
+/**
+ * Text measured by the Personalization Context estimate: the custom guidance
+ * while it is sent (D-127), then the enabled sections only.
+ */
 export function personalizationEstimateSource(
   style: WritingStyle,
   sections: readonly PersonalizationSection[],
 ): string {
   return [
-    style.freeform.trim(),
+    usesCustomGuidance(style) ? style.freeform.trim() : "",
     ...sections
       .filter((section) => section.enabled)
       .sort(
@@ -114,6 +127,28 @@ export function orderSectionsByUid(
     ...ordered,
     ...sections.filter((section) => !placed.has(section.uid)),
   ];
+}
+
+/**
+ * The guidance box caption naming the choices that use it (38.12 D-87): the
+ * one place the page says "use custom guidance". Null with no custom choice.
+ */
+export function customGuidanceCaption(style: WritingStyle): string | null {
+  const names = (
+    [
+      ["Tone", style.tone],
+      ["Length", style.length],
+      ["Directness", style.directness],
+    ] as const
+  )
+    .filter(([, value]) => value === "custom")
+    .map(([name]) => name);
+  if (names.length === 0) return null;
+  const list =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `${list} ${names.length === 1 ? "is" : "are"} set to use custom guidance:`;
 }
 
 export function formatEstimateCaption(
