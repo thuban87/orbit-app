@@ -109,3 +109,12 @@ file:line, what the user would see.
 
 Triage with the owner: fix, or mark as left on purpose. Items 1, 7, 10, 12, 13, 17 and 20 change what a user sees or
 hears. Items 2, 5, 8, 14 and 15 are hardening against states that cannot happen today. Item 11 belongs with Phase 38.5.
+
+## Triaged 2026-10-16 (backlog cleanup, owner-approved)
+
+Re-checked all 21 against the code on `main @ 33cdad8d`.
+
+- **Fixed or obsolete (4):** 10 (date-detail sheet retired in 38.8-03 `bcd4e089`; the new History stream reads "Archived, <time>" as one label, `HistoryStreamRows.tsx:194`); 13 (the dropdown now uses the shared `OptionSheet`, 38.9-12 `2e48aae4`); 19 (the unused import is gone, `MemoryScreen.tsx` was deleted in 38.10-17 `75014522`, and `biome lint` is clean); 20 (pluralised, 38.9-16 `2e793ff1`).
+- **Half fixed:** 9 (the dropdown half is fixed: "Select…" renders in `textSecondary` via `OptionSelectRow`); 12 ("1 interactions" is fixed; the Year grid is still off-centre and routed to 38.14).
+- **Left as is (owner, 2026-10-16):** 6 (debug log on narrow layouts) and the text-field half of 9 (an unused `placeholderTextColor`). No user effect.
+- **Routed to new todos:** 2, 3, 4, 14, 15, 16, 17, 21 → `2026-10-16-38-4-review-leftovers-38-12`; 1, 7, 18 → `…-38-13`; 12 (Year centring) → `…-38-14`; 5, 8, 11 → `…-40`.

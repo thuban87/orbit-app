@@ -8,6 +8,7 @@ files:
   - src/screens/DuplicateReviewScreen.tsx
   - src/screens/ImportCompleteScreen.tsx
 
+target_phase: 38.12
 source: 38.4 owner checklist item 25 (OWN-O3), owner 2026-09-28 — passed functionally, but "the screens here are terrible and janky"
 ---
 

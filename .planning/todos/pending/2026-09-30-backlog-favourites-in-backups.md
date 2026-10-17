@@ -8,6 +8,7 @@ files:
   - src/backup/backup-schema.ts
   - src/backup/restore-apply.ts
 
+target_phase: 38.12
 source: 38.6 device pass S8; owner ruling D-40 (backlog item), 2026-09-30
 ---
 

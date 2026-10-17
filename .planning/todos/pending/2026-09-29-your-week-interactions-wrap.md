@@ -7,6 +7,7 @@ files:
 
   - src/components/digest/YourWeekSection.tsx
 
+target_phase: 40
 source: 38.5 D-28 gap list G3; owner ruling D-53 (G3-LATER), UAT 2026-09-29
 ---
 

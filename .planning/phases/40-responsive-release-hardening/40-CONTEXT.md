@@ -3,6 +3,14 @@
 **Gathered:** 2026-09-02
 **Status:** DEFERRED PLANNING — do not plan, discuss, or interrogate this phase yet
 
+## Pending todos — check before locking scope
+
+Added 2026-10-16 (backlog cleanup, owner-approved). These pending todos target this phase. Before locking scope, give each one a disposition in the ledger (in scope, out of scope and re-targeted, or already done). A todo's recommendation is evidence, not a decision.
+
+- `.planning/todos/pending/2026-10-16-38-4-review-leftovers-40.md`: three 38.4 code-review Info findings (glass palette scope, FAB unmount, dialog re-measure)
+- `.planning/todos/pending/2026-10-12-phase-40-text-field-sweep.md`: shared text field rollout plus an audit of the remaining text inputs (~2 plans)
+- `.planning/todos/pending/2026-09-29-your-week-interactions-wrap.md`: Your Week "Interactions" label wraps mid-word at font 1.15
+
 <domain>
 ## Phase Boundary
 
