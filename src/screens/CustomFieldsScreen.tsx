@@ -5,20 +5,29 @@
  * pre-flight summary. This composes the whole Phase-3 data layer into the
  * user-facing capability of FLD-02/03/04/05 and the FLD-07 curation flags.
  *
- * The screen NEVER builds SQL: user label/type/options input becomes a col_name
- * + ALTER TABLE only through the tested data layer (makeColName in FieldDefForm,
- * the DAO/DDL ops here) — the T-03-01 trust-boundary mitigation.
+ * STORAGE (migration 006 / ADR-001): a field is a row in `custom_field_defs`;
+ * its values are rows in `custom_field_values`, one per (contact, field). The
+ * screen NEVER builds SQL: label/type/options input reaches the database only
+ * through the tested DAO / field-ddl ops (makeColName in FieldDefForm derives
+ * the stable slug kept on the definition) — the T-03-01 trust-boundary
+ * mitigation. No DDL runs here; there are no per-field columns.
  *
- * DATA-SAFETY (§14.5 / T-03-02): the delete control is dynamic — `isFieldEmpty`
- * decides Delete (immediate, empty only) vs Quarantine (reversible 30d,
- * populated). `deleteOrQuarantineField` re-checks emptiness atomically, so the
- * label here is an affordance and the DDL is the guard.
+ * DATA-SAFETY (§14.5 / T-03-02): the delete control is dynamic — the field's
+ * value count decides Delete (immediate, no values) vs Quarantine (kept for
+ * QUARANTINE_WINDOW_DAYS, has values). `deleteOrQuarantineField` re-checks
+ * emptiness atomically, so the label here is an affordance and the DAO is the
+ * guard.
+ *
+ * LIST (38.12 D-120): active fields are one reorderable list — a drag handle
+ * and a ⋯ menu per row, no inline buttons, the destructive item last inside ⋯.
  *
  * TYPE / OPTIONS changes (§14.4): a type change runs `preflightTypeChange` and
- * shows the "N convert / K need your input" summary as the SINGLE confirmation
- * (no separate second prompt), then `applyTypeChange` with the CURRENT type so
- * `field_history` records the transition; an options edit runs
- * `preflightOptionsChange` before `changeFieldOptions` the same way.
+ * shows the "N of M values will convert automatically. K need your input"
+ * summary as the SINGLE confirmation (no separate second prompt), then
+ * `applyTypeChange` with the CURRENT type so `field_history` records the
+ * transition; an options edit runs `preflightOptionsChange` before
+ * `changeFieldOptions` the same way. Values are never rewritten by a type
+ * change.
  *
  * Every colour resolves through `useTheme().colors.*` — no colour literal
  * (CLAUDE.md). The executor comes from `getExecutor()` (Plan 07).
@@ -44,7 +53,11 @@ import ReorderableList, {
   type ReorderableListReorderEvent,
   useReorderableDrag,
 } from "react-native-reorderable-list";
-import { type FieldDefDraft, FieldDefForm } from "@/components/FieldDefForm";
+import {
+  FIELD_TYPE_LABELS,
+  type FieldDefDraft,
+  FieldDefForm,
+} from "@/components/FieldDefForm";
 import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -57,7 +70,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { createField, deleteOrQuarantineField } from "@/db/field-ddl";
 import {
   changeFieldOptions,
-  isFieldEmpty,
+  countFieldValues,
   listDefs,
   renameField,
   reorderFields,
@@ -73,10 +86,13 @@ import {
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { QUARANTINE_WINDOW_DAYS } from "@/services/field-sweep";
 import { confirm, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { formatDisplayDateOrFallback, parseLocalMs } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
+import { plural, pluralWord } from "@/utils/plural";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
 
 const LOG_SCOPE = "custom-fields";
@@ -87,20 +103,51 @@ type Editor =
   | { mode: "edit"; field: CustomFieldDef }
   | null;
 
-/** Human summary of a type-change pre-flight (the §14.4 confirmation text). */
-function typeSummary(pf: { total: number; convert: number[]; flag: number[] }) {
-  return (
-    `${pf.convert.length} of ${pf.total} will convert automatically.\n` +
-    `${pf.flag.length} need your input — fix now or later.`
-  );
+/** "1 needs your input" / "4 need your input" (38.12 D-71). */
+function needsInput(count: number): string {
+  return `${count} ${pluralWord(count, "needs", "need")} your input — fix now or later.`;
 }
 
-/** Human summary of an options-change pre-flight. */
-function optionsSummary(pf: { total: number; keep: number[]; flag: number[] }) {
-  return (
-    `${pf.keep.length} of ${pf.total} will be kept.\n` +
-    `${pf.flag.length} need your input — fix now or later.`
-  );
+/**
+ * Human summary of a type-change pre-flight: the §14.4 confirmation text
+ * ("8 of 12 values will convert automatically. 4 need your input — fix now or
+ * later."), every count agreeing in number (38.12 D-71, D-24).
+ */
+export function typeSummary(pf: {
+  total: number;
+  convert: readonly number[];
+  flag: readonly number[];
+}) {
+  return `${pf.convert.length} of ${plural(pf.total, "value")} will convert automatically. ${needsInput(pf.flag.length)}`;
+}
+
+/** Human summary of an options-change pre-flight (same shape as typeSummary). */
+export function optionsSummary(pf: {
+  total: number;
+  keep: readonly number[];
+  flag: readonly number[];
+}) {
+  return `${pf.keep.length} of ${plural(pf.total, "value")} will be kept. ${needsInput(pf.flag.length)}`;
+}
+
+/**
+ * The display date a quarantined field is kept until (38.12 D-72): its
+ * `quarantined_at` plus QUARANTINE_WINDOW_DAYS, the window the launch sweep
+ * applies (field-sweep.ts). Null when the stored stamp cannot be read.
+ */
+export function quarantineKeptUntil(quarantinedAt: string): string | null {
+  let kept: Date;
+  try {
+    kept = new Date(parseLocalMs(quarantinedAt));
+  } catch {
+    return null;
+  }
+  kept.setDate(kept.getDate() + QUARANTINE_WINDOW_DAYS);
+  return formatDisplayDateOrFallback(kept, "") || null;
+}
+
+function typeLabel(type: CustomFieldDef["type"]): string {
+  return FIELD_TYPE_LABELS[type] ?? type;
 }
 
 /**
@@ -225,7 +272,7 @@ function FieldRow({
           {field.label}
         </Text>
         <Text style={[styles.rowType, { color: colors.textSecondary }]}>
-          {field.type}
+          {typeLabel(field.type)}
         </Text>
       </View>
       <Pressable
@@ -261,6 +308,10 @@ function QuarantinedFieldRow({
 }) {
   const { colors } = useTheme();
   const { anchorRef, menuOpen, openMenu, closeMenu } = useRowMenu();
+  const keptUntil =
+    field.quarantined_at === null
+      ? null
+      : quarantineKeptUntil(field.quarantined_at);
   return (
     <View
       testID={`quarantined-row-${field.id}`}
@@ -274,7 +325,9 @@ function QuarantinedFieldRow({
           {field.label}
         </Text>
         <Text style={[styles.rowType, { color: colors.textSecondary }]}>
-          quarantined · {field.type}
+          {keptUntil === null
+            ? typeLabel(field.type)
+            : `${typeLabel(field.type)} · kept until ${keptUntil}`}
         </Text>
       </View>
       <Pressable
@@ -312,7 +365,11 @@ export function CustomFieldsScreen() {
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
   const [defs, setDefs] = useState<CustomFieldDef[]>([]);
-  const [emptyById, setEmptyById] = useState<Record<number, boolean>>({});
+  // Contacts holding a value, per field: decides Delete vs Quarantine and
+  // feeds "has values for N contacts" (D-72).
+  const [valueCountById, setValueCountById] = useState<Record<number, number>>(
+    {},
+  );
   const [editor, setEditor] = useState<Editor>(null);
   const [newFieldShareDefault, setNewFieldShareDefault] = useState<0 | 1>(0);
 
@@ -344,7 +401,7 @@ export function CustomFieldsScreen() {
     },
   });
 
-  /** Load all defs (incl. quarantined) and each field's emptiness. */
+  /** Load all defs (incl. quarantined) and each field's value count. */
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
@@ -352,13 +409,13 @@ export function CustomFieldsScreen() {
         listDefs(exec, { includeQuarantined: true }),
         resolveNewItemAiDefault(exec, "custom-field"),
       ]);
-      const empties: Record<number, boolean> = {};
+      const counts: Record<number, number> = {};
       for (const d of all) {
-        empties[d.id] = await isFieldEmpty(exec, d.id);
+        counts[d.id] = await countFieldValues(exec, d.id);
       }
       setDefs(all);
       setNewFieldShareDefault(shareDefault);
-      setEmptyById(empties);
+      setValueCountById(counts);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load custom fields", err);
       void notice({
@@ -381,8 +438,8 @@ export function CustomFieldsScreen() {
     [defs],
   );
 
-  // The create path uniquifies against EVERY col_name, incl. quarantined
-  // fields' still-present columns, so a re-created label can't collide.
+  // The create path uniquifies the slug against EVERY definition's col_name,
+  // incl. quarantined ones, so a re-created label can't collide.
   const existingColNames = useMemo(
     () => new Set(defs.map((d) => d.col_name)),
     [defs],
@@ -549,15 +606,18 @@ export function CustomFieldsScreen() {
   }
 
   async function onDeletePress(field: CustomFieldDef) {
-    const empty = emptyById[field.id] === true;
-    const verb = empty ? "Delete" : "Quarantine";
+    const count = valueCountById[field.id] ?? 0;
+    const empty = count === 0;
+    const verb = empty ? "Delete" : QUARANTINE;
+    // The body says why the action differs (D-72): the field's values decide
+    // it (HANDOFF §14.5, D-24).
     const message = empty
-      ? `"${field.label}" is empty and will be deleted permanently.`
-      : `"${field.label}" has values and will be quarantined for 30 days — you can restore it before then.`;
+      ? `"${field.label}" has no values, so it will be deleted permanently.`
+      : `"${field.label}" has values for ${plural(count, "contact")}, so it will be quarantined for ${QUARANTINE_WINDOW_DAYS} days. You can restore it before then.`;
     // An empty field is deleted permanently: a destructive, non-dismissable
     // confirm (D-06, ADR-086). A field with values is quarantined, which is
-    // recoverable for 30 days (HANDOFF §14.5; "Quarantine" stays, D-41), so it
-    // stays a plain dismissable confirm, as before.
+    // recoverable for the window (HANDOFF §14.5; "Quarantine" stays, D-41), so
+    // it stays a plain dismissable confirm, as before.
     const confirmed = await confirm({
       title: `${verb} field`,
       message,
@@ -664,7 +724,7 @@ export function CustomFieldsScreen() {
             field={item}
             index={index}
             total={active.length}
-            empty={emptyById[item.id] === true}
+            empty={(valueCountById[item.id] ?? 0) === 0}
             onAction={(action) => onFieldAction(item, index, action)}
           />
         )}

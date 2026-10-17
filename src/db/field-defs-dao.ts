@@ -268,6 +268,25 @@ export function listDefs(
 }
 
 /**
+ * How many contacts hold a non-null value for `fieldDefId` (38.12 D-72): the
+ * count behind "has values for N contacts" on the Quarantine confirm. The same
+ * predicate as `isFieldEmpty` and the delete guard, so "" counts as a value.
+ * `UNIQUE(contact_id, field_def_id)` makes the pair count a contact count. A
+ * pure bound read: no transaction.
+ */
+export async function countFieldValues(
+  exec: SqlExecutor,
+  fieldDefId: number,
+): Promise<number> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM custom_field_values
+      WHERE field_def_id = ? AND value IS NOT NULL`,
+    [fieldDefId],
+  );
+  return row?.n ?? 0;
+}
+
+/**
  * True when no normalized pair for `fieldDefId` holds a non-null value. Empty
  * string remains a present value. A pure bound read: no transaction.
  */

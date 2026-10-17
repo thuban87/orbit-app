@@ -52,19 +52,36 @@ import { useTheme } from "@/theme";
 // type from the component; the canonical definition now lives in the pure logic.
 export type { FieldDefDraft } from "@/components/field-def-form-logic";
 
-/** Human labels for the 10 FieldType values (picker order mirrors the union). */
-const FIELD_TYPES: ReadonlyArray<{ value: FieldType; label: string }> = [
-  { value: "text", label: "Text" },
-  { value: "textarea", label: "Text area" },
-  { value: "dropdown", label: "Dropdown" },
-  { value: "date", label: "Date" },
-  { value: "toggle", label: "Toggle" },
-  { value: "number", label: "Number" },
-  { value: "photo", label: "Photo" },
-  { value: "url", label: "URL" },
-  { value: "email", label: "Email" },
-  { value: "phone", label: "Phone" },
-];
+/**
+ * Human labels for the 10 FieldType values, in picker order (mirrors the
+ * union). Exported so lists show "Photo", not the raw type id "photo" (38.12
+ * D-74).
+ */
+export const FIELD_TYPE_LABELS: Readonly<Record<FieldType, string>> = {
+  text: "Text",
+  textarea: "Text area",
+  dropdown: "Dropdown",
+  date: "Date",
+  toggle: "Toggle",
+  number: "Number",
+  photo: "Photo",
+  url: "URL",
+  email: "Email",
+  phone: "Phone",
+};
+
+const FIELD_TYPES = (Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map(
+  (value) => ({ value, label: FIELD_TYPE_LABELS[value] }),
+);
+
+/**
+ * Photo values are never sent to AI (38.12 D-129), so a photo definition has
+ * no Allow AI switch and always saves `share_with_ai = 0` (this plan's
+ * reading of D-129; the AI payload filter is the real guard).
+ */
+function offersAiSharing(type: FieldType): boolean {
+  return type !== "photo";
+}
 
 interface SharedProps {
   /**
@@ -184,20 +201,24 @@ export function FieldDefForm(props: FieldDefFormProps) {
   // Unsaved-work state for the host's guard: the live draft vs the seed, both
   // with options normalised by buildOptions so an untouched stored dropdown
   // never reads as changed.
+  // A photo definition's AI share is always off (D-129), on both sides, so
+  // an old photo field stored with it on does not read as changed.
   const seedComparable = useMemo<FieldDefDraft>(
     () => ({
       ...seed,
       options: buildOptions(seed.type, parseOptions(seed.options)),
+      share_with_ai: offersAiSharing(seed.type) ? seed.share_with_ai : 0,
     }),
     [seed],
   );
+  const effectiveShareWithAi = offersAiSharing(type) && shareWithAi;
   const dirty = isFieldDefDraftDirty(seedComparable, {
     label,
     type,
     options,
     show_on_new: toBool(showOnNew),
     always_show: toBool(alwaysShow),
-    share_with_ai: toBool(shareWithAi),
+    share_with_ai: toBool(effectiveShareWithAi),
   });
   const onDirtyChangeRef = useRef(props.onDirtyChange);
   onDirtyChangeRef.current = props.onDirtyChange;
@@ -227,7 +248,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
       options,
       show_on_new: toBool(showOnNew),
       always_show: toBool(alwaysShow),
-      share_with_ai: toBool(shareWithAi),
+      share_with_ai: toBool(effectiveShareWithAi),
     };
     const fields = draftToFieldFields(draft);
     if (props.mode === "create") {
@@ -267,7 +288,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
         accessibilityLabel="Field label"
         value={label}
         onChangeText={setLabel}
-        placeholder="e.g. Birthday"
+        placeholder="e.g. Favorite coffee"
         placeholderTextColor={colors.textPlaceholder}
         style={[
           styles.input,
@@ -388,22 +409,27 @@ export function FieldDefForm(props: FieldDefFormProps) {
       </View>
 
       {/* AI-sharing opt-in (AI-01) — OFF by default; only a deliberate opt-in
-          marks this field's value eligible for an AI suggestion payload. */}
-      <View style={styles.switchRow}>
-        <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>
-          Share with AI suggestions
-        </Text>
-        <OrbitSwitch
-          testID="field-def-share-with-ai"
-          accessibilityLabel="Share with AI suggestions"
-          value={shareWithAi}
-          onValueChange={setShareWithAi}
-        />
-      </View>
-      <Text style={[styles.helper, { color: colors.textSecondary }]}>
-        Off by default. When on, this field's value can be included in an AI
-        message suggestion — only if you enable AI and choose a provider.
-      </Text>
+          marks this field's value eligible for an AI suggestion payload. A
+          photo field is never sent to AI, so it has no switch (D-129). */}
+      {offersAiSharing(type) ? (
+        <>
+          <View style={styles.switchRow}>
+            <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>
+              Share with AI suggestions
+            </Text>
+            <OrbitSwitch
+              testID="field-def-share-with-ai"
+              accessibilityLabel="Share with AI suggestions"
+              value={shareWithAi}
+              onValueChange={setShareWithAi}
+            />
+          </View>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Off by default. When on, this field's value can be included in an AI
+            message suggestion — only if you enable AI and choose a provider.
+          </Text>
+        </>
+      ) : null}
 
       {/* Live preview of the selected type's value widget */}
       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>

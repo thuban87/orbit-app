@@ -73,7 +73,10 @@ vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/AnchoredMenu", () => ({
   AnchoredMenu: "AnchoredMenu",
 }));
-vi.mock("@/components/FieldDefForm", () => ({ FieldDefForm: "FieldDefForm" }));
+vi.mock("@/components/FieldDefForm", () => ({
+  FieldDefForm: "FieldDefForm",
+  FIELD_TYPE_LABELS: {},
+}));
 vi.mock("@/db/ai-permissions-dao", () => ({
   resolveNewItemAiDefault: vi.fn(),
 }));
@@ -87,7 +90,7 @@ vi.mock("@/db/field-ddl", () => ({
 }));
 vi.mock("@/db/field-defs-dao", () => ({
   changeFieldOptions: vi.fn(),
-  isFieldEmpty: vi.fn(),
+  countFieldValues: vi.fn(),
   listDefs: vi.fn(),
   renameField: vi.fn(),
   reorderFields: vi.fn(),
