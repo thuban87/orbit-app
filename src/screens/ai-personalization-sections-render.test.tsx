@@ -400,3 +400,208 @@ describe("AI sections use the shared list pattern (38.12 D-86, D-120)", () => {
     expect(rowElement(tree, 0).props.children).toBeNull();
   });
 });
+
+// =============================================================================
+// Writing Style (38.12 D-87, D-127 UI half) and the save lock (D-88).
+// =============================================================================
+
+const STYLE = {
+  tone: "balanced",
+  length: "normal",
+  directness: "balanced",
+  freeform: "Keep it warm.",
+} as const;
+
+/** The tree with every StyleRow (a hook-free local component) expanded. */
+function withStyleRows(tree: TestElement[]): TestElement[] {
+  return tree.flatMap((node) =>
+    typeof node.type === "function" &&
+    (node.type as { name?: string }).name === "StyleRow"
+      ? [
+          node,
+          ...nodes(
+            (node.type as (props: Record<string, unknown>) => ReactNode)(
+              node.props,
+            ),
+          ),
+        ]
+      : [node],
+  );
+}
+
+function segmented(tree: TestElement[], label: string): TestElement {
+  const found = tree.find(
+    (node) =>
+      node.type === "SegmentedControl" &&
+      node.props.testID === `writing-style-${label}`,
+  );
+  if (!found) throw new Error(`no ${label} control`);
+  return found;
+}
+
+/** Every visible string in the tree: text children and button labels. */
+function texts(tree: TestElement[]): string[] {
+  return tree.flatMap((node) => {
+    const out: string[] = [];
+    const { children, label } = node.props;
+    if (typeof children === "string") out.push(children);
+    if (Array.isArray(children))
+      out.push(children.filter((c) => typeof c === "string").join(""));
+    if (typeof label === "string") out.push(label);
+    return out;
+  });
+}
+
+const guidanceBox = (tree: TestElement[]) =>
+  tree.find(
+    (node) =>
+      node.type === "TextInput" &&
+      node.props.accessibilityLabel === "Custom Writing Style guidance",
+  );
+
+describe("Writing Style shows one clear selection (38.12 D-87)", () => {
+  it("a custom Tone selects its Custom choice and no Tone preset", () => {
+    const tree = withStyleRows(
+      render({ style: { ...STYLE, tone: "custom" }, sections: SECTIONS }),
+    );
+    const tone = segmented(tree, "tone");
+    expect(tone.props.value).toBe("custom");
+    const options = tone.props.options as Array<{ value: string }>;
+    expect(options.map((option) => option.value)).toEqual([
+      "casual",
+      "balanced",
+      "polished",
+      "custom",
+    ]);
+    // The other dimensions keep their own preset.
+    expect(segmented(tree, "length").props.value).toBe("normal");
+    expect(segmented(tree, "directness").props.value).toBe("balanced");
+  });
+
+  it("'use custom guidance' appears exactly once on the page", () => {
+    for (const style of [
+      { ...STYLE, tone: "custom" },
+      { ...STYLE, tone: "custom", length: "custom", directness: "custom" },
+    ]) {
+      const tree = withStyleRows(render({ style, sections: SECTIONS }));
+      const hits = texts(tree).filter((text) =>
+        /use custom guidance/i.test(text),
+      );
+      expect(hits, JSON.stringify(style)).toHaveLength(1);
+    }
+  });
+
+  it("choosing a preset leaves custom; choosing Custom sets it", () => {
+    const tree = withStyleRows(
+      render({ style: { ...STYLE, tone: "custom" }, sections: SECTIONS }),
+    );
+    (segmented(tree, "tone").props.onChange as (value: string) => void)(
+      "polished",
+    );
+    const update = hooks.setters[SLOT.style]?.mock.calls.at(-1)?.[0] as (
+      current: typeof STYLE,
+    ) => typeof STYLE;
+    expect(update({ ...STYLE, tone: "custom" } as never).tone).toBe("polished");
+    (segmented(tree, "length").props.onChange as (value: string) => void)(
+      "custom",
+    );
+    const next = hooks.setters[SLOT.style]?.mock.calls.at(-1)?.[0] as (
+      current: typeof STYLE,
+    ) => typeof STYLE;
+    expect(next(STYLE as never).length).toBe("custom");
+  });
+});
+
+describe("the guidance box shows only while a choice is custom (38.12 D-127)", () => {
+  it("no custom choice: no guidance box and no 'use custom guidance' text", () => {
+    const tree = withStyleRows(render({ style: STYLE, sections: SECTIONS }));
+    expect(guidanceBox(tree)).toBeUndefined();
+    expect(texts(tree).some((text) => /use custom guidance/i.test(text))).toBe(
+      false,
+    );
+  });
+
+  it("a custom choice shows the box with the stored text", () => {
+    const tree = withStyleRows(
+      render({
+        style: { ...STYLE, directness: "custom" },
+        sections: SECTIONS,
+      }),
+    );
+    expect(guidanceBox(tree)?.props.value).toBe("Keep it warm.");
+  });
+
+  it("saving with the box hidden keeps the stored guidance text", async () => {
+    dao.updateWritingStyle.mockResolvedValue(undefined);
+    const tree = withStyleRows(render({ style: STYLE, sections: SECTIONS }));
+    const save = tree.find(
+      (node) =>
+        node.type === "Button" && node.props.label === "Save Writing Style",
+    );
+    if (!save) throw new Error("no Save Writing Style");
+    (save.props.onPress as () => void)();
+    await flush();
+    expect(dao.updateWritingStyle).toHaveBeenCalledWith(
+      "exec",
+      STYLE,
+      "2026-10-17 12:00:00",
+    );
+  });
+});
+
+describe("personalization controls lock while a save runs (38.12 D-88)", () => {
+  for (const saving of ["savingStyle", "savingSection"] as const) {
+    it(`every control is held while ${saving}`, () => {
+      const tree = withStyleRows(
+        render({
+          style: { ...STYLE, tone: "custom" },
+          sections: SECTIONS,
+          [saving]: true,
+        }),
+      );
+      for (const label of ["tone", "length", "directness"]) {
+        expect(segmented(tree, label).props.disabled, label).toBe(true);
+      }
+      expect(guidanceBox(tree)?.props.editable).toBe(false);
+      for (const label of ["Import .txt / .md", "Add / paste section"]) {
+        const button = tree.find(
+          (node) => node.type === "Button" && node.props.label === label,
+        );
+        expect(button?.props.disabled, label).toBe(true);
+      }
+      expect(
+        tree.find(
+          (node) =>
+            node.type === "Button" &&
+            String(node.props.label).startsWith("Sav"),
+        )?.props.disabled,
+      ).toBe(true);
+      // Every section row is drawn busy (handle, ⋯ and switch held).
+      expect(rowElement(tree, 0).props.busy).toBe(true);
+    });
+  }
+
+  it("nothing is held while no save runs", () => {
+    const tree = withStyleRows(
+      render({ style: { ...STYLE, tone: "custom" }, sections: SECTIONS }),
+    );
+    expect(segmented(tree, "tone").props.disabled).toBe(false);
+    expect(guidanceBox(tree)?.props.editable).toBe(true);
+    expect(rowElement(tree, 0).props.busy).toBe(false);
+  });
+
+  it("a row drawn busy holds its switch as well as its handle and ⋯", () => {
+    const tree = render({ sections: SECTIONS, savingStyle: true });
+    const row = renderRow(tree, 0);
+    const toggle = row.find((node) => node.type === "OrbitSwitch");
+    expect(toggle?.props.busy).toBe(true);
+    for (const id of [
+      "personalization-drag-s-1",
+      "personalization-options-s-1",
+    ])
+      expect(
+        row.find((node) => node.props.testID === id)?.props.disabled,
+        id,
+      ).toBe(true);
+  });
+});

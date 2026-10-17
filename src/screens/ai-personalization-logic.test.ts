@@ -20,6 +20,7 @@ import {
   reorderSectionUids,
   type StyleSyncState,
   shouldReplaceStyleOnLoad,
+  usesCustomGuidance,
 } from "@/screens/ai-personalization-logic";
 
 const STYLE: WritingStyle = {
@@ -75,11 +76,15 @@ describe("ai-personalization-logic", () => {
   it("estimates only custom guidance and enabled sections in stable order", () => {
     expect(personalizationEstimateSource(STYLE, [])).toBe("");
     expect(
-      personalizationEstimateSource({ ...STYLE, freeform: "My guidance" }, [
-        section("later", 2),
-        section("private", 0, false),
-        section("first", 1),
-      ]),
+      // A custom choice, so the guidance is sent and counted (38.12 D-127).
+      personalizationEstimateSource(
+        { ...STYLE, tone: "custom", freeform: "My guidance" },
+        [
+          section("later", 2),
+          section("private", 0, false),
+          section("first", 1),
+        ],
+      ),
     ).toBe("My guidance\nTitle first\nBody first\nTitle later\nBody later");
   });
 
@@ -325,5 +330,35 @@ describe("section reorder helpers (38.12 D-120)", () => {
     expect(
       orderSectionsByUid(rows, ["c", "x", "a"]).map((row) => row.uid),
     ).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("the estimate counts guidance only when it is sent (38.12 D-127)", () => {
+  it("leaves the guidance out while no Writing Style choice is custom", () => {
+    expect(
+      personalizationEstimateSource({ ...STYLE, freeform: "My guidance" }, [
+        section("first", 0),
+      ]),
+    ).toBe("Title first\nBody first");
+  });
+
+  it("counts the guidance while any choice is custom", () => {
+    for (const custom of [
+      { tone: "custom" },
+      { length: "custom" },
+      { directness: "custom" },
+    ] as const) {
+      expect(
+        personalizationEstimateSource(
+          { ...STYLE, ...custom, freeform: "My guidance" },
+          [section("first", 0)],
+        ),
+      ).toBe("My guidance\nTitle first\nBody first");
+    }
+  });
+
+  it("usesCustomGuidance is true only with a custom choice", () => {
+    expect(usesCustomGuidance(STYLE)).toBe(false);
+    expect(usesCustomGuidance({ ...STYLE, length: "custom" })).toBe(true);
   });
 });
