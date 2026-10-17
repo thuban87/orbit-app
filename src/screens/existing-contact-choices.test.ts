@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveExistingContactChoices } from "./existing-contact-choices";
+import {
+  REVIEW_MATCH_CHOICES,
+  resolveExistingContactChoices,
+} from "./existing-contact-choices";
 
 /**
  * The import duplicate choices name an existing Orbit contact. Each choice
@@ -62,5 +65,71 @@ describe("resolveExistingContactChoices (38.6 D-25 F-1)", () => {
 
   it("returns an empty list for no candidates", async () => {
     expect(await resolveExistingContactChoices([], vi.fn())).toEqual([]);
+  });
+});
+
+describe("Review matches order and minimum strength (38.12 D-52)", () => {
+  const NAMES: Record<number, Header> = {
+    1: { name: "Ann Lane", photo: null },
+    2: { name: "Ann Leigh", photo: null },
+    3: { name: "Ann Low", photo: null },
+    4: { name: "Ann Lea", photo: null },
+    5: { name: "Ann Loy", photo: null },
+  };
+  const read = async (contactId: number) => NAMES[contactId] ?? null;
+  const ids = (choices: readonly { contactId: number }[]) =>
+    choices.map((choice) => choice.contactId);
+
+  it("lists phone/email matches first, each group in the given (score) order", async () => {
+    const result = await resolveExistingContactChoices(
+      [
+        { contactId: 1, signals: ["nameOverlap"] },
+        { contactId: 2, signals: ["phoneMatch"] },
+        { contactId: 3, signals: ["nameOverlap", "birthdayMatch"] },
+        { contactId: 4, signals: ["emailMatch", "nameOverlap"] },
+      ],
+      read,
+      REVIEW_MATCH_CHOICES,
+    );
+    expect(ids(result)).toEqual([2, 4, 1, 3]);
+  });
+
+  it("does not offer a candidate scored below 'possible' (birthday only, or no evidence)", async () => {
+    const readHeader = vi.fn(read);
+    const result = await resolveExistingContactChoices(
+      [
+        { contactId: 1, signals: ["nameOverlap"] },
+        { contactId: 2, signals: ["phoneMatch"] },
+        { contactId: 3, signals: ["birthdayMatch"] },
+        { contactId: 5, signals: [] },
+      ],
+      readHeader,
+      REVIEW_MATCH_CHOICES,
+    );
+    expect(ids(result)).toEqual([2, 1]);
+    // A dropped candidate's header is never read.
+    expect(readHeader.mock.calls.map(([id]) => id).sort()).toEqual([1, 2]);
+  });
+
+  it("returns nothing when no candidate reaches 'possible'", async () => {
+    expect(
+      await resolveExistingContactChoices(
+        [{ contactId: 3, signals: ["birthdayMatch"] }],
+        read,
+        REVIEW_MATCH_CHOICES,
+      ),
+    ).toEqual([]);
+  });
+
+  it("without the option keeps every candidate in input order (Import review unchanged)", async () => {
+    const result = await resolveExistingContactChoices(
+      [
+        { contactId: 3, signals: ["birthdayMatch"] },
+        { contactId: 1, signals: ["nameOverlap"] },
+        { contactId: 2, signals: ["phoneMatch"] },
+      ],
+      read,
+    );
+    expect(ids(result)).toEqual([3, 1, 2]);
   });
 });

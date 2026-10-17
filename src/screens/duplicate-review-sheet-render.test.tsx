@@ -90,6 +90,9 @@ const HEADERS: Record<number, { name: string; photo: string | null }> = {
   4: { name: "Ann Leigh", photo: null },
   9: { name: "Ann Lane", photo: null },
   5: { name: "Bo Rae", photo: null },
+  6: { name: "Cy Mo", photo: null },
+  7: { name: "Di Fox", photo: null },
+  8: { name: "Di Fax", photo: null },
 };
 vi.mock("@/db/contact-read", () => ({
   getContactHeader: async (_exec: unknown, id: number) => HEADERS[id] ?? null,
@@ -421,5 +424,50 @@ describe("Review matches bulk link queue (A-2, D-52)", () => {
     expect(sheetState()).toMatchObject({ visible: true, person: "Bo Ray" });
     (render().sheet.props.onClose as () => void)();
     expect(sheetState().visible).toBe(false);
+  });
+});
+
+describe("One filtered, ordered list for the row and the sheet (D-52; c2 B-10, c3 D-3)", () => {
+  // Raw stored candidates, deliberately NOT phone-first: A (possible, name
+  // only), B (phone match), C (below possible, birthday only).
+  const B10_ROWS = [
+    row(41, "Di Fix", [
+      { contactId: 7, signals: ["nameOverlap"] },
+      { contactId: 4, signals: ["phoneMatch"] },
+      { contactId: 8, signals: ["birthdayMatch"] },
+    ]),
+    row(42, "Cy May", [{ contactId: 6, signals: ["birthdayMatch"] }]),
+  ];
+
+  type Row = {
+    id: number;
+    evidenceHint: string;
+    candidates: { name: string; evidenceHint?: string }[];
+  };
+
+  it("the row names B (+1) with B's evidence, and the sheet lists B then A", async () => {
+    dao.listSessionRows.mockResolvedValue(B10_ROWS);
+    const { list } = await loaded();
+    const rows = list.props.items as Row[];
+    const first = rows[0] as Row;
+    expect(first.candidates.map((c) => c.name)).toEqual([
+      "Ann Leigh",
+      "Di Fox",
+    ]);
+    expect(first.evidenceHint).toBe("Matching phone number");
+    (list.props.onInspect as (item: unknown) => void)(first);
+    expect(sheetState()).toEqual({
+      visible: true,
+      person: "Di Fix",
+      choices: ["Ann Leigh", "Di Fox"],
+    });
+  });
+
+  it("a row whose only candidate is below 'possible' offers none and a neutral hint", async () => {
+    dao.listSessionRows.mockResolvedValue(B10_ROWS);
+    const { list } = await loaded();
+    const second = (list.props.items as Row[])[1] as Row;
+    expect(second.candidates).toEqual([]);
+    expect(second.evidenceHint).toBe("Needs a closer look");
   });
 });

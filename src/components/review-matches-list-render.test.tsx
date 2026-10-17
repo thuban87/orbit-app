@@ -153,6 +153,29 @@ describe("ReviewMatchesList (38.12 D-107)", () => {
     ]);
   });
 
+  it("reads 'Might be' only from the row's own (filtered, ordered) choices (B-10)", () => {
+    // The host passes the sheet's list; the row names its first entry and
+    // counts the rest, and shows the evidence it was given for that entry.
+    const filtered: CandidateItem = {
+      ...ANN,
+      evidenceHint: "Matching phone number",
+      candidates: [
+        {
+          contactId: 4,
+          name: "Ann Leigh",
+          evidenceHint: "Matching phone number",
+        },
+        { contactId: 9, name: "Ann Lane", evidenceHint: "Similar name" },
+      ],
+    };
+    const { rows } = render({ items: [filtered] });
+    expect(rowTexts(rows[0] as TestElement)).toEqual([
+      "Ann Lee",
+      "Might be: Ann Leigh (+1)",
+      "Matching phone number",
+    ]);
+  });
+
   it("announces the row through the shared candidate-card contract", () => {
     const row = render().rows[0] as TestElement;
     expect(row.props.accessibilityRole).toBe("button");

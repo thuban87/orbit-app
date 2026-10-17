@@ -1,10 +1,15 @@
 /**
  * Review-card accessible representation (RG-031 ui-accessibility/AUD-UIA-008).
  *
- * Duplicate Review and Reconcile Grid cards must announce the person, the
+ * Reconcile Grid cards and Review matches rows must announce the person, the
  * displayed recommendation/evidence and any per-card failure; expose `selected`
  * only while selecting; and offer a Select/Deselect action equivalent to the
  * long-press that enters selection.
+ *
+ * 38.12 D-107 / D-51: Duplicate Review left CandidateCardGrid for its own
+ * one-column ReviewMatchesList, so the grid's tap/long-press source contract
+ * below now guards Reconcile only; Review matches reuses the same helper and
+ * selection action, pinned in its own block.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -120,7 +125,7 @@ describe("buildCandidateCardAccessibility", () => {
   });
 });
 
-describe("CandidateCardGrid wiring (source contract)", () => {
+describe("CandidateCardGrid wiring — Reconcile only (source contract)", () => {
   const source = readFileSync(
     resolve(__dirname, "CandidateCardGrid.tsx"),
     "utf8",
@@ -134,7 +139,20 @@ describe("CandidateCardGrid wiring (source contract)", () => {
     );
   });
 
-  it("keeps long-press and the press-to-inspect/toggle semantics unchanged", () => {
+  it("is Reconcile's grid only: Duplicate Review no longer renders it (D-51)", () => {
+    const reconcile = readFileSync(
+      resolve(__dirname, "../screens/ReconcileGridScreen.tsx"),
+      "utf8",
+    );
+    const duplicate = readFileSync(
+      resolve(__dirname, "../screens/DuplicateReviewScreen.tsx"),
+      "utf8",
+    );
+    expect(reconcile).toMatch(/<CandidateCardGrid\b/);
+    expect(duplicate).not.toMatch(/CandidateCardGrid/);
+  });
+
+  it("keeps Reconcile's long-press and press-to-inspect/toggle semantics unchanged", () => {
     expect(source).toMatch(/onLongPress=\{\(\) => toggleSelection\(item\)\}/);
     expect(source).toMatch(
       /multiSelect \? toggleSelection\(item\) : onInspect\(item\)/,
@@ -145,5 +163,23 @@ describe("CandidateCardGrid wiring (source contract)", () => {
     expect(source).toMatch(/\{CANDIDATE_CARD_FAILURE_COPY\}/);
     expect(source).toMatch(/name="select"/);
     expect(source).not.toMatch(/accessibilityLabel=\{item\.name\}/);
+  });
+});
+
+describe("ReviewMatchesList wiring (source contract, 38.12 D-107)", () => {
+  const source = readFileSync(
+    resolve(__dirname, "ReviewMatchesList.tsx"),
+    "utf8",
+  );
+
+  it("reuses the same helper and Select/Deselect action as Reconcile", () => {
+    expect(source.match(/buildCandidateCardAccessibility\(/g)).toHaveLength(1);
+    expect(source).toMatch(
+      /actionName === CANDIDATE_SELECTION_ACTION[\s\S]{0,80}toggleSelection\(item\)/,
+    );
+    expect(source).toMatch(/onLongPress=\{\(\) => toggleSelection\(item\)\}/);
+    expect(source).toMatch(
+      /multiSelect \? toggleSelection\(item\) : onInspect\(item\)/,
+    );
   });
 });
