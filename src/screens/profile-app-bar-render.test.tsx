@@ -213,7 +213,8 @@ describe("ProfileAppBar (38.6 D-17)", () => {
     // Pressable, so the tap can explain; the screen writes nothing for it.
     expect(star?.props.disabled).toBe(false);
     handlers.onToggleFavourite.mockClear();
-    (star?.props.onPress as () => void)();
+    const press = star?.props.onPress as () => void;
+    press();
     expect(handlers.onToggleFavourite).toHaveBeenCalledTimes(1);
   });
 
