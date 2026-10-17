@@ -83,6 +83,7 @@ import {
   runMoveToBin,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
+  unboundStarExplanation,
 } from "@/screens/contact-profile-logic";
 import {
   bindWithLifecycleEffects,
@@ -128,6 +129,7 @@ export function ProfileAppBar({
   favourite,
   favouriteDisabled,
   favouriteUnavailable = false,
+  favouriteHint,
   scrolled,
   title = null,
   onBack,
@@ -142,6 +144,8 @@ export function ProfileAppBar({
    * dimmed (38.9 D-26 via 38.12 D-06).
    */
   favouriteUnavailable?: boolean;
+  /** Why the star is unavailable, read by a screen reader (38.12 D-36). */
+  favouriteHint?: string;
   /** Content is scrolled under the bar (drives the token scrim). */
   scrolled: boolean;
   /**
@@ -197,6 +201,7 @@ export function ProfileAppBar({
               ? `Remove ${name} from Favorites`
               : `Add ${name} to Favorites`
           }
+          accessibilityHint={favouriteHint}
           disabled={favouriteDisabled}
           onPress={onToggleFavourite}
           style={[
@@ -619,7 +624,18 @@ export function ContactProfileScreen({
   );
 
   const toggleFavourite = useCallback(async () => {
-    if (!snapshot || pendingFavourite || star.onPress !== "toggle") return;
+    if (!snapshot) return;
+    // 38.12 D-36: an Unbound star explains itself and writes nothing; the
+    // dormant rank is kept (D-21).
+    if (star.onPress === "explain") {
+      // A notice (the `success` accent pill, 38.10 D-132).
+      showSnackbar({
+        kind: "success",
+        label: unboundStarExplanation(snapshot.identity.name),
+      });
+      return;
+    }
+    if (pendingFavourite || star.onPress !== "toggle") return;
     setPendingFavourite(true);
     try {
       const now = localDateTime();
@@ -828,6 +844,11 @@ export function ContactProfileScreen({
             favourite={star.favourite}
             favouriteDisabled={star.disabled}
             favouriteUnavailable={star.unavailable}
+            favouriteHint={
+              star.onPress === "explain"
+                ? unboundStarExplanation(snapshot.identity.name)
+                : undefined
+            }
             scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}
             title={barShowsName ? snapshot.identity.name : null}
             onBack={leaveProfile}

@@ -53,6 +53,18 @@ function frequencyLabel(days: number | null): string {
     : `Every ${days} ${days === 1 ? "day" : "days"}`;
 }
 
+/**
+ * The Snooze tile shows only for a live Bound person (38.12 D-94): while
+ * Unbound or in the Bin there is no Snooze on the Profile; the tile returns on
+ * Bind and a stored snooze is left as data.
+ */
+export function overviewShowsSnooze(identity: {
+  trackingEnabled: number;
+  archivedAt?: string | null;
+}): boolean {
+  return identity.trackingEnabled === 1 && identity.archivedAt == null;
+}
+
 export function RelationshipOverview({
   snapshot,
   modules,
@@ -78,9 +90,12 @@ export function RelationshipOverview({
   const birthday = snapshot.identity.birthday;
   // D-55: the Birthday tile shows only when a birthday is set; dropping it
   // before the packer repacks the grid with no gap.
+  const showSnooze = overviewShowsSnooze(snapshot.identity);
   const visible = modules.filter(
     (module) =>
-      module.visible && (module.id !== "birthday" || Boolean(birthday)),
+      module.visible &&
+      (module.id !== "birthday" || Boolean(birthday)) &&
+      (module.id !== "snooze" || showSnooze),
   );
   const packed = useMemo(
     () => packOverviewModules(visible, { width, fontScale }),

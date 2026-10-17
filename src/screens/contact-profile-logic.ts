@@ -320,7 +320,6 @@ export interface ProfileLifecycleView {
   kind: ProfileLifecycleKind;
   showCadenceTreatment: boolean;
   showFrequencyPicker: boolean;
-  bindEnabled: boolean;
 }
 
 export type ProfileOverlay =
@@ -640,6 +639,10 @@ export function binnedProfileBanner(name: string): {
  * How the Profile's favourite star draws and what a tap does.
  *
  * - `toggle`: a live Bound person; the star is filled from the rank.
+ * - `explain`: Unbound (38.12 D-36). Drawn off and dimmed whatever the
+ *   dormant rank says — an Unbound person is not presented as a Favorite, and
+ *   the rank is kept (D-21). A tap shows `unboundStarExplanation` and writes
+ *   nothing.
  * - `none`: in the Bin (38.12 D-34) — disabled and drawn off whatever the
  *   stored rank says.
  */
@@ -650,7 +653,12 @@ export interface ProfileStarView {
   disabled: boolean;
   /** Drawn dimmed as unavailable (38.9 D-26 via 38.12 D-06). */
   unavailable: boolean;
-  onPress: "toggle" | "none";
+  onPress: "toggle" | "explain" | "none";
+}
+
+/** The Unbound star's tap explanation (38.12 D-36; copy is this plan's). */
+export function unboundStarExplanation(name: string): string {
+  return `Bind ${name} to make them a Favorite.`;
 }
 
 export function profileStarView(input: {
@@ -669,10 +677,10 @@ export function profileStarView(input: {
   }
   if (!input.bound) {
     return {
-      favourite: input.favouriteRank !== null,
-      disabled: true,
-      unavailable: false,
-      onPress: "none",
+      favourite: false,
+      disabled: false,
+      unavailable: true,
+      onPress: "explain",
     };
   }
   return {
@@ -708,7 +716,6 @@ export function profileLifecycleView(input: {
       kind: "bound",
       showCadenceTreatment: true,
       showFrequencyPicker: false,
-      bindEnabled: false,
     };
   }
   if (input.intervalDays !== null) {
@@ -716,14 +723,12 @@ export function profileLifecycleView(input: {
       kind: "unbound-dormant",
       showCadenceTreatment: false,
       showFrequencyPicker: false,
-      bindEnabled: true,
     };
   }
   return {
     kind: "unbound-never-assigned",
     showCadenceTreatment: false,
     showFrequencyPicker: true,
-    bindEnabled: false,
   };
 }
 
@@ -841,13 +846,6 @@ export async function runMoveToBin(input: {
     label: `Moved ${input.name} to the Bin`,
   });
   return "moved";
-}
-
-export function canStartLifecycleTransition(input: {
-  pending: boolean;
-  bindEnabled: boolean;
-}): boolean {
-  return !input.pending && input.bindEnabled;
 }
 
 /**
