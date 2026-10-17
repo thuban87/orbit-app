@@ -629,6 +629,36 @@ describe("the section forms hold their text while a save runs (38.12 D-88)", () 
   });
 });
 
+describe("the section form's heading says what it does (38.12-15 fold)", () => {
+  type Component = (props: Record<string, unknown>) => ReactNode;
+  const isComponent = (node: TestElement, name: string) =>
+    typeof node.type === "function" &&
+    (node.type as { name?: string }).name === name;
+  const heading = (form: TestElement) =>
+    nodes((form.type as unknown as Component)(form.props)).find(
+      (node) => node.type === "AppText" && node.props.role === "label",
+    )?.props.children;
+
+  it("the Add form reads 'New personalization section'", () => {
+    const tree = render({ sections: SECTIONS, adding: true });
+    const form = tree.find((node) => isComponent(node, "NewSectionEditor"));
+    if (!form) throw new Error("no NewSectionEditor");
+    expect(heading(form)).toBe("New personalization section");
+  });
+
+  it("editing an existing section reads 'Edit section'", () => {
+    const tree = render({ sections: SECTIONS, editingUid: "s-2" });
+    const editor = nodes(rowElement(tree, 1).props.children as ReactNode).find(
+      (node) => isComponent(node, "SectionEditor"),
+    );
+    if (!editor) throw new Error("no SectionEditor");
+    const form = (editor.type as unknown as Component)(
+      editor.props,
+    ) as TestElement;
+    expect(heading(form)).toBe("Edit section");
+  });
+});
+
 describe("AI Personalization draws its cards with the shared section card (38.12 D-119)", () => {
   it("Writing Style, Personalization Context and the estimate sit in SettingsSectionCards", () => {
     const tree = render({ sections: SECTIONS });

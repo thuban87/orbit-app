@@ -1,5 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -9,8 +10,12 @@ import {
 } from "react-native";
 import { connectOpenRouter } from "@/ai/openrouter-oauth";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, Button, ConfirmDialog, GlassSurface } from "@/components/ui";
-import { ScopedPalette } from "@/components/ui/ScopedPalette";
+import {
+  AppText,
+  Button,
+  ConfirmDialog,
+  SettingsSectionCard,
+} from "@/components/ui";
 import {
   type AiConnection,
   activateAiConnection,
@@ -27,10 +32,12 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
+  type ConnectionCardState,
   type CredentialDraft,
   CustomCredentialCompensationError,
   connectionCardState,
   editDraft,
+  readLaneCredentialPresence,
   removeLaneCredential,
   saveCustomConnection,
   saveDirectCredential,
@@ -40,6 +47,7 @@ import {
 import { CUSTOM_RETENTION_CAVEAT } from "./settings-ai-logic";
 
 const LOG_SCOPE = "ai-connections";
+const LOAD_ERROR = "Couldn't load saved AI connections.";
 const DIRECT_LANES = ["openai", "anthropic", "google"] as const;
 const LANE_NAMES: Record<AiCloudProviderId, string> = {
   openrouter: "OpenRouter",
@@ -53,13 +61,26 @@ export interface AIConnectionScreenProps {
   onChooseModel: (lane: AiCloudProviderId) => void;
 }
 
-/** Back is the shared header's only (38.9 D-16, D-07). */
+/**
+ * Back is the shared header's only (38.9 D-16, D-07).
+ *
+ * Truthful connection state (38.12 D-84, K-36): the page reloads on every
+ * focus, reads each saved lane's credential PRESENCE locally
+ * (`readLaneCredentialPresence` → `readCredentialPresence`; no provider call,
+ * no OAuth or egress change), and the active lane with a credential reads
+ * "Connected" with "Change model" as its primary action and Disconnect /
+ * Remove key demoted. "Recommended" and the default OpenRouter expansion stay
+ * (D-17). Sections draw on the shared Settings section card (D-119).
+ */
 export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
   const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
   const activeLane = useAiConfigStore((state) => state.activeConnection);
   const [connections, setConnections] = useState<AiConnection[]>([]);
+  const [credentialPresence, setCredentialPresence] = useState<
+    Partial<Record<AiCloudProviderId, boolean>>
+  >({});
   const [expanded, setExpanded] = useState<AiCloudProviderId | null>(
     "openrouter",
   );
@@ -70,20 +91,40 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
   const [pending, setPending] = useState<AiCloudProviderId | null>(null);
   const [removeLane, setRemoveLane] = useState<AiCloudProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The Custom fields prefill from the saved connection (D-88) until the user
+  // types in them; a reload never overwrites an edit in progress.
+  const customFieldsEdited = useRef(false);
 
   const load = useCallback(async () => {
     const exec = getExecutor();
     const rows = await listAiConnections(exec);
+    const presence = await readLaneCredentialPresence(rows, (lane, endpoint) =>
+      aiKeyStore.getKey(lane, endpoint),
+    );
     setConnections(rows);
+    setCredentialPresence(presence);
+    const custom = rows.find((row) => row.lane === "custom");
+    if (custom && !customFieldsEdited.current) {
+      setEndpoint(custom.customEndpoint);
+      setCustomModel(custom.customModel || custom.rememberedModel);
+    }
     await useAiConfigStore.getState().hydrate(exec);
   }, []);
 
-  useEffect(() => {
-    void load().catch((caught) => {
-      Logger.error(LOG_SCOPE, "failed to load connection metadata", caught);
-      setError("Couldn't load saved AI connections.");
-    });
-  }, [load]);
+  // Reload on every focus (D-84): returning from the model picker or the
+  // OpenRouter browser shows the state that is now saved.
+  useFocusEffect(
+    useCallback(() => {
+      void load()
+        .then(() =>
+          setError((current) => (current === LOAD_ERROR ? null : current)),
+        )
+        .catch((caught) => {
+          Logger.error(LOG_SCOPE, "failed to load connection metadata", caught);
+          setError(LOAD_ERROR);
+        });
+    }, [load]),
+  );
 
   const byLane = useMemo(
     () =>
@@ -211,6 +252,7 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
       }
       await activateAiConnection(getExecutor(), "custom", localDateTime());
       setCustomCredential("");
+      customFieldsEdited.current = false;
       await load();
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to configure custom connection");
@@ -237,102 +279,116 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
     }
   }
 
-  function card(lane: AiCloudProviderId, body: React.ReactNode) {
+  function card(
+    lane: AiCloudProviderId,
+    body: (state: ConnectionCardState) => React.ReactNode,
+  ) {
     const connection = byLane.get(lane);
-    const state = connectionCardState(
+    const state = connectionCardState({
       lane,
       activeLane,
-      connection?.rememberedModel,
-    );
+      rememberedModel: connection?.rememberedModel,
+      hasCredential: credentialPresence[lane] === true,
+    });
+    const connected = state.status === "connected";
     const isExpanded = expanded === lane;
+    const removeLabel = lane === "openrouter" ? "Disconnect" : "Remove key";
     return (
-      <GlassSurface key={lane} density="dense" style={styles.card}>
-        <ScopedPalette>
-          {(scoped) => (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{
-                  expanded: isExpanded,
-                  selected: state.active,
-                }}
-                accessibilityLabel={`${LANE_NAMES[lane]} connection`}
-                onPress={() => {
-                  setCredentialDraft(switchLane(lane));
-                  setExpanded(isExpanded ? null : lane);
-                }}
-                style={styles.cardHeader}
-              >
-                <View style={styles.copy}>
-                  <AppText role="label">{LANE_NAMES[lane]}</AppText>
-                  {state.rememberedModel ? (
-                    <AppText
-                      role="caption"
-                      style={{ color: scoped.textSecondary }}
-                    >
-                      {state.rememberedModel}
-                    </AppText>
-                  ) : null}
+      <View key={lane} testID={`ai-connection-card-${lane}`}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{
+            expanded: isExpanded,
+            selected: state.active,
+          }}
+          accessibilityLabel={`${LANE_NAMES[lane]} connection`}
+          onPress={() => {
+            setCredentialDraft(switchLane(lane));
+            setExpanded(isExpanded ? null : lane);
+          }}
+          style={styles.cardHeader}
+        >
+          <View style={styles.copy}>
+            <AppText role="label">{LANE_NAMES[lane]}</AppText>
+            {state.rememberedModel ? (
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                {state.rememberedModel}
+              </AppText>
+            ) : null}
+          </View>
+          <AppText
+            role="caption"
+            testID={`ai-connection-status-${lane}`}
+            style={{
+              color: state.active ? colors.accentText : colors.textSecondary,
+            }}
+          >
+            {connected
+              ? "Connected"
+              : state.active
+                ? "Active"
+                : state.saved
+                  ? "Saved"
+                  : isExpanded
+                    ? "−"
+                    : "+"}
+          </AppText>
+        </Pressable>
+        {isExpanded ? (
+          <View
+            style={[
+              styles.cardBody,
+              {
+                borderTopColor: state.active ? colors.accent : colors.border,
+              },
+            ]}
+          >
+            {connected ? (
+              // Connected: Change model leads (D-84).
+              <Button
+                role="primary"
+                label="Change model"
+                disabled={pending !== null}
+                onPress={() => onChooseModel(lane)}
+              />
+            ) : null}
+            {body(state)}
+            {state.saved ? (
+              <Button
+                role="secondary"
+                label="Use saved connection"
+                disabled={pending !== null}
+                onPress={() => void activateSaved(lane)}
+              />
+            ) : null}
+            {connection ? (
+              connected ? (
+                // Demoted: a plain control; the confirm stays destructive.
+                <View style={styles.actions}>
+                  <Button
+                    role="tertiary"
+                    label={removeLabel}
+                    onPress={() => setRemoveLane(lane)}
+                  />
                 </View>
-                <AppText
-                  role="caption"
-                  style={{
-                    color: state.active
-                      ? scoped.accentText
-                      : scoped.textSecondary,
-                  }}
-                >
-                  {state.active
-                    ? "Active"
-                    : state.saved
-                      ? "Saved"
-                      : isExpanded
-                        ? "−"
-                        : "+"}
-                </AppText>
-              </Pressable>
-              {isExpanded ? (
-                <View
-                  style={[
-                    styles.cardBody,
-                    {
-                      borderTopColor: state.active
-                        ? colors.accent
-                        : colors.border,
-                    },
-                  ]}
-                >
-                  {body}
-                  {state.saved ? (
-                    <Button
-                      role="secondary"
-                      label="Use saved connection"
-                      disabled={pending !== null}
-                      onPress={() => void activateSaved(lane)}
-                    />
-                  ) : null}
-                  {connection ? (
-                    <View style={styles.actions}>
-                      <Button
-                        role="tertiary"
-                        label="Choose model"
-                        onPress={() => onChooseModel(lane)}
-                      />
-                      <Button
-                        role="destructive"
-                        label={
-                          lane === "openrouter" ? "Disconnect" : "Remove key"
-                        }
-                        onPress={() => setRemoveLane(lane)}
-                      />
-                    </View>
-                  ) : null}
+              ) : (
+                <View style={styles.actions}>
+                  <Button
+                    role="tertiary"
+                    label="Choose model"
+                    onPress={() => onChooseModel(lane)}
+                  />
+                  <Button
+                    role="destructive"
+                    label={removeLabel}
+                    onPress={() => setRemoveLane(lane)}
+                  />
                 </View>
-              ) : null}
-            </>
-          )}
-        </ScopedPalette>
-      </GlassSurface>
+              )
+            ) : null}
+          </View>
+        ) : null}
+      </View>
     );
   }
 
@@ -346,33 +402,37 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.section}>
-          <AppText role="heading">Recommended</AppText>
-          {card(
-            "openrouter",
+        <SettingsSectionCard
+          title="Recommended"
+          testID="ai-connection-section-recommended"
+        >
+          {card("openrouter", (state) => (
             <>
               <AppText role="body">
                 One connection for a broad, current model catalog with live
                 pricing.
               </AppText>
               <Button
-                role="primary"
+                role={state.status === "connected" ? "secondary" : "primary"}
                 label={
                   pending === "openrouter"
                     ? "Connecting…"
-                    : "Connect with OpenRouter"
+                    : state.status === "connected"
+                      ? "Reconnect"
+                      : "Connect with OpenRouter"
                 }
                 disabled={pending !== null}
                 onPress={() => void configureOpenRouter()}
               />
-            </>,
-          )}
-        </View>
-        <View style={styles.section}>
-          <AppText role="heading">Advanced Setup</AppText>
+            </>
+          ))}
+        </SettingsSectionCard>
+        <SettingsSectionCard
+          title="Advanced Setup"
+          testID="ai-connection-section-advanced"
+        >
           {DIRECT_LANES.map((lane) =>
-            card(
-              lane,
+            card(lane, (state) => (
               <>
                 <TextInput
                   accessibilityLabel={`${LANE_NAMES[lane]} API key`}
@@ -397,16 +457,21 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
                   ]}
                 />
                 <Button
-                  role="primary"
-                  label={pending === lane ? "Saving…" : "Save key"}
+                  role={state.status === "connected" ? "secondary" : "primary"}
+                  label={
+                    pending === lane
+                      ? "Saving…"
+                      : state.status === "connected"
+                        ? "Replace key"
+                        : "Save key"
+                  }
                   disabled={pending !== null}
                   onPress={() => void configureDirect(lane)}
                 />
-              </>,
-            ),
+              </>
+            )),
           )}
-          {card(
-            "custom",
+          {card("custom", (state) => (
             <>
               <AppText role="body">
                 Advanced · OpenAI-compatible HTTPS only
@@ -418,7 +483,10 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
                 placeholder="https://api.example.com/v1"
                 placeholderTextColor={colors.textPlaceholder}
                 value={endpoint}
-                onChangeText={setEndpoint}
+                onChangeText={(value) => {
+                  customFieldsEdited.current = true;
+                  setEndpoint(value);
+                }}
                 style={[
                   styles.input,
                   {
@@ -453,7 +521,10 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
                 placeholder="Model id"
                 placeholderTextColor={colors.textPlaceholder}
                 value={customModel}
-                onChangeText={setCustomModel}
+                onChangeText={(value) => {
+                  customFieldsEdited.current = true;
+                  setCustomModel(value);
+                }}
                 style={[
                   styles.input,
                   {
@@ -463,25 +534,24 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
                   },
                 ]}
               />
-              <ScopedPalette>
-                {(scoped) => (
-                  <AppText
-                    role="caption"
-                    style={{ color: scoped.textSecondary }}
-                  >
-                    {CUSTOM_RETENTION_CAVEAT}
-                  </AppText>
-                )}
-              </ScopedPalette>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                {CUSTOM_RETENTION_CAVEAT}
+              </AppText>
               <Button
-                role="primary"
-                label={pending === "custom" ? "Saving…" : "Connect"}
+                role={state.status === "connected" ? "secondary" : "primary"}
+                label={
+                  pending === "custom"
+                    ? "Saving…"
+                    : state.status === "connected"
+                      ? "Save changes"
+                      : "Connect"
+                }
                 disabled={pending !== null}
                 onPress={() => void configureCustom()}
               />
-            </>,
-          )}
-        </View>
+            </>
+          ))}
+        </SettingsSectionCard>
         {error ? (
           <AppText role="caption" style={{ color: colors.danger }}>
             {error}
@@ -511,7 +581,6 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
 
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
-  card: { overflow: "hidden" },
   cardBody: {
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: SPACING.md,
@@ -533,5 +602,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   root: { flex: 1 },
-  section: { gap: SPACING.md },
 });

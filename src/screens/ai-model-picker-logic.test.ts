@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OpenRouterModel } from "@/ai/openrouter-catalog";
 import {
   currentModelRowId,
+  currentModelRowLabel,
   directCards,
   filterModelCards,
   markRememberedModel,
@@ -145,5 +146,45 @@ describe("currentModelRowId", () => {
   it("shows no row without a remembered model", () => {
     const marks = markRememberedModel(cards, null);
     expect(currentModelRowId(marks, [])).toBeNull();
+  });
+});
+
+describe("currentModelRowLabel shows the model's name (38.12 D-88, 38.4 #21)", () => {
+  const catalog = openRouterCards(
+    [
+      {
+        id: "vendor/model-a",
+        name: "Vendor Model A",
+        contextLength: null,
+        pricing: {},
+      },
+      {
+        id: "vendor/model-b",
+        name: "Vendor Model B",
+        contextLength: null,
+        pricing: {},
+      },
+    ],
+    [],
+  );
+
+  it("names a saved catalog model hidden from the visible list", () => {
+    const marks = markRememberedModel(catalog, "vendor/model-a");
+    expect(
+      currentModelRowLabel(
+        marks,
+        marks.cards.filter((card) => card.id !== "vendor/model-a"),
+      ),
+    ).toBe("Vendor Model A");
+  });
+
+  it("falls back to the id only when no name is known", () => {
+    const marks = markRememberedModel(catalog, "my-manual-id");
+    expect(currentModelRowLabel(marks, marks.cards)).toBe("my-manual-id");
+  });
+
+  it("shows no row when the saved model's card is visible", () => {
+    const marks = markRememberedModel(catalog, "vendor/model-b");
+    expect(currentModelRowLabel(marks, marks.cards)).toBeNull();
   });
 });

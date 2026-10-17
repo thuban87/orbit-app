@@ -2,9 +2,11 @@ import {
   type ValidateEndpointResult,
   validateCustomEndpoint,
 } from "@/ai/custom-endpoint";
+import type { AiConnection } from "@/db/ai-connections-dao";
 import {
   type AiAvailabilityInput,
   computeAiAvailability,
+  readCredentialPresence,
 } from "@/logic/ai-availability";
 import type { AiCloudProviderId } from "@/services/ai-types";
 
@@ -42,17 +44,86 @@ export function finishConnectionSetup(
   };
 }
 
-export function connectionCardState(
-  lane: AiCloudProviderId,
-  activeLane: AiCloudProviderId | null,
-  rememberedModel: string | null | undefined,
-) {
+export interface ConnectionCardInput {
+  readonly lane: AiCloudProviderId;
+  readonly activeLane: AiCloudProviderId | null;
+  readonly rememberedModel: string | null | undefined;
+  /**
+   * Whether the lane's credential is present on this device — PRESENCE only,
+   * read locally through `readCredentialPresence` (38.12 D-84). The secret
+   * never reaches this module.
+   */
+  readonly hasCredential: boolean;
+}
+
+/**
+ * What a lane card shows (38.12 D-84, K-36).
+ *
+ *   connected  the active lane with a usable credential: the header reads
+ *              "Connected", "Change model" is the primary action and
+ *              Disconnect / Remove key is demoted to a plain control.
+ *   connect    every other lane: the existing Connect / Save key primary.
+ *
+ * A Custom endpoint's credential is optional (it may be unauthenticated), so
+ * an active Custom lane counts as connected without one — the same rule
+ * `computeAiAvailability` applies. No provider call decides this.
+ */
+export type ConnectionCardStatus = "connected" | "connect";
+
+export interface ConnectionCardState {
+  readonly active: boolean;
+  readonly saved: boolean;
+  readonly status: ConnectionCardStatus;
+  readonly primaryAction: "change-model" | "connect";
+  readonly rememberedModel: string;
+}
+
+export function connectionCardState({
+  lane,
+  activeLane,
+  rememberedModel,
+  hasCredential,
+}: ConnectionCardInput): ConnectionCardState {
   const configured = (rememberedModel ?? "").trim() !== "";
+  const active = lane === activeLane;
+  const connected = active && (hasCredential || lane === "custom");
   return {
-    active: lane === activeLane,
-    saved: configured && lane !== activeLane,
+    active,
+    saved: configured && !active,
+    status: connected ? "connected" : "connect",
+    primaryAction: connected ? "change-model" : "connect",
     rememberedModel: rememberedModel ?? "",
-  } as const;
+  };
+}
+
+/**
+ * Credential PRESENCE for every saved lane (38.12 D-84), read locally through
+ * `readCredentialPresence`: only a boolean per lane comes back, the key value
+ * is never returned or kept. A Custom credential is bound to its endpoint, so
+ * its read passes the saved endpoint. No network call.
+ */
+export async function readLaneCredentialPresence(
+  connections: readonly Pick<AiConnection, "lane" | "customEndpoint">[],
+  getKey: (
+    provider: AiCloudProviderId,
+    customEndpoint?: string,
+  ) => Promise<string | null>,
+): Promise<Partial<Record<AiCloudProviderId, boolean>>> {
+  const entries = await Promise.all(
+    connections.map(
+      async (connection) =>
+        [
+          connection.lane,
+          await readCredentialPresence(connection.lane, (lane) =>
+            getKey(
+              lane,
+              lane === "custom" ? connection.customEndpoint : undefined,
+            ),
+          ),
+        ] as const,
+    ),
+  );
+  return Object.fromEntries(entries);
 }
 
 interface KeyWriter {

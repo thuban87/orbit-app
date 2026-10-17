@@ -42,12 +42,81 @@ describe("AI connection switching", () => {
   });
 
   it("marks configured inactive lanes Saved and restores remembered models", () => {
-    expect(connectionCardState("openai", "anthropic", "gpt-live")).toEqual({
+    expect(
+      connectionCardState({
+        lane: "openai",
+        activeLane: "anthropic",
+        rememberedModel: "gpt-live",
+        hasCredential: true,
+      }),
+    ).toEqual({
       active: false,
       saved: true,
+      status: "connect",
+      primaryAction: "connect",
       rememberedModel: "gpt-live",
     });
-    expect(connectionCardState("google", "anthropic", "").saved).toBe(false);
+    expect(
+      connectionCardState({
+        lane: "google",
+        activeLane: "anthropic",
+        rememberedModel: "",
+        hasCredential: false,
+      }).saved,
+    ).toBe(false);
+  });
+});
+
+describe("connectionCardState reads credential presence (38.12 D-84, K-36)", () => {
+  it("an active lane with a credential is Connected with Change model primary", () => {
+    expect(
+      connectionCardState({
+        lane: "openrouter",
+        activeLane: "openrouter",
+        rememberedModel: "vendor/model",
+        hasCredential: true,
+      }),
+    ).toEqual({
+      active: true,
+      saved: false,
+      status: "connected",
+      primaryAction: "change-model",
+      rememberedModel: "vendor/model",
+    });
+  });
+
+  it("an active lane without a credential keeps the Connect primary", () => {
+    const state = connectionCardState({
+      lane: "openrouter",
+      activeLane: "openrouter",
+      rememberedModel: "vendor/model",
+      hasCredential: false,
+    });
+    expect(state.status).toBe("connect");
+    expect(state.primaryAction).toBe("connect");
+    expect(state.active).toBe(true);
+  });
+
+  it("an inactive lane is never Connected, even with a credential", () => {
+    expect(
+      connectionCardState({
+        lane: "openai",
+        activeLane: "openrouter",
+        rememberedModel: "gpt-live",
+        hasCredential: true,
+      }).status,
+    ).toBe("connect");
+  });
+
+  it("an active Custom endpoint is Connected without a credential (it is optional)", () => {
+    expect(
+      connectionCardState({
+        lane: "custom",
+        activeLane: "custom",
+        rememberedModel: "local-model",
+        hasCredential: false,
+      }).status,
+    ).toBe("connected");
   });
 });
 

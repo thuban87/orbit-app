@@ -39,11 +39,13 @@ const GLASS_SCOPE_READ_ALLOWLIST: Record<string, string> = {};
  * The discovered scope slots. A new wrapper (a component or render helper that
  * renders a ReactNode slot inside a scope) changes this list, so it is noticed.
  * `AnchoredPanel` is absent: its surface is an orrery overlay (root palette).
+ * AI Connection's `card(body)` slot left the list in 38.12-15: its lane cards
+ * moved onto the plain shared Settings section card (D-119), so no glass scope
+ * wraps them any more.
  */
 const EXPECTED_SCOPE_SLOTS = [
   "ProfileSection.children",
   "ProfileSection.headerAction",
-  "src/screens/AIConnectionScreen.tsx#card(body)",
 ];
 
 function walk(dir: string, out: string[]): string[] {

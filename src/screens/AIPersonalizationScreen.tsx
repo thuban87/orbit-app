@@ -1000,6 +1000,12 @@ function PersonalizationSectionCard({
   );
 }
 
+/** The section form's heading: adding vs editing (38.12-15 fold). */
+export const SECTION_FORM_HEADING = {
+  add: "New personalization section",
+  edit: "Edit section",
+} as const;
+
 function NewSectionEditor({
   title,
   body,
@@ -1009,6 +1015,7 @@ function NewSectionEditor({
   onSave,
   busy = false,
   framed = true,
+  heading = SECTION_FORM_HEADING.add,
 }: {
   title: string;
   body: string;
@@ -1026,6 +1033,8 @@ function NewSectionEditor({
    * edit form sits inside its section's row, so it is drawn unframed.
    */
   framed?: boolean;
+  /** The form's heading; the inline edit form passes the edit heading. */
+  heading?: string;
 }) {
   const { colors } = useTheme();
   return (
@@ -1040,7 +1049,7 @@ function NewSectionEditor({
           : null,
       ]}
     >
-      <AppText role="label">New personalization section</AppText>
+      <AppText role="label">{heading}</AppText>
       <TextInput
         accessibilityLabel="Section title"
         editable={!busy}
@@ -1126,6 +1135,7 @@ function SectionEditor({
       onSave={() => void onSave({ ...section, title, body })}
       busy={busy}
       framed={false}
+      heading={SECTION_FORM_HEADING.edit}
     />
   );
 }

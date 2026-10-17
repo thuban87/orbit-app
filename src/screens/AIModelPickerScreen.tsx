@@ -45,7 +45,7 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import {
-  currentModelRowId,
+  currentModelRowLabel,
   directCards,
   filterModelCards,
   markRememberedModel,
@@ -176,8 +176,9 @@ export function AIModelPickerScreen({
   }, [browseAll, marks, query]);
   // A manual id, or a saved catalog model hidden by the current view, still gets
   // a visible, announced "Current model" row so the mark never disappears.
-  const currentRowId = useMemo(
-    () => currentModelRowId(marks, visibleCards),
+  // It shows the model's name, not its raw id (38.12 D-88).
+  const currentRowLabel = useMemo(
+    () => currentModelRowLabel(marks, visibleCards),
     [marks, visibleCards],
   );
 
@@ -283,16 +284,16 @@ export function AIModelPickerScreen({
           </>
         ) : null}
 
-        {currentRowId !== null ? (
+        {currentRowLabel !== null ? (
           // The saved model's surface is outlined in the success/stable token
           // (D-73d), like its catalog card when that card is shown.
           <GlassSurface density="dense" selected style={styles.card}>
             <View
               testID="ai-model-picker-current"
               accessible
-              accessibilityLabel={`Current model: ${currentRowId}`}
+              accessibilityLabel={`Current model: ${currentRowLabel}`}
             >
-              <AppText role="label">Current model: {currentRowId}</AppText>
+              <AppText role="label">Current model: {currentRowLabel}</AppText>
             </View>
           </GlassSurface>
         ) : null}

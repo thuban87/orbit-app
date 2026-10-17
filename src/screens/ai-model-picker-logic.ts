@@ -150,3 +150,20 @@ export function currentModelRowId(
     ? null
     : current.id;
 }
+
+/**
+ * The text the standalone "Current model" row shows (38.12 D-88, 38.4 #21): the
+ * matching catalog card's NAME, falling back to the saved id only when no name
+ * is known (a manual id, or a direct-provider id whose card name is its id).
+ * `null` when no row is shown.
+ */
+export function currentModelRowLabel(
+  marks: RememberedModelMarks,
+  visibleCards: readonly Pick<ModelPickerCard, "id">[],
+): string | null {
+  const id = currentModelRowId(marks, visibleCards);
+  if (id === null) return null;
+  const card = marks.cards.find((candidate) => candidate.id === id);
+  const name = card?.name.trim() ?? "";
+  return name !== "" ? name : id;
+}
