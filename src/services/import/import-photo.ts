@@ -13,6 +13,7 @@
  */
 import { setContactPhoto } from "@/db/contacts-dao";
 import { retireRowStagedPhoto } from "@/db/import-session-dao";
+import { recordImportedPhotoFingerprint } from "@/db/reconcile-snapshot-dao";
 import type { SqlExecutor } from "@/db/types";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { Logger } from "@/utils/logger";
@@ -119,6 +120,20 @@ export async function persistImportedPhotoPostCommit(
       }
     }
     await fs.setContactPhoto(exec, params.contactId, relative, params.now);
+    // D-132: best-effort. A failed record costs at most one later photo
+    // question in Check linked contacts, never a failed import.
+    try {
+      await recordImportedPhotoFingerprint(exec, {
+        rowId: params.rowId,
+        contactId: params.contactId,
+        now: params.now,
+      });
+    } catch (error) {
+      Logger.warn(
+        LOG_SCOPE,
+        `could not record the imported photo fingerprint for row ${params.rowId}: ${String(error)}`,
+      );
+    }
     await retireRowStagedPhoto(exec, params.rowId, params.now);
     try {
       await fs.deleteImportStaging(params.stagedPhotoPath);

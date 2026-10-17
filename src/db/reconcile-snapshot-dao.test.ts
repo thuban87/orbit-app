@@ -16,6 +16,7 @@ import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   getReviewedSnapshots,
+  recordImportedPhotoFingerprint,
   reviewedValueFor,
   upsertReviewedSnapshot,
   upsertReviewedSnapshotCore,
@@ -123,5 +124,108 @@ describe("reconcile source snapshots", () => {
         methods[1],
       ]),
     ).not.toBe(reviewed);
+  });
+});
+
+describe("recordImportedPhotoFingerprint (D-132)", () => {
+  const FINGERPRINT =
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+  async function contactId(): Promise<number> {
+    return (await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts",
+    ))!.id;
+  }
+
+  async function insertRow(
+    sourcePayload: string,
+    externalContactId = "source",
+  ): Promise<number> {
+    const session = await exec.runAsync(
+      "INSERT INTO import_sessions (uid, mode, status, batch_tracking_enabled, total_rows, created_at, modified_at) VALUES (?, 'single', 'pending', 0, 1, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    const row = await exec.runAsync(
+      "INSERT INTO import_session_rows (uid, session_id, external_contact_id, source_payload, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        uid(),
+        session.lastInsertRowId,
+        externalContactId,
+        sourcePayload,
+        NOW,
+        NOW,
+      ],
+    );
+    return row.lastInsertRowId;
+  }
+
+  async function snapshotCount(): Promise<number> {
+    return (await exec.getFirstAsync<{ count: number }>(
+      "SELECT count(*) AS count FROM reconcile_source_snapshot",
+    ))!.count;
+  }
+
+  it("writes a 'photo' reviewed row for the active link equal to the bridge fingerprint", async () => {
+    const rowId = await insertRow(
+      JSON.stringify({ displayName: "Orbit", photoFingerprint: FINGERPRINT }),
+    );
+    await recordImportedPhotoFingerprint(exec, {
+      rowId,
+      contactId: await contactId(),
+      now: NOW,
+    });
+    expect(await getReviewedSnapshots(exec, await linkId())).toEqual({
+      photo: FINGERPRINT,
+    });
+  });
+
+  it("is a no-op for a missing fingerprint, a non-string fingerprint or bad JSON", async () => {
+    const id = await contactId();
+    for (const payload of [
+      JSON.stringify({ displayName: "Orbit" }),
+      JSON.stringify({ photoFingerprint: null }),
+      JSON.stringify({ photoFingerprint: 42 }),
+      JSON.stringify({ photoFingerprint: "" }),
+      "not json",
+      "null",
+    ]) {
+      const rowId = await insertRow(payload);
+      await expect(
+        recordImportedPhotoFingerprint(exec, {
+          rowId,
+          contactId: id,
+          now: NOW,
+        }),
+      ).resolves.toBeUndefined();
+    }
+    expect(await snapshotCount()).toBe(0);
+  });
+
+  it("is a no-op when there is no active link or no import row", async () => {
+    const id = await contactId();
+    const otherSource = await insertRow(
+      JSON.stringify({ photoFingerprint: FINGERPRINT }),
+      "other-source",
+    );
+    await recordImportedPhotoFingerprint(exec, {
+      rowId: otherSource,
+      contactId: id,
+      now: NOW,
+    });
+    const inactive = await insertRow(
+      JSON.stringify({ photoFingerprint: FINGERPRINT }),
+    );
+    await exec.runAsync("UPDATE external_contact_links SET is_active = 0");
+    await recordImportedPhotoFingerprint(exec, {
+      rowId: inactive,
+      contactId: id,
+      now: NOW,
+    });
+    await recordImportedPhotoFingerprint(exec, {
+      rowId: 9999,
+      contactId: id,
+      now: NOW,
+    });
+    expect(await snapshotCount()).toBe(0);
   });
 });

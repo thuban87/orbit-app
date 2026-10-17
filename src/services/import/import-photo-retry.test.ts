@@ -284,6 +284,78 @@ describe("photo-only import retry", () => {
     expect((await row())?.photo_rel_path ?? null).toBeNull();
   });
 
+  describe("photo fingerprint record (D-132)", () => {
+    const FINGERPRINT = "f".repeat(64);
+    let linkId: number;
+
+    beforeEach(async () => {
+      await exec.runAsync(
+        "UPDATE import_session_rows SET source_payload = ? WHERE id = ?",
+        [JSON.stringify({ photoFingerprint: FINGERPRINT }), rowId],
+      );
+      const link = await exec.runAsync(
+        "INSERT INTO external_contact_links (uid, contact_id, provider, external_contact_id, created_at, modified_at) VALUES (?, ?, 'android', 'source', ?, ?)",
+        [uid(), contactId, NOW, NOW],
+      );
+      linkId = link.lastInsertRowId;
+    });
+
+    async function reviewedPhoto(): Promise<string | null | undefined> {
+      return (
+        await exec.getFirstAsync<{ reviewed_value: string | null }>(
+          "SELECT reviewed_value FROM reconcile_source_snapshot WHERE external_contact_link_id = ? AND field_family = 'photo'",
+          [linkId],
+        )
+      )?.reviewed_value;
+    }
+
+    it("records the fingerprint after the publish commits", async () => {
+      expect(await retryImportedPhoto(exec, fs(), rowId, NOW)).toBe(true);
+      expect((await photo())?.photo).toBe(canonical());
+      expect(await reviewedPhoto()).toBe(FINGERPRINT);
+    });
+
+    it("records nothing when the publish is refused (contact changed)", async () => {
+      const mocked = fs();
+      mocked.persistMaster = async (source, path) => {
+        h.files.set(path, h.files.get(source) ?? source);
+        await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+          "avatars/elsewhere.jpg",
+          contactId,
+        ]);
+        return path;
+      };
+      expect(await retryImportedPhoto(exec, mocked, rowId, NOW)).toBe(false);
+      expect(await reviewedPhoto()).toBeUndefined();
+    });
+
+    it("records nothing when the import row changed before publication", async () => {
+      const mocked = fs();
+      mocked.persistMaster = async (source, path) => {
+        h.files.set(path, h.files.get(source) ?? source);
+        await exec.runAsync(
+          "UPDATE import_session_rows SET row_status = 'skipped' WHERE id = ?",
+          [rowId],
+        );
+        return path;
+      };
+      expect(await retryImportedPhoto(exec, mocked, rowId, NOW)).toBe(false);
+      expect(await reviewedPhoto()).toBeUndefined();
+    });
+
+    it("a throwing record does not fail the retry", async () => {
+      await exec.execAsync(`
+        CREATE TRIGGER snapshot_insert_fails BEFORE INSERT ON reconcile_source_snapshot
+        BEGIN SELECT RAISE(ABORT, 'record refused'); END;
+      `);
+      expect(await retryImportedPhoto(exec, fs(), rowId, NOW)).toBe(true);
+      expect((await photo())?.photo).toBe(canonical());
+      expect(await row()).toMatchObject({ photo_rel_path: null });
+      expect(h.files.has(staged)).toBe(false);
+      expect(await reviewedPhoto()).toBeUndefined();
+    });
+  });
+
   it("explicit skip discards only photo work", async () => {
     expect(await skipRemainingPhotos(exec, fs(), sessionId, NOW)).toBe(1);
     expect(await row()).toMatchObject({

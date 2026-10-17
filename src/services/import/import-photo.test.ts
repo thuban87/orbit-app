@@ -29,6 +29,9 @@ vi.mock("@/services/photos/photo-storage", () => ({
   resolveImportStagingUri: (relative: string) =>
     `file:///documents/${relative}`,
 }));
+vi.mock("@/db/reconcile-snapshot-dao", () => ({
+  recordImportedPhotoFingerprint: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/utils/logger", () => ({
   Logger: { error: vi.fn(), warn: vi.fn() },
 }));
@@ -37,6 +40,7 @@ vi.mock("@/services/photos/derivative-cache", () => ({
 }));
 
 import { retireRowStagedPhoto } from "@/db/import-session-dao";
+import { recordImportedPhotoFingerprint } from "@/db/reconcile-snapshot-dao";
 import {
   type ImportedPhotoFs,
   importedPhotoFs,
@@ -132,6 +136,70 @@ describe("persistImportedPhotoPostCommit", () => {
     expect(fs.deleteImportStaging).toHaveBeenCalledWith(
       "import-staging/import-session-row.jpg",
     );
+  });
+
+  it("records the phone photo fingerprint after a successful persist (D-132)", async () => {
+    const fs = createFs();
+    const exec = {} as SqlExecutor;
+    await expect(
+      persistImportedPhotoPostCommit(exec, fs, {
+        contactId: 42,
+        rowId: 7,
+        stagedPhotoPath: "import-staging/a.jpg",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(recordImportedPhotoFingerprint).toHaveBeenCalledTimes(1);
+    expect(recordImportedPhotoFingerprint).toHaveBeenCalledWith(exec, {
+      rowId: 7,
+      contactId: 42,
+      now: NOW,
+    });
+    expect(
+      vi.mocked(fs.setContactPhoto).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(recordImportedPhotoFingerprint).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("a throwing fingerprint record never fails the photo import", async () => {
+    vi.mocked(recordImportedPhotoFingerprint).mockRejectedValueOnce(
+      new Error("locked"),
+    );
+    const fs = createFs();
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        rowId: 7,
+        stagedPhotoPath: "import-staging/a.jpg",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(retireRowStagedPhoto).toHaveBeenCalled();
+    expect(fs.deleteImportStaging).toHaveBeenCalledWith("import-staging/a.jpg");
+  });
+
+  it("a failed or skipped persist records no fingerprint", async () => {
+    for (const fs of [
+      createFs({ persistMaster: vi.fn().mockRejectedValue(new Error("p")) }),
+      createFs({ setContactPhoto: vi.fn().mockRejectedValue(new Error("db")) }),
+    ]) {
+      await expect(
+        persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+          contactId: 42,
+          rowId: 7,
+          stagedPhotoPath: "import-staging/a.jpg",
+          now: NOW,
+        }),
+      ).resolves.toEqual({ ok: false });
+    }
+    await persistImportedPhotoPostCommit({} as SqlExecutor, createFs(), {
+      contactId: 42,
+      rowId: 7,
+      stagedPhotoPath: null,
+      now: NOW,
+    });
+    expect(recordImportedPhotoFingerprint).not.toHaveBeenCalled();
   });
 
   it("photo failure returns ok:false and does not throw", async () => {

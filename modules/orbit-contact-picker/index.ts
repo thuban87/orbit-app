@@ -9,6 +9,17 @@ import OrbitContactPickerModule from "./src/OrbitContactPickerModule";
 export interface PickedMethod {
   readonly type: "phone" | "email";
   readonly value: string;
+  /**
+   * Raw ContactsContract TYPE code (Phone.TYPE / Email.TYPE, DATA2); null when
+   * the provider did not return it. Mapped to Orbit's label set by its
+   * consumer, never here (D-102).
+   */
+  readonly typeCode?: number | null;
+  /**
+   * Raw ContactsContract LABEL (DATA3) for TYPE_CUSTOM; null when the provider
+   * did not return one (D-102).
+   */
+  readonly customLabel?: string | null;
 }
 
 export interface PickedContact {
@@ -24,6 +35,19 @@ export interface PickedContact {
    * import-session acceptance flow before it is persisted.
    */
   readonly photoTempUri: string | null;
+  /**
+   * App-private cache copy of the provider thumbnail, present only when
+   * `photoTempUri` holds the full-size copy (a `preferFullSize` import read).
+   * Used by "Import with smaller photos" (D-133); evictable like photoTempUri.
+   */
+  readonly thumbnailTempUri?: string | null;
+  /**
+   * SHA-256 lowercase hex of the phone's thumbnail bytes, else of the
+   * full-size bytes when the phone has no thumbnail. Stable across Orbit's
+   * thumbnail-to-full-size switch (D-118), so Check linked contacts can tell an
+   * already-adopted phone photo from a changed one (D-132).
+   */
+  readonly photoFingerprint?: string | null;
 }
 
 export interface PickContactsOptions {

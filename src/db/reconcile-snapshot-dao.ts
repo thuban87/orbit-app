@@ -82,6 +82,70 @@ export function upsertReviewedSnapshot(
   );
 }
 
+export interface RecordImportedPhotoFingerprintInput {
+  rowId: number;
+  contactId: number;
+  now: string;
+}
+
+function payloadFingerprint(sourcePayload: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(sourcePayload);
+    if (parsed === null || typeof parsed !== "object") return null;
+    const value = (parsed as { photoFingerprint?: unknown }).photoFingerprint;
+    return typeof value === "string" && value !== "" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * D-132: when an import adopts the phone's photo, remember the bridge's photo
+ * fingerprint as the link's reviewed 'photo' value so the first Check linked
+ * contacts does not ask about a photo Orbit just took from the phone.
+ *
+ * Caller-owned transaction body; never wraps its own mutex/BEGIN. Missing
+ * data (no row, no/invalid fingerprint, no active link) is a silent no-op.
+ */
+export async function recordImportedPhotoFingerprintCore(
+  exec: SqlExecutor,
+  input: RecordImportedPhotoFingerprintInput,
+): Promise<void> {
+  const row = await exec.getFirstAsync<{
+    source_payload: string;
+    external_contact_id: string;
+  }>(
+    "SELECT source_payload, external_contact_id FROM import_session_rows WHERE id = ?",
+    [input.rowId],
+  );
+  if (!row) return;
+  const fingerprint = payloadFingerprint(row.source_payload);
+  if (fingerprint === null) return;
+  const link = await exec.getFirstAsync<{ id: number }>(
+    `SELECT id FROM external_contact_links
+      WHERE contact_id = ? AND external_contact_id = ? AND is_active = 1
+      ORDER BY id DESC LIMIT 1`,
+    [input.contactId, row.external_contact_id],
+  );
+  if (!link) return;
+  await upsertReviewedSnapshotCore(exec, {
+    externalContactLinkId: link.id,
+    fieldFamily: "photo",
+    reviewedValue: fingerprint,
+    reviewedAt: input.now,
+  });
+}
+
+/** Locked wrapper: the only form callers outside a transaction may use. */
+export function recordImportedPhotoFingerprint(
+  exec: SqlExecutor,
+  input: RecordImportedPhotoFingerprintInput,
+): Promise<void> {
+  return inWriteTransaction(exec, () =>
+    recordImportedPhotoFingerprintCore(exec, input),
+  );
+}
+
 /** Read shape consumed directly by classifyReconciliation's `lastReviewed` input. */
 export async function getReviewedSnapshots(
   exec: SqlExecutor,

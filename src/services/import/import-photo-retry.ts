@@ -1,5 +1,6 @@
 /** Photo-only recovery for contacts whose import already committed (ADR-065). */
 import { PHOTO_OUTSTANDING } from "@/db/import-session-dao";
+import { recordImportedPhotoFingerprint } from "@/db/reconcile-snapshot-dao";
 import { enqueueDeleteIntentCore } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -20,6 +21,7 @@ import {
   persistMaster,
   photoFileExists,
 } from "@/services/photos/photo-storage";
+import { Logger } from "@/utils/logger";
 
 export interface RetryPhotoFs extends ImportedPhotoFs {
   stagingExists?: (relative: string) => boolean;
@@ -171,7 +173,23 @@ export async function retryImportedPhoto(
         );
       }
     });
-    if (published) await fs.deleteImportStaging(row.photo_rel_path);
+    if (published) {
+      // D-132: the publish transaction has committed; record the phone photo's
+      // fingerprint best-effort in its own locked transaction.
+      try {
+        await recordImportedPhotoFingerprint(exec, {
+          rowId: row.id,
+          contactId: row.contact_id,
+          now,
+        });
+      } catch (error) {
+        Logger.warn(
+          "import-photo-retry",
+          `could not record the imported photo fingerprint for row ${row.id}: ${String(error)}`,
+        );
+      }
+      await fs.deleteImportStaging(row.photo_rel_path);
+    }
     return published;
   } finally {
     try {

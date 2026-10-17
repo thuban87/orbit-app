@@ -87,6 +87,48 @@ describe("import acquisition", () => {
     expect(discardDerivative).toHaveBeenCalledTimes(2);
   });
 
+  it("stores the bridge photo fingerprint in the payload and discards the unstaged thumbnail copy (D-132, D-133)", async () => {
+    const picked = {
+      lookupKey: "fingerprinted",
+      displayName: "Finn",
+      methods: [],
+      birthday: null,
+      photoTempUri: "file:///cache/contact-picker-full.photo",
+      thumbnailTempUri: "file:///cache/contact-picker-thumb.photo",
+      photoFingerprint: "a".repeat(64),
+    };
+    const sessionId = await acceptPickedContacts(exec, [picked], {
+      mode: "single",
+      batchCategoryId: null,
+      effectivePhoneRegion: "US",
+      now: NOW,
+    });
+    const [row] = await listSessionRows(exec, sessionId);
+    expect(JSON.parse(row.sourcePayload)).toMatchObject({
+      photoFingerprint: "a".repeat(64),
+    });
+    expect(stageImportPhoto).toHaveBeenCalledTimes(1);
+    expect(stageImportPhoto).toHaveBeenCalledWith(
+      picked.photoTempUri,
+      expect.any(String),
+    );
+    expect(discardDerivative).toHaveBeenCalledWith(picked.photoTempUri);
+    expect(discardDerivative).toHaveBeenCalledWith(picked.thumbnailTempUri);
+
+    const withoutFingerprint = await acceptPickedContacts(
+      exec,
+      [{ ...picked, lookupKey: "plain", photoFingerprint: undefined }],
+      {
+        mode: "single",
+        batchCategoryId: null,
+        effectivePhoneRegion: "US",
+        now: NOW,
+      },
+    );
+    const [plainRow] = await listSessionRows(exec, withoutFingerprint);
+    expect(JSON.parse(plainRow.sourcePayload).photoFingerprint).toBeNull();
+  });
+
   it("retires every accepted or skipped picker copy and keeps accepted rows when cleanup fails", async () => {
     discardDerivative.mockImplementation(() => {
       throw new Error("delete failed");

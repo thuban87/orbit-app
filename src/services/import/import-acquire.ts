@@ -104,13 +104,22 @@ export async function acceptPickedContacts(
             methods: contact.methods,
             birthday: contact.birthday,
             note: contact.note,
+            // D-132: recorded as the link's reviewed photo when the import
+            // adopts this phone photo (recordImportedPhotoFingerprint).
+            photoFingerprint: contact.photoFingerprint ?? null,
           }),
           photoRelPath,
         };
       } finally {
-        if (contact.photoTempUri) {
+        // The thumbnail copy (D-133) is never staged here; the cold-start
+        // cache sweep retires any copy whose discard fails.
+        for (const cacheUri of [
+          contact.photoTempUri,
+          contact.thumbnailTempUri,
+        ]) {
+          if (!cacheUri) continue;
           try {
-            discardDerivative(contact.photoTempUri);
+            discardDerivative(cacheUri);
           } catch {
             Logger.warn("import-acquire", "picker photo cleanup failed");
           }
