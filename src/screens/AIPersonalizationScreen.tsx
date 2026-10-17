@@ -1,15 +1,30 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
 import * as DocumentPicker from "expo-document-picker";
 import { Directory, File, Paths } from "expo-file-system";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  AccessibilityInfo,
+  findNodeHandle,
   type LayoutChangeEvent,
   Pressable,
-  ScrollView,
+  type ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
+import {
+  NestedReorderableList,
+  type ReorderableListReorderEvent,
+  ScrollViewContainer,
+  useReorderableDrag,
+} from "react-native-reorderable-list";
 import {
   COST_ESTIMATE_UNAVAILABLE,
   estimatePromptContext,
@@ -34,6 +49,10 @@ import {
   MIN_TOUCH_TARGET,
   OrbitSwitch,
 } from "@/components/ui";
+import {
+  AnchoredMenu,
+  type AnchoredMenuItem,
+} from "@/components/ui/AnchoredMenu";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -72,7 +91,9 @@ import {
   initialStyleSync,
   isWritingStyleDirty,
   moveSectionUid,
+  orderSectionsByUid,
   personalizationEstimateSource,
+  reorderSectionUids,
   type StyleSyncState,
 } from "./ai-personalization-logic";
 
@@ -185,6 +206,10 @@ export function AIPersonalizationScreen({
   const [savingStyle, setSavingStyle] = useState(false);
   // A section add or edit is saving (the header's disabled Back; WR-02).
   const [savingSection, setSavingSection] = useState(false);
+  // A section reorder (drag or Move up / Move down) is saving: the list's
+  // handles and menus hold so two reorders never race (38.12 D-120).
+  const [reordering, setReordering] = useState(false);
+  const reorderingRef = useRef(false);
   // Synchronous in-flight flag shared by the three saves the guard covers
   // (Writing Style, new section, section edit): the guard reads it to hold
   // Back while one runs (fix-pass WR-02); one save at a time.
@@ -194,13 +219,15 @@ export function AIPersonalizationScreen({
   // follow-up). It also holds each section's options (Rename / edit,
   // Replace from file, Delete section; third fix pass WR-02).
   const sectionFormBusy = savingStyle || savingSection;
+  // The section list (drag handles, ⋯ menus, switches) also holds while a
+  // reorder saves (38.12 D-120, D-88).
+  const listBusy = sectionFormBusy || reordering;
   const [adding, setAdding] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
   const [editingUid, setEditingUid] = useState<string | null>(null);
   // Whether the open inline section edit differs from its section (C5-L7).
   const [sectionEditDirty, setSectionEditDirty] = useState(false);
-  const [optionsUid, setOptionsUid] = useState<string | null>(null);
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const storage = useMemo(createOpenRouterStorage, []);
   const directStorage = useMemo(createFileCatalogStorage, []);
@@ -435,7 +462,6 @@ export function AIPersonalizationScreen({
         });
       }
       committed = true;
-      setOptionsUid(null);
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to import personalization", caught);
       setMessage("Couldn't import that text file. Please try again.");
@@ -498,25 +524,55 @@ export function AIPersonalizationScreen({
     }
   }
 
-  async function moveSection(uid: string, direction: "up" | "down") {
-    const next = moveSectionUid(
-      sections.map((section) => section.uid),
-      uid,
-      direction,
-    );
-    if (next.every((value, index) => value === sections[index]?.uid)) return;
+  /**
+   * Persist a new section order (38.12 D-120): a drag and Move up / Move down
+   * both land here, through the one reorder write. The new order shows at once
+   * so a dropped row does not jump back; a failed write restores the old one.
+   */
+  async function persistSectionOrder(nextUids: string[]) {
+    if (savingRef.current || reorderingRef.current) return;
+    const prior = sections;
+    if (nextUids.every((uid, index) => uid === prior[index]?.uid)) return;
+    reorderingRef.current = true;
+    setReordering(true);
+    setSections(orderSectionsByUid(prior, nextUids));
+    let committed = false;
     try {
       await reorderPersonalizationSections(
         getExecutor(),
-        next,
+        nextUids,
         localDateTime(),
       );
+      committed = true;
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to reorder personalization", caught);
+      setSections(prior);
       setMessage("Couldn't reorder those sections. Please try again.");
-      return;
+    } finally {
+      reorderingRef.current = false;
+      setReordering(false);
     }
-    await reloadAfterWrite();
+    if (committed) await reloadAfterWrite();
+  }
+
+  function moveSection(uid: string, direction: "up" | "down") {
+    void persistSectionOrder(
+      moveSectionUid(
+        sections.map((section) => section.uid),
+        uid,
+        direction,
+      ),
+    );
+  }
+
+  function dropSection({ from, to }: ReorderableListReorderEvent) {
+    void persistSectionOrder(
+      reorderSectionUids(
+        sections.map((section) => section.uid),
+        from,
+        to,
+      ),
+    );
   }
 
   async function confirmDelete() {
@@ -524,7 +580,6 @@ export function AIPersonalizationScreen({
     try {
       await deletePersonalizationSection(getExecutor(), deleteUid);
       setDeleteUid(null);
-      setOptionsUid(null);
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to delete personalization", caught);
       setMessage("Couldn't delete that section. Please try again.");
@@ -541,7 +596,9 @@ export function AIPersonalizationScreen({
         title="AI Personalization"
         backDisabled={savingStyle || savingSection}
       />
-      <ScrollView
+      {/* The one scroll container; the section list nests inside it so a
+          drag scrolls the page (ProfileLayoutEditor precedent, D-29). */}
+      <ScrollViewContainer
         ref={scrollRef}
         contentContainerStyle={[
           styles.content,
@@ -656,126 +713,53 @@ export function AIPersonalizationScreen({
               </ScopedPalette>
             </GlassSurface>
           ) : (
-            sections.map((section, index) => (
-              <GlassSurface
-                key={section.uid}
-                density="dense"
-                style={styles.card}
-              >
-                <View style={styles.cardHeader}>
-                  <Pressable
-                    accessibilityRole="adjustable"
-                    accessibilityLabel={`Reorder ${section.title}`}
-                    accessibilityHint="Use Move up or Move down"
-                    accessibilityActions={[
-                      { name: "increment", label: "Move down" },
-                      { name: "decrement", label: "Move up" },
-                    ]}
-                    onAccessibilityAction={(event) => {
-                      const direction =
-                        event.nativeEvent.actionName === "decrement"
-                          ? "up"
-                          : "down";
-                      void moveSection(section.uid, direction);
-                    }}
-                    style={styles.iconTarget}
-                  >
-                    <Icon name="sort" tone="textSecondary" size="md" />
-                  </Pressable>
-                  <View style={styles.cardCopy}>
-                    <AppText role="label">{section.title}</AppText>
-                    <ScopedPalette>
-                      {(scoped) => (
-                        <AppText
-                          role="body"
-                          style={{ color: scoped.textSecondary }}
-                        >
-                          {section.body || "No section text yet."}
-                        </AppText>
-                      )}
-                    </ScopedPalette>
-                  </View>
-                  <OrbitSwitch
-                    accessibilityLabel={`Send ${section.title} to AI`}
-                    value={section.enabled}
-                    onValueChange={(value) =>
-                      void toggleSection(section, value)
-                    }
-                  />
-                  {/* The options a save holds, and the button that opens
-                      them, draw disabled while one runs (third fix pass
-                      WR-02, D-26): Rename / edit would unmount the saving
-                      editor and lose its text; Replace and Delete would
-                      race the update. */}
-                  <Button
-                    role="iconOnly"
-                    icon="overflow"
-                    accessibilityLabel={`Section options for ${section.title}`}
-                    disabled={sectionFormBusy}
-                    onPress={() =>
-                      setOptionsUid((current) =>
-                        current === section.uid ? null : section.uid,
-                      )
-                    }
-                  />
-                </View>
-                <View style={styles.moveActions}>
-                  <Button
-                    role="tertiary"
-                    label="Move up"
-                    disabled={index === 0}
-                    onPress={() => void moveSection(section.uid, "up")}
-                  />
-                  <Button
-                    role="tertiary"
-                    label="Move down"
-                    disabled={index === sections.length - 1}
-                    onPress={() => void moveSection(section.uid, "down")}
-                  />
-                </View>
-                {optionsUid === section.uid ? (
-                  <View style={styles.options}>
-                    <Button
-                      role="tertiary"
-                      label="Rename / edit"
-                      disabled={sectionFormBusy}
-                      onPress={() => {
-                        if (savingRef.current) return;
-                        setEditingUid(section.uid);
-                        setOptionsUid(null);
-                      }}
+            <NestedReorderableList
+              data={sections}
+              keyExtractor={(section) => section.uid}
+              onReorder={dropSection}
+              // Rows read the screen's busy and editing state, which the list
+              // data does not carry.
+              extraData={{ editingUid, listBusy }}
+              renderItem={({ item: section, index }) => (
+                <PersonalizationSectionCard
+                  section={section}
+                  index={index}
+                  total={sections.length}
+                  busy={listBusy}
+                  onToggle={(enabled) => {
+                    if (savingRef.current || reorderingRef.current) return;
+                    void toggleSection(section, enabled);
+                  }}
+                  onEdit={() => {
+                    if (savingRef.current) return;
+                    setEditingUid(section.uid);
+                  }}
+                  onReplace={() => {
+                    if (savingRef.current) return;
+                    void importFile(section.uid);
+                  }}
+                  onMove={(direction) => moveSection(section.uid, direction)}
+                  onDelete={() => {
+                    if (savingRef.current) return;
+                    setDeleteUid(section.uid);
+                  }}
+                >
+                  {editingUid === section.uid ? (
+                    <SectionEditor
+                      section={section}
+                      onCancel={() => setEditingUid(null)}
+                      onSave={saveEditedSection}
+                      onDirtyChange={setSectionEditDirty}
+                      busy={sectionFormBusy}
                     />
-                    <Button
-                      role="tertiary"
-                      label="Replace from file"
-                      disabled={sectionFormBusy}
-                      onPress={() => {
-                        if (savingRef.current) return;
-                        void importFile(section.uid);
-                      }}
-                    />
-                    <Button
-                      role="destructive"
-                      label="Delete section"
-                      disabled={sectionFormBusy}
-                      onPress={() => {
-                        if (savingRef.current) return;
-                        setDeleteUid(section.uid);
-                      }}
-                    />
-                  </View>
-                ) : null}
-                {editingUid === section.uid ? (
-                  <SectionEditor
-                    section={section}
-                    onCancel={() => setEditingUid(null)}
-                    onSave={saveEditedSection}
-                    onDirtyChange={setSectionEditDirty}
-                    busy={sectionFormBusy}
-                  />
-                ) : null}
-              </GlassSurface>
-            ))
+                  ) : null}
+                </PersonalizationSectionCard>
+              )}
+              scrollable={false}
+              // The outer ScrollViewContainer is the only scroll container
+              // (ProfileLayoutEditor D-29); drag still pauses its scroll.
+              scrollEnabled={false}
+            />
           )}
 
           {adding ? (
@@ -838,7 +822,7 @@ export function AIPersonalizationScreen({
             {message}
           </AppText>
         ) : null}
-      </ScrollView>
+      </ScrollViewContainer>
       <ConfirmDialog
         visible={deleteUid !== null}
         destructive
@@ -882,6 +866,140 @@ function StyleRow<V extends string>({
         role="tertiary"
         label={custom ? `Use ${label} controls` : "Use custom guidance instead"}
         onPress={onToggleCustom}
+      />
+    </View>
+  );
+}
+
+/**
+ * One personalization section in the shared list pattern (38.12 D-86, D-120;
+ * Categories is the reference): a drag handle, the title, its Send-to-AI
+ * switch and a ⋯ holding every action, Delete section last. The section text
+ * spans the full card width under that row. `busy` holds the handle, the ⋯ and
+ * the switch while a save or reorder runs (D-26, D-88).
+ */
+function PersonalizationSectionCard({
+  section,
+  index,
+  total,
+  busy,
+  onToggle,
+  onEdit,
+  onReplace,
+  onMove,
+  onDelete,
+  children,
+}: {
+  section: PersonalizationSection;
+  index: number;
+  total: number;
+  busy: boolean;
+  onToggle: (enabled: boolean) => void;
+  onEdit: () => void;
+  onReplace: () => void;
+  onMove: (direction: "up" | "down") => void;
+  onDelete: () => void;
+  /** The inline section editor, while this section is being edited. */
+  children?: ReactNode;
+}) {
+  const { colors } = useTheme();
+  const drag = useReorderableDrag();
+  const anchorRef = useRef<View>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    // Focus returns to the ⋯ that opened the menu.
+    requestAnimationFrame(() => {
+      const node = findNodeHandle(anchorRef.current);
+      if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
+    });
+  }, []);
+  const items: AnchoredMenuItem[] = [
+    { id: "edit", label: "Rename / edit", icon: "edit", onPress: onEdit },
+    { id: "replace", label: "Replace from file", onPress: onReplace },
+    ...(index > 0
+      ? [
+          {
+            id: "up",
+            label: "Move up",
+            icon: "sort" as const,
+            onPress: () => onMove("up"),
+          },
+        ]
+      : []),
+    ...(index < total - 1
+      ? [
+          {
+            id: "down",
+            label: "Move down",
+            icon: "sort" as const,
+            onPress: () => onMove("down"),
+          },
+        ]
+      : []),
+    {
+      id: "delete",
+      label: "Delete section",
+      icon: "warning",
+      danger: true,
+      separatorBefore: true,
+      onPress: onDelete,
+    },
+  ];
+  return (
+    <View
+      testID={`personalization-section-${section.uid}`}
+      style={[
+        styles.sectionRow,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
+      <View style={styles.cardHeader}>
+        <Pressable
+          testID={`personalization-drag-${section.uid}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Reorder ${section.title}`}
+          accessibilityHint="Long press and drag to reorder sections"
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          onLongPress={drag}
+          style={styles.iconTarget}
+        >
+          <Icon name="sort" tone="textSecondary" size="md" />
+        </Pressable>
+        <AppText role="label" style={styles.cardTitle}>
+          {section.title}
+        </AppText>
+        <OrbitSwitch
+          accessibilityLabel={`Send ${section.title} to AI`}
+          value={section.enabled}
+          busy={busy}
+          onValueChange={onToggle}
+        />
+        <Pressable
+          ref={anchorRef}
+          testID={`personalization-options-${section.uid}`}
+          collapsable={false}
+          accessibilityRole="button"
+          accessibilityLabel={`Options for ${section.title}`}
+          accessibilityState={{ expanded: menuOpen, disabled: busy }}
+          disabled={busy}
+          onPress={() => setMenuOpen(true)}
+          style={styles.iconTarget}
+        >
+          <Icon name="overflow" tone="textSecondary" size="md" />
+        </Pressable>
+      </View>
+      <AppText role="body" style={{ color: colors.textSecondary }}>
+        {section.body || "No section text yet."}
+      </AppText>
+      {children}
+      <AnchoredMenu
+        anchorRef={anchorRef}
+        visible={menuOpen}
+        accessibilityLabel={`Options for ${section.title}`}
+        items={items}
+        onRequestClose={closeMenu}
       />
     </View>
   );
@@ -1011,23 +1129,25 @@ const styles = StyleSheet.create({
   },
   styleRow: { gap: SPACING.sm },
   card: { padding: SPACING.base },
+  // A section row in the shared list pattern (Categories' row look, D-120).
+  sectionRow: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: RADII.md,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
   cardHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: SPACING.sm,
   },
-  cardCopy: { flex: 1, gap: SPACING.xs },
+  cardTitle: { flex: 1 },
   iconTarget: {
     minHeight: MIN_TOUCH_TARGET,
     minWidth: MIN_TOUCH_TARGET,
     alignItems: "center",
     justifyContent: "center",
-  },
-  moveActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
   },
   options: {
     flexDirection: "row",

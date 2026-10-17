@@ -28,12 +28,12 @@ const SLOT = {
   message: 6,
   savingStyle: 7,
   savingSection: 8,
-  adding: 9,
-  draftTitle: 10,
-  draftBody: 11,
-  editingUid: 12,
-  sectionEditDirty: 13,
-  optionsUid: 14,
+  reordering: 9,
+  adding: 10,
+  draftTitle: 11,
+  draftBody: 12,
+  editingUid: 13,
+  sectionEditDirty: 14,
   deleteUid: 15,
 } as const;
 const SLOT_COUNT = 16;
@@ -62,6 +62,8 @@ vi.mock("react", async (original) => ({
   },
 }));
 vi.mock("react-native", () => ({
+  AccessibilityInfo: { setAccessibilityFocus: vi.fn() },
+  findNodeHandle: vi.fn(),
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   StyleSheet: {
@@ -70,6 +72,11 @@ vi.mock("react-native", () => ({
   },
   TextInput: "TextInput",
   View: "View",
+}));
+vi.mock("react-native-reorderable-list", () => ({
+  NestedReorderableList: "NestedReorderableList",
+  ScrollViewContainer: "ScrollViewContainer",
+  useReorderableDrag: () => vi.fn(),
 }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: vi.fn() }));
 vi.mock("expo-file-system", () => ({
@@ -97,6 +104,9 @@ vi.mock("@/components/ui", () => ({
   GlassSurface: "GlassSurface",
   MIN_TOUCH_TARGET: 44,
   OrbitSwitch: "OrbitSwitch",
+}));
+vi.mock("@/components/ui/AnchoredMenu", () => ({
+  AnchoredMenu: "AnchoredMenu",
 }));
 vi.mock("@/components/ui/ScopedPalette", () => ({
   ScopedPalette: "ScopedPalette",
@@ -135,11 +145,30 @@ const { resolveActiveAiConnection } = await import("@/db/ai-connections-dao");
 const { AIPersonalizationScreen } = await import("./AIPersonalizationScreen");
 
 type TestElement = ReactElement<Record<string, unknown>>;
+/**
+ * Every element in the tree. The section list's rows come from its
+ * `renderItem`, so each row element (and its children) is expanded here.
+ */
 function nodes(node: ReactNode): TestElement[] {
   if (!node || typeof node !== "object") return [];
   if (Array.isArray(node)) return node.flatMap(nodes);
   const element = node as TestElement;
-  return [element, ...nodes(element.props.children as ReactNode)];
+  const rows =
+    element.type === "NestedReorderableList"
+      ? (element.props.data as unknown[]).map((item, index) =>
+          (
+            element.props.renderItem as (info: {
+              item: unknown;
+              index: number;
+            }) => ReactNode
+          )({ item, index }),
+        )
+      : [];
+  return [
+    element,
+    ...nodes(element.props.children as ReactNode),
+    ...nodes(rows),
+  ];
 }
 
 function render(seed: Partial<Record<keyof typeof SLOT, unknown>> = {}) {
@@ -263,11 +292,10 @@ describe("reorder and delete keep the same split (third fix pass IN-02)", () => 
     const tree = render({
       sections: [SECTION, { ...SECTION, uid: "s-2", title: "Work" }],
     });
-    const moveDown = tree.find(
-      (node) => node.type === "Button" && node.props.label === "Move down",
-    );
-    if (!moveDown) throw new Error("Move down not rendered");
-    (moveDown.props.onPress as () => void)();
+    // Move down sits in the first section's ⋯ (38.12 D-120); the screen
+    // hands the row its move handler.
+    const row = component(tree, "PersonalizationSectionCard");
+    (row.props.onMove as (direction: "up" | "down") => void)("down");
     await flush();
     expect(dao.reorderPersonalizationSections).toHaveBeenCalledOnce();
     expect(messages()).toEqual([LOAD_ERROR]);

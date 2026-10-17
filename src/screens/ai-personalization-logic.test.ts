@@ -14,8 +14,10 @@ import {
   initialStyleSync,
   isWritingStyleDirty,
   moveSectionUid,
+  orderSectionsByUid,
   PERSONALIZATION_ESTIMATE_DEBOUNCE_MS,
   personalizationEstimateSource,
+  reorderSectionUids,
   type StyleSyncState,
   shouldReplaceStyleOnLoad,
 } from "@/screens/ai-personalization-logic";
@@ -298,5 +300,30 @@ describe("hasSectionDraftChanges (D-13; review C5-L7)", () => {
     expect(
       hasSectionDraftChanges({ ...none, editingOpen: true, editDirty: true }),
     ).toBe(true);
+  });
+});
+
+describe("section reorder helpers (38.12 D-120)", () => {
+  it("a drag moves one row and keeps the others in order", () => {
+    expect(reorderSectionUids(["a", "b", "c", "d"], 3, 1)).toEqual([
+      "a",
+      "d",
+      "b",
+      "c",
+    ]);
+    expect(reorderSectionUids(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
+  });
+
+  it("a drop in place or out of range leaves the order alone", () => {
+    expect(reorderSectionUids(["a", "b"], 1, 1)).toEqual(["a", "b"]);
+    expect(reorderSectionUids(["a", "b"], -1, 0)).toEqual(["a", "b"]);
+    expect(reorderSectionUids(["a", "b"], 0, 2)).toEqual(["a", "b"]);
+  });
+
+  it("orders loaded sections by uid, skipping unknown uids and keeping unlisted rows last", () => {
+    const rows = [section("a", 0), section("b", 1), section("c", 2)];
+    expect(
+      orderSectionsByUid(rows, ["c", "x", "a"]).map((row) => row.uid),
+    ).toEqual(["c", "a", "b"]);
   });
 });

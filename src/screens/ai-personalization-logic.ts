@@ -70,6 +70,52 @@ export function moveSectionUid(
   return next;
 }
 
+/**
+ * The section order after a drag drops the row at `from` onto `to` (38.12
+ * D-120): the row moves, every other row keeps its relative order. Out-of-range
+ * indexes leave the order unchanged.
+ */
+export function reorderSectionUids(
+  orderedUids: readonly string[],
+  from: number,
+  to: number,
+): string[] {
+  const next = [...orderedUids];
+  if (
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= next.length ||
+    to >= next.length
+  ) {
+    return next;
+  }
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+/**
+ * The loaded sections in `orderedUids` order, shown at once while a reorder
+ * saves so a dropped row does not jump back. A uid the list does not hold is
+ * skipped; a section missing from `orderedUids` keeps its place at the end.
+ */
+export function orderSectionsByUid(
+  sections: readonly PersonalizationSection[],
+  orderedUids: readonly string[],
+): PersonalizationSection[] {
+  const byUid = new Map(sections.map((section) => [section.uid, section]));
+  const ordered = orderedUids.flatMap((uid) => {
+    const section = byUid.get(uid);
+    return section ? [section] : [];
+  });
+  const placed = new Set(orderedUids);
+  return [
+    ...ordered,
+    ...sections.filter((section) => !placed.has(section.uid)),
+  ];
+}
+
 export function formatEstimateCaption(
   estimate: PromptContextEstimate,
   model: string,

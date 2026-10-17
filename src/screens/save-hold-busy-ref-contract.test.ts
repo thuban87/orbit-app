@@ -275,26 +275,33 @@ describe("AIPersonalizationScreen holds the section editors while a save runs", 
     }
   });
 
-  it("holds each section's options and the button that opens them (third fix pass WR-02)", () => {
-    const buttons = source.match(/<Button[\s\S]*?\/>/g) ?? [];
-    for (const label of [
-      "accessibilityLabel={`Section options for ",
-      'label="Rename / edit"',
-      'label="Replace from file"',
-      'label="Delete section"',
-    ]) {
-      const held = buttons.filter((b) => b.includes(label));
-      expect(held, label).toHaveLength(1);
-      expect(held[0]).toContain("disabled={sectionFormBusy}");
-    }
+  // 38.12 D-120: each section's actions live in its ⋯ menu; the row is drawn
+  // busy (handle, ⋯ and switch held) and every handler the screen hands it
+  // re-reads the ref (third fix pass WR-02, D-26).
+  it("holds each section's ⋯ and the actions it opens (third fix pass WR-02)", () => {
+    const at = source.indexOf("<PersonalizationSectionCard\n");
+    expect(at, "PersonalizationSectionCard element").toBeGreaterThan(-1);
+    const element = source.slice(at, source.indexOf(">\n", at));
+    expect(element).toContain("busy={listBusy}");
+    expect(source).toContain("const listBusy = sectionFormBusy || reordering;");
     // A press in the frame before the re-render reads the ref.
-    for (const label of [
-      "Rename / edit",
-      "Replace from file",
-      "Delete section",
+    for (const handler of ["onEdit", "onReplace", "onDelete", "onToggle"]) {
+      const start = element.indexOf(`${handler}={`);
+      expect(start, handler).toBeGreaterThan(-1);
+      const body = blockFrom(element, start, handler);
+      expect(body, handler).toMatch(/if \(savingRef\.current[^)]*\) return;/);
+    }
+    // The row's ⋯ and handle draw disabled while busy.
+    const row = componentBody("PersonalizationSectionCard");
+    for (const testID of [
+      "personalization-drag-",
+      "personalization-options-",
     ]) {
-      const element = buttons.find((b) => b.includes(`label="${label}"`)) ?? "";
-      expect(element, label).toContain("if (savingRef.current) return;");
+      const pressable = row.slice(row.indexOf(testID));
+      expect(
+        pressable.slice(0, pressable.indexOf("</Pressable>")),
+        testID,
+      ).toContain("disabled={busy}");
     }
   });
 
