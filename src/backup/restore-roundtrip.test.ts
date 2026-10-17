@@ -185,6 +185,50 @@ it("keeps restored live UIDs exportable across repeated Replace-all restores", a
   ).toEqual({ entity_uid: "gamma" });
 });
 
+it("export then Replace-all restore keeps exactly the backup's favourites (38.12 D-112, D-113)", async () => {
+  const source = await db();
+  for (const uid of ["alpha", "beta", "gamma", "delta"])
+    await contact(source, uid);
+  // Two favourites, one of them with a dormant rank on an Unbound contact (D-21).
+  await source.runAsync(
+    "UPDATE contacts SET favourite_rank=7 WHERE uid='beta'",
+  );
+  await source.runAsync(
+    "UPDATE contacts SET favourite_rank=2, tracking_enabled=0 WHERE uid='delta'",
+  );
+  const saved = await exported(source);
+  expect(saved.backupFormatVersion).toBe(9);
+
+  const destination = await db();
+  for (const uid of ["alpha", "gamma", "omega"])
+    await contact(destination, uid);
+  // The phone's own favourites are replaced, not kept.
+  await destination.runAsync(
+    "UPDATE contacts SET favourite_rank=0 WHERE uid IN ('alpha','omega')",
+  );
+  expect(await applyRestore(destination, saved, "replace-all")).toMatchObject({
+    status: "applied",
+  });
+  const rows = await destination.getAllAsync<{
+    uid: string;
+    favourite_rank: number | null;
+    modified_at: string;
+  }>("SELECT uid,favourite_rank,modified_at FROM contacts ORDER BY uid");
+  expect(
+    rows.filter((r) => r.favourite_rank !== null).map((r) => r.uid),
+  ).toEqual(["beta", "delta"]);
+  // Membership only: ranks are 0..n-1 in backup order, stamps stay the backup's.
+  expect(
+    rows.filter((r) => r.favourite_rank !== null).map((r) => r.favourite_rank),
+  ).toEqual([0, 1]);
+  expect(new Set(rows.map((r) => r.modified_at))).toEqual(new Set([NOW]));
+  // And it round-trips again unchanged.
+  const again = await exported(destination);
+  expect(
+    Object.fromEntries(again.contacts.map((c) => [c.uid, c.favourite])),
+  ).toEqual({ alpha: 0, beta: 1, delta: 1, gamma: 0 });
+});
+
 it.each(["merge", "replace-all"] as const)(
   "restores real exported custom-photo bytes from wire UIDs in %s",
   async (mode) => {
@@ -725,7 +769,7 @@ const JPEG_BASE64 = bytesToBase64([
 it.each(["merge", "replace-all"] as const)(
   "a mixed JPEG/WebP library restores and re-exports byte-for-byte under the unchanged .jpg names in %s (38.6 D-12/D-19/D-21)",
   async (mode) => {
-    expect(BACKUP_FORMAT_VERSION).toBe(8);
+    expect(BACKUP_FORMAT_VERSION).toBe(9);
     photo.files.clear();
     const source = await db();
     const destination = await db();
@@ -750,7 +794,7 @@ it.each(["merge", "replace-all"] as const)(
         readPhotoBase64: readMap,
       }),
     );
-    expect(manifest.backupFormatVersion).toBe(8);
+    expect(manifest.backupFormatVersion).toBe(9);
     const wire = Object.fromEntries(
       manifest.contacts.map((row) => [row.uid, row.photoBase64]),
     );
@@ -903,7 +947,7 @@ it("exports missing photos as marked nulls and counts them (D-24/D-26/D-29)", as
     photoBase64: null,
     photoSkipped: true,
   });
-  expect(manifest.backupFormatVersion).toBe(8);
+  expect(manifest.backupFormatVersion).toBe(9);
   const byUid = Object.fromEntries(manifest.contacts.map((r) => [r.uid, r]));
   expect(byUid["a-bytes"]?.photoBase64).toBe("QkJC");
   expect(byUid["a-bytes"]).not.toHaveProperty("photoSkipped");

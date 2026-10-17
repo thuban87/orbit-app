@@ -753,7 +753,7 @@ describe("Orrery production exploration integration", () => {
     });
     for (const key of ["camera", "pose", "focus", "sunContactId"])
       expect(manifest.appSettings).not.toHaveProperty(key);
-    expect(manifest.backupFormatVersion).toBe(8);
+    expect(manifest.backupFormatVersion).toBe(9);
     await deleteRelationshipNow(exec, {
       id: undoneId,
       contactId: parent.id,

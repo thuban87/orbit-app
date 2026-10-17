@@ -39,7 +39,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(8);
+    expect(manifest.backupFormatVersion).toBe(9);
     expect(manifest.tombstones).toContainEqual({
       entityType: "category",
       entityUid: "gone-category",
@@ -88,7 +88,7 @@ describe("buildExportManifest", () => {
         exportedAt: NOW,
         readPhotoBase64: async () => "AQID",
       });
-      expect(manifest.backupFormatVersion).toBe(8);
+      expect(manifest.backupFormatVersion).toBe(9);
       expect(manifest.tombstones).toContainEqual(
         expect.objectContaining({
           entityType: "group_event",
@@ -120,8 +120,8 @@ describe("buildExportManifest", () => {
     });
 
     // D-06 trip-wire: Phase 36 owns the coordinated wire change to v5.
-    expect(BACKUP_FORMAT_VERSION).toBe(8);
-    expect(manifest.backupFormatVersion).toBe(8);
+    expect(BACKUP_FORMAT_VERSION).toBe(9);
+    expect(manifest.backupFormatVersion).toBe(9);
     expect(manifest.appSettings).toMatchObject({
       orreryLastSystem: "builtin:all-contacts",
       themePackage: "galaxy",
@@ -182,7 +182,36 @@ describe("buildExportManifest", () => {
       }),
     ]);
     // Phase 36 owns the format bump; this guard keeps it unchanged this phase.
-    expect(BACKUP_FORMAT_VERSION).toBe(8);
+    expect(BACKUP_FORMAT_VERSION).toBe(9);
+  });
+
+  it("exports favourite membership as 1/0, including an Unbound contact's dormant rank (38.12 D-112, D-21)", async () => {
+    let count = 0;
+    const exec = nodeSqliteExecutor(openTestDb());
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+    for (const [uid, tracking, interval, rank] of [
+      ["fav-bound", 1, 7, 3],
+      ["fav-unbound", 0, null, 0],
+      ["plain", 1, 7, null],
+    ] as const)
+      await exec.runAsync(
+        "INSERT INTO contacts (uid, name, tracking_enabled, interval_days, favourite_rank, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [uid, uid, tracking, interval, rank, NOW, NOW],
+      );
+    const manifest = await buildExportManifest(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    expect(
+      Object.fromEntries(manifest.contacts.map((c) => [c.uid, c.favourite])),
+    ).toEqual({ "fav-bound": 1, "fav-unbound": 1, plain: 0 });
+    // The marker is membership only: no rank travels.
+    for (const contact of manifest.contacts)
+      expect(contact).not.toHaveProperty("favouriteRank");
+    expect(parseBackupManifest(manifest).contacts).toHaveLength(3);
   });
 
   it("serializes the v6 entity inventory with portable parent UIDs", async () => {
@@ -622,7 +651,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(8);
+    expect(manifest.backupFormatVersion).toBe(9);
     for (const key of [
       "themePackage",
       "galaxyMode",
@@ -682,7 +711,7 @@ describe("buildExportManifest", () => {
     });
     expect(report.skippedPhotos).toBe(3);
     const { manifest } = report;
-    expect(manifest.backupFormatVersion).toBe(8);
+    expect(manifest.backupFormatVersion).toBe(9);
     expect(parseBackupManifest(manifest)).toEqual(manifest);
     const byUid = Object.fromEntries(manifest.contacts.map((r) => [r.uid, r]));
     expect(byUid["contact-a"]?.photoBase64).toBe("AQID");
@@ -768,7 +797,7 @@ describe("buildExportManifest", () => {
       photoBase64: null,
     });
     expect(value).not.toHaveProperty("photoSkipped");
-    expect(report.manifest.backupFormatVersion).toBe(8);
+    expect(report.manifest.backupFormatVersion).toBe(9);
     // The backup schema accepts a text value on a photo-type field.
     expect(
       parseBackupManifest(JSON.parse(JSON.stringify(report.manifest)))

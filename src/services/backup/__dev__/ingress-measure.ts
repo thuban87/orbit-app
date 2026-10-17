@@ -60,6 +60,7 @@ export function syntheticManifest(targetBytes: number): BackupManifest {
     snoozeUntil: null,
     rarelyResponds: 0,
     remindersOff: 0,
+    favourite: 0,
     createdAt: now,
     modifiedAt: now,
   }));

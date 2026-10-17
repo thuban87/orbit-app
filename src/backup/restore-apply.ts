@@ -856,6 +856,27 @@ async function upsertContacts(exec: SqlExecutor, plan: Plan): Promise<void> {
     );
   }
 }
+/**
+ * D-112: favourite membership (binary, ADR-075; the rank is vestigial). Replace-all
+ * takes the backup's favourites: every contact was just inserted with no rank,
+ * so each backup favourite gets rank 0..n-1 in backup order. `modified_at` is
+ * left alone (this plan only, RESEARCH §3 A5) so the restored stamps stay the
+ * backup's.
+ */
+async function restoreFavourites(
+  exec: SqlExecutor,
+  manifest: BackupManifest,
+): Promise<void> {
+  let rank = 0;
+  for (const contact of manifest.contacts) {
+    if (contact.favourite !== 1 || typeof contact.uid !== "string") continue;
+    await exec.runAsync("UPDATE contacts SET favourite_rank=? WHERE uid=?", [
+      rank,
+      contact.uid,
+    ]);
+    rank += 1;
+  }
+}
 async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
   const contacts = await idMap(exec, "contacts");
   const defs = await idMap(exec, "custom_field_defs");
@@ -2285,6 +2306,7 @@ export async function applyRestore(
       await importTombstones(exec, manifest);
       await upsertParents(exec, plan, backgroundPendingByUid);
       await upsertContacts(exec, plan);
+      if (mode === "replace-all") await restoreFavourites(exec, manifest);
       await releaseLinkSlots(exec, plan);
       await upsertChildren(exec, plan);
       await syncLinkedPairs(exec);

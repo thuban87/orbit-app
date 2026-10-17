@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PORTABLE_SETTINGS_KEYS,
   parseBackupManifest,
+  UPDATE_FIRST_MESSAGE,
 } from "@/backup/backup-schema";
 import { BACKUP_FORMAT_VERSION, BackupSchemaError } from "@/backup/types";
 
@@ -245,14 +246,90 @@ describe("Profile presentation restore acceptance", () => {
 });
 
 describe("parseBackupManifest", () => {
-  it("migrates format 6 through 8 with the rolling Your Week default", () => {
+  it("migrates format 6 through 9 with the rolling Your Week default", () => {
     const legacy = valid();
     legacy.backupFormatVersion = 6;
     delete legacy.appSettings.yourWeekPeriod;
     expect(parseBackupManifest(legacy)).toMatchObject({
-      backupFormatVersion: 8,
+      backupFormatVersion: 9,
       appSettings: { yourWeekPeriod: "rolling7" },
     });
+  });
+
+  it("steps a format-8 file to 9 with nobody a favourite (38.12 D-112)", () => {
+    const v8 = valid();
+    v8.backupFormatVersion = 8;
+    v8.contacts = [
+      {
+        uid: "a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+      {
+        uid: "b",
+        trackingEnabled: 0,
+        intervalDays: null,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    const parsed = parseBackupManifest(v8);
+    expect(parsed.backupFormatVersion).toBe(9);
+    expect(parsed.contacts.map((c) => [c.uid, c.favourite])).toEqual([
+      ["a", 0],
+      ["b", 0],
+    ]);
+  });
+
+  it("keeps a format-9 favourite marker and reads an absent one as not a favourite (D-112)", () => {
+    const v9 = valid();
+    v9.contacts = [
+      {
+        uid: "a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        favourite: 1,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+      {
+        uid: "b",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        favourite: 0,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+      {
+        uid: "c",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    const parsed = parseBackupManifest(v9);
+    expect(parsed.contacts.map((c) => c.favourite)).toEqual([1, 0, undefined]);
+  });
+
+  it.each([2, -1, "1", true, null])(
+    "rejects a favourite marker that is not 0/1 (%s) at the parse boundary (T-38.12-21)",
+    (favourite) => {
+      const bad = valid();
+      bad.contacts = [
+        {
+          uid: "a",
+          trackingEnabled: 1,
+          intervalDays: 7,
+          favourite,
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ];
+      expect(() => parseBackupManifest(bad)).toThrow(/invalid favourite/);
+    },
+  );
+
+  it("refuses a format-10 file with the update-first message (T-38.12-23)", () => {
+    const future = valid();
+    future.backupFormatVersion = 10;
+    expect(() => parseBackupManifest(future)).toThrow(UPDATE_FIRST_MESSAGE);
   });
 
   it.each([6, 7])(
@@ -555,7 +632,7 @@ describe("parseBackupManifest", () => {
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
-    expect(parsed.backupFormatVersion).toBe(8);
+    expect(parsed.backupFormatVersion).toBe(9);
     expect(parsed.contacts[0]).not.toHaveProperty("phone");
     expect(parsed.contacts[0]).not.toHaveProperty("email");
     expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
@@ -597,7 +674,7 @@ describe("parseBackupManifest", () => {
 
     const parsed = parseBackupManifest(legacy);
 
-    expect(parsed.backupFormatVersion).toBe(8);
+    expect(parsed.backupFormatVersion).toBe(9);
     expect(parsed.contacts).toEqual([
       expect.objectContaining({
         uid: "contact-a",
@@ -630,7 +707,7 @@ describe("parseBackupManifest", () => {
     ])
       delete legacy[key];
     const upgraded = parseBackupManifest(legacy);
-    expect(upgraded.backupFormatVersion).toBe(8);
+    expect(upgraded.backupFormatVersion).toBe(9);
     expect(upgraded.systems).toEqual([]);
     expect(upgraded.profileContactPresentation).toEqual([]);
     expect(upgraded.appSettings.includeUnboundNeverContacted).toBe(1);
@@ -1279,7 +1356,7 @@ describe("format 7 files convert on parse (D-55, D-56)", () => {
 
   it("moves every legacy kind to its D-56 home with Allow AI off", () => {
     const parsed = parseBackupManifest(v7());
-    expect(parsed.backupFormatVersion).toBe(8);
+    expect(parsed.backupFormatVersion).toBe(9);
     expect(parsed).not.toHaveProperty("fuel");
 
     // A v7 off_limits row parses to offLimits with the same uid.

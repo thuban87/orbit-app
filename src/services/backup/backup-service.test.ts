@@ -369,7 +369,7 @@ describe("restore preview", () => {
     expect(
       preview.status === "ready" && preview.preview.backupFormatVersion,
     ).toBe(MAX_SUPPORTED_BACKUP_FORMAT_VERSION);
-    expect(MAX_SUPPORTED_BACKUP_FORMAT_VERSION).toBe(8);
+    expect(MAX_SUPPORTED_BACKUP_FORMAT_VERSION).toBe(9);
   });
 
   it("returns only aggregate metadata after wholly validating plaintext content", () => {

@@ -141,6 +141,17 @@ const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
   // Phase 38.10 (D-55): the legacy knowledge rows move to their D-56 homes.
   // The step lives in its own module (the D-01 gate allowlist, plan 18).
   7: (manifest) => convertV7ToV8(manifest),
+  // Phase 38.12 (D-112): contacts carry favourite membership (binary, ADR-075;
+  // no order). A format-8 file predates it, so nobody is a favourite.
+  8: (manifest) => {
+    const contacts = Array.isArray(manifest.contacts)
+      ? manifest.contacts.map((item) => ({
+          ...record(item, "contacts[]"),
+          favourite: 0,
+        }))
+      : fail("contacts must be an array");
+    return { ...manifest, backupFormatVersion: 9, contacts };
+  },
 };
 
 function fail(message: string): never {
@@ -408,7 +419,7 @@ function isNullableBinaryFlag(
   return value === null || value === undefined || isBinaryFlag(value);
 }
 
-/** A 0/1 marker; absent reads as 0 (format-8 writers always emit it). */
+/** A 0/1 marker; absent reads as 0 (the writers of its format always emit it). */
 function isMarker(value: unknown): boolean {
   return value === undefined || isBinaryFlag(value);
 }
@@ -656,6 +667,9 @@ function validate(manifest: RawManifest): BackupManifest {
       fail("contacts has an invalid trackingEnabled");
     if (contact.trackingEnabled === 1 && contact.intervalDays === null)
       fail("Bound contacts require an intervalDays");
+    // D-112: favourite membership is a 0/1 marker; absent reads as not a
+    // favourite (format-9 writers always emit it).
+    if (!isMarker(contact.favourite)) fail("contacts has an invalid favourite");
     if (
       contact.categoryUid !== null &&
       contact.categoryUid !== undefined &&

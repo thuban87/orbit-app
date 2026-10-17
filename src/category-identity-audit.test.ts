@@ -213,7 +213,7 @@ describe("category identity repository audit", () => {
     }
   });
 
-  it("pins the confirmed Your Week schema boundary and portable format 8", () => {
+  it("pins the confirmed Your Week schema boundary and portable format 9", () => {
     const database = source("src/db/database.ts");
     const migrationTests = source("src/db/migrations/full-chain.test.ts");
     const backupTypes = source("src/backup/types.ts");
@@ -226,7 +226,7 @@ describe("category identity repository audit", () => {
     expect(database).toContain("migration033");
     expect(database).toContain("migration034");
     expect(migrationTests).toContain("expect(TARGET_VERSION).toBe(34)");
-    expect(backupTypes).toMatch(/BACKUP_FORMAT_VERSION\s*=\s*8/);
+    expect(backupTypes).toMatch(/BACKUP_FORMAT_VERSION\s*=\s*9/);
   });
 
   it("keeps category seeding migration-only and leaves zero-category restore exact", () => {
