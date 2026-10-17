@@ -13,7 +13,9 @@ import java.io.File
 
 private const val EXPORT_DIRECTORY = "backup-exports"
 private const val REQUEST_CODE = 8611
-private val STAGED_NAME = Regex("^orbit-backup-\\d+\\.json$")
+// Old epoch-ms names and 38.12 D-116 local names (with a D-136 collision suffix);
+// mirrors isStagedManualExportName in src/backup/backup-file-names.ts exactly.
+private val STAGED_NAME = Regex("^orbit-backup-(\\d+|\\d{4}-\\d{2}-\\d{2}-\\d{4}(-\\d+)?)\\.json$")
 
 private class NotAStagedExportException :
   CodedException("ERR_NOT_STAGED_EXPORT", "Only staged backup exports can be shared.", null)

@@ -18,6 +18,12 @@ internal const val MAX_CONCURRENT_INGRESS = 4
 
 internal data class IngressResult(val file: File? = null, val failed: Boolean = false)
 
+/** D-117: backup intake opens only content:// links. A file:// (or any other)
+ * source would let another app make Orbit read its own private files, so it
+ * fails as "not a backup" before anything is opened. */
+internal fun isContentSource(source: String): Boolean =
+  source.startsWith("content://", ignoreCase = true)
+
 /** Owns every provider acquisition, stream, destination and completion. A
  * cancelled binder acquisition retains its slot until the provider returns. */
 internal class BackupIngressRequests(
@@ -71,7 +77,7 @@ internal class BackupIngressRequests(
     else currentPick?.let { cancel(it, false) }
     val request = Request(generation.incrementAndGet(), source, destination, kind, clock())
     if (kind == Kind.SHARE) currentShare = request else currentPick = request
-    if (destroyed || occupied >= cap) {
+    if (destroyed || occupied >= cap || !isContentSource(source)) {
       request.cancelled = true
       request.counted = false
       destination.delete()

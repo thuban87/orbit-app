@@ -23,12 +23,12 @@ class BackupIngressRequestsTest {
     val release = CountDownLatch(1)
     val late = TrackingStream("old")
     val requests = BackupIngressRequests(opener = { source ->
-      if (source == "A") { entered.countDown(); waitForProvider(release); late } else ByteArrayInputStream("new".toByteArray())
+      if (source == "content://A") { entered.countDown(); waitForProvider(release); late } else ByteArrayInputStream("new".toByteArray())
     })
-    val a = file(); requests.submitShare("A", a)
+    val a = file(); requests.submitShare("content://A", a)
     assertTrue(entered.await(1, TimeUnit.SECONDS))
     val waitingForLatest = requests.consumeShare()
-    val b = file(); requests.submitShare("B", b)
+    val b = file(); requests.submitShare("content://B", b)
     assertEquals("new", waitingForLatest.await().file?.readText())
     assertFalse(requests.hasShare())
     release.countDown()
@@ -43,7 +43,7 @@ class BackupIngressRequestsTest {
     val release = CountDownLatch(1)
     val late = TrackingStream("late")
     val requests = BackupIngressRequests(opener = { entered.countDown(); waitForProvider(release); late }, acquisitionMs = 30)
-    val target = file(); requests.submitShare("A", target)
+    val target = file(); requests.submitShare("content://A", target)
     assertTrue(entered.await(1, TimeUnit.SECONDS))
     assertTrue(requests.consumeShare().await().failed)
     release.countDown(); Thread.sleep(50)
@@ -56,11 +56,11 @@ class BackupIngressRequestsTest {
     val entered = CountDownLatch(1)
     val release = CountDownLatch(1)
     val requests = BackupIngressRequests(opener = { source ->
-      if (source == "A") { entered.countDown(); waitForProvider(release) }
+      if (source == "content://A") { entered.countDown(); waitForProvider(release) }
       ByteArrayInputStream(source.toByteArray())
     }, acquisitionMs = 30, workers = 1, cap = 2)
-    requests.submitPick("A", file()); assertTrue(entered.await(1, TimeUnit.SECONDS))
-    assertTrue(requests.submitShare("B", file()).await().failed)
+    requests.submitPick("content://A", file()); assertTrue(entered.await(1, TimeUnit.SECONDS))
+    assertTrue(requests.submitShare("content://B", file()).await().failed)
     release.countDown(); requests.destroyAll()
   }
 
@@ -70,7 +70,7 @@ class BackupIngressRequestsTest {
     val release = CountDownLatch(1)
     val late = TrackingStream("late")
     val requests = BackupIngressRequests(opener = { entered.countDown(); waitForProvider(release); late })
-    val result = requests.submitPick("A", file())
+    val result = requests.submitPick("content://A", file())
     assertTrue(entered.await(1, TimeUnit.SECONDS))
     Thread.sleep(50); assertFalse(result.isDone)
     release.countDown()
@@ -83,12 +83,12 @@ class BackupIngressRequestsTest {
     val release = CountDownLatch(1)
     val late = TrackingStream("old")
     val requests = BackupIngressRequests(opener = { source ->
-      if (source == "A") { entered.countDown(); waitForProvider(release); late }
+      if (source == "content://A") { entered.countDown(); waitForProvider(release); late }
       else ByteArrayInputStream("new".toByteArray())
     })
-    val a = file(); val old = requests.submitPick("A", a)
+    val a = file(); val old = requests.submitPick("content://A", a)
     assertTrue(entered.await(1, TimeUnit.SECONDS))
-    val newer = requests.submitPick("B", file())
+    val newer = requests.submitPick("content://B", file())
     assertFalse(old.await().failed)
     assertNull(old.await().file)
     assertEquals("new", newer.await().file?.readText())
@@ -105,10 +105,10 @@ class BackupIngressRequestsTest {
       entered.countDown(); waitForProvider(release)
       TrackingStream(source).also { synchronized(streams) { streams.add(it) } }
     }, cap = 2, workers = 2)
-    val a = file(); requests.submitPick("A", a)
-    val b = file(); requests.submitShare("B", b)
+    val a = file(); requests.submitPick("content://A", a)
+    val b = file(); requests.submitShare("content://B", b)
     assertTrue(entered.await(1, TimeUnit.SECONDS))
-    val c = file(); assertTrue(requests.submitPick("C", c).await().failed)
+    val c = file(); assertTrue(requests.submitPick("content://C", c).await().failed)
     val pending = requests.consumeShare()
     requests.destroyAll()
     assertTrue(pending.await().failed)
@@ -139,14 +139,14 @@ class BackupIngressRequestsTest {
       override fun close() { copyClosed.countDown() }
     }
     val requests = BackupIngressRequests(opener = { source -> when (source) {
-      "blocked" -> { acquiring.countDown(); waitForProvider(releaseAcquisition); late }
-      "copying" -> copyingStream
+      "content://blocked" -> { acquiring.countDown(); waitForProvider(releaseAcquisition); late }
+      "content://copying" -> copyingStream
       else -> ByteArrayInputStream("ready".toByteArray())
     } })
-    val abandoned = file(); requests.submitShare("blocked", abandoned)
+    val abandoned = file(); requests.submitShare("content://blocked", abandoned)
     assertTrue(acquiring.await(1, TimeUnit.SECONDS))
-    val ready = file(); requests.submitShare("ready", ready).await()
-    val partial = file(); val pendingPick = requests.submitPick("copying", partial)
+    val ready = file(); requests.submitShare("content://ready", ready).await()
+    val partial = file(); val pendingPick = requests.submitPick("content://copying", partial)
     assertTrue(copying.await(1, TimeUnit.SECONDS))
     requests.destroyAll()
     assertTrue(pendingPick.await().failed)
@@ -155,6 +155,72 @@ class BackupIngressRequestsTest {
     assertEquals(0L, copyClosed.count)
     assertTrue(late.closed)
     assertFalse(abandoned.exists()); assertFalse(ready.exists()); assertFalse(partial.exists())
+  }
+
+  // D-117: intake opens only content:// links; anything else fails as "not a backup".
+  private val rejectedSources = listOf(
+    "file:///data/data/com.bwales.orbit/databases/orbit.db",
+    "/data/data/com.bwales.orbit/files/backup.json",
+    "http://example.com/orbit-backup.json",
+  )
+
+  @Test fun pickAcceptsOnlyContentSourcesAndNeverOpensOthers() {
+    val opened = mutableListOf<String>()
+    val requests = BackupIngressRequests(opener = { source ->
+      synchronized(opened) { opened.add(source) }
+      ByteArrayInputStream("picked".toByteArray())
+    })
+    for (source in rejectedSources) {
+      val target = file()
+      val result = requests.submitPick(source, target).await()
+      assertTrue(source, result.failed)
+      assertNull(source, result.file)
+      assertFalse(source, target.exists())
+    }
+    assertEquals("picked", requests.submitPick("CONTENT://provider/document/1", file()).await().file?.readText())
+    assertEquals("picked", requests.submitPick("content://provider/document/2", file()).await().file?.readText())
+    assertEquals(
+      listOf("CONTENT://provider/document/1", "content://provider/document/2"),
+      synchronized(opened) { opened.toList() },
+    )
+    requests.destroyAll()
+  }
+
+  @Test fun shareAcceptsOnlyContentSourcesAndNeverOpensOthers() {
+    val opened = mutableListOf<String>()
+    val requests = BackupIngressRequests(opener = { source ->
+      synchronized(opened) { opened.add(source) }
+      ByteArrayInputStream("shared".toByteArray())
+    })
+    for (source in rejectedSources) {
+      val target = file()
+      requests.submitShare(source, target)
+      val consumed = requests.consumeShare().await()
+      assertTrue(source, consumed.failed)
+      assertNull(source, consumed.file)
+      assertFalse(source, target.exists())
+      assertFalse(source, requests.hasShare())
+    }
+    requests.submitShare("Content://provider/shared/1", file()).await()
+    assertEquals("shared", requests.consumeShare().await().file?.readText())
+    assertEquals(listOf("Content://provider/shared/1"), synchronized(opened) { opened.toList() })
+    requests.destroyAll()
+  }
+
+  @Test fun rejectedShareSettlesAWaiterOnTheShareItSuperseded() {
+    val entered = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val late = TrackingStream("late")
+    val requests = BackupIngressRequests(opener = { entered.countDown(); waitForProvider(release); late })
+    val pending = file(); requests.submitShare("content://provider/slow", pending)
+    assertTrue(entered.await(1, TimeUnit.SECONDS))
+    val waiter = requests.consumeShare()
+    requests.submitShare("file:///data/data/com.bwales.orbit/files/backup.json", file())
+    assertTrue(waiter.await().failed)
+    release.countDown(); Thread.sleep(50)
+    assertTrue(late.closed)
+    assertFalse(pending.exists())
+    requests.destroyAll()
   }
 
   private class TrackingStream(value: String) : ByteArrayInputStream(value.toByteArray()) {
