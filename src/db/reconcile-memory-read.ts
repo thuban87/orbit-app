@@ -8,10 +8,16 @@
  * screen (`getDeviceRegion()`), so this module stays node-testable.
  *
  * Read module: the SELECTs the reconcile screens used to run inline live here
- * (CLAUDE.md "Queries go through DAOs").
+ * (CLAUDE.md "Queries go through DAOs"). Its one write is the locked
+ * `deleteReviewedSnapshot` of a link's 'source' memory when that link reads
+ * again (classifyLinkedContact), so a later disappearance prompts again
+ * (D-45, convergence c3 D-6). It never calls a `*Core` writer.
  */
 import { listContactMethods } from "@/db/contact-methods-dao";
-import { getReviewedSnapshots } from "@/db/reconcile-snapshot-dao";
+import {
+  deleteReviewedSnapshot,
+  getReviewedSnapshots,
+} from "@/db/reconcile-snapshot-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
   actionableReconcileFields,
@@ -34,6 +40,8 @@ export interface ReviewMemory {
   snapshots: Partial<Record<ReconcileFieldFamily, string | null>>;
   /** `phoneRegionOverride ?? device region` — the one region rule (D-45). */
   effectivePhoneRegion: string | null;
+  /** Links whose missing source the person kept as is ('source' memory). */
+  missingKeptLinkIds: ReadonlySet<number>;
 }
 
 export interface LinkedScanContact {
@@ -57,6 +65,11 @@ export interface ReconcilePickedSource {
   readonly displayName: string | null;
   readonly methods: readonly ReconcileMethod[];
   readonly birthday: string | null;
+  /**
+   * The bridge's phone-photo fingerprint (38.12-02). Preferred over the staged
+   * bytes' hash, so a thumbnail/full-size byte switch is not a difference (D-132).
+   */
+  readonly photoFingerprint?: string | null;
 }
 
 /** A source photo staged by the screen before classification. */
@@ -92,11 +105,16 @@ export async function loadReviewMemory(
   const linkIds = await listActiveLinkIds(exec, contactId);
   const perLink: Array<Partial<Record<ReconcileFieldFamily, string | null>>> =
     [];
-  for (const linkId of linkIds)
-    perLink.push(await getReviewedSnapshots(exec, linkId));
+  const missingKeptLinkIds = new Set<number>();
+  for (const linkId of linkIds) {
+    const { source, ...fields } = await getReviewedSnapshots(exec, linkId);
+    if (source !== undefined) missingKeptLinkIds.add(linkId);
+    perLink.push(fields);
+  }
   return {
     snapshots: Object.assign({}, ...perLink),
     effectivePhoneRegion: effectivePhoneRegionFor(settings),
+    missingKeptLinkIds,
   };
 }
 
@@ -145,16 +163,37 @@ export interface ClassifyLinkedContactInput {
   memory: ReviewMemory;
 }
 
-/** Classify one linked contact exactly the same way for grid and detail. */
+/**
+ * Classify one linked contact exactly the same way for grid and detail.
+ *
+ * Missing sources (D-45): an unread link whose missing source was kept as is
+ * is left out; a contact with nothing else to compare produces no fields. A
+ * link that reads again has its 'source' memory deleted (locked wrapper).
+ */
 export async function classifyLinkedContact(
   exec: SqlExecutor,
   input: ClassifyLinkedContactInput,
 ): Promise<ReconcileDiffResult> {
   const { contact, links, pickedByKey, stagedPhotos, memory } = input;
-  const methods = await listContactMethods(exec, contact.id);
   const readLinks = links.filter((link) =>
     pickedByKey.has(link.external_contact_id),
   );
+  for (const link of readLinks)
+    if (memory.missingKeptLinkIds.has(link.id))
+      await deleteReviewedSnapshot(exec, link.id, "source");
+  const unkeptMissing = links.filter(
+    (link) =>
+      !pickedByKey.has(link.external_contact_id) &&
+      !memory.missingKeptLinkIds.has(link.id),
+  );
+  if (readLinks.length === 0 && unkeptMissing.length === 0)
+    return {
+      missingSource: false,
+      fields: [],
+      sourceLinkIds: [],
+      orbitModifiedAt: contact.modified_at,
+    };
+  const methods = await listContactMethods(exec, contact.id);
   const labels = reconcileSourceLabels(
     readLinks.map((link) => ({
       displayName:
@@ -175,10 +214,12 @@ export async function classifyLinkedContact(
       methods: picked.methods,
       birthday: picked.birthday,
       provenanceLabel: labelByLinkId.get(link.id) ?? "Phone contact",
+      // A source has a photo when its bytes were staged; it compares by the
+      // bridge fingerprint when there is one (D-132), else the bytes' hash.
       ...(staged
         ? {
             stagedPhotoRelative: staged.stagedRelative,
-            photoContentHash: staged.contentHash,
+            photoContentHash: picked.photoFingerprint || staged.contentHash,
           }
         : {}),
     };
@@ -197,7 +238,7 @@ export async function classifyLinkedContact(
     },
     sources,
     lastReviewed: memory.snapshots,
-    omittedCount: links.length - readLinks.length,
+    omittedCount: unkeptMissing.length,
     effectivePhoneRegion: memory.effectivePhoneRegion,
   });
 }

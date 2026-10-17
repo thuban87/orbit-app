@@ -20,6 +20,21 @@ function sourceMethods(field: ReconcileFieldDiff) {
   }));
 }
 
+/**
+ * The links a review is remembered on: every link behind the field's options,
+ * or — for a field with no source option (removed-from-source) — every read
+ * link of the card, so that review is remembered too (convergence c4 E-4).
+ */
+function reviewedLinkIds(
+  diff: ReconcileDiffResult,
+  field: ReconcileFieldDiff,
+): number[] {
+  const fromOptions = [
+    ...new Set(field.sourceOptions.flatMap((option) => option.sourceLinkIds)),
+  ];
+  return fromOptions.length > 0 ? fromOptions : [...(diff.sourceLinkIds ?? [])];
+}
+
 /** Carries the exact reviewed option through both detail and bulk apply. */
 export function buildReconcileSelections(
   diff: ReconcileDiffResult,
@@ -65,17 +80,14 @@ export function buildReconcileSelections(
             ? (chosenOption?.value ?? null)
             : field.sourceValue,
         sourceMethods: sourceMethods(field),
-        sourceLinkIds: [
-          ...new Set(
-            field.sourceOptions.flatMap((option) => option.sourceLinkIds),
-          ),
-        ],
+        sourceLinkIds: reviewedLinkIds(diff, field),
         reviewedValue: field.reviewedComparable ?? field.sourceValue,
         stagedPhotoRelative:
           chosenOption?.stagedPhotoRelative ??
           field.sourceOptions[0]?.stagedPhotoRelative ??
           null,
-        photoContentHash: field.sourceValue,
+        // The chosen option's own photo hash (convergence c4 E-4).
+        photoContentHash: chosenOption?.value ?? field.sourceValue,
       },
     ];
   });

@@ -32,7 +32,11 @@ export interface ReconcileSelection {
   sourceValue: string | null;
   sourceMethods?: readonly ReconcileMethod[];
   sourceLinkIds: readonly number[];
-  /** The value persisted in narrow source-memory after a non-photo review. */
+  /**
+   * The value persisted in source memory after a review: the field's reviewed
+   * comparable (every source option joined). Photo Keep Orbit writes it in the
+   * apply transaction; Use phone's photo writes it post-commit.
+   */
   reviewedValue: string | null;
   stagedPhotoRelative?: string | null;
   photoContentHash?: string | null;
@@ -103,7 +107,11 @@ async function writeReviewedSnapshots(
   selection: ReconcileSelection,
   now: string,
 ): Promise<void> {
-  if (selection.fieldFamily === "photo") return;
+  // Use phone's photo remembers post-commit, only after the promote succeeds.
+  // Keep Orbit remembers here, inside the caller's transaction, with the
+  // reviewed comparable (field.reviewedComparable — "" when the phone has no
+  // photo, the joined fingerprints for several; D-45, convergence c4 E-4).
+  if (selection.fieldFamily === "photo" && selection.useSource) return;
   for (const externalContactLinkId of [...selection.sourceLinkIds].sort(
     (a, b) => a - b,
   )) {
@@ -118,8 +126,9 @@ async function writeReviewedSnapshots(
 
 /**
  * Shared caller-owned transaction helper for detail and bulk reconciliation.
- * It deliberately does not promote/write photos or snapshot the photo family;
- * callers do that post-commit only after setContactPhoto succeeds.
+ * It deliberately does not promote/write photos; a Use phone's photo choice is
+ * returned as `pendingPhoto` and its memory is written post-commit only after
+ * setContactPhoto succeeds. A Keep Orbit photo choice is remembered here.
  */
 export async function applyReconcileSelections(
   exec: SqlExecutor,

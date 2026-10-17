@@ -2,21 +2,28 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import {
-  type ReconcileFieldFamily,
   type ReconcileMethod,
+  type ReviewMemoryFamily,
   serializeMethodFamily,
 } from "@/logic/reconcile-diff";
 
+/**
+ * The 'source' memory value written by a missing-source "Keep as is" (D-45).
+ * Cleared when the link reads again, so a later disappearance prompts again.
+ */
+export const MISSING_SOURCE_KEPT = "missing";
+
 export interface UpsertReviewedSnapshotInput {
   externalContactLinkId: number;
-  fieldFamily: ReconcileFieldFamily;
+  /** A field family, or 'source' (migration 034) for missing-source Keep as is. */
+  fieldFamily: ReviewMemoryFamily;
   /** Methods are encoded with reconcile-diff's shared canonical set serializer. */
   reviewedValue: string | null | readonly ReconcileMethod[];
   reviewedAt: string;
 }
 
 export type ReviewedSnapshotMap = Partial<
-  Record<ReconcileFieldFamily, string | null>
+  Record<ReviewMemoryFamily, string | null>
 >;
 
 function assertOneChange(
@@ -31,7 +38,7 @@ function assertOneChange(
 }
 
 export function reviewedValueFor(
-  fieldFamily: ReconcileFieldFamily,
+  fieldFamily: ReviewMemoryFamily,
   value: UpsertReviewedSnapshotInput["reviewedValue"],
 ): string | null {
   if (value != null && typeof value !== "string") {
@@ -80,6 +87,62 @@ export function upsertReviewedSnapshot(
   return inWriteTransaction(exec, () =>
     upsertReviewedSnapshotCore(exec, input),
   );
+}
+
+/**
+ * Caller-owned transaction body; never wraps its own mutex/BEGIN. Removes one
+ * family's memory for a link (used for 'source' memory when the link reads
+ * again, D-45). Deleting an absent row is a no-op.
+ */
+export async function deleteReviewedSnapshotCore(
+  exec: SqlExecutor,
+  externalContactLinkId: number,
+  fieldFamily: ReviewMemoryFamily,
+): Promise<void> {
+  await exec.runAsync(
+    `DELETE FROM reconcile_source_snapshot
+      WHERE external_contact_link_id = ? AND field_family = ?`,
+    [externalContactLinkId, fieldFamily],
+  );
+}
+
+/** Locked wrapper: the only form callers outside a transaction may use. */
+export function deleteReviewedSnapshot(
+  exec: SqlExecutor,
+  externalContactLinkId: number,
+  fieldFamily: ReviewMemoryFamily,
+): Promise<void> {
+  return inWriteTransaction(exec, () =>
+    deleteReviewedSnapshotCore(exec, externalContactLinkId, fieldFamily),
+  );
+}
+
+export interface RecordReviewedPhotoInput {
+  externalContactLinkIds: readonly number[];
+  /** The selection's reviewed comparable (field.reviewedComparable). */
+  reviewedValue: string | null;
+  reviewedAt: string;
+}
+
+/**
+ * Use phone's photo: remember the reviewed comparable on every link after the
+ * photo was promoted and set (post-commit; convergence c4 E-4). Locked.
+ */
+export function recordReviewedPhoto(
+  exec: SqlExecutor,
+  input: RecordReviewedPhotoInput,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    for (const externalContactLinkId of [...input.externalContactLinkIds].sort(
+      (a, b) => a - b,
+    ))
+      await upsertReviewedSnapshotCore(exec, {
+        externalContactLinkId,
+        fieldFamily: "photo",
+        reviewedValue: input.reviewedValue,
+        reviewedAt: input.reviewedAt,
+      });
+  });
 }
 
 export interface RecordImportedPhotoFingerprintInput {
@@ -146,13 +209,17 @@ export function recordImportedPhotoFingerprint(
   );
 }
 
-/** Read shape consumed directly by classifyReconciliation's `lastReviewed` input. */
+/**
+ * One link's review memory, 'source' included. Check linked contacts reads it
+ * through loadReviewMemory (reconcile-memory-read.ts), which merges every link
+ * and separates the 'source' memory from the classifier's `lastReviewed`.
+ */
 export async function getReviewedSnapshots(
   exec: SqlExecutor,
   externalContactLinkId: number,
 ): Promise<ReviewedSnapshotMap> {
   const rows = await exec.getAllAsync<{
-    field_family: ReconcileFieldFamily;
+    field_family: ReviewMemoryFamily;
     reviewed_value: string | null;
   }>(
     `SELECT field_family, reviewed_value

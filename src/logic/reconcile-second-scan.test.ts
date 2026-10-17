@@ -320,7 +320,7 @@ function staged(
 }
 
 /** The detail's post-commit Use phone's photo memory write (after promote). */
-async function usePhonePhotoPostCommit(
+async function applyPhonePhotoPostCommit(
   contactId: number,
   pending: NonNullable<
     Awaited<ReturnType<typeof applyReconcileSelections>>["pendingPhoto"]
@@ -412,7 +412,7 @@ describe("photo memory (D-45, D-132, convergence c4 E-4)", () => {
           "reconcile-staging/b.jpg",
         );
         expect(result.pendingPhoto?.photoContentHash).toBe("fp-b");
-        await usePhonePhotoPostCommit(contactId, result.pendingPhoto!);
+        await applyPhonePhotoPostCommit(contactId, result.pendingPhoto!);
       }
       expect(await gridScan(provider, photos)).toEqual([]);
     },

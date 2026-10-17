@@ -2,6 +2,7 @@ import {
   type ContactMethodType,
   normalizeContactMethod,
 } from "@/logic/contact-method-normalization";
+import { isBirthdayUnreadable } from "@/logic/picked-contact-map";
 
 export const RECONCILE_FIELD_FAMILIES = [
   "name",
@@ -73,6 +74,12 @@ export interface ReconcileFieldDiff {
 export interface ReconcileDiffResult {
   missingSource: boolean;
   fields: ReconcileFieldDiff[];
+  /**
+   * Every read source's link id (convergence c4 E-4). A field with no source
+   * option (removed-from-source) remembers its review on these links. Optional
+   * so stored diffs and existing literals still type-check; absent means [].
+   */
+  sourceLinkIds?: number[];
   /** The coarse card-level token persisted by the durable-card path. */
   orbitModifiedAt: string | null;
 }
@@ -142,11 +149,18 @@ function valuesForType(
   return values;
 }
 
+interface StableOptions {
+  options: ReconcileFieldOption[];
+  /** A phone birthday was present but failed the stored-birthday parser. */
+  droppedUnreadable: boolean;
+}
+
 function stableOptions(
   sources: readonly ReconcileSource[],
   field: "name" | "birthday" | "photo",
-): ReconcileFieldOption[] {
+): StableOptions {
   const byValue = new Map<string, ReconcileFieldOption>();
+  let droppedUnreadable = false;
   for (const source of sources) {
     const value =
       field === "name"
@@ -155,6 +169,11 @@ function stableOptions(
           ? source.birthday
           : (source.photoContentHash ?? null);
     if (value == null || value.trim() === "") continue;
+    // D-45: an impossible phone birthday (e.g. 2021-02-29) is never offered.
+    if (field === "birthday" && isBirthdayUnreadable(value)) {
+      droppedUnreadable = true;
+      continue;
+    }
     const key = value;
     const option = byValue.get(key) ?? {
       optionId: `${field}:${encodeURIComponent(value)}`,
@@ -170,27 +189,32 @@ function stableOptions(
       option.provenanceLabels.push(source.provenanceLabel);
     byValue.set(key, option);
   }
-  return [...byValue.values()].sort((left, right) =>
-    (left.value ?? "").localeCompare(right.value ?? ""),
-  );
+  return {
+    options: [...byValue.values()].sort((left, right) =>
+      (left.value ?? "").localeCompare(right.value ?? ""),
+    ),
+    droppedUnreadable,
+  };
 }
 
 function classifyScalar(
   fieldFamily: "name" | "birthday" | "photo",
   orbitBaseline: string | null,
-  sourceOptions: ReconcileFieldOption[],
+  { options: sourceOptions, droppedUnreadable }: StableOptions,
   reviewedValue: string | null,
 ): ReconcileFieldDiff | null {
+  // Only unreadable phone birthdays: nothing to offer, and the value was not
+  // removed from the phone either (D-45).
+  if (droppedUnreadable && sourceOptions.length === 0) return null;
   const sourceValue =
     sourceOptions.length === 1 ? sourceOptions[0].value : null;
-  const sourceComparable =
-    fieldFamily === "photo"
-      ? sourceValue
-      : sourceOptions
-          .map((option) => option.value)
-          .join(SERIALIZE_TUPLE_SEPARATOR);
+  // Every family (photo included, convergence c4 E-4): the sorted option values
+  // joined — "" for none, the value itself for one.
+  const sourceComparable = sourceOptions
+    .map((option) => option.value)
+    .join(SERIALIZE_TUPLE_SEPARATOR);
 
-  if (sourceComparable != null && reviewedValue === sourceComparable) {
+  if (reviewedValue === sourceComparable) {
     return {
       fieldFamily,
       outcome: "unchanged-since-review",
@@ -334,9 +358,13 @@ export function actionableReconcileFields(
 export function classifyReconciliation(
   input: ClassifyReconciliationInput,
 ): ReconcileDiffResult {
+  const sourceLinkIds = input.sources.map(
+    (source) => source.externalContactLinkId,
+  );
   if (input.omittedCount && input.omittedCount > 0) {
     return {
       missingSource: true,
+      sourceLinkIds,
       orbitModifiedAt: input.orbit.modifiedAt ?? null,
       fields: [
         {
@@ -381,6 +409,7 @@ export function classifyReconciliation(
 
   return {
     missingSource: false,
+    sourceLinkIds,
     orbitModifiedAt: input.orbit.modifiedAt ?? null,
     fields: RECONCILE_FIELD_FAMILIES.flatMap((family) =>
       [...scalarFields, ...methodFields].filter(

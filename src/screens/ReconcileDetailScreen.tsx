@@ -33,7 +33,11 @@ import {
   finalizeSessionIfTerminal,
   markCardStatusCore,
 } from "@/db/reconcile-session-dao";
-import { upsertReviewedSnapshotCore } from "@/db/reconcile-snapshot-dao";
+import {
+  MISSING_SOURCE_KEPT,
+  recordReviewedPhoto,
+  upsertReviewedSnapshotCore,
+} from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import {
   actionableReconcileFields,
@@ -84,8 +88,9 @@ interface ScanState {
    */
   orbitPhoto: string | null;
   diff: ReconcileDiffResult;
-  sourcePhotoUri: string | null;
   links: LinkedScanLink[];
+  /** Active links the provider read did not return (missing source). */
+  missingLinkIds: number[];
   /** The region the scan classified with; Apply uses the same one (D-45). */
   effectivePhoneRegion: string | null;
 }
@@ -137,27 +142,28 @@ export function ReconcileDetailScreen({
         const pickedByKey = new Map(
           read.contacts.map((picked) => [picked.lookupKey, picked]),
         );
-        const firstPhoto = links
-          .map((link) => ({
-            link,
-            picked: pickedByKey.get(link.external_contact_id),
-          }))
-          .find(
-            (item): item is { link: LinkedScanLink; picked: PickedContact } =>
-              item.picked?.photoTempUri != null,
-          );
+        // Every linked source with a photo gets its own staged copy, so each
+        // photo option previews and promotes its own photo (convergence c4 E-4).
         const stagedPhotos = new Map<number, StagedSourcePhoto>();
         try {
-          if (firstPhoto?.picked.photoTempUri) {
-            const staged = await stageReconcileSourcePhoto(
-              firstPhoto.picked.photoTempUri,
-              `contact-${contactId}-link-${firstPhoto.link.id}`,
+          for (const link of links) {
+            const photoTempUri = pickedByKey.get(
+              link.external_contact_id,
+            )?.photoTempUri;
+            if (!photoTempUri) continue;
+            stagedPhotos.set(
+              link.id,
+              await stageReconcileSourcePhoto(
+                photoTempUri,
+                `contact-${contactId}-link-${link.id}`,
+              ),
             );
-            stagedPhotos.set(firstPhoto.link.id, staged);
           }
         } finally {
           for (const picked of read.contacts) {
             if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
+            if (picked.thumbnailTempUri)
+              discardDerivative(picked.thumbnailTempUri);
           }
         }
         // The same memory read as the grid: every active link merged, region
@@ -179,8 +185,6 @@ export function ReconcileDetailScreen({
           ...classified,
           fields: actionableReconcileFields(classified),
         };
-        const stagedRelative =
-          [...stagedPhotos.values()][0]?.stagedRelative ?? null;
         setChoices(
           Object.fromEntries(
             diff.fields
@@ -198,10 +202,10 @@ export function ReconcileDetailScreen({
           contactName: contact.name,
           orbitPhoto: contact.photo,
           diff,
-          sourcePhotoUri: stagedRelative
-            ? resolveReconcileStagingUri(stagedRelative)
-            : null,
           links,
+          missingLinkIds: links
+            .filter((link) => !pickedByKey.has(link.external_contact_id))
+            .map((link) => link.id),
           effectivePhoneRegion: memory.effectivePhoneRegion,
         });
       }),
@@ -213,20 +217,35 @@ export function ReconcileDetailScreen({
     }, [load]),
   );
 
-  const completeMissingSource = useCallback(async () => {
-    if (cardId != null && sessionId != null) {
+  const completeMissingSource = useCallback(
+    async (rememberKept: boolean) => {
       const exec = getExecutor();
       const now = localDateTime();
-      await inWriteTransaction(exec, () =>
-        markCardStatusCore(exec, cardId, "missing_source", 0, now),
-      );
-      await finalizeSessionIfTerminal(exec, sessionId, now);
-    }
-  }, [cardId, sessionId]);
+      const keptLinkIds = rememberKept ? (scan?.missingLinkIds ?? []) : [];
+      const hasCard = cardId != null && sessionId != null;
+      if (keptLinkIds.length === 0 && !hasCard) return;
+      // Keep as is is remembered ('source' memory, D-45) in the same write
+      // transaction as the card's terminal status; the next check does not ask
+      // again until the source reads and then disappears again.
+      await inWriteTransaction(exec, async () => {
+        for (const externalContactLinkId of keptLinkIds)
+          await upsertReviewedSnapshotCore(exec, {
+            externalContactLinkId,
+            fieldFamily: "source",
+            reviewedValue: MISSING_SOURCE_KEPT,
+            reviewedAt: now,
+          });
+        if (hasCard)
+          await markCardStatusCore(exec, cardId, "missing_source", 0, now);
+      });
+      if (hasCard) await finalizeSessionIfTerminal(exec, sessionId, now);
+    },
+    [cardId, sessionId, scan?.missingLinkIds],
+  );
   const keepMissingSource = useCallback(async () => {
     setApplying(true);
     try {
-      await completeMissingSource();
+      await completeMissingSource(true);
       navigation.goBack();
     } catch {
       setMessage(
@@ -245,7 +264,7 @@ export function ReconcileDetailScreen({
         staleLinkId: staleLink.id,
         now: localDateTime(),
       });
-      await completeMissingSource();
+      await completeMissingSource(false);
       navigation.goBack();
     } catch {
       setMessage(
@@ -325,14 +344,13 @@ export function ReconcileDetailScreen({
             stagedRelative: pendingPhoto.stagedPhotoRelative,
           });
           await setContactPhoto(exec, contactId, relative, now);
-          await inWriteTransaction(exec, async () => {
-            for (const externalContactLinkId of pendingPhoto.sourceLinkIds)
-              await upsertReviewedSnapshotCore(exec, {
-                externalContactLinkId,
-                fieldFamily: "photo",
-                reviewedValue: pendingPhoto.photoContentHash ?? null,
-                reviewedAt: now,
-              });
+          // Remember the reviewed comparable (every phone photo joined), not
+          // the chosen photo's hash, so a two-photo source is not re-asked
+          // (convergence c4 E-4).
+          await recordReviewedPhoto(exec, {
+            externalContactLinkIds: pendingPhoto.sourceLinkIds,
+            reviewedValue: pendingPhoto.reviewedValue,
+            reviewedAt: now,
           });
         } finally {
           deleteReconcileStaging(pendingPhoto.stagedPhotoRelative);
@@ -477,17 +495,18 @@ export function ReconcileDetailScreen({
             field.fieldFamily === "photo" ? (
               <PhotoChoice
                 key="photo"
-                options={[
-                  {
-                    id: "source",
-                    uri: scan.sourcePhotoUri,
-                    name: "Contacts photo",
-                    // Name the linked phone contact the photo came from (RG-031).
-                    provenance:
-                      field.sourceOptions[0]?.provenanceLabels.join(", ") ||
-                      "Phone contact",
-                  },
-                ]}
+                // One option per phone photo, each with its own staged copy
+                // (convergence c4 E-4).
+                options={field.sourceOptions.map((option) => ({
+                  id: `source:${option.optionId}` as const,
+                  uri: option.stagedPhotoRelative
+                    ? resolveReconcileStagingUri(option.stagedPhotoRelative)
+                    : null,
+                  name: "Contacts photo",
+                  // Name the linked phone contact the photo came from (RG-031).
+                  provenance:
+                    option.provenanceLabels.join(", ") || "Phone contact",
+                }))}
                 mode={field.outcome === "conflict" ? "conflict" : "additive"}
                 keepPhoto={{
                   photo: scan.orbitPhoto,
@@ -496,16 +515,13 @@ export function ReconcileDetailScreen({
                 }}
                 selectedId={
                   choices.photo?.startsWith("source:")
-                    ? "source"
+                    ? (choices.photo as `source:${string}`)
                     : KEEP_ORBIT_PHOTO
                 }
                 onChange={(value) =>
                   setChoices((current) => ({
                     ...current,
-                    photo:
-                      value === "source"
-                        ? `source:${field.sourceOptions[0]?.optionId ?? ""}`
-                        : "orbit",
+                    photo: value === KEEP_ORBIT_PHOTO ? "orbit" : value,
                   }))
                 }
               />

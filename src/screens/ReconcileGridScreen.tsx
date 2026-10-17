@@ -11,7 +11,6 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { applyReconcileSelections } from "@/db/reconcile-apply";
 import {
   effectivePhoneRegionFor,
-  type LinkedScanLink,
   listLinkedContactsForScan,
   type StagedSourcePhoto,
   scanLinkedContacts,
@@ -54,10 +53,7 @@ import { discardDerivative } from "@/services/photos/derivative-cache";
 import { deleteReconcileStaging } from "@/services/photos/photo-storage";
 import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
-import {
-  type PickedContact,
-  readAllContacts,
-} from "../../modules/orbit-contact-picker";
+import { readAllContacts } from "../../modules/orbit-contact-picker";
 
 type StoredDiff = ReconcileDiffResult & {
   completionDisposition?: "updated" | "kept-orbit" | null;
@@ -169,29 +165,22 @@ export function ReconcileGridScreen({
         const stagedForCleanup: string[] = [];
         try {
           const settings = await getAppSettings(exec);
+          // Every linked source with a photo gets its own staged copy and hash
+          // (convergence c4 E-4); scanLinkedContacts compares by the picked
+          // contact's photoFingerprint when present, else this hash (D-132).
           const stagedPhotos = new Map<number, StagedSourcePhoto>();
-          for (const contact of linked.contacts) {
-            const firstPhoto = links
-              .filter((link) => link.contact_id === contact.id)
-              .map((link) => ({
-                link,
-                picked: pickedByKey.get(link.external_contact_id),
-              }))
-              .find(
-                (
-                  item,
-                ): item is { link: LinkedScanLink; picked: PickedContact } =>
-                  item.picked?.photoTempUri != null,
-              );
-            if (firstPhoto?.picked.photoTempUri) {
-              // The picker cache URI is consumed only at this durable staging boundary.
-              const staged = await stageReconcileSourcePhoto(
-                firstPhoto.picked.photoTempUri,
-                `contact-${contact.id}-link-${firstPhoto.link.id}`,
-              );
-              stagedForCleanup.push(staged.stagedRelative);
-              stagedPhotos.set(firstPhoto.link.id, staged);
-            }
+          for (const link of links) {
+            const photoTempUri = pickedByKey.get(
+              link.external_contact_id,
+            )?.photoTempUri;
+            if (!photoTempUri) continue;
+            // The picker cache URI is consumed only at this durable staging boundary.
+            const staged = await stageReconcileSourcePhoto(
+              photoTempUri,
+              `contact-${link.contact_id}-link-${link.id}`,
+            );
+            stagedForCleanup.push(staged.stagedRelative);
+            stagedPhotos.set(link.id, staged);
           }
           const scanned = await scanLinkedContacts(exec, {
             linked,
@@ -241,6 +230,8 @@ export function ReconcileGridScreen({
         } finally {
           for (const picked of sourceRead.contacts) {
             if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
+            if (picked.thumbnailTempUri)
+              discardDerivative(picked.thumbnailTempUri);
           }
           setScoring(false);
         }
