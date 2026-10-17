@@ -24,7 +24,12 @@ import {
   type StagedSourcePhoto,
   scanLinkedContacts,
 } from "@/db/reconcile-memory-read";
-import { upsertReviewedSnapshot } from "@/db/reconcile-snapshot-dao";
+import {
+  getReviewedSnapshots,
+  MISSING_SOURCE_KEPT,
+  recordReviewedPhoto,
+  upsertReviewedSnapshot,
+} from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
@@ -297,5 +302,206 @@ describe("second scan after resolving everything (D-45)", () => {
       "birthday",
     ]);
     expect(card.unresolvedCount).toBe(1);
+  });
+});
+
+function staged(
+  entries: Array<[linkId: number, contentHash: string, relative?: string]>,
+): Map<number, StagedSourcePhoto> {
+  return new Map(
+    entries.map(([linkId, contentHash, relative]) => [
+      linkId,
+      {
+        stagedRelative: relative ?? `reconcile-staging/link-${linkId}.jpg`,
+        contentHash,
+      },
+    ]),
+  );
+}
+
+/** The detail's post-commit Use phone's photo memory write (after promote). */
+async function usePhonePhotoPostCommit(
+  contactId: number,
+  pending: NonNullable<
+    Awaited<ReturnType<typeof applyReconcileSelections>>["pendingPhoto"]
+  >,
+) {
+  await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+    `contacts/${contactId}.jpg`,
+    contactId,
+  ]);
+  await recordReviewedPhoto(exec, {
+    externalContactLinkIds: pending.sourceLinkIds,
+    reviewedValue: pending.reviewedValue,
+    reviewedAt: NOW,
+  });
+}
+
+describe("photo memory (D-45, D-132, convergence c4 E-4)", () => {
+  it.each(["detail", "bulk"] as const)(
+    "Orbit photo, phone none → Keep Orbit (%s) → no card; the phone gains a photo → the card returns",
+    async (path) => {
+      const contactId = await seedContact({
+        name: "Phone Name",
+        photo: "contacts/1.jpg",
+      });
+      const linkId = await seedLink(contactId, "lk-1");
+      const provider = [picked("lk-1")];
+      const [card] = await gridScan(provider);
+      expect(card.diff.fields).toEqual([
+        expect.objectContaining({
+          fieldFamily: "photo",
+          outcome: "removed-from-source",
+        }),
+      ]);
+      if (path === "detail") {
+        const { diff } = await detailRead(contactId, provider);
+        await detailApply(contactId, diff, keepOrbit);
+      } else {
+        await bulkApply(contactId, card.diff, "keep-orbit");
+      }
+      expect(await gridScan(provider)).toEqual([]);
+
+      const withPhoto = [picked("lk-1", { photoFingerprint: "fp-new" })];
+      const returned = await gridScan(
+        withPhoto,
+        staged([[linkId, "bytes-new"]]),
+      );
+      expect(returned).toHaveLength(1);
+      expect(returned[0].diff.fields[0]).toMatchObject({
+        fieldFamily: "photo",
+        outcome: "conflict",
+        reviewedComparable: "fp-new",
+      });
+    },
+  );
+
+  it.each(["keep", "use-second"] as const)(
+    "two links with different phone photos → %s → no card",
+    async (choice) => {
+      const contactId = await seedContact({
+        name: "Phone Name",
+        photo: "contacts/1.jpg",
+      });
+      const first = await seedLink(contactId, "lk-1");
+      const second = await seedLink(contactId, "lk-2");
+      const provider = [
+        picked("lk-1", { photoFingerprint: "fp-a" }),
+        picked("lk-2", { photoFingerprint: "fp-b" }),
+      ];
+      const photos = staged([
+        [first, "bytes-a", "reconcile-staging/a.jpg"],
+        [second, "bytes-b", "reconcile-staging/b.jpg"],
+      ]);
+      const { diff } = await detailRead(contactId, provider, photos);
+      const photo = diff.fields.find((field) => field.fieldFamily === "photo")!;
+      expect(photo.sourceOptions.map((option) => option.value)).toEqual([
+        "fp-a",
+        "fp-b",
+      ]);
+      if (choice === "keep") {
+        await detailApply(contactId, diff, keepOrbit);
+      } else {
+        const option = photo.sourceOptions[1];
+        const result = await detailApply(
+          contactId,
+          diff,
+          () => `source:${option.optionId}`,
+        );
+        expect(result.pendingPhoto?.stagedPhotoRelative).toBe(
+          "reconcile-staging/b.jpg",
+        );
+        expect(result.pendingPhoto?.photoContentHash).toBe("fp-b");
+        await usePhonePhotoPostCommit(contactId, result.pendingPhoto!);
+      }
+      expect(await gridScan(provider, photos)).toEqual([]);
+    },
+  );
+
+  it("compares by the bridge fingerprint, so new bytes with the same fingerprint are not a difference", async () => {
+    const contactId = await seedContact({
+      name: "Phone Name",
+      photo: "contacts/1.jpg",
+    });
+    const linkId = await seedLink(contactId, "lk-1");
+    // What import records when it adopts the phone photo (38.12-02).
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: linkId,
+      fieldFamily: "photo",
+      reviewedValue: "fp-1",
+      reviewedAt: NOW,
+    });
+    const provider = [picked("lk-1", { photoFingerprint: "fp-1" })];
+    expect(await gridScan(provider, staged([[linkId, "bytes-thumb"]]))).toEqual(
+      [],
+    );
+    expect(await gridScan(provider, staged([[linkId, "bytes-full"]]))).toEqual(
+      [],
+    );
+    // No fingerprint from the bridge: the staged-bytes hash is the fallback.
+    expect(
+      await gridScan([picked("lk-1")], staged([[linkId, "bytes-full"]])),
+    ).toHaveLength(1);
+  });
+});
+
+describe("impossible phone birthday (D-45)", () => {
+  it("is not offered, so it never holds a card open", async () => {
+    const contactId = await seedContact({
+      name: "Orbit Name",
+      birthday: "1990-01-01",
+    });
+    await seedLink(contactId, "lk-1");
+    const provider = [picked("lk-1", { birthday: "2021-02-29" })];
+    const [card] = await gridScan(provider);
+    expect(card.diff.fields.map((field) => field.fieldFamily)).toEqual([
+      "name",
+    ]);
+    const { diff } = await detailRead(contactId, provider);
+    const result = await detailApply(contactId, diff, useFirstSource);
+    expect(result.staleFields).toEqual([]);
+    expect(await gridScan(provider)).toEqual([]);
+  });
+});
+
+describe("missing source (D-45)", () => {
+  it("Keep as is → rescan → no card; the source reads again → memory cleared; it disappears again → card", async () => {
+    const contactId = await seedContact({ name: "Phone Name" });
+    const linkId = await seedLink(contactId, "lk-1");
+    const [card] = await gridScan([]);
+    expect(card.diff.missingSource).toBe(true);
+
+    // The detail's Keep as is.
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: linkId,
+      fieldFamily: "source",
+      reviewedValue: MISSING_SOURCE_KEPT,
+      reviewedAt: NOW,
+    });
+    expect(await gridScan([])).toEqual([]);
+    expect((await detailRead(contactId, [])).diff.fields).toEqual([]);
+
+    expect(await gridScan([picked("lk-1")])).toEqual([]);
+    expect(await getReviewedSnapshots(exec, linkId)).toEqual({});
+
+    const [again] = await gridScan([]);
+    expect(again.diff.missingSource).toBe(true);
+  });
+
+  it("a kept missing link does not hide the other link's differences", async () => {
+    const contactId = await seedContact({ name: "Orbit Name" });
+    const missing = await seedLink(contactId, "lk-1");
+    await seedLink(contactId, "lk-2");
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: missing,
+      fieldFamily: "source",
+      reviewedValue: MISSING_SOURCE_KEPT,
+      reviewedAt: NOW,
+    });
+    const [card] = await gridScan([picked("lk-2")]);
+    expect(card.diff.missingSource).toBe(false);
+    expect(card.diff.fields.map((field) => field.fieldFamily)).toEqual([
+      "name",
+    ]);
   });
 });

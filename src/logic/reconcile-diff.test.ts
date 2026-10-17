@@ -110,6 +110,115 @@ describe("classifyReconciliation", () => {
   });
 });
 
+const SEP = "\u001e";
+const photoField = (result: ReturnType<typeof classifyReconciliation>) =>
+  result.fields.find((field) => field.fieldFamily === "photo");
+
+describe("photo comparable (convergence c4 E-4)", () => {
+  it('is "" when the phone has no photo, so an Orbit-only photo can be remembered', () => {
+    const removed = classifyReconciliation({
+      orbit: orbit({ photo: "contacts/1.jpg" }),
+      sources: [source()],
+      lastReviewed: {},
+    });
+    expect(photoField(removed)).toMatchObject({
+      outcome: "removed-from-source",
+      reviewedComparable: "",
+    });
+    const kept = classifyReconciliation({
+      orbit: orbit({ photo: "contacts/1.jpg" }),
+      sources: [source()],
+      lastReviewed: { photo: "" },
+    });
+    expect(photoField(kept)?.outcome).toBe("unchanged-since-review");
+  });
+
+  it("is the option value for one phone photo", () => {
+    const result = classifyReconciliation({
+      orbit: orbit({ photo: "contacts/1.jpg" }),
+      sources: [source({ photoContentHash: "fp-a" })],
+      lastReviewed: {},
+    });
+    expect(photoField(result)?.reviewedComparable).toBe("fp-a");
+    expect(photoField(result)?.sourceValue).toBe("fp-a");
+  });
+
+  it("is the sorted join for two phone photos, like name and birthday", () => {
+    const result = classifyReconciliation({
+      orbit: orbit({ photo: "contacts/1.jpg" }),
+      sources: [
+        source({ externalContactLinkId: 1, photoContentHash: "fp-b" }),
+        source({ externalContactLinkId: 2, photoContentHash: "fp-a" }),
+      ],
+      lastReviewed: {},
+    });
+    expect(photoField(result)?.reviewedComparable).toBe(`fp-a${SEP}fp-b`);
+    expect(photoField(result)?.sourceValue).toBeNull();
+    expect(
+      photoField(
+        classifyReconciliation({
+          orbit: orbit({ photo: "contacts/1.jpg" }),
+          sources: [
+            source({ externalContactLinkId: 1, photoContentHash: "fp-b" }),
+            source({ externalContactLinkId: 2, photoContentHash: "fp-a" }),
+          ],
+          lastReviewed: { photo: `fp-a${SEP}fp-b` },
+        }),
+      )?.outcome,
+    ).toBe("unchanged-since-review");
+  });
+});
+
+describe("unreadable phone birthday (D-45)", () => {
+  const birthdayField = (result: ReturnType<typeof classifyReconciliation>) =>
+    result.fields.find((field) => field.fieldFamily === "birthday");
+
+  it("is never offered; with no valid option left no birthday field is emitted", () => {
+    for (const orbitBirthday of ["1990-01-01", null]) {
+      expect(
+        birthdayField(
+          classifyReconciliation({
+            orbit: orbit({ birthday: orbitBirthday }),
+            sources: [source({ birthday: "2021-02-29" })],
+            lastReviewed: {},
+          }),
+        ),
+      ).toBeUndefined();
+    }
+  });
+
+  it("keeps only the readable options", () => {
+    const field = birthdayField(
+      classifyReconciliation({
+        orbit: orbit({ birthday: "1990-01-01" }),
+        sources: [
+          source({ externalContactLinkId: 1, birthday: "2021-02-29" }),
+          source({ externalContactLinkId: 2, birthday: "1991-01-01" }),
+        ],
+        lastReviewed: {},
+      }),
+    );
+    expect(field?.sourceOptions.map((option) => option.value)).toEqual([
+      "1991-01-01",
+    ]);
+  });
+});
+
+describe("diff source link ids (convergence c4 E-4)", () => {
+  it("lists every read source's link id", () => {
+    expect(
+      classifyReconciliation({
+        orbit: orbit(),
+        sources: [
+          source({ externalContactLinkId: 4 }),
+          source({ externalContactLinkId: 9 }),
+        ],
+        lastReviewed: {},
+      }).sourceLinkIds,
+    ).toEqual([4, 9]);
+  });
+});
+
 describe("actionableReconcileFields", () => {
   it("drops reviewed, unchanged fields and keeps every other outcome (D-45)", () => {
     const result = classifyReconciliation({

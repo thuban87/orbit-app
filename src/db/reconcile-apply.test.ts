@@ -324,6 +324,41 @@ describe("applyReconcileSelections", () => {
     expect(await getReviewedSnapshots(exec, externalContactLinkId)).toEqual({});
   });
 
+  it("Keep Orbit on a photo remembers the reviewed comparable inside the transaction (D-45, c4 E-4)", async () => {
+    const keep = {
+      fieldFamily: "photo" as const,
+      baseline: "contacts/1.jpg",
+      useSource: false,
+      sourceValue: null,
+      sourceLinkIds: [externalContactLinkId],
+      reviewedValue: "",
+      stagedPhotoRelative: null,
+      photoContentHash: null,
+    };
+    await expect(
+      inWriteTransaction(exec, async () => {
+        await applyReconcileSelections(exec, {
+          contactId,
+          now: NOW,
+          selections: [keep],
+        });
+        throw new Error("force rollback");
+      }),
+    ).rejects.toThrow("force rollback");
+    expect(await getReviewedSnapshots(exec, externalContactLinkId)).toEqual({});
+    const result = await inWriteTransaction(exec, () =>
+      applyReconcileSelections(exec, {
+        contactId,
+        now: NOW,
+        selections: [{ ...keep, reviewedValue: "fp-a\u001efp-b" }],
+      }),
+    );
+    expect(result.pendingPhoto).toBeNull();
+    expect(
+      (await getReviewedSnapshots(exec, externalContactLinkId)).photo,
+    ).toBe("fp-a\u001efp-b");
+  });
+
   it("never promotes a photo before a throwing apply transaction commits", async () => {
     const promoted = false;
     await expect(

@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -15,8 +19,11 @@ import { migration012 } from "@/db/migrations/012-import-sessions";
 import { migration013 } from "@/db/migrations/013-reconciliation-and-merge";
 import { runMigrations } from "@/db/migrations/runner";
 import {
+  deleteReviewedSnapshot,
+  deleteReviewedSnapshotCore,
   getReviewedSnapshots,
   recordImportedPhotoFingerprint,
+  recordReviewedPhoto,
   reviewedValueFor,
   upsertReviewedSnapshot,
   upsertReviewedSnapshotCore,
@@ -227,5 +234,81 @@ describe("recordImportedPhotoFingerprint (D-132)", () => {
       now: NOW,
     });
     expect(await snapshotCount()).toBe(0);
+  });
+});
+
+describe("'source' memory and the locked delete (D-45, migration 034)", () => {
+  beforeEach(async () => {
+    count = 0;
+    exec = nodeSqliteExecutor(openTestDb());
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: uid,
+    });
+    const contact = await exec.runAsync(
+      "INSERT INTO contacts (uid, name, tracking_enabled, created_at, modified_at) VALUES (?, 'Orbit', 0, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO external_contact_links (uid, contact_id, provider, external_contact_id, created_at, modified_at) VALUES (?, ?, 'android', 'source', ?, ?)",
+      [uid(), contact.lastInsertRowId, NOW, NOW],
+    );
+  });
+
+  it("stores a 'source' row beside field memory and deletes only that family", async () => {
+    const externalContactLinkId = await linkId();
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId,
+      fieldFamily: "source",
+      reviewedValue: "missing",
+      reviewedAt: NOW,
+    });
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId,
+      fieldFamily: "name",
+      reviewedValue: "Phone Name",
+      reviewedAt: NOW,
+    });
+    expect(await getReviewedSnapshots(exec, externalContactLinkId)).toEqual({
+      name: "Phone Name",
+      source: "missing",
+    });
+    await deleteReviewedSnapshot(exec, externalContactLinkId, "source");
+    expect(await getReviewedSnapshots(exec, externalContactLinkId)).toEqual({
+      name: "Phone Name",
+    });
+    // Deleting an absent row is a no-op.
+    await deleteReviewedSnapshot(exec, externalContactLinkId, "source");
+  });
+
+  it("composes the delete core inside an owner transaction", async () => {
+    const externalContactLinkId = await linkId();
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId,
+      fieldFamily: "source",
+      reviewedValue: "missing",
+      reviewedAt: NOW,
+    });
+    await expect(
+      inWriteTransaction(exec, async () => {
+        await deleteReviewedSnapshotCore(exec, externalContactLinkId, "source");
+        throw new Error("rollback");
+      }),
+    ).rejects.toThrow("rollback");
+    expect(await getReviewedSnapshots(exec, externalContactLinkId)).toEqual({
+      source: "missing",
+    });
+  });
+
+  it("recordReviewedPhoto writes the reviewed comparable to every link", async () => {
+    const externalContactLinkId = await linkId();
+    await recordReviewedPhoto(exec, {
+      externalContactLinkIds: [externalContactLinkId],
+      reviewedValue: "fp-a",
+      reviewedAt: NOW,
+    });
+    expect(await getReviewedSnapshots(exec, externalContactLinkId)).toEqual({
+      photo: "fp-a",
+    });
   });
 });

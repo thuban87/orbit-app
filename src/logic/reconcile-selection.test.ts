@@ -75,4 +75,79 @@ describe("buildReconcileSelections", () => {
       );
     }
   });
+
+  it('a zero-option photo field remembers "" on every read link (convergence c4 E-4)', () => {
+    const classified = classifyReconciliation({
+      orbit: {
+        name: "Orbit",
+        birthday: null,
+        photo: "contacts/1.jpg",
+        methods: [],
+      },
+      sources: [
+        {
+          externalContactLinkId: 7,
+          displayName: "Orbit",
+          birthday: null,
+          methods: [],
+        },
+        {
+          externalContactLinkId: 8,
+          displayName: "Orbit",
+          birthday: null,
+          methods: [],
+        },
+      ],
+      lastReviewed: {},
+    });
+    const [photo] = buildReconcileSelections(classified, "keep-orbit").filter(
+      (item) => item.fieldFamily === "photo",
+    );
+    expect(photo.sourceLinkIds).toEqual([7, 8]);
+    expect(photo.reviewedValue).toBe("");
+    expect(photo.useSource).toBe(false);
+  });
+
+  it("Use phone's photo carries the chosen option's own hash and staged copy (convergence c4 E-4)", () => {
+    const classified = classifyReconciliation({
+      orbit: {
+        name: "Orbit",
+        birthday: null,
+        photo: "contacts/1.jpg",
+        methods: [],
+      },
+      sources: [
+        {
+          externalContactLinkId: 1,
+          displayName: "Orbit",
+          birthday: null,
+          methods: [],
+          photoContentHash: "fp-a",
+          stagedPhotoRelative: "reconcile-staging/a.jpg",
+        },
+        {
+          externalContactLinkId: 2,
+          displayName: "Orbit",
+          birthday: null,
+          methods: [],
+          photoContentHash: "fp-b",
+          stagedPhotoRelative: "reconcile-staging/b.jpg",
+        },
+      ],
+      lastReviewed: {},
+    });
+    const field = classified.fields.find(
+      (item) => item.fieldFamily === "photo",
+    )!;
+    const second = field.sourceOptions.find(
+      (option) => option.value === "fp-b",
+    )!;
+    const [selection] = buildReconcileSelections(classified, {
+      photo: `source:${second.optionId}`,
+    });
+    expect(selection.photoContentHash).toBe("fp-b");
+    expect(selection.stagedPhotoRelative).toBe("reconcile-staging/b.jpg");
+    expect(selection.reviewedValue).toBe(field.reviewedComparable);
+    expect(selection.sourceLinkIds).toEqual([1, 2]);
+  });
 });
