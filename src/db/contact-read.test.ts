@@ -14,6 +14,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
+  countContactsNotInBin,
   findDuplicateNameIds,
   getContactForEdit,
   getContactHeader,
@@ -458,5 +459,16 @@ describe("getContactForEdit — links assembly (ORDER BY display_order)", () => 
     const id = await makeContactRow("NoLinks");
     const result = await getContactForEdit(exec, id, []);
     expect(result?.links).toEqual([]);
+  });
+});
+
+describe("countContactsNotInBin (38.12 D-60)", () => {
+  it("counts Bound and Unbound contacts that are not in the Bin", async () => {
+    expect(await countContactsNotInBin(exec)).toBe(0);
+    await makeContact("Bound");
+    await makeContact("Unbound", { trackingEnabled: 0 });
+    await makeContact("Binned", { archived: true });
+    await makeContact("Binned Unbound", { archived: true, trackingEnabled: 0 });
+    expect(await countContactsNotInBin(exec)).toBe(2);
   });
 });

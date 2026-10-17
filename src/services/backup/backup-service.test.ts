@@ -44,6 +44,7 @@ import {
   createVerifiedPreRestoreSnapshot,
   loadBackupForPreview,
   loadBackupForRestore,
+  loadBackupForRestorePreview,
   resolveWriteEncryptionMode,
   withBackupServiceLock,
 } from "@/services/backup/backup-service";
@@ -370,6 +371,119 @@ describe("restore preview", () => {
       preview.status === "ready" && preview.preview.backupFormatVersion,
     ).toBe(MAX_SUPPORTED_BACKUP_FORMAT_VERSION);
     expect(MAX_SUPPORTED_BACKUP_FORMAT_VERSION).toBe(9);
+  });
+
+  describe("people and linked-items counts (38.12 D-60)", () => {
+    const contact = (uid: string, archivedAt: string | null) => ({
+      uid,
+      name: uid,
+      categoryUid: null,
+      trackingEnabled: 1,
+      intervalDays: 30,
+      archivedAt,
+      snoozeUntil: null,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      favourite: 0,
+      createdAt: "2026-08-25 12:00:00",
+      modifiedAt: "2026-08-25 12:00:00",
+    });
+    const file = {
+      ...v7File,
+      backupFormatVersion: MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
+      offLimits: [],
+      contacts: [
+        contact("live-a", null),
+        contact("live-b", null),
+        contact("binned", "2026-08-20 12:00:00"),
+      ],
+      categories: [
+        {
+          uid: "cat",
+          name: "Friends",
+          displayOrder: 0,
+          createdAt: "2026-08-25 12:00:00",
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ],
+      events: [
+        {
+          uid: "ev",
+          contactUid: "live-a",
+          type: "snooze",
+          occurredAt: "2026-08-25 12:00:00",
+          detail: null,
+          recordedAt: "2026-08-25 12:00:00",
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ],
+      systems: [
+        {
+          uid: "sys",
+          name: "Close",
+          createdAt: "2026-08-25 12:00:00",
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ],
+      tombstones: [
+        {
+          entityType: "contact",
+          entityUid: "gone",
+          deletedAt: "2026-08-25 12:00:00",
+        },
+      ],
+    };
+
+    it("compares this phone's people with the backup's, both excluding the Bin", async () => {
+      const exec = nodeSqliteExecutor(openTestDb());
+      await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+        now: "2026-08-25 12:00:00",
+        newUid: (() => {
+          let n = 0;
+          return () => `uid-${++n}`;
+        })(),
+      });
+      for (const [uid, tracking, archived] of [
+        ["phone-bound", 1, null],
+        ["phone-unbound", 0, null],
+        ["phone-binned", 1, "2026-08-20 12:00:00"],
+      ] as const)
+        await exec.runAsync(
+          "INSERT INTO contacts (uid,name,tracking_enabled,interval_days,archived_at,created_at,modified_at) VALUES (?,?,?,30,?,?,?)",
+          [
+            uid,
+            uid,
+            tracking,
+            archived,
+            "2026-08-25 12:00:00",
+            "2026-08-25 12:00:00",
+          ],
+        );
+      const candidate = await loadBackupForRestorePreview(exec, {
+        contents: JSON.stringify(file),
+      });
+      expect(candidate.status).toBe("ready");
+      if (candidate.status !== "ready") return;
+      expect(candidate.preview).toMatchObject({
+        phoneContacts: 2,
+        backupContacts: 2,
+        // Every contact row the file carries, Bin included, stays as before.
+        contactCount: 3,
+      });
+    });
+
+    it("counts every linked entity the manifest carries, not a hand list", () => {
+      const candidate = loadBackupForRestore({
+        contents: JSON.stringify(file),
+      });
+      expect(candidate.status).toBe("ready");
+      if (candidate.status !== "ready") return;
+      expect(candidate.preview.backupContacts).toBe(2);
+      // categories (1) + events (1) + systems (1); contacts and tombstones
+      // are counted on their own lines.
+      expect(candidate.preview.relatedRowCount).toBe(3);
+      expect(candidate.preview.tombstoneCount).toBe(1);
+    });
   });
 
   it("returns only aggregate metadata after wholly validating plaintext content", () => {
