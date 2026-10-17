@@ -205,6 +205,7 @@ import {
   memoryDraftRowToItem,
   memoryRowToDraftRow,
   type OffLimitsDraftRow,
+  participationChoice,
   type RelationshipDraftRow,
   resolveEditSaveExit,
   resolveErrorSection,
@@ -426,6 +427,8 @@ export function EditContactScreen({
   // the ONLY case that shows the last-spoke control (owner ruling — see header).
   const [neverContacted, setNeverContacted] = useState(false);
   const [initialTrackingEnabled, setInitialTrackingEnabled] = useState(true);
+  // The loaded contact's Bin state (38.12 D-34, C-7).
+  const [archivedAt, setArchivedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // The synchronous save guard (verification IN-04): `saving` is render state
   // for the disabled look; this ref is what makes Save single-flight, so a
@@ -621,6 +624,7 @@ export function EditContactScreen({
       setForm(nextForm);
       setStale(false);
       setInitialTrackingEnabled(result.contact.trackingEnabled === 1);
+      setArchivedAt(result.contact.archived_at);
       setEffectivePhoneRegion(nextPhoneRegion);
       seedInputRef.current = editInputSignature(nextForm, {
         contactId,
@@ -1464,6 +1468,9 @@ export function EditContactScreen({
               <View style={styles.lifecycleChoices}>
                 {([true, false] as const).map((enabled) => {
                   const selected = form.trackingEnabled === enabled;
+                  // 38.12 D-34, C-7: a person in the Bin can't change Orbit
+                  // participation; the chips are disabled and dimmed (D-06).
+                  const choice = participationChoice(archivedAt);
                   const label = enabled ? "Bound" : "Unbound";
                   // Top-level choice: the primary (solid) chip tier (38.11
                   // D-85, ADR-203); the frequency chips stay the sub tier.
@@ -1474,7 +1481,11 @@ export function EditContactScreen({
                       testID={`edit-contact-${label.toLowerCase()}`}
                       accessibilityRole="button"
                       accessibilityLabel={label}
-                      accessibilityState={{ selected }}
+                      accessibilityState={{
+                        selected,
+                        disabled: choice.disabled,
+                      }}
+                      disabled={choice.disabled}
                       onPress={() =>
                         setForm((current) =>
                           current
@@ -1496,6 +1507,7 @@ export function EditContactScreen({
                           borderColor: colors[tone.border],
                           backgroundColor: colors[tone.fill],
                         },
+                        choice.dimmed ? styles.unavailable : null,
                       ]}
                     >
                       <AppText
@@ -2054,6 +2066,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
   },
+  // 38.9 D-26 via 38.12 D-06: an unavailable control is dimmed.
+  unavailable: { opacity: 0.5 },
   customBlock: {
     gap: 16,
   },

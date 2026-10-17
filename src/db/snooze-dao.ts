@@ -40,6 +40,7 @@
  * closed preset→modifier constants are literal text.
  */
 
+import { assertContactNotInBinCore } from "@/db/contact-lifecycle-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { recordEventCore } from "@/db/events-dao";
 import { inWriteTransaction } from "@/db/transaction";
@@ -145,6 +146,8 @@ export async function snoozeContactCore(
   exec: SqlExecutor,
   input: SnoozeContactCoreInput,
 ): Promise<void> {
+  // 38.12 D-34: a person in the Bin is never snoozed (Undo restore included).
+  await assertContactNotInBinCore(exec, input.contactId, "snoozeContact");
   const result = await exec.runAsync(
     "UPDATE contacts SET snooze_until = ?, modified_at = ? WHERE id = ?",
     [input.until, input.now, input.contactId],
@@ -191,6 +194,8 @@ export async function clearSnoozeCore(
   exec: SqlExecutor,
   input: ClearSnoozeInput,
 ): Promise<void> {
+  // 38.12 D-34: a binned person's stored snooze is left as data.
+  await assertContactNotInBinCore(exec, input.contactId, "clearSnooze");
   const result = await exec.runAsync(
     "UPDATE contacts SET snooze_until = NULL, modified_at = ? WHERE id = ?",
     [input.now, input.contactId],

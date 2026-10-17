@@ -737,3 +737,16 @@ export function resolveEditSaveExit(
   }
   return { kind: "replace", name: "Profile", params: { contactId } };
 }
+
+/**
+ * The Bound/Unbound chips on Edit Contact (38.12 D-34, C-7). A person in the
+ * Bin cannot change Orbit participation — `updateContactFull` refuses it — so
+ * the chips are disabled and dimmed (38.9 D-26 via 38.12 D-06). PURE.
+ */
+export function participationChoice(archivedAt: string | null): {
+  disabled: boolean;
+  dimmed: boolean;
+} {
+  const inBin = archivedAt !== null;
+  return { disabled: inBin, dimmed: inBin };
+}

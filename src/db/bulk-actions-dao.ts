@@ -3,6 +3,7 @@
  * enters the shared non-reentrant write transaction once, composes transaction
  * cores per selected row, and advances data revision once after all writes.
  */
+import { isContactInBinError } from "@/db/contact-lifecycle-dao";
 import {
   archiveContactCore,
   setContactCategoryCore,
@@ -29,6 +30,9 @@ import {
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { Logger } from "@/utils/logger";
+
+const LOG_SCOPE = "bulk-actions";
 
 export type QuickLogBatchReceipt = Array<{
   contactId: number;
@@ -89,6 +93,24 @@ export function undoBulkQuickLog(
   });
 }
 
+/**
+ * One per-id favourite/snooze write in a bulk batch (38.12 D-34, convergence
+ * c3 D-5). The Bin guard refuses before any write, so a binned id — reachable
+ * here only through a race with Move to Bin — is skipped and the loop goes on;
+ * any other error still rolls the whole batch back.
+ */
+async function skipIfInBin(
+  contactId: number,
+  write: () => Promise<void>,
+): Promise<void> {
+  try {
+    await write();
+  } catch (error) {
+    if (!isContactInBinError(error)) throw error;
+    Logger.debug(LOG_SCOPE, `skipped a contact in the Bin: id=${contactId}`);
+  }
+}
+
 export function bulkArchive(
   exec: SqlExecutor,
   ids: number[],
@@ -108,7 +130,9 @@ export function bulkAddFavourites(
 ): Promise<void> {
   if (ids.length === 0) return Promise.resolve();
   return inWriteTransaction(exec, async () => {
-    for (const id of ids) await setFavouriteRankCore(exec, id, now);
+    for (const id of ids) {
+      await skipIfInBin(id, () => setFavouriteRankCore(exec, id, now));
+    }
     await bumpDataRevisionCore(exec);
   });
 }
@@ -120,7 +144,9 @@ export function bulkRemoveFavourites(
 ): Promise<void> {
   if (ids.length === 0) return Promise.resolve();
   return inWriteTransaction(exec, async () => {
-    for (const id of ids) await clearFavouriteRankCore(exec, id, now);
+    for (const id of ids) {
+      await skipIfInBin(id, () => clearFavouriteRankCore(exec, id, now));
+    }
     await bumpDataRevisionCore(exec);
   });
 }
@@ -135,12 +161,14 @@ export function bulkSnooze(
   return resolveSnoozeUntil(exec, preset).then((until) =>
     inWriteTransaction(exec, async () => {
       for (const contactId of ids) {
-        await snoozeContactCore(exec, {
-          contactId,
-          uid: newUid(),
-          until,
-          now,
-        });
+        await skipIfInBin(contactId, () =>
+          snoozeContactCore(exec, {
+            contactId,
+            uid: newUid(),
+            until,
+            now,
+          }),
+        );
       }
       await bumpDataRevisionCore(exec);
     }),
@@ -167,12 +195,14 @@ export function bulkSnoozeUntil(
   if (ids.length === 0) return Promise.resolve();
   return inWriteTransaction(exec, async () => {
     for (const contactId of ids) {
-      await snoozeContactCore(exec, {
-        contactId,
-        uid: newUid(),
-        until,
-        now,
-      });
+      await skipIfInBin(contactId, () =>
+        snoozeContactCore(exec, {
+          contactId,
+          uid: newUid(),
+          until,
+          now,
+        }),
+      );
     }
     await bumpDataRevisionCore(exec);
   });
@@ -186,7 +216,9 @@ export function bulkUnsnooze(
   if (ids.length === 0) return Promise.resolve();
   return inWriteTransaction(exec, async () => {
     for (const contactId of ids) {
-      await clearSnoozeCore(exec, { contactId, uid: newUid(), now });
+      await skipIfInBin(contactId, () =>
+        clearSnoozeCore(exec, { contactId, uid: newUid(), now }),
+      );
     }
     await bumpDataRevisionCore(exec);
   });

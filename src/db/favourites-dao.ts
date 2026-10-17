@@ -14,6 +14,7 @@
  * only for membership and internal picker reads, so no rank-rewrite writer exists.
  */
 
+import { assertContactNotInBinCore } from "@/db/contact-lifecycle-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -36,6 +37,8 @@ export async function setFavouriteRankCore(
   id: number,
   now: string,
 ): Promise<void> {
+  // 38.12 D-34: a person in the Bin is never made a favourite.
+  await assertContactNotInBinCore(exec, id, "setFavouriteRank");
   const result = await exec.runAsync(
     `UPDATE contacts
         SET favourite_rank = (SELECT COALESCE(MAX(favourite_rank), -1) + 1 FROM contacts),
@@ -72,6 +75,8 @@ export async function clearFavouriteRankCore(
   id: number,
   now: string,
 ): Promise<void> {
+  // 38.12 D-34: a binned person's dormant rank is kept as data.
+  await assertContactNotInBinCore(exec, id, "clearFavouriteRank");
   const result = await exec.runAsync(
     "UPDATE contacts SET favourite_rank = NULL, modified_at = ? WHERE id = ?",
     [now, id],

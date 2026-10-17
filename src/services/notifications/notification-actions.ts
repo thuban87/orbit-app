@@ -46,6 +46,7 @@ import {
   cancelScheduledNotificationAsync,
   setNotificationCategoryAsync,
 } from "expo-notifications";
+import { isContactInBinError } from "@/db/contact-lifecycle-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
@@ -190,6 +191,18 @@ export async function handleNotificationAction(
     await cancelScheduledNotificationAsync(decayIdentifier(data.contactId));
     handledSet.add(key);
   } catch (err) {
+    if (actionIdentifier === ACTION_SNOOZE && isContactInBinError(err)) {
+      // 38.12 D-34 (convergence c3 D-5): the contact moved to the Bin after
+      // this notification was posted. Snooze is refused, which is an
+      // intentional no-op, not a failure: nothing was written, the decay
+      // notification is still cancelled (unlike the Unbound no-op above, a
+      // binned person's reminders must not linger), and the key is recorded
+      // so a replay does nothing.
+      Logger.debug(LOG_SOURCE, `snooze skipped, contact in the Bin: ${key}`);
+      await cancelScheduledNotificationAsync(decayIdentifier(data.contactId));
+      handledSet.add(key);
+      return;
+    }
     if (isUniqueViolation(err)) {
       // H2 layer 2 (durable): a re-delivered/cold-replayed tap collided on
       // UNIQUE(uid). It was already acted on — a benign no-op. Record the key

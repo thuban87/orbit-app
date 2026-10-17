@@ -53,7 +53,10 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 
-import { recordLifecycleTransitionCore } from "@/db/contact-lifecycle-dao";
+import {
+  ContactInBinError,
+  recordLifecycleTransitionCore,
+} from "@/db/contact-lifecycle-dao";
 import { addLinksCore } from "@/db/contact-links-dao";
 import {
   applyContactMethodDiffCore,
@@ -846,12 +849,25 @@ export function updateContactFull(
       last_contact: string | null;
       interval_days: number | null;
       tracking_enabled: number;
+      archived_at: string | null;
     }>(
-      "SELECT rarely_responds, last_contact, interval_days, tracking_enabled FROM contacts WHERE id = ?",
+      "SELECT rarely_responds, last_contact, interval_days, tracking_enabled, archived_at FROM contacts WHERE id = ?",
       [input.id],
     );
     if (!stored) {
       throw new Error(`updateContactFull: no contact with id=${input.id}`);
+    }
+    // 38.12 D-34, C-7: Edit Contact stays reachable from a binned Profile, so
+    // this is a participation writer too. A binned person's Bound/Unbound
+    // state never changes here; refused before any write (the transaction
+    // rolls back, nothing written). An unchanged or omitted participation
+    // still saves.
+    if (
+      stored.archived_at !== null &&
+      input.trackingEnabled !== undefined &&
+      (input.trackingEnabled ? 1 : 0) !== stored.tracking_enabled
+    ) {
+      throw new ContactInBinError("updateContactFull", input.id);
     }
 
     const trackingEnabled =
