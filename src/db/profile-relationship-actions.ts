@@ -105,7 +105,12 @@ export function setProfileContactFrequency(
   );
 }
 
-/** Apply a preset or already-resolved custom local snooze end date. */
+/**
+ * Apply a preset or already-resolved custom local snooze end date. A contact
+ * in the Bin (`archived_at` set) is refused by `snoozeContactCore`'s guard
+ * with `ContactInBinError`, writing nothing (38.12 D-34); the snooze sheet's
+ * Undo restore comes through here too.
+ */
 export function snoozeProfileContact(
   exec: SqlExecutor,
   input: SnoozeProfileContactInput,
@@ -134,7 +139,11 @@ export function snoozeProfileContact(
   });
 }
 
-/** Clear snooze while preserving the core's unconditional immutable event. */
+/**
+ * Clear snooze while preserving the core's unconditional immutable event. A
+ * contact in the Bin (`archived_at` set) is refused by `clearSnoozeCore`'s
+ * guard (38.12 D-34).
+ */
 export function unsnoozeProfileContact(
   exec: SqlExecutor,
   input: UnsnoozeProfileContactInput,

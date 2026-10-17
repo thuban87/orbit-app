@@ -37,7 +37,8 @@ export async function setFavouriteRankCore(
   id: number,
   now: string,
 ): Promise<void> {
-  // 38.12 D-34: a person in the Bin is never made a favourite.
+  // 38.12 D-34: a person in the Bin (`archived_at` set) is never made a
+  // favourite. Refused before any write.
   await assertContactNotInBinCore(exec, id, "setFavouriteRank");
   const result = await exec.runAsync(
     `UPDATE contacts
@@ -75,7 +76,8 @@ export async function clearFavouriteRankCore(
   id: number,
   now: string,
 ): Promise<void> {
-  // 38.12 D-34: a binned person's dormant rank is kept as data.
+  // 38.12 D-34: a binned person's (`archived_at` set) dormant rank is kept
+  // as data. Refused before any write.
   await assertContactNotInBinCore(exec, id, "clearFavouriteRank");
   const result = await exec.runAsync(
     "UPDATE contacts SET favourite_rank = NULL, modified_at = ? WHERE id = ?",
