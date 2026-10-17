@@ -1681,6 +1681,7 @@ Plans:
 **Coordination**: shares Profile files with 38.11 (not-contacted status code, ⋯ menu, merge entry) and builds on 38.11's shared snooze sheet (38.11 D-45; X-20). 38.11 renames Archive to "Bin" app-wide and makes Move to Bin a confirm without Undo (38.11 D-69, D-71) — see "Notes from 38.11" in this phase's workpaper. None blocks this phase.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
 **Plans**: 26 plans (7 waves; executed sequentially on main)
+**Wave 1**
 
 - [ ] 38.12-01-PLAN.md — Mute becomes an indefinite snooze + migration 034 (review-memory family, resume markers, mute conversion)
 - [ ] 38.12-02-PLAN.md — Contacts bridge (native): full-size photos, photo fingerprint, thumbnail copy, method labels
@@ -1690,23 +1691,41 @@ Plans:
 - [ ] 38.12-06-PLAN.md — Shared Settings row/card + About, Contacts & Relationships, Interactions, Orrery, Profile backgrounds
 - [ ] 38.12-07-PLAN.md — Management lists: Custom Fields, Categories, Systems (drag + ⋯) and their fixes
 - [ ] 38.12-08-PLAN.md — Review matches list + per-person sheet
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 38.12-09-PLAN.md — Backup format 9 (favorites), restore semantics, people counts, progress callback
 - [ ] 38.12-10-PLAN.md — Check linked contacts: review memory (no re-prompting)
 - [ ] 38.12-11-PLAN.md — Merge: searchable picker, complete summary, photo-field fixes, host threading
 - [ ] 38.12-12-PLAN.md — Profile state: Bin banner and gating, In the Bin status, Unbound snooze/star, DAO guards
 - [ ] 38.12-13-PLAN.md — Import intake: photo budget warning + already-linked
 - [ ] 38.12-14-PLAN.md — Notifications and Appearance pages (+ D-130 glossary)
-- [ ] 38.12-15-PLAN.md — AI Connection truthful state + AI hub
 - [ ] 38.12-16-PLAN.md — AI personalization, permissions and preview
 - [ ] 38.12-17-PLAN.md — Backup and Backup settings pages + Back up now
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 38.12-15-PLAN.md — AI Connection truthful state + AI hub
 - [ ] 38.12-18-PLAN.md — Restore pages: focused, steps, people counts, host param
 - [ ] 38.12-19-PLAN.md — Check linked contacts: apply with labels, wording, no Apply recommendation
-- [ ] 38.12-20-PLAN.md — Profile destinations: Merge and per-person check in ⋯, value history, template Save, docs
 - [ ] 38.12-21-PLAN.md — Import review, bulk setup and lifecycle effects
-- [ ] 38.12-22-PLAN.md — Lifecycle feedback (Restore/Bind/Unbind) and the Bin and Unbound lists
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 38.12-20-PLAN.md — Profile destinations: Merge and per-person check in ⋯, value history, template Save, docs
 - [ ] 38.12-23-PLAN.md — Import complete names + legacy contact picker
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 38.12-22-PLAN.md — Lifecycle feedback (Restore/Bind/Unbind) and the Bin and Unbound lists
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 38.12-24-PLAN.md — Fix flagged custom values + Review now
 - [ ] 38.12-25-PLAN.md — Resume prompts once + Settings "Finish your …" rows
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 38.12-26-PLAN.md — Device pass (debug walk, owner batch, one release build)
 
 ### Phase 38.13: Contacts List, Search & Digest UX (INSERTED)
@@ -1857,6 +1876,7 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 ### Phase 999.7: Widget overhaul (BACKLOG)
 
 **Goal:** A dedicated pass over the home-screen widget, which the owner dislikes in several ways (owner, 2026-09-25). Carries every item already deferred to "the widget-overhaul phase":
+
 - RG-001 remaining checks — max-size resize and a visible explicit refresh (38.2 owner disposition; also 38.3 UAT-023a widget leg).
 - RG-032 widget action accessible names, a hard requirement (38.4 D-16).
 - Tapping a contact on the widget does not open their Profile (38.4 owner checklist 9c, 2026-09-28; `src/navigation/widget-linking.ts`).
@@ -1870,6 +1890,7 @@ Widgets need the custom dev client and native `RemoteViews`; no text input is po
 ### Phase 999.8: Prune source-reading and count-pinning tests (BACKLOG)
 
 **Goal:** Cut test plumbing that breaks on harmless edits while keeping behaviour coverage. At 2026-10-12, `src` held about 159k lines of tests against about 177k of app code (618 test files); 110 files read source as text (`readFileSync`) and assert on wording, anchors or site counts (e.g. the RG-029 inventory test pins 61 snippets; the placeholder test has an "at least N sites" floor). In 38.10 they produced most plan-check findings from cycle 3 on.
+
 - Triage the 110 source-reading tests: retire those that pin text/anchors/counts without protecting behaviour; replace real guarantees with behaviour/render tests or a lint rule (e.g. `placeholderTextColor` must be the theme token).
 - Retire the RG-029 inventory test and its `.planning` inventory (`38.4-RG029-INVENTORY.md`) unless a behaviour check replaces it.
 - Keep data-layer tests (migrations, backup/restore, DAO invariants) — there is no remote repair for user databases (CLAUDE.md "SQLite migrations").
