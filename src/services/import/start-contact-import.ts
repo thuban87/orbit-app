@@ -1,9 +1,14 @@
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { SqlExecutor } from "@/db/types";
+import type { FlowHost } from "@/navigation/flow-host";
 import type { RootStackParamList } from "@/navigation/types";
 import type { ContactImportMode } from "@/screens/use-contact-import-mode";
 import { routePickedImport } from "@/services/import/import-acquire";
 import { withImportFlowActive } from "@/services/import/import-flow-guard";
+import type {
+  DecidePhotoBudget,
+  PhotoBudgetDeps,
+} from "@/services/import/import-photo-budget";
 import type { PickedContact } from "../../../modules/orbit-contact-picker";
 
 type AppNavigate = NativeStackNavigationProp<RootStackParamList>["navigate"];
@@ -38,6 +43,12 @@ export interface StartContactImportOptions {
   discardPhotoCopy?: (uri: string) => void;
   /** Wider than PickedImportNavigator so it can open LegacyContactPicker too. */
   navigate: AppNavigate;
+  /** Where the flow finishes (D-110); absent = DEFAULT_FLOW_HOST at the screen. */
+  host?: FlowHost;
+  /** The D-133 photo-budget prompt, forwarded to routePickedImport (c4 E-2). */
+  decidePhotoBudget?: DecidePhotoBudget;
+  /** Estimator deps, forwarded; absent = production defaults (F-3). */
+  photoBudget?: Partial<PhotoBudgetDeps>;
 }
 
 /**
@@ -55,9 +66,12 @@ export async function startContactImport({
   readByLookupKeys,
   discardPhotoCopy,
   navigate,
+  host,
+  decidePhotoBudget,
+  photoBudget,
 }: StartContactImportOptions): Promise<void> {
   if (mode === "legacy") {
-    navigate("LegacyContactPicker");
+    navigate("LegacyContactPicker", { host });
     return;
   }
 
@@ -71,7 +85,7 @@ export async function startContactImport({
     await routePickedImport(
       exec,
       picked,
-      { effectivePhoneRegion, now },
+      { effectivePhoneRegion, now, host, decidePhotoBudget, photoBudget },
       { navigate: (route, params) => navigate(route, params) },
     );
   });

@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { usePhotoBudgetPrompt } from "@/components/PhotoBudgetSheet";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -104,6 +105,9 @@ export function SettingsContactsScreen() {
   const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
   const [resumableReconcile, setResumableReconcile] =
     useState<ResumableReconcile | null>(null);
+  // D-133: asked before photos that may not fit in the encrypted backup.
+  const { sheet: photoBudgetSheet, ask: askPhotoBudget } =
+    usePhotoBudgetPrompt();
 
   // Contacts permission is OS-owned and revocable between opens — read it FRESH
   // on focus, never cached (mirrors the monolith's notification-permission
@@ -139,10 +143,12 @@ export function SettingsContactsScreen() {
         pick: () => pickContacts({ multiple: true }),
         ensureNotesAccess: async () =>
           (await ensureReadContactsPermission()).granted,
-        readByLookupKeys: async (keys) =>
-          (await readAllContacts(keys)).contacts,
+        // D-137: withNotes asks for full-size photos (an import path).
+        readByLookupKeys: async (keys, options) =>
+          (await readAllContacts(keys, options)).contacts,
         discardPhotoCopy: discardDerivative,
         navigate: navigation.navigate,
+        decidePhotoBudget: askPhotoBudget,
       });
     } catch {
       showSnackbar({
@@ -150,7 +156,7 @@ export function SettingsContactsScreen() {
         label: "Couldn't import contacts. Please try again.",
       });
     }
-  }, [navigation]);
+  }, [navigation, askPhotoBudget]);
 
   const onCheckLinkedContacts = useCallback(async () => {
     try {
@@ -369,6 +375,8 @@ export function SettingsContactsScreen() {
         onDismiss={() => setResumableReconcile(null)}
         onDiscarded={() => navigation.navigate("ReconcileGrid")}
       />
+
+      {photoBudgetSheet}
 
       {/* The region picker is the shared Sheet (D-79): it lifts above the
           soft keyboard (Sheet keyboard layout, 38.4 D-72), and closing it any

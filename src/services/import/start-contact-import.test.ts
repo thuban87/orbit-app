@@ -240,6 +240,49 @@ describe("startContactImport", () => {
 
     expect(pick).not.toHaveBeenCalled();
     expect(routePickedImport).not.toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith("LegacyContactPicker");
+    expect(navigate).toHaveBeenCalledWith("LegacyContactPicker", {
+      host: undefined,
+    });
+  });
+
+  it("opens the legacy picker with a non-default host (D-110; c1 A-1)", async () => {
+    await startContactImport({
+      mode: "legacy",
+      exec,
+      effectivePhoneRegion: "US",
+      now: "2026-08-30 10:00:00",
+      pick: vi.fn(),
+      navigate,
+      host: { kind: "digest" },
+    });
+
+    expect(navigate).toHaveBeenCalledWith("LegacyContactPicker", {
+      host: { kind: "digest" },
+    });
+  });
+
+  it("forwards host, decidePhotoBudget and photoBudget to routePickedImport (c4 E-2; A-1)", async () => {
+    const decidePhotoBudget = vi.fn();
+    const photoBudget = { encryptionEnabled: async () => true };
+    await startContactImport({
+      mode: "system",
+      exec,
+      effectivePhoneRegion: "US",
+      now: "2026-08-30 10:00:00",
+      pick: vi.fn().mockResolvedValue(picked),
+      navigate,
+      host: { kind: "digest" },
+      decidePhotoBudget,
+      photoBudget,
+    });
+
+    const options = routePickedImport.mock.calls[0][2];
+    expect(options.host).toEqual({ kind: "digest" });
+    expect(options.decidePhotoBudget).toBe(decidePhotoBudget);
+    expect(options.photoBudget).toBe(photoBudget);
+    expect(options).toMatchObject({
+      effectivePhoneRegion: "US",
+      now: "2026-08-30 10:00:00",
+    });
   });
 });
