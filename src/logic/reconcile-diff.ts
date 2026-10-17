@@ -12,6 +12,12 @@ export const RECONCILE_FIELD_FAMILIES = [
 ] as const;
 
 export type ReconcileFieldFamily = (typeof RECONCILE_FIELD_FAMILIES)[number];
+/**
+ * Families stored in review memory (`reconcile_source_snapshot`). 'source' is
+ * the missing-source "Keep as is" memory (migration 034, D-45); it is never a
+ * classifier field family, so RECONCILE_FIELD_FAMILIES stays unchanged.
+ */
+export type ReviewMemoryFamily = ReconcileFieldFamily | "source";
 export type ReconcileOutcome =
   | "additive"
   | "conflict"
@@ -309,6 +315,19 @@ function classifyMethodFamily(
     sourceOptions,
     reviewedValue,
   };
+}
+
+/**
+ * D-45: the fields a person still has to decide. The classifier keeps emitting
+ * "unchanged-since-review" (memory equals the current source); every card,
+ * count, chip and the detail view go through this filter instead.
+ */
+export function actionableReconcileFields(
+  diff: Pick<ReconcileDiffResult, "fields">,
+): ReconcileFieldDiff[] {
+  return diff.fields.filter(
+    (field) => field.outcome !== "unchanged-since-review",
+  );
 }
 
 /** Pure reconciliation classification. Source contact reads and photo staging happen upstream. */

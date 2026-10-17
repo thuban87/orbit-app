@@ -14,10 +14,17 @@ import {
 } from "@/components/FieldChoiceGroup";
 import { KEEP_ORBIT_PHOTO, PhotoChoice } from "@/components/PhotoChoice";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { listContactMethods } from "@/db/contact-methods-dao";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { setContactPhoto } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { applyReconcileSelections } from "@/db/reconcile-apply";
+import {
+  classifyLinkedContact,
+  getReconcileContact,
+  type LinkedScanLink,
+  loadReviewMemory,
+  type StagedSourcePhoto,
+} from "@/db/reconcile-memory-read";
 import {
   relinkExternalSource,
   unlinkExternalSource,
@@ -26,27 +33,23 @@ import {
   finalizeSessionIfTerminal,
   markCardStatusCore,
 } from "@/db/reconcile-session-dao";
-import {
-  getReviewedSnapshots,
-  upsertReviewedSnapshotCore,
-} from "@/db/reconcile-snapshot-dao";
+import { upsertReviewedSnapshotCore } from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import {
-  classifyReconciliation,
+  actionableReconcileFields,
   type ReconcileDiffResult,
   type ReconcileFieldDiff,
-  type ReconcileSource,
 } from "@/logic/reconcile-diff";
 import {
   buildReconcileSelections,
   type ReconcileChoice,
 } from "@/logic/reconcile-selection";
-import { reconcileSourceLabels } from "@/logic/reconcile-source-label";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
   ensureReadContactsPermission,
   openContactsSettings,
 } from "@/services/contacts/use-read-contacts-permission";
+import { getDeviceRegion } from "@/services/device-region";
 import {
   markReconcileSessionOpen,
   withReconcileFlowActive,
@@ -72,7 +75,6 @@ import {
 } from "../../modules/orbit-contact-picker";
 
 type Choice = ReconcileChoice;
-type ActiveLink = { id: number; external_contact_id: string; provider: string };
 interface ScanState {
   /** The Orbit contact under review — the screen must name the real person. */
   contactName: string;
@@ -83,7 +85,9 @@ interface ScanState {
   orbitPhoto: string | null;
   diff: ReconcileDiffResult;
   sourcePhotoUri: string | null;
-  links: ActiveLink[];
+  links: LinkedScanLink[];
+  /** The region the scan classified with; Apply uses the same one (D-45). */
+  effectivePhoneRegion: string | null;
 }
 
 /** Per-contact reconciliation detail with a non-destructive missing-source branch. */
@@ -111,22 +115,7 @@ export function ReconcileDetailScreen({
         setMessage(null);
         setNeedsContactsAccess(false);
         const exec = getExecutor();
-        const [contact, links, methods] = await Promise.all([
-          exec.getFirstAsync<{
-            name: string;
-            birthday: string | null;
-            photo: string | null;
-            modified_at: string;
-          }>(
-            "SELECT name, birthday, photo, modified_at FROM contacts WHERE id = ?",
-            [contactId],
-          ),
-          exec.getAllAsync<ActiveLink>(
-            "SELECT id, external_contact_id, provider FROM external_contact_links WHERE contact_id = ? AND is_active = 1 ORDER BY id ASC",
-            [contactId],
-          ),
-          listContactMethods(exec, contactId),
-        ]);
+        const { contact, links } = await getReconcileContact(exec, contactId);
         if (!contact || links.length === 0) {
           setMessage("No linked Contacts source is available.");
           return;
@@ -154,77 +143,44 @@ export function ReconcileDetailScreen({
             picked: pickedByKey.get(link.external_contact_id),
           }))
           .find(
-            (item): item is { link: ActiveLink; picked: PickedContact } =>
+            (item): item is { link: LinkedScanLink; picked: PickedContact } =>
               item.picked?.photoTempUri != null,
           );
-        let stagedRelative: string | null = null;
-        let photoHash: string | null = null;
+        const stagedPhotos = new Map<number, StagedSourcePhoto>();
         try {
           if (firstPhoto?.picked.photoTempUri) {
             const staged = await stageReconcileSourcePhoto(
               firstPhoto.picked.photoTempUri,
               `contact-${contactId}-link-${firstPhoto.link.id}`,
             );
-            stagedRelative = staged.stagedRelative;
-            photoHash = staged.contentHash;
+            stagedPhotos.set(firstPhoto.link.id, staged);
           }
         } finally {
           for (const picked of read.contacts) {
             if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
           }
         }
-        const readLinks = links.filter((link) =>
-          pickedByKey.has(link.external_contact_id),
-        );
-        const labels = reconcileSourceLabels(
-          readLinks.map((link) => ({
-            displayName:
-              pickedByKey.get(link.external_contact_id)?.displayName ?? null,
-          })),
-        );
-        const labelByLinkId = new Map(
-          readLinks.map((link, index) => [link.id, labels[index]]),
-        );
-        const sources: ReconcileSource[] = links.flatMap((link) => {
-          const picked = pickedByKey.get(link.external_contact_id);
-          return picked
-            ? [
-                {
-                  externalContactLinkId: link.id,
-                  displayName: picked.displayName,
-                  methods: picked.methods,
-                  birthday: picked.birthday,
-                  provenanceLabel:
-                    labelByLinkId.get(link.id) ?? "Phone contact",
-                  ...(link.id === firstPhoto?.link.id
-                    ? {
-                        stagedPhotoRelative: stagedRelative,
-                        photoContentHash: photoHash,
-                      }
-                    : {}),
-                },
-              ]
-            : [];
+        // The same memory read as the grid: every active link merged, region
+        // override ?? device (D-45).
+        const settings = await getAppSettings(exec);
+        const memory = await loadReviewMemory(exec, contactId, {
+          phoneRegionOverride: settings.phoneRegionOverride,
+          deviceRegion: getDeviceRegion(),
         });
-        const snapshots = await Promise.all(
-          links.map((link) => getReviewedSnapshots(exec, link.id)),
-        );
-        const diff = classifyReconciliation({
-          orbit: {
-            name: contact.name,
-            birthday: contact.birthday,
-            photo: contact.photo,
-            methods: methods.map((method) => ({
-              type: method.method_type,
-              value: method.raw_value,
-              label: method.label,
-            })),
-            modifiedAt: contact.modified_at,
-          },
-          sources,
-          lastReviewed: snapshots[0] ?? {},
-          omittedCount: read.omittedCount,
+        const classified = await classifyLinkedContact(exec, {
+          contact,
+          links,
+          pickedByKey,
+          stagedPhotos,
+          memory,
         });
+        // Reviewed, unchanged fields are never shown (D-45).
+        const diff: ReconcileDiffResult = {
+          ...classified,
+          fields: actionableReconcileFields(classified),
+        };
+        const stagedRelative =
+          [...stagedPhotos.values()][0]?.stagedRelative ?? null;
         setChoices(
           Object.fromEntries(
             diff.fields
@@ -246,6 +202,7 @@ export function ReconcileDetailScreen({
             ? resolveReconcileStagingUri(stagedRelative)
             : null,
           links,
+          effectivePhoneRegion: memory.effectivePhoneRegion,
         });
       }),
     [contactId],
@@ -353,7 +310,12 @@ export function ReconcileDetailScreen({
     try {
       const selections = buildReconcileSelections(scan.diff, choices);
       const result = await inWriteTransaction(exec, () =>
-        applyReconcileSelections(exec, { contactId, now, selections }),
+        applyReconcileSelections(exec, {
+          contactId,
+          now,
+          selections,
+          effectivePhoneRegion: scan.effectivePhoneRegion,
+        }),
       );
       const pendingPhoto = result.pendingPhoto;
       if (pendingPhoto?.stagedPhotoRelative) {

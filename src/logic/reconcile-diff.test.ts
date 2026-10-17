@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  actionableReconcileFields,
   buildDesiredMethodList,
   classifyReconciliation,
   type ReconcileSource,
@@ -77,6 +78,8 @@ describe("classifyReconciliation", () => {
         source({ methods: [{ type: "phone", value: "312-555-1234" }] }),
       ],
       lastReviewed: {},
+      // National numbers only canonicalize with a region (D-45).
+      effectivePhoneRegion: "US",
     });
     expect(
       result.fields.find((field) => field.fieldFamily === "phones"),
@@ -104,6 +107,23 @@ describe("classifyReconciliation", () => {
       lastReviewed: { name: "Source Name" },
     });
     expect(result.fields[0].outcome).toBe("conflict");
+  });
+});
+
+describe("actionableReconcileFields", () => {
+  it("drops reviewed, unchanged fields and keeps every other outcome (D-45)", () => {
+    const result = classifyReconciliation({
+      orbit: orbit({ birthday: "1990-01-01" }),
+      sources: [source({ birthday: "1991-02-03" })],
+      lastReviewed: { name: "Source Name" },
+    });
+    expect(result.fields.map((field) => field.outcome)).toEqual([
+      "unchanged-since-review",
+      "conflict",
+    ]);
+    expect(
+      actionableReconcileFields(result).map((field) => field.fieldFamily),
+    ).toEqual(["birthday"]);
   });
 });
 

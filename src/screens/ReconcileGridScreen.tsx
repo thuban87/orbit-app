@@ -7,9 +7,15 @@ import {
 } from "@/components/CandidateCardGrid";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { getAppSettings } from "@/db/app-settings-dao";
-import { listContactMethods } from "@/db/contact-methods-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { applyReconcileSelections } from "@/db/reconcile-apply";
+import {
+  effectivePhoneRegionFor,
+  type LinkedScanLink,
+  listLinkedContactsForScan,
+  type StagedSourcePhoto,
+  scanLinkedContacts,
+} from "@/db/reconcile-memory-read";
 import {
   createReconcileSessionCore,
   finalizeSessionIfTerminal,
@@ -23,25 +29,23 @@ import {
   type ReconcileCardIdentity,
   type ReconcileSessionCard,
 } from "@/db/reconcile-session-read";
-import { getReviewedSnapshots } from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import { newUid } from "@/db/uid";
 import { isAdditiveOnlySelection } from "@/logic/reconcile-bulk-eligibility";
 import {
-  classifyReconciliation,
+  actionableReconcileFields,
   type ReconcileDiffResult,
-  type ReconcileSource,
 } from "@/logic/reconcile-diff";
 import {
   buildReconcileSelections,
   remainingReconcileFields,
 } from "@/logic/reconcile-selection";
-import { reconcileSourceLabels } from "@/logic/reconcile-source-label";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
   ensureReadContactsPermission,
   openContactsSettings,
 } from "@/services/contacts/use-read-contacts-permission";
+import { getDeviceRegion } from "@/services/device-region";
 import {
   markReconcileSessionOpen,
   withReconcileFlowActive,
@@ -59,19 +63,6 @@ type StoredDiff = ReconcileDiffResult & {
   completionDisposition?: "updated" | "kept-orbit" | null;
 };
 type GridCard = { card: ReconcileSessionCard; diff: StoredDiff };
-type LinkedContact = {
-  id: number;
-  name: string;
-  birthday: string | null;
-  photo: string | null;
-  modified_at: string;
-};
-type Link = {
-  id: number;
-  contact_id: number;
-  external_contact_id: string;
-  provider: string;
-};
 
 function parseDiff(value: string): StoredDiff | null {
   try {
@@ -86,13 +77,15 @@ function parseDiff(value: string): StoredDiff | null {
 
 function chipLabel(diff: ReconcileDiffResult): string {
   if (diff.missingSource) return "Source missing";
+  // Reviewed, unchanged fields never shape the chip (D-45).
+  const fields = actionableReconcileFields(diff);
   if (
-    diff.fields.every(
+    fields.every(
       (field) => field.outcome === "additive" && field.fieldFamily !== "photo",
     )
   )
     return "Add";
-  if (diff.fields.every((field) => field.outcome === "removed-from-source"))
+  if (fields.every((field) => field.outcome === "removed-from-source"))
     return "Keep Orbit";
   return "Manual review";
 }
@@ -151,17 +144,8 @@ export function ReconcileGridScreen({
         setScoring(true);
         setMessage(null);
         setNeedsContactsAccess(false);
-        const contacts = await exec.getAllAsync<LinkedContact>(
-          `SELECT c.id, c.name, c.birthday, c.photo, c.modified_at
-       FROM contacts c
-       WHERE c.archived_at IS NULL
-         AND EXISTS (SELECT 1 FROM external_contact_links l WHERE l.contact_id = c.id AND l.is_active = 1)
-       ORDER BY c.id`,
-        );
-        const links = await exec.getAllAsync<Link>(
-          `SELECT id, contact_id, external_contact_id, provider
-       FROM external_contact_links WHERE is_active = 1 ORDER BY contact_id, id`,
-        );
+        const linked = await listLinkedContactsForScan(exec);
+        const { links } = linked;
         // ADR-003: reconcile reads ContactsContract directly — ensure READ_CONTACTS first.
         if (links.length > 0) {
           const access = await ensureReadContactsPermission();
@@ -182,110 +166,51 @@ export function ReconcileGridScreen({
         const pickedByKey = new Map(
           sourceRead.contacts.map((picked) => [picked.lookupKey, picked]),
         );
-        const linksByContact = new Map<number, Link[]>();
-        for (const link of links)
-          linksByContact.set(link.contact_id, [
-            ...(linksByContact.get(link.contact_id) ?? []),
-            link,
-          ]);
         const stagedForCleanup: string[] = [];
-        const built: Array<{
-          contactId: number;
-          diff: StoredDiff;
-          stagedPhotoRelPath: string | null;
-        }> = [];
         try {
           const settings = await getAppSettings(exec);
-          for (const contact of contacts) {
-            const contactLinks = linksByContact.get(contact.id) ?? [];
-            const methods = await listContactMethods(exec, contact.id);
-            const pickedLinks = contactLinks.map((link) => ({
-              link,
-              picked: pickedByKey.get(link.external_contact_id),
-            }));
-            const firstPhoto = pickedLinks.find(
-              (item): item is { link: Link; picked: PickedContact } =>
-                item.picked?.photoTempUri != null,
-            );
-            let stagedPhotoRelPath: string | null = null;
-            let photoContentHash: string | null = null;
+          const stagedPhotos = new Map<number, StagedSourcePhoto>();
+          for (const contact of linked.contacts) {
+            const firstPhoto = links
+              .filter((link) => link.contact_id === contact.id)
+              .map((link) => ({
+                link,
+                picked: pickedByKey.get(link.external_contact_id),
+              }))
+              .find(
+                (
+                  item,
+                ): item is { link: LinkedScanLink; picked: PickedContact } =>
+                  item.picked?.photoTempUri != null,
+              );
             if (firstPhoto?.picked.photoTempUri) {
               // The picker cache URI is consumed only at this durable staging boundary.
               const staged = await stageReconcileSourcePhoto(
                 firstPhoto.picked.photoTempUri,
                 `contact-${contact.id}-link-${firstPhoto.link.id}`,
               );
-              stagedPhotoRelPath = staged.stagedRelative;
-              photoContentHash = staged.contentHash;
-              stagedForCleanup.push(stagedPhotoRelPath);
+              stagedForCleanup.push(staged.stagedRelative);
+              stagedPhotos.set(firstPhoto.link.id, staged);
             }
-            const readPicked = pickedLinks.filter(({ picked }) => picked);
-            const labels = reconcileSourceLabels(
-              readPicked.map(({ picked }) => ({
-                displayName: picked?.displayName ?? null,
-              })),
-            );
-            const labelByLinkId = new Map(
-              readPicked.map(({ link }, index) => [link.id, labels[index]]),
-            );
-            const sources: ReconcileSource[] = pickedLinks.flatMap(
-              ({ link, picked }) =>
-                picked
-                  ? [
-                      {
-                        externalContactLinkId: link.id,
-                        displayName: picked.displayName,
-                        methods: picked.methods,
-                        birthday: picked.birthday,
-                        provenanceLabel:
-                          labelByLinkId.get(link.id) ?? "Phone contact",
-                        ...(link.id === firstPhoto?.link.id
-                          ? {
-                              stagedPhotoRelative: stagedPhotoRelPath,
-                              photoContentHash,
-                            }
-                          : {}),
-                      },
-                    ]
-                  : [],
-            );
-            const snapshots = await Promise.all(
-              contactLinks.map((link) => getReviewedSnapshots(exec, link.id)),
-            );
-            const lastReviewed = Object.assign({}, ...snapshots);
-            const diff = classifyReconciliation({
-              orbit: {
-                name: contact.name,
-                birthday: contact.birthday,
-                photo: contact.photo,
-                methods: methods.map((method) => ({
-                  type: method.method_type,
-                  value: method.raw_value,
-                  label: method.label,
-                })),
-                modifiedAt: contact.modified_at,
-              },
-              sources,
-              lastReviewed,
-              omittedCount: pickedLinks.some((item) => !item.picked) ? 1 : 0,
-              effectivePhoneRegion: settings.phoneRegionOverride,
-            });
-            if (diff.fields.length === 0) {
-              if (stagedPhotoRelPath)
-                deleteReconcileStaging(stagedPhotoRelPath);
-              continue;
-            }
-            built.push({
-              contactId: contact.id,
-              diff: { ...diff, completionDisposition: null },
-              stagedPhotoRelPath,
-            });
           }
+          const scanned = await scanLinkedContacts(exec, {
+            linked,
+            picked: sourceRead.contacts,
+            stagedPhotos,
+            settings: {
+              phoneRegionOverride: settings.phoneRegionOverride,
+              deviceRegion: getDeviceRegion(),
+            },
+          });
+          const built = scanned.cards.map((card) => ({
+            ...card,
+            diff: { ...card.diff, completionDisposition: null } as StoredDiff,
+          }));
           const now = localDateTime();
           const id = await inWriteTransaction(exec, async () => {
             const nextSessionId = await createReconcileSessionCore(exec, {
               uid: newUid(),
-              totalChecked: contacts.length,
+              totalChecked: linked.contacts.length,
               now,
             });
             for (const entry of built) {
@@ -297,15 +222,15 @@ export function ReconcileGridScreen({
                 // decision; `missing_source` is the terminal state after review.
                 cardStatus: "unresolved",
                 diffJson: JSON.stringify(entry.diff),
-                unresolvedCount: entry.diff.missingSource
-                  ? 0
-                  : entry.diff.fields.length,
+                unresolvedCount: entry.unresolvedCount,
                 stagedPhotoRelPath: entry.stagedPhotoRelPath,
                 now,
               });
             }
             return nextSessionId;
           });
+          for (const relative of scanned.discardStaged)
+            deleteReconcileStaging(relative);
           await finalizeSessionIfTerminal(exec, id, now);
           setSessionId(id);
           await refreshCards(id);
@@ -369,25 +294,37 @@ export function ReconcileGridScreen({
       const exec = getExecutor();
       const now = localDateTime();
       const failures: number[] = [];
+      const settings = await getAppSettings(exec);
+      // Same region rule as the scan and the detail screen (D-45).
+      const effectivePhoneRegion = effectivePhoneRegionFor({
+        phoneRegionOverride: settings.phoneRegionOverride,
+        deviceRegion: getDeviceRegion(),
+      });
       for (const target of targets) {
         const entry = itemById.get(Number(target.id));
         if (!entry) continue;
+        // A card stored before D-45 may still carry reviewed, unchanged fields.
+        const diff = {
+          ...entry.diff,
+          fields: actionableReconcileFields(entry.diff),
+        };
         try {
           let removeStaged: string | null = null;
           await inWriteTransaction(exec, async () => {
             const result = await applyReconcileSelections(exec, {
               contactId: entry.card.contactId,
               now,
-              selections: buildReconcileSelections(entry.diff, action),
+              selections: buildReconcileSelections(diff, action),
+              effectivePhoneRegion,
             });
             const remaining = remainingReconcileFields(
               action,
-              entry.diff,
+              diff,
               result.staleFields,
             );
             const status =
               remaining === 0
-                ? entry.diff.missingSource
+                ? diff.missingSource
                   ? "missing_source"
                   : "resolved"
                 : "partial";
@@ -462,7 +399,14 @@ export function ReconcileGridScreen({
           isAdditiveOnlySelection(
             selected.flatMap((item) => {
               const entry = itemById.get(Number(item.id));
-              return entry ? [entry.diff] : [];
+              return entry
+                ? [
+                    {
+                      ...entry.diff,
+                      fields: actionableReconcileFields(entry.diff),
+                    },
+                  ]
+                : [];
             }),
           )
         }
