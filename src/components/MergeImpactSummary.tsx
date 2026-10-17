@@ -10,8 +10,7 @@ import {
   type MergeImpactCounts,
   readMergeImpactCounts,
 } from "@/db/merge-impact-read";
-import { navigationRef } from "@/navigation/linking";
-import { resetToDashboardWith } from "@/navigation/reset-intents";
+import { DEFAULT_FLOW_HOST, finishFlowOnProfile } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-rehome";
 import { confirm } from "@/stores/confirm-store";
@@ -27,6 +26,11 @@ export function MergeImpactSummary({
   const theme = useTheme();
   const { colors } = theme;
   const { survivorId, absorbedId, resolutions } = route.params;
+  // 38.12 D-110: a merge finishes where it was started. A Profile ⋯ merge
+  // (profile host, keyed by the launching route) ends on the survivor's
+  // Profile in that stack; a Settings merge pops back to Contacts &
+  // Relationships. Never a root reset. 38.12-11 threads the host here.
+  const host = route.params.host ?? DEFAULT_FLOW_HOST;
   const [names, setNames] = useState({
     survivor: "Contact",
     absorbed: "Contact",
@@ -78,14 +82,7 @@ export function MergeImpactSummary({
         resolutions: typedResolutions,
         now: localDateTime(),
       })
-        .then(() =>
-          navigationRef.current?.reset(
-            resetToDashboardWith({
-              name: "Profile",
-              params: { contactId: survivorId },
-            }),
-          ),
-        )
+        .then(() => finishFlowOnProfile(navigation, host, survivorId))
         .catch((error: unknown) => {
           settleMerge();
           setFailureMessage(

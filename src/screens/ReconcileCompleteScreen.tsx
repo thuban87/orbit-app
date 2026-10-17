@@ -14,8 +14,7 @@ import {
 } from "@/db/reconcile-session-read";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
-import { navigationRef } from "@/navigation/linking";
-import { resetToDashboardRoot } from "@/navigation/reset-intents";
+import { DEFAULT_FLOW_HOST, finishFlow } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
@@ -77,12 +76,15 @@ export function ReconcileCompleteScreen({
     return () => authority.invalidate();
   }, [authority, load]);
 
-  // Done leaves the finished flow for Contacts. Header Back and system Back
-  // act like Done (owner ruling 38.9 D-73; review WR-07), never returning to
-  // the flow's setup screen. Every state carries the shared header (D-16).
+  // Done finishes the check where it was started: Settings → Contacts &
+  // Relationships by default (38.12 D-110), never a root reset that wipes the
+  // other tabs. Header Back and system Back act like Done (owner ruling 38.9
+  // D-73; review WR-07), never returning to the flow's setup screen. Every
+  // state carries the shared header (D-16).
+  const host = route.params.host ?? DEFAULT_FLOW_HOST;
   const done = useCallback(
-    () => navigationRef.current?.reset(resetToDashboardRoot()),
-    [],
+    () => finishFlow(navigation, host),
+    [navigation, host],
   );
   useBackActsAsDone(done);
   const header = (

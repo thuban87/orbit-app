@@ -614,33 +614,6 @@ export function profileOverflowEntries(input: {
   ];
 }
 
-export type ProfileOrigin =
-  | "dashboard"
-  | "orrery"
-  | "settings"
-  | "widget"
-  | "notification";
-
-/**
- * All origins retain the stack's own Back semantics. Widget and notification
- * reset construction happens at the linking/notification boundary, not here.
- */
-export function profileOriginIntent(
-  origin: ProfileOrigin,
-  contactId: number,
-  openReachOut?: boolean,
-): {
-  origin: ProfileOrigin;
-  route: { contactId: number; openReachOut?: boolean };
-  back: "native-go-back";
-} {
-  return {
-    origin,
-    route: openReachOut ? { contactId, openReachOut: true } : { contactId },
-    back: "native-go-back",
-  };
-}
-
 /**
  * Consume the widget-only Reach out intent exactly once. A methodless contact
  * still clears the flag so returning to Profile cannot replay stale intent.

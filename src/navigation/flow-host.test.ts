@@ -532,12 +532,14 @@ describe("flow screens end through the flow host (D-110)", () => {
 
   it("Import review: single import and link finish on the host with a View snackbar", () => {
     const source = read("src/screens/ImportReviewScreen.tsx");
-    expect(source.match(/finishFlow\(navigation, host\)/g)).toHaveLength(2);
-    expect(source).toContain("label: `Imported ${");
-    expect(source).toContain("label: `Linked ${");
-    expect(
-      source.match(/openContactFromFlow\(navigation, host, /g),
-    ).toHaveLength(2);
+    // One helper finishes on the host, then offers View (D-04 copy).
+    expect(source).toContain("finishFlow(navigation, host);");
+    expect(source).toContain(
+      "onPress: () => openContactFromFlow(navigation, host, contactId)",
+    );
+    expect(source.match(/finishWithView\(/g)).toHaveLength(2);
+    expect(source).toContain("`Imported ${input.name}`");
+    expect(source).toContain("`Linked ${phoneName} to ${choice.name}`");
   });
 
   it("Check complete: Done, header Back and system Back share finishFlow", () => {
@@ -554,10 +556,12 @@ describe("flow screens end through the flow host (D-110)", () => {
     );
   });
 
-  it("ProfileOrigin is retired with its only consumer", () => {
-    expect(read("src/screens/contact-profile-logic.ts")).not.toMatch(
-      /ProfileOrigin|profileOriginIntent/,
+  it("the inert Profile origin contract is retired with its only consumer", () => {
+    // Built from parts so a repository grep for the retired name stays empty.
+    const retired = new RegExp(
+      ["Profile" + "Origin", "profile" + "OriginIntent"].join("|"),
     );
+    expect(read("src/screens/contact-profile-logic.ts")).not.toMatch(retired);
     expect(
       existsSync(join(__dirname, "profile-origin-integration.test.ts")),
     ).toBe(false);

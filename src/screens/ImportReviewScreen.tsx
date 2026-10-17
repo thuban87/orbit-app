@@ -39,8 +39,11 @@ import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh"
 import { normalizeEditedBirthday } from "@/logic/birthday-logic";
 import { resolveCategorySelection } from "@/logic/category-logic";
 import { mapPickedContact } from "@/logic/picked-contact-map";
-import { navigationRef } from "@/navigation/linking";
-import { resetToDashboardWith } from "@/navigation/reset-intents";
+import {
+  DEFAULT_FLOW_HOST,
+  finishFlow,
+  openContactFromFlow,
+} from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
 import {
@@ -121,6 +124,27 @@ export function ImportReviewScreen({
     DuplicateOutcome,
     "already_linked"
   > | null>(null);
+
+  // 38.12 D-110: a single import or link finishes where the import was
+  // started (Settings → Contacts & Relationships by default), with a View
+  // action that opens the person's Contacts-tab Profile (D-04 copy).
+  const host = route.params.host ?? DEFAULT_FLOW_HOST;
+  const finishWithView = (
+    label: string,
+    contactId: number,
+    personName: string,
+  ) => {
+    finishFlow(navigation, host);
+    showSnackbar({
+      kind: "success",
+      label,
+      action: {
+        label: "View",
+        accessibilityLabel: `View ${personName}`,
+        onPress: () => openContactFromFlow(navigation, host, contactId),
+      },
+    });
+  };
 
   const markImportComplete = useImportLeaveGuard(
     navigation,
@@ -248,19 +272,18 @@ export function ImportReviewScreen({
     setCategories(currentCategories);
     if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
     const now = localDateTime();
+    const input = makeImportInput(now, currentCategoryId);
     const contactId = await commitSingleImport(exec, {
       sessionId: route.params.sessionId,
       rowId,
-      input: makeImportInput(now, currentCategoryId),
+      input,
       externalLinks: [{ provider: "android", externalContactId }],
       birthday: normalizedBirthday.stored,
       now,
     });
     setDuplicateOutcome(null);
     markImportComplete();
-    navigationRef.current?.reset(
-      resetToDashboardWith({ name: "Profile", params: { contactId } }),
-    );
+    finishWithView(`Imported ${input.name}`, contactId, input.name);
   }
 
   async function onImport() {
@@ -332,11 +355,13 @@ export function ImportReviewScreen({
       );
       setDuplicateOutcome(null);
       markImportComplete();
-      navigationRef.current?.reset(
-        resetToDashboardWith({
-          name: "Profile",
-          params: { contactId: choice.contactId },
-        }),
+      const phoneName = name.trim();
+      finishWithView(
+        phoneName === ""
+          ? `Linked to ${choice.name}`
+          : `Linked ${phoneName} to ${choice.name}`,
+        choice.contactId,
+        choice.name,
       );
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to link duplicate", error);
