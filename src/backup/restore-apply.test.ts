@@ -4331,3 +4331,227 @@ it("a merge restore of an older backup does not bring back a reset Profile layou
     collapseJson: "{}",
   });
 });
+
+describe("38.12-09 restore semantics: favourites, legacy mute, people counts, progress", () => {
+  const LATER = "2026-08-26 12:00:00";
+  const LATEST = "2026-08-27 12:00:00";
+  type Seed = {
+    uid: string;
+    modifiedAt?: string;
+    favourite?: boolean;
+    archived?: boolean;
+    remindersOff?: 0 | 1;
+    snoozeUntil?: string | null;
+  };
+  async function seed(exec: SqlExecutor, rows: Seed[]): Promise<void> {
+    for (const row of rows)
+      await exec.runAsync(
+        "INSERT INTO contacts (uid,name,interval_days,favourite_rank,archived_at,reminders_off,snooze_until,created_at,modified_at) VALUES (?,?,30,?,?,?,?,?,?)",
+        [
+          row.uid,
+          row.uid,
+          row.favourite ? 0 : null,
+          row.archived ? NOW : null,
+          row.remindersOff ?? 0,
+          row.snoozeUntil ?? null,
+          NOW,
+          row.modifiedAt ?? NOW,
+        ],
+      );
+  }
+  async function backupOf(rows: Seed[]) {
+    const source = await db();
+    await seed(source, rows);
+    return parseBackupManifest(
+      await buildExportManifest(source, {
+        exportedAt: NOW,
+        readPhotoBase64: async () => "",
+      }),
+    );
+  }
+  async function favourites(exec: SqlExecutor): Promise<string[]> {
+    return (
+      await exec.getAllAsync<{ uid: string }>(
+        "SELECT uid FROM contacts WHERE favourite_rank IS NOT NULL ORDER BY uid",
+      )
+    ).map((row) => row.uid);
+  }
+
+  it("Merge makes a person a favourite if either side marks them and never unfavourites anyone (D-113)", async () => {
+    const backup = await backupOf([
+      // Backup row newer, not a favourite: the upsert wins, the phone's mark stays.
+      { uid: "phone-fav", modifiedAt: LATER },
+      // Backup row newer and a favourite: the phone's row becomes a favourite.
+      { uid: "backup-fav", modifiedAt: LATER, favourite: true },
+      // Backup favourite older than the phone row: the phone row is retained,
+      // yet it becomes a favourite, and its stamp is untouched.
+      { uid: "retained", favourite: true },
+      // Only in the backup.
+      { uid: "new-fav", favourite: true },
+      // Deleted on the phone by a newer tombstone: nothing is resurrected.
+      { uid: "gone", favourite: true },
+    ]);
+    const phone = await db();
+    await seed(phone, [
+      { uid: "phone-fav", favourite: true },
+      { uid: "backup-fav" },
+      { uid: "retained", modifiedAt: LATEST },
+      { uid: "phone-only", favourite: true },
+    ]);
+    await phone.runAsync(
+      "INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES ('contact','gone',?)",
+      [LATEST],
+    );
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+    });
+    expect(await favourites(phone)).toEqual([
+      "backup-fav",
+      "new-fav",
+      "phone-fav",
+      "phone-only",
+      "retained",
+    ]);
+    expect(
+      await phone.getFirstAsync<{ modified_at: string }>(
+        "SELECT modified_at FROM contacts WHERE uid='retained'",
+      ),
+    ).toEqual({ modified_at: LATEST });
+    expect(
+      await phone.getFirstAsync("SELECT uid FROM contacts WHERE uid='gone'"),
+    ).toBeNull();
+    // Distinct ranks: an appended favourite never collides with an existing one.
+    const ranks = await phone.getAllAsync<{ favourite_rank: number }>(
+      "SELECT favourite_rank FROM contacts WHERE favourite_rank IS NOT NULL",
+    );
+    expect(new Set(ranks.map((r) => r.favourite_rank)).size).toBe(5);
+  });
+
+  it("Merge with no row changes still applies a backup favourite the phone lacks (D-113)", async () => {
+    const backup = await backupOf([{ uid: "same", favourite: true }]);
+    const phone = await db();
+    await seed(phone, [{ uid: "same" }]);
+    const before = await phone.getFirstAsync<{ revision: number }>(
+      "SELECT data_revision AS revision FROM app_settings WHERE id=1",
+    );
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+    });
+    expect(await favourites(phone)).toEqual(["same"]);
+    const after = await phone.getFirstAsync<{ revision: number }>(
+      "SELECT data_revision AS revision FROM app_settings WHERE id=1",
+    );
+    expect(after!.revision).toBeGreaterThan(before!.revision);
+  });
+
+  it("Replace-all takes exactly the backup's favourites (D-113)", async () => {
+    const backup = await backupOf([
+      { uid: "a", favourite: true },
+      { uid: "b" },
+      { uid: "c", favourite: true },
+    ]);
+    const phone = await db();
+    await seed(phone, [
+      { uid: "b", favourite: true },
+      { uid: "z", favourite: true },
+    ]);
+    expect(await applyRestore(phone, backup, "replace-all")).toMatchObject({
+      status: "applied",
+    });
+    expect(await favourites(phone)).toEqual(["a", "c"]);
+  });
+
+  it.each(["merge", "replace-all"] as const)(
+    "restores a legacy per-person mute as an indefinite snooze in %s, from any format (D-98, D-134)",
+    async (mode) => {
+      const current = await backupOf([
+        { uid: "muted", remindersOff: 1 },
+        { uid: "muted-dated", remindersOff: 1, snoozeUntil: "2026-09-30" },
+        { uid: "dated", snoozeUntil: "2026-09-30" },
+        { uid: "plain" },
+      ]);
+      // The same rows labelled as a format-8 file migrate forward first.
+      const v8 = JSON.parse(JSON.stringify(current));
+      v8.backupFormatVersion = 8;
+      for (const contact of v8.contacts) delete contact.favourite;
+      for (const manifest of [current, parseBackupManifest(v8)]) {
+        const phone = await db();
+        expect(await applyRestore(phone, manifest, mode)).toMatchObject({
+          status: "applied",
+        });
+        expect(
+          await phone.getAllAsync(
+            "SELECT uid,snooze_until AS snoozeUntil,reminders_off AS remindersOff FROM contacts ORDER BY uid",
+          ),
+        ).toEqual([
+          { uid: "dated", snoozeUntil: "2026-09-30", remindersOff: 0 },
+          { uid: "muted", snoozeUntil: "9999-12-31", remindersOff: 0 },
+          { uid: "muted-dated", snoozeUntil: "9999-12-31", remindersOff: 0 },
+          { uid: "plain", snoozeUntil: null, remindersOff: 0 },
+        ]);
+      }
+    },
+  );
+
+  it.each([
+    ["replace-all", { before: 2, restored: 2, removed: 1 }],
+    ["merge", { before: 2, restored: 2, removed: 0 }],
+  ] as const)(
+    "%s reports people: before, restored and removed (D-59)",
+    async (mode, people) => {
+      const backup = await backupOf([
+        { uid: "a" },
+        { uid: "d" },
+        { uid: "e", archived: true },
+      ]);
+      const phone = await db();
+      await seed(phone, [
+        { uid: "a" },
+        { uid: "b" },
+        { uid: "c", archived: true },
+      ]);
+      expect(await applyRestore(phone, backup, mode)).toMatchObject({
+        status: "applied",
+        people,
+      });
+    },
+  );
+
+  it("a Merge with nothing to write still reports people (D-59)", async () => {
+    const backup = await backupOf([{ uid: "a" }]);
+    const phone = await db();
+    await seed(phone, [{ uid: "a" }, { uid: "b" }]);
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+      inserted: 0,
+      people: { before: 2, restored: 1, removed: 0 },
+    });
+  });
+
+  it("reports the safety backup step and then the restoring step, in order (D-69)", async () => {
+    const backup = await backupOf([{ uid: "a" }]);
+    const phone = await db();
+    await phone.runAsync(
+      "UPDATE app_settings SET backup_folder_uri=? WHERE id=1",
+      ["content://configured"],
+    );
+    const steps: string[] = [];
+    const snapshot = vi.fn(async () => {
+      steps.push("snapshot ran");
+      return { status: "written" as const };
+    });
+    expect(
+      await applyRestore(phone, backup, "replace-all", {
+        createVerifiedPreRestoreSnapshot: snapshot,
+        onProgress: (step) => steps.push(step),
+      }),
+    ).toMatchObject({ status: "applied" });
+    expect(steps).toEqual(["safety-backup", "snapshot ran", "restoring"]);
+
+    const merged: string[] = [];
+    await applyRestore(phone, backup, "merge", {
+      onProgress: (step) => merged.push(step),
+    });
+    expect(merged).toEqual(["restoring"]);
+  });
+});
