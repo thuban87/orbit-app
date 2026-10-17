@@ -1,3 +1,5 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
+
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getCountries } from "libphonenumber-js";
@@ -7,13 +9,19 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { RegisteredModal } from "@/components/ui/RegisteredModal";
+import {
+  AppText,
+  EmptyState,
+  SettingsRow,
+  SettingsSectionCard,
+  Sheet,
+} from "@/components/ui";
+import { countryName } from "@/constants/country-names";
 import {
   type AppSettings,
   getAppSettings,
@@ -36,6 +44,8 @@ import { startContactImport } from "@/services/import/start-contact-import";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
   pickContacts,
@@ -53,13 +63,10 @@ import { contactImportMode } from "./use-contact-import-mode";
 
 const LOG_SCOPE = "settings-contacts-screen";
 
-const regionNames =
-  typeof Intl.DisplayNames === "function"
-    ? new Intl.DisplayNames(["en"], { type: "region" })
-    : null;
-
+// English names come from the bundled table (D-79): Hermes has no platform
+// region display-names API, so a runtime lookup showed bare codes on device.
 const PHONE_REGIONS = getCountries()
-  .map((code) => ({ code, name: regionNames?.of(code) ?? code }))
+  .map((code) => ({ code, name: countryName(code) }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
 /**
@@ -179,14 +186,20 @@ export function SettingsContactsScreen() {
     [reload],
   );
 
+  // Every way out of the region picker clears its search (D-79): a pick, the
+  // scrim, system Back.
+  const closePhoneRegionPicker = useCallback(() => {
+    setPhoneRegionPickerOpen(false);
+    setPhoneRegionSearch("");
+  }, []);
+
   const onSelectPhoneRegion = useCallback(
     async (region: string) => {
       if (await savePhoneRegionOverride(region)) {
-        setPhoneRegionPickerOpen(false);
-        setPhoneRegionSearch("");
+        closePhoneRegionPicker();
       }
     },
-    [savePhoneRegionOverride],
+    [savePhoneRegionOverride, closePhoneRegionPicker],
   );
 
   const filteredPhoneRegions = useMemo(() => {
@@ -219,32 +232,21 @@ export function SettingsContactsScreen() {
   const phoneRegionLabel = phoneRegionValueLabel(
     settings?.phoneRegionOverride ?? null,
     settings?.phoneRegionOverride
-      ? (regionNames?.of(settings.phoneRegionOverride) ??
-          settings.phoneRegionOverride)
+      ? countryName(settings.phoneRegionOverride)
       : null,
   );
 
   const renderRouteRow = (
     row: Extract<SettingsContactsRow, { kind: "route" }>,
   ) => (
-    <Pressable
+    <SettingsRow
       key={row.key}
       testID={`settings-contacts-${row.key}`}
-      accessibilityRole="button"
       accessibilityLabel={row.title}
+      title={row.title}
+      subtitle={row.subtitle}
       onPress={() => navigation.navigate(row.route)}
-      style={[
-        styles.row,
-        { backgroundColor: colors.surface, borderColor: colors.border },
-      ]}
-    >
-      <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-        {row.title}
-      </Text>
-      <Text style={[styles.helper, { color: colors.textSecondary }]}>
-        {row.subtitle}
-      </Text>
-    </Pressable>
+    />
   );
 
   const renderPermissionSurface = (
@@ -260,24 +262,16 @@ export function SettingsContactsScreen() {
         : granted
           ? "Contacts access is on. Import and linked-contact updates can read your phone contacts."
           : "Contacts access is off. Import and linked-contact updates stay available, but can't read your phone contacts until access is granted.";
+    // An info row (no chevron); its permission buttons sit under the status
+    // as the row's secondary content (D-119).
     return (
-      <View
+      <SettingsRow
         key={row.key}
         testID="settings-contacts-permission"
-        style={[
-          styles.row,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
+        title={row.title}
+        subtitle={status}
+        subtitleTestID="settings-contacts-permission-status"
       >
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-          {row.title}
-        </Text>
-        <Text
-          testID="settings-contacts-permission-status"
-          style={[styles.helper, { color: colors.textSecondary }]}
-        >
-          {status}
-        </Text>
         {needsSystemSettings ? (
           <Pressable
             testID="settings-contacts-permission-open-settings"
@@ -286,9 +280,9 @@ export function SettingsContactsScreen() {
             onPress={onOpenSystemSettings}
             style={[styles.inlineButton, { borderColor: colors.border }]}
           >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            <AppText role="label" style={{ color: colors.textPrimary }}>
               Open system settings
-            </Text>
+            </AppText>
           </Pressable>
         ) : null}
         {priming ? (
@@ -299,12 +293,12 @@ export function SettingsContactsScreen() {
             onPress={() => void onRequestContactsPermission()}
             style={[styles.inlineButton, { borderColor: colors.border }]}
           >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            <AppText role="label" style={{ color: colors.textPrimary }}>
               Allow Contacts access
-            </Text>
+            </AppText>
           </Pressable>
         ) : null}
-      </View>
+      </SettingsRow>
     );
   };
 
@@ -324,41 +318,18 @@ export function SettingsContactsScreen() {
     };
     const isPhoneRegion = row.action === "phone-region";
     return (
-      <Pressable
+      <SettingsRow
         key={row.key}
         testID={`settings-contacts-${row.key}`}
-        accessibilityRole="button"
         accessibilityLabel={
           isPhoneRegion ? `Phone number region, ${phoneRegionLabel}` : row.title
         }
-        accessibilityState={
-          isPhoneRegion ? { disabled: settings === null } : undefined
-        }
+        title={row.title}
+        subtitle={row.subtitle}
+        value={isPhoneRegion ? phoneRegionLabel : undefined}
         disabled={isPhoneRegion && settings === null}
         onPress={onPressForAction[row.action]}
-        style={[
-          styles.row,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        {isPhoneRegion ? (
-          <View style={styles.toggleRow}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              {row.title}
-            </Text>
-            <Text style={[styles.rowValue, { color: colors.accentText }]}>
-              {phoneRegionLabel}
-            </Text>
-          </View>
-        ) : (
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            {row.title}
-          </Text>
-        )}
-        <Text style={[styles.helper, { color: colors.textSecondary }]}>
-          {row.subtitle}
-        </Text>
-      </Pressable>
+      />
     );
   };
 
@@ -369,6 +340,8 @@ export function SettingsContactsScreen() {
     }
     return row.kind === "route" ? renderRouteRow(row) : renderActionRow(row);
   };
+
+  const phoneRegionTerm = phoneRegionSearch.trim();
 
   return (
     <View style={styles.root}>
@@ -381,19 +354,13 @@ export function SettingsContactsScreen() {
         ]}
       >
         {SETTINGS_CONTACTS_SECTIONS.map((section) => (
-          <View
+          <SettingsSectionCard
             key={section.key}
             testID={`settings-contacts-section-${section.key}`}
-            style={styles.section}
+            title={section.title}
           >
-            <Text
-              accessibilityRole="header"
-              style={[styles.sectionHeading, { color: colors.textSecondary }]}
-            >
-              {section.title}
-            </Text>
             {section.rows.map((row) => renderRow(row))}
-          </View>
+          </SettingsSectionCard>
         ))}
       </ScrollView>
 
@@ -403,80 +370,86 @@ export function SettingsContactsScreen() {
         onDiscarded={() => navigation.navigate("ReconcileGrid")}
       />
 
-      <RegisteredModal
+      {/* The region picker is the shared Sheet (D-79): it lifts above the
+          soft keyboard (Sheet keyboard layout, 38.4 D-72), and closing it any
+          way — a pick, the scrim, Back — clears the search. */}
+      <Sheet
         visible={phoneRegionPickerOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPhoneRegionPickerOpen(false)}
+        onRequestClose={closePhoneRegionPicker}
+        variant="expanded"
       >
-        <View style={styles.regionModalScrim}>
-          <View
-            testID="settings-phone-region-modal"
+        <View testID="settings-phone-region-modal" style={styles.regionRoot}>
+          <AppText role="heading" accessibilityRole="header">
+            Phone number region
+          </AppText>
+          <TextInput
+            testID="settings-phone-region-search"
+            accessibilityLabel="Search phone number regions"
+            value={phoneRegionSearch}
+            onChangeText={setPhoneRegionSearch}
+            placeholder="Search regions"
+            placeholderTextColor={colors.textPlaceholder}
+            autoCorrect={false}
             style={[
-              styles.regionModal,
-              { backgroundColor: colors.surfaceElevated },
+              styles.regionInput,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
             ]}
+          />
+          <Pressable
+            testID="settings-phone-region-device"
+            accessibilityRole="button"
+            accessibilityLabel="Use device region"
+            onPress={() => void onSelectPhoneRegion("")}
+            style={[styles.regionOption, { borderColor: colors.border }]}
           >
-            <Text
-              accessibilityRole="header"
-              style={[styles.title, { color: colors.textPrimary }]}
-            >
-              Phone number region
-            </Text>
-            <TextInput
-              testID="settings-phone-region-search"
-              accessibilityLabel="Search phone number regions"
-              value={phoneRegionSearch}
-              onChangeText={setPhoneRegionSearch}
-              placeholder="Search regions"
-              placeholderTextColor={colors.textPlaceholder}
-              autoCorrect={false}
-              style={[
-                styles.regionInput,
-                {
-                  color: colors.textPrimary,
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-            <Pressable
-              testID="settings-phone-region-device"
-              accessibilityRole="button"
-              accessibilityLabel="Use device region"
-              onPress={() => void onSelectPhoneRegion("")}
-              style={[styles.regionOption, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Use device region
-              </Text>
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                {getDeviceRegion() ?? "Unavailable"}
-              </Text>
-            </Pressable>
-            <FlatList
-              data={filteredPhoneRegions}
-              keyExtractor={(region) => region.code}
-              renderItem={({ item }) => (
-                <Pressable
-                  testID={`settings-phone-region-${item.code}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.name} (${item.code})`}
-                  accessibilityState={{
-                    selected: settings?.phoneRegionOverride === item.code,
-                  }}
-                  onPress={() => void onSelectPhoneRegion(item.code)}
-                  style={[styles.regionOption, { borderColor: colors.border }]}
-                >
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >{`${item.name} (${item.code})`}</Text>
-                </Pressable>
-              )}
-            />
-          </View>
+            <AppText role="label" style={{ color: colors.textPrimary }}>
+              Use device region
+            </AppText>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              {getDeviceRegion() ?? "Unavailable"}
+            </AppText>
+          </Pressable>
+          <FlatList
+            data={filteredPhoneRegions}
+            keyExtractor={(region) => region.code}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <EmptyState
+                testID="settings-phone-region-empty"
+                icon="search"
+                heading="No countries match"
+                term={phoneRegionTerm}
+                body="Try a different country name or code."
+                action={{
+                  label: "Clear search",
+                  onPress: () => setPhoneRegionSearch(""),
+                }}
+              />
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                testID={`settings-phone-region-${item.code}`}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.name} (${item.code})`}
+                accessibilityState={{
+                  selected: settings?.phoneRegionOverride === item.code,
+                }}
+                onPress={() => void onSelectPhoneRegion(item.code)}
+                style={[styles.regionOption, { borderColor: colors.border }]}
+              >
+                <AppText
+                  role="label"
+                  style={{ color: colors.textPrimary }}
+                >{`${item.name} (${item.code})`}</AppText>
+              </Pressable>
+            )}
+          />
         </View>
-      </RegisteredModal>
+      </Sheet>
     </View>
   );
 }
@@ -484,76 +457,30 @@ export function SettingsContactsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: {
-    padding: 16,
-    gap: 12,
-  },
-  section: {
-    gap: 12,
-  },
-  sectionHeading: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  row: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  rowLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  rowValue: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  helper: {
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 18,
+    padding: SPACING.base,
+    gap: SPACING.lg,
   },
   inlineButton: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: RADII.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    minHeight: 44,
+    justifyContent: "center",
     alignSelf: "flex-start",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
+  regionRoot: { flex: 1, gap: SPACING.md },
   regionInput: {
+    minHeight: 44,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
-  regionModalScrim: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  regionModal: {
-    maxHeight: "80%",
-    gap: 12,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    padding: 16,
+    borderRadius: RADII.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
   regionOption: {
     minHeight: 44,
     justifyContent: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 10,
+    paddingVertical: SPACING.sm,
   },
 });
