@@ -1,32 +1,45 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { File, Paths } from "expo-file-system";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { loadCachedOpenRouterCatalog } from "@/ai/openrouter-catalog";
 import { AIFirstUseDisclosure } from "@/components/AIFirstUseDisclosure";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { OrbitSwitch } from "@/components/ui";
+import {
+  AppText,
+  OrbitSwitch,
+  SettingsRow,
+  SettingsSectionCard,
+} from "@/components/ui";
+import { USE_AI_SUGGESTIONS } from "@/constants/glossary";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import { updateAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import {
-  type AiAvailability,
-  readCredentialPresence,
-} from "@/logic/ai-availability";
+import { readCredentialPresence } from "@/logic/ai-availability";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { aiKeyStore } from "@/services/ai-key-store";
 import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
+  type AiHubSection,
+  type AiHubSnapshot,
+  aiHubRowDisplay,
   buildAiEnabledPatch,
   deriveAiHubState,
-  loadAiHubAvailability,
+  loadAiHubSnapshot,
 } from "./settings-ai-hub-logic";
 
 const LOG_SCOPE = "settings-ai-screen";
+const LOAD_ERROR = "Couldn't load AI settings. Please try again.";
+
+function hubRowTestID(section: AiHubSection): string {
+  return `settings-ai-entry-${section.label.toLowerCase().replaceAll(" ", "-")}`;
+}
 
 /**
  * AI category screen (§J / D-09). A top-level Settings category that routes into
@@ -37,13 +50,19 @@ const LOG_SCOPE = "settings-ai-screen";
  * (`buildAiEnabledPatch`) and does NOT widen AI egress: `AiService.ts` is
  * untouched and the master control cannot mutate saved AI config.
  *
- * The hub derives from a POPULATED availability, not a default: on focus it runs
- * the migrated availability HYDRATION pipeline (`loadAiHubAvailability`) — hydrate
- * config → resolve the active connection → read credential presence → read the
- * cached OpenRouter catalog from disk → `computeAiHubAvailability` — feeds the
- * result to `deriveAiHubState`, and carries the focus-load error path. This is
- * read-path hydration of already-stored config; the catalog read is the LOCAL
- * cache file — NO real AI provider network call (local-first; no new egress).
+ * The hub derives from a POPULATED snapshot, not a default: on focus it runs
+ * the migrated HYDRATION pipeline (`loadAiHubSnapshot`) — hydrate config →
+ * resolve the active connection → read credential presence → read the cached
+ * OpenRouter catalog from disk → `computeAiHubAvailability` — feeds the result
+ * to `deriveAiHubState` and the row values (`aiHubRowDisplay`: provider · model
+ * and readiness, 38.12 D-85), and carries the focus-load error path, which a
+ * good reload clears (D-88). This is read-path hydration of already-stored
+ * config; the catalog read is the LOCAL cache file — NO real AI provider
+ * network call (local-first; no new egress).
+ *
+ * The master switch reads "Use AI suggestions" (D-130). One "Style and
+ * Context" row opens the personalization page at the top (D-126). Rows are the
+ * shared `SettingsRow` inside `SettingsSectionCard` (D-119).
  *
  * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
  * AUD-UIA-016, D-15): no duplicate in-body Back.
@@ -63,15 +82,20 @@ export function SettingsAIScreen() {
   const aiHydrated = useAiConfigStore((state) => state.hydrated);
   const hydrateAiConfig = useAiConfigStore((state) => state.hydrate);
   const [aiHubError, setAiHubError] = useState<string | null>(null);
-  const [aiAvailability, setAiAvailability] = useState<AiAvailability>("off");
-  const aiHubState = deriveAiHubState(aiEnabled, aiAvailability);
+  const [aiHubSnapshot, setAiHubSnapshot] = useState<AiHubSnapshot | null>(
+    null,
+  );
+  const aiHubState = deriveAiHubState(
+    aiEnabled,
+    aiHubSnapshot?.availability ?? "off",
+  );
 
-  // Fresh-on-focus availability hydration (migrated `reloadAiAvailability`),
-  // routed through the injectable `loadAiHubAvailability` producer. The catalog
-  // step reads ONLY the local on-disk cache file; the picker owns refresh writes.
+  // Fresh-on-focus hydration (migrated `reloadAiAvailability`), routed through
+  // the injectable `loadAiHubSnapshot` producer. The catalog step reads ONLY
+  // the local on-disk cache file; the picker owns refresh writes.
   const loadAvailability = useCallback(async () => {
-    setAiAvailability(
-      await loadAiHubAvailability(getExecutor(), {
+    setAiHubSnapshot(
+      await loadAiHubSnapshot(getExecutor(), {
         hydrateAiConfig,
         getAiConfig: () => ({
           aiEnabled: useAiConfigStore.getState().aiEnabled,
@@ -98,12 +122,17 @@ export function SettingsAIScreen() {
     );
   }, [hydrateAiConfig]);
 
+  // Each focus reload starts clean and a good one leaves no error behind
+  // (D-88): a stale "Couldn't load" never outlives the load that fixed it.
   useFocusEffect(
     useCallback(() => {
-      void loadAvailability().catch((error) => {
-        Logger.error(LOG_SCOPE, "failed to load AI configuration", error);
-        setAiHubError("Couldn't load AI settings. Please try again.");
-      });
+      setAiHubError(null);
+      void loadAvailability()
+        .then(() => setAiHubError(null))
+        .catch((error) => {
+          Logger.error(LOG_SCOPE, "failed to load AI configuration", error);
+          setAiHubError(LOAD_ERROR);
+        });
     }, [loadAvailability]),
   );
 
@@ -128,6 +157,31 @@ export function SettingsAIScreen() {
     [loadAvailability],
   );
 
+  function openSection(section: AiHubSection) {
+    switch (section.route) {
+      case "AIConnection":
+        navigation.navigate("AIConnection");
+        break;
+      case "AIModelPicker":
+        if (activeAiConnection === null) {
+          navigation.navigate("AIConnection");
+        } else {
+          navigation.navigate("AIModelPicker", { lane: activeAiConnection });
+        }
+        break;
+      case "AIPersonalization":
+        // Style and Context opens the page at the top: no section target.
+        navigation.navigate("AIPersonalization");
+        break;
+      case "AIPermissions":
+        navigation.navigate("AIPermissions");
+        break;
+      case "AIPreview":
+        navigation.navigate("AIPreview");
+        break;
+    }
+  }
+
   return (
     <View style={styles.root}>
       <ShellAppBar variant="child" title="AI" />
@@ -142,139 +196,66 @@ export function SettingsAIScreen() {
             app_settings.ai_enabled; every connection, model, personalization
             section, and permission survives the off state. */}
         <View testID="settings-ai-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            AI message suggestions
-          </Text>
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                AI Enabled
-              </Text>
-              <OrbitSwitch
-                testID="settings-ai-enabled"
-                accessibilityLabel="AI Enabled"
-                disabled={!aiHydrated}
-                value={aiEnabled}
-                onValueChange={(enabled) => void onToggleAi(enabled)}
-              />
-            </View>
-          </View>
+          <SettingsSectionCard title="AI message suggestions">
+            <SettingsRow
+              title={USE_AI_SUGGESTIONS}
+              trailing={
+                <OrbitSwitch
+                  testID="settings-ai-enabled"
+                  accessibilityLabel={USE_AI_SUGGESTIONS}
+                  disabled={!aiHydrated}
+                  value={aiEnabled}
+                  onValueChange={(enabled) => void onToggleAi(enabled)}
+                />
+              }
+            />
+          </SettingsSectionCard>
 
           {!aiHydrated ? (
-            <Text
+            <AppText
+              role="caption"
               testID="settings-ai-loading"
-              style={[styles.helper, { color: colors.textSecondary }]}
+              style={{ color: colors.textSecondary }}
             >
               Loading AI settings…
-            </Text>
+            </AppText>
           ) : aiHubState.showSimplified ? (
-            <View
-              testID="settings-ai-off-state"
-              style={[
-                styles.row,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                AI is off. Your connections, models, personalization, and
-                permissions are saved and will return when you turn AI back on.
-              </Text>
-              <Pressable
+            <SettingsSectionCard testID="settings-ai-off-state">
+              <SettingsRow
+                title="Manage saved connections"
+                subtitle="AI is off. Your connections, models, personalization, and permissions are saved and will return when you turn AI back on."
                 testID="settings-ai-manage-saved"
-                accessibilityRole="button"
                 accessibilityLabel="Manage saved connections"
                 onPress={() => navigation.navigate("AIConnection")}
-                style={[styles.aiButton, { borderColor: colors.border }]}
-              >
-                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                  Manage saved connections
-                </Text>
-              </Pressable>
-            </View>
+              />
+            </SettingsSectionCard>
           ) : (
-            <View testID="settings-ai-expanded" style={styles.section}>
-              {aiHubState.sections.map((section) => (
-                <Pressable
-                  key={section.label}
-                  testID={`settings-ai-entry-${section.label
-                    .toLowerCase()
-                    .replaceAll(" ", "-")}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={section.label}
-                  onPress={() => {
-                    switch (section.route) {
-                      case "AIConnection":
-                        navigation.navigate("AIConnection");
-                        break;
-                      case "AIModelPicker":
-                        if (activeAiConnection === null) {
-                          navigation.navigate("AIConnection");
-                        } else {
-                          navigation.navigate("AIModelPicker", {
-                            lane: activeAiConnection,
-                          });
-                        }
-                        break;
-                      case "AIPersonalization":
-                        navigation.navigate(
-                          "AIPersonalization",
-                          section.params,
-                        );
-                        break;
-                      case "AIPermissions":
-                        navigation.navigate("AIPermissions");
-                        break;
-                      case "AIPreview":
-                        navigation.navigate("AIPreview");
-                        break;
-                    }
-                  }}
-                  style={[
-                    styles.row,
-                    styles.aiHubRow,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    numberOfLines={2}
-                    style={[
-                      styles.rowLabel,
-                      styles.aiHubLabel,
-                      { color: colors.textPrimary },
-                    ]}
-                  >
-                    {section.label}
-                  </Text>
-                  <Text
-                    accessibilityElementsHidden
-                    style={[styles.chevron, { color: colors.textSecondary }]}
-                  >
-                    ›
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <SettingsSectionCard testID="settings-ai-expanded">
+              {aiHubState.sections.map((section) => {
+                const display = aiHubRowDisplay(section, aiHubSnapshot);
+                return (
+                  <SettingsRow
+                    key={section.label}
+                    testID={hubRowTestID(section)}
+                    title={section.label}
+                    value={display.value}
+                    subtitle={display.subtitle}
+                    onPress={() => openSection(section)}
+                  />
+                );
+              })}
+            </SettingsSectionCard>
           )}
 
           {aiHubError ? (
-            <Text
+            <AppText
+              role="caption"
               testID="settings-ai-error"
               accessibilityRole="alert"
-              style={[styles.helper, { color: colors.danger }]}
+              style={{ color: colors.danger }}
             >
               {aiHubError}
-            </Text>
+            </AppText>
           ) : null}
 
           <AIFirstUseDisclosure />
@@ -287,55 +268,10 @@ export function SettingsAIScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: SPACING.base,
+    gap: SPACING.md,
   },
   section: {
-    gap: 12,
-  },
-  sectionHeading: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  row: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  rowLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  helper: {
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 18,
-  },
-  aiButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignSelf: "flex-start",
-  },
-  aiHubRow: {
-    alignItems: "center",
-    flexDirection: "row",
-  },
-  aiHubLabel: {
-    flex: 1,
-  },
-  chevron: {
-    fontSize: 20,
-    fontWeight: "600",
+    gap: SPACING.md,
   },
 });

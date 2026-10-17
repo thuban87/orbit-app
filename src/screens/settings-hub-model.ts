@@ -137,7 +137,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     kind: "route",
     key: "ai",
     title: "AI",
-    subtitle: "Connection, model, personalization, and data permissions",
+    subtitle: "Connection, model, style and context, and data permissions",
     icon: "sparkle",
     route: "SettingsAI",
   },

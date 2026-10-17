@@ -222,10 +222,9 @@ describe("Settings → AI hub rows (38.12 D-85, D-126, D-119)", () => {
 
   it("Style and Context opens the personalization page with no section target", () => {
     const tree = render({ snapshot: SNAPSHOT });
-    (
-      row(tree, "settings-ai-entry-style-and-context")?.props
-        .onPress as () => void
-    )();
+    const styleAndContext = row(tree, "settings-ai-entry-style-and-context");
+    if (!styleAndContext) throw new Error("no Style and Context row");
+    (styleAndContext.props.onPress as () => void)();
     expect(nav.navigate).toHaveBeenCalledTimes(1);
     expect(nav.navigate.mock.calls[0]).toEqual(["AIPersonalization"]);
   });

@@ -10,6 +10,15 @@ import {
 } from "@/logic/ai-availability";
 import type { AiCloudProviderId } from "@/services/ai-types";
 
+/** The user-facing name of each AI connection lane. */
+export const AI_LANE_NAMES: Readonly<Record<AiCloudProviderId, string>> = {
+  openrouter: "OpenRouter",
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  google: "Google Gemini",
+  custom: "Custom Endpoint",
+};
+
 export interface ConnectionSwitchState {
   readonly activeLane: AiCloudProviderId | null;
   readonly pendingLane: AiCloudProviderId | null;

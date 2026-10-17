@@ -32,6 +32,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
+  AI_LANE_NAMES,
   type ConnectionCardState,
   type CredentialDraft,
   CustomCredentialCompensationError,
@@ -49,13 +50,7 @@ import { CUSTOM_RETENTION_CAVEAT } from "./settings-ai-logic";
 const LOG_SCOPE = "ai-connections";
 const LOAD_ERROR = "Couldn't load saved AI connections.";
 const DIRECT_LANES = ["openai", "anthropic", "google"] as const;
-const LANE_NAMES: Record<AiCloudProviderId, string> = {
-  openrouter: "OpenRouter",
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  google: "Google Gemini",
-  custom: "Custom Endpoint",
-};
+const LANE_NAMES = AI_LANE_NAMES;
 
 export interface AIConnectionScreenProps {
   onChooseModel: (lane: AiCloudProviderId) => void;
