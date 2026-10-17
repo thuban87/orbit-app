@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { MatchChoiceSheet } from "@/components/MatchChoiceSheet";
 import {
   type BulkAction,
-  CandidateCardGrid,
   type CandidateChoice,
   type CandidateItem,
-} from "@/components/CandidateCardGrid";
-import { ExistingContactChoiceSheet } from "@/components/ExistingContactChoice";
+  ReviewMatchesList,
+} from "@/components/ReviewMatchesList";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -193,23 +193,32 @@ export function DuplicateReviewScreen({
     );
   }
 
-  async function resolveAction(action: BulkAction, items: CandidateItem[]) {
+  /**
+   * Resolves the given rows. "link" only opens MatchChoiceSheet over them
+   * (the latched link write is `chooseLink`, A-2); "import-new" and "skip"
+   * run one latched write over every row (ADR-168). Resolves true when the
+   * write ran and no row failed, so the sheet can confirm one person.
+   */
+  async function resolveAction(
+    action: BulkAction,
+    items: CandidateItem[],
+  ): Promise<boolean> {
     const selected = reviewItems.filter((entry) =>
       items.some((item) => item.id === entry.item.id),
     );
     if (action === "link") {
       setCurrentLink(selected[0] ?? null);
       setLinkQueue(selected.slice(1));
-      return;
+      return true;
     }
-    if (!session) return;
+    if (!session) return false;
     let importedAny = false;
     // Per-row failures are collected and shown as ONE snackbar after the
     // loop (38.9 D-27), never one dialog per failing row.
     const failures: string[] = [];
     // Only a row's own write can fail its resolve; the trailing finalize and
     // re-read go to the read error + read-only Retry (D-04).
-    await runLatchedWrite(() =>
+    const ran = await runLatchedWrite(() =>
       runBulkResolveThenRecover({
         entries: selected,
         writeOne: async (entry) => {
@@ -264,6 +273,7 @@ export function DuplicateReviewScreen({
     ) {
       void applyBoundImportEffects(getExecutor());
     }
+    return ran && failures.length === 0;
   }
 
   async function chooseLink(choice: CandidateChoice) {
@@ -292,6 +302,11 @@ export function DuplicateReviewScreen({
           });
         },
         onWritten: () => {
+          // D-107 / D-04: confirmed only once the link has committed.
+          showSnackbar({
+            kind: "success",
+            label: `Linked ${linking.item.name} to ${choice.name}`,
+          });
           setCurrentLink(next);
           setLinkQueue((queue) => queue.slice(1));
         },
@@ -300,6 +315,40 @@ export function DuplicateReviewScreen({
         onRecoveryError: onReadError,
       }),
     );
+  }
+
+  /**
+   * MatchChoiceSheet's Import as new / Skip settle the shown person through
+   * the same latched `resolveAction` (D-51), confirm with a snackbar only
+   * when that row's write did not fail, then advance to the next queued
+   * person or close.
+   */
+  async function settleCurrent(action: "import-new" | "skip") {
+    if (!currentLink) return;
+    const settling = currentLink;
+    const ok = await resolveAction(action, [settling.item]);
+    if (!ok) return;
+    showSnackbar({
+      kind: "success",
+      label:
+        action === "import-new"
+          ? `Imported ${settling.item.name}`
+          : `Skipped ${settling.item.name}`,
+    });
+    setCurrentLink(linkQueue[0] ?? null);
+    setLinkQueue((queue) => queue.slice(1));
+  }
+
+  /**
+   * Cancel, scrim and Back (D-52): close the sheet AND drop any pending
+   * queue, so a later tap never resumes a stale bulk link. Held while a write
+   * is in flight; that write's own advance would otherwise reopen the sheet
+   * after the close (T-38.12-19).
+   */
+  function closeSheet() {
+    if (writeInFlight.current) return;
+    setCurrentLink(null);
+    setLinkQueue([]);
   }
 
   const view = duplicateReviewView({
@@ -313,13 +362,12 @@ export function DuplicateReviewScreen({
     <View style={styles.root}>
       <ShellAppBar variant="child" title="Review matches" />
       {view === "loading" ? (
-        <CandidateCardGrid
+        <ReviewMatchesList
           items={[]}
           bulkActions={[]}
-          onInspect={() => undefined}
-          onBulkAction={() => undefined}
-          recommendationExcludes="needs_review"
-          scoring
+          onInspect={() => {}}
+          onBulkAction={() => {}}
+          loading
         />
       ) : view === "error" ? (
         <View testID="duplicate-review-error" style={styles.empty}>
@@ -349,20 +397,33 @@ export function DuplicateReviewScreen({
           </Text>
         </View>
       ) : (
-        <CandidateCardGrid
+        <ReviewMatchesList
           items={reviewItems.map((entry) => entry.item)}
           bulkActions={["link", "import-new", "skip"]}
-          onInspect={() => undefined}
-          onBulkAction={resolveAction}
-          recommendationExcludes="needs_review"
+          onInspect={(item) => {
+            // D-51: a single tap settles that one person, with no queue.
+            const entry = reviewItems.find(
+              (candidate) => candidate.item.id === item.id,
+            );
+            if (!entry) return;
+            setCurrentLink(entry);
+            setLinkQueue([]);
+          }}
+          onBulkAction={async (action, items) => {
+            await resolveAction(action, items);
+          }}
         />
       )}
-      <ExistingContactChoiceSheet
+      <MatchChoiceSheet
         visible={currentLink !== null}
+        entryKey={currentLink?.item.id ?? null}
+        personName={currentLink?.item.name ?? ""}
         choices={currentChoices}
         writing={writing}
-        onChoose={(choice) => void chooseLink(choice)}
-        onClose={() => setCurrentLink(null)}
+        onLink={(choice) => void chooseLink(choice)}
+        onImportNew={() => void settleCurrent("import-new")}
+        onSkip={() => void settleCurrent("skip")}
+        onClose={closeSheet}
       />
     </View>
   );

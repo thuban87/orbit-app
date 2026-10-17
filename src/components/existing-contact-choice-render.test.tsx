@@ -1,21 +1,46 @@
 import type { ReactElement, ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 
 /**
- * Shallow render of the import duplicate choices (38.6 D-25 F-1): each
- * existing Orbit contact a user can link to shows its photo (or initials)
- * through `Avatar` beside its name, in Duplicate review's "Choose an existing
- * contact" sheet and Import review's "might already be in Orbit" choices.
+ * Review matches' per-person sheet (38.12 D-107, D-52) and Import review's
+ * link choice (38.6 D-25 F-1).
+ *
+ * `MatchChoiceSheet` replaced Duplicate review's centred "Choose an existing
+ * contact" modal: a bottom sheet titled with the incoming person, the
+ * candidate Orbit contacts as single-choice rows (Avatar, name, evidence),
+ * then Link (enabled once a candidate is picked), Import as new, Skip and
+ * Cancel. It renders through a STATEFUL hook store (state persists across
+ * renders, a setter updates its slot, `render()` re-runs the component), so a
+ * pick then Link behaves as on device.
  */
 
-// 38.9 D-24: raw RN Modal sites render through RegisteredModal; the window
-// itself is unchanged, so the wrapper is the mocked RN Modal here.
-vi.mock("@/components/ui/RegisteredModal", () => ({
-  RegisteredModal: "Modal",
+const hooks = vi.hoisted(() => ({
+  stateIndex: 0,
+  states: [] as unknown[],
+  setters: [] as ((value: unknown) => void)[],
+}));
+
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
+  useState: (value: unknown) => {
+    const slot = hooks.stateIndex++;
+    if (!(slot in hooks.states)) {
+      hooks.states[slot] =
+        typeof value === "function" ? (value as () => unknown)() : value;
+    }
+    if (!hooks.setters[slot]) {
+      hooks.setters[slot] = (next: unknown) => {
+        hooks.states[slot] =
+          typeof next === "function"
+            ? (next as (current: unknown) => unknown)(hooks.states[slot])
+            : next;
+      };
+    }
+    return [hooks.states[slot], hooks.setters[slot]];
+  },
 }));
 vi.mock("react-native", () => ({
-  Modal: "Modal",
   Pressable: "Pressable",
   Text: "Text",
   View: "View",
@@ -26,16 +51,24 @@ vi.mock("react-native", () => ({
   },
 }));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
+vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
+vi.mock("@/components/ui", () => ({
+  AppText: "AppText",
+  Button: "Button",
+  Sheet: "Sheet",
+}));
 vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
 
-const {
-  EXISTING_CONTACT_AVATAR_SIZE,
-  ExistingContactChoiceSheet,
-  LinkExistingChoiceButton,
-} = await import("./ExistingContactChoice");
+const { EXISTING_CONTACT_AVATAR_SIZE, LinkExistingChoiceButton } = await import(
+  "./ExistingContactChoice"
+);
+const { MATCH_CHOICE_EMPTY_COPY, MatchChoiceSheet } = await import(
+  "./MatchChoiceSheet"
+);
 type CandidateChoice = import("./CandidateCardGrid").CandidateChoice;
+type MatchChoiceSheetProps = import("./MatchChoiceSheet").MatchChoiceSheetProps;
 
 const colors = THEME_PRESETS.galaxy.dark;
 
@@ -84,20 +117,48 @@ const CHOICES: CandidateChoice[] = [
   },
 ];
 
-function sheet(
-  overrides: Partial<Parameters<typeof ExistingContactChoiceSheet>[0]> = {},
-) {
-  return nodes(
-    ExistingContactChoiceSheet({
-      visible: true,
-      choices: CHOICES,
-      writing: false,
-      onChoose: () => {},
-      onClose: () => {},
-      ...overrides,
-    }),
+let props: MatchChoiceSheetProps;
+
+function render(overrides: Partial<MatchChoiceSheetProps> = {}) {
+  props = { ...props, ...overrides };
+  hooks.stateIndex = 0;
+  return nodes(MatchChoiceSheet(props));
+}
+
+function radios(tree: TestElement[]) {
+  return tree.filter(
+    (node) =>
+      node.type === "Pressable" && node.props.accessibilityRole === "radio",
   );
 }
+
+function buttonIn(tree: TestElement[], label: string): TestElement {
+  const found = tree.find(
+    (node) => node.type === "Button" && node.props.label === label,
+  );
+  if (!found) throw new Error(`no ${label} button`);
+  return found;
+}
+
+function press(node: TestElement) {
+  (node.props.onPress as () => void)();
+}
+
+beforeEach(() => {
+  hooks.states = [];
+  hooks.setters = [];
+  props = {
+    visible: true,
+    entryKey: 31,
+    personName: "Ann Lee",
+    choices: CHOICES,
+    writing: false,
+    onLink: vi.fn(),
+    onImportNew: vi.fn(),
+    onSkip: vi.fn(),
+    onClose: vi.fn(),
+  };
+});
 
 describe("EXISTING_CONTACT_AVATAR_SIZE", () => {
   it("matches the Pending confirmations avatar (40)", () => {
@@ -105,111 +166,113 @@ describe("EXISTING_CONTACT_AVATAR_SIZE", () => {
   });
 });
 
-describe("ExistingContactChoiceSheet (38.6 D-25 F-1)", () => {
-  it("keeps the modal shell: fade, transparent, closes through onClose", () => {
-    const onClose = vi.fn();
-    const modal = sheet({ onClose }).find((node) => node.type === "Modal");
-    expect(modal?.props).toMatchObject({
-      visible: true,
-      transparent: true,
-      animationType: "fade",
-    });
-    ((modal as TestElement).props.onRequestClose as () => void)();
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(
-      sheet().some(
-        (node) =>
-          node.type === "Text" && textOf(node) === "Choose an existing contact",
-      ),
-    ).toBe(true);
+describe("MatchChoiceSheet (38.12 D-107)", () => {
+  it("is a bottom Sheet (not a centred modal) titled with the incoming person", () => {
+    const tree = render();
+    const sheet = tree.find((node) => node.type === "Sheet");
+    expect(sheet?.props.visible).toBe(true);
+    expect(tree.some((node) => node.type === "Modal")).toBe(false);
+    const heading = tree.find(
+      (node) => node.type === "AppText" && node.props.role === "heading",
+    );
+    expect(textOf(heading)).toBe("Ann Lee");
   });
 
-  it("renders one button per choice with the Avatar first, then name and hint", () => {
-    const pressables = sheet().filter((node) => node.type === "Pressable");
-    expect(pressables).toHaveLength(2);
-    const rows = pressables.map((pressable) => {
-      const tree = nodes(pressable.props.children as ReactNode);
+  it("lists every candidate as a radio row: Avatar, name, evidence; label = name + evidence", () => {
+    const rows = radios(render()).map((row) => {
+      const tree = nodes(row.props.children as ReactNode);
       const avatar = tree.find((node) => node.type === "Avatar");
-      const texts = tree.filter((node) => node.type === "Text").map(textOf);
-      const first = (
-        Array.isArray(pressable.props.children)
-          ? pressable.props.children
-          : [pressable.props.children]
-      ) as TestElement[];
       return {
-        firstChild: first[0]?.type,
         avatar: [
           avatar?.props.photo,
           avatar?.props.name,
           avatar?.props.contactId,
           avatar?.props.size,
         ],
-        texts,
-        role: pressable.props.accessibilityRole,
-        label: pressable.props.accessibilityLabel,
+        texts: tree.filter((node) => node.type === "AppText").map(textOf),
+        label: row.props.accessibilityLabel,
+        checked: (row.props.accessibilityState as { checked: boolean }).checked,
       };
     });
     expect(rows).toEqual([
       {
-        firstChild: "Avatar",
         avatar: ["avatars/contact-4.jpg", "Sam Carter", 4, 40],
         texts: ["Sam Carter", "Matching phone number"],
-        role: "button",
         label: "Sam Carter, Matching phone number",
+        checked: false,
       },
       {
-        firstChild: "Avatar",
         avatar: [null, "Sam Wilson", 9, 40],
         texts: ["Sam Wilson", "Similar name"],
-        role: "button",
         label: "Sam Wilson, Similar name",
+        checked: false,
       },
     ]);
   });
 
-  it("disables every choice while a write is in flight", () => {
-    for (const writing of [false, true]) {
-      const pressables = sheet({ writing }).filter(
-        (node) => node.type === "Pressable",
-      );
-      for (const pressable of pressables) {
-        expect(pressable.props.disabled).toBe(writing);
-        expect(pressable.props.accessibilityState).toEqual({
-          disabled: writing,
-        });
-      }
-    }
-  });
-
-  it("pressing a choice calls onChoose with that choice", () => {
-    const onChoose = vi.fn();
-    const pressables = sheet({ onChoose }).filter(
-      (node) => node.type === "Pressable",
-    );
-    ((pressables[1] as TestElement).props.onPress as () => void)();
-    expect(onChoose).toHaveBeenCalledWith(CHOICES[1]);
-  });
-
-  it("shows the unavailable line and no Avatar when no choice remains", () => {
-    const tree = sheet({ choices: [] });
-    expect(tree.some((node) => node.type === "Avatar")).toBe(false);
-    expect(tree.some((node) => node.type === "Pressable")).toBe(false);
+  it("Link is disabled until a candidate is picked, then links that candidate", () => {
+    let tree = render();
+    expect(buttonIn(tree, "Link").props.disabled).toBe(true);
+    press(radios(tree)[1] as TestElement);
+    tree = render();
     expect(
-      tree.some(
-        (node) =>
-          node.type === "Text" &&
-          textOf(node) === "This matching contact is no longer available.",
+      (
+        (radios(tree)[1] as TestElement).props.accessibilityState as {
+          checked: boolean;
+        }
+      ).checked,
+    ).toBe(true);
+    const link = buttonIn(tree, "Link");
+    expect(link.props.disabled).toBe(false);
+    press(link);
+    expect(props.onLink).toHaveBeenCalledWith(CHOICES[1]);
+  });
+
+  it("a pick never carries over to the next queued person", () => {
+    press(radios(render())[0] as TestElement);
+    expect(buttonIn(render(), "Link").props.disabled).toBe(false);
+    const tree = render({ entryKey: 32, personName: "Bo Ray" });
+    expect(buttonIn(tree, "Link").props.disabled).toBe(true);
+    expect(
+      radios(tree).every(
+        (row) =>
+          !(row.props.accessibilityState as { checked: boolean }).checked,
       ),
     ).toBe(true);
   });
 
-  it("does not show the unavailable line while choices remain", () => {
-    expect(
-      sheet().some(
-        (node) =>
-          textOf(node) === "This matching contact is no longer available.",
-      ),
-    ).toBe(false);
+  it("Import as new, Skip and Cancel call their handlers; scrim/Back is onClose", () => {
+    const tree = render();
+    press(buttonIn(tree, "Import as new"));
+    press(buttonIn(tree, "Skip"));
+    press(buttonIn(tree, "Cancel"));
+    expect(props.onImportNew).toHaveBeenCalledTimes(1);
+    expect(props.onSkip).toHaveBeenCalledTimes(1);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    const sheet = tree.find((node) => node.type === "Sheet") as TestElement;
+    (sheet.props.onRequestClose as () => void)();
+    expect(props.onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("holds every control while a write is in flight (T-38.12-20)", () => {
+    press(radios(render())[0] as TestElement);
+    const tree = render({ writing: true });
+    for (const label of ["Link", "Import as new", "Skip", "Cancel"]) {
+      expect(buttonIn(tree, label).props.disabled, label).toBe(true);
+    }
+    for (const row of radios(tree)) {
+      expect(row.props.disabled).toBe(true);
+    }
+  });
+
+  it("with no candidate left it says so and offers no radio", () => {
+    const tree = render({ choices: [] });
+    expect(radios(tree)).toHaveLength(0);
+    expect(tree.some((node) => textOf(node) === MATCH_CHOICE_EMPTY_COPY)).toBe(
+      true,
+    );
+    expect(buttonIn(tree, "Link").props.disabled).toBe(true);
+    expect(buttonIn(tree, "Import as new").props.disabled).toBe(false);
   });
 });
 
