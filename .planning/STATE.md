@@ -5,10 +5,10 @@ milestone_name: Release Readiness
 current_phase: 38.12
 current_phase_name: People Lifecycle, Import & Settings UX
 status: executing
-stopped_at: Phase 38.12 planned (26 plans, 7 waves; plan check passed with 2 inline fixes)
+stopped_at: Phase 38.12 planned and converged (26 plans, 7 waves; cross-AI convergence 5 cycles + close-out, final re-verify 0/0 both lanes)
 last_updated: "2026-10-17T08:15:00.333Z"
 last_activity: 2026-10-17
-last_activity_desc: Phase 38.12 planned
+last_activity_desc: Phase 38.12 plan-review convergence complete
 state_head: b26e7893a28e7a495fb53c26825c3670b0497d7a
 progress:
   total_phases: 38
