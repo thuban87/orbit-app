@@ -42,9 +42,9 @@ export interface ProfileStatusInput {
   readonly rarelyResponds: number;
   readonly rogueReason: RogueReason;
   /**
-   * The contact is archived. Consulted only inside the unavailable branch so an
-   * archived contact keeps exactly its pre-38.11 result (38.11 D-23; 38.12 owns
-   * the archived arm).
+   * The contact is in the Bin. Checked before any live status: a binned
+   * person reads "In the Bin", never a live bucket (38.12 D-35; ADR-228 left
+   * the archived arm to this phase).
    */
   readonly archived: boolean;
 }
@@ -60,13 +60,16 @@ export type ProfileStatusUnavailableReason =
   | "no-frequency"
   | "not-contacted";
 
-/** Unavailable Status label for archived, Unbound and no-frequency contacts. */
+/** Unavailable Status label for Unbound and no-frequency contacts. */
 export const STATUS_NOT_TRACKED = "Not tracked";
 
-/**
- * Pre-38.11 unavailable context. Still the archived result (D-23) and the
- * Bound-without-frequency reason.
- */
+/** A binned person's Status label (38.12 D-35). */
+export const STATUS_IN_THE_BIN = "In the Bin";
+/** A binned person's Status context (38.12 D-35). */
+export const STATUS_CONTEXT_IN_THE_BIN =
+  "Orbit Status is paused while they're in the Bin.";
+
+/** The Bound-without-frequency context (pre-38.11 literal). */
 export const STATUS_CONTEXT_SET_FREQUENCY =
   "Set a contact frequency to see Orbit Status.";
 /** Unbound with a frequency (D-24): the frequency exists, binding is missing. */
@@ -89,7 +92,10 @@ export const STATUS_CONTEXT_NOT_CONTACTED_RARELY_RESPONDS =
 export type ProfileStatusMetric =
   | {
       readonly available: false;
-      readonly label: typeof STATUS_NOT_TRACKED | typeof NEVER_CONTACTED;
+      readonly label:
+        | typeof STATUS_NOT_TRACKED
+        | typeof NEVER_CONTACTED
+        | typeof STATUS_IN_THE_BIN;
       readonly context: string;
       readonly reason: ProfileStatusUnavailableReason;
     }
@@ -204,10 +210,9 @@ type UnavailableProfileStatusMetric = Extract<
 >;
 
 /**
- * Classify an unavailable Status (38.11 D-23, D-24, D-05). Archived first, with
- * exactly the pre-38.11 literal (D-23); then Unbound, no frequency, not
- * contacted. Not contacted is display-only: no progress, no bucket, the clock
- * does not start (D-05, D-06); `getContactStatus` is untouched (D-20).
+ * Classify an unavailable Status (38.11 D-23, D-24, D-05). In the Bin first
+ * (38.12 D-35); then Unbound, no frequency, not contacted. Not contacted is
+ * display-only: no progress, no bucket, the clock does not start (D-05, D-06).
  */
 function unavailableProfileStatus(
   input: ProfileStatusInput,
@@ -216,8 +221,8 @@ function unavailableProfileStatus(
   if (input.archived) {
     return {
       available: false,
-      label: STATUS_NOT_TRACKED,
-      context: STATUS_CONTEXT_SET_FREQUENCY,
+      label: STATUS_IN_THE_BIN,
+      context: STATUS_CONTEXT_IN_THE_BIN,
       reason: "archived",
     };
   }
@@ -264,10 +269,10 @@ function unavailableProfileStatus(
 export function resolveProfileStatus(
   input: ProfileStatusInput,
 ): ProfileStatusMetric {
-  // The gate is unchanged from pre-38.11. `archived` is never consulted before
-  // the available return: an archived, Bound, contacted contact keeps its
-  // status (38.11 D-23).
+  // 38.12 D-35: a binned person reads "In the Bin" before any live status is
+  // computed — a Bound, contacted binned person no longer reads e.g. "Stable".
   if (
+    input.archived ||
     input.trackingEnabled !== 1 ||
     input.intervalDays === null ||
     input.intervalDays <= 0 ||

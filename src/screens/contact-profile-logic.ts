@@ -598,20 +598,89 @@ export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
   return null;
 }
 
-/** Keep the product-mandated overflow order independent from view rendering. */
+/**
+ * The product-mandated ⋯ order per state, independent from view rendering.
+ *
+ * - In the Bin (38.12 D-34): Profile Layout and Background only — no Snooze,
+ *   Unbind or Move to Bin (Move to Bin on a binned person failed, 38.11
+ *   IN-04). Restore and permanent delete stay in the Bin list (D-93, D-20).
+ * - Bound: Snooze… · Unbind contact · Move to Bin · separator · Profile Layout
+ *   · Background (38.11 D-63, D-64, D-65). "Snooze…" opens the shared snooze
+ *   sheet, where Unsnooze lives.
+ * - Unbound: no Snooze… while Unbound; it returns on Bind and a stored snooze
+ *   is left as data (38.12 D-94, amending 38.11 D-64).
+ */
 export function profileOverflowEntries(input: {
   bound: boolean;
+  archived: boolean;
 }): ProfileOverflowEntry[] {
+  if (input.archived) return ["layout", "background"];
   return [
-    // 38.11 D-64: one "Snooze…" entry in both states; it opens the shared
-    // snooze sheet, where Unsnooze lives.
-    "snooze",
-    ...(input.bound ? (["unbind"] as const) : []),
+    ...(input.bound ? (["snooze", "unbind"] as const) : []),
     "archive",
     "separator",
     "layout",
     "background",
   ];
+}
+
+/**
+ * The binned Profile's banner (38.12 D-93): the person is named, and "Open the
+ * Bin" leads to the one place Restore and permanent delete live (D-20). The
+ * Profile itself offers neither.
+ */
+export function binnedProfileBanner(name: string): {
+  title: string;
+  actionLabel: string;
+} {
+  return { title: `${name} is in the Bin`, actionLabel: "Open the Bin" };
+}
+
+/**
+ * How the Profile's favourite star draws and what a tap does.
+ *
+ * - `toggle`: a live Bound person; the star is filled from the rank.
+ * - `none`: in the Bin (38.12 D-34) — disabled and drawn off whatever the
+ *   stored rank says.
+ */
+export interface ProfileStarView {
+  /** Drawn filled. */
+  favourite: boolean;
+  /** Not pressable (pending write, or in the Bin). */
+  disabled: boolean;
+  /** Drawn dimmed as unavailable (38.9 D-26 via 38.12 D-06). */
+  unavailable: boolean;
+  onPress: "toggle" | "none";
+}
+
+export function profileStarView(input: {
+  favouriteRank: number | null;
+  bound: boolean;
+  archived: boolean;
+  pending: boolean;
+}): ProfileStarView {
+  if (input.archived) {
+    return {
+      favourite: false,
+      disabled: true,
+      unavailable: true,
+      onPress: "none",
+    };
+  }
+  if (!input.bound) {
+    return {
+      favourite: input.favouriteRank !== null,
+      disabled: true,
+      unavailable: false,
+      onPress: "none",
+    };
+  }
+  return {
+    favourite: input.favouriteRank !== null,
+    disabled: input.pending,
+    unavailable: false,
+    onPress: "toggle",
+  };
 }
 
 /**

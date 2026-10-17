@@ -170,38 +170,46 @@ describe("Profile Overview metric models", () => {
     }
   });
 
-  it("keeps today's literal for an archived contact that is unavailable, never contacted included (D-23)", () => {
-    const archivedNeverContacted = resolveProfileStatus({
-      ...STATUS_BASE,
-      archived: true,
-    });
-    const archivedUnbound = resolveProfileStatus({
-      ...STATUS_BASE,
-      archived: true,
-      trackingEnabled: 0,
-      lastContact: "2026-08-01 12:00:00",
-    });
-    const todays = {
+  it("reads In the Bin for a binned contact in every state, never contacted included (38.12 D-35)", () => {
+    const inTheBin = {
       available: false,
-      label: "Not tracked",
-      context: "Set a contact frequency to see Orbit Status.",
+      label: "In the Bin",
+      context: "Orbit Status is paused while they're in the Bin.",
       reason: "archived",
     };
-    expect(archivedNeverContacted).toEqual(todays);
-    expect(archivedNeverContacted.label).not.toBe("Never Contacted");
-    expect(archivedUnbound).toEqual(todays);
-    expect(archivedUnbound).not.toHaveProperty("visualValue");
+    const states = [
+      { ...STATUS_BASE, archived: true },
+      {
+        ...STATUS_BASE,
+        archived: true,
+        trackingEnabled: 0,
+        lastContact: "2026-08-01 12:00:00",
+      },
+      { ...STATUS_BASE, archived: true, intervalDays: null },
+    ];
+    for (const state of states) {
+      const status = resolveProfileStatus(state);
+      expect(status).toEqual(inTheBin);
+      expect(status).not.toHaveProperty("visualValue");
+    }
   });
 
-  it("keeps an archived, Bound, contacted contact available with its status (D-23)", () => {
+  it("gives a binned, Bound, contacted contact In the Bin before any live status (38.12 D-35)", () => {
     const live = resolveProfileStatus({ ...STATUS_BASE, ...CONTACTED });
-    const archived = resolveProfileStatus({
+    expect(live.available).toBe(true);
+    const binned = resolveProfileStatus({
       ...STATUS_BASE,
       ...CONTACTED,
+      status: "stable",
       archived: true,
     });
-    expect(archived.available).toBe(true);
-    expect(archived).toEqual(live);
+    expect(binned).toEqual({
+      available: false,
+      label: "In the Bin",
+      context: "Orbit Status is paused while they're in the Bin.",
+      reason: "archived",
+    });
+    expect(binned).not.toHaveProperty("factors");
   });
 
   it("exposes only canonical Status factors and no editable value", () => {

@@ -39,6 +39,7 @@ interface RawRow {
   rarely_responds: number;
   last_contact: string | null;
   trackingEnabled: number;
+  archived: number;
 }
 
 /**
@@ -59,6 +60,7 @@ export async function getContactStatus(
     `SELECT rarely_responds,
             last_contact,
             tracking_enabled AS trackingEnabled,
+            (archived_at IS NOT NULL) AS archived,
             (${PROGRESS_SQL}) AS progress,
             (${STATUS_SQL}) AS status,
             (${REASON_SQL}) AS reason
@@ -69,10 +71,15 @@ export async function getContactStatus(
   if (!row) {
     return null;
   }
-  // Unbound and never-contacted direct retrieval stays available, but neither
-  // may evaluate cadence status: STATUS_SQL would otherwise produce chrome for
-  // an inactive or NULL-cadence row.
-  if (row.trackingEnabled === 0 || row.last_contact === null) {
+  // Unbound, binned and never-contacted direct retrieval stays available, but
+  // none may evaluate cadence status: STATUS_SQL would otherwise produce chrome
+  // for an inactive or NULL-cadence row. A binned person has no live status
+  // (38.12 D-35).
+  if (
+    row.trackingEnabled === 0 ||
+    row.archived === 1 ||
+    row.last_contact === null
+  ) {
     return {
       status: null,
       reason: null,

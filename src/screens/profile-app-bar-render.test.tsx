@@ -63,9 +63,8 @@ vi.mock("@/theme", () => ({
 }));
 
 const { ProfileAppBar } = await import("./ContactProfileScreen");
-const { PROFILE_APP_BAR, PROFILE_APP_BAR_SCRIM_OPACITY } = await import(
-  "./contact-profile-logic"
-);
+const { PROFILE_APP_BAR, PROFILE_APP_BAR_SCRIM_OPACITY, profileStarView } =
+  await import("./contact-profile-logic");
 
 interface Node {
   readonly type: string;
@@ -111,6 +110,7 @@ function render(
   overrides: Partial<{
     favourite: boolean;
     favouriteDisabled: boolean;
+    favouriteUnavailable: boolean;
     scrolled: boolean;
     title: string | null;
   }> = {},
@@ -164,6 +164,25 @@ describe("ProfileAppBar (38.6 D-17)", () => {
     expect(active?.props.accessibilityLabel).toBe("Remove Alex from Favorites");
     expect(active?.props.disabled).toBe(true);
     expect(active?.children[0]?.props.state).toBe("active");
+  });
+
+  it("draws a binned person's star disabled, dimmed and not filled, even with a rank (38.12 D-34)", () => {
+    const view = profileStarView({
+      favouriteRank: 3,
+      bound: true,
+      archived: true,
+      pending: false,
+    });
+    const star = all(
+      render({
+        favourite: view.favourite,
+        favouriteDisabled: view.disabled,
+        favouriteUnavailable: view.unavailable,
+      }),
+    ).find(isStar);
+    expect(star?.props.disabled).toBe(true);
+    expect(star?.children[0]?.props.state).toBe("default");
+    expect(flatStyle(star?.props.style).opacity).toBe(0.5);
   });
 
   it("overlays the content and passes touches through its empty area", () => {

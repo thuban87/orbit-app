@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TAB_ORDER } from "./shell-contract";
 import {
   navigateIntoTab,
+  openBinFromProfile,
   openProfileInContactsTab,
   planContactsProfileOpen,
 } from "./tab-entry";
@@ -208,6 +209,55 @@ describe("openProfileInContactsTab (D-50)", () => {
     openProfileInContactsTab(nav as never, 41, {});
     expect(nav.navigate.mock.calls[0][1].params).toEqual({ contactId: 41 });
     expect("returnTab" in nav.navigate.mock.calls[0][1].params).toBe(false);
+  });
+});
+
+describe("openBinFromProfile (38.12 D-93)", () => {
+  function stackSpy(routes: { name: string }[] | undefined) {
+    return {
+      getState: vi.fn(() => (routes === undefined ? undefined : { routes })),
+      dispatch: vi.fn(),
+      navigate: vi.fn(),
+    };
+  }
+
+  it("pops back to the Bin when it is already under the Profile", () => {
+    const nav = stackSpy([
+      { name: "SettingsHome" },
+      { name: "Archived" },
+      { name: "Profile" },
+    ]);
+    openBinFromProfile(nav);
+    expect(nav.dispatch).toHaveBeenCalledTimes(1);
+    const action = nav.dispatch.mock.calls[0][0];
+    expect(action).toEqual(StackActions.popTo("Archived"));
+    expect(nav.navigate).not.toHaveBeenCalled();
+  });
+
+  it("opens the Bin in the Contacts tab when the stack has no Bin", () => {
+    const nav = stackSpy([{ name: "Orrery" }, { name: "Profile" }]);
+    openBinFromProfile(nav);
+    expect(nav.dispatch).not.toHaveBeenCalled();
+    expect(nav.navigate).toHaveBeenCalledWith("DashboardTab", {
+      screen: "Archived",
+      params: undefined,
+      initial: false,
+    });
+  });
+
+  it("opens the Bin in the Contacts tab when the stack state is not available", () => {
+    const nav = stackSpy(undefined);
+    openBinFromProfile(nav);
+    expect(nav.navigate).toHaveBeenCalledWith("DashboardTab", {
+      screen: "Archived",
+      params: undefined,
+      initial: false,
+    });
+  });
+
+  it("is a no-op without a navigator", () => {
+    expect(() => openBinFromProfile(null)).not.toThrow();
+    expect(() => openBinFromProfile(undefined)).not.toThrow();
   });
 });
 

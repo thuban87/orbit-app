@@ -91,7 +91,7 @@ describe("coherent local Profile snapshot", () => {
     });
   });
 
-  it("keeps an archived, Bound, contacted contact's Status available (38.11 D-23)", async () => {
+  it("reads a binned, Bound, contacted contact's Status as In the Bin (38.12 D-35)", async () => {
     const contactId = await contact();
     await exec.runAsync(
       `INSERT INTO interactions
@@ -108,10 +108,15 @@ describe("coherent local Profile snapshot", () => {
     );
     const snapshot = await readProfileSnapshot(exec, contactId, OPTIONS);
     expect(snapshot?.identity.archivedAt).toBe(NOW);
-    expect(snapshot?.metrics.status.available).toBe(true);
+    expect(snapshot?.metrics.status).toEqual({
+      available: false,
+      label: "In the Bin",
+      context: "Orbit Status is paused while they're in the Bin.",
+      reason: "archived",
+    });
   });
 
-  it("gives an archived, never-contacted contact today's Not tracked result (38.11 D-23)", async () => {
+  it("gives a binned, never-contacted contact In the Bin (38.12 D-35)", async () => {
     const contactId = await contact();
     await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
       NOW,
@@ -120,8 +125,8 @@ describe("coherent local Profile snapshot", () => {
     const snapshot = await readProfileSnapshot(exec, contactId, OPTIONS);
     expect(snapshot?.metrics.status).toEqual({
       available: false,
-      label: "Not tracked",
-      context: "Set a contact frequency to see Orbit Status.",
+      label: "In the Bin",
+      context: "Orbit Status is paused while they're in the Bin.",
       reason: "archived",
     });
   });

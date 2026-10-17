@@ -154,3 +154,33 @@ export function openProfileInContactsTab(
   };
   nav.dispatch(push as never);
 }
+
+/** The Profile's own stack navigator, structurally (state, dispatch, navigate). */
+export type BinFromProfileNavigator =
+  | {
+      getState(): { routes: readonly { name: string }[] } | undefined;
+      dispatch(action: never): void;
+      navigate(...args: never[]): void;
+    }
+  | null
+  | undefined;
+
+/**
+ * "Open the Bin" on a binned Profile (38.12 D-93). When the Bin (route
+ * `Archived`) is already under this Profile in its stack — Settings → Bin →
+ * Profile, or Contacts ⋯ → Bin → Profile — pop back to it. Otherwise open the
+ * Bin in the Contacts tab through `navigateIntoTab`, so it is not registered
+ * in every Profile host stack and the cross-tab entry stays here (RG-021).
+ * The pop is a plain `POP_TO` object with the shape of `StackActions.popTo`
+ * so this module stays importable from node tests.
+ */
+export function openBinFromProfile(nav: BinFromProfileNavigator): void {
+  if (nav == null) return;
+  const routes = nav.getState()?.routes ?? [];
+  if (routes.some((route) => route.name === "Archived")) {
+    const popTo = { type: "POP_TO", payload: { name: "Archived" } };
+    nav.dispatch(popTo as never);
+    return;
+  }
+  navigateIntoTab(nav, "DashboardTab", "Archived");
+}

@@ -185,6 +185,20 @@ describe("getContactStatus", () => {
     expect(res).toMatchObject({ status: null, reason: null, progress: null });
   });
 
+  it("guards a binned contacted contact: status/reason/progress all null (38.12 D-35)", async () => {
+    const id = await seedContact({
+      name: "Binned",
+      intervalDays: 10,
+      lastContact: daysAgo(3),
+    });
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      id,
+    ]);
+    const res = await getContactStatus(exec, id);
+    expect(res).toMatchObject({ status: null, reason: null, progress: null });
+  });
+
   it("returns null for a missing contact id", async () => {
     const res = await getContactStatus(exec, 999_999);
     expect(res).toBeNull();

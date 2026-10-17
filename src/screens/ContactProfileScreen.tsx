@@ -45,6 +45,7 @@ import { editRelationship } from "@/db/relationships-dao";
 import { linkedEntryRoute } from "@/logic/linked-entry-route";
 import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
 import { returnFromProfileToTab } from "@/navigation/flow-host";
+import { openBinFromProfile } from "@/navigation/tab-entry";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import type { KnowledgeEntryLink } from "@/profile/knowledge-presentation";
@@ -52,6 +53,7 @@ import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 import { describeCurrentLayout } from "@/profile/template-manager-model";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import {
+  binnedProfileBanner,
   closeTopmostProfileOverlay,
   consumeProfileReachOutIntent,
   createHeroNameTracker,
@@ -77,6 +79,7 @@ import {
   profileScrollA11yOffset,
   profileScrollContentTopPadding,
   profileScrollTargetY,
+  profileStarView,
   runMoveToBin,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
@@ -103,6 +106,9 @@ import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "contact-profile";
 
+/** The dim of an unavailable control (matches `Button`'s disabled 0.5). */
+const UNAVAILABLE_OPACITY = 0.5;
+
 /**
  * Which navigator hosts this Profile, passed explicitly by the host's route
  * wrapper (no nav-state inference). `"settings"` disables hero Message because
@@ -121,6 +127,7 @@ export function ProfileAppBar({
   name,
   favourite,
   favouriteDisabled,
+  favouriteUnavailable = false,
   scrolled,
   title = null,
   onBack,
@@ -130,6 +137,11 @@ export function ProfileAppBar({
   name: string;
   favourite: boolean;
   favouriteDisabled: boolean;
+  /**
+   * The star is unavailable for this person (in the Bin, 38.12 D-34): drawn
+   * dimmed (38.9 D-26 via 38.12 D-06).
+   */
+  favouriteUnavailable?: boolean;
   /** Content is scrolled under the bar (drives the token scrim). */
   scrolled: boolean;
   /**
@@ -187,7 +199,10 @@ export function ProfileAppBar({
           }
           disabled={favouriteDisabled}
           onPress={onToggleFavourite}
-          style={styles.appBarStar}
+          style={[
+            styles.appBarStar,
+            favouriteUnavailable ? styles.unavailable : null,
+          ]}
         >
           <Icon name="favorite" state={favourite ? "active" : "default"} />
         </Pressable>
@@ -387,6 +402,14 @@ export function ContactProfileScreen({
   const lifecycle = profileLifecycleView({
     trackingEnabled: snapshot?.identity.trackingEnabled ?? 0,
     intervalDays: snapshot?.identity.intervalDays ?? null,
+  });
+  // 38.12 D-93, D-34: a person in the Bin gets the banner and no live actions.
+  const archived = snapshot?.identity.archivedAt != null;
+  const star = profileStarView({
+    favouriteRank: snapshot?.identity.favouriteRank ?? null,
+    bound: lifecycle.kind === "bound",
+    archived,
+    pending: pendingFavourite,
   });
   const todayLocal = formatLocalDate(new Date());
   const snoozed =
@@ -596,7 +619,7 @@ export function ContactProfileScreen({
   );
 
   const toggleFavourite = useCallback(async () => {
-    if (!snapshot || pendingFavourite || lifecycle.kind !== "bound") return;
+    if (!snapshot || pendingFavourite || star.onPress !== "toggle") return;
     setPendingFavourite(true);
     try {
       const now = localDateTime();
@@ -615,7 +638,7 @@ export function ContactProfileScreen({
     } finally {
       setPendingFavourite(false);
     }
-  }, [contactId, lifecycle.kind, load, pendingFavourite, snapshot]);
+  }, [contactId, load, pendingFavourite, snapshot, star.onPress]);
 
   const launchMethod = useCallback(
     async (
@@ -802,8 +825,9 @@ export function ContactProfileScreen({
           // top edge as before, so no inset changes.
           <ProfileAppBar
             name={snapshot.identity.name}
-            favourite={snapshot.identity.favouriteRank !== null}
-            favouriteDisabled={pendingFavourite || lifecycle.kind !== "bound"}
+            favourite={star.favourite}
+            favouriteDisabled={star.disabled}
+            favouriteUnavailable={star.unavailable}
             scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}
             title={barShowsName ? snapshot.identity.name : null}
             onBack={leaveProfile}
@@ -868,7 +892,32 @@ export function ContactProfileScreen({
                 // the overlay bar and off the D-04 photo/name lines.
                 <AppText testID="profile-refresh-error">{error}</AppText>
               ) : null}
-              {lifecycle.kind !== "bound" ? (
+              {archived ? (
+                // 38.12 D-93: the binned Profile's banner. Restore and
+                // permanent delete live only in the Bin list (D-20), so the
+                // banner's one action opens it.
+                <View
+                  testID="profile-bin-banner"
+                  style={[
+                    styles.lifecycle,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                    },
+                  ]}
+                >
+                  <AppText role="heading">
+                    {binnedProfileBanner(snapshot.identity.name).title}
+                  </AppText>
+                  <Button
+                    role="secondary"
+                    label={
+                      binnedProfileBanner(snapshot.identity.name).actionLabel
+                    }
+                    onPress={() => openBinFromProfile(navigation)}
+                  />
+                </View>
+              ) : lifecycle.kind !== "bound" ? (
                 <View
                   style={[
                     styles.lifecycle,
@@ -961,6 +1010,7 @@ export function ContactProfileScreen({
                 <AppText role="heading">Profile actions</AppText>
                 {profileOverflowEntries({
                   bound: lifecycle.kind === "bound",
+                  archived,
                 }).map((entry) => {
                   if (entry === "separator") {
                     return (
@@ -1148,5 +1198,7 @@ const styles = StyleSheet.create({
     padding: SPACING.base,
   },
   menu: { gap: SPACING.sm },
+  // 38.9 D-26 via 38.12 D-06: an unavailable control is dimmed.
+  unavailable: { opacity: UNAVAILABLE_OPACITY },
   separator: { height: StyleSheet.hairlineWidth },
 });

@@ -7,6 +7,7 @@ import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import {
   binConfirmation,
+  binnedProfileBanner,
   bulkBinConfirmation,
   canStartLifecycleTransition,
   closeTopmostProfileOverlay,
@@ -45,6 +46,7 @@ import {
   profileScrollA11yOffset,
   profileScrollContentTopPadding,
   profileScrollTargetY,
+  profileStarView,
   runMoveToBin,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
@@ -705,8 +707,8 @@ describe("integrated Profile controller contracts", () => {
     });
   });
 
-  it("keeps the final ⋯ order: Snooze…, Unbind, Move to Bin, then Layout and Background (38.11 D-63, D-64, D-65)", () => {
-    expect(profileOverflowEntries({ bound: true })).toEqual([
+  it("keeps the Bound ⋯ order: Snooze…, Unbind, Move to Bin, then Layout and Background (38.11 D-63, D-64, D-65)", () => {
+    expect(profileOverflowEntries({ bound: true, archived: false })).toEqual([
       "snooze",
       "unbind",
       "archive",
@@ -714,14 +716,76 @@ describe("integrated Profile controller contracts", () => {
       "layout",
       "background",
     ]);
-    expect(profileOverflowEntries({ bound: false })).toEqual([
-      // 38.11 D-64: "snooze" in both states; never an instant "unsnooze".
-      "snooze",
+  });
+
+  it("offers no Snooze… while Unbound (38.12 D-94)", () => {
+    expect(profileOverflowEntries({ bound: false, archived: false })).toEqual([
       "archive",
       "separator",
       "layout",
       "background",
     ]);
+  });
+
+  it("offers only Profile Layout and Background in the Bin, Bound or Unbound (38.12 D-34)", () => {
+    for (const bound of [true, false]) {
+      const entries = profileOverflowEntries({ bound, archived: true });
+      expect(entries).toEqual(["layout", "background"]);
+      expect(entries).not.toContain("snooze");
+      expect(entries).not.toContain("unbind");
+      expect(entries).not.toContain("archive");
+    }
+  });
+
+  it("names the person in the binned Profile's banner, with Open the Bin (38.12 D-93)", () => {
+    expect(binnedProfileBanner("Alex")).toEqual({
+      title: "Alex is in the Bin",
+      actionLabel: "Open the Bin",
+    });
+  });
+
+  describe("profileStarView", () => {
+    it("draws a binned person's star off and disabled whatever the rank (38.12 D-34)", () => {
+      for (const bound of [true, false]) {
+        expect(
+          profileStarView({
+            favouriteRank: 2,
+            bound,
+            archived: true,
+            pending: false,
+          }),
+        ).toEqual({
+          favourite: false,
+          disabled: true,
+          unavailable: true,
+          onPress: "none",
+        });
+      }
+    });
+
+    it("fills a live Bound person's star from the rank and toggles it", () => {
+      expect(
+        profileStarView({
+          favouriteRank: 1,
+          bound: true,
+          archived: false,
+          pending: false,
+        }),
+      ).toEqual({
+        favourite: true,
+        disabled: false,
+        unavailable: false,
+        onPress: "toggle",
+      });
+      expect(
+        profileStarView({
+          favouriteRank: null,
+          bound: true,
+          archived: false,
+          pending: true,
+        }),
+      ).toMatchObject({ favourite: false, disabled: true });
+    });
   });
 
   describe("Move to Bin (38.11 D-69, D-71; review U-04)", () => {
