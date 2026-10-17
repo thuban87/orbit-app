@@ -11,6 +11,15 @@
  * `date('now')` (RESEARCH Pitfall 8), and never JS month-length math, so "+1
  * month" stays calendar-correct AND local. The `countSnoozed` /'snoozed' filter
  * segment (dashboard-read.ts) go live once this ships.
+ *
+ * INDEFINITE SNOOZE (38.12 D-96, D-98): "Until I turn it off" is stored as the
+ * sentinel `INDEFINITE_SNOOZE_UNTIL` (`'9999-12-31'`). It is a real local
+ * `YYYY-MM-DD` that passes `assertFutureLocalSnoozeDate`, so the existing
+ * writers, Undo (`onRestore`) and every snooze reader treat it exactly like a
+ * dated snooze with no change; only display sites special-case it, through
+ * `snoozeUntilLabel` (relationship-sheet-model.ts), so no surface prints the
+ * year 9999. Migration 034 converts every legacy per-person mute
+ * (`reminders_off = 1`) to this sentinel (D-134).
  * =============================================================================
  *
  * SINGLE-WRITER / MUTEX (DATA-04): both paths run inside the ONE shared
@@ -50,6 +59,18 @@ export const PRESET_MODIFIERS: Record<SnoozePreset, string> = {
   "1w": "+7 days",
   "1m": "+1 month",
 };
+
+/**
+ * The indefinite snooze ("Until I turn it off", D-96): a far-future local date
+ * every snooze reader already honours as an active snooze (D-98). Migration 034
+ * writes the same literal; its test pins the two equal.
+ */
+export const INDEFINITE_SNOOZE_UNTIL = "9999-12-31";
+
+/** True only for the exact indefinite-snooze sentinel. */
+export function isIndefiniteSnooze(value: string | null | undefined): boolean {
+  return value === INDEFINITE_SNOOZE_UNTIL;
+}
 
 /**
  * Reject a custom snooze end that is not a real local `YYYY-MM-DD` strictly

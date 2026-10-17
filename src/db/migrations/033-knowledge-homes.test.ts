@@ -221,9 +221,11 @@ async function seedInteraction(
 }
 
 describe("migration 033 — registration", () => {
-  it("is the registered schema head", () => {
+  it("is registered at or below the schema head", () => {
     expect(KNOWLEDGE_HOMES_SCHEMA_VERSION).toBe(33);
-    expect(TARGET_VERSION).toBe(KNOWLEDGE_HOMES_SCHEMA_VERSION);
+    expect(TARGET_VERSION).toBeGreaterThanOrEqual(
+      KNOWLEDGE_HOMES_SCHEMA_VERSION,
+    );
     expect(MIGRATIONS.filter((m) => m.version === 33)).toHaveLength(1);
   });
 });

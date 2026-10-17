@@ -53,10 +53,11 @@ import { migration029 } from "@/db/migrations/029-ai-configuration";
 import { migration030 } from "@/db/migrations/030-your-week-period";
 import { migration031 } from "@/db/migrations/031-your-week-occurred-at-indexes";
 import { migration032 } from "@/db/migrations/032-import-batch-cadence";
+import { migration033 } from "@/db/migrations/033-knowledge-homes";
 import {
-  KNOWLEDGE_HOMES_SCHEMA_VERSION,
-  migration033,
-} from "@/db/migrations/033-knowledge-homes";
+  migration034,
+  SNOOZE_REVIEW_RESUME_SCHEMA_VERSION,
+} from "@/db/migrations/034-snooze-review-memory-resume";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
@@ -68,7 +69,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = KNOWLEDGE_HOMES_SCHEMA_VERSION;
+export const TARGET_VERSION = SNOOZE_REVIEW_RESUME_SCHEMA_VERSION;
 
 /** The one authoritative migration registration list, shared by bootstrap and tests. */
 export const MIGRATIONS: Migration[] = [
@@ -105,6 +106,7 @@ export const MIGRATIONS: Migration[] = [
   migration031,
   migration032,
   migration033,
+  migration034,
 ];
 
 const DATABASE_NAME = "orbit.db";
