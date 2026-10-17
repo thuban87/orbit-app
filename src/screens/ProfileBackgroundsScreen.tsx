@@ -42,6 +42,8 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
+import { SettingsRow } from "@/components/ui/SettingsRow";
+import { SettingsSectionCard } from "@/components/ui/SettingsSectionCard";
 import { Sheet } from "@/components/ui/Sheet";
 import type { ProfileBackgroundTemplateRow } from "@/db/profile-presentation-read";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
@@ -189,89 +191,85 @@ export function ProfileBackgroundsScreen() {
           { paddingBottom: bottomClearance },
         ]}
       >
-        <GlassSurface style={styles.section}>
-          <AppText role="label" accessibilityRole="header">
-            Global background
-          </AppText>
-          <AppText role="body" testID="profile-backgrounds-global-name">
-            {globalName ?? "None"}
-          </AppText>
-          <AppText role="body">
-            Used for any contact without their own or a Category background.
-          </AppText>
-          {globalName !== null ? (
-            <Button
-              role="secondary"
-              label="Clear global background"
-              onPress={clearGlobal}
-            />
-          ) : null}
-        </GlassSurface>
+        {/* Sections are SettingsSectionCards on the glass surface (38.12
+            D-119): the page keeps GlassSurface's mode-aware card treatment by
+            passing it through the card's container. */}
+        <SettingsSectionCard title="Global background" surface="glass">
+          <SettingsRow
+            testID="profile-backgrounds-global-name"
+            title="Background"
+            value={globalName ?? "None"}
+            subtitle="Used for any contact without their own or a Category background."
+          >
+            {globalName !== null ? (
+              <Button
+                role="secondary"
+                label="Clear global background"
+                onPress={clearGlobal}
+              />
+            ) : null}
+          </SettingsRow>
+        </SettingsSectionCard>
 
-        <GlassSurface style={styles.section}>
-          <AppText role="label" accessibilityRole="header">
-            Category backgrounds
-          </AppText>
+        <SettingsSectionCard title="Category backgrounds" surface="glass">
           {categories.length === 0 ? (
-            <AppText role="body">No categories available</AppText>
-          ) : categoriesWithBackground.length === 0 ? (
-            <AppText role="body">No Category has its own background.</AppText>
-          ) : (
-            <>
-              {categoriesWithBackground.map((category) => (
-                <View key={category.id} style={styles.assignmentRow}>
-                  <AppText role="body" style={styles.flex}>
-                    {category.name}
-                  </AppText>
-                  <AppText role="body">
-                    {nameOf(categoryTemplateUids.get(category.id) ?? null)}
-                  </AppText>
-                </View>
-              ))}
+            <SettingsRow title="No categories available" />
+          ) : null}
+          {categories.length > 0 && categoriesWithBackground.length === 0 ? (
+            <SettingsRow title="No Category has its own background." />
+          ) : null}
+          {categoriesWithBackground.map((category) => (
+            <SettingsRow
+              key={category.id}
+              title={category.name}
+              value={nameOf(categoryTemplateUids.get(category.id) ?? null)}
+            />
+          ))}
+          {categoriesWithBackground.length > 0 ? (
+            <View style={styles.cardActions}>
               <Button
                 role="secondary"
                 label="Clear category background"
                 onPress={() => setCategoryPicker({ mode: "clear" })}
               />
-            </>
-          )}
-        </GlassSurface>
+            </View>
+          ) : null}
+        </SettingsSectionCard>
 
-        <GlassSurface style={styles.section}>
-          <AppText role="label" accessibilityRole="header">
-            Saved backgrounds
-          </AppText>
-          <Button
-            role="primary"
-            label="Choose photo"
-            accessibilityLabel="Choose photo for a new background"
-            onPress={() => void choosePhoto()}
-          />
-          {listState.kind === "loading" ? (
-            <AppText role="body">Loading backgrounds…</AppText>
-          ) : null}
-          {listState.kind === "empty" ? (
-            <AppText role="body">
-              No saved backgrounds yet. Choose a photo to create one.
-            </AppText>
-          ) : null}
-          {listState.kind === "error" ? (
-            <>
-              <ScopedPalette>
-                {(scoped) => (
-                  <AppText style={{ color: scoped.danger }}>
-                    {listState.message}
-                  </AppText>
-                )}
-              </ScopedPalette>
-              <Button
-                role="secondary"
-                label="Retry"
-                onPress={() => void refresh()}
-              />
-            </>
-          ) : null}
-        </GlassSurface>
+        <SettingsSectionCard title="Saved backgrounds" surface="glass">
+          <View style={styles.cardActions}>
+            <Button
+              role="primary"
+              label="Choose photo"
+              accessibilityLabel="Choose photo for a new background"
+              onPress={() => void choosePhoto()}
+            />
+            {listState.kind === "loading" ? (
+              <AppText role="body">Loading backgrounds…</AppText>
+            ) : null}
+            {listState.kind === "empty" ? (
+              <AppText role="body">
+                No saved backgrounds yet. Choose a photo to create one.
+              </AppText>
+            ) : null}
+            {listState.kind === "error" ? (
+              <>
+                <ScopedPalette>
+                  {(scoped) => (
+                    <AppText style={{ color: scoped.danger }}>
+                      {listState.message}
+                    </AppText>
+                  )}
+                </ScopedPalette>
+                <Button
+                  role="secondary"
+                  label="Retry"
+                  onPress={() => void refresh()}
+                />
+              </>
+            ) : null}
+          </View>
+        </SettingsSectionCard>
 
         {listState.kind === "populated"
           ? templates.map((template) => (
@@ -403,14 +401,12 @@ export function ProfileBackgroundsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { gap: SPACING.sm, padding: SPACING.md },
-  section: { gap: SPACING.xs, padding: SPACING.md },
-  assignmentRow: {
-    alignItems: "center",
-    flexDirection: "row",
+  content: { gap: SPACING.md, padding: SPACING.base },
+  cardActions: {
     gap: SPACING.sm,
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.md,
   },
-  flex: { flex: 1 },
   card: { padding: SPACING.sm },
   // Row layout goes on the content wrapper: GlassSurface lays children out in
   // an inner View, so a row style on the outer `style` stacked them (38.11-11).

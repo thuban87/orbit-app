@@ -1,15 +1,24 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
+
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { OrbitSwitch } from "@/components/ui";
+import {
+  AppText,
+  OrbitSwitch,
+  SettingsRow,
+  SettingsSectionCard,
+} from "@/components/ui";
 import { ORRERY_DENSITIES, type OrreryDensity } from "@/db/app-settings-dao";
 import { getExecutor } from "@/db/database";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
+import { SPACING } from "@/theme/tokens/spacing";
 
 const DENSITY_LABELS: Record<OrreryDensity, string> = {
   spacious: "Spacious",
@@ -33,6 +42,10 @@ const DENSITY_LABELS: Record<OrreryDensity, string> = {
  *
  * A Systems section routes to the canonical `SystemsManagement` screen (reuse by
  * navigation; it stays reachable from the Orrery too, per §H).
+ *
+ * Layout (38.12 D-119): `SettingsSectionCard`s holding `SettingsRow`s — the
+ * density radios sit under their row, the satellites switch is its row's
+ * trailing control, and Systems is a chevron row.
  *
  * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
  * AUD-UIA-016, D-15): no duplicate in-body Back.
@@ -80,26 +93,14 @@ export function SettingsOrreryScreen() {
       >
         {/* Display — density + Relationship Satellites, bound to the canonical
             useOrreryPreferencesStore (committed for read; save for write). */}
-        <View testID="settings-orrery-display-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        <SettingsSectionCard
+          testID="settings-orrery-display-section"
+          title="Display"
+        >
+          <SettingsRow
+            title="Density"
+            subtitle="How much space the orrery gives each contact."
           >
-            Display
-          </Text>
-
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Density
-            </Text>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              How much space the orrery gives each contact.
-            </Text>
             {ORRERY_DENSITIES.map((density) => {
               const selected = preferences.committed.density === density;
               return (
@@ -120,27 +121,19 @@ export function SettingsOrreryScreen() {
                     },
                   ]}
                 >
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >
+                  <AppText role="label" style={{ color: colors.textPrimary }}>
                     {DENSITY_LABELS[density]}
                     {selected ? " — Selected" : ""}
-                  </Text>
+                  </AppText>
                 </Pressable>
               );
             })}
-          </View>
+          </SettingsRow>
 
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Relationship Satellites
-              </Text>
+          <SettingsRow
+            title="Relationship Satellites"
+            subtitle="Show unlinked people around their contact."
+            trailing={
               <OrbitSwitch
                 testID="settings-orrery-satellites"
                 accessibilityLabel="Relationship Satellites"
@@ -154,85 +147,71 @@ export function SettingsOrreryScreen() {
                   });
                 }}
               />
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Show unlinked people around their contact.
-            </Text>
-          </View>
+            }
+          />
+        </SettingsSectionCard>
 
-          {busy ? (
-            <Text
-              testID="settings-orrery-busy"
-              accessibilityLiveRegion="polite"
-              style={[styles.helper, { color: colors.textSecondary }]}
-            >
-              {preferences.saving
-                ? "Saving orrery preferences…"
-                : "Loading orrery preferences…"}
-            </Text>
-          ) : null}
-
-          {showError ? (
-            <View
-              testID="settings-orrery-error"
-              style={[
-                styles.row,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                accessibilityRole="alert"
-                style={[styles.helper, { color: colors.danger }]}
-              >
-                {preferences.hydration === "error"
-                  ? "Couldn't load orrery preferences."
-                  : "Couldn't save your change."}{" "}
-                Please try again.
-              </Text>
-              <Pressable
-                testID="settings-orrery-retry"
-                accessibilityRole="button"
-                accessibilityLabel="Retry orrery preferences"
-                accessibilityState={{ disabled: busy }}
-                disabled={busy}
-                onPress={() => void preferences.retry(getExecutor())}
-                style={[styles.inlineButton, { borderColor: colors.border }]}
-              >
-                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                  Retry
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Systems — routes to the canonical Systems Management screen (reuse by
-            navigation; also reachable from the Orrery, §H). */}
-        <View testID="settings-orrery-systems-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        {busy ? (
+          <AppText
+            role="caption"
+            testID="settings-orrery-busy"
+            accessibilityLiveRegion="polite"
+            style={{ color: colors.textSecondary }}
           >
-            Systems
-          </Text>
-          <Pressable
-            testID="settings-orrery-systems"
-            accessibilityRole="button"
-            accessibilityLabel="Systems"
-            onPress={() => navigation.navigate("SystemsManagement")}
+            {preferences.saving
+              ? "Saving orrery preferences…"
+              : "Loading orrery preferences…"}
+          </AppText>
+        ) : null}
+
+        {showError ? (
+          <View
+            testID="settings-orrery-error"
             style={[
-              styles.row,
+              styles.errorBox,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Systems
-            </Text>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Manage the built-in and custom groups your orrery can show.
-            </Text>
-          </Pressable>
-        </View>
+            <AppText
+              role="caption"
+              accessibilityRole="alert"
+              style={{ color: colors.danger }}
+            >
+              {preferences.hydration === "error"
+                ? "Couldn't load orrery preferences."
+                : "Couldn't save your change."}{" "}
+              Please try again.
+            </AppText>
+            <Pressable
+              testID="settings-orrery-retry"
+              accessibilityRole="button"
+              accessibilityLabel="Retry orrery preferences"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
+              onPress={() => void preferences.retry(getExecutor())}
+              style={[styles.inlineButton, { borderColor: colors.border }]}
+            >
+              <AppText role="label" style={{ color: colors.textPrimary }}>
+                Retry
+              </AppText>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Systems — routes to the canonical Systems Management screen (reuse by
+            navigation; also reachable from the Orrery, §H). */}
+        <SettingsSectionCard
+          testID="settings-orrery-systems-section"
+          title="Systems"
+        >
+          <SettingsRow
+            testID="settings-orrery-systems"
+            accessibilityLabel="Systems"
+            title="Systems"
+            subtitle="Manage the built-in and custom groups your orrery can show."
+            onPress={() => navigation.navigate("SystemsManagement")}
+          />
+        </SettingsSectionCard>
       </ScrollView>
     </View>
   );
@@ -241,52 +220,30 @@ export function SettingsOrreryScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: {
-    padding: 16,
-    gap: 12,
-  },
-  section: {
-    gap: 12,
-  },
-  sectionHeading: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  row: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  rowLabel: {
-    fontSize: 16,
-    fontWeight: "600",
+    padding: SPACING.base,
+    gap: SPACING.lg,
   },
   densityOption: {
     minHeight: 44,
     justifyContent: "center",
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: RADII.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  helper: {
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 18,
+  errorBox: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: RADII.lg,
+    padding: SPACING.md,
+    gap: SPACING.sm,
   },
   inlineButton: {
+    minHeight: 44,
+    justifyContent: "center",
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: RADII.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     alignSelf: "flex-start",
   },
 });

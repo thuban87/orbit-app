@@ -2,7 +2,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, OrbitSwitch } from "@/components/ui";
+import {
+  AppText,
+  OrbitSwitch,
+  SettingsRow,
+  SettingsSectionCard,
+} from "@/components/ui";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -17,6 +22,7 @@ import { reconcileSchedule } from "@/services/notifications/notification-schedul
 import { useAssistBanner } from "@/stores/assist-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
@@ -38,6 +44,11 @@ const LOG_SCOPE = "settings-interactions-screen";
  * writer) — plus the migrated Interaction Assist toggle, which writes through
  * its CANONICAL specialized writer `setInteractionAssistEnabled` + banner refresh
  * (D-10 / ADR-070), NEVER the generic path.
+ *
+ * Layout (38.12 D-119): each setting is a `SettingsSectionCard`; the chip
+ * groups stay chip groups inside their card (they are not rows), and the
+ * Interaction Assist toggle is a `SettingsRow` with the switch as its trailing
+ * control.
  *
  * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
  * AUD-UIA-016, D-15): no duplicate in-body Back.
@@ -110,51 +121,46 @@ export function SettingsInteractionsScreen() {
     options: ReadonlyArray<InteractionOption<T>>,
     selectedValue: T | undefined,
   ) => (
-    <View testID={testID} style={styles.section}>
-      <AppText
-        accessibilityRole="header"
-        role="heading"
-        style={{ color: colors.textPrimary }}
-      >
-        {title}
-      </AppText>
-      <AppText role="caption" style={{ color: colors.textSecondary }}>
-        {caption}
-      </AppText>
-      <View style={styles.chipRow}>
-        {options.map((option) => {
-          const selected = selectedValue === option.value;
-          return (
-            <Pressable
-              key={String(option.value)}
-              testID={`${testID}-${String(option.value)}`}
-              accessibilityRole="button"
-              accessibilityLabel={`${title} ${option.label}`}
-              accessibilityState={{ selected, disabled: settings === null }}
-              disabled={settings === null}
-              onPress={() => void persist(option.patch)}
-              style={[
-                styles.chip,
-                {
-                  borderColor: selected ? colors.accent : colors.border,
-                  backgroundColor: selected ? colors.accent : colors.surface,
-                },
-              ]}
-            >
-              {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
-              <AppText
-                role="body"
-                style={{
-                  color: selected ? colors.onAccent : colors.textPrimary,
-                }}
+    <SettingsSectionCard testID={testID} title={title}>
+      <View style={styles.chipGroup}>
+        <AppText role="caption" style={{ color: colors.textSecondary }}>
+          {caption}
+        </AppText>
+        <View style={styles.chipRow}>
+          {options.map((option) => {
+            const selected = selectedValue === option.value;
+            return (
+              <Pressable
+                key={String(option.value)}
+                testID={`${testID}-${String(option.value)}`}
+                accessibilityRole="button"
+                accessibilityLabel={`${title} ${option.label}`}
+                accessibilityState={{ selected, disabled: settings === null }}
+                disabled={settings === null}
+                onPress={() => void persist(option.patch)}
+                style={[
+                  styles.chip,
+                  {
+                    borderColor: selected ? colors.accent : colors.border,
+                    backgroundColor: selected ? colors.accent : colors.surface,
+                  },
+                ]}
               >
-                {option.label}
-              </AppText>
-            </Pressable>
-          );
-        })}
+                {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
+                <AppText
+                  role="body"
+                  style={{
+                    color: selected ? colors.onAccent : colors.textPrimary,
+                  }}
+                >
+                  {option.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
-    </View>
+    </SettingsSectionCard>
   );
 
   return (
@@ -199,30 +205,21 @@ export function SettingsInteractionsScreen() {
           settings?.yourWeekPeriod,
         )}
 
-        <View
-          testID="settings-interaction-assist-section"
-          style={styles.section}
-        >
-          <View style={styles.toggleRow}>
-            <AppText
-              accessibilityRole="header"
-              role="heading"
-              style={{ color: colors.textPrimary }}
-            >
-              Interaction Assist
-            </AppText>
-            <OrbitSwitch
-              testID="settings-interaction-assist"
-              accessibilityLabel="Interaction Assist"
-              disabled={settings === null}
-              value={settings?.interactionAssistEnabled === 1}
-              onValueChange={(value) => void onToggleInteractionAssist(value)}
-            />
-          </View>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Ask me to log calls, texts and emails started from Orbit.
-          </AppText>
-        </View>
+        <SettingsSectionCard testID="settings-interaction-assist-section">
+          <SettingsRow
+            title="Interaction Assist"
+            subtitle="Ask me to log calls, texts and emails started from Orbit."
+            trailing={
+              <OrbitSwitch
+                testID="settings-interaction-assist"
+                accessibilityLabel="Interaction Assist"
+                disabled={settings === null}
+                value={settings?.interactionAssistEnabled === 1}
+                onValueChange={(value) => void onToggleInteractionAssist(value)}
+              />
+            }
+          />
+        </SettingsSectionCard>
       </ScrollView>
     </View>
   );
@@ -232,16 +229,12 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: {
     padding: SPACING.base,
-    gap: SPACING.md,
+    gap: SPACING.lg,
   },
-  section: {
+  chipGroup: {
     gap: SPACING.md,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: SPACING.md,
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.md,
   },
   chipRow: {
     flexDirection: "row",
@@ -252,7 +245,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: "center",
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: RADII.md,
     paddingHorizontal: SPACING.base,
     paddingVertical: SPACING.sm,
   },

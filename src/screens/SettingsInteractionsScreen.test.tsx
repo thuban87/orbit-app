@@ -40,6 +40,8 @@ vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   OrbitSwitch: "OrbitSwitch",
+  SettingsRow: "SettingsRow",
+  SettingsSectionCard: "SettingsSectionCard",
 }));
 vi.mock("@/navigation/use-bottom-clearance", () => ({
   useBottomClearance: () => 0,
