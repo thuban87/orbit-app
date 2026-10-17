@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomFieldDef } from "@/db/field-types";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 
@@ -12,13 +12,13 @@ import { THEME_PRESETS } from "@/theme/theme-presets";
  * order (active first, quarantined after).
  *
  * `useState` is a call-order slot harness (same as
- * custom-fields-header-render.test.tsx). Screen slot order: defs, emptyById,
+ * custom-fields-header-render.test.tsx). Screen slot order: defs, valueCounts,
  * editor, newFieldShareDefault, editorDirty, saving. Row components are
  * called as plain functions after the screen, so their slots follow.
  */
 
 const DEFS_SLOT = 0;
-const EMPTY_SLOT = 1;
+const COUNTS_SLOT = 1;
 const EDITOR_SLOT = 2;
 
 const drag = vi.hoisted(() => vi.fn());
@@ -57,6 +57,7 @@ vi.mock("react-native", () => ({
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   Text: "Text",
+  TextInput: "TextInput",
   View: "View",
   StyleSheet: {
     create: (styles: unknown) => styles,
@@ -72,7 +73,18 @@ vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
 vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
-vi.mock("@/components/FieldDefForm", () => ({ FieldDefForm: "FieldDefForm" }));
+// The real module's exports (FIELD_TYPE_LABELS), with the form itself a host
+// element; the form is rendered for real only by the photo Allow AI test.
+vi.mock("@/components/FieldDefForm", async (original) => ({
+  ...(await original<typeof import("@/components/FieldDefForm")>()),
+  FieldDefForm: "FieldDefForm",
+}));
+vi.mock("@/components/FieldValueInput", () => ({
+  FieldValueInput: "FieldValueInput",
+}));
+vi.mock("@/components/ui", () => ({ OrbitSwitch: "OrbitSwitch" }));
+vi.mock("@/db/col-name", () => ({ makeColName: () => "cf_x" }));
+vi.mock("@/db/uid", () => ({ newUid: () => "uid" }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/AnchoredMenu", () => ({
   AnchoredMenu: "AnchoredMenu",
@@ -90,7 +102,7 @@ vi.mock("@/db/field-ddl", () => ({
 }));
 vi.mock("@/db/field-defs-dao", () => ({
   changeFieldOptions: vi.fn(),
-  isFieldEmpty: vi.fn(),
+  countFieldValues: vi.fn(),
   listDefs: vi.fn(async () => []),
   renameField: vi.fn(),
   reorderFields: vi.fn(async () => undefined),
@@ -116,7 +128,11 @@ vi.mock("@/stores/confirm-store", () => ({
 vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
 
-const { CustomFieldsScreen } = await import("./CustomFieldsScreen");
+const { CustomFieldsScreen, optionsSummary, quarantineKeptUntil, typeSummary } =
+  await import("./CustomFieldsScreen");
+const { FieldDefForm } = await vi.importActual<
+  typeof import("@/components/FieldDefForm")
+>("@/components/FieldDefForm");
 const dao = await import("@/db/field-defs-dao");
 const confirmStore = await import("@/stores/confirm-store");
 
@@ -148,12 +164,12 @@ const QUARANTINED = [def(9, "Old", "photo", "2026-10-01 09:00:00")];
 
 function renderScreen(
   defs: CustomFieldDef[] = [...ACTIVE, ...QUARANTINED],
-  empty: Record<number, boolean> = { 1: true, 2: false, 9: false },
+  counts: Record<number, number> = { 1: 0, 2: 3, 9: 2 },
 ) {
   hooks.states = [];
   hooks.setters = [];
   hooks.states[DEFS_SLOT] = defs;
-  hooks.states[EMPTY_SLOT] = empty;
+  hooks.states[COUNTS_SLOT] = counts;
   hooks.states[EDITOR_SLOT] = null;
   hooks.index = 0;
   return nodes(CustomFieldsScreen());
@@ -274,9 +290,9 @@ describe("Custom Fields list: drag handle + ⋯ (38.12 D-120)", () => {
 
   it("a middle field offers both Move up and Move down", () => {
     const tree = renderScreen([...ACTIVE, def(3, "Pets", "text")], {
-      1: true,
-      2: true,
-      3: true,
+      1: 0,
+      2: 0,
+      3: 0,
     });
     const items = menuItems(renderRow(tree, 1));
     expect(items.map((item) => item.label)).toEqual([
@@ -343,5 +359,154 @@ describe("Custom Fields list: drag handle + ⋯ (38.12 D-120)", () => {
     await vi.waitFor(() =>
       expect(dao.restoreField).toHaveBeenCalledWith("exec", 9, "now"),
     );
+  });
+});
+
+describe("Custom Fields copy and labels (38.12 D-71, D-72, D-74, D-129)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 17, 12, 0, 0));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => i);
+
+  it("the type-change summary keeps the §14.4 sentence and agrees in number (D-71, D-24)", () => {
+    expect(typeSummary({ total: 12, convert: ids(8), flag: ids(4) })).toBe(
+      "8 of 12 values will convert automatically. 4 need your input — fix now or later.",
+    );
+    expect(typeSummary({ total: 3, convert: ids(2), flag: ids(1) })).toBe(
+      "2 of 3 values will convert automatically. 1 needs your input — fix now or later.",
+    );
+    expect(typeSummary({ total: 1, convert: ids(1), flag: [] })).toBe(
+      "1 of 1 value will convert automatically. 0 need your input — fix now or later.",
+    );
+  });
+
+  it("the options-change summary agrees in number too", () => {
+    expect(optionsSummary({ total: 5, keep: ids(4), flag: ids(1) })).toBe(
+      "4 of 5 values will be kept. 1 needs your input — fix now or later.",
+    );
+  });
+
+  it("a quarantined field is kept until its quarantine date plus the window (D-72)", () => {
+    expect(quarantineKeptUntil("2026-10-01 09:00:00")).toBe("Oct 31");
+    expect(quarantineKeptUntil("2025-12-20 09:00:00")).toBe("Jan 19");
+    expect(quarantineKeptUntil("2026-12-20 09:00:00")).toBe("Jan 19, 2027");
+    expect(quarantineKeptUntil("not a date")).toBeNull();
+  });
+
+  it("the quarantined row shows its type label and 'kept until <date>'", () => {
+    const [row] = renderQuarantinedRows(renderScreen());
+    const texts = row
+      .filter((node) => node.type === "Text")
+      .map((node) => [node.props.children].flat().join(""));
+    expect(texts).toContain("Photo · kept until Oct 31");
+  });
+
+  it("active rows show the field-type label, never the raw type id (D-74)", () => {
+    const tree = renderScreen();
+    const texts = [0, 1].flatMap((index) =>
+      renderRow(tree, index)
+        .filter((node) => node.type === "Text")
+        .map((node) => node.props.children),
+    );
+    expect(texts).toEqual(["Coffee", "Text", "Met at", "Date"]);
+  });
+
+  it("the Quarantine confirm says the field has values for N contacts (D-72)", async () => {
+    const items = menuItems(renderRow(renderScreen(), 1));
+    items.at(-1)?.onPress();
+    await vi.waitFor(() =>
+      expect(confirmStore.confirm).toHaveBeenCalledTimes(1),
+    );
+    const request = vi.mocked(confirmStore.confirm).mock.calls[0][0];
+    expect(request).toMatchObject({
+      title: "Quarantine field",
+      confirmLabel: "Quarantine",
+    });
+    expect(request.message).toBe(
+      '"Met at" has values for 3 contacts, so it will be quarantined for 30 days. You can restore it before then.',
+    );
+  });
+
+  it("the singular count reads '1 contact', and an empty field says it has no values", async () => {
+    const tree = renderScreen(ACTIVE, { 1: 0, 2: 1 });
+    menuItems(renderRow(tree, 1)).at(-1)?.onPress();
+    menuItems(renderRow(tree, 0)).at(-1)?.onPress();
+    await vi.waitFor(() =>
+      expect(confirmStore.confirm).toHaveBeenCalledTimes(2),
+    );
+    const [quarantine, remove] = vi
+      .mocked(confirmStore.confirm)
+      .mock.calls.map(([request]) => request);
+    expect(quarantine.message).toContain("has values for 1 contact, so");
+    expect(remove).toMatchObject({
+      title: "Delete field",
+      confirmLabel: "Delete",
+      destructive: true,
+      message: '"Coffee" has no values, so it will be deleted permanently.',
+    });
+  });
+
+  function renderForm(props: Record<string, unknown>) {
+    hooks.states = [];
+    hooks.setters = [];
+    hooks.index = 0;
+    return nodes(
+      FieldDefForm({
+        bottomClearance: 0,
+        onSubmit: vi.fn(),
+        onCancel: vi.fn(),
+        ...props,
+      } as never),
+    );
+  }
+
+  it("the new-field placeholder is a neutral example, not a built-in field (D-74)", () => {
+    const tree = renderForm({
+      mode: "create",
+      existingColNames: new Set(),
+      nextDisplayOrder: 0,
+    });
+    const input = tree.find((node) => node.props.testID === "field-def-label");
+    expect(input?.props.placeholder).toBe("e.g. Favorite coffee");
+  });
+
+  it("a photo-type definition offers no Allow AI switch and saves share_with_ai 0 (D-129)", () => {
+    const onSubmit = vi.fn();
+    const photo = {
+      id: 9,
+      label: "Headshot",
+      type: "photo",
+      options: null,
+      show_on_new: 0,
+      always_show: 0,
+      share_with_ai: 1,
+    } as unknown as CustomFieldDef;
+    const tree = renderForm({ mode: "edit", field: photo, onSubmit });
+    expect(
+      tree.some((node) => node.props.testID === "field-def-share-with-ai"),
+    ).toBe(false);
+    const submit = tree.find(
+      (node) => node.props.testID === "field-def-submit",
+    );
+    (submit?.props.onPress as () => void)();
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "photo", share_with_ai: 0 }),
+    );
+  });
+
+  it("a non-photo definition keeps its Allow AI switch", () => {
+    const tree = renderForm({
+      mode: "edit",
+      field: { ...ACTIVE[0], options: null, share_with_ai: 1 },
+    });
+    expect(
+      tree.some((node) => node.props.testID === "field-def-share-with-ai"),
+    ).toBe(true);
   });
 });

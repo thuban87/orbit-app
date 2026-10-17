@@ -7,6 +7,7 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createField } from "@/db/field-ddl";
 import {
   changeFieldOptions,
+  countFieldValues,
   isFieldEmpty,
   listDefs,
   quarantineField,
@@ -73,6 +74,29 @@ async function contact(): Promise<number> {
   );
   return result.lastInsertRowId;
 }
+
+describe("countFieldValues", () => {
+  it("counts the contacts holding a non-null value for the field (38.12 D-72)", async () => {
+    const fieldDefId = await makeDef();
+    const other = await makeDef({ col_name: "other", label: "Other" });
+    expect(await countFieldValues(exec, fieldDefId)).toBe(0);
+    for (const value of ["Ace", "", null]) {
+      const contactId = await contact();
+      await exec.runAsync(
+        "INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
+        [uid(), contactId, fieldDefId, value, NOW, NOW],
+      );
+      await exec.runAsync(
+        "INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
+        [uid(), contactId, other, "x", NOW, NOW],
+      );
+    }
+    // "" is a present value (as isFieldEmpty and the delete guard read it);
+    // NULL is not.
+    expect(await countFieldValues(exec, fieldDefId)).toBe(2);
+    expect(await countFieldValues(exec, other)).toBe(3);
+  });
+});
 
 describe("isFieldEmpty", () => {
   it("uses a bound field_def_id, treating only NULL as empty", async () => {
