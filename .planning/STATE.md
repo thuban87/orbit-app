@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.12
 current_phase_name: People Lifecycle, Import & Settings UX (INSERTED)
 status: executing
-stopped_at: Completed 38.12-14-PLAN.md
-last_updated: "2026-10-17T22:50:44.000Z"
+stopped_at: Completed 38.12-16-PLAN.md
+last_updated: "2026-10-17T23:16:00.000Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 38.12 execution started
-state_head: 53f128a3266fdc674892f361faa7770bea99e08d
+state_head: c277963f
 progress:
   total_phases: 38
   completed_phases: 25
   total_plans: 365
-  completed_plans: 350
+  completed_plans: 351
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -474,6 +474,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.12 P12 | 17 min | 3 tasks | 29 files |
 | Phase 38.12 P13 | 18 min | 4 tasks | 14 files |
 | Phase 38.12 P14 | 18 min | 2 tasks | 13 files |
+| Phase 38.12 P16 | 21 min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -1056,6 +1057,8 @@ Foundational decisions affecting current work:
 - [Phase 38.12]: 38.12-13: D-53 already-linked single pick resolved at the review's load via findActiveExternalLink + resolveAlreadyLinked + finalizeSessionIfTerminal (ImportReviewAlreadyLinked.tsx); Open = openContactFromFlow without finishing first (matches ImportComplete), Done/Back = finishFlow; sheet + already-linked copy is Claude's Discretion, owner sees it at 38.12-26
 - [Phase 38.12]: 38.12-14: quiet-hours arrival = nextAllowedFireInstant (stagger 0, no now-roll) via effectiveReminderArrival; when the roll crosses midnight with Birthday alerts on, the line says birthday alerts are not sent (scheduler skips them); helper says the weekly digest comes at the reminder time; paused line hidden while the degraded note shows; CHECK_IN_REMINDERS / USE_AI_SUGGESTIONS in glossary + doc + contract
 - [Phase 38.12]: 38.12-14: Orbit Center = shared Sheet + ContactPickerList over listSunCandidates (now PickerContactRow-shaped) with a You row and Cancel; default layout = OptionSheet 'Default Profile layout'; Your name joins useKeyboardCentering, save shows 'Saved your name' snackbar; RG-029 M41-M43 obsolete (done 41); Appearance keeps four sections, 'Your profile' -> 'You'
+- [Phase 38.12]: 38.12-16: AI sections = ScrollViewContainer + NestedReorderableList, drag handle + anchored ⋯ (Rename / edit, Replace from file, Move up/down, Delete section last); reorder optimistic + single-flight; Writing Style choices are presets + a Custom segment, guidance box only while a choice is custom (caption 'X is set to use custom guidance:'), estimate counts guidance only when sent; section switches held via busy + handler guard (disabled draws Off); SegmentedControl gains optional disabled
+- [Phase 38.12]: 38.12-16: AI Data Permissions excludes photo fields and clamps a photo def's share_with_ai to 0; default captions 'New items start with Allow AI on/off.'; filter-empty copy 'No items match this filter.'; AI Preview plain titles, contact card first with exact blocks, explicit no-contact state (EXAMPLE_PREVIEW_CONTEXT in settings-ai-logic); AI children on plain SettingsSectionCard
 
 ### Pending Todos
 
@@ -1125,8 +1128,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-17T22:50:23.236Z
-**Stopped at:** Completed 38.12-14-PLAN.md
+**Last session:** 2026-10-17T23:16:00.000Z
+**Stopped at:** Completed 38.12-16-PLAN.md
 _Prior stop:_ Phase 39 context gathered (dossier accepted; UX audit next, then plan-phase 39)
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
