@@ -68,6 +68,7 @@ vi.mock("@/utils/logger", () => ({
 const { showSnackbar } = vi.hoisted(() => ({ showSnackbar: vi.fn() }));
 vi.mock("@/stores/snackbar-store", () => ({ showSnackbar }));
 
+import { INDEFINITE_SNOOZE_UNTIL } from "@/db/snooze-dao";
 import {
   type BulkActionClaim,
   createBulkActionGate,
@@ -261,6 +262,81 @@ describe("SnoozeSheet choices (D-45, D-15, D-37)", () => {
     again.press("snooze-sheet-cancel-date");
     expect(again.byTestId("snooze-sheet-set")).toBeUndefined();
     expect(again.byTestId("snooze-sheet-picker")).toBeUndefined();
+  });
+});
+
+describe("SnoozeSheet indefinite snooze (38.12 D-96, D-98)", () => {
+  it("offers Until I turn it off after the presets and before Choose date", () => {
+    const sheet = mount();
+    const ids = sheet
+      .render()
+      .filter((node) =>
+        /^snooze-sheet-(3d|1w|1m|indefinite|custom)$/.test(
+          String(node.props.testID ?? ""),
+        ),
+      )
+      .map((node) => node.props.testID);
+    expect(ids).toEqual([
+      "snooze-sheet-3d",
+      "snooze-sheet-1w",
+      "snooze-sheet-1m",
+      "snooze-sheet-indefinite",
+      "snooze-sheet-custom",
+    ]);
+    const choice = sheet.byTestId("snooze-sheet-indefinite");
+    expect(choice?.props.accessibilityLabel).toBe("Snooze until I turn it off");
+    expect(textOf(choice)).toBe("Until I turn it off");
+  });
+
+  it("snoozes with no end date through onUntil, confirms, and Undo restores the previous state", async () => {
+    const onUntil = vi.fn(async (_until: string) => {});
+    const onRestore = vi.fn(async (_previous: string | null) => {});
+    const sheet = mount({ onUntil, confirmName: "Ann Lee", onRestore });
+    sheet.press("snooze-sheet-indefinite");
+    await flush();
+    expect(onUntil).toHaveBeenCalledExactlyOnceWith(INDEFINITE_SNOOZE_UNTIL);
+    expect(sheet.onClose).toHaveBeenCalledOnce();
+    const confirmation = snackbars().at(-1);
+    expect(confirmation).toMatchObject({
+      kind: "success",
+      label: "Snoozed Ann Lee until you turn it off",
+    });
+    confirmation?.action?.onPress();
+    await flush();
+    expect(onRestore).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it("names an indefinite snooze in the header, Unsnooze ends it, and Undo restores it", async () => {
+    const onUnsnooze = vi.fn(async () => {});
+    const onRestore = vi.fn(async (_previous: string | null) => {});
+    const sheet = mount({
+      snoozedUntil: INDEFINITE_SNOOZE_UNTIL,
+      showUnsnooze: true,
+      onUnsnooze,
+      confirmName: "Ann Lee",
+      onRestore,
+    });
+    expect(textOf(sheet.byTestId("snooze-sheet-current"))).toBe(
+      "Snoozed until you turn it off",
+    );
+    sheet.press("snooze-sheet-unsnooze");
+    await flush();
+    expect(onUnsnooze).toHaveBeenCalledOnce();
+    snackbars().at(-1)?.action?.onPress();
+    await flush();
+    expect(onRestore).toHaveBeenCalledExactlyOnceWith(INDEFINITE_SNOOZE_UNTIL);
+  });
+
+  it("caps the custom date picker at ten years so a pick never equals the sentinel", () => {
+    const sheet = mount();
+    sheet.press("snooze-sheet-custom");
+    const maximum = sheet.byTestId("snooze-sheet-picker")?.props
+      .maximumDate as Date;
+    expect([
+      maximum.getFullYear(),
+      maximum.getMonth(),
+      maximum.getDate(),
+    ]).toEqual([2036, 9, 16]);
   });
 });
 

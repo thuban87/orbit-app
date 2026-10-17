@@ -1,7 +1,9 @@
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { ProfileSnapshot } from "@/db/profile-read";
+import { INDEFINITE_SNOOZE_UNTIL } from "@/db/snooze-dao";
 import type { ProfileLayoutDocument } from "@/profile/types";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 import { RelationshipOverview } from "./RelationshipOverview";
 
 vi.mock("react", async (original) => ({
@@ -194,5 +196,50 @@ describe("RelationshipOverview Birthday tile (38.11 D-53, D-55)", () => {
       "profile-overview-contact-frequency",
       "profile-overview-snooze",
     ]);
+  });
+});
+
+// 38.12 D-37, D-96: the Snooze tile reads the EFFECTIVE (unexpired) snooze and
+// words an indefinite snooze without a date.
+describe("RelationshipOverview Snooze tile (38.12 D-37, D-96)", () => {
+  const snoozeModule = [
+    { id: "snooze", visible: true, expanded: false, size: "1x1" },
+  ] as unknown as ProfileLayoutDocument["overview"];
+  const TODAY = "2026-10-17";
+
+  function snoozeTile(snoozeUntil: string | null): Node | undefined {
+    return all(
+      resolve(
+        RelationshipOverview({
+          snapshot: {
+            ...snapshot,
+            identity: { ...snapshot.identity, snoozeUntil },
+          } as ProfileSnapshot,
+          modules: snoozeModule,
+          onOpenSheet: vi.fn(),
+          todayLocal: TODAY,
+        }),
+      ),
+    ).find((node) => node.props.testID === "profile-overview-snooze");
+  }
+
+  it("shows Snoozed · until you turn it off for an indefinite snooze", () => {
+    expect(snoozeTile(INDEFINITE_SNOOZE_UNTIL)?.props.accessibilityLabel).toBe(
+      "Snooze. Snoozed · until you turn it off",
+    );
+  });
+
+  it("keeps the dated wording for a future snooze", () => {
+    expect(snoozeTile("2026-11-01")?.props.accessibilityLabel).toBe(
+      `Snooze. Snoozed until ${formatDisplayDateOrFallback("2026-11-01")}`,
+    );
+  });
+
+  it("shows an expired snooze as not snoozed", () => {
+    for (const until of ["2026-10-17", "2026-10-01"]) {
+      expect(snoozeTile(until)?.props.accessibilityLabel, until).toBe(
+        "Snooze. Not snoozed",
+      );
+    }
   });
 });

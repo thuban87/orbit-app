@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCustomInterval } from "@/components/frequency-picker-logic";
+import { INDEFINITE_SNOOZE_UNTIL } from "@/db/snooze-dao";
 import type { ProfileStatusMetric } from "@/services/profile-metrics";
 import { formatDisplayDateOrFallback } from "@/utils/dates";
 import {
@@ -17,6 +18,7 @@ import {
   savedMethodKinds,
   snoozeConfirmationLabel,
   snoozeCustomDateDefault,
+  snoozeUntilLabel,
   validateCustomSnoozeDate,
 } from "./relationship-sheet-model";
 
@@ -597,6 +599,13 @@ describe("frequency and snooze choices", () => {
         label: "1 month",
         accessibilityLabel: "Snooze for 1 month",
       },
+      // 38.12 D-96: the indefinite choice, after the presets and before the
+      // custom date (38.12-01 only).
+      {
+        kind: "indefinite",
+        label: "Until I turn it off",
+        accessibilityLabel: "Snooze until I turn it off",
+      },
       {
         kind: "custom",
         label: "Choose date",
@@ -648,6 +657,26 @@ describe("frequency and snooze choices", () => {
     expect(snoozeConfirmationLabel("Alex", { kind: "unsnooze" })).toBe(
       "Unsnoozed Alex",
     );
+  });
+
+  // 38.12 D-96: an indefinite snooze never prints the sentinel's year.
+  it("words an indefinite snooze as until you turn it off (D-96)", () => {
+    expect(
+      snoozeConfirmationLabel("Ann Lee", {
+        kind: "until",
+        until: INDEFINITE_SNOOZE_UNTIL,
+      }),
+    ).toBe("Snoozed Ann Lee until you turn it off");
+  });
+
+  it("labels a snooze end through one helper (D-96)", () => {
+    expect(snoozeUntilLabel(INDEFINITE_SNOOZE_UNTIL)).toBe(
+      "until you turn it off",
+    );
+    expect(snoozeUntilLabel("2026-11-01")).toBe(
+      `until ${formatDisplayDateOrFallback("2026-11-01")}`,
+    );
+    expect(snoozeUntilLabel("2026-11-01")).not.toContain("9999");
   });
 });
 
