@@ -1680,7 +1680,34 @@ Plans:
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 11–16 plans — rough estimate from finding titles plus the triage's per-area range; includes a possible Settings page-layout sweep (K-05) and the favourites-in-backups format bump (K-22); site counts not taken.
 **Coordination**: shares Profile files with 38.11 (not-contacted status code, ⋯ menu, merge entry) and builds on 38.11's shared snooze sheet (38.11 D-45; X-20). 38.11 renames Archive to "Bin" app-wide and makes Move to Bin a confirm without Undo (38.11 D-69, D-71) — see "Notes from 38.11" in this phase's workpaper. None blocks this phase.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: TBD
+**Plans**: 26 plans (7 waves; executed sequentially on main)
+
+- [ ] 38.12-01-PLAN.md — Mute becomes an indefinite snooze + migration 034 (review-memory family, resume markers, mute conversion)
+- [ ] 38.12-02-PLAN.md — Contacts bridge (native): full-size photos, photo fingerprint, thumbnail copy, method labels
+- [ ] 38.12-03-PLAN.md — Flow endings via flow-host + Profile returnTab; Phase 39 amendment rows
+- [ ] 38.12-04-PLAN.md — Backup file names (local time, own auto prefix) + content://-only intake (native)
+- [ ] 38.12-05-PLAN.md — AI egress narrowing: guidance gate, unwrapped instructions, no photo fields
+- [ ] 38.12-06-PLAN.md — Shared Settings row/card + About, Contacts & Relationships, Interactions, Orrery, Profile backgrounds
+- [ ] 38.12-07-PLAN.md — Management lists: Custom Fields, Categories, Systems (drag + ⋯) and their fixes
+- [ ] 38.12-08-PLAN.md — Review matches list + per-person sheet
+- [ ] 38.12-09-PLAN.md — Backup format 9 (favorites), restore semantics, people counts, progress callback
+- [ ] 38.12-10-PLAN.md — Check linked contacts: review memory (no re-prompting)
+- [ ] 38.12-11-PLAN.md — Merge: searchable picker, complete summary, photo-field fixes, host threading
+- [ ] 38.12-12-PLAN.md — Profile state: Bin banner and gating, In the Bin status, Unbound snooze/star, DAO guards
+- [ ] 38.12-13-PLAN.md — Import intake: photo budget warning + already-linked
+- [ ] 38.12-14-PLAN.md — Notifications and Appearance pages (+ D-130 glossary)
+- [ ] 38.12-15-PLAN.md — AI Connection truthful state + AI hub
+- [ ] 38.12-16-PLAN.md — AI personalization, permissions and preview
+- [ ] 38.12-17-PLAN.md — Backup and Backup settings pages + Back up now
+- [ ] 38.12-18-PLAN.md — Restore pages: focused, steps, people counts, host param
+- [ ] 38.12-19-PLAN.md — Check linked contacts: apply with labels, wording, no Apply recommendation
+- [ ] 38.12-20-PLAN.md — Profile destinations: Merge and per-person check in ⋯, value history, template Save, docs
+- [ ] 38.12-21-PLAN.md — Import review, bulk setup and lifecycle effects
+- [ ] 38.12-22-PLAN.md — Lifecycle feedback (Restore/Bind/Unbind) and the Bin and Unbound lists
+- [ ] 38.12-23-PLAN.md — Import complete names + legacy contact picker
+- [ ] 38.12-24-PLAN.md — Fix flagged custom values + Review now
+- [ ] 38.12-25-PLAN.md — Resume prompts once + Settings "Finish your …" rows
+- [ ] 38.12-26-PLAN.md — Device pass (debug walk, owner batch, one release build)
 
 ### Phase 38.13: Contacts List, Search & Digest UX (INSERTED)
 
@@ -1799,7 +1826,7 @@ Plans:
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
 | 38.11 Everyday Screens UX | 14/14 | Complete| 2026-10-16 |
-| 38.12 People Lifecycle, Import & Settings UX | 0/TBD | Not started | - |
+| 38.12 People Lifecycle, Import & Settings UX | 0/26 | Planned | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
