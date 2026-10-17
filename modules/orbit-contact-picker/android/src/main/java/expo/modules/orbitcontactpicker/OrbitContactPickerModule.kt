@@ -188,6 +188,11 @@ class OrbitContactPickerModule : Module() {
       ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
       ContactsContract.Data.MIMETYPE,
       ContactsContract.Data.DATA1,
+      // D-102: phone/email TYPE and LABEL. Standard Data columns the API-37
+      // session URI is expected to return (RESEARCH A1); a missing column reads
+      // as null through stringAt/intAt.
+      ContactsContract.Data.DATA2,
+      ContactsContract.Data.DATA3,
       ContactsContract.Data.DATA15,
     )
     val contacts = linkedMapOf<String, MutablePickedContact>()
@@ -199,6 +204,8 @@ class OrbitContactPickerModule : Module() {
       val displayNameColumn = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
       val mimeTypeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
       val data1Column = cursor.getColumnIndex(ContactsContract.Data.DATA1)
+      val data2Column = cursor.getColumnIndex(ContactsContract.Data.DATA2)
+      val data3Column = cursor.getColumnIndex(ContactsContract.Data.DATA3)
       val data15Column = cursor.getColumnIndex(ContactsContract.Data.DATA15)
 
       while (cursor.moveToNext()) {
@@ -208,12 +215,26 @@ class OrbitContactPickerModule : Module() {
 
         when (cursor.stringAt(mimeTypeColumn)) {
           ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE ->
+            // getTypeLabel is deliberately not used (localized); the TS
+            // consumer maps codes to Orbit's labels (38.12-19).
             cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
-              contact.methods += mapOf("type" to "phone", "value" to value)
+              // D-102: raw TYPE (DATA2) and LABEL (DATA3); null when absent.
+              contact.methods += mapOf(
+                "type" to "phone",
+                "value" to value,
+                "typeCode" to cursor.intAt(data2Column),
+                "customLabel" to cursor.stringAt(data3Column)?.takeIf { it.isNotBlank() },
+              )
             }
           ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE ->
             cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
-              contact.methods += mapOf("type" to "email", "value" to value)
+              // D-102: raw TYPE (DATA2) and LABEL (DATA3); null when absent.
+              contact.methods += mapOf(
+                "type" to "email",
+                "value" to value,
+                "typeCode" to cursor.intAt(data2Column),
+                "customLabel" to cursor.stringAt(data3Column)?.takeIf { it.isNotBlank() },
+              )
             }
           ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
             contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
@@ -242,6 +263,7 @@ class OrbitContactPickerModule : Module() {
       ContactsContract.Data.MIMETYPE,
       ContactsContract.Data.DATA1,
       ContactsContract.Data.DATA2,
+      ContactsContract.Data.DATA3,
       ContactsContract.Data.DATA15,
     )
     val contacts = linkedMapOf<String, MutablePickedContact>()
@@ -265,6 +287,7 @@ class OrbitContactPickerModule : Module() {
       val mimeTypeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
       val data1Column = cursor.getColumnIndex(ContactsContract.Data.DATA1)
       val data2Column = cursor.getColumnIndex(ContactsContract.Data.DATA2)
+      val data3Column = cursor.getColumnIndex(ContactsContract.Data.DATA3)
       val data15Column = cursor.getColumnIndex(ContactsContract.Data.DATA15)
 
       while (cursor.moveToNext()) {
@@ -275,11 +298,23 @@ class OrbitContactPickerModule : Module() {
         when (cursor.stringAt(mimeTypeColumn)) {
           ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE ->
             cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
-              contact.methods += mapOf("type" to "phone", "value" to value)
+              // D-102: raw TYPE (DATA2) and LABEL (DATA3); null when absent.
+              contact.methods += mapOf(
+                "type" to "phone",
+                "value" to value,
+                "typeCode" to cursor.intAt(data2Column),
+                "customLabel" to cursor.stringAt(data3Column)?.takeIf { it.isNotBlank() },
+              )
             }
           ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE ->
             cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
-              contact.methods += mapOf("type" to "email", "value" to value)
+              // D-102: raw TYPE (DATA2) and LABEL (DATA3); null when absent.
+              contact.methods += mapOf(
+                "type" to "email",
+                "value" to value,
+                "typeCode" to cursor.intAt(data2Column),
+                "customLabel" to cursor.stringAt(data3Column)?.takeIf { it.isNotBlank() },
+              )
             }
           ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
             if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
@@ -411,6 +446,7 @@ class OrbitContactPickerModule : Module() {
       ContactsContract.Data.MIMETYPE,
       ContactsContract.Data.DATA1,
       ContactsContract.Data.DATA2,
+      ContactsContract.Data.DATA3,
       ContactsContract.Data.DATA15,
     )
     context.contentResolver.query(
@@ -425,6 +461,7 @@ class OrbitContactPickerModule : Module() {
       val mimeTypeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
       val data1Column = cursor.getColumnIndex(ContactsContract.Data.DATA1)
       val data2Column = cursor.getColumnIndex(ContactsContract.Data.DATA2)
+      val data3Column = cursor.getColumnIndex(ContactsContract.Data.DATA3)
       val data15Column = cursor.getColumnIndex(ContactsContract.Data.DATA15)
       while (cursor.moveToNext()) {
         val lookupKey = cursor.stringAt(lookupKeyColumn) ?: continue
@@ -432,11 +469,23 @@ class OrbitContactPickerModule : Module() {
         when (cursor.stringAt(mimeTypeColumn)) {
           ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE ->
             cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
-              contact.methods += mapOf("type" to "phone", "value" to value)
+              // D-102: raw TYPE (DATA2) and LABEL (DATA3); null when absent.
+              contact.methods += mapOf(
+                "type" to "phone",
+                "value" to value,
+                "typeCode" to cursor.intAt(data2Column),
+                "customLabel" to cursor.stringAt(data3Column)?.takeIf { it.isNotBlank() },
+              )
             }
           ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE ->
             cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }?.let { value ->
-              contact.methods += mapOf("type" to "email", "value" to value)
+              // D-102: raw TYPE (DATA2) and LABEL (DATA3); null when absent.
+              contact.methods += mapOf(
+                "type" to "email",
+                "value" to value,
+                "typeCode" to cursor.intAt(data2Column),
+                "customLabel" to cursor.stringAt(data3Column)?.takeIf { it.isNotBlank() },
+              )
             }
           ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
             if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {

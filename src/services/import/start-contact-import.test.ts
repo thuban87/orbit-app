@@ -54,13 +54,9 @@ describe("startContactImport", () => {
   it("merges provider notes after an in-context grant (API-37 picker omits notes)", async () => {
     const pick = vi.fn().mockResolvedValue(picked);
     const ensureNotesAccess = vi.fn().mockResolvedValue(true);
-    const readByLookupKeys = vi.fn().mockResolvedValue([
-      {
-        ...picked[0],
-        note: "Met at PyCon",
-        photoTempUri: "file:///cache/contact-picker-1.photo",
-      },
-    ]);
+    const readByLookupKeys = vi
+      .fn()
+      .mockResolvedValue([{ ...picked[0], note: "Met at PyCon" }]);
     const discardPhotoCopy = vi.fn();
 
     await startContactImport({
@@ -75,14 +71,113 @@ describe("startContactImport", () => {
       navigate,
     });
 
-    expect(readByLookupKeys).toHaveBeenCalledWith(["legacy-contact-1"]);
-    // The re-read's own photo copy is retired; the picked photo is untouched.
-    expect(discardPhotoCopy).toHaveBeenCalledWith(
-      "file:///cache/contact-picker-1.photo",
-    );
+    // The re-read is an import path: always full-size (D-118, D-137).
+    expect(readByLookupKeys).toHaveBeenCalledWith(["legacy-contact-1"], {
+      preferFullSize: true,
+    });
+    expect(discardPhotoCopy).not.toHaveBeenCalled();
     expect(routePickedImport.mock.calls[0][1]).toEqual([
       { ...picked[0], note: "Met at PyCon" },
     ]);
+  });
+
+  it("a re-read with a photo replaces the picker photo and retires the picker copies (D-118)", async () => {
+    const pickedWithPhoto: PickedContact = {
+      ...picked[0],
+      photoTempUri: "file:///cache/contact-picker-session.photo",
+      thumbnailTempUri: "file:///cache/contact-picker-session-thumb.photo",
+      photoFingerprint: "a".repeat(64),
+    };
+    const discardPhotoCopy = vi.fn();
+
+    await startContactImport({
+      mode: "system",
+      exec,
+      effectivePhoneRegion: "US",
+      now: "2026-08-30 10:00:00",
+      pick: vi.fn().mockResolvedValue([pickedWithPhoto]),
+      ensureNotesAccess: vi.fn().mockResolvedValue(true),
+      readByLookupKeys: vi.fn().mockResolvedValue([
+        {
+          ...picked[0],
+          note: "Met at PyCon",
+          photoTempUri: "file:///cache/contact-picker-full.photo",
+          thumbnailTempUri: "file:///cache/contact-picker-thumb.photo",
+          photoFingerprint: "b".repeat(64),
+        },
+      ]),
+      discardPhotoCopy,
+      navigate,
+    });
+
+    expect(discardPhotoCopy.mock.calls).toEqual([
+      ["file:///cache/contact-picker-session.photo"],
+      ["file:///cache/contact-picker-session-thumb.photo"],
+    ]);
+    expect(routePickedImport.mock.calls[0][1]).toEqual([
+      {
+        ...picked[0],
+        note: "Met at PyCon",
+        photoTempUri: "file:///cache/contact-picker-full.photo",
+        thumbnailTempUri: "file:///cache/contact-picker-thumb.photo",
+        photoFingerprint: "b".repeat(64),
+      },
+    ]);
+  });
+
+  it("a re-read without a photo keeps the picker photo and discards nothing", async () => {
+    const pickedWithPhoto: PickedContact = {
+      ...picked[0],
+      photoTempUri: "file:///cache/contact-picker-session.photo",
+      photoFingerprint: "a".repeat(64),
+    };
+    const discardPhotoCopy = vi.fn();
+
+    await startContactImport({
+      mode: "system",
+      exec,
+      effectivePhoneRegion: "US",
+      now: "2026-08-30 10:00:00",
+      pick: vi.fn().mockResolvedValue([pickedWithPhoto]),
+      ensureNotesAccess: vi.fn().mockResolvedValue(true),
+      readByLookupKeys: vi
+        .fn()
+        .mockResolvedValue([{ ...picked[0], note: "Met at PyCon" }]),
+      discardPhotoCopy,
+      navigate,
+    });
+
+    expect(discardPhotoCopy).not.toHaveBeenCalled();
+    expect(routePickedImport.mock.calls[0][1]).toEqual([
+      { ...pickedWithPhoto, note: "Met at PyCon" },
+    ]);
+  });
+
+  it("retires re-read photo copies that no picked contact takes", async () => {
+    const discardPhotoCopy = vi.fn();
+    await startContactImport({
+      mode: "system",
+      exec,
+      effectivePhoneRegion: "US",
+      now: "2026-08-30 10:00:00",
+      pick: vi.fn().mockResolvedValue(picked),
+      ensureNotesAccess: vi.fn().mockResolvedValue(true),
+      readByLookupKeys: vi.fn().mockResolvedValue([
+        {
+          ...picked[0],
+          lookupKey: "not-picked",
+          photoTempUri: "file:///cache/stray.photo",
+          thumbnailTempUri: "file:///cache/stray-thumb.photo",
+        },
+      ]),
+      discardPhotoCopy,
+      navigate,
+    });
+    expect(discardPhotoCopy.mock.calls).toEqual([
+      ["file:///cache/stray.photo"],
+      ["file:///cache/stray-thumb.photo"],
+    ]);
+    expect(routePickedImport.mock.calls[0][1]).toEqual(picked);
   });
 
   it("imports without notes when contacts access is denied", async () => {
