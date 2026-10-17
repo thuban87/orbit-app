@@ -20,6 +20,7 @@ import {
   finalizeSessionIfTerminal,
   insertReconcileCardCore,
   markCardStatusCore,
+  setCardCompletionDispositionCore,
 } from "@/db/reconcile-session-dao";
 import {
   getReconcileSessionById,
@@ -326,15 +327,13 @@ export function ReconcileGridScreen({
               remaining,
               now,
             );
-            const disposition =
-              action === "keep-orbit" ? "kept-orbit" : "updated";
-            await exec.runAsync(
-              `UPDATE reconciliation_session_cards
-             SET diff_json = json_set(diff_json, '$.completionDisposition', ?),
-                 staged_photo_rel_path = CASE WHEN ? = 'resolved' THEN NULL ELSE staged_photo_rel_path END,
-                 modified_at = ? WHERE id = ?`,
-              [disposition, status, now, entry.card.id],
-            );
+            // A partial card is not finished, so it records no disposition (D-45).
+            if (status !== "partial")
+              await setCardCompletionDispositionCore(exec, {
+                cardId: entry.card.id,
+                disposition: action === "keep-orbit" ? "kept-orbit" : "updated",
+                now,
+              });
             if (status === "resolved")
               removeStaged = entry.card.stagedPhotoRelPath;
           });

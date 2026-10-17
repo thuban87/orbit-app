@@ -12,6 +12,9 @@ import { runMigrations } from "@/db/migrations/runner";
 import {
   createReconcileSession,
   insertReconcileCard,
+  markCardStatus,
+  markCardStatusCore,
+  setCardCompletionDispositionCore,
 } from "@/db/reconcile-session-dao";
 import {
   getNewestPendingReconcileSessionId,
@@ -19,6 +22,7 @@ import {
   listReconcileCardIdentities,
   reconcileCompletionCounts,
 } from "@/db/reconcile-session-read";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-30 12:00:00";
@@ -148,6 +152,60 @@ describe("reconcile-session-read", () => {
       sourceMissing: 1,
       unresolved: 0,
     });
+  });
+
+  it("counts a detail-applied card and not a partial one (D-45, D-50)", async () => {
+    const sessionId = await seedSession(exec);
+    const card = async (status: "unresolved") =>
+      insertReconcileCard(exec, {
+        uid: newUid(),
+        sessionId,
+        contactId: await seedContact(exec),
+        cardStatus: status,
+        diffJson: JSON.stringify({ fields: [], completionDisposition: null }),
+        unresolvedCount: 1,
+        stagedPhotoRelPath: "reconcile-staging/card.jpg",
+        now: NOW,
+      });
+    const applied = await card("unresolved");
+    const partial = await card("unresolved");
+    // The detail Apply: a finished card records its disposition with its status.
+    await inWriteTransaction(exec, async () => {
+      await markCardStatusCore(exec, applied, "resolved", 0, NOW);
+      await setCardCompletionDispositionCore(exec, {
+        cardId: applied,
+        disposition: "kept-orbit",
+        now: NOW,
+      });
+    });
+    // A partial card records none.
+    await markCardStatus(exec, partial, "partial", 1, NOW);
+    await expect(reconcileCompletionCounts(exec, sessionId)).resolves.toEqual({
+      checked: 2,
+      changed: 2,
+      updated: 0,
+      keptOrbitValues: 1,
+      sourceMissing: 0,
+      unresolved: 1,
+    });
+    const rows = await exec.getAllAsync<{
+      id: number;
+      staged_photo_rel_path: string | null;
+    }>(
+      "SELECT id, staged_photo_rel_path FROM reconciliation_session_cards ORDER BY id",
+    );
+    // A resolved card drops its staged path; the partial card keeps it.
+    expect(rows).toEqual([
+      { id: applied, staged_photo_rel_path: null },
+      { id: partial, staged_photo_rel_path: "reconcile-staging/card.jpg" },
+    ]);
+    await expect(
+      setCardCompletionDispositionCore(exec, {
+        cardId: 9999,
+        disposition: "updated",
+        now: NOW,
+      }),
+    ).rejects.toThrow("setCardCompletionDispositionCore");
   });
 
   it("gets the newest pending id without reading malformed card payloads", async () => {

@@ -193,9 +193,12 @@ export interface ReconcileCompletionCounts {
 }
 
 /**
- * Completion buckets. A resolved card's durable diff payload optionally carries
- * the completed action written by the bulk/detail owner; cards without one are
- * still counted as changed but not guessed as an update or Keep-Orbit choice.
+ * Completion buckets. Every card in the session counts as changed. A finished
+ * card's diff_json carries `completionDisposition` ("updated" or "kept-orbit"),
+ * written by setCardCompletionDispositionCore when the grid's bulk action or
+ * the detail Apply finishes it; those two buckets count only that field, so a
+ * card without one (partial, unresolved, or a missing source kept as is) is in
+ * neither. Missing-source and unresolved/partial cards are counted by status.
  */
 export async function reconcileCompletionCounts(
   exec: SqlExecutor,

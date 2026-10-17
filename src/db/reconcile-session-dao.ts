@@ -150,6 +150,46 @@ export function markCardStatus(
   );
 }
 
+export type ReconcileCompletionDisposition = "updated" | "kept-orbit";
+
+export interface SetCardCompletionDispositionInput {
+  cardId: number;
+  disposition: ReconcileCompletionDisposition;
+  now: string;
+}
+
+/**
+ * Record how a finished card was completed, for the Check complete counts
+ * (reconcileCompletionCounts). Callers write it only for a card they finished
+ * (resolved or missing source), never for a partial one (D-45), right after
+ * markCardStatusCore in the same transaction: a resolved card also drops its
+ * staged photo path, which the caller deletes post-commit. The one writer of
+ * the disposition (D-50; formerly an in-screen UPDATE in ReconcileGridScreen).
+ */
+export async function setCardCompletionDispositionCore(
+  exec: SqlExecutor,
+  input: SetCardCompletionDispositionInput,
+): Promise<void> {
+  const result = await exec.runAsync(
+    `UPDATE reconciliation_session_cards
+     SET diff_json = json_set(diff_json, '$.completionDisposition', ?),
+         staged_photo_rel_path = CASE WHEN card_status = 'resolved' THEN NULL ELSE staged_photo_rel_path END,
+         modified_at = ?
+     WHERE id = ?`,
+    [input.disposition, input.now, input.cardId],
+  );
+  assertOneChange(result, "setCardCompletionDispositionCore", input.cardId);
+}
+
+export function setCardCompletionDisposition(
+  exec: SqlExecutor,
+  input: SetCardCompletionDispositionInput,
+): Promise<void> {
+  return inWriteTransaction(exec, () =>
+    setCardCompletionDispositionCore(exec, input),
+  );
+}
+
 export async function finalizeSessionIfTerminalCore(
   exec: SqlExecutor,
   sessionId: number,

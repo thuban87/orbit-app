@@ -32,6 +32,7 @@ import {
 import {
   finalizeSessionIfTerminal,
   markCardStatusCore,
+  setCardCompletionDispositionCore,
 } from "@/db/reconcile-session-dao";
 import {
   MISSING_SOURCE_KEPT,
@@ -358,8 +359,8 @@ export function ReconcileDetailScreen({
       }
       if (cardId != null && sessionId != null) {
         const remaining = result.staleFields.length;
-        await inWriteTransaction(exec, () =>
-          markCardStatusCore(
+        await inWriteTransaction(exec, async () => {
+          await markCardStatusCore(
             exec,
             cardId,
             remaining === 0
@@ -369,8 +370,18 @@ export function ReconcileDetailScreen({
               : "partial",
             remaining,
             now,
-          ),
-        );
+          );
+          // A finished card records how it was completed so Check complete
+          // counts it; a partial card does not (D-45).
+          if (remaining === 0)
+            await setCardCompletionDispositionCore(exec, {
+              cardId,
+              disposition: selections.some((selection) => selection.useSource)
+                ? "updated"
+                : "kept-orbit",
+              now,
+            });
+        });
         await finalizeSessionIfTerminal(exec, sessionId, now);
       }
       if (result.staleFields.length) {
