@@ -10,6 +10,8 @@ import {
 } from "@/backup/backup-schema";
 import { buildExportReport } from "@/backup/export-manifest";
 import type { BackupEncryptionProfile, BackupManifest } from "@/backup/types";
+import { countContactsNotInBin } from "@/db/contact-read";
+import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
   type BackupEnvelopeCrypto,
@@ -47,11 +49,35 @@ export type BackupPreviewResult =
       reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app";
     };
 
-export type RestorePreviewAggregate = BackupPreview & {
+/** What the file alone says, before this phone's side is read. */
+export type RestoreFileAggregate = BackupPreview & {
+  /** Every contact row in the file, Bin included. */
   contactCount: number;
+  /** D-60: the backup's people: its contacts not in the Bin. */
+  backupContacts: number;
+  /** D-60: every linked entity the manifest carries (see linkedItemCount). */
   relatedRowCount: number;
   tombstoneCount: number;
 };
+
+export type RestorePreviewAggregate = RestoreFileAggregate & {
+  /** D-60: this phone's people: its contacts not in the Bin (DAO count). */
+  phoneContacts: number;
+};
+
+type RestoreLoadFailure = {
+  status: "failed";
+  reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app";
+};
+
+/** The file side of a restore candidate (write-free and DB-free). */
+export type ValidatedRestoreFile =
+  | {
+      status: "ready";
+      preview: RestoreFileAggregate;
+      manifest: BackupManifest;
+    }
+  | RestoreLoadFailure;
 
 /** A validated restore candidate remains private to the apply owner, never navigation. */
 export type ValidatedRestoreCandidate =
@@ -60,10 +86,23 @@ export type ValidatedRestoreCandidate =
       preview: RestorePreviewAggregate;
       manifest: BackupManifest;
     }
-  | {
-      status: "failed";
-      reason: "wrong-passphrase" | "damaged-or-incomplete" | "newer-app";
-    };
+  | RestoreLoadFailure;
+
+/**
+ * D-60: the linked-items count covers every entity the manifest carries. It is
+ * enumerated from the manifest itself (every row array), not a hand list, so
+ * a new entity is counted without an edit here. Contacts (people) and
+ * tombstones (deleted items) have their own lines.
+ */
+function linkedItemCount(manifest: BackupManifest): number {
+  let count = 0;
+  for (const [key, value] of Object.entries(manifest) as Array<
+    [keyof BackupManifest, unknown]
+  >)
+    if (key !== "contacts" && key !== "tombstones" && Array.isArray(value))
+      count += value.length;
+  return count;
+}
 
 /**
  * The format version a backup file was written in, read from the raw (and,
@@ -89,7 +128,7 @@ export function loadBackupForRestore(input: {
   contents: string;
   passphrase?: string;
   crypto?: BackupEnvelopeCrypto;
-}): ValidatedRestoreCandidate {
+}): ValidatedRestoreFile {
   try {
     let raw: unknown = JSON.parse(input.contents);
     let encrypted = false;
@@ -142,13 +181,10 @@ export function loadBackupForRestore(input: {
           (row) => row?.photoBase64 !== null && row?.photoBase64 !== undefined,
         ).length,
         contactCount: manifest.contacts.length,
-        relatedRowCount:
-          manifest.interactions.length +
-          manifest.events.length +
-          manifest.offLimits.length +
-          manifest.contactLinks.length +
-          manifest.customFieldDefs.length +
-          manifest.customFieldValues.length,
+        backupContacts: manifest.contacts.filter(
+          (contact) => contact.archivedAt == null,
+        ).length,
+        relatedRowCount: linkedItemCount(manifest),
         tombstoneCount: manifest.tombstones.length,
       },
     };
@@ -164,6 +200,27 @@ export function loadBackupForRestore(input: {
     }
     return { status: "failed", reason: "damaged-or-incomplete" };
   }
+}
+
+/**
+ * The restore candidate the preview page uses: the file side from
+ * `loadBackupForRestore` plus this phone's people, read through the DAO
+ * (D-60: "This phone: N contacts · Backup: M contacts", both not in the Bin).
+ * Read-only; nothing is written.
+ */
+export async function loadBackupForRestorePreview(
+  exec: ReadOnlyExecutor | SqlExecutor,
+  input: Parameters<typeof loadBackupForRestore>[0],
+): Promise<ValidatedRestoreCandidate> {
+  const file = loadBackupForRestore(input);
+  if (file.status !== "ready") return file;
+  return {
+    ...file,
+    preview: {
+      ...file.preview,
+      phoneContacts: await countContactsNotInBin(exec),
+    },
+  };
 }
 
 /** Compatibility-safe aggregate-only preview API for callers that never apply. */

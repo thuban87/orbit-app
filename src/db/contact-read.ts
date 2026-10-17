@@ -17,6 +17,21 @@ import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /**
+ * People on this phone that are not in the Bin: Bound AND Unbound contacts with
+ * `archived_at IS NULL` (38.12 D-60, the restore preview's "This phone: N
+ * contacts"). Deliberately not `countAllContacts` (dashboard-read, Bound only)
+ * nor `countLiveContacts` (adds a last-contact filter).
+ */
+export async function countContactsNotInBin(
+  exec: ReadOnlyExecutor | SqlExecutor,
+): Promise<number> {
+  const row = await exec.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM contacts WHERE archived_at IS NULL",
+  );
+  return row?.count ?? 0;
+}
+
+/**
  * The ids of LIVE contacts already using `name` (the create/edit duplicate
  * warning; Add Contact's "Open existing", 38.11 D-73).
  *

@@ -28,6 +28,8 @@ const preview = {
   rowCount: 12,
   photoCount: 3,
   contactCount: 2,
+  backupContacts: 2,
+  phoneContacts: 5,
   relatedRowCount: 8,
   tombstoneCount: 2,
 };

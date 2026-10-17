@@ -20,7 +20,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   createManualExportService,
-  loadBackupForRestore,
+  loadBackupForRestorePreview,
 } from "@/services/backup/backup-service";
 import {
   APPROVED_BACKUP_ENCRYPTION_PROFILE,
@@ -276,7 +276,7 @@ export function BackupScreen({
       // performs decrypt/parse/validation work on this JS turn.
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
       try {
-        const candidate = loadBackupForRestore({
+        const candidate = await loadBackupForRestorePreview(getExecutor(), {
           contents,
           passphrase,
           crypto: createBackupEnvelopeCrypto({
