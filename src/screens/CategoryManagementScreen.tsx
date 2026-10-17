@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   findNodeHandle,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -48,7 +47,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
-import { plural } from "@/utils/plural";
+import { plural, pluralWord } from "@/utils/plural";
 
 const LOAD_ERROR = "Couldn't load categories. Try again.";
 export const CATEGORY_MANAGER_COPY = {
@@ -65,7 +64,7 @@ const REORDER_ERROR =
 type Editor =
   | { kind: "add"; name: string }
   | { kind: "rename"; row: CategoryManagementRow; name: string };
-type RowAction = "rename" | "earlier" | "later" | "delete";
+type RowAction = "rename" | "up" | "down" | "delete";
 
 export type CategoryManagementLoadOutcome =
   | { status: "success" }
@@ -214,6 +213,54 @@ export function deletionImpactRows(counts: CategoryDeletionCounts): string[] {
   return rows;
 }
 
+/** The one-line body of an empty, unused category's delete confirm (D-73). */
+export const EMPTY_CATEGORY_DELETE_BODY =
+  "It's empty and nothing uses it. This can't be undone.";
+
+/** Contacts plus imports: what moves to the chosen target on delete. */
+export function categoryMovingCount(counts: CategoryDeletionCounts): number {
+  return (
+    counts.contacts +
+    counts.importPending +
+    counts.importComplete +
+    counts.importDiscarded
+  );
+}
+
+/**
+ * The category delete confirm's plain-count body (38.12 D-73): "2 people move
+ * to Uncategorized." (and the import sessions that move with them), then that
+ * it can't be undone. The full breakdown sits behind the details toggle
+ * (`deletionImpactRows`). An unused category gets the one-line body.
+ */
+export function categoryDeleteMessage(
+  counts: CategoryDeletionCounts,
+  targetName: string,
+): string {
+  if (isUnusedCategoryPreview(counts)) return EMPTY_CATEGORY_DELETE_BODY;
+  const lines: string[] = [];
+  if (counts.contacts > 0)
+    lines.push(
+      `${plural(counts.contacts, "person", "people")} ${pluralWord(
+        counts.contacts,
+        "moves",
+        "move",
+      )} to ${targetName}.`,
+    );
+  else lines.push("No one is in this category.");
+  const imports = categoryMovingCount(counts) - counts.contacts;
+  if (imports > 0)
+    lines.push(
+      `${plural(imports, "import session")} ${pluralWord(
+        imports,
+        "moves",
+        "move",
+      )} there too.`,
+    );
+  lines.push("This can't be undone.");
+  return lines.join(" ");
+}
+
 export function createCategoryManagementLoadGuard() {
   let generation = 0;
   return () => {
@@ -257,20 +304,20 @@ function CategoryRow({
     ...(index > 0
       ? [
           {
-            id: "earlier",
-            label: "Move earlier",
+            id: "up",
+            label: "Move up",
             icon: "sort" as const,
-            onPress: () => onAction("earlier"),
+            onPress: () => onAction("up"),
           },
         ]
       : []),
     ...(index < total - 1
       ? [
           {
-            id: "later",
-            label: "Move later",
+            id: "down",
+            label: "Move down",
             icon: "sort" as const,
-            onPress: () => onAction("later"),
+            onPress: () => onAction("down"),
           },
         ]
       : []),
@@ -353,8 +400,9 @@ export function CategoryManagementScreen() {
   const [reordering, setReordering] = useState(false);
   const [deletePreview, setDeletePreview] =
     useState<CategoryDeletionPreview | null>(null);
-  const [deleteDetailOpen, setDeleteDetailOpen] = useState(false);
+  // The one delete confirm (D-73) and its "Show details" toggle.
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteDetailsShown, setDeleteDetailsShown] = useState(false);
   const [targetCategoryId, setTargetCategoryId] = useState<number | null>(null);
   const [targetChoiceOpen, setTargetChoiceOpen] = useState(false);
   const [readbackPending, setReadbackPending] =
@@ -393,16 +441,19 @@ export function CategoryManagementScreen() {
     showSnackbar({ kind, label });
   };
 
+  /** One Cancel leaves the delete confirm entirely (D-73). */
+  const closeDelete = () => {
+    setDeleteConfirmOpen(false);
+    setDeleteDetailsShown(false);
+    setDeletePreview(null);
+    setTargetChoiceOpen(false);
+  };
+
   const finalizeMutationUi = (
     finalize: PendingCategoryMutation["finalize"],
   ) => {
     if (finalize === "editor") setEditor(null);
-    else {
-      setDeleteConfirmOpen(false);
-      setDeleteDetailOpen(false);
-      setDeletePreview(null);
-      setTargetChoiceOpen(false);
-    }
+    else closeDelete();
   };
 
   const retryReadback = async () => {
@@ -519,20 +570,13 @@ export function CategoryManagementScreen() {
       }
       setDeletePreview(preview);
       setTargetCategoryId(null);
-      if (isUnusedCategoryPreview(preview.counts)) setDeleteConfirmOpen(true);
-      else setDeleteDetailOpen(true);
+      setDeleteDetailsShown(false);
+      setDeleteConfirmOpen(true);
     } catch {
       setSaveError(SAVE_ERROR);
     } finally {
       setSaving(false);
     }
-  };
-
-  const keepCategory = () => {
-    setDeleteConfirmOpen(false);
-    if (deletePreview && !isUnusedCategoryPreview(deletePreview.counts))
-      setDeleteDetailOpen(true);
-    else setDeletePreview(null);
   };
 
   const commitDelete = async () => {
@@ -562,11 +606,9 @@ export function CategoryManagementScreen() {
         finalizeUi: finalizeMutationUi,
         publishSuccess,
       });
-      if (outcome.status !== "success") {
-        setLoadError(true);
-        setDeleteConfirmOpen(false);
-        setDeleteDetailOpen(true);
-      }
+      // A committed delete whose readback failed keeps the confirm open with
+      // its Try again (readbackPending), so nothing is half-closed.
+      if (outcome.status !== "success") setLoadError(true);
     } catch (cause) {
       if (cause instanceof Error && cause.message === "stale deletion") {
         const fresh = result?.status === "stale" ? result.preview : null;
@@ -575,8 +617,9 @@ export function CategoryManagementScreen() {
           targetCategoryId === null ||
           !!fresh?.targets.some((target) => target.id === targetCategoryId);
         if (!stillValid) setTargetCategoryId(null);
-        setDeleteConfirmOpen(false);
-        setDeleteDetailOpen(!!fresh && !isUnusedCategoryPreview(fresh.counts));
+        // The confirm re-reads the fresh counts and stays open; with no fresh
+        // preview (the category is gone) it closes.
+        if (!fresh) closeDelete();
         await load();
         setSaveError(SAVE_ERROR);
         AccessibilityInfo.announceForAccessibility(SAVE_ERROR);
@@ -604,12 +647,18 @@ export function CategoryManagementScreen() {
       void beginDelete(row);
       return;
     }
-    const to = action === "earlier" ? index - 1 : index + 1;
+    const to = action === "up" ? index - 1 : index + 1;
     void persistOrder(moveCategoryRows(rows, index, to), to);
   };
   const onReorder = ({ from, to }: ReorderableListReorderEvent) => {
     void persistOrder(moveCategoryRows(rows, from, to), to);
   };
+
+  const targetName =
+    targetCategoryId === null
+      ? "Uncategorized"
+      : (deletePreview?.targets.find((target) => target.id === targetCategoryId)
+          ?.name ?? "Uncategorized");
 
   if (initialLoading)
     return (
@@ -787,88 +836,6 @@ export function CategoryManagementScreen() {
           </View>
         ) : null}
       </Sheet>
-      <Sheet
-        visible={deleteDetailOpen}
-        variant="expanded"
-        onRequestClose={() => {
-          if (!saving && !readbackPending) {
-            setDeleteDetailOpen(false);
-            setDeletePreview(null);
-          }
-        }}
-      >
-        {deletePreview ? (
-          <View style={styles.deleteSheet}>
-            <AppText role="heading">
-              Delete {deletePreview.category.name}?
-            </AppText>
-            <ScrollView contentContainerStyle={styles.deleteContent}>
-              <AppText role="body">This permanent deletion affects:</AppText>
-              {deletionImpactRows(deletePreview.counts).map((label) => (
-                <AppText key={label} role="caption">
-                  {label}
-                </AppText>
-              ))}
-              <AppText role="label">Move contacts to</AppText>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Choose reassignment category"
-                onPress={() => setTargetChoiceOpen(true)}
-                style={[styles.choice, { borderColor: colors.border }]}
-              >
-                <AppText>
-                  {targetCategoryId === null
-                    ? "Uncategorized"
-                    : (deletePreview.targets.find(
-                        (target) => target.id === targetCategoryId,
-                      )?.name ?? "Uncategorized")}
-                </AppText>
-              </Pressable>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Pending, completed, and discarded imports move to the same
-                target. Only this category’s rule or reference is removed from
-                each custom System; unrelated rules stay. An emptied invalid
-                System becomes Needs Attention. Profile and saved presentation
-                settings are removed, not transferred.
-              </AppText>
-            </ScrollView>
-            {readbackPending?.finalize === "delete" ? (
-              <View style={styles.recovery}>
-                <AppText
-                  accessibilityLiveRegion="polite"
-                  style={{ color: colors.danger }}
-                >
-                  {LOAD_ERROR}
-                </AppText>
-                <Button
-                  role="secondary"
-                  label="Try again"
-                  disabled={saving}
-                  onPress={() => void retryReadback()}
-                />
-              </View>
-            ) : null}
-            <Button
-              role="secondary"
-              label="Keep category"
-              disabled={saving || readbackPending !== null}
-              onPress={() => {
-                setDeleteDetailOpen(false);
-                setDeletePreview(null);
-              }}
-            />
-            <Button
-              role="primary"
-              label="Review deletion"
-              disabled={saving || readbackPending !== null}
-              onPress={() => {
-                setDeleteDetailOpen(false);
-                setDeleteConfirmOpen(true);
-              }}
-            />
-          </View>
-        ) : null}
-      </Sheet>
       <CategoryChoiceSheet
         visible={targetChoiceOpen && !readbackPending}
         categories={deletePreview?.targets ?? []}
@@ -878,30 +845,98 @@ export function CategoryManagementScreen() {
         onSelect={setTargetCategoryId}
         onRequestClose={() => setTargetChoiceOpen(false)}
       />
+      {/* The one delete confirm (D-73): plain counts, the target choice and a
+          details toggle; destructive and non-dismissable, so Back and the
+          scrim are inert (38.9 D-06) and one Cancel leaves it. */}
       <ConfirmDialog
         visible={deleteConfirmOpen}
         onRequestClose={() => {}}
         destructive
         title={`Delete ${deletePreview?.category.name ?? "category"}?`}
         message={
-          deletePreview && isUnusedCategoryPreview(deletePreview.counts)
-            ? `Delete ${deletePreview.category.name}? This can’t be undone.`
-            : `Move affected contacts and imports to ${
-                targetCategoryId === null
-                  ? "Uncategorized"
-                  : (deletePreview?.targets.find(
-                      (target) => target.id === targetCategoryId,
-                    )?.name ?? "Uncategorized")
-              }, remove the summarized dependent references, and permanently delete this category. This can’t be undone.`
+          deletePreview
+            ? categoryDeleteMessage(deletePreview.counts, targetName)
+            : undefined
         }
         confirmLabel="Delete category"
-        cancelLabel="Keep category"
+        cancelLabel="Cancel"
         confirmDisabled={saving || readbackPending !== null}
         onCancel={() => {
-          if (!readbackPending) keepCategory();
+          if (!readbackPending) closeDelete();
         }}
         onConfirm={() => void commitDelete()}
-      />
+      >
+        {deletePreview && !isUnusedCategoryPreview(deletePreview.counts) ? (
+          <View style={styles.deleteContent}>
+            {categoryMovingCount(deletePreview.counts) > 0 ? (
+              <>
+                <AppText role="label">Move contacts to</AppText>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Move contacts to ${targetName}. Choose another category`}
+                  disabled={saving || readbackPending !== null}
+                  onPress={() => setTargetChoiceOpen(true)}
+                  style={[styles.choice, { borderColor: colors.border }]}
+                >
+                  <AppText>{targetName}</AppText>
+                </Pressable>
+              </>
+            ) : null}
+            <Pressable
+              testID="category-delete-details-toggle"
+              accessibilityRole="button"
+              accessibilityState={{ expanded: deleteDetailsShown }}
+              onPress={() => setDeleteDetailsShown((shown) => !shown)}
+              style={styles.detailsToggle}
+            >
+              <AppText role="label" style={{ color: colors.accentText }}>
+                {deleteDetailsShown ? "Hide details" : "Show details"}
+              </AppText>
+            </Pressable>
+            {deleteDetailsShown ? (
+              <View style={styles.deleteContent}>
+                <AppText role="body">This deletion affects:</AppText>
+                {deletionImpactRows(deletePreview.counts).map((label) => (
+                  <AppText key={label} role="caption">
+                    {label}
+                  </AppText>
+                ))}
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  Pending, completed, and discarded imports move to the same
+                  target. Only this category’s rule or reference is removed from
+                  each custom System; unrelated rules stay. An emptied invalid
+                  System becomes Needs Attention. Profile and saved presentation
+                  settings are removed, not transferred.
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        {saveError && deleteConfirmOpen ? (
+          <AppText
+            accessibilityLiveRegion="polite"
+            style={{ color: colors.danger }}
+          >
+            {saveError}
+          </AppText>
+        ) : null}
+        {readbackPending?.finalize === "delete" ? (
+          <View style={styles.recovery}>
+            <AppText
+              accessibilityLiveRegion="polite"
+              style={{ color: colors.danger }}
+            >
+              {LOAD_ERROR}
+            </AppText>
+            <Button
+              role="secondary"
+              label="Try again"
+              disabled={saving}
+              onPress={() => void retryReadback()}
+            />
+          </View>
+        ) : null}
+      </ConfirmDialog>
     </View>
   );
 }
@@ -941,8 +976,8 @@ const styles = StyleSheet.create({
   },
   sheetBody: { gap: SPACING.base },
   recovery: { gap: SPACING.sm },
-  deleteSheet: { flex: 1, gap: SPACING.base },
-  deleteContent: { gap: SPACING.base, paddingBottom: SPACING.base },
+  deleteContent: { gap: SPACING.sm },
+  detailsToggle: { minHeight: 44, justifyContent: "center" },
   choice: {
     minHeight: 44,
     borderWidth: StyleSheet.hairlineWidth,

@@ -212,10 +212,20 @@ export type DashboardStackParamList = {
   } & FlowHostParam;
 };
 
+/**
+ * The System builder's route params. `initialPage: "members"` opens it on its
+ * Members page, as Systems → Manage Members does (38.12 D-76).
+ */
+export type SystemBuilderParams = {
+  systemUid?: string;
+  systemRef?: string;
+  initialPage?: "definition" | "members";
+};
+
 /** The Orrery owns its visual root and duplicates contact detail for origin-aware Back. */
 export type OrreryStackParamList = {
   Orrery: undefined;
-  SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
+  SystemBuilder: SystemBuilderParams | undefined;
   SystemsManagement: undefined;
   Profile: ProfileRouteParams;
   /**
@@ -503,7 +513,7 @@ export type SettingsStackParamList = {
   CategoryManagement: undefined;
   /** DEV-only device-UAT harness; its route is compile-time gated from release. */
   __ThemePreview: undefined;
-  SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
+  SystemBuilder: SystemBuilderParams | undefined;
   SystemsManagement: undefined;
   CustomFields: undefined;
   Archived: undefined;

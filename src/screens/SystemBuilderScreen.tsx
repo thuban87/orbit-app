@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button semantic roles are domain props.
 import { useIsFocused } from "@react-navigation/native";
-import { Canvas, Circle, Fill } from "@shopify/react-native-skia";
+import { Canvas, Fill } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
@@ -60,6 +60,8 @@ import {
 import {
   BUILTIN_SYSTEM_LABELS,
   parseSystemRef,
+  RESET_MEMBERSHIP_CHANGES,
+  RESET_MEMBERSHIP_CHANGES_CONFIRM,
 } from "@/logic/orrery-system-logic";
 import { applyMembershipOverrides } from "@/logic/system-rule-resolver";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
@@ -200,7 +202,10 @@ function nameForOverrideRef(
   return BUILTIN_SYSTEM_LABELS[parsed.id];
 }
 
-/** Opaque builder route: this is its own decorative Orrery canvas, never the live screen. */
+/**
+ * Opaque builder route: a plain background Fill, never the live screen. The
+ * decorative circles are gone (38.12 D-75); the Fill stays.
+ */
 function BuilderBackgroundCanvas() {
   const { colors } = useTheme();
   return (
@@ -212,15 +217,6 @@ function BuilderBackgroundCanvas() {
       style={styles.backgroundCanvas}
     >
       <Fill color={colors.background} />
-      <Circle cx={160} cy={270} r={42} color={colors.accent} />
-      <Circle
-        cx={160}
-        cy={270}
-        r={120}
-        color={colors.border}
-        style="stroke"
-        strokeWidth={1}
-      />
     </Canvas>
   );
 }
@@ -233,7 +229,10 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     ? refFromUid(route.params.systemUid)
     : null;
   const overrideOnly = !!systemRef;
-  const [page, setPage] = useState<BuilderPage>("definition");
+  // Systems → Manage Members opens the Members page directly (38.12 D-76).
+  const [page, setPage] = useState<BuilderPage>(
+    route.params?.initialPage ?? "definition",
+  );
   const [previewing, setPreviewing] = useState(false);
   const [previewScene, setPreviewScene] =
     useState<ProvisionalOrreryScene | null>(null);
@@ -523,12 +522,10 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
     const ref = systemRef ?? customRef;
     if (!ref) return;
     // D-06 / ADR-086: destructive and non-dismissable. Plain-word labels
-    // (D-41, D-63); the reset operation itself is unchanged.
+    // (D-41, D-63), one label shared with the Systems menu (38.12 D-76); the
+    // reset operation itself is unchanged.
     void confirm({
-      title: "Reset manual changes?",
-      message:
-        "Manual includes and excludes will be removed. The System's rules stay.",
-      confirmLabel: "Reset",
+      ...RESET_MEMBERSHIP_CHANGES_CONFIRM,
       destructive: true,
     }).then((confirmed) => {
       if (!confirmed) return;
@@ -812,7 +809,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                           {customRef || systemRef ? (
                             <Button
                               role="secondary"
-                              label="Reset Membership Changes"
+                              label={RESET_MEMBERSHIP_CHANGES}
                               onPress={resetOverrides}
                             />
                           ) : null}

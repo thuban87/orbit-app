@@ -42,7 +42,7 @@
 // typography role) and Button (semantic button role Primary/Secondary/…) is a
 // domain prop, NOT an ARIA role — the a11y lint false-fires on the prop name
 // (same precedent as ThemePreviewScreen.tsx).
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import {
   type LayoutChangeEvent,
   ScrollView,
@@ -92,6 +92,12 @@ export interface ConfirmDialogProps extends OverlayLifecycle {
   /** Warning glyph above the title; defaults to `destructive` (D-52). */
   headingGlyph?: boolean;
   /**
+   * Optional content under the message, inside the scrolling body (38.12
+   * D-73: the category delete's target choice and its details toggle). The
+   * explicit choices stay below it, always on screen.
+   */
+  children?: ReactNode;
+  /**
    * "confirm" (default): Cancel + confirm. "notice": one Primary button
    * labelled `confirmLabel` (the acknowledge label); `onCancel` is unused.
    */
@@ -114,6 +120,7 @@ export function ConfirmDialog({
   dismissable,
   headingGlyph = destructive,
   variant = "confirm",
+  children,
 }: ConfirmDialogProps) {
   // The dialog is an opaque surface: read the ROOT palette so its body text
   // keeps the secondary role even when opened from a glass scope (RG-029).
@@ -163,6 +170,7 @@ export function ConfirmDialog({
               {message}
             </AppText>
           ) : null}
+          {children}
         </ScrollView>
         <ConfirmActions
           notice={variant === "notice"}

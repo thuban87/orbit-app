@@ -48,7 +48,10 @@ vi.mock("@/theme/use-reduced-motion", () => ({
 
 const {
   CATEGORY_MANAGER_COPY,
+  EMPTY_CATEGORY_DELETE_BODY,
   categoryCountLabel,
+  categoryDeleteMessage,
+  categoryMovingCount,
   categoryResultKind,
   createCategoryManagementLoadGuard,
   deletionImpactRows,
@@ -355,5 +358,88 @@ describe("CategoryManagementScreen committed mutation coordinator", () => {
     ).rejects.toThrow("write failed");
     expect(publishRows).toHaveBeenLastCalledWith(prior);
     expect(commitRows).not.toHaveBeenCalled();
+  });
+});
+
+describe("CategoryManagementScreen one delete confirm (38.12 D-73) and D-120 menu wording", () => {
+  const zero = {
+    contacts: 0,
+    importPending: 0,
+    importComplete: 0,
+    importDiscarded: 0,
+    rules: 0,
+    systems: 0,
+    categoryOverrides: 0,
+    categoryPrefs: 0,
+    profilePresentations: 0,
+    dashboardFilters: 0,
+    activeSelection: 0,
+  };
+
+  it("says in plain counts who moves where", () => {
+    expect(
+      categoryDeleteMessage({ ...zero, contacts: 2 }, "Uncategorized"),
+    ).toBe("2 people move to Uncategorized. This can't be undone.");
+    expect(categoryDeleteMessage({ ...zero, contacts: 1 }, "Family")).toBe(
+      "1 person moves to Family. This can't be undone.",
+    );
+    expect(
+      categoryDeleteMessage(
+        { ...zero, contacts: 3, importPending: 1, importComplete: 1 },
+        "Work",
+      ),
+    ).toBe(
+      "3 people move to Work. 2 import sessions move there too. This can't be undone.",
+    );
+  });
+
+  it("an in-use category with no people says so; the breakdown is the details", () => {
+    expect(
+      categoryDeleteMessage({ ...zero, rules: 2, systems: 1 }, "Uncategorized"),
+    ).toBe("No one is in this category. This can't be undone.");
+    expect(categoryMovingCount({ ...zero, rules: 2, systems: 1 })).toBe(0);
+    expect(
+      categoryMovingCount({ ...zero, contacts: 2, importDiscarded: 1 }),
+    ).toBe(3);
+  });
+
+  it("an empty, unused category gets a one-line body", () => {
+    expect(categoryDeleteMessage(zero, "Uncategorized")).toBe(
+      EMPTY_CATEGORY_DELETE_BODY,
+    );
+    expect(EMPTY_CATEGORY_DELETE_BODY).toBe(
+      "It's empty and nothing uses it. This can't be undone.",
+    );
+  });
+
+  it("the delete is one destructive confirm: Back inert, one Cancel, details behind a toggle", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      new URL("./CategoryManagementScreen.tsx", import.meta.url),
+      "utf8",
+    );
+    const dialogs = source.split("<ConfirmDialog").length - 1;
+    expect(dialogs).toBe(1);
+    const dialog = source.slice(source.indexOf("<ConfirmDialog"));
+    expect(dialog).toContain("onRequestClose={() => {}}");
+    expect(dialog).toMatch(/\bdestructive\b/);
+    expect(dialog).toContain('cancelLabel="Cancel"');
+    expect(dialog).toContain('"Hide details" : "Show details"');
+    // No second Keep step and no separate review sheet.
+    expect(source).not.toContain("Keep category");
+    expect(source).not.toContain("Review deletion");
+    expect(source).not.toContain("deleteDetailOpen");
+  });
+
+  it("the row menu reads Move up / Move down (D-120 wording)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      new URL("./CategoryManagementScreen.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain('label: "Move up"');
+    expect(source).toContain('label: "Move down"');
+    expect(source).not.toContain("Move earlier");
+    expect(source).not.toContain("Move later");
   });
 });

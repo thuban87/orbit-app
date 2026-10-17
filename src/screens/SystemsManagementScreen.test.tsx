@@ -16,6 +16,8 @@ vi.mock("react", () => ({
   useState: <T,>(value: T) => [value, () => {}],
 }));
 vi.mock("react-native", () => ({
+  AccessibilityInfo: { setAccessibilityFocus: vi.fn() },
+  findNodeHandle: vi.fn(),
   Pressable: "Pressable",
   StyleSheet: { create: (styles: unknown) => styles },
   TextInput: "TextInput",
@@ -33,6 +35,9 @@ vi.mock("react-native-reorderable-list", () => ({
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
+vi.mock("@/components/ui/AnchoredMenu", () => ({
+  AnchoredMenu: "AnchoredMenu",
+}));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("@/db/database", () => ({
   getExecutor: () => "exec",
@@ -77,8 +82,9 @@ const {
   deleteManagedSystem,
   managementActions,
   pinAllContacts,
-  RESET_MANUAL_CHANGES_ACTION,
-  runResetManualChangesAction,
+  RESET_MEMBERSHIP_CHANGES_ACTION,
+  runResetMembershipChangesAction,
+  systemMenuItems,
 } = await import("./SystemsManagementScreen");
 const confirmStore = await import("@/stores/confirm-store");
 const dao = await import("@/db/systems-dao");
@@ -122,9 +128,10 @@ describe("SystemsManagementScreen contracts", () => {
       "Duplicate",
       "Manage Members",
       "Hide",
-      RESET_MANUAL_CHANGES_ACTION,
+      RESET_MEMBERSHIP_CHANGES_ACTION,
     ]);
-    expect(RESET_MANUAL_CHANGES_ACTION).toBe("Reset Manual Changes");
+    // One label in the Systems menu and the builder (38.12 D-76).
+    expect(RESET_MEMBERSHIP_CHANGES_ACTION).toBe("Reset Membership Changes");
     expect(
       managementActions({
         ...allContacts,
@@ -151,7 +158,7 @@ describe("SystemsManagementScreen contracts", () => {
     const onError = vi.fn();
 
     expect(
-      runResetManualChangesAction(shown, {
+      runResetMembershipChangesAction(shown, {
         systemRef: builtin.id as never,
         onChanged,
         onError,
@@ -160,7 +167,7 @@ describe("SystemsManagementScreen contracts", () => {
 
     expect(confirmStore.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "Reset manual changes?",
+        title: "Reset membership changes?",
         confirmLabel: "Reset",
         destructive: true,
       }),
@@ -179,7 +186,7 @@ describe("SystemsManagementScreen contracts", () => {
       "utf8",
     );
     const onAction = source.slice(source.indexOf("const onAction = ("));
-    expect(onAction).toContain("runResetManualChangesAction(action, {");
+    expect(onAction).toContain("runResetMembershipChangesAction(action, {");
     expect(source).not.toContain('"Reset Overrides"');
   });
 
@@ -189,17 +196,116 @@ describe("SystemsManagementScreen contracts", () => {
       onChanged: vi.fn(),
       onError: vi.fn(),
     };
-    expect(runResetManualChangesAction("Hide", input)).toBe(false);
-    expect(runResetManualChangesAction("Reset Overrides", input)).toBe(false);
+    expect(runResetMembershipChangesAction("Hide", input)).toBe(false);
+    expect(runResetMembershipChangesAction("Reset Overrides", input)).toBe(
+      false,
+    );
+    expect(runResetMembershipChangesAction("Reset Manual Changes", input)).toBe(
+      false,
+    );
     expect(confirmStore.confirm).not.toHaveBeenCalled();
 
     vi.mocked(confirmStore.confirm).mockResolvedValueOnce(false);
     expect(
-      runResetManualChangesAction(RESET_MANUAL_CHANGES_ACTION, input),
+      runResetMembershipChangesAction(RESET_MEMBERSHIP_CHANGES_ACTION, input),
     ).toBe(true);
     await vi.waitFor(() => expect(confirmStore.confirm).toHaveBeenCalledOnce());
     await Promise.resolve();
     expect(dao.resetSystemOverrides).not.toHaveBeenCalled();
+  });
+
+  it("puts every row action in the ⋯ menu: actions, moves, destructive last (38.12 D-120)", () => {
+    const onAction = vi.fn();
+    const custom: SystemManagementRow = {
+      ...allContacts,
+      id: "custom:family",
+      name: "Family",
+      ref: { kind: "custom" as const, uid: "family" },
+    };
+    const items = systemMenuItems({
+      row: custom,
+      canMoveUp: true,
+      canMoveDown: true,
+      onAction,
+    });
+    expect(items.map((item) => item.label)).toEqual([
+      "Edit",
+      "Rename",
+      "Duplicate",
+      "Move up",
+      "Move down",
+      "Delete",
+    ]);
+    // The stable `system-<id>-<action>` testIDs ride on the menu items.
+    expect(items.map((item) => item.id)).toEqual([
+      "system-custom:family-edit",
+      "system-custom:family-rename",
+      "system-custom:family-duplicate",
+      "system-custom:family-move-up",
+      "system-custom:family-move-down",
+      "system-custom:family-delete",
+    ]);
+    const last = items.at(-1);
+    expect(last?.danger).toBe(true);
+    expect(last?.separatorBefore).toBe(true);
+    expect(items.slice(0, -1).some((item) => item.danger)).toBe(false);
+    items[3].onPress();
+    expect(onAction).toHaveBeenCalledWith("Move up");
+  });
+
+  it("a built-in with manual changes ends with the reset as its destructive item", () => {
+    const builtin: SystemManagementRow = {
+      ...allContacts,
+      id: "builtin:favorites",
+      name: "Favorites",
+      ref: { kind: "builtin" as const, id: "favorites" as const },
+      hasOverrides: true,
+    };
+    const items = systemMenuItems({
+      row: builtin,
+      canMoveUp: false,
+      canMoveDown: true,
+      onAction: vi.fn(),
+    });
+    expect(items.map((item) => item.label)).toEqual([
+      "Duplicate",
+      "Manage Members",
+      "Hide",
+      "Move down",
+      "Reset Membership Changes",
+    ]);
+    expect(items.at(-1)).toMatchObject({
+      id: "system-builtin:favorites-reset-membership-changes",
+      danger: true,
+      separatorBefore: true,
+    });
+  });
+
+  it("All Contacts (pinned first) offers no move and nothing destructive", () => {
+    const items = systemMenuItems({
+      row: allContacts,
+      canMoveUp: false,
+      canMoveDown: false,
+      onAction: vi.fn(),
+    });
+    expect(items.map((item) => item.label)).toEqual([
+      "Duplicate",
+      "Manage Members",
+    ]);
+    expect(items.some((item) => item.danger)).toBe(false);
+  });
+
+  it("rows render a ⋯ menu, not a row of inline action buttons; Manage Members opens the builder's Members page (D-76)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      new URL("./SystemsManagementScreen.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("<AnchoredMenu");
+    expect(source).not.toContain("actions.map((action) => (");
+    expect(source).toMatch(
+      /navigate\("SystemBuilder", \{\s*systemRef,\s*initialPage: "members",\s*\}\)/,
+    );
   });
 
   it("only lets the latest deferred management load publish or report an error", async () => {

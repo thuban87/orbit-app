@@ -132,6 +132,12 @@ vi.mock("@/logic/system-rule-resolver", () => ({
 vi.mock("@/logic/orrery-system-logic", () => ({
   BUILTIN_SYSTEM_LABELS: {},
   parseSystemRef: vi.fn(),
+  RESET_MEMBERSHIP_CHANGES: "Reset Membership Changes",
+  RESET_MEMBERSHIP_CHANGES_CONFIRM: {
+    title: "Reset membership changes?",
+    message: "m",
+    confirmLabel: "Reset",
+  },
 }));
 // The guard is mocked; its options are captured so the sub-editor step-back
 // (38.9 D-14, D-69) can be fed to the real `decideGuardOnRemove`.
@@ -357,14 +363,17 @@ function nodes(node: ReactNode): TestElement[] {
 
 const navigation = { goBack: vi.fn() };
 
-function renderBuilder(seed: Partial<Record<SlotName, unknown>> = {}) {
+function renderBuilder(
+  seed: Partial<Record<SlotName, unknown>> = {},
+  params: Record<string, unknown> = {},
+) {
   hooks.index = 0;
   hooks.seed = new Map(
     Object.entries(seed).map(([key, value]) => [SLOT[key as SlotName], value]),
   );
   const tree = SystemBuilderScreen({
     navigation,
-    route: { params: {} },
+    route: { params },
   } as unknown as Parameters<typeof SystemBuilderScreen>[0]);
   return nodes(tree as ReactNode);
 }
@@ -762,5 +771,48 @@ describe("SystemBuilder shared header and in-builder Back (38.9 D-16, D-14, D-69
       "ShellAppBar",
       "AppText",
     ]);
+  });
+});
+
+describe("SystemBuilder 38.12 fixes (D-75, D-76)", () => {
+  beforeEach(() => {
+    hooks.runEffects = false;
+  });
+
+  it("opens on the Members page when Manage Members passes initialPage (D-76)", () => {
+    renderBuilder(
+      {},
+      { systemRef: "builtin:favorites", initialPage: "members" },
+    );
+    expect(hooks.initial[SLOT.page]).toBe("members");
+    renderBuilder({}, { systemRef: "builtin:favorites" });
+    expect(hooks.initial[SLOT.page]).toBe("definition");
+  });
+
+  it("the background canvas keeps its Fill and draws no decorative circles (D-75)", () => {
+    const tree = renderBuilder();
+    const host = tree.find(
+      (element) =>
+        typeof element.type === "function" &&
+        (element.type as { name?: string }).name === "BuilderBackgroundCanvas",
+    );
+    if (!host) throw new Error("no BuilderBackgroundCanvas");
+    const render = host.type as unknown as (
+      props: Record<string, unknown>,
+    ) => ReactNode;
+    const canvas = nodes(render(host.props));
+    expect(canvas.map((element) => element.type)).toEqual(["Canvas", "Fill"]);
+  });
+
+  it("the reset uses the one label shared with the Systems menu (D-76)", () => {
+    const tree = renderBuilder(
+      { ready: true },
+      { systemRef: "builtin:favorites" },
+    );
+    const labels = tree
+      .filter((element) => element.type === "Button")
+      .map((element) => element.props.label);
+    expect(labels).toContain("Reset Membership Changes");
+    expect(labels).not.toContain("Reset Manual Changes");
   });
 });

@@ -2,7 +2,14 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useRef, useState } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 import ReorderableList, {
   type ReorderableListRenderItemInfo,
   type ReorderableListReorderEvent,
@@ -12,6 +19,10 @@ import ReorderableList, {
 import { Icon } from "@/components/icons/Icon";
 import { buildSystemChoices } from "@/components/orrery/orrery-controls-logic";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import {
+  AnchoredMenu,
+  type AnchoredMenuItem,
+} from "@/components/ui/AnchoredMenu";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import type { OrrerySystemId } from "@/db/app-settings-dao";
@@ -32,7 +43,11 @@ import {
   restoreDeletedSystemAndActiveSelection,
   setSystemHidden,
 } from "@/db/systems-dao";
-import type { SystemDescriptor } from "@/logic/orrery-system-logic";
+import {
+  RESET_MEMBERSHIP_CHANGES,
+  RESET_MEMBERSHIP_CHANGES_CONFIRM,
+  type SystemDescriptor,
+} from "@/logic/orrery-system-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { confirm } from "@/stores/confirm-store";
@@ -41,6 +56,7 @@ import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { plural } from "@/utils/plural";
 
 const ALL_CONTACTS_REF = "builtin:all-contacts" as OrrerySystemId;
 
@@ -72,17 +88,78 @@ export function pinAllContacts<T extends { id: string }>(
 /**
  * The action that clears a System's manual includes/excludes. One constant is
  * both the label shown and the label `onAction` dispatches on, so renaming it
- * can never leave the button doing nothing (D-41, D-63; review C5-M5).
+ * can never leave the menu item doing nothing (D-41, D-63; review C5-M5). It
+ * is the builder's label too: one label in both places (38.12 D-76).
  */
-export const RESET_MANUAL_CHANGES_ACTION = "Reset Manual Changes";
+export const RESET_MEMBERSHIP_CHANGES_ACTION = RESET_MEMBERSHIP_CHANGES;
 
 /** Management has a readable, deterministic action contract per System kind. */
 export function managementActions(row: SystemManagementRow): string[] {
   if (isCustom(row)) return ["Edit", "Rename", "Duplicate", "Delete"];
   const actions = ["Duplicate", "Manage Members"];
   if (!isAllContacts(row)) actions.push(row.hidden ? "Show" : "Hide");
-  if (row.hasOverrides) actions.push(RESET_MANUAL_CHANGES_ACTION);
+  if (row.hasOverrides) actions.push(RESET_MEMBERSHIP_CHANGES_ACTION);
   return actions;
+}
+
+/** Menu-only reorder actions (D-120 wording), beside the drag handle. */
+export const MOVE_UP_ACTION = "Move up";
+export const MOVE_DOWN_ACTION = "Move down";
+
+/** The menu actions that destroy something: last, danger, separated (D-02). */
+const DESTRUCTIVE_ACTIONS: ReadonlySet<string> = new Set([
+  "Delete",
+  RESET_MEMBERSHIP_CHANGES_ACTION,
+]);
+
+/** `system-<id>-<action>` — the stable testID of a row action (kept, D-120). */
+export function systemActionTestId(rowId: string, action: string): string {
+  return `system-${rowId}-${action.toLowerCase().replaceAll(" ", "-")}`;
+}
+
+/**
+ * A System row's ⋯ items (38.12 D-120): its management actions, then Move up /
+ * Move down where the row can move (All Contacts stays pinned first, so the
+ * row under it cannot move up), then any destructive action last with danger
+ * and a separator. Each item id is the action's testID.
+ */
+export function systemMenuItems(input: {
+  row: SystemManagementRow;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onAction: (action: string) => void;
+}): AnchoredMenuItem[] {
+  const { row, canMoveUp, canMoveDown, onAction } = input;
+  const actions = managementActions(row);
+  const plain = actions.filter((action) => !DESTRUCTIVE_ACTIONS.has(action));
+  const destructive = actions.filter((action) =>
+    DESTRUCTIVE_ACTIONS.has(action),
+  );
+  const moves = [
+    ...(canMoveUp ? [MOVE_UP_ACTION] : []),
+    ...(canMoveDown ? [MOVE_DOWN_ACTION] : []),
+  ];
+  const item = (action: string): AnchoredMenuItem => ({
+    id: systemActionTestId(row.id, action),
+    label: action,
+    icon:
+      action === MOVE_UP_ACTION || action === MOVE_DOWN_ACTION
+        ? "sort"
+        : action === "Edit" || action === "Rename"
+          ? "edit"
+          : undefined,
+    onPress: () => onAction(action),
+  });
+  return [
+    ...plain.map(item),
+    ...moves.map(item),
+    ...destructive.map((action, index) => ({
+      ...item(action),
+      icon: "warning" as const,
+      danger: true,
+      separatorBefore: index === 0,
+    })),
+  ];
 }
 
 /**
@@ -91,7 +168,7 @@ export function managementActions(row: SystemManagementRow): string[] {
  * Only the labels are plain words (D-41, D-63); the reset operation is
  * unchanged.
  */
-export function runResetManualChangesAction(
+export function runResetMembershipChangesAction(
   action: string,
   input: {
     systemRef: OrrerySystemId;
@@ -99,12 +176,9 @@ export function runResetManualChangesAction(
     onError: (message: string) => void;
   },
 ): boolean {
-  if (action !== RESET_MANUAL_CHANGES_ACTION) return false;
+  if (action !== RESET_MEMBERSHIP_CHANGES_ACTION) return false;
   void confirm({
-    title: "Reset manual changes?",
-    message:
-      "Manual includes and excludes will be removed. The System's rules stay.",
-    confirmLabel: "Reset",
+    ...RESET_MEMBERSHIP_CHANGES_CONFIRM,
     destructive: true,
   }).then((confirmed) => {
     if (!confirmed) return;
@@ -233,6 +307,8 @@ export async function deleteManagedSystem(input: {
 
 function SystemRow({
   row,
+  canMoveUp,
+  canMoveDown,
   renaming,
   renameValue,
   onRenameValueChange,
@@ -241,6 +317,8 @@ function SystemRow({
   onAction,
 }: {
   row: SystemManagementRow;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   renaming: boolean;
   renameValue: string;
   onRenameValueChange: (value: string) => void;
@@ -250,7 +328,15 @@ function SystemRow({
 }) {
   const { colors } = useTheme();
   const drag = useReorderableDrag();
-  const actions = managementActions(row);
+  const anchorRef = useRef<View>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    requestAnimationFrame(() => {
+      const node = findNodeHandle(anchorRef.current);
+      if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
+    });
+  }, []);
   const indicator = row.broken
     ? {
         icon: "status-decay" as const,
@@ -327,7 +413,7 @@ function SystemRow({
           <>
             <AppText role="heading">{row.name}</AppText>
             <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {row.memberCount} {row.memberCount === 1 ? "member" : "members"}
+              {plural(row.memberCount, "member")}
               {row.hidden ? " · Hidden from switcher" : ""}
             </AppText>
             {indicator ? (
@@ -341,20 +427,32 @@ function SystemRow({
                 </AppText>
               </View>
             ) : null}
-            <View style={styles.actionRow}>
-              {actions.map((action) => (
-                <Button
-                  key={action}
-                  role={action === "Delete" ? "destructive" : "secondary"}
-                  label={action}
-                  onPress={() => onAction(action)}
-                  testID={`system-${row.id}-${action.toLowerCase().replaceAll(" ", "-")}`}
-                />
-              ))}
-            </View>
           </>
         )}
       </View>
+      {renaming ? null : (
+        <>
+          <Pressable
+            ref={anchorRef}
+            testID={`system-${row.id}-options`}
+            collapsable={false}
+            accessibilityRole="button"
+            accessibilityLabel={`Options for ${row.name}`}
+            accessibilityState={{ expanded: menuOpen }}
+            onPress={() => setMenuOpen(true)}
+            style={styles.dragHandle}
+          >
+            <Icon name="overflow" size="md" tone="textSecondary" />
+          </Pressable>
+          <AnchoredMenu
+            anchorRef={anchorRef}
+            visible={menuOpen}
+            accessibilityLabel={`Options for ${row.name}`}
+            items={systemMenuItems({ row, canMoveUp, canMoveDown, onAction })}
+            onRequestClose={closeMenu}
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -500,7 +598,11 @@ export function SystemsManagementScreen() {
     if (action === "Rename") return beginRename(row);
     if (action === "Delete") return deleteRow(row);
     if (action === "Manage Members") {
-      navigation.navigate("SystemBuilder", { systemRef });
+      // Lands on the builder's Members page (38.12 D-76).
+      navigation.navigate("SystemBuilder", {
+        systemRef,
+        initialPage: "members",
+      });
       return;
     }
     if (action === "Duplicate") {
@@ -532,14 +634,13 @@ export function SystemsManagementScreen() {
       })();
       return;
     }
-    runResetManualChangesAction(action, {
+    runResetMembershipChangesAction(action, {
       systemRef,
       onChanged: () => load(),
       onError: setError,
     });
   };
-  const onReorder = ({ from, to }: ReorderableListReorderEvent) => {
-    const next = pinAllContacts(reorderItems(rows, from, to));
+  const persistOrder = (next: SystemManagementRow[]) => {
     setRows(next);
     void reorderSystems(getExecutor(), {
       orderedRefs: next.map((row) => row.id as OrrerySystemId),
@@ -555,22 +656,40 @@ export function SystemsManagementScreen() {
         );
       });
   };
+  const onReorder = ({ from, to }: ReorderableListReorderEvent) => {
+    persistOrder(pinAllContacts(reorderItems(rows, from, to)));
+  };
+  // All Contacts is pinned first, so the first movable row is below it.
+  const firstMovable = rows[0] && isAllContacts(rows[0]) ? 1 : 0;
   const renderItem = ({
     item,
-  }: ReorderableListRenderItemInfo<SystemManagementRow>) => (
-    <SystemRow
-      row={item}
-      renaming={renamingId === item.id}
-      renameValue={renameValue}
-      onRenameValueChange={setRenameValue}
-      onSubmitRename={() => void submitRename()}
-      onCancelRename={() => {
-        setRenamingId(null);
-        setError(null);
-      }}
-      onAction={(action) => onAction(item, action)}
-    />
-  );
+    index,
+  }: ReorderableListRenderItemInfo<SystemManagementRow>) => {
+    const movable = !isAllContacts(item);
+    return (
+      <SystemRow
+        row={item}
+        canMoveUp={movable && index > firstMovable}
+        canMoveDown={movable && index < rows.length - 1}
+        renaming={renamingId === item.id}
+        renameValue={renameValue}
+        onRenameValueChange={setRenameValue}
+        onSubmitRename={() => void submitRename()}
+        onCancelRename={() => {
+          setRenamingId(null);
+          setError(null);
+        }}
+        onAction={(action) => {
+          if (action === MOVE_UP_ACTION || action === MOVE_DOWN_ACTION) {
+            const to = action === MOVE_UP_ACTION ? index - 1 : index + 1;
+            persistOrder(pinAllContacts(reorderItems(rows, index, to)));
+            return;
+          }
+          onAction(item, action);
+        }}
+      />
+    );
+  };
   const empty = rows.length === 0 && !error;
 
   return (

@@ -74,12 +74,6 @@ const ACCENT_FOREGROUND_ALLOWLIST: readonly AllowEntry[] = [
   },
   {
     file: "src/screens/SystemBuilderScreen.tsx",
-    rule: "accent-as-text",
-    text: "color={colors.accent}",
-    reason: `${SKIA_FILL} Builder backdrop Circle (Table C M9, kept).`,
-  },
-  {
-    file: "src/screens/SystemBuilderScreen.tsx",
     rule: "background-on-accent",
     text: "color={colors.background}",
     reason: `${SKIA_FILL} Builder backdrop canvas <Fill>.`,

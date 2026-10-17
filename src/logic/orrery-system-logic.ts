@@ -43,6 +43,19 @@ export const BUILTIN_SYSTEM_LABELS: Record<OrreryBuiltinId, string> = {
   snoozed: "Snoozed",
   chargers: "Chargers",
 };
+/**
+ * The one label for clearing a System's manual includes/excludes, shown in the
+ * Systems menu and in the builder (38.12 D-76; plain words, 38.9 D-41/D-63).
+ * The operation behind it (`resetSystemOverrides`) keeps its name.
+ */
+export const RESET_MEMBERSHIP_CHANGES = "Reset Membership Changes";
+/** The confirm both reset sites raise (D-06 destructive, D-76 one wording). */
+export const RESET_MEMBERSHIP_CHANGES_CONFIRM = {
+  title: "Reset membership changes?",
+  message:
+    "Manual includes and excludes will be removed. The System's rules stay.",
+  confirmLabel: "Reset",
+} as const;
 export function parseSystemRef(value: unknown): OrrerySystemRef | null {
   try {
     assertOrreryLastSystem("System", value);
