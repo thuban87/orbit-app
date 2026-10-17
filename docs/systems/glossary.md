@@ -1,7 +1,7 @@
 # Glossary
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-17
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/constants/glossary.ts`, `src/constants/product-labels.ts`, `src/constants/glossary-contract.test.ts`
 
 ## Purpose
@@ -52,6 +52,8 @@ identifiers keep their own spelling (see Gotchas).
 | Off Limits | `OFF_LIMITS` | Topics to avoid bringing up with a person. Shown in full on the Profile and in Compose Research, never sent to AI (38.10 D-09, D-10, D-90). The Profile helper "Avoid bringing these up" stays (D-105). |
 | Close | `CLOSE` | The button that closes a detail sheet, such as the Profile entry sheet (38.10 D-87, D-90). |
 | Not set | `NOT_SET` | An empty always-show custom field on the Profile (38.10 D-87, D-90). |
+| Check-in reminders | `CHECK_IN_REMINDERS` | The Notifications switch for reminders to reach out to people you're overdue with. Replaces "Decay reminders" (38.12 D-130). Only the switch label changed: the status names (Stable, Wobbly, Decaying, Rogue) are not renamed (D-05). |
+| Use AI suggestions | `USE_AI_SUGGESTIONS` | The master switch on Settings → AI. Replaces "AI Enabled" (38.12 D-130). |
 
 Sentence-case copy uses the same words in lower case where a label sits inside a sentence
 ("Add favorite", "Not favorite", "3 never contacted →").
@@ -187,3 +189,4 @@ None. The constants are the configuration.
 | 2026-10-16 | 38.11 | "Bin" and "Move to Bin" added as canonical terms; "Archive" is renamed "Bin" in user-visible text, internal names unchanged; "Archived contact(s)" / "Archived Contact(s)" added to the retired forms (D-69, D-70; plan 12). |
 | 2026-10-16 | 38.11 | "Rarely Responds" added as a canonical term (one Title Case spelling on the Edit Contact toggle and the Profile sheets, pinned by the glossary contract); the Bin entry follows D-93's "hidden from your lists". |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-226, ADR-228. |
+| 2026-10-17 | 38.12 | "Check-in reminders" (was "Decay reminders") and "Use AI suggestions" (was "AI Enabled") added as Settings switch labels, pinned by the glossary contract; status names unchanged (D-130, D-05; plan 14). |

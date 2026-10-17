@@ -1,18 +1,19 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
+
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
-import {
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { OrbitSwitch } from "@/components/ui";
+import {
+  AppText,
+  OrbitSwitch,
+  SettingsRow,
+  SettingsSectionCard,
+} from "@/components/ui";
+import { CHECK_IN_REMINDERS } from "@/constants/glossary";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -30,23 +31,23 @@ import {
 } from "@/services/notifications/permission";
 import { notice } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
+  effectiveReminderArrival,
+  formatHour,
+  NOTIFICATIONS_PAUSED_LINE,
   type PersistNotificationDeps,
   persistNotificationSettings,
+  QUIET_HOURS_HELPER,
+  reminderArrivalLine,
 } from "./settings-notifications-logic";
 
 const LOG_SCOPE = "settings-notifications-screen";
 
 /** Which time control's native picker is open (null = none). */
 type ActivePicker = "delivery" | "quiet-start" | "quiet-end" | null;
-
-/** Format a 0-23 hour as a "h:MM AM/PM" wall-clock label (e.g. 9 → "9:00 AM"). */
-function formatHour(hour: number): string {
-  const period = hour < 12 ? "AM" : "PM";
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12}:00 ${period}`;
-}
 
 /** A Date seeded to today at the given 0-23 hour — the time picker's initial value. */
 function seedForHour(hour: number): Date {
@@ -72,11 +73,20 @@ const NOTIFICATION_PERSIST_DEPS: PersistNotificationDeps = {
 
 /**
  * Notifications category screen (§G / D-09). Migrates all 10 notification
- * controls out of the monolith — master, degraded note, Decay, Birthday,
- * Birthday-unbound, Weekly digest, Lock-screen, Reminder time, Quiet start,
- * Quiet end — organized by user-facing notification type (relationship
+ * controls out of the monolith — master, degraded note, Check-in reminders,
+ * Birthday, Birthday-Unbound, Weekly digest, Lock-screen, Reminder time, Quiet
+ * start, Quiet end — organized by user-facing notification type (relationship
  * reminders, birthdays incl. Unbound behaviour, weekly digest, delivery timing,
  * and notification display).
+ *
+ * 38.12: every section is a `SettingsSectionCard` of `SettingsRow`s with the
+ * switch as the trailing control, testIDs kept (D-119). With Allow
+ * notifications off, one paused line replaces any per-row explanation and the
+ * child rows draw disabled — dimmed, switches drawn Off (D-77, D-06). The
+ * Unbound birthday row is disabled unless Birthday alerts is on, matching the
+ * scheduler, which only reads birthday candidates when Birthday alerts is on
+ * (D-77, D-83). A reminder time inside quiet hours shows when reminders really
+ * arrive, from the scheduler's own `nextAllowedFireInstant` (D-78).
  *
  * Every write routes through the shared `persistNotificationSettings` helper so
  * both `reconcileSchedule` and `reconcileDigestSchedule` fire immediately
@@ -215,6 +225,24 @@ export function SettingsNotificationsScreen() {
     [activePicker, persist],
   );
 
+  const birthdayOn = settings?.birthdayEnabled === 1;
+  const deliveryHour = settings?.deliveryHour ?? 9;
+  const quietStartHour = settings?.quietStartHour ?? 21;
+  const quietEndHour = settings?.quietEndHour ?? 8;
+  // D-78: the scheduler's own roll, so the page never promises a time the
+  // reminders don't keep.
+  const arrivalLine = reminderArrivalLine(
+    effectiveReminderArrival({
+      reminderTime: deliveryHour,
+      quietStart: quietStartHour,
+      quietEnd: quietEndHour,
+    }),
+    birthdayOn,
+  );
+  // D-77: one paused line while the master is off. The degraded note already
+  // explains a denial, so the two never show together.
+  const showPaused = settings !== null && !masterOn && !degraded;
+
   const pickerSeedHour =
     activePicker === "delivery"
       ? (settings?.deliveryHour ?? 9)
@@ -232,67 +260,42 @@ export function SettingsNotificationsScreen() {
           { paddingBottom: bottomClearance },
         ]}
       >
-        {/* Notifications — master toggle + degraded note. */}
-        <View testID="settings-notifications-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Notifications
-          </Text>
-
-          {/* Master toggle — the value-moment permission affordance. */}
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Allow notifications
-              </Text>
+        {/* Notifications — master toggle, OS permission, degraded note. */}
+        <SettingsSectionCard
+          testID="settings-notifications-section"
+          title="Notifications"
+        >
+          {/* Master toggle — the value-moment permission affordance. Its
+              description reads the same whether it is on or off (D-77). */}
+          <SettingsRow
+            title="Allow notifications"
+            subtitle="Calm reminders when someone's overdue, and a heads-up on birthdays."
+            trailing={
               <OrbitSwitch
                 testID="settings-notifications-master"
                 accessibilityLabel="Allow notifications"
                 value={masterOn}
                 onValueChange={(v) => void onToggleMaster(v)}
               />
-            </View>
-            {!masterOn ? (
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                Get a calm morning reminder when someone's overdue, and a
-                heads-up on birthdays.
-              </Text>
-            ) : null}
-          </View>
+            }
+          />
 
           {/* RAW OS notification-permission row (§G) — reflects true OS status
               regardless of the master toggle (separate from the master-on-but-
-              blocked `degraded` note). When blocked, hands off to system settings;
-              the controls below stay visible with this explanation. */}
+              blocked `degraded` note). When blocked, hands off to system
+              settings; the controls below stay visible with this
+              explanation. */}
           {permission ? (
-            <View
+            <SettingsRow
               testID="settings-notifications-permission"
-              style={[
-                styles.row,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Notification permission
-              </Text>
-              <Text
-                testID="settings-notifications-permission-status"
-                style={[styles.helper, { color: colors.textSecondary }]}
-              >
-                {permission.granted
+              title="Notification permission"
+              subtitle={
+                permission.granted
                   ? "Your phone allows Orbit's notifications. Reminders can be delivered."
-                  : "Your phone is blocking Orbit's notifications. Reminders won't appear until you allow them in system settings — the controls below stay available."}
-              </Text>
+                  : "Your phone is blocking Orbit's notifications. Reminders won't appear until you allow them in system settings — the controls below stay available."
+              }
+              subtitleTestID="settings-notifications-permission-status"
+            >
               {!permission.granted ? (
                 <Pressable
                   testID="settings-notifications-permission-open-settings"
@@ -301,197 +304,120 @@ export function SettingsNotificationsScreen() {
                   onPress={() => void onOpenSystemSettings()}
                   style={[styles.inlineButton, { borderColor: colors.border }]}
                 >
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >
+                  <AppText role="label" style={{ color: colors.textPrimary }}>
                     Open system settings
-                  </Text>
+                  </AppText>
                 </Pressable>
               ) : null}
-            </View>
+            </SettingsRow>
           ) : null}
 
           {degraded ? (
-            <View
-              style={[
-                styles.row,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Text
-                testID="settings-notifications-degraded"
-                style={[styles.degradedHeading, { color: colors.textPrimary }]}
-              >
-                Notifications are off
-              </Text>
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                Contacts still shows who's due. To get reminders, turn
-                notifications on in your phone's settings.
-              </Text>
-            </View>
+            <SettingsRow
+              testID="settings-notifications-degraded"
+              title="Notifications are off"
+              subtitle="Contacts still shows who's due. To get reminders, turn notifications on in your phone's settings."
+            />
           ) : null}
+        </SettingsSectionCard>
 
-          {saveError ? (
-            <Text
-              testID="settings-notifications-save-error"
-              accessibilityRole="alert"
-              style={[styles.helper, { color: colors.danger }]}
-            >
-              {saveError}
-            </Text>
-          ) : null}
-        </View>
+        {showPaused ? (
+          <AppText
+            role="caption"
+            testID="settings-notifications-paused"
+            accessibilityLiveRegion="polite"
+            style={[styles.note, { color: colors.textSecondary }]}
+          >
+            {NOTIFICATIONS_PAUSED_LINE}
+          </AppText>
+        ) : null}
+
+        {saveError ? (
+          <AppText
+            role="caption"
+            testID="settings-notifications-save-error"
+            accessibilityRole="alert"
+            style={[styles.note, { color: colors.danger }]}
+          >
+            {saveError}
+          </AppText>
+        ) : null}
 
         {/* Relationship reminders. */}
-        <View style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Relationship reminders
-          </Text>
-
-          {/* Decay reminders — gated by master. */}
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Decay reminders
-              </Text>
+        <SettingsSectionCard title="Relationship reminders">
+          {/* Check-in reminders — gated by master (D-130 label). */}
+          <SettingsRow
+            title={CHECK_IN_REMINDERS}
+            subtitle="Reminders to reach out to people you're overdue with."
+            disabled={!masterOn}
+            trailing={
               <OrbitSwitch
                 testID="settings-notifications-decay"
-                accessibilityLabel="Decay reminders"
+                accessibilityLabel={CHECK_IN_REMINDERS}
                 disabled={!masterOn}
                 value={settings?.decayEnabled === 1}
                 onValueChange={(v) => void persist({ decayEnabled: v ? 1 : 0 })}
               />
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Reminders to reach out to people you're overdue with.
-            </Text>
-          </View>
-        </View>
+            }
+          />
+        </SettingsSectionCard>
 
         {/* Birthdays. */}
-        <View style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Birthdays
-          </Text>
-
+        <SettingsSectionCard title="Birthdays">
           {/* Birthday alerts — gated by master. */}
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Birthday alerts
-              </Text>
+          <SettingsRow
+            title="Birthday alerts"
+            subtitle="A morning nudge on a contact's birthday."
+            disabled={!masterOn}
+            trailing={
               <OrbitSwitch
                 testID="settings-notifications-birthday"
                 accessibilityLabel="Birthday alerts"
                 disabled={!masterOn}
-                value={settings?.birthdayEnabled === 1}
+                value={birthdayOn}
                 onValueChange={(v) =>
                   void persist({ birthdayEnabled: v ? 1 : 0 })
                 }
               />
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              A morning nudge on a contact's birthday.
-            </Text>
-          </View>
+            }
+          />
 
-          {/* Birthday alerts for unbound contacts (§G — unbound birthday
+          {/* Birthday alerts for Unbound contacts (§G — Unbound birthday
               NOTIFICATION behaviour lives here; birthday presentation stays
-              deferred to Your Week per ADR-076). Gated by master. */}
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Birthday alerts for unbound contacts
-              </Text>
+              deferred to Your Week per ADR-076). Gated by the master AND by
+              Birthday alerts: the scheduler reads no birthday candidates while
+              Birthday alerts is off (D-77). */}
+          <SettingsRow
+            title="Birthday alerts for Unbound contacts"
+            subtitle={
+              masterOn && !birthdayOn
+                ? "Turn on Birthday alerts to use this."
+                : "Keep birthday reminders on for contacts outside your active orbit."
+            }
+            disabled={!masterOn || !birthdayOn}
+            trailing={
               <OrbitSwitch
                 testID="settings-notifications-birthday-unbound"
-                accessibilityLabel="Birthday alerts for unbound contacts"
-                disabled={!masterOn}
+                accessibilityLabel="Birthday alerts for Unbound contacts"
+                disabled={!masterOn || !birthdayOn}
                 value={settings?.birthdayUnboundEnabled === 1}
                 onValueChange={(value) =>
                   void persist({ birthdayUnboundEnabled: value ? 1 : 0 })
                 }
               />
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Keep birthday reminders on for contacts outside your active orbit.
-            </Text>
-          </View>
-        </View>
+            }
+          />
+        </SettingsSectionCard>
 
         {/* Weekly digest. */}
-        <View style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Weekly digest
-          </Text>
-
+        <SettingsSectionCard title="Weekly digest">
           {/* Weekly digest — gated by master. Persists + reconciles the WEEKLY
               trigger through the shared persist path. */}
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Weekly digest
-              </Text>
+          <SettingsRow
+            title="Weekly digest"
+            subtitle="A Sunday-morning look back at your week — who you reached, and who's slipping quietly."
+            disabled={!masterOn}
+            trailing={
               <OrbitSwitch
                 testID="settings-notifications-digest"
                 accessibilityLabel="Weekly digest"
@@ -501,176 +427,73 @@ export function SettingsNotificationsScreen() {
                   void persist({ digestEnabled: v ? 1 : 0 })
                 }
               />
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              A Sunday-morning look back at your week — who you reached, and
-              who's slipping quietly.
-            </Text>
-          </View>
-        </View>
+            }
+          />
+        </SettingsSectionCard>
 
         {/* Delivery timing — reminder time + quiet window (the user-tunable
             hours). */}
-        <View style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Delivery time
-          </Text>
-
-          {/* Reminder time — the user-tunable delivery hour. */}
-          <Pressable
+        <SettingsSectionCard title="Delivery time">
+          {/* Reminder time — the user-tunable delivery hour. Inside quiet
+              hours, its subtitle says when reminders really arrive (D-78). */}
+          <SettingsRow
             testID="settings-notifications-time"
-            accessibilityRole="button"
-            accessibilityLabel={`Reminder time, ${formatHour(settings?.deliveryHour ?? 9)}`}
-            accessibilityState={{ disabled: !masterOn }}
+            title="Reminder time"
+            value={formatHour(deliveryHour)}
+            subtitle={arrivalLine}
+            subtitleTestID="settings-notifications-arrival"
+            accessibilityLabel={`Reminder time, ${formatHour(deliveryHour)}${
+              arrivalLine ? `. ${arrivalLine}` : ""
+            }`}
             disabled={!masterOn}
             onPress={() => setActivePicker("delivery")}
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Reminder time
-              </Text>
-              <Text
-                style={[
-                  styles.rowValue,
-                  {
-                    color: masterOn ? colors.accentText : colors.textSecondary,
-                  },
-                ]}
-              >
-                {formatHour(settings?.deliveryHour ?? 9)}
-              </Text>
-            </View>
-          </Pressable>
+          />
 
           {/* Quiet-hours start — the user-tunable quiet-window start. */}
-          <Pressable
+          <SettingsRow
             testID="settings-notifications-quiet-start"
-            accessibilityRole="button"
-            accessibilityLabel={`Quiet hours start, ${formatHour(settings?.quietStartHour ?? 21)}`}
-            accessibilityState={{ disabled: !masterOn }}
+            title="Quiet hours start"
+            value={formatHour(quietStartHour)}
+            accessibilityLabel={`Quiet hours start, ${formatHour(quietStartHour)}`}
             disabled={!masterOn}
             onPress={() => setActivePicker("quiet-start")}
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Quiet hours start
-              </Text>
-              <Text
-                style={[
-                  styles.rowValue,
-                  {
-                    color: masterOn ? colors.accentText : colors.textSecondary,
-                  },
-                ]}
-              >
-                {formatHour(settings?.quietStartHour ?? 21)}
-              </Text>
-            </View>
-          </Pressable>
+          />
 
           {/* Quiet-hours end — the user-tunable quiet-window end. */}
-          <Pressable
+          <SettingsRow
             testID="settings-notifications-quiet-end"
-            accessibilityRole="button"
-            accessibilityLabel={`Quiet hours end, ${formatHour(settings?.quietEndHour ?? 8)}`}
-            accessibilityState={{ disabled: !masterOn }}
+            title="Quiet hours end"
+            value={formatHour(quietEndHour)}
+            accessibilityLabel={`Quiet hours end, ${formatHour(quietEndHour)}`}
             disabled={!masterOn}
             onPress={() => setActivePicker("quiet-end")}
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Quiet hours end
-              </Text>
-              <Text
-                style={[
-                  styles.rowValue,
-                  {
-                    color: masterOn ? colors.accentText : colors.textSecondary,
-                  },
-                ]}
-              >
-                {formatHour(settings?.quietEndHour ?? 8)}
-              </Text>
-            </View>
-          </Pressable>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Reminders that would land inside quiet hours wait until the next
-            morning.
-          </Text>
+          />
+        </SettingsSectionCard>
+        <AppText
+          role="caption"
+          testID="settings-notifications-quiet-helper"
+          style={[styles.note, { color: colors.textSecondary }]}
+        >
+          {QUIET_HOURS_HELPER}
+        </AppText>
 
-          {activePicker !== null ? (
-            <DateTimePicker
-              testID="settings-notifications-time-picker"
-              value={seedForHour(pickerSeedHour)}
-              mode="time"
-              onChange={onPickTime}
-            />
-          ) : null}
-        </View>
+        {activePicker !== null ? (
+          <DateTimePicker
+            testID="settings-notifications-time-picker"
+            value={seedForHour(pickerSeedHour)}
+            mode="time"
+            onChange={onPickTime}
+          />
+        ) : null}
 
         {/* Notification display. */}
-        <View style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Notification display
-          </Text>
-
+        <SettingsSectionCard title="Notification display">
           {/* Lock-screen visibility — default off (private). */}
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.toggleRow}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  {
-                    color: masterOn ? colors.textPrimary : colors.textSecondary,
-                  },
-                ]}
-              >
-                Show names on lock screen
-              </Text>
+          <SettingsRow
+            title="Show names on lock screen"
+            subtitle="When off, lock-screen reminders won't show who they're about."
+            disabled={!masterOn}
+            trailing={
               <OrbitSwitch
                 testID="settings-notifications-lockscreen"
                 accessibilityLabel="Show names on lock screen"
@@ -680,12 +503,9 @@ export function SettingsNotificationsScreen() {
                   void persist({ lockscreenPublic: v ? 1 : 0 })
                 }
               />
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              When off, lock-screen reminders won't show who they're about.
-            </Text>
-          </View>
-        </View>
+            }
+          />
+        </SettingsSectionCard>
       </ScrollView>
     </View>
   );
@@ -694,52 +514,17 @@ export function SettingsNotificationsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: SPACING.base,
+    gap: SPACING.lg,
   },
-  section: {
-    gap: 12,
-  },
-  sectionHeading: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  row: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  rowLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  rowValue: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  helper: {
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 18,
-  },
-  degradedHeading: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  note: { paddingHorizontal: SPACING.xs },
   inlineButton: {
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: RADII.sm,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: "center",
     alignSelf: "flex-start",
   },
 });

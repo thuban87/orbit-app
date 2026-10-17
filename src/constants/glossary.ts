@@ -82,3 +82,10 @@ export const ADD_MEMORY = "Add Memory";
 export const ADD_GIFT_IDEA = "Add Gift Idea";
 /** Proposed wording, for the plan-19 wording review (convergence c7, C-03). */
 export const ADD_THOUGHT_OF_THEM = "Add Thought of Them";
+
+// Settings switch labels (38.12 D-130, owner Q-31). Status names are not
+// renamed (D-05).
+/** Notifications: reminders to reach out to people you're overdue with. Was "Decay reminders". */
+export const CHECK_IN_REMINDERS = "Check-in reminders";
+/** Settings → AI master switch. Was "AI Enabled"; Settings → AI reads it in 38.12-15. */
+export const USE_AI_SUGGESTIONS = "Use AI suggestions";

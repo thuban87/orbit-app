@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { AppSettings, AppSettingsPatch } from "@/db/app-settings-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
+  effectiveReminderArrival,
+  formatHour,
   type PersistNotificationDeps,
   persistNotificationSettings,
+  QUIET_HOURS_HELPER,
+  reminderArrivalLine,
 } from "./settings-notifications-logic";
 
 /**
@@ -97,5 +101,132 @@ describe("persistNotificationSettings", () => {
     expect(deps.getAppSettings).not.toHaveBeenCalled();
     expect(deps.reconcileSchedule).not.toHaveBeenCalled();
     expect(deps.reconcileDigestSchedule).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 38.12 D-78: when a reminder time sits inside quiet hours, the page says when
+ * reminders really arrive, computed by the scheduler's own
+ * `nextAllowedFireInstant`.
+ */
+describe("effectiveReminderArrival (D-78)", () => {
+  const BASE = new Date(2026, 9, 17, 15, 30);
+
+  it("is null when the reminder time is outside quiet hours", () => {
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 9,
+        quietStart: 21,
+        quietEnd: 8,
+        baseDate: BASE,
+      }),
+    ).toBeNull();
+    // The hour quiet hours end on is already outside the window.
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 8,
+        quietStart: 21,
+        quietEnd: 8,
+        baseDate: BASE,
+      }),
+    ).toBeNull();
+  });
+
+  it("an early-morning time inside a window across midnight arrives the same morning", () => {
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 6,
+        quietStart: 21,
+        quietEnd: 8,
+        baseDate: BASE,
+      }),
+    ).toEqual({ arrivalHour: 8, nextDay: false });
+  });
+
+  it("an evening time inside a window across midnight arrives the next morning", () => {
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 22,
+        quietStart: 21,
+        quietEnd: 8,
+        baseDate: BASE,
+      }),
+    ).toEqual({ arrivalHour: 8, nextDay: true });
+    // Quiet start hour itself is inside the window.
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 21,
+        quietStart: 21,
+        quietEnd: 7,
+        baseDate: BASE,
+      }),
+    ).toEqual({ arrivalHour: 7, nextDay: true });
+  });
+
+  it("a daytime window that does not cross midnight rolls to its end the same day", () => {
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 13,
+        quietStart: 12,
+        quietEnd: 14,
+        baseDate: BASE,
+      }),
+    ).toEqual({ arrivalHour: 14, nextDay: false });
+  });
+
+  it("equal quiet start and end is no quiet window", () => {
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 10,
+        quietStart: 10,
+        quietEnd: 10,
+        baseDate: BASE,
+      }),
+    ).toBeNull();
+  });
+
+  it("ignores the time of day of the base date (no 'now' roll)", () => {
+    const lateEvening = new Date(2026, 9, 17, 23, 59);
+    expect(
+      effectiveReminderArrival({
+        reminderTime: 6,
+        quietStart: 21,
+        quietEnd: 8,
+        baseDate: lateEvening,
+      }),
+    ).toEqual({ arrivalHour: 8, nextDay: false });
+  });
+});
+
+describe("reminderArrivalLine / copy (D-78)", () => {
+  it("is null when there is no roll", () => {
+    expect(reminderArrivalLine(null, true)).toBeNull();
+  });
+
+  it("states the arrival time after quiet hours end", () => {
+    expect(reminderArrivalLine({ arrivalHour: 8, nextDay: false }, true)).toBe(
+      "Reminders will arrive at 8:00 AM, after quiet hours end.",
+    );
+  });
+
+  it("says birthday alerts are not sent when the roll crosses midnight and they are on", () => {
+    expect(reminderArrivalLine({ arrivalHour: 7, nextDay: true }, true)).toBe(
+      "Reminders will arrive at 7:00 AM, after quiet hours end. Birthday alerts can't move to the next day, so they won't be sent.",
+    );
+    expect(reminderArrivalLine({ arrivalHour: 7, nextDay: true }, false)).toBe(
+      "Reminders will arrive at 7:00 AM, after quiet hours end.",
+    );
+  });
+
+  it("formats hours as wall-clock labels", () => {
+    expect(formatHour(0)).toBe("12:00 AM");
+    expect(formatHour(9)).toBe("9:00 AM");
+    expect(formatHour(12)).toBe("12:00 PM");
+    expect(formatHour(21)).toBe("9:00 PM");
+  });
+
+  it("the quiet-hours helper no longer promises 'the next morning'", () => {
+    expect(QUIET_HOURS_HELPER).not.toMatch(/next morning/);
+    expect(QUIET_HOURS_HELPER).toContain("wait until quiet hours end");
   });
 });

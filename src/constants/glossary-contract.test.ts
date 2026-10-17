@@ -729,6 +729,22 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
     expect(card).not.toContain('"Add note"');
   });
 
+  it("pins the Settings switch labels (38.12 D-130)", () => {
+    expect({
+      CHECK_IN_REMINDERS: glossary.CHECK_IN_REMINDERS,
+      USE_AI_SUGGESTIONS: glossary.USE_AI_SUGGESTIONS,
+    }).toEqual({
+      CHECK_IN_REMINDERS: "Check-in reminders",
+      USE_AI_SUGGESTIONS: "Use AI suggestions",
+    });
+    // The status names are not renamed alongside (D-05).
+    expect(glossary.DECAYING).toBe("Decaying");
+    const notifications = read("src/screens/SettingsNotificationsScreen.tsx");
+    expect(notifications).toContain("title={CHECK_IN_REMINDERS}");
+    expect(notifications).toContain("accessibilityLabel={CHECK_IN_REMINDERS}");
+    expect(notifications).not.toContain("Decay reminders");
+  });
+
   it("the Contacts population filter uses the glossary labels (D-42, D-49)", () => {
     expect(POPULATION_LABELS["not-contacted"]).toBe(glossary.NEVER_CONTACTED);
     expect(POPULATION_LABELS.favourites).toBe(glossary.FAVORITES);
