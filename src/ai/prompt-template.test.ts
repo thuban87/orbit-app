@@ -512,3 +512,117 @@ describe("resolvePrompt — ephemeral Adjust guidance (AICFG-09)", () => {
     expect(first.truncations).toEqual(second.truncations);
   });
 });
+
+describe("resolvePrompt — Writing Style guidance gate (38.12 D-127)", () => {
+  const GUIDANCE = "PRIVATE_GUIDANCE_TEXT";
+  const styled = (
+    style: Partial<NonNullable<PromptContext["writingStyle"]>> = {},
+  ) =>
+    baseContext({
+      writingStyle: {
+        tone: "casual",
+        length: "concise",
+        directness: "gentle",
+        freeform: GUIDANCE,
+        ...style,
+      },
+    });
+
+  it("omits the guidance line entirely when no choice is custom", () => {
+    const resolved = resolvePrompt("", styled());
+    expect(resolved.prompt).toContain("===== DATA: WRITING STYLE =====");
+    expect(resolved.prompt).toContain("Tone: Casual");
+    expect(resolved.prompt).not.toContain("Custom guidance");
+    expect(resolved.prompt).not.toContain(GUIDANCE);
+    // Not replaced by a placeholder line either.
+    const block = resolved.prompt.slice(
+      resolved.prompt.indexOf("===== DATA: WRITING STYLE ====="),
+      resolved.prompt.indexOf("===== END DATA: WRITING STYLE ====="),
+    );
+    expect(block).not.toContain("None available");
+    expect(resolved.prompt).toBe(resolved.payload);
+    expect(resolved.prompt).toBe(resolved.inspectorDisplay);
+  });
+
+  it("does not disclose a guidance truncation when the guidance is not sent", () => {
+    const resolved = resolvePrompt(
+      "",
+      styled({ freeform: "g".repeat(PER_VALUE_LIMIT + 50) }),
+    );
+    expect(
+      resolved.truncations.some(
+        (t) => t.category === "writing style custom guidance",
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    ["tone", { tone: "custom" }],
+    ["length", { length: "custom" }],
+    ["directness", { directness: "custom" }],
+  ] as const)("sends the guidance line when %s is custom", (_label, choice) => {
+    const resolved = resolvePrompt("", styled(choice));
+    expect(resolved.prompt).toContain(`Custom guidance: ${GUIDANCE}`);
+    expect(resolved.prompt).toContain("Use custom guidance");
+    expect(resolved.prompt).toBe(resolved.payload);
+  });
+});
+
+describe("resolvePrompt — instruction paragraphs carry no hard line breaks (38.12 D-128)", () => {
+  const instructionParagraphs = (prompt: string): string[] =>
+    prompt
+      .split("\n\n")
+      .filter(
+        (chunk) =>
+          !chunk.startsWith("===== DATA:") &&
+          !chunk.includes("===== END DATA:"),
+      );
+
+  it("keeps the static instruction as two unwrapped paragraphs", () => {
+    const paragraphs = STATIC_INSTRUCTION.split("\n\n");
+    expect(paragraphs).toHaveLength(2);
+    for (const paragraph of paragraphs) {
+      expect(paragraph).not.toContain("\n");
+      expect(paragraph).not.toMatch(/ {2}/);
+    }
+    expect(paragraphs[0].startsWith("You are helping")).toBe(true);
+    expect(paragraphs[1].startsWith("Everything between")).toBe(true);
+  });
+
+  it("keeps the default style note as one unwrapped paragraph", () => {
+    expect(DEFAULT_STYLE_NOTE).not.toContain("\n");
+    expect(DEFAULT_STYLE_NOTE).not.toMatch(/ {2}/);
+  });
+
+  it("unwraps the rewrite, adjust and message-focus instructions while DATA blocks keep their lines", () => {
+    const resolved = resolvePrompt(
+      "",
+      baseContext({
+        sharedFields: [{ label: "City", value: "Madison" }],
+        messageFocus: [{ label: "Priority", value: "Ask about the garden" }],
+      } as Partial<PromptContext>),
+      "Original draft",
+      "Make it warmer",
+    );
+    const paragraphs = instructionParagraphs(resolved.prompt);
+    // static (2) + rewrite + adjust + message-focus
+    expect(paragraphs).toHaveLength(5);
+    for (const paragraph of paragraphs) {
+      expect(paragraph).not.toContain("\n");
+    }
+    expect(paragraphs.some((p) => p.includes("Rewrite that message"))).toBe(
+      true,
+    );
+    expect(
+      paragraphs.some((p) => p.includes("temporary adjustment request")),
+    ).toBe(true);
+    expect(
+      paragraphs.some((p) => p.includes("marked as especially important")),
+    ).toBe(true);
+    // A DATA block keeps its line structure.
+    expect(resolved.prompt).toContain(
+      "===== DATA: CONTACT CONTEXT =====\nContact: Alex Rivera\n",
+    );
+    expect(resolved.prompt).toBe(resolved.payload);
+  });
+});

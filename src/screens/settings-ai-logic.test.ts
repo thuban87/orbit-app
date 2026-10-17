@@ -210,6 +210,24 @@ describe("whole-system and contact-specific prompt previews", () => {
     expect(preview.display).toContain(STATIC_INSTRUCTION);
   });
 
+  it("sends no guidance text in the whole preview when no Writing Style choice is custom (38.12 D-127)", () => {
+    const context: PromptContext = {
+      ...EMPTY_CONTEXT,
+      writingStyle: {
+        tone: "casual",
+        length: "concise",
+        directness: "gentle",
+        freeform: "PRIVATE GLOBAL STYLE",
+      },
+    };
+    const resolved = resolvePrompt("", context);
+    const whole = buildWholePromptPreview(resolved);
+    expect(whole.display).toBe(resolved.payload);
+    expect(whole.display).toContain("===== DATA: WRITING STYLE =====");
+    expect(whole.display).not.toContain("PRIVATE GLOBAL STYLE");
+    expect(whole.display).not.toContain("Custom guidance");
+  });
+
   it("derives contact review blocks from that exact resolved prompt and omits global boilerplate", () => {
     const context: PromptContext = {
       ...EMPTY_CONTEXT,
@@ -226,7 +244,8 @@ describe("whole-system and contact-specific prompt previews", () => {
       writingStyle: {
         tone: "casual",
         length: "concise",
-        directness: "gentle",
+        // One custom choice, so the guidance line is sent (38.12 D-127).
+        directness: "custom",
         freeform: "PRIVATE GLOBAL STYLE",
       },
       personalizationSections: [
