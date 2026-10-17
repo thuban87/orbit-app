@@ -538,8 +538,8 @@ describe("flow screens end through the flow host (D-110)", () => {
       "onPress: () => openContactFromFlow(navigation, host, contactId)",
     );
     expect(source.match(/finishWithView\(/g)).toHaveLength(2);
-    expect(source).toContain("`Imported ${input.name}`");
-    expect(source).toContain("`Linked ${phoneName} to ${choice.name}`");
+    expect(source).toMatch(/`Imported \$\{input\.name\}`/);
+    expect(source).toMatch(/`Linked \$\{phoneName\} to \$\{choice\.name\}`/);
   });
 
   it("Check complete: Done, header Back and system Back share finishFlow", () => {
