@@ -39,6 +39,7 @@ import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh"
 import { normalizeEditedBirthday } from "@/logic/birthday-logic";
 import { resolveCategorySelection } from "@/logic/category-logic";
 import { mapPickedContact } from "@/logic/picked-contact-map";
+import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
 import {
   DEFAULT_FLOW_HOST,
   finishFlow,
@@ -60,6 +61,11 @@ import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
 import { boundFrequencyBlocksImport } from "./bulk-import-setup-logic";
 import { resolveExistingContactChoices } from "./existing-contact-choices";
+import {
+  type AlreadyLinkedReview,
+  ImportReviewAlreadyLinked,
+  resolveAlreadyLinkedReview,
+} from "./ImportReviewAlreadyLinked";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
 import { useOpenImportSession } from "./use-open-import-session";
 
@@ -124,6 +130,9 @@ export function ImportReviewScreen({
     DuplicateOutcome,
     "already_linked"
   > | null>(null);
+  // 38.12 D-53: an already-linked pick, decided and resolved at load.
+  const [alreadyLinked, setAlreadyLinked] =
+    useState<AlreadyLinkedReview | null>(null);
 
   // 38.12 D-110: a single import or link finishes where the import was
   // started (Settings → Contacts & Relationships by default), with a View
@@ -180,6 +189,20 @@ export function ImportReviewScreen({
         navigation.goBack();
         return;
       }
+      // D-53: an already-linked pick shows "Already in Orbit as <name>" with
+      // Open (ImportReviewAlreadyLinked), never an editable form. The row is
+      // resolved and the session finalized here, so no paused import is left.
+      const linked = await resolveAlreadyLinkedReview(exec, {
+        sessionId: route.params.sessionId,
+        rowId: row.id,
+        externalContactId: row.externalContactId,
+        now: localDateTime(),
+      });
+      if (linked) {
+        markImportComplete();
+        setAlreadyLinked(linked);
+        return;
+      }
       const snapshot = parseSnapshot(row.sourcePayload);
       if (!snapshot) throw new Error("invalid import snapshot");
       const mapped = mapPickedContact(
@@ -220,7 +243,7 @@ export function ImportReviewScreen({
     } finally {
       setLoading(false);
     }
-  }, [navigation, route.params.sessionId]);
+  }, [navigation, route.params.sessionId, markImportComplete]);
 
   useEffect(() => {
     void load();
@@ -414,6 +437,24 @@ export function ImportReviewScreen({
     } finally {
       setSaving(false);
     }
+  }
+
+  // D-53: Done, header Back and system Back finish the flow where it started.
+  const finishAlreadyLinked = useCallback(
+    () => finishFlow(navigation, host),
+    [navigation, host],
+  );
+  useBackActsAsDone(finishAlreadyLinked, alreadyLinked !== null);
+  if (alreadyLinked) {
+    return (
+      <ImportReviewAlreadyLinked
+        name={alreadyLinked.name}
+        onOpen={() =>
+          openContactFromFlow(navigation, host, alreadyLinked.contactId)
+        }
+        onDone={finishAlreadyLinked}
+      />
+    );
   }
 
   // The shared header's Back calls goBack(), which the import leave guard
