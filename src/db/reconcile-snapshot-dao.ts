@@ -117,6 +117,26 @@ export function deleteReviewedSnapshot(
   );
 }
 
+/**
+ * Missing-source "Keep as is" (D-45): remember it on every missing link.
+ * Caller-owned transaction body (written with the card's terminal status by
+ * the detail's Keep as is and the grid's bulk Keep Orbit).
+ */
+export async function rememberMissingSourceKeptCore(
+  exec: SqlExecutor,
+  input: { externalContactLinkIds: readonly number[]; now: string },
+): Promise<void> {
+  for (const externalContactLinkId of [...input.externalContactLinkIds].sort(
+    (a, b) => a - b,
+  ))
+    await upsertReviewedSnapshotCore(exec, {
+      externalContactLinkId,
+      fieldFamily: "source",
+      reviewedValue: MISSING_SOURCE_KEPT,
+      reviewedAt: input.now,
+    });
+}
+
 export interface RecordReviewedPhotoInput {
   externalContactLinkIds: readonly number[];
   /** The selection's reviewed comparable (field.reviewedComparable). */

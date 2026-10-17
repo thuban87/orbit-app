@@ -28,6 +28,7 @@ import {
   getReviewedSnapshots,
   MISSING_SOURCE_KEPT,
   recordReviewedPhoto,
+  rememberMissingSourceKeptCore,
   upsertReviewedSnapshot,
 } from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
@@ -470,13 +471,17 @@ describe("missing source (D-45)", () => {
     const linkId = await seedLink(contactId, "lk-1");
     const [card] = await gridScan([]);
     expect(card.diff.missingSource).toBe(true);
+    expect(card.diff.missingLinkIds).toEqual([linkId]);
 
-    // The detail's Keep as is.
-    await upsertReviewedSnapshot(exec, {
-      externalContactLinkId: linkId,
-      fieldFamily: "source",
-      reviewedValue: MISSING_SOURCE_KEPT,
-      reviewedAt: NOW,
+    // The detail's Keep as is (the same write the screen makes).
+    await inWriteTransaction(exec, () =>
+      rememberMissingSourceKeptCore(exec, {
+        externalContactLinkIds: card.diff.missingLinkIds ?? [],
+        now: NOW,
+      }),
+    );
+    expect(await getReviewedSnapshots(exec, linkId)).toEqual({
+      source: MISSING_SOURCE_KEPT,
     });
     expect(await gridScan([])).toEqual([]);
     expect((await detailRead(contactId, [])).diff.fields).toEqual([]);
@@ -486,6 +491,26 @@ describe("missing source (D-45)", () => {
 
     const [again] = await gridScan([]);
     expect(again.diff.missingSource).toBe(true);
+  });
+
+  it("the grid's bulk Keep Orbit on a missing-source card is remembered too", async () => {
+    const contactId = await seedContact({ name: "Phone Name" });
+    await seedLink(contactId, "lk-1");
+    const [card] = await gridScan([]);
+    // The grid's bulk transaction: apply, then remember the kept missing source.
+    await inWriteTransaction(exec, async () => {
+      await applyReconcileSelections(exec, {
+        contactId,
+        now: NOW,
+        selections: buildReconcileSelections(card.diff, "keep-orbit"),
+        effectivePhoneRegion: "US",
+      });
+      await rememberMissingSourceKeptCore(exec, {
+        externalContactLinkIds: card.diff.missingLinkIds ?? [],
+        now: NOW,
+      });
+    });
+    expect(await gridScan([])).toEqual([]);
   });
 
   it("a kept missing link does not hide the other link's differences", async () => {

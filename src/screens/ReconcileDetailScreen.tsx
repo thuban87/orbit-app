@@ -35,9 +35,8 @@ import {
   setCardCompletionDispositionCore,
 } from "@/db/reconcile-session-dao";
 import {
-  MISSING_SOURCE_KEPT,
   recordReviewedPhoto,
-  upsertReviewedSnapshotCore,
+  rememberMissingSourceKeptCore,
 } from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import {
@@ -90,7 +89,7 @@ interface ScanState {
   orbitPhoto: string | null;
   diff: ReconcileDiffResult;
   links: LinkedScanLink[];
-  /** Active links the provider read did not return (missing source). */
+  /** Active links the provider read did not return and not kept as is. */
   missingLinkIds: number[];
   /** The region the scan classified with; Apply uses the same one (D-45). */
   effectivePhoneRegion: string | null;
@@ -204,9 +203,7 @@ export function ReconcileDetailScreen({
           orbitPhoto: contact.photo,
           diff,
           links,
-          missingLinkIds: links
-            .filter((link) => !pickedByKey.has(link.external_contact_id))
-            .map((link) => link.id),
+          missingLinkIds: classified.missingLinkIds ?? [],
           effectivePhoneRegion: memory.effectivePhoneRegion,
         });
       }),
@@ -229,13 +226,10 @@ export function ReconcileDetailScreen({
       // transaction as the card's terminal status; the next check does not ask
       // again until the source reads and then disappears again.
       await inWriteTransaction(exec, async () => {
-        for (const externalContactLinkId of keptLinkIds)
-          await upsertReviewedSnapshotCore(exec, {
-            externalContactLinkId,
-            fieldFamily: "source",
-            reviewedValue: MISSING_SOURCE_KEPT,
-            reviewedAt: now,
-          });
+        await rememberMissingSourceKeptCore(exec, {
+          externalContactLinkIds: keptLinkIds,
+          now,
+        });
         if (hasCard)
           await markCardStatusCore(exec, cardId, "missing_source", 0, now);
       });

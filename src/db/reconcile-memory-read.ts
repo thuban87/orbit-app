@@ -153,6 +153,14 @@ export async function getReconcileContact(
   return { contact: contact ?? null, links };
 }
 
+/**
+ * A classified card: the classifier result plus the active links the provider
+ * read did not return and whose missing source was not kept as is.
+ */
+export type ReconcileCardDiff = ReconcileDiffResult & {
+  missingLinkIds?: number[];
+};
+
 export interface ClassifyLinkedContactInput {
   contact: LinkedScanContact;
   /** The contact's active links, in id order. */
@@ -173,7 +181,7 @@ export interface ClassifyLinkedContactInput {
 export async function classifyLinkedContact(
   exec: SqlExecutor,
   input: ClassifyLinkedContactInput,
-): Promise<ReconcileDiffResult> {
+): Promise<ReconcileCardDiff> {
   const { contact, links, pickedByKey, stagedPhotos, memory } = input;
   const readLinks = links.filter((link) =>
     pickedByKey.has(link.external_contact_id),
@@ -192,6 +200,7 @@ export async function classifyLinkedContact(
       fields: [],
       sourceLinkIds: [],
       orbitModifiedAt: contact.modified_at,
+      missingLinkIds: [],
     };
   const methods = await listContactMethods(exec, contact.id);
   const labels = reconcileSourceLabels(
@@ -224,7 +233,7 @@ export async function classifyLinkedContact(
         : {}),
     };
   });
-  return classifyReconciliation({
+  const diff = classifyReconciliation({
     orbit: {
       name: contact.name,
       birthday: contact.birthday,
@@ -241,6 +250,7 @@ export async function classifyLinkedContact(
     omittedCount: unkeptMissing.length,
     effectivePhoneRegion: memory.effectivePhoneRegion,
   });
+  return { ...diff, missingLinkIds: unkeptMissing.map((link) => link.id) };
 }
 
 export interface ScanLinkedContactsInput {
@@ -254,7 +264,7 @@ export interface ScanLinkedContactsInput {
 export interface ScannedReconcileCard {
   contactId: number;
   /** Classifier output narrowed to the actionable fields (D-45). */
-  diff: ReconcileDiffResult;
+  diff: ReconcileCardDiff;
   unresolvedCount: number;
   /** The staged photo kept on the durable card, if any. */
   stagedPhotoRelPath: string | null;

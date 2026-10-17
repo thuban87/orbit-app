@@ -12,6 +12,7 @@ import { applyReconcileSelections } from "@/db/reconcile-apply";
 import {
   effectivePhoneRegionFor,
   listLinkedContactsForScan,
+  type ReconcileCardDiff,
   type StagedSourcePhoto,
   scanLinkedContacts,
 } from "@/db/reconcile-memory-read";
@@ -29,6 +30,7 @@ import {
   type ReconcileCardIdentity,
   type ReconcileSessionCard,
 } from "@/db/reconcile-session-read";
+import { rememberMissingSourceKeptCore } from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import { newUid } from "@/db/uid";
 import { isAdditiveOnlySelection } from "@/logic/reconcile-bulk-eligibility";
@@ -56,7 +58,7 @@ import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
 import { readAllContacts } from "../../modules/orbit-contact-picker";
 
-type StoredDiff = ReconcileDiffResult & {
+type StoredDiff = ReconcileCardDiff & {
   completionDisposition?: "updated" | "kept-orbit" | null;
 };
 type GridCard = { card: ReconcileSessionCard; diff: StoredDiff };
@@ -327,6 +329,13 @@ export function ReconcileGridScreen({
               remaining,
               now,
             );
+            // Bulk Keep Orbit on a missing-source card keeps it as is: remember
+            // that like the detail's Keep as is (D-45).
+            if (status === "missing_source" && action === "keep-orbit")
+              await rememberMissingSourceKeptCore(exec, {
+                externalContactLinkIds: diff.missingLinkIds ?? [],
+                now,
+              });
             // A partial card is not finished, so it records no disposition (D-45).
             if (status !== "partial")
               await setCardCompletionDispositionCore(exec, {
