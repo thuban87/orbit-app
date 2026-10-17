@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  BACK_UP_NOW_FAILED_COPY,
+  backUpNowSnackbar,
+  backupWarningAction,
+  backupWarningActionLabel,
   MANUAL_EXPORT_TOO_LARGE_COPY,
   manualExportFailureCopy,
   resolveBackupHealth,
@@ -232,5 +236,103 @@ describe("over-cap backups say too large (38.6 D-39)", () => {
     expect(
       manualExportFailureCopy({ status: "shared", skippedPhotos: 0 }),
     ).toBeNull();
+  });
+});
+
+describe("warning card action (38.12 D-115)", () => {
+  const base = {
+    folderUri: "content://tree/primary%3AOrbit",
+    folderName: "Orbit",
+    folderAccessible: true,
+    lastAutomaticBackupAt: "2026-10-01 09:00:00",
+    currentDataRevision: 5,
+    lastBackupDataRevision: 5,
+    intervalDays: 7,
+  };
+  const now = new Date(2026, 9, 17);
+
+  it("offers Back up now when a usable folder is set and the backup needs attention or was too large", () => {
+    expect(
+      backupWarningAction(
+        resolveBackupHealth({ ...base, currentDataRevision: 6 }, now),
+      ),
+    ).toBe("back-up-now");
+    expect(
+      backupWarningAction(
+        resolveBackupHealth({ ...base, lastAutomaticBackupAt: null }, now),
+      ),
+    ).toBe("back-up-now");
+    expect(
+      backupWarningAction(
+        resolveBackupHealth(
+          {
+            ...base,
+            folderDiagnostic: AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC,
+          },
+          now,
+        ),
+      ),
+    ).toBe("back-up-now");
+  });
+
+  it("offers Choose a folder when no folder is chosen or it needs reconnecting", () => {
+    expect(
+      backupWarningAction(
+        resolveBackupHealth({ ...base, folderUri: null }, now),
+      ),
+    ).toBe("choose-folder");
+    expect(
+      backupWarningAction(
+        resolveBackupHealth({ ...base, folderAccessible: false }, now),
+      ),
+    ).toBe("choose-folder");
+  });
+
+  it("a healthy or unread card has no action", () => {
+    expect(backupWarningAction(resolveBackupHealth(base, now))).toBeNull();
+    expect(backupWarningAction(null)).toBeNull();
+  });
+
+  it("labels each action", () => {
+    expect(backupWarningActionLabel("back-up-now")).toBe("Back up now");
+    expect(backupWarningActionLabel("choose-folder")).toBe("Choose a folder");
+  });
+});
+
+describe("Back up now snackbar (38.12 D-115)", () => {
+  const skipped = (count: number) =>
+    count > 0 ? `${count} photos couldn't be included.` : null;
+
+  it("confirms a verified write, with the skipped-photos line when photos were left out", () => {
+    expect(
+      backUpNowSnackbar({ status: "written", skippedPhotos: 0 }, skipped),
+    ).toEqual({ kind: "success", label: "Backed up" });
+    expect(
+      backUpNowSnackbar({ status: "written", skippedPhotos: 2 }, skipped),
+    ).toEqual({
+      kind: "success",
+      label: "Backed up. 2 photos couldn't be included.",
+    });
+  });
+
+  it("reports each failure as an error", () => {
+    expect(backUpNowSnackbar({ status: "too-large" }, skipped)).toEqual({
+      kind: "error",
+      label: "Couldn't back up. Your backup is too large to create.",
+    });
+    expect(backUpNowSnackbar({ status: "failed" }, skipped)).toEqual({
+      kind: "error",
+      label: BACK_UP_NOW_FAILED_COPY,
+    });
+    expect(BACK_UP_NOW_FAILED_COPY).toBe(
+      "Couldn't back up. Reconnect your backup folder.",
+    );
+    for (const status of ["blocked", "no-folder", "error"] as const) {
+      const outcome =
+        status === "blocked"
+          ? { status, reason: "passphrase-unavailable" }
+          : { status };
+      expect(backUpNowSnackbar(outcome, skipped).kind).toBe("error");
+    }
   });
 });

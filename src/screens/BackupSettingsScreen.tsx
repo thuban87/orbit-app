@@ -29,6 +29,7 @@ import {
 } from "@/logic/read-phase";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { chooseAutomaticBackupFolder } from "@/services/backup/backup-now";
 import {
   createAutomaticBackupReencryptionService,
   createBackupEncryptionLifecycle,
@@ -204,23 +205,14 @@ export function BackupSettingsScreen({
 
   const chooseFolder = useCallback(async () => {
     await commitThenRefresh({
-      commit: async () => {
-        // Do not seed DocumentsUI with the previously persisted provider URI.
-        // Some providers (notably Drive) can leave the picker blank when the
-        // initial URI is stale or unsupported; the user can still choose the
-        // existing folder from the normal provider UI.
-        const result = await safStorage.requestDirectory();
-        if (!result.granted || !result.directoryUri) return false;
-        await inWriteTransaction(getExecutor(), () =>
-          recordAutomaticBackupHealthCore(getExecutor(), {
-            backupFolderUri: result.directoryUri,
-            backupFolderName: "Selected backup folder",
-            backupFolderAccessible: 1,
-            backupFolderDiagnostic: null,
-          }),
-        );
-        return true;
-      },
+      // The one folder chooser, shared with the Backup page's "Choose a
+      // folder" (38.12 D-115).
+      commit: () =>
+        chooseAutomaticBackupFolder({
+          exec: getExecutor(),
+          folders: safStorage,
+          folderName: () => "Selected backup folder",
+        }),
       refresh: readSettings,
       onCommitFailed: (error) => {
         Logger.error(LOG_SCOPE, "folder selection failed", error);

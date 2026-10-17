@@ -157,6 +157,93 @@ export function resolveBackupNudge(
   };
 }
 
+/**
+ * The warning card's one action (38.12 D-115). A folder that is set and
+ * reachable offers "Back up now" when the backup needs attention or was too
+ * large; with no usable folder (none chosen, or it needs reconnecting) the
+ * card offers "Choose a folder" instead. A healthy (or unread) card has none.
+ */
+export type BackupWarningAction = "back-up-now" | "choose-folder";
+
+export function backupWarningAction(
+  health: BackupHealth | null,
+): BackupWarningAction | null {
+  if (!health) return null;
+  switch (health.kind) {
+    case "stale":
+    case "too-large":
+      return "back-up-now";
+    case "not-configured":
+    case "lost-folder":
+      return "choose-folder";
+    case "healthy":
+      return null;
+  }
+}
+
+export const BACK_UP_NOW_LABEL = "Back up now";
+export const CHOOSE_A_FOLDER_LABEL = "Choose a folder";
+
+/** The warning action's button label. */
+export function backupWarningActionLabel(action: BackupWarningAction): string {
+  return action === "back-up-now" ? BACK_UP_NOW_LABEL : CHOOSE_A_FOLDER_LABEL;
+}
+
+/** The result shapes "Back up now" reports (`runAutomaticBackupNow`). */
+export type BackUpNowOutcome =
+  | { status: "written"; skippedPhotos: number }
+  | { status: "too-large" }
+  | { status: "failed" }
+  | { status: "blocked"; reason: string }
+  | { status: "busy" }
+  | { status: "no-folder" }
+  /** The call itself threw. */
+  | { status: "error" };
+
+export const BACK_UP_NOW_FAILED_COPY =
+  "Couldn't back up. Reconnect your backup folder.";
+
+/**
+ * The snackbar "Back up now" ends with (D-115): a success notice on a verified
+ * write (with the skipped-photos line when photos were left out, 38.6 D-24),
+ * otherwise an error naming what to do.
+ */
+export function backUpNowSnackbar(
+  outcome: BackUpNowOutcome,
+  skippedPhotosLine: (count: number) => string | null,
+): { kind: "success" | "error"; label: string } {
+  switch (outcome.status) {
+    case "written": {
+      const skipped = skippedPhotosLine(outcome.skippedPhotos);
+      return {
+        kind: "success",
+        label: skipped ? `Backed up. ${skipped}` : "Backed up",
+      };
+    }
+    case "too-large":
+      return {
+        kind: "error",
+        label: "Couldn't back up. Your backup is too large to create.",
+      };
+    case "failed":
+      return { kind: "error", label: BACK_UP_NOW_FAILED_COPY };
+    case "blocked":
+      return {
+        kind: "error",
+        label: "Couldn't back up. Orbit couldn't read your backup passphrase.",
+      };
+    case "busy":
+      return { kind: "success", label: "A backup is already running." };
+    case "no-folder":
+      return {
+        kind: "error",
+        label: "Couldn't back up. Choose a backup folder first.",
+      };
+    case "error":
+      return { kind: "error", label: "Couldn't back up. Please try again." };
+  }
+}
+
 /** 38.6 D-39: the manual export's over-cap message (the themed notice's body). */
 export const MANUAL_EXPORT_TOO_LARGE_COPY =
   "Your backup is too large to create. Nothing was shared.";

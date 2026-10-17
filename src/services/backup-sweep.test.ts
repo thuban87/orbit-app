@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   health: vi.fn(),
   record: vi.fn(async (_record: { at: string; count: number }) => {}),
   hook: null as null | (() => Promise<void>),
+  due: true,
 }));
 
 vi.mock("expo-sqlite", () => ({}));
@@ -34,7 +35,7 @@ vi.mock("@/db/transaction", () => ({
     fn(),
 }));
 vi.mock("@/backup/auto-backup-policy", () => ({
-  shouldRunAutomaticBackup: () => true,
+  shouldRunAutomaticBackup: () => h.due,
 }));
 vi.mock("@/services/backup/backup-service", () => ({
   AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC: "too-large-diagnostic",
@@ -80,6 +81,7 @@ async function runBackupHook() {
 }
 
 beforeEach(() => {
+  h.due = true;
   h.health.mockReset();
   h.record.mockReset().mockResolvedValue(undefined);
 });
@@ -148,5 +150,15 @@ describe("backup sweep health on failure (38.6 D-39)", () => {
       backupFolderAccessible: 1,
       backupFolderDiagnostic: null,
     });
+  });
+});
+
+describe("backup sweep gate (38.12 D-115: unchanged by the Back up now extraction)", () => {
+  it("writes nothing and records nothing when the backup is not due", async () => {
+    h.due = false;
+    h.result = { status: "written", filename: "f", skippedPhotos: 3 };
+    await runBackupHook();
+    expect(h.health).not.toHaveBeenCalled();
+    expect(h.record).not.toHaveBeenCalled();
   });
 });

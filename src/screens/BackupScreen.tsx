@@ -19,6 +19,10 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
+  chooseAutomaticBackupFolder,
+  runAutomaticBackupNow,
+} from "@/services/backup/backup-now";
+import {
   createManualExportService,
   loadBackupForRestorePreview,
 } from "@/services/backup/backup-service";
@@ -53,7 +57,11 @@ import {
   shouldConsumeSharedBackup,
 } from "./backup-dualhome-logic";
 import {
+  type BackUpNowOutcome,
   type BackupHealth,
+  backUpNowSnackbar,
+  backupWarningAction,
+  backupWarningActionLabel,
   manualExportFailureCopy,
   resolveBackupHealth,
   resolveBackupNudge,
@@ -110,6 +118,11 @@ export function BackupScreen({
   >(null);
   const [restorePassphrase, setRestorePassphrase] = useState("");
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  // D-115: "Back up now" / "Choose a folder" on the warning card. The ref is
+  // the synchronous single-flight (a double tap starts one write, T-38.12-39);
+  // the state draws the button busy.
+  const warningActionInFlightRef = useRef(false);
+  const [warningActionBusy, setWarningActionBusy] = useState(false);
 
   const reload = useCallback(() => {
     let cancelled = false;
@@ -179,6 +192,51 @@ export function BackupScreen({
     (section?: "automatic" | "encryption") =>
       navigation.navigate("BackupSettings", { section }),
     [navigation],
+  );
+
+  // D-115: the automatic backup's own write-verify-record function, with no
+  // due gate; then a snackbar, and the reload clears the warning on success.
+  const backUpNow = useCallback(async () => {
+    let outcome: BackUpNowOutcome;
+    try {
+      outcome = await runAutomaticBackupNow({ exec: getExecutor() });
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "back up now failed", error);
+      outcome = { status: "error" };
+    }
+    showSnackbar(backUpNowSnackbar(outcome, skippedPhotosCopy));
+  }, []);
+
+  const chooseFolder = useCallback(async () => {
+    try {
+      await chooseAutomaticBackupFolder({
+        exec: getExecutor(),
+        folderName: () => "Selected backup folder",
+      });
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "folder selection failed", error);
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't choose folder. Please try again.",
+      });
+    }
+  }, []);
+
+  const runWarningAction = useCallback(
+    async (action: "back-up-now" | "choose-folder") => {
+      if (warningActionInFlightRef.current) return;
+      warningActionInFlightRef.current = true;
+      setWarningActionBusy(true);
+      try {
+        if (action === "back-up-now") await backUpNow();
+        else await chooseFolder();
+      } finally {
+        warningActionInFlightRef.current = false;
+        setWarningActionBusy(false);
+        reload();
+      }
+    },
+    [backUpNow, chooseFolder, reload],
   );
 
   const dismissNudge = useCallback(async () => {
@@ -396,12 +454,7 @@ export function BackupScreen({
     void validateRestore(selectedEncryptedContents, restorePassphrase);
   }, [restorePassphrase, selectedEncryptedContents, validateRestore]);
 
-  const heroAction =
-    health?.kind === "not-configured"
-      ? "Set up backups"
-      : health?.kind === "lost-folder"
-        ? "Choose folder"
-        : "Manage backups";
+  const warningAction = backupWarningAction(health);
   const heroDetail =
     health?.kind === "healthy"
       ? `Automatic backup: ${relativeTime(health.lastAutomaticBackupAt)}\n${health.automaticFileCount} backup${health.automaticFileCount === 1 ? "" : "s"} kept in ${health.folderName}`
@@ -460,14 +513,38 @@ export function BackupScreen({
               {automaticSkippedLine}
             </Text>
           ) : null}
+          {warningAction ? (
+            <Pressable
+              testID="backup-warning-action"
+              accessibilityRole="button"
+              accessibilityLabel={backupWarningActionLabel(warningAction)}
+              accessibilityState={{
+                disabled: warningActionBusy,
+                busy: warningActionBusy,
+              }}
+              disabled={warningActionBusy}
+              onPress={() => void runWarningAction(warningAction)}
+              style={[
+                styles.primaryButton,
+                {
+                  backgroundColor: colors.accent,
+                  opacity: warningActionBusy ? 0.6 : 1,
+                },
+              ]}
+            >
+              <Text style={{ color: colors.onAccent }}>
+                {backupWarningActionLabel(warningAction)}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable
             testID="backup-manage"
             accessibilityRole="button"
-            accessibilityLabel={heroAction}
+            accessibilityLabel="Backup settings"
             onPress={() => openSettings("automatic")}
             style={styles.linkButton}
           >
-            <Text style={{ color: colors.accentText }}>{heroAction}</Text>
+            <Text style={{ color: colors.accentText }}>Backup settings</Text>
           </Pressable>
         </View>
       ) : (

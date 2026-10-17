@@ -47,13 +47,14 @@ function labelColor(region: string): string {
 }
 
 describe("Backup/Restore filled-action role foregrounds (RG-029 AUD-UIA-002)", () => {
-  it("Backup: the accent-filled passphrase continue action labels with onAccent", () => {
+  it("Backup: the warning action (D-115) and the passphrase continue action label with onAccent", () => {
     const regions = primaryButtonRegions(read("src/screens/BackupScreen.tsx"));
-    expect(regions).toHaveLength(1);
-    const [region] = regions;
-    expect(region).toContain("backgroundColor: colors.accent");
-    expect(labelColor(region)).toBe("colors.onAccent");
-    expect(region).not.toContain("colors.textPrimary");
+    expect(regions).toHaveLength(2);
+    for (const region of regions) {
+      expect(region).toContain("backgroundColor: colors.accent");
+      expect(labelColor(region)).toBe("colors.onAccent");
+      expect(region).not.toContain("colors.textPrimary");
+    }
   });
 
   it("Restore Preview: 'Choose file again' labels with onAccent and the apply label mirrors its fill", () => {
