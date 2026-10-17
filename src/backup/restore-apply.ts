@@ -44,6 +44,7 @@ import {
   listJournalForCanonicalCore,
   type RestorePhotoJournalEntry,
 } from "@/db/restore-photo-journal-dao";
+import { INDEFINITE_SNOOZE_UNTIL } from "@/db/snooze-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -84,6 +85,20 @@ import {
 } from "@/services/photos/staging-sessions";
 
 export type RestoreMode = "merge" | "replace-all";
+/** D-69: the steps a restore reports, in order, so its page can show them. */
+export type RestoreProgressStep = "safety-backup" | "restoring";
+/**
+ * D-59: people, not rows. `before` is this phone's contacts not in the Bin
+ * before the restore; `restored` is the backup's contacts not in the Bin;
+ * `removed` is, for Replace-all, the phone's not-in-Bin people the backup does
+ * not carry (Merge never removes anyone this way: 0). Also 39 D-96's branch
+ * signal.
+ */
+export interface RestorePeopleCounts {
+  before: number;
+  restored: number;
+  removed: number;
+}
 export type PreRestoreSnapshotResult =
   /** `skippedPhotos`: photos the safety backup left out (38.6 D-24). */
   | { status: "written"; skippedPhotos?: number }
@@ -135,6 +150,12 @@ export interface RestoreApplyDependencies {
    * default slot instead. Retired ids always restore unchanged.
    */
   unavailableBackgrounds?: "reject" | "use-default";
+  /**
+   * D-69: called at each step boundary: `"safety-backup"` just before the
+   * Replace-all safety backup runs (only when one runs), then `"restoring"`
+   * once the restore itself starts.
+   */
+  onProgress?: (step: RestoreProgressStep) => void;
 }
 export type RestoreApplyResult =
   | {
@@ -158,6 +179,8 @@ export type RestoreApplyResult =
        * shows "Photo unavailable" (D-28).
        */
       restoredPhotosMissing: number;
+      /** D-59: people counts; the row totals above stay for their consumers. */
+      people: RestorePeopleCounts;
     }
   | { status: "incompatible-destination"; incompatibilities: number }
   | { status: "pre-restore-snapshot-failed" }
@@ -836,6 +859,10 @@ async function upsertContacts(exec: SqlExecutor, plan: Plan): Promise<void> {
       typeof r.categoryUid === "string"
         ? (categories.get(r.categoryUid) ?? null)
         : null;
+    // D-98/D-134: the per-person mute is now an indefinite snooze. A row of
+    // any format that still carries remindersOff = 1 lands as that snooze,
+    // in both modes, so it never comes back as a mute with no switch.
+    const muted = r.remindersOff === 1;
     await exec.runAsync(
       "INSERT INTO contacts (uid,name,category_id,tracking_enabled,interval_days,social_battery,birthday,archived_at,snooze_until,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET name=excluded.name,category_id=excluded.category_id,tracking_enabled=excluded.tracking_enabled,interval_days=excluded.interval_days,social_battery=excluded.social_battery,birthday=excluded.birthday,archived_at=excluded.archived_at,snooze_until=excluded.snooze_until,rarely_responds=excluded.rarely_responds,reminders_off=excluded.reminders_off,modified_at=excluded.modified_at",
       [
@@ -847,9 +874,9 @@ async function upsertContacts(exec: SqlExecutor, plan: Plan): Promise<void> {
         r.socialBattery ?? null,
         r.birthday ?? null,
         r.archivedAt ?? null,
-        r.snoozeUntil ?? null,
+        muted ? INDEFINITE_SNOOZE_UNTIL : (r.snoozeUntil ?? null),
         r.rarelyResponds,
-        r.remindersOff,
+        muted ? 0 : r.remindersOff,
         r.createdAt,
         r.modified_at,
       ],
@@ -876,6 +903,63 @@ async function restoreFavourites(
     ]);
     rank += 1;
   }
+}
+/** The backup's favourite contact uids, in backup order. */
+function backupFavouriteUids(manifest: BackupManifest): string[] {
+  return manifest.contacts.flatMap((contact) =>
+    contact.favourite === 1 && typeof contact.uid === "string"
+      ? [contact.uid]
+      : [],
+  );
+}
+/**
+ * D-113, Merge: a person is a favourite if either side marks them. Runs over
+ * every backup favourite, not only rows the backup won, and only fills a
+ * missing mark (`favourite_rank IS NULL`), appending like the favourites DAO.
+ * It never clears a rank, leaves `modified_at` alone (RESEARCH §3 A5, this plan
+ * only), and matches nothing for a uid a newer local tombstone deleted.
+ */
+async function unionFavourites(
+  exec: SqlExecutor,
+  manifest: BackupManifest,
+): Promise<void> {
+  for (const uid of backupFavouriteUids(manifest))
+    await exec.runAsync(
+      "UPDATE contacts SET favourite_rank=(SELECT COALESCE(MAX(favourite_rank),-1)+1 FROM contacts) WHERE uid=? AND favourite_rank IS NULL",
+      [uid],
+    );
+}
+/** True when the Merge favourite union would mark at least one existing row. */
+async function favouriteUnionPending(
+  exec: SqlExecutor,
+  manifest: BackupManifest,
+): Promise<boolean> {
+  const wanted = new Set(backupFavouriteUids(manifest));
+  if (wanted.size === 0) return false;
+  const unmarked = await exec.getAllAsync<{ uid: string }>(
+    "SELECT uid FROM contacts WHERE favourite_rank IS NULL",
+  );
+  return unmarked.some((row) => wanted.has(row.uid));
+}
+/** D-59: people counts, read inside the restore transaction before any write. */
+async function peopleCounts(
+  exec: SqlExecutor,
+  manifest: BackupManifest,
+  mode: RestoreMode,
+): Promise<RestorePeopleCounts> {
+  const liveBefore = await exec.getAllAsync<{ uid: string }>(
+    "SELECT uid FROM contacts WHERE archived_at IS NULL",
+  );
+  const backupUids = new Set(manifest.contacts.map((contact) => contact.uid));
+  return {
+    before: liveBefore.length,
+    restored: manifest.contacts.filter((contact) => contact.archivedAt == null)
+      .length,
+    removed:
+      mode === "replace-all"
+        ? liveBefore.filter((row) => !backupUids.has(row.uid)).length
+        : 0,
+  };
 }
 async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
   const contacts = await idMap(exec, "contacts");
@@ -2021,6 +2105,8 @@ export async function applyRestore(
     )?.backup_folder_uri,
   );
   if (mode === "replace-all" && configured) {
+    if (deps.createVerifiedPreRestoreSnapshot)
+      deps.onProgress?.("safety-backup");
     const snapshot = deps.createVerifiedPreRestoreSnapshot
       ? await deps.createVerifiedPreRestoreSnapshot()
       : null;
@@ -2031,6 +2117,7 @@ export async function applyRestore(
     preRestoreSnapshotCreated = true;
     preRestoreSnapshotSkippedPhotos = snapshot.skippedPhotos ?? 0;
   }
+  deps.onProgress?.("restoring");
   const restoreSessionToken = deps.sessionToken ?? newUid();
   beginStagingSession(restoreSessionToken);
   const stagedPhotos = new Map<string, FinalizeCandidate>();
@@ -2062,6 +2149,8 @@ export async function applyRestore(
       stagedBackgrounds,
     );
     const prepared = await inWriteTransaction(exec, async () => {
+      // D-59: before replaceAllReset or any other write.
+      const people = await peopleCounts(exec, manifest, mode);
       const [settings, local] = await Promise.all([
         getPortableSettingsSnapshot(exec),
         Promise.all(
@@ -2201,10 +2290,15 @@ export async function applyRestore(
         );
         return current === undefined || item.deletedAt > current;
       });
+      // D-113: a backup favourite the phone lacks is a change even when no
+      // row action is (equal rows retain).
+      const favouritesPending =
+        mode === "merge" && (await favouriteUnionPending(exec, manifest));
       if (
         totals.insert + totals.update + totals.delete === 0 &&
         !applySettings &&
-        !novelTombstone
+        !novelTombstone &&
+        !favouritesPending
       )
         return {
           result: {
@@ -2221,6 +2315,7 @@ export async function applyRestore(
             preRestoreSnapshotCreated,
             preRestoreSnapshotSkippedPhotos,
             restoredPhotosMissing: 0,
+            people,
           },
         };
       const fileDeletes = await captureRestoreDeletes(exec, plan, mode);
@@ -2307,6 +2402,7 @@ export async function applyRestore(
       await upsertParents(exec, plan, backgroundPendingByUid);
       await upsertContacts(exec, plan);
       if (mode === "replace-all") await restoreFavourites(exec, manifest);
+      else await unionFavourites(exec, manifest);
       await releaseLinkSlots(exec, plan);
       await upsertChildren(exec, plan);
       await syncLinkedPairs(exec);
@@ -2452,6 +2548,7 @@ export async function applyRestore(
         fileDeletes,
         deferredFlags,
         restoredPhotosMissing,
+        people,
       };
     });
     if (prepared.result) return prepared.result;
@@ -2463,6 +2560,7 @@ export async function applyRestore(
       fileDeletes,
       deferredFlags,
       restoredPhotosMissing,
+      people,
     } = prepared;
     const committedPaths = new Set(
       candidates.finalize.map((candidate) => candidate.relativePath),
@@ -2587,6 +2685,7 @@ export async function applyRestore(
       preRestoreSnapshotCreated,
       preRestoreSnapshotSkippedPhotos,
       restoredPhotosMissing,
+      people,
     };
   } finally {
     for (const [key, candidate] of stagedPhotos) {

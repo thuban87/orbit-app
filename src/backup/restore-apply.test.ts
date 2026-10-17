@@ -4420,11 +4420,14 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
     expect(
       await phone.getFirstAsync("SELECT uid FROM contacts WHERE uid='gone'"),
     ).toBeNull();
-    // Distinct ranks: an appended favourite never collides with an existing one.
-    const ranks = await phone.getAllAsync<{ favourite_rank: number }>(
-      "SELECT favourite_rank FROM contacts WHERE favourite_rank IS NOT NULL",
+    // Appended like the favourites DAO: each new mark lands above every
+    // existing rank (the phone's seeded favourites hold rank 0).
+    const appended = await phone.getAllAsync<{ favourite_rank: number }>(
+      "SELECT favourite_rank FROM contacts WHERE uid IN ('backup-fav','new-fav','retained')",
     );
-    expect(new Set(ranks.map((r) => r.favourite_rank)).size).toBe(5);
+    const appendedRanks = appended.map((r) => r.favourite_rank);
+    expect(new Set(appendedRanks).size).toBe(3);
+    expect(Math.min(...appendedRanks)).toBeGreaterThan(0);
   });
 
   it("Merge with no row changes still applies a backup favourite the phone lacks (D-113)", async () => {

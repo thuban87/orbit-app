@@ -473,6 +473,7 @@ describe("restore apply decisions", () => {
         preRestoreSnapshotCreated: true,
         preRestoreSnapshotSkippedPhotos: 2,
         restoredPhotosMissing: 1,
+        people: { before: 5, restored: 4, removed: 1 },
       }),
     ).toEqual({
       added: 3,
@@ -502,6 +503,7 @@ describe("restore apply decisions", () => {
       preRestoreSnapshotCreated: false,
       preRestoreSnapshotSkippedPhotos: 3,
       restoredPhotosMissing: 0,
+      people: { before: 0, restored: 0, removed: 0 },
     };
     expect(
       toRestoreResultParams({ ...base, mode: "merge" })
