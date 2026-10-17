@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>38.12 D-119 — Settings row and section card mockup</title>
+<!--
+  WORKPAPER (38.12-06, D-119). A static mockup of the shared SettingsRow and
+  SettingsSectionCard, for the owner's look check at the device pass (38.12-26),
+  shown next to device screenshots. Colours are the theme token hex values read
+  from src/theme/theme-presets.ts on 2026-10-17 (mockup only; the app code
+  resolves every colour through useTheme()). Sizes follow the components:
+  row padding 16/12 (SPACING.base / SPACING.md), min height 44, card radius 16
+  (RADII.lg), hairline border and dividers, title = AppText body (16/24),
+  subtitle = caption (14/20), header = label (14/600) uppercase.
+  Row kinds: route (chevron), value (right-aligned value + chevron), switch
+  (trailing control, no chevron), info-only (no chevron, no pressed state).
+-->
+<style>
+  body { margin: 0; padding: 24px; background: #777; font-family: Inter, Roboto, system-ui, sans-serif; }
+  h1 { font-size: 18px; color: #fff; margin: 0 0 4px; }
+  p.note { color: #eee; font-size: 13px; margin: 0 0 20px; max-width: 900px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 24px; }
+  .phone { width: 360px; background: var(--background); border-radius: 24px; padding: 0 16px 24px; box-sizing: border-box; }
+  .label { font-size: 12px; color: var(--textSecondary); padding: 12px 4px 0; }
+  .appbar { color: var(--textPrimary); font-size: 20px; font-weight: 600; padding: 12px 0 16px; }
+  .back { font-size: 26px; margin-right: 8px; }
+  .section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .heading { color: var(--textSecondary); font-size: 14px; font-weight: 600; line-height: 20px; text-transform: uppercase; letter-spacing: 0.5px; padding: 0 4px; }
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .divider { height: 0.5px; background: var(--border); }
+  .row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 12px 16px; box-sizing: border-box; }
+  .row.tappable { cursor: pointer; }
+  .row.tappable:active { opacity: 0.7; }
+  .copy { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .title { color: var(--textPrimary); font-size: 16px; line-height: 24px; }
+  .subtitle { color: var(--textSecondary); font-size: 14px; line-height: 20px; }
+  .value { color: var(--textSecondary); font-size: 16px; line-height: 24px; text-align: right; }
+  .chevron { color: var(--textSecondary); font-size: 22px; line-height: 1; }
+  .switch { position: relative; width: 52px; height: 32px; border-radius: 16px; box-sizing: border-box; flex: none; }
+  .switch.on { background: var(--accent); }
+  .switch.off { border: 2px solid var(--borderStrong); }
+  .switch .thumb { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .switch.on .thumb { width: 24px; height: 24px; top: 4px; left: 24px; background: var(--onAccent); color: var(--accent); }
+  .switch.off .thumb { width: 16px; height: 16px; top: 6px; left: 6px; background: var(--textSecondary); }
+</style>
+</head>
+<body>
+<h1>Settings row and section card (D-119)</h1>
+<p class="note">One section card per section, rows divided by a hairline. A row that opens something ends in a chevron; a row with a switch has no chevron; an info-only row (Version, Your data) has neither and does not react to a tap. Shown in both theme packages, light and dark. The "Your data" line is the D-125 copy for the owner's review.</p>
+<div class="grid">
+  <section class="phone" style="--background:#0B0E1A;--surface:#141828;--border:#2A3048;--borderStrong:#3C4568;--textPrimary:#E6E9F5;--textSecondary:#8B93B0;--accent:#6C8CFF;--onAccent:#0A1330">
+    <div class="label">Galaxy · dark</div>
+    <div class="appbar"><span class="back">&#8249;</span> Contacts &amp; Relationships</div>
+    <div class="section">
+      <div class="heading">Contact sources</div>
+      <div class="card">
+        <div class="row tappable">
+          <div class="copy"><div class="title">Import contacts</div><div class="subtitle">Pick people from your phone's contacts.</div></div>
+          <span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row tappable">
+          <div class="copy"><div class="title">Phone number region</div><div class="subtitle">Used to read numbers without a country code.</div></div>
+          <span class="value">Germany</span><span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Interaction Assist</div><div class="subtitle">Ask me to log calls, texts and emails started from Orbit.</div></div>
+          <span class="switch on"><span class="thumb">&#10003;</span></span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Relationship Satellites</div></div>
+          <span class="switch off"><span class="thumb"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="heading">About</div>
+      <div class="card">
+        <div class="row info">
+          <div class="copy"><div class="title">Version</div></div>
+          <span class="value">1.0.0</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row info">
+          <div class="copy"><div class="title">Your data</div><div class="subtitle">Your contact data stays on this phone, and in the backup folder you choose. Orbit never sends it anywhere else, except to your own AI provider when you choose to use AI.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="phone" style="--background:#EDF0F9;--surface:#FBFCFE;--border:#D2D9EA;--borderStrong:#B4BFD8;--textPrimary:#1A1F33;--textSecondary:#515A78;--accent:#3355E6;--onAccent:#FFFFFF">
+    <div class="label">Galaxy · light</div>
+    <div class="appbar"><span class="back">&#8249;</span> Contacts &amp; Relationships</div>
+    <div class="section">
+      <div class="heading">Contact sources</div>
+      <div class="card">
+        <div class="row tappable">
+          <div class="copy"><div class="title">Import contacts</div><div class="subtitle">Pick people from your phone's contacts.</div></div>
+          <span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row tappable">
+          <div class="copy"><div class="title">Phone number region</div><div class="subtitle">Used to read numbers without a country code.</div></div>
+          <span class="value">Germany</span><span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Interaction Assist</div><div class="subtitle">Ask me to log calls, texts and emails started from Orbit.</div></div>
+          <span class="switch on"><span class="thumb">&#10003;</span></span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Relationship Satellites</div></div>
+          <span class="switch off"><span class="thumb"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="heading">About</div>
+      <div class="card">
+        <div class="row info">
+          <div class="copy"><div class="title">Version</div></div>
+          <span class="value">1.0.0</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row info">
+          <div class="copy"><div class="title">Your data</div><div class="subtitle">Your contact data stays on this phone, and in the backup folder you choose. Orbit never sends it anywhere else, except to your own AI provider when you choose to use AI.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="phone" style="--background:#101216;--surface:#191C22;--border:#2E333C;--borderStrong:#424956;--textPrimary:#E9ECF1;--textSecondary:#9AA1AD;--accent:#8091D6;--onAccent:#0C1130">
+    <div class="label">Standard · dark</div>
+    <div class="appbar"><span class="back">&#8249;</span> Contacts &amp; Relationships</div>
+    <div class="section">
+      <div class="heading">Contact sources</div>
+      <div class="card">
+        <div class="row tappable">
+          <div class="copy"><div class="title">Import contacts</div><div class="subtitle">Pick people from your phone's contacts.</div></div>
+          <span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row tappable">
+          <div class="copy"><div class="title">Phone number region</div><div class="subtitle">Used to read numbers without a country code.</div></div>
+          <span class="value">Germany</span><span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Interaction Assist</div><div class="subtitle">Ask me to log calls, texts and emails started from Orbit.</div></div>
+          <span class="switch on"><span class="thumb">&#10003;</span></span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Relationship Satellites</div></div>
+          <span class="switch off"><span class="thumb"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="heading">About</div>
+      <div class="card">
+        <div class="row info">
+          <div class="copy"><div class="title">Version</div></div>
+          <span class="value">1.0.0</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row info">
+          <div class="copy"><div class="title">Your data</div><div class="subtitle">Your contact data stays on this phone, and in the backup folder you choose. Orbit never sends it anywhere else, except to your own AI provider when you choose to use AI.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="phone" style="--background:#F2F3F6;--surface:#FFFFFF;--border:#DADEE6;--borderStrong:#BCC3CF;--textPrimary:#1B1E26;--textSecondary:#565D6B;--accent:#4453B0;--onAccent:#FFFFFF">
+    <div class="label">Standard · light</div>
+    <div class="appbar"><span class="back">&#8249;</span> Contacts &amp; Relationships</div>
+    <div class="section">
+      <div class="heading">Contact sources</div>
+      <div class="card">
+        <div class="row tappable">
+          <div class="copy"><div class="title">Import contacts</div><div class="subtitle">Pick people from your phone's contacts.</div></div>
+          <span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row tappable">
+          <div class="copy"><div class="title">Phone number region</div><div class="subtitle">Used to read numbers without a country code.</div></div>
+          <span class="value">Germany</span><span class="chevron">&#8250;</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Interaction Assist</div><div class="subtitle">Ask me to log calls, texts and emails started from Orbit.</div></div>
+          <span class="switch on"><span class="thumb">&#10003;</span></span>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="copy"><div class="title">Relationship Satellites</div></div>
+          <span class="switch off"><span class="thumb"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="heading">About</div>
+      <div class="card">
+        <div class="row info">
+          <div class="copy"><div class="title">Version</div></div>
+          <span class="value">1.0.0</span>
+        </div>
+        <div class="divider"></div>
+        <div class="row info">
+          <div class="copy"><div class="title">Your data</div><div class="subtitle">Your contact data stays on this phone, and in the backup folder you choose. Orbit never sends it anywhere else, except to your own AI provider when you choose to use AI.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

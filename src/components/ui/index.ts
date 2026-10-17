@@ -68,6 +68,17 @@ export {
   type OverlayLifecycle,
   SCRIM_OPACITY,
 } from "./overlay-base";
+export {
+  SETTINGS_ROW_DISABLED_OPACITY,
+  SETTINGS_ROW_PRESSED_OPACITY,
+  SettingsRow,
+  type SettingsRowProps,
+} from "./SettingsRow";
+export {
+  SettingsSectionCard,
+  type SettingsSectionCardProps,
+  type SettingsSectionCardSurface,
+} from "./SettingsSectionCard";
 export { Sheet, type SheetProps, type SheetVariant } from "./Sheet";
 export {
   type UseKeyboardCenteringArgs,
