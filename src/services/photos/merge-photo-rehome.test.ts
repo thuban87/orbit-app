@@ -389,3 +389,76 @@ describe("stageLocalPhotoForRestore (38.6 D-26, review WR2-02)", () => {
     expect(h.fs!.files.has(STAGED)).toBe(false);
   });
 });
+
+describe("text in a photo field (38.12 D-131)", () => {
+  it("merges with text in the absorbed photo field: the text moves as an ordinary value and no file is touched", async () => {
+    const s = await contact("Survivor");
+    const a = await contact("Absorbed");
+    const def = await exec.runAsync(
+      "INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES (?, 'portrait', 'Portrait', 'photo', 0, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [uid(), a.id, def.lastInsertRowId, "hello", NOW, NOW],
+    );
+    const before = new Map(h.fs!.files);
+    await expect(
+      mergeContactsWithPhotoOwnership(exec, {
+        survivorId: s.id,
+        absorbedId: a.id,
+        now: NOW,
+      }),
+    ).resolves.toEqual({ recoveryPending: false });
+    expect(
+      await exec.getFirstAsync<{ value: string }>(
+        "SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+        [s.id, def.lastInsertRowId],
+      ),
+    ).toEqual({ value: "hello" });
+    // Nothing was staged or written: the file set is unchanged.
+    expect(new Map(h.fs!.files)).toEqual(before);
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+  });
+
+  it("takes the absorbed text when chosen over a survivor photo, without staging anything", async () => {
+    const s = await contact("Survivor");
+    const a = await contact("Absorbed");
+    const def = await exec.runAsync(
+      "INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES (?, 'portrait', 'Portrait', 'photo', 0, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    const own = `avatars/cv-${s.id}-portrait.jpg`;
+    h.fs!.files.set(own, "Survivor portrait");
+    await exec.runAsync(
+      "INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)",
+      [
+        uid(),
+        s.id,
+        def.lastInsertRowId,
+        own,
+        NOW,
+        NOW,
+        uid(),
+        a.id,
+        def.lastInsertRowId,
+        "hello",
+        NOW,
+        NOW,
+      ],
+    );
+    await mergeContactsWithPhotoOwnership(exec, {
+      survivorId: s.id,
+      absorbedId: a.id,
+      now: NOW,
+      resolutions: { customFields: { [def.lastInsertRowId]: "absorbed" } },
+    });
+    expect(
+      await exec.getFirstAsync<{ value: string }>(
+        "SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+        [s.id, def.lastInsertRowId],
+      ),
+    ).toEqual({ value: "hello" });
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+  });
+});

@@ -609,3 +609,94 @@ describe("mergeContacts", () => {
     ).toEqual({ last_contact: occurredAt });
   });
 });
+
+/**
+ * Text in a photo field (38.12 D-131; CLAUDE.md custom-field invariants): only
+ * a stored photo path is a photo. Text kept in a photo-type field (e.g. after a
+ * Text→Photo type change) travels as an ordinary raw TEXT custom value — never
+ * coerced, never cleared, never treated as a path.
+ */
+describe("mergeContacts — text in a photo field (D-131)", () => {
+  async function photoDef(): Promise<number> {
+    const def = await exec.runAsync(
+      "INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES (?, 'portrait', 'Portrait', 'photo', 0, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    return def.lastInsertRowId;
+  }
+  async function setValue(
+    contactId: number,
+    fieldDefId: number,
+    value: string | null,
+  ): Promise<void> {
+    await exec.runAsync(
+      "INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [uid(), contactId, fieldDefId, value, NOW, NOW],
+    );
+  }
+  async function valueOf(
+    contactId: number,
+    fieldDefId: number,
+  ): Promise<string | null | undefined> {
+    const row = await exec.getFirstAsync<{ value: string | null }>(
+      "SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+      [contactId, fieldDefId],
+    );
+    return row === null ? undefined : row.value;
+  }
+
+  it("moves the absorbed text to a survivor with no value, raw and unchanged", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const def = await photoDef();
+    await setValue(absorbed, def, " hello ");
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: NOW,
+    });
+    expect(await valueOf(survivor, def)).toBe(" hello ");
+  });
+
+  it("takes the absorbed text over a blank survivor value", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const def = await photoDef();
+    await setValue(survivor, def, "");
+    await setValue(absorbed, def, "hello");
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: NOW,
+    });
+    expect(await valueOf(survivor, def)).toBe("hello");
+  });
+
+  it("takes the absorbed text when it is chosen over a survivor value", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const def = await photoDef();
+    await setValue(survivor, def, "older note");
+    await setValue(absorbed, def, "hello");
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: NOW,
+      resolutions: { customFields: { [def]: "absorbed" } },
+    });
+    expect(await valueOf(survivor, def)).toBe("hello");
+  });
+
+  it("still drops an absorbed stored photo path that has no staged transfer", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const def = await photoDef();
+    await setValue(absorbed, def, `avatars/cv-${absorbed}-portrait.jpg`);
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: NOW,
+    });
+    expect(await valueOf(survivor, def)).toBeUndefined();
+  });
+});
