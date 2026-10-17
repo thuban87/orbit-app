@@ -176,12 +176,18 @@ const CATEGORY_PATHS: readonly CategoryPath[] = [
   {
     file: "src/screens/MergeConflictsScreen.tsx",
     identity: "name",
-    role: "audited pre-existing screen-local SQL label exception",
+    role: "renders the category label read by merge-conflicts-read",
+  },
+  {
+    file: "src/db/merge-conflicts-read.ts",
+    identity: "name",
+    role: "merge conflicts read: category label by join (38.12 D-44, moved out of the screen)",
   },
 ];
 
 const REQUIRED_CONSUMERS = [
   "src/screens/MergeConflictsScreen.tsx",
+  "src/db/merge-conflicts-read.ts",
   "src/db/merge-dao.ts",
   "src/db/reconcile-apply.ts",
   "src/db/bulk-actions-dao.ts",
@@ -245,7 +251,10 @@ describe("category identity repository audit", () => {
     expect(restore).toContain("clearReplacedLiveTombstones(exec)");
   });
 
-  it("keeps production component SQL at the one audited merge exception", () => {
+  // 38.12 D-44: the one audited exception (Merge conflicts' screen-local
+  // SQL) moved into src/db/merge-conflicts-read.ts, so no component reads
+  // categories with SQL.
+  it("keeps category SQL out of every production screen and component", () => {
     const components = CATEGORY_PATHS.filter(({ file }) =>
       /src\/(screens|components)\//.test(file),
     );
@@ -254,9 +263,7 @@ describe("category identity repository audit", () => {
         /\b(SELECT|INSERT|UPDATE|DELETE)\b[\s\S]{0,120}\b(categories|category_id)\b/i.test(
           source(file),
         );
-      expect(hasSql, file).toBe(
-        file === "src/screens/MergeConflictsScreen.tsx",
-      );
+      expect(hasSql, file).toBe(false);
     }
   });
 

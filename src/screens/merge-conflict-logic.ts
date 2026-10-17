@@ -1,3 +1,4 @@
+import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { customValueDisplayText } from "@/profile/knowledge-presentation";
 import type { FieldType } from "@/schemas/types";
@@ -50,9 +51,29 @@ export function customConflictDisplayValues(
   survivor: string,
   absorbed: string,
 ): [string, string] {
-  const shownSurvivor = customValueDisplayText(type, survivor);
-  const shownAbsorbed = customValueDisplayText(type, absorbed);
+  const shownSurvivor = customConflictDisplayValue(type, survivor);
+  const shownAbsorbed = customConflictDisplayValue(type, absorbed);
   return shownSurvivor === shownAbsorbed
     ? [survivor, absorbed]
     : [shownSurvivor, shownAbsorbed];
+}
+
+/**
+ * One custom-field value as shown in a text choice. A photo-type field shown as
+ * text (D-129: one side holds text left in the field) never shows a stored
+ * photo's file path; that side reads "Photo". Text shows as itself.
+ */
+function customConflictDisplayValue(type: FieldType, value: string): string {
+  if (type === "photo") return isStoredPhotoPath(value) ? "Photo" : value;
+  return customValueDisplayText(type, value);
+}
+
+/**
+ * A photo-field conflict's choice (D-129). The photo choice also offers its
+ * "keep" row; in a merge that keeps the surviving contact's photo.
+ */
+export function customPhotoConflictChoice(
+  selection: string,
+): MergeConflictChoice {
+  return selection === "absorbed" ? "absorbed" : "survivor";
 }

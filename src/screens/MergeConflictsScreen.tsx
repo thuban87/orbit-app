@@ -11,57 +11,22 @@ import {
 import { type KEEP_ORBIT_PHOTO, PhotoChoice } from "@/components/PhotoChoice";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { getExecutor } from "@/db/database";
+import {
+  type MergeConflictData,
+  readMergeConflictData,
+} from "@/db/merge-conflicts-read";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { DEFAULT_FLOW_HOST } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
-import type { FieldType } from "@/schemas/types";
 import {
   customConflictDisplayValues,
+  customPhotoConflictChoice,
   hasResolvedMergeConflicts,
   type MergeConflictChoice,
 } from "@/screens/merge-conflict-logic";
 import { useTheme } from "@/theme";
 import { formatStoredBirthdayForDisplay } from "@/utils/dates";
-
-type ContactConflictRow = {
-  id: number;
-  name: string;
-  birthday: string | null;
-  category_id: number | null;
-  category_label: string | null;
-  photo: string | null;
-};
-
-type CustomConflictRow = {
-  field_def_id: number;
-  label: string;
-  /** The field's type; drives the display form only (38.9 D-66). */
-  type: FieldType;
-  survivor_value: string | null;
-  absorbed_value: string | null;
-};
-
-type PrimaryMethodRow = {
-  uid: string;
-  contact_id: number;
-  method_type: ContactMethodType;
-  raw_value: string;
-  display_value: string;
-  canonical_value: string | null;
-};
-
-type LoadedConflictData = {
-  survivor: ContactConflictRow;
-  absorbed: ContactConflictRow;
-  customFields: CustomConflictRow[];
-  primaryByType: Partial<
-    Record<
-      ContactMethodType,
-      { survivor: PrimaryMethodRow; absorbed: PrimaryMethodRow }
-    >
-  >;
-};
 
 function meaningful(value: string | null): boolean {
   return value != null && value.trim().length > 0;
@@ -74,17 +39,6 @@ function differs(
   return (
     a !== b &&
     !(typeof a === "string" && typeof b === "string" && a.trim() === b.trim())
-  );
-}
-
-function primaryConflict(
-  survivor: PrimaryMethodRow | undefined,
-  absorbed: PrimaryMethodRow | undefined,
-): survivor is PrimaryMethodRow {
-  if (!survivor || !absorbed) return false;
-  return (
-    (survivor.canonical_value ?? survivor.raw_value.trim()) !==
-    (absorbed.canonical_value ?? absorbed.raw_value.trim())
   );
 }
 
@@ -102,7 +56,7 @@ export function MergeConflictsScreen({
   // 38.12 D-110: the flow host passes through to the merge summary, which ends
   // the merge where it was started.
   const host = route.params.host ?? DEFAULT_FLOW_HOST;
-  const [data, setData] = useState<LoadedConflictData | null>(null);
+  const [data, setData] = useState<MergeConflictData | null>(null);
   const [failed, setFailed] = useState(false);
   const [scalarChoices, setScalarChoices] = useState<
     Record<string, MergeConflictChoice>
@@ -117,62 +71,19 @@ export function MergeConflictsScreen({
     "survivor" | "absorbed" | typeof KEEP_ORBIT_PHOTO | null
   >(null);
 
+  // Read through the merge conflicts DAO (38.12 D-44; CLAUDE.md DAO rule).
   useEffect(() => {
-    const exec = getExecutor();
-    void (async () => {
-      try {
-        const contacts = await exec.getAllAsync<ContactConflictRow>(
-          `SELECT c.id, c.name, c.birthday, c.category_id, c.photo, category.name AS category_label
-             FROM contacts AS c
-             LEFT JOIN categories AS category ON category.id = c.category_id
-            WHERE c.id IN (?, ?) AND c.archived_at IS NULL`,
-          [survivorId, absorbedId],
-        );
-        const survivor = contacts.find((contact) => contact.id === survivorId);
-        const absorbed = contacts.find((contact) => contact.id === absorbedId);
-        if (!survivor || !absorbed)
-          throw new Error("merge contacts are unavailable");
-        const [customFields, methods] = await Promise.all([
-          exec.getAllAsync<CustomConflictRow>(
-            `SELECT defs.id AS field_def_id, defs.label, defs.type,
-                    survivor_values.value AS survivor_value, absorbed_values.value AS absorbed_value
-               FROM custom_field_defs AS defs
-               JOIN custom_field_values AS survivor_values
-                 ON survivor_values.field_def_id = defs.id AND survivor_values.contact_id = ?
-               JOIN custom_field_values AS absorbed_values
-                 ON absorbed_values.field_def_id = defs.id AND absorbed_values.contact_id = ?
-              WHERE defs.quarantined_at IS NULL
-                AND NULLIF(TRIM(COALESCE(survivor_values.value, '')), '') IS NOT NULL
-                AND NULLIF(TRIM(COALESCE(absorbed_values.value, '')), '') IS NOT NULL
-                AND survivor_values.value <> absorbed_values.value
-              ORDER BY defs.display_order, defs.id`,
-            [survivorId, absorbedId],
-          ),
-          exec.getAllAsync<PrimaryMethodRow>(
-            `SELECT uid, contact_id, method_type, raw_value, display_value, canonical_value
-               FROM contact_methods
-              WHERE contact_id IN (?, ?) AND is_primary = 1`,
-            [survivorId, absorbedId],
-          ),
-        ]);
-        const primaryByType: LoadedConflictData["primaryByType"] = {};
-        for (const type of ["phone", "email"] as const) {
-          const own = methods.find(
-            (method) =>
-              method.contact_id === survivorId && method.method_type === type,
-          );
-          const other = methods.find(
-            (method) =>
-              method.contact_id === absorbedId && method.method_type === type,
-          );
-          if (primaryConflict(own, other) && other)
-            primaryByType[type] = { survivor: own, absorbed: other };
-        }
-        setData({ survivor, absorbed, customFields, primaryByType });
-      } catch {
-        setFailed(true);
-      }
-    })();
+    let cancelled = false;
+    void readMergeConflictData(getExecutor(), survivorId, absorbedId)
+      .then((loaded) => {
+        if (!cancelled) setData(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [absorbedId, survivorId]);
 
   const scalarConflicts = useMemo(() => {
@@ -345,29 +256,62 @@ export function MergeConflictsScreen({
             }
           />
         ))}
-        {data.customFields.map((field) => (
-          <FieldChoiceGroup
-            key={field.field_def_id}
-            label={field.label}
-            // Render only (38.9 D-66): a Date field's choices show the
-            // display form; the stored values and the choice id stay raw.
-            options={choiceOptions(
-              ...customConflictDisplayValues(
-                field.type,
-                field.survivor_value!,
-                field.absorbed_value!,
-              ),
-            )}
-            mode="conflict"
-            selectedId={customFieldChoices[field.field_def_id] ?? null}
-            onChange={(option) =>
-              setCustomFieldChoices((current) => ({
-                ...current,
-                [field.field_def_id]: option.id,
-              }))
-            }
-          />
-        ))}
+        {data.customFields.map((field) =>
+          // D-129: a photo-type field holding two stored photos is a photo
+          // choice; text left in a photo field is shown as text.
+          field.kind === "photo" ? (
+            <PhotoChoice
+              key={field.field_def_id}
+              label={field.label}
+              mode="conflict"
+              options={[
+                {
+                  id: "survivor",
+                  photo: field.survivor_value,
+                  uri: null,
+                  name: data.survivor.name,
+                  provenance: provenance(data.survivor.name),
+                },
+                {
+                  id: "absorbed",
+                  photo: field.absorbed_value,
+                  uri: null,
+                  name: data.absorbed.name,
+                  provenance: provenance(data.absorbed.name),
+                },
+              ]}
+              selectedId={customFieldChoices[field.field_def_id] ?? null}
+              onChange={(selection) =>
+                setCustomFieldChoices((current) => ({
+                  ...current,
+                  [field.field_def_id]: customPhotoConflictChoice(selection),
+                }))
+              }
+            />
+          ) : (
+            <FieldChoiceGroup
+              key={field.field_def_id}
+              label={field.label}
+              // Render only (38.9 D-66): a Date field's choices show the
+              // display form; the stored values and the choice id stay raw.
+              options={choiceOptions(
+                ...customConflictDisplayValues(
+                  field.type,
+                  field.survivor_value,
+                  field.absorbed_value,
+                ),
+              )}
+              mode="conflict"
+              selectedId={customFieldChoices[field.field_def_id] ?? null}
+              onChange={(option) =>
+                setCustomFieldChoices((current) => ({
+                  ...current,
+                  [field.field_def_id]: option.id,
+                }))
+              }
+            />
+          ),
+        )}
         {photoConflict ? (
           <PhotoChoice
             label="Photo"

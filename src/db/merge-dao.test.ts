@@ -634,7 +634,7 @@ describe("mergeContacts — text in a photo field (D-131)", () => {
       [uid(), contactId, fieldDefId, value, NOW, NOW],
     );
   }
-  async function valueOf(
+  async function storedValue(
     contactId: number,
     fieldDefId: number,
   ): Promise<string | null | undefined> {
@@ -655,7 +655,7 @@ describe("mergeContacts — text in a photo field (D-131)", () => {
       absorbedId: absorbed,
       now: NOW,
     });
-    expect(await valueOf(survivor, def)).toBe(" hello ");
+    expect(await storedValue(survivor, def)).toBe(" hello ");
   });
 
   it("takes the absorbed text over a blank survivor value", async () => {
@@ -669,7 +669,7 @@ describe("mergeContacts — text in a photo field (D-131)", () => {
       absorbedId: absorbed,
       now: NOW,
     });
-    expect(await valueOf(survivor, def)).toBe("hello");
+    expect(await storedValue(survivor, def)).toBe("hello");
   });
 
   it("takes the absorbed text when it is chosen over a survivor value", async () => {
@@ -684,7 +684,7 @@ describe("mergeContacts — text in a photo field (D-131)", () => {
       now: NOW,
       resolutions: { customFields: { [def]: "absorbed" } },
     });
-    expect(await valueOf(survivor, def)).toBe("hello");
+    expect(await storedValue(survivor, def)).toBe("hello");
   });
 
   it("still drops an absorbed stored photo path that has no staged transfer", async () => {
@@ -697,6 +697,6 @@ describe("mergeContacts — text in a photo field (D-131)", () => {
       absorbedId: absorbed,
       now: NOW,
     });
-    expect(await valueOf(survivor, def)).toBeUndefined();
+    expect(await storedValue(survivor, def)).toBeUndefined();
   });
 });

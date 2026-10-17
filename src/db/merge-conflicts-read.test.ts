@@ -66,7 +66,7 @@ async function method(
   raw: string,
 ): Promise<void> {
   await exec.runAsync(
-    "INSERT INTO contact_methods (uid, contact_id, method_type, raw_value, display_value, canonical_value, is_primary, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+    "INSERT INTO contact_methods (uid, contact_id, method_type, raw_value, display_value, canonical_value, is_primary, display_order, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?)",
     [uid(), contactId, type, raw, raw, raw, NOW, NOW],
   );
 }

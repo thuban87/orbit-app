@@ -8,6 +8,7 @@ import {
 import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
+  isStoredPhotoPath,
   restorePendingRelPath,
 } from "@/db/photo-relative-path";
 import type { RestorePhotoJournalEntry } from "@/db/restore-photo-journal-dao";
@@ -75,13 +76,18 @@ export async function mergeContactsWithPhotoOwnership(
     resolutions.photo !== "keep-survivor" &&
     !!absorbed.photo &&
     (resolutions.photo?.choice === "absorbed" || !survivor.photo);
+  // Only a stored photo path takes the rehome path (38.12 D-131, T-38.12-26).
+  // A photo-type field can hold text (e.g. kept after a Text→Photo type
+  // change); that text is data, never a filesystem path, and mergeContacts
+  // moves it as an ordinary raw TEXT custom value.
   const selected = defs
     .filter((def) => def.type === "photo")
     .flatMap((def) => {
       const other = otherValues.find((row) => row.field_def_id === def.id);
       const own = ownById.get(def.id);
       const chosen = resolutions.customFields?.[def.id];
-      return other?.value &&
+      return other != null &&
+        isStoredPhotoPath(other.value) &&
         (chosen === "absorbed" || (chosen == null && !own?.value?.trim()))
         ? [{ def, other, source: other.value }]
         : [];

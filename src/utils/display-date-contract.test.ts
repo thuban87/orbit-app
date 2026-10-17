@@ -231,9 +231,12 @@ describe("remaining date-only display sites (38.9-16)", () => {
 
   it("Merge conflicts read the field type and format custom choices at render only", () => {
     const code = codeOnly(source("src/screens/MergeConflictsScreen.tsx"));
-    expect(code).toMatch(/defs\.label, defs\.type,/);
+    // The read moved into the merge conflicts DAO (38.12 D-44).
+    expect(codeOnly(source("src/db/merge-conflicts-read.ts"))).toMatch(
+      /defs\.label, defs\.type,/,
+    );
     expect(code).toMatch(
-      /customConflictDisplayValues\(\s*field\.type,\s*field\.survivor_value!,\s*field\.absorbed_value!,?\s*\)/,
+      /customConflictDisplayValues\(\s*field\.type,\s*field\.survivor_value,\s*field\.absorbed_value,?\s*\)/,
     );
     // The resolution stores only the option id.
     expect(code).toMatch(/\[field\.field_def_id\]: option\.id/);

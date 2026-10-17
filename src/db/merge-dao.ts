@@ -8,6 +8,7 @@ import { upsertValueCore } from "@/db/field-values-dao";
 import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
+  isStoredPhotoPath,
 } from "@/db/photo-relative-path";
 import { recomputeLastContactCore } from "@/db/recency-dao";
 import {
@@ -408,9 +409,15 @@ export async function mergeContacts(
       const own = survivorValues.find(
         (value) => value.field_def_id === other.field_def_id,
       );
-      const isPhoto = fieldTypes.some(
-        (def) => def.id === other.field_def_id && def.type === "photo",
-      );
+      // A stored photo in a photo-type field moves only through a staged
+      // transfer. Text in a photo-type field is not a photo (38.12 D-131): it
+      // takes the ordinary custom-value path below, raw and never coerced or
+      // cleared (CLAUDE.md custom-field invariants).
+      const isPhoto =
+        isStoredPhotoPath(other.value) &&
+        fieldTypes.some(
+          (def) => def.id === other.field_def_id && def.type === "photo",
+        );
       const transfer = transfers.find(
         (item) =>
           item.kind === "customField" && item.fieldDefId === other.field_def_id,
