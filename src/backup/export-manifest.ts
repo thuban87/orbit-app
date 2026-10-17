@@ -147,7 +147,7 @@ async function readManifest(
       "SELECT uid, name, photo, created_at AS createdAt, modified_at AS modifiedAt FROM profile ORDER BY uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
-      `SELECT c.id AS localContactId, c.uid, c.name, category.uid AS categoryUid, c.tracking_enabled AS trackingEnabled, c.interval_days AS intervalDays, c.social_battery AS socialBattery, c.birthday, c.photo, c.archived_at AS archivedAt, c.snooze_until AS snoozeUntil, c.rarely_responds AS rarelyResponds, c.reminders_off AS remindersOff, CASE WHEN c.favourite_rank IS NULL THEN 0 ELSE 1 END AS favourite, c.created_at AS createdAt, c.modified_at AS modifiedAt FROM contacts c LEFT JOIN categories category ON category.id = c.category_id ORDER BY c.uid`,
+      `SELECT c.id AS localContactId, c.uid, c.name, category.uid AS categoryUid, c.tracking_enabled AS trackingEnabled, c.interval_days AS intervalDays, c.social_battery AS socialBattery, c.birthday, c.photo, c.archived_at AS archivedAt, c.snooze_until AS snoozeUntil, c.rarely_responds AS rarelyResponds, c.reminders_off AS remindersOff, CASE WHEN c.favourite_rank IS NULL THEN 0 ELSE 1 END AS favouriteMember, c.created_at AS createdAt, c.modified_at AS modifiedAt FROM contacts c LEFT JOIN categories category ON category.id = c.category_id ORDER BY c.uid`,
     ),
     ro.getAllAsync<Record<string, unknown>>(
       "SELECT m.uid, c.uid AS contactUid, m.method_type AS methodType, m.raw_value AS rawValue, m.display_value AS displayValue, m.canonical_value AS canonicalValue, m.canonical_region AS canonicalRegion, m.label, m.extension, m.is_actionable AS isActionable, m.is_primary AS isPrimary, m.display_order AS displayOrder, m.created_at AS createdAt, m.modified_at AS modifiedAt FROM contact_methods m JOIN contacts c ON c.id = m.contact_id ORDER BY m.uid",
@@ -314,8 +314,16 @@ async function readManifest(
       ? await withPhoto(profileRows[0], deps.readPhotoBase64, counter)
       : null,
     contacts: await Promise.all(
-      contactRows.map(async ({ localContactId: _localContactId, ...row }) =>
-        withPhoto(row, deps.readPhotoBase64, counter),
+      // D-112: favourite membership (binary, ADR-075; the rank never travels),
+      // for every contact, Bound or not (D-21). The SQL alias differs from the
+      // wire key only so no query text carries the retired copy form.
+      contactRows.map(
+        async ({ localContactId: _localContactId, favouriteMember, ...row }) =>
+          withPhoto(
+            { ...row, favourite: favouriteMember },
+            deps.readPhotoBase64,
+            counter,
+          ),
       ),
     ),
     contactMethods,

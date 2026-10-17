@@ -147,6 +147,8 @@ const DEVELOPER_ONLY: Readonly<Record<string, readonly string[]>> = {
     "appSettings has invalid Dashboard filters",
     // 38.9-15: `fail(…)` text, never shown (found by the C3-M2 re-grep).
     "interactions has an invalid Group Event UID",
+    // 38.12-09: `fail(…)` text naming the D-112 wire key, never shown.
+    "contacts has an invalid favourite",
   ],
   "src/stores/dashboard-query-store.ts": [
     "Dashboard preferences were malformed; using empty query axes.",
