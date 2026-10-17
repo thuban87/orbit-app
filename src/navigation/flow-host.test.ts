@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   CommonActions,
   StackActions,
@@ -335,6 +337,48 @@ describe("finishFlowOnProfile — profile host (D-110, 38.9 D-08; T-38.12-07)", 
   });
 });
 
+describe("merge summary endings (D-110)", () => {
+  it("settings host: a merge run from Settings → Check linked contacts pops to Contacts & Relationships", () => {
+    const state = stack("settings-stack", SETTINGS_ROUTE_NAMES, [
+      r("Settings"),
+      r("SettingsContacts"),
+      r("ReconcileGrid"),
+      r("ReconcileDetail"),
+      r("SurvivorSelect"),
+      r("MergeConflicts"),
+      r("MergeImpactSummary"),
+    ]);
+    const nav = navigatorSpy(state);
+    finishFlowOnProfile(asFlow(nav), DEFAULT_FLOW_HOST, 7);
+    const next = applyToStack(state, nav.dispatch.mock.calls[0][0]);
+    expect(next?.routes.map((x) => x.name)).toEqual([
+      "Settings",
+      "SettingsContacts",
+    ]);
+  });
+
+  it("profile host: a merge run from a Settings-hosted Profile ends on the survivor there", () => {
+    const state = stack("settings-stack", SETTINGS_ROUTE_NAMES, [
+      r("Settings"),
+      r("Profile", "Profile-launch", { contactId: 3 }),
+      r("SurvivorSelect"),
+      r("MergeConflicts"),
+      r("MergeImpactSummary"),
+    ]);
+    const nav = navigatorSpy(state);
+    finishFlowOnProfile(
+      asFlow(nav),
+      { kind: "profile", profileKey: "Profile-launch" },
+      8,
+    );
+    const next = applyToStack(state, nav.dispatch.mock.calls[0][0]);
+    expect(next?.routes.map((x) => [x.name, x.params])).toEqual([
+      ["Settings", undefined],
+      ["Profile", { contactId: 8 }],
+    ]);
+  });
+});
+
 describe("profile host without a survivor", () => {
   it("finishFlow and exitFlow go back", () => {
     for (const end of [finishFlow, exitFlow]) {
@@ -462,5 +506,60 @@ describe("returnFromProfileToTab (D-110 Profile Back)", () => {
     const nav = navigatorSpy(contacts);
     returnFromProfileToTab(asFlow(nav), "DigestTab");
     expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The four flow endings D-110 converts (38.12-03): none root-resets (that
+ * wiped every tab's history, `tab-entry.ts`), each goes through the host.
+ */
+describe("flow screens end through the flow host (D-110)", () => {
+  const read = (file: string) =>
+    readFileSync(join(__dirname, "../..", file), "utf8");
+  const files = [
+    "src/screens/ImportCompleteScreen.tsx",
+    "src/screens/ImportReviewScreen.tsx",
+    "src/screens/ReconcileCompleteScreen.tsx",
+    "src/components/MergeImpactSummary.tsx",
+  ];
+
+  it.each(files)("%s never root-resets", (file) => {
+    const source = read(file);
+    expect(source).not.toMatch(/resetToDashboardRoot|resetToDashboardWith/);
+    expect(source).not.toContain("@/navigation/reset-intents");
+    expect(source).toContain("route.params.host ?? DEFAULT_FLOW_HOST");
+  });
+
+  it("Import review: single import and link finish on the host with a View snackbar", () => {
+    const source = read("src/screens/ImportReviewScreen.tsx");
+    expect(source.match(/finishFlow\(navigation, host\)/g)).toHaveLength(2);
+    expect(source).toContain("label: `Imported ${");
+    expect(source).toContain("label: `Linked ${");
+    expect(
+      source.match(/openContactFromFlow\(navigation, host, /g),
+    ).toHaveLength(2);
+  });
+
+  it("Check complete: Done, header Back and system Back share finishFlow", () => {
+    const source = read("src/screens/ReconcileCompleteScreen.tsx");
+    expect(source).toMatch(
+      /const done = useCallback\(\s*\(\) => finishFlow\(navigation, host\),/,
+    );
+  });
+
+  it("Merge summary: a profile host ends on the survivor, otherwise finishFlow", () => {
+    const source = read("src/components/MergeImpactSummary.tsx");
+    expect(source).toContain(
+      "finishFlowOnProfile(navigation, host, survivorId)",
+    );
+  });
+
+  it("ProfileOrigin is retired with its only consumer", () => {
+    expect(read("src/screens/contact-profile-logic.ts")).not.toMatch(
+      /ProfileOrigin|profileOriginIntent/,
+    );
+    expect(
+      existsSync(join(__dirname, "profile-origin-integration.test.ts")),
+    ).toBe(false);
   });
 });

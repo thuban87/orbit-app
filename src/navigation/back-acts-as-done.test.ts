@@ -28,17 +28,17 @@ describe("completionBackHandler (D-73)", () => {
 });
 
 describe("Import complete and Check complete wire Back to Done (D-73)", () => {
+  // 38.12 D-110: both flows finish on their host, never a root reset.
   for (const [file, title, doneBody] of [
     [
       "src/screens/ImportCompleteScreen.tsx",
       "Import complete",
-      // 38.12 D-110: the flow finishes on its host, never a root reset.
       /const done = useCallback\(\s*\(\) => finishFlow\(navigation, host\),/,
     ],
     [
       "src/screens/ReconcileCompleteScreen.tsx",
       "Check complete",
-      /const done = useCallback\(\s*\(\) => navigationRef\.current\?\.reset\(resetToDashboardRoot\(\)\),/,
+      /const done = useCallback\(\s*\(\) => finishFlow\(navigation, host\),/,
     ],
   ] as const) {
     const source = readFileSync(join(__dirname, "../..", file), "utf8");
