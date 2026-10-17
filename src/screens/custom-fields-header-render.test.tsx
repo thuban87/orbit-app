@@ -49,6 +49,8 @@ vi.mock("react", async (original) => ({
   },
 }));
 vi.mock("react-native", () => ({
+  AccessibilityInfo: { setAccessibilityFocus: vi.fn() },
+  findNodeHandle: vi.fn(),
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   Text: "Text",
@@ -63,6 +65,14 @@ vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
 vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
+vi.mock("react-native-reorderable-list", () => ({
+  default: "ReorderableList",
+  useReorderableDrag: () => vi.fn(),
+}));
+vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
+vi.mock("@/components/ui/AnchoredMenu", () => ({
+  AnchoredMenu: "AnchoredMenu",
+}));
 vi.mock("@/components/FieldDefForm", () => ({ FieldDefForm: "FieldDefForm" }));
 vi.mock("@/db/ai-permissions-dao", () => ({
   resolveNewItemAiDefault: vi.fn(),

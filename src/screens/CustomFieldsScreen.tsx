@@ -31,9 +31,27 @@ import {
   useRef,
   useState,
 } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import ReorderableList, {
+  type ReorderableListRenderItemInfo,
+  type ReorderableListReorderEvent,
+  useReorderableDrag,
+} from "react-native-reorderable-list";
 import { type FieldDefDraft, FieldDefForm } from "@/components/FieldDefForm";
+import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import {
+  AnchoredMenu,
+  type AnchoredMenuItem,
+} from "@/components/ui/AnchoredMenu";
+import { QUARANTINE } from "@/constants/glossary";
 import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { createField, deleteOrQuarantineField } from "@/db/field-ddl";
@@ -91,6 +109,195 @@ function optionsSummary(pf: { total: number; keep: number[]; flag: number[] }) {
  */
 function confirmSummary(title: string, message: string): Promise<boolean> {
   return confirm({ title, message, confirmLabel: "Apply", dismissable: true });
+}
+
+/** Move one row from `from` to `to` without mutating the source. */
+export function moveFieldRows<T>(rows: readonly T[], from: number, to: number) {
+  const next = [...rows];
+  const [moved] = next.splice(from, 1);
+  if (moved !== undefined) next.splice(to, 0, moved);
+  return next;
+}
+
+type FieldRowAction = "edit" | "up" | "down" | "remove";
+
+/**
+ * The ⋯ items for an active field row (D-120): Edit, Move up / Move down where
+ * the row can move, and the destructive item last behind a separator. The
+ * destructive item follows the data (D-24, HANDOFF §14.5): "Delete" for a
+ * field with no values, "Quarantine" for one that has values.
+ */
+export function fieldMenuItems(input: {
+  index: number;
+  total: number;
+  empty: boolean;
+  onAction: (action: FieldRowAction) => void;
+}): AnchoredMenuItem[] {
+  const { index, total, empty, onAction } = input;
+  return [
+    {
+      id: "edit",
+      label: "Edit",
+      icon: "edit",
+      onPress: () => onAction("edit"),
+    },
+    ...(index > 0
+      ? [
+          {
+            id: "up",
+            label: "Move up",
+            icon: "sort" as const,
+            onPress: () => onAction("up"),
+          },
+        ]
+      : []),
+    ...(index < total - 1
+      ? [
+          {
+            id: "down",
+            label: "Move down",
+            icon: "sort" as const,
+            onPress: () => onAction("down"),
+          },
+        ]
+      : []),
+    {
+      id: "remove",
+      label: empty ? "Delete" : QUARANTINE,
+      icon: "warning",
+      danger: true,
+      separatorBefore: true,
+      onPress: () => onAction("remove"),
+    },
+  ];
+}
+
+/** Returns accessibility focus to a row's ⋯ once its menu closes. */
+function useRowMenu() {
+  const anchorRef = useRef<View>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    requestAnimationFrame(() => {
+      const node = findNodeHandle(anchorRef.current);
+      if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
+    });
+  }, []);
+  return { anchorRef, menuOpen, openMenu: () => setMenuOpen(true), closeMenu };
+}
+
+function FieldRow({
+  field,
+  index,
+  total,
+  empty,
+  onAction,
+}: {
+  field: CustomFieldDef;
+  index: number;
+  total: number;
+  empty: boolean;
+  onAction: (action: FieldRowAction) => void;
+}) {
+  const { colors } = useTheme();
+  const drag = useReorderableDrag();
+  const { anchorRef, menuOpen, openMenu, closeMenu } = useRowMenu();
+  return (
+    <View
+      testID={`field-row-${field.id}`}
+      style={[
+        styles.row,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
+      <Pressable
+        testID={`field-drag-${field.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`Reorder ${field.label}`}
+        accessibilityHint="Long press and drag to reorder fields"
+        onLongPress={drag}
+        style={styles.iconTarget}
+      >
+        <Icon name="sort" size="md" tone="textSecondary" />
+      </Pressable>
+      <View style={styles.rowMain}>
+        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+          {field.label}
+        </Text>
+        <Text style={[styles.rowType, { color: colors.textSecondary }]}>
+          {field.type}
+        </Text>
+      </View>
+      <Pressable
+        ref={anchorRef}
+        testID={`field-options-${field.id}`}
+        collapsable={false}
+        accessibilityRole="button"
+        accessibilityLabel={`Options for ${field.label}`}
+        accessibilityState={{ expanded: menuOpen }}
+        onPress={openMenu}
+        style={styles.iconTarget}
+      >
+        <Icon name="overflow" size="md" tone="textSecondary" />
+      </Pressable>
+      <AnchoredMenu
+        anchorRef={anchorRef}
+        visible={menuOpen}
+        accessibilityLabel={`Options for ${field.label}`}
+        items={fieldMenuItems({ index, total, empty, onAction })}
+        onRequestClose={closeMenu}
+      />
+    </View>
+  );
+}
+
+/** A quarantined field: no drag (it keeps its place after the active ones). */
+function QuarantinedFieldRow({
+  field,
+  onRestore,
+}: {
+  field: CustomFieldDef;
+  onRestore: () => void;
+}) {
+  const { colors } = useTheme();
+  const { anchorRef, menuOpen, openMenu, closeMenu } = useRowMenu();
+  return (
+    <View
+      testID={`quarantined-row-${field.id}`}
+      style={[
+        styles.row,
+        { backgroundColor: colors.surface, borderColor: colors.borderStrong },
+      ]}
+    >
+      <View style={styles.rowMain}>
+        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+          {field.label}
+        </Text>
+        <Text style={[styles.rowType, { color: colors.textSecondary }]}>
+          quarantined · {field.type}
+        </Text>
+      </View>
+      <Pressable
+        ref={anchorRef}
+        testID={`field-options-${field.id}`}
+        collapsable={false}
+        accessibilityRole="button"
+        accessibilityLabel={`Options for ${field.label}`}
+        accessibilityState={{ expanded: menuOpen }}
+        onPress={openMenu}
+        style={styles.iconTarget}
+      >
+        <Icon name="overflow" size="md" tone="textSecondary" />
+      </Pressable>
+      <AnchoredMenu
+        anchorRef={anchorRef}
+        visible={menuOpen}
+        accessibilityLabel={`Options for ${field.label}`}
+        items={[{ id: "restore", label: "Restore", onPress: onRestore }]}
+        onRequestClose={closeMenu}
+      />
+    </View>
+  );
 }
 
 /**
@@ -307,25 +514,38 @@ export function CustomFieldsScreen() {
     }
   }
 
-  async function moveField(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= active.length) return;
-    const reordered = [...active];
-    const tmp = reordered[index];
-    reordered[index] = reordered[target];
-    reordered[target] = tmp;
-    // Reorder over the FULL set (active first, quarantined after) so
-    // display_order stays a clean contiguous total order.
+  /**
+   * Move one active field from `from` to `to` (drag end, or Move up / Move
+   * down). The reorder runs over the FULL set (active first, quarantined
+   * after) so display_order stays a clean contiguous total order. The new
+   * order shows at once so a dropped row stays where it landed; the reload
+   * after the write (or after a failure) re-reads the stored order.
+   */
+  async function reorderActive(from: number, to: number) {
+    if (from === to || to < 0 || to >= active.length) return;
+    const reordered = moveFieldRows(active, from, to);
     const orderedIds = [
       ...reordered.map((d) => d.id),
       ...quarantined.map((d) => d.id),
     ];
+    setDefs([...reordered, ...quarantined]);
     try {
       await reorderFields(getExecutor(), orderedIds, localDateTime());
-      await load();
     } catch (err) {
       reportError(err);
     }
+    await load();
+  }
+
+  function onFieldAction(
+    field: CustomFieldDef,
+    index: number,
+    action: FieldRowAction,
+  ) {
+    if (action === "edit") setEditor({ mode: "edit", field });
+    else if (action === "up") void reorderActive(index, index - 1);
+    else if (action === "down") void reorderActive(index, index + 1);
+    else void onDeletePress(field);
   }
 
   async function onDeletePress(field: CustomFieldDef) {
@@ -400,178 +620,76 @@ export function CustomFieldsScreen() {
     );
   } else {
     body = (
-      <ScrollView
+      <ReorderableList
         testID="custom-fields-screen"
+        data={active}
+        keyExtractor={(field) => String(field.id)}
+        onReorder={({ from, to }: ReorderableListReorderEvent) =>
+          void reorderActive(from, to)
+        }
+        style={styles.list}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: bottomClearance },
         ]}
-      >
-        <Pressable
-          testID="custom-fields-new"
-          accessibilityRole="button"
-          accessibilityLabel="New field"
-          onPress={() => setEditor({ mode: "create" })}
-          style={[
-            styles.newBtn,
-            { backgroundColor: colors.accent, borderColor: colors.accent },
-          ]}
-        >
-          <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
-            New field
-          </Text>
-        </Pressable>
-
-        {active.length === 0 ? (
+        ListHeaderComponent={
+          <Pressable
+            testID="custom-fields-new"
+            accessibilityRole="button"
+            accessibilityLabel="New field"
+            onPress={() => setEditor({ mode: "create" })}
+            style={[
+              styles.newBtn,
+              { backgroundColor: colors.accent, borderColor: colors.accent },
+            ]}
+          >
+            <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+              New field
+            </Text>
+          </Pressable>
+        }
+        ListEmptyComponent={
           <Text
             testID="custom-fields-empty"
             style={[styles.emptyNote, { color: colors.textSecondary }]}
           >
             No custom fields yet. Add one to start describing your people.
           </Text>
-        ) : (
-          active.map((field, index) => {
-            const empty = emptyById[field.id] === true;
-            return (
-              <View
-                key={field.id}
-                testID={`field-row-${field.id}`}
-                style={[
-                  styles.row,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.rowMain}>
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >
-                    {field.label}
-                  </Text>
-                  <Text
-                    style={[styles.rowType, { color: colors.textSecondary }]}
-                  >
-                    {field.type}
-                  </Text>
-                </View>
-                <View style={styles.rowActions}>
-                  <Pressable
-                    testID={`field-move-up-${field.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Move ${field.label} up`}
-                    disabled={index === 0}
-                    onPress={() => void moveField(index, -1)}
-                    style={[styles.iconBtn, { borderColor: colors.border }]}
-                  >
-                    <Text
-                      style={{
-                        color:
-                          index === 0 ? colors.border : colors.textSecondary,
-                      }}
-                    >
-                      Up
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    testID={`field-move-down-${field.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Move ${field.label} down`}
-                    disabled={index === active.length - 1}
-                    onPress={() => void moveField(index, 1)}
-                    style={[styles.iconBtn, { borderColor: colors.border }]}
-                  >
-                    <Text
-                      style={{
-                        color:
-                          index === active.length - 1
-                            ? colors.border
-                            : colors.textSecondary,
-                      }}
-                    >
-                      Down
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    testID={`field-edit-${field.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Edit ${field.label}`}
-                    onPress={() => setEditor({ mode: "edit", field })}
-                    style={[styles.iconBtn, { borderColor: colors.border }]}
-                  >
-                    <Text style={{ color: colors.accentText }}>Edit</Text>
-                  </Pressable>
-                  <Pressable
-                    testID={`field-delete-${field.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${empty ? "Delete" : "Quarantine"} ${
-                      field.label
-                    }`}
-                    onPress={() => void onDeletePress(field)}
-                    style={[
-                      styles.iconBtn,
-                      { borderColor: colors.borderStrong },
-                    ]}
-                  >
-                    <Text style={{ color: colors.textPrimary }}>
-                      {empty ? "Delete" : "Quarantine"}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })
+        }
+        renderItem={({
+          item,
+          index,
+        }: ReorderableListRenderItemInfo<CustomFieldDef>) => (
+          <FieldRow
+            field={item}
+            index={index}
+            total={active.length}
+            empty={emptyById[item.id] === true}
+            onAction={(action) => onFieldAction(item, index, action)}
+          />
         )}
-
-        {quarantined.length > 0 ? (
-          <View
-            testID="custom-fields-quarantined"
-            style={styles.quarantineSection}
-          >
-            <Text
-              style={[styles.sectionHeading, { color: colors.textSecondary }]}
+        ListFooterComponent={
+          quarantined.length > 0 ? (
+            <View
+              testID="custom-fields-quarantined"
+              style={styles.quarantineSection}
             >
-              Quarantined
-            </Text>
-            {quarantined.map((field) => (
-              <View
-                key={field.id}
-                testID={`quarantined-row-${field.id}`}
-                style={[
-                  styles.row,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.borderStrong,
-                  },
-                ]}
+              <Text
+                style={[styles.sectionHeading, { color: colors.textSecondary }]}
               >
-                <View style={styles.rowMain}>
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >
-                    {field.label}
-                  </Text>
-                  <Text
-                    style={[styles.rowType, { color: colors.textSecondary }]}
-                  >
-                    quarantined · {field.type}
-                  </Text>
-                </View>
-                <Pressable
-                  testID={`field-restore-${field.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Restore ${field.label}`}
-                  onPress={() => void doRestore(field)}
-                  style={[styles.iconBtn, { borderColor: colors.accent }]}
-                >
-                  <Text style={{ color: colors.accentText }}>Restore</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </ScrollView>
+                Quarantined
+              </Text>
+              {quarantined.map((field) => (
+                <QuarantinedFieldRow
+                  key={field.id}
+                  field={field}
+                  onRestore={() => void doRestore(field)}
+                />
+              ))}
+            </View>
+          ) : null
+        }
+      />
     );
   }
 
@@ -606,14 +724,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 8,
   },
+  list: { flex: 1 },
   row: {
     borderWidth: 1,
     borderRadius: 10,
-    padding: 12,
-    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
   },
   rowMain: {
+    flex: 1,
     gap: 2,
+    paddingLeft: 4,
   },
   rowLabel: {
     fontSize: 16,
@@ -622,16 +746,11 @@ const styles = StyleSheet.create({
   rowType: {
     fontSize: 13,
   },
-  rowActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  iconBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  iconTarget: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   quarantineSection: {
     gap: 10,
