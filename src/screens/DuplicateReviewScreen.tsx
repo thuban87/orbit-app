@@ -37,7 +37,10 @@ import {
   runBulkResolveThenRecover,
   runResolveThenRecover,
 } from "./duplicate-review-logic";
-import { resolveExistingContactChoices } from "./existing-contact-choices";
+import {
+  REVIEW_MATCH_CHOICES,
+  resolveExistingContactChoices,
+} from "./existing-contact-choices";
 import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "duplicate-review";
@@ -64,6 +67,11 @@ function evidenceHint(candidate: DurableCandidate | undefined): string {
   return "Needs a closer look";
 }
 
+/**
+ * The row's choices, filtered and ordered once (D-52: phone/email first,
+ * nothing below "possible"). The row's "Might be" line, its evidence line and
+ * MatchChoiceSheet all read this one list (convergence c2 B-10, c3 D-3).
+ */
 async function choicesForRow(
   row: ImportSessionRow,
 ): Promise<CandidateChoice[]> {
@@ -74,8 +82,10 @@ async function choicesForRow(
       typeof (candidate as DurableCandidate).contactId === "number",
   );
   const exec = getExecutor();
-  const resolved = await resolveExistingContactChoices(candidates, (id) =>
-    getContactHeader(exec, id),
+  const resolved = await resolveExistingContactChoices(
+    candidates,
+    (id) => getContactHeader(exec, id),
+    REVIEW_MATCH_CHOICES,
   );
   return resolved.map((candidate) => ({
     contactId: candidate.contactId,
@@ -127,19 +137,16 @@ export function DuplicateReviewScreen({
     const nextItems = await Promise.all(
       needsReview.map(async (row) => {
         const candidates = await choicesForRow(row);
-        const firstCandidate = row.candidates.find(
-          (candidate): candidate is DurableCandidate =>
-            typeof candidate === "object" &&
-            candidate !== null &&
-            typeof (candidate as DurableCandidate).contactId === "number",
-        );
         return {
           row,
           item: {
             id: row.id,
             name: incomingName(row),
             outcome: row.matchOutcome ?? "needs_review",
-            evidenceHint: evidenceHint(firstCandidate),
+            // The named (first offered) choice's evidence; the neutral hint
+            // when no candidate is offered (c3 D-3).
+            evidenceHint:
+              candidates[0]?.evidenceHint ?? evidenceHint(undefined),
             photoUri: row.photoRelPath
               ? resolveImportStagingUri(row.photoRelPath)
               : null,

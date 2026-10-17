@@ -7,6 +7,7 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import {
+  candidateEvidenceStrength,
   findActiveExternalLink,
   scoreImportCandidate,
 } from "@/services/import/duplicate-evidence";
@@ -275,6 +276,27 @@ describe("duplicate-evidence", () => {
       expect.arrayContaining([
         expect.objectContaining({ recommendation: "Manual Review Required" }),
       ]),
+    );
+  });
+});
+
+describe("candidateEvidenceStrength (38.12 D-52)", () => {
+  it("reads a stored candidate's signals on the scoring ladder", () => {
+    expect(candidateEvidenceStrength(["phoneMatch"])).toBe("probable");
+    expect(candidateEvidenceStrength(["emailMatch"])).toBe("probable");
+    expect(candidateEvidenceStrength(["nameOverlap"])).toBe("possible");
+    expect(candidateEvidenceStrength(["nameOverlap", "birthdayMatch"])).toBe(
+      "possible",
+    );
+    expect(candidateEvidenceStrength(["birthdayMatch"])).toBe("new");
+    expect(candidateEvidenceStrength([])).toBe("new");
+    expect(candidateEvidenceStrength(undefined)).toBe("new");
+  });
+
+  it("ignores unknown signal strings from a stored payload", () => {
+    expect(candidateEvidenceStrength(["bogus", 7, null])).toBe("new");
+    expect(candidateEvidenceStrength(["bogus", "nameOverlap"])).toBe(
+      "possible",
     );
   });
 });

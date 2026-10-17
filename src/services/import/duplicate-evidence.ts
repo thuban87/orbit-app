@@ -108,7 +108,9 @@ function candidateFor(
   return candidate;
 }
 
-function candidateScore(candidate: DuplicateEvidenceCandidate): number {
+function candidateScore(
+  candidate: Pick<DuplicateEvidenceCandidate, "signals">,
+): number {
   const phoneWeight = candidate.signals.includes("phoneMatch")
     ? PHONE_MATCH_WEIGHT
     : 0;
@@ -136,6 +138,25 @@ function classifyCandidate(score: number): ScoredCandidate["outcome"] {
   if (score >= PROBABLE_THRESHOLD) return "probable";
   if (score >= POSSIBLE_THRESHOLD) return "possible";
   return "new";
+}
+
+/**
+ * The advisory strength of one stored candidate's evidence, on the same
+ * ladder `scoreImportCandidate` used (38.12 D-52). Unknown signal strings
+ * (a stored JSON payload) count for nothing. Never a link decision (ADR-067):
+ * Review matches uses it only to stop offering below-"possible" candidates.
+ */
+export function candidateEvidenceStrength(
+  signals: readonly unknown[] | undefined,
+): ScoredCandidate["outcome"] {
+  const known = (signals ?? []).filter(
+    (signal): signal is DuplicateEvidenceSignal =>
+      signal === "phoneMatch" ||
+      signal === "emailMatch" ||
+      signal === "nameOverlap" ||
+      signal === "birthdayMatch",
+  );
+  return classifyCandidate(candidateScore({ signals: known }));
 }
 
 function recommendationFor(

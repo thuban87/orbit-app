@@ -1,6 +1,7 @@
 /**
- * Pure accessible representation for a CandidateCardGrid review card
- * (Duplicate Review + Reconcile Grid) — RG-031 ui-accessibility/AUD-UIA-008.
+ * Pure accessible representation for a review card or row (Reconcile Grid's
+ * CandidateCardGrid and Review matches' ReviewMatchesList, 38.12 D-107) —
+ * RG-031 ui-accessibility/AUD-UIA-008.
  *
  * The card announces what it displays: the person's name, the recommendation
  * chip text (import confidence or reconciliation advisory copy — advisory
