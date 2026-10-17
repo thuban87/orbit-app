@@ -237,7 +237,10 @@ class OrbitContactPickerModule : Module() {
               )
             }
           ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
-            contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
+            // Only the birthday Event row; an anniversary or other event is not a birthday.
+            if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
+              contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
+            }
           ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
             // A provider can expose several Note rows; preserve the first non-blank value.
             contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
