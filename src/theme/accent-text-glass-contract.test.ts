@@ -134,9 +134,11 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
   // less M4 (Update Contact retired to docs/archive, 38.11-02 D-62), less
   // M35 (the phone-region value moved into the shared SettingsRow, 38.12-06
   // D-119), less M6/M7 (Custom Fields' inline Edit and Restore moved into the
-  // row ⋯ menus, 38.12-07 D-120).
-  it("covers the 44 swapped sites still in the tree", () => {
-    expect(done.length).toBe(44);
+  // row ⋯ menus, 38.12-07 D-120), less M41–M43 (the Appearance Orbit Center
+  // and profile-default values moved into the shared SettingsRow, 38.12-14
+  // D-119).
+  it("covers the 41 swapped sites still in the tree", () => {
+    expect(done.length).toBe(41);
   });
 
   const superseded = rows.filter((row) => SUPERSEDED_STATUS.test(row.status));
