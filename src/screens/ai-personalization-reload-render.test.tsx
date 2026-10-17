@@ -101,15 +101,14 @@ vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   Button: "Button",
   ConfirmDialog: "ConfirmDialog",
-  GlassSurface: "GlassSurface",
   MIN_TOUCH_TARGET: 44,
   OrbitSwitch: "OrbitSwitch",
 }));
 vi.mock("@/components/ui/AnchoredMenu", () => ({
   AnchoredMenu: "AnchoredMenu",
 }));
-vi.mock("@/components/ui/ScopedPalette", () => ({
-  ScopedPalette: "ScopedPalette",
+vi.mock("@/components/ui/SettingsSectionCard", () => ({
+  SettingsSectionCard: "SettingsSectionCard",
 }));
 vi.mock("@/db/ai-connections-dao", () => ({
   resolveActiveAiConnection: vi.fn(),

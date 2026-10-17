@@ -45,7 +45,6 @@ import {
   AppText,
   Button,
   ConfirmDialog,
-  GlassSurface,
   MIN_TOUCH_TARGET,
   OrbitSwitch,
 } from "@/components/ui";
@@ -53,7 +52,7 @@ import {
   AnchoredMenu,
   type AnchoredMenuItem,
 } from "@/components/ui/AnchoredMenu";
-import { ScopedPalette } from "@/components/ui/ScopedPalette";
+import { SettingsSectionCard } from "@/components/ui/SettingsSectionCard";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -619,206 +618,203 @@ export function AIPersonalizationScreen({
           style={styles.section}
           onLayout={(event) => scrollToFocusedSection("writing-style", event)}
         >
-          <AppText role="heading">Writing Style</AppText>
-          <StyleRow
-            label="Tone"
-            options={TONE_OPTIONS}
-            value={style.tone}
-            disabled={sectionFormBusy}
-            onChange={(tone) => setStyle((current) => ({ ...current, tone }))}
-          />
-          <StyleRow
-            label="Length"
-            options={LENGTH_OPTIONS}
-            value={style.length}
-            disabled={sectionFormBusy}
-            onChange={(length) =>
-              setStyle((current) => ({ ...current, length }))
-            }
-          />
-          <StyleRow
-            label="Directness"
-            options={DIRECTNESS_OPTIONS}
-            value={style.directness}
-            disabled={sectionFormBusy}
-            onChange={(directness) =>
-              setStyle((current) => ({ ...current, directness }))
-            }
-          />
-          {/* The guidance is sent only while a choice is Custom (D-127), so
-              its box shows only then; hiding it keeps the stored text. */}
-          {usesCustomGuidance(style) ? (
-            <View style={styles.styleRow}>
-              <AppText role="label">Custom guidance</AppText>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {customGuidanceCaption(style)}
-              </AppText>
-              <TextInput
-                accessibilityLabel="Custom Writing Style guidance"
-                multiline
-                editable={!sectionFormBusy}
-                placeholder="Optional guidance in your own words"
-                placeholderTextColor={colors.textPlaceholder}
-                value={style.freeform}
-                onChangeText={(freeform) =>
-                  setStyle((current) => ({ ...current, freeform }))
+          <SettingsSectionCard title="Writing Style">
+            <View key="style" style={styles.cardBody}>
+              <StyleRow
+                label="Tone"
+                options={TONE_OPTIONS}
+                value={style.tone}
+                disabled={sectionFormBusy}
+                onChange={(tone) =>
+                  setStyle((current) => ({ ...current, tone }))
                 }
-                style={[
-                  styles.bodyInput,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                    color: colors.textPrimary,
-                  },
-                ]}
+              />
+              <StyleRow
+                label="Length"
+                options={LENGTH_OPTIONS}
+                value={style.length}
+                disabled={sectionFormBusy}
+                onChange={(length) =>
+                  setStyle((current) => ({ ...current, length }))
+                }
+              />
+              <StyleRow
+                label="Directness"
+                options={DIRECTNESS_OPTIONS}
+                value={style.directness}
+                disabled={sectionFormBusy}
+                onChange={(directness) =>
+                  setStyle((current) => ({ ...current, directness }))
+                }
+              />
+              {/* The guidance is sent only while a choice is Custom (D-127), so
+              its box shows only then; hiding it keeps the stored text. */}
+              {usesCustomGuidance(style) ? (
+                <View style={styles.styleRow}>
+                  <AppText role="label">Custom guidance</AppText>
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {customGuidanceCaption(style)}
+                  </AppText>
+                  <TextInput
+                    accessibilityLabel="Custom Writing Style guidance"
+                    multiline
+                    editable={!sectionFormBusy}
+                    placeholder="Optional guidance in your own words"
+                    placeholderTextColor={colors.textPlaceholder}
+                    value={style.freeform}
+                    onChangeText={(freeform) =>
+                      setStyle((current) => ({ ...current, freeform }))
+                    }
+                    style={[
+                      styles.bodyInput,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
+                  />
+                </View>
+              ) : null}
+              <Button
+                role="primary"
+                label={savingStyle ? "Saving…" : "Save Writing Style"}
+                disabled={savingStyle || savingSection}
+                onPress={() => void saveStyle()}
               />
             </View>
-          ) : null}
-          <Button
-            role="primary"
-            label={savingStyle ? "Saving…" : "Save Writing Style"}
-            disabled={savingStyle || savingSection}
-            onPress={() => void saveStyle()}
-          />
+          </SettingsSectionCard>
         </View>
 
         <View
           style={styles.section}
           onLayout={(event) => scrollToFocusedSection("personalization", event)}
         >
-          <View style={styles.sectionHeadingRow}>
-            <AppText role="heading">Personalization Context</AppText>
-            <Button
-              role="secondary"
-              label="Import .txt / .md"
-              disabled={listBusy}
-              onPress={() => {
-                if (savingRef.current) return;
-                void importFile();
-              }}
-            />
-          </View>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Enabled sections are sent to AI. Disabled sections stay on this
-            device. Order is organizational only; every section has equal
-            weight.
-          </AppText>
-          {sections.length === 0 ? (
-            <GlassSurface density="dense" style={styles.card}>
-              <AppText role="label">No personalization yet.</AppText>
-              <ScopedPalette>
-                {(scoped) => (
-                  <AppText role="body" style={{ color: scoped.textSecondary }}>
+          <SettingsSectionCard title="Personalization Context">
+            <View key="context" style={styles.cardBody}>
+              <View style={styles.sectionHeadingRow}>
+                <Button
+                  role="secondary"
+                  label="Import .txt / .md"
+                  disabled={listBusy}
+                  onPress={() => {
+                    if (savingRef.current) return;
+                    void importFile();
+                  }}
+                />
+              </View>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                Enabled sections are sent to AI. Disabled sections stay on this
+                device. Order is organizational only; every section has equal
+                weight.
+              </AppText>
+              {sections.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <AppText role="label">No personalization yet.</AppText>
+                  <AppText role="body" style={{ color: colors.textSecondary }}>
                     {EMPTY_COPY}
                   </AppText>
-                )}
-              </ScopedPalette>
-            </GlassSurface>
-          ) : (
-            <NestedReorderableList
-              data={sections}
-              keyExtractor={(section) => section.uid}
-              onReorder={dropSection}
-              // Rows read the screen's busy and editing state, which the list
-              // data does not carry.
-              extraData={{ editingUid, listBusy }}
-              renderItem={({ item: section, index }) => (
-                <PersonalizationSectionCard
-                  section={section}
-                  index={index}
-                  total={sections.length}
-                  busy={listBusy}
-                  onToggle={(enabled) => {
-                    if (savingRef.current || reorderingRef.current) return;
-                    void toggleSection(section, enabled);
-                  }}
-                  onEdit={() => {
-                    if (savingRef.current) return;
-                    setEditingUid(section.uid);
-                  }}
-                  onReplace={() => {
-                    if (savingRef.current) return;
-                    void importFile(section.uid);
-                  }}
-                  onMove={(direction) => moveSection(section.uid, direction)}
-                  onDelete={() => {
-                    if (savingRef.current) return;
-                    setDeleteUid(section.uid);
-                  }}
-                >
-                  {editingUid === section.uid ? (
-                    <SectionEditor
+                </View>
+              ) : (
+                <NestedReorderableList
+                  data={sections}
+                  keyExtractor={(section) => section.uid}
+                  onReorder={dropSection}
+                  // Rows read the screen's busy and editing state, which the list
+                  // data does not carry.
+                  extraData={{ editingUid, listBusy }}
+                  renderItem={({ item: section, index }) => (
+                    <PersonalizationSectionCard
                       section={section}
-                      onCancel={() => setEditingUid(null)}
-                      onSave={saveEditedSection}
-                      onDirtyChange={setSectionEditDirty}
-                      busy={sectionFormBusy}
-                    />
-                  ) : null}
-                </PersonalizationSectionCard>
+                      index={index}
+                      total={sections.length}
+                      busy={listBusy}
+                      onToggle={(enabled) => {
+                        if (savingRef.current || reorderingRef.current) return;
+                        void toggleSection(section, enabled);
+                      }}
+                      onEdit={() => {
+                        if (savingRef.current) return;
+                        setEditingUid(section.uid);
+                      }}
+                      onReplace={() => {
+                        if (savingRef.current) return;
+                        void importFile(section.uid);
+                      }}
+                      onMove={(direction) =>
+                        moveSection(section.uid, direction)
+                      }
+                      onDelete={() => {
+                        if (savingRef.current) return;
+                        setDeleteUid(section.uid);
+                      }}
+                    >
+                      {editingUid === section.uid ? (
+                        <SectionEditor
+                          section={section}
+                          onCancel={() => setEditingUid(null)}
+                          onSave={saveEditedSection}
+                          onDirtyChange={setSectionEditDirty}
+                          busy={sectionFormBusy}
+                        />
+                      ) : null}
+                    </PersonalizationSectionCard>
+                  )}
+                  scrollable={false}
+                  // The outer ScrollViewContainer is the only scroll container
+                  // (ProfileLayoutEditor D-29); drag still pauses its scroll.
+                  scrollEnabled={false}
+                />
               )}
-              scrollable={false}
-              // The outer ScrollViewContainer is the only scroll container
-              // (ProfileLayoutEditor D-29); drag still pauses its scroll.
-              scrollEnabled={false}
-            />
-          )}
 
-          {adding ? (
-            <NewSectionEditor
-              title={draftTitle}
-              body={draftBody}
-              onTitleChange={setDraftTitle}
-              onBodyChange={setDraftBody}
-              onCancel={() => setAdding(false)}
-              onSave={() => void addSection()}
-              busy={sectionFormBusy}
-            />
-          ) : (
-            <Button
-              role="primary"
-              label="Add / paste section"
-              disabled={sectionFormBusy}
-              onPress={() => setAdding(true)}
-            />
-          )}
+              {adding ? (
+                <NewSectionEditor
+                  title={draftTitle}
+                  body={draftBody}
+                  onTitleChange={setDraftTitle}
+                  onBodyChange={setDraftBody}
+                  onCancel={() => setAdding(false)}
+                  onSave={() => void addSection()}
+                  busy={sectionFormBusy}
+                />
+              ) : (
+                <Button
+                  role="primary"
+                  label="Add / paste section"
+                  disabled={sectionFormBusy}
+                  onPress={() => setAdding(true)}
+                />
+              )}
+            </View>
+          </SettingsSectionCard>
         </View>
 
-        <GlassSurface density="dense" style={styles.estimateCard}>
-          <ScopedPalette>
-            {(scoped) => (
-              <>
-                <AppText role="caption">{formattedEstimate.context}</AppText>
-                {recomputing ? (
-                  <AppText
-                    role="caption"
-                    style={{ color: scoped.textSecondary }}
-                  >
-                    Recalculating…
-                  </AppText>
-                ) : null}
-                {displayCost ? (
-                  <AppText
-                    role="caption"
-                    style={{ color: scoped.textSecondary }}
-                  >
-                    {displayCost}
-                  </AppText>
-                ) : null}
-                {formattedEstimate.overflow ? (
-                  <View
-                    style={[styles.warning, { borderColor: scoped.danger }]}
-                  >
-                    <Icon name="warning" tone="danger" size="sm" />
-                    <AppText role="body" style={{ color: scoped.danger }}>
-                      {formattedEstimate.overflow}
-                    </AppText>
-                  </View>
-                ) : null}
-              </>
-            )}
-          </ScopedPalette>
-        </GlassSurface>
+        <SettingsSectionCard>
+          <View key="estimate" style={styles.cardBody}>
+            <AppText role="caption">{formattedEstimate.context}</AppText>
+            {recomputing ? (
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                Recalculating…
+              </AppText>
+            ) : null}
+            {displayCost ? (
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                {displayCost}
+              </AppText>
+            ) : null}
+            {formattedEstimate.overflow ? (
+              <View style={[styles.warning, { borderColor: colors.danger }]}>
+                <Icon name="warning" tone="danger" size="sm" />
+                <AppText role="body" style={{ color: colors.danger }}>
+                  {formattedEstimate.overflow}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+        </SettingsSectionCard>
 
         {message ? (
           <AppText role="body" style={{ color: colors.textSecondary }}>
@@ -1012,6 +1008,7 @@ function NewSectionEditor({
   onCancel,
   onSave,
   busy = false,
+  framed = true,
 }: {
   title: string;
   body: string;
@@ -1024,10 +1021,25 @@ function NewSectionEditor({
    * section are held and drawn disabled (D-26). Absent → false.
    */
   busy?: boolean;
+  /**
+   * Draw the form as its own bordered row (the Add form, D-119). The inline
+   * edit form sits inside its section's row, so it is drawn unframed.
+   */
+  framed?: boolean;
 }) {
   const { colors } = useTheme();
   return (
-    <GlassSurface density="dense" style={styles.card}>
+    <View
+      style={[
+        styles.form,
+        framed
+          ? [
+              styles.sectionRow,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]
+          : null,
+      ]}
+    >
       <AppText role="label">New personalization section</AppText>
       <TextInput
         accessibilityLabel="Section title"
@@ -1076,7 +1088,7 @@ function NewSectionEditor({
           onPress={onSave}
         />
       </View>
-    </GlassSurface>
+    </View>
   );
 }
 
@@ -1113,6 +1125,7 @@ function SectionEditor({
       onCancel={onCancel}
       onSave={() => void onSave({ ...section, title, body })}
       busy={busy}
+      framed={false}
     />
   );
 }
@@ -1129,7 +1142,10 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   styleRow: { gap: SPACING.sm },
-  card: { padding: SPACING.base },
+  // A shared section card's content brings its own padding (D-119).
+  cardBody: { padding: SPACING.base, gap: SPACING.base },
+  emptyState: { gap: SPACING.xs },
+  form: { gap: SPACING.sm },
   // A section row in the shared list pattern (Categories' row look, D-120).
   sectionRow: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -1170,7 +1186,6 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     textAlignVertical: "top",
   },
-  estimateCard: { padding: SPACING.base, gap: SPACING.xs },
   warning: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: RADII.md,

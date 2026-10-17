@@ -190,6 +190,73 @@ export interface WholePromptPreview {
   readonly truncations: ReadonlyArray<TruncationNotice>;
 }
 
+/**
+ * AI Preview's page copy in plain words (38.12 D-89). The contact's part is
+ * drawn first, above the full message, so the copy says so.
+ */
+export const AI_PREVIEW_COPY = {
+  intro:
+    "This is everything Orbit sends to your AI provider when you ask for a suggestion, exactly as sent. Your API key is never part of it.",
+  contactIntro:
+    "Pick a contact to see what Orbit sends about them. Their part shows first, above the full message.",
+  noContact:
+    "No contact chosen. The message below uses an example contact; pick one to see what Orbit sends about them.",
+  wholeTitle: "What Orbit sends",
+  contactTitle: "About this contact",
+} as const;
+
+/**
+ * The stand-in contact the preview resolves before one is chosen. It never
+ * decides whether the contact card shows: the screen's chosen contact does (38.12
+ * D-88).
+ */
+export const EXAMPLE_PREVIEW_CONTEXT: PromptContext = {
+  contactName: "Example contact",
+  category: "",
+  gravityTier: "",
+  intensity: {
+    currentCount: 0,
+    intendedPerPeriod: 0,
+    multiple: 0,
+    trailingAvgGapDays: null,
+  },
+  quality: { good: 0, fine: 0, hard: 0 },
+  cadence: { totalCount: 0, connectedCount: 0 },
+  newestChannel: "unspecified",
+  sharedFields: [],
+  sharedMemories: [],
+  recentInteractions: [],
+};
+
+/** Plain-word titles for the payload's data blocks (38.12 D-89). */
+const PLAIN_BLOCK_TITLES: ReadonlyArray<
+  readonly [RegExp, (n: string) => string]
+> = [
+  [/^CONTACT CONTEXT$/, () => "About this person"],
+  [/^WRITING STYLE$/, () => "Your style"],
+  [/^USER STYLE NOTE$/, () => "Your style note"],
+  [/^SHARED MEMORY (\d+)$/, (n) => `Memory ${n}`],
+  [/^RECENT INTERACTION (\d+)$/, (n) => `Recent interaction ${n}`],
+  [/^PERSONALIZATION CONTEXT (\d+)$/, (n) => `Your context ${n}`],
+  [/^MESSAGE FOCUS$/, () => "What to focus on"],
+  [/^MESSAGE TO REWRITE$/, () => "Message to rewrite"],
+  [/^TEMPORARY ADJUSTMENT$/, () => "Adjustment for this message"],
+];
+
+/**
+ * The plain title for a payload data block named `blockName` (the text in its
+ * `===== DATA: … =====` delimiter). Display only: the block's bytes are never
+ * touched. An unknown block reads in sentence case.
+ */
+export function previewSectionTitle(blockName: string): string {
+  for (const [pattern, title] of PLAIN_BLOCK_TITLES) {
+    const match = pattern.exec(blockName);
+    if (match) return title(match[1] ?? "");
+  }
+  const lower = blockName.trim().toLowerCase();
+  return lower ? `${lower[0].toUpperCase()}${lower.slice(1)}` : "Prompt data";
+}
+
 /** Split a resolved prompt for readability without changing its canonical bytes. */
 function readablePromptSections(prompt: string): PromptPreviewSection[] {
   const blockPattern =
@@ -204,21 +271,21 @@ function readablePromptSections(prompt: string): PromptPreviewSection[] {
         sections.push({
           title:
             sections.length === 0
-              ? "Orbit instructions and output contract"
-              : "Placement instructions",
+              ? "Orbit's instructions"
+              : "More instructions from Orbit",
           content: instructions,
         });
       }
     }
     sections.push({
-      title: match[1] ?? "Prompt data",
+      title: previewSectionTitle(match[1] ?? ""),
       content: match[0],
     });
     cursor = index + match[0].length;
   }
   const tail = prompt.slice(cursor).trim();
   if (tail) {
-    sections.push({ title: "Output contract", content: tail });
+    sections.push({ title: "How the AI should answer", content: tail });
   }
   return sections;
 }
@@ -280,6 +347,38 @@ export function buildContactPromptReview(
       itemCount === 0
         ? "No AI-permitted contact items are shared. The base contact context shown below is still included."
         : null,
+  };
+}
+
+/**
+ * AI Preview's contact card (38.12 D-88, D-89). With no contact chosen it is
+ * an explicit "no contact" state (never inferred from the contact's name, so a
+ * real contact named "Example contact" still gets its card). With a contact it
+ * carries the heading, the nothing-shared note, and the contact's own blocks,
+ * byte-for-byte from the resolved payload (D-27).
+ */
+export type PreviewContactCard =
+  | { readonly kind: "none"; readonly message: string }
+  | {
+      readonly kind: "contact";
+      readonly heading: string;
+      readonly emptyMessage: string | null;
+      readonly display: string;
+    };
+
+export function buildPreviewContactCard(
+  chosenContext: PromptContext | null,
+  resolved: ResolvedPrompt,
+): PreviewContactCard {
+  if (chosenContext === null) {
+    return { kind: "none", message: AI_PREVIEW_COPY.noContact };
+  }
+  const review = buildContactPromptReview(resolved, chosenContext);
+  return {
+    kind: "contact",
+    heading: review.heading,
+    emptyMessage: review.emptyMessage,
+    display: review.display,
   };
 }
 

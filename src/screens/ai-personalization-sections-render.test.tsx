@@ -101,15 +101,11 @@ vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   Button: "Button",
   ConfirmDialog: "ConfirmDialog",
-  GlassSurface: "GlassSurface",
   MIN_TOUCH_TARGET: 44,
   OrbitSwitch: "OrbitSwitch",
 }));
 vi.mock("@/components/ui/AnchoredMenu", () => ({
   AnchoredMenu: "AnchoredMenu",
-}));
-vi.mock("@/components/ui/ScopedPalette", () => ({
-  ScopedPalette: "ScopedPalette",
 }));
 vi.mock("@/components/ui/SettingsSectionCard", () => ({
   SettingsSectionCard: "SettingsSectionCard",
@@ -630,5 +626,18 @@ describe("the section forms hold their text while a save runs (38.12 D-88)", () 
       );
       expect(input?.props.editable, label).toBe(false);
     }
+  });
+});
+
+describe("AI Personalization draws its cards with the shared section card (38.12 D-119)", () => {
+  it("Writing Style, Personalization Context and the estimate sit in SettingsSectionCards", () => {
+    const tree = render({ sections: SECTIONS });
+    const cards = tree.filter((node) => node.type === "SettingsSectionCard");
+    expect(cards.map((card) => card.props.title)).toEqual([
+      "Writing Style",
+      "Personalization Context",
+      undefined,
+    ]);
+    expect(tree.some((node) => node.type === "GlassSurface")).toBe(false);
   });
 });

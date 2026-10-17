@@ -5,7 +5,8 @@ import { resolvePrompt } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { ContactPicker } from "@/components/ContactPicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, Button, GlassSurface } from "@/components/ui";
+import { AppText, Button } from "@/components/ui";
+import { SettingsSectionCard } from "@/components/ui/SettingsSectionCard";
 import { readPromptContext } from "@/db/ai-context-read";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor } from "@/db/database";
@@ -15,35 +16,22 @@ import {
 } from "@/db/personalization-dao";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
-  buildContactPromptReview,
+  AI_PREVIEW_COPY,
+  buildPreviewContactCard,
   buildWholePromptPreview,
+  EXAMPLE_PREVIEW_CONTEXT,
 } from "@/screens/settings-ai-logic";
+import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "ai-preview";
 
-const EMPTY_PREVIEW_CONTEXT: PromptContext = {
-  contactName: "Example contact",
-  category: "",
-  gravityTier: "",
-  intensity: {
-    currentCount: 0,
-    intendedPerPeriod: 0,
-    multiple: 0,
-    trailingAvgGapDays: null,
-  },
-  quality: { good: 0, fine: 0, hard: 0 },
-  cadence: { totalCount: 0, connectedCount: 0 },
-  newestChannel: "unspecified",
-  sharedFields: [],
-  sharedMemories: [],
-  recentInteractions: [],
-};
-
 interface PreviewState {
   resolved: ResolvedPrompt;
   context: PromptContext;
+  /** The chosen contact's context, or null while no contact is chosen. */
+  chosen: PromptContext | null;
 }
 
 /**
@@ -54,6 +42,7 @@ interface PreviewState {
  * (D-17).
  */
 export function AIPreviewScreen() {
+  const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
   const [preview, setPreview] = useState<PreviewState | null>(null);
@@ -86,7 +75,10 @@ export function AIPreviewScreen() {
     setLoading(true);
     setError(null);
     try {
-      setPreview(await resolveFor(EMPTY_PREVIEW_CONTEXT));
+      setPreview({
+        ...(await resolveFor(EXAMPLE_PREVIEW_CONTEXT)),
+        chosen: null,
+      });
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to resolve preview", caught);
       setError("Couldn't build the AI preview. Please try again.");
@@ -105,7 +97,8 @@ export function AIPreviewScreen() {
       setError(null);
       try {
         const context = await readPromptContext(getExecutor(), contactId);
-        setPreview(await resolveFor(context));
+        const next = await resolveFor(context);
+        setPreview({ ...next, chosen: next.context });
       } catch (caught) {
         Logger.error(LOG_SCOPE, "failed to resolve contact preview", caught);
         setError("Couldn't preview that contact. Please try again.");
@@ -118,7 +111,7 @@ export function AIPreviewScreen() {
 
   const whole = preview ? buildWholePromptPreview(preview.resolved) : null;
   const contact = preview
-    ? buildContactPromptReview(preview.resolved, preview.context)
+    ? buildPreviewContactCard(preview.chosen, preview.resolved)
     : null;
 
   return (
@@ -131,9 +124,9 @@ export function AIPreviewScreen() {
           { paddingBottom: bottomClearance },
         ]}
       >
-        <AppText role="body">
-          This is the complete resolved prompt. API keys and credentials are
-          never part of it.
+        <AppText role="body">{AI_PREVIEW_COPY.intro}</AppText>
+        <AppText role="body" style={{ color: colors.textSecondary }}>
+          {AI_PREVIEW_COPY.contactIntro}
         </AppText>
         <View style={styles.actions}>
           <Button
@@ -156,32 +149,52 @@ export function AIPreviewScreen() {
 
         {loading ? <AppText role="caption">Resolving preview…</AppText> : null}
         {error ? <AppText role="caption">{error}</AppText> : null}
+
+        {/* The contact's part comes first, where the copy above says. */}
+        {contact && !loading ? (
+          <View testID="ai-preview-contact-summary">
+            <SettingsSectionCard title={AI_PREVIEW_COPY.contactTitle}>
+              {contact.kind === "none" ? (
+                <View key="none" style={styles.card}>
+                  <AppText role="caption">{contact.message}</AppText>
+                </View>
+              ) : (
+                <View key="contact" style={styles.card}>
+                  <AppText role="label">{contact.heading}</AppText>
+                  {contact.emptyMessage ? (
+                    <AppText
+                      role="caption"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {contact.emptyMessage}
+                    </AppText>
+                  ) : null}
+                  <AppText role="caption">{contact.display}</AppText>
+                </View>
+              )}
+            </SettingsSectionCard>
+          </View>
+        ) : null}
+
         {whole && !loading ? (
           rawOpen ? (
             <View testID="ai-preview-raw">
-              <GlassSurface style={styles.card}>
-                <AppText role="caption">{whole.raw}</AppText>
-              </GlassSurface>
+              <SettingsSectionCard title={AI_PREVIEW_COPY.wholeTitle}>
+                <View key="raw" style={styles.card}>
+                  <AppText role="caption">{whole.raw}</AppText>
+                </View>
+              </SettingsSectionCard>
             </View>
           ) : (
-            whole.sections.map((section) => (
-              <GlassSurface key={section.content} style={styles.card}>
-                <AppText role="label">{section.title}</AppText>
-                <AppText role="caption">{section.content}</AppText>
-              </GlassSurface>
-            ))
+            <SettingsSectionCard title={AI_PREVIEW_COPY.wholeTitle}>
+              {whole.sections.map((section) => (
+                <View key={section.content} style={styles.card}>
+                  <AppText role="label">{section.title}</AppText>
+                  <AppText role="caption">{section.content}</AppText>
+                </View>
+              ))}
+            </SettingsSectionCard>
           )
-        ) : null}
-
-        {contact && preview?.context.contactName !== "Example contact" ? (
-          <View testID="ai-preview-contact-summary">
-            <GlassSurface style={styles.card}>
-              <AppText role="label">{contact.heading}</AppText>
-              {contact.emptyMessage ? (
-                <AppText role="caption">{contact.emptyMessage}</AppText>
-              ) : null}
-            </GlassSurface>
-          </View>
         ) : null}
       </ScrollView>
       <ContactPicker

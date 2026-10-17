@@ -1,5 +1,5 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -9,15 +9,9 @@ import {
 } from "react-native";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import {
-  AppText,
-  Button,
-  ConfirmDialog,
-  GlassSurface,
-  OrbitSwitch,
-} from "@/components/ui";
+import { AppText, Button, ConfirmDialog, OrbitSwitch } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
-import { ScopedPalette } from "@/components/ui/ScopedPalette";
+import { SettingsSectionCard } from "@/components/ui/SettingsSectionCard";
 import {
   type AiDefaultKey,
   type AiPermissionCategory,
@@ -42,6 +36,7 @@ import { plural } from "@/utils/plural";
 import {
   type AiPermissionTypeFilter,
   buildPermissionSummaryCopy,
+  defaultRowCaption,
   filterAiPermissionItems,
   groupAiPermissionItems,
   permissionGroupA11yLabel,
@@ -66,35 +61,32 @@ const TYPE_CHIPS: FilterChip<AiPermissionTypeFilter>[] = [
  * `reviewCategory` is the closed review filter its "Review existing" link
  * opens. Gift Ideas and Thought of Them have their own defaults (D-61) but are
  * reviewed as memories, so the review union stays closed (RESEARCH Pitfall 5).
+ * Every row's caption follows its switch (`defaultRowCaption`, 38.12 D-88,
+ * D-28).
  */
 const DEFAULT_ROWS: ReadonlyArray<{
   defaultKey: AiDefaultKey;
   reviewCategory: AiPermissionCategory;
   key: keyof AiPermissionDefaults;
   label: string;
-  caption?: string;
 }> = [
   {
     defaultKey: "memory",
     reviewCategory: "memory",
     key: "memory",
     label: "Memories",
-    // D-136 O13: the same caption the two newer memory-type rows carry.
-    caption: "New items default to Allow AI",
   },
   {
     defaultKey: "gift_idea",
     reviewCategory: "memory",
     key: "giftIdea",
     label: "Gift Ideas",
-    caption: "New items default to Allow AI",
   },
   {
     defaultKey: "thought_of_them",
     reviewCategory: "memory",
     key: "thoughtOfThem",
     label: "Thought of Them",
-    caption: "New items default to Allow AI",
   },
   {
     defaultKey: "interaction-note",
@@ -115,13 +107,7 @@ type PendingAction =
   | { kind: "enable"; impact: AiPermissionImpact }
   | null;
 
-/**
- * The "Review existing…" link label on each defaults card. It reads the palette
- * itself so `accentText` resolves INSIDE the card's GlassSurface scope and picks
- * up the Standard-Light glass variant (RG-029 ui-accessibility/AUD-UIA-001,
- * D-24/D-26). The screen's own `colors` is resolved above the card and would
- * render the root tone.
- */
+/** The "Review existing…" link label on each default row. */
 function ReviewExistingLinkLabel() {
   const { colors } = useTheme();
   return (
@@ -131,10 +117,7 @@ function ReviewExistingLinkLabel() {
   );
 }
 
-/**
- * A default row's caption. Like `ReviewExistingLinkLabel`, it reads the
- * palette inside the card's GlassSurface scope so it takes the card's tone.
- */
+/** A default row's caption. */
 function DefaultRowCaption({ text }: { text: string }) {
   const { colors } = useTheme();
   return (
@@ -172,6 +155,9 @@ export function AIPermissionsScreen() {
   // Only a successful read backs a count (38.4 AUD-UIA-013): until the first
   // read lands the empty `items` array is not "AI can access nothing".
   const [loaded, setLoaded] = useState(false);
+  // "Review existing…" scrolls the page to the review list (38.12 D-86).
+  const scrollRef = useRef<ScrollView>(null);
+  const reviewY = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -318,220 +304,215 @@ export function AIPermissionsScreen() {
     <View style={styles.root}>
       <ShellAppBar variant="child" title="AI Data Permissions" />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: bottomClearance },
         ]}
       >
-        <View style={styles.section}>
-          <AppText role="heading">Defaults for new information</AppText>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            {DEFAULT_NOTE}
-          </AppText>
+        <SettingsSectionCard title="Defaults for new information">
+          <View key="note" style={styles.cardRow}>
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              {DEFAULT_NOTE}
+            </AppText>
+          </View>
           {DEFAULT_ROWS.map((row) => (
-            <GlassSurface key={row.key} density="dense" style={styles.card}>
-              <View style={styles.defaultRow}>
-                <View style={styles.copy}>
-                  <AppText role="body">{row.label}</AppText>
-                  {row.caption ? (
-                    <DefaultRowCaption text={row.caption} />
-                  ) : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Review existing ${row.label}`}
-                    onPress={() => {
-                      setTypeFilter(row.reviewCategory);
-                      setEnabledOnly(false);
-                    }}
-                    style={styles.reviewLink}
-                  >
-                    <ReviewExistingLinkLabel />
-                  </Pressable>
-                </View>
+            <View key={row.key} style={[styles.cardRow, styles.defaultRow]}>
+              <View style={styles.copy}>
+                <AppText role="body">{row.label}</AppText>
+                <DefaultRowCaption
+                  text={defaultRowCaption(defaults[row.key] === 1)}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Review existing ${row.label}`}
+                  onPress={() => {
+                    setTypeFilter(row.reviewCategory);
+                    setEnabledOnly(false);
+                    scrollRef.current?.scrollTo({
+                      y: reviewY.current,
+                      animated: true,
+                    });
+                  }}
+                  style={styles.reviewLink}
+                >
+                  <ReviewExistingLinkLabel />
+                </Pressable>
+              </View>
+              <OrbitSwitch
+                accessibilityLabel={`Allow AI for new ${row.label}`}
+                value={defaults[row.key] === 1}
+                onValueChange={(value) =>
+                  void toggleDefault(row.defaultKey, row.key, value)
+                }
+              />
+            </View>
+          ))}
+        </SettingsSectionCard>
+
+        <View
+          onLayout={(event) => {
+            reviewY.current = event.nativeEvent.layout.y;
+          }}
+        >
+          <SettingsSectionCard title="Review existing">
+            <View key="filters" style={[styles.cardRow, styles.filters]}>
+              <TextInput
+                accessibilityLabel="Search contacts"
+                autoCapitalize="none"
+                placeholder="Search contacts"
+                placeholderTextColor={colors.textPlaceholder}
+                value={query}
+                onChangeText={setQuery}
+                style={[
+                  styles.search,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+              />
+              <FilterChipRow
+                chips={TYPE_CHIPS}
+                active={typeFilter}
+                onSelect={setTypeFilter}
+              />
+              <View style={styles.enabledRow}>
+                <AppText role="body">Enabled only</AppText>
                 <OrbitSwitch
-                  accessibilityLabel={`Allow AI for new ${row.label}`}
-                  value={defaults[row.key] === 1}
-                  onValueChange={(value) =>
-                    void toggleDefault(row.defaultKey, row.key, value)
-                  }
+                  accessibilityLabel="Show enabled information only"
+                  value={enabledOnly}
+                  onValueChange={setEnabledOnly}
                 />
               </View>
-            </GlassSurface>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <AppText role="heading">Review existing</AppText>
-          <TextInput
-            accessibilityLabel="Search contacts"
-            autoCapitalize="none"
-            placeholder="Search contacts"
-            placeholderTextColor={colors.textPlaceholder}
-            value={query}
-            onChangeText={setQuery}
-            style={[
-              styles.search,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          <FilterChipRow
-            chips={TYPE_CHIPS}
-            active={typeFilter}
-            onSelect={setTypeFilter}
-          />
-          <View style={styles.enabledRow}>
-            <AppText role="body">Enabled only</AppText>
-            <OrbitSwitch
-              accessibilityLabel="Show enabled information only"
-              value={enabledOnly}
-              onValueChange={setEnabledOnly}
-            />
-          </View>
-          {summaryCopy.accessLine !== null ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {summaryCopy.accessLine}
-            </AppText>
-          ) : null}
-          {summaryCopy.listLine !== null ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {summaryCopy.listLine}
-            </AppText>
-          ) : null}
-
-          {shownError ? (
-            <AppText
-              accessibilityLabel={shownError}
-              role="caption"
-              style={{ color: colors.danger }}
-            >
-              {shownError}
-            </AppText>
-          ) : null}
-
-          {groups.length === 0 ? (
-            summaryCopy.emptyLine !== null ? (
-              <GlassSurface density="dense" style={styles.card}>
-                <AppText role="body">{summaryCopy.emptyLine}</AppText>
-              </GlassSurface>
-            ) : null
-          ) : (
-            groups.map((group) => {
-              const expanded = expandedContact === group.contactUid;
-              return (
-                <GlassSurface
-                  key={group.contactUid}
-                  density="dense"
-                  style={styles.card}
+              {summaryCopy.accessLine !== null ? (
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  {summaryCopy.accessLine}
+                </AppText>
+              ) : null}
+              {summaryCopy.listLine !== null ? (
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  {summaryCopy.listLine}
+                </AppText>
+              ) : null}
+              {shownError ? (
+                <AppText
+                  accessibilityLabel={shownError}
+                  role="caption"
+                  style={{ color: colors.danger }}
                 >
-                  <ScopedPalette>
-                    {(scoped) => (
-                      <>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={permissionGroupA11yLabel(
-                            group,
-                            expanded,
-                          )}
-                          accessibilityState={{ expanded }}
-                          onPress={() =>
-                            setExpandedContact(
-                              expanded ? null : group.contactUid,
-                            )
-                          }
-                          style={styles.contactHeader}
-                        >
-                          <AppText role="body">{group.contactName}</AppText>
-                          <AppText
-                            role="caption"
-                            style={{ color: scoped.textSecondary }}
-                          >
-                            {permissionGroupCaption(group, expanded)}
-                          </AppText>
-                        </Pressable>
-                        {expanded
-                          ? group.items.map((item) => {
-                              const checked = visibleSelected.has(item.itemKey);
-                              return (
-                                <Pressable
-                                  key={item.itemKey}
-                                  accessibilityRole="checkbox"
-                                  accessibilityLabel={permissionItemA11yLabel(
-                                    item,
-                                  )}
-                                  accessibilityState={{ checked }}
-                                  onPress={() => toggleSelected(item.itemKey)}
-                                  style={[
-                                    styles.item,
-                                    { borderTopColor: colors.border },
-                                  ]}
+                  {shownError}
+                </AppText>
+              ) : null}
+            </View>
+            {groups.length === 0 ? (
+              summaryCopy.emptyLine !== null ? (
+                <View key="empty" style={styles.cardRow}>
+                  <AppText role="body">{summaryCopy.emptyLine}</AppText>
+                </View>
+              ) : null
+            ) : (
+              groups.map((group) => {
+                const expanded = expandedContact === group.contactUid;
+                return (
+                  <View key={group.contactUid} style={styles.cardRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={permissionGroupA11yLabel(
+                        group,
+                        expanded,
+                      )}
+                      accessibilityState={{ expanded }}
+                      onPress={() =>
+                        setExpandedContact(expanded ? null : group.contactUid)
+                      }
+                      style={styles.contactHeader}
+                    >
+                      <AppText role="body">{group.contactName}</AppText>
+                      <AppText
+                        role="caption"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {permissionGroupCaption(group, expanded)}
+                      </AppText>
+                    </Pressable>
+                    {expanded
+                      ? group.items.map((item) => {
+                          const checked = visibleSelected.has(item.itemKey);
+                          return (
+                            <Pressable
+                              key={item.itemKey}
+                              accessibilityRole="checkbox"
+                              accessibilityLabel={permissionItemA11yLabel(item)}
+                              accessibilityState={{ checked }}
+                              onPress={() => toggleSelected(item.itemKey)}
+                              style={[
+                                styles.item,
+                                { borderTopColor: colors.border },
+                              ]}
+                            >
+                              <View style={styles.copy}>
+                                <AppText role="body">{item.label}</AppText>
+                                <AppText
+                                  role="caption"
+                                  style={{ color: colors.textSecondary }}
                                 >
-                                  <View style={styles.copy}>
-                                    <AppText role="body">{item.label}</AppText>
-                                    <AppText
-                                      role="caption"
-                                      style={{ color: scoped.textSecondary }}
-                                    >
-                                      {item.value}
-                                    </AppText>
-                                    {item.locked ? (
-                                      <AppText
-                                        role="caption"
-                                        style={{ color: scoped.textSecondary }}
-                                      >
-                                        {aiLockReason(item.locked)}
-                                      </AppText>
-                                    ) : null}
-                                  </View>
+                                  {item.value}
+                                </AppText>
+                                {item.locked ? (
                                   <AppText
                                     role="caption"
-                                    style={{
-                                      color: item.enabled
-                                        ? scoped.accentText
-                                        : scoped.textSecondary,
-                                    }}
+                                    style={{ color: colors.textSecondary }}
                                   >
-                                    {checked
-                                      ? "Selected"
-                                      : item.enabled
-                                        ? "Enabled"
-                                        : "Disabled"}
+                                    {aiLockReason(item.locked)}
                                   </AppText>
-                                </Pressable>
-                              );
-                            })
-                          : null}
-                      </>
-                    )}
-                  </ScopedPalette>
-                </GlassSurface>
-              );
-            })
-          )}
-
-          {visibleSelected.size > 0 ? (
-            <View style={styles.bulkActions}>
-              <AppText role="caption">{visibleSelected.size} selected</AppText>
-              <View style={styles.buttonRow}>
-                <Button
-                  role="secondary"
-                  label="Disable selected"
-                  disabled={busy}
-                  onPress={() => setPendingAction({ kind: "disable" })}
-                />
-                <Button
-                  role="primary"
-                  label="Enable selected"
-                  disabled={busy || enableRefs.length === 0}
-                  onPress={() => void requestEnable()}
-                />
-              </View>
-            </View>
-          ) : null}
+                                ) : null}
+                              </View>
+                              <AppText
+                                role="caption"
+                                style={{
+                                  color: item.enabled
+                                    ? colors.accentText
+                                    : colors.textSecondary,
+                                }}
+                              >
+                                {checked
+                                  ? "Selected"
+                                  : item.enabled
+                                    ? "Enabled"
+                                    : "Disabled"}
+                              </AppText>
+                            </Pressable>
+                          );
+                        })
+                      : null}
+                  </View>
+                );
+              })
+            )}
+          </SettingsSectionCard>
         </View>
+
+        {visibleSelected.size > 0 ? (
+          <View style={styles.bulkActions}>
+            <AppText role="caption">{visibleSelected.size} selected</AppText>
+            <View style={styles.buttonRow}>
+              <Button
+                role="secondary"
+                label="Disable selected"
+                disabled={busy}
+                onPress={() => setPendingAction({ kind: "disable" })}
+              />
+              <Button
+                role="primary"
+                label="Enable selected"
+                disabled={busy || enableRefs.length === 0}
+                onPress={() => void requestEnable()}
+              />
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       <ConfirmDialog
@@ -554,9 +535,10 @@ export function AIPermissionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  bulkActions: { gap: SPACING.sm, paddingTop: SPACING.sm },
+  bulkActions: { gap: SPACING.sm },
   buttonRow: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
-  card: { padding: SPACING.base },
+  // A row inside a shared section card brings its own padding (D-119).
+  cardRow: { padding: SPACING.base, gap: SPACING.xs },
   contactHeader: { gap: SPACING.xs },
   content: { gap: SPACING.xl, padding: SPACING.base },
   copy: { flex: 1, gap: SPACING.xs },
@@ -566,6 +548,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  filters: { gap: SPACING.md },
   // The "Review existing…" link meets the 44dp floor with its own box — no
   // overlapping hitSlop (38.4 RG-030; ui-accessibility/AUD-UIA-006).
   reviewLink: {
@@ -590,5 +573,4 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: SPACING.md,
   },
-  section: { gap: SPACING.md },
 });

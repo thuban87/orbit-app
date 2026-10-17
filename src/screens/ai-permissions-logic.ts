@@ -99,7 +99,8 @@ export interface PermissionSummaryCopy {
 
 export const PERMISSION_EMPTY_COPY =
   "AI can't access any contact information yet.";
-export const PERMISSION_NO_MATCH_COPY = "No information matches these filters.";
+/** A filter or search hides every item (38.12 D-88; 38.4 #17). */
+export const PERMISSION_NO_MATCH_COPY = "No items match this filter.";
 
 /** Items AI can access, from a list that may include disabled ones. */
 function enabledItems(
@@ -151,13 +152,25 @@ export function buildPermissionSummaryCopy(
       "items",
     )} · ${accessible} of these shared with AI.`;
   }
+  // The empty-library copy is only true with no items at all, or with Enabled
+  // only on and nothing enabled; any other empty list is the filter's doing
+  // (38.12 D-88; 38.4 #17).
   const emptyLine =
     input.filteredItems.length > 0
       ? null
-      : access.items === 0
+      : input.allItems.length === 0 || (input.enabledOnly && access.items === 0)
         ? PERMISSION_EMPTY_COPY
         : PERMISSION_NO_MATCH_COPY;
   return { accessLine, listLine, emptyLine };
+}
+
+/**
+ * A "new items" default row's caption, following its switch (38.12 D-88; the
+ * same rule on all five rows, including 38.10's Gift Ideas and Thought of
+ * Them, D-28).
+ */
+export function defaultRowCaption(enabled: boolean): string {
+  return `New items start with Allow AI ${enabled ? "on" : "off"}.`;
 }
 
 /**

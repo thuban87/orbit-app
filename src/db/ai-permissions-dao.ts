@@ -400,6 +400,8 @@ export async function listAiPermissionItems(
     }
   }
   if (filter.category === undefined || filter.category === "custom-field") {
+    // Photo-type fields are never sent to AI, so they are not listed here and
+    // offer no Allow AI control (38.12 D-129, D-138).
     const rows = await exec.getAllAsync<FieldReviewRow>(
       `SELECT d.id, v.id AS valueId, c.id AS contactId, c.uid AS contactUid,
               c.name AS contactName, d.label, v.value,
@@ -408,6 +410,7 @@ export async function listAiPermissionItems(
          JOIN custom_field_defs d ON d.id = v.field_def_id
          JOIN contacts c ON c.id = v.contact_id
         WHERE d.quarantined_at IS NULL
+          AND d.type != 'photo'
           AND trim(COALESCE(v.value, '')) != ''
         ORDER BY c.name COLLATE NOCASE, c.uid, d.display_order, d.id, v.id`,
     );
@@ -523,7 +526,13 @@ async function setSelectedPermissions(
                 [value, now, ref.id],
               ]
             : [
-                "UPDATE custom_field_defs SET share_with_ai=?, modified_at=? WHERE id=?",
+                // A photo field is never sent to AI (38.12 D-129, D-138), so a
+                // stale ref can never turn one on: it is clamped to 0, the same
+                // lock shape as the interaction-note branch.
+                `UPDATE custom_field_defs
+                    SET share_with_ai = CASE WHEN type = 'photo' THEN 0 ELSE ? END,
+                        modified_at = ?
+                  WHERE id = ?`,
                 [value, now, ref.id],
               ];
       const result = await exec.runAsync(sql, params);

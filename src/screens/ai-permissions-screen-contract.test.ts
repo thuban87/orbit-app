@@ -108,8 +108,8 @@ describe("AI permissions labels carry count and access state (Lane D WR-03)", ()
 
 describe("AI permissions defaults and review link (38.12 D-86, D-88, D-28)", () => {
   it("every default row's caption follows its switch", () => {
-    expect(screen).toContain(
-      "<DefaultRowCaption text={defaultRowCaption(defaults[row.key] === 1)} />",
+    expect(screen).toMatch(
+      /<DefaultRowCaption\s+text=\{defaultRowCaption\(defaults\[row\.key\] === 1\)\}\s*\/>/,
     );
     // No fixed caption text on the rows.
     expect(screen).not.toMatch(/caption: "New items default/);

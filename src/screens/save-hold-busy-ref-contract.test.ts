@@ -281,7 +281,8 @@ describe("AIPersonalizationScreen holds the section editors while a save runs", 
   it("holds each section's ⋯ and the actions it opens (third fix pass WR-02)", () => {
     const at = source.indexOf("<PersonalizationSectionCard\n");
     expect(at, "PersonalizationSectionCard element").toBeGreaterThan(-1);
-    const element = source.slice(at, source.indexOf(">\n", at));
+    // The opening tag ends at the line holding only its `>`.
+    const element = source.slice(at, at + source.slice(at).search(/\n\s*>\n/));
     expect(element).toContain("busy={listBusy}");
     expect(source).toContain("const listBusy = sectionFormBusy || reordering;");
     // A press in the frame before the re-render reads the ref.
