@@ -258,6 +258,42 @@ describe("handleNotificationAction — now-Unbound lifecycle guard", () => {
   });
 });
 
+describe("handleNotificationAction — contact moved to the Bin (38.12 D-34, convergence c3 D-5)", () => {
+  it("makes Snooze a no-op that still cancels the decay notification and marks the key handled", async () => {
+    await h.exec?.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      h.now,
+      CONTACT_ID,
+    ]);
+    const errorSpy = vi.fn();
+    const logger = await import("@/utils/logger");
+    const restore = vi
+      .spyOn(logger.Logger, "error")
+      .mockImplementation(errorSpy);
+    const { handleNotificationAction, cancel } = await freshHandler();
+    const loggerAfterReset = await import("@/utils/logger");
+    const restoreAfterReset = vi
+      .spyOn(loggerAfterReset.Logger, "error")
+      .mockImplementation(errorSpy);
+
+    await handleNotificationAction(DATA, ACTION_SNOOZE);
+
+    expect(snoozeEventCount()).toBe(0);
+    expect(snoozeUntil()).toBeNull();
+    expect(cancel).toHaveBeenCalledWith(decayIdentifier(CONTACT_ID));
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(h.bumpShellRefresh).not.toHaveBeenCalled();
+
+    // The key is recorded: a warm replay is short-circuited before the DB.
+    cancel.mockClear();
+    vi.mocked(h.openAndMigrate as () => Promise<null>).mockClear();
+    await handleNotificationAction(DATA, ACTION_SNOOZE);
+    expect(h.openAndMigrate).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    restore.mockRestore();
+    restoreAfterReset.mockRestore();
+  });
+});
+
 describe("handleNotificationAction — unknown action", () => {
   it("does nothing: no write, no cancel, no DB bootstrap", async () => {
     const { handleNotificationAction, cancel } = await freshHandler();

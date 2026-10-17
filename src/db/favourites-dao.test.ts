@@ -10,6 +10,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { ContactInBinError } from "@/db/contact-lifecycle-dao";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -127,5 +128,37 @@ describe("clearFavouriteRank — NULL the rank, guarded", () => {
     await expect(clearFavouriteRank(exec, 9999, LATER)).rejects.toThrow(
       /no contact matched id=9999/,
     );
+  });
+});
+
+describe("favourite writers refuse a contact in the Bin (38.12 D-34)", () => {
+  it("setFavouriteRank rejects with ContactInBinError and writes nothing", async () => {
+    const id = await seedContact("Binned");
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      id,
+    ]);
+    await expect(setFavouriteRank(exec, id, LATER)).rejects.toBeInstanceOf(
+      ContactInBinError,
+    );
+    expect(await readRow(id)).toMatchObject({
+      favourite_rank: null,
+      modified_at: NOW,
+    });
+  });
+
+  it("clearFavouriteRank rejects with ContactInBinError and keeps the dormant rank", async () => {
+    const id = await seedContact("Binned");
+    await exec.runAsync(
+      "UPDATE contacts SET favourite_rank = 4, archived_at = ? WHERE id = ?",
+      [NOW, id],
+    );
+    await expect(clearFavouriteRank(exec, id, LATER)).rejects.toBeInstanceOf(
+      ContactInBinError,
+    );
+    expect(await readRow(id)).toMatchObject({
+      favourite_rank: 4,
+      modified_at: NOW,
+    });
   });
 });

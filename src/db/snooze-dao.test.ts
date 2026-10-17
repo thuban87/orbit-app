@@ -17,6 +17,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { ContactInBinError } from "@/db/contact-lifecycle-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -238,5 +239,53 @@ describe("clearSnooze — NULL snooze_until + ALWAYS an unsnooze event (item 10)
       "SELECT COUNT(*) AS n FROM events",
     );
     expect(events[0].n).toBe(0);
+  });
+});
+
+describe("snooze writers refuse a contact in the Bin (38.12 D-34)", () => {
+  async function binned(): Promise<number> {
+    const id = await seedContact("Binned");
+    await exec.runAsync(
+      "UPDATE contacts SET snooze_until = '2026-09-01', archived_at = ? WHERE id = ?",
+      [NOW, id],
+    );
+    return id;
+  }
+
+  async function eventCount(id: number): Promise<number> {
+    const row = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?",
+      [id],
+    );
+    return row?.n ?? 0;
+  }
+
+  it("snoozeContact rejects with ContactInBinError and writes nothing", async () => {
+    const id = await binned();
+    await expect(
+      snoozeContact(exec, {
+        contactId: id,
+        uid: uid(),
+        preset: "1w",
+        now: LATER,
+      }),
+    ).rejects.toBeInstanceOf(ContactInBinError);
+    expect(await readRow(id)).toMatchObject({
+      snooze_until: "2026-09-01",
+      modified_at: NOW,
+    });
+    expect(await eventCount(id)).toBe(0);
+  });
+
+  it("clearSnooze rejects with ContactInBinError and keeps the stored snooze", async () => {
+    const id = await binned();
+    await expect(
+      clearSnooze(exec, { contactId: id, uid: uid(), now: LATER }),
+    ).rejects.toBeInstanceOf(ContactInBinError);
+    expect(await readRow(id)).toMatchObject({
+      snooze_until: "2026-09-01",
+      modified_at: NOW,
+    });
+    expect(await eventCount(id)).toBe(0);
   });
 });

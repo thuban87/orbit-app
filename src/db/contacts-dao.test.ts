@@ -28,6 +28,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { ContactInBinError } from "@/db/contact-lifecycle-dao";
 import {
   archiveContact,
   createContactFull,
@@ -179,6 +180,83 @@ describe("updateContactFull — lifecycle event and committed returns", () => {
       { type: "bind", occurred_at: NOW },
       { type: "unbind", occurred_at: NOW },
     ]);
+  });
+
+  it("refuses a participation change for a contact in the Bin and writes nothing (38.12 D-34, C-7)", async () => {
+    const LATER = "2026-08-14 13:00:00";
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "A",
+      intervalDays: 30,
+      trackingEnabled: true,
+      now: NOW,
+    });
+    await archiveContact(exec, contactId, NOW);
+    const eventsBefore = await exec.getAllAsync(
+      "SELECT id FROM events WHERE contact_id = ?",
+      [contactId],
+    );
+    const revisionBefore = await readDataRevision(exec);
+
+    await expect(
+      updateContactFull(exec, {
+        id: contactId,
+        name: "Renamed",
+        intervalDays: 30,
+        trackingEnabled: false,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: LATER,
+      }),
+    ).rejects.toBeInstanceOf(ContactInBinError);
+
+    expect(
+      await exec.getFirstAsync(
+        "SELECT name, tracking_enabled, modified_at FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ name: "A", tracking_enabled: 1, modified_at: NOW });
+    expect(
+      await exec.getAllAsync("SELECT id FROM events WHERE contact_id = ?", [
+        contactId,
+      ]),
+    ).toEqual(eventsBefore);
+    expect(await readDataRevision(exec)).toBe(revisionBefore);
+  });
+
+  it("still saves a binned contact's edit when participation is unchanged or omitted (38.12 C-7)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "A",
+      intervalDays: 30,
+      trackingEnabled: false,
+      now: NOW,
+    });
+    await archiveContact(exec, contactId, NOW);
+    const base = {
+      id: contactId,
+      intervalDays: 30,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: NOW,
+    };
+    await updateContactFull(exec, {
+      ...base,
+      name: "Same participation",
+      trackingEnabled: false,
+    });
+    await updateContactFull(exec, { ...base, name: "Omitted participation" });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT name, tracking_enabled FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ name: "Omitted participation", tracking_enabled: 0 });
+    const types = await exec.getAllAsync<{ type: string }>(
+      "SELECT type FROM events WHERE contact_id = ? ORDER BY id",
+      [contactId],
+    );
+    expect(types.map((row) => row.type)).toEqual(["archive"]);
   });
 
   it("rolls back a transition event with a later failing edit", async () => {

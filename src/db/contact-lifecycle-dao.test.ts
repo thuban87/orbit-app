@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { bindContact, unbindContact } from "@/db/contact-lifecycle-dao";
+import {
+  bindContact,
+  ContactInBinError,
+  unbindContact,
+} from "@/db/contact-lifecycle-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -258,6 +262,38 @@ describe("contact lifecycle DAO", () => {
       tracking_enabled: 1,
       modified_at: NOW,
     });
+    expect(await dataRevision()).toBe(0);
+  });
+
+  it("refuses to bind or unbind a contact in the Bin and writes nothing (38.12 D-34)", async () => {
+    const unbound = await seedContact({ intervalDays: 14, trackingEnabled: 0 });
+    const bound = await seedContact({ intervalDays: 14, trackingEnabled: 1 });
+    await exec.runAsync(
+      "UPDATE contacts SET archived_at = ? WHERE id IN (?, ?)",
+      [NOW, unbound, bound],
+    );
+
+    await expect(bindContact(exec, unbound, LATER)).rejects.toBeInstanceOf(
+      ContactInBinError,
+    );
+    await expect(bindContact(exec, unbound, LATER, 30)).rejects.toBeInstanceOf(
+      ContactInBinError,
+    );
+    await expect(unbindContact(exec, bound, LATER)).rejects.toBeInstanceOf(
+      ContactInBinError,
+    );
+
+    expect(await row(unbound)).toMatchObject({
+      tracking_enabled: 0,
+      interval_days: 14,
+      modified_at: NOW,
+    });
+    expect(await row(bound)).toMatchObject({
+      tracking_enabled: 1,
+      modified_at: NOW,
+    });
+    expect(await events(unbound)).toEqual([]);
+    expect(await events(bound)).toEqual([]);
     expect(await dataRevision()).toBe(0);
   });
 

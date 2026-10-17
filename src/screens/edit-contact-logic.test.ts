@@ -22,6 +22,7 @@ import {
   memoryRowToDraftRow,
   type OffLimitsDraftRow,
   parseBirthdayForForm,
+  participationChoice,
   resolveEditSaveExit,
   resolveErrorSection,
   seedEditState,
@@ -922,6 +923,22 @@ describe("resolveEditSaveExit: Edit save returns to the Profile it came from (D-
     });
     expect(resolveEditSaveExit({ routes: [], index: 0 }, 7)).toMatchObject({
       kind: "replace",
+    });
+  });
+});
+
+describe("participationChoice (38.12 D-34, C-7; D-06)", () => {
+  it("disables and dims the Bound/Unbound chips for a contact in the Bin", () => {
+    expect(participationChoice("2026-10-01 09:00:00")).toEqual({
+      disabled: true,
+      dimmed: true,
+    });
+  });
+
+  it("leaves a live contact's chips enabled", () => {
+    expect(participationChoice(null)).toEqual({
+      disabled: false,
+      dimmed: false,
     });
   });
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { ContactInBinError } from "@/db/contact-lifecycle-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import {
@@ -263,5 +264,47 @@ describe("Profile snooze actions", () => {
     const second = traceTransactions(exec);
     await unsnoozeProfileContact(second.traced, { contactId, now: LATER });
     expect(second.statements).toEqual(["BEGIN", "COMMIT"]);
+  });
+});
+
+describe("Profile snooze actions refuse a contact in the Bin (38.12 D-34)", () => {
+  beforeEach(async () => {
+    await exec.runAsync(
+      "UPDATE contacts SET snooze_until='2026-10-01', archived_at=? WHERE id=?",
+      [NOW, contactId],
+    );
+  });
+
+  it("refuses a preset snooze, a custom date and the Undo restore, writing nothing", async () => {
+    await expect(
+      snoozeProfileContact(exec, { contactId, preset: "1w", now: LATER }),
+    ).rejects.toBeInstanceOf(ContactInBinError);
+    // The snooze sheet's Undo restores the previous end date through the same
+    // writer with `until`.
+    await expect(
+      snoozeProfileContact(exec, {
+        contactId,
+        until: "2026-10-12",
+        now: LATER,
+      }),
+    ).rejects.toBeInstanceOf(ContactInBinError);
+    expect(await contactRow()).toMatchObject({
+      snooze_until: "2026-10-01",
+      modified_at: NOW,
+    });
+    expect(await eventTypes()).toEqual([]);
+    expect(await revision()).toBe(0);
+  });
+
+  it("refuses Unsnooze, keeping the stored snooze as data", async () => {
+    await expect(
+      unsnoozeProfileContact(exec, { contactId, now: LATER }),
+    ).rejects.toBeInstanceOf(ContactInBinError);
+    expect(await contactRow()).toMatchObject({
+      snooze_until: "2026-10-01",
+      modified_at: NOW,
+    });
+    expect(await eventTypes()).toEqual([]);
+    expect(await revision()).toBe(0);
   });
 });

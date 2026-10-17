@@ -399,3 +399,116 @@ describe("other bulk action composers", () => {
     }).toEqual(before);
   });
 });
+
+describe("bulk favourite and snooze writers skip a contact in the Bin (38.12 D-34, convergence c3 D-5)", () => {
+  async function mixed(): Promise<{ a: number; b: number; c: number }> {
+    const a = await seedContact("Live A");
+    const b = await seedContact("Binned B");
+    const c = await seedContact("Live C");
+    await exec.runAsync(
+      "UPDATE contacts SET snooze_until = '2026-12-01', favourite_rank = 9, archived_at = ? WHERE id = ?",
+      [NOW, b],
+    );
+    return { a, b, c };
+  }
+
+  async function row(id: number) {
+    return exec.getFirstAsync<{
+      snooze_until: string | null;
+      favourite_rank: number | null;
+      modified_at: string;
+    }>(
+      "SELECT snooze_until, favourite_rank, modified_at FROM contacts WHERE id = ?",
+      [id],
+    );
+  }
+
+  async function eventsFor(id: number): Promise<number> {
+    const result = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?",
+      [id],
+    );
+    return result?.n ?? 0;
+  }
+
+  const LATER = "2026-09-06 13:00:00";
+
+  async function expectBinnedUntouched(b: number): Promise<void> {
+    expect(await row(b)).toEqual({
+      snooze_until: "2026-12-01",
+      favourite_rank: 9,
+      modified_at: NOW,
+    });
+    expect(await eventsFor(b)).toBe(0);
+  }
+
+  it("bulkAddFavourites writes the live ids, skips the binned one, one bump", async () => {
+    const { a, b, c } = await mixed();
+    const before = await readDataRevision(exec);
+    await bulkAddFavourites(exec, [a, b, c], LATER);
+    expect((await row(a))?.favourite_rank).not.toBeNull();
+    expect((await row(c))?.favourite_rank).not.toBeNull();
+    await expectBinnedUntouched(b);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("bulkRemoveFavourites writes the live ids, skips the binned one, one bump", async () => {
+    const { a, b, c } = await mixed();
+    await exec.runAsync(
+      "UPDATE contacts SET favourite_rank = 1 WHERE id IN (?, ?)",
+      [a, c],
+    );
+    const before = await readDataRevision(exec);
+    await bulkRemoveFavourites(exec, [a, b, c], LATER);
+    expect((await row(a))?.favourite_rank).toBeNull();
+    expect((await row(c))?.favourite_rank).toBeNull();
+    await expectBinnedUntouched(b);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("bulkSnooze writes the live ids, skips the binned one, one bump", async () => {
+    const { a, b, c } = await mixed();
+    const before = await readDataRevision(exec);
+    await bulkSnooze(exec, [a, b, c], "1w", LATER);
+    expect((await row(a))?.snooze_until).not.toBeNull();
+    expect((await row(c))?.snooze_until).not.toBeNull();
+    expect(await eventsFor(a)).toBe(1);
+    expect(await eventsFor(c)).toBe(1);
+    await expectBinnedUntouched(b);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("bulkSnoozeUntil writes the live ids, skips the binned one, one bump", async () => {
+    const { a, b, c } = await mixed();
+    const before = await readDataRevision(exec);
+    await bulkSnoozeUntil(exec, [a, b, c], "2099-01-01", LATER);
+    expect((await row(a))?.snooze_until).toBe("2099-01-01");
+    expect((await row(c))?.snooze_until).toBe("2099-01-01");
+    await expectBinnedUntouched(b);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("bulkUnsnooze writes the live ids, skips the binned one, one bump", async () => {
+    const { a, b, c } = await mixed();
+    await exec.runAsync(
+      "UPDATE contacts SET snooze_until = '2099-01-01' WHERE id IN (?, ?)",
+      [a, c],
+    );
+    const before = await readDataRevision(exec);
+    await bulkUnsnooze(exec, [a, b, c], LATER);
+    expect((await row(a))?.snooze_until).toBeNull();
+    expect((await row(c))?.snooze_until).toBeNull();
+    await expectBinnedUntouched(b);
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("still rolls the whole batch back on any other error", async () => {
+    const { a } = await mixed();
+    const before = await readDataRevision(exec);
+    await expect(bulkSnooze(exec, [a, 999_999], "1w", LATER)).rejects.toThrow(
+      /no contact matched/,
+    );
+    expect((await row(a))?.snooze_until).toBeNull();
+    expect(await readDataRevision(exec)).toBe(before);
+  });
+});
