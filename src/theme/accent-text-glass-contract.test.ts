@@ -113,7 +113,7 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
     for (const row of rows) {
       expect(
         row.status === "done" ||
-          /^obsolete — removed by (?:Plan \d+|38\.9 review IN-\d+|38\.1[01] Plan \d+) \([0-9a-f]{7,}\)$/.test(
+          /^obsolete — removed by (?:Plan \d+|38\.9 review IN-\d+|38\.1[012] Plan \d+) \([0-9a-f]{7,}\)$/.test(
             row.status,
           ) ||
           row.status.startsWith("kept — not a text/glyph foreground") ||
@@ -131,9 +131,11 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
   // 38.10-17), less M51 (the retired kind editor deleted, 38.10-18), less
   // M21–M25 (the Things to Remember screen retired, 38.10-18), less M59/M60
   // (the Snackbar actions read the pill's own foreground, 38.10-23 D-132),
-  // less M4 (Update Contact retired to docs/archive, 38.11-02 D-62).
-  it("covers the 47 swapped sites still in the tree", () => {
-    expect(done.length).toBe(47);
+  // less M4 (Update Contact retired to docs/archive, 38.11-02 D-62), less
+  // M35 (the phone-region value moved into the shared SettingsRow, 38.12-06
+  // D-119).
+  it("covers the 46 swapped sites still in the tree", () => {
+    expect(done.length).toBe(46);
   });
 
   const superseded = rows.filter((row) => SUPERSEDED_STATUS.test(row.status));
