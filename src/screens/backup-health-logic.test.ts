@@ -4,6 +4,7 @@ import {
   backUpNowSnackbar,
   backupWarningAction,
   backupWarningActionLabel,
+  keptBackupsLine,
   MANUAL_EXPORT_TOO_LARGE_COPY,
   manualExportFailureCopy,
   resolveBackupHealth,
@@ -334,5 +335,44 @@ describe("Back up now snackbar (38.12 D-115)", () => {
           : { status };
       expect(backUpNowSnackbar(outcome, skipped).kind).toBe("error");
     }
+  });
+});
+
+describe("hero kept-backups count is real (38.12 D-62)", () => {
+  const healthyInput = {
+    folderUri: "content://tree/primary%3AOrbit",
+    folderName: "Orbit",
+    folderAccessible: true,
+    lastAutomaticBackupAt: "2026-10-17 09:00:00",
+    currentDataRevision: 3,
+    lastBackupDataRevision: 3,
+    intervalDays: 7,
+  };
+  const at = new Date(2026, 9, 17);
+
+  it("reports the number of owned automatic files in the folder", () => {
+    expect(
+      resolveBackupHealth({ ...healthyInput, automaticFileCount: 4 }, at),
+    ).toMatchObject({ kind: "healthy", automaticFileCount: 4 });
+  });
+
+  it("reports zero when the folder holds none, never a constant", () => {
+    expect(
+      resolveBackupHealth({ ...healthyInput, automaticFileCount: 0 }, at),
+    ).toMatchObject({ kind: "healthy", automaticFileCount: 0 });
+  });
+
+  it("leaves the count unknown (null) until the folder has been listed", () => {
+    expect(resolveBackupHealth(healthyInput, at)).toMatchObject({
+      kind: "healthy",
+      automaticFileCount: null,
+    });
+  });
+
+  it("words the kept line from the count", () => {
+    expect(keptBackupsLine(0, "Orbit")).toBe("0 backups kept in Orbit");
+    expect(keptBackupsLine(1, "Orbit")).toBe("1 backup kept in Orbit");
+    expect(keptBackupsLine(5, "Orbit")).toBe("5 backups kept in Orbit");
+    expect(keptBackupsLine(null, "Orbit")).toBe("Backups are kept in Orbit");
   });
 });

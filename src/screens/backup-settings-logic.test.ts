@@ -11,9 +11,12 @@ import {
 } from "@/logic/read-phase";
 import {
   BACKUP_DAYS_VALIDATION_COPY,
+  BACKUP_FOLDER_FALLBACK_NAME,
   type BackupDayController,
   type BackupDaysFieldPatch,
+  backupFolderDisplayName,
   backupSettingsPresentation,
+  backupSettingsScrollOffset,
   buildBackupDaysFieldPatch,
   commitThenRefresh,
   createBackupDayController,
@@ -808,5 +811,67 @@ describe("passphrase-change error copy (38.6 D-39, WR5-03)", () => {
     expect(encryptionErrorCopy("needs-recovery")).toBe(
       "Orbit couldn't safely re-encrypt every accessible automatic backup. Reconnect the folder and try again.",
     );
+  });
+});
+
+describe("backupFolderDisplayName — the folder's real name from its tree URI (38.12 D-62)", () => {
+  it("names an external-storage folder by its last path segment", () => {
+    expect(
+      backupFolderDisplayName(
+        "content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FOrbit",
+      ),
+    ).toBe("Orbit");
+  });
+
+  it("names a top-level folder on the volume", () => {
+    expect(
+      backupFolderDisplayName(
+        "content://com.android.externalstorage.documents/tree/primary%3AOrbit%20backups",
+      ),
+    ).toBe("Orbit backups");
+  });
+
+  it("reads the tree id, not a document id appended after it", () => {
+    expect(
+      backupFolderDisplayName(
+        "content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FOrbit/document/primary%3ADocuments%2FOrbit%2Forbit-auto-2026-10-17-0930.json",
+      ),
+    ).toBe("Orbit");
+  });
+
+  it("a Drive-style tree URI yields its last decoded path segment", () => {
+    expect(
+      backupFolderDisplayName(
+        "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3DAbC%2FOrbit",
+      ),
+    ).toBe("Orbit");
+  });
+
+  it("an undecodable, rootless or missing URI falls back to the neutral name", () => {
+    expect(BACKUP_FOLDER_FALLBACK_NAME).toBe("your backup folder");
+    for (const uri of [
+      "content://com.android.externalstorage.documents/tree/primary%3ADocs%E0%A4%A",
+      "content://com.android.externalstorage.documents/tree/primary%3A",
+      "content://com.android.externalstorage.documents/document/primary%3AOrbit",
+      "",
+      null,
+      undefined,
+    ]) {
+      expect(backupFolderDisplayName(uri)).toBe(BACKUP_FOLDER_FALLBACK_NAME);
+    }
+  });
+});
+
+describe("backupSettingsScrollOffset — Backup settings honours the section it was opened for (38.12 D-64)", () => {
+  const offsets = { automatic: 0, encryption: 640 };
+
+  it("scrolls to the section's top once its offset is known", () => {
+    expect(backupSettingsScrollOffset("encryption", offsets)).toBe(640);
+    expect(backupSettingsScrollOffset("automatic", offsets)).toBe(0);
+  });
+
+  it("does nothing without a section or before the section has laid out", () => {
+    expect(backupSettingsScrollOffset(undefined, offsets)).toBeNull();
+    expect(backupSettingsScrollOffset("encryption", {})).toBeNull();
   });
 });
