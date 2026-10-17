@@ -91,10 +91,42 @@ describe("local export staging", () => {
     expect(state.removed).toEqual([`orbit-backup-${now - grace}.json`]);
   });
 
+  // 38.12 D-116: new readable names retire by their local stamp too.
+  it("retires a new local-named export at the grace boundary and keeps a newer one", async () => {
+    const grace = 86_400_000;
+    const created = new Date(2026, 9, 16, 9, 30);
+    const nowMs = created.getTime() + grace;
+    state.names = [
+      "orbit-backup-2026-10-16-0930.json",
+      "orbit-backup-2026-10-16-0931-2.json",
+      "orbit-auto-2026-10-16-0930.json",
+    ];
+    await createLocalExportFiles().retireStale(nowMs, grace);
+    expect(state.removed).toEqual(["orbit-backup-2026-10-16-0930.json"]);
+  });
+
+  it("names a new export with the local time and suffixes a same-minute one", async () => {
+    const at = new Date(2026, 9, 17, 9, 30, 15).getTime();
+    expect((await createLocalExportFiles(() => at).create()).uri).toBe(
+      "file:///cache/backup-exports/orbit-backup-2026-10-17-0930.json",
+    );
+    state.names = ["orbit-backup-2026-10-17-0930.json"];
+    expect((await createLocalExportFiles(() => at).create()).uri).toBe(
+      "file:///cache/backup-exports/orbit-backup-2026-10-17-0930-2.json",
+    );
+  });
+
   it("next export retires only prior app-owned staging", async () => {
-    state.names = ["orbit-backup-123.json", "unrelated.json"];
+    state.names = [
+      "orbit-backup-123.json",
+      "orbit-backup-2026-10-17-0930.json",
+      "unrelated.json",
+    ];
     await createLocalExportFiles().retireAll();
-    expect(state.removed).toEqual(["orbit-backup-123.json"]);
+    expect(state.removed).toEqual([
+      "orbit-backup-123.json",
+      "orbit-backup-2026-10-17-0930.json",
+    ]);
   });
 
   it("revokes the chosen share target's grant before deleting (ADR-155)", async () => {

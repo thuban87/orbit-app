@@ -1,8 +1,9 @@
+import { isExpiredAutomaticBackup } from "@/backup/auto-backup-policy";
 import {
-  automaticBackupFilename,
-  isExpiredAutomaticBackup,
-  isOwnedAutomaticBackup,
-} from "@/backup/auto-backup-policy";
+  automaticBackupFileName,
+  isOwnedAutomaticBackupName,
+  uniqueBackupFileName,
+} from "@/backup/backup-file-names";
 import {
   parseBackupManifest,
   UPDATE_FIRST_MESSAGE,
@@ -388,9 +389,15 @@ export function createAutomaticBackupReencryptionService(
         }
 
         try {
-          const uris = (await deps.storage.list(deps.directoryUri)).filter(
-            (uri) => isOwnedAutomaticBackup(ownedName(uri)),
+          const listed = await deps.storage.list(deps.directoryUri);
+          // Only automatic backups are re-encrypted (38.12 D-136): a manual
+          // export saved into this folder is never rewritten or removed.
+          const uris = listed.filter((uri) =>
+            isOwnedAutomaticBackupName(ownedName(uri)),
           );
+          // Every name in the folder plus every name this run writes, so the
+          // minute-precision replacements never collide (D-136).
+          const taken = new Set(listed.map(ownedName));
           const replacementUris = new Set(
             pending.replacements.map(
               (replacement) => replacement.replacementUri,
@@ -399,7 +406,7 @@ export function createAutomaticBackupReencryptionService(
           const sourceUris = uris.filter((uri) => !replacementUris.has(uri));
           let reencryptedCount = 0;
 
-          for (const [index, sourceUri] of sourceUris.entries()) {
+          for (const sourceUri of sourceUris) {
             const prior = pending.replacements.find(
               (replacement) => replacement.sourceUri === sourceUri,
             );
@@ -442,11 +449,17 @@ export function createAutomaticBackupReencryptionService(
                 profile: deps.profile,
               }),
             );
+            const replacementName = uniqueBackupFileName(
+              automaticBackupFileName(deps.now),
+              taken,
+            );
+            taken.add(replacementName);
             const replacementUri = await deps.storage.writeVerified(
               deps.directoryUri,
-              automaticBackupFilename(new Date(deps.now.getTime() + index + 1)),
+              replacementName,
               replacementContents,
             );
+            taken.add(ownedName(replacementUri));
             const verifiedReplacement: unknown = JSON.parse(
               await deps.storage.read(replacementUri),
             );
@@ -704,7 +717,21 @@ export function createAutomaticBackupService(
               ? encryption?.encrypt(plaintext, mode.passphrase)
               : plaintext;
           if (contents === undefined) return { status: "failed" } as const;
-          const filename = automaticBackupFilename(deps.now);
+          // A readable local name (38.12 D-116), suffixed when this minute's
+          // name is already in the folder (D-136). A failed listing only loses
+          // the suffix check; it never negates the write.
+          let existing: string[] = [];
+          try {
+            existing = (await deps.storage.list(deps.directoryUri)).map(
+              ownedName,
+            );
+          } catch {
+            existing = [];
+          }
+          const filename = uniqueBackupFileName(
+            automaticBackupFileName(deps.now),
+            new Set(existing),
+          );
           await deps.storage.writeVerified(
             deps.directoryUri,
             filename,
@@ -712,14 +739,15 @@ export function createAutomaticBackupService(
           );
           // The just-written snapshot is protected by identity, not clock order:
           // a rollback may make its filename look older than retained snapshots.
+          // Only automatic names are pruned; a manual export is never (D-136).
           try {
             const listed = await deps.storage.list(deps.directoryUri);
             await Promise.all(
               listed.map(async (uri) => {
-                const name = decodeURIComponent(uri).split("/").pop() ?? "";
+                const name = ownedName(uri);
                 if (
                   name !== filename &&
-                  isOwnedAutomaticBackup(name) &&
+                  isOwnedAutomaticBackupName(name) &&
                   isExpiredAutomaticBackup(name, deps.retentionDays, deps.now)
                 ) {
                   await deps.storage.remove(uri);

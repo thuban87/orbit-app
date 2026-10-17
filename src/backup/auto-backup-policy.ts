@@ -1,20 +1,16 @@
-export const AUTOMATIC_BACKUP_PREFIX = "orbit-auto-";
+import {
+  backupNameTimestampMs,
+  isOwnedAutomaticBackupName,
+} from "@/backup/backup-file-names";
+
+/** Names are built and recognised in `backup-file-names.ts` (38.12 D-116, D-136). */
+export { AUTOMATIC_BACKUP_PREFIX } from "@/backup/backup-file-names";
 
 export interface AutomaticBackupMetadata {
   lastAutomaticBackupAt: string | null;
   lastBackupDataRevision: number;
   backupIntervalDays: number;
   backupRetentionDays: number;
-}
-
-export function automaticBackupFilename(now: Date): string {
-  return `${AUTOMATIC_BACKUP_PREFIX}${now.toISOString().replace(/[:.]/g, "-")}.json`;
-}
-
-export function isOwnedAutomaticBackup(name: string): boolean {
-  return new RegExp(
-    `^${AUTOMATIC_BACKUP_PREFIX}\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z\\.json$`,
-  ).test(name);
 }
 
 export function shouldRunAutomaticBackup(
@@ -37,26 +33,15 @@ export function filesToPrune(
   keepDays: number,
   now: Date,
 ): string[] {
-  const owned = files.filter((file) => isOwnedAutomaticBackup(file.name));
+  const owned = files.filter((file) => isOwnedAutomaticBackupName(file.name));
   if (owned.length <= 1) return [];
   const newest = owned.reduce((a, b) =>
     a.verifiedOrder >= b.verifiedOrder ? a : b,
   );
   const cutoff = now.getTime() - keepDays * 86_400_000;
-  const timestamp = (name: string): number => {
-    const match =
-      /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.json$/.exec(
-        name.slice(AUTOMATIC_BACKUP_PREFIX.length),
-      );
-    return match
-      ? Date.parse(
-          `${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`,
-        )
-      : Number.NaN;
-  };
   return owned
     .filter((file) => file.name !== newest.name)
-    .filter((file) => timestamp(file.name) < cutoff)
+    .filter((file) => (backupNameTimestampMs(file.name) ?? Number.NaN) < cutoff)
     .map((file) => file.name);
 }
 
@@ -66,16 +51,9 @@ export function isExpiredAutomaticBackup(
   keepDays: number,
   now: Date,
 ): boolean {
-  const match =
-    /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.json$/.exec(
-      name.slice(AUTOMATIC_BACKUP_PREFIX.length),
-    );
-  if (!match) return false;
-  const timestamp = Date.parse(
-    `${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`,
-  );
+  if (!isOwnedAutomaticBackupName(name)) return false;
+  const timestamp = backupNameTimestampMs(name);
   return (
-    Number.isFinite(timestamp) &&
-    timestamp < now.getTime() - keepDays * 86_400_000
+    timestamp !== null && timestamp < now.getTime() - keepDays * 86_400_000
   );
 }

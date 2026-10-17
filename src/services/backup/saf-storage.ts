@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Linking } from "react-native";
-import { isOwnedAutomaticBackup } from "@/backup/auto-backup-policy";
+import { isOwnedAutomaticBackupName } from "@/backup/backup-file-names";
 
 export interface SafStorage {
   /** Returns the provider URI only after the replacement can be read back. */
@@ -58,6 +58,6 @@ export function createSafStorage(): SafReadableStorage & SafFolderAdapter {
 
 export function ownedAutomaticUris(uris: string[]): string[] {
   return uris.filter((uri) =>
-    isOwnedAutomaticBackup(decodeURIComponent(uri).split("/").pop() ?? ""),
+    isOwnedAutomaticBackupName(decodeURIComponent(uri).split("/").pop() ?? ""),
   );
 }

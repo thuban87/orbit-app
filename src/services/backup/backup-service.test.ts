@@ -23,6 +23,10 @@ vi.mock("@/backup/export-manifest", () => ({
 vi.mock("expo-sqlite", () => ({}));
 
 import {
+  automaticBackupFileName,
+  isOwnedAutomaticBackupName,
+} from "@/backup/backup-file-names";
+import {
   MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
   parseBackupManifest,
 } from "@/backup/backup-schema";
@@ -1081,6 +1085,92 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
     expect(state.pending?.replacements[0]?.sourceUri).toBe(small);
     expect(entries.has(small)).toBe(false);
     expect(entries.get(big)).toBe(oversizedPlaintext);
+  });
+
+  // 38.12 D-116 / D-136: re-encryption finds old and new automatic names,
+  // gives every same-run replacement its own owned name, and never touches a
+  // manual export saved in the backup folder.
+  it("re-encrypts old and new automatic names into distinct owned replacements and leaves a manual export alone", async () => {
+    const manual = "content://backup/orbit-backup-2026-08-24-0930.json";
+    const legacyManual = "content://backup/orbit-backup-1756000000000.json";
+    const sources = [
+      "content://backup/orbit-auto-2026-08-22T00-00-00-000Z.json",
+      "content://backup/orbit-auto-2026-08-23-0930.json",
+      "content://backup/orbit-auto-2026-08-23-0930-2.json",
+    ];
+    const { entries, state, service } = reencryptionHarness([
+      ...sources.map((uri): [string, string] => [
+        uri,
+        JSON.stringify(manifest),
+      ]),
+      [manual, "manual export"],
+      [legacyManual, "older manual export"],
+    ]);
+    await expect(
+      service.change({ currentPassphrase: "old", nextPassphrase: "new" }),
+    ).resolves.toEqual({ status: "changed", reencryptedCount: 3 });
+    expect(state.active).toBe("new");
+    const base = automaticBackupFileName(new Date("2026-08-25T00:00:00.000Z"));
+    const stem = base.replace(/\.json$/, "");
+    const replacements = [...entries.keys()]
+      .filter((uri) => uri !== manual && uri !== legacyManual)
+      .map((uri) => uri.split("/").pop()!);
+    expect(replacements.sort()).toEqual(
+      [base, `${stem}-2.json`, `${stem}-3.json`].sort(),
+    );
+    for (const name of replacements)
+      expect(isOwnedAutomaticBackupName(name)).toBe(true);
+    for (const uri of sources) expect(entries.has(uri)).toBe(false);
+    expect(entries.get(manual)).toBe("manual export");
+    expect(entries.get(legacyManual)).toBe("older manual export");
+  });
+
+  it("writes a readable local automatic name, suffixes a same-minute collision, and prunes only expired automatic names", async () => {
+    const now = new Date("2026-08-25T00:00:00.000Z");
+    const base = automaticBackupFileName(now);
+    const folder = [
+      `content://backup/${base}`,
+      "content://backup/orbit-auto-2020-01-01T00-00-00-000Z.json",
+      "content://backup/orbit-auto-2020-01-02-0930.json",
+      "content://backup/orbit-backup-2020-01-01-0930.json",
+      "content://backup/orbit-backup-1577836800000.json",
+    ];
+    const removed: string[] = [];
+    const writeVerified = vi.fn(
+      async (_directory: string, name: string) => `content://backup/${name}`,
+    );
+    const service = createAutomaticBackupService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      now,
+      readPhotoBase64: async () => "",
+      directoryUri: "content://backup",
+      retentionDays: 7,
+      storage: {
+        writeVerified,
+        list: async () => folder,
+        remove: async (uri) => {
+          removed.push(uri);
+        },
+      },
+    });
+    const suffixed = base.replace(/\.json$/, "-2.json");
+    await expect(service.writeVerifiedSnapshot()).resolves.toMatchObject({
+      status: "written",
+      filename: suffixed,
+    });
+    expect(base).toMatch(/^orbit-auto-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
+    expect(writeVerified).toHaveBeenCalledWith(
+      "content://backup",
+      suffixed,
+      expect.any(String),
+    );
+    expect(removed.sort()).toEqual(
+      [
+        "content://backup/orbit-auto-2020-01-01T00-00-00-000Z.json",
+        "content://backup/orbit-auto-2020-01-02-0930.json",
+      ].sort(),
+    );
   });
 
   it("pins the device-local health diagnostic the Backup card reads", () => {

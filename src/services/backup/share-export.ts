@@ -1,6 +1,12 @@
 /** Native file/share adapters live here so the service remains node-testable. */
 import { Directory, File, Paths } from "expo-file-system";
 import { Platform } from "react-native";
+import {
+  backupNameTimestampMs,
+  isStagedManualExportName,
+  manualBackupFileName,
+  uniqueBackupFileName,
+} from "@/backup/backup-file-names";
 import type {
   ExportShareAdapter,
   LocalExportFile,
@@ -41,14 +47,19 @@ export function createLocalExportFiles(
       .list()
       .filter(
         (item): item is File =>
-          item instanceof File && /^orbit-backup-\d+\.json$/.test(item.name),
+          item instanceof File && isStagedManualExportName(item.name),
       );
   };
   return {
     async create(): Promise<LocalExportFile> {
       const dir = directory();
       dir.create({ intermediates: true, idempotent: true });
-      const file = new File(dir, `orbit-backup-${now()}.json`);
+      // Readable local name (38.12 D-116); a same-minute export takes a suffix.
+      const taken = new Set(dir.list().map((item) => item.name));
+      const file = new File(
+        dir,
+        uniqueBackupFileName(manualBackupFileName(new Date(now())), taken),
+      );
       return {
         uri: file.uri,
         async write(contents) {
@@ -67,8 +78,8 @@ export function createLocalExportFiles(
     },
     async retireStale(nowMs, graceMs) {
       for (const file of stagedFiles()) {
-        const stamp = Number(/^orbit-backup-(\d+)\.json$/.exec(file.name)?.[1]);
-        const created = Number.isFinite(stamp) ? stamp : file.modificationTime;
+        const created =
+          backupNameTimestampMs(file.name) ?? file.modificationTime;
         if (created != null && nowMs - created >= graceMs) retire(file);
       }
     },
