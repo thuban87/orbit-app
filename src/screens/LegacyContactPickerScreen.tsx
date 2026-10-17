@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { usePhotoBudgetPrompt } from "@/components/PhotoBudgetSheet";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -61,6 +62,9 @@ export function LegacyContactPickerScreen({
   const [importing, setImporting] = useState(false);
   const [omittedCount, setOmittedCount] = useState(0);
   const [denialCount, setDenialCount] = useState(0);
+  // D-133: asked before photos that may not fit in the encrypted backup.
+  const { sheet: photoBudgetSheet, ask: askPhotoBudget } =
+    usePhotoBudgetPrompt();
 
   useEffect(() => {
     mounted.current = true;
@@ -153,13 +157,18 @@ export function LegacyContactPickerScreen({
     setImporting(true);
     setOmittedCount(0);
     try {
-      const result = await readAllContacts(selectedKeys);
+      // An import path: full-size photos (D-137, D-118).
+      const result = await readAllContacts(selectedKeys, {
+        preferFullSize: true,
+      });
       if (!mounted.current) return;
       if (result.omittedCount > 0) setOmittedCount(result.omittedCount);
 
       const exec = getExecutor();
       const settings = await getAppSettings(exec);
       if (!mounted.current) return;
+      // "Go back" on the photo-budget sheet returns { status: "cancelled" }:
+      // nothing was imported and the list keeps its selection (D-133).
       await routePickedImport(
         exec,
         result.contacts,
@@ -168,6 +177,7 @@ export function LegacyContactPickerScreen({
             settings.phoneRegionOverride ?? getDeviceRegion(),
           // Read settings and clock at Import, not when the picker opened.
           now: localDateTime(),
+          decidePhotoBudget: askPhotoBudget,
         },
         navigation,
       );
@@ -336,6 +346,7 @@ export function LegacyContactPickerScreen({
           </Pressable>
         ) : null}
       </View>
+      {photoBudgetSheet}
     </View>
   );
 }
