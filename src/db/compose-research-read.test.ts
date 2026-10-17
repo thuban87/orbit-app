@@ -104,6 +104,7 @@ async function addCustomField(
     shareWithAi: 0 | 1;
     value: string | null;
     alwaysShow?: 0 | 1;
+    type?: string;
   },
 ): Promise<number> {
   const def = await exec.runAsync(
@@ -111,11 +112,12 @@ async function addCustomField(
        (uid, col_name, label, type, options, show_on_new, always_show,
         display_order, share_with_ai, scope, history_retained, field_group,
         created_at, modified_at)
-     VALUES (?, ?, ?, 'text', NULL, 0, ?, 0, ?, 'global', 0, NULL, ?, ?)`,
+     VALUES (?, ?, ?, ?, NULL, 0, ?, 0, ?, 'global', 0, NULL, ?, ?)`,
     [
       uid(),
       opts.colName,
       opts.label,
+      opts.type ?? "text",
       opts.alwaysShow ?? 0,
       opts.shareWithAi,
       NOW,
@@ -136,6 +138,34 @@ function byId(items: Awaited<ReturnType<typeof readComposeResearch>>) {
 }
 
 describe("compose-research-read — normalized ResearchItem projection", () => {
+  it("never lists a photo-type custom field, even one marked share_with_ai (38.12 D-129)", async () => {
+    const owner = await contact("Owner");
+    const photoField = await addCustomField(owner, {
+      colName: "pet_photo",
+      label: "Pet photo",
+      shareWithAi: 1,
+      value: "file:///photos/pet.jpg",
+      type: "photo",
+    });
+    const textField = await addCustomField(owner, {
+      colName: "hobby",
+      label: "Hobby",
+      shareWithAi: 1,
+      value: "Climbing",
+    });
+
+    const items = byId(await readComposeResearch(exec, owner));
+    expect(items.get(`custom:${textField}`)).toMatchObject({
+      label: "Hobby",
+      value: "Climbing",
+      aiEligible: true,
+    });
+    expect(items.has(`custom:${photoField}`)).toBe(false);
+    expect(
+      [...items.values()].some((item) => item.value.includes("pet.jpg")),
+    ).toBe(false);
+  });
+
   it("derives per-source aiEligible, marks off-limits, and includes visible Key People", async () => {
     const owner = await contact("Owner");
     const aiMemory = await addMemory(owner, {

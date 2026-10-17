@@ -386,6 +386,36 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     ]);
   });
 
+  it("never sends a photo-type field, even when it is marked share_with_ai (38.12 D-129)", async () => {
+    const c = await makeContact(30, 0, 1);
+    const photo = makeDef("pet_photo", {
+      label: "Pet photo",
+      type: "photo",
+      display_order: 0,
+      share_with_ai: 1,
+    });
+    const hobby = makeDef("hobby", {
+      label: "Hobby",
+      display_order: 1,
+      share_with_ai: 1,
+    });
+    await persistDef(photo);
+    await persistDef(hobby);
+    await upsertValue(
+      exec,
+      c,
+      photo.id,
+      uid(),
+      "file:///data/user/0/com.bwales.orbit/files/photos/pet.jpg",
+      NOW,
+    );
+    await upsertValue(exec, c, hobby.id, uid(), "Climbing", NOW);
+
+    const ctx = await readPromptContext(exec, c, NOW);
+    expect(ctx.sharedFields).toEqual([{ label: "Hobby", value: "Climbing" }]);
+    expect(JSON.stringify(ctx)).not.toContain("pet.jpg");
+  });
+
   it("cannot widen the shared DAO map or prompt projection with non-shared and quarantined pairs", async () => {
     const c = await makeContact(30, 0, 1);
     const shared = makeDef("shared_fact", {

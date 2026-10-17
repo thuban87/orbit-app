@@ -561,4 +561,49 @@ describe("Profile knowledge projection", () => {
       items.some((item) => item.fieldDefId === quarantinedDef.lastInsertRowId),
     ).toBe(false);
   });
+
+  it("readPopulatedCustomFields leaves out photo-type fields while the Profile read keeps them (38.12 D-129)", async () => {
+    const owner = await contact("Owner");
+    const photoDef = await exec.runAsync(
+      `INSERT INTO custom_field_defs
+         (uid, col_name, label, type, options, show_on_new, always_show,
+          display_order, share_with_ai, scope, history_retained, field_group,
+          created_at, modified_at)
+       VALUES (?, 'pet_photo', 'Pet photo', 'photo', NULL, 0, 0, 0, 1,
+               'global', 0, NULL, ?, ?)`,
+      [uid(), NOW, NOW],
+    );
+    const textDef = await exec.runAsync(
+      `INSERT INTO custom_field_defs
+         (uid, col_name, label, type, options, show_on_new, always_show,
+          display_order, share_with_ai, scope, history_retained, field_group,
+          created_at, modified_at)
+       VALUES (?, 'hobby', 'Hobby', 'text', NULL, 0, 0, 1, 1,
+               'global', 0, NULL, ?, ?)`,
+      [uid(), NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO custom_field_values
+         (uid, contact_id, field_def_id, value, created_at, modified_at)
+       VALUES (?, ?, ?, 'file:///photos/pet.jpg', ?, ?)`,
+      [uid(), owner, photoDef.lastInsertRowId, NOW, NOW],
+    );
+    await exec.runAsync(
+      `INSERT INTO custom_field_values
+         (uid, contact_id, field_def_id, value, created_at, modified_at)
+       VALUES (?, ?, ?, 'Climbing', ?, ?)`,
+      [uid(), owner, textDef.lastInsertRowId, NOW, NOW],
+    );
+
+    const research = (await readPopulatedCustomFields(readOnly(), owner))
+      .flatMap((group) => group.items)
+      .map((item) => item.fieldDefId);
+    expect(research).toEqual([textDef.lastInsertRowId]);
+
+    const profile = (await readProfileKnowledge(readOnly(), owner)).customFields
+      .flatMap((group) => group.items)
+      .map((item) => item.fieldDefId);
+    expect(profile).toContain(photoDef.lastInsertRowId);
+    expect(profile).toContain(textDef.lastInsertRowId);
+  });
 });
