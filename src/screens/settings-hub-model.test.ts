@@ -189,7 +189,7 @@ describe("Settings hub row anatomy (RG-037 AUD-UIA-017, D-15)", () => {
       ],
       ["Orrery", "Display density, relationship satellites, and Systems"],
       ["Data & Backup", "Export, restore, encryption, and automatic backups"],
-      ["AI", "Connection, model, personalization, and data permissions"],
+      ["AI", "Connection, model, style and context, and data permissions"],
       ["About Orbit", "App name and version"],
       ["Add Orbit widget", "Pin the Orbit widget to your home screen"],
     ]);
