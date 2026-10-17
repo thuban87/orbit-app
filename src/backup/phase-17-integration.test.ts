@@ -331,6 +331,13 @@ describe("Phase 17 composed backup regressions", () => {
         "reconciliation_session_cards",
         "device-local reconciliation workflow state",
       ],
+      // Check linked contacts review memory is device-local and not in the
+      // backup. 38.12-10 deletes a link's 'source' (missing-source kept) memory
+      // when that link reads again (D-45).
+      [
+        "reconcile_source_snapshot",
+        "device-local reconcile review memory, not in the backup",
+      ],
       // Phase 30 Systems are durable local state, but their backup wire shape is
       // explicitly deferred to Phase 36. Until that format work lands, deleting
       // a System definition/rule/override/preference is intentionally not a
