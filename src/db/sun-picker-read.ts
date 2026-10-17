@@ -21,17 +21,21 @@
  * The synthetic "Me / self" option (NULL id) is prepended by the Settings picker
  * UI, NOT here — this read returns only real contacts.
  *
+ * ROW SHAPE (38.12 D-81): each row carries the shared contact picker's columns
+ * (`PickerContactRow`), so Settings → Appearance can hand these rows to
+ * `ContactPickerList` as host rows and reuse the one picker.
+ *
  * INJECTION: a fully static query — no runtime value is interpolated or bound.
  */
+import type { PickerContactRow } from "@/db/picker-read";
 import type { SqlExecutor } from "@/db/types";
 
-/** One sun-picker row — enough to render a picker row with an avatar. */
-export interface SunCandidate {
-  id: number;
-  name: string;
-  /** Raw relative path or null — never resolved here (mirrors orrery-read C2-1). */
-  photo: string | null;
-}
+/**
+ * One sun-picker row: a shared contact-picker row (38.12 D-81). `photo` is the
+ * raw relative path or null — never resolved here (mirrors orrery-read C2-1).
+ * `archived_at` is always null (archived contacts are excluded).
+ */
+export type SunCandidate = PickerContactRow;
 
 /**
  * The favourites-first candidate list: non-archived Bound contacts, favourites by
@@ -39,7 +43,8 @@ export interface SunCandidate {
  */
 export function listSunCandidates(exec: SqlExecutor): Promise<SunCandidate[]> {
   return exec.getAllAsync<SunCandidate>(
-    `SELECT id, name, photo
+    `SELECT id, name, photo, modified_at, favourite_rank, last_contact,
+            snooze_until, archived_at
        FROM contacts
       WHERE archived_at IS NULL AND tracking_enabled = 1
       ORDER BY (favourite_rank IS NULL), favourite_rank ASC, name COLLATE NOCASE, id`,

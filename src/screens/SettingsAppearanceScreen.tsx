@@ -1,8 +1,9 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button role is a typography/visual role.
+
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useRef, useState } from "react";
 import {
-  FlatList,
   Image,
   Pressable,
   ScrollView,
@@ -12,11 +13,21 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { ContactPickerList } from "@/components/ContactPicker";
 import { Icon } from "@/components/icons/Icon";
 import type { IconTone } from "@/components/icons/icon-registry";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { RegisteredModal } from "@/components/ui/RegisteredModal";
+import {
+  AppText,
+  Button,
+  KeyboardCenteringProvider,
+  OptionSheet,
+  SettingsRow,
+  SettingsSectionCard,
+  Sheet,
+  useKeyboardCentering,
+} from "@/components/ui";
 import {
   type AppSettingsPatch,
   getAppSettings,
@@ -35,6 +46,7 @@ import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
 import { ACCENTS } from "@/theme/accents";
@@ -50,6 +62,8 @@ import type {
   ThemePackage,
   ThemePalette,
 } from "@/theme/theme-types";
+import { RADII } from "@/theme/tokens/radii";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
   backgroundChoicesForPackage,
@@ -234,6 +248,15 @@ function ColourSwatch({
  * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
  * AUD-UIA-016, D-15): no duplicate in-body Back.
  *
+ * 38.12: every section is a `SettingsSectionCard` of `SettingsRow`s, testIDs
+ * kept (D-119). Orbit Center, Your star and Your name stay here; the "Your
+ * profile" section reads "You" and "Center" has one spelling (D-80). The
+ * default-layout picker is the shared `OptionSheet` with a title, and Orbit
+ * Center picks through the shared contact picker (`ContactPickerList`) with
+ * "You" first and a Cancel (D-81, phase-37 §D). Your name is centered above the
+ * keyboard (the repo's keyboard-centering pattern) and a successful save shows
+ * a "Saved your name" snackbar (D-82).
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 export function SettingsAppearanceScreen() {
@@ -242,6 +265,14 @@ export function SettingsAppearanceScreen() {
   const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // D-82: Your name is centered in the space above the keyboard.
+  const scrollRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null) as RefObject<View>;
+  const nameInputRef = useRef<TextInput>(null);
+  const { centering, bottomSpacer } = useKeyboardCentering({
+    scrollRef,
+    contentRef,
+  });
 
   // Live theme selection from the store — the ThemeProvider re-renders from
   // these, so a change restyles the whole app instantly; persist() writes the
@@ -275,15 +306,14 @@ export function SettingsAppearanceScreen() {
   // "Orbit Appearance" / Orbit Center (migrated from the monolith's "Your
   // orbit" group). `selfSunColour` is the raw stored self-star hex or NULL; NULL
   // resolves to `starPalette[0]` (gold) at RENDER — no stored hex default. The
-  // centre occupant is the raw stored id (NULL = You), the RESOLVED display name
-  // (archived/missing → "You"), the favourites-first candidate list, the picker
-  // modal's open state, and its search term.
+  // center occupant is the raw stored id (NULL = You), the RESOLVED display name
+  // (archived/missing → "You"), the favourites-first candidate list, and the
+  // picker sheet's open state (the shared contact picker owns its search).
   const [selfSunColour, setSelfSunColour] = useState<string | null>(null);
   const [sunContactId, setSunContactId] = useState<number | null>(null);
   const [sunOccupantName, setSunOccupantName] = useState("You");
   const [sunCandidates, setSunCandidates] = useState<SunCandidate[]>([]);
   const [sunPickerOpen, setSunPickerOpen] = useState(false);
-  const [sunSearch, setSunSearch] = useState("");
 
   // Self-name editor (D-04b). The draft mirrors the persisted `profile.name`
   // (seeded on focus); committing routes through `setProfileName` (trim /
@@ -376,6 +406,8 @@ export function SettingsAppearanceScreen() {
     try {
       await setProfileName(getExecutor(), selfNameDraft, localDateTime());
       setNameError(null);
+      // D-82: a short saved cue.
+      showSnackbar({ kind: "success", label: "Saved your name" });
       await reloadProfile();
     } catch (err) {
       lastCommittedNameRef.current = previous;
@@ -412,7 +444,7 @@ export function SettingsAppearanceScreen() {
     [reloadProfileDefaults],
   );
 
-  // Load the Orbit Center settings (self-star colour + centre occupant). Read on
+  // Load the Orbit Center settings (self-star colour + center occupant). Read on
   // focus so a change made elsewhere refreshes when this screen regains focus.
   const reloadOrbit = useCallback(async () => {
     const exec = getExecutor();
@@ -453,9 +485,9 @@ export function SettingsAppearanceScreen() {
   );
 
   // Persist the tapped self-star token (a themed starPalette entry). ADR-047 /
-  // D-02: only the self-star colour is user-configurable — a contact at centre
+  // D-02: only the self-star colour is user-configurable — a contact at center
   // keeps its status-derived glow, so this control is NOT conditioned on the
-  // current centre and never assigns a colour to a contact centre.
+  // current center and never assigns a colour to a contact center.
   const onPickStarColour = useCallback(
     async (token: string) => {
       try {
@@ -472,7 +504,7 @@ export function SettingsAppearanceScreen() {
     [reloadOrbit],
   );
 
-  // Persist the chosen centre occupant (a candidate id, or NULL for "You").
+  // Persist the chosen center occupant (a candidate id, or NULL for "You").
   // Closes the picker and reloads the displayed occupant from the write.
   const onPickSunOccupant = useCallback(
     async (id: number | null) => {
@@ -483,7 +515,6 @@ export function SettingsAppearanceScreen() {
           localDateTime(),
         );
         setSunPickerOpen(false);
-        setSunSearch("");
         await reloadOrbit();
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to persist sun occupant", err);
@@ -492,22 +523,12 @@ export function SettingsAppearanceScreen() {
     [reloadOrbit],
   );
 
-  // The picker list: a synthetic "You" (NULL id) first, then the favourites-first
-  // candidates (already archived-excluded by listSunCandidates), filtered by the
-  // search term. Choosing the centre lives in Settings by owner decision — NOT an
-  // orrery gesture (the orrery long-press was rejected, ADR-047).
-  const sunOptions = useMemo<Array<{ id: number | null; name: string }>>(() => {
-    const all: Array<{ id: number | null; name: string }> = [
-      { id: null, name: "You" },
-      ...sunCandidates.map((c) => ({
-        id: c.id as number | null,
-        name: c.name,
-      })),
-    ];
-    const term = sunSearch.trim().toLocaleLowerCase();
-    if (term === "") return all;
-    return all.filter((o) => o.name.toLocaleLowerCase().includes(term));
-  }, [sunCandidates, sunSearch]);
+  // The picker: a "You" (NULL id) choice first, then the shared contact picker
+  // over the favourites-first candidates (already archived-excluded and
+  // Bound-only by listSunCandidates). Choosing the center lives in Settings by
+  // owner decision — NOT an orrery gesture (the orrery long-press was rejected,
+  // ADR-047).
+  const closeSunPicker = useCallback(() => setSunPickerOpen(false), []);
 
   const activeBackground =
     themePackage === "galaxy" ? galaxyBackground : standardBackground;
@@ -569,734 +590,533 @@ export function SettingsAppearanceScreen() {
     [persist, setBackgroundForActivePackage, themePackage],
   );
 
+  const layoutName =
+    layoutTemplates.find((t) => t.uid === globalLayoutUid)?.name ??
+    "Default / None";
+
   return (
     <View style={styles.root}>
       <ShellAppBar variant="child" title="Appearance" />
       <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
         testID="settings-appearance-screen"
         contentContainerStyle={[
           styles.content,
           { paddingBottom: bottomClearance },
         ]}
       >
-        {saveError !== null ? (
-          <View
-            testID="settings-appearance-save-error"
-            accessibilityLiveRegion="polite"
-            accessibilityRole="alert"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.danger },
-            ]}
-          >
-            <Text style={[styles.helper, { color: colors.danger }]}>
+        <KeyboardCenteringProvider value={centering}>
+          {saveError !== null ? (
+            <AppText
+              role="caption"
+              testID="settings-appearance-save-error"
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+              style={[styles.note, { color: colors.danger }]}
+            >
               {saveError}
-            </Text>
-          </View>
-        ) : null}
+            </AppText>
+          ) : null}
 
-        {__DEV__ ? (
-          <Pressable
-            testID="settings-dev-theme-preview-row"
-            accessibilityRole="button"
-            accessibilityLabel="Open background failure test harness"
-            onPress={() => navigation.navigate("__ThemePreview")}
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Background failure test harness
-            </Text>
-          </Pressable>
-        ) : null}
+          {__DEV__ ? (
+            <SettingsSectionCard>
+              <SettingsRow
+                testID="settings-dev-theme-preview-row"
+                title="Background failure test harness"
+                accessibilityLabel="Open background failure test harness"
+                onPress={() => navigation.navigate("__ThemePreview")}
+              />
+            </SettingsSectionCard>
+          ) : null}
 
-        <View testID="settings-appearance-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          <SettingsSectionCard
+            testID="settings-appearance-section"
+            title="Theme"
           >
-            Theme
-          </Text>
-
-          {/* Theme package */}
-          <View
-            testID="settings-theme-package-row"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Theme
-            </Text>
-            <View style={styles.themeChipRow}>
-              {(
-                [
-                  ["galaxy", "Galaxy"],
-                  ["standard", "Standard"],
-                ] as [ThemePackage, string][]
-              ).map(([value, label]) => {
-                const selected = themePackage === value;
-                return (
-                  <Pressable
-                    key={value}
-                    testID={`settings-theme-package-${value}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Theme ${label}`}
-                    accessibilityState={{ selected }}
-                    onPress={() => {
-                      setThemePackage(value);
-                      void persist({ themePackage: value });
-                    }}
-                    style={[
-                      styles.themeChip,
-                      {
-                        borderColor: selected ? colors.accent : colors.border,
-                        backgroundColor: selected
-                          ? colors.accent
-                          : colors.surface,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.themeChipLabel,
-                        {
-                          color: selected
-                            ? colors.onAccent
-                            : colors.textPrimary,
-                        },
-                      ]}
-                    >
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Galaxy is glass-forward and deep-space; Standard is flatter and
-              calmer. Each package remembers its own mode and accent.
-            </Text>
-          </View>
-
-          {/* Appearance mode (per active package) */}
-          <View
-            testID="settings-theme-mode-row"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Mode
-            </Text>
-            <View style={styles.themeChipRow}>
-              {(
-                [
-                  ["light", "Light"],
-                  ["dark", "Dark"],
-                  ["system", "Follow System"],
-                ] as [ThemeMode, string][]
-              ).map(([value, label]) => {
-                const activeMode =
-                  themePackage === "galaxy" ? galaxyMode : standardMode;
-                const selected = activeMode === value;
-                return (
-                  <Pressable
-                    key={value}
-                    testID={`settings-theme-mode-${value}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Mode ${label}`}
-                    accessibilityState={{ selected }}
-                    onPress={() => {
-                      setModeForActivePackage(value);
-                      void persist(
-                        themePackage === "galaxy"
-                          ? { galaxyMode: value }
-                          : { standardMode: value },
-                      );
-                    }}
-                    style={[
-                      styles.themeChip,
-                      {
-                        borderColor: selected ? colors.accent : colors.border,
-                        backgroundColor: selected
-                          ? colors.accent
-                          : colors.surface,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.themeChipLabel,
-                        {
-                          color: selected
-                            ? colors.onAccent
-                            : colors.textPrimary,
-                        },
-                      ]}
-                    >
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Accent (per active package) */}
-          <View
-            testID="settings-theme-accent-row"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Accent
-            </Text>
-            <View style={styles.swatchRow}>
-              {(() => {
-                const activeAccent =
-                  themePackage === "galaxy" ? galaxyAccent : standardAccent;
-                const defaultSelected = activeAccent === null;
-                return (
-                  <>
-                    {/* Package default (NULL accent) */}
+            {/* Theme package */}
+            <SettingsRow
+              testID="settings-theme-package-row"
+              title="Theme"
+              subtitle="Galaxy is glass-forward and deep-space; Standard is flatter and calmer. Each package remembers its own mode and accent."
+            >
+              <View style={styles.themeChipRow}>
+                {(
+                  [
+                    ["galaxy", "Galaxy"],
+                    ["standard", "Standard"],
+                  ] as [ThemePackage, string][]
+                ).map(([value, label]) => {
+                  const selected = themePackage === value;
+                  return (
                     <Pressable
-                      testID="settings-theme-accent-default"
+                      key={value}
+                      testID={`settings-theme-package-${value}`}
                       accessibilityRole="button"
-                      accessibilityLabel="Accent package default"
-                      accessibilityState={{ selected: defaultSelected }}
+                      accessibilityLabel={`Theme ${label}`}
+                      accessibilityState={{ selected }}
                       onPress={() => {
-                        setAccentForActivePackage(null);
-                        void persist(
-                          themePackage === "galaxy"
-                            ? { galaxyAccent: null }
-                            : { standardAccent: null },
-                        );
+                        setThemePackage(value);
+                        void persist({ themePackage: value });
                       }}
                       style={[
                         styles.themeChip,
                         {
-                          borderColor: defaultSelected
+                          borderColor: selected ? colors.accent : colors.border,
+                          backgroundColor: selected
                             ? colors.accent
-                            : colors.border,
-                          backgroundColor: colors.surface,
+                            : colors.surface,
                         },
                       ]}
                     >
                       <Text
                         style={[
                           styles.themeChipLabel,
-                          { color: colors.textPrimary },
+                          {
+                            color: selected
+                              ? colors.onAccent
+                              : colors.textPrimary,
+                          },
                         ]}
                       >
-                        Default
+                        {label}
                       </Text>
                     </Pressable>
-                    {ACCENT_IDS.map((id: AccentId, index) => {
-                      const selected = activeAccent === id;
-                      const fill = ACCENTS[id][mode].fill;
-                      return (
-                        <ColourSwatch
-                          key={id}
-                          colors={colors}
-                          fill={fill}
-                          selected={selected}
-                          // The selected accent is the active accent, so the
-                          // palette's onAccent is ACCENTS[id][mode].onAccent
-                          // (AA-tested on every fill; D-60, C5-L9).
-                          checkTone="onAccent"
-                          testID={`settings-theme-accent-${index}`}
-                          accessibilityLabel={`Accent ${id.replace(/-/g, " ")}`}
-                          onPress={() => {
-                            setAccentForActivePackage(id);
-                            void persist(
-                              themePackage === "galaxy"
-                                ? { galaxyAccent: id }
-                                : { standardAccent: id },
-                            );
-                          }}
-                        />
-                      );
-                    })}
-                  </>
-                );
-              })()}
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              The accent tints buttons, links, and active states across the app.
-            </Text>
-          </View>
+                  );
+                })}
+              </View>
+            </SettingsRow>
 
-          {/* Background — only the ACTIVE package's choices are offered (D-07):
-              the reactive themePackage selects backgroundChoicesForPackage, so
-              the Galaxy-only slots are not shown while Standard is active (and
-              vice-versa). Mode/Accent already read the active package, so only
-              this grid needed the guard. A failed thumbnail silently becomes
-              themed solid. */}
-          <View
-            testID="settings-theme-background-row"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Background
-            </Text>
-            <View style={styles.backgroundGrid}>
-              {backgroundChoicesForPackage(themePackage).map((slot) => (
-                <BackgroundThumbnail
-                  // The mode joins the key so each thumbnail's render-failure
-                  // latch resets on a mode switch (each mode has its own file).
-                  key={`${slot}:${mode}`}
-                  colors={colors}
-                  columnWidth={backgroundColumnWidth}
-                  label={BACKGROUND_LABELS[slot]}
-                  mode={mode}
-                  onPress={onSelectBackground}
-                  selected={selectedBackgroundSlot === slot}
-                  slot={slot}
-                  sourcePackage={themePackage}
-                />
-              ))}
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Backgrounds stay fixed behind your screens. Each package remembers
-              its own choice.
-            </Text>
-          </View>
-        </View>
+            {/* Appearance mode (per active package) */}
+            <SettingsRow testID="settings-theme-mode-row" title="Mode">
+              <View style={styles.themeChipRow}>
+                {(
+                  [
+                    ["light", "Light"],
+                    ["dark", "Dark"],
+                    ["system", "Follow System"],
+                  ] as [ThemeMode, string][]
+                ).map(([value, label]) => {
+                  const activeMode =
+                    themePackage === "galaxy" ? galaxyMode : standardMode;
+                  const selected = activeMode === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      testID={`settings-theme-mode-${value}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Mode ${label}`}
+                      accessibilityState={{ selected }}
+                      onPress={() => {
+                        setModeForActivePackage(value);
+                        void persist(
+                          themePackage === "galaxy"
+                            ? { galaxyMode: value }
+                            : { standardMode: value },
+                        );
+                      }}
+                      style={[
+                        styles.themeChip,
+                        {
+                          borderColor: selected ? colors.accent : colors.border,
+                          backgroundColor: selected
+                            ? colors.accent
+                            : colors.surface,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.themeChipLabel,
+                          {
+                            color: selected
+                              ? colors.onAccent
+                              : colors.textPrimary,
+                          },
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </SettingsRow>
 
-        {/* Owner profile — the self record's photo (migrated from the monolith's
-            "Your photo" row). The self-name editor is added alongside it. */}
-        <View testID="settings-owner-profile-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Your profile
-          </Text>
+            {/* Accent (per active package) */}
+            <SettingsRow
+              testID="settings-theme-accent-row"
+              title="Accent"
+              subtitle="The accent tints buttons, links, and active states across the app."
+            >
+              <View style={styles.swatchRow}>
+                {(() => {
+                  const activeAccent =
+                    themePackage === "galaxy" ? galaxyAccent : standardAccent;
+                  const defaultSelected = activeAccent === null;
+                  return (
+                    <>
+                      {/* Package default (NULL accent) */}
+                      <Pressable
+                        testID="settings-theme-accent-default"
+                        accessibilityRole="button"
+                        accessibilityLabel="Accent package default"
+                        accessibilityState={{ selected: defaultSelected }}
+                        onPress={() => {
+                          setAccentForActivePackage(null);
+                          void persist(
+                            themePackage === "galaxy"
+                              ? { galaxyAccent: null }
+                              : { standardAccent: null },
+                          );
+                        }}
+                        style={[
+                          styles.themeChip,
+                          {
+                            borderColor: defaultSelected
+                              ? colors.accent
+                              : colors.border,
+                            backgroundColor: colors.surface,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.themeChipLabel,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          Default
+                        </Text>
+                      </Pressable>
+                      {ACCENT_IDS.map((id: AccentId, index) => {
+                        const selected = activeAccent === id;
+                        const fill = ACCENTS[id][mode].fill;
+                        return (
+                          <ColourSwatch
+                            key={id}
+                            colors={colors}
+                            fill={fill}
+                            selected={selected}
+                            // The selected accent is the active accent, so the
+                            // palette's onAccent is ACCENTS[id][mode].onAccent
+                            // (AA-tested on every fill; D-60, C5-L9).
+                            checkTone="onAccent"
+                            testID={`settings-theme-accent-${index}`}
+                            accessibilityLabel={`Accent ${id.replace(/-/g, " ")}`}
+                            onPress={() => {
+                              setAccentForActivePackage(id);
+                              void persist(
+                                themePackage === "galaxy"
+                                  ? { galaxyAccent: id }
+                                  : { standardAccent: id },
+                              );
+                            }}
+                          />
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+              </View>
+            </SettingsRow>
 
-          {/* Self-name editor (D-04b). A bounded input seeded from the persisted
-              `profile.name`; committing on blur/submit routes through
-              setProfileName (empty clears to NULL → the "You" display fallback).
-              Writes the `profile` table, never `contacts`. */}
-          <View
-            testID="settings-self-name-row"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Your name
-            </Text>
-            <TextInput
-              testID="settings-self-name-input"
-              accessibilityLabel="Your name"
-              value={selfNameDraft}
-              onChangeText={setSelfNameDraft}
-              onEndEditing={() => void onCommitSelfName()}
-              onSubmitEditing={() => void onCommitSelfName()}
-              placeholder="You"
-              placeholderTextColor={colors.textPlaceholder}
-              maxLength={100}
-              returnKeyType="done"
-              style={[
-                styles.searchInput,
-                {
-                  color: colors.textPrimary,
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 8,
-                },
-              ]}
-            />
-            {nameError !== null ? (
-              <Text
-                testID="settings-self-name-error"
-                accessibilityLiveRegion="polite"
-                accessibilityRole="alert"
-                style={[styles.helper, { color: colors.danger }]}
-              >
-                {nameError}
-              </Text>
-            ) : (
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                Shown at the centre of your orbit. Leave blank to use "You".
-              </Text>
-            )}
-          </View>
-
-          <View
-            testID="settings-your-photo-row"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Your photo
-            </Text>
-            <PhotoSourcePicker
-              target={{ kind: "profile" }}
-              photo={selfPhoto}
-              name={selfName ?? "You"}
-              onChanged={() => void reloadProfile()}
-            />
-          </View>
-        </View>
-
-        {/* Orbit Appearance / Orbit Center (§D, migrated from the monolith's
-            "Your orbit" group). Per ADR-047 / D-02 the self-star colour is the
-            ONLY user-configurable colour: it stays available regardless of the
-            current centre, and a contact at centre keeps its status-derived glow
-            (no user-chosen colour for a contact centre). */}
-        <View testID="settings-orbit-appearance-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Orbit Appearance
-          </Text>
-
-          {/* "Your star" — the self-sun colour, picked from the themed
-              starPalette. The selected swatch = selfSunColour, or starPalette[0]
-              (gold) when unset (NULL resolves to gold at RENDER — no stored hex
-              default). Swatch fills ARE starPalette TOKENS (legitimate token
-              use, not hardcoded hex); a textPrimary ring with a surface gap and a
-              check marks the selection (D-60). */}
-          <View
-            testID="settings-your-star-row"
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Your star
-            </Text>
-            <View style={styles.swatchRow}>
-              {colors.starPalette.map((token, index) => {
-                const isSelected =
-                  token === (selfSunColour ?? colors.starPalette[0]);
-                return (
-                  <ColourSwatch
-                    key={token}
+            {/* Background — only the ACTIVE package's choices are offered (D-07):
+                the reactive themePackage selects backgroundChoicesForPackage, so
+                the Galaxy-only slots are not shown while Standard is active (and
+                vice-versa). Mode/Accent already read the active package, so only
+                this grid needed the guard. A failed thumbnail silently becomes
+                themed solid. */}
+            <SettingsRow
+              testID="settings-theme-background-row"
+              title="Background"
+              subtitle="Backgrounds stay fixed behind your screens. Each package remembers its own choice."
+            >
+              <View style={styles.backgroundGrid}>
+                {backgroundChoicesForPackage(themePackage).map((slot) => (
+                  <BackgroundThumbnail
+                    // The mode joins the key so each thumbnail's render-failure
+                    // latch resets on a mode switch (each mode has its own file).
+                    key={`${slot}:${mode}`}
                     colors={colors}
-                    fill={token}
-                    selected={isSelected}
-                    checkTone={starSwatchCheckTone(token, colors)}
-                    testID={`settings-star-swatch-${index}`}
-                    accessibilityLabel={`Star colour ${index + 1}`}
-                    onPress={() => void onPickStarColour(token)}
+                    columnWidth={backgroundColumnWidth}
+                    label={BACKGROUND_LABELS[slot]}
+                    mode={mode}
+                    onPress={onSelectBackground}
+                    selected={selectedBackgroundSlot === slot}
+                    slot={slot}
+                    sourcePackage={themePackage}
                   />
-                );
-              })}
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Pick the colour of your star at the centre of your orbit.
-            </Text>
-          </View>
+                ))}
+              </View>
+            </SettingsRow>
+          </SettingsSectionCard>
 
-          {/* "Orbit Center" — the occupant picker (You / favourites / all
-              contacts), writing sun_contact_id (NULL = You). Relocated to
-              Settings by owner decision (ADR-047). Shows the resolved occupant
-              name ("You" when the stored occupant is archived/missing). */}
-          <Pressable
-            testID="settings-sun-centre-row"
-            accessibilityRole="button"
-            accessibilityLabel={`Orbit Center, ${sunOccupantName}`}
-            onPress={() => setSunPickerOpen(true)}
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
+          {/* You — the owner's own name and photo (D-80: retitled from "Your
+              profile"). */}
+          <SettingsSectionCard
+            testID="settings-owner-profile-section"
+            title="You"
           >
-            <View style={styles.toggleRow}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Orbit Center
-              </Text>
-              <Text style={[styles.rowValue, { color: colors.accentText }]}>
-                {sunOccupantName}
-              </Text>
-            </View>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Choose who sits at the centre — you, or someone you orbit around.
-            </Text>
-          </Pressable>
-
-          <RegisteredModal
-            visible={sunPickerOpen}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setSunPickerOpen(false)}
-          >
-            <View style={styles.modalRoot}>
-              <Pressable
-                accessibilityLabel="Dismiss Orbit Center options"
-                style={StyleSheet.absoluteFill}
-                onPress={() => setSunPickerOpen(false)}
-              >
-                <View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    styles.scrim,
-                    { backgroundColor: colors.background },
-                  ]}
-                />
-              </Pressable>
-
-              <View
-                testID="settings-sun-picker"
+            {/* Self-name editor (D-04b). A bounded input seeded from the
+                persisted `profile.name`; committing on blur/submit routes
+                through setProfileName (empty clears to NULL → the "You" display
+                fallback). Writes the `profile` table, never `contacts`. The
+                field tells the keyboard-centering host on focus and blur
+                (D-82). */}
+            <SettingsRow
+              testID="settings-self-name-row"
+              title="Your name"
+              subtitle={
+                nameError === null
+                  ? 'Shown at the center of your orbit. Leave blank to use "You".'
+                  : null
+              }
+            >
+              <TextInput
+                ref={nameInputRef}
+                testID="settings-self-name-input"
+                accessibilityLabel="Your name"
+                value={selfNameDraft}
+                onChangeText={setSelfNameDraft}
+                onFocus={() => centering.onFieldFocus(nameInputRef)}
+                onBlur={() => centering.onFieldBlur(nameInputRef)}
+                onEndEditing={() => void onCommitSelfName()}
+                onSubmitEditing={() => void onCommitSelfName()}
+                placeholder="You"
+                placeholderTextColor={colors.textPlaceholder}
+                maxLength={100}
+                returnKeyType="done"
                 style={[
-                  styles.sheet,
+                  styles.nameInput,
                   {
-                    backgroundColor: colors.surfaceElevated,
+                    color: colors.textPrimary,
+                    backgroundColor: colors.background,
                     borderColor: colors.border,
                   },
                 ]}
+              />
+              {nameError !== null ? (
+                <AppText
+                  role="caption"
+                  testID="settings-self-name-error"
+                  accessibilityLiveRegion="polite"
+                  accessibilityRole="alert"
+                  style={{ color: colors.danger }}
+                >
+                  {nameError}
+                </AppText>
+              ) : null}
+            </SettingsRow>
+
+            <SettingsRow testID="settings-your-photo-row" title="Your photo">
+              <PhotoSourcePicker
+                target={{ kind: "profile" }}
+                photo={selfPhoto}
+                name={selfName ?? "You"}
+                onChanged={() => void reloadProfile()}
+              />
+            </SettingsRow>
+          </SettingsSectionCard>
+
+          {/* Orbit Appearance / Orbit Center (§D, migrated from the monolith's
+              "Your orbit" group). Per ADR-047 / D-02 the self-star colour is
+              the ONLY user-configurable colour: it stays available regardless
+              of the current center, and a contact at center keeps its
+              status-derived glow (no user-chosen colour for a contact
+              center). */}
+          <SettingsSectionCard
+            testID="settings-orbit-appearance-section"
+            title="Orbit Appearance"
+          >
+            {/* "Your star" — the self-sun colour, picked from the themed
+                starPalette. The selected swatch = selfSunColour, or
+                starPalette[0] (gold) when unset (NULL resolves to gold at RENDER
+                — no stored hex default). Swatch fills ARE starPalette TOKENS
+                (legitimate token use, not hardcoded hex); a textPrimary ring
+                with a surface gap and a check marks the selection (D-60). */}
+            <SettingsRow
+              testID="settings-your-star-row"
+              title="Your star"
+              subtitle="Pick the color of your star at the center of your orbit."
+            >
+              <View style={styles.swatchRow}>
+                {colors.starPalette.map((token, index) => {
+                  const isSelected =
+                    token === (selfSunColour ?? colors.starPalette[0]);
+                  return (
+                    <ColourSwatch
+                      key={token}
+                      colors={colors}
+                      fill={token}
+                      selected={isSelected}
+                      checkTone={starSwatchCheckTone(token, colors)}
+                      testID={`settings-star-swatch-${index}`}
+                      accessibilityLabel={`Star colour ${index + 1}`}
+                      onPress={() => void onPickStarColour(token)}
+                    />
+                  );
+                })}
+              </View>
+            </SettingsRow>
+
+            {/* "Orbit Center" — the occupant picker (You / favorites / all
+                Bound contacts), writing sun_contact_id (NULL = You). Relocated
+                to Settings by owner decision (ADR-047). Shows the resolved
+                occupant name ("You" when the stored occupant is
+                archived/missing). The testID keeps its original spelling. */}
+            <SettingsRow
+              testID="settings-sun-centre-row"
+              title="Orbit Center"
+              value={sunOccupantName}
+              subtitle="Choose who sits at the center — you, or someone you orbit around."
+              accessibilityLabel={`Orbit Center, ${sunOccupantName}`}
+              onPress={() => setSunPickerOpen(true)}
+            />
+          </SettingsSectionCard>
+
+          {/* Orbit Center picker (D-81, phase-37 §D): a searchable contact
+              picker with You as the special first choice, reusing the shared
+              contact picker over the Bound, non-archived candidates. */}
+          <Sheet
+            visible={sunPickerOpen}
+            onRequestClose={closeSunPicker}
+            variant="expanded"
+          >
+            <View testID="settings-sun-picker" style={styles.pickerRoot}>
+              <AppText role="heading" accessibilityRole="header">
+                Orbit Center
+              </AppText>
+              <Pressable
+                testID="settings-sun-option-me"
+                accessibilityRole="button"
+                accessibilityLabel="You"
+                accessibilityState={{ selected: sunContactId === null }}
+                onPress={() => void onPickSunOccupant(null)}
+                style={[
+                  styles.youOption,
+                  {
+                    backgroundColor:
+                      sunContactId === null ? colors.accent : colors.surface,
+                    borderColor:
+                      sunContactId === null ? colors.accent : colors.border,
+                  },
+                ]}
               >
-                <TextInput
-                  testID="settings-sun-picker-search"
-                  accessibilityLabel="Search Orbit Center contacts"
-                  value={sunSearch}
-                  onChangeText={setSunSearch}
-                  placeholder="Search contacts"
-                  placeholderTextColor={colors.textPlaceholder}
-                  autoCorrect={false}
+                <AppText
                   style={[
-                    styles.searchInput,
+                    styles.youLabel,
                     {
-                      color: colors.textPrimary,
-                      backgroundColor: colors.background,
-                      borderColor: colors.border,
+                      color:
+                        sunContactId === null
+                          ? colors.onAccent
+                          : colors.textPrimary,
                     },
                   ]}
-                />
-                <FlatList
-                  data={sunOptions}
-                  keyExtractor={(item) =>
-                    item.id === null ? "me" : String(item.id)
-                  }
-                  renderItem={({ item }) => {
-                    const isSelected = item.id === sunContactId;
-                    return (
-                      <Pressable
-                        testID={`settings-sun-option-${item.id === null ? "me" : item.id}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={item.name}
-                        accessibilityState={{ selected: isSelected }}
-                        onPress={() => void onPickSunOccupant(item.id)}
-                        style={[styles.option, { borderColor: colors.border }]}
-                      >
-                        <Text
-                          numberOfLines={1}
-                          style={{
-                            color: isSelected
-                              ? colors.accentText
-                              : colors.textPrimary,
-                          }}
-                        >
-                          {item.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  }}
-                />
-              </View>
+                >
+                  You
+                </AppText>
+                {sunContactId === null ? (
+                  <Icon name="select" state="active" tone="onAccent" />
+                ) : null}
+              </Pressable>
+              <ContactPickerList
+                mode="single"
+                visible={sunPickerOpen}
+                rows={sunCandidates}
+                keepSourceOrder
+                allowArchivedSearch={false}
+                searchResetKey={sunPickerOpen}
+                onPick={(row) => void onPickSunOccupant(row.id)}
+                style={styles.pickerList}
+              />
+              <Button
+                testID="settings-sun-picker-cancel"
+                role="tertiary"
+                label="Cancel"
+                onPress={closeSunPicker}
+              />
             </View>
-          </RegisteredModal>
-        </View>
+          </Sheet>
 
-        {/* Profile Defaults (D-05) — the GLOBAL default profile layout/background
-            (app_settings PREFs). A NULL value is "Default / None": no global
-            override, so a contact without a stronger override falls back to
-            factory/inherited. The background row opens the Profile Backgrounds
-            page, the one control for the global background (38.11 D-84). */}
-        <View testID="settings-profile-defaults-section" style={styles.section}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionHeading, { color: colors.textSecondary }]}
-          >
-            Profile Defaults
-          </Text>
-
+          {/* Profile Defaults (D-05) — the GLOBAL default profile
+              layout/background (app_settings PREFs). A NULL value is "Default /
+              None": no global override, so a contact without a stronger
+              override falls back to factory/inherited. The background row
+              opens the Profile Backgrounds page, the one control for the global
+              background (38.11 D-84). */}
           {templatesError !== null ? (
-            <View
+            <AppText
+              role="caption"
               testID="settings-profile-defaults-error"
               accessibilityLiveRegion="polite"
               accessibilityRole="alert"
-              style={[
-                styles.row,
-                { backgroundColor: colors.surface, borderColor: colors.danger },
-              ]}
+              style={[styles.note, { color: colors.danger }]}
             >
-              <Text style={[styles.helper, { color: colors.danger }]}>
-                {templatesError}
-              </Text>
-            </View>
+              {templatesError}
+            </AppText>
           ) : null}
 
-          {templatesLoading ? (
-            <Text
-              testID="settings-profile-defaults-loading"
-              accessibilityLiveRegion="polite"
-              style={[styles.helper, { color: colors.textSecondary }]}
-            >
-              Loading profile templates…
-            </Text>
-          ) : (
-            <>
-              <Pressable
-                testID="settings-profile-default-layout-row"
-                accessibilityRole="button"
-                accessibilityLabel={`Default profile layout, ${
-                  layoutTemplates.find((t) => t.uid === globalLayoutUid)
-                    ?.name ?? "Default / None"
-                }`}
-                onPress={() => setOpenTemplatePicker("layout")}
-                style={[
-                  styles.row,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.toggleRow}>
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >
-                    Default profile layout
-                  </Text>
-                  <Text style={[styles.rowValue, { color: colors.accentText }]}>
-                    {layoutTemplates.find((t) => t.uid === globalLayoutUid)
-                      ?.name ?? "Default / None"}
-                  </Text>
-                </View>
-                <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                  Used for any contact that doesn't have its own layout.
-                </Text>
-              </Pressable>
-
-              <Pressable
-                testID="settings-profile-default-background-row"
-                accessibilityRole="button"
-                accessibilityLabel={`Default profile background, ${
-                  backgroundTemplates.find((t) => t.uid === globalBackgroundUid)
-                    ?.name ?? "None"
-                }`}
-                onPress={() => navigation.navigate("ProfileBackgrounds")}
-                style={[
-                  styles.row,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.toggleRow}>
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >
-                    Default profile background
-                  </Text>
-                  {/* 38.11-14 E4: "None" when unset, as the Profile
-                      Backgrounds page this row opens says (D-84). */}
-                  <Text style={[styles.rowValue, { color: colors.accentText }]}>
-                    {backgroundTemplates.find(
-                      (t) => t.uid === globalBackgroundUid,
-                    )?.name ?? "None"}
-                  </Text>
-                </View>
-                <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                  Global, category and saved backgrounds
-                </Text>
-              </Pressable>
-            </>
-          )}
-
-          {/* Layout picker: "Default / None" (writes null) first, then every
-              layout template. */}
-          <RegisteredModal
-            visible={openTemplatePicker !== null}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setOpenTemplatePicker(null)}
+          <SettingsSectionCard
+            testID="settings-profile-defaults-section"
+            title="Profile Defaults"
           >
-            <View style={styles.modalRoot}>
-              <Pressable
-                accessibilityLabel="Dismiss profile default options"
-                style={StyleSheet.absoluteFill}
-                onPress={() => setOpenTemplatePicker(null)}
-              >
-                <View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    styles.scrim,
-                    { backgroundColor: colors.background },
-                  ]}
-                />
-              </Pressable>
-
-              <View
-                testID="settings-profile-default-picker"
-                style={[
-                  styles.sheet,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <FlatList
-                  data={
-                    [
-                      { uid: null, name: "Default / None" },
-                      ...layoutTemplates.map((t) => ({
-                        uid: t.uid as string | null,
-                        name: t.name,
-                      })),
-                    ] as Array<{ uid: string | null; name: string }>
+            {templatesLoading ? (
+              <SettingsRow
+                testID="settings-profile-defaults-loading"
+                title="Loading profile templates…"
+              />
+            ) : (
+              [
+                <SettingsRow
+                  key="layout"
+                  testID="settings-profile-default-layout-row"
+                  title="Default profile layout"
+                  value={layoutName}
+                  subtitle="Used for any contact that doesn't have its own layout."
+                  accessibilityLabel={`Default profile layout, ${layoutName}`}
+                  onPress={() => setOpenTemplatePicker("layout")}
+                />,
+                // 38.11-14 E4: "None" when unset, as the Profile Backgrounds
+                // page this row opens says (D-84).
+                <SettingsRow
+                  key="background"
+                  testID="settings-profile-default-background-row"
+                  title="Default profile background"
+                  value={
+                    backgroundTemplates.find(
+                      (t) => t.uid === globalBackgroundUid,
+                    )?.name ?? "None"
                   }
-                  keyExtractor={(item) => item.uid ?? "default-none"}
-                  renderItem={({ item }) => {
-                    const isSelected = item.uid === globalLayoutUid;
-                    return (
-                      <Pressable
-                        testID={`settings-profile-default-option-${item.uid ?? "default-none"}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={item.name}
-                        accessibilityState={{ selected: isSelected }}
-                        onPress={() => void onSelectGlobalLayout(item.uid)}
-                        style={[styles.option, { borderColor: colors.border }]}
-                      >
-                        <Text
-                          numberOfLines={1}
-                          style={{
-                            color: isSelected
-                              ? colors.accentText
-                              : colors.textPrimary,
-                          }}
-                        >
-                          {item.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  }}
-                />
-              </View>
-            </View>
-          </RegisteredModal>
-        </View>
+                  subtitle="Global, category and saved backgrounds"
+                  accessibilityLabel={`Default profile background, ${
+                    backgroundTemplates.find(
+                      (t) => t.uid === globalBackgroundUid,
+                    )?.name ?? "None"
+                  }`}
+                  onPress={() => navigation.navigate("ProfileBackgrounds")}
+                />,
+              ]
+            )}
+          </SettingsSectionCard>
+
+          {/* Layout picker (D-81): the shared option sheet with a title;
+              "Default / None" (writes null) first, then every layout
+              template. */}
+          <OptionSheet<string | null>
+            visible={openTemplatePicker === "layout"}
+            title="Default Profile layout"
+            options={[
+              { value: null, label: "Default / None" },
+              ...layoutTemplates.map((t) => ({ value: t.uid, label: t.name })),
+            ]}
+            selected={globalLayoutUid}
+            onSelect={(uid) => void onSelectGlobalLayout(uid)}
+            onRequestClose={() => setOpenTemplatePicker(null)}
+          />
+
+          {bottomSpacer}
+        </KeyboardCenteringProvider>
       </ScrollView>
     </View>
   );
@@ -1305,33 +1125,10 @@ export function SettingsAppearanceScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: SPACING.base,
+    gap: SPACING.lg,
   },
-  section: {
-    gap: 12,
-  },
-  sectionHeading: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  row: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  rowLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  helper: {
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 18,
-  },
+  note: { paddingHorizontal: SPACING.xs },
   swatchRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1354,41 +1151,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  rowValue: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  scrim: {
-    opacity: 0.85,
-  },
-  sheet: {
+  nameInput: {
+    minHeight: 44,
     borderWidth: 1,
-    borderRadius: 12,
-    maxHeight: "60%",
-    overflow: "hidden",
-  },
-  searchInput: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: RADII.sm,
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.md,
     fontSize: 15,
   },
-  option: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  pickerRoot: { flex: 1, gap: SPACING.md },
+  pickerList: { flex: 1 },
+  youOption: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: RADII.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
+  youLabel: { flex: 1 },
   backgroundGrid: {
     flexDirection: "row",
     flexWrap: "wrap",

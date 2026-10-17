@@ -104,7 +104,8 @@ describe("Appearance opens Profile Backgrounds (D-84)", () => {
     const row = appearance.slice(
       appearance.indexOf('testID="settings-profile-default-background-row"'),
     );
-    const rowEnd = row.indexOf("</Pressable>");
+    // 38.12 D-119: the row is a self-closing shared SettingsRow.
+    const rowEnd = row.indexOf("/>");
     expect(rowEnd).toBeGreaterThan(0);
     const rowSource = row.slice(0, rowEnd);
     expect(rowSource).toContain('navigation.navigate("ProfileBackgrounds")');
