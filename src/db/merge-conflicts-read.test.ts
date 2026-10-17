@@ -88,8 +88,8 @@ describe("readMergeConflictData", () => {
     const same = await def("Team", "text", 1);
     await value(survivor, nickname, "A");
     await value(absorbed, nickname, "Annie");
-    await value(survivor, same, "Blue");
-    await value(absorbed, same, "Blue");
+    await value(survivor, same, "Tuesday");
+    await value(absorbed, same, "Tuesday");
     await method(survivor, "phone", "+15550001");
     await method(absorbed, "phone", "+15550002");
     await method(survivor, "email", "a@example.com");

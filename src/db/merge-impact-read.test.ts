@@ -129,7 +129,7 @@ describe("readMergeImpactCounts — every moved table (D-44)", () => {
       "INSERT INTO off_limits (uid, contact_id, text, created_at, modified_at) VALUES (?, ?, 'Topic', ?, ?)",
       [uid(), absorbed, NOW, NOW],
     );
-    for (const [order, text] of ["Blue", "42", "hello", "  "].entries()) {
+    for (const [order, text] of ["Tuesday", "42", "hello", "  "].entries()) {
       const def = await exec.runAsync(
         "INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES (?, ?, ?, 'text', ?, ?, ?)",
         [uid(), `f${order}`, `F${order}`, order, NOW, NOW],

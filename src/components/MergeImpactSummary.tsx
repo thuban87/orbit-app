@@ -16,7 +16,7 @@ import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-r
 import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
-import { plural } from "@/utils/plural";
+import { mergeImpactLines } from "./merge-impact-lines";
 import { ShellAppBar } from "./ShellAppBar";
 
 export function MergeImpactSummary({
@@ -94,14 +94,9 @@ export function MergeImpactSummary({
         });
     });
   };
-  const rows = counts
-    ? [
-        plural(counts.interactions, "interaction", "interactions"),
-        plural(counts.events, "event", "events"),
-        plural(counts.methods, "contact method", "contact methods"),
-        plural(counts.externalLinks, "external link", "external links"),
-      ]
-    : [];
+  // One plural() line per non-zero count over every table the merge moves
+  // (38.12 D-44).
+  const rows = counts ? mergeImpactLines(counts) : [];
   return (
     <View style={styles.screen}>
       {/* House header with the ✕ Cancel (38.9 D-16, D-59): it abandons the
