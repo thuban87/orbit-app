@@ -117,10 +117,6 @@ export const ICON_REGISTRY = {
   // and Restore read as opposites (share out / bring in), not two up-arrows.
   "backup-export": { outline: "share-outline", filled: "share" },
   "backup-restore": { outline: "download-outline", filled: "download" },
-  "backup-encryption": {
-    outline: "lock-closed-outline",
-    filled: "lock-closed",
-  },
   "backup-privacy": {
     outline: "shield-checkmark-outline",
     filled: "shield-checkmark",

@@ -563,3 +563,53 @@ export function subscribeBackgroundLeaveFlush(
   });
   return () => subscription.remove();
 }
+
+/** The neutral name shown when a folder URI yields no readable name (D-62). */
+export const BACKUP_FOLDER_FALLBACK_NAME = "your backup folder";
+
+/**
+ * The chosen backup folder's real name, derived from its SAF tree URI at
+ * display time (38.12 D-62). Nothing stored is repaired (D-30): rows written
+ * before this read "Selected backup folder", and the URI is the truth.
+ *
+ * A tree URI is `content://<authority>/tree/<encoded tree id>` (sometimes with
+ * `/document/<id>` after it). The tree id decodes to `<volume>:<path>` for
+ * device storage (e.g. `primary:Documents/Orbit`); the name is its last path
+ * segment. Any other provider's id yields its last decoded segment. A URI with
+ * no tree id, an undecodable id or an empty path falls back to the neutral
+ * name.
+ */
+export function backupFolderDisplayName(
+  uri: string | null | undefined,
+): string {
+  if (!uri) return BACKUP_FOLDER_FALLBACK_NAME;
+  const match = /\/tree\/([^/]+)/.exec(uri);
+  if (!match) return BACKUP_FOLDER_FALLBACK_NAME;
+  let treeId: string;
+  try {
+    treeId = decodeURIComponent(match[1]);
+  } catch {
+    return BACKUP_FOLDER_FALLBACK_NAME;
+  }
+  const colon = treeId.indexOf(":");
+  const path = colon === -1 ? treeId : treeId.slice(colon + 1);
+  const segments = path.split("/").filter((segment) => segment.trim() !== "");
+  return segments.at(-1)?.trim() ?? BACKUP_FOLDER_FALLBACK_NAME;
+}
+
+/** The sections Backup settings can be opened for (route param, D-64). */
+export type BackupSettingsSection = "automatic" | "encryption";
+
+/**
+ * Where Backup settings scrolls to for the section it was opened for (38.12
+ * D-64): the section's laid-out top, or null when no section was asked for or
+ * it has not laid out yet.
+ */
+export function backupSettingsScrollOffset(
+  section: BackupSettingsSection | undefined,
+  offsets: Partial<Record<BackupSettingsSection, number>>,
+): number | null {
+  if (!section) return null;
+  const offset = offsets[section];
+  return offset === undefined ? null : offset;
+}

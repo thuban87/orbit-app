@@ -161,17 +161,12 @@ describe("ICON_REGISTRY", () => {
     expect({
       "backup-export": registry["backup-export"],
       "backup-restore": registry["backup-restore"],
-      "backup-encryption": registry["backup-encryption"],
       "backup-privacy": registry["backup-privacy"],
       "show-secret": registry["show-secret"],
       "hide-secret": registry["hide-secret"],
     }).toEqual({
       "backup-export": { outline: "share-outline", filled: "share" },
       "backup-restore": { outline: "download-outline", filled: "download" },
-      "backup-encryption": {
-        outline: "lock-closed-outline",
-        filled: "lock-closed",
-      },
       "backup-privacy": {
         outline: "shield-checkmark-outline",
         filled: "shield-checkmark",

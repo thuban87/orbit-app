@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { SettingsRow, SettingsSectionCard } from "@/components/ui";
 import {
   getAppSettings,
   recordAutomaticBackupHealthCore,
@@ -32,6 +33,10 @@ import {
   createBackupEnvelopeCrypto,
 } from "@/services/backup/encryption";
 import { backupPassphraseStore } from "@/services/backup/passphrase-store";
+import {
+  createSafStorage,
+  ownedAutomaticUris,
+} from "@/services/backup/saf-storage";
 import {
   createExpoShareAdapter,
   createLocalExportFiles,
@@ -63,6 +68,7 @@ import {
   backUpNowSnackbar,
   backupWarningAction,
   backupWarningActionLabel,
+  keptBackupsLine,
   manualExportFailureCopy,
   resolveBackupHealth,
   resolveBackupNudge,
@@ -73,6 +79,7 @@ import {
   restorePreviewCache,
   restorePreviewFailure,
 } from "./backup-restore-logic";
+import { backupFolderDisplayName } from "./backup-settings-logic";
 
 const LOG_SCOPE = "backup-screen";
 
@@ -153,21 +160,20 @@ export function BackupScreen({
           );
         }
         if (cancelled) return;
-        setHealth(
-          resolveBackupHealth(
-            {
-              folderUri: settings.backupFolderUri,
-              folderName: settings.backupFolderName,
-              folderAccessible: settings.backupFolderAccessible === 1,
-              folderDiagnostic: settings.backupFolderDiagnostic,
-              lastAutomaticBackupAt: settings.lastAutomaticBackupAt,
-              currentDataRevision: settings.dataRevision,
-              lastBackupDataRevision: settings.lastBackupDataRevision,
-              intervalDays: settings.backupIntervalDays,
-            },
-            new Date(),
-          ),
-        );
+        const healthInput = {
+          folderUri: settings.backupFolderUri,
+          // D-62: the folder's real name, from its URI at display time.
+          folderName: settings.backupFolderUri
+            ? backupFolderDisplayName(settings.backupFolderUri)
+            : null,
+          folderAccessible: settings.backupFolderAccessible === 1,
+          folderDiagnostic: settings.backupFolderDiagnostic,
+          lastAutomaticBackupAt: settings.lastAutomaticBackupAt,
+          currentDataRevision: settings.dataRevision,
+          lastBackupDataRevision: settings.lastBackupDataRevision,
+          intervalDays: settings.backupIntervalDays,
+        };
+        setHealth(resolveBackupHealth(healthInput, new Date()));
         setAutomaticSkippedLine(
           automaticSkippedPhotosLine(
             skippedRecord,
@@ -176,6 +182,25 @@ export function BackupScreen({
         );
         setEncryptionEnabled(settings.encryptionEnabled === 1);
         setShowNudge(nudge.shouldShow);
+        // D-62: the hero counts the owned automatic backups really in the
+        // folder. Listed after the card is drawn, so a slow provider never
+        // holds the card back; a failed listing leaves the count unknown.
+        if (settings.backupFolderUri && settings.backupFolderAccessible === 1) {
+          try {
+            const automaticFileCount = ownedAutomaticUris(
+              await createSafStorage().list(settings.backupFolderUri),
+            ).length;
+            if (cancelled) return;
+            setHealth(
+              resolveBackupHealth(
+                { ...healthInput, automaticFileCount },
+                new Date(),
+              ),
+            );
+          } catch (error) {
+            Logger.warn(LOG_SCOPE, "could not count kept backups", error);
+          }
+        }
       } catch (error) {
         Logger.error(LOG_SCOPE, "failed to load backup health", error);
         if (!cancelled) {
@@ -214,7 +239,7 @@ export function BackupScreen({
     try {
       await chooseAutomaticBackupFolder({
         exec: getExecutor(),
-        folderName: () => "Selected backup folder",
+        folderName: backupFolderDisplayName,
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "folder selection failed", error);
@@ -464,9 +489,12 @@ export function BackupScreen({
   }, [restorePassphrase, selectedEncryptedContents, validateRestore]);
 
   const warningAction = backupWarningAction(health);
+  const encryptionSummary = encryptionEnabled
+    ? "On — new backups are protected with your passphrase"
+    : "Off — backups are readable JSON";
   const heroDetail =
     health?.kind === "healthy"
-      ? `Automatic backup: ${relativeTime(health.lastAutomaticBackupAt)}\n${health.automaticFileCount} backup${health.automaticFileCount === 1 ? "" : "s"} kept in ${health.folderName}`
+      ? `Automatic backup: ${relativeTime(health.lastAutomaticBackupAt)}\n${keptBackupsLine(health.automaticFileCount, health.folderName)}`
       : (health?.kind === "stale" || health?.kind === "too-large") &&
           health.lastAutomaticBackupAt
         ? `Automatic backup: ${relativeTime(health.lastAutomaticBackupAt)}`
@@ -754,29 +782,16 @@ export function BackupScreen({
         </View>
       ) : null}
 
-      <Pressable
-        testID="backup-encryption"
-        accessibilityRole="button"
-        accessibilityLabel={`Encryption. ${encryptionEnabled ? "On — new backups are protected with your passphrase" : "Off — backups are readable JSON"}`}
-        onPress={() => openSettings("encryption")}
-        style={[
-          styles.encryptionRow,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Icon name="backup-encryption" size="lg" tone="textSecondary" />
-        <View style={styles.encryptionCopy}>
-          <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
-            Encryption
-          </Text>
-          <Text style={[styles.actionHelper, { color: colors.textSecondary }]}>
-            {encryptionEnabled
-              ? "On — new backups are protected with your passphrase"
-              : "Off — backups are readable JSON"}
-          </Text>
-        </View>
-        <Icon name="forward" size="sm" tone="textSecondary" />
-      </Pressable>
+      {/* D-119: the encryption row is the shared Settings row in its card. */}
+      <SettingsSectionCard>
+        <SettingsRow
+          testID="backup-encryption"
+          title="Encryption"
+          subtitle={encryptionSummary}
+          accessibilityLabel={`Encryption. ${encryptionSummary}`}
+          onPress={() => openSettings("encryption")}
+        />
+      </SettingsSectionCard>
 
       {showNudge ? (
         <View
@@ -864,16 +879,6 @@ const styles = StyleSheet.create({
   },
   actionTitle: { fontSize: 16, fontWeight: "700" },
   actionHelper: { fontSize: 13, lineHeight: 18 },
-  encryptionRow: {
-    minHeight: 76,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  encryptionCopy: { flex: 1, gap: 4 },
   rowTitle: { fontSize: 16, fontWeight: "700" },
   nudge: {
     borderWidth: 1,

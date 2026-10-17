@@ -15,7 +15,11 @@ export interface BackupHealthInput {
   readonly currentDataRevision: number;
   readonly lastBackupDataRevision: number;
   readonly intervalDays: number;
-  readonly automaticFileCount?: number;
+  /**
+   * Owned automatic backups in the folder (38.12 D-62); null/absent until the
+   * folder has been listed.
+   */
+  readonly automaticFileCount?: number | null;
 }
 
 export type BackupHealth =
@@ -41,7 +45,8 @@ export type BackupHealth =
       readonly headline: "Your data is protected";
       readonly folderName: string;
       readonly lastAutomaticBackupAt: string;
-      readonly automaticFileCount: number;
+      /** Null until the folder has been listed (never a made-up count). */
+      readonly automaticFileCount: number | null;
     }
   | {
       readonly kind: "stale";
@@ -109,8 +114,17 @@ export function resolveBackupHealth(
     headline: "Your data is protected",
     folderName: input.folderName ?? "your backup folder",
     lastAutomaticBackupAt: input.lastAutomaticBackupAt,
-    automaticFileCount: input.automaticFileCount ?? 1,
+    automaticFileCount: input.automaticFileCount ?? null,
   };
+}
+
+/** The hero's kept-backups line: the real count, or no count before listing. */
+export function keptBackupsLine(
+  count: number | null,
+  folderName: string,
+): string {
+  if (count === null) return `Backups are kept in ${folderName}`;
+  return `${count} backup${count === 1 ? "" : "s"} kept in ${folderName}`;
 }
 
 export interface BackupNudgeInput {

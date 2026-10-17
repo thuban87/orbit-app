@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   choose: vi.fn(),
   confirm: vi.fn(),
   manualExport: vi.fn(),
+  focusEffects: [] as (() => unknown)[],
+  folderListing: [] as string[],
 }));
 
 vi.mock("react", () => ({
@@ -47,7 +49,11 @@ vi.mock("react", () => ({
     return [value, setter];
   },
 }));
-vi.mock("@react-navigation/native", () => ({ useFocusEffect: vi.fn() }));
+vi.mock("@react-navigation/native", () => ({
+  useFocusEffect: (effect: () => unknown) => {
+    mocks.focusEffects.push(effect);
+  },
+}));
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
   ScrollView: "ScrollView",
@@ -94,7 +100,7 @@ vi.mock("@/services/backup/backup-service", () => ({
   loadBackupForRestorePreview: vi.fn(),
 }));
 vi.mock("@/services/backup/saf-storage", () => ({
-  createSafStorage: () => ({ list: async () => [] }),
+  createSafStorage: () => ({ list: async () => mocks.folderListing }),
   ownedAutomaticUris: (uris: string[]) => uris,
 }));
 vi.mock("@/services/backup/encryption", () => ({
@@ -152,6 +158,7 @@ function render(overrides: Record<number, unknown> = {}): TestElement[] {
     Object.entries(overrides).map(([key, value]) => [Number(key), value]),
   );
   mocks.setters = [];
+  mocks.focusEffects = [];
   mocks.cursor = 0;
   const navigation = { navigate: vi.fn() };
   return nodes(
@@ -406,5 +413,63 @@ describe("Backup page chrome (38.12 D-64, D-65)", () => {
     expect(names).toEqual(
       expect.arrayContaining(["backup-export", "backup-restore"]),
     );
+  });
+});
+
+describe("hero kept-backups count and folder name (38.12 D-62)", () => {
+  it("on focus, counts the owned automatic backups in the folder and names the folder from its URI", async () => {
+    mocks.folderListing = ["a", "b", "c"];
+    render();
+    const setHealth = mocks.setters[STATE.health];
+    const reload = mocks.focusEffects[0] as () => () => void;
+    reload();
+    await vi.waitFor(() =>
+      expect(setHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "healthy", automaticFileCount: 3 }),
+      ),
+    );
+    // Drawn first without a count, so a slow folder never holds the card.
+    expect(setHealth.mock.calls[0]?.[0]).toMatchObject({
+      kind: "healthy",
+      folderName: "Orbit",
+      automaticFileCount: null,
+    });
+    mocks.folderListing = [];
+  });
+
+  it("the healthy hero says how many backups are kept, zero included", () => {
+    const tree = render({
+      [STATE.health]: { ...HEALTHY, automaticFileCount: 0 },
+    });
+    const detail = tree.find(
+      (n) =>
+        typeof n.props.children === "string" &&
+        (n.props.children as string).includes("kept in"),
+    );
+    expect(detail?.props.children).toContain("0 backups kept in Orbit");
+  });
+});
+
+describe("Backup page shared row (38.12 D-119)", () => {
+  it("the Encryption entry is the shared Settings row, opening the encryption section", () => {
+    const navigation = { navigate: vi.fn() };
+    mocks.overrides = new Map();
+    mocks.setters = [];
+    mocks.focusEffects = [];
+    mocks.cursor = 0;
+    const tree = nodes(
+      BackupScreen({
+        navigation,
+        route: { key: "Backup", name: "Backup", params: undefined },
+        host: "settings",
+      } as never),
+    );
+    const row = byTestID(tree, "backup-encryption");
+    expect(row.type).toBe("SettingsRow");
+    expect(row.props.title).toBe("Encryption");
+    (row.props.onPress as () => void)();
+    expect(navigation.navigate).toHaveBeenCalledWith("BackupSettings", {
+      section: "encryption",
+    });
   });
 });
