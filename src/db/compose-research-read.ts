@@ -29,7 +29,8 @@
  *     Focus (D-142). Key people are never AI-eligible. Current-state uses
  *     `getCurrentStateValues` (each field's Most Recent entry by date, D-45)
  *     ONLY — never the history read; custom fields come from the
- *     populated-only `readPopulatedCustomFields`.
+ *     populated-only `readPopulatedCustomFields`, which excludes photo-type
+ *     fields (38.12 D-129); the mapping below re-checks the type.
  *   - Memory `aiEligible` comes from the SAME SQL predicate as the AI read
  *     (`listAiEligibleMemories`), so a linked memory whose interaction has AI
  *     off can never be Message Focus (D-49).
@@ -284,8 +285,13 @@ export async function readComposeResearch(
   }
 
   // 5. Custom fields — populated only; per-field share_with_ai drives eligibility.
+  //    Photo-type fields never appear (D-129): a photo value is a stored path,
+  //    and a listed item could become Message Focus and be sent to AI. The
+  //    read already excludes them in SQL; this guard keeps the projection safe
+  //    if its source ever widens.
   for (const group of customGroups) {
     for (const field of group.items) {
+      if (field.type === "photo") continue;
       items.push({
         id: `custom:${field.fieldDefId}`,
         groupId: `custom:${group.name ?? ""}`,

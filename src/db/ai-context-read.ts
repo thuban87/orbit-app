@@ -25,7 +25,8 @@
  *      rows keep flowing). Off Limits, Last Talked About and Current Location
  *      are never read here, in any shape (D-09, D-16). Custom values come ONLY
  *      through the validated `col_name` boundary in field-values-dao, filtered
- *      to live, non-quarantined, `share_with_ai=1` defs. NEVER add a fallback
+ *      to live, non-quarantined, `share_with_ai=1`, non-photo defs (38.12
+ *      D-129: a photo field's stored path is never sent). NEVER add a fallback
  *      query that widens the allowlist, and NEVER interpolate a label as SQL.
  * =============================================================================
  */
@@ -190,15 +191,20 @@ async function readRecentInteractions(
  * non-quarantined defs flagged `share_with_ai=1`, resolved through the validated
  * `col_name` boundary and displayed by label. Null / blank values are simply
  * absent (less data, never an error or a disclosure). Preserves display order.
+ *
+ * Photo-type defs are dropped BEFORE any value is read, whatever their
+ * `share_with_ai` flag, so a photo's stored path never enters the payload
+ * builder (38.12 D-129; narrows D-27 egress).
  */
 async function readSharedFields(
   exec: SqlExecutor,
   contactId: number,
 ): Promise<SharedFieldValue[]> {
-  // listDefs already excludes quarantined defs; keep only the opted-in ones.
+  // listDefs already excludes quarantined defs; keep only the opted-in,
+  // non-photo ones (D-129), so no photo value is ever queried below.
   const liveDefs = await listDefs(exec, { includeQuarantined: false });
   const sharedDefs: CustomFieldDef[] = liveDefs.filter(
-    (d) => d.share_with_ai === 1,
+    (d) => d.share_with_ai === 1 && d.type !== "photo",
   );
   if (sharedDefs.length === 0) {
     return [];

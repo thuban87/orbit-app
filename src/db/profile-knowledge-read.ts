@@ -254,6 +254,11 @@ async function readCustomFields(
  * (`shareWithAi`), with NO PROFILE_REPEATABLE_LIMIT cap. `compose-research-read`
  * consumes THIS export for its custom-field source; it never imports the private
  * `readCustomFields` (cross-module-uncallable) nor `readProfileKnowledge`.
+ *
+ * Photo-type fields are excluded in SQL (38.12 D-129): Research never lists a
+ * photo, so a photo's stored path can never become Message Focus and reach AI.
+ * The Profile's own custom-field read (`readCustomFields`, above) is unchanged
+ * and still shows photo fields.
  */
 export async function readPopulatedCustomFields(
   exec: ReadOnlyExecutor,
@@ -268,6 +273,7 @@ export async function readPopulatedCustomFields(
          ON v.field_def_id = d.id AND v.contact_id = ?
       WHERE d.quarantined_at IS NULL
         AND v.value IS NOT NULL
+        AND d.type <> 'photo'
       ORDER BY d.display_order, d.id`,
     [contactId],
   );
