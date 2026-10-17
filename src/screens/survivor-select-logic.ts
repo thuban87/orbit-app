@@ -60,3 +60,37 @@ export function makeCloseStepTwo<Pair>({
     setParams({ secondContactId: undefined });
   };
 }
+
+/** The fields of a picker row the merge picker filters on. */
+export interface MergePickerRow {
+  id: number;
+  archived_at: string | null;
+}
+
+/**
+ * The merge picker's rows (38.12 D-43): never the first person (they are the
+ * fixed first party shown above the list) and never a contact in the Bin, even
+ * if a read ever returned one. The picker also gets `excludeContactId` and
+ * `allowArchivedSearch={false}`; this keeps the host's rows honest on its own.
+ */
+export function mergePickerRows<Row extends MergePickerRow>(
+  rows: readonly Row[],
+  firstContactId: number,
+): Row[] {
+  return rows.filter(
+    (row) => row.archived_at == null && row.id !== firstContactId,
+  );
+}
+
+/**
+ * What the picker step shows (D-43): a failed read and a read still in flight
+ * are their own states, never the picker's empty list.
+ */
+export function mergePickerState(
+  rows: readonly unknown[] | null,
+  failed: boolean,
+): "error" | "loading" | "list" {
+  if (failed) return "error";
+  if (rows == null) return "loading";
+  return "list";
+}

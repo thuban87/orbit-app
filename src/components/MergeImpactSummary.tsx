@@ -29,7 +29,8 @@ export function MergeImpactSummary({
   // 38.12 D-110: a merge finishes where it was started. A Profile ⋯ merge
   // (profile host, keyed by the launching route) ends on the survivor's
   // Profile in that stack; a Settings merge pops back to Contacts &
-  // Relationships. Never a root reset. 38.12-11 threads the host here.
+  // Relationships. Never a root reset. SurvivorSelect and MergeConflicts
+  // thread the host here (38.12-11).
   const host = route.params.host ?? DEFAULT_FLOW_HOST;
   const [names, setNames] = useState({
     survivor: "Contact",

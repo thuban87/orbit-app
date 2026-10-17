@@ -1,32 +1,64 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { ContactPickerList } from "@/components/ContactPicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { EmptyState } from "@/components/ui";
 import { getExecutor } from "@/db/database";
 import {
   getMergeCandidate,
-  listMergeCandidates,
   type MergeCandidate,
 } from "@/db/merge-candidate-read";
+import { listPickerContacts, type PickerContactRow } from "@/db/picker-read";
 import { recommendSurvivor } from "@/logic/survivor-recommendation";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import { DEFAULT_FLOW_HOST } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
-import { canContinueToImpact, makeCloseStepTwo } from "./survivor-select-logic";
+import {
+  canContinueToImpact,
+  makeCloseStepTwo,
+  mergePickerRows,
+  mergePickerState,
+} from "./survivor-select-logic";
 
 type Candidate = MergeCandidate;
 
-/** Select the other contact first, then choose the surviving identity. */
+/**
+ * Select the other contact first, then choose the surviving identity.
+ *
+ * Step one is the shared contact picker (38.12 D-43): search, the house ✕
+ * Cancel in the header, the launching person shown first as the fixed first
+ * party (D-99) and excluded from the list, never a contact in the Bin, and its
+ * own loading and error states apart from an empty list. Opened with both ids
+ * (Reconcile's "Review merge"), it starts at step two and never mounts the
+ * picker (convergence c1 L-5).
+ */
 export function SurvivorSelectScreen({
   navigation,
   route,
 }: RootStackScreenProps<"SurvivorSelect">) {
   const { colors } = useTheme();
-  const [rows, setRows] = useState<Candidate[] | null>(null);
+  // null while the picker read is in flight (D-43).
+  const [rows, setRows] = useState<PickerContactRow[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Bumped by "Try again" to re-run the picker read.
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [firstPerson, setFirstPerson] = useState<Candidate | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [pair, setPair] = useState<Candidate[] | null>(null);
   const first = route.params.firstContactId;
   const second = route.params.secondContactId;
+  // 38.12 D-110: the flow host travels SurvivorSelect → MergeConflicts →
+  // MergeImpactSummary, which ends the merge where it was started.
+  const host = route.params.host ?? DEFAULT_FLOW_HOST;
+  const onPickerStep = second == null;
   // Opened at step two with both ids (Reconcile, `ReconcileDetailScreen`'s
   // "Review merge"): Back keeps leaving to Reconcile, as before (this plan only;
   // review C6-H1). Captured once on mount.
@@ -52,11 +84,35 @@ export function SurvivorSelectScreen({
       close: closeStepTwo,
     },
   });
+  // The picker read runs only on the picker step: a step-two entry never
+  // reads the candidate list (L-5). `loadAttempt` re-runs it after a failure.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadAttempt is bumped by "Try again" only to re-issue this read.
   useEffect(() => {
-    void listMergeCandidates(getExecutor(), first)
-      .then(setRows)
-      .catch(() => setRows([]));
-  }, [first]);
+    if (!onPickerStep) return;
+    let cancelled = false;
+    setLoadFailed(false);
+    const exec = getExecutor();
+    void Promise.all([
+      listPickerContacts(exec, { includeArchived: false }),
+      getMergeCandidate(exec, first),
+    ])
+      .then(([list, person]) => {
+        if (cancelled) return;
+        setRows(list);
+        setFirstPerson(person);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [first, loadAttempt, onPickerStep]);
+  const retryLoad = useCallback(() => {
+    setRows(null);
+    setLoadFailed(false);
+    setLoadAttempt((attempt) => attempt + 1);
+  }, []);
   useEffect(() => {
     if (!second) return;
     // A read for an earlier pick never fills the screen (review C6-M2).
@@ -90,46 +146,80 @@ export function SurvivorSelectScreen({
     navigation.navigate("MergeConflicts", {
       survivorId: selected,
       absorbedId: selected === first ? second : first,
+      host,
     });
-  }, [first, navigation, pair, second, selected]);
-  // House header with plain Back (38.9 D-16, D-44); the title follows the step.
+  }, [first, host, navigation, pair, second, selected]);
+  // House header (38.9 D-16, D-44); the title follows the step. The picker
+  // step carries the ✕ Cancel (D-43, 38.9 D-59): it leaves the merge before
+  // anything was chosen. Step two keeps plain Back (its sub-editor guard).
   const header = (
     <ShellAppBar
       variant="child"
       title={second ? "Which contact survives?" : "Choose a contact to merge"}
+      backKind={onPickerStep ? "cancel" : "back"}
     />
   );
-  if (!second)
+  if (onPickerStep) {
+    const state = mergePickerState(rows, loadFailed);
     return (
       <View style={styles.screen}>
         {header}
         <View style={styles.root}>
-          <FlatList
-            data={rows ?? []}
-            keyExtractor={(row) => String(row.id)}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() =>
-                  navigation.setParams({ secondContactId: item.id })
-                }
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Avatar name={item.name} photo={item.photo} size={40} />
+          {firstPerson ? (
+            <View
+              testID="merge-first-party"
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Avatar
+                name={firstPerson.name}
+                photo={firstPerson.photo}
+                size={40}
+              />
+              <View style={styles.cardCopy}>
+                <Text style={{ color: colors.textSecondary }}>Merging</Text>
                 <Text style={[styles.name, { color: colors.textPrimary }]}>
-                  {item.name}
+                  {firstPerson.name}
                 </Text>
-              </Pressable>
-            )}
-          />
+              </View>
+            </View>
+          ) : null}
+          {state === "error" ? (
+            <EmptyState
+              testID="merge-picker-failed"
+              icon="warning"
+              heading="Couldn't load contacts"
+              body="Nothing was changed."
+              action={{ label: "Try again", onPress: retryLoad }}
+            />
+          ) : state === "loading" ? (
+            <View testID="merge-picker-loading" style={styles.loading}>
+              <ActivityIndicator color={colors.accentText} />
+              <Text style={{ color: colors.textSecondary }}>
+                Loading contacts…
+              </Text>
+            </View>
+          ) : (
+            <ContactPickerList
+              mode="single"
+              rows={mergePickerRows(rows ?? [], first)}
+              excludeContactId={first}
+              allowArchivedSearch={false}
+              onPick={(row) =>
+                navigation.setParams({ secondContactId: row.id })
+              }
+              style={styles.picker}
+            />
+          )}
         </View>
       </View>
     );
+  }
   return (
     <View style={styles.screen}>
       {header}
@@ -222,4 +312,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   cta: { padding: 16, borderRadius: 12, alignItems: "center" },
+  picker: { flex: 1 },
+  loading: {
+    alignItems: "center",
+    gap: 10,
+    justifyContent: "center",
+    minHeight: 128,
+  },
 });

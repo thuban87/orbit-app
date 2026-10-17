@@ -13,6 +13,7 @@ import { ShellAppBar } from "@/components/ShellAppBar";
 import { getExecutor } from "@/db/database";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
+import { DEFAULT_FLOW_HOST } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
 import type { FieldType } from "@/schemas/types";
 import {
@@ -98,6 +99,9 @@ export function MergeConflictsScreen({
 }: RootStackScreenProps<"MergeConflicts">) {
   const { colors } = useTheme();
   const { survivorId, absorbedId } = route.params;
+  // 38.12 D-110: the flow host passes through to the merge summary, which ends
+  // the merge where it was started.
+  const host = route.params.host ?? DEFAULT_FLOW_HOST;
   const [data, setData] = useState<LoadedConflictData | null>(null);
   const [failed, setFailed] = useState(false);
   const [scalarChoices, setScalarChoices] = useState<
@@ -251,6 +255,7 @@ export function MergeConflictsScreen({
       survivorId,
       absorbedId,
       resolutions,
+      host,
     });
   };
 

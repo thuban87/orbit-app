@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   canContinueToImpact,
   makeCloseStepTwo,
+  mergePickerRows,
+  mergePickerState,
   type SurvivorPairMember,
 } from "./survivor-select-logic";
 
@@ -173,5 +175,27 @@ describe("makeCloseStepTwo (review C7-L4)", () => {
     expect(setSelected).toHaveBeenCalledWith(null);
     expect(setParams).toHaveBeenCalledOnce();
     expect(setParams).toHaveBeenCalledWith({ secondContactId: undefined });
+  });
+});
+
+describe("merge picker rows and state (38.12 D-43)", () => {
+  it("drops the first person and any contact in the Bin", () => {
+    expect(
+      mergePickerRows(
+        [
+          { id: A, archived_at: null },
+          { id: B, archived_at: null },
+          { id: C, archived_at: "2026-10-01 00:00:00" },
+        ],
+        A,
+      ).map((row) => row.id),
+    ).toEqual([B]);
+  });
+
+  it("keeps loading and a failed read apart from an empty list", () => {
+    expect(mergePickerState(null, false)).toBe("loading");
+    expect(mergePickerState(null, true)).toBe("error");
+    expect(mergePickerState([], true)).toBe("error");
+    expect(mergePickerState([], false)).toBe("list");
   });
 });
