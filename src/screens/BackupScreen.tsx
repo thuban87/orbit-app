@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   getAppSettings,
@@ -41,7 +42,7 @@ import {
   readAutomaticSkippedPhotos,
   skippedPhotosCopy,
 } from "@/services/backup/skipped-photos";
-import { confirm, notice } from "@/stores/confirm-store";
+import { choose, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -117,6 +118,8 @@ export function BackupScreen({
     string | null
   >(null);
   const [restorePassphrase, setRestorePassphrase] = useState("");
+  // D-124: the restore passphrase starts hidden; the eye button reveals it.
+  const [passphraseVisible, setPassphraseVisible] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   // D-115: "Back up now" / "Choose a folder" on the warning card. The ref is
   // the synchronous single-flight (a double tap starts one write, T-38.12-39);
@@ -312,18 +315,22 @@ export function BackupScreen({
       void runExport(false);
       return;
     }
-    // 38.9 D-24/D-27 (RESEARCH Pitfall 1): BOTH buttons run an export, so
-    // this confirm is never dismissable. Back and the scrim do nothing, and
-    // the readable export runs only from its own explicit button (V6).
-    const readable = await confirm({
+    // 38.12 D-63: two export choices and a Cancel. The readable export runs
+    // only from its own explicit button (V6); Cancel, Back and the scrim
+    // export nothing and release the single-flight claim.
+    const choice = await choose({
       title: "Export readable JSON?",
       message:
         "Anyone with this file can read its contents. Use this only when you need a portable JSON backup.",
-      cancelLabel: "Keep encrypted export",
       confirmLabel: "Export readable JSON",
-      dismissable: false,
+      secondaryLabel: "Export encrypted",
+      cancelLabel: "Cancel",
     });
-    void runExport(readable);
+    if (choice === "cancel") {
+      exportInFlightRef.current = false;
+      return;
+    }
+    void runExport(choice === "confirm");
   }, [encryptionEnabled, runExport]);
 
   const validateRestore = useCallback(
@@ -353,6 +360,7 @@ export function BackupScreen({
         const route = restorePreviewCache.store(candidate);
         setSelectedEncryptedContents(null);
         setRestorePassphrase("");
+        setPassphraseVisible(false);
         setRestoreStage("idle");
         navigation.navigate("RestorePreview", route);
       } catch (error) {
@@ -376,6 +384,7 @@ export function BackupScreen({
         if (isEncryptedBackupEnvelope(contents)) {
           setSelectedEncryptedContents(contents);
           setRestorePassphrase("");
+          setPassphraseVisible(false);
           setRestoreStage("passphrase");
           return;
         }
@@ -473,10 +482,8 @@ export function BackupScreen({
         { paddingBottom: bottomClearance },
       ]}
     >
-      <ShellAppBar
-        variant={backupAppBarVariant(host)}
-        title="Backup & Restore"
-      />
+      {/* D-64: the page title is the hub row's own label (D-25). */}
+      <ShellAppBar variant={backupAppBarVariant(host)} title="Data & Backup" />
 
       {health ? (
         <View
@@ -575,9 +582,7 @@ export function BackupScreen({
             },
           ]}
         >
-          <Text style={[styles.actionIcon, { color: colors.accentText }]}>
-            ⇧
-          </Text>
+          <Icon name="backup-export" size="lg" tone="accentText" />
           <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>
             Export now
           </Text>
@@ -601,9 +606,7 @@ export function BackupScreen({
             },
           ]}
         >
-          <Text style={[styles.actionIcon, { color: colors.textSecondary }]}>
-            ↥
-          </Text>
+          <Icon name="backup-restore" size="lg" tone="textSecondary" />
           <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>
             Restore a backup
           </Text>
@@ -646,23 +649,42 @@ export function BackupScreen({
             This encrypted backup needs its passphrase before Orbit can preview
             it.
           </Text>
-          <TextInput
-            testID="restore-passphrase-input"
-            secureTextEntry
-            value={restorePassphrase}
-            onChangeText={setRestorePassphrase}
-            accessibilityLabel="Backup passphrase"
-            placeholder="Passphrase"
-            placeholderTextColor={colors.textPlaceholder}
+          <View
             style={[
-              styles.passphraseInput,
+              styles.passphraseField,
               {
-                color: colors.textPrimary,
                 borderColor: colors.border,
                 backgroundColor: colors.background,
               },
             ]}
-          />
+          >
+            <TextInput
+              testID="restore-passphrase-input"
+              secureTextEntry={!passphraseVisible}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={restorePassphrase}
+              onChangeText={setRestorePassphrase}
+              accessibilityLabel="Backup passphrase"
+              placeholder="Passphrase"
+              placeholderTextColor={colors.textPlaceholder}
+              style={[styles.passphraseInput, { color: colors.textPrimary }]}
+            />
+            <Pressable
+              testID="restore-passphrase-visibility"
+              accessibilityRole="button"
+              accessibilityLabel={
+                passphraseVisible ? "Hide passphrase" : "Show passphrase"
+              }
+              onPress={() => setPassphraseVisible((visible) => !visible)}
+              style={styles.passphraseToggle}
+            >
+              <Icon
+                name={passphraseVisible ? "hide-secret" : "show-secret"}
+                tone="textSecondary"
+              />
+            </Pressable>
+          </View>
           <View style={styles.restorePromptActions}>
             <Pressable
               accessibilityRole="button"
@@ -670,6 +692,7 @@ export function BackupScreen({
               onPress={() => {
                 setSelectedEncryptedContents(null);
                 setRestorePassphrase("");
+                setPassphraseVisible(false);
                 setRestoreStage("idle");
                 void chooseRestore();
               }}
@@ -741,7 +764,7 @@ export function BackupScreen({
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
-        <Text style={[styles.lock, { color: colors.textSecondary }]}>⌑</Text>
+        <Icon name="backup-encryption" size="lg" tone="textSecondary" />
         <View style={styles.encryptionCopy}>
           <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
             Encryption
@@ -752,7 +775,7 @@ export function BackupScreen({
               : "Off — backups are readable JSON"}
           </Text>
         </View>
-        <Text style={{ color: colors.textSecondary }}>›</Text>
+        <Icon name="forward" size="sm" tone="textSecondary" />
       </Pressable>
 
       {showNudge ? (
@@ -785,13 +808,13 @@ export function BackupScreen({
             onPress={() => void dismissNudge()}
             style={styles.dismiss}
           >
-            <Text style={{ color: colors.textSecondary }}>×</Text>
+            <Icon name="close" tone="textSecondary" />
           </Pressable>
         </View>
       ) : null}
 
       <View style={styles.privacy}>
-        <Text style={{ color: colors.textSecondary }}>⌾</Text>
+        <Icon name="backup-privacy" size="sm" tone="textSecondary" />
         <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
           Backups include your contacts, notes, photos, and settings. API keys
           are never included.
@@ -839,7 +862,6 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
-  actionIcon: { fontSize: 24 },
   actionTitle: { fontSize: 16, fontWeight: "700" },
   actionHelper: { fontSize: 13, lineHeight: 18 },
   encryptionRow: {
@@ -851,7 +873,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  lock: { fontSize: 22 },
   encryptionCopy: { flex: 1, gap: 4 },
   rowTitle: { fontSize: 16, fontWeight: "700" },
   nudge: {
@@ -871,12 +892,24 @@ const styles = StyleSheet.create({
   privacy: { flexDirection: "row", gap: 8, paddingBottom: 24 },
   privacyText: { flex: 1, fontSize: 13, lineHeight: 18 },
   restoreNotice: { borderWidth: 1, borderRadius: 10, padding: 16, gap: 8 },
-  passphraseInput: {
+  passphraseField: {
     minHeight: 44,
     borderWidth: 1,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  passphraseInput: {
+    flex: 1,
+    minHeight: 44,
     paddingHorizontal: 12,
     fontSize: 16,
+  },
+  passphraseToggle: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   restorePromptActions: { gap: 8 },
   secondaryButton: {

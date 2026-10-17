@@ -111,6 +111,24 @@ export const ICON_REGISTRY = {
   // `location` / `section-current-location` is the map pin, not this one.
   pin: { outline: "pin-outline", filled: "pin" },
 
+  // ---- Backup page (38.12 D-65) -----------------------------------------
+  // Planner glyph picks replacing the page's text glyphs; the owner reviews them
+  // on the device pass and can swap any glyph here (ADR-086 swap seam). Export
+  // and Restore read as opposites (share out / bring in), not two up-arrows.
+  "backup-export": { outline: "share-outline", filled: "share" },
+  "backup-restore": { outline: "download-outline", filled: "download" },
+  "backup-encryption": {
+    outline: "lock-closed-outline",
+    filled: "lock-closed",
+  },
+  "backup-privacy": {
+    outline: "shield-checkmark-outline",
+    filled: "shield-checkmark",
+  },
+  // 38.12 D-124: the restore passphrase field's show/hide control.
+  "show-secret": { outline: "eye-outline", filled: "eye" },
+  "hide-secret": { outline: "eye-off-outline", filled: "eye-off" },
+
   // ---- Plan 07 destructive affordance -----------------------------------
   warning: { outline: "warning-outline", filled: "warning" },
 

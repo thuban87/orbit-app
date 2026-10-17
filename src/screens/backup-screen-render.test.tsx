@@ -11,7 +11,12 @@ import type { BackupHealth } from "./backup-health-logic";
  * `useState` is answered in call order; `STATE` names the slots this test
  * reads or seeds. Every other slot gets its initial value.
  */
-const STATE = { health: 0 } as const;
+const STATE = {
+  health: 0,
+  encryptionEnabled: 2,
+  restoreStage: 5,
+  passphraseVisible: 8,
+} as const;
 
 const mocks = vi.hoisted(() => ({
   overrides: new Map<number, unknown>(),
@@ -308,5 +313,98 @@ describe("warning card action (38.12 D-115)", () => {
     await vi.waitFor(() => expect(mocks.getAppSettings).toHaveBeenCalled());
     expect(mocks.chooseFolder).toHaveBeenCalledOnce();
     expect(mocks.backUpNow).not.toHaveBeenCalled();
+  });
+});
+
+describe("export choice with Cancel (38.12 D-63)", () => {
+  async function exportWith(choice: "confirm" | "secondary" | "cancel") {
+    mocks.choose.mockResolvedValue(choice);
+    mocks.manualExport.mockResolvedValue({
+      status: "shared",
+      skippedPhotos: 0,
+    });
+    const tree = render({ [STATE.encryptionEnabled]: true });
+    await (
+      byTestID(tree, "backup-export").props.onPress as () => Promise<void>
+    )();
+  }
+
+  it("offers both exports and a Cancel in one themed choice", async () => {
+    await exportWith("cancel");
+    expect(mocks.choose).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        title: "Export readable JSON?",
+        confirmLabel: "Export readable JSON",
+        secondaryLabel: "Export encrypted",
+        cancelLabel: "Cancel",
+      }),
+    );
+    expect(mocks.confirm).not.toHaveBeenCalled();
+  });
+
+  it("Cancel exports nothing", async () => {
+    await exportWith("cancel");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.manualExport).not.toHaveBeenCalled();
+  });
+
+  it("the readable choice exports readable JSON; the secondary exports encrypted", async () => {
+    await exportWith("confirm");
+    await vi.waitFor(() =>
+      expect(mocks.manualExport).toHaveBeenCalledWith({
+        readableOverride: true,
+      }),
+    );
+    mocks.manualExport.mockClear();
+    await exportWith("secondary");
+    await vi.waitFor(() =>
+      expect(mocks.manualExport).toHaveBeenCalledWith({
+        readableOverride: false,
+      }),
+    );
+  });
+});
+
+describe("restore passphrase show/hide (38.12 D-124)", () => {
+  it("starts hidden with a Show passphrase control", () => {
+    const tree = render({ [STATE.restoreStage]: "passphrase" });
+    expect(
+      byTestID(tree, "restore-passphrase-input").props.secureTextEntry,
+    ).toBe(true);
+    const toggle = byTestID(tree, "restore-passphrase-visibility");
+    expect(toggle.props.accessibilityLabel).toBe("Show passphrase");
+    (toggle.props.onPress as () => void)();
+    const update = mocks.setters[STATE.passphraseVisible].mock
+      .calls[0]?.[0] as (visible: boolean) => boolean;
+    expect(update(false)).toBe(true);
+  });
+
+  it("revealed, the field shows the text and offers Hide passphrase", () => {
+    const tree = render({
+      [STATE.restoreStage]: "passphrase",
+      [STATE.passphraseVisible]: true,
+    });
+    expect(
+      byTestID(tree, "restore-passphrase-input").props.secureTextEntry,
+    ).toBe(false);
+    expect(
+      byTestID(tree, "restore-passphrase-visibility").props.accessibilityLabel,
+    ).toBe("Hide passphrase");
+  });
+});
+
+describe("Backup page chrome (38.12 D-64, D-65)", () => {
+  it("is titled with the hub row's label", () => {
+    const bar = render().find((n) => n.type === "ShellAppBar");
+    expect(bar?.props.title).toBe("Data & Backup");
+  });
+
+  it("draws its icons through the registry", () => {
+    const names = render({ [STATE.health]: STALE })
+      .filter((n) => n.type === "Icon")
+      .map((n) => n.props.name);
+    expect(names).toEqual(
+      expect.arrayContaining(["backup-export", "backup-restore"]),
+    );
   });
 });

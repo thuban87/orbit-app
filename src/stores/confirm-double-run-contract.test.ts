@@ -7,9 +7,9 @@
  * - Merge contacts: the button stayed live while the merge ran, so a later
  *   tap opened a fresh confirm. It is now guarded by a ref and drawn disabled
  *   (D-26) from the confirm until the merge settles.
- * - Backup export: BOTH buttons of the readable-JSON prompt run an export, so
- *   a duplicate's `false` would mean "run an encrypted export". The ref is
- *   claimed before the prompt is shown.
+ * - Backup export: the readable-JSON prompt (38.12 D-63: a three-way
+ *   `choose()` with Cancel) must open once per export. The ref is claimed
+ *   before the prompt is shown and released on Cancel.
  *
  * Render-free: source assertions.
  */
@@ -63,10 +63,17 @@ describe("Backup export single-flight (WR-01)", () => {
   it("claims the in-flight ref before the readable-JSON prompt", () => {
     const guard = onExport.indexOf("if (exportInFlightRef.current) return;");
     const claim = onExport.indexOf("exportInFlightRef.current = true;");
-    const prompt = onExport.indexOf("confirm({");
+    const prompt = onExport.indexOf("choose({");
     expect(guard).toBeGreaterThan(-1);
     expect(claim).toBeGreaterThan(guard);
     expect(prompt).toBeGreaterThan(claim);
+  });
+
+  it("releases it on Cancel, exporting nothing (38.12 D-63)", () => {
+    expect(onExport).toMatch(
+      /if \(choice === "cancel"\) \{\s*exportInFlightRef\.current = false;\s*return;/,
+    );
+    expect(onExport).not.toContain("dismissable: false");
   });
 
   it("releases it only when the export settles", () => {

@@ -155,6 +155,36 @@ describe("ICON_REGISTRY", () => {
     );
   });
 
+  it("registers the Backup page icons and the passphrase show/hide pair (38.12 D-65, D-124)", () => {
+    const registry: Record<string, { outline: string; filled: string }> =
+      ICON_REGISTRY;
+    expect({
+      "backup-export": registry["backup-export"],
+      "backup-restore": registry["backup-restore"],
+      "backup-encryption": registry["backup-encryption"],
+      "backup-privacy": registry["backup-privacy"],
+      "show-secret": registry["show-secret"],
+      "hide-secret": registry["hide-secret"],
+    }).toEqual({
+      "backup-export": { outline: "share-outline", filled: "share" },
+      "backup-restore": { outline: "download-outline", filled: "download" },
+      "backup-encryption": {
+        outline: "lock-closed-outline",
+        filled: "lock-closed",
+      },
+      "backup-privacy": {
+        outline: "shield-checkmark-outline",
+        filled: "shield-checkmark",
+      },
+      "show-secret": { outline: "eye-outline", filled: "eye" },
+      "hide-secret": { outline: "eye-off-outline", filled: "eye-off" },
+    });
+    // Export and Restore are visibly different glyphs (K-24: both were up-arrows).
+    expect(ICON_REGISTRY["backup-export"].outline).not.toBe(
+      ICON_REGISTRY["backup-restore"].outline,
+    );
+  });
+
   it("reserves the `warning` name required by Plan 07 (REVIEWS 23-05 LOW)", () => {
     expect(ICON_REGISTRY.warning).toBeDefined();
     expect(ICON_REGISTRY.warning.outline).toBeTruthy();
