@@ -1,8 +1,10 @@
+import type { ProfileReturnTab } from "./flow-host";
 import type {
   DashboardStackParamList,
   DigestStackParamList,
   EventsStackParamList,
   OrreryStackParamList,
+  ProfileRouteParams,
   SettingsStackParamList,
   TabParamList,
 } from "./types";
@@ -122,24 +124,32 @@ export type ContactsProfileNavigator =
 
 /**
  * Open the person's Profile in the Contacts tab (D-50, owner 2026-10-10): the
- * one completion jump out of Settings, used when an Add Contact started from
- * the Settings tab saves. The push action is a plain object with the shape of
- * `StackActions.push` so this module stays importable from node tests.
+ * completion jump out of Settings, used when an Add Contact started from the
+ * Settings tab saves, and by flow endings' "View contact" (38.12 D-110, via
+ * `flow-host.ts`). `returnTab` rides on the Profile's params so its Back
+ * returns to that tab instead of Contacts Home (`ContactProfileScreen`). The
+ * push action is a plain object with the shape of `StackActions.push` so this
+ * module stays importable from node tests.
  */
 export function openProfileInContactsTab(
   nav: ContactsProfileNavigator,
   contactId: number,
+  options?: { returnTab?: ProfileReturnTab },
 ): void {
   if (nav == null) return;
+  const params: ProfileRouteParams =
+    options?.returnTab === undefined
+      ? { contactId }
+      : { contactId, returnTab: options.returnTab };
   const plan = planContactsProfileOpen(nav.getRootState());
   if (plan.kind === "navigate-into") {
-    navigateIntoTab(nav, "DashboardTab", "Profile", { contactId });
+    navigateIntoTab(nav, "DashboardTab", "Profile", params);
     return;
   }
   focusTab(nav, "DashboardTab");
   const push = {
     type: "PUSH",
-    payload: { name: "Profile", params: { contactId } },
+    payload: { name: "Profile", params },
     target: plan.stackKey,
   };
   nav.dispatch(push as never);

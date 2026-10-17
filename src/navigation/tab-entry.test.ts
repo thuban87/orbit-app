@@ -167,6 +167,48 @@ describe("openProfileInContactsTab (D-50)", () => {
   it("is a no-op without a navigator", () => {
     expect(() => openProfileInContactsTab(null, 41)).not.toThrow();
   });
+
+  // 38.12 D-110: a flow's "View contact" carries the host tab so the
+  // Profile's Back returns there instead of Contacts Home.
+  it("carries returnTab onto the Profile params when entering an unmounted tab", () => {
+    const nav = containerSpy({ routes: [{ name: "SettingsTab" }] });
+    openProfileInContactsTab(nav as never, 41, { returnTab: "SettingsTab" });
+    expect(nav.navigate).toHaveBeenCalledWith("DashboardTab", {
+      screen: "Profile",
+      params: { contactId: 41, returnTab: "SettingsTab" },
+      initial: false,
+    });
+  });
+
+  it("carries returnTab onto the pushed Profile on a mounted stack", () => {
+    const nav = containerSpy({
+      routes: [
+        {
+          name: "DashboardTab",
+          state: {
+            key: "dash-stack",
+            stale: false,
+            routes: [{ name: "Home" }],
+          },
+        },
+      ],
+    });
+    openProfileInContactsTab(nav as never, 41, { returnTab: "DigestTab" });
+    expect(nav.dispatch).toHaveBeenCalledWith({
+      ...StackActions.push("Profile", {
+        contactId: 41,
+        returnTab: "DigestTab",
+      }),
+      target: "dash-stack",
+    });
+  });
+
+  it("omits returnTab when none is given", () => {
+    const nav = containerSpy({ routes: [{ name: "SettingsTab" }] });
+    openProfileInContactsTab(nav as never, 41, {});
+    expect(nav.navigate.mock.calls[0][1].params).toEqual({ contactId: 41 });
+    expect("returnTab" in nav.navigate.mock.calls[0][1].params).toBe(false);
+  });
 });
 
 /**

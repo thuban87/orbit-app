@@ -28,16 +28,23 @@ describe("completionBackHandler (D-73)", () => {
 });
 
 describe("Import complete and Check complete wire Back to Done (D-73)", () => {
-  for (const [file, title] of [
-    ["src/screens/ImportCompleteScreen.tsx", "Import complete"],
-    ["src/screens/ReconcileCompleteScreen.tsx", "Check complete"],
+  for (const [file, title, doneBody] of [
+    [
+      "src/screens/ImportCompleteScreen.tsx",
+      "Import complete",
+      // 38.12 D-110: the flow finishes on its host, never a root reset.
+      /const done = useCallback\(\s*\(\) => finishFlow\(navigation, host\),/,
+    ],
+    [
+      "src/screens/ReconcileCompleteScreen.tsx",
+      "Check complete",
+      /const done = useCallback\(\s*\(\) => navigationRef\.current\?\.reset\(resetToDashboardRoot\(\)\),/,
+    ],
   ] as const) {
     const source = readFileSync(join(__dirname, "../..", file), "utf8");
 
     it(`${title}: header Back, system Back and Done share one done()`, () => {
-      expect(source).toMatch(
-        /const done = useCallback\(\s*\(\) => navigationRef\.current\?\.reset\(resetToDashboardRoot\(\)\),/,
-      );
+      expect(source).toMatch(doneBody);
       expect(source).toContain("useBackActsAsDone(done);");
       expect(source).toContain(
         `<ShellAppBar variant="child" title="${title}" onBack={done} />`,

@@ -9,6 +9,7 @@ import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
+import type { FlowHost, ProfileReturnTab } from "./flow-host";
 
 /**
  * CropPhoto's serializable params, shared by every stack that hosts it. Either
@@ -38,7 +39,20 @@ export type CropPhotoParams =
 export type ProfileRouteParams = {
   contactId: number;
   openReachOut?: boolean;
+  /**
+   * Set when a flow opened this Contacts-tab Profile from another tab (38.12
+   * D-110, `openContactFromFlow`): header and system Back return to that tab
+   * instead of Contacts Home.
+   */
+  returnTab?: ProfileReturnTab;
 };
+
+/**
+ * Optional flow host on every import, check and merge route (38.12 D-110,
+ * D-57): where the flow finishes. Absent means `DEFAULT_FLOW_HOST` (settings).
+ * Forwarding it between flow screens is owned by the plans that touch them.
+ */
+type FlowHostParam = { host?: FlowHost };
 
 /**
  * Where a Compose session was launched from, driving origin-aware return
@@ -184,15 +198,18 @@ export type DashboardStackParamList = {
    * route is untouched.
    */
   Orrery: undefined;
-  SurvivorSelect: { firstContactId: number; secondContactId?: number };
-  MergeConflicts: { survivorId: number; absorbedId: number };
+  SurvivorSelect: {
+    firstContactId: number;
+    secondContactId?: number;
+  } & FlowHostParam;
+  MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
     resolutions: MergeResolutions;
-  };
+  } & FlowHostParam;
 };
 
 /** The Orrery owns its visual root and duplicates contact detail for origin-aware Back. */
@@ -264,15 +281,18 @@ export type OrreryStackParamList = {
    *  here too because Compose is hosted in the Orrery stack (COMP-08). */
   ComposeResearch: { contactId: number };
   CropPhoto: CropPhotoParams;
-  SurvivorSelect: { firstContactId: number; secondContactId?: number };
-  MergeConflicts: { survivorId: number; absorbedId: number };
+  SurvivorSelect: {
+    firstContactId: number;
+    secondContactId?: number;
+  } & FlowHostParam;
+  MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
     resolutions: MergeResolutions;
-  };
+  } & FlowHostParam;
 };
 
 export type BackupStackParamList = {
@@ -345,15 +365,18 @@ export type DigestStackParamList = {
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
   CropPhoto: CropPhotoParams;
-  SurvivorSelect: { firstContactId: number; secondContactId?: number };
-  MergeConflicts: { survivorId: number; absorbedId: number };
+  SurvivorSelect: {
+    firstContactId: number;
+    secondContactId?: number;
+  } & FlowHostParam;
+  MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
     resolutions: MergeResolutions;
-  };
+  } & FlowHostParam;
 };
 
 export type EventsStackParamList = {
@@ -406,15 +429,18 @@ export type EventsStackParamList = {
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
   CropPhoto: CropPhotoParams;
-  SurvivorSelect: { firstContactId: number; secondContactId?: number };
-  MergeConflicts: { survivorId: number; absorbedId: number };
+  SurvivorSelect: {
+    firstContactId: number;
+    secondContactId?: number;
+  } & FlowHostParam;
+  MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
     resolutions: MergeResolutions;
-  };
+  } & FlowHostParam;
 };
 
 export type SettingsStackParamList = {
@@ -546,30 +572,37 @@ export type SettingsStackParamList = {
     contactId: number;
   };
   CropPhoto: CropPhotoParams;
-  LegacyContactPicker: undefined;
-  ImportReview: { sessionId: number };
-  BulkImportSetup: { sessionId: number };
+  LegacyContactPicker: FlowHostParam | undefined;
+  ImportReview: { sessionId: number } & FlowHostParam;
+  BulkImportSetup: { sessionId: number } & FlowHostParam;
   ImportProgress: {
     sessionId: number;
     batchCategoryId: number | null;
     /** Fresh per explicit resume so a reused route re-runs (38.3 B-WR-01). */
     runKey?: number;
-  };
-  DuplicateReview: { sessionId: number };
-  ImportComplete: { sessionId: number };
+  } & FlowHostParam;
+  DuplicateReview: { sessionId: number } & FlowHostParam;
+  ImportComplete: { sessionId: number } & FlowHostParam;
   BulkReview: undefined;
-  SurvivorSelect: { firstContactId: number; secondContactId?: number };
-  MergeConflicts: { survivorId: number; absorbedId: number };
+  SurvivorSelect: {
+    firstContactId: number;
+    secondContactId?: number;
+  } & FlowHostParam;
+  MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
     resolutions: MergeResolutions;
-  };
-  ReconcileDetail: { contactId: number; sessionId?: number; cardId?: number };
-  ReconcileGrid: { sessionId?: number } | undefined;
-  ReconcileComplete: { sessionId: number };
+  } & FlowHostParam;
+  ReconcileDetail: {
+    contactId: number;
+    sessionId?: number;
+    cardId?: number;
+  } & FlowHostParam;
+  ReconcileGrid: ({ sessionId?: number } & FlowHostParam) | undefined;
+  ReconcileComplete: { sessionId: number } & FlowHostParam;
 };
 
 /** The root container exposes the five permanent tab destinations. */

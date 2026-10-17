@@ -43,6 +43,8 @@ import {
 } from "@/db/profile-relationship-actions";
 import { editRelationship } from "@/db/relationships-dao";
 import { linkedEntryRoute } from "@/logic/linked-entry-route";
+import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
+import { returnFromProfileToTab } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import type { KnowledgeEntryLink } from "@/profile/knowledge-presentation";
@@ -212,6 +214,19 @@ export function ContactProfileScreen({
   // WR-03: the ScrollView's one-pixel accessibility-order offset.
   const { scale: pixelRatio } = useWindowDimensions();
   const contactId = route.params.contactId;
+  // 38.12 D-110: a Profile a flow opened from Settings (or Phase 39's Digest)
+  // carries `returnTab`; header Back, system Back and leaving after Move to
+  // Bin return to that tab and pop this Profile off-screen, instead of
+  // landing on Contacts Home. Without it, Back stays the native pop.
+  const returnTab = route.params.returnTab;
+  const leaveProfile = useCallback(() => {
+    if (returnTab !== undefined) {
+      returnFromProfileToTab(navigation, returnTab);
+      return;
+    }
+    navigation.goBack();
+  }, [navigation, returnTab]);
+  useBackActsAsDone(leaveProfile, returnTab !== undefined);
   const [snapshot, setSnapshot] = useState<ProfileSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -651,7 +666,7 @@ export function ContactProfileScreen({
           );
         },
         closeOverlay,
-        goBack: () => navigation.goBack(),
+        goBack: leaveProfile,
         showSnackbar,
         logError: (cause) =>
           Logger.error(
@@ -660,7 +675,7 @@ export function ContactProfileScreen({
             cause,
           ),
       }),
-    [closeOverlay, contactId, navigation],
+    [closeOverlay, contactId, leaveProfile],
   );
 
   const setFrequency = useCallback(
@@ -791,7 +806,7 @@ export function ContactProfileScreen({
             favouriteDisabled={pendingFavourite || lifecycle.kind !== "bound"}
             scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}
             title={barShowsName ? snapshot.identity.name : null}
-            onBack={() => navigation.goBack()}
+            onBack={leaveProfile}
             onToggleFavourite={() => void toggleFavourite()}
             onOpenOverflow={() => setOverlay("overflow")}
           />

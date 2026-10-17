@@ -28,12 +28,16 @@ export function completionBackHandler(
 /**
  * Registers the system-Back handler while the screen is focused (the
  * useFocusEffect + BackHandler idiom of CaptureScreen / ComposeScreen).
+ * `enabled: false` registers nothing, so a screen that only sometimes owns
+ * Back (a Profile opened with `returnTab`, 38.12 D-110) keeps the native pop
+ * otherwise.
  */
-export function useBackActsAsDone(done: () => void): void {
+export function useBackActsAsDone(done: () => void, enabled = true): void {
   const doneRef = useRef(done);
   doneRef.current = done;
   useFocusEffect(
     useCallback(() => {
+      if (!enabled) return undefined;
       const subscription = BackHandler.addEventListener(
         "hardwareBackPress",
         completionBackHandler(
@@ -42,6 +46,6 @@ export function useBackActsAsDone(done: () => void): void {
         ),
       );
       return () => subscription.remove();
-    }, []),
+    }, [enabled]),
   );
 }
