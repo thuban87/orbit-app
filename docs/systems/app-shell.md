@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -22,7 +22,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Navigator | `src/navigation/RootNavigator.tsx` | Mounts the fixed Contacts, Events, Digest, Orrery, and Settings tabs with a native stack for each. |
 | Background shell | `src/components/ui/BackgroundHost.tsx`, `src/navigation/focused-route-classification.ts`, `src/stores/focused-route-store.ts` | Renders one fixed local System background, selects a density from the deepest focused route, and suppresses the image only on the Orrery visualization. |
 | Route types | `src/navigation/types.ts` | Defines serializable tab and per-stack route parameters. |
-| Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested semantic tab-root reset states for external and completion paths. |
+| Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested semantic tab-root reset states for external paths. |
+| Flow host | `src/navigation/flow-host.ts` | Host-aware endings for import, check, merge and restore flows (`FlowHost`: `settings`, `profile`, `digest`); no flow screen imports `reset-intents` (ADR-241). |
 | Refresh signals | `src/stores/shell-refresh-store.ts`, `src/utils/latest-request.ts` | Carries the shell tick (in-process committed writes) and the foreground tick (once per owning launch-sweep run), plus the shared latest-request authority consumers use to discard stale reads. |
 | Transient/back state | `src/stores/shell-transient-store.ts`, `src/navigation/back-intent.ts` | Registers executable overlay dismissal callbacks and resolves transient-first Back behavior. |
 | Shell chrome | `src/components/ShellAppBar.tsx`, `src/navigation/use-bottom-clearance.ts` | Provides themed root/child app bars, measured compact trailing content, and shared tab/FAB clearance. |
@@ -104,7 +105,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 1. The fixed root tabs are Contacts, Events, Digest, Orrery, and Settings. Digest is the centered initial tab on a fresh launch; each renders a separate native stack, so switching tabs preserves its in-tab history. The tab navigator uses `backBehavior="history"`: Back on a tab root returns to the previously visited tab, and when that history is exhausted on a non-launch tab `RootNavigator` first switches to Digest without adding a history entry, so the app always exits from Digest (ADR-202). `switchTabWithoutHistory` (`src/navigation/tab-history.ts`) is the sanctioned untracked tab switch; it rewrites only the tab history and keeps every stack's state.
 2. A retap on the active tab dismisses the top shell transient first; a subsequent retap pops that tab to its root. Focused workflows and an open software keyboard hide the tab bar and universal FAB.
 3. `ShellAppBar` and Android Back resolve a shell transient before ordinary stack navigation. Every pushed screen uses `ShellAppBar variant="child"` with an icon-only chevron Back (or a ✕ Cancel on confirm-or-abandon screens), and an optional person line (ADR-201). Registered dialogs and sheets are never shell transients: they report to the overlay registry, which Back and retap cannot close (ADR-198). Contacts control panels register a dismiss callback as that transient; completed edits replace or focus their destination so Back never replays a finished workflow.
-4. `reset-intents.ts` expresses notification, widget, Compose, import, reconcile, merge, and other external fallbacks as nested semantic tab states. An in-app Profile Back instead remains origin-aware through its owning stack.
+4. `reset-intents.ts` expresses notification, widget, Compose and other external fallbacks as nested semantic tab states. Import, Check linked contacts, merge and restore flows do not reset: each route takes an optional `host` param and ends through `flow-host.ts` (`finishFlow`, `finishFlowOnProfile`, `exitFlow`). A Settings host finishes on Settings → Contacts & Relationships (Done, header Back and system Back alike); a `profile` host ends a merge on the survivor's Profile, replacing the launching Profile by route key; a `digest` host (Phase 39) switches to Digest and pops every `FLOW_ROUTE_NAMES` route off the Settings stack. A person opened from a flow result opens on the Contacts tab carrying `returnTab`; its Back switches tab without history and pops that Profile off the Contacts stack (ADR-241). An in-app Profile Back otherwise remains origin-aware through its owning stack.
 5. The + forms (Add Contact, Group Log, Log Interaction) are registered in every tab stack (`FAB_ROUTES` in `shell-contract.ts`: `Create`, `GroupLog`, `LogContact`) and open over the tab the user is on; Back before saving returns there. An Add Contact started from Settings finishes on the new Profile in the Contacts tab through `openProfileInContactsTab` (ADR-202).
 6. Every other cross-tab entry (share ingress, Compose AI repair, import/reconcile resume prompts, Orrery Add Contact, Import Complete links, Contacts detail actions and Events overflow, Digest drill-through) calls `navigateIntoTab`. Because tabs are lazy, a first visit that carried only a nested `screen` would build that tab's stack from the target alone; `initial: false` makes the stack start at its declared root with the target on top, so Back and active-tab reselect still reach the root. An already-mounted tab receives an ordinary navigate and keeps its history.
 
@@ -143,7 +144,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 1. Backup / Restore is reached from Settings → Data & Backup through one canonical screen tree; it is no longer a bottom tab.
 2. `Backup` owns manual export, file selection, and health actions. Its child settings, preview, and result routes retain only serializable aggregate or opaque-token parameters.
-3. The surviving Settings host selects Back chrome, post-restore destination, and the single shared-backup consumer; host identity is never inferred from nested navigation state.
+3. The surviving Settings host selects Back chrome, post-restore destination, and the single shared-backup consumer; host identity is never inferred from nested navigation state. The Backup, RestorePreview and RestoreResult routes carry an explicit `host?: RestoreHost` route param (`settings` or `digest`); "Choose file again" pops to Backup with the host kept (ADR-241). RestorePreview and RestoreResult are focused routes, so neither shows the tab bar or the + (ADR-243).
 4. `App.tsx` registers backup and restore-photo recovery hooks after migration readiness, before the foreground launch-sweep trigger runs.
 
 ### Composing from a contact
@@ -246,7 +247,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 1. Home's speed dial and Settings' Contacts Integration row call the same `startContactImport()` seam. It opens the permissionless system picker on API 37+ and the typed `LegacyContactPicker` route on API 36 and below.
 2. The legacy route primes and requests the scoped read permission at the value moment, offers a calm re-request state after denial, and opens app settings after permanent denial; it uses theme tokens but remains a standalone utility list.
 3. `RootNavigator` registers legacy acquisition alongside import review, setup, progress, duplicate-review, and completion routes; every downstream screen reads durable session state rather than a source URI.
-4. A foreground prompt routes interrupted work to its local continuation or explicitly discards unresolved rows.
+4. A foreground prompt routes interrupted work to its local continuation or explicitly discards unresolved rows. It asks once per paused session; afterwards the Settings Import contacts row reads "Finish your import (N left)", and starting a new import first asks Resume or Discard (ADR-237). All import routes live in the Settings stack and take the flow host (ADR-241).
 
 ### Reconciling and merging contacts
 
@@ -408,6 +409,12 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-225:** Profile Top: Edit Contact, Compose, Name in a Solid Top Bar, Slimmer ⋯ — the Profile top bar and ⋯.
 - **ADR-226:** Archive Becomes the Bin — Settings → Bin.
 - **ADR-227:** One Snooze Sheet — the shared snooze sheet hosts.
+- **ADR-233:** The Profile ⋯ Follows Lifecycle State — `ReconcileDetail` in `PROFILE_REACHABLE_ROUTES`; `UnboundContacts` in the Settings stack.
+- **ADR-237:** A Paused Import or Check Asks Once — the prompts ask once; Settings rows carry paused work.
+- **ADR-241:** Import, Check, Merge and Restore Carry a Flow Host — `flow-host.ts`, `returnTab`, host route params.
+- **ADR-243:** Restore Runs on Focused Pages — RestorePreview and RestoreResult are focused routes.
+- **ADR-245:** A Flagged Custom-Field Value Opens Edit at That Field — `ValueHistory` in every Profile host; `CustomFieldReview` and `EditContact`'s `focusFieldDefId`.
+- **ADR-246:** One Settings Row and Section Card on Every Settings Page — the Settings sub-pages' rows.
 - **ADR-230:** Settings Page for Profile Backgrounds — the `ProfileBackgrounds` route in all five Profile-hosting stacks.
 
 ## Gotchas
@@ -458,6 +465,8 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 37. **Visible capture labels are product copy.** Keep the internal `LogContact` route identifier for typed compatibility, but show Log Interaction consistently in the dial, accessibility label, and focused form title.
 38. **Types do not prove Settings registration.** A Settings route advertised by the hub must appear in the runtime registration contract and as a real `<Stack.Screen>`; a type-only route may be intentionally reserved.
 38. **Keep AI routes typed and content-free.** Route parameters identify a screen or focus only; keys, prompt text, personalization bodies, and callback material remain in their owning local state.
+39. **Flow screens end through `flow-host`, never a reset.** A root reset wipes every tab's history (ADR-146); forward `route.params.host` to the next flow screen, since a dropped host silently falls back to Settings (ADR-241).
+40. **`popTo` replaces a route's params.** Pass the host when popping to Backup (`popTo('Backup', { host })`), or a digest host is lost.
 
 - **Resume freshness comes from the foreground tick, not AppState.** A consumer that re-reads on its own `AppState` listener can race the launch sweep and show pre-purge data. Subscribe with `useForegroundRefresh`, which only fires after the owning sweep run settles. Never detect a day change with a timer.
 - **Types do not register native routes.** A shared type intersection cannot prove that a route is mounted in each hosting stack; Group Event routes require all three runtime registrations.
@@ -556,3 +565,4 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 | 2026-10-16 | 38.11 | The + has four actions (Add Contact, Quick Log, Log Interaction, Group Log); Update Contact retired to `docs/archive/update-contact/` (D-62); Memory left the + and is Profile-reachable in all five stacks (D-66); FAB clearance margin `FAB_CLEARANCE_MARGIN` (D-41). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-223–ADR-227, ADR-230. |
 | 2026-10-18 | 38.12 | Profile ⋯ gains `Check with phone Contacts…` (linked) and `Merge with another contact…`; `ReconcileDetail` and the read-only custom-field `ValueHistory` screen are Profile-reachable in all five stacks; the ⋯ sheet is content-sized with a Close and titled "More actions" (D-99, D-100, D-106, D-42, D-91). |
+| 2026-10-18 | 38.12 | KB extraction: flow host for import, check, merge and restore endings with `returnTab` Profiles; focused restore pages; `RestoreHost` route params; ask-once resume prompts; Decisions link ADR-233, ADR-237, ADR-241, ADR-243, ADR-245, ADR-246. |
