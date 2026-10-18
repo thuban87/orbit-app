@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** ADR-078 (partial — Off Limits and permitted interaction notes); ADR-214 (partial)
+**Superseded by:** ADR-078 (partial — Off Limits and permitted interaction notes); ADR-214 (partial); ADR-248 (partial)
 
 ## Context
 

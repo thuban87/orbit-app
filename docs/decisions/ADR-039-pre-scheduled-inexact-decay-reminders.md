@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-029 (partial)
-**Superseded by:** None
+**Superseded by:** ADR-234 (note — the "muted" suppressor is now an indefinite snooze, covered by "snoozed"; the rest unchanged)
 
 ## Context
 

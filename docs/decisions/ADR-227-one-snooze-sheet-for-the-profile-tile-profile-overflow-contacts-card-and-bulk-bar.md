@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** ADR-103 (partial — "every selected contact is eligible for every bulk action" dies for bulk Unsnooze only, which now acts on the selected people the database says are snoozed; its rejected per-action eligibility filtering is adopted for that one action; bulk Snooze and every other bulk action still apply to all selected IDs through composed cores in one transaction)
-**Superseded by:** None
+**Superseded by:** ADR-234 (partial)
 
 ## Context
 

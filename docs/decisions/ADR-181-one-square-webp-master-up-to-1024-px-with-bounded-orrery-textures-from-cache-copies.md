@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-021 (partial — the one 512×512 JPEG master's size and format die; one master per target, the document directory, identity-derived `.jpg` names and the crash-safe swap and cleanup survive)
-**Superseded by:** None
+**Superseded by:** ADR-240 (partial)
 
 ## Context
 

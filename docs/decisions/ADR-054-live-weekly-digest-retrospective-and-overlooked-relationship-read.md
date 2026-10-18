@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** ADR-147 (partial)
+**Superseded by:** ADR-147 (partial); ADR-234 (note — the decay-push mute it ignores is now an indefinite snooze; the rest unchanged)
 
 ## Context
 

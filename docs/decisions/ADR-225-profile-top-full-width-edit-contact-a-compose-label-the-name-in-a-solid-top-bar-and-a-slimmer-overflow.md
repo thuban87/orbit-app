@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** ADR-109 (partial — the Hero's direct actions "Message, Call" gain a full-width Edit Contact above them and the message action is labelled "Compose"; the fixed-structure Hero, identity, Favorite, the one overflow and "unavailable direct actions remain visible with an explanation" survive)
-**Superseded by:** None
+**Superseded by:** ADR-233 (partial)
 
 ## Context
 
