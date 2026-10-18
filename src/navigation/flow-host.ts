@@ -43,7 +43,7 @@ const LOG_SCOPE = "flow-host";
 export const SETTINGS_FLOW_HOME = "SettingsContacts";
 
 /**
- * The routes that belong to an import, check or merge flow. A digest-hosted
+ * The routes that belong to an import, check, merge or restore flow. A digest-hosted
  * ending pops every one of them off the Settings stack (the routes below the
  * first of them are what the user had before the flow started).
  */
@@ -60,6 +60,10 @@ export const FLOW_ROUTE_NAMES: ReadonlySet<string> = new Set([
   "SurvivorSelect",
   "MergeConflicts",
   "MergeImpactSummary",
+  // 38.12 D-68: the restore routes, so a digest-hosted restore's return
+  // (`returnFromRestore`) pops them off the Settings stack too.
+  "RestorePreview",
+  "RestoreResult",
 ]);
 
 type FlowRoute = { key: string; name: string };

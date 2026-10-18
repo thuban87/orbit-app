@@ -1,67 +1,109 @@
-/**
- * Host identity for the dual-homed Backup screen tree (D-08 / §I). The four
- * Backup screens (`BackupScreen`/`BackupSettingsScreen`/`RestorePreviewScreen`/
- * `RestoreResultScreen`) are one canonical tree now hosted by Settings. The
- * hosting stack threads an explicit `host` prop through
- * per-stack wrapper components rather than inferring the parent tab from nested
- * navigation state (review cycle-1 HIGH: `getParent`/`getState` inference had no
- * parent id, no fail-closed default, and no test). Every host-dependent
- * behaviour is a pure function of this single primitive — unit-testable without
- * a device or a navigator (Task 2 adds those helpers).
- */
-export type BackupHost = "backup-tab" | "settings";
+import {
+  type FlowHost,
+  type FlowNavigator,
+  finishFlow,
+} from "@/navigation/flow-host";
 
 /**
- * Legacy fail-closed default retained for compatibility with the canonical
- * Backup screen's optional host prop. The live Settings route always supplies
- * `host="settings"` explicitly.
+ * Host identity for the Backup screen tree (`BackupScreen` / `RestorePreview`
+ * / `RestoreResult`), 38.12 D-68. The host travels as an optional `host` route
+ * param on those routes (absent = `DEFAULT_RESTORE_HOST`), the same idiom as
+ * the import / merge flows (`flow-host.ts`, D-110), instead of a React prop
+ * each stack injected. Phase 39 D-96 passes `{ kind: "digest" }` for its
+ * first-run restore.
+ *
+ * A Profile never opens Backup or Restore, so `profile` is excluded at the
+ * type level rather than mapped (38.12-18, convergence c2 B-8). Every helper
+ * below is an exhaustive switch on `host.kind`: a new `FlowHost` kind fails
+ * tsc here instead of falling through.
  */
-export const DEFAULT_BACKUP_HOST: BackupHost = "backup-tab";
+export type RestoreHost = Exclude<FlowHost, { kind: "profile" }>;
+
+/** Settings → Data & Backup, the only entry outside first run. */
+export const DEFAULT_RESTORE_HOST: RestoreHost = { kind: "settings" };
 
 /**
- * Origin-aware post-restore return target. The Backup-TAB flow resets to the
- * `Backup` root (UNCHANGED shipped behaviour); the Settings-entry flow returns
- * to the `Settings` hub. Applied at EVERY reset-to-Backup site across the tree
- * (`RestoreResultScreen`'s "Return to Backup & Restore" and the
- * `RestorePreviewScreen` success-reset BASE) so a Settings-hosted restore never
- * strands the user on a `Backup` route inside the Settings stack.
+ * The route the restore's success reset leaves beneath Backup restored, for
+ * every host: the Settings hub, so Back from the result lands on it (today's
+ * behaviour). A digest host's return then leaves the Settings tab on its hub.
  */
-export function restoreReturnRouteName(
-  host: BackupHost,
-): "Backup" | "Settings" {
-  return host === "settings" ? "Settings" : "Backup";
+export const RESTORE_SUCCESS_BASE_ROUTE = "Settings";
+
+function unreachable(host: never): never {
+  throw new Error(`backup-dualhome: unknown restore host ${String(host)}`);
 }
 
 /**
- * Host-aware label for the post-restore return button. Must describe the actual
- * destination `restoreReturnRouteName` resets to: the Backup-tab flow returns to
- * "Backup & Restore" (UNCHANGED), the Settings-entry flow returns to the Settings
- * hub. A single hardcoded "Return to Backup & Restore" misdescribed the Settings
- * destination (review WR-02). Mirrors restoreReturnRouteName's host split.
+ * The post-restore return button's label: it names where
+ * `returnFromRestore` goes.
  */
-export function restoreReturnLabel(host: BackupHost): string {
-  return host === "settings"
-    ? "Return to Settings"
-    : "Return to Backup & Restore";
+export function restoreReturnLabel(
+  host: RestoreHost,
+): "Return to Settings" | "Return to Digest" {
+  switch (host.kind) {
+    case "settings":
+      return "Return to Settings";
+    case "digest":
+      return "Return to Digest";
+    default:
+      return unreachable(host);
+  }
 }
 
 /**
- * Whether this mount drains the native shared-backup singleton on focus. After
- * Phase 38 removed the Backup tab, the Settings-hosted screen is the sole live
- * consumer. Native consumption safely returns `{ uri: null }` when nothing is
- * staged, so ordinary Settings navigation remains a no-op.
+ * The post-restore return (the result page's button):
+ * - settings: reset the Settings stack to its hub, as before (the shape of
+ *   `CommonActions.reset`, so this module stays node-testable);
+ * - digest: `finishFlow(navigation, { kind: "digest" })`: switch to Digest
+ *   without a Back-history entry and pop the restore routes off the Settings
+ *   stack (they are flow routes, `FLOW_ROUTE_NAMES`).
  */
-export function shouldConsumeSharedBackup(host: BackupHost): boolean {
-  return host === "settings";
+export function returnFromRestore(
+  navigation: FlowNavigator,
+  host: RestoreHost,
+): void {
+  switch (host.kind) {
+    case "settings":
+      navigation.dispatch({
+        type: "RESET",
+        payload: { index: 0, routes: [{ name: RESTORE_SUCCESS_BASE_ROUTE }] },
+      } as never);
+      return;
+    case "digest":
+      finishFlow(navigation, { kind: "digest" });
+      return;
+    default:
+      unreachable(host);
+  }
 }
 
 /**
- * Host-aware Backup app-bar chrome (review cycle-2 MEDIUM / §M). The
- * Settings-hosted copy renders `variant="child"` (a Back affordance that returns
- * to the Settings hub via ShellAppBar's `onBack`); the Backup-tab root stays
- * `variant="root"` (title-only, UNCHANGED). Reusing `root` under Settings would
- * strand the back affordance.
+ * Whether this Backup mount drains the native shared-backup singleton on
+ * focus. Both hosts are Settings-stack mounts and the sole live consumer;
+ * native consumption returns `{ uri: null }` when nothing is staged.
  */
-export function backupAppBarVariant(host: BackupHost): "root" | "child" {
-  return host === "settings" ? "child" : "root";
+export function shouldConsumeSharedBackup(host: RestoreHost): boolean {
+  switch (host.kind) {
+    case "settings":
+      return true;
+    case "digest":
+      return true;
+    default:
+      return unreachable(host);
+  }
+}
+
+/**
+ * The Backup page's app bar: a pushed child page with a Back for both hosts
+ * (`ShellAppBar variant="child"`).
+ */
+export function backupAppBarVariant(host: RestoreHost): "child" {
+  switch (host.kind) {
+    case "settings":
+      return "child";
+    case "digest":
+      return "child";
+    default:
+      return unreachable(host);
+  }
 }

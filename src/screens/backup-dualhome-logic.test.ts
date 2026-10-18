@@ -1,86 +1,106 @@
-import { describe, expect, it } from "vitest";
-import {
-  type BackupHost,
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FlowNavigator } from "@/navigation/flow-host";
+
+/**
+ * 38.12 D-68 (convergence c2 B-8): every restore host kind has an explicit
+ * mapping in each helper. A restore host is settings or digest; a Profile is
+ * not a restore host and is rejected by the type.
+ */
+const flowHost = vi.hoisted(() => ({ finishFlow: vi.fn() }));
+vi.mock("@/navigation/flow-host", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/navigation/flow-host")>()),
+  finishFlow: flowHost.finishFlow,
+}));
+
+const {
   backupAppBarVariant,
-  DEFAULT_BACKUP_HOST,
+  DEFAULT_RESTORE_HOST,
+  RESTORE_SUCCESS_BASE_ROUTE,
   restoreReturnLabel,
-  restoreReturnRouteName,
+  returnFromRestore,
   shouldConsumeSharedBackup,
-} from "./backup-dualhome-logic";
+} = await import("./backup-dualhome-logic");
+type RestoreHost = import("./backup-dualhome-logic").RestoreHost;
 
-const ALL_HOSTS: readonly BackupHost[] = ["backup-tab", "settings"];
+const SETTINGS: RestoreHost = { kind: "settings" };
+const DIGEST: RestoreHost = { kind: "digest" };
 
-describe("backup dual-home host helpers (D-08 / §I)", () => {
-  describe("DEFAULT_BACKUP_HOST", () => {
-    it("is fail-closed to the shipped Backup-tab behaviour", () => {
-      // An un-anticipated host-less mount must preserve the shipped
-      // single-consumer / reset-to-Backup behaviour (review cycle-1 CONTESTED).
-      expect(DEFAULT_BACKUP_HOST).toBe("backup-tab");
-    });
+function navigatorSpy() {
+  return {
+    getState: vi.fn(() => undefined),
+    dispatch: vi.fn(),
+    goBack: vi.fn(),
+    getParent: vi.fn(() => undefined),
+  } satisfies FlowNavigator;
+}
+
+describe("restore host helpers (38.12 D-68)", () => {
+  beforeEach(() => {
+    flowHost.finishFlow.mockReset();
   });
 
-  describe("restoreReturnRouteName", () => {
-    it("resets to Backup for the tab host (UNCHANGED shipped behaviour)", () => {
-      expect(restoreReturnRouteName("backup-tab")).toBe("Backup");
-    });
-
-    it("returns to the Settings hub for the settings host", () => {
-      expect(restoreReturnRouteName("settings")).toBe("Settings");
-    });
-
-    it("defaults (via DEFAULT_BACKUP_HOST) to resetting to Backup", () => {
-      expect(restoreReturnRouteName(DEFAULT_BACKUP_HOST)).toBe("Backup");
-    });
-  });
-
-  describe("restoreReturnLabel", () => {
-    it("labels the tab host return as Backup & Restore (UNCHANGED)", () => {
-      expect(restoreReturnLabel("backup-tab")).toBe(
-        "Return to Backup & Restore",
-      );
-    });
-
-    it("labels the settings host return as Settings (matches destination, WR-02)", () => {
-      expect(restoreReturnLabel("settings")).toBe("Return to Settings");
-    });
-
-    it("describes the same destination restoreReturnRouteName resets to", () => {
-      // The label must not misdescribe where the button actually navigates.
-      for (const host of ALL_HOSTS) {
-        const route = restoreReturnRouteName(host);
-        const label = restoreReturnLabel(host);
-        expect(
-          label.includes(route === "Settings" ? "Settings" : "Backup"),
-        ).toBe(true);
-      }
-    });
+  it("defaults to the Settings host", () => {
+    expect(DEFAULT_RESTORE_HOST).toEqual({ kind: "settings" });
   });
 
   describe("shouldConsumeSharedBackup", () => {
-    it("does not drain from the removed legacy tab host", () => {
-      expect(shouldConsumeSharedBackup("backup-tab")).toBe(false);
+    it("settings consumes the shared backup", () => {
+      expect(shouldConsumeSharedBackup(SETTINGS)).toBe(true);
     });
-
-    it("drains from the surviving Settings-hosted restore path", () => {
-      expect(shouldConsumeSharedBackup("settings")).toBe(true);
-    });
-
-    it("consumes the singleton exactly once across the two mounts (single-drain-per-host)", () => {
-      const consumers = ALL_HOSTS.filter((host) =>
-        shouldConsumeSharedBackup(host),
-      );
-      expect(consumers).toEqual(["settings"]);
-      expect(consumers).toHaveLength(1);
+    it("digest consumes the shared backup", () => {
+      expect(shouldConsumeSharedBackup(DIGEST)).toBe(true);
     });
   });
 
   describe("backupAppBarVariant", () => {
-    it("gives the Settings-hosted copy a Back affordance (variant=child)", () => {
-      expect(backupAppBarVariant("settings")).toBe("child");
+    it("settings uses the child bar", () => {
+      expect(backupAppBarVariant(SETTINGS)).toBe("child");
+    });
+    it("digest uses the child bar", () => {
+      expect(backupAppBarVariant(DIGEST)).toBe("child");
+    });
+  });
+
+  describe("restore return", () => {
+    it("settings returns to the Settings hub, labelled 'Return to Settings'", () => {
+      expect(restoreReturnLabel(SETTINGS)).toBe("Return to Settings");
+      const navigation = navigatorSpy();
+      returnFromRestore(navigation, SETTINGS);
+      expect(navigation.dispatch).toHaveBeenCalledWith({
+        type: "RESET",
+        payload: { index: 0, routes: [{ name: "Settings" }] },
+      });
+      expect(RESTORE_SUCCESS_BASE_ROUTE).toBe("Settings");
+      expect(flowHost.finishFlow).not.toHaveBeenCalled();
     });
 
-    it("keeps the Backup-tab root title-only (variant=root, UNCHANGED)", () => {
-      expect(backupAppBarVariant("backup-tab")).toBe("root");
+    it("digest returns through finishFlow({ kind: 'digest' }), labelled 'Return to Digest'", () => {
+      expect(restoreReturnLabel(DIGEST)).toBe("Return to Digest");
+      const navigation = navigatorSpy();
+      returnFromRestore(navigation, DIGEST);
+      expect(flowHost.finishFlow).toHaveBeenCalledWith(navigation, {
+        kind: "digest",
+      });
+      expect(navigation.dispatch).not.toHaveBeenCalled();
     });
+  });
+
+  it("rejects a Profile host at the type level", () => {
+    const profile = { kind: "profile", profileKey: "Profile-1" } as const;
+    // @ts-expect-error a Profile is not a restore host (B-8)
+    const host: RestoreHost = profile;
+    // Type-checked only, never run: each helper refuses a Profile host.
+    const typeOnly = () => {
+      // @ts-expect-error a Profile is not a restore host (B-8)
+      shouldConsumeSharedBackup(profile);
+      // @ts-expect-error a Profile is not a restore host (B-8)
+      backupAppBarVariant(profile);
+      // @ts-expect-error a Profile is not a restore host (B-8)
+      restoreReturnLabel(profile);
+      // @ts-expect-error a Profile is not a restore host (B-8)
+      returnFromRestore(navigatorSpy(), profile);
+    };
+    expect(typeof typeOnly).toBe("function");
+    expect(host.kind).toBe("profile");
   });
 });

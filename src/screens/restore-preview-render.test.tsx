@@ -182,3 +182,47 @@ describe("Restore preview (38.12 D-60, D-61, D-66)", () => {
     expect(labels.some((line) => /Replace all local/.test(line))).toBe(false);
   });
 });
+
+describe("Choose file again keeps the host's stack (38.12 D-67, D-68)", () => {
+  function renderExpired(host?: { kind: "settings" } | { kind: "digest" }) {
+    mocks.seeds = new Map();
+    const navigation = {
+      addListener: vi.fn(),
+      popTo: vi.fn(),
+      reset: vi.fn(),
+    };
+    const tree = nodes(
+      RestorePreviewScreen({
+        navigation,
+        route: {
+          key: "RestorePreview",
+          name: "RestorePreview",
+          params: { token: "expired-token", preview, host },
+        },
+      } as never),
+    );
+    return { tree, navigation };
+  }
+
+  it.each([
+    [undefined, { kind: "settings" }],
+    [{ kind: "digest" } as const, { kind: "digest" }],
+  ] as const)(
+    "pops to the Backup page beneath, keeping host %j",
+    (host, expected) => {
+      const { tree, navigation } = renderExpired(host);
+      const chooseAgain = tree.find(
+        (node) => node.props.accessibilityLabel === "Choose file again",
+      );
+      if (!chooseAgain) throw new Error("Missing Choose file again");
+      (chooseAgain.props.onPress as () => void)();
+      const appBar = byType(tree, "ShellAppBar");
+      (appBar.props.onBack as () => void)();
+      expect(navigation.popTo.mock.calls).toEqual([
+        ["Backup", { host: expected }],
+        ["Backup", { host: expected }],
+      ]);
+      expect(navigation.reset).not.toHaveBeenCalled();
+    },
+  );
+});

@@ -57,9 +57,8 @@ import {
   pickBackupDocument,
 } from "../../modules/orbit-backup-document-picker";
 import {
-  type BackupHost,
   backupAppBarVariant,
-  DEFAULT_BACKUP_HOST,
+  DEFAULT_RESTORE_HOST,
   shouldConsumeSharedBackup,
 } from "./backup-dualhome-logic";
 import {
@@ -100,8 +99,10 @@ function relativeTime(value: string): string {
 
 export function BackupScreen({
   navigation,
-  host = DEFAULT_BACKUP_HOST,
-}: RootStackScreenProps<"Backup"> & { host?: BackupHost }) {
+  route,
+}: RootStackScreenProps<"Backup">) {
+  // 38.12 D-68: the host travels as a route param (absent = settings).
+  const host = route.params?.host ?? DEFAULT_RESTORE_HOST;
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const [health, setHealth] = useState<BackupHealth | null>(null);
@@ -382,12 +383,13 @@ export function BackupScreen({
           if (failure.step === "selection") setSelectedEncryptedContents(null);
           return;
         }
-        const route = restorePreviewCache.store(candidate);
+        const previewRoute = restorePreviewCache.store(candidate);
         setSelectedEncryptedContents(null);
         setRestorePassphrase("");
         setPassphraseVisible(false);
         setRestoreStage("idle");
-        navigation.navigate("RestorePreview", route);
+        // The host travels on to the preview and the result (D-68).
+        navigation.navigate("RestorePreview", { ...previewRoute, host });
       } catch (error) {
         Logger.error(LOG_SCOPE, "restore preview validation failed", error);
         setSelectedEncryptedContents(null);
@@ -397,7 +399,7 @@ export function BackupScreen({
         );
       }
     },
-    [navigation],
+    [host, navigation],
   );
 
   const loadRestoreDocument = useCallback(

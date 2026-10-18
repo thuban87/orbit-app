@@ -61,7 +61,7 @@ const COMPUTED_CHILD_VARIANTS: Record<
   "src/screens/BackupScreen.tsx": {
     expr: "backupAppBarVariant(host)",
     // Backup is Settings-only after Phase 38: the Settings host is a child.
-    resolvesChild: () => backupAppBarVariant("settings") === "child",
+    resolvesChild: () => backupAppBarVariant({ kind: "settings" }) === "child",
   },
 };
 

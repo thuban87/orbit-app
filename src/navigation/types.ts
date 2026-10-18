@@ -6,6 +6,7 @@ import type {
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { CurrentStateFieldKey, MemoryTypeKey } from "@/db/memory-registry";
 import type { MergeResolutions } from "@/db/merge-dao";
+import type { RestoreHost } from "@/screens/backup-dualhome-logic";
 import type {
   RestorePreviewRoute,
   RestoreResultRoute,
@@ -56,6 +57,9 @@ export type ProfileRouteParams = {
  * Forwarding it between flow screens is owned by the plans that touch them.
  */
 type FlowHostParam = { host?: FlowHost };
+
+/** The Backup / restore routes' host (38.12 D-68): FlowHost minus profile. */
+type RestoreHostParam = { host?: RestoreHost };
 
 /**
  * Where a Compose session was launched from, driving origin-aware return
@@ -308,13 +312,6 @@ export type OrreryStackParamList = {
   } & FlowHostParam;
 };
 
-export type BackupStackParamList = {
-  Backup: undefined;
-  BackupSettings: { section?: "automatic" | "encryption" } | undefined;
-  RestorePreview: RestorePreviewRoute;
-  RestoreResult: RestoreResultRoute;
-};
-
 export type DigestStackParamList = {
   Digest: undefined;
   Profile: ProfileRouteParams;
@@ -471,13 +468,15 @@ export type SettingsStackParamList = {
   SettingsAbout: undefined;
   /**
    * Data & Backup is Settings-only after the redundant bottom tab was removed
-   * in Phase 38. These routes host the canonical Backup screens in this stack;
-   * wrappers pass an explicit `host` so restore returns remain origin-aware.
+   * in Phase 38. These routes host the canonical Backup screens in this stack.
+   * The restore routes carry an optional `host` (38.12 D-68; absent =
+   * `DEFAULT_RESTORE_HOST`, settings) so the return is host-aware; Phase 39
+   * D-96 passes `{ kind: "digest" }`.
    */
-  Backup: undefined;
+  Backup: RestoreHostParam | undefined;
   BackupSettings: { section?: "automatic" | "encryption" } | undefined;
-  RestorePreview: RestorePreviewRoute;
-  RestoreResult: RestoreResultRoute;
+  RestorePreview: RestorePreviewRoute & RestoreHostParam;
+  RestoreResult: RestoreResultRoute & RestoreHostParam;
   /**
    * Categories IA reservation (D-03 / §K). A stable internal route NAME held for
    * a FUTURE Category Management phase (CRUD + deletion cascade). Phase 37 ships
@@ -609,7 +608,6 @@ export type RootStackParamList = DashboardStackParamList &
   DigestStackParamList &
   EventsStackParamList &
   OrreryStackParamList &
-  BackupStackParamList &
   SettingsStackParamList;
 
 export type DashboardScreenProps<T extends keyof DashboardStackParamList> =
@@ -621,12 +619,6 @@ export type DashboardScreenProps<T extends keyof DashboardStackParamList> =
 export type OrreryScreenProps<T extends keyof OrreryStackParamList> =
   CompositeScreenProps<
     NativeStackScreenProps<OrreryStackParamList, T>,
-    BottomTabScreenProps<TabParamList>
-  >;
-
-export type BackupScreenProps<T extends keyof BackupStackParamList> =
-  CompositeScreenProps<
-    NativeStackScreenProps<BackupStackParamList, T>,
     BottomTabScreenProps<TabParamList>
   >;
 

@@ -12,9 +12,8 @@ import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
-  type BackupHost,
-  DEFAULT_BACKUP_HOST,
-  restoreReturnRouteName,
+  DEFAULT_RESTORE_HOST,
+  RESTORE_SUCCESS_BASE_ROUTE,
 } from "@/screens/backup-dualhome-logic";
 import {
   backupNeedsBackgroundConsent,
@@ -106,8 +105,9 @@ async function createPreRestoreSnapshot() {
 export function RestorePreviewScreen({
   navigation,
   route,
-  host = DEFAULT_BACKUP_HOST,
-}: RootStackScreenProps<"RestorePreview"> & { host?: BackupHost }) {
+}: RootStackScreenProps<"RestorePreview">) {
+  // 38.12 D-68: the host travels as a route param (absent = settings).
+  const host = route.params.host ?? DEFAULT_RESTORE_HOST;
   const { colors } = useTheme();
   // A focused page (D-114): no tab bar and no +, so the last item only clears
   // the system navigation area.
@@ -194,15 +194,12 @@ export function RestorePreviewScreen({
     [applying, navigation],
   );
 
-  // Re-pick a file: intentionally stays targeting `Backup`, NOT the origin hub.
-  // `Backup` exists in BOTH hosting stacks, so this reset resolves within
-  // whichever stack currently hosts this screen — the user lands back on the
-  // Backup screen to choose another file, which is the right destination for a
-  // "choose file again" affordance regardless of entry point (review MEDIUM:
-  // this site is deliberately not origin-routed, unlike the success/return sites).
+  // Re-pick a file (D-67): pop back to the Backup page beneath this one, so the
+  // host's stack (Settings under Backup) stays. Its host is passed again
+  // because popTo replaces the route's params.
   const returnToSelection = useCallback(() => {
-    navigation.reset({ index: 0, routes: [{ name: "Backup" }] });
-  }, [navigation]);
+    navigation.popTo("Backup", { host });
+  }, [host, navigation]);
 
   confirmRef.current = (confirmMode) =>
     // One dialog at most: Replace-all's, carrying the D-47 notice when a
@@ -252,15 +249,17 @@ export function RestorePreviewScreen({
       // against user Back actions during the apply.
       allowNavigationRef.current = true;
       restorePreviewCache.discard(route.params.token);
-      // Origin-aware success reset: the BASE route is the entry point's return
-      // target (Backup tab → `Backup`, UNCHANGED; Settings entry → `Settings`
-      // hub) so RestoreResult sits atop the right root. The RestoreResult that
-      // lands is the same-stack copy — its own `host` drives its return button.
+      // The success reset leaves Backup restored on the Settings hub, so its
+      // Back lands there; the result carries the host, which drives its
+      // return button (D-68).
       navigation.reset({
         index: 1,
         routes: [
-          { name: restoreReturnRouteName(host) },
-          { name: "RestoreResult", params: toRestoreResultParams(result) },
+          { name: RESTORE_SUCCESS_BASE_ROUTE },
+          {
+            name: "RestoreResult",
+            params: { ...toRestoreResultParams(result), host },
+          },
         ],
       });
     } catch (error) {

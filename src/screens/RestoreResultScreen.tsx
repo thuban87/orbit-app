@@ -3,10 +3,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
-  type BackupHost,
-  DEFAULT_BACKUP_HOST,
+  DEFAULT_RESTORE_HOST,
   restoreReturnLabel,
-  restoreReturnRouteName,
+  returnFromRestore,
 } from "@/screens/backup-dualhome-logic";
 import { restoreResultPeopleLines } from "@/screens/backup-restore-logic";
 import {
@@ -18,8 +17,9 @@ import { useTheme } from "@/theme";
 export function RestoreResultScreen({
   navigation,
   route,
-  host = DEFAULT_BACKUP_HOST,
-}: RootStackScreenProps<"RestoreResult"> & { host?: BackupHost }) {
+}: RootStackScreenProps<"RestoreResult">) {
+  // 38.12 D-68: the host travels as a route param (absent = settings).
+  const host = route.params.host ?? DEFAULT_RESTORE_HOST;
   const { colors } = useTheme();
   // A focused page (D-114): no tab bar and no +, so the last item only clears
   // the system navigation area.
@@ -49,7 +49,8 @@ export function RestoreResultScreen({
     .join(", ");
   const returnLabel = restoreReturnLabel(host);
   // The shared header and its Back (38.9 D-16). The success reset leaves
-  // [hub, RestoreResult], so Back lands on the return hub, like the button.
+  // [Settings, RestoreResult], so Back lands on the Settings hub; the button
+  // returns through the host (D-68).
   return (
     <View style={styles.root}>
       <ShellAppBar variant="child" title="Backup restored" />
@@ -102,12 +103,7 @@ export function RestoreResultScreen({
             testID="restore-return-to-backup"
             accessibilityRole="button"
             accessibilityLabel={returnLabel}
-            onPress={() =>
-              navigation.reset({
-                index: 0,
-                routes: [{ name: restoreReturnRouteName(host) }],
-              })
-            }
+            onPress={() => returnFromRestore(navigation, host)}
             style={[styles.primaryButton, { backgroundColor: colors.accent }]}
           >
             <Text style={{ color: colors.onAccent }}>{returnLabel}</Text>

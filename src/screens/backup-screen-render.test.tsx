@@ -165,7 +165,6 @@ function render(overrides: Record<number, unknown> = {}): TestElement[] {
     BackupScreen({
       navigation,
       route: { key: "Backup", name: "Backup", params: undefined },
-      host: "settings",
     } as never),
   );
 }
@@ -461,7 +460,6 @@ describe("Backup page shared row (38.12 D-119)", () => {
       BackupScreen({
         navigation,
         route: { key: "Backup", name: "Backup", params: undefined },
-        host: "settings",
       } as never),
     );
     const row = byTestID(tree, "backup-encryption");

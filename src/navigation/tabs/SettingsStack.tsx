@@ -138,32 +138,9 @@ function SettingsAIRoute() {
   return <SettingsAIScreen />;
 }
 
-// Backup is Settings-only after Phase 38. These wrappers host the same canonical
-// four-screen tree and thread an
-// explicit `host="settings"` (review cycle-1 HIGH — no nav-state inference) so
-// the shared screens return to the Settings hub after a restore, drain the
-// shared-backup singleton as its sole consumer (linking.ts), and
-// render a Back affordance. `BackupSettings` needs no host — it neither resets to
-// Backup nor consumes.
-function BackupSettingsHostRoute(props: RootStackScreenProps<"Backup">) {
-  return <BackupScreen {...props} host="settings" />;
-}
-
-function RestorePreviewSettingsRoute(
-  props: RootStackScreenProps<"RestorePreview">,
-) {
-  return <RestorePreviewScreen {...props} host="settings" />;
-}
-
-function RestoreResultSettingsRoute(
-  props: RootStackScreenProps<"RestoreResult">,
-) {
-  return <RestoreResultScreen {...props} host="settings" />;
-}
-
 // Profile is hosted here (Settings → Archived → Profile, and a participant
 // Profile reached through a group event). The wrapper threads an explicit host,
-// mirroring the Backup wrappers above, so the hero disables Message: Compose and
+// so the hero disables Message: Compose and
 // ComposeResearch are deliberately never registered under Settings (D-09, D-25,
 // RG-021 — archived messaging stays prohibited; no cross-tab jump to message).
 function SettingsProfileHostRoute(props: RootStackScreenProps<"Profile">) {
@@ -212,19 +189,13 @@ export function SettingsStack() {
       <Stack.Screen name="SettingsOrrery" component={SettingsOrreryRoute} />
       <Stack.Screen name="SettingsAI" component={SettingsAIRoute} />
       <Stack.Screen name="SettingsAbout" component={SettingsAboutRoute} />
-      {/* Backup is Settings-only after Phase 38. The canonical four-screen tree
-          is hosted here via `host="settings"` wrappers; `BackupSettings` reuses
-          the screen directly because it has no host-dependent behavior. */}
-      <Stack.Screen name="Backup" component={BackupSettingsHostRoute} />
+      {/* Backup is Settings-only after Phase 38. The Backup and restore pages
+          read their host from an optional `host` route param (38.12 D-68;
+          absent = settings), so no wrapper injects one. */}
+      <Stack.Screen name="Backup" component={BackupScreen} />
       <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
-      <Stack.Screen
-        name="RestorePreview"
-        component={RestorePreviewSettingsRoute}
-      />
-      <Stack.Screen
-        name="RestoreResult"
-        component={RestoreResultSettingsRoute}
-      />
+      <Stack.Screen name="RestorePreview" component={RestorePreviewScreen} />
+      <Stack.Screen name="RestoreResult" component={RestoreResultScreen} />
       <Stack.Screen name="AIConnection" component={AIConnectionRoute} />
       <Stack.Screen name="AIModelPicker" component={AIModelPickerRoute} />
       <Stack.Screen
