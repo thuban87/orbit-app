@@ -76,8 +76,8 @@ function pickedOptions(
  *
  * | Mode | Family | Applied | Remembered |
  * |---|---|---|---|
- * | Detail picks, field tapped | phones/emails | exactly the picks, labelled; first pick (display order) primary | full source serialization |
- * | Detail picks, untapped defaults | phones/emails | exactly the picks, labelled; Orbit primary unchanged (D-144) | full source serialization |
+ * | Detail picks, one ticked by the person | phones/emails | exactly the picks, labelled; the person's own tick primary | full source serialization |
+ * | Detail picks, only pre-ticked defaults (or only unticks) | phones/emails | exactly the picks, labelled; Orbit primary unchanged (D-144, D-148) | full source serialization |
  * | Detail pick | name/birthday/photo | the one chosen option | as before |
  * | Bulk use-contact-values | phones/emails (additive) | every option, labelled; Orbit primary unchanged | full source serialization |
  * | Bulk use-contact-values | name/birthday (one option), photo skipped | as before | as before |
@@ -87,15 +87,16 @@ function pickedOptions(
  * source serialization), so they are not offered again until the phone side
  * changes (convergence c3 D-1; D-45).
  *
- * `tappedFamilies` (38.12 D-144, owner): the fields the person actually tapped
- * in the detail. Pre-ticked defaults are still added, but only a tapped field
- * can make a phone value primary; with no tap, Orbit's primary stays. Absent
- * means nothing was tapped. Bulk ignores it and never elects.
+ * `primaryPicks` (38.12 D-144 refined by D-148, owner): per field, the value
+ * the person ticked themselves (the latest such tick still ticked; see
+ * `userPrimaryPick`). Only that value can become Orbit's primary; pre-ticked
+ * defaults and unticks never elect, so with no own tick Orbit's primary
+ * stays. Bulk ignores it and never elects.
  */
 export function buildReconcileSelections(
   diff: ReconcileDiffResult,
   choices: ReconcileChoices | ReconcileBulkMode,
-  tappedFamilies: ReadonlySet<string> = new Set(),
+  primaryPicks: Partial<Record<string, ReconcileSourceChoice>> = {},
 ): ReconcileSelection[] {
   const bulk = typeof choices === "string" ? choices : null;
   return diff.fields.flatMap((field): ReconcileSelection[] => {
@@ -133,6 +134,18 @@ export function buildReconcileSelections(
       }
     }
 
+    // D-148: only a value the person ticked themselves may become primary.
+    // It is moved first, because Apply elects the first picked method.
+    const primaryPick = bulk ? undefined : primaryPicks[field.fieldFamily];
+    const primaryOption =
+      isMethodFamily(field) && primaryPick
+        ? picked.find((option) => choiceFor(option) === primaryPick)
+        : undefined;
+    if (primaryOption)
+      picked = [
+        primaryOption,
+        ...picked.filter((option) => option !== primaryOption),
+      ];
     const useSource = picked.length > 0;
     const chosenOption = picked[0];
     return [
@@ -144,14 +157,9 @@ export function buildReconcileSelections(
         ...(isMethodFamily(field) && useSource
           ? { sourceOptionIds: picked.map((option) => option.optionId) }
           : {}),
-        // A tapped detail pick names the new primary (D-102); untapped
-        // defaults (D-144) and bulk never do.
-        ...(isMethodFamily(field) &&
-        useSource &&
-        !bulk &&
-        tappedFamilies.has(field.fieldFamily)
-          ? { electPrimary: true }
-          : {}),
+        // The person's own tick names the new primary (D-102, D-148);
+        // pre-ticked defaults, unticks (D-144) and bulk never do.
+        ...(primaryOption ? { electPrimary: true } : {}),
         sourceValue:
           (field.fieldFamily === "name" || field.fieldFamily === "birthday") &&
           useSource
@@ -214,6 +222,33 @@ export function toggleReconcileMethodChoice(
     ? picks.filter((pick) => pick !== tapped)
     : [...picks, tapped];
   return next.length > 0 ? next : "orbit";
+}
+
+/**
+ * The values the person ticked themselves in one phones/emails field, oldest
+ * first (38.12 D-148). A tap that ticks a value moves it to the end; a tap
+ * that unticks it removes it; Orbit clears the list. Pre-ticked defaults
+ * never enter it, so unticking one never counts as choosing a primary.
+ */
+export function nextUserTicks(
+  ticks: readonly ReconcileSourceChoice[],
+  next: ReconcileFamilyChoice,
+  tapped: ReconcileChoice,
+): ReconcileSourceChoice[] {
+  if (tapped === "orbit") return [];
+  const without = ticks.filter((tick) => tick !== tapped);
+  return selectedReconcileChoiceIds(next).includes(tapped)
+    ? [...without, tapped]
+    : without;
+}
+
+/** The value that becomes primary: the latest own tick still ticked (D-148). */
+export function userPrimaryPick(
+  ticks: readonly ReconcileSourceChoice[],
+  choice: ReconcileFamilyChoice | undefined,
+): ReconcileSourceChoice | undefined {
+  const selected = selectedReconcileChoiceIds(choice);
+  return [...ticks].reverse().find((tick) => selected.includes(tick));
 }
 
 /** The picks a phones/emails row shows as selected. */

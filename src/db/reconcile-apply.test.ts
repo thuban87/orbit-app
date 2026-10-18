@@ -462,19 +462,19 @@ describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)",
     });
   }
 
-  /** The fields the person tapped in the detail (D-144); none for defaults. */
-  const TAPPED_PHONES: ReadonlySet<string> = new Set(["phones"]);
+  /** The value the person ticked themselves (D-144, D-148); none for defaults. */
+  const ownTick = (choice: ReconcileSourceChoice) => ({ phones: choice });
 
   async function apply(
     diff: ReturnType<typeof classifyReconciliation>,
     choices: ReconcileChoices | "use-contact-values",
-    tapped?: ReadonlySet<string>,
+    primaryPicks?: Partial<Record<string, ReconcileSourceChoice>>,
   ) {
     return inWriteTransaction(exec, () =>
       applyReconcileSelections(exec, {
         contactId,
         now: NOW,
-        selections: buildReconcileSelections(diff, choices, tapped),
+        selections: buildReconcileSelections(diff, choices, primaryPicks),
         effectivePhoneRegion: REGION,
       }),
     );
@@ -519,7 +519,8 @@ describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)",
     await seedPhones([{ value: "+13125550111", label: "Mobile" }]);
     const source = [phone("(312) 555-0122", 3), phone("(312) 555-0133", 1)];
     const diff = await classify(source);
-    await apply(diff, { phones: pick(diff, "+13125550122") }, TAPPED_PHONES);
+    const [ticked] = pick(diff, "+13125550122");
+    await apply(diff, { phones: [ticked] }, ownTick(ticked));
     const rows = await orbitPhones();
     expect(shape(rows)).toEqual([
       { value: "+13125550111", label: "Mobile", primary: false },
@@ -533,7 +534,7 @@ describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)",
     expect(await phonesAskedAgain(source)).toBe(false);
   });
 
-  it("two picks of three: both added labelled, first in display order primary, the third not added", async () => {
+  it("two picks of three: both added labelled, the person's last own tick primary, the third not added", async () => {
     await seedPhones([{ value: "+13125550111", label: "Mobile" }]);
     const source = [
       phone("(312) 555-0122", 3),
@@ -541,12 +542,9 @@ describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)",
       phone("(312) 555-0144", 2),
     ];
     const diff = await classify(source);
-    // Tapped in reverse order; display order still decides the primary.
-    await apply(
-      diff,
-      { phones: pick(diff, "+13125550144", "+13125550122") },
-      TAPPED_PHONES,
-    );
+    // Ticked 0144 then 0122: the latest own tick is the primary (D-148).
+    const picks = pick(diff, "+13125550144", "+13125550122");
+    await apply(diff, { phones: picks }, ownTick(picks[1]));
     expect(shape(await orbitPhones())).toEqual([
       { value: "+13125550111", label: "Mobile", primary: false },
       { value: "+13125550122", label: "Work", primary: true },
@@ -587,7 +585,8 @@ describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)",
     const before = await orbitPhones();
     const source = [phone("(312) 555-0122", 3), phone("(312) 555-0155", 2)];
     const diff = await classify(source);
-    await apply(diff, { phones: pick(diff, "+13125550122") }, TAPPED_PHONES);
+    const [ticked] = pick(diff, "+13125550122");
+    await apply(diff, { phones: [ticked] }, ownTick(ticked));
     const rows = await orbitPhones();
     expect(rows).toHaveLength(2);
     const flipped = rows.find((row) => row.canonical_value === "+13125550122");
@@ -640,17 +639,44 @@ describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)",
     expect(await phonesAskedAgain(source)).toBe(false);
   });
 
-  it("a tapped field still elects its first pick as primary (38.12 D-144, D-102)", async () => {
+  it("an own tick elects that value even with pre-ticked defaults (38.12 D-148, D-102)", async () => {
     await seedPhones([{ value: "+13125550155", label: "Mobile" }]);
     const source = [phone("(312) 555-0155", 2), phone("(312) 555-0122", 3)];
     const diff = await classify(source);
-    // The person unticked and re-ticked 0122: the field was tapped.
-    await apply(diff, defaultReconcileChoices(diff), TAPPED_PHONES);
+    // The person unticked and re-ticked 0122: their own tick.
+    const [ticked] = pick(diff, "+13125550122");
+    await apply(diff, defaultReconcileChoices(diff), ownTick(ticked));
     expect(shape(await orbitPhones())).toEqual([
       { value: "+13125550122", label: "Work", primary: true },
       { value: "+13125550155", label: "Mobile", primary: false },
     ]);
     expect(await contactMethodTombstones()).toBe(0);
+  });
+
+  it("unticking a pre-ticked value never makes an untapped value primary (38.12 review B-WR-04)", async () => {
+    // Orbit's primary 0155 sorts after 0122, so a display-order election
+    // after an untick would make the never-tapped 0122 primary.
+    await seedPhones([{ value: "+13125550155", label: "Mobile" }]);
+    const source = [
+      phone("(312) 555-0155", 2),
+      phone("(312) 555-0122", 3),
+      phone("(312) 555-0133", 1),
+    ];
+    const diff = await classify(source);
+    expect(diff.fields.find((f) => f.fieldFamily === "phones")?.outcome).toBe(
+      "additive",
+    );
+    const [, unwanted] = pick(diff, "+13125550122", "+13125550133");
+    const phones = toggleReconcileMethodChoice(
+      defaultReconcileChoices(diff).phones,
+      unwanted,
+    );
+    // No own tick: nothing elects.
+    await apply(diff, { phones }, {});
+    expect(shape(await orbitPhones())).toEqual([
+      { value: "+13125550122", label: "Work", primary: false },
+      { value: "+13125550155", label: "Mobile", primary: true },
+    ]);
   });
 
   it("detail default: unticking one adds only the other two", async () => {

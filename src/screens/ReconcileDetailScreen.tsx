@@ -54,11 +54,14 @@ import {
   buildReconcileSelections,
   defaultReconcileChoices,
   isReconcileChoiceUnresolved,
+  nextUserTicks,
   type ReconcileChoice,
   type ReconcileChoices,
   type ReconcileFamilyChoice,
+  type ReconcileSourceChoice,
   selectedReconcileChoiceIds,
   toggleReconcileMethodChoice,
+  userPrimaryPick,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
@@ -126,11 +129,12 @@ export function ReconcileDetailScreen({
   );
   const [scan, setScan] = useState<ScanState | null>(null);
   const [choices, setChoices] = useState<ReconcileChoices>({});
-  // The fields the person tapped (38.12 D-144): only these may change Orbit's
-  // primary; pre-ticked defaults are added as secondaries.
-  const [tappedFamilies, setTappedFamilies] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+  // Per phones/emails field, the values the person ticked themselves (38.12
+  // D-144, D-148): only such a value may become Orbit's primary; pre-ticked
+  // defaults are added as secondaries and an untick never elects.
+  const [userTicks, setUserTicks] = useState<
+    Partial<Record<string, ReconcileSourceChoice[]>>
+  >(() => ({}));
   const [message, setMessage] = useState<string | null>(null);
   const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -223,7 +227,7 @@ export function ReconcileDetailScreen({
         // Additive phones/emails open with every phone value picked (the
         // remembered full list); conflicts open with nothing (convergence c4 E-5).
         setChoices(defaultReconcileChoices(diff));
-        setTappedFamilies(new Set());
+        setUserTicks({});
         setApplied(false);
         if (diff.fields.length === 0) setMessage("No changes from Contacts.");
         setScan({
@@ -360,7 +364,7 @@ export function ReconcileDetailScreen({
       const selections = buildReconcileSelections(
         scan.diff,
         choices,
-        tappedFamilies,
+        primaryPicksFor(userTicks, choices),
       );
       const result = await inWriteTransaction(exec, () =>
         applyReconcileSelections(exec, {
@@ -468,7 +472,7 @@ export function ReconcileDetailScreen({
     cardId,
     sessionId,
     staging,
-    tappedFamilies,
+    userTicks,
   ]);
 
   // An unchosen field, or an emptied phone/email pick list, blocks Apply.
@@ -619,20 +623,32 @@ export function ReconcileDetailScreen({
                 key={field.fieldFamily}
                 field={field}
                 choice={choices[field.fieldFamily]}
+                primaryChoice={userPrimaryPick(
+                  userTicks[field.fieldFamily] ?? [],
+                  choices[field.fieldFamily],
+                )}
                 onChoice={(choice) => {
-                  setTappedFamilies((current) =>
-                    new Set(current).add(field.fieldFamily),
-                  );
+                  const multiple =
+                    field.fieldFamily === "phones" ||
+                    field.fieldFamily === "emails";
+                  const next = multiple
+                    ? toggleReconcileMethodChoice(
+                        choices[field.fieldFamily],
+                        choice,
+                      )
+                    : choice;
+                  if (multiple)
+                    setUserTicks((current) => ({
+                      ...current,
+                      [field.fieldFamily]: nextUserTicks(
+                        current[field.fieldFamily] ?? [],
+                        next,
+                        choice,
+                      ),
+                    }));
                   setChoices((current) => ({
                     ...current,
-                    [field.fieldFamily]:
-                      field.fieldFamily === "phones" ||
-                      field.fieldFamily === "emails"
-                        ? toggleReconcileMethodChoice(
-                            current[field.fieldFamily],
-                            choice,
-                          )
-                        : choice,
+                    [field.fieldFamily]: next,
                   }));
                 }}
               />
@@ -666,6 +682,19 @@ export function ReconcileDetailScreen({
   );
 }
 
+/** Each field's primary pick: the person's own latest tick (D-148). */
+function primaryPicksFor(
+  ticks: Partial<Record<string, ReconcileSourceChoice[]>>,
+  choices: ReconcileChoices,
+): Partial<Record<string, ReconcileSourceChoice>> {
+  const picks: Partial<Record<string, ReconcileSourceChoice>> = {};
+  for (const [family, list] of Object.entries(ticks)) {
+    const pick = userPrimaryPick(list ?? [], choices[family]);
+    if (pick) picks[family] = pick;
+  }
+  return picks;
+}
+
 /** One contact method as a person reads it: "Mobile · +1 555 000 1111". */
 function methodLine(value: string, label: string | null | undefined): string {
   return label ? `${label} · ${value}` : value;
@@ -674,12 +703,16 @@ function methodLine(value: string, label: string | null | undefined): string {
 function ChoiceRow({
   field,
   choice,
+  primaryChoice,
   onChoice,
 }: {
   field: ReconcileFieldDiff;
   choice?: ReconcileFamilyChoice;
+  /** Phones/emails: the value that will become the main one (D-148). */
+  primaryChoice?: ReconcileSourceChoice;
   onChoice: (choice: ReconcileChoice) => void;
 }) {
+  const { colors } = useTheme();
   // Render only (38.9 D-70, D-23; review C7-L2): birthday values show their
   // display form; the diff, every option id and `onChoice(option.id)` stay raw.
   // A phone shape the strict gate rejects ("--06-02") stays raw.
@@ -716,11 +749,17 @@ function ChoiceRow({
           : multiple
             ? methodLine(option.rawValue ?? option.value, option.label)
             : shown(option.value),
-      provenance: option.provenanceLabels.join(", ") || "Contacts",
+      provenance:
+        (option.provenanceLabels.join(", ") || "Contacts") +
+        (multiple && primaryChoice === `source:${option.optionId}`
+          ? field.fieldFamily === "phones"
+            ? " · Becomes the main number"
+            : " · Becomes the main email"
+          : ""),
       recommended: field.outcome === "additive",
     })),
   ];
-  return (
+  const group = (
     <FieldChoiceGroup
       label={
         field.fieldFamily === "phones"
@@ -745,6 +784,24 @@ function ChoiceRow({
       onChange={(option) => onChoice(option.id)}
     />
   );
+  // D-148: say how the main value is chosen when Orbit already has one and
+  // the phone offers more than one value to add.
+  if (
+    !multiple ||
+    field.sourceOptions.length < 2 ||
+    !(field.orbitMethods?.length ?? 0)
+  )
+    return group;
+  return (
+    <View style={styles.choiceRow}>
+      {group}
+      <Text style={[styles.hint, { color: colors.textSecondary }]}>
+        {field.fieldFamily === "phones"
+          ? "Ticked numbers are added. A number you tick yourself becomes the main one."
+          : "Ticked addresses are added. An address you tick yourself becomes the main one."}
+      </Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -761,6 +818,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   missingSource: { gap: 16 },
+  choiceRow: { gap: 6 },
+  hint: { fontSize: 13, lineHeight: 18 },
   chip: {
     alignSelf: "flex-start",
     borderRadius: 10,

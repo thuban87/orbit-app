@@ -4,8 +4,10 @@ import {
   buildReconcileSelections,
   defaultReconcileChoices,
   isReconcileChoiceUnresolved,
+  nextUserTicks,
   remainingReconcileFields,
   toggleReconcileMethodChoice,
+  userPrimaryPick,
 } from "@/logic/reconcile-selection";
 
 function diff(birthday: string | null = "1990-01-01") {
@@ -224,23 +226,24 @@ describe("phone picks (D-47, D-102; convergence c3 D-1, c4 E-5)", () => {
     expect(labelled?.reviewedComparable).toBe(plain?.reviewedComparable);
   });
 
-  it("a detail pick applies exactly the picks in display order and elects the first primary", () => {
+  it("a detail pick applies exactly the picks and elects the person's own tick (D-148)", () => {
     const diff = phoneDiff();
     const [first, , third] = ids(diff);
     const [selection] = buildReconcileSelections(
       diff,
       { phones: [third, first] },
-      new Set(["phones"]),
+      { phones: third },
     );
     expect(selection.useSource).toBe(true);
     expect(selection.electPrimary).toBe(true);
+    // The ticked primary leads (Apply elects the first method).
     expect(selection.sourceMethods).toEqual([
-      { type: "phone", value: "(312) 555-0122", label: "Work" },
       { type: "phone", value: "(312) 555-0144", label: "Mobile" },
+      { type: "phone", value: "(312) 555-0122", label: "Work" },
     ]);
     expect(selection.sourceOptionIds).toEqual([
-      first.slice("source:".length),
       third.slice("source:".length),
+      first.slice("source:".length),
     ]);
     // The whole source list is remembered, so untapped values are not re-asked.
     expect(selection.reviewedValue).toBe(
@@ -248,34 +251,67 @@ describe("phone picks (D-47, D-102; convergence c3 D-1, c4 E-5)", () => {
     );
   });
 
-  it("untapped default picks are applied but elect nothing; only a tapped field elects (38.12 D-144)", () => {
+  it("pre-ticked defaults and unticks elect nothing; only an own tick elects (38.12 D-144, D-148)", () => {
     const diff = phoneDiff();
     const defaults = defaultReconcileChoices(diff);
+    const [a, b] = ids(diff);
     const [untapped] = buildReconcileSelections(diff, defaults);
     expect(untapped.useSource).toBe(true);
     expect(untapped.sourceMethods).toHaveLength(3);
     expect(untapped.electPrimary).toBeUndefined();
-    // A tap on another field does not let this one elect.
-    const [otherTapped] = buildReconcileSelections(
+    // Unticking B (a pre-ticked default) is not choosing A as primary.
+    const afterUntick = toggleReconcileMethodChoice(defaults.phones, b);
+    const ticks = nextUserTicks([], afterUntick, b);
+    expect(ticks).toEqual([]);
+    expect(userPrimaryPick(ticks, afterUntick)).toBeUndefined();
+    const [unticked] = buildReconcileSelections(
       diff,
-      defaults,
-      new Set(["emails"]),
+      { phones: afterUntick },
+      {},
     );
+    expect(unticked.electPrimary).toBeUndefined();
+    // A primary pick for another field does not let this one elect.
+    const [otherTapped] = buildReconcileSelections(diff, defaults, {
+      emails: a,
+    });
     expect(otherTapped.electPrimary).toBeUndefined();
+    // Untick B then tick it again: B is the person's own tick → primary,
+    // and A stays added as a secondary.
+    const retick = toggleReconcileMethodChoice(afterUntick, b);
+    const ownTicks = nextUserTicks(ticks, retick, b);
+    expect(userPrimaryPick(ownTicks, retick)).toBe(b);
     const [tapped] = buildReconcileSelections(
       diff,
-      defaults,
-      new Set(["phones"]),
+      { phones: retick },
+      { phones: userPrimaryPick(ownTicks, retick) },
     );
     expect(tapped.electPrimary).toBe(true);
+    expect(tapped.sourceOptionIds?.[0]).toBe(b.slice("source:".length));
+    expect(tapped.sourceMethods).toHaveLength(3);
+  });
+
+  it("the latest own tick still ticked is the primary; unticking it falls back to an earlier own tick", () => {
+    const diff = phoneDiff();
+    const [a, b] = ids(diff);
+    let choice = toggleReconcileMethodChoice(undefined, a);
+    let ticks = nextUserTicks([], choice, a);
+    choice = toggleReconcileMethodChoice(choice, b);
+    ticks = nextUserTicks(ticks, choice, b);
+    expect(userPrimaryPick(ticks, choice)).toBe(b);
+    choice = toggleReconcileMethodChoice(choice, b);
+    ticks = nextUserTicks(ticks, choice, b);
+    expect(userPrimaryPick(ticks, choice)).toBe(a);
+    choice = toggleReconcileMethodChoice(choice, "orbit");
+    expect(nextUserTicks(ticks, choice, "orbit")).toEqual([]);
   });
 
   it("bulk Use Contact Values adds every phone value, labelled, and elects nothing", () => {
+    const diff = phoneDiff();
     const [selection] = buildReconcileSelections(
-      phoneDiff(),
+      diff,
       "use-contact-values",
-      // Bulk never elects, whatever was tapped (D-102, D-144).
-      new Set(["phones"]),
+      // Bulk never elects, whatever was ticked (D-102, D-144).
+      { phones: ids(diff)[0] },
     );
     expect(selection.electPrimary).toBeUndefined();
     expect(selection.sourceMethods?.map((method) => method.label)).toEqual([
