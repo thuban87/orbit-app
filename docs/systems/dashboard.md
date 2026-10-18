@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -86,7 +86,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 
 1. An empty explicit population set resolves to Active Contacts: non-archived, Bound, status-bearing contacts only.
 2. Explicit Favorites, Birthdays, Not Contacted, Snoozed, and All Contacts selections combine as a deduplicated OR-union beneath the archived-and-Bound scope. All Contacts is Active Contacts plus Not Contacted. The population labels come from the glossary constants: the user sees "Favorites" and "Never Contacted", while the persisted population ids (e.g. `favourites`) are unchanged (ADR-206).
-3. SQL-expressible filters combine OR within a family and AND across families. Current snoozes stay in Active and All Contacts, but Needs Attention suppresses them.
+3. SQL-expressible filters combine OR within a family and AND across families. Current snoozes stay in Active and All Contacts, but Needs Attention suppresses them. An indefinite snooze ("Until I turn it off", `snooze_until = '9999-12-31'`) is a current snooze like any other: it counts in Snoozed and drops out of Needs Attention with no reader change (ADR-234).
 4. `listDashboardPopulation()` orders the result with a population-aware Default or an explicit persisted override, then applies selected Gravity tiers in TypeScript without changing that order.
 5. The returned rows are the sole eligible universe for Dashboard search and empty-state decisions. A search that finds nothing shows the shared `EmptyState` (icon, the truncated search term, one help line, "Clear search"); hidden never-contacted people are announced as "N never contacted →" (ADR-199, ADR-206).
 
@@ -157,7 +157,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 1. Favourites are binary membership; the widget reads Favorites in shared Default order instead of user-visible rank order.
 2. The permanent birthday banner is absent. Birthdays remain reachable through the next-30-days population; Horizon owns the richer next-seven-days presentation.
 3. The standalone Never Contacted screen is retired. The `not-contacted` population is the shared Digest preview/drill path and includes opted-in Unbound contacts only when `include_unbound_never_contacted = 1`.
-4. Unbound contacts remain outside the Dashboard universe. Their child browse route now filters its loaded local rows by name and distinguishes a true empty state from no matching rows.
+4. Unbound contacts remain outside the Dashboard universe. Their child browse route now filters its loaded local rows by name and distinguishes a true empty state from no matching rows. The list scrolls to the top on a new query, keeps taps while the keyboard is up, and each row's subtitle reads "Last contact <date>" or "No contact logged" (`unbound-read.ts` carries the column). The route is also registered in the Settings stack, reached from Settings → Contacts & Relationships → "Unbound contacts"; the Contacts ⋯ entry stays (ADR-233).
 
 ### Handing selected contacts to canonical Group Log
 
@@ -233,6 +233,8 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — "Never Contacted", "Favorites" and singular-aware counts on Contacts.
 - **ADR-226:** Archive Becomes the Bin — bulk Move to Bin confirms (destructive) and reports "Moved N contacts to the Bin".
 - **ADR-227:** One Snooze Sheet — card and bulk snooze open the shared SnoozeSheet; bulk Unsnooze lives in the sheet and reads `readCurrentlySnoozedIds`.
+- **ADR-233:** The Profile ⋯ Follows Lifecycle State — the Unbound list's subtitle, scroll and keyboard behaviour, and its Settings entry.
+- **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — the sentinel date reads as a current snooze in every population and filter.
 
 ## Gotchas
 
@@ -311,3 +313,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-10-16 | 38.11 | Code review IN-01: `readCurrentlySnoozedIds` documented as `countSnoozed`'s date predicate without its bound filter (behaviour unchanged). |
 | 2026-10-16 | 38.11 | Code review IN-06: the card and bulk snooze sheets keep their title and Unsnooze row while animating closed (`useRetainedWhileClosing`); visibility and writes still read the live target. |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-226, ADR-227. |
+| 2026-10-18 | 38.12 | Indefinite snooze reads as a current snooze everywhere; Unbound list subtitle, scroll-to-top and keyboard taps, and a Settings entry (ADR-233, ADR-234). |
