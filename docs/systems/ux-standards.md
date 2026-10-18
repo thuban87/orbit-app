@@ -330,6 +330,7 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 - **ADR-233:** The Profile ⋯ Follows Lifecycle State — Bind/Unbind snackbars with Undo; the compact ⋯ sheet with a Close.
 - **ADR-237:** A Paused Import or Check Asks Once — one shared resume-prompt layout.
 - **ADR-246:** One Settings Row and Section Card on Every Settings Page, One Drag-and-⋯ List Pattern — the shared row and card, and the list pattern.
+- **ADR-243:** Restore Runs on Focused Pages — `parseIsoUtcMs` and `formatSourceTimeMinuteOrFallback` in `src/utils/dates.ts` read UTC "Z" and millisecond source times.
 
 ## Gotchas
 

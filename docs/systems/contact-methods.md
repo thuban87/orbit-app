@@ -146,6 +146,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 - **ADR-236:** Check Linked Contacts Never Re-Asks a Reviewed Difference — a picked phone value is added with its label as the primary, the old Orbit value stays secondary; only a user's tick elects a primary.
 - **ADR-239:** Import Screens Keep Add Contact's Order — imported methods keep the phone's labels.
 - **ADR-246:** One Settings Row and Section Card — the phone-region picker shows bundled English country names (`country-names.ts`).
+- **ADR-248:** AI Egress Narrows — Compose Research never lists a photo-type custom field.
 
 ## Gotchas
 

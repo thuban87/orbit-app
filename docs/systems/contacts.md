@@ -290,6 +290,9 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — the sentinel, migration 034's conversion and the restore mapping.
 - **ADR-235:** Merge Starts from the Profile — Merge from any live Profile.
 - **ADR-242:** Backup Format 9 Carries Favourites — favourite membership in backups; a Bin person is never favourited by a Merge restore.
+- **ADR-241:** Import, Check, Merge and Restore Carry a Flow Host — a Profile opened from a flow result carries `returnTab`.
+- **ADR-243:** Restore Runs on Focused Pages — `countContactsNotInBin` in `contact-read.ts` for the restore preview.
+- **ADR-245:** A Flagged Custom-Field Value Opens Edit at That Field — Edit Contact's `focusFieldDefId`.
 
 ## Gotchas
 

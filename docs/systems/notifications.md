@@ -140,6 +140,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-239:** Import Screens Keep Add Contact's Order — an Unbound import reschedules when Birthday alerts for Unbound contacts is on.
 - **ADR-246:** One Settings Row and Section Card — the Notifications page rows and "Check-in reminders".
 - **ADR-247:** Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day — `sameDayAllowedInstant`, `digestFireHour`, the arrival line.
+- **ADR-232:** A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards — snooze and unsnooze refuse a binned person (`ContactInBinError`), and notification actions handle the refusal.
 
 ## Gotchas
 

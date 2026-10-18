@@ -1,7 +1,7 @@
 # Contact Knowledge
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/off-limits-dao.ts`, `src/db/off-limits-read.ts`, `src/db/knowledge-move-dao.ts`, `src/db/linked-entry-dao.ts`, `src/db/undo-restore.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`
 
 ## Purpose
@@ -71,7 +71,7 @@ Migration 016 added `memories`, `relationships` and `current_state_entries`; mig
 | `src/screens/MemoryAddScreen.tsx` | + → Memory add form. |
 | `src/components/MemoryEditor.tsx` | Memory draft form, card edit mode, Allow AI in the draft. |
 | `src/components/MoveEntrySheet.tsx` | Move sheet and drop confirm. |
-| `src/db/compose-research-read.ts` | Compose Research projection with source-owned AI eligibility. |
+| `src/db/compose-research-read.ts` | Compose Research projection with source-owned AI eligibility; photo-type custom fields are never listed (ADR-248). |
 
 ## How It Works
 
@@ -179,6 +179,8 @@ A selected Android contact note becomes an `imported` memory with `provenance='i
 - **ADR-219:** Per-Section Editors Replace the Things to Remember and Memory Screens.
 - **ADR-220:** Things to Remember Inline on Add and Edit Contact.
 - **ADR-224:** One Contact Form and a Four-Action + — Update Contact's focused editors retired; knowledge is edited from Edit Contact and the Profile sections.
+- **ADR-245:** A Flagged Custom-Field Value Opens Edit at That Field — Things to Remember shows one "Needs attention" marker and opens Edit at the field.
+- **ADR-248:** AI Egress Narrows — `compose-research-read.ts` and `readPopulatedCustomFields` leave out photo-type custom fields.
 
 ## Gotchas
 
@@ -234,3 +236,4 @@ A selected Android contact note becomes an `imported` memory with `provenance='i
 | 2026-10-15 | 38.10 | Fuel retired: Off Limits table, Gift Ideas / Thought of Them types, labels on every memory, dated current state with no current flag, linked "Also save to" entries, one delete-with-Undo pattern (Recently Deleted and the trash sweep removed), moves between sections, per-section editors, Hide from Profile switched off (ADR-207..215, ADR-218..220). |
 | 2026-10-16 | 38.11 | Update Contact retired (D-62) and its rapid knowledge editors archived in `docs/archive/update-contact/`; Memory left the universal + but stays reachable from the Profile in all five stacks (D-66). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-224. |
+| 2026-10-18 | 38.12 | Compose Research and the Research count leave out photo-type custom fields; a flagged custom value shows one marker and opens Edit at its field (ADR-245, ADR-248). |

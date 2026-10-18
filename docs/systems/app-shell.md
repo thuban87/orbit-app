@@ -416,6 +416,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-245:** A Flagged Custom-Field Value Opens Edit at That Field — `ValueHistory` in every Profile host; `CustomFieldReview` and `EditContact`'s `focusFieldDefId`.
 - **ADR-246:** One Settings Row and Section Card on Every Settings Page — the Settings sub-pages' rows.
 - **ADR-230:** Settings Page for Profile Backgrounds — the `ProfileBackgrounds` route in all five Profile-hosting stacks.
+- **ADR-232, ADR-235, ADR-236, ADR-238, ADR-239, ADR-240, ADR-244, ADR-249 (38.12):** routes and entries this doc registers — `openBinFromProfile`; the merge picker; Check linked contacts' grid and detail; Import review's already-linked view and Review matches; the legacy picker's way out and the photo-budget prompt in `startContactImport`; Backup icons from the registry; the AI hub row subtitle.
 
 ## Gotchas
 
