@@ -169,7 +169,8 @@ describe("SettingsAppearanceScreen (38.12-14)", () => {
   it("the default-layout picker is the titled option sheet (D-81)", () => {
     const sheets = render().filter((n) => n.type === "OptionSheet");
     expect(sheets).toHaveLength(1);
-    expect(sheets[0].props.title).toBe("Default Profile layout");
+    // Same case as its row (D-IN-13).
+    expect(sheets[0].props.title).toBe("Default profile layout");
     const options = sheets[0].props.options as Array<{
       value: string | null;
       label: string;

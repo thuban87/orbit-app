@@ -1105,7 +1105,7 @@ export function SettingsAppearanceScreen() {
               template. */}
           <OptionSheet<string | null>
             visible={openTemplatePicker === "layout"}
-            title="Default Profile layout"
+            title="Default profile layout"
             options={[
               { value: null, label: "Default / None" },
               ...layoutTemplates.map((t) => ({ value: t.uid, label: t.name })),
