@@ -35,7 +35,7 @@ vi.mock("@/components/ui", () => ({
 }));
 vi.mock("@/components/MemoryCard", () => ({ openMemoryLink: vi.fn() }));
 
-const { ThingsToRemember } = await import("./ThingsToRemember");
+const { DetailSheet, ThingsToRemember } = await import("./ThingsToRemember");
 
 interface Node {
   type: string;
@@ -176,5 +176,47 @@ describe("flagged custom-field value on the Profile (38.12 D-70)", () => {
     expect(markers(card)).toHaveLength(0);
     (card.props.onPress as () => void)();
     expect(onAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("the flagged value's detail sheet (38.12 D-70, review C-WR-04)", () => {
+  function sheetTexts(invalid: boolean): Node[] {
+    const item = {
+      title: "Met on",
+      preview: "sometime",
+      metadata: invalid ? ["Needs attention"] : [],
+      invalid,
+      detail: { owner: "custom-field", id: 21 },
+      history: null,
+      management: { accessibility: ["edit"] },
+    };
+    return all(
+      resolve(
+        DetailSheet({
+          item: item as never,
+          onClose: vi.fn(),
+          onAction: vi.fn(),
+          onOpenValueHistory: vi.fn(),
+        }),
+      ),
+    ).filter((node) => node.type === "AppText");
+  }
+  const says = (node: Node, pattern: RegExp) =>
+    node.children.some(
+      (child) => child.type === "literal" && pattern.test(child.text),
+    );
+
+  it("shows needs attention once, in the danger colour", () => {
+    const found = sheetTexts(true).filter((node) =>
+      says(node, /needs attention/i),
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]?.props.style).toEqual({ color: "danger" });
+  });
+
+  it("a valid value's sheet has no marker", () => {
+    expect(
+      sheetTexts(false).filter((node) => says(node, /needs attention/i)),
+    ).toHaveLength(0);
   });
 });

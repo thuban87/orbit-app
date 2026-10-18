@@ -95,7 +95,13 @@ function childIcon(id: KnowledgeChildId): "favorite" | "message" | "settings" {
   }
 }
 
-function DetailSheet({
+/**
+ * An entry's detail sheet. A flagged custom-field value (38.12 D-70) shows one
+ * "needs attention" line, in the danger colour, with how to fix it; the
+ * metadata marker the card shows is not repeated here (review C-WR-04).
+ * Exported for its render test.
+ */
+export function DetailSheet({
   item,
   onClose,
   onAction,
@@ -109,6 +115,7 @@ function DetailSheet({
     fieldDefId: number;
   }) => void;
 }) {
+  const { colors } = useTheme();
   const url = item?.detail.url;
   return (
     <Sheet visible={item !== null} onRequestClose={onClose} variant="detail">
@@ -116,11 +123,14 @@ function DetailSheet({
         <View style={styles.sheetContent}>
           <AppText role="heading">{item.title}</AppText>
           {item.preview ? <AppText role="body">{item.preview}</AppText> : null}
-          {item.metadata.map((entry) => (
-            <AppText key={entry} role="caption">
-              {entry}
-            </AppText>
-          ))}
+          {/* D-70: the invalid line below is the sheet's one marker. */}
+          {item.invalid
+            ? null
+            : item.metadata.map((entry) => (
+                <AppText key={entry} role="caption">
+                  {entry}
+                </AppText>
+              ))}
           {url ? (
             // D-24: a link entry's sheet shows its URL with Open.
             <View style={styles.link}>
@@ -136,7 +146,7 @@ function DetailSheet({
             </View>
           ) : null}
           {item.invalid ? (
-            <AppText role="caption">
+            <AppText role="caption" style={{ color: colors.danger }}>
               This value needs attention. Tap Edit to fix it.
             </AppText>
           ) : null}
