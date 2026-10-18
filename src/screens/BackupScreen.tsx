@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useRef, useState } from "react";
+import { type RefObject, useCallback, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -11,6 +11,7 @@ import {
 import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { SettingsRow, SettingsSectionCard } from "@/components/ui";
+import { useKeyboardCentering } from "@/components/ui/use-keyboard-centering";
 import {
   getAppSettings,
   recordAutomaticBackupHealthCore,
@@ -139,6 +140,19 @@ export function BackupScreen({
   // D-124: the restore passphrase starts hidden; the eye button reveals it.
   const [passphraseVisible, setPassphraseVisible] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  // DEF-06: the passphrase prompt opens at the foot of the page, where the
+  // + covered its eye and the keyboard covered the field. It scrolls itself
+  // to the top of the page when it appears, and the field centres above the
+  // keyboard on focus (the shared D-66 primitive).
+  const scrollRef = useRef<ScrollView | null>(null);
+  // ScrollView.d.ts types innerViewRef as non-null (use-first-error-reveal).
+  const contentRef = useRef<View>(null) as RefObject<View>;
+  const passphraseInputRef = useRef<TextInput | null>(null);
+  const revealPassphrasePrompt = useRef(false);
+  const { centering, bottomSpacer } = useKeyboardCentering({
+    scrollRef,
+    contentRef,
+  });
   // D-115: "Back up now" / "Choose a folder" on the warning card. The ref is
   // the synchronous single-flight (a double tap starts one write, T-38.12-39);
   // the state draws the button busy.
@@ -400,6 +414,8 @@ export function BackupScreen({
         if (candidate.status !== "ready") {
           const failure = restorePreviewFailure(candidate.reason);
           setRestoreMessage(failure.message);
+          if (failure.step === "passphrase")
+            revealPassphrasePrompt.current = true;
           setRestoreStage(
             failure.step === "passphrase" ? "passphrase" : "idle",
           );
@@ -435,6 +451,7 @@ export function BackupScreen({
           setSelectedEncryptedContents(contents);
           setRestorePassphrase("");
           setPassphraseVisible(false);
+          revealPassphrasePrompt.current = true;
           setRestoreStage("passphrase");
           return;
         }
@@ -528,6 +545,9 @@ export function BackupScreen({
   return (
     <ScrollView
       testID="backup-screen"
+      ref={scrollRef}
+      innerViewRef={contentRef}
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={[
         styles.content,
         { paddingBottom: bottomClearance },
@@ -688,6 +708,14 @@ export function BackupScreen({
       {restoreStage === "passphrase" ? (
         <View
           testID="restore-passphrase-prompt"
+          onLayout={(event) => {
+            if (!revealPassphrasePrompt.current) return;
+            revealPassphrasePrompt.current = false;
+            scrollRef.current?.scrollTo({
+              y: passphrasePromptScrollY(event.nativeEvent.layout.y),
+              animated: true,
+            });
+          }}
           style={[
             styles.restoreNotice,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -710,7 +738,10 @@ export function BackupScreen({
             ]}
           >
             <TextInput
+              ref={passphraseInputRef}
               testID="restore-passphrase-input"
+              onFocus={() => centering.onFieldFocus(passphraseInputRef)}
+              onBlur={() => centering.onFieldBlur(passphraseInputRef)}
               secureTextEntry={!passphraseVisible}
               autoCapitalize="none"
               autoCorrect={false}
@@ -858,9 +889,16 @@ export function BackupScreen({
           are never included.
         </Text>
       </View>
+      {bottomSpacer}
     </ScrollView>
   );
 }
+
+/** DEF-06: the prompt's scroll target, a small gap below the page top. */
+export function passphrasePromptScrollY(promptY: number): number {
+  return Math.max(0, promptY - PASSPHRASE_PROMPT_TOP_GAP);
+}
+const PASSPHRASE_PROMPT_TOP_GAP = 16;
 
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 24 },

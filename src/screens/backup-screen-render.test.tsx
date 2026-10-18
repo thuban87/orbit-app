@@ -72,6 +72,13 @@ vi.mock("@/components/ui", () => ({
   SettingsRow: "SettingsRow",
   SettingsSectionCard: "SettingsSectionCard",
 }));
+const centering = vi.hoisted(() => ({
+  onFieldFocus: vi.fn(),
+  onFieldBlur: vi.fn(),
+}));
+vi.mock("@/components/ui/use-keyboard-centering", () => ({
+  useKeyboardCentering: () => ({ centering, bottomSpacer: null }),
+}));
 vi.mock("@/navigation/use-bottom-clearance", () => ({
   useBottomClearance: () => 0,
 }));
@@ -144,7 +151,9 @@ vi.mock("./backup-restore-logic", () => ({
   restorePreviewFailure: vi.fn(),
 }));
 
-const { BackupScreen } = await import("./BackupScreen");
+const { BackupScreen, passphrasePromptScrollY } = await import(
+  "./BackupScreen"
+);
 
 type TestElement = ReactElement<Record<string, unknown>>;
 function nodes(node: ReactNode): TestElement[] {
@@ -398,6 +407,29 @@ describe("restore passphrase show/hide (38.12 D-124)", () => {
     expect(
       byTestID(tree, "restore-passphrase-visibility").props.accessibilityLabel,
     ).toBe("Hide passphrase");
+  });
+});
+
+describe("restore passphrase stays reachable (38.12 DEF-06)", () => {
+  it("the field centres above the keyboard on focus and lets go on blur", () => {
+    const tree = render({ [STATE.restoreStage]: "passphrase" });
+    const input = byTestID(tree, "restore-passphrase-input");
+    (input.props.onFocus as () => void)();
+    expect(centering.onFieldFocus).toHaveBeenCalledTimes(1);
+    (input.props.onBlur as () => void)();
+    expect(centering.onFieldBlur).toHaveBeenCalledTimes(1);
+  });
+
+  it("the page keeps taps for the eye while the keyboard is up", () => {
+    const scroll = render({ [STATE.restoreStage]: "passphrase" }).find(
+      (n) => n.props.testID === "backup-screen",
+    );
+    expect(scroll?.props.keyboardShouldPersistTaps).toBe("handled");
+  });
+
+  it("the prompt scrolls to just below the page top, never past it", () => {
+    expect(passphrasePromptScrollY(900)).toBe(884);
+    expect(passphrasePromptScrollY(4)).toBe(0);
   });
 });
 
