@@ -79,6 +79,11 @@ export interface ConfirmDialogProps extends OverlayLifecycle {
   secondaryLabel?: string;
   onSecondary?: () => void;
   /**
+   * Draw the secondary choice as a Destructive Button (38.12 D-150: an
+   * irreversible choice inside a single three-way ask).
+   */
+  secondaryDestructive?: boolean;
+  /**
    * When true the confirm is a Destructive Button (warning glyph + onDanger) and
    * the dialog requires an explicit choice — no scrim/Back dismissal.
    */
@@ -115,6 +120,7 @@ export function ConfirmDialog({
   onCancel,
   secondaryLabel,
   onSecondary,
+  secondaryDestructive = false,
   destructive = false,
   confirmDisabled = false,
   dismissable,
@@ -177,6 +183,7 @@ export function ConfirmDialog({
           cancelLabel={cancelLabel}
           confirmLabel={confirmLabel}
           secondaryLabel={onSecondary ? secondaryLabel : undefined}
+          secondaryDestructive={secondaryDestructive}
           destructive={destructive}
           confirmDisabled={confirmDisabled}
           onCancel={cancel}
@@ -205,6 +212,7 @@ export function ConfirmActions({
   cancelLabel,
   confirmLabel,
   secondaryLabel,
+  secondaryDestructive = false,
   destructive,
   confirmDisabled,
   cancelDisabled = false,
@@ -217,6 +225,8 @@ export function ConfirmActions({
   confirmLabel: string;
   /** A third, secondary-role choice; drawn only with `onSecondary`. */
   secondaryLabel?: string;
+  /** Draw that third choice as a Destructive Button (38.12 D-150). */
+  secondaryDestructive?: boolean;
   destructive: boolean;
   confirmDisabled: boolean;
   cancelDisabled?: boolean;
@@ -284,7 +294,7 @@ export function ConfirmActions({
       {hasSecondary ? (
         <View style={actionStyle} onLayout={measure("secondary")}>
           <Button
-            role="secondary"
+            role={secondaryDestructive ? "destructive" : "secondary"}
             label={secondaryLabel}
             onPress={onSecondary}
           />

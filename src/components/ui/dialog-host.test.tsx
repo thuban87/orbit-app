@@ -104,6 +104,19 @@ describe("DialogHost (D-24)", () => {
       expect(element?.props.variant).toBeUndefined();
     });
 
+    it("passes secondaryDestructive through, and it is part of the duplicate identity (38.12 D-150)", async () => {
+      void choose({ ...request, secondaryDestructive: true });
+      expect(render()?.props.secondaryDestructive).toBe(true);
+      // A request differing only in the styling is not a duplicate.
+      void choose(request);
+      expect(confirmStore.getState().queue).toHaveLength(2);
+      // An identical one is.
+      await expect(
+        choose({ ...request, secondaryDestructive: true }),
+      ).resolves.toBe("cancel");
+      expect(confirmStore.getState().queue).toHaveLength(2);
+    });
+
     it.each([
       ["onConfirm", "confirm"],
       ["onSecondary", "secondary"],

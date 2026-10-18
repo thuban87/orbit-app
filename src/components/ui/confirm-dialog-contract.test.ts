@@ -56,6 +56,15 @@ describe("ConfirmDialog themed card and variants (38.9 D-43, D-52, D-24)", () =>
     expect(actions).toMatch(/if \(notice\)[\s\S]*?role="primary"/);
   });
 
+  it("can draw the third choice as a Destructive button, off by default (38.12 D-150)", () => {
+    const actions = code.slice(code.indexOf("export function ConfirmActions("));
+    expect(actions).toContain("secondaryDestructive = false,");
+    expect(actions).toMatch(
+      /role=\{secondaryDestructive \? "destructive" : "secondary"\}\s+label=\{secondaryLabel\}/,
+    );
+    expect(code).toContain("secondaryDestructive={secondaryDestructive}");
+  });
+
   it("can draw Cancel disabled for a host holding its exits, off by default (D-26; fix-pass WR-01)", () => {
     const actions = code.slice(code.indexOf("export function ConfirmActions("));
     expect(actions).toContain("cancelDisabled = false,");

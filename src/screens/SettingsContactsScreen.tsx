@@ -253,6 +253,9 @@ export function SettingsContactsScreen() {
           message: `${plural(left, "person", "people")} ${left === 1 ? "is" : "are"} left to import. Discard drops them; nothing already imported changes.`,
           confirmLabel: "Resume",
           secondaryLabel: "Discard and start new",
+          // D-150 (owner): the irreversible Discard is styled destructive
+          // inside this one Resume/Discard ask (D-111 kept).
+          secondaryDestructive: true,
           cancelLabel: "Cancel",
         });
         if (choice === "cancel") return;

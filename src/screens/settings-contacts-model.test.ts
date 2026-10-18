@@ -200,3 +200,18 @@ describe("paused import and check rows (D-105, D-111)", () => {
     expect(contactsRowSubtitle(region, busy)).toBe(region.subtitle);
   });
 });
+
+describe("Import contacts' Resume / Discard ask (D-111, D-150)", () => {
+  it("is one choice whose Discard and start new is styled destructive", () => {
+    const source = readFileSync(
+      join(__dirname, "SettingsContactsScreen.tsx"),
+      "utf8",
+    );
+    const ask = source.slice(
+      source.indexOf('title: "Finish your last import first?"'),
+    );
+    expect(ask).toMatch(
+      /confirmLabel: "Resume",\s+secondaryLabel: "Discard and start new",[\s\S]*?secondaryDestructive: true,/,
+    );
+  });
+});

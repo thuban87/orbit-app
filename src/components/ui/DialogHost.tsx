@@ -51,6 +51,7 @@ export function DialogHost() {
       message,
       confirmLabel,
       secondaryLabel,
+      secondaryDestructive,
       cancelLabel,
       dismissable,
     } = current.request;
@@ -62,6 +63,7 @@ export function DialogHost() {
         message={message}
         confirmLabel={confirmLabel}
         secondaryLabel={secondaryLabel}
+        secondaryDestructive={secondaryDestructive}
         cancelLabel={cancelLabel}
         dismissable={dismissable}
         onConfirm={() => chooseCurrent("confirm", id)}

@@ -68,6 +68,12 @@ export interface ChooseRequest {
   confirmLabel: string;
   /** The third, secondary-role choice; resolves "secondary". */
   secondaryLabel: string;
+  /**
+   * Draw the secondary choice as a Destructive button (danger fill + warning
+   * glyph) for an irreversible choice inside a single ask (38.12 D-150).
+   * Styling only: dismissal still resolves "cancel", which does nothing.
+   */
+  secondaryDestructive?: boolean;
   /** Defaults to "Cancel"; resolves "cancel". */
   cancelLabel?: string;
   /** Back/scrim dismissal resolving "cancel" (default true). */
@@ -230,6 +236,7 @@ function choiceIdentity(request: ChooseRequest) {
     request.message ?? "",
     request.confirmLabel,
     request.secondaryLabel,
+    request.secondaryDestructive ?? false,
     request.cancelLabel ?? "Cancel",
     effectiveDismissable({ dismissable: request.dismissable }),
   ];
