@@ -362,3 +362,44 @@ describe("Profile refresh error placement (review WR-04)", () => {
     expect(belowHero).toBeGreaterThan(hero);
   });
 });
+
+describe("Profile lifecycle feedback wiring (38.12 D-32, D-33, D-38, D-95)", () => {
+  const source = readFileSync(
+    join(__dirname, "ContactProfileScreen.tsx"),
+    "utf8",
+  );
+  const screen = source.slice(
+    source.indexOf("export function ContactProfileScreen"),
+  );
+
+  it("the favourite toggle publishes a widget refresh after the write (D-38)", () => {
+    const toggle = screen.slice(
+      screen.indexOf("const toggleFavourite = useCallback"),
+      screen.indexOf("const launchMethod = useCallback"),
+    );
+    const write = toggle.indexOf("await clearFavouriteRank(");
+    const publish = toggle.indexOf("notifyWidgetDataChanged()");
+    expect(write).toBeGreaterThan(0);
+    expect(publish).toBeGreaterThan(write);
+  });
+
+  it("a confirmed Unbind closes the ⋯ sheet before the transition (D-33)", () => {
+    const unbind = screen.slice(
+      screen.indexOf('case "unbind": {'),
+      screen.indexOf('case "update-from-contacts":'),
+    );
+    const close = unbind.indexOf("closeOverlay();");
+    const transition = unbind.indexOf('transitionLifecycle("unbind")');
+    expect(close).toBeGreaterThan(0);
+    expect(transition).toBeGreaterThan(close);
+  });
+
+  it("Bind and Unbind run through the feedback runner with Undo (D-32, D-33)", () => {
+    expect(screen).toContain("runProfileLifecycleTransition({");
+  });
+
+  it("the Bind card reads its label and Change link from bindCardModel (D-95)", () => {
+    expect(screen).toContain("bindCardModel(");
+    expect(screen).toContain('testID="profile-bind-change"');
+  });
+});

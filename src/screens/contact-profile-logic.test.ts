@@ -7,6 +7,7 @@ import type { ProfileKnowledge } from "@/db/profile-knowledge-read";
 import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import {
   binConfirmation,
+  bindCardModel,
   binnedProfileBanner,
   bulkBinConfirmation,
   closeTopmostProfileOverlay,
@@ -17,6 +18,8 @@ import {
   editDestination,
   heroNameBottomInContent,
   knowledgeNavigateParams,
+  lifecycleSnackbar,
+  lifecycleUndoneSnackbar,
   MOVE_TO_BIN_CONFIRM_MESSAGE,
   PROFILE_APP_BAR,
   PROFILE_APP_BAR_SCRIM_OPACITY,
@@ -50,6 +53,7 @@ import {
   profileScrollTargetY,
   profileStarView,
   runMoveToBin,
+  runProfileLifecycleTransition,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
   unboundStarExplanation,
@@ -206,6 +210,130 @@ describe("profile lifecycle actions", () => {
       message:
         "This removes them from your active orbit, reminders, favorites, and widgets. Their history, details, and saved reminder schedule stay.",
     });
+  });
+});
+
+describe("bindCardModel (38.12 D-95)", () => {
+  it("shows a saved frequency on the Bind card with a Change link", () => {
+    expect(bindCardModel({ trackingEnabled: 0, intervalDays: 30 })).toEqual({
+      label: "Bind · Every 30 days",
+      showChange: true,
+    });
+  });
+
+  it("uses the singular day for a one-day frequency", () => {
+    expect(bindCardModel({ trackingEnabled: 0, intervalDays: 1 }).label).toBe(
+      "Bind · Every 1 day",
+    );
+  });
+
+  it("keeps today's picker flow when no frequency was ever saved", () => {
+    expect(bindCardModel({ trackingEnabled: 0, intervalDays: null })).toEqual({
+      label: "Bind contact",
+      showChange: false,
+    });
+  });
+});
+
+describe("Bind / Unbind feedback (38.12 D-32, D-33; D-03, D-04)", () => {
+  it("names the person, verb first", () => {
+    expect(lifecycleSnackbar("bind", "Ann Lee")).toBe("Bound Ann Lee");
+    expect(lifecycleSnackbar("unbind", "Ann Lee")).toBe("Unbound Ann Lee");
+    expect(lifecycleUndoneSnackbar("bind", "Ann Lee")).toBe(
+      "Unbound Ann Lee again",
+    );
+    expect(lifecycleUndoneSnackbar("unbind", "Ann Lee")).toBe(
+      "Bound Ann Lee again",
+    );
+  });
+
+  function harness(options: { direction: "bind" | "unbind"; fail?: boolean }) {
+    const calls: string[] = [];
+    const showSnackbar = vi.fn(
+      (message: {
+        kind: string;
+        label: string;
+        action?: { label: string; onPress: () => void };
+      }) => {
+        calls.push(`snackbar:${message.label}`);
+      },
+    );
+    const input = {
+      direction: options.direction,
+      name: "Ann Lee",
+      transition: vi.fn(async () => {
+        calls.push("transition");
+        if (options.fail) throw new Error("write failed");
+      }),
+      undo: vi.fn(async () => {
+        calls.push("undo");
+      }),
+      reload: vi.fn(async () => {
+        calls.push("reload");
+      }),
+      showSnackbar,
+      logError: vi.fn(),
+    };
+    return { calls, input, showSnackbar };
+  }
+
+  it("Bind: writes, reloads, then 'Bound <name>' with Undo that unbinds", async () => {
+    const { calls, input, showSnackbar } = harness({ direction: "bind" });
+    await expect(runProfileLifecycleTransition(input)).resolves.toBe("done");
+    expect(calls).toEqual(["transition", "reload", "snackbar:Bound Ann Lee"]);
+    const message = showSnackbar.mock.calls[0]?.[0];
+    expect(message?.kind).toBe("success");
+    expect(message?.action?.label).toBe("Undo");
+
+    message?.action?.onPress();
+    await vi.waitFor(() => expect(calls).toHaveLength(6));
+    expect(calls.slice(3)).toEqual([
+      "undo",
+      "reload",
+      "snackbar:Unbound Ann Lee again",
+    ]);
+  });
+
+  it("Unbind: 'Unbound <name>' with Undo that binds again", async () => {
+    const { calls, input, showSnackbar } = harness({ direction: "unbind" });
+    await runProfileLifecycleTransition(input);
+    expect(calls).toEqual(["transition", "reload", "snackbar:Unbound Ann Lee"]);
+    showSnackbar.mock.calls[0]?.[0].action?.onPress();
+    await vi.waitFor(() =>
+      expect(calls.at(-1)).toBe("snackbar:Bound Ann Lee again"),
+    );
+    expect(input.undo).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed write shows only the error and no Undo", async () => {
+    const { calls, input, showSnackbar } = harness({
+      direction: "bind",
+      fail: true,
+    });
+    await expect(runProfileLifecycleTransition(input)).resolves.toBe("failed");
+    expect(input.reload).not.toHaveBeenCalled();
+    expect(showSnackbar).toHaveBeenCalledWith({
+      kind: "error",
+      label: "Couldn't update contact. Please try again.",
+    });
+    expect(calls).toEqual([
+      "transition",
+      "snackbar:Couldn't update contact. Please try again.",
+    ]);
+  });
+
+  it("a failed Undo shows its own error and re-reads", async () => {
+    const { input, showSnackbar } = harness({ direction: "unbind" });
+    input.undo.mockRejectedValueOnce(new Error("in the Bin"));
+    await runProfileLifecycleTransition(input);
+    showSnackbar.mock.calls[0]?.[0].action?.onPress();
+    await vi.waitFor(() =>
+      expect(showSnackbar).toHaveBeenLastCalledWith({
+        kind: "error",
+        label: "Couldn't undo the unbind.",
+      }),
+    );
+    expect(input.reload).toHaveBeenCalledTimes(2);
   });
 });
 
