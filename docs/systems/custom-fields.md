@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -97,13 +97,15 @@ Migration 006 stores current values as normalized rows. Field type determines in
 3. `createField()` accepts global definitions only and seeds a blank pair row for every contact in one shared transaction. Contact-scoped creation is deliberately deferred until durable ownership and owner-purge behavior arrive together.
 4. The editor is an in-screen sub-editor of the Custom Fields screen: header, system and gesture Back close it first, and its Cancel goes through the same dirty-aware close, so typed changes prompt "Discard changes?" and an untouched form closes at once (ADR-200). The editor ends its scroll with the shared bottom clearance so the + never covers "Create field" at the end of scroll (ADR-202).
 5. Rename changes only the visible label; curation, option, order, AI sharing, quarantine, and restore changes each serialize through the same write boundary.
+6. The active list follows the shared management pattern (ADR-246): each row has a drag handle and a ⋯ menu (Edit, Rename, Move up, Move down, then Delete or Quarantine last as danger); a quarantined row's ⋯ offers Restore. Rows show the field-type label (`FIELD_TYPE_LABELS`), never the raw id. A quarantined field reads "kept until <date>" (`quarantined_at` + 30 days), and the Delete/Quarantine confirm says why the action differs ("has values for N contacts", `countFieldValues`). The new-field placeholder is "e.g. Favorite coffee".
+7. The form's **Keep past values** switch (off by default, matching the stored default) sets `history_retained`; it is what makes a field's history exist (ADR-245).
 
 ### Choosing AI-sharing consent
 
-1. The definition form initializes `share_with_ai` to off for a new field and hydrates its stored value for an edit.
+1. The definition form initializes `share_with_ai` to off for a new field and hydrates its stored value for an edit. A photo-type field has no AI switch and always stores 0: `createField`, `updateFieldShareWithAi`, a type change to photo, and a backup restore all clamp it (ADR-248).
 2. The explicit “Share with AI suggestions” control changes only definition metadata through `updateFieldShareWithAi()`; it does not read or rewrite any contact value.
 3. The AI context reader can use only live, non-quarantined definitions with the flag set, addressing values through a defs-filtered compatibility map while showing the label.
-4. An unshared, null, blank, dropped, or quarantined field contributes no fallback data to an AI prompt.
+4. An unshared, null, blank, dropped, or quarantined field contributes no fallback data to an AI prompt. Photo-type fields never reach the AI payload, Compose Research or Message Focus, and are absent from Settings → AI → Permissions (ADR-248).
 
 ### Reading and writing contact values
 
@@ -116,8 +118,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 ### Interpreting values and changing a type
 
 1. `FieldValueInput` dispatches to one controlled widget for the definition type; all widgets emit TEXT-compatible values. The `date` widget (`DateFieldWidget`) is a native date-picker row with Clear: a pick writes `YYYY-MM-DD` through `formatLocalDate()`, Clear emits `""`, the value shows through the date-only display formatter, a stored value that fails the date parser shows as written with "Not a date", and the widget never emits on render, so an existing value is never rewritten (ADR-205). The `dropdown` widget (`DropdownFieldWidget`, e.g. "Met via") opens the themed `OptionSheet`; a stored value outside the options stays listed first and selected (ADR-204).
-2. Parsers validate and canonicalize clean values only at read time. `CustomFieldValue` presents a tap-to-fix affordance when a parser fails or a dropdown value is no longer in its options.
-3. Before a type or dropdown-option edit, the screen runs a read-only preflight and displays the clean-versus-flagged summary.
+2. Parsers validate and canonicalize clean values only at read time. One predicate, `isFlaggedCustomValue({ type, options }, raw)` in `field-parsers.ts`, decides whether a stored value fails its type or is no longer an option; the Profile read, the preflight and the Review list all use it. A flagged value shows one "Needs attention" marker in the danger token on the Profile. Tapping the card (or any custom-field Edit from the Profile) opens Edit Contact at that field: the route carries `focusFieldDefId`, Custom Fields expands after hydration and the field scrolls into view. `FieldValueInput` takes an `error` (problem plus expected format, from `customFieldValueError`, e.g. "This isn't a valid date" / "Use YYYY-MM-DD") shown only while the input still holds the saved value (ADR-245).
+3. Before a type or dropdown-option edit, the screen runs a read-only preflight (`preflightTypeChange`) and displays the clean-versus-flagged summary, counted with `plural()`. With 0 values needing input the summary drops the "need your input — fix now or later" clause. When an applied change flags values, a dismissable offer gives **Review now** or Later; Review now opens `CustomFieldReview`, the list of people whose values need fixing (`listContactsWithUnreadableValues`), each opening Edit Contact at the field (ADR-245).
 4. Applying a type change snapshots non-null values to `field_history` and updates definition metadata in one transaction. It never rewrites normalized value bytes or identities.
 
 ### Capturing a custom photo value
@@ -134,6 +136,11 @@ Migration 006 stores current values as normalized rows. Field type determines in
 2. On app launch, the registered sweep identifies definitions older than the fixed retention window.
 3. For each candidate, `expireFieldIfStale()` reacquires the serialized transaction, rechecks staleness, snapshots values, and deletes dependent pairs with the definition.
 4. The same launch hook prunes old history rows in a separate serialized transaction.
+
+### Viewing a field's past values
+
+1. Long-pressing a custom-field card opens its entry sheet; **View history** opens the read-only `ValueHistory` route (`{ contactId, fieldDefId }`), registered in every Profile-hosting stack (ADR-245).
+2. `readValueHistory` lists the field's prior values for this person, newest first. Each row shows the value (empty "Not set", dates through the date-only formatter, toggles Yes/No, a stored photo path "Photo") and "Replaced <date, time>", since `custom_field_value_history.created_at` is when the value was replaced. Empty and failed states read "No earlier values" and "Couldn't load the history" with Retry.
 
 ### Restoring normalized field state
 
@@ -178,6 +185,10 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-204:** One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay — dropdown fields choose through the themed sheet and never rewrite an out-of-list value.
 - **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — the Date widget is a native picker writing `YYYY-MM-DD`; storage stays raw TEXT and existing values are never rewritten.
 - **ADR-224:** One Contact Form and a Four-Action + — Update Contact's named and generic custom-field rows retired; Edit Contact edits values.
+- **ADR-235:** Merge Starts from the Profile — photo-type conflicts by what they hold; text in a photo field merges as text.
+- **ADR-245:** A Flagged Custom-Field Value Opens Edit at That Field — the flagged predicate, tap-to-fix, Review now, the zero-case summary, View history and Keep past values.
+- **ADR-246:** One Settings Row and Section Card — the drag + ⋯ list pattern on Custom Fields.
+- **ADR-248:** AI Egress Narrows — photo-type fields are never AI data; the Allow AI clamp.
 
 ## Gotchas
 
@@ -201,6 +212,10 @@ Migration 006 stores current values as normalized rows. Field type determines in
 16. **Definition sharing expands across its values.** The permission manager presents contact/value review rows but a custom-field enable changes the owning definition's `share_with_ai` state; its impact confirmation must show that fan-out.
 17. **Restore completion is narrow, not repair.** After committing restored definitions, deterministically create only missing `(contact_id, field_def_id)` rows with `NULL` values; do not rewrite existing raw TEXT, infer values, or introduce a migration for legacy cleanup.
 18. **Text in a photo field must never reach an image resolver.** After a Text→Photo change, the raw TEXT stays, which is "type changes never destroy data". Gate every resolver with `isStoredPhotoPath`. Before 38.6, the value crashed Edit Contact and the Profile said "Photo added".
+19. **Use the one flagged predicate.** A second notion of "invalid value" would let the Profile marker, the preflight count and the Review list disagree; call `isFlaggedCustomValue` (ADR-245).
+20. **A new field type needs its error copy.** Add its line to `customFieldValueError`, or Edit shows a generic error.
+21. **Photo fields never store Allow AI on.** Every writer of `share_with_ai` clamps a photo field to 0 (ADR-248).
+22. **Count your parsers from the code.** There are ten field types and parsers today; CLAUDE.md's "7 parsers" predates URL, Email and Phone (ADR-090).
 
 ## Related Systems
 
@@ -232,3 +247,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-10-11 | 38.9 | The Date widget is a native date picker writing `YYYY-MM-DD` and showing "Not a date" for an unparseable stored value; dropdowns use the themed option sheet; the definition editor is a guarded sub-editor with end-of-scroll clearance. Storage and invariants unchanged (ADR-200, ADR-202, ADR-204, ADR-205). |
 | 2026-10-16 | 38.11 | Update Contact retired (D-62): Edit Contact is the single contact form for custom-field values; the rapid-capture discovery path is archived in `docs/archive/update-contact/`. |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-224. |
+| 2026-10-18 | 38.12 | Flagged values: one predicate, one danger marker, tap-to-fix at the field with an inline error; Review now after a flagging type or option change; no "0 need your input"; read-only View history behind a Keep past values switch; drag + ⋯ list with type labels and quarantine copy; photo fields never AI data (ADR-235, ADR-245, ADR-246, ADR-248). |
