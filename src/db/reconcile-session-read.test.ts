@@ -208,6 +208,31 @@ describe("reconcile-session-read", () => {
     ).rejects.toThrow("setCardCompletionDispositionCore");
   });
 
+  it("counts are exclusive: a missing-source card is never also a Kept Orbit value (D-141)", async () => {
+    const sessionId = await seedSession(exec);
+    await seedCard(exec, sessionId, "resolved", "updated");
+    await seedCard(exec, sessionId, "resolved", "kept-orbit");
+    // The grid's bulk Keep Orbit finishes a missing-source card with a
+    // "kept-orbit" disposition; it counts once, under Source missing.
+    await seedCard(exec, sessionId, "missing_source", "kept-orbit");
+    await seedCard(exec, sessionId, "missing_source");
+    await seedCard(exec, sessionId, "partial");
+    const counts = await reconcileCompletionCounts(exec, sessionId);
+    expect(counts).toMatchObject({
+      changed: 5,
+      updated: 1,
+      keptOrbitValues: 1,
+      sourceMissing: 2,
+      unresolved: 1,
+    });
+    expect(
+      counts.updated +
+        counts.keptOrbitValues +
+        counts.sourceMissing +
+        counts.unresolved,
+    ).toBe(counts.changed);
+  });
+
   it("gets the newest pending id without reading malformed card payloads", async () => {
     const older = await seedSession(exec, "2026-08-30 11:00:00");
     const newest = await seedSession(exec, NOW);

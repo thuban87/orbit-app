@@ -271,3 +271,50 @@ describe("buildDesiredMethodList", () => {
     expect(desired).toHaveLength(3);
   });
 });
+
+describe("readable Orbit methods (D-47)", () => {
+  it("a phones diff lists Orbit's numbers one per method, with labels, never the joined serialization", () => {
+    const diff = classifyReconciliation({
+      orbit: orbit({
+        methods: [
+          { type: "phone", value: "(312) 555-0111", label: "Mobile" },
+          { type: "phone", value: "(312) 555-0122", label: null },
+          { type: "email", value: "a@example.com", label: "Work" },
+        ],
+      }),
+      sources: [
+        source({
+          displayName: "Orbit Name",
+          methods: [
+            { type: "phone", value: "(312) 555-0133" },
+            { type: "email", value: "b@example.com" },
+          ],
+        }),
+      ],
+      lastReviewed: {},
+      effectivePhoneRegion: "US",
+    });
+    const phones = diff.fields.find((field) => field.fieldFamily === "phones");
+    const emails = diff.fields.find((field) => field.fieldFamily === "emails");
+    expect(phones?.orbitMethods).toEqual([
+      { value: "(312) 555-0111", label: "Mobile" },
+      { value: "(312) 555-0122", label: null },
+    ]);
+    expect(emails?.orbitMethods).toEqual([
+      { value: "a@example.com", label: "Work" },
+    ]);
+    // The serialization stays for memory comparison only.
+    expect(phones?.orbitBaseline).toContain("\u001f");
+  });
+
+  it("scalar fields carry no method list", () => {
+    const diff = classifyReconciliation({
+      orbit: orbit(),
+      sources: [source()],
+      lastReviewed: {},
+    });
+    expect(
+      diff.fields.find((field) => field.fieldFamily === "name")?.orbitMethods,
+    ).toBeUndefined();
+  });
+});
