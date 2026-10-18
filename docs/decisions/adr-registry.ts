@@ -48,7 +48,7 @@
 // IMPORTANT: ADR-0036 [SUPERSEDED BY ADR-078 (partial — Off Limits visible on the Research side); ADR-214 (partial)] Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails
 // NOTE: ADR-0037 [ACCEPTED] Text-Only Android Share Intent Integration
 // IMPORTANT: ADR-0038 [SUPERSEDED BY ADR-216 (partial)] Contact-Owned Share Capture Fuel
-// NOTE: ADR-0039 [ACCEPTED] Pre-Scheduled Inexact Decay Reminders
+// IMPORTANT: ADR-0039 [SUPERSEDED BY ADR-234 (note — the "muted" suppressor is now an indefinite snooze, covered by "snoozed"; the rest unchanged)] Pre-Scheduled Inexact Decay Reminders
 // NOTE: ADR-0040 [ACCEPTED] Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing
 // NOTE: ADR-0041 [ACCEPTED] Notification Settings, Privacy Channels, and Birthday Alerts
 // NOTE: ADR-0042 [ACCEPTED] Shared Status Palette for Dashboard and Widget Rings
@@ -59,11 +59,11 @@
 // NOTE: ADR-0047 [ACCEPTED] App-Level Assignable Sun and Themed Self Identity
 // IMPORTANT: ADR-0048 [SUPERSEDED BY ADR-077 (partial — dual view/morph); ADR-189 (partial)] Status-Default Static Orrery with a Single-Canvas Morph
 // NOTE: ADR-0049 [ACCEPTED] BYO-Key AI Configuration and Credential Boundary
-// IMPORTANT: ADR-0050 [SUPERSEDED BY ADR-078 (partial — Off Limits and permitted interaction notes); ADR-214 (partial)] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
+// IMPORTANT: ADR-0050 [SUPERSEDED BY ADR-078 (partial — Off Limits and permitted interaction notes); ADR-214 (partial); ADR-248 (partial)] Closed AI Prompt Egress Allowlist and Opt-In Field Sharing
 // NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
 // IMPORTANT: ADR-0052 [SUPERSEDED BY ADR-079 (partial — acknowledgement and Profile entry)] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
-// IMPORTANT: ADR-0054 [SUPERSEDED BY ADR-147 (partial)] Live Weekly Digest Retrospective and Overlooked Relationship Read
+// IMPORTANT: ADR-0054 [SUPERSEDED BY ADR-147 (partial); ADR-234 (note — the decay-push mute it ignores is now an indefinite snooze; the rest unchanged)] Live Weekly Digest Retrospective and Overlooke
 // NOTE: ADR-0055 [ACCEPTED] Dedicated Weekly Digest Scheduling and Persisted Notification Policy
 // IMPORTANT: ADR-0056 [SUPERSEDED BY ADR-060 (partial)] Tombstone-Backed UID Reconciliation for Portable Restores
 // NOTE: ADR-0057 [ACCEPTED] Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots
@@ -164,7 +164,7 @@
 // NOTE: ADR-0152 [ACCEPTED] Vertical History Heatmap and Minute-Precision Timestamps
 // NOTE: ADR-0153 [ACCEPTED] Two-Row Normal Contacts Grid
 // NOTE: ADR-0154 [ACCEPTED] API-37 Import Requests Contacts Access for Notes
-// NOTE: ADR-0155 [ACCEPTED] Backup Share Grants Only the Chosen App
+// IMPORTANT: ADR-0155 [SUPERSEDED BY ADR-244 (partial)] Backup Share Grants Only the Chosen App
 // NOTE: ADR-0156 [ACCEPTED] Foreground Maintenance Fault Isolation with Per-Pass Dependencies
 // NOTE: ADR-0157 [ACCEPTED] Bounded Native Transfer Ownership
 // NOTE: ADR-0158 [ACCEPTED] Canonical Photo Ownership Across Masters, Staging, and Derivatives
@@ -188,9 +188,9 @@
 // NOTE: ADR-0176 [ACCEPTED] Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs
 // NOTE: ADR-0177 [ACCEPTED] Mode-Specific Background Art and Signed Per-Combination Art Treatments
 // NOTE: ADR-0178 [ACCEPTED] Restore Asks Before Replacing an Unavailable Background Id with the Package Default
-// IMPORTANT: ADR-0179 [SUPERSEDED BY ADR-189 (partial)] Owner-Ruled Art Treatments Beyond the Signed Table
+// IMPORTANT: ADR-0179 [SUPERSEDED BY ADR-189 (partial); ADR-236 (partial)] Owner-Ruled Art Treatments Beyond the Signed Table
 // NOTE: ADR-0180 [ACCEPTED] Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface
-// NOTE: ADR-0181 [ACCEPTED] One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies
+// IMPORTANT: ADR-0181 [SUPERSEDED BY ADR-240 (partial)] One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies
 // NOTE: ADR-0182 [ACCEPTED] Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos
 // NOTE: ADR-0183 [ACCEPTED] 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox
 // NOTE: ADR-0184 [ACCEPTED] Width-Derived Contacts Grid Photo Geometry, Edge Corner Controls, Two-Line Names and 72 List Photos
@@ -234,12 +234,30 @@
 // NOTE: ADR-0222 [ACCEPTED] Add Contact Opens Bound, Monthly and Not Yet, with Relationship Basics Open
 // NOTE: ADR-0223 [ACCEPTED] Birthday, Social Battery, Links and a Held Photo on Add Contact, and Open Existing on a Duplicate Name
 // NOTE: ADR-0224 [ACCEPTED] One Contact Form — Update Contact Retired to the Archive, and a Four-Action +
-// NOTE: ADR-0225 [ACCEPTED] Profile Top — a Full-Width Edit Contact Button, a "Compose" Label, the Name in a Solid Top Bar, and a Slimmer ⋯
+// IMPORTANT: ADR-0225 [SUPERSEDED BY ADR-233 (partial)] Profile Top — a Full-Width Edit Contact Button, a "Compose" Label, the Name in a Solid Top Bar, and a Slimmer ⋯
 // NOTE: ADR-0226 [ACCEPTED] Archive Becomes the Bin, and Move to Bin Confirms First with No Undo
-// NOTE: ADR-0227 [ACCEPTED] One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar
+// IMPORTANT: ADR-0227 [SUPERSEDED BY ADR-234 (partial)] One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar
 // NOTE: ADR-0228 [ACCEPTED] Truthful Relationship Overview — Never Contacted, Honest Unbound Reasons, Plain Definitions and a Custom Frequency Row
 // NOTE: ADR-0229 [ACCEPTED] Birthday on the Profile — an Overview Tile, a Save-on-Pick Sheet, and One Birthday Control That Asks for the Year
 // NOTE: ADR-0230 [ACCEPTED] A Settings Page for Profile Backgrounds and a Choose-Only Background Sheet
 // NOTE: ADR-0231 [ACCEPTED] Open/Closed Sections Survive Own-Layout Edits, Layout Tools Move into the Sheets, and Reset Writes an All-Default Row
+// NOTE: ADR-0232 [ACCEPTED] A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards, and the Bin List Reloads with Restore and Undo
+// NOTE: ADR-0233 [ACCEPTED] The Profile ⋯ Follows Lifecycle State, Bind and Unbind Show Undo, and Unbound People Get a Bind-Card Frequency, a Disabled Star and a Settings Row
+// NOTE: ADR-0234 [ACCEPTED] Per-Person Mute Becomes an Indefinite Snooze, Stored as a Far-Future Date and Converted by Migration 034 and on Restore
+// NOTE: ADR-0235 [ACCEPTED] Merge Starts from the Profile with a Searchable Picker, a Complete Summary, and Photo Fields Handled by What They Hold
+// NOTE: ADR-0236 [ACCEPTED] Check Linked Contacts Never Re-Asks a Reviewed Difference, Applies Only Tapped Values, and Only a User's Tick Elects a Primary
+// NOTE: ADR-0237 [ACCEPTED] A Paused Import or Check Asks Once, Then Waits on Its Settings Row, and a New Import Asks First
+// NOTE: ADR-0238 [ACCEPTED] Review Matches Becomes a List with a Per-Person Sheet, an Already-Linked Contact Is Caught Before the Form, and the Bin Is Never a Link Target
+// NOTE: ADR-0239 [ACCEPTED] Import Screens Keep Add Contact's Order, Name Every Outcome, Give the Legacy Picker a Way Out, and Share One Awaited Effects Helper
+// NOTE: ADR-0240 [ACCEPTED] Import Takes Full-Size Phone Photos, Warns Before Photos Outgrow the Encrypted Backup, and Check Linked Contacts Keeps Thumbnails
+// NOTE: ADR-0241 [ACCEPTED] Import, Check, Merge and Restore Carry a Flow Host, and Settings-Started Flows Finish Back on Settings
+// NOTE: ADR-0242 [ACCEPTED] Backup Format 9 Carries Favourites — Merge Restore Unions Them, Replace-All Takes the Backup's, and the Bin Is Never Favourited
+// NOTE: ADR-0243 [ACCEPTED] Restore Runs on Focused Pages, Shows Its Steps, Counts People, and Names Replace All One Way
+// NOTE: ADR-0244 [ACCEPTED] Backup Files Get Readable Local-Time Names, Intake Accepts Only content:// Links, Back Up Now Shares the Automatic Path, and the Backup Folder Works Through a Native Modul
+// NOTE: ADR-0245 [ACCEPTED] A Flagged Custom-Field Value Opens Edit at That Field, Review Now Lists the People to Fix, and View History Is a Read-Only Screen Behind "Keep Past Values"
+// NOTE: ADR-0246 [ACCEPTED] One Settings Row and Section Card on Every Settings Page, One Drag-and-⋯ List Pattern, a Truthful About Privacy Line, and Plain Switch Labels
+// NOTE: ADR-0247 [ACCEPTED] Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day, and Notifications Shows When Reminders Really Arrive
+// NOTE: ADR-0248 [ACCEPTED] AI Egress Narrows — Custom Guidance Only When a Choice Uses It, Instruction Paragraphs Without Hard Breaks, and Photo Fields Never Sent or Offered
+// NOTE: ADR-0249 [ACCEPTED] AI Settings Tell the Truth — a Connected Lane Shows Connected, the Hub Shows Current Values, and One "Style and Context" Row Replaces Two
 
-export const ADR_COUNT = 231;
+export const ADR_COUNT = 249;
