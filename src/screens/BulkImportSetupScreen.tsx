@@ -39,6 +39,7 @@ import {
   BULK_IMPORT_STILL_RUNNING_TITLE,
   BULK_IMPORT_STOPPED_CONTINUE,
   BULK_IMPORT_STOPPED_DISCARD,
+  BULK_LIFECYCLE_OPTIONS,
   boundFrequencyBlocksImport,
   bulkImportStoppedMessage,
   bulkLifecycleChoice,
@@ -57,12 +58,6 @@ import {
 } from "./use-open-import-session";
 
 const LOG_SCOPE = "bulk-import-setup";
-
-/** D-57: Unbound first (the default), then Bound. */
-const LIFECYCLE_OPTIONS = [
-  { bound: false, label: "Unbound" },
-  { bound: true, label: "Bound" },
-] as const;
 
 function contactLabel(count: number): string {
   return `${count} ${count === 1 ? "contact" : "contacts"}`;
@@ -242,9 +237,11 @@ export function BulkImportSetupScreen({
       // and removes this screen; unmarked, the guard asked "Leave import?" or
       // silently discarded the batch's Need-review rows.
       markImportComplete();
+      // D-110 (convergence c1 A-1): the flow host travels on.
       navigation.navigate("ImportProgress", {
         sessionId: route.params.sessionId,
         batchCategoryId: currentCategoryId,
+        host: route.params.host,
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to start bulk import", error);
@@ -331,6 +328,7 @@ export function BulkImportSetupScreen({
         markImportComplete();
         navigation.replace("ImportComplete", {
           sessionId: route.params.sessionId,
+          host: route.params.host,
         });
         return;
       }
@@ -384,6 +382,7 @@ export function BulkImportSetupScreen({
       sessionId: route.params.sessionId,
       batchCategoryId: null,
       runKey: nextImportRunKey(),
+      host: route.params.host,
     });
   }
 
@@ -485,7 +484,8 @@ export function BulkImportSetupScreen({
           <Text style={[styles.label, { color: colors.textSecondary }]}>
             Orbit participation
           </Text>
-          {/* D-57: one lifecycle for the whole batch, Unbound by default. The
+          {/* D-57: one lifecycle for the whole batch, Unbound by default;
+            D-108: Bound then Unbound, as on Add/Edit Contact. The
             selected option is accent-filled with an onAccent label (ADR-084,
             as D-30). D-64: disabled once any row of the batch is resolved;
             D-73c: a stopped batch never reaches this form (stopped view). */}
@@ -494,7 +494,7 @@ export function BulkImportSetupScreen({
             accessibilityLabel="Orbit participation"
             style={styles.defaults}
           >
-            {LIFECYCLE_OPTIONS.map(({ bound, label }) => {
+            {BULK_LIFECYCLE_OPTIONS.map(({ bound, label }) => {
               const selected = trackingEnabled === bound;
               return (
                 <Pressable

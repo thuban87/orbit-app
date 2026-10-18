@@ -5,10 +5,10 @@ import {
   type ImportSessionMode,
   type ImportSessionRowStatus,
   PHOTO_OUTSTANDING,
-  UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
 import { isBirthdayUnreadable } from "@/logic/picked-contact-map";
+import { sanitiseImportLifecycle } from "@/screens/bulk-import-setup-logic";
 
 export interface ImportSession {
   id: number;
@@ -81,16 +81,11 @@ function mapSession(row: ImportSessionDbRow): ImportSession {
 export function sessionBatchLifecycle(
   session: Pick<ImportSession, "batchTrackingEnabled" | "batchIntervalDays">,
 ): ImportLifecycle {
-  const days = session.batchIntervalDays;
-  if (
-    session.batchTrackingEnabled &&
-    days !== null &&
-    Number.isInteger(days) &&
-    days > 0
-  ) {
-    return { trackingEnabled: true, intervalDays: days };
-  }
-  return UNBOUND_IMPORT;
+  // 38.12 D-58: the one sanitiser bulk setup's restore also uses.
+  return sanitiseImportLifecycle({
+    trackingEnabled: session.batchTrackingEnabled,
+    intervalDays: session.batchIntervalDays,
+  });
 }
 
 function parseCandidates(value: string | null): unknown[] {

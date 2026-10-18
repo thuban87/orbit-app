@@ -115,8 +115,10 @@ export function ImportProgressScreen({
         }
         releaseDriving();
         if (run.live) {
+          // D-110 (convergence c1 A-1): the flow host travels on.
           navigation.replace("ImportComplete", {
             sessionId: route.params.sessionId,
+            host: route.params.host,
           });
         }
       } catch (error) {
@@ -162,6 +164,7 @@ export function ImportProgressScreen({
               onPress={() =>
                 navigation.replace("ImportComplete", {
                   sessionId: route.params.sessionId,
+                  host: route.params.host,
                 })
               }
               style={[styles.button, { backgroundColor: colors.accent }]}

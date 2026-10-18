@@ -299,12 +299,14 @@ describe("BulkImportSetup forwards the flow host (D-110, A-1)", () => {
     const importButton = tree.find(
       (node) => node.type === "Pressable" && text(node) === "Import 2 contacts",
     );
-    (importButton?.props.onPress as () => void)();
+    if (!importButton) throw new Error("no Import button");
+    (importButton.props.onPress as () => void)();
     await flush();
     tree = render();
     const prompt = tree.find((node) => node.type === "ConsolidationPrompt");
-    expect(prompt?.props.visible).toBe(true);
-    (prompt?.props.onCombine as () => void)();
+    if (!prompt) throw new Error("no ConsolidationPrompt");
+    expect(prompt.props.visible).toBe(true);
+    (prompt.props.onCombine as () => void)();
     await flush();
     expect(mocks.combineCluster).toHaveBeenCalledTimes(1);
     expect(navigation.replace).toHaveBeenCalledWith("ImportComplete", {

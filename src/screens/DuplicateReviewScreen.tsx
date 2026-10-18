@@ -160,11 +160,13 @@ export function DuplicateReviewScreen({
     setReviewItems(nextItems);
     const counts = await sessionRowCounts(exec, route.params.sessionId);
     if (counts.needs_review === 0 && counts.pending === 0) {
+      // D-110 (convergence c1 A-1): the flow host travels on.
       navigation.replace("ImportComplete", {
         sessionId: route.params.sessionId,
+        host: route.params.host,
       });
     }
-  }, [navigation, route.params.sessionId]);
+  }, [navigation, route.params.sessionId, route.params.host]);
 
   // Read-only: a successful read clears the error; a failed one never falls
   // through to "Nothing to review" (RG-035, D-24).

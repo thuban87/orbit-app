@@ -18,6 +18,17 @@ import { FREQUENCY_DAYS } from "@/types";
 export const BULK_IMPORT_DEFAULT_FREQUENCY = FREQUENCY_DAYS.Monthly;
 
 /**
+ * The participation options in Add/Edit Contact's order (38.12 D-108): Bound,
+ * then Unbound. Unbound stays the default (D-16, ADR-171), so the selected
+ * default sits second; a default in a different position than the rest of the
+ * app "would clue the user in" (owner, Q-14).
+ */
+export const BULK_LIFECYCLE_OPTIONS = [
+  { bound: true, label: "Bound" },
+  { bound: false, label: "Unbound" },
+] as const;
+
+/**
  * Shown only while Bound is selected. It must stay true: a Bound contact gets
  * birthday reminders at once and decay reminders after its first touchpoint.
  * The owner reviews the wording on the device (Plan 17).
@@ -95,14 +106,41 @@ export function boundFrequencyBlocksImport(
   return trackingEnabled && !intervalValid;
 }
 
-/** The screen's starting choice, restored from the session (resume keeps it). */
+/**
+ * The one lifecycle sanitiser for stored batch values (38.12 D-58): Bound only
+ * with a positive integer cadence, otherwise Unbound with no cadence. Setup's
+ * restore (`initialBulkLifecycle`) and resume (`sessionBatchLifecycle`,
+ * import-session-read.ts) both read the stored session through it, so the two
+ * can never disagree about the same stored inputs (T-38.12-46). The contacts
+ * CHECK (migration 011) stays the backstop.
+ */
+export function sanitiseImportLifecycle(stored: {
+  trackingEnabled: boolean;
+  intervalDays: number | null;
+}): ImportLifecycle {
+  const days = stored.intervalDays;
+  if (
+    stored.trackingEnabled &&
+    days !== null &&
+    Number.isInteger(days) &&
+    days > 0
+  ) {
+    return { trackingEnabled: true, intervalDays: days };
+  }
+  return UNBOUND_IMPORT;
+}
+
+/**
+ * The screen's starting choice, restored from the session (resume keeps it),
+ * through the shared sanitiser (D-58).
+ */
 export function initialBulkLifecycle(
   session: Pick<ImportSession, "batchTrackingEnabled" | "batchIntervalDays">,
-): { trackingEnabled: boolean; intervalDays: number | null } {
-  return {
+): ImportLifecycle {
+  return sanitiseImportLifecycle({
     trackingEnabled: session.batchTrackingEnabled,
     intervalDays: session.batchIntervalDays,
-  };
+  });
 }
 
 /**
