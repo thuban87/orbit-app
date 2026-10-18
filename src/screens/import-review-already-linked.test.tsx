@@ -232,10 +232,7 @@ describe("a pick linked only to a person in the Bin (38.12 D-154)", () => {
     );
     expect(message?.props.children).toBe("In the Bin: Ada Lovelace");
     const buttons = tree.filter((n) => n.type === "Button");
-    expect(buttons.map((b) => b.props.label)).toEqual([
-      "Open the Bin",
-      "Done",
-    ]);
+    expect(buttons.map((b) => b.props.label)).toEqual(["Open the Bin", "Done"]);
     (buttons[0].props.onPress as () => void)();
     expect(onOpenBin).toHaveBeenCalledOnce();
     expect(onOpen).not.toHaveBeenCalled();
