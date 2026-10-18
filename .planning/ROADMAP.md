@@ -1680,7 +1680,7 @@ Plans:
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 11–16 plans — rough estimate from finding titles plus the triage's per-area range; includes a possible Settings page-layout sweep (K-05) and the favourites-in-backups format bump (K-22); site counts not taken.
 **Coordination**: shares Profile files with 38.11 (not-contacted status code, ⋯ menu, merge entry) and builds on 38.11's shared snooze sheet (38.11 D-45; X-20). 38.11 renames Archive to "Bin" app-wide and makes Move to Bin a confirm without Undo (38.11 D-69, D-71) — see "Notes from 38.11" in this phase's workpaper. None blocks this phase.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 25/27 plans executed (7 waves; executed sequentially on main)
+**Plans**: 26/27 plans executed (7 waves; executed sequentially on main)
 **Wave 1**
 
 - [x] 38.12-01-PLAN.md — Mute becomes an indefinite snooze + migration 034 (review-memory family, resume markers, mute conversion)
@@ -1726,7 +1726,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 38.12-27-PLAN.md — Quiet hours: birthday alerts and weekly digest fire at quiet-hours end (D-142, added mid-phase)
+- [x] 38.12-27-PLAN.md — Quiet hours: birthday alerts and weekly digest fire at quiet-hours end (D-142, added mid-phase)
 - [ ] 38.12-26-PLAN.md — Device pass (debug walk, owner batch, one release build)
 
 ### Phase 38.13: Contacts List, Search & Digest UX (INSERTED)
@@ -1846,7 +1846,7 @@ Plans:
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
 | 38.11 Everyday Screens UX | 14/14 | Complete| 2026-10-16 |
-| 38.12 People Lifecycle, Import & Settings UX | 25/27 | In Progress|  |
+| 38.12 People Lifecycle, Import & Settings UX | 26/27 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
