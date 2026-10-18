@@ -79,7 +79,10 @@ import {
   type SettingsContactsResumeState,
   type SettingsContactsRow,
 } from "./settings-contacts-model";
-import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
+import {
+  deviceRegionCaption,
+  phoneRegionValueLabel,
+} from "./settings-lifecycle-logic";
 import { phoneRegionOverridePatch } from "./settings-region-logic";
 import { contactImportMode } from "./use-contact-import-mode";
 
@@ -369,6 +372,12 @@ export function SettingsContactsScreen() {
       : null,
   );
 
+  const deviceRegion = getDeviceRegion();
+  const deviceRegionLabel = deviceRegionCaption(
+    deviceRegion,
+    deviceRegion ? countryName(deviceRegion) : null,
+  );
+
   const renderRouteRow = (
     row: Extract<SettingsContactsRow, { kind: "route" }>,
   ) => (
@@ -544,8 +553,9 @@ export function SettingsContactsScreen() {
             <AppText role="label" style={{ color: colors.textPrimary }}>
               Use device region
             </AppText>
+            {/* D-79: a country name, like every other region choice. */}
             <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {getDeviceRegion() ?? "Unavailable"}
+              {deviceRegionLabel}
             </AppText>
           </Pressable>
           <FlatList
