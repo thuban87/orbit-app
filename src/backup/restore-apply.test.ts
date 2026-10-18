@@ -4499,6 +4499,35 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
     expect(after!.revision).toBe(before!.revision);
   });
 
+  it.each(["merge", "replace-all"] as const)(
+    "%s never restores a photo field with Allow AI on (D-129, D-138; fix-pass queue 1)",
+    async (mode) => {
+      const source = await db();
+      await source.runAsync(
+        "INSERT INTO custom_field_defs (uid,col_name,label,type,display_order,share_with_ai,created_at,modified_at) VALUES ('pic-def','pic','Pic','photo',0,1,?,?),('txt-def','txt','Txt','text',1,1,?,?)",
+        [NOW, NOW, NOW, NOW],
+      );
+      const backup = parseBackupManifest(
+        await buildExportManifest(source, {
+          exportedAt: NOW,
+          readPhotoBase64: async () => "",
+        }),
+      );
+      const phone = await db();
+      expect(await applyRestore(phone, backup, mode)).toMatchObject({
+        status: "applied",
+      });
+      expect(
+        await phone.getAllAsync(
+          "SELECT uid, share_with_ai AS share FROM custom_field_defs ORDER BY uid",
+        ),
+      ).toEqual([
+        { uid: "pic-def", share: 0 },
+        { uid: "txt-def", share: 1 },
+      ]);
+    },
+  );
+
   it("Replace-all takes exactly the backup's favourites (D-113)", async () => {
     const backup = await backupOf([
       { uid: "a", favourite: true },

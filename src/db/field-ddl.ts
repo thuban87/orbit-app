@@ -81,7 +81,8 @@ export function createField(
         def.show_on_new,
         def.always_show,
         def.display_order,
-        def.share_with_ai,
+        // A photo field never stores Allow AI on (38.12 D-129, D-138).
+        def.type === "photo" ? 0 : def.share_with_ai,
         def.scope ?? "global",
         def.history_retained ?? 0,
         def.field_group ?? null,

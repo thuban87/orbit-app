@@ -778,7 +778,9 @@ async function upsertParents(
         r.alwaysShow,
         r.displayOrder,
         r.quarantinedAt ?? null,
-        r.shareWithAi,
+        // A photo field never stores Allow AI on (D-129, D-138), even from a
+        // backup that says so (38.12 fix-pass queue item 1).
+        r.type === "photo" ? 0 : r.shareWithAi,
         r.scope ?? "global",
         r.historyRetained ?? 0,
         r.fieldGroup ?? null,

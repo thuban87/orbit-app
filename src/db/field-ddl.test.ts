@@ -105,6 +105,25 @@ describe("normalized field lifecycle", () => {
     ]);
   });
 
+  it("never stores Allow AI on for a photo field (D-129, D-138; fix-pass queue 1)", async () => {
+    await createField(
+      exec,
+      newDef({ col_name: "pic", type: "photo", share_with_ai: 1 }),
+    );
+    await createField(
+      exec,
+      newDef({ col_name: "words", type: "text", share_with_ai: 1 }),
+    );
+    await expect(
+      exec.getAllAsync(
+        "SELECT col_name,share_with_ai FROM custom_field_defs ORDER BY id",
+      ),
+    ).resolves.toEqual([
+      { col_name: "pic", share_with_ai: 0 },
+      { col_name: "words", share_with_ai: 1 },
+    ]);
+  });
+
   it("creates durable blank pairs for every existing contact, including archived contacts", async () => {
     const live = await seedContact("Alex");
     const archived = await seedContact("Bo", true);
