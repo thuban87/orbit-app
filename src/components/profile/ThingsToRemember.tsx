@@ -22,6 +22,7 @@ import {
   type KnowledgePresentationItem,
   knowledgeChildTarget,
 } from "@/profile/knowledge-presentation";
+import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
 export type { KnowledgeChildId } from "@/profile/knowledge-presentation";
@@ -172,7 +173,10 @@ function DetailSheet({
 /**
  * One entry card. Tap opens a linked entry's interaction (D-107) or the
  * entry's sheet; long-press opens the sheet; the screen-reader actions run
- * Edit, Pin or Unpin directly.
+ * Edit, Pin or Unpin directly. A flagged custom-field value (38.12 D-70)
+ * shows its one "Needs attention" marker in the danger colour, and its tap
+ * goes straight to Edit (Edit Contact at that field); long-press still opens
+ * the sheet.
  */
 export function KnowledgeCard({
   item,
@@ -187,12 +191,20 @@ export function KnowledgeCard({
   onOpenLinked?: (link: KnowledgeEntryLink) => void;
   hideTitle?: boolean;
 }) {
+  const { colors } = useTheme();
   const link = item.detail.link;
-  const onPress = link && onOpenLinked ? () => onOpenLinked(link) : onOpen;
+  const onPress = item.invalid
+    ? () => onAction("edit")
+    : link && onOpenLinked
+      ? () => onOpenLinked(link)
+      : onOpen;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${item.title}${item.invalid ? ", needs attention" : ""}${item.pinned ? ", pinned" : ""}`}
+      accessibilityHint={
+        item.invalid ? "Opens Edit Contact to fix it" : undefined
+      }
       accessibilityActions={item.management.accessibility.map((action) => ({
         name: action,
         label: ACTION_LABELS[action],
@@ -223,12 +235,17 @@ export function KnowledgeCard({
           {item.preview}
         </AppText>
       ) : null}
+      {/* The one "Needs attention" marker is the item's metadata entry,
+          drawn in the danger colour (38.12 D-70). */}
       {item.metadata.map((entry) => (
-        <AppText key={entry} role="caption">
+        <AppText
+          key={entry}
+          role="caption"
+          style={item.invalid ? { color: colors.danger } : undefined}
+        >
           {entry}
         </AppText>
       ))}
-      {item.invalid ? <AppText role="caption">Needs attention</AppText> : null}
     </Pressable>
   );
 }

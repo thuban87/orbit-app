@@ -59,7 +59,14 @@ export function DateFieldWidget({
   onChange,
   label,
   testID,
-}: FieldWidgetProps) {
+  showInvalidCaption = true,
+}: FieldWidgetProps & {
+  /**
+   * False when the host already explains the flagged value (Edit Contact's
+   * field error, 38.12 D-70), so "Not a date" is not said twice.
+   */
+  showInvalidCaption?: boolean;
+}) {
   const { colors } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const shown = dateDisplay(value);
@@ -109,7 +116,7 @@ export function DateFieldWidget({
           </Pressable>
         ) : null}
       </View>
-      {shown.invalid ? (
+      {shown.invalid && showInvalidCaption ? (
         <AppText role="caption" style={{ color: colors.danger }}>
           Not a date
         </AppText>

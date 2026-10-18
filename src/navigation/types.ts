@@ -52,6 +52,17 @@ export type ProfileRouteParams = {
 };
 
 /**
+ * Edit Contact's params, the same in every stack that registers Edit.
+ * `focusFieldDefId` (38.12 D-70) opens the form with Custom Fields expanded
+ * and that custom field scrolled into view, e.g. from the Profile's "Needs
+ * attention" marker or the "Review now" list.
+ */
+export type EditContactParams = {
+  contactId: number;
+  focusFieldDefId?: number;
+};
+
+/**
  * Optional flow host on every import, check and merge route (38.12 D-110,
  * D-57): where the flow finishes. Absent means `DEFAULT_FLOW_HOST` (settings).
  * Forwarding it between flow screens is owned by the plans that touch them.
@@ -141,7 +152,7 @@ export type DashboardStackParamList = {
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
-  Edit: { contactId: number };
+  Edit: EditContactParams;
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
   EditInteraction: { contactId: number; interactionId: number };
   Archived: undefined;
@@ -286,7 +297,7 @@ export type OrreryStackParamList = {
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
-  Edit: { contactId: number };
+  Edit: EditContactParams;
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
   EditInteraction: { contactId: number; interactionId: number };
   /**
@@ -363,7 +374,7 @@ export type DigestStackParamList = {
     type?: MemoryTypeKey;
     origin?: "fab" | "profile" | "update";
   };
-  Edit: { contactId: number };
+  Edit: EditContactParams;
   EditInteraction: { contactId: number; interactionId: number };
   /**
    * `editId` opens that entry's edit form after the read (D-107; plan 17
@@ -438,7 +449,7 @@ export type EventsStackParamList = {
     type?: MemoryTypeKey;
     origin?: "fab" | "profile" | "update";
   };
-  Edit: { contactId: number };
+  Edit: EditContactParams;
   EditInteraction: { contactId: number; interactionId: number };
   /**
    * `editId` opens that entry's edit form after the read (D-107; plan 17
@@ -587,7 +598,7 @@ export type SettingsStackParamList = {
   SectionEditor: { contactId: number; type: MemoryTypeKey; editId?: number };
   OffLimitsEditor: { contactId: number; editId?: number };
   KeyPeopleEditor: { contactId: number; editId?: number };
-  Edit: { contactId: number };
+  Edit: EditContactParams;
   /**
    * The canonical Edit Interaction route (HIST-12). Registered here too because
    * Profile is hosted in Settings (Archived → Profile), and RootStackParamList is

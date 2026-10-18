@@ -9,8 +9,18 @@
  *
  * `field.options` is the DEFS row's JSON TEXT column (`string | null`); it is
  * parsed to a `string[]` here so the widget contract stays a plain array.
+ *
+ * `error` (38.12 D-70): a flagged stored value shows its problem and the
+ * expected format under the widget, in the danger colour. The widget still
+ * shows the stored value as-is; a switch cannot show text, so a toggle also
+ * names the saved text. Nothing here rewrites the value (CLAUDE.md
+ * custom-field invariants).
  */
+import { StyleSheet, View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
 import type { CustomFieldDef } from "@/db/field-types";
+import { useTheme } from "@/theme";
+import type { FieldValueError } from "./field-value-error";
 import { DateFieldWidget } from "./field-widgets/DateFieldWidget";
 import { DropdownFieldWidget } from "./field-widgets/DropdownFieldWidget";
 import { NumberFieldWidget } from "./field-widgets/NumberFieldWidget";
@@ -37,6 +47,8 @@ export interface FieldValueInputProps {
   /** The contact being edited — forwarded to the photo widget ONLY (edit-only). */
   contactId?: number;
   testID?: string;
+  /** A flagged stored value's problem and expected format (38.12 D-70). */
+  error?: FieldValueError | null;
 }
 
 /**
@@ -62,7 +74,60 @@ export function FieldValueInput({
   onChange,
   contactId,
   testID,
+  error,
 }: FieldValueInputProps) {
+  const { colors } = useTheme();
+  const widget = (
+    <FieldWidget
+      field={field}
+      value={value}
+      onChange={onChange}
+      contactId={contactId}
+      testID={testID}
+      showOwnInvalidCaption={!error}
+    />
+  );
+  if (!error) return widget;
+  const danger = { color: colors.danger };
+  return (
+    <View style={styles.withError}>
+      {widget}
+      {field.type === "toggle" && value != null && value !== "" ? (
+        <AppText
+          role="caption"
+          style={danger}
+          testID={testID ? `${testID}-saved` : undefined}
+        >
+          {`Saved as "${value}"`}
+        </AppText>
+      ) : null}
+      <AppText
+        role="caption"
+        style={danger}
+        accessibilityLiveRegion="polite"
+        testID={testID ? `${testID}-problem` : undefined}
+      >
+        {error.problem}
+      </AppText>
+      <AppText
+        role="caption"
+        style={danger}
+        testID={testID ? `${testID}-expected` : undefined}
+      >
+        {error.expectedFormat}
+      </AppText>
+    </View>
+  );
+}
+
+function FieldWidget({
+  field,
+  value,
+  onChange,
+  contactId,
+  testID,
+  showOwnInvalidCaption,
+}: Omit<FieldValueInputProps, "error"> & { showOwnInvalidCaption: boolean }) {
   const shared = { value, onChange, label: field.label, testID };
 
   switch (field.type) {
@@ -76,7 +141,14 @@ export function FieldValueInput({
         />
       );
     case "date":
-      return <DateFieldWidget {...shared} />;
+      // With an `error` shown, the date widget's own "Not a date" caption
+      // would repeat the problem line, so it is turned off.
+      return (
+        <DateFieldWidget
+          {...shared}
+          showInvalidCaption={showOwnInvalidCaption}
+        />
+      );
     case "toggle":
       return <ToggleFieldWidget {...shared} />;
     case "number":
@@ -101,3 +173,7 @@ export function FieldValueInput({
       return <TextFieldWidget {...shared} />;
   }
 }
+
+const styles = StyleSheet.create({
+  withError: { gap: 4 },
+});

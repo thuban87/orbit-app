@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  isFlaggedCustomValue,
   isValueInOptions,
   type ParseResult,
   parsers,
@@ -214,5 +215,48 @@ describe("isValueInOptions", () => {
     expect(
       isValueInOptions(dropdown(JSON.stringify({ not: "array" })), "x"),
     ).toBe(true);
+  });
+});
+
+describe("isFlaggedCustomValue — the one flagged predicate (38.12 D-70, D-121; C-4)", () => {
+  const options = JSON.stringify(["Platinum", "Bronze"]);
+
+  it("flags a value its current type's parser rejects", () => {
+    // "2026-13-40" passes the leading-YYYY-MM-DD date parser (B-7), so the
+    // fixture is plainly not a date.
+    expect(
+      isFlaggedCustomValue({ type: "date", options: null }, "not a date"),
+    ).toBe(true);
+    expect(
+      isFlaggedCustomValue({ type: "number", options: null }, "about 60k"),
+    ).toBe(true);
+    expect(
+      isFlaggedCustomValue({ type: "date", options: null }, "2026-10-20"),
+    ).toBe(false);
+    expect(
+      isFlaggedCustomValue({ type: "text", options: null }, "anything"),
+    ).toBe(false);
+  });
+
+  it("flags a dropdown value that is no longer one of the options", () => {
+    expect(isFlaggedCustomValue({ type: "dropdown", options }, "Gold")).toBe(
+      true,
+    );
+    expect(
+      isFlaggedCustomValue({ type: "dropdown", options }, "Platinum"),
+    ).toBe(false);
+  });
+
+  it("never flags an empty dropdown or one whose options cannot be read", () => {
+    expect(isFlaggedCustomValue({ type: "dropdown", options }, "")).toBe(false);
+    expect(isFlaggedCustomValue({ type: "dropdown", options }, null)).toBe(
+      false,
+    );
+    expect(
+      isFlaggedCustomValue({ type: "dropdown", options: "{not json" }, "Gold"),
+    ).toBe(false);
+    expect(
+      isFlaggedCustomValue({ type: "dropdown", options: null }, "Gold"),
+    ).toBe(false);
   });
 });

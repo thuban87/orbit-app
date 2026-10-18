@@ -37,7 +37,8 @@ export type ProfileKnowledgeDestination =
   | { screen: "Memory"; type: MemoryTypeKey; origin: "profile" }
   | { screen: "SectionEditor"; type: MemoryTypeKey; editId?: number }
   | { screen: "KeyPeopleEditor" | "OffLimitsEditor"; editId?: number }
-  | { screen: "Edit" }
+  /** `focusFieldDefId`: a custom field's Edit opens at that field (D-70). */
+  | { screen: "Edit"; focusFieldDefId?: number }
   /** The section has no action here (Pinned; empty Imported). */
   | { screen: "none" };
 
@@ -190,7 +191,7 @@ function currentStateFieldOf(
  * An item's Edit opens that entry's form in its own editor (D-107, D-75): the
  * memory's section editor (its type picks the section), the history page, the
  * Key People or Off Limits editor, each with `editId`; a custom field opens
- * Edit Contact.
+ * Edit Contact at that field (`focusFieldDefId`, 38.12 D-70).
  */
 export function editDestination(
   target: KnowledgeDetailTarget,
@@ -216,7 +217,11 @@ export function editDestination(
     case "offLimits":
       return { screen: "OffLimitsEditor", editId: target.id };
     case "custom-field":
-      return { screen: "Edit" };
+      // 38.12 D-70: Edit Contact opens scrolled to that field (an id of 0 is
+      // the section-level target, which has no field).
+      return target.id > 0
+        ? { screen: "Edit", focusFieldDefId: target.id }
+        : { screen: "Edit" };
   }
 }
 
@@ -238,7 +243,7 @@ export type ProfileKnowledgeNavigation =
     ]
   | ["KeyPeopleEditor", { contactId: number; editId?: number }]
   | ["OffLimitsEditor", { contactId: number; editId?: number }]
-  | ["Edit", { contactId: number }];
+  | ["Edit", { contactId: number; focusFieldDefId?: number }];
 
 /** Route and params for a destination; null when it has none. */
 export function knowledgeNavigateParams(
@@ -273,7 +278,12 @@ export function knowledgeNavigateParams(
     case "OffLimitsEditor":
       return ["OffLimitsEditor", { contactId, ...editId(destination.editId) }];
     case "Edit":
-      return ["Edit", { contactId }];
+      return [
+        "Edit",
+        destination.focusFieldDefId === undefined
+          ? { contactId }
+          : { contactId, focusFieldDefId: destination.focusFieldDefId },
+      ];
     case "none":
       return null;
   }

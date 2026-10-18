@@ -160,3 +160,21 @@ export function isValueInOptions(
   if (!Array.isArray(parsed)) return true;
   return parsed.includes(value);
 }
+
+/**
+ * The ONE "flagged" predicate for a stored custom value (38.12 D-70, D-121;
+ * convergence c1 C-4): true when the field's CURRENT type parser rejects the
+ * raw TEXT, or a dropdown value is no longer one of its options. The Profile's
+ * "Needs attention" marker, Edit Contact's field error, the "Review now" list
+ * and the type-change pre-flight all classify through this, so a value is
+ * flagged in one place exactly when it is flagged in the others.
+ *
+ * Read-only: it never rewrites, clears or coerces the value (CLAUDE.md
+ * custom-field invariants, ADR-001).
+ */
+export function isFlaggedCustomValue(
+  field: Pick<CustomFieldDef, "type" | "options">,
+  raw: string | null,
+): boolean {
+  return !parsers[field.type](raw).ok || !isValueInOptions(field, raw);
+}

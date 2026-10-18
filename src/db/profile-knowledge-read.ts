@@ -1,6 +1,6 @@
 import { currentStateOrderSql } from "@/db/current-state-history-read";
 import {
-  isValueInOptions,
+  isFlaggedCustomValue,
   type ParseResult,
   parsers,
 } from "@/db/field-parsers";
@@ -199,7 +199,9 @@ function groupCustomFieldRows(
       groups.push(group);
     }
     const parsed = parsers[row.type](row.raw_value);
-    const validOption = isValueInOptions(
+    // The one shared predicate (38.12 D-70, C-4): parser failure or a
+    // dropdown value no longer in its options.
+    const flagged = isFlaggedCustomValue(
       { type: row.type, options: row.options },
       row.raw_value,
     );
@@ -210,7 +212,7 @@ function groupCustomFieldRows(
       type: row.type,
       options: row.options,
       rawValue: row.raw_value,
-      parsed: validOption ? parsed : { ok: false },
+      parsed: flagged ? { ok: false } : parsed,
       shareWithAi: row.share_with_ai,
       historyRetained: row.history_retained,
       historyKey:

@@ -644,12 +644,23 @@ describe("integrated Profile controller contracts", () => {
         ).toEqual(["OffLimitsEditor", { contactId: 4, editId: 9 }]);
       });
 
-      it("opens Edit Contact for a custom field", () => {
+      it("opens Edit Contact at that custom field (38.12 D-70)", () => {
         expect(
           editDestination({ owner: "custom-field", id: 22 }, knowledge),
         ).toEqual({
           screen: "Edit",
+          focusFieldDefId: 22,
         });
+        expect(
+          knowledgeNavigateParams(
+            editDestination({ owner: "custom-field", id: 22 }, knowledge),
+            4,
+          ),
+        ).toEqual(["Edit", { contactId: 4, focusFieldDefId: 22 }]);
+        // The section-level target (id 0) has no field to focus.
+        expect(
+          editDestination({ owner: "custom-field", id: 0 }, knowledge),
+        ).toEqual({ screen: "Edit" });
       });
     });
 

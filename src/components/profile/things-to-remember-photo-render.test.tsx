@@ -19,6 +19,9 @@ vi.mock("react-native", () => ({
   View: "View",
 }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
+vi.mock("@/theme", () => ({
+  useTheme: () => ({ colors: { danger: "danger" } }),
+}));
 vi.mock("@/components/ui", () => ({
   AppText: "AppText",
   Button: "Button",

@@ -71,7 +71,6 @@ import {
   seedMethodGroups,
   updateMethodDraft,
 } from "@/components/contact-methods-editor-model";
-import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import {
@@ -190,6 +189,11 @@ import {
   pickCreateSubEditor,
   SOCIAL_BATTERY_SHEET_OPTIONS,
 } from "./create-contact-logic";
+import {
+  CUSTOM_SECTION_ID,
+  EditCustomFieldsSection,
+  useFocusFieldReveal,
+} from "./edit-contact-custom-fields";
 import { mostRecentEntryCard } from "./edit-contact-display";
 import {
   applyMemoryPatch,
@@ -384,7 +388,7 @@ export function EditContactScreen({
   route,
 }: RootStackScreenProps<"Edit">) {
   const { colors } = useTheme();
-  const { contactId } = route.params;
+  const { contactId, focusFieldDefId } = route.params;
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
     [],
@@ -534,6 +538,30 @@ export function EditContactScreen({
     },
     [reveal, setSectionExpanded],
   );
+
+  // 38.12 D-70 (C-5): opened at a custom field (the Profile's "Needs
+  // attention" marker or the "Review now" list). After hydration the Custom
+  // Fields section expands, and once the field's row has laid out it is
+  // revealed with the same helper as revealAndFocus. A flagged value
+  // (isFlaggedCustomValue, via customFieldValueError) shows its problem and
+  // expected format under the input (C-4).
+  const expandCustomFields = useCallback(
+    () => setSectionExpanded(CUSTOM_SECTION_ID, true),
+    [setSectionExpanded],
+  );
+  const revealCustomRow = useCallback(
+    (node: View | null) => reveal(node),
+    [reveal],
+  );
+  const focusFieldReveal = useFocusFieldReveal({
+    focusFieldDefId,
+    ready:
+      form !== null &&
+      focusFieldDefId !== undefined &&
+      editDefs.some((def) => def.id === focusFieldDefId),
+    expand: expandCustomFields,
+    reveal: revealCustomRow,
+  });
 
   // Read every knowledge subdomain seed for the contact (§E). `getContactForEdit`
   // returns NONE of these, so each needs its OWN explicit read. Off Limits rows
@@ -1866,45 +1894,26 @@ export function EditContactScreen({
 
           {/* -- Custom block: EVERY non-quarantined field, as a top-level section. -- */}
           {editDefs.length > 0 ? (
-            <AccordionSection
-              sectionId="custom"
-              title="Custom Fields"
+            <EditCustomFieldsSection
+              defs={editDefs}
+              values={form.values}
+              savedValues={committedValuesRef.current}
+              contactId={contactId}
               expanded={expandedSections.custom}
-              onExpandedChange={(next) => setSectionExpanded("custom", next)}
-              containerRef={registerSectionRef("custom")}
-            >
-              <View
-                testID="edit-contact-custom-block"
-                style={styles.customBlock}
-              >
-                {editDefs.map((def) => (
-                  <View key={def.id} style={styles.field}>
-                    <AppText
-                      role="label"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {def.label}
-                    </AppText>
-                    <FieldValueInput
-                      testID={`edit-contact-custom-${def.col_name}`}
-                      field={def}
-                      contactId={contactId}
-                      value={form.values[def.col_name] ?? null}
-                      onChange={(v) =>
-                        setForm((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                values: { ...prev.values, [def.col_name]: v },
-                              }
-                            : prev,
-                        )
-                      }
-                    />
-                  </View>
-                ))}
-              </View>
-            </AccordionSection>
+              onExpandedChange={(next) =>
+                setSectionExpanded(CUSTOM_SECTION_ID, next)
+              }
+              containerRef={registerSectionRef(CUSTOM_SECTION_ID)}
+              onChange={(colName, v) =>
+                setForm((prev) =>
+                  prev
+                    ? { ...prev, values: { ...prev.values, [colName]: v } }
+                    : prev,
+                )
+              }
+              registerRow={focusFieldReveal.registerRow}
+              onRowLayout={focusFieldReveal.onRowLayout}
+            />
           ) : null}
 
           {/* -- Off Limits (§E): its own table, no kind control (D-08, D-11).
@@ -2068,9 +2077,6 @@ const styles = StyleSheet.create({
   },
   // 38.9 D-26 via 38.12 D-06: an unavailable control is dimmed.
   unavailable: { opacity: 0.5 },
-  customBlock: {
-    gap: 16,
-  },
   saveBtn: {
     borderWidth: 1,
     borderRadius: 8,
