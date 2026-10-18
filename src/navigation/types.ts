@@ -527,7 +527,11 @@ export type SettingsStackParamList = {
    * `DEFAULT_RESTORE_HOST`, settings) so the return is host-aware; Phase 39
    * D-96 passes `{ kind: "digest" }`.
    */
-  Backup: RestoreHostParam | undefined;
+  /**
+   * `shareSeq` (38.12 DEF-04): set by the share gate for each backup shared
+   * into a running Orbit, so a Backup page that is already open consumes it.
+   */
+  Backup: (RestoreHostParam & { shareSeq?: number }) | undefined;
   BackupSettings: { section?: "automatic" | "encryption" } | undefined;
   RestorePreview: RestorePreviewRoute & RestoreHostParam;
   RestoreResult: RestoreResultRoute & RestoreHostParam;

@@ -114,6 +114,9 @@ export function BackupScreen({
 }: RootStackScreenProps<"Backup">) {
   // 38.12 D-68: the host travels as a route param (absent = settings).
   const host = route.params?.host ?? DEFAULT_RESTORE_HOST;
+  // DEF-04: a backup shared while this page is already open arrives as a new
+  // shareSeq; it re-runs the focus consumption below.
+  const shareSeq = route.params?.shareSeq;
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const [health, setHealth] = useState<BackupHealth | null>(null);
@@ -489,6 +492,7 @@ export function BackupScreen({
   }, [restoreStage, loadRestoreDocument]);
 
   useFocusEffect(
+    // biome-ignore lint/correctness/useExhaustiveDependencies: shareSeq re-runs the drain for a share that arrives while the page is open (DEF-04).
     useCallback(() => {
       // Backup is Settings-only after Phase 38. This surviving host drains the
       // shared-backup singleton; ordinary visits are safe because native
@@ -520,7 +524,7 @@ export function BackupScreen({
       return () => {
         cancelled = true;
       };
-    }, [host, loadRestoreDocument]),
+    }, [host, loadRestoreDocument, shareSeq]),
   );
 
   const continueEncryptedRestore = useCallback(() => {

@@ -1,6 +1,7 @@
 import type { NavigationContainerRef } from "@react-navigation/native";
 import { useShareIntentContext } from "expo-share-intent";
-import { createRef, useEffect } from "react";
+import { createRef, useEffect, useState } from "react";
+import { AppState } from "react-native";
 import { hasSharedBackup } from "../../modules/orbit-backup-document-picker";
 import { shouldRouteBackupShare } from "./backup-share-intent";
 import { navigateIntoTab } from "./tab-entry";
@@ -52,7 +53,18 @@ export const navigationRef = createRef<NavigationContainerRef<TabParamList>>();
  */
 export function ShareIntentGate({ isReady }: { isReady: boolean }) {
   const { hasShareIntent, resetShareIntent } = useShareIntentContext();
+  // DEF-04: a backup shared into a running Orbit is captured natively but
+  // changes no React state, so nothing re-ran this check until Data & Backup
+  // was visited. Each return to the foreground re-checks the native flag.
+  const [foregroundTick, setForegroundTick] = useState(0);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") setForegroundTick((tick) => tick + 1);
+    });
+    return () => subscription.remove();
+  }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: foregroundTick only re-runs the native check on each return to the foreground.
   useEffect(() => {
     // Query unconditionally: expo-share-intent's cold-start state can settle
     // after this module has already captured the JSON stream. The native cache
@@ -61,14 +73,24 @@ export function ShareIntentGate({ isReady }: { isReady: boolean }) {
     if (isReady) {
       if (shouldRouteBackupShare(backupReady, hasShareIntent)) {
         resetShareIntent();
-        navigateIntoTab(navigationRef.current, "SettingsTab", "Backup");
+        // A fresh shareSeq makes an already-open Backup page consume it too.
+        navigateIntoTab(navigationRef.current, "SettingsTab", "Backup", {
+          shareSeq: nextBackupShareSeq(),
+        });
         return;
       }
       if (hasShareIntent) {
         navigateIntoTab(navigationRef.current, "DashboardTab", "Capture");
       }
     }
-  }, [hasShareIntent, isReady, resetShareIntent]);
+  }, [hasShareIntent, isReady, resetShareIntent, foregroundTick]);
 
   return null;
+}
+
+let backupShareSeq = 0;
+/** A new Backup `shareSeq` per routed share (DEF-04). */
+export function nextBackupShareSeq(): number {
+  backupShareSeq += 1;
+  return backupShareSeq;
 }
