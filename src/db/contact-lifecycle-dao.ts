@@ -180,21 +180,42 @@ export function bindContact(
 /**
  * Make a Bound contact Unbound without changing its cadence, favourite rank, or
  * relationship history. The cadence remains dormant and is reused by bindContact.
+ *
+ * `options.restoreCadence` is only for the Undo of a D-95 "Change" then Bind
+ * (38.12 review C-WR-05): the saved frequency goes back in the SAME
+ * transaction as the unbind.
  */
 export function unbindContact(
   exec: SqlExecutor,
   id: number,
   now: string,
+  options: { restoreCadence?: number } = {},
 ): Promise<void> {
+  const cadence = options.restoreCadence;
+  if (cadence !== undefined) {
+    try {
+      assertPositiveCadence(cadence);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
   return inWriteTransaction(exec, async () => {
     // 38.12 D-34: a person in the Bin is never unbound.
     await assertContactNotInBinCore(exec, id, "unbindContact");
-    const result = await exec.runAsync(
-      `UPDATE contacts
-          SET tracking_enabled = 0, modified_at = ?
-        WHERE id = ? AND tracking_enabled = 1`,
-      [now, id],
-    );
+    const result =
+      cadence === undefined
+        ? await exec.runAsync(
+            `UPDATE contacts
+                SET tracking_enabled = 0, modified_at = ?
+              WHERE id = ? AND tracking_enabled = 1`,
+            [now, id],
+          )
+        : await exec.runAsync(
+            `UPDATE contacts
+                SET tracking_enabled = 0, interval_days = ?, modified_at = ?
+              WHERE id = ? AND tracking_enabled = 1`,
+            [cadence, now, id],
+          );
     if (result.changes !== 1) {
       throw new Error(
         `unbindContact: no Bound contact matched id=${id} (changed ${result.changes})`,

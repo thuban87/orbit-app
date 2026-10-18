@@ -371,6 +371,29 @@ describe("bind with a changed frequency is one transaction (38.12 D-95, review C
     expect(await dataRevision()).toBe(0);
   });
 
+  it("its Undo unbinds and restores the saved frequency together", async () => {
+    const contactId = await seedContact({
+      intervalDays: 30,
+      trackingEnabled: 0,
+    });
+    await bindContact(exec, contactId, LATER, 45, { replaceCadence: true });
+
+    await unbindContact(exec, contactId, LATER, { restoreCadence: 30 });
+
+    expect(await row(contactId)).toMatchObject({
+      interval_days: 30,
+      tracking_enabled: 0,
+    });
+    // A refused Undo (already Unbound) restores nothing.
+    await exec.runAsync("UPDATE contacts SET interval_days = 45 WHERE id = ?", [
+      contactId,
+    ]);
+    await expect(
+      unbindContact(exec, contactId, LATER, { restoreCadence: 30 }),
+    ).rejects.toThrow("no Bound contact");
+    expect(await row(contactId)).toMatchObject({ interval_days: 45 });
+  });
+
   it("needs a positive frequency", async () => {
     const contactId = await seedContact({
       intervalDays: 30,

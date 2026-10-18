@@ -47,6 +47,7 @@ type LifecycleDeps = Omit<EffectDeps, "exec"> & {
     exec: SqlExecutor,
     contactId: number,
     now: string,
+    options?: { restoreCadence?: number },
   ) => Promise<void>;
 };
 
@@ -116,6 +117,23 @@ export async function bindWithLifecycleEffects(
 ): Promise<void> {
   await deps.bindContact(exec, contactId, now, intervalDays);
   await applyLifecycleTransitionEffects(contactId, "bind", { exec, ...deps });
+}
+
+/**
+ * Undo of a D-95 "Change" then Bind (C-WR-05): unbind and put the saved
+ * frequency back in ONE transaction, then the scheduler and widget follow.
+ */
+export async function unbindWithCadenceAndLifecycleEffects(
+  exec: SqlExecutor,
+  contactId: number,
+  now: string,
+  savedIntervalDays: number,
+  deps: LifecycleDeps = defaultDeps,
+): Promise<void> {
+  await deps.unbindContact(exec, contactId, now, {
+    restoreCadence: savedIntervalDays,
+  });
+  await applyLifecycleTransitionEffects(contactId, "unbind", { exec, ...deps });
 }
 
 /**

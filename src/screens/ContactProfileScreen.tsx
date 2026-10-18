@@ -94,6 +94,7 @@ import {
 import {
   bindWithCadenceAndLifecycleEffects,
   bindWithLifecycleEffects,
+  unbindWithCadenceAndLifecycleEffects,
   unbindWithLifecycleEffects,
 } from "@/services/contact-lifecycle-effects";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -855,14 +856,17 @@ export function ContactProfileScreen({
           undo: async () => {
             const now = localDateTime();
             if (direction === "bind") {
-              await unbindWithLifecycleEffects(getExecutor(), contactId, now);
-              if (changedIntervalDays !== null && savedIntervalDays !== null) {
-                await setProfileContactFrequency(getExecutor(), {
+              // C-WR-05: the saved frequency comes back with the unbind, in
+              // one transaction.
+              if (changedIntervalDays !== null && savedIntervalDays !== null)
+                await unbindWithCadenceAndLifecycleEffects(
+                  getExecutor(),
                   contactId,
-                  intervalDays: savedIntervalDays,
                   now,
-                });
-              }
+                  savedIntervalDays,
+                );
+              else
+                await unbindWithLifecycleEffects(getExecutor(), contactId, now);
             } else {
               await bindWithLifecycleEffects(getExecutor(), contactId, now);
             }

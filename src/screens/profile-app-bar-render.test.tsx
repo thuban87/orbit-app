@@ -405,6 +405,12 @@ describe("Profile lifecycle feedback wiring (38.12 D-32, D-33, D-38, D-95)", () 
     );
     expect(transition).toContain("bindWithCadenceAndLifecycleEffects(");
     expect(transition).not.toContain("setProfileContactFrequency(");
+    const undo = screen.slice(
+      screen.indexOf("undo: async () => {"),
+      screen.indexOf("reload: () => load(),"),
+    );
+    expect(undo).toContain("unbindWithCadenceAndLifecycleEffects(");
+    expect(undo).not.toContain("setProfileContactFrequency(");
   });
 
   it("the Overview frequency change reconciles the notification schedule (C-WR-06)", () => {
