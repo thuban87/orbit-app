@@ -92,13 +92,38 @@ export function unlinkExternalSource(
   exec: SqlExecutor,
   { staleLinkId, now }: { staleLinkId: number; now: string },
 ): Promise<void> {
+  return unlinkExternalSources(exec, { staleLinkIds: [staleLinkId], now });
+}
+
+/**
+ * Retire several missing sources of one contact in one transaction (38.12
+ * review B-CR-01): the missing-source "Unlink" acts on every link the check
+ * found missing, never on a link that still reads. Each id must retire
+ * exactly one active row of `contactId`, else nothing is written.
+ */
+export function unlinkExternalSources(
+  exec: SqlExecutor,
+  {
+    staleLinkIds,
+    now,
+    contactId,
+  }: { staleLinkIds: readonly number[]; now: string; contactId?: number },
+): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    const retired = await exec.runAsync(
-      `UPDATE external_contact_links
-       SET is_active = 0, modified_at = ?
-       WHERE id = ? AND is_active = 1`,
-      [now, staleLinkId],
-    );
-    assertOneChange(retired, "unlinkExternalSource", staleLinkId);
+    for (const staleLinkId of [...new Set(staleLinkIds)]) {
+      const retired = await exec.runAsync(
+        contactId === undefined
+          ? `UPDATE external_contact_links
+             SET is_active = 0, modified_at = ?
+             WHERE id = ? AND is_active = 1`
+          : `UPDATE external_contact_links
+             SET is_active = 0, modified_at = ?
+             WHERE id = ? AND is_active = 1 AND contact_id = ?`,
+        contactId === undefined
+          ? [now, staleLinkId]
+          : [now, staleLinkId, contactId],
+      );
+      assertOneChange(retired, "unlinkExternalSource", staleLinkId);
+    }
   });
 }

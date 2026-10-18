@@ -33,7 +33,7 @@ import {
 } from "@/db/reconcile-memory-read";
 import {
   relinkExternalSource,
-  unlinkExternalSource,
+  unlinkExternalSources,
 } from "@/db/reconcile-relink-dao";
 import {
   finalizeSessionIfTerminal,
@@ -275,13 +275,17 @@ export function ReconcileDetailScreen({
       setApplying(false);
     }
   }, [completeMissingSource, navigation]);
+  // Both missing-source actions act on the links the check found missing,
+  // never on `links[0]`, which can be a link that still reads (38.12 review
+  // B-CR-01). Unlink retires every missing link; relink replaces the first.
+  const missingLinkIds = scan?.missingLinkIds;
   const unlinkMissingSource = useCallback(async () => {
-    const staleLink = scan?.links[0];
-    if (!staleLink) return;
+    if (!missingLinkIds?.length) return;
     setApplying(true);
     try {
-      await unlinkExternalSource(getExecutor(), {
-        staleLinkId: staleLink.id,
+      await unlinkExternalSources(getExecutor(), {
+        staleLinkIds: missingLinkIds,
+        contactId,
         now: localDateTime(),
       });
       await completeMissingSource(false);
@@ -293,17 +297,17 @@ export function ReconcileDetailScreen({
     } finally {
       setApplying(false);
     }
-  }, [completeMissingSource, navigation, scan?.links]);
+  }, [completeMissingSource, contactId, missingLinkIds, navigation]);
   const relinkMissingSource = useCallback(async () => {
-    const staleLink = scan?.links[0];
-    if (!staleLink) return;
+    const staleLinkId = missingLinkIds?.[0];
+    if (staleLinkId == null) return;
     let selected: PickedContact | undefined;
     try {
       [selected] = await pickContacts({ multiple: false });
       if (!selected) return;
       const result = await relinkExternalSource(getExecutor(), {
         contactId,
-        staleLinkId: staleLink.id,
+        staleLinkId,
         newProvider: "android",
         newExternalContactId: selected.lookupKey,
         now: localDateTime(),
@@ -341,7 +345,7 @@ export function ReconcileDetailScreen({
     } finally {
       if (selected?.photoTempUri) discardDerivative(selected.photoTempUri);
     }
-  }, [contactId, load, navigation, route.params.host, scan?.links]);
+  }, [contactId, load, missingLinkIds, navigation, route.params.host]);
 
   const apply = useCallback(async () => {
     if (!scan || applied || applying) return;

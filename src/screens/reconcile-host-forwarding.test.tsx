@@ -22,6 +22,7 @@ const hooks = vi.hoisted(() => ({
 const mocks = vi.hoisted(() => ({
   pickContacts: vi.fn(),
   relinkExternalSource: vi.fn(),
+  unlinkExternalSources: vi.fn(),
   confirm: vi.fn(),
   listReconcileSessionCards: vi.fn(),
   listReconcileCardIdentities: vi.fn(),
@@ -84,7 +85,7 @@ vi.mock("@/db/reconcile-memory-read", () => ({
 }));
 vi.mock("@/db/reconcile-relink-dao", () => ({
   relinkExternalSource: mocks.relinkExternalSource,
-  unlinkExternalSource: vi.fn(),
+  unlinkExternalSources: mocks.unlinkExternalSources,
 }));
 vi.mock("@/db/reconcile-session-dao", () => ({
   createReconcileSessionCore: vi.fn(),
@@ -257,6 +258,65 @@ describe("ReconcileDetail forwards the flow host (D-110, A-1)", () => {
     );
     expect(titleOf(renderDetail(loadedScan(true), navigation()))).toBe(
       "Check linked contacts",
+    );
+  });
+});
+
+describe("missing-source actions act on the missing link (38.12 review B-CR-01)", () => {
+  // Link 7 still reads; link 8 is the one the check found missing.
+  const twoLinkScan = {
+    ...loadedScan(true),
+    links: [
+      {
+        id: 7,
+        contact_id: CONTACT,
+        external_contact_id: "lk-7",
+        provider: "a",
+      },
+      {
+        id: 8,
+        contact_id: CONTACT,
+        external_contact_id: "lk-8",
+        provider: "a",
+      },
+    ],
+    missingLinkIds: [8],
+  };
+
+  it("Unlink retires the missing link, never links[0]", async () => {
+    mocks.unlinkExternalSources.mockResolvedValue(undefined);
+    const tree = renderDetail(twoLinkScan, navigation());
+    (
+      pressableWithText(tree, /Unlink from phone contact/i).props
+        .onPress as () => void
+    )();
+    await flush();
+    expect(mocks.unlinkExternalSources).toHaveBeenCalledWith("exec", {
+      staleLinkIds: [8],
+      contactId: CONTACT,
+      now: "2026-10-17 12:00:00",
+    });
+  });
+
+  it("Link to a different phone contact replaces the missing link", async () => {
+    mocks.pickContacts.mockResolvedValue([
+      { lookupKey: "new", photoTempUri: null },
+    ]);
+    mocks.relinkExternalSource.mockResolvedValue({
+      kind: "duplicate-active-link",
+      otherContactId: 9,
+    });
+    mocks.confirm.mockResolvedValue(false);
+    const tree = renderDetail(twoLinkScan, navigation());
+    (
+      pressableWithText(tree, /different phone contact/).props
+        .onPress as () => void
+    )();
+    await flush();
+    await flush();
+    expect(mocks.relinkExternalSource).toHaveBeenCalledWith(
+      "exec",
+      expect.objectContaining({ staleLinkId: 8, contactId: CONTACT }),
     );
   });
 });

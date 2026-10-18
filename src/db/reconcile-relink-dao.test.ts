@@ -8,6 +8,7 @@ import { runMigrations } from "@/db/migrations/runner";
 import {
   relinkExternalSource,
   unlinkExternalSource,
+  unlinkExternalSources,
 } from "@/db/reconcile-relink-dao";
 import type { SqlExecutor } from "@/db/types";
 
@@ -138,5 +139,43 @@ describe("reconcile-relink-dao", () => {
         [contactId],
       ),
     ).toEqual({ name: "Keep me" });
+  });
+
+  it("unlinks every given missing link of the contact and leaves a reading link active (B-CR-01)", async () => {
+    const contactId = await contact("Two links");
+    const reading = await link(contactId, "reads");
+    const missing = await link(contactId, "missing");
+    await unlinkExternalSources(exec, {
+      staleLinkIds: [missing],
+      contactId,
+      now: NOW,
+    });
+    expect(
+      await exec.getAllAsync<{ id: number; is_active: number }>(
+        "SELECT id, is_active FROM external_contact_links ORDER BY id",
+      ),
+    ).toEqual([
+      { id: reading, is_active: 1 },
+      { id: missing, is_active: 0 },
+    ]);
+  });
+
+  it("refuses a link id of another contact and writes nothing", async () => {
+    const owner = await contact("Owner");
+    const other = await contact("Other");
+    const mine = await link(owner, "mine");
+    const theirs = await link(other, "theirs");
+    await expect(
+      unlinkExternalSources(exec, {
+        staleLinkIds: [mine, theirs],
+        contactId: owner,
+        now: NOW,
+      }),
+    ).rejects.toThrow();
+    expect(
+      await exec.getAllAsync<{ is_active: number }>(
+        "SELECT is_active FROM external_contact_links ORDER BY id",
+      ),
+    ).toEqual([{ is_active: 1 }, { is_active: 1 }]);
   });
 });
