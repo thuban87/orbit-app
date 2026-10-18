@@ -1,7 +1,7 @@
 # UX Standards
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/stores/confirm-store.ts`, `src/components/ui/DialogHost.tsx`, `src/stores/overlay-registry-store.ts`, `src/components/ui/RegisteredModal.tsx`, `src/navigation/discard-keep-guard.ts`, `src/components/ShellAppBar.tsx`, `src/navigation/tab-history.ts`, `src/stores/snackbar-store.ts`, `src/components/ui/` (OrbitSwitch, OptionSheet, FieldError, EmptyState, chip-tone), `src/utils/dates.ts`, `src/utils/plural.ts`
 
 ## Purpose
@@ -36,6 +36,8 @@ behaviour; no schema, migration or backup-format change came with it (D-12).
 | `src/stores/snackbar-store.ts`, `src/components/Snackbar.tsx` | `showSnackbar`, 6000 ms auto-dismiss (D-04). |
 | `src/components/ui/OrbitSwitch.tsx`, `orbit-switch-logic.ts` | The one switch (D-25, D-26, D-47). |
 | `src/components/ui/chip-tone.ts` | `chipTone(tier, selected)` for the two chip tiers (D-05). |
+| `src/components/ui/SettingsRow.tsx`, `SettingsSectionCard.tsx` | The one Settings row (title, optional subtitle or right-aligned value, chevron only with `onPress` and no trailing control, info-only rows non-tappable, `disabled` dims) and section card (`surface` `plain` or `glass`; owns surface, border and dividers). Every Settings sub-page uses them (ADR-246). |
+| `src/components/ui/AnchoredMenu.tsx` | The row ⋯ menu of the shared list pattern (ADR-246). |
 | `src/components/ui/OptionSheet.tsx`, `OptionSelectRow.tsx` | The one single-choice sheet and its trigger row (D-28). |
 | `src/components/ui/FieldError.tsx`, `use-first-error-reveal.ts`, `field-error-logic.ts` | Inline validation and scroll to the first error (D-19). |
 | `src/components/ui/EmptyState.tsx`, `empty-state-logic.ts` | The one empty-state component (D-20, D-71). |
@@ -63,7 +65,9 @@ themed destructive confirm and shows no Undo: the Profile ⋯ confirm reads "Mov
 and, once the write succeeds, a "Moved {name} to the Bin" snackbar names the person with no action
 (38.11 D-69, D-71, superseding 38.9 D-32 for Move to Bin only). In the Profile ⋯ menu Unbind is a
 plain entry with its confirm unchanged (38.11 D-68), and Move to Bin is the red entry with the
-warning glyph. 38.11 and 38.12 wire this on their screens.
+warning glyph. 38.11 and 38.12 wire this on their screens: the Bin list shows "Restored <name>" with Undo, the Profile shows "Bound <name>" / "Unbound <name>" with Undo after the action (a confirmed Unbind closes ⋯ first), and Undo confirms itself ("Moved <name> back to the Bin", "Unbound <name> again", "Bound <name> again"; ADR-232, ADR-233).
+
+**One list pattern (ADR-246).** Custom Fields, Categories, Systems and AI sections each give a row a drag handle and a ⋯ `AnchoredMenu` with the row's actions (Edit, Rename, Duplicate, Move up, Move down, then Delete or Quarantine last, danger, after a separator). No list shows rows of inline buttons, and destructive actions sit only inside ⋯. The Bin list keeps a visible Restore (not destructive) and puts Delete permanently behind its row ⋯. Category delete is one non-dismissable destructive confirm with plain counts and the detail behind a toggle.
 
 What makes an action reversible: contacts in the Bin (internally archived); custom fields with values in Quarantine for
 30 days; and, since 38.10, the snackbar Undo window for every Things to Remember item (memories of
@@ -322,6 +326,10 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 - **ADR-223:** Birthday, Social Battery, Links and a Held Photo on Add Contact — `choose()`, the three-way themed dialog.
 - **ADR-226:** Archive Becomes the Bin — Move to Bin is the one reversible lifecycle action that confirms instead of offering Undo.
 - **ADR-227:** One Snooze Sheet — one shared snooze sheet; the last native Alert is gone.
+- **ADR-232:** A Binned Person Gets a Bin Banner — Restore with Undo on the Bin list; Delete permanently behind the row ⋯.
+- **ADR-233:** The Profile ⋯ Follows Lifecycle State — Bind/Unbind snackbars with Undo; the compact ⋯ sheet with a Close.
+- **ADR-237:** A Paused Import or Check Asks Once — one shared resume-prompt layout.
+- **ADR-246:** One Settings Row and Section Card on Every Settings Page, One Drag-and-⋯ List Pattern — the shared row and card, and the list pattern.
 
 ## Gotchas
 
@@ -338,6 +346,8 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 5. **Worklets are defined above their callers.** The section-button morph runs worklets on the UI
    thread; a worklet calling one defined later in the same file is undefined on device under Hermes
    and vitest cannot catch it.
+6. **New Settings pages use the shared row and card.** A page that draws its own rows drifts; the settings chrome contract checks only the header (ADR-246).
+7. **A chevron means the row opens something.** Never put one on an info-only row or a row with a trailing switch.
 
 ## Related Systems
 
@@ -364,3 +374,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-16 | 38.11 | No native Alert remains: the Contacts card snooze opens the shared snooze sheet (`SnoozeSheet`, D-45), and the no-native-alert contract now pins zero production `Alert.alert` calls. Single-contact snooze and unsnooze show one person-naming snackbar with Undo (38.9 D-39). |
 | 2026-10-16 | 38.11 | Move to Bin asks first with the themed destructive confirm and shows no Undo (D-71, superseding 38.9 D-32 for this action); Restore and Bind keep act-at-once with Undo; the Profile ⋯ Unbind entry loses its red look and keeps its confirm (D-68). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-222, ADR-223, ADR-226, ADR-227; reversible-action and snackbar examples use the Bin wording. |
+| 2026-10-18 | 38.12 | Shared `SettingsRow` / `SettingsSectionCard` on every Settings sub-page; one drag + ⋯ list pattern; Bin Restore, Bind and Unbind snackbars with self-confirming Undo; one resume-prompt layout (ADR-232, ADR-233, ADR-237, ADR-246). |
