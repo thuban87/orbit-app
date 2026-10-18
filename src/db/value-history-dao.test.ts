@@ -9,7 +9,7 @@ import { createField } from "@/db/field-ddl";
 import { runMigrations } from "@/db/migrations/runner";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { listValueHistory } from "@/db/value-history-dao";
+import { listValueHistory, readValueHistory } from "@/db/value-history-dao";
 
 const NOW = "2026-09-04 12:00:00";
 const LATER = "2026-09-04 12:01:00";
@@ -207,5 +207,52 @@ describe("retained custom-field value history", () => {
       ),
     ).toEqual({ value: "before" });
     expect(await listValueHistory(exec, contactId, def.id)).toEqual([]);
+  });
+});
+
+describe("readValueHistory (38.12 D-106)", () => {
+  it("returns the field's name and type with its past values, newest first", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Alex",
+      intervalDays: 30,
+      now: NOW,
+    });
+    await createField(exec, {
+      uid: uid(),
+      col_name: "nickname",
+      label: "Nickname",
+      type: "text",
+      options: null,
+      show_on_new: 0,
+      always_show: 0,
+      display_order: 0,
+      share_with_ai: 0,
+      history_retained: 1,
+      now: NOW,
+    });
+    const def = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM custom_field_defs WHERE col_name = 'nickname'",
+    );
+    if (!def) throw new Error("missing field definition");
+    await edit(contactId, def.id, "Al", "2026-09-04 12:01:00");
+    await edit(contactId, def.id, "Lex", "2026-09-04 12:02:00");
+    await edit(contactId, def.id, "Sandy", "2026-09-04 12:03:00");
+    await edit(contactId, def.id, "Xander", "2026-09-04 12:04:00");
+
+    const read = await readValueHistory(exec, contactId, def.id);
+    expect(read.field).toEqual({ label: "Nickname", type: "text" });
+    expect(read.entries.map((row) => [row.value, row.created_at])).toEqual([
+      ["Sandy", "2026-09-04 12:04:00"],
+      ["Lex", "2026-09-04 12:03:00"],
+      ["Al", "2026-09-04 12:02:00"],
+    ]);
+  });
+
+  it("returns no field and no values for a missing definition", async () => {
+    expect(await readValueHistory(exec, 1, 999)).toEqual({
+      field: null,
+      entries: [],
+    });
   });
 });
