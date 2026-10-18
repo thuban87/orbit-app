@@ -24,8 +24,18 @@ export interface PhotoChoiceOption<T extends string = string> {
 
 export const KEEP_ORBIT_PHOTO = "keep-orbit" as const;
 
-/** The keep option's copy (shared by the full-width row and the photo card). */
+/** The keep option's copy on the full-width row (Merge conflicts). */
 const KEEP_ORBIT_PHOTO_TEXT = "No meaningful change — keep Orbit photo";
+
+/**
+ * The keep option's copy. On Check linked contacts' photo card (38.12 D-162)
+ * it says what keeping means: "Keep Orbit photo" when Orbit has one, "Keep no
+ * photo" when it has none. The Merge conflicts row is unchanged.
+ */
+export function keepOrbitPhotoText(keepPhoto?: KeepOrbitPhoto): string {
+  if (!keepPhoto) return KEEP_ORBIT_PHOTO_TEXT;
+  return keepPhoto.photo ? "Keep Orbit photo" : "Keep no photo";
+}
 
 /**
  * The contact's current Orbit photo for the keep option (38.6 D-25 F-3): the
@@ -66,6 +76,7 @@ export function PhotoChoice<T extends string>({
   );
   const [errors, setErrors] = useState<Set<T>>(new Set());
   const activeId = selectedId === undefined ? selected : selectedId;
+  const keepText = keepOrbitPhotoText(keepPhoto);
 
   // Built once so the keep option has a single ✓ block, rendered as a card in
   // the ScrollView (with `keepPhoto`) or as the full-width row below it.
@@ -73,9 +84,7 @@ export function PhotoChoice<T extends string>({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected: activeId === KEEP_ORBIT_PHOTO }}
-      {...(keepPhoto
-        ? { accessibilityLabel: `${label}: ${KEEP_ORBIT_PHOTO_TEXT}` }
-        : {})}
+      {...(keepPhoto ? { accessibilityLabel: `${label}: ${keepText}` } : {})}
       onPress={() => {
         if (selectedId === undefined) setSelected(KEEP_ORBIT_PHOTO);
         onChange(KEEP_ORBIT_PHOTO);
@@ -101,7 +110,7 @@ export function PhotoChoice<T extends string>({
         {...(keepPhoto ? { numberOfLines: 3 } : {})}
         style={{ color: colors.textPrimary }}
       >
-        {KEEP_ORBIT_PHOTO_TEXT}
+        {keepText}
       </Text>
       {activeId === KEEP_ORBIT_PHOTO ? (
         <Text

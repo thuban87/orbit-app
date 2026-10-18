@@ -171,6 +171,7 @@ describe("PhotoChoice photo sources (38.6 D-01/D-14)", () => {
 });
 
 const KEEP_TEXT = "No meaningful change — keep Orbit photo";
+const KEEP_TEXTS = [KEEP_TEXT, "Keep Orbit photo", "Keep no photo"];
 const SOURCE_OPTION: PhotoChoiceOption = {
   id: "source",
   uri: "file:///docs/reconcile-contact-3-link-9.jpg",
@@ -190,7 +191,7 @@ function keepPressable(tree: TestElement[]): TestElement | undefined {
     (node) =>
       node.type === "Pressable" &&
       nodes(node.props.children as ReactNode).some(
-        (kid) => kid.type === "Text" && textOf(kid) === KEEP_TEXT,
+        (kid) => kid.type === "Text" && KEEP_TEXTS.includes(textOf(kid)),
       ),
   );
 }
@@ -256,7 +257,19 @@ describe("PhotoChoice keep-Orbit photo card (38.6 D-25 F-3)", () => {
     const text = kids.find((node) => node.type === "Text");
     expect(text?.props.numberOfLines).toBe(3);
     expect(keep?.props.accessibilityRole).toBe("radio");
-    expect(keep?.props.accessibilityLabel).toBe(`Photo: ${KEEP_TEXT}`);
+    expect(keep?.props.accessibilityLabel).toBe("Photo: Keep Orbit photo");
+    expect(textOf(text)).toBe("Keep Orbit photo");
+  });
+
+  it('says "Keep no photo" when Orbit has no photo, never "No meaningful change" (D-162)', () => {
+    const keep = keepPressable(
+      nodes(render({ photo: null, name: "Ada", contactId: 3 })),
+    );
+    const text = nodes(keep?.props.children as ReactNode).find(
+      (node) => node.type === "Text",
+    );
+    expect(textOf(text)).toBe("Keep no photo");
+    expect(keep?.props.accessibilityLabel).toBe("Photo: Keep no photo");
   });
 
   it("shows initials when the contact has no Orbit photo", () => {
@@ -281,7 +294,7 @@ describe("PhotoChoice keep-Orbit photo card (38.6 D-25 F-3)", () => {
     const texts = nodes(keep?.props.children as ReactNode).filter(
       (node) => node.type === "Text",
     );
-    expect(texts.map(textOf)).toEqual([KEEP_TEXT, "✓"]);
+    expect(texts.map(textOf)).toEqual(["Keep no photo", "✓"]);
     expect(keep?.props.accessibilityState).toEqual({ selected: true });
   });
 
@@ -315,6 +328,8 @@ describe("PhotoChoice keep-Orbit photo card (38.6 D-25 F-3)", () => {
     expect(kids.some((node) => node.type === "Avatar")).toBe(false);
     const text = kids.find((node) => node.type === "Text");
     expect(text?.props).not.toHaveProperty("numberOfLines");
+    // Merge conflicts keeps its own copy (D-162 is Check linked contacts only).
+    expect(textOf(text)).toBe(KEEP_TEXT);
   });
 });
 
