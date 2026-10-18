@@ -1,7 +1,7 @@
 # Status Engine
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/status.ts`, `src/db/contact-status-read.ts`, `src/db/queries.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -59,7 +59,8 @@ Status is a query-time projection over the contacts and interactions schema; no 
 
 1. The profile reads `getContactStatus()` for the selected contact.
 2. `REASON_SQL` repeats `STATUS_SQL` branch order: the Rarely-responds path yields `unresponsive`, then the `ROGUE_K` path yields `overdue`.
-3. A null `last_contact` forces status, reason, and progress to null so a never-contacted contact does not display stable.
+3. A null `last_contact` forces status, reason, and progress to null so a never-contacted contact does not display stable. A binned contact (`archived_at` set) also gets a null status from `getContactStatus`, so a Bound, contacted person in the Bin never reads "Stable" (ADR-232).
+3a. The Profile's Orbit Status checks the Bin before any live status: a binned person reads **In the Bin** (`STATUS_IN_THE_BIN` in `profile-metrics.ts`) with "Orbit Status is paused while they're in the Bin."
 4. The profile displays rogue and its reason in-app only; notification behavior is owned by the later notifications system.
 
 ## Configuration
@@ -83,6 +84,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — guards nullable cadence and leaves Status derived from its established inputs.
 - **ADR-228:** Truthful Relationship Overview — Profile-only unavailable reasons; `getContactStatus` unchanged.
+- **ADR-232:** A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards — `getContactStatus` returns no status for a binned row; the Profile reads In the Bin first.
 
 ## Gotchas
 
@@ -112,3 +114,4 @@ Status is a query-time projection over the contacts and interactions schema; no 
 | 2026-09-02 | 31 | Added truthful Profile explanations and guarded Bound/Unbound relationship presentation without a new Health score. |
 | 2026-10-16 | 38.11 | Profile Status unavailable reasons: Bound never-contacted reads Never Contacted (no progress or bucket), Unbound and no-frequency read Not tracked with honest context, archived keeps its previous result; `getContactStatus` unchanged (D-05, D-20, D-23, D-24). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-228. |
+| 2026-10-18 | 38.12 | A binned contact has no live status: `getContactStatus` nulls it and the Profile reads "In the Bin" before any other state (ADR-232). |
