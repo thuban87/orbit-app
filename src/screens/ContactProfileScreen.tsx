@@ -92,6 +92,7 @@ import {
   unboundStarExplanation,
 } from "@/screens/contact-profile-logic";
 import {
+  bindWithCadenceAndLifecycleEffects,
   bindWithLifecycleEffects,
   unbindWithLifecycleEffects,
 } from "@/services/contact-lifecycle-effects";
@@ -808,9 +809,10 @@ export function ContactProfileScreen({
       if (!snapshot || transitioning) return;
       setTransitioning(true);
       const savedIntervalDays = snapshot.identity.intervalDays;
-      // D-95: a frequency changed on the Bind card is written first; a
-      // dormant cadence is kept by the bind itself (bindContact), so the
-      // change cannot ride on it. Undo puts the saved frequency back.
+      // D-95: a frequency changed on the Bind card is written WITH the bind,
+      // in one transaction (bindContact replaceCadence; review C-WR-05), so a
+      // refused bind leaves the saved frequency as it was. Undo puts the
+      // saved frequency back.
       const changedIntervalDays =
         direction === "bind" &&
         bindChanging &&
@@ -825,19 +827,20 @@ export function ContactProfileScreen({
           transition: async () => {
             const now = localDateTime();
             if (direction === "bind") {
-              if (changedIntervalDays !== null) {
-                await setProfileContactFrequency(getExecutor(), {
+              if (changedIntervalDays !== null)
+                await bindWithCadenceAndLifecycleEffects(
+                  getExecutor(),
                   contactId,
-                  intervalDays: changedIntervalDays,
                   now,
-                });
-              }
-              await bindWithLifecycleEffects(
-                getExecutor(),
-                contactId,
-                now,
-                lifecycle.showFrequencyPicker ? bindIntervalDays : undefined,
-              );
+                  changedIntervalDays,
+                );
+              else
+                await bindWithLifecycleEffects(
+                  getExecutor(),
+                  contactId,
+                  now,
+                  lifecycle.showFrequencyPicker ? bindIntervalDays : undefined,
+                );
             } else {
               await unbindWithLifecycleEffects(getExecutor(), contactId, now);
             }

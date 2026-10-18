@@ -41,6 +41,7 @@ type LifecycleDeps = Omit<EffectDeps, "exec"> & {
     contactId: number,
     now: string,
     intervalDays?: number,
+    options?: { replaceCadence?: boolean },
   ) => Promise<void>;
   unbindContact: (
     exec: SqlExecutor,
@@ -114,5 +115,23 @@ export async function bindWithLifecycleEffects(
   deps: LifecycleDeps = defaultDeps,
 ): Promise<void> {
   await deps.bindContact(exec, contactId, now, intervalDays);
+  await applyLifecycleTransitionEffects(contactId, "bind", { exec, ...deps });
+}
+
+/**
+ * D-95 "Change" then Bind (38.12 review C-WR-05): the new frequency and the
+ * bind commit in ONE transaction (`bindContact` `replaceCadence`), then the
+ * scheduler and widget observe it. A refused bind changes nothing.
+ */
+export async function bindWithCadenceAndLifecycleEffects(
+  exec: SqlExecutor,
+  contactId: number,
+  now: string,
+  intervalDays: number,
+  deps: LifecycleDeps = defaultDeps,
+): Promise<void> {
+  await deps.bindContact(exec, contactId, now, intervalDays, {
+    replaceCadence: true,
+  });
   await applyLifecycleTransitionEffects(contactId, "bind", { exec, ...deps });
 }

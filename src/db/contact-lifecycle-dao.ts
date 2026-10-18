@@ -91,13 +91,25 @@ export async function recordLifecycleTransitionCore(
  * Make an Unbound contact Bound. A dormant positive cadence is retained. A
  * never-assigned cadence must be provided for the first bind; this makes the
  * v11 Bound-plus-NULL constraint explicit at the command boundary.
+ *
+ * `options.replaceCadence` (38.12 D-95 "Change" on the Bind card; review
+ * C-WR-05): `intervalDays` is required and becomes the person's frequency in
+ * the SAME transaction as the bind, replacing a dormant cadence, so a bind
+ * that fails leaves the saved frequency unchanged.
  */
 export function bindContact(
   exec: SqlExecutor,
   id: number,
   now: string,
   intervalDays?: number,
+  options: { replaceCadence?: boolean } = {},
 ): Promise<void> {
+  const replaceCadence = options.replaceCadence === true;
+  if (replaceCadence && intervalDays === undefined) {
+    return Promise.reject(
+      new Error("bindContact: replaceCadence needs intervalDays"),
+    );
+  }
   // Return a rejected Promise before opening the transaction, matching the
   // aggregate DAO's caller-facing async contract.
   if (intervalDays !== undefined) {
@@ -131,8 +143,14 @@ export function bindContact(
       );
     }
 
-    const result =
-      current.interval_days === null
+    const result = replaceCadence
+      ? await exec.runAsync(
+          `UPDATE contacts
+              SET tracking_enabled = 1, interval_days = ?, modified_at = ?
+            WHERE id = ? AND tracking_enabled = 0`,
+          [intervalDays, now, id],
+        )
+      : current.interval_days === null
         ? await exec.runAsync(
             `UPDATE contacts
                 SET tracking_enabled = 1, interval_days = ?, modified_at = ?

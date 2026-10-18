@@ -10,6 +10,7 @@ vi.mock("@/services/widget/widget-refresh", () => ({
 
 import {
   applyLifecycleTransitionEffects,
+  bindWithCadenceAndLifecycleEffects,
   bindWithLifecycleEffects,
   unbindWithLifecycleEffects,
 } from "./contact-lifecycle-effects";
@@ -50,6 +51,27 @@ describe("lifecycle transition effects", () => {
     expect(d.bindContact.mock.invocationCallOrder[0]).toBeLessThan(
       d.reconcileSchedule.mock.invocationCallOrder[0],
     );
+  });
+
+  it("binds with a changed frequency in one DAO call, then runs the effects (C-WR-05)", async () => {
+    const d = deps();
+    await bindWithCadenceAndLifecycleEffects(exec, 7, now, 45, d);
+
+    expect(d.bindContact).toHaveBeenCalledTimes(1);
+    expect(d.bindContact).toHaveBeenCalledWith(exec, 7, now, 45, {
+      replaceCadence: true,
+    });
+    expect(d.reconcileSchedule).toHaveBeenCalledWith(exec);
+    expect(d.notifyWidgetDataChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("a refused bind with a changed frequency runs no effects", async () => {
+    const d = deps();
+    d.bindContact.mockRejectedValueOnce(new Error("in the Bin"));
+    await expect(
+      bindWithCadenceAndLifecycleEffects(exec, 7, now, 45, d),
+    ).rejects.toThrow("in the Bin");
+    expect(d.reconcileSchedule).not.toHaveBeenCalled();
   });
 
   it("runs effects without a DAO call for an already-transitioned edit save", async () => {

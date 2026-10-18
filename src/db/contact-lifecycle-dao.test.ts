@@ -328,3 +328,63 @@ describe("contact lifecycle DAO", () => {
     });
   });
 });
+
+describe("bind with a changed frequency is one transaction (38.12 D-95, review C-WR-05)", () => {
+  it("replaces a dormant cadence and binds together", async () => {
+    const contactId = await seedContact({
+      intervalDays: 30,
+      trackingEnabled: 0,
+    });
+
+    await bindContact(exec, contactId, LATER, 45, { replaceCadence: true });
+
+    expect(await row(contactId)).toMatchObject({
+      interval_days: 45,
+      tracking_enabled: 1,
+      modified_at: LATER,
+    });
+    expect((await events(contactId)).map((event) => event.type)).toEqual([
+      "bind",
+    ]);
+    expect(await dataRevision()).toBe(1);
+  });
+
+  it("a refused bind leaves the saved frequency unchanged", async () => {
+    const bound = await seedContact({ intervalDays: 30, trackingEnabled: 1 });
+    const binned = await seedContact({ intervalDays: 30, trackingEnabled: 0 });
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      binned,
+    ]);
+
+    await expect(
+      bindContact(exec, bound, LATER, 45, { replaceCadence: true }),
+    ).rejects.toThrow("no Unbound contact");
+    await expect(
+      bindContact(exec, binned, LATER, 45, { replaceCadence: true }),
+    ).rejects.toBeInstanceOf(ContactInBinError);
+    for (const id of [bound, binned])
+      expect(await row(id)).toMatchObject({
+        interval_days: 30,
+        modified_at: NOW,
+      });
+    expect(await dataRevision()).toBe(0);
+  });
+
+  it("needs a positive frequency", async () => {
+    const contactId = await seedContact({
+      intervalDays: 30,
+      trackingEnabled: 0,
+    });
+    await expect(
+      bindContact(exec, contactId, LATER, undefined, { replaceCadence: true }),
+    ).rejects.toThrow("replaceCadence needs intervalDays");
+    await expect(
+      bindContact(exec, contactId, LATER, 0, { replaceCadence: true }),
+    ).rejects.toThrow("positive integer");
+    expect(await row(contactId)).toMatchObject({
+      interval_days: 30,
+      tracking_enabled: 0,
+    });
+  });
+});

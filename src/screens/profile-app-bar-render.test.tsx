@@ -398,6 +398,15 @@ describe("Profile lifecycle feedback wiring (38.12 D-32, D-33, D-38, D-95)", () 
     expect(screen).toContain("runProfileLifecycleTransition({");
   });
 
+  it("a frequency changed on the Bind card is written with the bind, not before it (D-95, C-WR-05)", () => {
+    const transition = screen.slice(
+      screen.indexOf("transition: async () => {"),
+      screen.indexOf("undo: async () => {"),
+    );
+    expect(transition).toContain("bindWithCadenceAndLifecycleEffects(");
+    expect(transition).not.toContain("setProfileContactFrequency(");
+  });
+
   it("the Bind card reads its label and Change link from bindCardModel (D-95)", () => {
     expect(screen).toContain("bindCardModel(");
     expect(screen).toContain('testID="profile-bind-change"');
