@@ -1727,7 +1727,7 @@ Plans:
 **Wave 7** *(blocked on Wave 6 completion)*
 
 - [x] 38.12-27-PLAN.md — Quiet hours: birthday alerts and weekly digest fire at quiet-hours end (D-142, added mid-phase)
-- [ ] 38.12-26-PLAN.md — Device pass (debug walk, owner batch, one release build)
+- [x] 38.12-26-PLAN.md — Device pass (debug walk, owner batch, one release build)
 
 ### Phase 38.13: Contacts List, Search & Digest UX (INSERTED)
 
@@ -1846,7 +1846,7 @@ Plans:
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
 | 38.11 Everyday Screens UX | 14/14 | Complete| 2026-10-16 |
-| 38.12 People Lifecycle, Import & Settings UX | 26/27 | In Progress|  |
+| 38.12 People Lifecycle, Import & Settings UX | 27/27 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
