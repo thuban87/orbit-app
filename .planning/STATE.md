@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.12
 current_phase_name: People Lifecycle, Import & Settings UX (INSERTED)
 status: executing
-stopped_at: Completed 38.12-22-PLAN.md
-last_updated: "2026-10-18T02:20:00.000Z"
+stopped_at: Completed 38.12-24-PLAN.md
+last_updated: "2026-10-18T02:41:00.000Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 38.12 execution started
-state_head: 6622065c
+state_head: 4316d7a3
 progress:
   total_phases: 38
   completed_phases: 25
   total_plans: 365
-  completed_plans: 359
+  completed_plans: 360
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -483,6 +483,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.12 P23 | 15 min | 3 tasks | 11 files |
 | Phase 38.12 P20 | 16 min | 3 tasks | 30 files |
 | Phase 38.12 P22 | 19 min | 3 tasks | 20 files |
+| Phase 38.12 P24 | 20 min | 3 tasks | 31 files |
 
 ## Accumulated Context
 
@@ -1083,6 +1084,8 @@ Foundational decisions affecting current work:
 - [Phase 38.12]: 38.12-20: D-144 resolves 38.12-19 deferred item 1 — buildReconcileSelections(diff, choices, tappedFamilies): only a phones/emails field the person tapped elects a primary (per field, any tap); untapped defaults are added as secondaries; bulk never elects
 - [Phase 38.12]: 38.12-22: Bin list reads on focus (loading line, re-read after failed Restore/Delete), BinRow = Avatar + name + 'Moved to the Bin <date>' + secondary Restore + ⋯ Delete permanently; Restore → widget + reconcileSchedule → 'Restored <name>' + Undo (archiveContact + Move to Bin after-effects, 'Moved <name> back to the Bin'); RG-029 M1 obsolete
 - [Phase 38.12]: 38.12-22: Profile Bind/Unbind via runProfileLifecycleTransition ('Bound/Unbound <name>' + Undo; '… again' confirmations); Unbind closes ⋯ first; bindCardModel 'Bind · Every N days' + Change (changed frequency written by setProfileContactFrequency before bind, restored on Undo); favourite toggle → notifyWidgetDataChanged; Unbound rows 'Last contact <date>'/'No contact logged', scroll-to-top, keyboardShouldPersistTaps; UnboundContacts in SettingsStack + Contact Management row. Wording for owner on device pass: Undo confirmations, Unbound subtitle, Settings row subtitle
+- [Phase 38.12]: 38.12-24: isFlaggedCustomValue({type, options}, raw) in field-parsers.ts is the one flagged predicate (Profile flag, Edit error via customFieldValueError, listContactsWithUnreadableValues, preflightTypeChange). Profile: one danger 'Needs attention' marker, flagged card tap → Edit; every custom-field Edit from the Profile opens Edit { contactId, focusFieldDefId } (EditContactParams); Edit's Custom Fields section extracted to edit-contact-custom-fields.tsx, useFocusFieldReveal expands after hydration and reveals on the row's onLayout once; FieldValueInput error only while the input holds the saved value
+- [Phase 38.12]: 38.12-24: CustomFieldReview { fieldDefId } (Settings stack) lists live flagged people by name, rows → Edit at the field, reload on focus, 'Nothing left to fix'; preflightTypeChange(exec, field, { type, options }); 'Review now'/'Later' offer after an applied type change that flagged values; D-139 summary drops the clause at 0; photo clamp in updateFieldShareWithAi and applyTypeChange → photo clears share_with_ai. Deferred to owner: createField/restore photo clamp, options-summary D-139/Review now parity, CLAUDE.md '7 parsers' drift (10)
 
 ### Pending Todos
 
