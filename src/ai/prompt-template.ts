@@ -405,8 +405,12 @@ export function resolvePrompt(
     return `- ${sanitizeValue(field.label)}: ${value}`;
   });
 
-  // Assemble the contact block with a marker for the permitted shared fields.
-  const FIELD_MARKER = " FIELDS ";
+  // Assemble the contact block with the permitted shared fields inlined. No
+  // placeholder + String.replace: a string replacement expands `$$`, `$&`,
+  // `` $` `` and `$'` patterns, which corrupted user field text and spliced
+  // prompt sections into the DATA block (38.12 D-WR-01).
+  const fieldsBlock =
+    boundedFields.length > 0 ? boundedFields.join("\n") : NONE_AVAILABLE;
   const contactBlock = [
     "===== DATA: CONTACT CONTEXT =====",
     `Contact: ${sanitizeValue(context.contactName) || NONE_AVAILABLE}`,
@@ -417,7 +421,7 @@ export function resolvePrompt(
     `Touchpoints: ${context.cadence.totalCount} total, ${context.cadence.connectedCount} connected`,
     `Most recent channel: ${context.newestChannel || NONE_AVAILABLE}`,
     "Additional shared details:",
-    FIELD_MARKER,
+    fieldsBlock,
     "===== END DATA: CONTACT CONTEXT =====",
   ].join("\n");
 
@@ -537,11 +541,7 @@ export function resolvePrompt(
       "===== END DATA: USER STYLE NOTE =====",
     );
   }
-  const scaffold = scaffoldParts.join("\n");
-
-  const fieldsBlock =
-    boundedFields.length > 0 ? boundedFields.join("\n") : NONE_AVAILABLE;
-  const prompt = scaffold.replace(FIELD_MARKER, fieldsBlock);
+  const prompt = scaffoldParts.join("\n");
 
   // One immutable object; the same string instance is prompt / inspector / payload.
   const frozenTruncations: ReadonlyArray<TruncationNotice> = Object.freeze(

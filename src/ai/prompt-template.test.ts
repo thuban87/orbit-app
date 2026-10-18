@@ -92,6 +92,24 @@ describe("resolvePrompt — bounded immutable construction", () => {
     expect(occurrences).toBe(1);
   });
 
+  it("sends `$` replacement patterns in field text literally, never expanded (38.12 D-WR-01)", () => {
+    const value = "costs $$5, $& and $` and $' end";
+    const label = "Budget $' $& $$";
+    const resolved = resolvePrompt(
+      "",
+      baseContext({ sharedFields: [{ label, value }] }),
+    );
+    // The user's text survives byte-for-byte on its own line.
+    expect(resolved.prompt).toContain(`- ${label}: ${value}\n`);
+    // No prompt section is spliced into the DATA block: one fence each.
+    const close = "===== END DATA: CONTACT CONTEXT =====";
+    expect(resolved.prompt.split(close).length - 1).toBe(1);
+    expect(resolved.prompt.split(STATIC_INSTRUCTION).length - 1).toBe(1);
+    expect(resolved.prompt.split(DEFAULT_STYLE_NOTE).length - 1).toBe(1);
+    // Preview and payload stay the same string (D-27).
+    expect(resolved.inspectorDisplay).toBe(resolved.payload);
+  });
+
   it("bounds a single value to 300 code points and discloses the trim without the omitted tail", () => {
     const long = `HEAD_${"x".repeat(400)}_TAIL`;
     const resolved = resolvePrompt(
