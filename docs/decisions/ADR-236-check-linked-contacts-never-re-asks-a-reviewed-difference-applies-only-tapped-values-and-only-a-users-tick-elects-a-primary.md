@@ -56,6 +56,7 @@ Reconcile stays one-way and user-triggered, and never deletes (D-22, ADR-068).
 - `src/logic/reconcile-diff.ts` — `actionableReconcileFields`, photo comparable value, unreadable birthdays dropped, `orbitMethods`.
 - `src/logic/reconcile-selection.ts` — tapped options only, `electPrimary`, `buildReconcileSelections`.
 - `src/db/reconcile-apply.ts` — primary election, Keep Orbit photo memory inside the apply transaction.
+- `src/db/contact-methods-dao.ts` — `addContactMethodsCore`, the append-only method writer Apply uses (only `is_primary` changes on stored rows).
 - `src/db/reconcile-snapshot-dao.ts` — the `'source'` family, `MISSING_SOURCE_KEPT`, `recordImportedPhotoFingerprint`.
 - `src/db/reconcile-session-dao.ts` — `setCardCompletionDisposition`.
 - `src/db/reconcile-session-read.ts` — exclusive Check complete counts.
