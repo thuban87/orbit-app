@@ -12,9 +12,7 @@ import {
 import {
   AccessibilityInfo,
   findNodeHandle,
-  type LayoutChangeEvent,
   Pressable,
-  type ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -171,17 +169,11 @@ function importedTitle(name: string): string {
   return name.replace(/\.(?:txt|md)$/i, "").trim() || "Imported context";
 }
 
-export interface AIPersonalizationScreenProps {
-  focus?: "writing-style" | "personalization";
-}
-
 /**
  * Back is the shared header's only (38.9 D-16, D-07). Its goBack() fires
  * beforeRemove, so the Writing Style guard below still prompts.
  */
-export function AIPersonalizationScreen({
-  focus,
-}: AIPersonalizationScreenProps) {
+export function AIPersonalizationScreen() {
   const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
@@ -239,21 +231,6 @@ export function AIPersonalizationScreen({
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const storage = useMemo(createOpenRouterStorage, []);
   const directStorage = useMemo(createFileCatalogStorage, []);
-  const scrollRef = useRef<ScrollView>(null);
-
-  const scrollToFocusedSection = useCallback(
-    (
-      section: "writing-style" | "personalization",
-      event: LayoutChangeEvent,
-    ) => {
-      if (focus !== section) return;
-      scrollRef.current?.scrollTo({
-        y: Math.max(0, event.nativeEvent.layout.y - SPACING.base),
-        animated: false,
-      });
-    },
-    [focus],
-  );
 
   const load = useCallback(async () => {
     const exec = getExecutor();
@@ -607,17 +584,13 @@ export function AIPersonalizationScreen({
       {/* The one scroll container; the section list nests inside it so a
           drag scrolls the page (ProfileLayoutEditor precedent, D-29). */}
       <ScrollViewContainer
-        ref={scrollRef}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: bottomClearance },
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <View
-          style={styles.section}
-          onLayout={(event) => scrollToFocusedSection("writing-style", event)}
-        >
+        <View style={styles.section}>
           <SettingsSectionCard title="Writing Style">
             <View key="style" style={styles.cardBody}>
               <StyleRow
@@ -689,10 +662,7 @@ export function AIPersonalizationScreen({
           </SettingsSectionCard>
         </View>
 
-        <View
-          style={styles.section}
-          onLayout={(event) => scrollToFocusedSection("personalization", event)}
-        >
+        <View style={styles.section}>
           <SettingsSectionCard title="Personalization Context">
             <View key="context" style={styles.cardBody}>
               <View style={styles.sectionHeadingRow}>

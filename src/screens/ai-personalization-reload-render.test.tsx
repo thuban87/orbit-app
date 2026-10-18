@@ -178,7 +178,7 @@ function render(seed: Partial<Record<keyof typeof SLOT, unknown>> = {}) {
       value,
     ]),
   );
-  const tree = nodes(AIPersonalizationScreen({}) as ReactNode);
+  const tree = nodes(AIPersonalizationScreen() as ReactNode);
   expect(hooks.index).toBe(SLOT_COUNT);
   return tree;
 }

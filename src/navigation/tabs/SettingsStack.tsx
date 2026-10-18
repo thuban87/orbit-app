@@ -94,10 +94,8 @@ function AIModelPickerRoute({
   );
 }
 
-function AIPersonalizationRoute({
-  route,
-}: SettingsScreenProps<"AIPersonalization">) {
-  return <AIPersonalizationScreen focus={route.params?.focus} />;
+function AIPersonalizationRoute() {
+  return <AIPersonalizationScreen />;
 }
 
 function AIPermissionsRoute() {

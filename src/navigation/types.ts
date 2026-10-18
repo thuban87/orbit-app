@@ -499,9 +499,8 @@ export type SettingsStackParamList = {
   Settings: undefined;
   AIConnection: undefined;
   AIModelPicker: { lane: AiCloudProviderId };
-  AIPersonalization:
-    | { focus?: "writing-style" | "personalization" }
-    | undefined;
+  /** Opens at the top (38.12 D-126); there is no section-focus param. */
+  AIPersonalization: undefined;
   AIPermissions: undefined;
   AIPreview: undefined;
   /**
