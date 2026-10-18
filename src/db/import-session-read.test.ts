@@ -19,7 +19,8 @@ import {
   UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import {
-  getResumableSession,
+  discardStaleImportSessions,
+  getNewestResumableImportSession,
   getSessionById,
   listSessionRows,
   sessionBatchLifecycle,
@@ -196,7 +197,10 @@ describe("import-session-read", () => {
       reopened = new DatabaseSync(dbPath);
       reopened.exec("PRAGMA foreign_keys = ON");
       const reopenedExec = nodeSqliteExecutor(reopened);
-      const resumable = await getResumableSession(reopenedExec, NOW);
+      await expect(
+        discardStaleImportSessions(reopenedExec, NOW),
+      ).resolves.toEqual([]);
+      const resumable = await getNewestResumableImportSession(reopenedExec);
       expect(resumable).toMatchObject({
         session: {
           id: accepted.sessionId,
@@ -204,7 +208,9 @@ describe("import-session-read", () => {
           batchCategoryId: category.id,
           totalRows: 1,
         },
-        sweptPhotoRelPaths: [],
+        peopleLeft: 1,
+        photosLeft: 0,
+        resumePromptedAt: null,
       });
       expect(
         await getSessionById(reopenedExec, accepted.sessionId),
@@ -420,14 +426,128 @@ describe("import-session-read", () => {
     ]);
   });
 
-  it("keeps only the newest pending session and returns stale staged-photo paths", async () => {
+  it("cleanup keeps only the newest pending session and returns stale staged-photo paths", async () => {
     const older = await acceptRows(exec, ["older"], "2026-08-29 11:00:00");
     const newer = await acceptRows(exec, ["newer"], "2026-08-29 12:00:00");
 
-    await expect(getResumableSession(exec, NOW)).resolves.toEqual({
-      session: expect.objectContaining({ id: newer.sessionId }),
-      sweptPhotoRelPaths: ["import-staging/older.jpg"],
+    await expect(discardStaleImportSessions(exec, NOW)).resolves.toEqual([
+      "import-staging/older.jpg",
+    ]);
+    await expect(getNewestResumableImportSession(exec)).resolves.toMatchObject({
+      session: { id: newer.sessionId },
+      peopleLeft: 1,
+      photosLeft: 0,
     });
+    await expect(getSessionById(exec, older.sessionId)).resolves.toMatchObject({
+      status: "discarded",
+    });
+  });
+
+  it("the newest-resumable read has no side effects (38.12 D-56)", async () => {
+    const older = await acceptRows(exec, ["older"], "2026-08-29 11:00:00");
+    const newer = await acceptRows(exec, ["newer"], "2026-08-29 12:00:00");
+    const before = await exec.getAllAsync(
+      "SELECT * FROM import_sessions ORDER BY id",
+    );
+    const beforeRows = await exec.getAllAsync(
+      "SELECT * FROM import_session_rows ORDER BY id",
+    );
+
+    expect((await getNewestResumableImportSession(exec))?.session.id).toBe(
+      newer.sessionId,
+    );
+    expect((await getNewestResumableImportSession(exec))?.session.id).toBe(
+      newer.sessionId,
+    );
+    expect(
+      await exec.getAllAsync("SELECT * FROM import_sessions ORDER BY id"),
+    ).toEqual(before);
+    expect(
+      await exec.getAllAsync("SELECT * FROM import_session_rows ORDER BY id"),
+    ).toEqual(beforeRows);
+    await expect(getSessionById(exec, older.sessionId)).resolves.toMatchObject({
+      status: "pending",
+    });
+  });
+
+  it("reads the newest session's resume_prompted_at (D-111)", async () => {
+    const accepted = await acceptRows(exec, ["prompted"]);
+    await exec.runAsync(
+      "UPDATE import_sessions SET resume_prompted_at = ? WHERE id = ?",
+      [NOW, accepted.sessionId],
+    );
+    await expect(getNewestResumableImportSession(exec)).resolves.toMatchObject({
+      session: { id: accepted.sessionId },
+      resumePromptedAt: NOW,
+    });
+  });
+
+  it("returns a completed session with one outstanding photo as people 0 / photos 1 (B-6)", async () => {
+    const done = await acceptRows(exec, ["committed"]);
+    const contactId = await seedContact(exec);
+    await setRowContact(exec, done.rowIds[0], contactId, "imported", NOW);
+    await exec.runAsync(
+      "UPDATE import_sessions SET status = 'complete' WHERE id = ?",
+      [done.sessionId],
+    );
+    await expect(getNewestResumableImportSession(exec)).resolves.toMatchObject({
+      session: { id: done.sessionId, status: "complete" },
+      peopleLeft: 0,
+      photosLeft: 1,
+    });
+  });
+
+  it("cleanup discards older pending sessions only and leaves a completed photo-outstanding one (B-6)", async () => {
+    const photo = await acceptRows(exec, ["photo"], "2026-08-29 09:00:00");
+    const contactId = await seedContact(exec);
+    await setRowContact(exec, photo.rowIds[0], contactId, "imported", NOW);
+    await exec.runAsync(
+      "UPDATE import_sessions SET status = 'complete' WHERE id = ?",
+      [photo.sessionId],
+    );
+    const olderPending = await acceptRows(
+      exec,
+      ["older"],
+      "2026-08-29 10:00:00",
+    );
+    const newest = await acceptRows(exec, ["newest"], "2026-08-29 11:00:00");
+
+    await expect(discardStaleImportSessions(exec, NOW)).resolves.toEqual([
+      "import-staging/older.jpg",
+    ]);
+    await expect(
+      getSessionById(exec, olderPending.sessionId),
+    ).resolves.toMatchObject({ status: "discarded" });
+    await expect(getSessionById(exec, photo.sessionId)).resolves.toMatchObject({
+      status: "complete",
+    });
+    expect((await listSessionRows(exec, photo.sessionId))[0]).toMatchObject({
+      photoRelPath: "import-staging/photo.jpg",
+    });
+    await expect(getSessionById(exec, newest.sessionId)).resolves.toMatchObject(
+      { status: "pending" },
+    );
+  });
+
+  it("counts failed rows as people left and never discards a newest failed-only session (F-2)", async () => {
+    const older = await acceptRows(exec, ["older"], "2026-08-29 10:00:00");
+    const failedOnly = await acceptRows(
+      exec,
+      ["fail-a", "fail-b"],
+      "2026-08-29 11:00:00",
+    );
+    for (const rowId of failedOnly.rowIds)
+      await markRowStatus(exec, rowId, "failed", "boom", NOW);
+
+    await expect(getNewestResumableImportSession(exec)).resolves.toMatchObject({
+      session: { id: failedOnly.sessionId, status: "pending" },
+      peopleLeft: 2,
+      photosLeft: 0,
+    });
+    await discardStaleImportSessions(exec, NOW);
+    await expect(
+      getSessionById(exec, failedOnly.sessionId),
+    ).resolves.toMatchObject({ status: "pending" });
     await expect(getSessionById(exec, older.sessionId)).resolves.toMatchObject({
       status: "discarded",
     });
@@ -441,18 +561,19 @@ describe("import-session-read", () => {
       "UPDATE import_sessions SET status = 'complete' WHERE id = ?",
       [old.sessionId],
     );
-    expect(await getResumableSession(exec, NOW)).toMatchObject({
+    expect(await getNewestResumableImportSession(exec)).toMatchObject({
       session: { id: old.sessionId, status: "complete" },
     });
     const newest = await acceptRows(exec, ["newer"], NOW);
-    expect(await getResumableSession(exec, NOW)).toMatchObject({
+    await discardStaleImportSessions(exec, NOW);
+    expect(await getNewestResumableImportSession(exec)).toMatchObject({
       session: { id: newest.sessionId },
     });
     await exec.runAsync(
       "UPDATE import_sessions SET status = 'discarded' WHERE id = ?",
       [newest.sessionId],
     );
-    expect(await getResumableSession(exec, NOW)).toMatchObject({
+    expect(await getNewestResumableImportSession(exec)).toMatchObject({
       session: { id: old.sessionId, status: "complete" },
     });
   });
@@ -462,7 +583,8 @@ describe("import-session-read", () => {
     const contactId = await seedContact(exec);
     await setRowContact(exec, old.rowIds[0], contactId, "imported", NOW);
     const newer = await acceptRows(exec, ["newer"], NOW);
-    expect((await getResumableSession(exec, NOW))?.session.id).toBe(
+    await discardStaleImportSessions(exec, NOW);
+    expect((await getNewestResumableImportSession(exec))?.session.id).toBe(
       newer.sessionId,
     );
     expect(await getSessionById(exec, old.sessionId)).toMatchObject({
@@ -475,7 +597,7 @@ describe("import-session-read", () => {
       "UPDATE import_sessions SET status = 'discarded' WHERE id = ?",
       [newer.sessionId],
     );
-    expect((await getResumableSession(exec, NOW))?.session.id).toBe(
+    expect((await getNewestResumableImportSession(exec))?.session.id).toBe(
       old.sessionId,
     );
   });
@@ -531,7 +653,7 @@ describe("import-session-read batch lifecycle (D-57)", () => {
       trackingEnabled: true,
       intervalDays: 21,
     });
-    const resumable = await getResumableSession(exec, NOW);
+    const resumable = await getNewestResumableImportSession(exec);
     expect(resumable?.session).toMatchObject({
       id: accepted.sessionId,
       batchTrackingEnabled: true,

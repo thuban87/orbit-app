@@ -458,6 +458,11 @@ function AppShell() {
       <Snackbar />
       {/* 38.9 D-24: the single host for imperative confirm()/notice() dialogs. */}
       <DialogHost />
+      {/* 38.12 D-105/D-111: a prompt mounts only when it is the active,
+          unsuppressed one, so its mount effect is where the "asked once"
+          marker is written (markImportResumePrompted /
+          markReconcileResumePrompted). A prompt hidden by a pending share or
+          Capture writes nothing and still appears afterwards. */}
       {activeResumePrompt === "import" ? (
         <ResumeImportPrompt
           resumable={resumableImport}

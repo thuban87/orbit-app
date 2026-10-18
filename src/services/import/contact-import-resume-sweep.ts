@@ -4,7 +4,8 @@ import {
   PHOTO_OUTSTANDING,
 } from "@/db/import-session-dao";
 import {
-  getResumableSession,
+  discardStaleImportSessions,
+  getNewestResumableImportSession,
   type ImportSession,
   listSessionRows,
   type SessionRowCounts,
@@ -191,15 +192,23 @@ export function registerImportResumeSweep(
       Logger.error(LOG_SCOPE, "could not retire detached import rows", error);
     }
     try {
-      const resumable = await getResumableSession(exec, now());
-      if (resumable) {
-        // getResumableSession's stale-session discard has committed before it
-        // returns these paths, so file cleanup cannot race the DB transaction.
-        cleanupDiscardedStagedPhotos(fs, resumable.sweptPhotoRelPaths);
-        // The session an import screen is already showing is not "resumable".
-        if (!isImportSessionOpen(resumable.session.id))
-          description = await describeResumable(exec, resumable.session);
-      }
+      // Launch cleanup first (38.12 D-56): the stale discard commits before it
+      // returns these paths, so file cleanup cannot race the DB transaction.
+      cleanupDiscardedStagedPhotos(
+        fs,
+        await discardStaleImportSessions(exec, now()),
+      );
+      const newest = await getNewestResumableImportSession(exec);
+      // Ask once per paused session (D-111): a session whose
+      // resume_prompted_at is set was already shown the prompt and stays
+      // quiet until it is resumed (which clears it, L-3). The session an
+      // import screen is already showing is not "resumable" either.
+      if (
+        newest &&
+        newest.resumePromptedAt === null &&
+        !isImportSessionOpen(newest.session.id)
+      )
+        description = await describeResumable(exec, newest.session);
     } catch (error) {
       Logger.error(LOG_SCOPE, "could not inspect resumable import", error);
     } finally {

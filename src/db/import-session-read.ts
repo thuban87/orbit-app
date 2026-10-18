@@ -124,32 +124,92 @@ export async function getSessionById(
 }
 
 /**
- * Return the newest resumable session. Older pending sessions are terminally
- * discarded so launch can offer exactly one resume choice, with their staged
- * paths returned for the caller's post-commit cleanup.
+ * Every resumable session, newest first: still pending, or a completed session
+ * whose committed contacts still have a staged photo to add (convergence c2
+ * B-6 — photo-only recovery stays reachable).
  */
-export async function getResumableSession(
+async function listResumableImportSessions(
   exec: SqlExecutor,
-  now: string,
-): Promise<{ session: ImportSession; sweptPhotoRelPaths: string[] } | null> {
-  const candidates = await exec.getAllAsync<ImportSessionDbRow>(
+): Promise<Array<ImportSessionDbRow & { resume_prompted_at: string | null }>> {
+  return exec.getAllAsync(
     `SELECT id, uid, mode, status, batch_category_id, batch_tracking_enabled,
-            batch_interval_days, phone_region, total_rows, created_at, modified_at
+            batch_interval_days, phone_region, total_rows, created_at, modified_at,
+            resume_prompted_at
      FROM import_sessions s WHERE status = 'pending'
        OR EXISTS (SELECT 1 FROM import_session_rows r
                    WHERE r.session_id = s.id AND ${PHOTO_OUTSTANDING})
      ORDER BY created_at DESC, id DESC`,
   );
-  const newest = candidates[0];
-  if (!newest) return null;
+}
 
+/**
+ * People still to finish in an import (38.12 D-111): pending, needs_review and
+ * failed rows. Failed rows are retryable from Import complete and keep the
+ * session pending (`finalizeSessionIfTerminal`), so they count (convergence c5
+ * F-2).
+ */
+export function importPeopleLeft(
+  counts: Pick<SessionRowCounts, "pending" | "needs_review" | "failed">,
+): number {
+  return counts.pending + counts.needs_review + counts.failed;
+}
+
+export interface NewestResumableImport {
+  session: ImportSession;
+  /** pending + needs_review + failed rows (F-2). */
+  peopleLeft: number;
+  /** Imported rows with a contact and a staged photo still to add (B-6). */
+  photosLeft: number;
+  /** When the resume prompt was shown for this session; null = never (D-111). */
+  resumePromptedAt: string | null;
+}
+
+/**
+ * The newest resumable import with its "left" counts (38.12 D-56). No side
+ * effects: the resume prompt's sweep, the Settings row and the new-import
+ * pre-check all read through this. Stale-session cleanup is the separate
+ * launch-only `discardStaleImportSessions`.
+ */
+export async function getNewestResumableImportSession(
+  exec: SqlExecutor,
+): Promise<NewestResumableImport | null> {
+  const [newest] = await listResumableImportSessions(exec);
+  if (!newest) return null;
+  const [counts, photos] = await Promise.all([
+    sessionRowCounts(exec, newest.id),
+    exec.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM import_session_rows r
+       WHERE r.session_id = ? AND ${PHOTO_OUTSTANDING}`,
+      [newest.id],
+    ),
+  ]);
+  return {
+    session: mapSession(newest),
+    peopleLeft: importPeopleLeft(counts),
+    photosLeft: photos?.n ?? 0,
+    resumePromptedAt: newest.resume_prompted_at,
+  };
+}
+
+/**
+ * Launch cleanup (38.12 D-56): terminally discard every OLDER pending session
+ * so launch offers exactly one resume choice. A completed session with
+ * outstanding photos is never discarded (B-6), and neither is the newest
+ * resumable session whatever its rows (F-2). Returns the swept staged paths
+ * for the caller's post-commit file cleanup.
+ */
+export async function discardStaleImportSessions(
+  exec: SqlExecutor,
+  now: string,
+): Promise<string[]> {
+  const candidates = await listResumableImportSessions(exec);
   const sweptPhotoRelPaths: string[] = [];
   for (const stale of candidates
     .slice(1)
     .filter((session) => session.status === "pending")) {
     sweptPhotoRelPaths.push(...(await discardSession(exec, stale.id, now)));
   }
-  return { session: mapSession(newest), sweptPhotoRelPaths };
+  return sweptPhotoRelPaths;
 }
 
 interface ImportSessionRowDbRow {

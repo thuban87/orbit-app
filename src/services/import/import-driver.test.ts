@@ -10,7 +10,10 @@ import {
   setSessionBatchDefaults,
   UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
-import { getResumableSession, listSessionRows } from "@/db/import-session-read";
+import {
+  getNewestResumableImportSession,
+  listSessionRows,
+} from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -252,7 +255,7 @@ describe("runImportBatch", () => {
         "SELECT category_id FROM contacts WHERE name = 'Categorized'",
       ),
     ).toEqual({ category_id: category.id });
-    await expect(getResumableSession(exec, NOW)).resolves.toBeNull();
+    await expect(getNewestResumableImportSession(exec)).resolves.toBeNull();
   });
 
   it("never runs two passes over one session at once (D-74)", async () => {

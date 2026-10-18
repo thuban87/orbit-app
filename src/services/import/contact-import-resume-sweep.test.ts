@@ -5,16 +5,43 @@ vi.mock("@/services/photos/photo-storage", () => ({
   deleteImportStaging: vi.fn(),
   listImportStagingPhotos: vi.fn(() => []),
 }));
+// The prompt module is imported only for its pure `resumeImport` routing
+// (convergence c5 F-2); its native UI dependencies are stubbed.
+vi.mock("react-native", () => ({
+  Pressable: "Pressable",
+  ScrollView: "ScrollView",
+  StyleSheet: { create: <T>(styles: T) => styles, absoluteFill: {} },
+  Text: "Text",
+  View: "View",
+}));
+vi.mock("@react-navigation/native", () => ({ useNavigation: () => null }));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+vi.mock("@/components/ui/RegisteredModal", () => ({
+  RegisteredModal: "RegisteredModal",
+}));
+vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 
+import { resumeImport } from "@/components/ResumeImportPrompt";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   acceptImportSessionWithRows,
   discardSession,
+  markRowStatus,
+  PHOTO_OUTSTANDING,
   setRowContact,
 } from "@/db/import-session-dao";
-import { getSessionById } from "@/db/import-session-read";
+import {
+  getNewestResumableImportSession,
+  getSessionById,
+} from "@/db/import-session-read";
 import { runMigrations } from "@/db/migrations/runner";
+import {
+  clearImportResumePrompted,
+  markImportResumePrompted,
+} from "@/db/resume-prompt-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
   cleanupDiscardedStagedPhotos,
@@ -352,6 +379,164 @@ describe("contact-import-resume-sweep", () => {
     expect(onResumable).toHaveBeenCalledWith(null);
     expect(await getSessionById(exec, accepted.sessionId)).toMatchObject({
       status: "discarded",
+    });
+  });
+
+  it("asks once: a prompted session no longer triggers onResumable (D-111)", async () => {
+    const accepted = await acceptRows(["paused"]);
+    const onResumable = vi.fn<(value: ResumableImport | null) => void>();
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: accepted.sessionId }),
+    );
+
+    // The prompt mounted visible and wrote the marker.
+    await markImportResumePrompted(exec, accepted.sessionId, NOW);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+    // Still pending: the work stays findable from Settings.
+    await expect(
+      getSessionById(exec, accepted.sessionId),
+    ).resolves.toMatchObject({ status: "pending" });
+  });
+
+  it("asks again once a resume clears the marker and the session is left again (L-3)", async () => {
+    const accepted = await acceptRows(["resumed"]);
+    await markImportResumePrompted(exec, accepted.sessionId, NOW);
+    const onResumable = vi.fn<(value: ResumableImport | null) => void>();
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+
+    await clearImportResumePrompted(exec, accepted.sessionId);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: accepted.sessionId }),
+    );
+  });
+
+  it("offers a completed session with one outstanding photo once, and its photo work stays reachable (B-6)", async () => {
+    const accepted = await acceptRows(["photo"]);
+    const contactId = await seedContact();
+    await setRowContact(exec, accepted.rowIds[0], contactId, "imported", NOW);
+    await exec.runAsync(
+      "UPDATE import_sessions SET status = 'complete' WHERE id = ?",
+      [accepted.sessionId],
+    );
+    const onResumable = vi.fn<(value: ResumableImport | null) => void>();
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId: accepted.sessionId,
+        photoOutstanding: 1,
+      }),
+    );
+    await markImportResumePrompted(exec, accepted.sessionId, NOW);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+
+    // The photo row is still outstanding, so the resume route (Import
+    // complete's Retry, `retryImportedPhoto`, which reads PHOTO_OUTSTANDING)
+    // can still add it, and the Settings row still sees it.
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM import_session_rows r
+         WHERE r.session_id = ? AND ${PHOTO_OUTSTANDING}`,
+        [accepted.sessionId],
+      ),
+    ).toEqual({ n: 1 });
+    await expect(getNewestResumableImportSession(exec)).resolves.toMatchObject({
+      session: { id: accepted.sessionId },
+      peopleLeft: 0,
+      photosLeft: 1,
+    });
+    const navigate = vi.fn();
+    resumeImport(
+      { navigate },
+      {
+        sessionId: accepted.sessionId,
+        mode: "bulk",
+        counts: {
+          pending: 0,
+          imported: 1,
+          linked: 0,
+          needs_review: 0,
+          failed: 0,
+          skipped: 0,
+        },
+        discardOnly: false,
+        photoOutstanding: 1,
+      },
+    );
+    expect(navigate).toHaveBeenCalledWith("SettingsTab", {
+      screen: "ImportComplete",
+      params: { sessionId: accepted.sessionId },
+      initial: false,
+    });
+  });
+
+  it("offers an unprompted failed-only pending session (F-2)", async () => {
+    const accepted = await acceptRows(["fail-a", "fail-b"]);
+    for (const rowId of accepted.rowIds)
+      await markRowStatus(exec, rowId, "failed", "boom", NOW);
+    const onResumable = vi.fn<(value: ResumableImport | null) => void>();
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId: accepted.sessionId,
+        counts: expect.objectContaining({
+          pending: 0,
+          needs_review: 0,
+          failed: 2,
+        }),
+      }),
+    );
+  });
+
+  it("resumeImport routes a failed-only session to Import complete, where Retry lives (F-2)", () => {
+    const navigate = vi.fn();
+    resumeImport(
+      { navigate },
+      {
+        sessionId: 7,
+        mode: "bulk",
+        counts: {
+          pending: 0,
+          imported: 1,
+          linked: 0,
+          needs_review: 0,
+          failed: 2,
+          skipped: 0,
+        },
+        discardOnly: false,
+      },
+    );
+    expect(navigate).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith("SettingsTab", {
+      screen: "ImportComplete",
+      params: { sessionId: 7 },
+      initial: false,
     });
   });
 });

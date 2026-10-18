@@ -46,6 +46,8 @@ interface PromptCase {
   heading: string;
   /** A fragment of every body-copy variant. */
   bodyFragments: string[];
+  /** Copy that lives in a body helper outside the JSX. */
+  copyFragments?: string[];
   actions: string[];
 }
 
@@ -54,12 +56,14 @@ const PROMPTS: PromptCase[] = [
     name: "ResumeImportPrompt",
     path: "src/components/ResumeImportPrompt.tsx",
     heading: "Resume your import?",
-    bodyFragments: [
+    // 38.12 D-111: the body is chosen by `resumeImportBody`.
+    bodyFragments: ["{resumeImportBody(resumable)}"],
+    copyFragments: [
       "Imported contacts have photos waiting",
       "This saved import can’t be resumed.",
-      "Unresolved items are saved.",
+      "left to import. Discard drops them; nothing already imported changes.",
     ],
-    actions: ['"Resume import"', '"Discard import"', '"Later"'],
+    actions: ['"Resume import"', '"Discard import"', '"Later"', '"Not now"'],
   },
   {
     name: "ResumeReconcilePrompt",
@@ -99,6 +103,9 @@ describe("recovery prompts keep their buttons reachable at large text (D-49)", (
         expect(inside).toContain(prompt.heading);
         for (const fragment of prompt.bodyFragments) {
           expect(inside, fragment).toContain(fragment);
+        }
+        for (const fragment of prompt.copyFragments ?? []) {
+          expect(text, fragment).toContain(fragment);
         }
       });
 
