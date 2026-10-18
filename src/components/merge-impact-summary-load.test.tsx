@@ -165,6 +165,19 @@ describe("merge summary load (38.12 review B-WR-10)", () => {
     expect(pressable(tree, /Merge contacts/)?.props.disabled).toBe(false);
   });
 
+  it('the dropped line reads "Not kept from <absorbed>:" with no survivor clause (D-166)', () => {
+    const tree = render([
+      [0, { survivor: "Juniper Okafor", absorbed: "Wrenna Calloway" }],
+      [1, { interactions: 1 }],
+      [2, { profilePresentation: true, orrerySystemChoices: 0 }],
+    ]);
+    const texts = nodes(tree)
+      .filter((node) => node.type === "Text")
+      .map(textOf);
+    expect(texts).toContain("Not kept from Wrenna Calloway:");
+    expect(texts.some((text) => text.includes("'s stay"))).toBe(false);
+  });
+
   it("a committed merge refreshes reminders and the widget (38.12 review B-IN-07)", async () => {
     mocks.confirm.mockResolvedValue(true);
     mocks.merge.mockResolvedValue({ recoveryPending: false });

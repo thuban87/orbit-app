@@ -161,7 +161,7 @@ export function MergeImpactSummary({
             ]}
           >
             <Text style={{ color: colors.textPrimary }}>
-              {`Not kept from ${names.absorbed} (${names.survivor}'s stay):`}
+              {`Not kept from ${names.absorbed}:`}
             </Text>
             {droppedRows.map((row) => (
               <Text key={row} style={{ color: colors.textSecondary }}>
