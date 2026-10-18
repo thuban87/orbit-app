@@ -28,6 +28,10 @@ import {
 } from "@/db/import-session-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import {
+  initialBulkLifecycle,
+  sanitiseImportLifecycle,
+} from "@/screens/bulk-import-setup-logic";
 
 const NOW = "2026-08-29 12:00:00";
 let exec: SqlExecutor;
@@ -368,4 +372,36 @@ describe("import-session-read batch lifecycle (D-57)", () => {
       batchIntervalDays: 21,
     });
   });
+});
+
+/**
+ * 38.12 D-58 (T-38.12-46): resume (`sessionBatchLifecycle`) and bulk setup's
+ * restore (`initialBulkLifecycle`) read the same stored session through the one
+ * shared `sanitiseImportLifecycle`, so they agree on every stored value.
+ */
+describe("import-session-read shares the lifecycle sanitiser with setup (D-58)", () => {
+  it.each([
+    [1, 21, { trackingEnabled: true, intervalDays: 21 }],
+    [0, null, UNBOUND_IMPORT],
+    [0, 30, UNBOUND_IMPORT],
+  ] as const)(
+    "stored tracking %s / cadence %s reads identically for resume and setup",
+    async (tracking, days, expected) => {
+      const accepted = await acceptRows(exec, [`parity-${tracking}-${days}`]);
+      await exec.runAsync(
+        "UPDATE import_sessions SET batch_tracking_enabled = ?, batch_interval_days = ? WHERE id = ?",
+        [tracking, days, accepted.sessionId],
+      );
+      const session = await getSessionById(exec, accepted.sessionId);
+      if (!session) throw new Error("missing session");
+      expect(sessionBatchLifecycle(session)).toEqual(expected);
+      expect(initialBulkLifecycle(session)).toEqual(expected);
+      expect(
+        sanitiseImportLifecycle({
+          trackingEnabled: session.batchTrackingEnabled,
+          intervalDays: session.batchIntervalDays,
+        }),
+      ).toEqual(expected);
+    },
+  );
 });

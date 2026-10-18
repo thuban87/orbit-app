@@ -2,13 +2,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { UNBOUND_IMPORT } from "@/db/import-session-dao";
+import { sessionBatchLifecycle } from "@/db/import-session-read";
 import { FREQUENCY_DAYS } from "@/types";
 import {
   BULK_BOUND_BLURB,
   BULK_IMPORT_DEFAULT_FREQUENCY,
+  BULK_LIFECYCLE_OPTIONS,
   bulkLifecycleChoice,
   bulkLifecycleLocked,
   initialBulkLifecycle,
+  sanitiseImportLifecycle,
 } from "./bulk-import-setup-logic";
 
 /**
@@ -51,6 +54,17 @@ describe("bulk import setup lifecycle logic (D-57)", () => {
     ).toEqual({ trackingEnabled: false, intervalDays: null });
   });
 
+  it("offers Bound then Unbound, in Add/Edit Contact's order (D-108)", () => {
+    expect(BULK_LIFECYCLE_OPTIONS.map((option) => option.label)).toEqual([
+      "Bound",
+      "Unbound",
+    ]);
+    expect(BULK_LIFECYCLE_OPTIONS.map((option) => option.bound)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
   it("says binding puts every imported contact on reminders at this frequency", () => {
     expect(BULK_BOUND_BLURB).toMatch(/every imported contact/i);
     expect(BULK_BOUND_BLURB).toMatch(/reminders/i);
@@ -73,14 +87,17 @@ function functionBody(name: string): string {
 }
 
 describe("BulkImportSetupScreen lifecycle source contract (D-57)", () => {
-  it("offers Unbound then Bound as a radio group with selected state", () => {
+  it("offers Bound then Unbound as a radio group with selected state, Unbound by default (D-108)", () => {
     expect(screen).toContain('accessibilityRole="radiogroup"');
     expect(screen).toContain('accessibilityRole="radio"');
     expect(screen).toMatch(/accessibilityState=\{\{\s*selected/);
-    const unbound = screen.indexOf('"Unbound"');
-    const bound = screen.indexOf('"Bound"');
-    expect(unbound).toBeGreaterThan(-1);
-    expect(bound).toBeGreaterThan(unbound);
+    // The options render from the shared, ordered list (Bound, Unbound).
+    expect(screen).toContain("BULK_LIFECYCLE_OPTIONS.map(");
+    expect(screen).not.toMatch(/label: "Unbound"/);
+    // Unbound stays the default (D-16).
+    expect(screen).toContain(
+      "const [trackingEnabled, setTrackingEnabled] = useState(false);",
+    );
     expect(screen).toContain("Orbit participation");
   });
 
@@ -211,6 +228,38 @@ describe("bulkLifecycleLocked (D-64)", () => {
     "locks once a row is %s",
     (status) => {
       expect(bulkLifecycleLocked({ ...none, [status]: 1 })).toBe(true);
+    },
+  );
+});
+
+/**
+ * 38.12 D-58 (T-38.12-46): setup's restore and resume read the stored session
+ * through the one sanitiser, so they never disagree about the same inputs:
+ * Bound needs a positive integer cadence; anything else is Unbound, no cadence.
+ */
+describe("sanitiseImportLifecycle — setup and resume parity (D-58)", () => {
+  const stored = [
+    [true, 14, { trackingEnabled: true, intervalDays: 14 }],
+    [true, null, UNBOUND_IMPORT],
+    [true, 0, UNBOUND_IMPORT],
+    [true, -7, UNBOUND_IMPORT],
+    [true, 2.5, UNBOUND_IMPORT],
+    [false, 30, UNBOUND_IMPORT],
+    [false, null, UNBOUND_IMPORT],
+  ] as const;
+
+  it.each(stored)(
+    "tracking %s with cadence %s sanitises the same for setup and resume",
+    (batchTrackingEnabled, batchIntervalDays, expected) => {
+      const session = { batchTrackingEnabled, batchIntervalDays };
+      expect(
+        sanitiseImportLifecycle({
+          trackingEnabled: batchTrackingEnabled,
+          intervalDays: batchIntervalDays,
+        }),
+      ).toEqual(expected);
+      expect(initialBulkLifecycle(session)).toEqual(expected);
+      expect(sessionBatchLifecycle(session)).toEqual(expected);
     },
   );
 });
