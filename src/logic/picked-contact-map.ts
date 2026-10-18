@@ -1,8 +1,12 @@
 import type { CreateContactFullInput } from "@/db/contacts-dao";
 import { newUid } from "@/db/uid";
 import { isValidStoredBirthday } from "@/logic/birthday-logic";
+import { pickedMethodLabel } from "@/logic/picked-method-label";
 import { buildBirthdayForStorage } from "@/screens/edit-contact-logic";
-import type { PickedContact } from "../../modules/orbit-contact-picker";
+import type {
+  PickedContact,
+  PickedMethod,
+} from "../../modules/orbit-contact-picker";
 
 export interface MapPickedContactOptions {
   categoryId: number | null;
@@ -86,13 +90,21 @@ export function mapPickedContact(
   const name = picked.displayName?.trim() ?? "";
   const methodDrafts = picked.methods
     .filter(
-      (method): method is { type: "phone" | "email"; value: string } =>
+      (method): method is PickedMethod =>
         method.type === "phone" || method.type === "email",
     )
     .map((method) => ({
       uid: newUid(),
       type: method.type,
       value: method.value,
+      // 38.12 D-161: the phone's own label (Mobile, Work, custom …), mapped
+      // exactly as Check linked contacts maps it; null when the phone gave
+      // no type, so no label is invented (never a forced "Main").
+      label: pickedMethodLabel(
+        method.type,
+        method.typeCode,
+        method.customLabel,
+      ),
     }));
 
   return {

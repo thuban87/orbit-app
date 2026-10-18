@@ -63,6 +63,18 @@ export function emptyMethodDraft(
   return { uid, type, value: "", extension: "", label: "Main" };
 }
 
+/**
+ * An imported phone value as the Import review form's draft (38.12 D-161):
+ * the phone's own label as mapped at import (`pickedMethodLabel`), or no
+ * label when the phone gave no type — never a forced "Main". An empty label
+ * is stored as NULL, like a bulk import's.
+ */
+export function importedMethodDraft(
+  method: ContactMethodDraft,
+): ContactMethodEditorDraft {
+  return { ...method, extension: "", label: method.label ?? "" };
+}
+
 export function seedMethodDraft(
   row: ContactMethodRow,
 ): ContactMethodEditorDraft {

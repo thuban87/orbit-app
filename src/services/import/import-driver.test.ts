@@ -27,7 +27,12 @@ const uid = () => `import-driver-${++counter}`;
 
 function payload(
   displayName: string | null,
-  methods: Array<{ type: "phone" | "email"; value: string }> = [],
+  methods: Array<{
+    type: "phone" | "email";
+    value: string;
+    typeCode?: number | null;
+    customLabel?: string | null;
+  }> = [],
   note: string | null = null,
 ): string {
   return JSON.stringify({ displayName, methods, birthday: null, note });
@@ -81,6 +86,39 @@ async function createLinkedContact(externalContactId: string): Promise<number> {
 }
 
 describe("runImportBatch", () => {
+  it("a bulk import stores the phone's labels, no forced Main (38.12 D-161)", async () => {
+    const session = await createSession([
+      {
+        externalContactId: "labels",
+        sourcePayload: payload("Labelled Person", [
+          { type: "phone", value: "312 555 0140", typeCode: 2 },
+          {
+            type: "phone",
+            value: "312 555 0141",
+            typeCode: 0,
+            customLabel: "Boat",
+          },
+          { type: "phone", value: "312 555 0142" },
+          { type: "email", value: "work@example.test", typeCode: 2 },
+        ]),
+      },
+    ]);
+    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+    const row = (await listSessionRows(exec, session.sessionId))[0];
+    if (row.contactId === null) throw new Error("bulk import did not commit");
+    expect(
+      await exec.getAllAsync<{ raw_value: string; label: string | null }>(
+        "SELECT raw_value, label FROM contact_methods WHERE contact_id = ? ORDER BY raw_value",
+        [row.contactId],
+      ),
+    ).toEqual([
+      { raw_value: "312 555 0140", label: "Mobile" },
+      { raw_value: "312 555 0141", label: "Boat" },
+      { raw_value: "312 555 0142", label: null },
+      { raw_value: "work@example.test", label: "Work" },
+    ]);
+  });
+
   it("keeps a bulk-imported note out of AI context under the ON default", async () => {
     await exec.runAsync(
       "UPDATE app_settings SET ai_default_memory_allow = 1 WHERE id = 1",

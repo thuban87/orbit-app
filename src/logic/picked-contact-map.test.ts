@@ -6,6 +6,39 @@ import {
 } from "./picked-contact-map";
 
 describe("mapPickedContact", () => {
+  it("carries the phone's own labels, mapped as Check linked contacts maps them, never a forced Main (D-161)", () => {
+    const result = mapPickedContact(
+      {
+        lookupKey: "labels",
+        displayName: "Labelled",
+        methods: [
+          { type: "phone", value: "+1 312 555 0100", typeCode: 2 },
+          { type: "phone", value: "+1 312 555 0101", typeCode: 3 },
+          {
+            type: "phone",
+            value: "+1 312 555 0102",
+            typeCode: 0,
+            customLabel: " Boat ",
+          },
+          { type: "phone", value: "+1 312 555 0103" },
+          { type: "email", value: "w@example.test", typeCode: 2 },
+          { type: "email", value: "h@example.test", typeCode: 1 },
+        ],
+        birthday: null,
+        photoTempUri: null,
+      },
+      { categoryId: null, effectivePhoneRegion: "US" },
+    );
+    expect(result.input.methodDrafts?.map((draft) => draft.label)).toEqual([
+      "Mobile",
+      "Work",
+      "Boat",
+      null,
+      "Work",
+      "Home",
+    ]);
+  });
+
   it("maps the allowed fields into an Unbound create input with the phone region", () => {
     const result = mapPickedContact(
       {

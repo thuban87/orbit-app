@@ -6,6 +6,7 @@ import {
   collapseCanonicalDuplicate,
   discardBlankMethodDrafts,
   emptyMethodDraft,
+  importedMethodDraft,
   METHOD_LABELS,
   type MethodGroups,
   methodLabelChoice,
@@ -222,5 +223,39 @@ describe("updateMethodDraft recomputes the live warning (38.11 D-30; warn only, 
   it("never blocks the save path: an unusable draft still reaches the DAO input", () => {
     const typed = updateMethodDraft(groups(), "p1", { value: "12" }, "US");
     expect(toMethodDrafts(typed).map((draft) => draft.value)).toContain("12");
+  });
+});
+
+describe("importedMethodDraft (38.12 D-161)", () => {
+  it("keeps the phone's label and seeds no forced Main", () => {
+    expect(
+      importedMethodDraft({
+        uid: "a",
+        type: "phone",
+        value: "1",
+        label: "Mobile",
+      }),
+    ).toEqual({
+      uid: "a",
+      type: "phone",
+      value: "1",
+      label: "Mobile",
+      extension: "",
+    });
+    expect(
+      importedMethodDraft({
+        uid: "b",
+        type: "email",
+        value: "x@y.z",
+        label: null,
+      }).label,
+    ).toBe("");
+  });
+
+  it("an unlabelled value is stored without a label", () => {
+    const draft = importedMethodDraft({ uid: "b", type: "phone", value: "1" });
+    expect(
+      toMethodDrafts({ phone: [draft], email: [] })[0]?.label,
+    ).toBeUndefined();
   });
 });

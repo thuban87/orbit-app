@@ -21,6 +21,7 @@ import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
   addMethodDraft,
   choosePrimary,
+  importedMethodDraft,
   type MethodGroups,
   removeMethodDraft,
   resolveEffectivePhoneRegion,
@@ -84,7 +85,13 @@ const LOG_SCOPE = "import-review";
 
 type Snapshot = {
   displayName: string | null;
-  methods: Array<{ type: "phone" | "email"; value: string }>;
+  /** The bridge's raw TYPE code and custom label ride along (D-102, D-161). */
+  methods: Array<{
+    type: "phone" | "email";
+    value: string;
+    typeCode?: number | null;
+    customLabel?: string | null;
+  }>;
   birthday: string | null;
 };
 
@@ -258,13 +265,16 @@ export function ImportReviewScreen({
       setPhotoRelPath(row.photoRelPath);
       setPhoneRegion(session.phoneRegion);
       const methodDrafts = mapped.input.methodDrafts ?? [];
+      // D-161: each value keeps the phone's own label (the mapper's, as in
+      // Check linked contacts); a value the phone gave no type stays
+      // unlabelled, never a forced "Main".
       setMethods({
         phone: methodDrafts
           .filter((method) => method.type === "phone")
-          .map((method) => ({ ...method, extension: "", label: "Main" })),
+          .map((method) => importedMethodDraft(method)),
         email: methodDrafts
           .filter((method) => method.type === "email")
-          .map((method) => ({ ...method, extension: "", label: "Main" })),
+          .map((method) => importedMethodDraft(method)),
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to load import review", error);
