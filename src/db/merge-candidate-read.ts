@@ -21,19 +21,11 @@ const MERGE_CANDIDATE_SELECT = `SELECT c.id, c.name, c.photo, c.created_at AS cr
    (SELECT COUNT(*) FROM contact_methods AS m WHERE m.contact_id = c.id AND NULLIF(TRIM(m.display_value), '') IS NOT NULL)) AS completeDataCount
   FROM contacts AS c`;
 
-/** Every live contact is eligible for a profile-initiated merge, Bound or Unbound. */
-export function listMergeCandidates(
-  exec: SqlExecutor,
-  excludeContactId: number,
-): Promise<MergeCandidate[]> {
-  return exec.getAllAsync<MergeCandidate>(
-    `${MERGE_CANDIDATE_SELECT}
-      WHERE c.archived_at IS NULL AND c.id <> ?
-      ORDER BY (c.favourite_rank IS NULL), c.favourite_rank ASC, c.name COLLATE NOCASE, c.id`,
-    [excludeContactId],
-  );
-}
-
+/**
+ * One merge candidate (not in the Bin), Bound or Unbound, for SurvivorSelect.
+ * The list form had no production caller and was removed (38.12 fix-pass
+ * queue 5); the merge picker lists through `listPickerContacts`.
+ */
 export function getMergeCandidate(
   exec: SqlExecutor,
   contactId: number,
