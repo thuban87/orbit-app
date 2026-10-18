@@ -1,6 +1,6 @@
 # Glossary
 
-**Last updated:** 2026-10-17
+**Last updated:** 2026-10-18
 **Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/constants/glossary.ts`, `src/constants/product-labels.ts`, `src/constants/glossary-contract.test.ts`
 
@@ -103,7 +103,7 @@ unconverted screens.
 | "Sensitive Operations" | "Careful actions" |
 | "Format version", "Related rows", "Tombstones" (restore preview) | "Backup version", "Linked items", "Deleted items kept" |
 | "cadence" in captions | "reach-out reminders", "reminder schedule", "Days between backups" |
-| "Reset Overrides", "Overrides" badge, "Reset Membership Overrides" (Systems) | "Reset Manual Changes", "Edited", "Reset Membership Changes" |
+| "Reset Overrides", "Overrides" badge, "Reset Membership Overrides", "Reset Manual Changes" (Systems) | "Reset Membership Changes" (one label on the Systems ⋯ and in the builder; 38.12 D-76), "Edited" |
 | "Contact override", "Category override", "Batch category override" | "Set for this contact", "Set for this category", "Category for all imported contacts" |
 
 Decided metric names (Gravity) and the canonical terms above are not changed (D-41).
@@ -154,6 +154,8 @@ None. The constants are the configuration.
 - **ADR-218:** Things to Remember on the Profile — the Things to Remember terms, entry-sheet wording (Edit, Pin, Unpin, Close) and "Not set" (D-87, D-90).
 - **ADR-226:** Archive Becomes the Bin — `BIN`, `MOVE_TO_BIN`; "Archived contact(s)" retired.
 - **ADR-228:** Truthful Relationship Overview — "Never Contacted" on the Profile; `RARELY_RESPONDS`.
+- **ADR-236:** Check Linked Contacts Never Re-Asks a Reviewed Difference — `CHECK_LINKED_CONTACTS` and the four plain-word labels.
+- **ADR-246:** One Settings Row and Section Card — `CHECK_IN_REMINDERS`, `USE_AI_SUGGESTIONS`, "Unbound" capitalised, one membership-reset label.
 
 ## Gotchas
 
@@ -168,8 +170,10 @@ None. The constants are the configuration.
 3. **A new retired form goes in the contract, not in a grep.** Add it to `RETIRED_FORMS` in
    `glossary-contract.test.ts`; the self-tests there show the caught and skipped cases.
 4. **A renamed label that code dispatches on must come from one constant.** The Systems
-   screen dispatches row actions by label, so "Reset Manual Changes" is
-   `RESET_MANUAL_CHANGES_ACTION`, used by both the button list and the handler (D-63). The
+   screen dispatches row actions by label, so "Reset Membership Changes" is
+   `RESET_MEMBERSHIP_CHANGES_ACTION` (from `RESET_MEMBERSHIP_CHANGES` in
+   `orrery-system-logic.ts`, shared with the builder), used by both the ⋯ menu and the handler
+   (38.9 D-63; 38.12 D-76). The
    `systems-dao` function keeps its name `resetSystemOverrides`; identifiers are not copy.
 5. **Other system docs still use old names in prose** (for example "Not Contacted" in
    `dashboard.md`). They describe internals; the KB extraction for 38.9 brings them in line.
@@ -196,3 +200,4 @@ None. The constants are the configuration.
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-226, ADR-228. |
 | 2026-10-17 | 38.12 | "Check-in reminders" (was "Decay reminders") and "Use AI suggestions" (was "AI Enabled") added as Settings switch labels, pinned by the glossary contract; status names unchanged (D-130, D-05; plan 14). |
 | 2026-10-17 | 38.12 | Check linked contacts wording: one flow name (D-49) and four plain-word labels replacing developer wording ("Not in phone Contacts", "Needs your choice", "Link to a different phone contact", "Unlink from phone contact"); pinned by the glossary contract; canonical terms unchanged (D-103, D-05; plan 19). |
+| 2026-10-18 | 38.12 | KB extraction: one Systems reset label, "Reset Membership Changes" ("Reset Manual Changes" retired; Gotcha 4 updated); Decisions link ADR-236, ADR-246. |
