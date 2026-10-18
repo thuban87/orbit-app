@@ -13,6 +13,7 @@ import {
   preflightTypeChange,
 } from "@/db/field-type-change";
 import type { CustomFieldDef } from "@/db/field-types";
+import { listContactsWithUnreadableValues } from "@/db/field-values-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -328,6 +329,75 @@ describe("type change checks the target type AND options (38.12 D-121, D-24; c2 
         preflightTypeChange(exec, definition, { type: "dropdown", options }),
       ).resolves.toEqual({ total: 1, convert: [gil], flag: [] });
     }
+  });
+});
+
+describe("pre-flights count the same people as the Review now list (A-WR-04, C-WR-03)", () => {
+  async function bin(contactId: number): Promise<void> {
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      contactId,
+    ]);
+  }
+
+  it("a type change leaves a Bin person's value out of the counts and the offer", async () => {
+    const definition = field({ col_name: "age", type: "text" });
+    await persistField(definition);
+    const live = await contact("Live");
+    const liveBad = await contact("Live bad");
+    const binned = await contact("Binned bad");
+    await value(live, definition.id, "42");
+    await value(liveBad, definition.id, "forty");
+    await value(binned, definition.id, "fifty");
+    await bin(binned);
+
+    const pf = await preflightTypeChange(exec, definition, {
+      type: "number",
+      options: null,
+    });
+    expect(pf).toEqual({ total: 2, convert: [live], flag: [liveBad] });
+    await applyTypeChange(exec, definition, "number", LATER);
+    expect(
+      (await listContactsWithUnreadableValues(exec, definition.id)).map(
+        (row) => row.contactId,
+      ),
+    ).toEqual(pf.flag);
+  });
+
+  it("an options edit leaves a Bin person's value out too", async () => {
+    const definition = field({
+      col_name: "tier3",
+      type: "dropdown",
+      options: JSON.stringify(["basic", "premium"]),
+    });
+    await persistField(definition);
+    const live = await contact("Live");
+    const binned = await contact("Binned");
+    await value(live, definition.id, "premium");
+    await value(binned, definition.id, "premium");
+    await bin(binned);
+
+    await expect(
+      preflightOptionsChange(exec, definition, JSON.stringify(["basic"])),
+    ).resolves.toEqual({ total: 1, keep: [], flag: [live] });
+  });
+
+  it("a Bin person's value is not rewritten and stays in the audit snapshot", async () => {
+    const definition = field({ col_name: "age2", type: "text" });
+    await persistField(definition);
+    const binned = await contact("Binned");
+    await value(binned, definition.id, "fifty", "binned-value-uid");
+    await bin(binned);
+    const before = await rowsFor(definition.id);
+
+    await applyTypeChange(exec, definition, "number", LATER);
+
+    expect(await rowsFor(definition.id)).toEqual(before);
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id, old_value FROM field_history WHERE field_col_name = 'age2'",
+      ),
+    ).toEqual([{ contact_id: binned, old_value: "fifty" }]);
   });
 });
 

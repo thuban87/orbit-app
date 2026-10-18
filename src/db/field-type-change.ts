@@ -62,19 +62,27 @@ interface ValueRow {
 }
 
 /**
- * Read every non-null normalized raw value for a field as `{ contact_id, value
- * }` rows. `fieldDefId` is bound so a definition's compatibility `col_name`
- * can never influence SQL; no transaction is opened — this is the read the
- * pre-flights share.
+ * Read every non-null normalized raw value for a field, owned by a person NOT
+ * in the Bin, as `{ contact_id, value }` rows. The pre-flight counts, the
+ * "Review now" offer and the list it opens (`listContactsWithUnreadableValues`,
+ * `archived_at IS NULL`) therefore count the same people (38.12 review A-WR-04
+ * / C-WR-03; D-121). A Bin person's value is untouched and is still flagged on
+ * read if they are restored. `fieldDefId` is bound so a definition's
+ * compatibility `col_name` can never influence SQL; no transaction is opened —
+ * this is the read the pre-flights share.
  */
 function readValues(
   exec: SqlExecutor,
   fieldDefId: number,
 ): Promise<ValueRow[]> {
   return exec.getAllAsync<ValueRow>(
-    `SELECT contact_id, value
-       FROM custom_field_values
-      WHERE field_def_id = ? AND value IS NOT NULL`,
+    `SELECT values_table.contact_id, values_table.value
+       FROM custom_field_values AS values_table
+       JOIN contacts ON contacts.id = values_table.contact_id
+      WHERE values_table.field_def_id = ?
+        AND values_table.value IS NOT NULL
+        AND contacts.archived_at IS NULL
+      ORDER BY values_table.id`,
     [fieldDefId],
   );
 }
