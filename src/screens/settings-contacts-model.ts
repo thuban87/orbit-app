@@ -1,4 +1,4 @@
-import { BIN } from "@/constants/glossary";
+import { BIN, CHECK_LINKED_CONTACTS } from "@/constants/glossary";
 import type { SettingsStackParamList } from "@/navigation/types";
 
 /**
@@ -145,7 +145,7 @@ export const SETTINGS_CONTACTS_SECTIONS: ReadonlyArray<SettingsContactsSection> 
         {
           kind: "action",
           key: "check-linked-contacts",
-          title: "Check linked contacts",
+          title: CHECK_LINKED_CONTACTS,
           subtitle: "Review changes from linked people in your phone.",
           action: "reconcile",
         },

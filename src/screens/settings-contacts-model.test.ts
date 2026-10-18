@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { CHECK_LINKED_CONTACTS } from "@/constants/glossary";
 import {
   contactsRowSubtitle,
   importEntryNeedsPrecheck,
@@ -123,6 +124,15 @@ describe("paused import and check rows (D-105, D-111)", () => {
   const importRow = actionRow("import-contacts");
   const checkRow = actionRow("check-linked-contacts");
   const none = { importResume: null, checkCardsLeft: null };
+
+  it("titles the Check linked contacts row with the glossary constant (fix-pass queue 3)", () => {
+    expect(checkRow.title).toBe(CHECK_LINKED_CONTACTS);
+    const source = readFileSync(
+      join(__dirname, "settings-contacts-model.ts"),
+      "utf8",
+    );
+    expect(source).not.toContain('title: "Check linked contacts"');
+  });
 
   it("keeps each row's normal subtitle with nothing paused", () => {
     expect(contactsRowSubtitle(importRow, none)).toBe(importRow.subtitle);

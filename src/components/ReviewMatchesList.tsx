@@ -22,7 +22,6 @@ import { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import type {
-  BulkAction,
   CandidateChoice,
   CandidateItem,
 } from "@/components/CandidateCardGrid";
@@ -40,18 +39,20 @@ import { SPACING } from "@/theme/tokens/spacing";
 
 // The row/choice shapes are shared with Reconcile's grid; Review matches
 // callers import them from here so they do not depend on the grid itself.
-export type { BulkAction, CandidateChoice, CandidateItem };
+export type { CandidateChoice, CandidateItem };
+
+/** Review matches' bulk actions (the grid has its own, fix-pass queue 3). */
+export type BulkAction = "link" | "import-new" | "skip";
 
 /** Row avatar diameter (40), the existing-contact choice size. */
 const ROW_AVATAR_SIZE = SPACING["2xl"] - SPACING.sm;
 
 /** The bulk bar's button labels (D-107 sheet wording). */
-export const REVIEW_MATCHES_ACTION_LABELS: Partial<Record<BulkAction, string>> =
-  {
-    link: "Link",
-    "import-new": "Import as new",
-    skip: "Skip",
-  };
+export const REVIEW_MATCHES_ACTION_LABELS: Record<BulkAction, string> = {
+  link: "Link",
+  "import-new": "Import as new",
+  skip: "Skip",
+};
 
 /**
  * "Might be: <first> (+N)" from the row's filtered/ordered choices; null when

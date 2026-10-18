@@ -28,3 +28,18 @@ describe("isBulkActionAvailable", () => {
     expect(isBulkActionAvailable("keep-orbit", mixed)).toBe(true);
   });
 });
+
+describe("the grid's own actions (fix-pass queue 3)", () => {
+  it("offers only Check linked contacts' two bulk actions", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(
+      join(__dirname, "CandidateCardGrid.tsx"),
+      "utf8",
+    );
+    expect(source).toContain(
+      'export type BulkAction = "keep-orbit" | "use-contact-values";',
+    );
+    expect(source).not.toMatch(/"import-new"|Link to Existing/);
+  });
+});

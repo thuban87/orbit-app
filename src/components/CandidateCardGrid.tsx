@@ -17,12 +17,12 @@ import { Icon } from "@/components/icons/Icon";
 import { RegisteredModal } from "@/components/ui/RegisteredModal";
 import { useTheme } from "@/theme";
 
-export type BulkAction =
-  | "link"
-  | "import-new"
-  | "skip"
-  | "keep-orbit"
-  | "use-contact-values";
+/**
+ * The grid's bulk actions. Only Check linked contacts uses the grid since
+ * Review matches moved to its own list (38.12-08); that list owns its own
+ * actions (`ReviewMatchesList`'s `BulkAction`). Fix-pass queue item 3.
+ */
+export type BulkAction = "keep-orbit" | "use-contact-values";
 
 export interface CandidateChoice {
   contactId: number;
@@ -75,9 +75,6 @@ interface CandidateCardGridProps {
 }
 
 const actionLabels: Record<BulkAction, string> = {
-  link: "Link to Existing",
-  "import-new": "Import as New",
-  skip: "Skip",
   "keep-orbit": "Keep Orbit Values",
   "use-contact-values": "Use Contact Values",
 };
