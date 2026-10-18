@@ -25,6 +25,7 @@ import {
   sessionBatchLifecycle,
   sessionRowCounts,
   sessionSummaryCounts,
+  UNNAMED_IMPORT_ROW,
 } from "@/db/import-session-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -80,6 +81,75 @@ async function seedContact(target: SqlExecutor): Promise<number> {
     [newUid(), "Existing", 0, NOW, NOW],
   );
   return result.lastInsertRowId;
+}
+
+async function seedNamedContact(
+  target: SqlExecutor,
+  name: string,
+): Promise<number> {
+  const result = await target.runAsync(
+    `INSERT INTO contacts (uid, name, tracking_enabled, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [newUid(), name, 0, NOW, NOW],
+  );
+  return result.lastInsertRowId;
+}
+
+/** Rows whose source payload carries a phone display name (the real shape). */
+async function acceptNamedRows(
+  target: SqlExecutor,
+  displayNames: string[],
+): Promise<{ sessionId: number; rowIds: number[] }> {
+  return acceptImportSessionWithRows(target, {
+    session: {
+      uid: newUid(),
+      mode: "bulk",
+      batchCategoryId: null,
+      batchTrackingEnabled: false,
+      phoneRegion: "US",
+      now: NOW,
+    },
+    rows: displayNames.map((displayName, index) => ({
+      uid: newUid(),
+      externalContactId: `named-${index}`,
+      sourcePayload: JSON.stringify({
+        displayName,
+        methods: [],
+        birthday: null,
+      }),
+      photoRelPath: null,
+    })),
+  });
+}
+
+type Summary = Awaited<ReturnType<typeof sessionSummaryCounts>>;
+const BUCKETS = [
+  "imported",
+  "linked",
+  "alreadyInOrbit",
+  "skippedByUser",
+  "skippedNoName",
+  "failed",
+  "needsReview",
+] as const;
+
+function bucketCounts(summary: Summary): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const key of BUCKETS) {
+    expect(summary[key].people).toHaveLength(summary[key].count);
+    counts[key] = summary[key].count;
+  }
+  counts.birthdayUnreadable = summary.birthdayUnreadable;
+  return counts;
+}
+
+function namesByBucket(summary: Summary): Record<string, string[]> {
+  const names: Record<string, string[]> = {};
+  for (const key of BUCKETS) {
+    if (summary[key].count > 0)
+      names[key] = summary[key].people.map((person) => person.name);
+  }
+  return names;
 }
 
 describe("import-session-read", () => {
@@ -175,16 +245,21 @@ describe("import-session-read", () => {
     await markRowStatus(exec, accepted.rowIds[3], "needs_review", null, NOW);
     await markRowStatus(exec, accepted.rowIds[4], "failed", "network", NOW);
 
-    await expect(
-      sessionSummaryCounts(exec, accepted.sessionId),
-    ).resolves.toEqual({
+    const summary = await sessionSummaryCounts(exec, accepted.sessionId);
+    expect(bucketCounts(summary)).toEqual({
       imported: 1,
+      linked: 0,
       alreadyInOrbit: 1,
-      needReview: 1,
-      failedOrSkipped: 2,
-      nameRequiredSkipped: 0,
+      skippedByUser: 1,
+      skippedNoName: 0,
+      failed: 1,
+      needsReview: 1,
       birthdayUnreadable: 0,
     });
+    // The already-linked row is named by the Orbit contact it matched.
+    expect(summary.alreadyInOrbit.people).toEqual([
+      { rowId: accepted.rowIds[1], name: "Existing", contactId },
+    ]);
     await expect(sessionRowCounts(exec, accepted.sessionId)).resolves.toEqual({
       pending: 0,
       imported: 1,
@@ -195,7 +270,7 @@ describe("import-session-read", () => {
     });
   });
 
-  it("reports name-required skips separately from other failed or skipped rows", async () => {
+  it("reports name-required skips in their own bucket, never as a user skip or a failure (B-3)", async () => {
     const accepted = await acceptRows(exec, ["name-required", "user-skipped"]);
     await markRowStatus(
       exec,
@@ -206,11 +281,11 @@ describe("import-session-read", () => {
     );
     await markRowStatus(exec, accepted.rowIds[1], "skipped", null, NOW);
 
-    await expect(
-      sessionSummaryCounts(exec, accepted.sessionId),
-    ).resolves.toMatchObject({
-      nameRequiredSkipped: 1,
-      failedOrSkipped: 1,
+    const summary = await sessionSummaryCounts(exec, accepted.sessionId);
+    expect(bucketCounts(summary)).toMatchObject({
+      skippedNoName: 1,
+      skippedByUser: 1,
+      failed: 0,
     });
   });
 
@@ -234,13 +309,104 @@ describe("import-session-read", () => {
       );
     }
 
-    await expect(
-      sessionSummaryCounts(exec, accepted.sessionId),
-    ).resolves.toMatchObject({
+    const summary = await sessionSummaryCounts(exec, accepted.sessionId);
+    expect(bucketCounts(summary)).toMatchObject({
       imported: 4,
-      failedOrSkipped: 0,
+      failed: 0,
+      skippedByUser: 0,
       birthdayUnreadable: 1,
     });
+  });
+
+  it("counts an already-linked row once, under Already in Orbit — never as a user skip (B-2)", async () => {
+    const contactId = await seedContact(exec);
+    const accepted = await acceptRows(exec, ["already-linked"]);
+    await resolveAlreadyLinked(exec, accepted.rowIds[0], contactId, NOW);
+
+    const summary = await sessionSummaryCounts(exec, accepted.sessionId);
+    expect(summary.alreadyInOrbit.count).toBe(1);
+    expect(summary.skippedByUser.count).toBe(0);
+    expect(summary.failed.count).toBe(0);
+  });
+
+  it("lists a row that failed and then succeeded on Retry only under Imported (F-1)", async () => {
+    const contactId = await seedNamedContact(exec, "Rescued Person");
+    const accepted = await acceptNamedRows(exec, ["Rescued Person"]);
+    await markRowStatus(exec, accepted.rowIds[0], "failed", "network", NOW);
+    await setRowContact(exec, accepted.rowIds[0], contactId, "imported", NOW);
+    // The old reason is history: it stays on the row after the rescue.
+    expect((await listSessionRows(exec, accepted.sessionId))[0]).toMatchObject({
+      rowStatus: "imported",
+      failureReason: "network",
+    });
+
+    const summary = await sessionSummaryCounts(exec, accepted.sessionId);
+    expect(summary.imported.count).toBe(1);
+    expect(summary.failed.count).toBe(0);
+    expect(namesByBucket(summary)).toEqual({ imported: ["Rescued Person"] });
+  });
+
+  it("puts every non-pending row in exactly one bucket, and every name once (F-1)", async () => {
+    const names = [
+      "Imported Ivy",
+      "Linked Lee",
+      "Review Rae",
+      "Failed Fay",
+      "Already Al",
+      "Nameless Ned",
+      "Skipped Sue",
+      "Retried Ray",
+      "Pending Pat",
+    ];
+    const accepted = await acceptNamedRows(exec, names);
+    const [imported, linked, review, failed, already, noName, skip, retried] =
+      accepted.rowIds;
+    const importedId = await seedNamedContact(exec, "Imported Ivy");
+    const linkedId = await seedNamedContact(exec, "Linked Lee");
+    const retriedId = await seedNamedContact(exec, "Retried Ray");
+    const alreadyId = await seedNamedContact(exec, "Already Al");
+    await setRowContact(exec, imported, importedId, "imported", NOW);
+    await setRowContact(exec, linked, linkedId, "linked", NOW);
+    await markRowStatus(exec, review, "needs_review", null, NOW);
+    await markRowStatus(exec, failed, "failed", "network", NOW);
+    await resolveAlreadyLinked(exec, already, alreadyId, NOW);
+    await markRowStatus(exec, noName, "skipped", "name-required", NOW);
+    await markRowStatus(exec, skip, "skipped", null, NOW);
+    await markRowStatus(exec, retried, "failed", "network", NOW);
+    await setRowContact(exec, retried, retriedId, "imported", NOW);
+
+    const summary = await sessionSummaryCounts(exec, accepted.sessionId);
+    const counts = bucketCounts(summary);
+    const { birthdayUnreadable: _ignored, ...buckets } = counts;
+    const raw = await sessionRowCounts(exec, accepted.sessionId);
+    const total = Object.values(buckets).reduce((sum, n) => sum + n, 0);
+    expect(total + raw.pending).toBe(names.length);
+    expect(total).toBe(names.length - 1);
+    expect(namesByBucket(summary)).toEqual({
+      imported: ["Imported Ivy", "Retried Ray"],
+      linked: ["Linked Lee"],
+      needsReview: ["Review Rae"],
+      failed: ["Failed Fay"],
+      alreadyInOrbit: ["Already Al"],
+      skippedNoName: ["Nameless Ned"],
+      skippedByUser: ["Skipped Sue"],
+    });
+    const listed = Object.values(namesByBucket(summary)).flat();
+    expect(new Set(listed).size).toBe(listed.length);
+    // Imported and linked people carry the contact a tap opens.
+    expect(summary.imported.people.map((p) => p.contactId)).toEqual([
+      importedId,
+      retriedId,
+    ]);
+    expect(summary.linked.people[0].contactId).toBe(linkedId);
+    expect(summary.failed.people[0].contactId).toBeNull();
+  });
+
+  it("names an unnamed row with the shared fallback label", async () => {
+    const accepted = await acceptRows(exec, ["no-display-name"]);
+    await markRowStatus(exec, accepted.rowIds[0], "skipped", null, NOW);
+    const summary = await sessionSummaryCounts(exec, accepted.sessionId);
+    expect(summary.skippedByUser.people[0].name).toBe(UNNAMED_IMPORT_ROW);
   });
 
   it("treats malformed durable candidate JSON as an empty advisory list", async () => {

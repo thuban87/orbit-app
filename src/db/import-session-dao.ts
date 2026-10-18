@@ -21,6 +21,10 @@
  * | photo-only failure | unchanged | unchanged | unchanged | unchanged | markRowPhotoFailed |
  * | staging retired (success) | unchanged | unchanged | unchanged | photo_rel_path → NULL | retireRowStagedPhoto |
  */
+import {
+  type ImportLifecycle,
+  sanitiseImportLifecycle,
+} from "@/db/import-lifecycle";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -43,19 +47,10 @@ export type ImportMatchOutcome =
   | "new"
   | "needs_review";
 
-/**
- * The lifecycle every contact a bulk import creates receives (38.4 D-57;
- * ADR-062): Bound with a positive cadence, or Unbound and never-assigned.
- */
-export type ImportLifecycle =
-  | { trackingEnabled: true; intervalDays: number }
-  | { trackingEnabled: false; intervalDays: null };
-
-/** The default batch lifecycle (ADR-066: Unbound stays the default). */
-export const UNBOUND_IMPORT: ImportLifecycle = Object.freeze({
-  trackingEnabled: false,
-  intervalDays: null,
-}) as ImportLifecycle;
+// 38.12 D-58: the lifecycle type, the Unbound default and the one sanitiser
+// live in a leaf module so this DAO, resume and bulk setup share them without
+// an import cycle. Re-exported here for the existing importers.
+export { type ImportLifecycle, UNBOUND_IMPORT } from "@/db/import-lifecycle";
 
 export class InvalidImportLifecycleError extends Error {
   constructor(detail: string) {
@@ -487,23 +482,17 @@ export function completeSession(
 
 /**
  * The lifecycle a stored session actually applies: Bound only with a positive
- * integer cadence, else Unbound. Mirrors `sessionBatchLifecycle` in
- * `import-session-read.ts` (which imports this module, so it cannot be reused
- * here without a cycle).
+ * integer cadence, else Unbound — through the one shared sanitiser (38.12
+ * D-58), the same read `sessionBatchLifecycle` hands the driver.
  */
 function effectiveSessionLifecycle(row: {
   tracking: number;
   days: number | null;
 }): ImportLifecycle {
-  if (
-    row.tracking === 1 &&
-    row.days !== null &&
-    Number.isInteger(row.days) &&
-    row.days > 0
-  ) {
-    return { trackingEnabled: true, intervalDays: row.days };
-  }
-  return UNBOUND_IMPORT;
+  return sanitiseImportLifecycle({
+    trackingEnabled: row.tracking === 1,
+    intervalDays: row.days,
+  });
 }
 
 function sameLifecycle(left: ImportLifecycle, right: ImportLifecycle): boolean {

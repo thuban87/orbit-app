@@ -8,7 +8,11 @@
  * import session (`setSessionBatchDefaults`), so every bulk create path — and a
  * resumed import — reads the same choice.
  */
-import { type ImportLifecycle, UNBOUND_IMPORT } from "@/db/import-session-dao";
+import {
+  type ImportLifecycle,
+  sanitiseImportLifecycle,
+  UNBOUND_IMPORT,
+} from "@/db/import-lifecycle";
 import type { ImportSession, SessionRowCounts } from "@/db/import-session-read";
 import { FREQUENCY_DAYS } from "@/types";
 
@@ -106,29 +110,10 @@ export function boundFrequencyBlocksImport(
   return trackingEnabled && !intervalValid;
 }
 
-/**
- * The one lifecycle sanitiser for stored batch values (38.12 D-58): Bound only
- * with a positive integer cadence, otherwise Unbound with no cadence. Setup's
- * restore (`initialBulkLifecycle`) and resume (`sessionBatchLifecycle`,
- * import-session-read.ts) both read the stored session through it, so the two
- * can never disagree about the same stored inputs (T-38.12-46). The contacts
- * CHECK (migration 011) stays the backstop.
- */
-export function sanitiseImportLifecycle(stored: {
-  trackingEnabled: boolean;
-  intervalDays: number | null;
-}): ImportLifecycle {
-  const days = stored.intervalDays;
-  if (
-    stored.trackingEnabled &&
-    days !== null &&
-    Number.isInteger(days) &&
-    days > 0
-  ) {
-    return { trackingEnabled: true, intervalDays: days };
-  }
-  return UNBOUND_IMPORT;
-}
+// 38.12 D-58: the one lifecycle sanitiser lives in the leaf
+// `@/db/import-lifecycle` (shared with resume and the DAO's lifecycle lock);
+// re-exported here for setup's existing importers.
+export { sanitiseImportLifecycle };
 
 /**
  * The screen's starting choice, restored from the session (resume keeps it),

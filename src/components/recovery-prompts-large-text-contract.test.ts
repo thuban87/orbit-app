@@ -172,7 +172,7 @@ describe("PendingConfirmationsSheet keeps every confirmation reachable (D-49)", 
 
 /**
  * Import Complete at large text (38.4 D-67, owner; review C WR-02). The loaded
- * summary stacks a title, six count cards, a notice and a retry block above
+ * summary stacks a title, the outcome cards, a notice and a retry block above
  * its actions. It takes the D-49 shape: the content scrolls in one bounded
  * ScrollView and the actions (Review possible matches, View contact, Done) sit
  * after it, outside the scroll, so they are always on screen and reachable.
@@ -205,7 +205,10 @@ describe("Import Complete keeps Done and Review reachable at large text (D-67)",
     expect(headerAt).toBeGreaterThan(-1);
     expect(headerAt).toBeLessThan(open);
     for (const fragment of [
-      "Imported (",
+      // 38.12 D-55/D-109: every outcome card ("Imported (3)", "Skipped by
+      // you (1)", …) is one mapped card with a titled-count line.
+      "testID={`import-complete-outcome-",
+      "bucket.count})`}",
       // The count goes through the shared plural helper (38.9 D-21).
       'plural(counts.birthdayUnreadable, "birthday")} couldn\'t be read',
       'testID="import-complete-action-notice"',

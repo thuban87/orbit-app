@@ -140,18 +140,29 @@ describe("runImportBatch", () => {
     ]);
     const progress: Array<[number, number]> = [];
 
-    await expect(
-      runImportBatch(exec, {
-        sessionId: session.sessionId,
-        now: NOW,
-        onProgress: (done, total) => progress.push([done, total]),
-      }),
-    ).resolves.toEqual({
-      imported: 1,
-      alreadyInOrbit: 1,
-      needReview: 1,
-      failedOrSkipped: 1,
-      nameRequiredSkipped: 0,
+    const summary = await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+    // 38.12 D-55: mutually exclusive buckets, each naming its people.
+    expect(
+      Object.fromEntries(
+        Object.entries(summary).map(([key, value]) => [
+          key,
+          typeof value === "number"
+            ? value
+            : value.people.map((person) => person.name),
+        ]),
+      ),
+    ).toEqual({
+      imported: ["New Person"],
+      linked: [],
+      alreadyInOrbit: ["Already Orbit"],
+      skippedByUser: [],
+      skippedNoName: [],
+      failed: ["Unnamed contact"],
+      needsReview: ["Ambiguous Person"],
       birthdayUnreadable: 0,
     });
     const rows = await listSessionRows(exec, session.sessionId);
@@ -289,7 +300,7 @@ describe("runImportBatch", () => {
       runImportBatch(exec, { sessionId: session.sessionId, now: NOW }),
     ).rejects.toBeInstanceOf(ImportRunActiveError);
     const counts = await first;
-    expect(counts.imported).toBe(25);
+    expect(counts.imported.count).toBe(25);
     const contacts = await exec.getFirstAsync<{ n: number }>(
       "SELECT COUNT(*) AS n FROM contacts",
     );
@@ -299,7 +310,7 @@ describe("runImportBatch", () => {
     // Once the pass settles, a later pass may run (it finds nothing pending).
     await expect(
       runImportBatch(exec, { sessionId: session.sessionId, now: NOW }),
-    ).resolves.toMatchObject({ imported: 25 });
+    ).resolves.toMatchObject({ imported: { count: 25 } });
   });
 
   it("retries failed rows without double-importing a row that already has a contact", async () => {
@@ -574,7 +585,7 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
         throw new Error("effects down");
       },
     });
-    expect(counts.imported).toBe(2);
+    expect(counts.imported.count).toBe(2);
     expect(
       (await listSessionRows(exec, session.sessionId)).map(
         (row) => row.rowStatus,

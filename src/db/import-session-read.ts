@@ -1,3 +1,4 @@
+import { sanitiseImportLifecycle } from "@/db/import-lifecycle";
 import {
   discardSession,
   type ImportLifecycle,
@@ -8,7 +9,6 @@ import {
 } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
 import { isBirthdayUnreadable } from "@/logic/picked-contact-map";
-import { sanitiseImportLifecycle } from "@/screens/bulk-import-setup-logic";
 
 export interface ImportSession {
   id: number;
@@ -235,73 +235,159 @@ export async function sessionRowCounts(
   return counts;
 }
 
-export interface SessionSummaryCounts {
-  imported: number;
-  alreadyInOrbit: number;
-  needReview: number;
-  failedOrSkipped: number;
-  nameRequiredSkipped: number;
+/** One person in a completion-report bucket (38.12 D-109). */
+export interface SummaryPerson {
+  /** The import row the person came from (stable list key). */
+  rowId: number;
+  /**
+   * The Orbit contact's current name when the row resolved to one, else the
+   * phone contact's display name, else `UNNAMED_IMPORT_ROW`.
+   */
+  name: string;
+  /** The Orbit contact the row resolved to, when it still exists. */
+  contactId: number | null;
+}
+
+export interface SummaryBucket {
+  count: number;
+  people: SummaryPerson[];
+}
+
+/** The mutually exclusive person-outcome buckets (38.12 D-55). */
+export type SummaryBucketKey =
+  | "imported"
+  | "linked"
+  | "alreadyInOrbit"
+  | "skippedByUser"
+  | "skippedNoName"
+  | "failed"
+  | "needsReview";
+
+export type SessionSummaryCounts = Record<SummaryBucketKey, SummaryBucket> & {
+  /** Imported rows whose phone birthday was present but unreadable. */
   birthdayUnreadable: number;
+};
+
+/** The label for a row with no usable name (DuplicateReview's wording). */
+export const UNNAMED_IMPORT_ROW = "Unnamed contact";
+
+interface SummaryRowDbRow {
+  id: number;
+  row_status: ImportSessionRowStatus;
+  match_outcome: ImportMatchOutcome | null;
+  failure_reason: string | null;
+  source_payload: string;
+  resolved_contact_id: number | null;
+  contact_name: string | null;
+}
+
+function sourceDisplayName(value: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const name = (parsed as { displayName?: unknown }).displayName;
+    return typeof name === "string" && name.trim() !== "" ? name.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Completion-report buckets from the canonical state transition table. The
- * grouped durable row query distinguishes deterministic already-linked skips
- * from a user-directed Skip.
+ * The one bucket a row belongs to (38.12 D-55; convergence c5 F-1). The
+ * CURRENT row_status decides first: failure_reason is history, not state — a
+ * row that failed and then succeeded on Retry is `imported` with its old
+ * reason still set (`setRowContactCore` writes contact_id/row_status only), so
+ * imported and linked ignore it. Only skipped rows split by match_outcome and
+ * failure_reason: already-linked (B-2: `resolveAlreadyLinkedCore` writes
+ * skipped + already_linked + NULL reason), name-required (B-3), a NULL reason
+ * (the user's Skip). A skipped row with any other reason — no writer produces
+ * one today — reads as failed. Pending rows have no bucket.
+ */
+export function summaryBucketFor(row: {
+  rowStatus: ImportSessionRowStatus;
+  matchOutcome: ImportMatchOutcome | null;
+  failureReason: string | null;
+}): SummaryBucketKey | null {
+  switch (row.rowStatus) {
+    case "imported":
+      return "imported";
+    case "linked":
+      return "linked";
+    case "needs_review":
+      return "needsReview";
+    case "failed":
+      return "failed";
+    case "pending":
+      return null;
+    case "skipped":
+      if (row.matchOutcome === "already_linked") return "alreadyInOrbit";
+      if (row.failureReason === "name-required") return "skippedNoName";
+      if (row.failureReason === null) return "skippedByUser";
+      return "failed";
+  }
+}
+
+function emptyBucket(): SummaryBucket {
+  return { count: 0, people: [] };
+}
+
+/**
+ * Completion-report buckets with the people in each (38.12 D-55, D-109). Every
+ * non-pending row lands in exactly one bucket (`summaryBucketFor`), named by
+ * the Orbit contact it resolved to (imported/linked: `contact_id`;
+ * already-linked: `matched_contact_id`) or else by the phone contact's display
+ * name. `birthdayUnreadable` counts imported rows whose present source birthday
+ * cannot be read, as before.
  */
 export async function sessionSummaryCounts(
   exec: SqlExecutor,
   sessionId: number,
 ): Promise<SessionSummaryCounts> {
-  const rows = await exec.getAllAsync<{
-    row_status: ImportSessionRowStatus;
-    match_outcome: ImportMatchOutcome | null;
-    failure_reason: string | null;
-    count: number;
-  }>(
-    `SELECT row_status, match_outcome, failure_reason, COUNT(*) AS count
-     FROM import_session_rows WHERE session_id = ?
-     GROUP BY row_status, match_outcome, failure_reason`,
+  const rows = await exec.getAllAsync<SummaryRowDbRow>(
+    `SELECT r.id, r.row_status, r.match_outcome, r.failure_reason,
+            r.source_payload, c.id AS resolved_contact_id, c.name AS contact_name
+     FROM import_session_rows r
+     LEFT JOIN contacts c ON c.id = CASE
+       WHEN r.row_status IN ('imported', 'linked') THEN r.contact_id
+       WHEN r.row_status = 'skipped' AND r.match_outcome = 'already_linked'
+         THEN r.matched_contact_id
+       ELSE NULL END
+     WHERE r.session_id = ? ORDER BY r.id`,
     [sessionId],
   );
-  const counts: SessionSummaryCounts = {
-    imported: 0,
-    alreadyInOrbit: 0,
-    needReview: 0,
-    failedOrSkipped: 0,
-    nameRequiredSkipped: 0,
+  const summary: SessionSummaryCounts = {
+    imported: emptyBucket(),
+    linked: emptyBucket(),
+    alreadyInOrbit: emptyBucket(),
+    skippedByUser: emptyBucket(),
+    skippedNoName: emptyBucket(),
+    failed: emptyBucket(),
+    needsReview: emptyBucket(),
     birthdayUnreadable: 0,
   };
   for (const row of rows) {
-    if (row.row_status === "imported" || row.row_status === "linked")
-      counts.imported += row.count;
-    if (row.match_outcome === "already_linked")
-      counts.alreadyInOrbit += row.count;
-    if (row.row_status === "needs_review") counts.needReview += row.count;
+    const key = summaryBucketFor({
+      rowStatus: row.row_status,
+      matchOutcome: row.match_outcome,
+      failureReason: row.failure_reason,
+    });
+    if (key === null) continue;
+    const bucket = summary[key];
+    bucket.count += 1;
+    bucket.people.push({
+      rowId: row.id,
+      name:
+        row.contact_name?.trim() ||
+        sourceDisplayName(row.source_payload) ||
+        UNNAMED_IMPORT_ROW,
+      contactId: row.resolved_contact_id,
+    });
     if (
-      row.row_status === "skipped" &&
-      row.failure_reason === "name-required"
+      row.row_status === "imported" &&
+      isBirthdayUnreadable(sourceBirthday(row.source_payload))
     ) {
-      counts.nameRequiredSkipped += row.count;
-      continue;
-    }
-    if (
-      row.row_status === "failed" ||
-      (row.row_status === "skipped" && row.match_outcome !== "already_linked")
-    ) {
-      counts.failedOrSkipped += row.count;
+      summary.birthdayUnreadable += 1;
     }
   }
-  const importedPayloads = await exec.getAllAsync<{ source_payload: string }>(
-    `SELECT source_payload FROM import_session_rows
-     WHERE session_id = ? AND row_status = 'imported'`,
-    [sessionId],
-  );
-  counts.birthdayUnreadable = importedPayloads.reduce(
-    (count, row) =>
-      count +
-      (isBirthdayUnreadable(sourceBirthday(row.source_payload)) ? 1 : 0),
-    0,
-  );
-  return counts;
+  return summary;
 }

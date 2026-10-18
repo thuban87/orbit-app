@@ -8,6 +8,7 @@ import {
   getSessionById,
   listSessionRows,
   type SessionSummaryCounts,
+  type SummaryBucketKey,
   sessionRowCounts,
   sessionSummaryCounts,
 } from "@/db/import-session-read";
@@ -40,11 +41,35 @@ import {
 } from "./import-complete-logic";
 import { useOpenImportSession } from "./use-open-import-session";
 
+// --- Tunable constants (top-of-file per project convention) ------------------
+
+/**
+ * How many names an outcome lists before "Show all" (38.12 D-109: "collapsed
+ * after about five"; the exact number is 38.12 Plan 23's choice).
+ */
+export const IMPORT_COMPLETE_NAME_PREVIEW = 5;
+
 const LOG_SCOPE = "import-complete";
 
-function contactLabel(count: number): string {
-  return plural(count, "contact");
-}
+/**
+ * The person outcomes, in display order (38.12 D-55, D-109). Each renders only
+ * when non-zero. `opens`: a listed name opens that person (imported and linked
+ * only, D-109).
+ */
+const OUTCOME_BUCKETS: ReadonlyArray<{
+  key: SummaryBucketKey;
+  title: string;
+  opens: boolean;
+}> = [
+  { key: "imported", title: "Imported", opens: true },
+  { key: "linked", title: "Linked", opens: true },
+  { key: "alreadyInOrbit", title: "Already in Orbit", opens: false },
+  { key: "skippedByUser", title: "Skipped by you", opens: false },
+  // B-3 (convergence c2): name-required skips keep their own outcome.
+  { key: "skippedNoName", title: "Skipped — no name", opens: false },
+  { key: "failed", title: "Couldn't import", opens: false },
+  { key: "needsReview", title: "Needs review", opens: false },
+];
 
 interface ImportCompleteSummary {
   counts: SessionSummaryCounts;
@@ -115,6 +140,10 @@ export function ImportCompleteScreen({
   // winner's imported row "failed". One synchronous slot covers Retry and
   // Skip remaining photos.
   const actionInFlight = useRef(false);
+  // D-109: outcomes the user expanded past the name preview with "Show all".
+  const [expanded, setExpanded] = useState<ReadonlySet<SummaryBucketKey>>(
+    () => new Set(),
+  );
 
   const load = useCallback(async (): Promise<void> => {
     await runGatedRead({
@@ -271,96 +300,113 @@ export function ImportCompleteScreen({
           contentContainerStyle={styles.scrollContent}
         >
           <View style={styles.counts}>
-            <View
-              style={[
-                styles.footerEntry,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-                {`Imported (${counts.imported})`}
-              </Text>
-              <Text
-                style={[styles.countDetail, { color: colors.textSecondary }]}
+            {OUTCOME_BUCKETS.map(({ key, title, opens }) => {
+              const bucket = counts[key];
+              // D-55: an outcome with nobody in it is not shown.
+              if (bucket.count === 0) return null;
+              const showAll =
+                expanded.has(key) ||
+                bucket.people.length <= IMPORT_COMPLETE_NAME_PREVIEW;
+              const shown = showAll
+                ? bucket.people
+                : bucket.people.slice(0, IMPORT_COMPLETE_NAME_PREVIEW);
+              return (
+                <View
+                  key={key}
+                  testID={`import-complete-outcome-${key}`}
+                  style={[
+                    styles.footerEntry,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    accessibilityRole="header"
+                    style={[styles.footerText, { color: colors.textPrimary }]}
+                  >
+                    {`${title} (${bucket.count})`}
+                  </Text>
+                  {shown.map((person) => {
+                    const contactId = person.contactId;
+                    if (opens && contactId !== null) {
+                      return (
+                        <Pressable
+                          key={person.rowId}
+                          testID={`import-complete-person-${person.rowId}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Open ${person.name}`}
+                          onPress={() =>
+                            openContactFromFlow(navigation, host, contactId)
+                          }
+                          style={styles.personButton}
+                        >
+                          <Text
+                            style={[
+                              styles.personName,
+                              { color: colors.accentText },
+                            ]}
+                          >
+                            {person.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    }
+                    return (
+                      <Text
+                        key={person.rowId}
+                        testID={`import-complete-person-${person.rowId}`}
+                        style={[
+                          styles.personName,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {person.name}
+                      </Text>
+                    );
+                  })}
+                  {showAll ? null : (
+                    <Pressable
+                      testID={`import-complete-show-all-${key}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Show all ${bucket.count}: ${title}`}
+                      onPress={() =>
+                        setExpanded((current) => new Set(current).add(key))
+                      }
+                      style={styles.personButton}
+                    >
+                      <Text
+                        style={[
+                          styles.personName,
+                          { color: colors.accentText },
+                        ]}
+                      >
+                        Show all
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+            {counts.birthdayUnreadable > 0 ? (
+              <View
+                testID="import-complete-birthday-unreadable"
+                style={[
+                  styles.footerEntry,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
               >
-                {contactLabel(counts.imported)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.footerEntry,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-                {`Already in Orbit (${counts.alreadyInOrbit})`}
-              </Text>
-              <Text
-                style={[styles.countDetail, { color: colors.textSecondary }]}
-              >
-                {contactLabel(counts.alreadyInOrbit)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.footerEntry,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-                {`Need review (${counts.needReview})`}
-              </Text>
-              <Text
-                style={[styles.countDetail, { color: colors.textSecondary }]}
-              >
-                {contactLabel(counts.needReview)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.footerEntry,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-                {`Failed / skipped (${counts.failedOrSkipped})`}
-              </Text>
-              <Text
-                style={[styles.countDetail, { color: colors.textSecondary }]}
-              >
-                {contactLabel(counts.failedOrSkipped)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.footerEntry,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-                {`${counts.nameRequiredSkipped} skipped — no name`}
-              </Text>
-              <Text
-                style={[styles.countDetail, { color: colors.textSecondary }]}
-              >
-                {contactLabel(counts.nameRequiredSkipped)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.footerEntry,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-                {`${plural(counts.birthdayUnreadable, "birthday")} couldn't be read`}
-              </Text>
-              <Text
-                style={[styles.countDetail, { color: colors.textSecondary }]}
-              >
-                {contactLabel(counts.birthdayUnreadable)}
-              </Text>
-            </View>
+                <Text
+                  style={[styles.footerText, { color: colors.textPrimary }]}
+                >
+                  {`${plural(counts.birthdayUnreadable, "birthday")} couldn't be read`}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {actionNotice ? (
@@ -412,14 +458,16 @@ export function ImportCompleteScreen({
         </ScrollView>
 
         <View style={styles.actions}>
-          {counts.needReview > 0 ? (
+          {counts.needsReview.count > 0 ? (
             <Pressable
               testID="import-complete-review"
               accessibilityRole="button"
               accessibilityLabel="Review possible matches"
               onPress={() =>
+                // D-110 (convergence c1 A-1): the flow host travels on.
                 navigation.navigate("DuplicateReview", {
                   sessionId: route.params.sessionId,
+                  host: route.params.host,
                 })
               }
               style={[
@@ -476,7 +524,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   footerText: { fontSize: 16, fontWeight: "600" },
-  countDetail: { fontSize: 13 },
+  personButton: { minHeight: 44, justifyContent: "center" },
+  personName: { fontSize: 15, lineHeight: 21 },
   scroll: { flexGrow: 1, flexShrink: 1 },
   scrollContent: { gap: 16 },
   retryBlock: { gap: 8 },
