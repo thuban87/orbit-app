@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
   FlatList,
+  Keyboard,
   Pressable,
   StyleSheet,
   TextInput,
@@ -164,6 +165,7 @@ export function LegacyContactPickerScreen({
     setLoadState(permission.verdict === "permanent" ? "permanent" : "denied");
   }
 
+  const searchRef = useRef<TextInput | null>(null);
   const filteredRows = useMemo(() => filterRows(rows, query), [rows, query]);
   const selectedCount = selectionCount(selectedLookupKeys);
 
@@ -173,6 +175,11 @@ export function LegacyContactPickerScreen({
 
   async function importSelected() {
     if (importing || selectedCount === 0) return;
+    // OBS-9: let go of the search field first. Otherwise Android hands focus
+    // back to it when the photo-budget sheet closes ("Go back") and the
+    // keyboard reopens over the Import button.
+    searchRef.current?.blur();
+    Keyboard.dismiss();
     const selectedKeys = [...selectedLookupKeys];
     setImporting(true);
     setOmittedCount(0);
@@ -272,6 +279,7 @@ export function LegacyContactPickerScreen({
         ) : (
           <>
             <TextInput
+              ref={searchRef}
               accessibilityLabel="Search contacts"
               autoCapitalize="none"
               onChangeText={setQuery}
@@ -295,6 +303,9 @@ export function LegacyContactPickerScreen({
             ) : null}
             <FlatList
               data={filteredRows}
+              // OBS-1: a row tap with the keyboard up selects the row; it no
+              // longer only closes the keyboard.
+              keyboardShouldPersistTaps="handled"
               keyExtractor={(row) => row.lookupKey}
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={

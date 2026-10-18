@@ -65,9 +65,11 @@ vi.mock("react", async (original) => ({
 vi.mock("expo-sqlite", () => ({}));
 vi.mock("expo-image", () => ({ Image: "Image" }));
 vi.mock("@react-navigation/native", () => ({ useFocusEffect: runOnce }));
+const keyboard = vi.hoisted(() => ({ dismiss: vi.fn() }));
 vi.mock("react-native", () => ({
   AppState: { addEventListener: () => ({ remove: () => {} }) },
   FlatList: "FlatList",
+  Keyboard: keyboard,
   Pressable: "Pressable",
   StyleSheet: { create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   Text: "Text",
@@ -421,6 +423,22 @@ describe("legacy picker import (D-57, D-110)", () => {
       decidePhotoBudget: mocks.askPhotoBudget,
     });
     expect(mocks.showSnackbar).not.toHaveBeenCalled();
+  });
+});
+
+describe("legacy picker keyboard (38.12 OBS-1, OBS-9)", () => {
+  it("a row tap with the keyboard up reaches the row (OBS-1)", async () => {
+    const tree = await selectAnn();
+    const list = tree.find((node) => node.type === "FlatList");
+    expect(list?.props.keyboardShouldPersistTaps).toBe("handled");
+  });
+
+  it("Import lets go of the search field first, so Go back does not reopen the keyboard (OBS-9)", async () => {
+    const tree = await selectAnn();
+    keyboard.dismiss.mockClear();
+    press(tree, "Import 1 contact");
+    expect(keyboard.dismiss).toHaveBeenCalledTimes(1);
+    await flush();
   });
 });
 
