@@ -406,6 +406,7 @@ export async function mergeContacts(
       "SELECT field_def_id, value FROM custom_field_values WHERE contact_id = ?",
       [absorbed.id],
     );
+    const survivorPhotoDeletes: string[] = [];
     for (const other of absorbedValues) {
       const own = survivorValues.find(
         (value) => value.field_def_id === other.field_def_id,
@@ -455,6 +456,18 @@ export async function mergeContacts(
           "merge-overwritten",
           input.now,
         );
+        // Absorbed text (not a staged photo) replaces the survivor's stored
+        // photo: its file would otherwise be orphaned (38.12 review B-IN-06).
+        // As in field-ddl's drop, the history row keeps the old value and
+        // the file is deleted after commit.
+        if (
+          !isPhoto &&
+          isStoredPhotoPath(own.value) &&
+          fieldTypes.some(
+            (def) => def.id === other.field_def_id && def.type === "photo",
+          )
+        )
+          survivorPhotoDeletes.push(own.value);
         await upsertValueCore(
           exec,
           survivor.id,
@@ -639,6 +652,7 @@ export async function mergeContacts(
         ...defs.map((def) =>
           customFieldPhotoRelPath(absorbed.id, def.col_name),
         ),
+        ...survivorPhotoDeletes,
       ]),
     ];
     for (const path of deletePaths) await enqueueDeleteIntentCore(exec, path);

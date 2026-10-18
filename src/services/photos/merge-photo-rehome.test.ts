@@ -460,6 +460,15 @@ describe("text in a photo field (38.12 D-131)", () => {
       ),
     ).toEqual({ value: "hello" });
     expect(await listJournalEntriesCore(exec)).toEqual([]);
+    // The survivor's replaced photo file is not orphaned (38.12 review
+    // B-IN-06); its old value stays in history.
+    expect(h.fs!.files.has(own)).toBe(false);
+    expect(
+      await exec.getFirstAsync<{ old_value: string }>(
+        "SELECT old_value FROM field_history WHERE contact_id = ? AND operation = 'merge-overwritten'",
+        [s.id],
+      ),
+    ).toEqual({ old_value: own });
   });
 });
 
