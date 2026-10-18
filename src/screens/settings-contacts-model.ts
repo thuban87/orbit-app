@@ -214,3 +214,68 @@ export const SETTINGS_CONTACTS_SECTIONS: ReadonlyArray<SettingsContactsSection> 
       ],
     },
   ]);
+
+/** The paused-import counts the Import contacts row reads (D-111; B-6). */
+export interface ImportResumeCounts {
+  /** pending + needs_review + failed rows (convergence c5 F-2). */
+  readonly peopleLeft: number;
+  /** Committed contacts with a staged photo still to add (B-6). */
+  readonly photosLeft: number;
+}
+
+/** What the Contacts screen knows about paused work on focus. */
+export interface SettingsContactsResumeState {
+  /** The newest resumable import, or null when none. */
+  readonly importResume: ImportResumeCounts | null;
+  /** Cards left in the newest pending check, or null when none. */
+  readonly checkCardsLeft: number | null;
+}
+
+/**
+ * The subtitle a row shows (38.12 D-105, D-111): paused work replaces the
+ * normal subtitle on its own row until it is finished or discarded. People
+ * left win over photos left; a photo-only import says photos are left, never
+ * "0 left" (B-6). Every other row keeps its authored subtitle.
+ */
+export function contactsRowSubtitle(
+  row: SettingsContactsActionRow | SettingsContactsRouteRow,
+  resume: SettingsContactsResumeState,
+): string {
+  if (row.kind === "action" && row.action === "import") {
+    const paused = resume.importResume;
+    if (paused && paused.peopleLeft > 0)
+      return `Finish your import (${paused.peopleLeft} left)`;
+    if (paused && paused.photosLeft > 0)
+      return `Finish adding photos (${paused.photosLeft} left)`;
+  }
+  if (
+    row.kind === "action" &&
+    row.action === "reconcile" &&
+    resume.checkCardsLeft !== null &&
+    resume.checkCardsLeft > 0
+  ) {
+    return `Finish your check (${resume.checkCardsLeft} left)`;
+  }
+  return row.subtitle;
+}
+
+/**
+ * Whether tapping Import contacts first asks Resume / Discard (D-111): only
+ * while people are still left, failed rows included (F-2). Photo-only work
+ * does not block a new import this way (this plan only, 38.12-25).
+ */
+export function importEntryNeedsPrecheck(
+  resume: ImportResumeCounts | null,
+): boolean {
+  return resume !== null && resume.peopleLeft > 0;
+}
+
+/**
+ * Whether the Import contacts row opens the paused session's photo recovery
+ * (the route the resume prompt's Resume uses) instead of a new import (B-6).
+ */
+export function importRowOpensPhotoRecovery(
+  resume: ImportResumeCounts | null,
+): boolean {
+  return resume !== null && resume.peopleLeft === 0 && resume.photosLeft > 0;
+}

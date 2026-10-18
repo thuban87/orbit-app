@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { usePhotoBudgetPrompt } from "@/components/PhotoBudgetSheet";
+import { resumeImport } from "@/components/ResumeImportPrompt";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -29,7 +30,13 @@ import {
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { discardSession } from "@/db/import-session-dao";
+import {
+  getNewestResumableImportSession,
+  type NewestResumableImport,
+} from "@/db/import-session-read";
 import { getNewestResumableReconcileSession } from "@/db/reconcile-session-read";
+import { clearImportResumePrompted } from "@/db/resume-prompt-dao";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
@@ -40,22 +47,33 @@ import {
   requestContactsPermission,
 } from "@/services/contacts/use-read-contacts-permission";
 import { getDeviceRegion } from "@/services/device-region";
+import {
+  cleanupDiscardedStagedPhotos,
+  describeResumable,
+} from "@/services/import/contact-import-resume-sweep";
 import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
 import { startContactImport } from "@/services/import/start-contact-import";
 import { discardDerivative } from "@/services/photos/derivative-cache";
+import { deleteImportStaging } from "@/services/photos/photo-storage";
+import { choose, confirm } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 import {
   pickContacts,
   readAllContacts,
 } from "../../modules/orbit-contact-picker";
 import {
+  contactsRowSubtitle,
+  importEntryNeedsPrecheck,
+  importRowOpensPhotoRecovery,
   isActiveContactsRow,
   SETTINGS_CONTACTS_SECTIONS,
   type SettingsContactsAction,
+  type SettingsContactsResumeState,
   type SettingsContactsRow,
 } from "./settings-contacts-model";
 import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
@@ -105,6 +123,13 @@ export function SettingsContactsScreen() {
   const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
   const [resumableReconcile, setResumableReconcile] =
     useState<ResumableReconcile | null>(null);
+  // 38.12 D-105 / D-111: paused work shown on its row ("Finish your import
+  // (N left)", "Finish adding photos (N left)", "Finish your check (N left)")
+  // until it is finished or discarded. Read on focus.
+  const [resumeState, setResumeState] = useState<SettingsContactsResumeState>({
+    importResume: null,
+    checkCardsLeft: null,
+  });
   // D-133: asked before photos that may not fit in the encrypted backup.
   const { sheet: photoBudgetSheet, ask: askPhotoBudget } =
     usePhotoBudgetPrompt();
@@ -123,6 +148,19 @@ export function SettingsContactsScreen() {
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to read contacts permission", err);
     }
+    try {
+      // Side-effect-free reads (D-56): stale cleanup stays a launch sweep.
+      const [paused, check] = await Promise.all([
+        getNewestResumableImportSession(getExecutor()),
+        getNewestResumableReconcileSession(getExecutor()),
+      ]);
+      setResumeState({
+        importResume: paused,
+        checkCardsLeft: check?.cardsLeft ?? null,
+      });
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to read paused import or check", err);
+    }
   }, []);
 
   useFocusEffect(
@@ -131,33 +169,112 @@ export function SettingsContactsScreen() {
     }, [reload]),
   );
 
+  const startNewImport = useCallback(async () => {
+    const currentSettings = await getAppSettings(getExecutor());
+    await startContactImport({
+      mode: contactImportMode(),
+      exec: getExecutor(),
+      effectivePhoneRegion:
+        currentSettings.phoneRegionOverride ?? getDeviceRegion(),
+      now: localDateTime(),
+      pick: () => pickContacts({ multiple: true }),
+      ensureNotesAccess: async () =>
+        (await ensureReadContactsPermission()).granted,
+      // D-137: withNotes asks for full-size photos (an import path).
+      readByLookupKeys: async (keys, options) =>
+        (await readAllContacts(keys, options)).contacts,
+      discardPhotoCopy: discardDerivative,
+      navigate: navigation.navigate,
+      decidePhotoBudget: askPhotoBudget,
+    });
+  }, [navigation, askPhotoBudget]);
+
+  /**
+   * Resume a paused import from Settings (D-111): clear its "asked once"
+   * marker so leaving it again asks once more (L-3), then route through the
+   * prompt's own `resumeImport` (a failed-only session lands on Import
+   * complete, where Retry lives — F-2; photo-only work too — B-6).
+   */
+  const resumePausedImport = useCallback(
+    async (paused: NewestResumableImport) => {
+      const exec = getExecutor();
+      try {
+        await clearImportResumePrompted(exec, paused.session.id);
+      } catch (err) {
+        // Best-effort: a failed clear only means no second launch prompt.
+        Logger.error(LOG_SCOPE, "could not clear the resume prompt", err);
+      }
+      resumeImport(navigation, await describeResumable(exec, paused.session));
+    },
+    [navigation],
+  );
+
+  const discardPausedImport = useCallback(async (sessionId: number) => {
+    const stagedPaths = await discardSession(
+      getExecutor(),
+      sessionId,
+      localDateTime(),
+    );
+    // The discard transaction has committed before it returns these paths.
+    cleanupDiscardedStagedPhotos({ deleteImportStaging }, stagedPaths);
+  }, []);
+
   const onImportContacts = useCallback(async () => {
     try {
-      const currentSettings = await getAppSettings(getExecutor());
-      await startContactImport({
-        mode: contactImportMode(),
-        exec: getExecutor(),
-        effectivePhoneRegion:
-          currentSettings.phoneRegionOverride ?? getDeviceRegion(),
-        now: localDateTime(),
-        pick: () => pickContacts({ multiple: true }),
-        ensureNotesAccess: async () =>
-          (await ensureReadContactsPermission()).granted,
-        // D-137: withNotes asks for full-size photos (an import path).
-        readByLookupKeys: async (keys, options) =>
-          (await readAllContacts(keys, options)).contacts,
-        discardPhotoCopy: discardDerivative,
-        navigate: navigation.navigate,
-        decidePhotoBudget: askPhotoBudget,
-      });
+      const exec = getExecutor();
+      const paused = await getNewestResumableImportSession(exec);
+      if (paused && importRowOpensPhotoRecovery(paused)) {
+        // B-6: the row reads "Finish adding photos (N left)" and opens that
+        // session's photo recovery, the same route the prompt's Resume uses.
+        await resumePausedImport(paused);
+        return;
+      }
+      if (paused && importEntryNeedsPrecheck(paused)) {
+        // D-111: a new import never silently abandons a paused one. The copy
+        // states what Discard drops (T-38.12-53).
+        const description = await describeResumable(exec, paused.session);
+        if (description.discardOnly) {
+          const discard = await confirm({
+            title: "Discard your last import?",
+            message:
+              "It can’t be resumed. Its unresolved people are dropped; contacts already imported stay in Orbit.",
+            confirmLabel: "Discard and start new",
+            destructive: true,
+          });
+          if (!discard) return;
+          await discardPausedImport(paused.session.id);
+          await reload();
+          await startNewImport();
+          return;
+        }
+        const left = paused.peopleLeft;
+        const choice = await choose({
+          title: "Finish your last import first?",
+          message: `${plural(left, "person", "people")} ${left === 1 ? "is" : "are"} left to import. Discard drops them; nothing already imported changes.`,
+          confirmLabel: "Resume",
+          secondaryLabel: "Discard and start new",
+          cancelLabel: "Cancel",
+        });
+        if (choice === "cancel") return;
+        if (choice === "confirm") {
+          await resumePausedImport(paused);
+          return;
+        }
+        await discardPausedImport(paused.session.id);
+        await reload();
+      }
+      await startNewImport();
     } catch {
       showSnackbar({
         kind: "error",
         label: "Couldn't import contacts. Please try again.",
       });
     }
-  }, [navigation, askPhotoBudget]);
+  }, [startNewImport, resumePausedImport, discardPausedImport, reload]);
 
+  // A pending check opens the shared check prompt; its Resume clears the
+  // session's "asked once" marker before opening the grid (L-3), and the
+  // row reads "Finish your check (N left)" until it is finished (D-105).
   const onCheckLinkedContacts = useCallback(async () => {
     try {
       const pending = await getNewestResumableReconcileSession(getExecutor());
@@ -335,7 +452,7 @@ export function SettingsContactsScreen() {
           isPhoneRegion ? `Phone number region, ${phoneRegionLabel}` : row.title
         }
         title={row.title}
-        subtitle={row.subtitle}
+        subtitle={contactsRowSubtitle(row, resumeState)}
         value={isPhoneRegion ? phoneRegionLabel : undefined}
         disabled={isPhoneRegion && settings === null}
         onPress={onPressForAction[row.action]}
