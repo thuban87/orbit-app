@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
@@ -13,6 +15,7 @@ import {
   createReconcileSession,
   insertReconcileCard,
 } from "@/db/reconcile-session-dao";
+import { getNewestResumableReconcileSession } from "@/db/reconcile-session-read";
 import {
   clearReconcileResumePrompted,
   markReconcileResumePrompted,
@@ -26,6 +29,7 @@ import {
 import {
   type ReconcileStagingFileSystem,
   type ResumableReconcile,
+  readResumableReconcile,
   reconcileOrphanReconcileStagedPhotos,
   registerReconcileResumeSweep,
 } from "@/services/import/reconcile-resume-sweep";
@@ -271,5 +275,38 @@ describe("an open detail's staged photos survive the foreground sweep (38.12 rev
     tracker.clear();
     expect(isReconcileStagingHeld("reconcile-staging/b.jpg")).toBe(false);
     expect(deleted).toEqual(["reconcile-staging/b.jpg"]);
+  });
+});
+
+describe("Settings' Check linked contacts entry shares the sweep's description (38.12 D-IN-12)", () => {
+  it("a malformed check read for Settings is discard-only, a sound one resumable", async () => {
+    const newest = async () => {
+      const pending = await getNewestResumableReconcileSession(exec);
+      if (!pending) throw new Error("no pending check");
+      return pending;
+    };
+    const bad = await seedCard("not-json");
+    expect(await readResumableReconcile(exec, await newest())).toEqual({
+      sessionId: bad,
+      discardOnly: true,
+      cardsLeft: 1,
+    });
+    const good = await seedCard();
+    expect(await readResumableReconcile(exec, await newest())).toEqual({
+      sessionId: good,
+      discardOnly: false,
+      cardsLeft: 1,
+    });
+  });
+
+  it("the Settings entry builds its value through readResumableReconcile, never a hard-coded discardOnly", () => {
+    const source = readFileSync(
+      join(__dirname, "../../screens/SettingsContactsScreen.tsx"),
+      "utf8",
+    );
+    expect(source).toContain(
+      "setResumableReconcile(await readResumableReconcile(exec, pending));",
+    );
+    expect(source).not.toMatch(/discardOnly:\s*false/);
   });
 });

@@ -79,6 +79,23 @@ export function describeResumableReconcile(input: {
 }
 
 /**
+ * Describe a pending check for its resume prompt from its durable cards: the
+ * one path the launch sweep and Settings' Check linked contacts entry share,
+ * so a check with a malformed card is discard-only from either (38.12
+ * D-IN-12).
+ */
+export async function readResumableReconcile(
+  exec: SqlExecutor,
+  pending: { session: { id: number }; cardsLeft: number },
+): Promise<ResumableReconcile> {
+  return describeResumableReconcile({
+    session: pending.session,
+    cards: await listReconcileSessionCards(exec, pending.session.id),
+    cardsLeft: pending.cardsLeft,
+  });
+}
+
+/**
  * Uses the first-class staged path column rather than diff_json so a malformed
  * card cannot strand files or break launch cleanup. A copy an open detail
  * screen holds is live too (38.12 review B-WR-02).
@@ -141,11 +158,7 @@ export function registerReconcileResumeSweep(
         newest.resumePromptedAt === null &&
         !isReconcileSessionOpen(newest.session.id)
       ) {
-        description = describeResumableReconcile({
-          session: newest.session,
-          cards: await listReconcileSessionCards(exec, newest.session.id),
-          cardsLeft: newest.cardsLeft,
-        });
+        description = await readResumableReconcile(exec, newest);
       }
     } catch (error) {
       Logger.error(

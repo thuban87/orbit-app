@@ -51,7 +51,10 @@ import {
   cleanupDiscardedStagedPhotos,
   describeResumable,
 } from "@/services/import/contact-import-resume-sweep";
-import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
+import {
+  type ResumableReconcile,
+  readResumableReconcile,
+} from "@/services/import/reconcile-resume-sweep";
 import { startContactImport } from "@/services/import/start-contact-import";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { deleteImportStaging } from "@/services/photos/photo-storage";
@@ -280,13 +283,13 @@ export function SettingsContactsScreen() {
   // row reads "Finish your check (N left)" until it is finished (D-105).
   const onCheckLinkedContacts = useCallback(async () => {
     try {
-      const pending = await getNewestResumableReconcileSession(getExecutor());
+      const exec = getExecutor();
+      const pending = await getNewestResumableReconcileSession(exec);
       if (pending !== null) {
-        setResumableReconcile({
-          sessionId: pending.session.id,
-          discardOnly: false,
-          cardsLeft: pending.cardsLeft,
-        });
+        // The sweep's own description: a malformed card makes the check
+        // discard-only here too, never a Resume into a grid that cannot
+        // parse it (D-IN-12).
+        setResumableReconcile(await readResumableReconcile(exec, pending));
         return;
       }
       navigation.navigate("ReconcileGrid");
