@@ -23,7 +23,10 @@ import { importContactRecord } from "@/db/imported-contact-dao";
 import type { SqlExecutor } from "@/db/types";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import { scoreImportCandidate } from "@/services/import/duplicate-evidence";
-import type { BoundImportEffects } from "@/services/import/import-lifecycle-effects";
+import type {
+  ImportLifecycleEffects,
+  ImportLifecycleFlags,
+} from "@/services/import/import-lifecycle-effects";
 import {
   importedPhotoFs,
   persistImportedPhotoPostCommit,
@@ -56,12 +59,13 @@ export interface RunImportBatchParams {
   /** An in-pass override; the durable session value is the normal source. */
   batchCategoryId?: number | null;
   /**
-   * Post-commit reminder/widget effects after a Bound pass (D-57). Tests inject
-   * a spy; the default lazily imports `import-lifecycle-effects`, which pulls in
-   * native modules. The batch lifecycle itself is never a parameter here: it
-   * is read from the session so a resume keeps it.
+   * Post-commit lifecycle effects after a pass that created contacts (D-57,
+   * D-58). Tests inject a spy; the default lazily imports
+   * `import-lifecycle-effects`, which pulls in native modules. The batch
+   * lifecycle itself is never a parameter here: it is read from the session so
+   * a resume keeps it.
    */
-  effects?: BoundImportEffects;
+  effects?: ImportLifecycleEffects;
 }
 
 function pickedFromRow(row: ImportSessionRow): PickedContact {
@@ -69,21 +73,23 @@ function pickedFromRow(row: ImportSessionRow): PickedContact {
 }
 
 /**
- * Run the Bound import effects once, post-commit and best-effort (D-57): a
- * failure — including a failed lazy import — is logged and never rethrown.
+ * Run the import lifecycle effects once, post-commit and best-effort (D-57,
+ * D-58): a failure — including a failed lazy import — is logged and never
+ * rethrown.
  */
-async function runBoundImportEffects(
+async function runImportLifecycleEffects(
   exec: SqlExecutor,
-  effects: BoundImportEffects | undefined,
+  effects: ImportLifecycleEffects | undefined,
+  flags: ImportLifecycleFlags,
 ): Promise<void> {
   try {
     const run =
       effects ??
       (await import("@/services/import/import-lifecycle-effects"))
-        .applyBoundImportEffects;
-    await run(exec);
+        .applyImportLifecycleEffects;
+    await run(exec, flags);
   } catch (error) {
-    Logger.error("import-driver", "Bound import effects failed", error);
+    Logger.error("import-driver", "import lifecycle effects failed", error);
   }
 }
 
@@ -257,10 +263,14 @@ async function runImportPass(
   }
 
   await finalizeSessionIfTerminal(exec, params.sessionId, params.now);
-  // D-57: a Bound pass that created contacts refreshes reminders and the
-  // widget once, after everything above has committed.
-  if (lifecycle.trackingEnabled && createdContacts > 0) {
-    await runBoundImportEffects(exec, params.effects);
+  // D-57 / D-58: a pass that created contacts runs the lifecycle effects once,
+  // after everything above has committed — Bound refreshes reminders and the
+  // widget; Unbound reschedules birthdays when that setting is on.
+  if (createdContacts > 0) {
+    await runImportLifecycleEffects(exec, params.effects, {
+      anyBound: lifecycle.trackingEnabled,
+      anyUnbound: !lifecycle.trackingEnabled,
+    });
   }
   return sessionSummaryCounts(exec, params.sessionId);
 }

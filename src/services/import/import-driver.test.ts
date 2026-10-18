@@ -407,7 +407,10 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
     });
 
     expect(effects).toHaveBeenCalledTimes(1);
-    expect(effects).toHaveBeenCalledWith(exec);
+    expect(effects).toHaveBeenCalledWith(exec, {
+      anyBound: true,
+      anyUnbound: false,
+    });
     expect(await lifecycles()).toEqual([
       {
         name: "Alpha",
@@ -424,7 +427,7 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
     ]);
   });
 
-  it("keeps a default session Unbound with no cadence", async () => {
+  it("keeps a default session Unbound with no cadence and runs the Unbound effects once (D-58)", async () => {
     const session = await createSession([
       { externalContactId: "u", sourcePayload: payload("Unbound Person") },
     ]);
@@ -434,7 +437,13 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
       now: NOW,
       effects,
     });
-    expect(effects).not.toHaveBeenCalled();
+    // D-58: the helper decides — Unbound birthdays reschedule when that
+    // setting is on (import-lifecycle-effects.test.ts).
+    expect(effects).toHaveBeenCalledTimes(1);
+    expect(effects).toHaveBeenCalledWith(exec, {
+      anyBound: false,
+      anyUnbound: true,
+    });
     expect(await lifecycles()).toEqual([
       {
         name: "Unbound Person",
@@ -504,7 +513,7 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
     ]);
   });
 
-  it("runs the effects after finalize, only when the Bound pass created a contact", async () => {
+  it("runs the effects after finalize, only when the pass created a contact", async () => {
     const session = await createSession([
       { externalContactId: "e1", sourcePayload: payload("Effect One") },
     ]);

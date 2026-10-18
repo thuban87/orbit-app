@@ -484,8 +484,8 @@ describe("source consolidation", () => {
 
 /**
  * 38.4 D-57 (owner, OA-E2): Combine creates the one contact with the batch
- * lifecycle, and a Bound combine runs the reminder/widget effects once, after
- * the commit, without ever failing the combine.
+ * lifecycle, and every combine runs the lifecycle effects once (D-58, F-4),
+ * after the commit, without ever failing the combine.
  */
 describe("combineCluster lifecycle (D-57)", () => {
   async function pair(prefix: string) {
@@ -536,11 +536,14 @@ describe("combineCluster lifecycle (D-57)", () => {
       interval_days: 30,
     });
     expect(effects).toHaveBeenCalledTimes(1);
-    expect(effects).toHaveBeenCalledWith(exec);
+    expect(effects).toHaveBeenCalledWith(exec, {
+      anyBound: true,
+      anyUnbound: false,
+    });
     expect(committedAtEffect).toEqual([{ count: 1 }]);
   });
 
-  it("creates an Unbound, never-assigned contact and runs no effects", async () => {
+  it("creates an Unbound, never-assigned contact and runs the Unbound effects once (D-58, F-4)", async () => {
     const session = await pair("unbound");
     const effects = vi.fn(async () => {});
     const result = await combineCluster(exec, photoFs(), {
@@ -556,7 +559,13 @@ describe("combineCluster lifecycle (D-57)", () => {
       tracking_enabled: 0,
       interval_days: null,
     });
-    expect(effects).not.toHaveBeenCalled();
+    // The helper decides: Unbound birthdays reschedule only when "Birthday
+    // alerts for Unbound contacts" is on (import-lifecycle-effects.test.ts).
+    expect(effects).toHaveBeenCalledTimes(1);
+    expect(effects).toHaveBeenCalledWith(exec, {
+      anyBound: false,
+      anyUnbound: true,
+    });
   });
 
   it("a throwing effect leaves the combine committed and its rows resolved", async () => {

@@ -25,7 +25,7 @@ import {
 import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { importRowAsNew } from "@/services/import/import-driver";
-import { applyBoundImportEffects } from "@/services/import/import-lifecycle-effects";
+import { applyImportLifecycleEffects } from "@/services/import/import-lifecycle-effects";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -33,6 +33,7 @@ import { Logger } from "@/utils/logger";
 import { runSingleFlight } from "@/utils/single-flight";
 import {
   bulkResolveFailureLabel,
+  bulkResolveMessage,
   duplicateReviewView,
   runBulkResolveThenRecover,
   runResolveThenRecover,
@@ -205,10 +206,13 @@ export function DuplicateReviewScreen({
    * (the latched link write is `chooseLink`, A-2); "import-new" and "skip"
    * run one latched write over every row (ADR-168). Resolves true when the
    * write ran and no row failed, so the sheet can confirm one person.
+   * `confirm` (the bulk bar) also confirms the rows that succeeded, in the
+   * same one snackbar as any failures (D-04); the sheet confirms its own.
    */
   async function resolveAction(
     action: BulkAction,
     items: CandidateItem[],
+    confirm = false,
   ): Promise<boolean> {
     const selected = reviewItems.filter((entry) =>
       items.some((item) => item.id === entry.item.id),
@@ -220,6 +224,8 @@ export function DuplicateReviewScreen({
     }
     if (!session) return false;
     let importedAny = false;
+    // Names of the rows whose write succeeded, for the bulk confirm (D-04).
+    const succeeded: string[] = [];
     // Per-row failures are collected and shown as ONE snackbar after the
     // loop (38.9 D-27), never one dialog per failing row.
     const failures: string[] = [];
@@ -238,7 +244,10 @@ export function DuplicateReviewScreen({
               phoneRegion: session.phoneRegion,
               now,
             });
-            if (result.contactId !== null) importedAny = true;
+            if (result.contactId !== null) {
+              importedAny = true;
+              succeeded.push(entry.item.name);
+            }
             if (result.skipped === "name-required") {
               failures.push(
                 "Couldn't import — no name. Add a name before importing.",
@@ -252,6 +261,7 @@ export function DuplicateReviewScreen({
               null,
               now,
             );
+            succeeded.push(entry.item.name);
           }
         },
         onRowError: (entry, error) => {
@@ -269,16 +279,28 @@ export function DuplicateReviewScreen({
         onRecoveryError: onReadError,
       }),
     );
-    const failureLabel = bulkResolveFailureLabel(failures);
-    if (failureLabel) showSnackbar({ kind: "error", label: failureLabel });
-    // D-57: a Bound batch's Import as new refreshes reminders and the widget
-    // once, post-commit and best-effort (the helper never rejects).
-    if (
-      action === "import-new" &&
-      importedAny &&
-      sessionBatchLifecycle(session).trackingEnabled
-    ) {
-      void applyBoundImportEffects(getExecutor());
+    const message =
+      confirm && (action === "import-new" || action === "skip")
+        ? bulkResolveMessage(action, succeeded, failures)
+        : (() => {
+            const label = bulkResolveFailureLabel(failures);
+            return label ? { kind: "error" as const, label } : null;
+          })();
+    if (message) showSnackbar(message);
+    // D-57 / D-58: an Import as new that created contacts runs the lifecycle
+    // effects once, post-commit, awaited and best-effort — Bound refreshes
+    // reminders and the widget; Unbound reschedules birthdays when that
+    // setting is on (the helper decides).
+    if (action === "import-new" && importedAny) {
+      const { trackingEnabled } = sessionBatchLifecycle(session);
+      try {
+        await applyImportLifecycleEffects(getExecutor(), {
+          anyBound: trackingEnabled,
+          anyUnbound: !trackingEnabled,
+        });
+      } catch (error) {
+        Logger.error(LOG_SCOPE, "import lifecycle effects failed", error);
+      }
     }
     return ran && failures.length === 0;
   }
@@ -417,7 +439,7 @@ export function DuplicateReviewScreen({
             setLinkQueue([]);
           }}
           onBulkAction={async (action, items) => {
-            await resolveAction(action, items);
+            await resolveAction(action, items, true);
           }}
         />
       )}

@@ -422,10 +422,64 @@ describe("commitSingleImport lifecycle (D-57)", () => {
           [contactId],
         ),
       ).toEqual(expected);
-      // D-57: a Bound single import refreshes reminders and the widget once.
-      expect(effects).toHaveBeenCalledTimes(trackingEnabled ? 1 : 0);
+      // D-57 / D-58: every single import runs the lifecycle effects once,
+      // telling the helper which lifecycle it created.
+      expect(effects).toHaveBeenCalledTimes(1);
+      expect(effects).toHaveBeenCalledWith(exec, {
+        anyBound: trackingEnabled,
+        anyUnbound: !trackingEnabled,
+      });
     },
   );
+
+  it("completeSession rejects after create → returns the id and still runs the effects (C-6)", async () => {
+    const { sessionId, rowId } = await singleSession("single-finalize-fails");
+    // Every statement passes through except the session's completion UPDATE.
+    const failingFinalize: SqlExecutor = {
+      execAsync: (sql) => exec.execAsync(sql),
+      getFirstAsync: (sql, params) => exec.getFirstAsync(sql, params),
+      getAllAsync: (sql, params) => exec.getAllAsync(sql, params),
+      runAsync: (sql, params) =>
+        sql.includes("SET status = 'complete'")
+          ? Promise.reject(new Error("finalize down"))
+          : exec.runAsync(sql, params),
+    };
+    const effects = vi.fn(async () => {});
+    const contactId = await commitSingleImport(failingFinalize, {
+      sessionId,
+      rowId,
+      effects,
+      input: {
+        uid: uid(),
+        name: "Single Person",
+        intervalDays: null,
+        trackingEnabled: false,
+        now: NOW,
+        methodDrafts: [],
+        methodNormalization: { effectivePhoneRegion: "US" },
+      },
+      externalLinks: [
+        { provider: "android", externalContactId: "single-finalize-fails" },
+      ],
+      birthday: null,
+      now: NOW,
+    });
+    expect(typeof contactId).toBe("number");
+    expect(
+      await exec.getFirstAsync("SELECT name FROM contacts WHERE id = ?", [
+        contactId,
+      ]),
+    ).toEqual({ name: "Single Person" });
+    expect(effects).toHaveBeenCalledTimes(1);
+    expect(effects).toHaveBeenCalledWith(failingFinalize, {
+      anyBound: false,
+      anyUnbound: true,
+    });
+    // The session stays pending for the existing resume/finalize path.
+    expect((await getSessionById(exec, sessionId))?.status).not.toBe(
+      "complete",
+    );
+  });
 });
 
 /**

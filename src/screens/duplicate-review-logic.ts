@@ -6,6 +6,8 @@
  * the moment its write resolves: a later finalize or re-read failure is a read
  * problem recovered by a read-only Retry, never a prompt to redo the write.
  */
+import { plural } from "@/utils/plural";
+
 export type DuplicateReviewView = "loading" | "error" | "empty" | "items";
 
 export interface DuplicateReviewViewInput {
@@ -105,4 +107,32 @@ export function bulkResolveFailureLabel(
   if (failures.length === 0) return null;
   if (failures.length === 1) return failures[0];
   return `${failures.length} contacts couldn't be resolved. They're still listed.`;
+}
+
+/**
+ * The one snackbar for a bulk-bar Import as new / Skip (38.12 D-04, folded
+ * into 38.12-21 from 38.12-08's deferred item): every write that succeeded is
+ * confirmed — one person by name, more by count ("Imported 3 people") — and
+ * any failures ride in the same message, since a later snackbar replaces an
+ * earlier one. Failures make it an error (announced as an alert). Null when
+ * nothing was written and nothing failed.
+ */
+export function bulkResolveMessage(
+  action: "import-new" | "skip",
+  succeededNames: readonly string[],
+  failures: readonly string[],
+): { kind: "success" | "error"; label: string } | null {
+  const verb = action === "import-new" ? "Imported" : "Skipped";
+  const success =
+    succeededNames.length === 0
+      ? null
+      : succeededNames.length === 1
+        ? `${verb} ${succeededNames[0]}`
+        : `${verb} ${plural(succeededNames.length, "person", "people")}`;
+  const failure = bulkResolveFailureLabel(failures);
+  if (failure && success)
+    return { kind: "error", label: `${success}. ${failure}` };
+  if (failure) return { kind: "error", label: failure };
+  if (success) return { kind: "success", label: success };
+  return null;
 }

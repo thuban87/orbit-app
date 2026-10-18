@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   bulkResolveFailureLabel,
+  bulkResolveMessage,
   duplicateReviewView,
   runBulkResolveThenRecover,
   runResolveThenRecover,
@@ -23,6 +24,55 @@ describe("bulkResolveFailureLabel (38.9 D-27: one snackbar per bulk resolve)", (
     expect(bulkResolveFailureLabel(["a", "b", "c"])).toBe(
       "3 contacts couldn't be resolved. They're still listed.",
     );
+  });
+});
+
+describe("bulkResolveMessage (38.12 D-04: bulk Import as new / Skip confirm)", () => {
+  it("names a single success", () => {
+    expect(bulkResolveMessage("import-new", ["Ann Lee"], [])).toEqual({
+      kind: "success",
+      label: "Imported Ann Lee",
+    });
+    expect(bulkResolveMessage("skip", ["Bo Ray"], [])).toEqual({
+      kind: "success",
+      label: "Skipped Bo Ray",
+    });
+  });
+
+  it("counts several successes in one message", () => {
+    expect(bulkResolveMessage("import-new", ["A", "B", "C"], [])).toEqual({
+      kind: "success",
+      label: "Imported 3 people",
+    });
+    expect(bulkResolveMessage("skip", ["A", "B"], [])).toEqual({
+      kind: "success",
+      label: "Skipped 2 people",
+    });
+  });
+
+  it("puts successes and failures in the one message, as an error", () => {
+    expect(
+      bulkResolveMessage(
+        "import-new",
+        ["A", "B"],
+        ["Couldn't import — no name. Add a name before importing."],
+      ),
+    ).toEqual({
+      kind: "error",
+      label:
+        "Imported 2 people. Couldn't import — no name. Add a name before importing.",
+    });
+  });
+
+  it("keeps the failure label alone when nothing succeeded", () => {
+    expect(bulkResolveMessage("skip", [], ["a", "b"])).toEqual({
+      kind: "error",
+      label: "2 contacts couldn't be resolved. They're still listed.",
+    });
+  });
+
+  it("is null when nothing was written and nothing failed", () => {
+    expect(bulkResolveMessage("skip", [], [])).toBeNull();
   });
 });
 

@@ -104,6 +104,7 @@ const dao = vi.hoisted(() => ({
   importRowAsNew: vi.fn(async () => ({ contactId: 77, skipped: null })),
   listSessionRows: vi.fn(),
   showSnackbar: vi.fn(),
+  applyImportLifecycleEffects: vi.fn(async (..._args: unknown[]) => {}),
 }));
 vi.mock("@/db/import-session-dao", () => ({
   finalizeSessionIfTerminal: dao.finalizeSessionIfTerminal,
@@ -128,7 +129,7 @@ vi.mock("@/services/import/import-driver", () => ({
   importRowAsNew: dao.importRowAsNew,
 }));
 vi.mock("@/services/import/import-lifecycle-effects", () => ({
-  applyBoundImportEffects: vi.fn(async () => {}),
+  applyImportLifecycleEffects: dao.applyImportLifecycleEffects,
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
   resolveImportStagingUri: (path: string) => `file:///${path}`,
@@ -424,6 +425,62 @@ describe("Review matches bulk link queue (A-2, D-52)", () => {
     expect(sheetState()).toMatchObject({ visible: true, person: "Bo Ray" });
     (render().sheet.props.onClose as () => void)();
     expect(sheetState().visible).toBe(false);
+  });
+});
+
+/**
+ * 38.12 D-04 (folded into 38.12-21 from 38.12-08's deferred item 1): the bulk
+ * bar's Import as new / Skip confirms the rows that succeeded in one snackbar,
+ * alongside any failure; Import as new awaits the lifecycle effects once (D-58).
+ */
+describe("Review matches bulk Import as new / Skip confirm (D-04, D-58)", () => {
+  type BulkFn = (a: string, i: Item[]) => Promise<void>;
+
+  it("bulk Skip of two people confirms with one count message", async () => {
+    const { list, items } = await loaded();
+    await (list.props.onBulkAction as BulkFn)("skip", items);
+    expect(dao.markRowStatus).toHaveBeenCalledTimes(2);
+    expect(snackbarLabels()).toEqual(["Skipped 2 people"]);
+    expect(dao.showSnackbar.mock.calls[0]?.[0]).toMatchObject({
+      kind: "success",
+    });
+    expect(dao.applyImportLifecycleEffects).not.toHaveBeenCalled();
+  });
+
+  it("bulk Import as new of two people confirms once and runs the effects once", async () => {
+    const { list, items } = await loaded();
+    await (list.props.onBulkAction as BulkFn)("import-new", items);
+    expect(dao.importRowAsNew).toHaveBeenCalledTimes(2);
+    expect(snackbarLabels()).toEqual(["Imported 2 people"]);
+    expect(dao.applyImportLifecycleEffects).toHaveBeenCalledTimes(1);
+    expect(dao.applyImportLifecycleEffects).toHaveBeenCalledWith("exec", {
+      anyBound: false,
+      anyUnbound: true,
+    });
+  });
+
+  it("a mixed bulk Import as new names the success and the failure in one message", async () => {
+    dao.importRowAsNew.mockResolvedValueOnce({
+      contactId: null,
+      skipped: "name-required",
+    } as never);
+    const { list, items } = await loaded();
+    await (list.props.onBulkAction as BulkFn)("import-new", items);
+    expect(snackbarLabels()).toEqual([
+      "Imported Bo Ray. Couldn't import — no name. Add a name before importing.",
+    ]);
+    expect(dao.showSnackbar.mock.calls[0]?.[0]).toMatchObject({
+      kind: "error",
+    });
+  });
+
+  it("a thrown row write is reported with the other row's success", async () => {
+    dao.markRowStatus.mockRejectedValueOnce(new Error("write down"));
+    const { list, items } = await loaded();
+    await (list.props.onBulkAction as BulkFn)("skip", items);
+    expect(snackbarLabels()).toEqual([
+      "Skipped Bo Ray. Couldn't resolve this contact. The other selected contacts are still available.",
+    ]);
   });
 });
 

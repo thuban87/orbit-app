@@ -108,8 +108,8 @@ describe("Duplicate Review Import as new (D-57)", () => {
     );
   });
 
-  it("runs the Bound import effects once, after the latched import-new write, on a Bound session", () => {
-    const effects = [...screen.matchAll(/applyBoundImportEffects\(/g)];
+  it("awaits the import lifecycle effects once, after the latched import-new write (D-58)", () => {
+    const effects = [...screen.matchAll(/applyImportLifecycleEffects\(/g)];
     expect(effects).toHaveLength(1);
     const at = effects[0].index ?? 0;
     const write = screen.indexOf(
@@ -119,6 +119,8 @@ describe("Duplicate Review Import as new (D-57)", () => {
     expect(at).toBeGreaterThan(write);
     const guard = screen.slice(write, at);
     expect(guard).toMatch(/action === "import-new"/);
-    expect(guard).toMatch(/sessionBatchLifecycle\(session\)\.trackingEnabled/);
+    // D-58: an Unbound import-new also calls the helper (it decides what
+    // runs), so there is no Bound-only guard; the call is awaited.
+    expect(screen.slice(at - "await ".length, at)).toBe("await ");
   });
 });

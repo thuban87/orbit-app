@@ -24,7 +24,7 @@ import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import type { FlowHost } from "@/navigation/flow-host";
-import type { BoundImportEffects } from "@/services/import/import-lifecycle-effects";
+import type { ImportLifecycleEffects } from "@/services/import/import-lifecycle-effects";
 import {
   importedPhotoFs,
   persistImportedPhotoPostCommit,
@@ -61,10 +61,10 @@ export interface CommitSingleImportInput {
   birthday: string | null;
   now: string;
   /**
-   * Post-commit reminder/widget effects after a Bound single import (D-57).
+   * Post-commit lifecycle effects after the single import (D-57, D-58).
    * Tests inject a spy; the default lazily imports `import-lifecycle-effects`.
    */
-  effects?: BoundImportEffects;
+  effects?: ImportLifecycleEffects;
 }
 
 export interface PickedImportNavigator {
@@ -235,18 +235,31 @@ export async function commitSingleImport(
       );
     }
   }
-  await completeSession(exec, params.sessionId, params.now);
-  if (lifecycle.trackingEnabled) {
-    // D-57: best-effort, post-commit; never fails the committed import.
-    try {
-      const run =
-        params.effects ??
-        (await import("@/services/import/import-lifecycle-effects"))
-          .applyBoundImportEffects;
-      await run(exec);
-    } catch (error) {
-      Logger.error("import-acquire", "Bound import effects failed", error);
-    }
+  // D-58 / convergence c1 C-6: the contact is already committed, so a
+  // finalize failure must not read as a failed import. Log it and continue —
+  // the effects still run and the created id is returned. A pending session
+  // left behind is picked up by the existing resume/finalize path; no retry.
+  try {
+    await completeSession(exec, params.sessionId, params.now);
+  } catch (error) {
+    Logger.error(
+      "import-acquire",
+      "could not finalize import session after create",
+      error,
+    );
+  }
+  // D-57 / D-58: best-effort, post-commit; never fails the committed import.
+  try {
+    const run =
+      params.effects ??
+      (await import("@/services/import/import-lifecycle-effects"))
+        .applyImportLifecycleEffects;
+    await run(exec, {
+      anyBound: lifecycle.trackingEnabled,
+      anyUnbound: !lifecycle.trackingEnabled,
+    });
+  } catch (error) {
+    Logger.error("import-acquire", "import lifecycle effects failed", error);
   }
   return contactId;
 }
