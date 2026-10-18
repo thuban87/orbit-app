@@ -1,7 +1,7 @@
 # Photos
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/db/photo-relative-path.ts`, `src/components/Avatar.tsx`, `src/components/photo-display.ts`, `src/components/PhotoUnavailableNotice.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -145,13 +145,13 @@ The path lock is process-local. Crash safety comes from settling old journal row
 
 ### Importing a selected contact photo
 
-1. Contact Import moves an accepted picker-cache copy into private flat `import-staging/` before it commits the durable session snapshot.
-2. After the imported contact transaction succeeds, `import-photo.ts` resolves that relative staging path, produces the ordinary Orbit master through `encodeMaster` (centre-squared, at the picker thumbnail's own size), and writes the contact photo reference.
+1. Contact Import reads the phone contact's full-size photo when there is one, falling back to the thumbnail (`preferFullSize`, import paths only; ADR-240). It moves the accepted picker-cache copy into private flat `import-staging/` before it commits the durable session snapshot. If the photos may push the encrypted backup past its 8 MiB cap (about 62 KB per photo contact), the photo-budget sheet first offers smaller photos (at most 256 px), Continue anyway, no photos, or Go back.
+2. After the imported contact transaction succeeds, `import-photo.ts` resolves that relative staging path, produces the ordinary Orbit master through `encodeMaster` (centre-squared, up to 1024 px, never upscaled), writes the contact photo reference, and records the phone photo's fingerprint as the link's reviewed photo so Check linked contacts does not see the larger master as a change.
 3. Success retires the row reference before best-effort deletion of raw staging. A mastering failure leaves the contact imported and retains the staged input for Retry.
 
 ### Reconciling a linked-contact photo
 
-1. Reconciliation copies a current linked-source photo into the guarded `reconcile-staging/` namespace and hashes its bytes for source-change comparison.
+1. Reconciliation copies a current linked-source photo, at thumbnail size, into the guarded `reconcile-staging/` namespace. Source-change comparison uses the bridge's `photoFingerprint` (SHA-256 of the phone's thumbnail bytes), falling back to the staged-bytes hash (ADR-236). The detail's own staging copies are named `detail-contact-N-link-M` and deleted on close or re-read (`reconcile-detail-staging.ts`).
 2. The detail view offers the staged source photo for a deliberate choice; it never supplies a picker-cache URI to the regular Avatar path.
 3. Once the selected data transaction commits, `promoteReconcilePhoto()` produces the usual master and writes the photo reference. A promotion failure leaves the photo snapshot unwritten so it is offered again on a later scan.
 
@@ -206,7 +206,10 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **ADR-158:** Canonical Photo Ownership Across Masters, Staging, and Derivatives — gives each photo namespace one explicit owner and retirement rule.
 - **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — finalizes only journal-authorized bytes owned by the committed restore state.
 - **ADR-180:** Display-Revision Photo URIs and Current Photos on Every Existing-Contact Surface — the ownership layer publishes a display revision that `Avatar` puts in the URI.
-- **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — replaces ADR-021's 512 JPEG size; the Orrery reads small cache copies.
+- **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — replaces ADR-021's 512 JPEG size; the Orrery reads small cache copies. Its thumbnail-size import rule is superseded by ADR-240.
+- **ADR-235:** Merge Starts from the Profile — only a stored photo path is rehomed; text in a photo field moves as text.
+- **ADR-236:** Check Linked Contacts Never Re-Asks a Reviewed Difference — photos compared by the phone's fingerprint.
+- **ADR-240:** Import Takes Full-Size Phone Photos — full-size import masters, the photo-budget sheet, thumbnail-only Check.
 - **ADR-182:** Missing Photos Keep Their Reference; Backups Skip and Mark Only Missing Photos — "Photo unavailable" instead of a cleared reference.
 - **ADR-183:** 224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox — the reusable `PhotoLightbox`.
 - **ADR-185:** Assist Banner Renders in Flow Above the Tab Navigator — Crop Photo sizes its canvas to the space below the banner.
@@ -236,6 +239,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 17. **The `.jpg` extension does not tell you the format.** New masters are WebP bytes under the unchanged `.jpg` names, and older ones are JPEG. Never branch on the extension or assume 512 px.
 18. **Never let the Orrery decode a 1024 master.** The manipulator decodes through Glide into hardware bitmaps that are freed only at GC. The in-memory downsample cache (D-37) still measured +23 % graphics at 20 s. Only the on-disk copy (D-41) passes the 5 % memory gate.
 19. **Never clear a reference because its file is missing.** Show "Photo unavailable" instead. A text value in a photo field must pass `isStoredPhotoPath` before any resolver; reaching one used to crash Edit Contact.
+20. **Imported photos are no longer thumbnail-sized.** A 1024 px import master costs about 62 KB of backup per photo contact; the cap is reached at about 145. Keep the photo-budget warning on every import path that takes photos, and keep Check linked contacts at thumbnail size (ADR-240).
 
 ## Related Systems
 
@@ -270,3 +274,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-10-16 | 38.11 | Code review IN-03/IN-09: the hold-mode picker keeps its pending crop path until the result arrives (a late result is consumed on the next focus) and Add Contact memoises its `hold` prop; `listCreateStagingPhotos` skips and logs a stray entry instead of throwing. |
 | 2026-10-16 | 38.11 | Device review (38.11-14 A8): the held Add Contact photo's Remove confirm reads "Remove this photo? It hasn't been saved yet."; the saved-photo confirm is unchanged. |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-223. |
+| 2026-10-18 | 38.12 | Import reads full-size phone photos (import only; Check stays thumbnail) with a backup-size warning; photos fingerprinted for Check; merge rehomes only stored photo paths (ADR-235, ADR-236, ADR-240).
