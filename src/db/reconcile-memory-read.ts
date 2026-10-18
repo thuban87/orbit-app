@@ -36,8 +36,17 @@ export interface ReviewMemorySettings {
 }
 
 export interface ReviewMemory {
-  /** Reviewed values merged across every active link (classifier `lastReviewed`). */
+  /** Reviewed values merged across every active link (higher link id wins). */
   snapshots: Partial<Record<ReconcileFieldFamily, string | null>>;
+  /**
+   * Each active link's own reviewed values. The classifier merges only the
+   * links that read in this check (38.12 review B-CR-02): an unread link
+   * provides no source value, so its memory must not decide the comparison.
+   */
+  perLink: ReadonlyMap<
+    number,
+    Partial<Record<ReconcileFieldFamily, string | null>>
+  >;
   /** `phoneRegionOverride ?? device region` — the one region rule (D-45). */
   effectivePhoneRegion: string | null;
   /** Links whose missing source the person kept as is ('source' memory). */
@@ -103,16 +112,19 @@ export async function loadReviewMemory(
   settings: ReviewMemorySettings,
 ): Promise<ReviewMemory> {
   const linkIds = await listActiveLinkIds(exec, contactId);
-  const perLink: Array<Partial<Record<ReconcileFieldFamily, string | null>>> =
-    [];
+  const perLink = new Map<
+    number,
+    Partial<Record<ReconcileFieldFamily, string | null>>
+  >();
   const missingKeptLinkIds = new Set<number>();
   for (const linkId of linkIds) {
     const { source, ...fields } = await getReviewedSnapshots(exec, linkId);
     if (source !== undefined) missingKeptLinkIds.add(linkId);
-    perLink.push(fields);
+    perLink.set(linkId, fields);
   }
   return {
-    snapshots: Object.assign({}, ...perLink),
+    snapshots: Object.assign({}, ...perLink.values()),
+    perLink,
     effectivePhoneRegion: effectivePhoneRegionFor(settings),
     missingKeptLinkIds,
   };
@@ -246,7 +258,12 @@ export async function classifyLinkedContact(
       modifiedAt: contact.modified_at,
     },
     sources,
-    lastReviewed: memory.snapshots,
+    // Only the links that read this time (B-CR-02); every review is written
+    // to all of them, so they agree after the first review.
+    lastReviewed: Object.assign(
+      {},
+      ...readLinks.map((link) => memory.perLink.get(link.id) ?? {}),
+    ),
     omittedCount: unkeptMissing.length,
     effectivePhoneRegion: memory.effectivePhoneRegion,
   });

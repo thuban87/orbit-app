@@ -42,18 +42,24 @@ function sourceMethods(
 }
 
 /**
- * The links a review is remembered on: every link behind the field's options,
- * or — for a field with no source option (removed-from-source) — every read
- * link of the card, so that review is remembered too (convergence c4 E-4).
+ * The links a review is remembered on: every link that was read for the card
+ * (38.12 review B-CR-02), plus every link behind the field's options (a
+ * stored diff from before `sourceLinkIds` existed carries only those).
+ *
+ * Memory is merged across the read links when the next check classifies, so
+ * a review written only to the option links left another read link's stale
+ * memory in the merge and the same difference came back forever (D-45).
  */
 function reviewedLinkIds(
   diff: ReconcileDiffResult,
   field: ReconcileFieldDiff,
 ): number[] {
-  const fromOptions = [
-    ...new Set(field.sourceOptions.flatMap((option) => option.sourceLinkIds)),
+  return [
+    ...new Set([
+      ...(diff.sourceLinkIds ?? []),
+      ...field.sourceOptions.flatMap((option) => option.sourceLinkIds),
+    ]),
   ];
-  return fromOptions.length > 0 ? fromOptions : [...(diff.sourceLinkIds ?? [])];
 }
 
 /** The picked options, in display order (`field.sourceOptions` order). */

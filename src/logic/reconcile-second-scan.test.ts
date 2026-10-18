@@ -530,3 +530,70 @@ describe("missing source (D-45)", () => {
     ]);
   });
 });
+
+describe("several links: one review holds across every read link (38.12 review B-CR-02)", () => {
+  it("divergent photo memory on two read links: Keep Orbit once → rescan → no card", async () => {
+    const contactId = await seedContact({
+      name: "Phone Name",
+      photo: "contacts/1.jpg",
+    });
+    const first = await seedLink(contactId, "lk-1");
+    const second = await seedLink(contactId, "lk-2");
+    // A import-recorded fingerprint on L1; an earlier "Keep Orbit" on L2
+    // (whose phone contact has no photo) — e.g. after a D-99 merge.
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: first,
+      fieldFamily: "photo",
+      reviewedValue: "fp-1",
+      reviewedAt: NOW,
+    });
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: second,
+      fieldFamily: "photo",
+      reviewedValue: "",
+      reviewedAt: NOW,
+    });
+    const provider = [
+      picked("lk-1", { photoFingerprint: "fp-1" }),
+      picked("lk-2"),
+    ];
+    const photos = staged([[first, "bytes-1"]]);
+    const [card] = await gridScan(provider, photos);
+    expect(card.diff.fields.map((field) => field.fieldFamily)).toEqual([
+      "photo",
+    ]);
+    const { diff } = await detailRead(contactId, provider, photos);
+    await detailApply(contactId, diff, keepOrbit);
+    expect((await getReviewedSnapshots(exec, second)).photo).toBe("fp-1");
+    expect(await gridScan(provider, photos)).toEqual([]);
+    expect((await detailRead(contactId, provider, photos)).diff.fields).toEqual(
+      [],
+    );
+  });
+
+  it("a kept-missing link's stale memory does not decide the comparison", async () => {
+    const contactId = await seedContact({ name: "Orbit Name" });
+    const reads = await seedLink(contactId, "lk-1");
+    const kept = await seedLink(contactId, "lk-2");
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: reads,
+      fieldFamily: "name",
+      reviewedValue: "Phone Name",
+      reviewedAt: NOW,
+    });
+    // The unread, kept-as-is link holds an older name review (higher id).
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: kept,
+      fieldFamily: "name",
+      reviewedValue: "Old Name",
+      reviewedAt: NOW,
+    });
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: kept,
+      fieldFamily: "source",
+      reviewedValue: MISSING_SOURCE_KEPT,
+      reviewedAt: NOW,
+    });
+    expect(await gridScan([picked("lk-1")])).toEqual([]);
+  });
+});
