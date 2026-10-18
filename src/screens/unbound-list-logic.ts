@@ -1,5 +1,6 @@
 /** Pure presentation helpers shared by the neutral Unbound population surface. */
 import type { UnboundRow } from "@/db/unbound-read";
+import { formatDisplayDateOrFallback } from "@/utils/dates";
 
 export function unboundCountLabel(
   count: number,
@@ -25,8 +26,24 @@ export function filterUnboundByName(
 export function unboundRowAccessibilityLabel(
   name: string,
   categoryLabel: string | null,
+  subtitle?: string,
 ): string {
-  return [name, categoryLabel, "Unbound"].filter(Boolean).join(", ");
+  return [name, categoryLabel, "Unbound", subtitle].filter(Boolean).join(", ");
+}
+
+/**
+ * The Unbound row's second line (38.12 D-39; wording is Claude's Discretion
+ * per CONTEXT, seen by the owner at the device check): when they were last
+ * contacted, through the one date-only display formatter (38.9 D-23, D-48).
+ * Every row on this list is Unbound, so the old "Unbound" line said nothing.
+ */
+export function unboundRowSubtitle(
+  lastContact: string | null,
+  now?: Date,
+): string {
+  if (lastContact === null) return "No contact logged";
+  const date = formatDisplayDateOrFallback(lastContact, "", { now });
+  return date === "" ? "No contact logged" : `Last contact ${date}`;
 }
 
 /** Only direct retrieval rows outside the active lifecycle use neutral list chrome. */

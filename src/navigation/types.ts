@@ -537,6 +537,11 @@ export type SettingsStackParamList = {
   SystemsManagement: undefined;
   CustomFields: undefined;
   Archived: undefined;
+  /**
+   * The Unbound list (38.12 D-97): Settings → Contacts & Relationships →
+   * Contact Management opens it here; the Contacts-stack entry stays.
+   */
+  UnboundContacts: undefined;
   Profile: ProfileRouteParams;
   /**
    * The detailed-log route (HIST-15). Registered here because Profile is hosted

@@ -14,6 +14,8 @@ export interface UnboundRow {
   name: string;
   photo: string | null;
   modified_at: string;
+  /** The last logged contact (local date), or null; the row subtitle (38.12 D-39). */
+  last_contact: string | null;
   trackingEnabled: number;
   favourite_rank: null;
   status: ProfileStatus | null;
@@ -27,6 +29,7 @@ export function listUnbound(exec: SqlExecutor): Promise<UnboundRow[]> {
        name,
        photo,
        modified_at,
+       last_contact,
        tracking_enabled AS trackingEnabled,
        NULL AS favourite_rank,
        NULL AS status,

@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -23,6 +23,7 @@ import {
   filterUnboundByName,
   unboundCountLabel,
   unboundRowAccessibilityLabel,
+  unboundRowSubtitle,
 } from "./unbound-list-logic";
 
 const LOG_SCOPE = "unbound-contacts";
@@ -39,6 +40,12 @@ export function UnboundContactsScreen({
   const [term, setTerm] = useState("");
   const hasTerm = term.trim() !== "";
   const filteredRows = rows === null ? [] : filterUnboundByName(rows, term);
+  const listRef = useRef<FlatList<UnboundRow>>(null);
+  // 38.12 D-39: a new query starts the results from the top.
+  const changeTerm = useCallback((next: string) => {
+    setTerm(next);
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,7 +121,7 @@ export function UnboundContactsScreen({
               accessibilityLabel="Search unbound contacts"
               autoCapitalize="none"
               value={term}
-              onChangeText={setTerm}
+              onChangeText={changeTerm}
               placeholder="Search unbound contacts"
               placeholderTextColor={colors.textPlaceholder}
               style={[
@@ -131,7 +138,7 @@ export function UnboundContactsScreen({
                 testID="unbound-contacts-search-clear"
                 accessibilityRole="button"
                 accessibilityLabel="Clear search"
-                onPress={() => setTerm("")}
+                onPress={() => changeTerm("")}
                 style={styles.searchClear}
               >
                 <Text style={{ color: colors.textSecondary }}>✕</Text>
@@ -222,58 +229,69 @@ export function UnboundContactsScreen({
                 </ChromeScrim>
               ) : (
                 <FlatList
+                  ref={listRef}
                   data={filteredRows}
+                  // 38.12 D-39: a row tap works while the search keyboard is
+                  // up (the first tap is not spent dismissing it).
+                  keyboardShouldPersistTaps="handled"
                   keyExtractor={(item) => String(item.id)}
                   contentContainerStyle={[
                     styles.listContent,
                     { paddingBottom: bottomClearance },
                   ]}
-                  renderItem={({ item }) => (
-                    <Pressable
-                      testID={`unbound-contacts-row-${item.id}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={unboundRowAccessibilityLabel(
-                        item.name,
-                        null,
-                      )}
-                      onPress={() =>
-                        navigation.navigate("Profile", { contactId: item.id })
-                      }
-                      style={[
-                        styles.row,
-                        {
-                          backgroundColor: colors.surface,
-                          borderColor: colors.border,
-                        },
-                      ]}
-                    >
-                      <Avatar
-                        photo={item.photo}
-                        name={item.name}
-                        contactId={item.id}
-                        size={40}
-                      />
-                      <View style={styles.rowText}>
-                        <Text
-                          numberOfLines={1}
-                          style={[
-                            styles.rowName,
-                            { color: colors.textPrimary },
-                          ]}
-                        >
-                          {item.name}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.unboundLabel,
-                            { color: colors.textSecondary },
-                          ]}
-                        >
-                          Unbound
-                        </Text>
-                      </View>
-                    </Pressable>
-                  )}
+                  renderItem={({ item }) => {
+                    const subtitle = unboundRowSubtitle(item.last_contact);
+                    return (
+                      <Pressable
+                        testID={`unbound-contacts-row-${item.id}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={unboundRowAccessibilityLabel(
+                          item.name,
+                          null,
+                          subtitle,
+                        )}
+                        onPress={() =>
+                          navigation.navigate("Profile", { contactId: item.id })
+                        }
+                        style={[
+                          styles.row,
+                          {
+                            backgroundColor: colors.surface,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
+                        <Avatar
+                          photo={item.photo}
+                          name={item.name}
+                          contactId={item.id}
+                          size={40}
+                        />
+                        <View style={styles.rowText}>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.rowName,
+                              { color: colors.textPrimary },
+                            ]}
+                          >
+                            {item.name}
+                          </Text>
+                          {/* 38.12 D-39: every row here is Unbound, so the
+                            second line says when they were last contacted. */}
+                          <Text
+                            testID={`unbound-contacts-subtitle-${item.id}`}
+                            style={[
+                              styles.subtitle,
+                              { color: colors.textSecondary },
+                            ]}
+                          >
+                            {subtitle}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  }}
                 />
               )}
             </>
@@ -327,7 +345,7 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: 4 },
   rowName: { fontSize: 16, fontWeight: "600" },
-  unboundLabel: { fontSize: 13, fontWeight: "600" },
+  subtitle: { fontSize: 13 },
   emptyState: { gap: 8, marginTop: 24 },
   emptyHeading: { fontSize: 18, fontWeight: "600" },
   emptyBody: { fontSize: 15, lineHeight: 21 },

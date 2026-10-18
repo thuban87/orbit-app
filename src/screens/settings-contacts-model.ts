@@ -37,8 +37,8 @@ type ParamlessSettingsRoute = {
 
 /**
  * The Settings-stack routes the Contacts category navigates to: the
- * param-less managers (CustomFields, Archived, BulkReview) and
- * `CategoryManagement`. Listed explicitly (38.9 review IN-06) so adding a
+ * param-less managers (CustomFields, Archived, UnboundContacts, BulkReview)
+ * and `CategoryManagement`. Listed explicitly (38.9 review IN-06) so adding a
  * route to the Settings stack can never grow this union past the size at
  * which TypeScript stops matching it against `navigate`'s per-route overloads
  * (it stops decomposing unions past 25 members). `satisfies` keeps every
@@ -48,6 +48,7 @@ type ParamlessSettingsRoute = {
 export const SETTINGS_CONTACTS_ROUTES = [
   "CustomFields",
   "Archived",
+  "UnboundContacts",
   "BulkReview",
   "CategoryManagement",
 ] as const satisfies readonly ParamlessSettingsRoute[];
@@ -199,6 +200,16 @@ export const SETTINGS_CONTACTS_SECTIONS: ReadonlyArray<SettingsContactsSection> 
           subtitle:
             "People you've moved to the Bin. Restore them or delete them permanently.",
           route: "Archived",
+        },
+        // 38.12 D-97 (owner, Q-05): beside the Bin; the Contacts ⋯ entry
+        // stays. Subtitle wording is this plan's.
+        {
+          kind: "route",
+          key: "unbound-contacts",
+          title: "Unbound contacts",
+          subtitle:
+            "People outside your active orbit. Open one to bind them again.",
+          route: "UnboundContacts",
         },
       ],
     },

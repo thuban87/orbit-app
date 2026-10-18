@@ -50,6 +50,7 @@ import { SettingsOrreryScreen } from "@/screens/SettingsOrreryScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
+import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
 import { ValueHistoryScreen } from "@/screens/ValueHistoryScreen";
 import type {
   RootStackScreenProps,
@@ -221,6 +222,8 @@ export function SettingsStack() {
         component={CategoryManagementScreen}
       />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
+      {/* 38.12 D-97: Contact Management's "Unbound contacts" row. */}
+      <Stack.Screen name="UnboundContacts" component={UnboundContactsScreen} />
       <Stack.Screen name="Profile" component={SettingsProfileHostRoute} />
       {/* Detailed-log route (HIST-15): a Settings-originated (Archived -> Profile)
           empty-date "Log interaction" must resolve here. */}
