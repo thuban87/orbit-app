@@ -19,6 +19,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { AppText } from "./AppText";
 import { MIN_TOUCH_TARGET } from "./button-roles";
+import { SETTINGS_ROW_DISABLED_OPACITY } from "./SettingsRow";
 
 export interface OptionSelectRowProps {
   /** The field name, spoken as the button's label. */
@@ -83,5 +84,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   value: { flex: 1 },
-  disabled: { opacity: 0.6 },
+  // The one disabled dim, shared with SettingsRow, Button and
+  // SegmentedControl (38.9 D-26; 38.12 D-IN-13).
+  disabled: { opacity: SETTINGS_ROW_DISABLED_OPACITY },
 });
