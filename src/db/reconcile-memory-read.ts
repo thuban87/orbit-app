@@ -149,13 +149,21 @@ export async function listLinkedContactsForScan(exec: SqlExecutor): Promise<{
   return { contacts, links };
 }
 
-/** One contact and its active links, for the detail screen. */
+/**
+ * One contact and its active links, for the detail screen. `archived_at` lets
+ * the detail refuse a person moved to the Bin after the scan (B-IN-03).
+ */
 export async function getReconcileContact(
   exec: SqlExecutor,
   contactId: number,
-): Promise<{ contact: LinkedScanContact | null; links: LinkedScanLink[] }> {
-  const contact = await exec.getFirstAsync<LinkedScanContact>(
-    "SELECT id, name, birthday, photo, modified_at FROM contacts WHERE id = ?",
+): Promise<{
+  contact: (LinkedScanContact & { archived_at?: string | null }) | null;
+  links: LinkedScanLink[];
+}> {
+  const contact = await exec.getFirstAsync<
+    LinkedScanContact & { archived_at: string | null }
+  >(
+    "SELECT id, name, birthday, photo, modified_at, archived_at FROM contacts WHERE id = ?",
     [contactId],
   );
   const links = await exec.getAllAsync<LinkedScanLink>(

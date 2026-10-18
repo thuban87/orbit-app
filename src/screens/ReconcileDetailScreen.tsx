@@ -169,6 +169,14 @@ export function ReconcileDetailScreen({
           setMessage("No linked Contacts source is available.");
           return;
         }
+        // Moved to the Bin after the check started: nothing is changed
+        // (38.12 review B-IN-03).
+        if (contact.archived_at) {
+          setMessage(
+            `${contact.name} is in the Bin. Restore them from the Bin to check their phone contact.`,
+          );
+          return;
+        }
         // ADR-003: reconcile reads ContactsContract directly; ensure READ_CONTACTS first (in-context of this tap).
         const access = await ensureReadContactsPermission();
         if (!access.granted) {

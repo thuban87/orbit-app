@@ -373,6 +373,28 @@ describe("applyReconcileSelections", () => {
     ).toBe("fp-a\u001efp-b");
   });
 
+  it("refuses to write to a person moved to the Bin after the scan (38.12 review B-IN-03)", async () => {
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      contactId,
+    ]);
+    await expect(
+      inWriteTransaction(exec, () =>
+        applyReconcileSelections(exec, {
+          contactId,
+          now: NOW,
+          selections: [nameSelection()],
+        }),
+      ),
+    ).rejects.toThrow(/in the Bin/);
+    expect(
+      await exec.getFirstAsync<{ name: string }>(
+        "SELECT name FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ name: "Orbit Original" });
+  });
+
   it("never promotes a photo before a throwing apply transaction commits", async () => {
     const promoted = false;
     await expect(

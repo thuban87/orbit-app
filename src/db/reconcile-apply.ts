@@ -130,12 +130,14 @@ export async function applyReconcileSelections(
   const contact = await exec.getFirstAsync<ContactApplyRow>(
     `SELECT id, name, category_id, interval_days, tracking_enabled, social_battery,
             birthday, rarely_responds, reminders_off, photo, modified_at
-       FROM contacts WHERE id = ?`,
+       FROM contacts WHERE id = ? AND archived_at IS NULL`,
     [input.contactId],
   );
+  // A paused check's card can outlive a move to the Bin: never write to a
+  // person in the Bin (38.12 review B-IN-03).
   if (!contact)
     throw new Error(
-      `applyReconcileSelections: contact ${input.contactId} missing`,
+      `applyReconcileSelections: contact ${input.contactId} missing or in the Bin`,
     );
 
   const staleFields: ReconcileWriteField[] = [];
