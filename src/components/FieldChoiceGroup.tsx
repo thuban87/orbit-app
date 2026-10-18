@@ -103,11 +103,18 @@ export function FieldChoiceGroup<T extends string>({
           >
             {/* Every row reads as selectable before a tap: an empty radio or
                 checkbox, filled in the accent when chosen (38.12 D-48). */}
-            <Icon
-              name={multiple ? "checkbox" : "select"}
-              state={selected ? "active" : "default"}
-              tone={selected ? "accentText" : "textSecondary"}
-            />
+            {selected ? (
+              <Icon
+                name={multiple ? "checkbox" : "select"}
+                state="active"
+                tone="accentText"
+              />
+            ) : (
+              <Icon
+                name={multiple ? "checkbox" : "select"}
+                tone="textSecondary"
+              />
+            )}
             <View style={styles.copy}>
               <Text style={[styles.value, { color: colors.textPrimary }]}>
                 {option.value}
