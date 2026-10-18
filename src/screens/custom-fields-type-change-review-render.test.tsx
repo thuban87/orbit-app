@@ -96,6 +96,7 @@ const dao = vi.hoisted(() => ({
   applyTypeChange: vi.fn(),
   changeFieldOptions: vi.fn(),
   preflightTypeChange: vi.fn(),
+  preflightOptionsChange: vi.fn(),
   updateFieldShareWithAi: vi.fn(),
 }));
 vi.mock("@/db/field-defs-dao", () => ({
@@ -110,7 +111,7 @@ vi.mock("@/db/field-defs-dao", () => ({
 }));
 vi.mock("@/db/field-type-change", () => ({
   applyTypeChange: dao.applyTypeChange,
-  preflightOptionsChange: vi.fn(),
+  preflightOptionsChange: dao.preflightOptionsChange,
   preflightTypeChange: dao.preflightTypeChange,
 }));
 vi.mock("@/navigation/discard-keep-guard", () => ({
@@ -173,6 +174,62 @@ beforeEach(() => {
   dao.changeFieldOptions.mockReset();
   dao.preflightTypeChange.mockReset();
   dao.updateFieldShareWithAi.mockReset();
+  dao.preflightOptionsChange.mockReset();
+});
+
+describe('a dropdown options edit gets the same "Review now" offer (D-153)', () => {
+  const DROPDOWN = {
+    ...TIER,
+    type: "dropdown",
+    options: JSON.stringify(["Gold", "Platinum"]),
+  } as unknown as CustomFieldDef;
+  const DROP_GOLD = { ...TO_DROPDOWN, options: JSON.stringify(["Platinum"]) };
+
+  it("stored values no longer options: summary with the clause, then Review now opens the list", async () => {
+    dao.preflightOptionsChange.mockResolvedValue({
+      total: 2,
+      keep: [4],
+      flag: [3],
+    });
+    dialogs.confirm.mockResolvedValue(true);
+
+    submitEdit(DROP_GOLD, DROPDOWN);
+
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(dialogs.confirm).toHaveBeenCalledTimes(2);
+    expect(dialogs.confirm.mock.calls[0][0].message).toBe(
+      "1 of 2 values will be kept. 1 needs your input — fix now or later.",
+    );
+    expect(dialogs.confirm.mock.calls[1][0]).toMatchObject({
+      title: "Tier changed",
+      message: "1 value needs your input.",
+      confirmLabel: "Review now",
+    });
+    expect(dao.changeFieldOptions.mock.invocationCallOrder[0]).toBeLessThan(
+      dialogs.confirm.mock.invocationCallOrder[1],
+    );
+    expect(navigate).toHaveBeenCalledWith("CustomFieldReview", {
+      fieldDefId: 7,
+    });
+  });
+
+  it("nothing flagged: no clause and no offer", async () => {
+    dao.preflightOptionsChange.mockResolvedValue({
+      total: 1,
+      keep: [4],
+      flag: [],
+    });
+    dialogs.confirm.mockResolvedValue(true);
+
+    submitEdit(DROP_GOLD, DROPDOWN);
+
+    await vi.waitFor(() => expect(dao.changeFieldOptions).toHaveBeenCalled());
+    expect(dialogs.confirm).toHaveBeenCalledTimes(1);
+    expect(dialogs.confirm.mock.calls[0][0].message).toBe(
+      "1 of 1 value will be kept.",
+    );
+    expect(navigate).not.toHaveBeenCalled();
+  });
 });
 
 describe("Photo → another type with Share with AI on keeps it on (C-WR-01)", () => {

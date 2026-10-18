@@ -406,6 +406,12 @@ describe("Custom Fields copy and labels (38.12 D-71, D-72, D-74, D-129)", () => 
     );
   });
 
+  it("the options-change summary leaves out the 'need your input' clause at 0 (D-153)", () => {
+    expect(optionsSummary({ total: 3, keep: ids(3), flag: [] })).toBe(
+      "3 of 3 values will be kept.",
+    );
+  });
+
   it("a quarantined field is kept until its quarantine date plus the window (D-72)", () => {
     expect(quarantineKeptUntil("2026-10-01 09:00:00")).toBe("Oct 31");
     expect(quarantineKeptUntil("2025-12-20 09:00:00")).toBe("Jan 19");

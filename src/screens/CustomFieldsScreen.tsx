@@ -130,9 +130,10 @@ export function typeSummary(pf: {
 }
 
 /**
- * The offer after a type change that flagged values (38.12 D-121): go fix
- * them now on the "Review now" list, or later. It is an offer, not a second
- * confirmation to run the change (D-24); the change has already applied.
+ * The offer after a type change, or a dropdown options edit (38.12 D-153),
+ * that flagged values (38.12 D-121): go fix them now on the "Review now" list,
+ * or later. It is an offer, not a second confirmation to run the change
+ * (D-24); the change has already applied.
  */
 export function reviewOffer(label: string, flagged: number) {
   return {
@@ -143,13 +144,18 @@ export function reviewOffer(label: string, flagged: number) {
   };
 }
 
-/** Human summary of an options-change pre-flight (same shape as typeSummary). */
+/**
+ * Human summary of an options-change pre-flight (same shape as typeSummary).
+ * With nothing to fix the "need your input" clause is left out, as for a type
+ * change (38.12 D-153, D-139 parity).
+ */
 export function optionsSummary(pf: {
   total: number;
   keep: readonly number[];
   flag: readonly number[];
 }) {
-  return `${pf.keep.length} of ${plural(pf.total, "value")} will be kept. ${needsInput(pf.flag.length)}`;
+  const kept = `${pf.keep.length} of ${plural(pf.total, "value")} will be kept.`;
+  return pf.flag.length === 0 ? kept : `${kept} ${needsInput(pf.flag.length)}`;
 }
 
 /**
@@ -501,9 +507,9 @@ export function CustomFieldsScreen() {
     if (!beginInFlight(savingRef)) return;
     setSaving(true);
     const exec = getExecutor();
-    // Values the type change flagged, offered for review once it has applied
-    // (38.12 D-121).
-    let flaggedByTypeChange = 0;
+    // Values the type change (D-121) or the dropdown options edit (D-153)
+    // flagged, offered for review once it has applied.
+    let flaggedByChange = 0;
     let applied = false;
     try {
       const labelChanged = draft.label !== field.label;
@@ -532,7 +538,7 @@ export function CustomFieldsScreen() {
         if (!(await confirmSummary("Change field type", typeSummary(pf)))) {
           return; // cancelled — nothing has been written
         }
-        flaggedByTypeChange = pf.flag.length;
+        flaggedByChange = pf.flag.length;
       } else if (optionsChanged) {
         const pf = await preflightOptionsChange(exec, field, draft.options);
         if (
@@ -540,6 +546,9 @@ export function CustomFieldsScreen() {
         ) {
           return; // cancelled — nothing has been written
         }
+        // D-153: the same "Review now" offer when stored values are no longer
+        // options (only a dropdown's options are written below).
+        if (draft.type === "dropdown") flaggedByChange = pf.flag.length;
       }
 
       // Every gate passed — apply each diff. Each DAO op owns its OWN
@@ -607,13 +616,13 @@ export function CustomFieldsScreen() {
       endInFlight(savingRef);
       settleHold();
     }
-    // 38.12 D-121: after a type change that flagged values, offer the
-    // "Review now" list. An offer to go fix, not a second confirmation to run
-    // the change (D-24): the change has already applied. No offer when
-    // nothing was flagged.
-    if (applied && flaggedByTypeChange > 0) {
+    // 38.12 D-121 / D-153: after a type change or an options edit that
+    // flagged values, offer the "Review now" list. An offer to go fix, not a
+    // second confirmation to run the change (D-24): the change has already
+    // applied. No offer when nothing was flagged.
+    if (applied && flaggedByChange > 0) {
       const reviewNow = await confirm({
-        ...reviewOffer(draft.label, flaggedByTypeChange),
+        ...reviewOffer(draft.label, flaggedByChange),
         dismissable: true,
       });
       if (reviewNow) {

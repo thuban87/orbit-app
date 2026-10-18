@@ -1,10 +1,10 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's AppText `role` is a typography role, not ARIA.
 /**
- * The "Review now" list (38.12 D-121; D-70, D-24): after a type change that
- * flagged values, the people whose value for this field needs fixing. Each row
- * opens Edit Contact at that field, where the problem is explained. The list
- * reloads on focus, so a person drops off once their value is fixed; an empty
- * list says there is nothing left to fix.
+ * The "Review now" list (38.12 D-121, D-153; D-70, D-24): after a type change
+ * or a dropdown options edit that flagged values, the people whose value for
+ * this field needs fixing. Each row opens Edit Contact at that field, where
+ * the problem is explained. The list reloads on focus, so a person drops off
+ * once their value is fixed; an empty list says there is nothing left to fix.
  *
  * Read-only: it lists through `listContactsWithUnreadableValues` (the shared
  * `isFlaggedCustomValue` predicate, C-4) and never writes a value (CLAUDE.md
