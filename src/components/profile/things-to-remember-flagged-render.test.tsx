@@ -154,7 +154,7 @@ describe("flagged custom-field value on the Profile (38.12 D-70)", () => {
   it("tapping the flagged card runs Edit for that field", () => {
     const onAction = vi.fn();
     const [card] = cardsOf([field({})], onAction);
-    (card?.props.onPress as () => void)();
+    (card?.props.onPress as (() => void) | undefined)?.();
     expect(onAction).toHaveBeenCalledWith({
       action: "edit",
       target: { owner: "custom-field", id: 21 },

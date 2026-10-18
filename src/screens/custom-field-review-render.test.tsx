@@ -197,7 +197,7 @@ describe("Review now list (38.12 D-121, D-70)", () => {
     const row = tree.find(
       (node) => node.props.testID === "custom-field-review-row-5",
     );
-    (row?.props.onPress as () => void)();
+    (row?.props.onPress as (() => void) | undefined)?.();
     expect(navigate).toHaveBeenCalledWith("Edit", {
       contactId: 5,
       focusFieldDefId: 12,

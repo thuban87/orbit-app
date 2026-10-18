@@ -514,7 +514,7 @@ describe("Custom Fields copy and labels (38.12 D-71, D-72, D-74, D-129)", () => 
     const submit = tree.find(
       (node) => node.props.testID === "field-def-submit",
     );
-    (submit?.props.onPress as () => void)();
+    (submit?.props.onPress as (() => void) | undefined)?.();
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ type: "photo", share_with_ai: 0 }),
     );

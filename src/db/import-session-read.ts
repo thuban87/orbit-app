@@ -1,11 +1,11 @@
 import { sanitiseImportLifecycle } from "@/db/import-lifecycle";
 import {
   discardSession,
-  IN_BIN_REASON,
   type ImportLifecycle,
   type ImportMatchOutcome,
   type ImportSessionMode,
   type ImportSessionRowStatus,
+  IN_BIN_REASON,
   PHOTO_OUTSTANDING,
 } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
