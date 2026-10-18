@@ -224,6 +224,18 @@ export function SurvivorSelectScreen({
     <View style={styles.screen}>
       {header}
       <View style={styles.root}>
+        {pair?.length === 0 ? (
+          // Either person is in the Bin or gone (getMergeCandidate reads
+          // live contacts only): say so instead of an empty screen with a
+          // dead Continue (38.12 review B-IN-05).
+          <Text
+            testID="survivor-select-unavailable"
+            style={{ color: colors.textSecondary }}
+          >
+            This contact isn&apos;t available to merge. People in the Bin
+            can&apos;t be merged.
+          </Text>
+        ) : null}
         {(pair ?? []).map((candidate) => (
           <Pressable
             key={candidate.id}

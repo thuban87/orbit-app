@@ -292,6 +292,26 @@ describe("step-two entry (convergence c1 L-5)", () => {
     expect(reads.listPickerContacts).not.toHaveBeenCalled();
   });
 
+  it("an unavailable pair (in the Bin or gone) says so instead of an empty screen (38.12 review B-IN-05)", () => {
+    const { tree } = render(
+      { firstContactId: FIRST, secondContactId: OTHER },
+      { enteredAtStepTwo: true, pair: [] },
+    );
+    expect(
+      tree.some((n) => n.props.testID === "survivor-select-unavailable"),
+    ).toBe(true);
+    const { tree: loaded } = render(
+      { firstContactId: FIRST, secondContactId: OTHER },
+      {
+        enteredAtStepTwo: true,
+        pair: [candidate(FIRST, "Ana"), candidate(OTHER, "Bo")],
+      },
+    );
+    expect(
+      loaded.some((n) => n.props.testID === "survivor-select-unavailable"),
+    ).toBe(false);
+  });
+
   it("Continue opens MergeConflicts for that pair with the host", () => {
     const host = { kind: "profile", profileKey: "Profile-abc" };
     const { tree, navigation } = render(
