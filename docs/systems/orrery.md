@@ -1,8 +1,8 @@
 # Orrery
 
-**Last updated:** 2026-10-15
+**Last updated:** 2026-10-18
 
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 
 **Evidence:** automated implementation/SQLite/controller tests plus physical-Pixel authoring, management, accessibility and switch-choreography acceptance recorded in [30-UAT](../../.planning/phases/30-orrery-systems/30-UAT.md) and [30-12-DEVICE](../../.planning/phases/30-orrery-systems/30-12-DEVICE.md). V2 (38.7): release measurements against the Day-1 baseline in [38.7-DEVICE-PASS](../../.planning/phases/38.7-orrery-v2/38.7-DEVICE-PASS.md) and [38.7-PHASE-END-REPORT](../../.planning/phases/38.7-orrery-v2/38.7-PHASE-END-REPORT.md).
 
@@ -61,7 +61,7 @@ A sun excluded by Favorites or Category still has global contact focus/Profile a
 
 A custom System is a live Orrery-only view, not a frozen contact list or Dashboard query-state snapshot. Migration 022 stores custom definitions in `systems`, one closed rule value per `system_rules` row, ref-keyed manual membership in `system_overrides`, and cross-kind order/visibility state in `system_prefs`. Built-in and Category bases remain generated and immutable; their user-authored overrides and preferences use the same stable `system_ref` representation as custom Systems.
 
-Rules use OR within a family and AND across families. Category, Favourite, Needs Attention, Social Battery, Contact Frequency, Not Contacted and Snoozed reuse canonical Dashboard predicate semantics; Gravity remains a post-query TypeScript filter. Manual inclusions add eligible active contacts outside the rule result. Exclusions suppress current rule matches and become semantically inert once a contact stops matching; an intentional definition save prunes those stale rows so a nominal read never writes.
+Rules use OR within a family and AND across families. Category, Favourite, Needs Attention, Social Battery, Contact Frequency, Not Contacted and Snoozed reuse canonical Dashboard predicate semantics (an indefinite snooze, `9999-12-31`, counts as Snoozed with no reader change, ADR-234); Gravity remains a post-query TypeScript filter. Manual inclusions add eligible active contacts outside the rule result. Exclusions suppress current rule matches and become semantically inert once a contact stops matching; an intentional definition save prunes those stale rows so a nominal read never writes.
 
 A missing Category UID stays stored as a broken rule. The resolver omits that predicate, continues resolving every valid rule and manual inclusion, and exposes a stable needs-attention diagnostic. A missing custom-System reference is distinct from a valid empty System and safely falls back to All Contacts.
 
@@ -180,6 +180,8 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 
 - **ADR-218:** Things to Remember on the Profile — while `HIDE_FROM_PROFILE_ENABLED` is false, key people stored as hidden appear as satellites; ADR-105's hidden exclusion returns when the switch does.
 - **ADR-212:** One Delete Pattern — key people are hard-deleted, so a deleted relationship never lingers as a satellite.
+- **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — the Snoozed System and the snoozed look include indefinite snoozes.
+- **ADR-246:** One Settings Row and Section Card — Systems management rows use the drag + ⋯ pattern; "Manage Members" opens the builder on Members; one "Reset Membership Changes" label; the builder's decorative circles are gone.
 
 ## Deferred seams and evidence limits
 
@@ -209,3 +211,4 @@ The `orrery-overlay` treatment is a controlled-canvas exception to ordinary card
 | 2026-10-05 | 38.7 | Framing is persistent chrome only (owner-directed, CONTEXT D-79). Panels, the cluster group and notices no longer move the map, the switch viewport hold is removed, and the focus card stacks above the controls' touch column. The frame-rate vote is the panel's top rate during motion. |
 | 2026-10-05 | 38.7 | Orrery V2 (phase close, Plan 16): added the V2 renderer, camera and switch section (fixed picture tree and render host, world-plane rings, 62° tilted Home with dolly focal and lens shift, ambient clock with the 30 Hz idle / 120 Hz motion / 0 reduced-motion frame-rate vote, warm cache, cover gate, Lab C switch camera with the tap lead-in, focus framing and card stacking). Corrected the pre-V2 statements: drift, tilt range, native-sibling occlusion, `OrreryCanvas` as clock owner, and tap-to-Profile. Release evidence and the owner's sign-off are in `38.7-PHASE-END-REPORT.md`. |
 | 2026-10-15 | 38.10 | Relationship satellites follow the Hide from Profile switch (off: stored-hidden key people show) and hard-deleted key people (ADR-212, ADR-218). |
+| 2026-10-18 | 38.12 | Indefinite snooze counts as Snoozed; Systems management on the drag + ⋯ list pattern, Manage Members opens the Members page, one reset label, no decorative builder circles (ADR-234, ADR-246). |
