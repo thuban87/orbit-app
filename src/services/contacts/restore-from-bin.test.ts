@@ -22,7 +22,9 @@ import {
  * <name>" with Undo; Undo moves the person back with the same effects.
  */
 function deps(
-  restoreContact: RestoreFromBinDeps["restoreContact"] = vi.fn(async () => {}),
+  restoreContact: RestoreFromBinDeps["restoreContact"] = vi.fn(
+    async () => "2026-09-01 08:00:00",
+  ),
 ) {
   return {
     restoreContact: vi.fn(restoreContact),
@@ -54,10 +56,12 @@ describe("restoreFromBinWithUndo (D-154)", () => {
     expect(snackbar).toMatchObject({ kind: "success", label: "Restored Ada" });
     snackbar.action.onPress();
     await flush();
+    // A-WR-03: back to the Bin with the original Bin date.
     expect(d.archiveContact).toHaveBeenCalledWith(
       exec,
       4,
       "2026-10-17 12:00:00",
+      "2026-09-01 08:00:00",
     );
     expect(d.notifyWidgetDataChanged).toHaveBeenCalledTimes(2);
     expect(d.reconcileSchedule).toHaveBeenCalledTimes(2);

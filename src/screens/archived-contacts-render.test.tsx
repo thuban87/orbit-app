@@ -86,7 +86,7 @@ vi.mock("@/components/ui/ScopedPalette", () => ({
 vi.mock("@/db/contacts-dao", () => ({
   archiveContact: vi.fn(async () => undefined),
   listArchived: vi.fn(async () => []),
-  restoreContact: vi.fn(async () => undefined),
+  restoreContact: vi.fn(async () => "2026-09-01 08:00:00"),
 }));
 vi.mock("@/db/database", () => ({
   getExecutor: () => "exec",
@@ -322,10 +322,12 @@ describe("Restore with Undo (D-32, D-03; L-2)", () => {
     message?.action?.onPress();
     await flush();
 
+    // A-WR-03: back to the Bin with the original Bin date.
     expect(dao.archiveContact).toHaveBeenCalledWith(
       "exec",
       7,
       "2026-10-17 10:00:00",
+      "2026-09-01 08:00:00",
     );
     expect(widget.notifyWidgetDataChanged).toHaveBeenCalledTimes(1);
     expect(schedule.reconcileSchedule).toHaveBeenCalledTimes(1);

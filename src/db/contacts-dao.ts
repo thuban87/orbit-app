@@ -1036,15 +1036,21 @@ export interface ArchivedContactRow {
  * event). The contact then fails every `archived_at IS NULL` live read and
  * appears in listArchived. `last_contact` is untouched.
  */
-/** Non-mutexed archive primitive for callers that already own a transaction. */
+/**
+ * Non-mutexed archive primitive for callers that already own a transaction.
+ * `archivedAt` defaults to `now`; an Undo of a Bin Restore passes the date the
+ * person first went to the Bin, so the row keeps its D-40 date and its place
+ * in the Bin list (38.12 review A-WR-03). The event is always stamped `now`.
+ */
 export async function archiveContactCore(
   exec: SqlExecutor,
   id: number,
   now: string,
+  archivedAt: string = now,
 ): Promise<void> {
   const result = await exec.runAsync(
     "UPDATE contacts SET archived_at = ?, modified_at = ? WHERE id = ? AND archived_at IS NULL",
-    [now, now, id],
+    [archivedAt, now, id],
   );
   if (result.changes !== 1) {
     throw new Error(
@@ -1065,9 +1071,10 @@ export function archiveContact(
   exec: SqlExecutor,
   id: number,
   now: string,
+  archivedAt: string = now,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    await archiveContactCore(exec, id, now);
+    await archiveContactCore(exec, id, now, archivedAt);
     await bumpDataRevisionCore(exec);
   });
 }
@@ -1078,14 +1085,19 @@ export function archiveContact(
  * (`archived_at IS NOT NULL`) means only a REAL archived→live transition matches:
  * restoring a live contact matches 0 rows and throws before the event INSERT (no
  * spurious event). The contact reappears in live reads and leaves listArchived.
- * `last_contact` is untouched.
+ * `last_contact` is untouched. Resolves the `archived_at` it cleared, so an
+ * Undo can put the person back with their original Bin date (A-WR-03).
  */
 export function restoreContact(
   exec: SqlExecutor,
   id: number,
   now: string,
-): Promise<void> {
+): Promise<string> {
   return inWriteTransaction(exec, async () => {
+    const prior = await exec.getFirstAsync<{ archived_at: string | null }>(
+      "SELECT archived_at FROM contacts WHERE id = ?",
+      [id],
+    );
     const result = await exec.runAsync(
       "UPDATE contacts SET archived_at = NULL, modified_at = ? WHERE id = ? AND archived_at IS NOT NULL",
       [now, id],
@@ -1106,6 +1118,8 @@ export function restoreContact(
       now,
     });
     await bumpDataRevisionCore(exec);
+    // Matched `archived_at IS NOT NULL` above, so the prior value is set.
+    return prior?.archived_at ?? now;
   });
 }
 

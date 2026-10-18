@@ -1990,6 +1990,52 @@ describe("restoreContact — nulls archived_at, returns to live reads", () => {
   });
 });
 
+describe("Undo of a Bin Restore keeps the original Bin date (A-WR-03)", () => {
+  it("restoreContact resolves the archived_at it cleared, and archiveContact writes it back", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "UndoBin",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+    const cleared = await restoreContact(
+      exec,
+      contactId,
+      "2026-08-17 09:00:00",
+    );
+    expect(cleared).toBe(ARCHIVE_NOW);
+
+    await archiveContact(exec, contactId, "2026-08-17 09:01:00", cleared);
+
+    expect(await archivedAt(contactId)).toBe(ARCHIVE_NOW);
+    expect(
+      (
+        await exec.getFirstAsync<{ modified_at: string }>(
+          "SELECT modified_at FROM contacts WHERE id = ?",
+          [contactId],
+        )
+      )?.modified_at,
+    ).toBe("2026-08-17 09:01:00");
+    expect(await eventTypes(contactId)).toEqual([
+      "archive",
+      "restore",
+      "archive",
+    ]);
+  });
+
+  it("a plain archive still dates the Bin entry now", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "PlainBin",
+      intervalDays: 14,
+      now: NOW,
+    });
+    await archiveContact(exec, contactId, ARCHIVE_NOW);
+    expect(await archivedAt(contactId)).toBe(ARCHIVE_NOW);
+  });
+});
+
 describe("archiveContact — same-name archived contact stays hidden from the live predicate (Pitfall 4)", () => {
   it("an archived contact does not collide with a same-name live duplicate check", async () => {
     const { contactId: first } = await createContactFull(exec, {

@@ -3,7 +3,8 @@
  * review's "In the Bin: <name>" Restore), with the Bin list's own effects and
  * feedback (D-32, D-03): the widget and the reminder schedule follow the
  * restore, then "Restored <name>" shows with Undo; Undo moves the person back
- * to the Bin through the same archive writer, with the same effects, and
+ * to the Bin through the same archive writer, with their original Bin date
+ * (A-WR-03) and the same effects, and
  * confirms itself ("Moved <name> back to the Bin", 38.9 D-39).
  *
  * The copy matches ArchivedContactsScreen's `restoredSnackbar` and
@@ -23,8 +24,18 @@ import { Logger } from "@/utils/logger";
 const LOG_SCOPE = "restore-from-bin";
 
 export interface RestoreFromBinDeps {
-  restoreContact: (exec: SqlExecutor, id: number, now: string) => Promise<void>;
-  archiveContact: (exec: SqlExecutor, id: number, now: string) => Promise<void>;
+  /** Resolves the `archived_at` it cleared (A-WR-03). */
+  restoreContact: (
+    exec: SqlExecutor,
+    id: number,
+    now: string,
+  ) => Promise<string>;
+  archiveContact: (
+    exec: SqlExecutor,
+    id: number,
+    now: string,
+    archivedAt?: string,
+  ) => Promise<void>;
   reconcileSchedule: (exec: SqlExecutor) => Promise<void>;
   notifyWidgetDataChanged: () => void;
   showSnackbar: (input: SnackbarMessage) => void;
@@ -67,8 +78,9 @@ export async function restoreFromBinWithUndo(
   input: { contactId: number; name: string; onUndone?: () => void },
   deps: RestoreFromBinDeps = defaultDeps,
 ): Promise<boolean> {
+  let archivedAt: string;
   try {
-    await deps.restoreContact(exec, input.contactId, deps.now());
+    archivedAt = await deps.restoreContact(exec, input.contactId, deps.now());
   } catch (error) {
     Logger.error(LOG_SCOPE, "failed to restore contact", error);
     deps.showSnackbar({
@@ -87,7 +99,14 @@ export async function restoreFromBinWithUndo(
       onPress: () => {
         void (async () => {
           try {
-            await deps.archiveContact(exec, input.contactId, deps.now());
+            // A-WR-03: back to the Bin with the original Bin date.
+            const now = deps.now();
+            await deps.archiveContact(
+              exec,
+              input.contactId,
+              now,
+              archivedAt || now,
+            );
           } catch (error) {
             Logger.error(LOG_SCOPE, "failed to undo restore", error);
             deps.showSnackbar({

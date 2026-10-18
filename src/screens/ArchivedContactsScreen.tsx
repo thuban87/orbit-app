@@ -288,9 +288,12 @@ export function ArchivedContactsScreen() {
   }, []);
 
   const undoRestore = useCallback(
-    async (id: number, name: string) => {
+    async (id: number, name: string, archivedAt: string | undefined) => {
       try {
-        await archiveContact(getExecutor(), id, localDateTime());
+        // A-WR-03: back to the Bin with the date the person first went there
+        // (the D-40 row date and the list order), not a new one.
+        const now = localDateTime();
+        await archiveContact(getExecutor(), id, now, archivedAt || now);
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to undo restore", err);
         showSnackbar({ kind: "error", label: "Couldn't undo the restore." });
@@ -309,8 +312,9 @@ export function ArchivedContactsScreen() {
       if (restoring.current.has(id)) return;
       restoring.current.add(id);
       try {
+        let archivedAt: string | undefined;
         try {
-          await restoreContact(getExecutor(), id, localDateTime());
+          archivedAt = await restoreContact(getExecutor(), id, localDateTime());
         } catch (err) {
           Logger.error(LOG_SCOPE, "failed to restore contact", err);
           showSnackbar({
@@ -331,7 +335,7 @@ export function ArchivedContactsScreen() {
           action: {
             label: "Undo",
             accessibilityLabel: `Undo restoring ${name}`,
-            onPress: () => void undoRestore(id, name),
+            onPress: () => void undoRestore(id, name, archivedAt),
           },
         });
       } finally {
