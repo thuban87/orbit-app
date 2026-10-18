@@ -113,6 +113,7 @@ vi.mock("@/db/database", () => ({
 vi.mock("@/db/import-session-dao", () => ({
   finalizeSessionIfTerminal: vi.fn(async () => {}),
   markRowStatus: vi.fn(async () => {}),
+  skipNeedsReviewRow: vi.fn(async () => {}),
   setSessionBatchDefaults: mocks.setSessionBatchDefaults,
   UNBOUND_IMPORT: { trackingEnabled: false, intervalDays: null },
 }));

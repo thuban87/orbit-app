@@ -12,7 +12,7 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   finalizeSessionIfTerminal,
-  markRowStatus,
+  skipNeedsReviewRow,
 } from "@/db/import-session-dao";
 import {
   getSessionById,
@@ -256,13 +256,8 @@ export function DuplicateReviewScreen({
               );
             }
           } else if (action === "skip") {
-            await markRowStatus(
-              getExecutor(),
-              entry.row.id,
-              "skipped",
-              null,
-              now,
-            );
+            // Guarded (B-WR-12): only a row still needing review is skipped.
+            await skipNeedsReviewRow(getExecutor(), entry.row.id, now);
             succeeded.push(entry.item.name);
           }
         },
@@ -342,7 +337,10 @@ export function DuplicateReviewScreen({
           setLinkQueue((queue) => queue.slice(1));
         },
         finalize: finalizeSession,
-        reread: next ? async () => undefined : reread,
+        // Always re-read after a committed link (38.12 review B-WR-12): if
+        // the queue is then closed or its next write fails, the list must
+        // not still show the linked person.
+        reread,
         onRecoveryError: onReadError,
       }),
     );

@@ -99,7 +99,7 @@ vi.mock("@/db/contact-read", () => ({
 }));
 const dao = vi.hoisted(() => ({
   finalizeSessionIfTerminal: vi.fn(async (..._args: unknown[]) => {}),
-  markRowStatus: vi.fn(async (..._args: unknown[]) => {}),
+  skipNeedsReviewRow: vi.fn(async (..._args: unknown[]) => {}),
   linkExistingContactToRow: vi.fn(async (..._args: unknown[]) => {}),
   importRowAsNew: vi.fn(async () => ({ contactId: 77, skipped: null })),
   listSessionRows: vi.fn(),
@@ -108,7 +108,7 @@ const dao = vi.hoisted(() => ({
 }));
 vi.mock("@/db/import-session-dao", () => ({
   finalizeSessionIfTerminal: dao.finalizeSessionIfTerminal,
-  markRowStatus: dao.markRowStatus,
+  skipNeedsReviewRow: dao.skipNeedsReviewRow,
 }));
 vi.mock("@/db/import-session-read", () => ({
   getSessionById: async () => ({
@@ -319,12 +319,11 @@ describe("Review matches single tap (D-107, D-51)", () => {
     (list.props.onInspect as (item: Item) => void)(items[1] as Item);
     (render().sheet.props.onSkip as () => void)();
     await flush();
-    expect(dao.markRowStatus).toHaveBeenCalledTimes(1);
-    expect(dao.markRowStatus).toHaveBeenCalledWith(
+    expect(dao.skipNeedsReviewRow).toHaveBeenCalledTimes(1);
+    // Guarded skip: only a row still needing review (B-WR-12).
+    expect(dao.skipNeedsReviewRow).toHaveBeenCalledWith(
       "exec",
       32,
-      "skipped",
-      null,
       "2026-10-17 12:00:00",
     );
     expect(snackbarLabels()).toEqual(["Skipped Bo Ray"]);
@@ -380,6 +379,22 @@ describe("Review matches bulk link queue (A-2, D-52)", () => {
       "Linked Ann Lee to Ann Leigh",
       "Linked Bo Ray to Bo Rae",
     ]);
+  });
+
+  it("re-reads the list after every committed link, even with a queued next person (B-WR-12)", async () => {
+    const { list, items } = await loaded();
+    await (list.props.onBulkAction as (a: string, i: Item[]) => Promise<void>)(
+      "link",
+      items,
+    );
+    const readsBefore = dao.listSessionRows.mock.calls.length;
+    const { sheet } = render();
+    (sheet.props.onLink as (choice: unknown) => void)(
+      (sheet.props.choices as unknown[])[0],
+    );
+    await flush();
+    expect(sheetState()).toMatchObject({ visible: true, person: "Bo Ray" });
+    expect(dao.listSessionRows.mock.calls.length).toBeGreaterThan(readsBefore);
   });
 
   it("(c) Cancel clears the queue: a later single tap links once and closes", async () => {
@@ -439,7 +454,7 @@ describe("Review matches bulk Import as new / Skip confirm (D-04, D-58)", () => 
   it("bulk Skip of two people confirms with one count message", async () => {
     const { list, items } = await loaded();
     await (list.props.onBulkAction as BulkFn)("skip", items);
-    expect(dao.markRowStatus).toHaveBeenCalledTimes(2);
+    expect(dao.skipNeedsReviewRow).toHaveBeenCalledTimes(2);
     expect(snackbarLabels()).toEqual(["Skipped 2 people"]);
     expect(dao.showSnackbar.mock.calls[0]?.[0]).toMatchObject({
       kind: "success",
@@ -475,7 +490,7 @@ describe("Review matches bulk Import as new / Skip confirm (D-04, D-58)", () => 
   });
 
   it("a thrown row write is reported with the other row's success", async () => {
-    dao.markRowStatus.mockRejectedValueOnce(new Error("write down"));
+    dao.skipNeedsReviewRow.mockRejectedValueOnce(new Error("write down"));
     const { list, items } = await loaded();
     await (list.props.onBulkAction as BulkFn)("skip", items);
     expect(snackbarLabels()).toEqual([

@@ -15,7 +15,7 @@
  * | import as new | imported | new | set | unchanged | importer composition |
  * | link existing | linked | probable/possible | set | unchanged | link composition |
  * | ambiguous deferred | needs_review | probable/possible/needs_review | NULL | unchanged | deferNeedsReview(Core) |
- * | user Skip | skipped | prior or NULL, never already_linked | NULL | unchanged | markRowStatus |
+ * | user Skip | skipped | prior or NULL, never already_linked | NULL | unchanged | markRowStatus; Review matches: skipNeedsReviewRow (needs_review only) |
  * | nameless bulk row | skipped | NULL | NULL | unchanged | importRowAsNew (failure_reason='name-required') |
  * | import failure | failed | prior | NULL | unchanged | markRowStatus |
  * | photo-only failure | unchanged | unchanged | unchanged | unchanged | markRowPhotoFailed |
@@ -347,6 +347,27 @@ export function markRowStatus(
   return inWriteTransaction(exec, () =>
     markRowStatusCore(exec, rowId, status, failureReason, now),
   );
+}
+
+/**
+ * The Review matches user Skip (38.12 review B-WR-12): skips a row only while
+ * it still needs review, so a stale list can never turn an already linked or
+ * imported row into "Skipped by you". Throws (nothing written) otherwise.
+ */
+export function skipNeedsReviewRow(
+  exec: SqlExecutor,
+  rowId: number,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE import_session_rows
+       SET row_status = 'skipped', failure_reason = NULL, modified_at = ?
+       WHERE id = ? AND row_status = 'needs_review'`,
+      [now, rowId],
+    );
+    assertOneChange(result, "skipNeedsReviewRow", rowId);
+  });
 }
 
 export async function markRowPhotoFailedCore(

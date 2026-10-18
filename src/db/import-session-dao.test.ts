@@ -19,6 +19,7 @@ import {
   setRowContactCore,
   setRowMatchOutcomeCore,
   setSessionBatchDefaults,
+  skipNeedsReviewRow,
   UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import { runMigrations } from "@/db/migrations/runner";
@@ -554,5 +555,41 @@ describe("import session batch lifecycle (D-57)", () => {
         "SELECT COUNT(*) AS count FROM import_sessions",
       ),
     ).toEqual(sessionsBefore);
+  });
+});
+
+describe("skipNeedsReviewRow (38.12 review B-WR-12)", () => {
+  it("skips a row still needing review and refuses a linked row", async () => {
+    const contactId = await seedContact();
+    const { rowIds } = await acceptRows(["review", "linked"]);
+    await inWriteTransaction(exec, async () => {
+      await deferNeedsReviewCore(
+        exec,
+        rowIds[0],
+        "possible",
+        contactId,
+        "[]",
+        NOW,
+      );
+      await deferNeedsReviewCore(
+        exec,
+        rowIds[1],
+        "possible",
+        contactId,
+        "[]",
+        NOW,
+      );
+      await setRowContactCore(exec, rowIds[1], contactId, "linked", NOW);
+    });
+    await skipNeedsReviewRow(exec, rowIds[0], NOW);
+    await expect(skipNeedsReviewRow(exec, rowIds[1], NOW)).rejects.toThrow();
+    expect(
+      await exec.getAllAsync<{ row_status: string; contact_id: number | null }>(
+        "SELECT row_status, contact_id FROM import_session_rows ORDER BY id",
+      ),
+    ).toEqual([
+      { row_status: "skipped", contact_id: null },
+      { row_status: "linked", contact_id: contactId },
+    ]);
   });
 });
