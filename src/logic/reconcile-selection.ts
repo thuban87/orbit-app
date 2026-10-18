@@ -99,6 +99,11 @@ export function buildReconcileSelections(
 ): ReconcileSelection[] {
   const bulk = typeof choices === "string" ? choices : null;
   return diff.fields.flatMap((field): ReconcileSelection[] => {
+    // A missing-source card's placeholder field is not a reviewed value:
+    // Keep Orbit there is the 'source' memory (rememberMissingSourceKeptCore),
+    // never a NULL name review over the links that still read (38.12 review
+    // B-WR-01; the detail's Keep as is writes no selection either, D-45).
+    if (field.outcome === "missing-source") return [];
     if (bulk && bulk !== "keep-orbit") {
       if (field.outcome !== "additive" || field.fieldFamily === "photo")
         return [];

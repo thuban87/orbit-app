@@ -597,3 +597,40 @@ describe("several links: one review holds across every read link (38.12 review B
     expect(await gridScan([picked("lk-1")])).toEqual([]);
   });
 });
+
+describe("grid bulk Keep Orbit on a missing-source card (38.12 review B-WR-01)", () => {
+  it("keeps the reading link's name memory and remembers the missing link", async () => {
+    const contactId = await seedContact({ name: "Orbit Name" });
+    const reads = await seedLink(contactId, "lk-1");
+    const missing = await seedLink(contactId, "lk-2");
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: reads,
+      fieldFamily: "name",
+      reviewedValue: "Phone Name",
+      reviewedAt: NOW,
+    });
+    const provider = [picked("lk-1")];
+    const [card] = await gridScan(provider);
+    expect(card.diff.missingSource).toBe(true);
+    expect(buildReconcileSelections(card.diff, "keep-orbit")).toEqual([]);
+    await inWriteTransaction(exec, async () => {
+      await applyReconcileSelections(exec, {
+        contactId,
+        now: NOW,
+        selections: buildReconcileSelections(card.diff, "keep-orbit"),
+        effectivePhoneRegion: "US",
+      });
+      await rememberMissingSourceKeptCore(exec, {
+        externalContactLinkIds: card.diff.missingLinkIds ?? [],
+        now: NOW,
+      });
+    });
+    expect(await getReviewedSnapshots(exec, reads)).toEqual({
+      name: "Phone Name",
+    });
+    expect((await getReviewedSnapshots(exec, missing)).source).toBe(
+      MISSING_SOURCE_KEPT,
+    );
+    expect(await gridScan(provider)).toEqual([]);
+  });
+});
