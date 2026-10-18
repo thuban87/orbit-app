@@ -708,4 +708,34 @@ describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)",
     );
     expect(defaultReconcileChoices(diff).phones).toBeUndefined();
   });
+
+  it("two stored numbers that collide under today's region both survive an addition (38.12 review B-WR-05)", async () => {
+    // Stored separately: a national number written while no region was known
+    // (no canonical value) and the same number in E.164.
+    for (const [order, raw, canonical, primary] of [
+      [0, "(312) 555-1234", null, 1],
+      [1, "+13125551234", "+13125551234", 0],
+    ] as const) {
+      await exec.runAsync(
+        `INSERT INTO contact_methods
+           (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+            is_actionable, is_primary, display_order, created_at, modified_at)
+         VALUES (?, ?, 'phone', ?, ?, ?, 1, ?, ?, ?, ?)`,
+        [uid(), contactId, raw, raw, canonical, primary, order, NOW, NOW],
+      );
+    }
+    const before = await orbitPhones();
+    const source = [phone("(312) 555-1234", 2), phone("(312) 555-9999", 3)];
+    const diff = await classify(source);
+    await apply(diff, "use-contact-values");
+    const rows = await orbitPhones();
+    expect(rows.map((row) => row.id)).toEqual(
+      expect.arrayContaining(before.map((row) => row.id)),
+    );
+    expect(rows).toHaveLength(3);
+    // Stored rows are untouched (no re-normalization), nothing tombstoned.
+    for (const row of before)
+      expect(rows.find((item) => item.id === row.id)).toEqual(row);
+    expect(await contactMethodTombstones()).toBe(0);
+  });
 });

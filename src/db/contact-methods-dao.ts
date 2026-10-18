@@ -2,6 +2,7 @@ import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { newUid } from "@/db/uid";
 import {
   type ContactMethodType,
   normalizeContactMethod,
@@ -365,6 +366,143 @@ export function setContactMethodPrimary(
 
     await bumpDataRevisionCore(exec);
   });
+}
+
+/** One method to add through `addContactMethodsCore`. */
+export interface ContactMethodAddition {
+  type: ContactMethodType;
+  value: string;
+  label?: string | null;
+}
+
+/**
+ * Add methods to a contact without touching any existing row (38.12 D-102:
+ * "nothing is deleted"; review B-WR-05). Caller-owned transaction body.
+ *
+ * Unlike `applyContactMethodDiffCore`, this never re-normalizes, reorders,
+ * deletes or tombstones a stored method, so two stored methods that collide
+ * under today's region (e.g. a national number stored with no region and the
+ * same number in E.164) both survive. An addition that matches a stored
+ * method (by its stored canonical value, or its value under the given
+ * region) or an earlier addition is not inserted again.
+ *
+ * `primary`: the addition that becomes the primary of its type (D-102,
+ * D-148); a match to a stored method flips that row instead. Only is_primary
+ * changes on stored rows. A type with no primary at all after the additions
+ * gets its first method in display order as primary (the diff writer's
+ * singleton rule), so no type is left without one.
+ */
+export async function addContactMethodsCore(
+  exec: SqlExecutor,
+  params: {
+    contactId: number;
+    additions: readonly ContactMethodAddition[];
+    primary?: ContactMethodAddition;
+    now: string;
+    effectivePhoneRegion?: string | null;
+  },
+): Promise<{ added: number; methods: ContactMethodRow[] }> {
+  const seeded = await listContactMethods(exec, params.contactId);
+  const keyOf = (type: ContactMethodType, value: string): string => {
+    const canonical = normalizeContactMethod({
+      type,
+      value,
+      defaultPhoneRegion: params.effectivePhoneRegion,
+    }).canonicalValue;
+    return `${type}\u0000${canonical ?? value.trim()}`;
+  };
+  // Every key a stored row answers to: its stored canonical value and its
+  // value re-read under the apply region.
+  const idByKey = new Map<string, number>();
+  for (const row of seeded) {
+    if (row.canonical_value)
+      idByKey.set(`${row.method_type}\u0000${row.canonical_value}`, row.id);
+    const key = keyOf(row.method_type, row.raw_value);
+    if (!idByKey.has(key)) idByKey.set(key, row.id);
+  }
+  const nextOrder: Record<ContactMethodType, number> = { phone: 0, email: 0 };
+  for (const row of seeded)
+    nextOrder[row.method_type] = Math.max(
+      nextOrder[row.method_type],
+      row.display_order + 1,
+    );
+
+  let changed = false;
+  let added = 0;
+  for (const addition of params.additions) {
+    if (!addition.value.trim()) continue;
+    const key = keyOf(addition.type, addition.value);
+    if (idByKey.has(key)) continue;
+    const normalized = normalizeContactMethod({
+      type: addition.type,
+      value: addition.value,
+      defaultPhoneRegion: params.effectivePhoneRegion,
+    });
+    const result = await exec.runAsync(
+      `INSERT INTO contact_methods
+         (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+          canonical_region, extension, label, is_actionable, is_primary, display_order,
+          created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+      [
+        newUid(),
+        params.contactId,
+        addition.type,
+        normalized.rawValue,
+        normalized.displayValue,
+        normalized.canonicalValue,
+        normalized.canonicalRegion,
+        addition.type === "phone" ? normalized.extension : null,
+        addition.label?.trim() || null,
+        normalized.isActionable ? 1 : 0,
+        nextOrder[addition.type]++,
+        params.now,
+        params.now,
+      ],
+    );
+    idByKey.set(key, result.lastInsertRowId);
+    changed = true;
+    added += 1;
+  }
+
+  const current = await listContactMethods(exec, params.contactId);
+  const promote = async (type: ContactMethodType, id: number) => {
+    // Clear before promote: the partial unique index is statement-immediate.
+    await exec.runAsync(
+      "UPDATE contact_methods SET is_primary = 0, modified_at = ? WHERE contact_id = ? AND method_type = ? AND is_primary = 1",
+      [params.now, params.contactId, type],
+    );
+    const result = await exec.runAsync(
+      "UPDATE contact_methods SET is_primary = 1, modified_at = ? WHERE id = ? AND contact_id = ? AND method_type = ?",
+      [params.now, id, params.contactId, type],
+    );
+    assertOneChange(
+      "addContactMethodsPrimary",
+      id,
+      params.contactId,
+      result.changes,
+    );
+    changed = true;
+  };
+  const elected = params.primary
+    ? idByKey.get(keyOf(params.primary.type, params.primary.value))
+    : undefined;
+  for (const type of ["phone", "email"] as const) {
+    const ofType = current.filter((row) => row.method_type === type);
+    const primaryRow = ofType.find((row) => row.is_primary === 1);
+    const target =
+      params.primary?.type === type && elected !== undefined
+        ? ofType.find((row) => row.id === elected)
+        : undefined;
+    if (target) {
+      if (target.is_primary !== 1) await promote(type, target.id);
+    } else if (!primaryRow && ofType.length > 0) {
+      await promote(type, ofType[0].id);
+    }
+  }
+
+  if (changed) await bumpDataRevisionCore(exec);
+  return { added, methods: await listContactMethods(exec, params.contactId) };
 }
 
 /** Standalone transaction-owning wrapper for an editor-only method save. */
