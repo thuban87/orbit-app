@@ -63,6 +63,44 @@ export function listBackupFolderEntries(
   return OrbitBackupDocumentPickerModule.listFolderEntries(treeUri);
 }
 
+/**
+ * 38.12 D-158: create a document in the backup folder (named in full, ".json"
+ * included) and return its URI. Uses DocumentsContract, so any document
+ * provider works, Google Drive included. Rejects on failure.
+ */
+export function createBackupFolderDocument(
+  treeUri: string,
+  displayName: string,
+  mimeType: string,
+): Promise<string> {
+  return OrbitBackupDocumentPickerModule.createFolderDocument(
+    treeUri,
+    displayName,
+    mimeType,
+  );
+}
+
+/** D-158: write UTF-8 text to a backup-folder document. Rejects on failure. */
+export function writeBackupFolderDocument(
+  documentUri: string,
+  contents: string,
+): Promise<void> {
+  return OrbitBackupDocumentPickerModule.writeDocumentText(
+    documentUri,
+    contents,
+  );
+}
+
+/** D-158: read a backup-folder document as UTF-8 text. Rejects on failure. */
+export function readBackupFolderDocument(documentUri: string): Promise<string> {
+  return OrbitBackupDocumentPickerModule.readDocumentText(documentUri);
+}
+
+/** D-158: delete a backup-folder document. Rejects on failure. */
+export function deleteBackupFolderDocument(documentUri: string): Promise<void> {
+  return OrbitBackupDocumentPickerModule.deleteDocument(documentUri);
+}
+
 /** Debug-only, point-in-time Android process PSS for the synthetic ingress probe. */
 export function sampleBackupProcessPssKb(): number | null {
   return OrbitBackupDocumentPickerModule.sampleProcessPssKb();

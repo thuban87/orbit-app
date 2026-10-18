@@ -30,6 +30,26 @@ class OrbitBackupDocumentPickerModule extends NativeModule<
   ): Promise<readonly NativeBackupFolderEntry[] | null> {
     return null;
   }
+
+  async createFolderDocument(
+    _treeUri: string,
+    _displayName: string,
+    _mimeType: string,
+  ): Promise<string> {
+    throw new Error("Backup folders are not available on the web.");
+  }
+
+  async writeDocumentText(_documentUri: string, _contents: string) {
+    throw new Error("Backup folders are not available on the web.");
+  }
+
+  async readDocumentText(_documentUri: string): Promise<string> {
+    throw new Error("Backup folders are not available on the web.");
+  }
+
+  async deleteDocument(_documentUri: string) {
+    throw new Error("Backup folders are not available on the web.");
+  }
 }
 
 export default registerWebModule(

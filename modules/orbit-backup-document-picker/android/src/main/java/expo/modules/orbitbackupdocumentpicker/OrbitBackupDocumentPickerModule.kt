@@ -72,6 +72,31 @@ class OrbitBackupDocumentPickerModule : Module() {
       listFolderEntries(treeUri)
     }
 
+    // 38.12 D-158: the backup folder's create / write / read / delete, through
+    // DocumentsContract and ContentResolver so every document provider works,
+    // Google Drive included. (expo-file-system's legacy StorageAccessFramework
+    // treats only com.android.externalstorage URIs as SAF and refused Drive.)
+    // Each throws on failure; the JS side maps a failure to its own result.
+    AsyncFunction("createFolderDocument") { treeUri: String, displayName: String, mimeType: String ->
+      createFolderDocument(treeUri, displayName, mimeType)
+    }
+
+    AsyncFunction("writeDocumentText") { documentUri: String, contents: String ->
+      BackupFolderText.write(context.contentResolver.openOutputStream(contentUri(documentUri), "w"), contents)
+    }
+
+    AsyncFunction("readDocumentText") { documentUri: String ->
+      val input = context.contentResolver.openInputStream(contentUri(documentUri))
+        ?: throw java.io.IOException("The backup folder refused the read")
+      BackupFolderText.readBounded(input)
+    }
+
+    AsyncFunction("deleteDocument") { documentUri: String ->
+      if (!DocumentsContract.deleteDocument(context.contentResolver, contentUri(documentUri))) {
+        throw java.io.IOException("The backup folder refused the delete")
+      }
+    }
+
     Function("hasSharedBackup") {
       // Cold-start order: currentActivity may not exist at OnCreate time.
       appContext.currentActivity?.intent?.let(::captureBackupShare)
@@ -124,6 +149,25 @@ class OrbitBackupDocumentPickerModule : Module() {
       documentId = DocumentsContract.getDocumentId(treeUri)
     }
     return DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+  }
+
+  /** Only content:// documents are backup-folder documents. */
+  private fun contentUri(value: String): Uri {
+    val uri = Uri.parse(value)
+    if (uri.scheme != "content") throw java.io.IOException("Not a backup folder document")
+    return uri
+  }
+
+  /**
+   * A new document in the chosen folder, named [displayName] in full (".json"
+   * included, so a provider that keeps names as given, like Drive, still shows
+   * a recognisable backup name; device storage keeps a matching extension).
+   */
+  private fun createFolderDocument(treeUri: String, displayName: String, mimeType: String): String {
+    val folder = folderDocumentUri(contentUri(treeUri))
+    val created = DocumentsContract.createDocument(context.contentResolver, folder, mimeType, displayName)
+      ?: throw java.io.IOException("The backup folder refused the new file")
+    return created.toString()
   }
 
   private fun readFolderDisplayName(treeUri: String): String? =

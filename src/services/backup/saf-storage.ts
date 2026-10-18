@@ -4,9 +4,15 @@ import { isOwnedAutomaticBackupName } from "@/backup/backup-file-names";
 import {
   type BackupFolderEntry,
   backupFolderEntry,
-  entriesFromUris,
 } from "@/backup/backup-folder-entries";
-import { listBackupFolderEntries } from "../../../modules/orbit-backup-document-picker";
+import {
+  createBackupFolderDocument,
+  deleteBackupFolderDocument,
+  listBackupFolderEntries,
+  type NativeBackupFolderEntry,
+  readBackupFolderDocument,
+  writeBackupFolderDocument,
+} from "../../../modules/orbit-backup-document-picker";
 
 export type { BackupFolderEntry } from "@/backup/backup-folder-entries";
 
@@ -41,39 +47,70 @@ export interface SafFolderAdapter {
   open(uri: string): Promise<void>;
 }
 
-export function createSafStorage(): SafReadableStorage & SafFolderAdapter {
+/**
+ * The backup folder's file operations (38.12 D-158). Every create, write,
+ * read, list and delete goes through Orbit's own native backup module
+ * (DocumentsContract / ContentResolver), so any document provider works,
+ * Google Drive included. expo-file-system's legacy StorageAccessFramework
+ * treated only device-storage URIs as SAF and refused Drive outright; it is
+ * kept only for the folder picker, which works on every provider.
+ */
+export interface BackupFolderNative {
+  createDocument(
+    treeUri: string,
+    displayName: string,
+    mimeType: string,
+  ): Promise<string>;
+  write(documentUri: string, contents: string): Promise<void>;
+  read(documentUri: string): Promise<string>;
+  remove(documentUri: string): Promise<void>;
+  list(treeUri: string): Promise<readonly NativeBackupFolderEntry[] | null>;
+}
+
+const nativeBackupFolder: BackupFolderNative = {
+  createDocument: createBackupFolderDocument,
+  write: writeBackupFolderDocument,
+  read: readBackupFolderDocument,
+  remove: deleteBackupFolderDocument,
+  list: listBackupFolderEntries,
+};
+
+export function createSafStorage(
+  native: BackupFolderNative = nativeBackupFolder,
+): SafReadableStorage & SafFolderAdapter {
   return {
     async writeVerified(directoryUri, name, contents) {
-      const uri = await FileSystem.StorageAccessFramework.createFileAsync(
+      // The full name, ".json" included: a provider such as Drive keeps the
+      // name exactly as given, and device storage keeps a matching extension.
+      const uri = await native.createDocument(
         directoryUri,
-        name.replace(/\.json$/, ""),
+        name,
         "application/json",
       );
-      await FileSystem.StorageAccessFramework.writeAsStringAsync(uri, contents);
-      // A read-back is both an access probe and the durable-write verification.
-      JSON.parse(
-        await FileSystem.StorageAccessFramework.readAsStringAsync(uri),
-      );
+      try {
+        await native.write(uri, contents);
+        // A read-back is both an access probe and the durable-write verification.
+        JSON.parse(await native.read(uri));
+      } catch (error) {
+        // Never leave an empty or partial file that looks like a backup.
+        try {
+          await native.remove(uri);
+        } catch {
+          /* keep the original failure */
+        }
+        throw error;
+      }
       return uri;
     },
     async list(directoryUri) {
-      // The provider's own names (works on Drive). If the native listing is
-      // unavailable, the URI listing still names device-storage files right.
-      let native: Awaited<ReturnType<typeof listBackupFolderEntries>> = null;
-      try {
-        native = await listBackupFolderEntries(directoryUri);
-      } catch {
-        native = null;
-      }
-      if (native) return native.map(backupFolderEntry);
-      return entriesFromUris(
-        await FileSystem.StorageAccessFramework.readDirectoryAsync(
-          directoryUri,
-        ),
-      );
+      // The provider's own names (works on Drive). A failed listing is a
+      // failure, never an empty folder: callers keep their own fallbacks.
+      const entries = await native.list(directoryUri);
+      if (!entries) throw new Error("The backup folder could not be listed.");
+      return entries.map(backupFolderEntry);
     },
-    remove: (uri) => FileSystem.StorageAccessFramework.deleteAsync(uri),
-    read: (uri) => FileSystem.StorageAccessFramework.readAsStringAsync(uri),
+    remove: (uri) => native.remove(uri),
+    read: (uri) => native.read(uri),
     requestDirectory: (initialUri) =>
       FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(
         initialUri,

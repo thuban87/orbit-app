@@ -30,8 +30,7 @@ const JSON_MIME_TYPES = new Set(["application/json", "text/json"]);
 
 /**
  * The last decoded segment of a document URI: the file name on device storage
- * only. Used when the provider gives no display name and for the legacy
- * listing fallback. Never throws.
+ * only. Used when the provider gives no display name. Never throws.
  */
 export function uriSegmentName(uri: string): string {
   let decoded: string;
@@ -64,7 +63,11 @@ export function backupFolderEntry(
   return { uri: raw.uri, name };
 }
 
-/** The legacy listing (URIs only) as entries named by their URI segment. */
+/**
+ * URIs as entries named by their URI segment (device-storage names). Since
+ * 38.12 D-158 the app lists only through the native module; this stays for
+ * tests that model a device-storage folder.
+ */
 export function entriesFromUris(uris: readonly string[]): BackupFolderEntry[] {
   return uris.map((uri) => ({ uri, name: uriSegmentName(uri) }));
 }

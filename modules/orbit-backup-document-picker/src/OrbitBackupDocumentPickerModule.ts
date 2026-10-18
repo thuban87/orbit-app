@@ -13,6 +13,14 @@ declare class OrbitBackupDocumentPickerModule extends NativeModule<
   listFolderEntries(
     treeUri: string,
   ): Promise<readonly NativeBackupFolderEntry[] | null>;
+  createFolderDocument(
+    treeUri: string,
+    displayName: string,
+    mimeType: string,
+  ): Promise<string>;
+  writeDocumentText(documentUri: string, contents: string): Promise<void>;
+  readDocumentText(documentUri: string): Promise<string>;
+  deleteDocument(documentUri: string): Promise<void>;
 }
 
 export default requireNativeModule<OrbitBackupDocumentPickerModule>(
