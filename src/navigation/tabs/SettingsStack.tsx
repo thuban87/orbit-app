@@ -14,6 +14,7 @@ import { CategoryManagementScreen } from "@/screens/CategoryManagementScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
+import { CustomFieldReviewScreen } from "@/screens/CustomFieldReviewScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { DuplicateReviewScreen } from "@/screens/DuplicateReviewScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
@@ -217,6 +218,11 @@ export function SettingsStack() {
         component={SystemsManagementScreen}
       />
       <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
+      {/* 38.12 D-121: the "Review now" list after a type change. */}
+      <Stack.Screen
+        name="CustomFieldReview"
+        component={CustomFieldReviewScreen}
+      />
       <Stack.Screen
         name="CategoryManagement"
         component={CategoryManagementScreen}

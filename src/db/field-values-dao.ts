@@ -9,6 +9,7 @@
  */
 
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { isFlaggedCustomValue } from "@/db/field-parsers";
 import type { CustomFieldDef } from "@/db/field-types";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -39,6 +40,57 @@ export async function getValuesForContact(
   );
 
   return Object.fromEntries(rows.map((row) => [row.col_name, row.value]));
+}
+
+/** One person on the "Review now" list (38.12 D-121). */
+export interface UnreadableValueRow {
+  contactId: number;
+  name: string;
+  photo: string | null;
+  /** The stored raw TEXT, as-is. */
+  value: string;
+}
+
+/**
+ * The live (not in the Bin) contacts whose stored value for one field is
+ * flagged under the field's CURRENT type and options, ordered by name (38.12
+ * D-121; convergence c1 C-4). "Flagged" is `isFlaggedCustomValue`, the same
+ * predicate as the Profile marker and Edit Contact's field error, so a
+ * dropdown value dropped from its options is listed too. Read-only: no write,
+ * no coercion (CLAUDE.md custom-field invariants).
+ */
+export async function listContactsWithUnreadableValues(
+  exec: SqlExecutor,
+  fieldDefId: number,
+): Promise<UnreadableValueRow[]> {
+  const field = await exec.getFirstAsync<
+    Pick<CustomFieldDef, "type" | "options">
+  >("SELECT type, options FROM custom_field_defs WHERE id = ?", [fieldDefId]);
+  if (!field) return [];
+  const rows = await exec.getAllAsync<{
+    contact_id: number;
+    name: string;
+    photo: string | null;
+    value: string;
+  }>(
+    `SELECT contacts.id AS contact_id, contacts.name, contacts.photo,
+            values_table.value
+       FROM custom_field_values AS values_table
+       JOIN contacts ON contacts.id = values_table.contact_id
+      WHERE values_table.field_def_id = ?
+        AND values_table.value IS NOT NULL
+        AND contacts.archived_at IS NULL
+      ORDER BY contacts.name COLLATE NOCASE, contacts.id`,
+    [fieldDefId],
+  );
+  return rows
+    .filter((row) => isFlaggedCustomValue(field, row.value))
+    .map((row) => ({
+      contactId: row.contact_id,
+      name: row.name,
+      photo: row.photo,
+      value: row.value,
+    }));
 }
 
 /**

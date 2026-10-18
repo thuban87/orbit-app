@@ -553,6 +553,12 @@ export type SettingsStackParamList = {
    * Contact Management opens it here; the Contacts-stack entry stays.
    */
   UnboundContacts: undefined;
+  /**
+   * The "Review now" list (38.12 D-121): the people whose value for one
+   * custom field needs fixing after a type change; each opens Edit Contact at
+   * that field (D-70). Reached from Custom Fields, so Settings only.
+   */
+  CustomFieldReview: { fieldDefId: number };
   Profile: ProfileRouteParams;
   /**
    * The detailed-log route (HIST-15). Registered here because Profile is hosted
