@@ -29,7 +29,7 @@ import {
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { getNewestPendingReconcileSessionId } from "@/db/reconcile-session-read";
+import { getNewestResumableReconcileSession } from "@/db/reconcile-session-read";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
@@ -160,9 +160,13 @@ export function SettingsContactsScreen() {
 
   const onCheckLinkedContacts = useCallback(async () => {
     try {
-      const pendingId = await getNewestPendingReconcileSessionId(getExecutor());
-      if (pendingId !== null) {
-        setResumableReconcile({ sessionId: pendingId, discardOnly: false });
+      const pending = await getNewestResumableReconcileSession(getExecutor());
+      if (pending !== null) {
+        setResumableReconcile({
+          sessionId: pending.session.id,
+          discardOnly: false,
+          cardsLeft: pending.cardsLeft,
+        });
         return;
       }
       navigation.navigate("ReconcileGrid");

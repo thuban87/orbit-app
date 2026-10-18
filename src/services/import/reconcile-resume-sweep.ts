@@ -1,7 +1,8 @@
 import { getExecutor, localDateTime } from "@/db/database";
 import {
-  getNewestPendingReconcileSessionId,
-  getResumableReconcileSession,
+  discardStaleReconcileSessions,
+  getNewestResumableReconcileSession,
+  listReconcileSessionCards,
 } from "@/db/reconcile-session-read";
 import type { SqlExecutor } from "@/db/types";
 import {
@@ -34,6 +35,8 @@ export interface ResumableReconcile {
   sessionId: number;
   /** A malformed durable card can be discarded but must not be resumed. */
   discardOnly: boolean;
+  /** Unresolved + partial cards left to check (38.12 D-105). */
+  cardsLeft: number;
 }
 
 export interface RegisterReconcileResumeSweepOptions {
@@ -50,13 +53,28 @@ export function cleanupDiscardedReconcileStagedPhotos(
   for (const path of paths) fs.deleteReconcileStaging(path);
 }
 
-/** A corrupt durable card is safe to discard but must not be resumed. */
+/**
+ * A corrupt durable card is safe to discard but must not be resumed: any card
+ * whose payload does not parse makes the whole check discard-only.
+ */
 export function describeResumableReconcile(input: {
   session: { id: number };
   cards: Array<{ diffJson: string }>;
+  cardsLeft: number;
 }): ResumableReconcile {
-  for (const card of input.cards) JSON.parse(card.diffJson);
-  return { sessionId: input.session.id, discardOnly: false };
+  const discardOnly = input.cards.some((card) => {
+    try {
+      JSON.parse(card.diffJson);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  return {
+    sessionId: input.session.id,
+    discardOnly,
+    cardsLeft: input.cardsLeft,
+  };
 }
 
 /**
@@ -102,15 +120,27 @@ export function registerReconcileResumeSweep(
     const exec = getExec();
     let description: ResumableReconcile | null = null;
     try {
-      const resumable = await getResumableReconcileSession(exec, now());
-      if (resumable) {
-        cleanupDiscardedReconcileStagedPhotos(
-          fs,
-          resumable.sweptStagedPhotoRelPaths,
-        );
-        // The check a reconcile screen is showing is not "resumable".
-        if (!isReconcileSessionOpen(resumable.session.id))
-          description = describeResumableReconcile(resumable);
+      // Launch cleanup first (38.12 D-56): the discard commits before it
+      // returns these paths, so file cleanup cannot race the transaction.
+      cleanupDiscardedReconcileStagedPhotos(
+        fs,
+        await discardStaleReconcileSessions(exec, now()),
+      );
+      const newest = await getNewestResumableReconcileSession(exec);
+      // Ask once per paused check (D-105): a check whose resume_prompted_at
+      // is set was already shown the prompt and stays quiet until it is
+      // resumed (which clears it, L-3). The check a reconcile screen is
+      // showing is not "resumable" either.
+      if (
+        newest &&
+        newest.resumePromptedAt === null &&
+        !isReconcileSessionOpen(newest.session.id)
+      ) {
+        description = describeResumableReconcile({
+          session: newest.session,
+          cards: await listReconcileSessionCards(exec, newest.session.id),
+          cardsLeft: newest.cardsLeft,
+        });
       }
     } catch (error) {
       Logger.error(
@@ -118,16 +148,6 @@ export function registerReconcileResumeSweep(
         "could not inspect resumable reconciliation",
         error,
       );
-      try {
-        const sessionId = await getNewestPendingReconcileSessionId(exec);
-        if (sessionId !== null) description = { sessionId, discardOnly: true };
-      } catch (fallbackError) {
-        Logger.error(
-          LOG_SCOPE,
-          "could not find corrupt reconciliation",
-          fallbackError,
-        );
-      }
     } finally {
       try {
         await reconcileOrphanReconcileStagedPhotos(exec, fs);

@@ -1,8 +1,9 @@
 import { type NavigationProp, useNavigation } from "@react-navigation/native";
 import { useEffect } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RegisteredModal } from "@/components/ui/RegisteredModal";
+import {
+  type ResumePromptAction,
+  ResumePromptSheet,
+} from "@/components/ResumePromptSheet";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/import-session-dao";
 import { importPeopleLeft } from "@/db/import-session-read";
@@ -21,8 +22,6 @@ import {
   type ResumableImport,
 } from "@/services/import/contact-import-resume-sweep";
 import { deleteImportStaging } from "@/services/photos/photo-storage";
-import { useTheme } from "@/theme";
-import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import { plural } from "@/utils/plural";
 
@@ -95,7 +94,8 @@ export function resumeImportBody(resumable: ResumableImport): string {
 }
 
 /**
- * App-root, explicit-action-only recovery sheet for a durable import snapshot.
+ * App-root, explicit-action-only recovery sheet for a durable import snapshot,
+ * on the shared `ResumePromptSheet` layout (D-56).
  * App renders it only when it is the active, unsuppressed prompt, so mounting
  * means visible: that is when the "asked once" marker is written (38.12 D-111;
  * RESEARCH Pitfall 6).
@@ -104,10 +104,7 @@ export function ResumeImportPrompt({
   resumable,
   onDismiss,
 }: ResumeImportPromptProps) {
-  const { colors } = useTheme();
   const navigation = useNavigation<RootNavigation>();
-  // D-49: inset by the safe area so the bounded card never meets the bars.
-  const insets = useSafeAreaInsets();
   const sessionId = resumable?.sessionId ?? null;
   useEffect(() => {
     if (sessionId === null) return;
@@ -148,146 +145,25 @@ export function ResumeImportPrompt({
     }
   };
 
+  const actions: ResumePromptAction[] = [];
+  if (!resumable.discardOnly)
+    actions.push({ label: "Resume import", tone: "primary", onPress: resume });
+  // Photo work keeps its "Later" in place of Discard (B-6); Later only closes.
+  actions.push({
+    label: resumable.photoOutstanding ? "Later" : "Discard import",
+    tone: "danger",
+    onPress: () => void discard(),
+  });
+  // D-111: the prompt asks once; Not now leaves the import paused and
+  // findable on Settings → Contacts & Relationships.
+  if (!resumable.photoOutstanding)
+    actions.push({ label: "Not now", tone: "plain", onPress: onDismiss });
+
   return (
-    <RegisteredModal
-      visible
-      transparent
-      animationType="fade"
-      // Explicit buttons are the only exit; an Android back press must not
-      // silently abandon a pending import.
-      onRequestClose={() => undefined}
-    >
-      <View
-        style={[
-          styles.modalRoot,
-          {
-            paddingTop: insets.top + SPACING.lg,
-            paddingBottom: insets.bottom + SPACING.lg,
-          },
-        ]}
-      >
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.scrim,
-            { backgroundColor: colors.background },
-          ]}
-        />
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          {/* D-49: the heading and body give up height first and scroll at
-              large text; the actions below stay outside, always reachable. */}
-          <ScrollView
-            style={styles.body}
-            contentContainerStyle={styles.bodyContent}
-          >
-            <Text style={[styles.heading, { color: colors.textPrimary }]}>
-              Resume your import?
-            </Text>
-            <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-              {resumeImportBody(resumable)}
-            </Text>
-          </ScrollView>
-          {!resumable.discardOnly ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Resume import"
-              onPress={resume}
-              style={[styles.button, { backgroundColor: colors.accent }]}
-            >
-              <Text style={[styles.buttonLabel, { color: colors.onAccent }]}>
-                Resume import
-              </Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              resumable.photoOutstanding ? "Later" : "Discard import"
-            }
-            onPress={() => void discard()}
-            style={[
-              styles.button,
-              styles.discardButton,
-              { borderColor: colors.danger },
-            ]}
-          >
-            <Text style={[styles.buttonLabel, { color: colors.danger }]}>
-              {resumable.photoOutstanding ? "Later" : "Discard import"}
-            </Text>
-          </Pressable>
-          {resumable.photoOutstanding ? null : (
-            // D-111: the prompt asks once; Not now leaves the import paused
-            // and findable on Settings → Contacts & Relationships.
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Not now"
-              onPress={onDismiss}
-              style={styles.button}
-            >
-              <Text style={[styles.buttonLabel, { color: colors.textPrimary }]}>
-                Not now
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-    </RegisteredModal>
+    <ResumePromptSheet
+      heading="Resume your import?"
+      body={resumeImportBody(resumable)}
+      actions={actions}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  scrim: {
-    opacity: 0.85,
-  },
-  // flexShrink: the card never outgrows the (safe-area inset) window (D-49).
-  sheet: {
-    flexShrink: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 20,
-    gap: 14,
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  // Bounded scroll body: short copy keeps its height, tall copy scrolls (D-49).
-  body: {
-    flexGrow: 0,
-    flexShrink: 1,
-  },
-  bodyContent: {
-    gap: 14,
-  },
-  bodyText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  button: {
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    paddingHorizontal: 16,
-  },
-  discardButton: {
-    borderWidth: 1,
-  },
-  buttonLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});

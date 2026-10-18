@@ -30,7 +30,8 @@ const HIDDEN_INSIDE_NAVIGATOR = {
 
 /**
  * Separate-window RN Modals: exempt, asserted to render `<RegisteredModal`
- * (the app's only RN Modal wrapper, 38.9 D-24).
+ * (the app's only RN Modal wrapper, 38.9 D-24). 38.12 D-56: both resume
+ * prompts render it through their one shared `ResumePromptSheet`.
  */
 const SEPARATE_WINDOW_MODALS = {
   ResumeImportPrompt: "src/components/ResumeImportPrompt.tsx",
@@ -116,13 +117,19 @@ describe("App.tsx shell overlays outside the tab navigator (D-42 A)", () => {
   });
 
   it("exempts the resume prompts only because they are separate-window RN Modals", () => {
+    const sheet = read("src/components/ResumePromptSheet.tsx");
+    expect(sheet, "the shared sheet renders an RN Modal window").toMatch(
+      /import \{ RegisteredModal \} from "@\/components\/ui\/RegisteredModal"/,
+    );
+    const sheetStart = sheet.indexOf("export function ResumePromptSheet(");
+    expect(sheet.slice(sheetStart)).toMatch(/return \(\s*<RegisteredModal\b/);
     for (const [name, path] of Object.entries(SEPARATE_WINDOW_MODALS)) {
       const source = read(path);
-      expect(source, `${name} renders an RN Modal window`).toMatch(
-        /import \{ RegisteredModal \} from "@\/components\/ui\/RegisteredModal"/,
+      expect(source, `${name} renders the shared sheet`).toMatch(
+        /import \{[^}]*\bResumePromptSheet\b[^}]*\} from "@\/components\/ResumePromptSheet"/,
       );
       const start = source.indexOf(`export function ${name}(`);
-      expect(source.slice(start)).toMatch(/return \(\s*<RegisteredModal\b/);
+      expect(source.slice(start)).toMatch(/return \(\s*<ResumePromptSheet\b/);
     }
   });
 

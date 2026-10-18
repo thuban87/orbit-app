@@ -136,37 +136,75 @@ export async function listReconcileCardIdentities(
 }
 
 /**
- * Return the one newest pending session and terminally sweep older work.
- * Card payloads are intentionally never parsed in this sweep; cleanup only
- * needs the first-class durable staging-path column.
+ * Cards still to check in a session (38.12 D-105): unresolved or partial — the
+ * predicate the card writers and staging cleanup use for live work.
  */
-export async function getResumableReconcileSession(
+export async function countReconcileCardsLeft(
+  exec: SqlExecutor,
+  sessionId: number,
+): Promise<number> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM reconciliation_session_cards
+     WHERE session_id = ? AND card_status IN ('unresolved', 'partial')`,
+    [sessionId],
+  );
+  return row?.n ?? 0;
+}
+
+export interface NewestResumableReconcile {
+  session: ReconcileSession;
+  /** Unresolved + partial cards (D-105). */
+  cardsLeft: number;
+  /** When the resume prompt was shown for this check; null = never (D-105). */
+  resumePromptedAt: string | null;
+}
+
+/**
+ * The newest pending check with its "left" count (38.12 D-56, D-105). No side
+ * effects and no card payload parsing, so a malformed card cannot hide the
+ * session. Stale cleanup is the separate launch-only
+ * `discardStaleReconcileSessions`.
+ */
+export async function getNewestResumableReconcileSession(
+  exec: SqlExecutor,
+): Promise<NewestResumableReconcile | null> {
+  const newest = await exec.getFirstAsync<
+    ReconcileSessionDbRow & { resume_prompted_at: string | null }
+  >(
+    `SELECT id, uid, status, total_checked, created_at, modified_at,
+            resume_prompted_at
+     FROM reconciliation_sessions WHERE status = 'pending'
+     ORDER BY created_at DESC, id DESC LIMIT 1`,
+  );
+  if (!newest) return null;
+  return {
+    session: mapReconcileSession(newest),
+    cardsLeft: await countReconcileCardsLeft(exec, newest.id),
+    resumePromptedAt: newest.resume_prompted_at,
+  };
+}
+
+/**
+ * Launch cleanup (38.12 D-56): terminally discard every pending check older
+ * than the newest so launch offers exactly one. Card payloads are never
+ * parsed; cleanup needs only the first-class staging-path column. Returns the
+ * swept staged paths for the caller's post-commit file cleanup.
+ */
+export async function discardStaleReconcileSessions(
   exec: SqlExecutor,
   now: string,
-): Promise<{
-  session: ReconcileSession;
-  cards: ReconcileSessionCard[];
-  sweptStagedPhotoRelPaths: string[];
-} | null> {
-  const pending = await exec.getAllAsync<ReconcileSessionDbRow>(
-    `SELECT id, uid, status, total_checked, created_at, modified_at
-     FROM reconciliation_sessions WHERE status = 'pending'
+): Promise<string[]> {
+  const pending = await exec.getAllAsync<{ id: number }>(
+    `SELECT id FROM reconciliation_sessions WHERE status = 'pending'
      ORDER BY created_at DESC, id DESC`,
   );
-  const newest = pending[0];
-  if (!newest) return null;
-
   const sweptStagedPhotoRelPaths: string[] = [];
   for (const stale of pending.slice(1)) {
     sweptStagedPhotoRelPaths.push(
       ...(await discardSession(exec, stale.id, now)),
     );
   }
-  return {
-    session: mapReconcileSession(newest),
-    cards: await listReconcileSessionCards(exec, newest.id),
-    sweptStagedPhotoRelPaths,
-  };
+  return sweptStagedPhotoRelPaths;
 }
 
 /**

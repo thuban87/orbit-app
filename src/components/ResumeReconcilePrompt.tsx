@@ -1,9 +1,15 @@
 import { type NavigationProp, useNavigation } from "@react-navigation/native";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RegisteredModal } from "@/components/ui/RegisteredModal";
+import { useEffect } from "react";
+import {
+  type ResumePromptAction,
+  ResumePromptSheet,
+} from "@/components/ResumePromptSheet";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/reconcile-session-dao";
+import {
+  clearReconcileResumePrompted,
+  markReconcileResumePrompted,
+} from "@/db/resume-prompt-dao";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { TabParamList } from "@/navigation/types";
 import {
@@ -11,9 +17,10 @@ import {
   type ResumableReconcile,
 } from "@/services/import/reconcile-resume-sweep";
 import { deleteReconcileStaging } from "@/services/photos/photo-storage";
-import { useTheme } from "@/theme";
-import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
+
+const LOG_SCOPE = "resume-reconcile-prompt";
 
 type RootNavigation = NavigationProp<TabParamList>;
 
@@ -23,17 +30,52 @@ export interface ResumeReconcilePromptProps {
   onDiscarded?(): void;
 }
 
-/** App-root, explicit-action-only recovery sheet for a durable check. */
+/** The body copy: discard-only, or how many contacts are left (D-105). */
+export function resumeReconcileBody(resumable: ResumableReconcile): string {
+  if (resumable.discardOnly)
+    return "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied.";
+  const left = resumable.cardsLeft;
+  return `${plural(left, "contact")} ${left === 1 ? "is" : "are"} left to check. Changes you already applied stay applied.`;
+}
+
+/**
+ * Explicit-action-only recovery sheet for a durable check, on the shared
+ * `ResumePromptSheet` layout (D-56). It is rendered only when visible (App's
+ * active, unsuppressed prompt, or Settings' Check linked contacts), so its
+ * mount is when the "asked once" marker is written (38.12 D-105).
+ */
 export function ResumeReconcilePrompt({
   resumable,
   onDismiss,
   onDiscarded,
 }: ResumeReconcilePromptProps) {
-  const { colors } = useTheme();
   const navigation = useNavigation<RootNavigation>();
-  // D-49: inset by the safe area so the bounded card never meets the bars.
-  const insets = useSafeAreaInsets();
+  const sessionId = resumable?.sessionId ?? null;
+  useEffect(() => {
+    if (sessionId === null) return;
+    markReconcileResumePrompted(
+      getExecutor(),
+      sessionId,
+      localDateTime(),
+    ).catch((error: unknown) =>
+      Logger.error(LOG_SCOPE, "could not record the resume prompt", error),
+    );
+  }, [sessionId]);
   if (!resumable) return null;
+
+  const resume = () => {
+    // L-3: a check resumed and then left again asks once more. Best-effort:
+    // a failed clear only means no second prompt; the Settings row remains.
+    clearReconcileResumePrompted(getExecutor(), resumable.sessionId).catch(
+      (error: unknown) =>
+        Logger.error(LOG_SCOPE, "could not clear the resume prompt", error),
+    );
+    navigateIntoTab(navigation, "SettingsTab", "ReconcileGrid", {
+      sessionId: resumable.sessionId,
+    });
+    onDismiss();
+  };
+
   const discard = async () => {
     try {
       const stagedPaths = await discardSession(
@@ -48,116 +90,33 @@ export function ResumeReconcilePrompt({
       onDismiss();
       onDiscarded?.();
     } catch (error) {
-      Logger.error("resume-reconcile-prompt", "could not discard check", error);
+      Logger.error(LOG_SCOPE, "could not discard check", error);
     }
   };
+
+  const actions: ResumePromptAction[] = [];
+  if (!resumable.discardOnly)
+    actions.push({
+      label: "Resume",
+      accessibilityLabel: "Resume check",
+      tone: "primary",
+      onPress: resume,
+    });
+  actions.push({
+    label: "Discard",
+    accessibilityLabel: "Discard check",
+    tone: "danger",
+    onPress: () => void discard(),
+  });
+  // D-105: the prompt asks once; Not now leaves the check paused and
+  // findable on Settings → Contacts & Relationships.
+  actions.push({ label: "Not now", tone: "plain", onPress: onDismiss });
+
   return (
-    <RegisteredModal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={() => undefined}
-    >
-      <View
-        style={[
-          styles.modalRoot,
-          {
-            paddingTop: insets.top + SPACING.lg,
-            paddingBottom: insets.bottom + SPACING.lg,
-          },
-        ]}
-      >
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.scrim,
-            { backgroundColor: colors.background },
-          ]}
-        />
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          {/* D-49: the heading and body give up height first and scroll at
-              large text; the actions below stay outside, always reachable. */}
-          <ScrollView
-            style={styles.body}
-            contentContainerStyle={styles.bodyContent}
-          >
-            <Text style={[styles.heading, { color: colors.textPrimary }]}>
-              Resume your check?
-            </Text>
-            <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-              {resumable.discardOnly
-                ? "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied."
-                : "Unresolved contacts are saved. Changes you already applied stay applied."}
-            </Text>
-          </ScrollView>
-          {!resumable.discardOnly ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Resume check"
-              onPress={() => {
-                navigateIntoTab(navigation, "SettingsTab", "ReconcileGrid", {
-                  sessionId: resumable.sessionId,
-                });
-                onDismiss();
-              }}
-              style={[styles.button, { backgroundColor: colors.accent }]}
-            >
-              <Text style={[styles.buttonLabel, { color: colors.onAccent }]}>
-                Resume
-              </Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Discard check"
-            onPress={() => void discard()}
-            style={[
-              styles.button,
-              styles.discardButton,
-              { borderColor: colors.danger },
-            ]}
-          >
-            <Text style={[styles.buttonLabel, { color: colors.danger }]}>
-              Discard
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </RegisteredModal>
+    <ResumePromptSheet
+      heading="Resume your check?"
+      body={resumeReconcileBody(resumable)}
+      actions={actions}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  scrim: { opacity: 0.85 },
-  // flexShrink: the card never outgrows the (safe-area inset) window (D-49).
-  sheet: {
-    flexShrink: 1,
-    gap: 14,
-    padding: 20,
-    borderWidth: 1,
-    borderRadius: 12,
-  },
-  heading: { fontSize: 18, fontWeight: "700" },
-  // Bounded scroll body: short copy keeps its height, tall copy scrolls (D-49).
-  body: { flexGrow: 0, flexShrink: 1 },
-  bodyContent: { gap: 14 },
-  bodyText: { fontSize: 15, lineHeight: 22 },
-  button: {
-    minHeight: 44,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  discardButton: { borderWidth: 1 },
-  buttonLabel: { fontSize: 16, fontWeight: "700" },
-});
