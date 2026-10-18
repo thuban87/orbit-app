@@ -65,6 +65,7 @@ import {
   userPrimaryPick,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { PROFILE_MERGE_LABEL } from "@/screens/contact-profile-logic";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import {
   ensureReadContactsPermission,
@@ -653,8 +654,10 @@ export function ReconcileDetailScreen({
               })
             }
           >
+            {/* The same label as the Profile's ⋯ entry, with its ellipsis
+                (it opens a chooser; fix-pass queue 4). */}
             <Text style={{ color: colors.textSecondary }}>
-              Merge with another contact
+              {PROFILE_MERGE_LABEL}
             </Text>
           </Pressable>
         </View>

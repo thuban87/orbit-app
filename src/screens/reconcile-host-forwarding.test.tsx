@@ -260,6 +260,8 @@ describe("ReconcileDetail forwards the flow host (D-110, A-1)", () => {
       pressableWithText(tree, /Merge with another contact/).props
         .onPress as () => void
     )();
+    // It opens a chooser, so it carries the ellipsis (fix-pass queue 4).
+    expect(pressableWithText(tree, /Merge with another contact…/)).toBeTruthy();
     expect(nav.navigate).toHaveBeenCalledWith("SurvivorSelect", {
       firstContactId: CONTACT,
       host: PROFILE_HOST,
