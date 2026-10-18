@@ -184,7 +184,9 @@ export function buildReconcileSelections(
  * - additive phones/emails → every source option preselected (display order),
  *   matching the remembered full list; the person can untick;
  * - additive name/birthday/photo → the first source option;
- * - conflict → nothing (the person must choose);
+ * - conflict → nothing (the person must choose), except the photo: its
+ *   keep card is always drawn selected, so it opens as Keep Orbit and Apply
+ *   works without a second tap (38.12 D-163);
  * - removed-from-source → Keep Orbit.
  */
 export function defaultReconcileChoices(
@@ -192,7 +194,10 @@ export function defaultReconcileChoices(
 ): ReconcileChoices {
   const choices: ReconcileChoices = {};
   for (const field of diff.fields) {
-    if (field.outcome === "conflict") continue;
+    if (field.outcome === "conflict") {
+      if (field.fieldFamily === "photo") choices.photo = "orbit";
+      continue;
+    }
     if (field.outcome === "additive" && field.sourceOptions.length > 0)
       choices[field.fieldFamily] = isMethodFamily(field)
         ? field.sourceOptions.map(choiceFor)

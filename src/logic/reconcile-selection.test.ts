@@ -338,6 +338,28 @@ describe("phone picks (D-47, D-102; convergence c3 D-1, c4 E-5)", () => {
     expect(isReconcileChoiceUnresolved("orbit")).toBe(false);
   });
 
+  it("a photo conflict opens as Keep Orbit, the choice its card shows selected, so Apply needs no second tap (D-163)", () => {
+    const photoConflict = {
+      fields: [
+        {
+          fieldFamily: "photo",
+          outcome: "conflict",
+          sourceOptions: [{ optionId: "photo:a", value: "hash-a" }],
+        },
+        {
+          fieldFamily: "name",
+          outcome: "conflict",
+          sourceOptions: [{ optionId: "name:a", value: "Other" }],
+        },
+      ],
+    } as unknown as Parameters<typeof defaultReconcileChoices>[0];
+    const choices = defaultReconcileChoices(photoConflict);
+    expect(choices.photo).toBe("orbit");
+    expect(isReconcileChoiceUnresolved(choices.photo)).toBe(false);
+    // Any other conflict still needs a choice.
+    expect(choices.name).toBeUndefined();
+  });
+
   it("defaults: additive phones → every value; conflict phones → nothing; additive name → first option", () => {
     const additive = phoneDiff();
     expect(defaultReconcileChoices(additive).phones).toEqual(ids(additive));
