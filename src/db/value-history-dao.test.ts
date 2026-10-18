@@ -6,6 +6,7 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { createContactFull, updateContactFull } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createField } from "@/db/field-ddl";
+import { updateFieldHistoryRetained } from "@/db/field-defs-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -254,5 +255,53 @@ describe("readValueHistory (38.12 D-106)", () => {
       field: null,
       entries: [],
     });
+  });
+
+  it("Keep past values turned on later starts history; turned off it stops new entries and keeps the old ones (D-159)", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "Alex",
+      intervalDays: 30,
+      now: NOW,
+    });
+    await createField(exec, {
+      uid: uid(),
+      col_name: "later",
+      label: "Later",
+      type: "text",
+      options: null,
+      show_on_new: 0,
+      always_show: 0,
+      display_order: 0,
+      share_with_ai: 0,
+      now: NOW,
+    });
+    const def = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM custom_field_defs WHERE col_name = 'later'",
+    );
+    if (!def) throw new Error("missing field definition");
+
+    await edit(contactId, def.id, "one", "2026-09-04 12:01:00");
+    await edit(contactId, def.id, "two", "2026-09-04 12:02:00");
+    expect(await listValueHistory(exec, contactId, def.id)).toEqual([]);
+
+    await updateFieldHistoryRetained(exec, def.id, 1, "2026-09-04 12:03:00");
+    expect(
+      await exec.getFirstAsync<{ history_retained: number }>(
+        "SELECT history_retained FROM custom_field_defs WHERE id = ?",
+        [def.id],
+      ),
+    ).toEqual({ history_retained: 1 });
+    await edit(contactId, def.id, "three", "2026-09-04 12:04:00");
+    expect(
+      (await listValueHistory(exec, contactId, def.id)).map((row) => row.value),
+    ).toEqual(["two"]);
+
+    await updateFieldHistoryRetained(exec, def.id, 0, "2026-09-04 12:05:00");
+    await edit(contactId, def.id, "four", "2026-09-04 12:06:00");
+    // No new entry, and the kept one is never deleted by turning it off.
+    expect(
+      (await listValueHistory(exec, contactId, def.id)).map((row) => row.value),
+    ).toEqual(["two"]);
   });
 });

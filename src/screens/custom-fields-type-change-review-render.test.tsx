@@ -98,6 +98,7 @@ const dao = vi.hoisted(() => ({
   preflightTypeChange: vi.fn(),
   preflightOptionsChange: vi.fn(),
   updateFieldShareWithAi: vi.fn(),
+  updateFieldHistoryRetained: vi.fn(),
 }));
 vi.mock("@/db/field-defs-dao", () => ({
   changeFieldOptions: dao.changeFieldOptions,
@@ -108,6 +109,7 @@ vi.mock("@/db/field-defs-dao", () => ({
   restoreField: vi.fn(),
   updateFieldCuration: vi.fn(),
   updateFieldShareWithAi: dao.updateFieldShareWithAi,
+  updateFieldHistoryRetained: dao.updateFieldHistoryRetained,
 }));
 vi.mock("@/db/field-type-change", () => ({
   applyTypeChange: dao.applyTypeChange,
@@ -144,6 +146,7 @@ const TIER = {
   show_on_new: 0,
   always_show: 0,
   share_with_ai: 0,
+  history_retained: 0,
 } as unknown as CustomFieldDef;
 
 const TO_DROPDOWN = {
@@ -153,6 +156,7 @@ const TO_DROPDOWN = {
   show_on_new: 0,
   always_show: 0,
   share_with_ai: 0,
+  history_retained: 0,
 };
 
 function submitEdit(draft: typeof TO_DROPDOWN, field: CustomFieldDef = TIER) {
@@ -174,7 +178,35 @@ beforeEach(() => {
   dao.changeFieldOptions.mockReset();
   dao.preflightTypeChange.mockReset();
   dao.updateFieldShareWithAi.mockReset();
+  dao.updateFieldHistoryRetained.mockReset();
   dao.preflightOptionsChange.mockReset();
+});
+
+describe("Keep past values saves through its own writer (38.12 D-159)", () => {
+  it("turning it on writes history_retained = 1 and nothing else changes type", async () => {
+    submitEdit({
+      ...TO_DROPDOWN,
+      type: "text",
+      options: null,
+      history_retained: 1,
+    } as never);
+    await vi.waitFor(() =>
+      expect(dao.updateFieldHistoryRetained).toHaveBeenCalledWith(
+        "exec",
+        7,
+        1,
+        "2026-10-17 12:00:00",
+      ),
+    );
+    expect(dao.applyTypeChange).not.toHaveBeenCalled();
+    expect(dao.updateFieldShareWithAi).not.toHaveBeenCalled();
+  });
+
+  it("an unchanged switch writes nothing", async () => {
+    submitEdit({ ...TO_DROPDOWN, type: "text", options: null } as never);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(dao.updateFieldHistoryRetained).not.toHaveBeenCalled();
+  });
 });
 
 describe('a dropdown options edit gets the same "Review now" offer (D-153)', () => {

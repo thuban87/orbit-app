@@ -166,6 +166,30 @@ export function updateFieldShareWithAi(
 }
 
 /**
+ * "Keep past values" (38.12 D-159): the definition's history_retained flag.
+ * Turning it on starts keeping a changed value's prior TEXT (D-106); turning
+ * it off only stops new entries — retained history is never deleted here.
+ * Own transaction, like the other flag writers.
+ */
+export function updateFieldHistoryRetained(
+  exec: SqlExecutor,
+  id: number,
+  historyRetained: SqliteBool,
+  now: string,
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE custom_field_defs
+          SET history_retained = ?, modified_at = ?
+        WHERE id = ?`,
+      [historyRetained === 1 ? 1 : 0, now, id],
+    );
+    assertOneChange("updateFieldHistoryRetained", id, result.changes);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
  * Quarantine a field (soft-delete): stamp `quarantined_at`. Data + column are
  * untouched.
  */

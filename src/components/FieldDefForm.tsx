@@ -182,6 +182,9 @@ export function FieldDefForm(props: FieldDefFormProps) {
   const [showOnNew, setShowOnNew] = useState(seed.show_on_new === 1);
   const [alwaysShow, setAlwaysShow] = useState(seed.always_show === 1);
   const [shareWithAi, setShareWithAi] = useState(seed.share_with_ai === 1);
+  const [keepPastValues, setKeepPastValues] = useState(
+    seed.history_retained === 1,
+  );
   // A live, throwaway value so the owner can drive the previewed widget.
   const [previewValue, setPreviewValue] = useState<string | null>(null);
 
@@ -219,6 +222,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
     show_on_new: toBool(showOnNew),
     always_show: toBool(alwaysShow),
     share_with_ai: toBool(effectiveShareWithAi),
+    history_retained: toBool(keepPastValues),
   });
   const onDirtyChangeRef = useRef(props.onDirtyChange);
   onDirtyChangeRef.current = props.onDirtyChange;
@@ -249,6 +253,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
       show_on_new: toBool(showOnNew),
       always_show: toBool(alwaysShow),
       share_with_ai: toBool(effectiveShareWithAi),
+      history_retained: toBool(keepPastValues),
     };
     const fields = draftToFieldFields(draft);
     if (props.mode === "create") {
@@ -407,6 +412,25 @@ export function FieldDefForm(props: FieldDefFormProps) {
           onValueChange={setAlwaysShow}
         />
       </View>
+
+      {/* "Keep past values" (38.12 D-159): off by default, as stored; when on,
+          a changed value's earlier value is kept and the Profile offers
+          View history (D-106). */}
+      <View style={styles.switchRow}>
+        <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>
+          Keep past values
+        </Text>
+        <OrbitSwitch
+          testID="field-def-keep-past-values"
+          accessibilityLabel="Keep past values"
+          value={keepPastValues}
+          onValueChange={setKeepPastValues}
+        />
+      </View>
+      <Text style={[styles.helper, { color: colors.textSecondary }]}>
+        Off by default. When on, Orbit keeps the earlier value each time this
+        field changes, and the profile shows View history.
+      </Text>
 
       {/* AI-sharing opt-in (AI-01) — OFF by default; only a deliberate opt-in
           marks this field's value eligible for an AI suggestion payload. A

@@ -31,6 +31,12 @@ export interface FieldDefDraft {
   show_on_new: SqliteBool;
   always_show: SqliteBool;
   share_with_ai: SqliteBool;
+  /**
+   * "Keep past values" (38.12 D-159): off on create, the stored value on edit.
+   * When on, a changed value's prior TEXT is kept and the Profile offers
+   * "View history" (D-106).
+   */
+  history_retained: SqliteBool;
 }
 
 /**
@@ -42,14 +48,21 @@ export interface FieldDefDraft {
  */
 export type FieldDraftFields = Pick<
   NewFieldDef,
-  "label" | "type" | "options" | "show_on_new" | "always_show" | "share_with_ai"
+  | "label"
+  | "type"
+  | "options"
+  | "show_on_new"
+  | "always_show"
+  | "share_with_ai"
+  | "history_retained"
 >;
 
 /** The stored-def subset `hydrateFieldDefDraft` reads when seeding an edit. */
 type HydrationSource = Pick<
   CustomFieldDef,
   "label" | "type" | "options" | "show_on_new" | "always_show" | "share_with_ai"
->;
+> &
+  Partial<Pick<CustomFieldDef, "history_retained">>;
 
 /**
  * Seed a `FieldDefDraft`. On CREATE (`initial` null/undefined) every flag —
@@ -68,6 +81,7 @@ export function hydrateFieldDefDraft(
       show_on_new: 0,
       always_show: 0,
       share_with_ai: 0,
+      history_retained: 0,
     };
   }
   return {
@@ -77,13 +91,14 @@ export function hydrateFieldDefDraft(
     show_on_new: initial.show_on_new,
     always_show: initial.always_show,
     share_with_ai: initial.share_with_ai,
+    history_retained: initial.history_retained === 1 ? 1 : 0,
   };
 }
 
 /**
  * Project a draft to the draft-derived payload subset (a FRESH object) — carrying
  * the toggled `share_with_ai` so neither the create nor the edit submit can drop
- * it. It returns ONLY the six editor-owned fields; the component adds create-only
+ * it. It returns ONLY the editor-owned fields; the component adds create-only
  * metadata around this when building a `NewFieldDef`. Pure builder.
  */
 export function draftToFieldFields(draft: FieldDefDraft): FieldDraftFields {
@@ -94,12 +109,13 @@ export function draftToFieldFields(draft: FieldDefDraft): FieldDraftFields {
     show_on_new: draft.show_on_new,
     always_show: draft.always_show,
     share_with_ai: draft.share_with_ai,
+    history_retained: draft.history_retained,
   };
 }
 
 /**
  * Whether the custom-field editor holds typed changes (38.9 D-14, D-61; G-04):
- * the live draft vs its seed, all six editor-owned fields. The caller passes
+ * the live draft vs its seed, every editor-owned field. The caller passes
  * both with `options` normalised the same way (FieldDefForm's buildOptions).
  */
 export function isFieldDefDraftDirty(
@@ -112,6 +128,7 @@ export function isFieldDefDraftDirty(
     seed.options !== draft.options ||
     seed.show_on_new !== draft.show_on_new ||
     seed.always_show !== draft.always_show ||
-    seed.share_with_ai !== draft.share_with_ai
+    seed.share_with_ai !== draft.share_with_ai ||
+    seed.history_retained !== draft.history_retained
   );
 }

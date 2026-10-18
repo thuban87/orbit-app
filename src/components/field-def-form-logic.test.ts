@@ -80,6 +80,7 @@ describe("hydrateFieldDefDraft — create default vs edit hydration (H7)", () =>
       show_on_new: 1,
       always_show: 1,
       share_with_ai: 1,
+      history_retained: 0,
     });
   });
 });
@@ -93,6 +94,7 @@ describe("draftToFieldFields — draft-derived payload subset (C3-L1)", () => {
       show_on_new: 1,
       always_show: 0,
       share_with_ai: 1,
+      history_retained: 1,
     };
     const fields = draftToFieldFields(draft);
     expect(fields).toEqual({
@@ -102,6 +104,7 @@ describe("draftToFieldFields — draft-derived payload subset (C3-L1)", () => {
       show_on_new: 1,
       always_show: 0,
       share_with_ai: 1,
+      history_retained: 1,
     });
     // It is a fresh object (a builder, not the same reference).
     expect(fields).not.toBe(draft);
@@ -120,8 +123,31 @@ describe("draftToFieldFields — draft-derived payload subset (C3-L1)", () => {
       show_on_new: 0,
       always_show: 0,
       share_with_ai: 0,
+      history_retained: 0,
     };
     expect(draftToFieldFields(draft).share_with_ai).toBe(0);
+  });
+});
+
+describe("Keep past values (38.12 D-159)", () => {
+  it("is off on create, matching the stored default", () => {
+    expect(hydrateFieldDefDraft().history_retained).toBe(0);
+  });
+
+  it("seeds from the stored flag on edit", () => {
+    expect(
+      hydrateFieldDefDraft(storedDef({ history_retained: 1 })).history_retained,
+    ).toBe(1);
+    expect(
+      hydrateFieldDefDraft(storedDef({ history_retained: 0 })).history_retained,
+    ).toBe(0);
+  });
+
+  it("a toggle makes the form dirty", () => {
+    const seed = hydrateFieldDefDraft(storedDef());
+    expect(isFieldDefDraftDirty(seed, { ...seed, history_retained: 1 })).toBe(
+      true,
+    );
   });
 });
 

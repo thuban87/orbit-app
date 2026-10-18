@@ -79,6 +79,7 @@ import {
   reorderFields,
   restoreField,
   updateFieldCuration,
+  updateFieldHistoryRetained,
   updateFieldShareWithAi,
 } from "@/db/field-defs-dao";
 import {
@@ -517,6 +518,8 @@ export function CustomFieldsScreen() {
         draft.show_on_new !== field.show_on_new ||
         draft.always_show !== field.always_show;
       const shareChanged = draft.share_with_ai !== field.share_with_ai;
+      const historyChanged =
+        draft.history_retained !== (field.history_retained === 1 ? 1 : 0);
       const typeChanged = draft.type !== field.type;
       const optionsChanged = draft.options !== field.options;
 
@@ -590,6 +593,15 @@ export function CustomFieldsScreen() {
           exec,
           field.id,
           draft.share_with_ai,
+          localDateTime(),
+        );
+      }
+      // "Keep past values" (38.12 D-159) — its own flag writer, same idiom.
+      if (historyChanged) {
+        await updateFieldHistoryRetained(
+          exec,
+          field.id,
+          draft.history_retained,
           localDateTime(),
         );
       }
