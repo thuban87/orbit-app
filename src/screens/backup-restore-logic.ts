@@ -315,10 +315,13 @@ export function backupIntakeFailureMessage(result: {
  */
 export const REPLACE_ALL_LABEL = "Replace all";
 
-/** D-60: the people on each side, both excluding the Bin. */
+/**
+ * D-60: the people on each side, both excluding the Bin, plus the people in
+ * this phone's Bin that Replace all would delete permanently (A-WR-01).
+ */
 export type RestorePeopleScale = Pick<
   RestorePreviewAggregate,
-  "phoneContacts" | "backupContacts"
+  "phoneContacts" | "backupContacts" | "phoneBinNotInBackup"
 >;
 
 /** The restore mode choice, Merge first: it is the default (D-23). */
@@ -335,7 +338,9 @@ export function restoreModeLabel(mode: RestoreMode): string {
 }
 
 /** D-60: "This phone: 12 contacts · Backup: 40 contacts". */
-export function restorePeopleComparison(scale: RestorePeopleScale): string {
+export function restorePeopleComparison(
+  scale: Pick<RestorePeopleScale, "phoneContacts" | "backupContacts">,
+): string {
   return `This phone: ${plural(scale.phoneContacts, "contact")} · Backup: ${plural(scale.backupContacts, "contact")}`;
 }
 
@@ -346,7 +351,9 @@ export function restoreApplyLabel(
 }
 
 /**
- * The Replace all confirm (D-60, D-02): the scale on both sides, then the
+ * The Replace all confirm (D-60, D-02): the scale on both sides, then (only
+ * when there are any) the people in this phone's Bin it deletes permanently
+ * (A-WR-01; D-59/D-60 honesty, the Bin never empties itself), then the
  * safety-backup sentence. The screen shows it destructive and
  * non-dismissable.
  */
@@ -357,7 +364,12 @@ export function replaceAllConfirmation(
   title: string;
   message: string;
 } {
-  const replaces = `This replaces the ${plural(scale.phoneContacts, "contact")} on this phone with the ${scale.backupContacts} in the backup.`;
+  const binned = scale.phoneBinNotInBackup;
+  const replaces = `This replaces the ${plural(scale.phoneContacts, "contact")} on this phone with the ${scale.backupContacts} in the backup.${
+    binned > 0
+      ? ` It also permanently deletes the ${plural(binned, "contact")} in this phone's Bin that the backup doesn't have.`
+      : ""
+  }`;
   return {
     title: `${REPLACE_ALL_LABEL}?`,
     message: `${replaces}\n\n${
@@ -417,7 +429,8 @@ export type RestoreResultRoute = {
  * contacts restored always; for Replace-all the contacts it removed (Merge
  * never removes anyone, so it has no such line); and D-140 (owner
  * 2026-10-17): the phone's people the backup has in its Bin, only when there
- * are any. Row totals ("Added", "Updated") are not shown: they count every
+ * are any; and (A-WR-01) the people in the phone's Bin that Replace-all
+ * deleted permanently, only when there are any. Row totals ("Added", "Updated") are not shown: they count every
  * record, not people.
  */
 export function restoreResultPeopleLines(
@@ -431,6 +444,12 @@ export function restoreResultPeopleLines(
   if (mode === "replace-all") lines.push(`Contacts removed: ${people.removed}`);
   if (people.movedToBin > 0)
     lines.push(`${plural(people.movedToBin, "contact")} moved to the Bin`);
+  // A-WR-01: Replace-all's permanent deletions from this phone's Bin, only
+  // when there are any (like D-140's line).
+  if (people.removedFromBin > 0)
+    lines.push(
+      `${plural(people.removedFromBin, "contact")} in the Bin permanently deleted`,
+    );
   return lines;
 }
 

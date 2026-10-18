@@ -466,6 +466,8 @@ describe("restore preview", () => {
       if (candidate.status !== "ready") return;
       expect(candidate.preview).toMatchObject({
         phoneContacts: 2,
+        // A-WR-01: the phone's Bin person the backup lacks.
+        phoneBinNotInBackup: 1,
         backupContacts: 2,
         // Every contact row the file carries, Bin included, stays as before.
         contactCount: 3,

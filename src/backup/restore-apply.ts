@@ -95,12 +95,17 @@ export type RestoreProgressStep = "safety-backup" | "restoring";
  * signal. `movedToBin` (D-140, owner 2026-10-17) is, for Replace-all, the
  * phone's not-in-Bin people the backup carries in its Bin, so they end up in
  * the Bin here (Merge: 0). `removed` and `movedToBin` never overlap.
+ * `removedFromBin` (38.12 review A-WR-01; D-59 "a correct deletions line",
+ * D-60) is, for Replace-all, the people already in this phone's Bin that the
+ * backup does not carry: Replace-all deletes them permanently, so they are
+ * counted apart from `removed` (Merge: 0).
  */
 export interface RestorePeopleCounts {
   before: number;
   restored: number;
   removed: number;
   movedToBin: number;
+  removedFromBin: number;
 }
 export type PreRestoreSnapshotResult =
   /** `skippedPhotos`: photos the safety backup left out (38.6 D-24). */
@@ -953,6 +958,9 @@ async function peopleCounts(
   const liveBefore = await exec.getAllAsync<{ uid: string }>(
     "SELECT uid FROM contacts WHERE archived_at IS NULL",
   );
+  const binBefore = await exec.getAllAsync<{ uid: string }>(
+    "SELECT uid FROM contacts WHERE archived_at IS NOT NULL",
+  );
   const backupUids = new Set(manifest.contacts.map((contact) => contact.uid));
   const backupBinned = new Set(
     manifest.contacts
@@ -969,6 +977,9 @@ async function peopleCounts(
       : 0,
     movedToBin: replacing
       ? liveBefore.filter((row) => backupBinned.has(row.uid)).length
+      : 0,
+    removedFromBin: replacing
+      ? binBefore.filter((row) => !backupUids.has(row.uid)).length
       : 0,
   };
 }

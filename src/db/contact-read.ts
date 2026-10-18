@@ -32,6 +32,20 @@ export async function countContactsNotInBin(
 }
 
 /**
+ * The uids of the people in this phone's Bin (`archived_at IS NOT NULL`). The
+ * restore preview compares them with a backup's contacts to say how many
+ * Replace all would delete permanently (38.12 review A-WR-01; D-59, D-60).
+ */
+export async function listBinContactUids(
+  exec: ReadOnlyExecutor | SqlExecutor,
+): Promise<string[]> {
+  const rows = await exec.getAllAsync<{ uid: string }>(
+    "SELECT uid FROM contacts WHERE archived_at IS NOT NULL",
+  );
+  return rows.map((row) => row.uid);
+}
+
+/**
  * The ids of LIVE contacts already using `name` (the create/edit duplicate
  * warning; Add Contact's "Open existing", 38.11 D-73).
  *

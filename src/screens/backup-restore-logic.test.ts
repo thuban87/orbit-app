@@ -33,12 +33,13 @@ const preview = {
   contactCount: 2,
   backupContacts: 2,
   phoneContacts: 5,
+  phoneBinNotInBackup: 0,
   relatedRowCount: 8,
   tombstoneCount: 2,
 };
 
 /** The people scale the Replace-all confirm states (D-60). */
-const SCALE = { phoneContacts: 12, backupContacts: 40 };
+const SCALE = { phoneContacts: 12, backupContacts: 40, phoneBinNotInBackup: 0 };
 
 describe("restore preview route safety", () => {
   it("hands navigation only an opaque token and aggregate preview", () => {
@@ -481,11 +482,23 @@ describe("restore apply decisions", () => {
         preRestoreSnapshotCreated: true,
         preRestoreSnapshotSkippedPhotos: 2,
         restoredPhotosMissing: 1,
-        people: { before: 5, restored: 4, removed: 1, movedToBin: 2 },
+        people: {
+          before: 5,
+          restored: 4,
+          removed: 1,
+          movedToBin: 2,
+          removedFromBin: 0,
+        },
       }),
     ).toEqual({
       mode: "replace-all",
-      people: { before: 5, restored: 4, removed: 1, movedToBin: 2 },
+      people: {
+        before: 5,
+        restored: 4,
+        removed: 1,
+        movedToBin: 2,
+        removedFromBin: 0,
+      },
       photosNeedingAttention: 2,
       photoCleanupPending: 1,
       scheduleResyncPending: true,
@@ -509,7 +522,13 @@ describe("restore apply decisions", () => {
       preRestoreSnapshotCreated: false,
       preRestoreSnapshotSkippedPhotos: 3,
       restoredPhotosMissing: 0,
-      people: { before: 0, restored: 0, removed: 0, movedToBin: 0 },
+      people: {
+        before: 0,
+        restored: 0,
+        removed: 0,
+        movedToBin: 0,
+        removedFromBin: 0,
+      },
     };
     expect(
       toRestoreResultParams({ ...base, mode: "merge" })
@@ -794,6 +813,7 @@ describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
         restored: 40,
         removed: 3,
         movedToBin: 0,
+        removedFromBin: 0,
       }),
     ).toEqual([
       "Contacts on this phone before: 12",
@@ -807,6 +827,7 @@ describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
         restored: 2,
         removed: 0,
         movedToBin: 0,
+        removedFromBin: 0,
       }),
     ).toContain("Contacts removed: 0");
   });
@@ -817,6 +838,7 @@ describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
       restored: 40,
       removed: 0,
       movedToBin: 0,
+      removedFromBin: 0,
     });
     expect(lines).toEqual([
       "Contacts on this phone before: 12",
@@ -828,15 +850,40 @@ describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
   it("says how many of the phone's people moved to the Bin, only when any did (D-140)", () => {
     const people = { before: 5, restored: 3, removed: 1 };
     expect(
-      restoreResultPeopleLines("replace-all", { ...people, movedToBin: 2 }),
+      restoreResultPeopleLines("replace-all", {
+        ...people,
+        movedToBin: 2,
+        removedFromBin: 0,
+      }),
     ).toContain("2 contacts moved to the Bin");
     expect(
-      restoreResultPeopleLines("replace-all", { ...people, movedToBin: 1 }),
+      restoreResultPeopleLines("replace-all", {
+        ...people,
+        movedToBin: 1,
+        removedFromBin: 0,
+      }),
     ).toContain("1 contact moved to the Bin");
     expect(
       restoreResultPeopleLines("replace-all", {
         ...people,
         movedToBin: 0,
+        removedFromBin: 0,
+      }).some((line) => line.includes("Bin")),
+    ).toBe(false);
+  });
+
+  it("says how many people Replace-all deleted from the phone's Bin, only when any (A-WR-01)", () => {
+    const people = { before: 5, restored: 3, removed: 1, movedToBin: 0 };
+    expect(
+      restoreResultPeopleLines("replace-all", { ...people, removedFromBin: 3 }),
+    ).toContain("3 contacts in the Bin permanently deleted");
+    expect(
+      restoreResultPeopleLines("replace-all", { ...people, removedFromBin: 1 }),
+    ).toContain("1 contact in the Bin permanently deleted");
+    expect(
+      restoreResultPeopleLines("replace-all", {
+        ...people,
+        removedFromBin: 0,
       }).some((line) => line.includes("Bin")),
     ).toBe(false);
   });
@@ -847,6 +894,7 @@ describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
       restored: 1,
       removed: 0,
       movedToBin: 0,
+      removedFromBin: 0,
     });
     expect(lines.join(" ")).not.toMatch(/Added|Updated|Newer local kept/);
   });
@@ -865,6 +913,20 @@ describe("restore preview people and the one Replace name (38.12 D-60, D-61)", (
     ).toBe("This phone: 0 contacts · Backup: 3 contacts");
   });
 
+  it("the Replace all confirm says when it deletes people in this phone's Bin (A-WR-01)", () => {
+    expect(
+      replaceAllConfirmation(true, { ...SCALE, phoneBinNotInBackup: 3 })
+        .message,
+    ).toBe(
+      "This replaces the 12 contacts on this phone with the 40 in the backup. It also permanently deletes the 3 contacts in this phone's Bin that the backup doesn't have.\n\nOrbit will first create and verify a fresh automatic backup of this device.",
+    );
+    expect(
+      replaceAllConfirmation(false, { ...SCALE, phoneBinNotInBackup: 1 })
+        .message,
+    ).toContain("the 1 contact in this phone's Bin");
+    expect(replaceAllConfirmation(true, SCALE).message).not.toContain("Bin");
+  });
+
   it("the Replace all confirm states the scale, then the safety-backup sentence", () => {
     const configured = replaceAllConfirmation(true, SCALE);
     expect(configured.title).toBe("Replace all?");
@@ -872,8 +934,11 @@ describe("restore preview people and the one Replace name (38.12 D-60, D-61)", (
       "This replaces the 12 contacts on this phone with the 40 in the backup.\n\nOrbit will first create and verify a fresh automatic backup of this device.",
     );
     expect(
-      replaceAllConfirmation(false, { phoneContacts: 1, backupContacts: 1 })
-        .message,
+      replaceAllConfirmation(false, {
+        phoneContacts: 1,
+        backupContacts: 1,
+        phoneBinNotInBackup: 0,
+      }).message,
     ).toBe(
       "This replaces the 1 contact on this phone with the 1 in the backup.\n\nYour current local data will be lost and no automatic backup destination is configured.",
     );

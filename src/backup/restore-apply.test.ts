@@ -4497,8 +4497,14 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
   );
 
   it.each([
-    ["replace-all", { before: 2, restored: 2, removed: 1, movedToBin: 0 }],
-    ["merge", { before: 2, restored: 2, removed: 0, movedToBin: 0 }],
+    [
+      "replace-all",
+      { before: 2, restored: 2, removed: 1, movedToBin: 0, removedFromBin: 1 },
+    ],
+    [
+      "merge",
+      { before: 2, restored: 2, removed: 0, movedToBin: 0, removedFromBin: 0 },
+    ],
   ] as const)(
     "%s reports people: before, restored and removed (D-59)",
     async (mode, people) => {
@@ -4557,6 +4563,40 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
             )
           ).map((row) => row.uid),
         ).toEqual(["already-binned", "binned-1", "binned-2"]);
+    },
+  );
+
+  it.each([
+    ["replace-all", 2],
+    ["merge", 0],
+  ] as const)(
+    "%s counts the people in this phone's Bin it deletes permanently (A-WR-01)",
+    async (mode, removedFromBin) => {
+      const backup = await backupOf([{ uid: "kept" }, { uid: "binned-kept" }]);
+      const phone = await db();
+      await seed(phone, [
+        { uid: "kept" },
+        { uid: "binned-kept", archived: true },
+        { uid: "binned-gone-1", archived: true },
+        { uid: "binned-gone-2", archived: true },
+      ]);
+      expect(await applyRestore(phone, backup, mode)).toMatchObject({
+        status: "applied",
+        people: { before: 1, removed: 0, movedToBin: 0, removedFromBin },
+      });
+      const left = (
+        await phone.getAllAsync<{ uid: string }>(
+          "SELECT uid FROM contacts ORDER BY uid",
+        )
+      ).map((row) => row.uid);
+      if (mode === "replace-all") expect(left).toEqual(["binned-kept", "kept"]);
+      else
+        expect(left).toEqual([
+          "binned-gone-1",
+          "binned-gone-2",
+          "binned-kept",
+          "kept",
+        ]);
     },
   );
 

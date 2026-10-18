@@ -108,6 +108,7 @@ const preview = {
   contactCount: 42,
   backupContacts: 40,
   phoneContacts: 12,
+  phoneBinNotInBackup: 0,
   relatedRowCount: 18,
   tombstoneCount: 2,
 };

@@ -51,6 +51,7 @@ function render(params: {
     restored: number;
     removed: number;
     movedToBin: number;
+    removedFromBin: number;
   };
 }): string[] {
   const element = RestoreResultScreen({
@@ -58,7 +59,13 @@ function render(params: {
     route: {
       params: {
         mode: "replace-all",
-        people: { before: 1, restored: 1, removed: 0, movedToBin: 0 },
+        people: {
+          before: 1,
+          restored: 1,
+          removed: 0,
+          movedToBin: 0,
+          removedFromBin: 0,
+        },
         photosNeedingAttention: 0,
         photoCleanupPending: 0,
         scheduleResyncPending: false,
@@ -114,7 +121,13 @@ describe("Backup restored counts people (38.12 D-59, D-140)", () => {
     const lines = render({
       ...photos,
       mode: "replace-all",
-      people: { before: 12, restored: 40, removed: 3, movedToBin: 2 },
+      people: {
+        before: 12,
+        restored: 40,
+        removed: 3,
+        movedToBin: 2,
+        removedFromBin: 0,
+      },
     });
     expect(lines).toContain("Contacts on this phone before: 12");
     expect(lines).toContain("Contacts restored: 40");
@@ -127,7 +140,13 @@ describe("Backup restored counts people (38.12 D-59, D-140)", () => {
     const lines = render({
       ...photos,
       mode: "merge",
-      people: { before: 12, restored: 40, removed: 0, movedToBin: 0 },
+      people: {
+        before: 12,
+        restored: 40,
+        removed: 0,
+        movedToBin: 0,
+        removedFromBin: 0,
+      },
     });
     expect(lines).toContain("Contacts on this phone before: 12");
     expect(lines).toContain("Contacts restored: 40");

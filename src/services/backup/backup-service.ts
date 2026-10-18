@@ -10,7 +10,7 @@ import {
 } from "@/backup/backup-schema";
 import { buildExportReport } from "@/backup/export-manifest";
 import type { BackupEncryptionProfile, BackupManifest } from "@/backup/types";
-import { countContactsNotInBin } from "@/db/contact-read";
+import { countContactsNotInBin, listBinContactUids } from "@/db/contact-read";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import {
@@ -63,6 +63,12 @@ export type RestoreFileAggregate = BackupPreview & {
 export type RestorePreviewAggregate = RestoreFileAggregate & {
   /** D-60: this phone's people: its contacts not in the Bin (DAO count). */
   phoneContacts: number;
+  /**
+   * People in this phone's Bin that the backup does not carry: Replace all
+   * deletes them permanently, so its confirm says so when this is above 0
+   * (38.12 review A-WR-01; D-59, D-60). Merge never deletes them.
+   */
+  phoneBinNotInBackup: number;
 };
 
 type RestoreLoadFailure = {
@@ -214,11 +220,15 @@ export async function loadBackupForRestorePreview(
 ): Promise<ValidatedRestoreCandidate> {
   const file = loadBackupForRestore(input);
   if (file.status !== "ready") return file;
+  const backupUids = new Set(file.manifest.contacts.map((row) => row.uid));
   return {
     ...file,
     preview: {
       ...file.preview,
       phoneContacts: await countContactsNotInBin(exec),
+      phoneBinNotInBackup: (await listBinContactUids(exec)).filter(
+        (uid) => !backupUids.has(uid),
+      ).length,
     },
   };
 }
