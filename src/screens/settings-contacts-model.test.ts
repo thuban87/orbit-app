@@ -2,9 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  contactsRowSubtitle,
+  importEntryNeedsPrecheck,
+  importRowOpensPhotoRecovery,
   isActiveContactsRow,
   SETTINGS_CONTACTS_SECTION_ORDER,
   SETTINGS_CONTACTS_SECTIONS,
+  type SettingsContactsActionRow,
 } from "./settings-contacts-model";
 
 /**
@@ -100,5 +104,85 @@ describe("Settings contacts model", () => {
       "UnboundContacts",
     );
     expect(isRegisteredScreen("UnboundContacts")).toBe(true);
+  });
+});
+
+/**
+ * 38.12 D-105 / D-111: paused work stays findable on its Settings row, and a
+ * new import asks first while people are still left (failed rows included,
+ * convergence c5 F-2; photo-only work never blocks a new import, B-6).
+ */
+describe("paused import and check rows (D-105, D-111)", () => {
+  const actionRow = (key: string): SettingsContactsActionRow => {
+    const row = SETTINGS_CONTACTS_SECTIONS.flatMap(
+      (section) => section.rows,
+    ).find((candidate) => candidate.key === key);
+    if (row?.kind !== "action") throw new Error(`missing action row ${key}`);
+    return row;
+  };
+  const importRow = actionRow("import-contacts");
+  const checkRow = actionRow("check-linked-contacts");
+  const none = { importResume: null, checkCardsLeft: null };
+
+  it("keeps each row's normal subtitle with nothing paused", () => {
+    expect(contactsRowSubtitle(importRow, none)).toBe(importRow.subtitle);
+    expect(contactsRowSubtitle(checkRow, none)).toBe(checkRow.subtitle);
+    expect(importEntryNeedsPrecheck(null)).toBe(false);
+    expect(importRowOpensPhotoRecovery(null)).toBe(false);
+  });
+
+  it("reads 'Finish your import (4 left)' with 4 people pending", () => {
+    const importResume = { peopleLeft: 4, photosLeft: 0 };
+    expect(
+      contactsRowSubtitle(importRow, { importResume, checkCardsLeft: null }),
+    ).toBe("Finish your import (4 left)");
+    expect(importEntryNeedsPrecheck(importResume)).toBe(true);
+    expect(importRowOpensPhotoRecovery(importResume)).toBe(false);
+  });
+
+  it("counts a failed-only session: 'Finish your import (3 left)' and the pre-check (F-2)", () => {
+    const importResume = { peopleLeft: 3, photosLeft: 0 };
+    expect(
+      contactsRowSubtitle(importRow, { importResume, checkCardsLeft: null }),
+    ).toBe("Finish your import (3 left)");
+    expect(importEntryNeedsPrecheck(importResume)).toBe(true);
+  });
+
+  it("reads 'Finish adding photos (1 left)' for photo-only work, never '0 left', with no pre-check (B-6)", () => {
+    const importResume = { peopleLeft: 0, photosLeft: 1 };
+    const subtitle = contactsRowSubtitle(importRow, {
+      importResume,
+      checkCardsLeft: null,
+    });
+    expect(subtitle).toBe("Finish adding photos (1 left)");
+    expect(subtitle).not.toContain("0 left");
+    expect(importEntryNeedsPrecheck(importResume)).toBe(false);
+    expect(importRowOpensPhotoRecovery(importResume)).toBe(true);
+  });
+
+  it("people left win over photos left on the import row", () => {
+    const importResume = { peopleLeft: 2, photosLeft: 5 };
+    expect(
+      contactsRowSubtitle(importRow, { importResume, checkCardsLeft: null }),
+    ).toBe("Finish your import (2 left)");
+    expect(importRowOpensPhotoRecovery(importResume)).toBe(false);
+  });
+
+  it("reads 'Finish your check (2 left)' with a pending check of 2", () => {
+    expect(
+      contactsRowSubtitle(checkRow, { importResume: null, checkCardsLeft: 2 }),
+    ).toBe("Finish your check (2 left)");
+    expect(
+      contactsRowSubtitle(checkRow, { importResume: null, checkCardsLeft: 0 }),
+    ).toBe(checkRow.subtitle);
+  });
+
+  it("leaves every other row's subtitle alone", () => {
+    const busy = {
+      importResume: { peopleLeft: 4, photosLeft: 1 },
+      checkCardsLeft: 2,
+    };
+    const region = actionRow("phone-region");
+    expect(contactsRowSubtitle(region, busy)).toBe(region.subtitle);
   });
 });
