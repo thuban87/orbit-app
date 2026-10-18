@@ -342,22 +342,23 @@ export function BackupScreen({
       void runExport(false);
       return;
     }
-    // 38.12 D-63: two export choices and a Cancel. The readable export runs
-    // only from its own explicit button (V6); Cancel, Back and the scrim
-    // export nothing and release the single-flight claim.
+    // 38.12 D-63: two export choices and a Cancel. D-149 (owner): with
+    // encryption on, the encrypted export is the primary button; the readable
+    // export runs only from its own explicit secondary button (V6). Cancel,
+    // Back and the scrim export nothing and release the single-flight claim.
     const choice = await choose({
-      title: "Export readable JSON?",
+      title: "Export your data?",
       message:
-        "Anyone with this file can read its contents. Use this only when you need a portable JSON backup.",
-      confirmLabel: "Export readable JSON",
-      secondaryLabel: "Export encrypted",
+        "The encrypted export needs your backup passphrase to open. Anyone with a readable JSON file can read its contents, so use it only when you need a portable JSON backup.",
+      confirmLabel: "Export encrypted",
+      secondaryLabel: "Export readable JSON",
       cancelLabel: "Cancel",
     });
     if (choice === "cancel") {
       exportInFlightRef.current = false;
       return;
     }
-    void runExport(choice === "confirm");
+    void runExport(choice === "secondary");
   }, [encryptionEnabled, runExport]);
 
   const validateRestore = useCallback(

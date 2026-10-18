@@ -335,13 +335,13 @@ describe("export choice with Cancel (38.12 D-63)", () => {
     )();
   }
 
-  it("offers both exports and a Cancel in one themed choice", async () => {
+  it("offers both exports and a Cancel in one themed choice; encrypted is the primary (D-149)", async () => {
     await exportWith("cancel");
     expect(mocks.choose).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        title: "Export readable JSON?",
-        confirmLabel: "Export readable JSON",
-        secondaryLabel: "Export encrypted",
+        title: "Export your data?",
+        confirmLabel: "Export encrypted",
+        secondaryLabel: "Export readable JSON",
         cancelLabel: "Cancel",
       }),
     );
@@ -354,18 +354,18 @@ describe("export choice with Cancel (38.12 D-63)", () => {
     expect(mocks.manualExport).not.toHaveBeenCalled();
   });
 
-  it("the readable choice exports readable JSON; the secondary exports encrypted", async () => {
+  it("the primary choice exports encrypted; only the secondary exports readable JSON (D-149)", async () => {
     await exportWith("confirm");
     await vi.waitFor(() =>
       expect(mocks.manualExport).toHaveBeenCalledWith({
-        readableOverride: true,
+        readableOverride: false,
       }),
     );
     mocks.manualExport.mockClear();
     await exportWith("secondary");
     await vi.waitFor(() =>
       expect(mocks.manualExport).toHaveBeenCalledWith({
-        readableOverride: false,
+        readableOverride: true,
       }),
     );
   });
