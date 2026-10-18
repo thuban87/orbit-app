@@ -191,7 +191,9 @@ const navigation = {
 
 type Params = { host?: unknown } | undefined;
 
-function render(params: Params = { host: DIGEST }): TestElement[] {
+const DIGEST_PARAMS: Params = { host: DIGEST };
+
+function render(params: Params = DIGEST_PARAMS): TestElement[] {
   hooks.stateIndex = 0;
   hooks.refIndex = 0;
   hooks.effectIndex = 0;
@@ -209,7 +211,9 @@ async function flush() {
   }
 }
 
-async function settled(params?: Params): Promise<TestElement[]> {
+async function settled(
+  params: Params = DIGEST_PARAMS,
+): Promise<TestElement[]> {
   render(params);
   await flush();
   return render(params);
@@ -341,7 +345,8 @@ describe("legacy picker denied states have a way out (D-57)", () => {
       verdict: "permanent",
       denialCount: 3,
     });
-    const tree = await settled(undefined);
+    // A route opened without params (`LegacyContactPicker: … | undefined`).
+    const tree = await settled({});
     press(tree, "Not now");
     expect(mocks.exitFlow).toHaveBeenCalledWith(navigation, {
       kind: "settings",

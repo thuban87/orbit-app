@@ -13,6 +13,7 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { usePhotoBudgetPrompt } from "@/components/PhotoBudgetSheet";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { Button, EmptyState } from "@/components/ui";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@/logic/contact-picker-selection";
 import type { ContactPickerRow } from "@/logic/contact-picker-source";
 import { toPickerRows } from "@/logic/contact-picker-source";
+import { DEFAULT_FLOW_HOST, exitFlow } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
   getContactsPermissionState,
@@ -30,7 +32,10 @@ import {
 } from "@/services/contacts/use-read-contacts-permission";
 import { getDeviceRegion } from "@/services/device-region";
 import { routePickedImport } from "@/services/import/import-acquire";
+import { withImportFlowActive } from "@/services/import/import-flow-guard";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { Logger } from "@/utils/logger";
 import { plural } from "@/utils/plural";
 import {
   listContactsSummary,
@@ -47,11 +52,23 @@ type LoadState =
 
 const SETTINGS_ESCAPE_DENIAL_COUNT = 2;
 
+const LOG_SCOPE = "legacy-contact-picker";
+
+/** The error snackbar when Import fails; the list and selection stay (D-57). */
+export const LEGACY_IMPORT_FAILED_MESSAGE =
+  "Couldn't import those contacts. Your selection is kept, so you can try again.";
+
 /** API <= 36's standalone, provider-backed multi-select contact picker. */
 export function LegacyContactPickerScreen({
   navigation,
+  route,
 }: RootStackScreenProps<"LegacyContactPicker">) {
   const { colors } = useTheme();
+  // 38.12 D-57/D-110: the flow host this picker was opened from. "Not now"
+  // leaves through it (Phase 39 retargets a first-run import via the host,
+  // 39 D-61) and the import carries it on to review.
+  const host = route.params?.host;
+  const leave = () => exitFlow(navigation, host ?? DEFAULT_FLOW_HOST);
   const mounted = useRef(false);
   const [rows, setRows] = useState<ContactPickerRow[]>([]);
   const [selectedLookupKeys, setSelectedLookupKeys] = useState<Set<string>>(
@@ -157,32 +174,44 @@ export function LegacyContactPickerScreen({
     setImporting(true);
     setOmittedCount(0);
     try {
-      // An import path: full-size photos (D-137, D-118).
-      const result = await readAllContacts(selectedKeys, {
-        preferFullSize: true,
-      });
-      if (!mounted.current) return;
-      if (result.omittedCount > 0) setOmittedCount(result.omittedCount);
+      // 38.12 D-57: the import runs inside the import-flow guard, like the
+      // system path (`start-contact-import.ts`), so the launch sweep never
+      // offers to "resume" the session this import is creating.
+      await withImportFlowActive(async () => {
+        // An import path: full-size photos (D-137, D-118).
+        const result = await readAllContacts(selectedKeys, {
+          preferFullSize: true,
+        });
+        if (!mounted.current) return;
+        if (result.omittedCount > 0) setOmittedCount(result.omittedCount);
 
-      const exec = getExecutor();
-      const settings = await getAppSettings(exec);
-      if (!mounted.current) return;
-      // "Go back" on the photo-budget sheet returns { status: "cancelled" }:
-      // nothing was imported and the list keeps its selection (D-133).
-      await routePickedImport(
-        exec,
-        result.contacts,
-        {
-          effectivePhoneRegion:
-            settings.phoneRegionOverride ?? getDeviceRegion(),
-          // Read settings and clock at Import, not when the picker opened.
-          now: localDateTime(),
-          decidePhotoBudget: askPhotoBudget,
-        },
-        navigation,
-      );
-    } catch {
-      if (mounted.current) setLoadState("error");
+        const exec = getExecutor();
+        const settings = await getAppSettings(exec);
+        if (!mounted.current) return;
+        // "Go back" on the photo-budget sheet returns { status: "cancelled" }:
+        // nothing was imported and the list keeps its selection (D-133).
+        await routePickedImport(
+          exec,
+          result.contacts,
+          {
+            effectivePhoneRegion:
+              settings.phoneRegionOverride ?? getDeviceRegion(),
+            // Read settings and clock at Import, not when the picker opened.
+            now: localDateTime(),
+            decidePhotoBudget: askPhotoBudget,
+            // D-110 (convergence c1 A-1): the flow host travels on.
+            host: route.params?.host,
+          },
+          navigation,
+        );
+      });
+    } catch (error) {
+      // 38.12 D-57: a failed import keeps the loaded list and the selection,
+      // so the user can try again; an error snackbar says what happened.
+      Logger.error(LOG_SCOPE, "import of picked contacts failed", error);
+      if (mounted.current) {
+        showSnackbar({ kind: "error", label: LEGACY_IMPORT_FAILED_MESSAGE });
+      }
     } finally {
       if (mounted.current) setImporting(false);
     }
@@ -202,9 +231,10 @@ export function LegacyContactPickerScreen({
           />
         ) : loadState === "denied" ? (
           <PermissionMessage
-            actionLabel="Grant access"
+            actionLabel="Try again"
             copy="Contact access is needed to choose contacts to import."
             onAction={() => void requestAccess()}
+            onNotNow={leave}
             secondaryAction={
               denialCount >= SETTINGS_ESCAPE_DENIAL_COUNT
                 ? {
@@ -220,11 +250,19 @@ export function LegacyContactPickerScreen({
             actionLabel="Open Settings"
             copy="Contact access is off for Orbit. Allow it in Settings to choose contacts to import."
             onAction={() => void openContactsSettings()}
+            onNotNow={leave}
           />
         ) : loadState === "error" ? (
-          <PickerMessage>
-            Couldn&apos;t read contacts. Please go back and try again.
-          </PickerMessage>
+          <EmptyState
+            testID="legacy-picker-read-error"
+            icon="warning"
+            heading="Couldn't read contacts"
+            body="Check that Orbit can still read contacts on this phone, then try again."
+            action={{
+              label: "Try again",
+              onPress: () => void refreshPermission(),
+            }}
+          />
         ) : (
           <>
             <TextInput
@@ -364,6 +402,8 @@ interface PermissionMessageProps {
   actionLabel: string;
   copy: string;
   onAction: () => void;
+  /** The in-screen way out (D-57); absent on the priming screen. */
+  onNotNow?: () => void;
   secondaryAction?: { copy: string; label: string; onPress: () => void };
 }
 
@@ -371,6 +411,7 @@ function PermissionMessage({
   actionLabel,
   copy,
   onAction,
+  onNotNow,
   secondaryAction,
 }: PermissionMessageProps) {
   const { colors } = useTheme();
@@ -379,35 +420,21 @@ function PermissionMessage({
       <Text style={[styles.permissionCopy, { color: colors.textSecondary }]}>
         {copy}
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={actionLabel}
-        onPress={onAction}
-        style={[styles.permissionAction, { backgroundColor: colors.accent }]}
-      >
-        <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
-          {actionLabel}
-        </Text>
-      </Pressable>
+      <Button role="primary" label={actionLabel} onPress={onAction} />
       {secondaryAction ? (
         <View style={styles.secondaryAction}>
           <Text style={{ color: colors.textSecondary }}>
             {secondaryAction.copy}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={secondaryAction.label}
+          <Button
+            role="secondary"
+            label={secondaryAction.label}
             onPress={secondaryAction.onPress}
-            style={[
-              styles.settingsAction,
-              { borderColor: colors.border, backgroundColor: colors.surface },
-            ]}
-          >
-            <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
-              {secondaryAction.label}
-            </Text>
-          </Pressable>
+          />
         </View>
+      ) : null}
+      {onNotNow ? (
+        <Button role="tertiary" label="Not now" onPress={onNotNow} />
       ) : null}
     </View>
   );
@@ -419,21 +446,7 @@ const styles = StyleSheet.create({
   message: { flex: 1, justifyContent: "center", alignItems: "center" },
   permissionMessage: { flex: 1, justifyContent: "center", gap: 16 },
   permissionCopy: { fontSize: 16, lineHeight: 24, textAlign: "center" },
-  permissionAction: {
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-  },
   secondaryAction: { alignItems: "center", gap: 8 },
-  settingsAction: {
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
   search: {
     minHeight: 44,
     borderWidth: 1,
