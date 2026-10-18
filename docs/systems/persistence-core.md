@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -72,7 +72,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/030-your-week-period.ts` | Adds the validated portable Rolling 7 Days / Calendar Week setting. |
 | Migration | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Adds `occurred_at` indexes on `interactions` and `group_events` so Your Week reads SEARCH the period. |
 | Migration | `src/db/migrations/032-import-batch-cadence.ts` | Adds the nullable positive-integer `import_sessions.batch_interval_days` so a bulk import's Bound batch cadence survives resume (38.4 D-57); schema head 32 until 38.10. |
-| Migration | `src/db/migrations/033-knowledge-homes.ts` | Adds `off_limits`, memory interaction links and `group_note_copy`, `interactions.note_ai_locked`, two AI-default settings; rebuilds `current_state_entries` dated with no current flag; moves every fuel row by kind with a per-row proof; drops `fuel`; purges soft-deleted knowledge; the current schema head (`TARGET_VERSION = KNOWLEDGE_HOMES_SCHEMA_VERSION`, 33). |
+| Migration | `src/db/migrations/033-knowledge-homes.ts` | Adds `off_limits`, memory interaction links and `group_note_copy`, `interactions.note_ai_locked`, two AI-default settings; rebuilds `current_state_entries` dated with no current flag; moves every fuel row by kind with a per-row proof; drops `fuel`; purges soft-deleted knowledge. |
+| Migration | `src/db/migrations/034-snooze-review-memory-resume.ts` | Rebuilds `reconcile_source_snapshot` with a `'source'` family, adds `resume_prompted_at` to both session tables, converts every `reminders_off = 1` to the indefinite snooze; the current schema head (`TARGET_VERSION = SNOOZE_REVIEW_RESUME_SCHEMA_VERSION`, 34). |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -115,6 +116,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Plain additive `CREATE INDEX idx_interactions_occurred_at` / `idx_group_events_occurred_at` (no existence guard; no row read or rewritten; no backup-format change — indexes are not portable data). |
 | `src/db/migrations/032-import-batch-cadence.ts` | Plain additive `ALTER TABLE import_sessions ADD COLUMN batch_interval_days INTEGER CHECK (NULL or positive integer)`; no row read or rewritten, so existing sessions read Unbound with no cadence; no backup-format change — import sessions are local-only and not backup data (migration 012). The Bound ⇒ cadence pairing is enforced by the session writer, not a cross-column CHECK. |
 | `src/db/migrations/033-knowledge-homes.ts` | One-way knowledge-homes migration (ADR-208): uids re-minted collision-complete before any copy; each copied row proven by uid; contentless non-Off-Limits rows skipped and counted; `PRAGMA foreign_key_check(<table>)` scoped to its own tables so an unrelated old violation cannot brick launch; exports `applyMigration033` returning a result struct for tests. Shares its mapping with `src/db/legacy-fuel-mapping.ts`, pinned by a test that runs both on the same seeds. |
+| `src/db/migrations/034-snooze-review-memory-resume.ts` | One-way 38.12 migration (ADR-234, ADR-236, ADR-237): (a) rebuilds `reconcile_source_snapshot` copy → count-and-match → DROP → RENAME with `field_family` admitting `'source'`, throwing on a mismatch so the runner rolls back; (b) adds nullable `resume_prompted_at` to `import_sessions` and `reconciliation_sessions`; (c) sets `snooze_until = '9999-12-31'` and clears `reminders_off` on every muted row, leaving `modified_at` unchanged. The sentinel is a literal, pinned equal to `INDEFINITE_SNOOZE_UNTIL` by its test. None of these tables is exported, so no backup-format change. |
 | `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
@@ -156,6 +158,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 27. Migration 029 adds non-secret multi-lane AI settings, the `ai_connections` table, and ordered `personalization_sections`. The active lane is durable text rather than a local row ID; credentials remain outside SQLite in SecureStore.
 28. Migration 030 additively adds the checked `your_week_period` singleton setting with a Rolling 7 Days default. It carries a user preference only; Digest activity remains derived from canonical tables.
 29. Migration 033 (ADR-207, ADR-208, ADR-210) gives the retired fuel kinds their homes: it creates `off_limits`, adds memory links and the Group-Note-copy marker (with `CHECK (group_note_copy = 0 OR allow_ai = 0)`), adds `interactions.note_ai_locked` (`CHECK (note_ai_locked = 0 OR allow_ai = 0)`) and the Gift Ideas / Thought of Them AI defaults (`DEFAULT 0`), and rebuilds `current_state_entries` with `entry_date NOT NULL`, `entry_time`, `url`, links and markers and no `is_current`, proving the rebuild row by row. It then purges soft-deleted memories and key people with tombstones, converts `custom` memories to `general` keeping the label, copies and proves each fuel row into its home AI-off, converts fuel tombstones, drops `fuel`, and runs scoped foreign-key checks. A non-text legacy value fails the whole step as `Migration033IntegrityError`.
+30. Migration 034 (ADR-234, ADR-236, ADR-237) widens the reconcile review-memory CHECK through a verified table rebuild, adds the two asked-once resume markers and converts per-person mute into the indefinite snooze. It is the phase's only migration; head+1 was checked on disk at authoring (D-29).
 
 ### Running launch maintenance
 
@@ -178,7 +181,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
 | `SWEEP_HOOK_TIMEOUT_MS` | `60000` | `src/services/launch-sweep.ts` | Per-hook launch-sweep wait budget (D-30); sized for a normal automatic backup. |
-| `TARGET_VERSION` | `33` (`KNOWLEDGE_HOMES_SCHEMA_VERSION`) | `src/db/database.ts` | Current registered schema head, including the knowledge homes (migration 033). |
+| `TARGET_VERSION` | `34` (`SNOOZE_REVIEW_RESUME_SCHEMA_VERSION`) | `src/db/database.ts` | Current registered schema head, including the snooze, review-memory and resume-marker migration (034). |
 
 ## Decisions
 
@@ -201,6 +204,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-210:** Dated Last Talked About and Current Location — the `current_state_entries` rebuild.
 - **ADR-211:** Linked Interaction Notes — the link columns and unique link indexes.
 - **ADR-212:** One Delete Pattern — the soft-deleted purge; no trash sweep.
+- **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — migration 034 part c.
+- **ADR-236:** Check Linked Contacts Never Re-Asks a Reviewed Difference — migration 034 part a, the `'source'` review family.
+- **ADR-237:** A Paused Import or Check Asks Once — migration 034 part b, `resume_prompted_at`.
 - **ADR-213:** Moving Entries — `note_ai_locked` and `from_share`.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — uses migration 002 for durable, backup-native local notification policy.
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — uses migration 003 for validated, app-level Orrery sun preferences.
@@ -275,6 +281,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 29. **Do not turn `your_week_period` into a Digest cache.** Migration 030 persists a bounded app setting; metrics, heatmap, and detail remain read-time derivations.
 
 - **Declare maintenance prerequisites at registration.** Source order and promise chaining are not dependency contracts; a failed or skipped prerequisite must make each dependent unavailable for that pass without creating a durable hold.
+- **A shipped migration writes literals, not runtime constants.** Migration 034 writes `'9999-12-31'` itself and a test pins it to `INDEFINITE_SNOOZE_UNTIL`; importing the constant would change shipped behaviour if the constant ever changed.
 - **Never bulk-format shipped migrations.** Forward-only migration source is production history; formatting-only rewrites to an already-shipped step create needless audit risk and must be excluded from automated formatting.
 - **Do not attach sweep-ordered work to a trigger's promise.** A re-entrant `runLaunchSweep()` resolves immediately while the in-flight pass is still running; code that must observe the sweep's purge/expiry writes subscribes with `onSweepSettled`, which only the owning run fires.
 - **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
@@ -334,3 +341,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 35 | Added migration 028's durable default/remembered Compose message-mode settings. |
 | 2026-09-02 | 36 | Added migration 029's non-secret AI connection, personalization, and permission-default schema. |
 | 2026-09-02 | 38 | Added migration 030's validated portable Your Week period preference without adding Digest-domain storage. |
+| 2026-10-18 | 38.12 | Added migration 034 (schema head 34, `SNOOZE_REVIEW_RESUME_SCHEMA_VERSION`): the `'source'` review family through a verified `reconcile_source_snapshot` rebuild, `resume_prompted_at` on both session tables, and the mute-to-indefinite-snooze conversion (ADR-234, ADR-236, ADR-237). |
