@@ -28,7 +28,10 @@ describe("Merge contacts single-flight (WR-01)", () => {
   );
 
   it("claims the in-flight ref before the confirm opens", () => {
-    const guard = handler.indexOf("if (mergingRef.current) return;");
+    // 38.12 review B-WR-10: the guard also refuses before the summary loads.
+    const guard = handler.indexOf(
+      "if (mergingRef.current || counts === null) return;",
+    );
     const claim = handler.indexOf("mergingRef.current = true;");
     const prompt = handler.indexOf("confirm({");
     expect(guard).toBeGreaterThan(-1);
@@ -47,8 +50,12 @@ describe("Merge contacts single-flight (WR-01)", () => {
     const open = source.lastIndexOf("<Pressable");
     const button = source.slice(open, source.indexOf("</Pressable>", open));
     expect(button).toContain("Merge contacts");
-    expect(button).toContain("disabled={merging}");
-    expect(button).toContain("accessibilityState={{ disabled: merging }}");
+    // B-WR-10: disabled while in flight AND until the summary has loaded.
+    expect(source).toMatch(/const mergeDisabled =\s*merging \|\|/);
+    expect(button).toContain("disabled={mergeDisabled}");
+    expect(button).toContain(
+      "accessibilityState={{ disabled: mergeDisabled }}",
+    );
     expect(button).toContain("colors.surfaceElevated");
   });
 });
