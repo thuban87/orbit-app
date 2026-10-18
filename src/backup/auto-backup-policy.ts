@@ -27,24 +27,6 @@ export function shouldRunAutomaticBackup(
   );
 }
 
-/** Keep the newest verified snapshot even when the clock moves backwards. */
-export function filesToPrune(
-  files: Array<{ name: string; verifiedOrder: number }>,
-  keepDays: number,
-  now: Date,
-): string[] {
-  const owned = files.filter((file) => isOwnedAutomaticBackupName(file.name));
-  if (owned.length <= 1) return [];
-  const newest = owned.reduce((a, b) =>
-    a.verifiedOrder >= b.verifiedOrder ? a : b,
-  );
-  const cutoff = now.getTime() - keepDays * 86_400_000;
-  return owned
-    .filter((file) => file.name !== newest.name)
-    .filter((file) => (backupNameTimestampMs(file.name) ?? Number.NaN) < cutoff)
-    .map((file) => file.name);
-}
-
 /** Filename-only retention for files older than the configured window. */
 export function isExpiredAutomaticBackup(
   name: string,

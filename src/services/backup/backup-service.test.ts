@@ -1289,6 +1289,38 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
     );
   });
 
+  it("never prunes the snapshot it just wrote, even when its name reads as expired (A-IN-03)", async () => {
+    // Minute-precision names: with 0 retention days the just-written name
+    // (00:00) is older than `now` (00:00:30), so only identity protects it.
+    const now = new Date(2026, 7, 25, 0, 0, 30);
+    const written = automaticBackupFileName(now);
+    const removed: string[] = [];
+    let listed: string[] = [];
+    const service = createAutomaticBackupService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      now,
+      readPhotoBase64: async () => "",
+      directoryUri: "content://backup",
+      retentionDays: 0,
+      storage: {
+        writeVerified: async (_directory: string, name: string) => {
+          listed = [`content://backup/${name}`];
+          return `content://backup/${name}`;
+        },
+        list: async () => listed,
+        remove: async (uri) => {
+          removed.push(uri);
+        },
+      },
+    });
+    await expect(service.writeVerifiedSnapshot()).resolves.toMatchObject({
+      status: "written",
+      filename: written,
+    });
+    expect(removed).toEqual([]);
+  });
+
   it("pins the device-local health diagnostic the Backup card reads", () => {
     expect(AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC).toBe(
       "The latest automatic backup was too large to create.",
