@@ -207,20 +207,6 @@ export async function discardStaleReconcileSessions(
   return sweptStagedPhotoRelPaths;
 }
 
-/**
- * A deliberately corruption-tolerant descriptor read for resume/discard UI.
- * It never touches a card payload, including malformed `diff_json`.
- */
-export async function getNewestPendingReconcileSessionId(
-  exec: SqlExecutor,
-): Promise<number | null> {
-  const row = await exec.getFirstAsync<{ id: number }>(
-    `SELECT id FROM reconciliation_sessions WHERE status = 'pending'
-     ORDER BY created_at DESC, id DESC LIMIT 1`,
-  );
-  return row?.id ?? null;
-}
-
 export interface ReconcileCompletionCounts {
   checked: number;
   changed: number;

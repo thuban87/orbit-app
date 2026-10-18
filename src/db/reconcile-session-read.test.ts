@@ -19,7 +19,6 @@ import {
 import {
   countReconcileCardsLeft,
   discardStaleReconcileSessions,
-  getNewestPendingReconcileSessionId,
   getNewestResumableReconcileSession,
   listReconcileCardIdentities,
   listReconcileSessionCards,
@@ -284,21 +283,6 @@ describe("reconcile-session-read", () => {
         counts.sourceMissing +
         counts.unresolved,
     ).toBe(counts.changed);
-  });
-
-  it("gets the newest pending id without reading malformed card payloads", async () => {
-    const older = await seedSession(exec, "2026-08-30 11:00:00");
-    const newest = await seedSession(exec, NOW);
-    await exec.runAsync(
-      `INSERT INTO reconciliation_session_cards
-       (uid, session_id, contact_id, diff_json, created_at, modified_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [newUid(), newest, await seedContact(exec), "not-json", NOW, NOW],
-    );
-    await expect(getNewestPendingReconcileSessionId(exec)).resolves.toBe(
-      newest,
-    );
-    expect(older).toBeLessThan(newest);
   });
 });
 
