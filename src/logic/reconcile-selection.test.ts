@@ -227,9 +227,11 @@ describe("phone picks (D-47, D-102; convergence c3 D-1, c4 E-5)", () => {
   it("a detail pick applies exactly the picks in display order and elects the first primary", () => {
     const diff = phoneDiff();
     const [first, , third] = ids(diff);
-    const [selection] = buildReconcileSelections(diff, {
-      phones: [third, first],
-    });
+    const [selection] = buildReconcileSelections(
+      diff,
+      { phones: [third, first] },
+      new Set(["phones"]),
+    );
     expect(selection.useSource).toBe(true);
     expect(selection.electPrimary).toBe(true);
     expect(selection.sourceMethods).toEqual([
@@ -246,10 +248,34 @@ describe("phone picks (D-47, D-102; convergence c3 D-1, c4 E-5)", () => {
     );
   });
 
+  it("untapped default picks are applied but elect nothing; only a tapped field elects (38.12 D-144)", () => {
+    const diff = phoneDiff();
+    const defaults = defaultReconcileChoices(diff);
+    const [untapped] = buildReconcileSelections(diff, defaults);
+    expect(untapped.useSource).toBe(true);
+    expect(untapped.sourceMethods).toHaveLength(3);
+    expect(untapped.electPrimary).toBeUndefined();
+    // A tap on another field does not let this one elect.
+    const [otherTapped] = buildReconcileSelections(
+      diff,
+      defaults,
+      new Set(["emails"]),
+    );
+    expect(otherTapped.electPrimary).toBeUndefined();
+    const [tapped] = buildReconcileSelections(
+      diff,
+      defaults,
+      new Set(["phones"]),
+    );
+    expect(tapped.electPrimary).toBe(true);
+  });
+
   it("bulk Use Contact Values adds every phone value, labelled, and elects nothing", () => {
     const [selection] = buildReconcileSelections(
       phoneDiff(),
       "use-contact-values",
+      // Bulk never elects, whatever was tapped (D-102, D-144).
+      new Set(["phones"]),
     );
     expect(selection.electPrimary).toBeUndefined();
     expect(selection.sourceMethods?.map((method) => method.label)).toEqual([
