@@ -50,4 +50,4 @@ The system uses user-triggered, one-way reconciliation of name, phones, emails, 
 - `src/screens/ReconcileGridScreen.tsx` — presents Settings-launched batch review and safe bulk actions.
 
 **Depends on:** ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment)
-**Required by:** ADR-073 (Merge-Reparented, Purge-Cascaded Interaction Assists); ADR-160 (Committed-Identity Contact Edits and Exact-Source Reconciliation)
+**Required by:** ADR-073 (Merge-Reparented, Purge-Cascaded Interaction Assists); ADR-160 (Committed-Identity Contact Edits and Exact-Source Reconciliation); ADR-236 (Check Linked Contacts Never Re-Asks a Reviewed Difference, Applies Only Tapped Values, and Only a User's Tick Elects a Primary); ADR-237 (A Paused Import or Check Asks Once, Then Waits on Its Settings Row, and a New Import Asks First)

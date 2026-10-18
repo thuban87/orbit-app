@@ -51,4 +51,4 @@ The system pre-schedules bounded, inexact local decay reminders and reconciles t
 - `src/services/notifications/notification-ids.ts` — owns stable identifiers and generic notification copy.
 
 **Depends on:** ADR-011 (Query-Time Status and Never-Contacted Segregation); ADR-034 (Birthday Banner and Re-query Dashboard Freshness)
-**Required by:** None.
+**Required by:** None.; ADR-247 (Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day, and Notifications Shows When Reminders Really Arrive)

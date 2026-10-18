@@ -48,4 +48,4 @@ The system uses the preserved `Settings` route as a navigation-first directory: 
 - `src/screens/SettingsInteractionsScreen.tsx` — migrates interaction defaults while preserving the specialized Interaction Assist path.
 
 **Depends on:** ADR-080 (Four-Tab Bottom Navigation Shell with Per-Tab Stacks)
-**Required by:** ADR-175 (Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child); ADR-230 (A Settings Page for Profile Backgrounds and a Choose-Only Background Sheet)
+**Required by:** ADR-175 (Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child); ADR-230 (A Settings Page for Profile Backgrounds and a Choose-Only Background Sheet); ADR-246 (One Settings Row and Section Card on Every Settings Page, One Drag-and-⋯ List Pattern, a Truthful About Privacy Line, and Plain Switch Labels)

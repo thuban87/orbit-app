@@ -49,4 +49,4 @@ We will raise `BACKUP_FORMAT_VERSION` from 7 to 8 (D-55). Format 8 carries `offL
 - `src/services/backup/backup-service.ts` — restore preview shows the file's own format version.
 
 **Depends on:** ADR-208 (Migration 033 Copies and Verifies Every Fuel Row); ADR-057 (Full-State Versioned Backups); ADR-117 (Per-Interaction Allow-AI Consent Gate)
-**Required by:** None
+**Required by:** ADR-242 (Backup Format 9 Carries Favourites — Merge Restore Unions Them, Replace-All Takes the Backup's, and the Bin Is Never Favourited)

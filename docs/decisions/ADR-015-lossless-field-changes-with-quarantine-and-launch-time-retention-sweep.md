@@ -48,4 +48,4 @@ The system snapshots destructive custom-field changes to `field_history` in the 
 - `App.tsx` — registers the field sweep before the cold-start trigger runs.
 
 **Depends on:** ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL)
-**Required by:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup); ADR-089 (Recoverable Memory Lifecycle and Contact-Operation Integrity)
+**Required by:** ADR-021 (Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup); ADR-089 (Recoverable Memory Lifecycle and Contact-Operation Integrity); ADR-245 (A Flagged Custom-Field Value Opens Edit at That Field, Review Now Lists the People to Fix, and View History Is a Read-Only Screen Behind "Keep Past Values")

@@ -55,4 +55,4 @@ The system schedules one unconditional `digest:weekly` native trigger on Sunday 
 - `src/screens/SettingsScreen.tsx` — exposes the master-gated Weekly digest control through the shared persistence path.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-040 (Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing); ADR-041 (Notification Settings, Privacy Channels, and Birthday Alerts)
-**Required by:** None.
+**Required by:** None.; ADR-247 (Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day, and Notifications Shows When Reminders Really Arrive)

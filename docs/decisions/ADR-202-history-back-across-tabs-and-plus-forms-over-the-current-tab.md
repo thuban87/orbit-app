@@ -60,4 +60,4 @@ The tab navigator uses `backBehavior="history"`: Back on a tab root returns to t
 - `src/screens/CustomFieldsScreen.tsx` — `useBottomClearance` on the field editor.
 
 **Depends on:** ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing); ADR-166 (Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress); ADR-173 (Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance); ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log)
-**Required by:** None
+**Required by:** ADR-241 (Import, Check, Merge and Restore Carry a Flow Host, and Settings-Started Flows Finish Back on Settings)

@@ -54,4 +54,4 @@ The ⋯ for a bound contact is Snooze… · Unbind contact · Move to Bin · sep
 - `src/components/icons/icon-registry.ts` — `chevron-up`.
 
 **Depends on:** ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors); ADR-183 (224 Profile Photo Growing Upward, App-Bar Favourite Star and a Reusable Profile Photo Lightbox); ADR-150 (Semantic Profile Hierarchy and Source-Owned Knowledge Editing)
-**Required by:** None
+**Required by:** ADR-233 (The Profile ⋯ Follows Lifecycle State, Bind and Unbind Show Undo, and Unbound People Get a Bind-Card Frequency, a Disabled Star and a Settings Row)

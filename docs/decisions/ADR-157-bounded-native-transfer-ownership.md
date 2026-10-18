@@ -49,4 +49,4 @@ The system gives every external transfer an explicit owner, cancellation path, b
 - `src/ai/secure-fetch.ts` — maps native bounded-transfer outcomes to sanitized application errors.
 
 **Depends on:** ADR-020 (Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download); ADR-051 (Public-HTTPS Custom AI Egress Guard); ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots)
-**Required by:** None
+**Required by:** ADR-244 (Backup Files Get Readable Local-Time Names, Intake Accepts Only content:// Links, Back Up Now Shares the Automatic Path, and the Backup Folder Works Through a Native Module)

@@ -49,4 +49,4 @@ The backup manifest advances to format 5 and exports/restores the complete non-s
 - `src/services/photos/background-storage.ts` — stages and finalizes restored background bytes.
 
 **Depends on:** ADR-058 (Optional Encrypted Backups and Previewed Local Restoration)
-**Required by:** None
+**Required by:** ADR-242 (Backup Format 9 Carries Favourites — Merge Restore Unions Them, Replace-All Takes the Backup's, and the Bin Is Never Favourited)

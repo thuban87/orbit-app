@@ -52,4 +52,4 @@ The system stores notification policy in the additive SQLite `app_settings` sing
 - `src/services/notifications/notification-schedule.ts` — maps the stored policy to channel choice and scheduled requests.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** ADR-055 (Dedicated Weekly Digest Scheduling and Persisted Notification Policy)
+**Required by:** ADR-055 (Dedicated Weekly Digest Scheduling and Persisted Notification Policy); ADR-247 (Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day, and Notifications Shows When Reminders Really Arrive)

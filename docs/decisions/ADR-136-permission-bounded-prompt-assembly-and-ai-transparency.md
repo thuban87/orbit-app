@@ -49,4 +49,4 @@ The system assembles one immutable resolved prompt from only individually permit
 - `src/components/AIComposeContextReview.tsx` — displays Compose contact context from the resolved prompt.
 
 **Depends on:** ADR-079 (On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation); ADR-107 (Off Limits Excluded from All AI Egress)
-**Required by:** ADR-214 (AI Permission for the New Knowledge Homes, and Compose Research After Fuel)
+**Required by:** ADR-214 (AI Permission for the New Knowledge Homes, and Compose Research After Fuel); ADR-248 (AI Egress Narrows — Custom Guidance Only When a Choice Uses It, Instruction Paragraphs Without Hard Breaks, and Photo Fields Never Sent or Offered); ADR-249 (AI Settings Tell the Truth — a Connected Lane Shows Connected, the Hub Shows Current Values, and One "Style and Context" Row Replaces Two)

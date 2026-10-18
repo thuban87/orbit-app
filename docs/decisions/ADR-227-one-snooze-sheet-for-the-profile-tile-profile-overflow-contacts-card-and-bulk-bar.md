@@ -63,4 +63,4 @@ The bulk bar's Snooze always opens the sheet, which is the one place for bulk sn
 - `src/logic/dashboard-bulk-action-session.ts` — `runClaimedBulkWrite`.
 
 **Depends on:** ADR-103 (Atomic Composed Dashboard Bulk Mutations); ADR-111 (Cadence-Guarded Profile Metrics and Composed Relationship Actions); ADR-102 (Frozen-Universe Dashboard Multi-Select); ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State)
-**Required by:** None
+**Required by:** ADR-234 (Per-Person Mute Becomes an Indefinite Snooze, Stored as a Far-Future Date and Converted by Migration 034 and on Restore)

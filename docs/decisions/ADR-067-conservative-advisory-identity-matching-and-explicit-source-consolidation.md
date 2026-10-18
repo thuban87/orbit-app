@@ -49,4 +49,4 @@ The system treats an active external source link as deterministic identity and t
 - `src/components/ConsolidationPrompt.tsx` — asks the user to combine matched source records or keep them separate.
 
 **Depends on:** ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance); ADR-066 (Deliberate Reviewed Import with Unbound Bulk Defaults)
-**Required by:** None.
+**Required by:** None.; ADR-238 (Review Matches Becomes a List with a Per-Person Sheet, an Already-Linked Contact Is Caught Before the Form, and the Bin Is Never a Link Target)

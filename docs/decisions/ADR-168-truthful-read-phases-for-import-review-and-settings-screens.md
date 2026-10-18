@@ -56,4 +56,4 @@ Read screens use an explicit read phase gated by the latest-request authority (`
 - `src/utils/single-flight.ts` — shared synchronous in-flight latch.
 
 **Depends on:** ADR-065 (Durable Resumable Contact-Import Sessions with Failure-Isolated Photos); ADR-161 (Durable Post-Commit Import Recovery and AI-Off Provenance)
-**Required by:** ADR-219 (Per-Section Editors Replace the Things to Remember and Memory Screens, with Card Edit Mode and a Section Add Button)
+**Required by:** ADR-219 (Per-Section Editors Replace the Things to Remember and Memory Screens, with Card Edit Mode and a Section Add Button); ADR-238 (Review Matches Becomes a List with a Per-Person Sheet, an Already-Linked Contact Is Caught Before the Form, and the Bin Is Never a Link Target)

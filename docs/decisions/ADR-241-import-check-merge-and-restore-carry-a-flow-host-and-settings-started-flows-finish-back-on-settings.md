@@ -65,4 +65,4 @@ Restore uses `RestoreHost`, the flow host without `profile` (D-68). "Choose file
 - `src/navigation/profile-origin-integration.test.ts` — deleted with the inert origin path.
 
 **Depends on:** ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing); ADR-166 (Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress); ADR-202 (History Back Across Tabs and + Forms Over the Current Tab); ADR-141 (Explicit-Host Dual-Home Backup Navigation)
-**Required by:** None
+**Required by:** ADR-243 (Restore Runs on Focused Pages, Shows Its Steps, Counts People, and Names Replace All One Way)

@@ -57,4 +57,4 @@ There is no Delete on the Profile: permanent deletion stays only in the Bin (D-6
 - `src/screens/settings-hub-model.ts` — hub subtitle.
 
 **Depends on:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State); ADR-206 (Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper)
-**Required by:** None
+**Required by:** ADR-232 (A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards, and the Bin List Reloads with Restore and Undo)

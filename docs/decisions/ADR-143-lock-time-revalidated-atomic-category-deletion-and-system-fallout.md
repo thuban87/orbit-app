@@ -50,4 +50,4 @@ The system uses a count-only deletion preview fingerprint that is revalidated un
 - `src/db/orrery-system-read.ts` — carries validity-bearing System reads and safe selection state.
 
 **Depends on:** ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores); ADR-104 (Durable Orrery Preferences and Live System Scope); ADR-108 (Durable Independent-Axis Profile Presentation and Inheritance); ADR-142 (User-Owned Categories with Stable Identity and Canonical Ordering)
-**Required by:** ADR-145 (Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore)
+**Required by:** ADR-145 (Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore); ADR-246 (One Settings Row and Section Card on Every Settings Page, One Drag-and-⋯ List Pattern, a Truthful About Privacy Line, and Plain Switch Labels)

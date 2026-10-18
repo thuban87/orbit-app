@@ -82,4 +82,4 @@ Import Complete's "View Unbound contacts" action is removed (D-58). Unbound cont
 - `src/screens/import-progress-back-contract.test.ts` — Back-during-pass contract.
 
 **Depends on:** ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-065 (Durable Resumable Contact-Import Sessions with Failure-Isolated Photos); ADR-066 (Deliberate Reviewed Import with Unbound Bulk Defaults)
-**Required by:** None
+**Required by:** ADR-239 (Import Screens Keep Add Contact's Order, Name Every Outcome, Give the Legacy Picker a Way Out, and Share One Awaited Effects Helper)

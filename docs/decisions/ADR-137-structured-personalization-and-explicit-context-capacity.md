@@ -49,4 +49,4 @@ The system uses constrained Writing Style settings plus ordered, enableable glob
 - `src/ai/openrouter-catalog.ts` — provides cached OpenRouter model capacity and pricing.
 
 **Depends on:** ADR-135 (Multi-Connection AI Configuration and Fail-Closed Readiness)
-**Required by:** None
+**Required by:** ADR-248 (AI Egress Narrows — Custom Guidance Only When a Choice Uses It, Instruction Paragraphs Without Hard Breaks, and Photo Fields Never Sent or Offered); ADR-249 (AI Settings Tell the Truth — a Connected Lane Shows Connected, the Hub Shows Current Values, and One "Style and Context" Row Replaces Two)

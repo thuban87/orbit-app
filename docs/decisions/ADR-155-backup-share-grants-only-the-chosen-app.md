@@ -46,4 +46,4 @@ Outbound backup sharing uses a local module (`orbit-backup-share`) that shares o
 - `src/services/backup/share-export.ts` — share adapter and revoke-before-delete retirement.
 
 **Depends on:** None
-**Required by:** None
+**Required by:** ADR-244 (Backup Files Get Readable Local-Time Names, Intake Accepts Only content:// Links, Back Up Now Shares the Automatic Path, and the Backup Folder Works Through a Native Module)

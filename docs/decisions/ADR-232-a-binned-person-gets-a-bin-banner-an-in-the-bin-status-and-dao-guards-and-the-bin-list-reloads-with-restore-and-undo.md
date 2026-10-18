@@ -64,4 +64,4 @@ The Bin list reloads on focus and in both catch blocks, and shows a loading line
 - `src/screens/archived-contacts-render.test.tsx` — Bin list render tests.
 
 **Depends on:** ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-226 (Archive Becomes the Bin, and Move to Bin Confirms First with No Undo); ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards, and One Empty State)
-**Required by:** None
+**Required by:** ADR-233 (The Profile ⋯ Follows Lifecycle State, Bind and Unbind Show Undo, and Unbound People Get a Bind-Card Frequency, a Disabled Star and a Settings Row)

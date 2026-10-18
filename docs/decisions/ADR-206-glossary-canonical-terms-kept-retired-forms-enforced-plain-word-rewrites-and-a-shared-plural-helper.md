@@ -55,4 +55,4 @@ No decided term is renamed: Bound / Unbound and "Orbit participation", Transmit,
 - `app.config.ts` — the widget picker label "Orbit — Favorites".
 
 **Depends on:** ADR-132 (Focused Rapid Capture Workflows); ADR-075 (Binary Favourite Membership Without a User-Facing Order)
-**Required by:** ADR-226 (Archive Becomes the Bin, and Move to Bin Confirms First with No Undo); ADR-228 (Truthful Relationship Overview — Never Contacted, Honest Unbound Reasons, Plain Definitions and a Custom Frequency Row)
+**Required by:** ADR-226 (Archive Becomes the Bin, and Move to Bin Confirms First with No Undo); ADR-228 (Truthful Relationship Overview — Never Contacted, Honest Unbound Reasons, Plain Definitions and a Custom Frequency Row); ADR-236 (Check Linked Contacts Never Re-Asks a Reviewed Difference, Applies Only Tapped Values, and Only a User's Tick Elects a Primary); ADR-246 (One Settings Row and Section Card on Every Settings Page, One Drag-and-⋯ List Pattern, a Truthful About Privacy Line, and Plain Switch Labels)

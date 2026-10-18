@@ -60,4 +60,4 @@ Data still goes only to the user's own provider, on explicit invoke (D-27).
 - `src/screens/settings-ai-logic.test.ts` — preview byte-identical to the payload.
 
 **Depends on:** ADR-050 (Closed AI Prompt Egress Allowlist and Opt-In Field Sharing); ADR-079 (On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation); ADR-136 (Permission-Bounded Prompt Assembly and AI Transparency); ADR-137 (Structured Personalization and Explicit Context Capacity)
-**Required by:** None
+**Required by:** ADR-249 (AI Settings Tell the Truth — a Connected Lane Shows Connected, the Hub Shows Current Values, and One "Style and Context" Row Replaces Two)
