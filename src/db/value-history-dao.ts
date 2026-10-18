@@ -2,6 +2,7 @@
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import type { FieldType } from "@/schemas/types";
 
 export interface ValueHistoryEntry {
   id: number;
@@ -75,4 +76,33 @@ export function listValueHistory(
       ORDER BY created_at DESC, id DESC`,
     [contactId, fieldDefId],
   );
+}
+
+/** A history-retained field's past values for one person (38.12 D-106). */
+export interface ValueHistoryRead {
+  /** The field's name and type, or null when the definition is gone. */
+  field: { label: string; type: FieldType } | null;
+  /** Newest first (`listValueHistory`). */
+  entries: ValueHistoryEntry[];
+}
+
+/**
+ * The read behind the Profile's "View history" screen (38.12 D-106): the
+ * field's name for the header and its type for display, plus this person's
+ * retained past values. Read-only.
+ */
+export async function readValueHistory(
+  exec: ReadOnlyExecutor,
+  contactId: number,
+  fieldDefId: number,
+): Promise<ValueHistoryRead> {
+  const field = await exec.getFirstAsync<{ label: string; type: FieldType }>(
+    "SELECT label, type FROM custom_field_defs WHERE id = ?",
+    [fieldDefId],
+  );
+  if (!field) return { field: null, entries: [] };
+  return {
+    field: { label: field.label, type: field.type },
+    entries: await listValueHistory(exec, contactId, fieldDefId),
+  };
 }

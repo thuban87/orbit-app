@@ -16,13 +16,15 @@ import type {
  */
 
 let sheetItem: KnowledgePresentationItem | null = null;
+/** Every `useState` setter (the selected-entry setter closes the sheet). */
+const setState = vi.fn();
 
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useMemo: <T,>(factory: () => T) => factory(),
   // The selected-entry state starts null; a test can open the sheet on an item.
   useState: <T,>(value: T) =>
-    [value === null && sheetItem ? sheetItem : value, vi.fn()] as const,
+    [value === null && sheetItem ? sheetItem : value, setState] as const,
 }));
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
@@ -140,6 +142,10 @@ function render(
   handlers: {
     onAction?: (intent: KnowledgeActionIntent) => void;
     onOpenLinked?: (link: KnowledgeEntryLink) => void;
+    onOpenValueHistory?: (target: {
+      contactId: number;
+      fieldDefId: number;
+    }) => void;
   } = {},
 ): Node[] {
   return all(
@@ -150,7 +156,7 @@ function render(
         childIds: childId,
         onAction: handlers.onAction ?? vi.fn(),
         onViewAll: vi.fn(),
-        onOpenValueHistory: vi.fn(),
+        onOpenValueHistory: handlers.onOpenValueHistory ?? vi.fn(),
         onOpenLinked: handlers.onOpenLinked,
       }),
     ),
@@ -176,6 +182,7 @@ const buttonLabels = (nodes: Node[]) =>
 
 beforeEach(() => {
   sheetItem = null;
+  setState.mockReset();
   openMemoryLink.mockReset();
 });
 
@@ -385,5 +392,30 @@ describe("entry sheet (D-87, D-70, D-24)", () => {
     );
     (props(open).onPress as () => void)();
     expect(openMemoryLink).toHaveBeenCalledWith("https://example.test/soup");
+  });
+});
+
+describe("View history (38.12 D-106)", () => {
+  it("opens the field's history and closes the sheet", () => {
+    const history = { contactId: 7, fieldDefId: 22 };
+    sheetItem = {
+      id: "custom-field:22",
+      title: "Nickname",
+      preview: "Sandy",
+      metadata: [],
+      detail: { owner: "custom-field", id: 22, history },
+      management: { longPress: ["edit"], accessibility: ["edit"] },
+      sparkle: false,
+      history,
+    } as KnowledgePresentationItem;
+    const onOpenValueHistory = vi.fn();
+    const nodes = render(empty, ["memories"], { onOpenValueHistory });
+    const button = nodes.find(
+      (node) => node.type === "Button" && node.props.label === "View history",
+    );
+    (props(button).onPress as () => void)();
+    expect(onOpenValueHistory).toHaveBeenCalledWith(history);
+    // The sheet does not stay open over the history screen.
+    expect(setState).toHaveBeenCalledWith(null);
   });
 });

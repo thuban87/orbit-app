@@ -1011,10 +1011,13 @@ export function ContactProfileScreen({
                 onOpenKnowledgeChange={(fieldKey) =>
                   navigation.navigate("MemoryHistory", { contactId, fieldKey })
                 }
-                // Custom-field history is managed through the existing complete
-                // contact editor, never coerced into a current-state field key.
-                onOpenValueHistory={() =>
-                  navigation.navigate("Edit", { contactId })
+                // 38.12 D-106: a custom field's past values, read-only, on
+                // its own screen (never coerced into a current-state key).
+                onOpenValueHistory={(target) =>
+                  navigation.navigate("ValueHistory", {
+                    contactId: target.contactId,
+                    fieldDefId: target.fieldDefId,
+                  })
                 }
                 onContactMethodAction={(method, action) =>
                   void launchMethod(method, action)

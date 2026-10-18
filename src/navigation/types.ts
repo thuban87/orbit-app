@@ -212,6 +212,11 @@ export type DashboardStackParamList = {
   MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
+  /**
+   * A custom field's past values for one person (38.12 D-106); reached from the
+   * Profile's "View history", so Profile-reachable (RG-021).
+   */
+  ValueHistory: { contactId: number; fieldDefId: number };
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -311,6 +316,11 @@ export type OrreryStackParamList = {
   MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
+  /**
+   * A custom field's past values for one person (38.12 D-106); reached from the
+   * Profile's "View history", so Profile-reachable (RG-021).
+   */
+  ValueHistory: { contactId: number; fieldDefId: number };
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -381,6 +391,11 @@ export type DigestStackParamList = {
   MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
+  /**
+   * A custom field's past values for one person (38.12 D-106); reached from the
+   * Profile's "View history", so Profile-reachable (RG-021).
+   */
+  ValueHistory: { contactId: number; fieldDefId: number };
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -451,6 +466,11 @@ export type EventsStackParamList = {
   MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
+  /**
+   * A custom field's past values for one person (38.12 D-106); reached from the
+   * Profile's "View history", so Profile-reachable (RG-021).
+   */
+  ValueHistory: { contactId: number; fieldDefId: number };
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;
@@ -601,6 +621,11 @@ export type SettingsStackParamList = {
   MergeConflicts: { survivorId: number; absorbedId: number } & FlowHostParam;
   /** Settings Profile Backgrounds page (38.11 D-58.1); Profile-reachable (RG-021). */
   ProfileBackgrounds: undefined;
+  /**
+   * A custom field's past values for one person (38.12 D-106); reached from the
+   * Profile's "View history", so Profile-reachable (RG-021).
+   */
+  ValueHistory: { contactId: number; fieldDefId: number };
   MergeImpactSummary: {
     survivorId: number;
     absorbedId: number;

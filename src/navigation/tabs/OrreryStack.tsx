@@ -26,6 +26,7 @@ import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
+import { ValueHistoryScreen } from "@/screens/ValueHistoryScreen";
 import { useOrrerySessionStore } from "@/stores/orrery-session-store";
 import type { OrreryStackParamList } from "../types";
 
@@ -91,6 +92,8 @@ export function OrreryStack() {
         name="ProfileBackgrounds"
         component={ProfileBackgroundsScreen}
       />
+      {/* A custom field's "View history" (38.12 D-106, RG-021). */}
+      <Stack.Screen name="ValueHistory" component={ValueHistoryScreen} />
       {/* The Profile ⋯ per-person phone check (38.12 D-100, RG-021). */}
       <Stack.Screen name="ReconcileDetail" component={ReconcileDetailScreen} />
     </Stack.Navigator>

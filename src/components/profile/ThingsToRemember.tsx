@@ -143,7 +143,12 @@ function DetailSheet({
             <Button
               role="tertiary"
               label="View history"
-              onPress={() => item.history && onOpenValueHistory(item.history)}
+              // Close the sheet first, as the other actions do, so it does
+              // not stay over the history screen (38.12 D-106).
+              onPress={() => {
+                if (item.history) onOpenValueHistory(item.history);
+                onClose();
+              }}
             />
           ) : null}
           {item.management.accessibility.map((action) => (

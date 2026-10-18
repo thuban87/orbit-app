@@ -23,6 +23,7 @@ import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
+import { ValueHistoryScreen } from "@/screens/ValueHistoryScreen";
 import { DIGEST_STACK_ROUTES } from "../shell-contract";
 import type { DigestStackParamList } from "../types";
 
@@ -57,6 +58,8 @@ const DIGEST_ROUTE_COMPONENTS = {
   ProfileBackgrounds: ProfileBackgroundsScreen,
   // 38.12 D-100: the Profile ⋯ per-person phone check (RG-021).
   ReconcileDetail: ReconcileDetailScreen,
+  // 38.12 D-106: a custom field's "View history" (RG-021).
+  ValueHistory: ValueHistoryScreen,
 } as const satisfies Record<DigestRouteName, ComponentType<never>>;
 
 export function DigestStack() {

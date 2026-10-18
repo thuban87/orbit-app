@@ -25,6 +25,7 @@ import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
+import { ValueHistoryScreen } from "@/screens/ValueHistoryScreen";
 import type { DashboardStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<DashboardStackParamList>();
@@ -68,6 +69,8 @@ export function DashboardStack() {
         name="ProfileBackgrounds"
         component={ProfileBackgroundsScreen}
       />
+      {/* A custom field's "View history" (38.12 D-106, RG-021). */}
+      <Stack.Screen name="ValueHistory" component={ValueHistoryScreen} />
       {/* The Profile ⋯ per-person phone check (38.12 D-100, RG-021). */}
       <Stack.Screen name="ReconcileDetail" component={ReconcileDetailScreen} />
     </Stack.Navigator>

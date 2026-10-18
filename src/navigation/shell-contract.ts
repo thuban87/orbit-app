@@ -34,6 +34,8 @@ export const DIGEST_STACK_ROUTES = [
   "ProfileBackgrounds",
   // 38.12 D-100: the Profile ⋯ "Check with phone Contacts…" entry.
   "ReconcileDetail",
+  // 38.12 D-106: a custom field's "View history".
+  "ValueHistory",
 ] as const;
 
 export const EVENTS_STACK_ROUTES = [
@@ -62,6 +64,8 @@ export const EVENTS_STACK_ROUTES = [
   "ProfileBackgrounds",
   // 38.12 D-100: the Profile ⋯ "Check with phone Contacts…" entry.
   "ReconcileDetail",
+  // 38.12 D-106: a custom field's "View history".
+  "ValueHistory",
 ] as const;
 
 /**
@@ -95,6 +99,8 @@ export const PROFILE_REACHABLE_ROUTES = [
   "ProfileBackgrounds",
   // 38.12 D-100: the Profile ⋯ "Check with phone Contacts…" entry.
   "ReconcileDetail",
+  // 38.12 D-106: a custom field's "View history".
+  "ValueHistory",
 ] as const;
 
 /**

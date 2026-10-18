@@ -50,6 +50,7 @@ import { SettingsOrreryScreen } from "@/screens/SettingsOrreryScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
+import { ValueHistoryScreen } from "@/screens/ValueHistoryScreen";
 import type {
   RootStackScreenProps,
   SettingsScreenProps,
@@ -181,6 +182,8 @@ export function SettingsStack() {
         name="ProfileBackgrounds"
         component={ProfileBackgroundsScreen}
       />
+      {/* A custom field's "View history" (38.12 D-106, RG-021). */}
+      <Stack.Screen name="ValueHistory" component={ValueHistoryScreen} />
       <Stack.Screen name="SettingsContacts" component={SettingsContactsRoute} />
       <Stack.Screen
         name="SettingsNotifications"
