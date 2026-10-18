@@ -1,7 +1,7 @@
 # Widget
 
-**Last updated:** 2026-10-15
-**Updated by phase:** 38.10-fuel-retirement-things-to-remember
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -70,7 +70,7 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 
 ### Staying fresh and recovering
 
-1. Widget-visible foreground writes call `notifyWidgetDataChanged()` after their successful commit; the call is fire-and-forget and refresh failures are swallowed. A committed Dashboard bulk batch publishes exactly one refresh for the whole transaction, never one per selected contact.
+1. Widget-visible foreground writes call `notifyWidgetDataChanged()` after their successful commit; the call is fire-and-forget and refresh failures are swallowed. A committed Dashboard bulk batch publishes exactly one refresh for the whole transaction, never one per selected contact. The Profile favourite toggle refreshes the widget, as do Bin Restore (and its Undo) and Bind/Unbind from the Profile (ADR-232, ADR-233). After an import, `applyImportLifecycleEffects` refreshes the widget only when the pass imported a Bound contact; an Unbound import cannot appear among the favourites shown (ADR-239).
 2. `App.tsx` registers `registerWidgetSweep()` only for a real foreground launch, never for a headless widget context.
 3. The native boot receiver handles only `BOOT_COMPLETED` and asks the widget library to update placed `OrbitFavourites` instances. No widget timer or polling period runs.
 
@@ -105,6 +105,8 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 - **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — includes the widget notify in the shared assist post-commit publisher.
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 - **ADR-181:** One Square WebP Master up to 1024 px with Bounded Orrery Textures from Cache Copies — the widget decodes WebP or JPEG masters of up to 1024 px into its 88 px thumbnail, one tile at a time.
+- **ADR-233:** The Profile ⋯ Follows Lifecycle State — the Profile favourite toggle publishes a widget refresh; an Unbound person's star is disabled.
+- **ADR-239:** Import Screens Keep Add Contact's Order — import refreshes the widget only for Bound contacts.
 
 ## Gotchas
 
@@ -149,3 +151,4 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 | 2026-09-23 | 38.4 | Three widget glyphs use `accentText` instead of the accent fill (D-63; ADR-169). Widget action accessible names (RG-032) are untouched and belong to the widget-overhaul phase (D-16), as does the widget contact tap that does not open the Profile (todo `2026-09-28-widget-contact-tap-does-not-open-profile.md`). |
 | 2026-09-30 | 38.6 | Tile thumbnails encode sequentially (`encodeTileThumbs` in `widget-photo.ts`, replacing a `Promise.all`), each manipulator ref is released, masters may be 1024 WebP, and text left in a photo field never reaches the encoder. Thumbnail size and quality unchanged (ADR-181). |
 | 2026-10-15 | 38.10 | Removed the large tile's fuel line; the widget reads no knowledge, and capture no longer refreshes it (ADR-215). |
+| 2026-10-18 | 38.12 | The Profile favourite toggle, Bin Restore and Profile Bind/Unbind refresh the widget; imports refresh it only for Bound contacts (ADR-232, ADR-233, ADR-239). |
