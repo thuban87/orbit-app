@@ -16,6 +16,7 @@ import {
   sectionPinSnackbar,
   sectionPinUndoneSnackbar,
 } from "@/screens/section-editor-logic";
+import type { SnackbarMessage } from "@/stores/snackbar-store";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { plural } from "@/utils/plural";
 import { isAppBackgrounded } from "@/utils/screen-visibility";
@@ -756,6 +757,107 @@ export function profileLifecycleView(input: {
     showCadenceTreatment: false,
     showFrequencyPicker: true,
   };
+}
+
+/**
+ * The Unbound Bind card (38.12 D-95, owner Q-04): a person with a saved
+ * frequency sees it on the button ("Bind · Every 30 days") and a "Change"
+ * link that opens the frequency choices before binding. With no saved
+ * frequency the card keeps today's picker flow ("Bind contact" under the
+ * picker; `profileLifecycleView().showFrequencyPicker`).
+ */
+export function bindCardModel(input: {
+  trackingEnabled: number;
+  intervalDays: number | null;
+}): { label: string; showChange: boolean } {
+  if (input.intervalDays === null) {
+    return { label: "Bind contact", showChange: false };
+  }
+  return {
+    label: `Bind · Every ${plural(input.intervalDays, "day")}`,
+    showChange: true,
+  };
+}
+
+/** The Bind / Unbind snackbar (38.12 D-32, D-33; verb first, naming the person). */
+export function lifecycleSnackbar(
+  direction: "bind" | "unbind",
+  name: string,
+): string {
+  return direction === "bind" ? `Bound ${name}` : `Unbound ${name}`;
+}
+
+/**
+ * The confirmation after a Bind / Unbind Undo (38.9 D-39 via 38.12 D-04: Undo
+ * confirms itself). Copy is this plan's; the owner sees it at the 38.12
+ * device check.
+ */
+export function lifecycleUndoneSnackbar(
+  direction: "bind" | "unbind",
+  name: string,
+): string {
+  return direction === "bind" ? `Unbound ${name} again` : `Bound ${name} again`;
+}
+
+/**
+ * The Profile Bind / Unbind flow (38.12 D-32, D-33; D-03): the transition
+ * acts at once (Unbind has already been confirmed by the caller, D-11), the
+ * Profile re-reads, then a snackbar names the person with Undo. Undo runs the
+ * opposite transition, re-reads and confirms itself (D-04); Undo of Unbind
+ * binds with the kept cadence (ADR-062). A failed write shows only the error
+ * snackbar, with no Undo.
+ */
+export async function runProfileLifecycleTransition(input: {
+  direction: "bind" | "unbind";
+  name: string;
+  transition: () => Promise<void>;
+  undo: () => Promise<void>;
+  reload: () => Promise<void>;
+  showSnackbar: (message: SnackbarMessage) => void;
+  logError?: (cause: unknown) => void;
+}): Promise<"done" | "failed"> {
+  try {
+    await input.transition();
+  } catch (cause) {
+    input.logError?.(cause);
+    input.showSnackbar({
+      kind: "error",
+      label: "Couldn't update contact. Please try again.",
+    });
+    return "failed";
+  }
+  await input.reload();
+  const undo = async () => {
+    try {
+      await input.undo();
+    } catch (cause) {
+      input.logError?.(cause);
+      input.showSnackbar({
+        kind: "error",
+        label: `Couldn't undo the ${input.direction}.`,
+      });
+      await input.reload();
+      return;
+    }
+    await input.reload();
+    input.showSnackbar({
+      kind: "success",
+      label: lifecycleUndoneSnackbar(input.direction, input.name),
+    });
+  };
+  input.showSnackbar({
+    kind: "success",
+    label: lifecycleSnackbar(input.direction, input.name),
+    action: {
+      label: "Undo",
+      accessibilityLabel:
+        input.direction === "bind"
+          ? `Undo binding ${input.name}`
+          : `Undo unbinding ${input.name}`,
+      onPress: () => void undo(),
+    },
+  });
+  return "done";
 }
 
 export function unbindConfirmation(name: string): {

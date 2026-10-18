@@ -54,6 +54,7 @@ import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 import { describeCurrentLayout } from "@/profile/template-manager-model";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import {
+  bindCardModel,
   binnedProfileBanner,
   closeTopmostProfileOverlay,
   consumeProfileReachOutIntent,
@@ -85,6 +86,7 @@ import {
   profileScrollTargetY,
   profileStarView,
   runMoveToBin,
+  runProfileLifecycleTransition,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
   unboundStarExplanation,
@@ -261,6 +263,9 @@ export function ContactProfileScreen({
   const [bindIntervalDays, setBindIntervalDays] = useState(30);
   const [bindIntervalValid, setBindIntervalValid] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  // 38.12 D-95: "Change" on the Bind card opens the frequency choices for a
+  // person with a saved frequency.
+  const [bindChanging, setBindChanging] = useState(false);
   const [reachOutOpen, setReachOutOpen] = useState(false);
   // WR-06: the hero photo failed to load (initials showing) — no lightbox entry.
   const [heroPhotoFailed, setHeroPhotoFailed] = useState(false);
@@ -416,6 +421,15 @@ export function ContactProfileScreen({
     trackingEnabled: snapshot?.identity.trackingEnabled ?? 0,
     intervalDays: snapshot?.identity.intervalDays ?? null,
   });
+  // 38.12 D-95: the Bind card's label and Change link. While changing, the
+  // label follows the picked frequency.
+  const bindCard = bindCardModel({
+    trackingEnabled: snapshot?.identity.trackingEnabled ?? 0,
+    intervalDays: bindChanging
+      ? bindIntervalDays
+      : (snapshot?.identity.intervalDays ?? null),
+  });
+  const showBindPicker = lifecycle.showFrequencyPicker || bindChanging;
   // 38.12 D-93, D-34: a person in the Bin gets the banner and no live actions.
   const archived = snapshot?.identity.archivedAt != null;
   const star = profileStarView({
@@ -652,6 +666,10 @@ export function ContactProfileScreen({
       } else {
         await clearFavouriteRank(getExecutor(), contactId, now);
       }
+      // 38.12 D-38: the widget lists favourites, so a committed star change
+      // publishes the same best-effort refresh as Move to Bin
+      // (docs/systems/contacts.md "Managing favourites").
+      notifyWidgetDataChanged();
       await load();
     } catch (cause) {
       Logger.error(LOG_SCOPE, "failed to update favourite", cause);
@@ -782,38 +800,79 @@ export function ContactProfileScreen({
     [commitAndReload, contactId],
   );
 
+  // 38.12 D-32, D-33 (D-03, D-04): Bind and a confirmed Unbind act at once,
+  // then "Bound <name>" / "Unbound <name>" with Undo. Undo of Bind unbinds;
+  // Undo of Unbind binds with the kept cadence (ADR-062).
   const transitionLifecycle = useCallback(
     async (direction: "bind" | "unbind") => {
       if (!snapshot || transitioning) return;
       setTransitioning(true);
+      const savedIntervalDays = snapshot.identity.intervalDays;
+      // D-95: a frequency changed on the Bind card is written first; a
+      // dormant cadence is kept by the bind itself (bindContact), so the
+      // change cannot ride on it. Undo puts the saved frequency back.
+      const changedIntervalDays =
+        direction === "bind" &&
+        bindChanging &&
+        savedIntervalDays !== null &&
+        bindIntervalDays !== savedIntervalDays
+          ? bindIntervalDays
+          : null;
       try {
-        const now = localDateTime();
-        if (direction === "bind") {
-          await bindWithLifecycleEffects(
-            getExecutor(),
-            contactId,
-            now,
-            lifecycle.showFrequencyPicker ? bindIntervalDays : undefined,
-          );
-        } else {
-          await unbindWithLifecycleEffects(getExecutor(), contactId, now);
-        }
-        await load();
-      } catch (cause) {
-        Logger.error(
-          LOG_SCOPE,
-          `failed to ${direction} Profile contact`,
-          cause,
-        );
-        showSnackbar({
-          kind: "error",
-          label: "Couldn't update contact. Please try again.",
+        const result = await runProfileLifecycleTransition({
+          direction,
+          name: snapshot.identity.name,
+          transition: async () => {
+            const now = localDateTime();
+            if (direction === "bind") {
+              if (changedIntervalDays !== null) {
+                await setProfileContactFrequency(getExecutor(), {
+                  contactId,
+                  intervalDays: changedIntervalDays,
+                  now,
+                });
+              }
+              await bindWithLifecycleEffects(
+                getExecutor(),
+                contactId,
+                now,
+                lifecycle.showFrequencyPicker ? bindIntervalDays : undefined,
+              );
+            } else {
+              await unbindWithLifecycleEffects(getExecutor(), contactId, now);
+            }
+          },
+          undo: async () => {
+            const now = localDateTime();
+            if (direction === "bind") {
+              await unbindWithLifecycleEffects(getExecutor(), contactId, now);
+              if (changedIntervalDays !== null && savedIntervalDays !== null) {
+                await setProfileContactFrequency(getExecutor(), {
+                  contactId,
+                  intervalDays: savedIntervalDays,
+                  now,
+                });
+              }
+            } else {
+              await bindWithLifecycleEffects(getExecutor(), contactId, now);
+            }
+          },
+          reload: () => load(),
+          showSnackbar,
+          logError: (cause) =>
+            Logger.error(
+              LOG_SCOPE,
+              `failed to ${direction} Profile contact`,
+              cause,
+            ),
         });
+        if (result === "done") setBindChanging(false);
       } finally {
         setTransitioning(false);
       }
     },
     [
+      bindChanging,
       bindIntervalDays,
       contactId,
       lifecycle.showFrequencyPicker,
@@ -961,7 +1020,7 @@ export function ContactProfileScreen({
                     This contact is outside your active orbit. Their details and
                     history stay here.
                   </AppText>
-                  {lifecycle.showFrequencyPicker ? (
+                  {showBindPicker ? (
                     <FrequencyPicker
                       value={bindIntervalDays}
                       onChange={setBindIntervalDays}
@@ -969,14 +1028,31 @@ export function ContactProfileScreen({
                     />
                   ) : null}
                   <Button
+                    testID="profile-bind"
                     role="primary"
-                    label="Bind contact"
+                    label={bindCard.label}
                     disabled={
-                      transitioning ||
-                      (lifecycle.showFrequencyPicker && !bindIntervalValid)
+                      transitioning || (showBindPicker && !bindIntervalValid)
                     }
                     onPress={() => void transitionLifecycle("bind")}
                   />
+                  {/* 38.12 D-95: the saved frequency can be changed before
+                      binding; the choices open in place. */}
+                  {bindCard.showChange && !bindChanging ? (
+                    <Button
+                      testID="profile-bind-change"
+                      role="tertiary"
+                      label="Change"
+                      accessibilityLabel="Change the frequency before binding"
+                      disabled={transitioning}
+                      onPress={() => {
+                        setBindIntervalDays(
+                          snapshot.identity.intervalDays ?? bindIntervalDays,
+                        );
+                        setBindChanging(true);
+                      }}
+                    />
+                  ) : null}
                 </View>
               ) : null}
               <ProfileModuleHost
@@ -1088,7 +1164,11 @@ export function ContactProfileScreen({
                           confirmLabel: "Unbind contact",
                           destructive: true,
                         }).then((ok) => {
-                          if (ok) void transitionLifecycle("unbind");
+                          if (!ok) return;
+                          // 38.12 D-33: the ⋯ sheet closes, then the
+                          // snackbar with Undo follows the write.
+                          closeOverlay();
+                          void transitionLifecycle("unbind");
                         });
                         return;
                       }
