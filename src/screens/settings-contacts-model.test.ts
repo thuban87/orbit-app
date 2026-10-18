@@ -105,6 +105,10 @@ describe("Settings contacts model", () => {
       "UnboundContacts",
     );
     expect(isRegisteredScreen("UnboundContacts")).toBe(true);
+    // Imports start Unbound (D-16), so most were never Bound (D-IN-07).
+    expect(unbound?.subtitle).toBe(
+      "People outside your active orbit. Open someone to bind them.",
+    );
   });
 });
 

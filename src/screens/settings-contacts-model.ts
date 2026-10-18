@@ -208,7 +208,7 @@ export const SETTINGS_CONTACTS_SECTIONS: ReadonlyArray<SettingsContactsSection> 
           key: "unbound-contacts",
           title: "Unbound contacts",
           subtitle:
-            "People outside your active orbit. Open one to bind them again.",
+            "People outside your active orbit. Open someone to bind them.",
           route: "UnboundContacts",
         },
       ],
