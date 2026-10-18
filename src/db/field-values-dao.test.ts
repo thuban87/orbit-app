@@ -5,6 +5,7 @@ import {
   defsForCreateForm,
   defsForEditForm,
   getValuesForContact,
+  listContactsWithUnreadableValues,
   upsertValue,
   visibleDefsForProfile,
 } from "@/db/field-values-dao";
@@ -245,5 +246,66 @@ describe("visibility selectors — the three §14.7 surfaces (FLD-07)", () => {
     expect(
       cols(visibleDefsForProfile(allDefs, { city: "Leeds", nickname: null })),
     ).toEqual(["birthday", "city"]);
+  });
+});
+
+describe("listContactsWithUnreadableValues — the Review now list (38.12 D-121; C-4)", () => {
+  async function snapshot() {
+    return exec.getAllAsync(
+      "SELECT uid, contact_id, field_def_id, value, modified_at FROM custom_field_values ORDER BY id",
+    );
+  }
+
+  it("lists live contacts whose value fails the field's current parser, by name, read-only", async () => {
+    const field = def({ col_name: "met_on", type: "date" });
+    await persistDef(field);
+    const zoe = await makeContact("Zoe");
+    const amy = await makeContact("amy");
+    const fine = await makeContact("Bea");
+    const binned = await makeContact("Cal");
+    const blank = await makeContact("Dee");
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      binned,
+    ]);
+    await upsertValue(exec, zoe, field.id, uid(), "not a date", NOW);
+    await upsertValue(exec, amy, field.id, uid(), "sometime", NOW);
+    await upsertValue(exec, fine, field.id, uid(), "2026-10-20", NOW);
+    await upsertValue(exec, binned, field.id, uid(), "never", NOW);
+    await upsertValue(exec, blank, field.id, uid(), null, NOW);
+    const before = await snapshot();
+
+    expect(await listContactsWithUnreadableValues(exec, field.id)).toEqual([
+      { contactId: amy, name: "amy", photo: null, value: "sometime" },
+      { contactId: zoe, name: "Zoe", photo: null, value: "not a date" },
+    ]);
+    // Read-only: no stored value changed.
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("lists a dropdown value that was dropped from the options (C-4)", async () => {
+    const field = def({
+      col_name: "tier",
+      type: "dropdown",
+      options: JSON.stringify(["Platinum", "Bronze"]),
+    });
+    await persistDef(field);
+    const gold = await makeContact("Gil");
+    const kept = await makeContact("Hal");
+    await upsertValue(exec, gold, field.id, uid(), "Gold", NOW);
+    await upsertValue(exec, kept, field.id, uid(), "Bronze", NOW);
+
+    expect(await listContactsWithUnreadableValues(exec, field.id)).toEqual([
+      { contactId: gold, name: "Gil", photo: null, value: "Gold" },
+    ]);
+  });
+
+  it("returns nothing for a missing field or one with nothing to fix", async () => {
+    const field = def({ col_name: "nickname" });
+    await persistDef(field);
+    const contactId = await makeContact();
+    await upsertValue(exec, contactId, field.id, uid(), "Ace", NOW);
+    expect(await listContactsWithUnreadableValues(exec, field.id)).toEqual([]);
+    expect(await listContactsWithUnreadableValues(exec, 9999)).toEqual([]);
   });
 });
