@@ -52,13 +52,16 @@ private data class MutablePickedContact(
   var thumbnailTempUri: String? = null,
   // D-132: SHA-256 of the thumbnail bytes (else full-size); stable across D-118.
   var photoFingerprint: String? = null,
+  // 38.12 review B-WR-06: the first Event row whose TYPE could not be read
+  // (picker session without DATA2). Used only when no row reads as a birthday.
+  var birthdayFallback: String? = null,
 ) {
   /** The one bridge shape every reader returns (photoFingerprint + thumbnailTempUri included). */
   fun toBridgeMap(): Map<String, Any?> = mapOf(
     "lookupKey" to lookupKey,
     "displayName" to displayName,
     "methods" to methods,
-    "birthday" to birthday,
+    "birthday" to (birthday ?: birthdayFallback),
     "note" to note,
     "photoTempUri" to photoTempUri,
     "thumbnailTempUri" to thumbnailTempUri,
@@ -199,7 +202,24 @@ class OrbitContactPickerModule : Module() {
 
     // Picker session URIs reject selection and selectionArgs. Read only the
     // temporary, OS-granted table and group its data rows by lookup key.
-    context.contentResolver.query(sessionUri, projection, null, null, null)?.use { cursor ->
+    // RESEARCH A1 (DATA2/DATA3 on the session URI) is unverified (38.12 review
+    // B-WR-06): if the session rejects the projection, read again without
+    // them, so a pick never imports nothing; labels and event types then read
+    // as unknown.
+    val sessionCursor = try {
+      context.contentResolver.query(sessionUri, projection, null, null, null)
+    } catch (_: IllegalArgumentException) {
+      context.contentResolver.query(
+        sessionUri,
+        projection.filterNot {
+          it == ContactsContract.Data.DATA2 || it == ContactsContract.Data.DATA3
+        }.toTypedArray(),
+        null,
+        null,
+        null,
+      )
+    }
+    sessionCursor?.use { cursor ->
       val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Data.LOOKUP_KEY)
       val displayNameColumn = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
       val mimeTypeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
@@ -236,11 +256,17 @@ class OrbitContactPickerModule : Module() {
                 "customLabel" to cursor.stringAt(data3Column)?.takeIf { it.isNotBlank() },
               )
             }
-          ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
+          ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE -> {
             // Only the birthday Event row; an anniversary or other event is not a birthday.
-            if (cursor.intAt(data2Column) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
+            // B-WR-06: when the session gives no TYPE (column missing or null),
+            // fall back to the first such row rather than dropping every birthday.
+            val eventType = cursor.intAt(data2Column)
+            if (eventType == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
               contact.birthday = contact.birthday ?: cursor.stringAt(data1Column)
+            } else if (eventType == null) {
+              contact.birthdayFallback = contact.birthdayFallback ?: cursor.stringAt(data1Column)
             }
+          }
           ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
             // A provider can expose several Note rows; preserve the first non-blank value.
             contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
