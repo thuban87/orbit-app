@@ -5,6 +5,7 @@ import {
   defaultReconcileChoices,
   isReconcileChoiceUnresolved,
   nextUserTicks,
+  reconcileCardHint,
   remainingReconcileFields,
   toggleReconcileMethodChoice,
   userPrimaryPick,
@@ -392,5 +393,16 @@ describe("phone picks (D-47, D-102; convergence c3 D-1, c4 E-5)", () => {
     expect(toggleReconcileMethodChoice([a, b], a)).toEqual([b]);
     expect(toggleReconcileMethodChoice([a], a)).toBe("orbit");
     expect(toggleReconcileMethodChoice([a, b], "orbit")).toBe("orbit");
+  });
+});
+
+describe("reconcileCardHint (38.12 D-164)", () => {
+  it("counts differences left on an ordinary card", () => {
+    expect(reconcileCardHint(false, 1)).toBe("1 difference left");
+    expect(reconcileCardHint(undefined, 3)).toBe("3 differences left");
+  });
+
+  it("a Not in phone Contacts card shows no count line", () => {
+    expect(reconcileCardHint(true, 0)).toBe("");
   });
 });

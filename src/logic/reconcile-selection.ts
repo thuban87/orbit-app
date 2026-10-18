@@ -288,3 +288,16 @@ export function remainingReconcileFields(
       staleFields.includes(field.fieldFamily),
   ).length;
 }
+
+/**
+ * A Check grid card's evidence line: "N differences left", or nothing on a
+ * "Not in phone Contacts" card, which has no differences to count (38.12
+ * D-164).
+ */
+export function reconcileCardHint(
+  missingSource: boolean | undefined,
+  unresolvedCount: number,
+): string {
+  if (missingSource) return "";
+  return `${unresolvedCount} difference${unresolvedCount === 1 ? "" : "s"} left`;
+}

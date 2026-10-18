@@ -46,6 +46,7 @@ import {
 import {
   buildReconcileSelections,
   type ReconcileBulkMode,
+  reconcileCardHint,
   remainingReconcileFields,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -284,7 +285,7 @@ export function ReconcileGridScreen({
       name: identity?.name ?? "Contact no longer in Orbit",
       outcome: "needs_review",
       chipLabel: chipLabel(diff),
-      evidenceHint: `${card.unresolvedCount} difference${card.unresolvedCount === 1 ? "" : "s"} left`,
+      evidenceHint: reconcileCardHint(diff.missingSource, card.unresolvedCount),
       // Canonical Orbit photo through Avatar (follows the display revision, 38.6 D-01).
       photo: identity?.photo ?? null,
       photoUri: null,

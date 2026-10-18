@@ -261,13 +261,16 @@ export function CandidateCardGrid({
               ) : (
                 <ConfidenceChip outcome={item.outcome} />
               )}
-              <Text
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                style={[styles.hint, { color: colors.textSecondary }]}
-              >
-                {item.evidenceHint}
-              </Text>
+              {/* An empty hint draws no line (38.12 D-164). */}
+              {item.evidenceHint ? (
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={[styles.hint, { color: colors.textSecondary }]}
+                >
+                  {item.evidenceHint}
+                </Text>
+              ) : null}
               {failed ? (
                 <Text style={[styles.error, { color: colors.textSecondary }]}>
                   {CANDIDATE_CARD_FAILURE_COPY}
