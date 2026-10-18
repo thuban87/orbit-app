@@ -4,7 +4,7 @@
 
 Use this procedure when changing linked-contact reconciliation, duplicate merge, or the Contacts permission path. It verifies the feature against a debuggable Android build and a WAL-aware SQLite snapshot; it must use isolated device-local fixtures and must never mutate real synced contacts.
 
-## Architecture (Phase 20)
+## Architecture (Phases 20, 38.12)
 
 Reconciliation reads an already-linked Android contact through `orbit-contact-picker`, classifies five field families, and persists review work in migration-013 session tables. Source choices retain stable option identity through apply, and the reviewed snapshot stores the comparable for the exact selected option. Merge is a local SQLite transaction that reparents compatible children, deletes the absorbed contact, and writes a generic tombstone. API-37 import separately uses the system picker, then requests Contacts access after a non-empty pick only to enrich selected rows with Notes; denial continues without Notes (ADR-154).
 
