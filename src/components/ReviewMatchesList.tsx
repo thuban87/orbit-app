@@ -20,6 +20,7 @@
 import { Image } from "expo-image";
 import { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/Avatar";
 import type {
   CandidateChoice,
@@ -108,6 +109,10 @@ export function ReviewMatchesList({
 
   const selectedItems = items.filter((item) => selectedIds.has(item.id));
   const multiSelect = selectedItems.length > 0;
+  // Edge-to-edge build on a focused route (no tab bar beneath): the bulk bar,
+  // or the list's last row when the bar is hidden, clears the system
+  // navigation bar (38.12 D-WR-02).
+  const bottomInset = useSafeAreaInsets().bottom;
 
   const toggleSelection = (item: CandidateItem) => {
     setSelectedIds((current) => {
@@ -159,7 +164,10 @@ export function ReviewMatchesList({
       <FlatList
         data={items}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          multiSelect ? null : { paddingBottom: bottomInset + SPACING.base },
+        ]}
         renderItem={({ item }) => {
           const selected = selectedIds.has(item.id);
           const failed = failedIds.has(item.id);
@@ -279,6 +287,7 @@ export function ReviewMatchesList({
             {
               backgroundColor: colors.surfaceElevated,
               borderColor: colors.border,
+              paddingBottom: bottomInset + SPACING.md,
             },
           ]}
         >

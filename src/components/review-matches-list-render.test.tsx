@@ -47,6 +47,9 @@ vi.mock("react-native", () => ({
   StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
 }));
 vi.mock("expo-image", () => ({ Image: "Image" }));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 48, left: 0 }),
+}));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
@@ -248,6 +251,30 @@ describe("ReviewMatchesList (38.12 D-107)", () => {
         (node) => node.props.testID === "review-matches-bulk-bar",
       ),
     ).toBe(false);
+  });
+
+  it("clears the system navigation bar: list padding at rest, bulk bar padding in multi-select (D-WR-02)", () => {
+    const flat = (style: unknown): Record<string, unknown> =>
+      Object.assign(
+        {},
+        ...(Array.isArray(style) ? style : [style]).filter(Boolean),
+      );
+    const listAt = (tree: TestElement[]) =>
+      tree.find((node) => node.type === "FlatList") as TestElement;
+    // At rest (no bar) the list's content clears the 48 px inset.
+    expect(
+      flat(listAt(render().tree).props.contentContainerStyle).paddingBottom,
+    ).toBe(48 + 16);
+    ((render().rows[0] as TestElement).props.onLongPress as () => void)();
+    const { tree } = render();
+    const bar = tree.find(
+      (node) => node.props.testID === "review-matches-bulk-bar",
+    ) as TestElement;
+    expect(flat(bar.props.style).paddingBottom).toBe(48 + 12);
+    // The bar now sits at the bottom, so the list adds no extra clearance.
+    expect(
+      flat(listAt(tree).props.contentContainerStyle).paddingBottom,
+    ).not.toBe(48 + 16);
   });
 
   it("filters the bar's buttons through isActionEligible", () => {
