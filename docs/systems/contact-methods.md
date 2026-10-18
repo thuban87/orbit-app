@@ -101,7 +101,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 ### Applying a phone value from Check linked contacts
 
 1. Each phone option shows the phone's value with its own label (`pickedMethodLabel`); Apply adds only the options the person chose, with their labels (ADR-236).
-2. A chosen phone value becomes the type's primary through the method DAO's normal demote-then-promote path; the previous Orbit primary stays as a secondary and nothing is deleted.
+2. Apply writes through the append-only `addContactMethodsCore`: a chosen phone value becomes the type's primary (an addition that matches a stored method flips that row instead), the previous Orbit primary stays as a secondary, and stored methods are never re-normalized, deleted or tombstoned, even when two collide under today's region. Only `is_primary` changes on stored rows.
 3. Pre-ticked new values are still added, but only a field the person tapped can change the primary; unticking a pre-ticked value is not a choice, and with no tap the Orbit primary stays.
 
 ### Consolidating methods during a contact merge
@@ -165,6 +165,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 12. **Resolve primaries before reparenting a merge.** The partial primary-per-type index rejects a naïve child update when both contacts own a primary.
 13. **Validate before promoting a Compose selection.** `setContactMethodPrimary()` must prove contact and method type before clearing a prior primary; promoting first violates SQLite's statement-immediate partial unique index.
 14. **Never baseline a generated method from its draft identity.** Inserted link and method IDs become authoritative only in the committed DAO return; using the request draft after commit can duplicate the child on a retry.
+15. **Check linked contacts never rewrites stored methods.** Use `addContactMethodsCore`, not `applyContactMethodDiffCore`, for reconcile additions; the diff writer re-normalizes and can tombstone a colliding row (38.12 review B-WR-05, ADR-236).
 
 ## Related Systems
 
