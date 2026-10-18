@@ -63,3 +63,35 @@ describe("Profile layout templates sheet header (D-43)", () => {
     expect(back).toBeLessThan(manager.indexOf("Profile layout templates"));
   });
 });
+
+/**
+ * 38.12 D-90: a successful new-template save returns the manager to its list
+ * (or the new template's assignment page) through `finishTemplateCreate`, so
+ * the create form is never left empty but open, and shows a success snackbar
+ * naming the template. The page logic is unit-tested in
+ * `template-manager-model.test.ts`.
+ */
+describe("saving a new layout template (38.12 D-90)", () => {
+  const manager = source("ProfileTemplateManager.tsx");
+  const save = manager.slice(
+    manager.indexOf("const saveNewTemplate"),
+    manager.indexOf("const openUsage"),
+  );
+
+  it("returns to the list through finishTemplateCreate after a durable save", () => {
+    expect(save).toContain("if (saved) {");
+    expect(save).toContain(
+      "finishTemplateCreate(current, assignCreatedTemplate ? uid : null)",
+    );
+    // The old path cleared the draft but left the create page on top.
+    expect(save).not.toContain("clearTemplateDraft(current)");
+  });
+
+  it("shows a success snackbar naming the template, only after the save", () => {
+    const saved = save.indexOf("if (saved) {");
+    const snackbar = save.indexOf("showSnackbar({");
+    expect(snackbar).toBeGreaterThan(saved);
+    expect(save).toContain('kind: "success"');
+    expect(save).toContain("label: templateSavedSnackbar(draft.name)");
+  });
+});

@@ -64,7 +64,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 
 ### Reviewing linked-contact changes
 
-1. A user taps `Update from Contacts` on a linked profile or `Check linked contacts` in Settings; the API-37+ read requests Contacts access in context before querying the linked source records.
+1. A user taps `Check with phone Contacts…` in a linked person's Profile ⋯ (38.12 D-100) or `Check linked contacts` in Settings; the API-37+ read requests Contacts access in context before querying the linked source records.
 2. `classifyReconciliation()` compares name, methods, birthday, and photo identity against Orbit using canonical method equality. It emits additive, conflict, removed-from-source, or distinct missing-source outcomes.
 3. The detail flow applies only selected values. It re-reads scalar baselines before writing, snapshots overwritten local values, and records the source value reviewed for that link and family.
    Each source option has a stable ID. The selected birthday or name reaches the writer exactly, while the reviewed snapshot records the comparable for all linked source options. A null source scalar is rejected as stale and cannot clear an Orbit value.
@@ -81,7 +81,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 
 ### Merging duplicate Orbit contacts
 
-1. A user begins from profile overflow or a reconciliation duplicate path, chooses a survivor (Survivor select's second step is a guard sub-editor: Back returns to the picker, ADR-200), and resolves genuine scalar, photo, and competing-primary conflicts. The candidate grid and merge-conflict photo choice render each Orbit photo by passing its stored relative path to `Avatar` (`CandidateItem.photo`, `PhotoChoiceOption.photo`), so they follow the display revision. Staging previews keep their own URI with `cachePolicy="none"` (ADR-180).
+1. A user begins from the Profile ⋯ `Merge with another contact…` (any live person, never a binned one; 38.12 D-99, D-34) or a reconciliation duplicate path, chooses a survivor (Survivor select's second step is a guard sub-editor: Back returns to the picker, ADR-200), and resolves genuine scalar, photo, and competing-primary conflicts. The candidate grid and merge-conflict photo choice render each Orbit photo by passing its stored relative path to `Avatar` (`CandidateItem.photo`, `PhotoChoiceOption.photo`), so they follow the display revision. Staging previews keep their own URI with `cachePolicy="none"` (ADR-180).
 2. `mergeContacts()` resolves method and active-link collisions before reparenting compatible children — including any pending `interaction_assists` — to the survivor inside one write transaction, so a later assist confirmation logs against the survivor with no survivor lookup.
 3. The writer preserves field-history snapshots for overwritten or dropped meaningful values, recomputes `last_contact` through the recency core, deletes the absorbed row, and writes a generic contact tombstone.
 4. It reparents knowledge rows (including `off_limits`) before deletion and clears links that would become a self-link. Current state needs no demotion step: Most Recent follows date order (ADR-210). Interaction links stay same-contact.
@@ -164,3 +164,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-30 | 38.6 | Candidate grid and merge-conflict photo choice render Orbit photos through `Avatar` (no screen imports `resolvePhotoUri`); Update from Contacts' "keep Orbit photo" option is a card with the current Orbit photo beside the phone photo (`PhotoChoice` `keepPhoto`, `ScanState.orbitPhoto`); reconcile promotion encodes through `encodeMaster` (ADR-180, ADR-181). |
 | 2026-10-11 | 38.9 | Reconcile and merge screens use the shared child header; Check complete's Back acts like Done (D-73); Merge impact summary has a ✕ Cancel; Survivor select's second step returns to the picker on Back; native alerts became themed confirms (ADR-198, ADR-200, ADR-201). |
 | 2026-10-15 | 38.10 | Merge reparents Off Limits rows; no current-state demotion; the review screen's counts come from `readMergeImpactCounts` without a fuel line (ADR-207, ADR-210). |
+| 2026-10-18 | 38.12 | The per-person check and merge start from the Profile ⋯ (`Check with phone Contacts…` when linked, `Merge with another contact…`) in any tab (D-99, D-100, D-91). In the detail, pre-ticked phone/email values are added but only a field the person tapped can change Orbit's primary (D-144). |

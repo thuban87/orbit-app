@@ -37,6 +37,7 @@ import {
   createTemplateManagerState,
   describeCurrentLayout,
   effectiveLayoutTemplateUid,
+  finishTemplateCreate,
   finishTemplateManagerListLoad,
   managerBackIntent,
   openTemplateManagerPage,
@@ -50,12 +51,14 @@ import {
   templateLayoutForDisplay,
   templateLayoutForNewTemplate,
   templatePreviewLines,
+  templateSavedSnackbar,
 } from "@/profile/template-manager-model";
 import type {
   ProfileLayoutDocument,
   ProfilePresentationInputs,
 } from "@/profile/types";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -257,14 +260,14 @@ export function ProfileTemplateManager({
         });
       });
       if (saved) {
-        setState((current) => {
-          const cleared = clearTemplateDraft(current);
-          return assignCreatedTemplate
-            ? openTemplateManagerPage(cleared, {
-                kind: "assignment",
-                templateUid: uid,
-              })
-            : cleared;
+        // 38.12 D-90: back to the list (or the new template's assignment
+        // page), never a leftover empty create form, with a snackbar.
+        setState((current) =>
+          finishTemplateCreate(current, assignCreatedTemplate ? uid : null),
+        );
+        showSnackbar({
+          kind: "success",
+          label: templateSavedSnackbar(draft.name),
         });
         if (pendingTemplateLayout) onPendingTemplateResolved?.();
         setAssignCreatedTemplate(false);

@@ -250,7 +250,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 
 ### Reconciling and merging contacts
 
-1. Profile overflow offers `Update from Contacts` for an actively linked person and `Merge with another contact`; Settings offers `Check linked contacts` and flagged-item review.
+1. The Profile ⋯ offers `Check with phone Contacts…` for an actively linked person and `Merge with another contact…` for any live person, just above Move to Bin; a binned Profile offers neither (38.12 D-99, D-100, D-34). Both open in the tab that hosts the Profile (`ReconcileDetail` and `SurvivorSelect` are in `PROFILE_REACHABLE_ROUTES`), carry a `profile` flow host, and a merge ends on the survivor's Profile there. Settings offers `Check linked contacts` and flagged-item review.
 2. The navigator registers typed reconciliation grid, detail, completion, survivor selection, and merge-conflict routes. Screens fetch durable session or contact data instead of receiving source payloads in route state.
 3. `App.tsx` registers the foreground reconciliation resume sweep after database readiness. If import and reconciliation work are both resumable, the import prompt takes precedence so app-root sheets do not overlap. `AppShell` resolves the active prompt once with `resolveActiveResumePrompt(import, reconcile, { suppressed })`; both prompts are suppressed while a share is pending or Capture is focused, on cold and warm starts (D-23, ADR-216).
 
@@ -555,3 +555,4 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 | 2026-10-15 | 38.10 | Things to Remember, Recently Deleted and Memory screens retired; `SectionEditor`, `KeyPeopleEditor`, `OffLimitsEditor` and `MemoryHistory` registered in all five stacks; `Memory` is the add form on the current tab; resume prompts suppressed during a share; `section-fab-store` feeds root snackbar placement (ADR-212, ADR-216, ADR-219, ADR-221). |
 | 2026-10-16 | 38.11 | The + has four actions (Add Contact, Quick Log, Log Interaction, Group Log); Update Contact retired to `docs/archive/update-contact/` (D-62); Memory left the + and is Profile-reachable in all five stacks (D-66); FAB clearance margin `FAB_CLEARANCE_MARGIN` (D-41). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-223–ADR-227, ADR-230. |
+| 2026-10-18 | 38.12 | Profile ⋯ gains `Check with phone Contacts…` (linked) and `Merge with another contact…`; `ReconcileDetail` and the read-only custom-field `ValueHistory` screen are Profile-reachable in all five stacks; the ⋯ sheet is content-sized with a Close and titled "More actions" (D-99, D-100, D-106, D-42, D-91). |

@@ -218,6 +218,35 @@ export function clearTemplateDraft(
   return { ...state, draft: null, dirty: false, error: null };
 }
 
+/**
+ * After a new template is saved (38.12 D-90): the draft clears AND the create
+ * page closes, so the manager is back on its template list, or on the new
+ * template's assignment page when the save asked for one. Clearing the draft
+ * alone left an empty create form whose name field ignored typing.
+ */
+export function finishTemplateCreate(
+  state: TemplateManagerState,
+  assignTemplateUid: string | null,
+): TemplateManagerState {
+  const cleared = clearTemplateDraft(state);
+  const pages = cleared.pages.filter((page) => page.kind !== "create");
+  const listed: TemplateManagerState = {
+    ...cleared,
+    pages: pages.length > 0 ? pages : [{ kind: "list" }],
+  };
+  return assignTemplateUid === null
+    ? listed
+    : openTemplateManagerPage(listed, {
+        kind: "assignment",
+        templateUid: assignTemplateUid,
+      });
+}
+
+/** The success snackbar after a new template is saved (38.12 D-90). */
+export function templateSavedSnackbar(name: string): string {
+  return `Saved layout template ${name}`;
+}
+
 /** Inner pages always resolve before an unsaved draft guard or sheet dismissal. */
 export function managerBackIntent(
   state: TemplateManagerState,

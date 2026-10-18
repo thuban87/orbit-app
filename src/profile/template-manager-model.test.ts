@@ -11,6 +11,7 @@ import {
   createTemplateManagerState,
   describeCurrentLayout,
   effectiveLayoutTemplateUid,
+  finishTemplateCreate,
   finishTemplateManagerListLoad,
   managerBackIntent,
   openTemplateManagerPage,
@@ -22,6 +23,7 @@ import {
   templateLayoutForDisplay,
   templateLayoutForNewTemplate,
   templatePreviewLines,
+  templateSavedSnackbar,
 } from "./template-manager-model";
 
 describe("Profile template manager model", () => {
@@ -314,5 +316,37 @@ describe("templatePreviewLines (review IN-08)", () => {
       ...lines.thingsToRemember,
     ].join(" ");
     expect(all).not.toMatch(/[a-z]+-[a-z]+|1x1|2x1/);
+  });
+});
+
+describe("saving a new template (38.12 D-90)", () => {
+  const draft = { name: "Close friends", layout: FACTORY_PROFILE_LAYOUT };
+
+  it("returns to the template list with no draft, never an empty create form", () => {
+    const creating = openTemplateManagerPage(
+      setTemplateDraft(createTemplateManagerState(), draft),
+      { kind: "create" },
+    );
+    const saved = finishTemplateCreate(creating, null);
+    expect(saved.pages).toEqual([{ kind: "list" }]);
+    expect(saved.draft).toBeNull();
+    expect(saved.dirty).toBe(false);
+    expect(managerBackIntent(saved)).toEqual({ kind: "close-sheet" });
+  });
+
+  it("opens the new template's assignment page when the save asked for it", () => {
+    const fromList = setTemplateDraft(createTemplateManagerState(), draft);
+    const saved = finishTemplateCreate(fromList, "tpl-1");
+    expect(saved.pages).toEqual([
+      { kind: "list" },
+      { kind: "assignment", templateUid: "tpl-1" },
+    ]);
+    expect(saved.draft).toBeNull();
+  });
+
+  it("names the template in the success snackbar", () => {
+    expect(templateSavedSnackbar("Close friends")).toBe(
+      "Saved layout template Close friends",
+    );
   });
 });
