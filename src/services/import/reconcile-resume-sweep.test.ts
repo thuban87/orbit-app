@@ -13,6 +13,10 @@ import {
   createReconcileSession,
   insertReconcileCard,
 } from "@/db/reconcile-session-dao";
+import {
+  clearReconcileResumePrompted,
+  markReconcileResumePrompted,
+} from "@/db/resume-prompt-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
   markReconcileSessionOpen,
@@ -99,7 +103,11 @@ describe("reconcile-resume-sweep", () => {
 
     await runLaunchSweep();
 
-    expect(onResumable).toHaveBeenCalledWith({ sessionId, discardOnly: false });
+    expect(onResumable).toHaveBeenCalledWith({
+      sessionId,
+      discardOnly: false,
+      cardsLeft: 1,
+    });
   });
 
   it("skips the pass entirely while a scan is reading sources", async () => {
@@ -136,10 +144,11 @@ describe("reconcile-resume-sweep", () => {
     expect(onResumable).toHaveBeenLastCalledWith({
       sessionId,
       discardOnly: false,
+      cardsLeft: 1,
     });
   });
 
-  it("turns a malformed card into a discard-only descriptor via the tolerant id read", async () => {
+  it("turns a malformed card into a discard-only descriptor", async () => {
     const sessionId = await seedCard("not-json");
     const onResumable = vi.fn<(value: ResumableReconcile | null) => void>();
     registerReconcileResumeSweep(onResumable, {
@@ -149,7 +158,11 @@ describe("reconcile-resume-sweep", () => {
 
     await expect(runLaunchSweep()).resolves.toBeUndefined();
 
-    expect(onResumable).toHaveBeenCalledWith({ sessionId, discardOnly: true });
+    expect(onResumable).toHaveBeenCalledWith({
+      sessionId,
+      discardOnly: true,
+      cardsLeft: 1,
+    });
   });
 
   it("keeps live staged photos and removes abandoned reconciliation staging files", async () => {
@@ -165,6 +178,58 @@ describe("reconcile-resume-sweep", () => {
     await reconcileOrphanReconcileStagedPhotos(exec, fs);
 
     expect(fs.deleted).toEqual(["reconcile-staging/orphan.jpg"]);
+  });
+
+  it("asks once: a prompted check no longer triggers onResumable (D-105)", async () => {
+    const sessionId = await seedCard();
+    const onResumable = vi.fn<(value: ResumableReconcile | null) => void>();
+    registerReconcileResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId }),
+    );
+    // The prompt mounted visible and wrote the marker.
+    await markReconcileResumePrompted(exec, sessionId, NOW);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+  });
+
+  it("asks again once a resume clears the marker and the check is left again (L-3)", async () => {
+    const sessionId = await seedCard();
+    await markReconcileResumePrompted(exec, sessionId, NOW);
+    const onResumable = vi.fn<(value: ResumableReconcile | null) => void>();
+    registerReconcileResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+    await clearReconcileResumePrompted(exec, sessionId);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith({
+      sessionId,
+      discardOnly: false,
+      cardsLeft: 1,
+    });
+  });
+
+  it("a prompted malformed check stays quiet too", async () => {
+    const sessionId = await seedCard("not-json");
+    await markReconcileResumePrompted(exec, sessionId, NOW);
+    const onResumable = vi.fn<(value: ResumableReconcile | null) => void>();
+    registerReconcileResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
   });
 
   it("does not register or run work merely by importing the module", async () => {

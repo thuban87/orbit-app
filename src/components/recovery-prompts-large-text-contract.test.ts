@@ -17,6 +17,10 @@
  * height-bounded and its queue scrolls, so every confirmation's buttons can be
  * reached.
  *
+ * 38.12 D-56: both prompts now render through the one shared
+ * `ResumePromptSheet`, so the layout contract is asserted there once and each
+ * prompt is checked to use it with its own copy.
+ *
  * Render-free: these are source assertions over the component files.
  */
 import { readFileSync } from "node:fs";
@@ -40,14 +44,19 @@ function styleBody(text: string, name: string): string {
   return match?.[1] ?? "";
 }
 
+/**
+ * 38.12 D-56: both prompts share one pattern — the layout, sizes and
+ * explicit-action-only exit live in `ResumePromptSheet`; each prompt supplies
+ * only its heading, body copy and actions.
+ */
+const SHEET_PATH = "src/components/ResumePromptSheet.tsx";
+
 interface PromptCase {
   name: string;
   path: string;
   heading: string;
   /** A fragment of every body-copy variant. */
   bodyFragments: string[];
-  /** Copy that lives in a body helper outside the JSX. */
-  copyFragments?: string[];
   actions: string[];
 }
 
@@ -56,9 +65,7 @@ const PROMPTS: PromptCase[] = [
     name: "ResumeImportPrompt",
     path: "src/components/ResumeImportPrompt.tsx",
     heading: "Resume your import?",
-    // 38.12 D-111: the body is chosen by `resumeImportBody`.
-    bodyFragments: ["{resumeImportBody(resumable)}"],
-    copyFragments: [
+    bodyFragments: [
       "Imported contacts have photos waiting",
       "This saved import can’t be resumed.",
       "left to import. Discard drops them; nothing already imported changes.",
@@ -69,78 +76,87 @@ const PROMPTS: PromptCase[] = [
     name: "ResumeReconcilePrompt",
     path: "src/components/ResumeReconcilePrompt.tsx",
     heading: "Resume your check?",
-    bodyFragments: [
-      "This saved check can’t be resumed.",
-      "Unresolved contacts are saved.",
-    ],
-    actions: ['"Resume check"', '"Discard check"'],
+    bodyFragments: ["This saved check can’t be resumed.", "left to check."],
+    actions: ['"Resume check"', '"Discard check"', '"Not now"'],
   },
 ];
 
-describe("recovery prompts keep their buttons reachable at large text (D-49)", () => {
+describe("the shared resume prompt sheet keeps its buttons reachable at large text (D-49, D-56)", () => {
+  const text = source(SHEET_PATH);
+
+  it("stays an RN Modal window (through RegisteredModal, 38.9 D-24) with an explicit-action-only exit", () => {
+    expect(text).toMatch(/<RegisteredModal\b/);
+    expect(text).toContain("onRequestClose={() => undefined}");
+  });
+
+  it("scrolls the heading and body inside one bounded ScrollView", () => {
+    const opens = [...text.matchAll(/<ScrollView\b/g)];
+    expect(opens).toHaveLength(1);
+    const open = opens[0].index ?? -1;
+    const close = text.indexOf("</ScrollView>", open);
+    expect(close).toBeGreaterThan(open);
+    const opener = text.slice(open, text.indexOf(">", open) + 1);
+    const styleName = /style=\{styles\.(\w+)\}/.exec(opener)?.[1];
+    expect(styleName, "ScrollView style binding").toBeDefined();
+    const body = styleBody(text, styleName ?? "");
+    expect(body).toMatch(/flexGrow:\s*0\b/);
+    expect(body).toMatch(/flexShrink:\s*1\b/);
+    const inside = text.slice(open, close);
+    expect(inside).toContain("{heading}");
+    expect(inside).toContain("{body}");
+  });
+
+  it("renders every action after the scroll region, never inside it", () => {
+    const close = text.indexOf("</ScrollView>");
+    expect(close).toBeGreaterThan(-1);
+    const pressables = [...text.matchAll(/<Pressable\b/g)];
+    expect(pressables.length).toBeGreaterThanOrEqual(1);
+    for (const pressable of pressables) {
+      expect(pressable.index ?? -1).toBeGreaterThan(close);
+    }
+    expect(text.indexOf("actions.map(")).toBeGreaterThan(close);
+  });
+
+  it("shrinks the card and insets the root by the safe area", () => {
+    expect(styleBody(text, "sheet")).toMatch(/flexShrink:\s*1\b/);
+    expect(text).toMatch(
+      /import \{[^}]*\buseSafeAreaInsets\b[^}]*\} from "react-native-safe-area-context"/,
+    );
+    expect(text).toMatch(/=\s*useSafeAreaInsets\(\)/);
+    expect(text).toMatch(/paddingTop:\s*insets\.top\s*\+/);
+    expect(text).toMatch(/paddingBottom:\s*insets\.bottom\s*\+/);
+  });
+
+  it("labels the accent-filled button in onAccent (ADR-084)", () => {
+    expect(text).toContain("backgroundColor: colors.accent");
+    expect(text).toMatch(/primary:\s*colors\.onAccent\b/);
+    expect(text).not.toContain("color: colors.background");
+  });
+});
+
+describe("both resume prompts use the shared sheet (D-56)", () => {
   for (const prompt of PROMPTS) {
     describe(prompt.name, () => {
       const text = source(prompt.path);
 
-      it("stays an RN Modal window (through RegisteredModal, 38.9 D-24) with an explicit-action-only exit", () => {
-        expect(text).toMatch(/<RegisteredModal\b/);
-        expect(text).toContain("onRequestClose={() => undefined}");
+      it("renders through ResumePromptSheet with no layout of its own", () => {
+        expect(text).toMatch(
+          /import \{[^}]*\bResumePromptSheet\b[^}]*\} from "@\/components\/ResumePromptSheet"/,
+        );
+        expect(text).toMatch(/<ResumePromptSheet\b/);
+        expect(text).not.toMatch(/<ScrollView\b/);
+        expect(text).not.toMatch(/<RegisteredModal\b/);
+        expect(text).not.toContain("StyleSheet.create(");
       });
 
-      it("scrolls the heading and body inside one bounded ScrollView", () => {
-        const opens = [...text.matchAll(/<ScrollView\b/g)];
-        expect(opens).toHaveLength(1);
-        const open = opens[0].index ?? -1;
-        const close = text.indexOf("</ScrollView>", open);
-        expect(close).toBeGreaterThan(open);
-        const opener = text.slice(open, text.indexOf(">", open) + 1);
-        const styleName = /style=\{styles\.(\w+)\}/.exec(opener)?.[1];
-        expect(styleName, "ScrollView style binding").toBeDefined();
-        const body = styleBody(text, styleName ?? "");
-        expect(body).toMatch(/flexGrow:\s*0\b/);
-        expect(body).toMatch(/flexShrink:\s*1\b/);
-        const inside = text.slice(open, close);
-        expect(inside).toContain(prompt.heading);
+      it("keeps its heading, every body variant and every action", () => {
+        expect(text).toContain(prompt.heading);
         for (const fragment of prompt.bodyFragments) {
-          expect(inside, fragment).toContain(fragment);
-        }
-        for (const fragment of prompt.copyFragments ?? []) {
           expect(text, fragment).toContain(fragment);
         }
-      });
-
-      it("renders every action after the scroll region, never inside it", () => {
-        const close = text.indexOf("</ScrollView>");
-        expect(close).toBeGreaterThan(-1);
-        const pressables = [...text.matchAll(/<Pressable\b/g)];
-        expect(pressables.length).toBeGreaterThanOrEqual(
-          prompt.actions.length - 1,
-        );
-        for (const pressable of pressables) {
-          expect(pressable.index ?? -1).toBeGreaterThan(close);
-        }
         for (const action of prompt.actions) {
-          const at = text.indexOf(action);
-          expect(at, action).toBeGreaterThan(close);
+          expect(text, action).toContain(action);
         }
-      });
-
-      it("shrinks the card and insets the root by the safe area", () => {
-        expect(styleBody(text, "sheet")).toMatch(/flexShrink:\s*1\b/);
-        expect(text).toMatch(
-          /import \{[^}]*\buseSafeAreaInsets\b[^}]*\} from "react-native-safe-area-context"/,
-        );
-        expect(text).toMatch(/=\s*useSafeAreaInsets\(\)/);
-        expect(text).toMatch(/paddingTop:\s*insets\.top\s*\+/);
-        expect(text).toMatch(/paddingBottom:\s*insets\.bottom\s*\+/);
-      });
-
-      it("labels the accent-filled button in onAccent (ADR-084)", () => {
-        const fill = text.indexOf("backgroundColor: colors.accent");
-        expect(fill).toBeGreaterThan(-1);
-        const label = /color:\s*colors\.(\w+)/.exec(text.slice(fill + 1));
-        expect(label?.[1]).toBe("onAccent");
-        expect(text).not.toContain("color: colors.background");
       });
     });
   }

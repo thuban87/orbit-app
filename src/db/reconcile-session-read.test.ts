@@ -17,9 +17,12 @@ import {
   setCardCompletionDispositionCore,
 } from "@/db/reconcile-session-dao";
 import {
+  countReconcileCardsLeft,
+  discardStaleReconcileSessions,
   getNewestPendingReconcileSessionId,
-  getResumableReconcileSession,
+  getNewestResumableReconcileSession,
   listReconcileCardIdentities,
+  listReconcileSessionCards,
   reconcileCompletionCounts,
 } from "@/db/reconcile-session-read";
 import { inWriteTransaction } from "@/db/transaction";
@@ -104,15 +107,20 @@ describe("reconcile-session-read", () => {
 
       reopened = new DatabaseSync(dbPath);
       reopened.exec("PRAGMA foreign_keys = ON");
-      const resumed = await getResumableReconcileSession(
-        nodeSqliteExecutor(reopened),
-        NOW,
-      );
-      expect(resumed).toMatchObject({
+      const reopenedExec = nodeSqliteExecutor(reopened);
+      await expect(
+        discardStaleReconcileSessions(reopenedExec, NOW),
+      ).resolves.toEqual([]);
+      await expect(
+        getNewestResumableReconcileSession(reopenedExec),
+      ).resolves.toMatchObject({
         session: { id: sessionId, totalChecked: 2 },
-        cards: [{ cardStatus: "partial", unresolvedCount: 1 }],
-        sweptStagedPhotoRelPaths: [],
+        cardsLeft: 1,
+        resumePromptedAt: null,
       });
+      await expect(
+        listReconcileSessionCards(reopenedExec, sessionId),
+      ).resolves.toMatchObject([{ cardStatus: "partial", unresolvedCount: 1 }]);
     } finally {
       first?.close();
       reopened?.close();
@@ -120,18 +128,63 @@ describe("reconcile-session-read", () => {
     }
   });
 
-  it("keeps the newest pending session and sweeps older staged work", async () => {
+  it("the newest-resumable read has no side effects (38.12 D-56)", async () => {
+    const older = await seedSession(exec, "2026-08-30 11:00:00");
+    await seedCard(exec, older);
+    const newest = await seedSession(exec, NOW);
+    await seedCard(exec, newest);
+    const before = await exec.getAllAsync(
+      "SELECT * FROM reconciliation_sessions ORDER BY id",
+    );
+
+    await expect(
+      getNewestResumableReconcileSession(exec),
+    ).resolves.toMatchObject({ session: { id: newest }, cardsLeft: 1 });
+    expect(
+      await exec.getAllAsync(
+        "SELECT * FROM reconciliation_sessions ORDER BY id",
+      ),
+    ).toEqual(before);
+  });
+
+  it("reads the newest session's resume_prompted_at (D-105)", async () => {
+    const sessionId = await seedSession(exec);
+    await exec.runAsync(
+      "UPDATE reconciliation_sessions SET resume_prompted_at = ? WHERE id = ?",
+      [NOW, sessionId],
+    );
+    await expect(
+      getNewestResumableReconcileSession(exec),
+    ).resolves.toMatchObject({
+      session: { id: sessionId },
+      resumePromptedAt: NOW,
+    });
+  });
+
+  it("countReconcileCardsLeft counts unresolved and partial cards only (D-105)", async () => {
+    const sessionId = await seedSession(exec);
+    await seedCard(exec, sessionId, "unresolved");
+    await seedCard(exec, sessionId, "partial");
+    await seedCard(exec, sessionId, "resolved", "updated");
+    await seedCard(exec, sessionId, "missing_source");
+    const other = await seedSession(exec);
+    await seedCard(exec, other, "unresolved");
+    await expect(countReconcileCardsLeft(exec, sessionId)).resolves.toBe(2);
+    await expect(countReconcileCardsLeft(exec, 9999)).resolves.toBe(0);
+  });
+
+  it("cleanup keeps the newest pending session and sweeps older staged work", async () => {
     const older = await seedSession(exec, "2026-08-30 11:00:00");
     await seedCard(exec, older);
     const newest = await seedSession(exec, NOW);
     await seedCard(exec, newest);
 
+    await expect(discardStaleReconcileSessions(exec, NOW)).resolves.toEqual([
+      "reconcile-staging/card.jpg",
+    ]);
     await expect(
-      getResumableReconcileSession(exec, NOW),
-    ).resolves.toMatchObject({
-      session: { id: newest },
-      sweptStagedPhotoRelPaths: ["reconcile-staging/card.jpg"],
-    });
+      getNewestResumableReconcileSession(exec),
+    ).resolves.toMatchObject({ session: { id: newest } });
     expect(
       await exec.getFirstAsync<{ status: string }>(
         "SELECT status FROM reconciliation_sessions WHERE id = ?",
