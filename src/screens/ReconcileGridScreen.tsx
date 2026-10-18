@@ -54,6 +54,7 @@ import {
 } from "@/services/import/reconcile-flow-guard";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { deleteReconcileStaging } from "@/services/photos/photo-storage";
+import { gridStagingToken } from "@/services/photos/reconcile-detail-staging";
 import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
 import { readAllContacts } from "../../modules/orbit-contact-picker";
@@ -180,7 +181,7 @@ export function ReconcileGridScreen({
             // The picker cache URI is consumed only at this durable staging boundary.
             const staged = await stageReconcileSourcePhoto(
               photoTempUri,
-              `contact-${link.contact_id}-link-${link.id}`,
+              gridStagingToken(link.contact_id, link.id),
             );
             stagedForCleanup.push(staged.stagedRelative);
             stagedPhotos.set(link.id, staged);

@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -46,7 +46,13 @@ import {
 } from "@/logic/reconcile-diff";
 import {
   buildReconcileSelections,
+  defaultReconcileChoices,
+  isReconcileChoiceUnresolved,
   type ReconcileChoice,
+  type ReconcileChoices,
+  type ReconcileFamilyChoice,
+  selectedReconcileChoiceIds,
+  toggleReconcileMethodChoice,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
@@ -64,11 +70,16 @@ import {
   resolveReconcileStagingUri,
 } from "@/services/photos/photo-storage";
 import {
+  createDetailStagingTracker,
+  detailStagingToken,
+} from "@/services/photos/reconcile-detail-staging";
+import {
   promoteReconcilePhoto,
   reconcilePhotoFs,
   stageReconcileSourcePhoto,
 } from "@/services/photos/reconcile-photo";
 import { confirm } from "@/stores/confirm-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
 import { formatStoredBirthdayForDisplay } from "@/utils/dates";
@@ -78,7 +89,6 @@ import {
   readAllContacts,
 } from "../../modules/orbit-contact-picker";
 
-type Choice = ReconcileChoice;
 interface ScanState {
   /** The Orbit contact under review — the screen must name the real person. */
   contactName: string;
@@ -108,10 +118,19 @@ export function ReconcileDetailScreen({
     [sessionId],
   );
   const [scan, setScan] = useState<ScanState | null>(null);
-  const [choices, setChoices] = useState<Partial<Record<string, Choice>>>({});
+  const [choices, setChoices] = useState<ReconcileChoices>({});
   const [message, setMessage] = useState<string | null>(null);
   const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
   const [applying, setApplying] = useState(false);
+  // A successful Apply cannot run again (D-48).
+  const [applied, setApplied] = useState(false);
+  // The detail's own phone-photo copies: deleted when it closes or re-reads,
+  // except a promoted one (38.12-10 deferred item 1, folded here).
+  const staging = useMemo(
+    () => createDetailStagingTracker(deleteReconcileStaging),
+    [],
+  );
+  useEffect(() => () => staging.clear(), [staging]);
 
   const load = useCallback(
     () =>
@@ -144,6 +163,9 @@ export function ReconcileDetailScreen({
         );
         // Every linked source with a photo gets its own staged copy, so each
         // photo option previews and promotes its own photo (convergence c4 E-4).
+        // The detail's names differ from the grid's, so it never deletes a
+        // file a grid card points at; a re-read drops the previous copies.
+        staging.clear();
         const stagedPhotos = new Map<number, StagedSourcePhoto>();
         try {
           for (const link of links) {
@@ -151,13 +173,12 @@ export function ReconcileDetailScreen({
               link.external_contact_id,
             )?.photoTempUri;
             if (!photoTempUri) continue;
-            stagedPhotos.set(
-              link.id,
-              await stageReconcileSourcePhoto(
-                photoTempUri,
-                `contact-${contactId}-link-${link.id}`,
-              ),
+            const staged = await stageReconcileSourcePhoto(
+              photoTempUri,
+              detailStagingToken(contactId, link.id),
             );
+            staging.track(staged.stagedRelative);
+            stagedPhotos.set(link.id, staged);
           }
         } finally {
           for (const picked of read.contacts) {
@@ -185,18 +206,10 @@ export function ReconcileDetailScreen({
           ...classified,
           fields: actionableReconcileFields(classified),
         };
-        setChoices(
-          Object.fromEntries(
-            diff.fields
-              .filter((field) => field.outcome !== "conflict")
-              .map((field) => [
-                field.fieldFamily,
-                field.outcome === "additive" && field.sourceOptions[0]
-                  ? `source:${field.sourceOptions[0].optionId}`
-                  : "orbit",
-              ]),
-          ),
-        );
+        // Additive phones/emails open with every phone value picked (the
+        // remembered full list); conflicts open with nothing (convergence c4 E-5).
+        setChoices(defaultReconcileChoices(diff));
+        setApplied(false);
         if (diff.fields.length === 0) setMessage("No changes from Contacts.");
         setScan({
           contactName: contact.name,
@@ -207,7 +220,7 @@ export function ReconcileDetailScreen({
           effectivePhoneRegion: memory.effectivePhoneRegion,
         });
       }),
-    [contactId],
+    [contactId, staging],
   );
   useFocusEffect(
     useCallback(() => {
@@ -317,7 +330,7 @@ export function ReconcileDetailScreen({
   }, [contactId, load, navigation, scan?.links]);
 
   const apply = useCallback(async () => {
-    if (!scan) return;
+    if (!scan || applied || applying) return;
     setApplying(true);
     const exec = getExecutor();
     const now = localDateTime();
@@ -349,6 +362,7 @@ export function ReconcileDetailScreen({
           });
         } finally {
           deleteReconcileStaging(pendingPhoto.stagedPhotoRelative);
+          staging.release(pendingPhoto.stagedPhotoRelative);
         }
       }
       if (cardId != null && sessionId != null) {
@@ -383,7 +397,18 @@ export function ReconcileDetailScreen({
           "Orbit changed while this was open. Review the highlighted fields again.",
         );
         await load();
-      } else setMessage("Changes applied.");
+      } else {
+        // Back to where the check came from (the grid, or a Profile) with a
+        // snackbar naming the person (D-48, D-04).
+        setApplied(true);
+        navigation.goBack();
+        showSnackbar({
+          kind: "success",
+          label: selections.some((selection) => selection.useSource)
+            ? `Updated ${scan.contactName} from phone Contacts`
+            : `Kept Orbit values for ${scan.contactName}`,
+        });
+      }
     } catch {
       setMessage(
         "Could not apply those changes. Your Orbit contact was kept safe.",
@@ -391,11 +416,24 @@ export function ReconcileDetailScreen({
     } finally {
       setApplying(false);
     }
-  }, [choices, contactId, load, scan, cardId, sessionId]);
+  }, [
+    applied,
+    applying,
+    choices,
+    contactId,
+    load,
+    navigation,
+    scan,
+    cardId,
+    sessionId,
+    staging,
+  ]);
 
-  const unresolved = scan?.diff.fields.some(
-    (field) => field.outcome === "conflict" && !choices[field.fieldFamily],
+  // An unchosen field, or an emptied phone/email pick list, blocks Apply.
+  const unresolved = scan?.diff.fields.some((field) =>
+    isReconcileChoiceUnresolved(choices[field.fieldFamily]),
   );
+  const photoChoice = choices.photo;
   // Every branch (loading / permission, missing source, main) carries the
   // shared header and its one Back (38.9 D-16, D-07).
   if (!scan)
@@ -519,8 +557,9 @@ export function ReconcileDetailScreen({
                   contactId,
                 }}
                 selectedId={
-                  choices.photo?.startsWith("source:")
-                    ? (choices.photo as `source:${string}`)
+                  typeof photoChoice === "string" &&
+                  photoChoice.startsWith("source:")
+                    ? (photoChoice as `source:${string}`)
                     : KEEP_ORBIT_PHOTO
                 }
                 onChange={(value) =>
@@ -538,7 +577,14 @@ export function ReconcileDetailScreen({
                 onChoice={(choice) =>
                   setChoices((current) => ({
                     ...current,
-                    [field.fieldFamily]: choice,
+                    [field.fieldFamily]:
+                      field.fieldFamily === "phones" ||
+                      field.fieldFamily === "emails"
+                        ? toggleReconcileMethodChoice(
+                            current[field.fieldFamily],
+                            choice,
+                          )
+                        : choice,
                   }))
                 }
               />
@@ -548,13 +594,17 @@ export function ReconcileDetailScreen({
             <Text style={{ color: colors.textSecondary }}>{message}</Text>
           ) : null}
           <Pressable
-            disabled={unresolved || applying}
+            accessibilityRole="button"
+            accessibilityState={{
+              disabled: Boolean(unresolved || applying || applied),
+            }}
+            disabled={unresolved || applying || applied}
             onPress={() => void apply()}
             style={[
               styles.apply,
               {
                 backgroundColor: colors.accent,
-                opacity: unresolved || applying ? 0.5 : 1,
+                opacity: unresolved || applying || applied ? 0.5 : 1,
               },
             ]}
           >
@@ -568,14 +618,19 @@ export function ReconcileDetailScreen({
   );
 }
 
+/** One contact method as a person reads it: "Mobile · +1 555 000 1111". */
+function methodLine(value: string, label: string | null | undefined): string {
+  return label ? `${label} · ${value}` : value;
+}
+
 function ChoiceRow({
   field,
   choice,
   onChoice,
 }: {
   field: ReconcileFieldDiff;
-  choice?: Choice;
-  onChoice: (choice: Choice) => void;
+  choice?: ReconcileFamilyChoice;
+  onChoice: (choice: ReconcileChoice) => void;
 }) {
   // Render only (38.9 D-70, D-23; review C7-L2): birthday values show their
   // display form; the diff, every option id and `onChoice(option.id)` stay raw.
@@ -584,7 +639,9 @@ function ChoiceRow({
     field.fieldFamily === "birthday"
       ? formatStoredBirthdayForDisplay(value)
       : value;
-  const options: FieldChoiceOption<Choice>[] = [
+  const multiple =
+    field.fieldFamily === "phones" || field.fieldFamily === "emails";
+  const options: FieldChoiceOption<ReconcileChoice>[] = [
     {
       id: "orbit",
       value:
@@ -596,7 +653,13 @@ function ChoiceRow({
     },
     ...field.sourceOptions.map((option) => ({
       id: `source:${option.optionId}` as const,
-      value: option.value != null ? shown(option.value) : "Use Contacts value",
+      // Phones/emails show the phone's own value with its label (D-47).
+      value:
+        option.value == null
+          ? "Use Contacts value"
+          : multiple
+            ? methodLine(option.rawValue ?? option.value, option.label)
+            : shown(option.value),
       provenance: option.provenanceLabels.join(", ") || "Contacts",
       recommended: field.outcome === "additive",
     })),
@@ -618,7 +681,11 @@ function ChoiceRow({
             ? "conflict"
             : "additive"
       }
-      selectedId={choice ?? null}
+      // Phones/emails take several picks (convergence c3 D-1).
+      selectedIds={multiple ? selectedReconcileChoiceIds(choice) : undefined}
+      selectedId={
+        multiple ? undefined : typeof choice === "string" ? choice : null
+      }
       onChange={(option) => onChoice(option.id)}
     />
   );

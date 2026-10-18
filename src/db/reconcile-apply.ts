@@ -9,6 +9,7 @@ import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { upsertReviewedSnapshotCore } from "@/db/reconcile-snapshot-dao";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { normalizeContactMethod } from "@/logic/contact-method-normalization";
 import {
   isBirthdayUnreadable,
   mapBirthdayForStorage,
@@ -29,6 +30,17 @@ export interface ReconcileSelection {
   useSource: boolean;
   /** Stable classifier option selected in the UI, when useSource is true. */
   sourceOptionId?: string;
+  /**
+   * Phones/emails: every picked option, in display order (convergence c3
+   * D-1). `sourceOptionId` is the first of them.
+   */
+  sourceOptionIds?: readonly string[];
+  /**
+   * Phones/emails detail pick (D-102): the first of `sourceMethods` becomes
+   * the type's primary and every other method of that type a secondary.
+   * Absent for bulk, which keeps Orbit's primary.
+   */
+  electPrimary?: boolean;
   sourceValue: string | null;
   sourceMethods?: readonly ReconcileMethod[];
   sourceLinkIds: readonly number[];
@@ -88,6 +100,40 @@ async function snapshotPriorScalar(
      VALUES (?, ?, ?, 'reconcile-overwritten', ?)`,
     [contactId, field, oldValue, now],
   );
+}
+
+function methodKey(
+  method: { type: string; value: string },
+  effectivePhoneRegion?: string | null,
+): string {
+  const canonical = normalizeContactMethod({
+    type: method.type as ReconcileMethod["type"],
+    value: method.value,
+    defaultPhoneRegion: effectivePhoneRegion,
+  }).canonicalValue;
+  return `${method.type}\u0000${canonical ?? method.value.trim()}`;
+}
+
+/**
+ * D-102: the picked value becomes the primary of its type; every other
+ * method of that type (the previous primary included) stays as a secondary.
+ * A pick that already exists in Orbit (canonical match) is that row, flipped
+ * to primary, never a duplicate. Nothing is removed: only isPrimary changes.
+ */
+function electPrimary(
+  current: ContactMethodDraft[],
+  picked: ReconcileMethod,
+  effectivePhoneRegion?: string | null,
+): void {
+  const key = methodKey(picked, effectivePhoneRegion);
+  const target = current.find(
+    (draft) =>
+      draft.type === picked.type &&
+      methodKey(draft, effectivePhoneRegion) === key,
+  );
+  if (!target) return;
+  for (const draft of current)
+    if (draft.type === picked.type) draft.isPrimary = draft === target;
 }
 
 function draftFor(row: ContactMethodRow): ContactMethodDraft {
@@ -251,7 +297,7 @@ export async function applyReconcileSelections(
     const additions = methodSelections.flatMap((selection) =>
       selection.useSource ? (selection.sourceMethods ?? []) : [],
     );
-    const desired = buildDesiredMethodList(
+    const desired = buildDesiredMethodList<ReconcileMethod>(
       seeded.map((row) => ({
         type: row.method_type,
         value: row.raw_value,
@@ -261,7 +307,7 @@ export async function applyReconcileSelections(
       input.effectivePhoneRegion,
     );
     const seededByCanonical = seeded.map(draftFor);
-    const current = desired.map((method) => {
+    const current = desired.map((method): ContactMethodDraft => {
       const existing = seededByCanonical.find(
         (draft) => draft.type === method.type && draft.value === method.value,
       );
@@ -271,9 +317,16 @@ export async function applyReconcileSelections(
           type: method.type,
           value: method.value,
           label: method.label ?? null,
+          isPrimary: false,
         }
       );
     });
+    // Seeded ∪ additions is passed, so nothing is tombstoned (T-38.12-42).
+    for (const selection of methodSelections) {
+      const first = selection.sourceMethods?.[0];
+      if (selection.useSource && selection.electPrimary && first)
+        electPrimary(current, first, input.effectivePhoneRegion);
+    }
     await applyContactMethodDiffCore(exec, {
       contactId: input.contactId,
       seeded,

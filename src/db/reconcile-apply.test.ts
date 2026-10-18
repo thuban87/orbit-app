@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import {
+  applyContactMethodDiffCore,
+  listContactMethods,
+} from "@/db/contact-methods-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -19,8 +23,18 @@ import { applyReconcileSelections } from "@/db/reconcile-apply";
 import { getReviewedSnapshots } from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { classifyReconciliation } from "@/logic/reconcile-diff";
-import { buildReconcileSelections } from "@/logic/reconcile-selection";
+import {
+  actionableReconcileFields,
+  classifyReconciliation,
+  type ReconcileMethod,
+} from "@/logic/reconcile-diff";
+import {
+  buildReconcileSelections,
+  defaultReconcileChoices,
+  type ReconcileChoices,
+  type ReconcileSourceChoice,
+  toggleReconcileMethodChoice,
+} from "@/logic/reconcile-selection";
 
 const NOW = "2026-08-30 12:00:00";
 const migrations = [
@@ -378,5 +392,255 @@ describe("applyReconcileSelections", () => {
         [contactId],
       ),
     ).toEqual({ name: "Orbit Original" });
+  });
+});
+
+/**
+ * D-47 / D-102 / convergence c3 D-1 + c4 E-5: phone values are applied exactly
+ * as picked, with their labels; a detail pick elects the first pick (display
+ * order) primary; bulk adds every phone value and keeps Orbit's primary;
+ * nothing is deleted; a second scan asks nothing about phones.
+ */
+describe("phone picks: labels, primary election, nothing deleted (D-47, D-102)", () => {
+  const REGION = "US";
+  // ContactsContract Phone.TYPE codes: 1 Home, 2 Mobile, 3 Work.
+  const phone = (value: string, typeCode: number): ReconcileMethod => ({
+    type: "phone",
+    value,
+    typeCode,
+  });
+
+  async function seedPhones(
+    phones: Array<{ value: string; label?: string | null; primary?: boolean }>,
+  ) {
+    await inWriteTransaction(exec, () =>
+      applyContactMethodDiffCore(exec, {
+        contactId,
+        seeded: [],
+        current: phones.map((item) => ({
+          uid: uid(),
+          type: "phone" as const,
+          value: item.value,
+          label: item.label ?? null,
+          isPrimary: item.primary === true,
+        })),
+        now: NOW,
+        effectivePhoneRegion: REGION,
+      }),
+    );
+  }
+
+  async function orbitPhones() {
+    return (await listContactMethods(exec, contactId)).filter(
+      (row) => row.method_type === "phone",
+    );
+  }
+
+  async function classify(sourcePhones: ReconcileMethod[]) {
+    const rows = await listContactMethods(exec, contactId);
+    return classifyReconciliation({
+      orbit: {
+        name: "Orbit Original",
+        birthday: "2000-01-01",
+        photo: null,
+        methods: rows.map((row) => ({
+          type: row.method_type,
+          value: row.raw_value,
+          label: row.label,
+        })),
+      },
+      sources: [
+        {
+          externalContactLinkId,
+          displayName: "Orbit Original",
+          birthday: "2000-01-01",
+          methods: sourcePhones,
+        },
+      ],
+      lastReviewed: await getReviewedSnapshots(exec, externalContactLinkId),
+      effectivePhoneRegion: REGION,
+    });
+  }
+
+  async function apply(
+    diff: ReturnType<typeof classifyReconciliation>,
+    choices: ReconcileChoices | "use-contact-values",
+  ) {
+    return inWriteTransaction(exec, () =>
+      applyReconcileSelections(exec, {
+        contactId,
+        now: NOW,
+        selections: buildReconcileSelections(diff, choices),
+        effectivePhoneRegion: REGION,
+      }),
+    );
+  }
+
+  function pick(
+    diff: ReturnType<typeof classifyReconciliation>,
+    ...canonical: string[]
+  ): ReconcileSourceChoice[] {
+    const field = diff.fields.find((item) => item.fieldFamily === "phones")!;
+    return canonical.map((value): ReconcileSourceChoice => {
+      const option = field.sourceOptions.find((item) => item.value === value);
+      if (!option) throw new Error(`no option ${value}`);
+      return `source:${option.optionId}`;
+    });
+  }
+
+  async function phonesAskedAgain(sourcePhones: ReconcileMethod[]) {
+    return actionableReconcileFields(await classify(sourcePhones)).some(
+      (field) => field.fieldFamily === "phones",
+    );
+  }
+
+  async function contactMethodTombstones() {
+    return (
+      await exec.getAllAsync(
+        "SELECT entity_uid FROM tombstones WHERE entity_type = 'contact_method'",
+      )
+    ).length;
+  }
+
+  const shape = (rows: Awaited<ReturnType<typeof orbitPhones>>) =>
+    rows
+      .map((row) => ({
+        value: row.canonical_value,
+        label: row.label,
+        primary: row.is_primary === 1,
+      }))
+      .sort((a, b) => (a.value ?? "").localeCompare(b.value ?? ""));
+
+  it("a tap on one phone value adds only it, labelled, as primary; the old primary stays secondary", async () => {
+    await seedPhones([{ value: "+13125550111", label: "Mobile" }]);
+    const source = [phone("(312) 555-0122", 3), phone("(312) 555-0133", 1)];
+    const diff = await classify(source);
+    await apply(diff, { phones: pick(diff, "+13125550122") });
+    const rows = await orbitPhones();
+    expect(shape(rows)).toEqual([
+      { value: "+13125550111", label: "Mobile", primary: false },
+      { value: "+13125550122", label: "Work", primary: true },
+    ]);
+    // The phone's own value is stored, not the canonical key.
+    expect(
+      rows.find((row) => row.canonical_value === "+13125550122")?.raw_value,
+    ).toBe("(312) 555-0122");
+    expect(await contactMethodTombstones()).toBe(0);
+    expect(await phonesAskedAgain(source)).toBe(false);
+  });
+
+  it("two picks of three: both added labelled, first in display order primary, the third not added", async () => {
+    await seedPhones([{ value: "+13125550111", label: "Mobile" }]);
+    const source = [
+      phone("(312) 555-0122", 3),
+      phone("(312) 555-0133", 1),
+      phone("(312) 555-0144", 2),
+    ];
+    const diff = await classify(source);
+    // Tapped in reverse order; display order still decides the primary.
+    await apply(diff, { phones: pick(diff, "+13125550144", "+13125550122") });
+    expect(shape(await orbitPhones())).toEqual([
+      { value: "+13125550111", label: "Mobile", primary: false },
+      { value: "+13125550122", label: "Work", primary: true },
+      { value: "+13125550144", label: "Mobile", primary: false },
+    ]);
+    expect(await contactMethodTombstones()).toBe(0);
+    expect(await phonesAskedAgain(source)).toBe(false);
+  });
+
+  it("bulk Use Contact Values adds every phone value labelled and keeps Orbit's primary", async () => {
+    await seedPhones([{ value: "+13125550111", label: "Mobile" }]);
+    const source = [
+      phone("(312) 555-0111", 2),
+      phone("(312) 555-0122", 3),
+      phone("(312) 555-0133", 1),
+      phone("(312) 555-0144", 0),
+    ];
+    source[3] = { ...source[3], customLabel: "Gym" };
+    const diff = await classify(source);
+    expect(diff.fields.find((f) => f.fieldFamily === "phones")?.outcome).toBe(
+      "additive",
+    );
+    await apply(diff, "use-contact-values");
+    expect(shape(await orbitPhones())).toEqual([
+      { value: "+13125550111", label: "Mobile", primary: true },
+      { value: "+13125550122", label: "Work", primary: false },
+      { value: "+13125550133", label: "Home", primary: false },
+      { value: "+13125550144", label: "Gym", primary: false },
+    ]);
+    expect(await phonesAskedAgain(source)).toBe(false);
+  });
+
+  it("a pick already in Orbit as a secondary becomes primary instead of a duplicate", async () => {
+    await seedPhones([
+      { value: "+13125550111", label: "Mobile", primary: true },
+      { value: "+13125550122", label: null },
+    ]);
+    const before = await orbitPhones();
+    const source = [phone("(312) 555-0122", 3), phone("(312) 555-0155", 2)];
+    const diff = await classify(source);
+    await apply(diff, { phones: pick(diff, "+13125550122") });
+    const rows = await orbitPhones();
+    expect(rows).toHaveLength(2);
+    const flipped = rows.find((row) => row.canonical_value === "+13125550122");
+    // Same row (no duplicate, no delete); only is_primary changed.
+    expect(flipped?.id).toBe(
+      before.find((row) => row.canonical_value === "+13125550122")?.id,
+    );
+    expect(flipped?.is_primary).toBe(1);
+    expect(
+      rows.find((row) => row.canonical_value === "+13125550111")?.is_primary,
+    ).toBe(0);
+    expect(await contactMethodTombstones()).toBe(0);
+  });
+
+  it("detail default: an additive field opens with every phone value picked; Apply adds all three (convergence c4 E-5)", async () => {
+    const source = [
+      phone("(312) 555-0144", 2),
+      phone("(312) 555-0122", 3),
+      phone("(312) 555-0133", 1),
+    ];
+    const diff = await classify(source);
+    const defaults = defaultReconcileChoices(diff);
+    expect(defaults.phones).toEqual(
+      pick(diff, "+13125550122", "+13125550133", "+13125550144"),
+    );
+    await apply(diff, defaults);
+    expect(shape(await orbitPhones())).toEqual([
+      { value: "+13125550122", label: "Work", primary: true },
+      { value: "+13125550133", label: "Home", primary: false },
+      { value: "+13125550144", label: "Mobile", primary: false },
+    ]);
+    expect(await phonesAskedAgain(source)).toBe(false);
+  });
+
+  it("detail default: unticking one adds only the other two", async () => {
+    const source = [
+      phone("(312) 555-0122", 3),
+      phone("(312) 555-0133", 1),
+      phone("(312) 555-0144", 2),
+    ];
+    const diff = await classify(source);
+    const [untick] = pick(diff, "+13125550133");
+    const phones = toggleReconcileMethodChoice(
+      defaultReconcileChoices(diff).phones,
+      untick,
+    );
+    await apply(diff, { phones });
+    expect(shape(await orbitPhones()).map((row) => row.value)).toEqual([
+      "+13125550122",
+      "+13125550144",
+    ]);
+    // The unticked number is remembered as reviewed, not offered again.
+    expect(await phonesAskedAgain(source)).toBe(false);
+  });
+
+  it("a conflict phones field opens with nothing picked", async () => {
+    await seedPhones([{ value: "+13125550111" }]);
+    const diff = await classify([phone("(312) 555-0122", 2)]);
+    expect(diff.fields.find((f) => f.fieldFamily === "phones")?.outcome).toBe(
+      "conflict",
+    );
+    expect(defaultReconcileChoices(diff).phones).toBeUndefined();
   });
 });

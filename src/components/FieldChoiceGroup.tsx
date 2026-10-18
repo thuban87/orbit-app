@@ -18,6 +18,14 @@ interface FieldChoiceGroupProps<T extends string> {
   mode: FieldChoiceMode;
   /** Controlled selection, if the caller keeps merge/reconciliation state. */
   selectedId?: T | null;
+  /**
+   * Multi-select mode (convergence c3 D-1): when set, every listed id is
+   * selected, rows are checkboxes, and a tap calls `onToggle` (else
+   * `onChange`); the caller owns the toggle rule. Single-choice callers
+   * (MergeConflicts, PhotoChoice, Reconcile name/birthday) leave it unset.
+   */
+  selectedIds?: readonly T[];
+  onToggle?: (option: FieldChoiceOption<T>) => void;
   onChange: (option: FieldChoiceOption<T>) => void;
 }
 
@@ -40,8 +48,11 @@ export function FieldChoiceGroup<T extends string>({
   options,
   mode,
   selectedId,
+  selectedIds,
+  onToggle,
   onChange,
 }: FieldChoiceGroupProps<T>) {
+  const multiple = selectedIds !== undefined;
   const { colors } = useTheme();
   const [uncontrolledSelection, setUncontrolledSelection] = useState<T | null>(
     () => initialSelection(options, mode),
@@ -60,17 +71,23 @@ export function FieldChoiceGroup<T extends string>({
         {label}
       </Text>
       {options.map((option) => {
-        const selected = selection === option.id;
+        const selected = multiple
+          ? selectedIds.includes(option.id)
+          : selection === option.id;
         return (
           // `id` is the selection bucket (e.g. "source"), not unique per row: a
           // multi-value family yields several options sharing one id, so the
           // React key also folds in the per-row value. Selection identity stays `id`.
           <Pressable
             key={`${option.id}:${option.value}`}
-            accessibilityRole="radio"
-            accessibilityState={{ selected }}
+            accessibilityRole={multiple ? "checkbox" : "radio"}
+            accessibilityState={multiple ? { checked: selected } : { selected }}
             accessibilityLabel={`${label}: ${option.value}, ${option.provenance}`}
             onPress={() => {
+              if (multiple) {
+                (onToggle ?? onChange)(option);
+                return;
+              }
               if (selectedId === undefined) setUncontrolledSelection(option.id);
               onChange(option);
             }}

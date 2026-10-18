@@ -3,6 +3,7 @@ import {
   normalizeContactMethod,
 } from "@/logic/contact-method-normalization";
 import { isBirthdayUnreadable } from "@/logic/picked-contact-map";
+import { pickedMethodLabel } from "@/logic/picked-method-label";
 
 export const RECONCILE_FIELD_FAMILIES = [
   "name",
@@ -30,6 +31,13 @@ export interface ReconcileMethod {
   type: ContactMethodType;
   value: string;
   label?: string | null;
+  /**
+   * A phone source's raw ContactsContract TYPE / custom LABEL (38.12-02).
+   * They name the option's label only; they never enter the family
+   * serialization, so review memory is unchanged by them (D-47).
+   */
+  typeCode?: number | null;
+  customLabel?: string | null;
 }
 
 export interface ReconcileSource {
@@ -54,10 +62,15 @@ export interface ReconcileOrbitContact {
 
 export interface ReconcileFieldOption {
   optionId: string;
+  /** The comparison key (canonical for phones/emails); memory keys on it. */
   value: string | null;
   sourceLinkIds: number[];
   provenanceLabels: string[];
   stagedPhotoRelative?: string | null;
+  /** Phones/emails: the phone's own value, as stored when applied (D-47). */
+  rawValue?: string;
+  /** Phones/emails: Orbit's label for the phone's TYPE/LABEL, if any (D-47). */
+  label?: string | null;
 }
 
 export interface ReconcileFieldDiff {
@@ -297,6 +310,14 @@ function classifyMethodFamily(
       provenanceLabels: item.source.provenanceLabel
         ? [item.source.provenanceLabel]
         : [],
+      // The canonical key stays the option's value (memory and equality key
+      // on it); the raw value and label are what Apply stores (D-47).
+      rawValue: item.method.value.trim(),
+      label: pickedMethodLabel(
+        type,
+        item.method.typeCode,
+        item.method.customLabel,
+      ),
     }))
     .sort((left, right) => (left.value ?? "").localeCompare(right.value ?? ""));
 
