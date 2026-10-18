@@ -510,6 +510,11 @@ export async function mergeContacts(
     );
     if (sharedGroup) throw new GroupMergeCollisionError();
 
+    // Not reparented (38.12 D-146, owner): the survivor's own Profile
+    // presentation (profile_contact_presentation) and Orrery overrides
+    // (system_overrides) are kept; the absorbed person's cascade away with
+    // the absorbed row, and the merge review lists them as not kept
+    // (readMergeDroppedItems).
     for (const table of [
       "interactions",
       "events",

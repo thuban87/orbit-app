@@ -135,3 +135,39 @@ export async function readMergeImpactCounts(
     pendingAssists,
   };
 }
+
+/**
+ * What of the absorbed person a merge does NOT keep (38.12 D-146, owner):
+ * the survivor's Profile layout, background and Orrery overrides win, so the
+ * absorbed person's own are dropped (their rows cascade with the absorbed
+ * contact) and the merge review lists them (review B-WR-08).
+ */
+export interface MergeDroppedItems {
+  /** The absorbed person has their own Profile layout or background. */
+  profilePresentation: boolean;
+  /** The absorbed person's manual include/exclude choices in Orrery systems. */
+  orrerySystemChoices: number;
+}
+
+export async function readMergeDroppedItems(
+  exec: SqlExecutor,
+  absorbedId: number,
+): Promise<MergeDroppedItems> {
+  const [presentation, orrerySystemChoices] = await Promise.all([
+    count(
+      exec,
+      `SELECT COUNT(*) AS n FROM profile_contact_presentation
+        WHERE contact_id = ?
+          AND (layout_template_uid IS NOT NULL
+            OR freeform_layout_json IS NOT NULL
+            OR background_template_uid IS NOT NULL)`,
+      absorbedId,
+    ),
+    count(
+      exec,
+      "SELECT COUNT(*) AS n FROM system_overrides WHERE contact_id = ?",
+      absorbedId,
+    ),
+  ]);
+  return { profilePresentation: presentation > 0, orrerySystemChoices };
+}

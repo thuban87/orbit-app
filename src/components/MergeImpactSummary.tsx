@@ -7,7 +7,9 @@ import {
   type MergeResolutions,
 } from "@/db/merge-dao";
 import {
+  type MergeDroppedItems,
   type MergeImpactCounts,
+  readMergeDroppedItems,
   readMergeImpactCounts,
 } from "@/db/merge-impact-read";
 import { DEFAULT_FLOW_HOST, finishFlowOnProfile } from "@/navigation/flow-host";
@@ -16,7 +18,7 @@ import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-r
 import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
 import { persistentDangerScrim } from "@/theme/danger-scrim";
-import { mergeImpactLines } from "./merge-impact-lines";
+import { mergeDroppedLines, mergeImpactLines } from "./merge-impact-lines";
 import { ShellAppBar } from "./ShellAppBar";
 
 export function MergeImpactSummary({
@@ -37,6 +39,7 @@ export function MergeImpactSummary({
     absorbed: "Contact",
   });
   const [counts, setCounts] = useState<MergeImpactCounts | null>(null);
+  const [dropped, setDropped] = useState<MergeDroppedItems | null>(null);
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   useEffect(() => {
     const exec = getExecutor();
@@ -44,12 +47,14 @@ export function MergeImpactSummary({
       getContactHeader(exec, survivorId),
       getContactHeader(exec, absorbedId),
       readMergeImpactCounts(exec, absorbedId),
-    ]).then(([survivor, absorbed, impact]) => {
+      readMergeDroppedItems(exec, absorbedId),
+    ]).then(([survivor, absorbed, impact, notKept]) => {
       setNames({
         survivor: survivor?.name ?? "Contact",
         absorbed: absorbed?.name ?? "Contact",
       });
       setCounts(impact);
+      setDropped(notKept);
     });
   }, [absorbedId, survivorId]);
   const typedResolutions: MergeResolutions = resolutions;
@@ -97,6 +102,9 @@ export function MergeImpactSummary({
   // One plural() line per non-zero count over every table the merge moves
   // (38.12 D-44).
   const rows = counts ? mergeImpactLines(counts) : [];
+  // D-146: the survivor's Profile layout, background and Orrery choices win;
+  // the absorbed person's own are listed as not kept.
+  const droppedRows = dropped ? mergeDroppedLines(dropped) : [];
   return (
     <View style={styles.screen}>
       {/* House header with the ✕ Cancel (38.9 D-16, D-59): it abandons the
@@ -118,6 +126,23 @@ export function MergeImpactSummary({
             <Text style={{ color: colors.textPrimary }}>{row}</Text>
           </View>
         ))}
+        {droppedRows.length > 0 ? (
+          <View
+            style={[
+              styles.row,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={{ color: colors.textPrimary }}>
+              {`Not kept from ${names.absorbed} (${names.survivor}'s stay):`}
+            </Text>
+            {droppedRows.map((row) => (
+              <Text key={row} style={{ color: colors.textSecondary }}>
+                {row}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         <View
           style={[
             styles.warning,

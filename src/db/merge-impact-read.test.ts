@@ -2,14 +2,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
 
-import { mergeImpactLines } from "@/components/merge-impact-lines";
+import {
+  mergeDroppedLines,
+  mergeImpactLines,
+} from "@/components/merge-impact-lines";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   createPendingAssist,
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
-import { readMergeImpactCounts } from "@/db/merge-impact-read";
+import { mergeContacts } from "@/db/merge-dao";
+import {
+  readMergeDroppedItems,
+  readMergeImpactCounts,
+} from "@/db/merge-impact-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -241,5 +248,73 @@ describe("mergeImpactLines (D-44)", () => {
       "2 external links",
     ]);
     expect(mergeImpactLines(zero)).toEqual([]);
+  });
+});
+
+describe("D-146: the survivor's Profile look and Orrery choices win; the absorbed's are listed (review B-WR-08)", () => {
+  async function presentation(contactId: number) {
+    await exec.runAsync(
+      `INSERT INTO profile_contact_presentation
+         (contact_id, freeform_layout_json, created_at, modified_at)
+       VALUES (?, '{"version":1}', ?, ?)`,
+      [contactId, NOW, NOW],
+    );
+  }
+  async function override(contactId: number, ref: string, mode: string) {
+    await exec.runAsync(
+      `INSERT INTO system_overrides (uid, system_ref, contact_id, mode, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [uid(), ref, contactId, mode, NOW],
+    );
+  }
+
+  it("lists the absorbed person's own layout and Orrery choices", async () => {
+    const absorbed = await contact("Absorbed");
+    expect(await readMergeDroppedItems(exec, absorbed)).toEqual({
+      profilePresentation: false,
+      orrerySystemChoices: 0,
+    });
+    await presentation(absorbed);
+    await override(absorbed, "user:1", "include");
+    await override(absorbed, "user:2", "exclude");
+    const dropped = await readMergeDroppedItems(exec, absorbed);
+    expect(dropped).toEqual({
+      profilePresentation: true,
+      orrerySystemChoices: 2,
+    });
+    expect(mergeDroppedLines(dropped)).toEqual([
+      "Profile layout and background",
+      "2 Orrery system choices",
+    ]);
+    expect(
+      mergeDroppedLines({ profilePresentation: false, orrerySystemChoices: 0 }),
+    ).toEqual([]);
+  });
+
+  it("the merge keeps the survivor's rows and drops the absorbed person's", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    await presentation(survivor);
+    await presentation(absorbed);
+    await override(survivor, "user:1", "exclude");
+    await override(absorbed, "user:1", "include");
+    await override(absorbed, "user:2", "include");
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: NOW,
+    });
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id FROM profile_contact_presentation ORDER BY contact_id",
+      ),
+    ).toEqual([{ contact_id: survivor }]);
+    expect(
+      await exec.getAllAsync(
+        "SELECT system_ref, contact_id, mode FROM system_overrides ORDER BY id",
+      ),
+    ).toEqual([
+      { system_ref: "user:1", contact_id: survivor, mode: "exclude" },
+    ]);
   });
 });
