@@ -89,7 +89,11 @@ export type RestoreMode = "merge" | "replace-all";
 export type RestoreProgressStep = "safety-backup" | "restoring";
 /**
  * D-59: people, not rows. `before` is this phone's contacts not in the Bin
- * before the restore; `restored` is the backup's contacts not in the Bin;
+ * before the restore; `restored` is the backup's contacts not in the Bin whose
+ * record this restore writes: all of them for Replace-all, and for Merge only
+ * the ones the backup won (38.12 review A-IN-02: a row the phone kept, one a
+ * newer local deletion suppressed, or a Merge that writes nothing is not
+ * "restored");
  * `removed` is, for Replace-all, the phone's not-in-Bin people the backup does
  * not carry (Merge never removes anyone this way: 0). Also 39 D-96's branch
  * signal. `movedToBin` (D-140, owner 2026-10-17) is, for Replace-all, the
@@ -2242,6 +2246,12 @@ export async function applyRestore(
       }
       for (const entity of entities)
         survivors[entity] = survivorSet(plan[entity]);
+      // A-IN-02: count only the people whose contact record this restore
+      // writes and leaves out of the Bin (Replace-all: every backup contact
+      // not in its Bin, as before).
+      people.restored = writes(plan, "contacts").filter(
+        (action) => action.row?.archivedAt == null,
+      ).length;
       const finalCategories = plan.categories
         .filter(
           (action) =>

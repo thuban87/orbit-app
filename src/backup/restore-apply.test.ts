@@ -4503,7 +4503,9 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
     ],
     [
       "merge",
-      { before: 2, restored: 2, removed: 0, movedToBin: 0, removedFromBin: 0 },
+      // A-IN-02: "a" is the same on both sides (the phone keeps it), so only
+      // "d" is restored.
+      { before: 2, restored: 1, removed: 0, movedToBin: 0, removedFromBin: 0 },
     ],
   ] as const)(
     "%s reports people: before, restored and removed (D-59)",
@@ -4550,7 +4552,8 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
         status: "applied",
         people: {
           before: 4,
-          restored: 1,
+          // A-IN-02: Merge keeps the phone's identical "kept" row.
+          restored: mode === "replace-all" ? 1 : 0,
           removed: mode === "replace-all" ? 1 : 0,
           movedToBin,
         },
@@ -4607,7 +4610,28 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
     expect(await applyRestore(phone, backup, "merge")).toMatchObject({
       status: "applied",
       inserted: 0,
-      people: { before: 2, restored: 1, removed: 0, movedToBin: 0 },
+      // A-IN-02: nothing was written, so nobody was restored.
+      people: { before: 2, restored: 0, removed: 0, movedToBin: 0 },
+    });
+  });
+
+  it("Merge counts as restored only the people whose record the backup won (A-IN-02)", async () => {
+    const backup = await backupOf([
+      { uid: "won", modifiedAt: LATER },
+      { uid: "kept" },
+      { uid: "new" },
+      { uid: "new-binned", archived: true },
+      { uid: "gone" },
+    ]);
+    const phone = await db();
+    await seed(phone, [{ uid: "won" }, { uid: "kept", modifiedAt: LATEST }]);
+    await phone.runAsync(
+      "INSERT INTO tombstones (entity_type,entity_uid,deleted_at) VALUES ('contact','gone',?)",
+      [LATEST],
+    );
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+      people: { before: 2, restored: 2, removed: 0 },
     });
   });
 
