@@ -39,6 +39,13 @@ import type {
 export const TEMPLATE_LIMIT = 2_000;
 /** Max code points of a single human-entered value (field / memory / note). */
 export const PER_VALUE_LIMIT = 300;
+/**
+ * The template argument every caller that builds the SENT prompt passes:
+ * Compose's payload and Settings → AI → Preview alike, so the preview stays
+ * byte-identical to the payload even if a context ever lacks `writingStyle`
+ * (D-27; 38.12 D-IN-02). The legacy raw template is never sent.
+ */
+export const SENT_PROMPT_TEMPLATE = "";
 
 // Output sizing is NO LONGER a flat constant here. The former stopgap
 // `MAX_OUTPUT_TOKENS` (bumped 120 → 1024 → 2048) was fragile for THINKING models

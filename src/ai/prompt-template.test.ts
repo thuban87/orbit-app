@@ -7,11 +7,14 @@
  * WITHOUT retaining omitted content, and the returned object is deeply frozen and
  * handed by strict reference identity to every consumer.
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_STYLE_NOTE,
   PER_VALUE_LIMIT,
   resolvePrompt,
+  SENT_PROMPT_TEMPLATE,
   STATIC_INSTRUCTION,
   TEMPLATE_LIMIT,
 } from "@/ai/prompt-template";
@@ -642,5 +645,30 @@ describe("resolvePrompt — instruction paragraphs carry no hard line breaks (38
       "===== DATA: CONTACT CONTEXT =====\nContact: Alex Rivera\n",
     );
     expect(resolved.prompt).toBe(resolved.payload);
+  });
+});
+
+describe("Preview and Compose pass the same template argument (D-27; 38.12 D-IN-02)", () => {
+  const screen = (name: string) =>
+    readFileSync(resolve(__dirname, "../screens", name), "utf8");
+
+  it("both callers pass SENT_PROMPT_TEMPLATE, never the legacy stored template", () => {
+    for (const name of ["ComposeScreen.tsx", "AIPreviewScreen.tsx"]) {
+      const source = screen(name);
+      const calls = source.match(/resolvePrompt\(\s*([^,)]+)/g) ?? [];
+      expect(calls.length).toBeGreaterThan(0);
+      for (const call of calls) {
+        expect(call).toMatch(/resolvePrompt\(\s*SENT_PROMPT_TEMPLATE$/);
+      }
+      expect(source).not.toContain("aiPromptTemplate");
+    }
+  });
+
+  it("without a Writing Style the sent prompt uses the built-in note, not a stored template", () => {
+    const resolved = resolvePrompt(
+      SENT_PROMPT_TEMPLATE,
+      baseContext({ writingStyle: undefined }),
+    );
+    expect(resolved.payload).toContain(DEFAULT_STYLE_NOTE);
   });
 });

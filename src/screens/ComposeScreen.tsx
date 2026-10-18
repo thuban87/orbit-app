@@ -68,7 +68,7 @@ import {
   loadCachedOpenRouterCatalog,
   type OpenRouterModel,
 } from "@/ai/openrouter-catalog";
-import { resolvePrompt } from "@/ai/prompt-template";
+import { resolvePrompt, SENT_PROMPT_TEMPLATE } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { AIComposeContextReview } from "@/components/AIComposeContextReview";
@@ -464,7 +464,7 @@ export function ComposeScreen({
           messageFocus: focusedContext,
         };
         const resolved = resolvePrompt(
-          "",
+          SENT_PROMPT_TEMPLATE,
           completeContext,
           sourceDraft,
           ephemeralAdjustGuidance,

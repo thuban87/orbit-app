@@ -1,14 +1,13 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { resolvePrompt } from "@/ai/prompt-template";
+import { resolvePrompt, SENT_PROMPT_TEMPLATE } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { ContactPicker } from "@/components/ContactPicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button } from "@/components/ui";
 import { SettingsSectionCard } from "@/components/ui/SettingsSectionCard";
 import { readPromptContext } from "@/db/ai-context-read";
-import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor } from "@/db/database";
 import {
   getWritingStyle,
@@ -53,13 +52,10 @@ export function AIPreviewScreen() {
 
   const resolveFor = useCallback(async (contactContext: PromptContext) => {
     const exec = getExecutor();
-    const [settings, writingStyle, personalizationSections] = await Promise.all(
-      [
-        getAppSettings(exec),
-        getWritingStyle(exec),
-        listPersonalizationSections(exec),
-      ],
-    );
+    const [writingStyle, personalizationSections] = await Promise.all([
+      getWritingStyle(exec),
+      listPersonalizationSections(exec),
+    ]);
     const context = {
       ...contactContext,
       writingStyle,
@@ -67,7 +63,8 @@ export function AIPreviewScreen() {
     };
     return {
       context,
-      resolved: resolvePrompt(settings.aiPromptTemplate, context),
+      // The same template argument Compose sends, so preview = payload (D-27).
+      resolved: resolvePrompt(SENT_PROMPT_TEMPLATE, context),
     };
   }, []);
 
