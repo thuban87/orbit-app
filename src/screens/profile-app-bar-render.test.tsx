@@ -407,6 +407,17 @@ describe("Profile lifecycle feedback wiring (38.12 D-32, D-33, D-38, D-95)", () 
     expect(transition).not.toContain("setProfileContactFrequency(");
   });
 
+  it("the Overview frequency change reconciles the notification schedule (C-WR-06)", () => {
+    const setFrequency = screen.slice(
+      screen.indexOf("const setFrequency = useCallback"),
+      screen.indexOf("const snooze = useCallback"),
+    );
+    const write = setFrequency.indexOf("setProfileContactFrequency(");
+    const reconcile = setFrequency.indexOf("reconcileSchedule(getExecutor())");
+    expect(write).toBeGreaterThan(0);
+    expect(reconcile).toBeGreaterThan(write);
+  });
+
   it("the Bind card reads its label and Change link from bindCardModel (D-95)", () => {
     expect(screen).toContain("bindCardModel(");
     expect(screen).toContain('testID="profile-bind-change"');

@@ -744,15 +744,22 @@ export function ContactProfileScreen({
     [closeOverlay, contactId, leaveProfile],
   );
 
+  // A new frequency moves a Bound person's due date, so the scheduled
+  // check-in reminder follows it at once, like snooze and the birthday
+  // (review C-WR-06).
   const setFrequency = useCallback(
-    (intervalDays: number) =>
-      commitAndReload(() =>
+    async (intervalDays: number) => {
+      await commitAndReload(() =>
         setProfileContactFrequency(getExecutor(), {
           contactId,
           intervalDays,
           now: localDateTime(),
         }),
-      ),
+      );
+      void reconcileSchedule(getExecutor()).catch((cause) =>
+        Logger.error(LOG_SCOPE, "failed to reconcile frequency", cause),
+      );
+    },
     [commitAndReload, contactId],
   );
   const snooze = useCallback(
