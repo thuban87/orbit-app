@@ -2039,8 +2039,9 @@ describe("listArchived — inverse read, most-recently-archived first", () => {
     const archived = await listArchived(exec);
     expect(archived.map((r) => r.id)).toEqual([b, a]); // DESC: newer first
     expect(archived.map((r) => r.id)).not.toContain(c);
-    // Shape: id + name + archived_at.
-    expect(archived[0]).toMatchObject({ id: b, name: "Bo" });
+    // Shape: id + name + photo + archived_at (the photo feeds the Bin row's
+    // Avatar, 38.12 D-40).
+    expect(archived[0]).toMatchObject({ id: b, name: "Bo", photo: null });
     expect(archived[0]?.archived_at).toBe("2026-08-18 09:00:00");
   });
 

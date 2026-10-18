@@ -1009,18 +1009,21 @@ export function updateContactFull(
 //
 // listArchived is the SOLE inverse read (`archived_at IS NOT NULL`); every
 // live/list surface keeps the `archived_at IS NULL` filter. The by-id
-// getContactHeader / getContactForEdit seeks stay archived-reachable by design
-// (no Phase-4 surface routes to an archived profile/edit) — see the plan's
-// archived-read reconciliation note.
+// getContactHeader / getContactForEdit seeks stay archived-reachable by design:
+// a Bin row opens the person's Profile, which shows the in-the-Bin banner and
+// offers no live actions (38.12 D-93, D-34); the lifecycle, snooze, favourite
+// and Edit-participation writers refuse a binned contact (`ContactInBinError`).
 //
 // SECURITY (T-04-02 / T-06-11): every value is `?`-bound; no interpolation. The
 // events INSERT adds no second `last_contact` writer.
 // =============================================================================
 
-/** One archived contact as surfaced by the Archived list. */
+/** One archived contact as surfaced by the Bin list (route id `Archived`). */
 export interface ArchivedContactRow {
   id: number;
   name: string;
+  /** The stored relative photo path, or null; the row's Avatar (38.12 D-40). */
+  photo: string | null;
   /** When it was archived — the list orders by this, most-recent first. */
   archived_at: string;
 }
@@ -1112,7 +1115,7 @@ export function restoreContact(
  */
 export function listArchived(exec: SqlExecutor): Promise<ArchivedContactRow[]> {
   return exec.getAllAsync<ArchivedContactRow>(
-    `SELECT id, name, archived_at
+    `SELECT id, name, photo, archived_at
        FROM contacts
       WHERE archived_at IS NOT NULL
       ORDER BY archived_at DESC`,
