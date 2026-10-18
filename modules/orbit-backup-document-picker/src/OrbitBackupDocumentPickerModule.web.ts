@@ -1,6 +1,6 @@
 import { NativeModule, registerWebModule } from "expo";
 
-import type { ConsumedBackupShare } from "..";
+import type { ConsumedBackupShare, NativeBackupFolderEntry } from "..";
 
 class OrbitBackupDocumentPickerModule extends NativeModule<
   Record<never, never>
@@ -19,6 +19,16 @@ class OrbitBackupDocumentPickerModule extends NativeModule<
 
   async pickBackupDocument(): Promise<ConsumedBackupShare> {
     return { uri: null };
+  }
+
+  async folderDisplayName(_treeUri: string): Promise<string | null> {
+    return null;
+  }
+
+  async listFolderEntries(
+    _treeUri: string,
+  ): Promise<readonly NativeBackupFolderEntry[] | null> {
+    return null;
   }
 }
 

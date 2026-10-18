@@ -27,6 +27,10 @@ import {
   isOwnedAutomaticBackupName,
 } from "@/backup/backup-file-names";
 import {
+  backupFolderEntry,
+  entriesFromUris,
+} from "@/backup/backup-folder-entries";
+import {
   MAX_SUPPORTED_BACKUP_FORMAT_VERSION,
   parseBackupManifest,
 } from "@/backup/backup-schema";
@@ -616,7 +620,7 @@ describe("backup encryption safety", () => {
         },
       },
       storage: {
-        list: async () => [...entries.keys()],
+        list: async () => entriesFromUris([...entries.keys()]),
         read: async (uri) => entries.get(uri)!,
         writeVerified: async (_directory, name, contents) => {
           const uri = `content://backup/${name}`;
@@ -676,9 +680,10 @@ describe("backup encryption safety", () => {
         },
       },
       storage: {
-        list: async () => [
-          "content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json",
-        ],
+        list: async () =>
+          entriesFromUris([
+            "content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json",
+          ]),
         read: async () => {
           throw new Error("SAF permission revoked");
         },
@@ -978,9 +983,11 @@ describe("only missing photos are skipped, in every writer (38.6 D-29)", () => {
     retentionDays: 7,
     storage: {
       writeVerified: vi.fn(async () => "content://backup/f"),
-      list: vi.fn(async () => [
-        "content://backup/orbit-auto-2020-01-01T00-00-00-000Z.json",
-      ]),
+      list: vi.fn(async () =>
+        entriesFromUris([
+          "content://backup/orbit-auto-2020-01-01T00-00-00-000Z.json",
+        ]),
+      ),
       remove: vi.fn(async () => {}),
     },
   });
@@ -1149,7 +1156,35 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
     expect(writeVerified).not.toHaveBeenCalled();
   });
 
-  function reencryptionHarness(sources: ReadonlyArray<[string, string]>) {
+  // A Google Drive-shaped folder (38.12 review A-WR-02): the URI carries an
+  // opaque document id, the file name lives only in the provider's display
+  // name, and a created file keeps the bare stem with a JSON mime type.
+  function driveFolder() {
+    const names = new Map<string, string>();
+    let next = 0;
+    return {
+      uriFor(name: string): string {
+        next += 1;
+        const uri = `content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3Droot/document/acc%3D1%3Bdoc%3Dencoded%3DQk${next}x`;
+        names.set(uri, name.replace(/\.json$/, ""));
+        return uri;
+      },
+      list(uris: Iterable<string>) {
+        return [...uris].map((uri) =>
+          backupFolderEntry({
+            uri,
+            name: names.get(uri) ?? null,
+            mimeType: "application/json",
+          }),
+        );
+      },
+    };
+  }
+
+  function reencryptionHarness(
+    sources: ReadonlyArray<[string, string]>,
+    folder?: ReturnType<typeof driveFolder>,
+  ) {
     const entries = new Map<string, string>(sources);
     const state = {
       active: "old",
@@ -1206,10 +1241,13 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
         },
       },
       storage: {
-        list: async () => [...entries.keys()],
+        list: async () =>
+          folder
+            ? folder.list(entries.keys())
+            : entriesFromUris([...entries.keys()]),
         read: async (uri) => entries.get(uri)!,
         writeVerified: async (_directory, name, contents) => {
-          const uri = `content://backup/${name}`;
+          const uri = folder ? folder.uriFor(name) : `content://backup/${name}`;
           entries.set(uri, contents);
           return uri;
         },
@@ -1220,6 +1258,40 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
     });
     return { entries, state, service };
   }
+
+  it("on a Drive-shaped folder, re-encrypts the automatic backups found by display name and leaves a manual export alone (A-WR-02)", async () => {
+    const folder = driveFolder();
+    const autos = [
+      folder.uriFor("orbit-auto-2026-08-22T00-00-00-000Z.json"),
+      folder.uriFor("orbit-auto-2026-08-23-0930.json"),
+    ];
+    const manual = folder.uriFor("orbit-backup-2026-08-24-0930.json");
+    const { entries, state, service } = reencryptionHarness(
+      [
+        ...autos.map((uri): [string, string] => [
+          uri,
+          JSON.stringify(manifest),
+        ]),
+        [manual, "manual export"],
+      ],
+      folder,
+    );
+    await expect(
+      service.change({ currentPassphrase: "old", nextPassphrase: "new" }),
+    ).resolves.toEqual({ status: "changed", reencryptedCount: 2 });
+    expect(state.active).toBe("new");
+    for (const uri of autos) expect(entries.has(uri)).toBe(false);
+    expect(entries.get(manual)).toBe("manual export");
+    const names = folder.list(entries.keys()).map((entry) => entry.name);
+    const base = automaticBackupFileName(new Date("2026-08-25T00:00:00.000Z"));
+    expect(names.sort()).toEqual(
+      [
+        base,
+        base.replace(/\.json$/, "-2.json"),
+        "orbit-backup-2026-08-24-0930.json",
+      ].sort(),
+    );
+  });
   // A plaintext automatic backup written while encryption was off.
   const oversizedPlaintext = JSON.stringify({ ...manifest, oversized: true });
 
@@ -1318,7 +1390,7 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
       retentionDays: 7,
       storage: {
         writeVerified,
-        list: async () => folder,
+        list: async () => entriesFromUris(folder),
         remove: async (uri) => {
           removed.push(uri);
         },
@@ -1362,7 +1434,7 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
           listed = [`content://backup/${name}`];
           return `content://backup/${name}`;
         },
-        list: async () => listed,
+        list: async () => entriesFromUris(listed),
         remove: async (uri) => {
           removed.push(uri);
         },
@@ -1373,6 +1445,56 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
       filename: written,
     });
     expect(removed).toEqual([]);
+  });
+
+  it("on a Drive-shaped folder, suffixes a same-minute name and prunes expired automatic backups by display name (A-WR-02)", async () => {
+    const now = new Date(2026, 7, 25, 9, 30, 0);
+    const base = automaticBackupFileName(now);
+    const folder = driveFolder();
+    const present = new Set([
+      folder.uriFor(base),
+      folder.uriFor("orbit-auto-2020-01-01T00-00-00-000Z.json"),
+      folder.uriFor("orbit-auto-2020-01-02-0930.json"),
+      folder.uriFor("orbit-backup-2020-01-01-0930.json"),
+    ]);
+    const [sameMinute, oldUtc, oldLocal, manual] = [...present];
+    const removed: string[] = [];
+    const writeVerified = vi.fn(async (_directory: string, name: string) => {
+      const uri = folder.uriFor(name);
+      present.add(uri);
+      return uri;
+    });
+    const service = createAutomaticBackupService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      now,
+      readPhotoBase64: async () => "",
+      directoryUri:
+        "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3Droot",
+      retentionDays: 7,
+      storage: {
+        writeVerified,
+        list: async () => folder.list(present),
+        remove: async (uri) => {
+          removed.push(uri);
+          present.delete(uri);
+        },
+      },
+    });
+    const suffixed = base.replace(/\.json$/, "-2.json");
+    await expect(service.writeVerifiedSnapshot()).resolves.toMatchObject({
+      status: "written",
+      filename: suffixed,
+    });
+    expect(removed.sort()).toEqual([oldUtc, oldLocal].sort());
+    expect(present.has(sameMinute!)).toBe(true);
+    expect(present.has(manual!)).toBe(true);
+    // The kept-backups count reads the same names: two automatic backups.
+    expect(
+      folder
+        .list(present)
+        .filter((entry) => isOwnedAutomaticBackupName(entry.name)),
+    ).toHaveLength(2);
   });
 
   it("pins the device-local health diagnostic the Backup card reads", () => {

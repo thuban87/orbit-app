@@ -244,6 +244,25 @@ describe("runAutomaticBackupNow — inputs", () => {
 });
 
 describe("chooseAutomaticBackupFolder — the one folder chooser", () => {
+  it("awaits a looked-up display name before recording the folder (38.12 D-143)", async () => {
+    await expect(
+      chooseAutomaticBackupFolder({
+        exec,
+        folders: {
+          requestDirectory: async () => ({
+            granted: true,
+            directoryUri:
+              "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3DAbC",
+          }),
+        },
+        folderName: async () => "Orbit backups",
+      }),
+    ).resolves.toBe(true);
+    expect(h.health.mock.calls[0]?.[1]).toMatchObject({
+      backupFolderName: "Orbit backups",
+    });
+  });
+
   it("records the chosen folder as accessible with its display name", async () => {
     const requestDirectory = vi.fn(async () => ({
       granted: true,

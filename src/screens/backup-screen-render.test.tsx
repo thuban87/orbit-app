@@ -101,7 +101,7 @@ vi.mock("@/services/backup/backup-service", () => ({
 }));
 vi.mock("@/services/backup/saf-storage", () => ({
   createSafStorage: () => ({ list: async () => mocks.folderListing }),
-  ownedAutomaticUris: (uris: string[]) => uris,
+  ownedAutomaticEntries: (entries: unknown[]) => entries,
 }));
 vi.mock("@/services/backup/encryption", () => ({
   APPROVED_BACKUP_ENCRYPTION_PROFILE: "test",
@@ -133,6 +133,7 @@ vi.mock("@/utils/logger", () => ({
 vi.mock("../../modules/orbit-backup-document-picker", () => ({
   consumeSharedBackup: vi.fn(),
   pickBackupDocument: vi.fn(),
+  readBackupFolderDisplayName: async () => "Orbit backups",
 }));
 vi.mock("./backup-restore-document", () => ({
   readRestoreDocument: vi.fn(),
@@ -206,7 +207,8 @@ const HEALTHY: BackupHealth = {
 
 /** Settings that resolve to a healthy card once re-read after the backup. */
 const SETTINGS_AFTER_BACKUP = {
-  backupFolderUri: "content://tree/primary%3AOrbit",
+  backupFolderUri:
+    "content://com.android.externalstorage.documents/tree/primary%3AOrbit",
   backupFolderName: "Orbit",
   backupFolderAccessible: 1,
   backupFolderDiagnostic: null,
@@ -415,8 +417,8 @@ describe("Backup page chrome (38.12 D-64, D-65)", () => {
   });
 });
 
-describe("hero kept-backups count and folder name (38.12 D-62)", () => {
-  it("on focus, counts the owned automatic backups in the folder and names the folder from its URI", async () => {
+describe("hero kept-backups count and folder name (38.12 D-62, D-143)", () => {
+  it("on focus, counts the owned automatic backups in the folder and names the folder from its provider", async () => {
     mocks.folderListing = ["a", "b", "c"];
     render();
     const setHealth = mocks.setters[STATE.health];
@@ -424,10 +426,15 @@ describe("hero kept-backups count and folder name (38.12 D-62)", () => {
     reload();
     await vi.waitFor(() =>
       expect(setHealth).toHaveBeenCalledWith(
-        expect.objectContaining({ kind: "healthy", automaticFileCount: 3 }),
+        expect.objectContaining({
+          kind: "healthy",
+          automaticFileCount: 3,
+          folderName: "Orbit backups",
+        }),
       ),
     );
-    // Drawn first without a count, so a slow folder never holds the card.
+    // Drawn first without a count and with the URI-derived name, so a slow
+    // provider never holds the card back.
     expect(setHealth.mock.calls[0]?.[0]).toMatchObject({
       kind: "healthy",
       folderName: "Orbit",

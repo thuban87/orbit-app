@@ -35,7 +35,7 @@ import {
 import { backupPassphraseStore } from "@/services/backup/passphrase-store";
 import {
   createSafStorage,
-  ownedAutomaticUris,
+  ownedAutomaticEntries,
 } from "@/services/backup/saf-storage";
 import {
   createExpoShareAdapter,
@@ -56,6 +56,7 @@ import { plural } from "@/utils/plural";
 import {
   consumeSharedBackup,
   pickBackupDocument,
+  readBackupFolderDisplayName,
 } from "../../modules/orbit-backup-document-picker";
 import {
   backupAppBarVariant,
@@ -80,7 +81,14 @@ import {
   restorePreviewCache,
   restorePreviewFailure,
 } from "./backup-restore-logic";
-import { backupFolderDisplayName } from "./backup-settings-logic";
+import {
+  backupFolderDisplayName,
+  resolveBackupFolderName,
+} from "./backup-settings-logic";
+
+/** D-143: the provider's own folder name, else the URI derivation. */
+const backupFolderName = (uri: string): Promise<string> =>
+  resolveBackupFolderName(uri, readBackupFolderDisplayName);
 
 const LOG_SCOPE = "backup-screen";
 
@@ -165,7 +173,8 @@ export function BackupScreen({
         if (cancelled) return;
         const healthInput = {
           folderUri: settings.backupFolderUri,
-          // D-62: the folder's real name, from its URI at display time.
+          // D-62: a first name from the URI at display time; D-143's provider
+          // lookup replaces it below, after the card is drawn.
           folderName: settings.backupFolderUri
             ? backupFolderDisplayName(settings.backupFolderUri)
             : null,
@@ -185,18 +194,29 @@ export function BackupScreen({
         );
         setEncryptionEnabled(settings.encryptionEnabled === 1);
         setShowNudge(nudge.shouldShow);
+        // D-143: the provider's own folder name (Drive included). Looked up
+        // after the card is drawn, so a slow provider never holds it back.
+        let laterInput: typeof healthInput = healthInput;
+        if (settings.backupFolderUri) {
+          laterInput = {
+            ...laterInput,
+            folderName: await backupFolderName(settings.backupFolderUri),
+          };
+          if (cancelled) return;
+          setHealth(resolveBackupHealth(laterInput, new Date()));
+        }
         // D-62: the hero counts the owned automatic backups really in the
-        // folder. Listed after the card is drawn, so a slow provider never
-        // holds the card back; a failed listing leaves the count unknown.
+        // folder, recognised by display name (review A-WR-02). A failed
+        // listing leaves the count unknown.
         if (settings.backupFolderUri && settings.backupFolderAccessible === 1) {
           try {
-            const automaticFileCount = ownedAutomaticUris(
+            const automaticFileCount = ownedAutomaticEntries(
               await createSafStorage().list(settings.backupFolderUri),
             ).length;
             if (cancelled) return;
             setHealth(
               resolveBackupHealth(
-                { ...healthInput, automaticFileCount },
+                { ...laterInput, automaticFileCount },
                 new Date(),
               ),
             );
@@ -242,7 +262,7 @@ export function BackupScreen({
     try {
       await chooseAutomaticBackupFolder({
         exec: getExecutor(),
-        folderName: backupFolderDisplayName,
+        folderName: backupFolderName,
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "folder selection failed", error);

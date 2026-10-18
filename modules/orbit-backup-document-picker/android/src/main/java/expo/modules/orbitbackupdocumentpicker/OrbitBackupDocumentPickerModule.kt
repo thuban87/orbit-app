@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Debug
+import android.provider.DocumentsContract
 import android.util.Log
 import java.io.File
 import java.util.Locale
@@ -55,6 +56,22 @@ class OrbitBackupDocumentPickerModule : Module() {
       ingress = null
     }
 
+    // 38.12 D-143: the chosen backup folder's own display name, for any
+    // document provider (Google Drive's tree ids are opaque). Null when the
+    // provider cannot answer; the TS side then derives a neutral name.
+    AsyncFunction("folderDisplayName") { treeUri: String ->
+      readFolderDisplayName(treeUri)
+    }
+
+    // 38.12 review A-WR-02 / D-WR-03: the folder's children with their display
+    // names, so backup files are recognised by name and never by the last URI
+    // segment (an opaque id on Drive). Child URIs are built exactly as
+    // DocumentFile.listFiles (expo-file-system's readDirectoryAsync) builds
+    // them, so read/delete keep working on the same URIs. Null on failure.
+    AsyncFunction("listFolderEntries") { treeUri: String ->
+      listFolderEntries(treeUri)
+    }
+
     Function("hasSharedBackup") {
       // Cold-start order: currentActivity may not exist at OnCreate time.
       appContext.currentActivity?.intent?.let(::captureBackupShare)
@@ -99,6 +116,65 @@ class OrbitBackupDocumentPickerModule : Module() {
       }
     }
   }
+
+  /** The folder document for a tree URI, as DocumentFile.fromTreeUri builds it. */
+  private fun folderDocumentUri(treeUri: Uri): Uri {
+    var documentId = DocumentsContract.getTreeDocumentId(treeUri)
+    if (DocumentsContract.isDocumentUri(context, treeUri)) {
+      documentId = DocumentsContract.getDocumentId(treeUri)
+    }
+    return DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+  }
+
+  private fun readFolderDisplayName(treeUri: String): String? =
+    try {
+      context.contentResolver.query(
+        folderDocumentUri(Uri.parse(treeUri)),
+        arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+        null,
+        null,
+        null,
+      )?.use { cursor ->
+        if (cursor.moveToFirst()) cursor.getString(0)?.trim()?.takeIf { it.isNotEmpty() } else null
+      }
+    } catch (_: Exception) {
+      null
+    }
+
+  private fun listFolderEntries(treeUri: String): List<Map<String, String?>>? =
+    try {
+      val folder = folderDocumentUri(Uri.parse(treeUri))
+      val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+        folder,
+        DocumentsContract.getDocumentId(folder),
+      )
+      context.contentResolver.query(
+        children,
+        arrayOf(
+          DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+          DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+          DocumentsContract.Document.COLUMN_MIME_TYPE,
+        ),
+        null,
+        null,
+        null,
+      )?.use { cursor ->
+        val entries = mutableListOf<Map<String, String?>>()
+        while (cursor.moveToNext()) {
+          val documentId = cursor.getString(0) ?: continue
+          entries.add(
+            mapOf(
+              "uri" to DocumentsContract.buildDocumentUriUsingTree(folder, documentId).toString(),
+              "name" to cursor.getString(1),
+              "mimeType" to cursor.getString(2),
+            ),
+          )
+        }
+        entries
+      }
+    } catch (_: Exception) {
+      null
+    }
 
   private fun captureBackupShare(intent: Intent) {
     if (capturedIntent === intent) return

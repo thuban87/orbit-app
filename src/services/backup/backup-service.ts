@@ -409,10 +409,6 @@ interface AutomaticBackupReencryptionDependencies {
   readonly storage: SafReadableStorage;
 }
 
-function ownedName(uri: string): string {
-  return decodeURIComponent(uri).split("/").pop() ?? "";
-}
-
 /**
  * Converts one automatic file only after its new encrypted replacement has
  * been read, decrypted, and schema-validated. A SecureStore journal retains
@@ -462,15 +458,17 @@ export function createAutomaticBackupReencryptionService(
         }
 
         try {
+          // Recognised by display name, never by URI (38.12 review A-WR-02):
+          // on Google Drive the URI's last segment is an opaque id.
           const listed = await deps.storage.list(deps.directoryUri);
           // Only automatic backups are re-encrypted (38.12 D-136): a manual
           // export saved into this folder is never rewritten or removed.
-          const uris = listed.filter((uri) =>
-            isOwnedAutomaticBackupName(ownedName(uri)),
-          );
+          const uris = listed
+            .filter((entry) => isOwnedAutomaticBackupName(entry.name))
+            .map((entry) => entry.uri);
           // Every name in the folder plus every name this run writes, so the
           // minute-precision replacements never collide (D-136).
-          const taken = new Set(listed.map(ownedName));
+          const taken = new Set(listed.map((entry) => entry.name));
           const replacementUris = new Set(
             pending.replacements.map(
               (replacement) => replacement.replacementUri,
@@ -532,7 +530,6 @@ export function createAutomaticBackupReencryptionService(
               replacementName,
               replacementContents,
             );
-            taken.add(ownedName(replacementUri));
             const verifiedReplacement: unknown = JSON.parse(
               await deps.storage.read(replacementUri),
             );
@@ -795,8 +792,9 @@ export function createAutomaticBackupService(
           // the suffix check; it never negates the write.
           let existing: string[] = [];
           try {
+            // Display names, never URI segments (38.12 review A-WR-02).
             existing = (await deps.storage.list(deps.directoryUri)).map(
-              ownedName,
+              (entry) => entry.name,
             );
           } catch {
             existing = [];
@@ -816,8 +814,7 @@ export function createAutomaticBackupService(
           try {
             const listed = await deps.storage.list(deps.directoryUri);
             await Promise.all(
-              listed.map(async (uri) => {
-                const name = ownedName(uri);
+              listed.map(async ({ uri, name }) => {
                 if (
                   name !== filename &&
                   isOwnedAutomaticBackupName(name) &&

@@ -187,8 +187,8 @@ export interface ChooseBackupFolderDeps {
   exec: SqlExecutor;
   /** Defaults to the real SAF picker. */
   folders?: Pick<SafFolderAdapter, "requestDirectory">;
-  /** The display name stored beside the URI. */
-  folderName: (directoryUri: string) => string;
+  /** The display name stored beside the URI (38.12 D-143: may look it up). */
+  folderName: (directoryUri: string) => string | Promise<string>;
 }
 
 /**
@@ -207,10 +207,11 @@ export async function chooseAutomaticBackupFolder(
   const result = await folders.requestDirectory();
   if (!result.granted || !result.directoryUri) return false;
   const directoryUri = result.directoryUri;
+  const backupFolderName = await deps.folderName(directoryUri);
   await inWriteTransaction(deps.exec, () =>
     recordAutomaticBackupHealthCore(deps.exec, {
       backupFolderUri: directoryUri,
-      backupFolderName: deps.folderName(directoryUri),
+      backupFolderName,
       backupFolderAccessible: 1,
       backupFolderDiagnostic: null,
     }),

@@ -1,6 +1,14 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Linking } from "react-native";
 import { isOwnedAutomaticBackupName } from "@/backup/backup-file-names";
+import {
+  type BackupFolderEntry,
+  backupFolderEntry,
+  entriesFromUris,
+} from "@/backup/backup-folder-entries";
+import { listBackupFolderEntries } from "../../../modules/orbit-backup-document-picker";
+
+export type { BackupFolderEntry } from "@/backup/backup-folder-entries";
 
 export interface SafStorage {
   /** Returns the provider URI only after the replacement can be read back. */
@@ -9,7 +17,12 @@ export interface SafStorage {
     name: string,
     contents: string,
   ): Promise<string>;
-  list(directoryUri: string): Promise<string[]>;
+  /**
+   * The folder's children with their display names (38.12 review A-WR-02).
+   * Recognise backup files by `name`, never by the URI: on Google Drive the
+   * URI's last segment is an opaque id.
+   */
+  list(directoryUri: string): Promise<BackupFolderEntry[]>;
   remove(uri: string): Promise<void>;
 }
 
@@ -43,8 +56,22 @@ export function createSafStorage(): SafReadableStorage & SafFolderAdapter {
       );
       return uri;
     },
-    list: (directoryUri) =>
-      FileSystem.StorageAccessFramework.readDirectoryAsync(directoryUri),
+    async list(directoryUri) {
+      // The provider's own names (works on Drive). If the native listing is
+      // unavailable, the URI listing still names device-storage files right.
+      let native: Awaited<ReturnType<typeof listBackupFolderEntries>> = null;
+      try {
+        native = await listBackupFolderEntries(directoryUri);
+      } catch {
+        native = null;
+      }
+      if (native) return native.map(backupFolderEntry);
+      return entriesFromUris(
+        await FileSystem.StorageAccessFramework.readDirectoryAsync(
+          directoryUri,
+        ),
+      );
+    },
     remove: (uri) => FileSystem.StorageAccessFramework.deleteAsync(uri),
     read: (uri) => FileSystem.StorageAccessFramework.readAsStringAsync(uri),
     requestDirectory: (initialUri) =>
@@ -56,8 +83,9 @@ export function createSafStorage(): SafReadableStorage & SafFolderAdapter {
   };
 }
 
-export function ownedAutomaticUris(uris: string[]): string[] {
-  return uris.filter((uri) =>
-    isOwnedAutomaticBackupName(decodeURIComponent(uri).split("/").pop() ?? ""),
-  );
+/** The folder's automatic backups (D-136), recognised by display name. */
+export function ownedAutomaticEntries(
+  entries: readonly BackupFolderEntry[],
+): BackupFolderEntry[] {
+  return entries.filter((entry) => isOwnedAutomaticBackupName(entry.name));
 }

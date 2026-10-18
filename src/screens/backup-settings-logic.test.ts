@@ -22,6 +22,7 @@ import {
   createBackupDayController,
   encryptionErrorCopy,
   REENCRYPTION_TOO_LARGE_COPY,
+  resolveBackupFolderName,
   shouldFlushOnLeave,
   shouldReseedDayField,
   subscribeBackgroundLeaveFlush,
@@ -839,12 +840,17 @@ describe("backupFolderDisplayName — the folder's real name from its tree URI (
     ).toBe("Orbit");
   });
 
-  it("a Drive-style tree URI yields its last decoded path segment", () => {
-    expect(
-      backupFolderDisplayName(
-        "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3DAbC%2FOrbit",
-      ),
-    ).toBe("Orbit");
+  // 38.12 review D-WR-03: only device storage has volume:path tree ids. A
+  // Drive (or any other provider's) id is opaque and must never show as the
+  // folder's name; D-143's native lookup names those folders.
+  it("a Google Drive tree URI yields the neutral name, never its document id", () => {
+    for (const uri of [
+      "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3DAbCdEf",
+      "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3DAbC%2FOrbit",
+      "content://com.android.providers.downloads.documents/tree/msf%3A1234",
+    ]) {
+      expect(backupFolderDisplayName(uri)).toBe(BACKUP_FOLDER_FALLBACK_NAME);
+    }
   });
 
   it("an undecodable, rootless or missing URI falls back to the neutral name", () => {
@@ -859,6 +865,48 @@ describe("backupFolderDisplayName — the folder's real name from its tree URI (
     ]) {
       expect(backupFolderDisplayName(uri)).toBe(BACKUP_FOLDER_FALLBACK_NAME);
     }
+  });
+});
+
+describe("resolveBackupFolderName — the provider's folder name, else the derivation (38.12 D-143)", () => {
+  const drive =
+    "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dencoded%3DAbCdEf";
+  const local =
+    "content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FOrbit";
+
+  it("uses the provider's display name, trimmed", async () => {
+    await expect(
+      resolveBackupFolderName(drive, async () => "  Orbit backups "),
+    ).resolves.toBe("Orbit backups");
+  });
+
+  it("falls back to the URI derivation when the lookup answers nothing, blank or throws", async () => {
+    for (const lookup of [
+      async () => null,
+      async () => "   ",
+      async () => {
+        throw new Error("provider gone");
+      },
+    ]) {
+      await expect(resolveBackupFolderName(local, lookup)).resolves.toBe(
+        "Orbit",
+      );
+      await expect(resolveBackupFolderName(drive, lookup)).resolves.toBe(
+        BACKUP_FOLDER_FALLBACK_NAME,
+      );
+    }
+  });
+
+  it("an unset folder is the neutral name without a lookup", async () => {
+    let called = false;
+    const lookup = async () => {
+      called = true;
+      return "x";
+    };
+    await expect(resolveBackupFolderName(null, lookup)).resolves.toBe(
+      BACKUP_FOLDER_FALLBACK_NAME,
+    );
+    expect(called).toBe(false);
   });
 });
 

@@ -45,6 +45,7 @@ import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
+import { readBackupFolderDisplayName } from "../../modules/orbit-backup-document-picker";
 import {
   type BackupDayController,
   type BackupSettingsSection,
@@ -54,6 +55,7 @@ import {
   commitThenRefresh,
   createBackupDayController,
   encryptionErrorCopy,
+  resolveBackupFolderName,
   subscribeBackgroundLeaveFlush,
   validateEncryptionSetup,
 } from "./backup-settings-logic";
@@ -224,8 +226,9 @@ export function BackupSettingsScreen({
         chooseAutomaticBackupFolder({
           exec: getExecutor(),
           folders: safStorage,
-          // D-62: the folder's real name, from its URI.
-          folderName: backupFolderDisplayName,
+          // D-143: the provider's own folder name, else the URI derivation.
+          folderName: (uri) =>
+            resolveBackupFolderName(uri, readBackupFolderDisplayName),
         }),
       refresh: readSettings,
       onCommitFailed: (error) => {
@@ -439,9 +442,30 @@ export function BackupSettingsScreen({
   const encryptionEnabled = presentation.encryptionSummary === "on";
   const { folderConfigured, folderAccessible } = presentation;
   const setupFlow = !encryptionEnabled || encryptionFlow === "forgotten";
-  // D-62: derived at display time from the URI; nothing stored is repaired.
+  // D-143: the provider's own name for the folder (Drive included), looked up
+  // for the current URI; until it answers, D-62's URI derivation. Nothing
+  // stored is repaired.
+  const folderUri = settings?.backupFolderUri ?? null;
+  const [providerFolderName, setProviderFolderName] = useState<{
+    readonly uri: string;
+    readonly name: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!folderUri) return;
+    let cancelled = false;
+    void resolveBackupFolderName(folderUri, readBackupFolderDisplayName).then(
+      (name) => {
+        if (!cancelled) setProviderFolderName({ uri: folderUri, name });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [folderUri]);
   const folderName = folderConfigured
-    ? backupFolderDisplayName(settings?.backupFolderUri)
+    ? providerFolderName?.uri === folderUri && providerFolderName
+      ? providerFolderName.name
+      : backupFolderDisplayName(folderUri)
     : null;
 
   // Scroll to the requested section once its offset is known; a new request

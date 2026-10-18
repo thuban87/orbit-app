@@ -568,22 +568,27 @@ export function subscribeBackgroundLeaveFlush(
 export const BACKUP_FOLDER_FALLBACK_NAME = "your backup folder";
 
 /**
- * The chosen backup folder's real name, derived from its SAF tree URI at
- * display time (38.12 D-62). Nothing stored is repaired (D-30): rows written
- * before this read "Selected backup folder", and the URI is the truth.
+ * The chosen backup folder's name derived from its SAF tree URI, the fallback
+ * for 38.12 D-143's native display-name lookup (`resolveBackupFolderName`).
+ * Nothing stored is repaired (D-30).
  *
  * A tree URI is `content://<authority>/tree/<encoded tree id>` (sometimes with
- * `/document/<id>` after it). The tree id decodes to `<volume>:<path>` for
- * device storage (e.g. `primary:Documents/Orbit`); the name is its last path
- * segment. Any other provider's id yields its last decoded segment. A URI with
- * no tree id, an undecodable id or an empty path falls back to the neutral
- * name.
+ * `/document/<id>` after it). Only device storage
+ * (`com.android.externalstorage.documents`) has tree ids of the
+ * `<volume>:<path>` shape (e.g. `primary:Documents/Orbit`); the name is the
+ * path's last segment. Every other provider's id is opaque (Google Drive's
+ * decodes to `acc=1;doc=encoded=…`), so it yields the neutral name, never the
+ * id (38.12 review D-WR-03). A URI with no tree id, an undecodable id or an
+ * empty path also falls back to the neutral name.
  */
 export function backupFolderDisplayName(
   uri: string | null | undefined,
 ): string {
   if (!uri) return BACKUP_FOLDER_FALLBACK_NAME;
-  const match = /\/tree\/([^/]+)/.exec(uri);
+  const match =
+    /^content:\/\/com\.android\.externalstorage\.documents\/tree\/([^/]+)/.exec(
+      uri,
+    );
   if (!match) return BACKUP_FOLDER_FALLBACK_NAME;
   let treeId: string;
   try {
@@ -592,9 +597,31 @@ export function backupFolderDisplayName(
     return BACKUP_FOLDER_FALLBACK_NAME;
   }
   const colon = treeId.indexOf(":");
-  const path = colon === -1 ? treeId : treeId.slice(colon + 1);
-  const segments = path.split("/").filter((segment) => segment.trim() !== "");
+  if (colon <= 0) return BACKUP_FOLDER_FALLBACK_NAME;
+  const segments = treeId
+    .slice(colon + 1)
+    .split("/")
+    .filter((segment) => segment.trim() !== "");
   return segments.at(-1)?.trim() ?? BACKUP_FOLDER_FALLBACK_NAME;
+}
+
+/**
+ * The backup folder's display name (38.12 D-143): the document provider's own
+ * name for it (works for Google Drive), else the URI derivation above. A
+ * lookup that fails, throws or answers blank falls back; never an id.
+ */
+export async function resolveBackupFolderName(
+  uri: string | null | undefined,
+  lookup: (treeUri: string) => Promise<string | null>,
+): Promise<string> {
+  if (!uri) return BACKUP_FOLDER_FALLBACK_NAME;
+  try {
+    const name = (await lookup(uri))?.trim();
+    if (name) return name;
+  } catch {
+    // The provider could not answer; the derivation below is the fallback.
+  }
+  return backupFolderDisplayName(uri);
 }
 
 /** The sections Backup settings can be opened for (route param, D-64). */
