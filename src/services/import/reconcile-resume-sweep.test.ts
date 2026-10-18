@@ -19,6 +19,7 @@ import {
 } from "@/db/resume-prompt-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
+  holdReconcileStaging,
   markReconcileSessionOpen,
   withReconcileFlowActive,
 } from "@/services/import/reconcile-flow-guard";
@@ -234,5 +235,41 @@ describe("reconcile-resume-sweep", () => {
 
   it("does not register or run work merely by importing the module", async () => {
     await expect(runLaunchSweep()).resolves.toBeUndefined();
+  });
+});
+
+describe("an open detail's staged photos survive the foreground sweep (38.12 review B-WR-02)", () => {
+  it("keeps held detail copies, deletes them once released", async () => {
+    const held = "reconcile-staging/detail-contact-4-link-7.jpg";
+    const orphan = "reconcile-staging/old.jpg";
+    const fs = stagingFs([held, orphan]);
+    const release = holdReconcileStaging(held);
+    await reconcileOrphanReconcileStagedPhotos(exec, fs);
+    expect(fs.deleted).toEqual([orphan]);
+    release();
+    await reconcileOrphanReconcileStagedPhotos(exec, fs);
+    expect(fs.deleted).toEqual([orphan, held]);
+  });
+
+  it("the detail tracker holds what it stages and lets go on clear", async () => {
+    const { createDetailStagingTracker } = await import(
+      "@/services/photos/reconcile-detail-staging"
+    );
+    const { isReconcileStagingHeld } = await import(
+      "@/services/import/reconcile-flow-guard"
+    );
+    const deleted: string[] = [];
+    const tracker = createDetailStagingTracker(
+      (relative) => deleted.push(relative),
+      holdReconcileStaging,
+    );
+    tracker.track("reconcile-staging/a.jpg");
+    tracker.track("reconcile-staging/b.jpg");
+    expect(isReconcileStagingHeld("reconcile-staging/a.jpg")).toBe(true);
+    tracker.release("reconcile-staging/a.jpg");
+    expect(isReconcileStagingHeld("reconcile-staging/a.jpg")).toBe(false);
+    tracker.clear();
+    expect(isReconcileStagingHeld("reconcile-staging/b.jpg")).toBe(false);
+    expect(deleted).toEqual(["reconcile-staging/b.jpg"]);
   });
 });

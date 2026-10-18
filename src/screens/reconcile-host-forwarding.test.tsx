@@ -112,6 +112,7 @@ vi.mock("@/services/contacts/use-read-contacts-permission", () => ({
 }));
 vi.mock("@/services/device-region", () => ({ getDeviceRegion: () => "US" }));
 vi.mock("@/services/import/reconcile-flow-guard", () => ({
+  holdReconcileStaging: () => () => undefined,
   markReconcileSessionOpen: vi.fn(),
   withReconcileFlowActive: (run: () => unknown) => run(),
 }));

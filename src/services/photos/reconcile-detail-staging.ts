@@ -5,8 +5,9 @@
  * - The grid and the detail stage under different names, so the detail never
  *   deletes (or overwrites) a file a grid card points at.
  * - The detail tracks what it staged and deletes every copy it did not promote
- *   when it closes (Apply, Back, or a re-read). The launch sweep stays the
- *   backstop for a crash.
+ *   when it closes (Apply, Back, or a re-read). While tracked, a copy is held
+ *   against the orphan sweep, which runs on every foreground, not only at
+ *   launch (38.12 review B-WR-02); the sweep stays the backstop for a crash.
  *
  * Pure apart from the injected delete, so it is node-testable.
  */
@@ -32,19 +33,25 @@ export interface DetailStagingTracker {
 
 export function createDetailStagingTracker(
   deleteStaged: (relative: string) => void,
+  /** Hold a copy against the orphan sweep; returns its release (B-WR-02). */
+  hold: (relative: string) => () => void = () => () => undefined,
 ): DetailStagingTracker {
-  const staged = new Set<string>();
+  const staged = new Map<string, () => void>();
+  const forget = (relative: string) => {
+    staged.get(relative)?.();
+    staged.delete(relative);
+  };
   return {
     track: (relative) => {
-      staged.add(relative);
+      if (!staged.has(relative)) staged.set(relative, hold(relative));
     },
     release: (relative) => {
-      staged.delete(relative);
+      forget(relative);
     },
     clear: () => {
-      const pending = [...staged];
-      staged.clear();
+      const pending = [...staged.keys()];
       for (const relative of pending) {
+        forget(relative);
         try {
           deleteStaged(relative);
         } catch {

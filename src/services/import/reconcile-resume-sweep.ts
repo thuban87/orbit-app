@@ -8,6 +8,7 @@ import type { SqlExecutor } from "@/db/types";
 import {
   isReconcileFlowActive,
   isReconcileSessionOpen,
+  isReconcileStagingHeld,
 } from "@/services/import/reconcile-flow-guard";
 import { registerSweepHook } from "@/services/launch-sweep";
 import {
@@ -79,7 +80,8 @@ export function describeResumableReconcile(input: {
 
 /**
  * Uses the first-class staged path column rather than diff_json so a malformed
- * card cannot strand files or break launch cleanup.
+ * card cannot strand files or break launch cleanup. A copy an open detail
+ * screen holds is live too (38.12 review B-WR-02).
  */
 export async function reconcileOrphanReconcileStagedPhotos(
   exec: SqlExecutor,
@@ -99,7 +101,10 @@ export async function reconcileOrphanReconcileStagedPhotos(
     ),
   );
   for (const staged of fs.listReconcileStagingPhotos()) {
-    if (!livePaths.has(staged.relative))
+    if (
+      !livePaths.has(staged.relative) &&
+      !isReconcileStagingHeld(staged.relative)
+    )
       fs.deleteReconcileStaging(staged.relative);
   }
 }

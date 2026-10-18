@@ -42,3 +42,29 @@ export function markReconcileSessionOpen(sessionId: number): () => void {
 export function isReconcileSessionOpen(sessionId: number): boolean {
   return openSessions.has(sessionId);
 }
+
+/**
+ * Staged phone photos a reconcile screen is still showing (38.12 review
+ * B-WR-02). The detail screen's own copies are never stored in the DB, so the
+ * orphan sweep (which runs on every background→active) would otherwise delete
+ * them while the detail is open — e.g. after a trip to the phone's Contacts.
+ */
+const heldStaging = new Map<string, number>();
+
+/** Hold `relative` against the orphan sweep; the returned function releases it. */
+export function holdReconcileStaging(relative: string): () => void {
+  heldStaging.set(relative, (heldStaging.get(relative) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const count = (heldStaging.get(relative) ?? 1) - 1;
+    if (count > 0) heldStaging.set(relative, count);
+    else heldStaging.delete(relative);
+  };
+}
+
+/** True while some open reconcile screen holds `relative`. */
+export function isReconcileStagingHeld(relative: string): boolean {
+  return heldStaging.has(relative);
+}

@@ -67,6 +67,7 @@ import {
 } from "@/services/contacts/use-read-contacts-permission";
 import { getDeviceRegion } from "@/services/device-region";
 import {
+  holdReconcileStaging,
   markReconcileSessionOpen,
   withReconcileFlowActive,
 } from "@/services/import/reconcile-flow-guard";
@@ -136,9 +137,11 @@ export function ReconcileDetailScreen({
   // A successful Apply cannot run again (D-48).
   const [applied, setApplied] = useState(false);
   // The detail's own phone-photo copies: deleted when it closes or re-reads,
-  // except a promoted one (38.12-10 deferred item 1, folded here).
+  // except a promoted one (38.12-10 deferred item 1, folded here). Held
+  // against the foreground orphan sweep while open (38.12 review B-WR-02).
   const staging = useMemo(
-    () => createDetailStagingTracker(deleteReconcileStaging),
+    () =>
+      createDetailStagingTracker(deleteReconcileStaging, holdReconcileStaging),
     [],
   );
   useEffect(() => () => staging.clear(), [staging]);
