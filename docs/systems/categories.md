@@ -1,7 +1,7 @@
 # Categories
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/categories-dao.ts`, `src/logic/category-logic.ts`, `src/screens/CategoryManagementScreen.tsx`
 
 ## Purpose
@@ -26,7 +26,7 @@ Migration 001 alone seeds the original four rows on a new database. They become 
 |---|---|---|
 | Validation/model | `src/logic/category-logic.ts` | Trim/NFC/case-insensitive name rules, canonical ordering, 12/13 search threshold, optional Uncategorized row, and stale-ID resolution. |
 | DAO | `src/db/categories-dao.ts` | Canonical list/create/rename/reorder, deletion preview fingerprint, atomic fallout, tombstone, and one revision bump. |
-| Manager | `src/screens/CategoryManagementScreen.tsx` | Add, rename, reorder, and two-stage delete UI with committed-state refresh. |
+| Manager | `src/screens/CategoryManagementScreen.tsx` | Add, rename, reorder (drag handle, or Move up/down in the row ⋯), and a one-step delete confirm with committed-state refresh. It is the reference for the shared management-list pattern (ADR-246). |
 | Shared chooser | `src/components/category/CategoryChoiceSheet.tsx` | Complete bounded category selection at every catalog size; a thin wrapper over the app-wide `OptionSheet` that shows search at 13 or more rows. |
 | Shell refresh | `src/stores/shell-refresh-store.ts` | Publishes committed taxonomy changes to mounted consumers. |
 
@@ -56,6 +56,7 @@ Migration 001 alone seeds the original four rows on a new database. They become 
 
 1. The manager asks `readCategoryDeletionPreview()` for the source row, every survivor target, and aggregate counts for contacts, pending/complete/discarded imports, rules, System customization, active selection, Profile presentation, and Dashboard filters.
 2. The preview serializes those facts into a fingerprint. Final confirmation supplies that fingerprint and either one surviving category ID or `NULL` for Uncategorized.
+2a. Delete is one non-dismissable destructive `ConfirmDialog` (ADR-246): plain counts ("2 people move to Uncategorized"), the Move-to chooser, the detail behind a Show details toggle, and one Cancel; an empty category gets a one-line body. Back stays inert on it (38.9 D-06).
 3. Under the shared writer lock, `deleteCategory()` re-reads the preview. Any changed fallout, removed source, or stale target returns a refreshed preview with zero writes.
 4. The committed transaction reassigns contacts and **every import-session status** to the same target, removes only rules referencing the deleted UID, removes the category System's overrides/preferences, falls an active selection back to All Contacts, removes Dashboard/Profile references, normalizes order, writes a category tombstone, and deletes the parent row last.
 5. Custom Systems keep unrelated rules and explicit includes. A definition with no positive rule/include becomes Needs Attention; historical missing-category rules unrelated to this proven deletion remain visible diagnostics.
@@ -88,6 +89,7 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 - **ADR-057/058:** Versioned atomic backup and restore — category rows and dependents are validated before mutation and applied transactionally.
 - **ADR-104:** Durable Orrery Preferences and Live System Scope — Category Systems use stable UID references.
 - **ADR-108:** Durable Independent-Axis Profile Presentation — category presentation is inherited and may fall through after deletion.
+- **ADR-246:** One Settings Row and Section Card, One Drag-and-⋯ List Pattern — Categories is the reference list; delete is one confirm with plain counts.
 
 ## Gotchas
 
@@ -116,3 +118,4 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 | 2026-09-17 | 37.1 | Documented the canonical mutable taxonomy, identity matrix, atomic all-status deletion fallout, complete selectors, tombstone merge, and exact replace-all contracts. |
 | 2026-09-23 | 38.4 | `CategoryChoiceSheet` lists every category again: its uid exclusion no longer drops categories without an internal id (D-72; pre-existing since 37.1). |
 | 2026-10-11 | 38.9 | Category choice uses the themed sheet at every catalog size (`CategoryChoiceSheet` wraps the app-wide `OptionSheet`); the native picker below 13 is gone and `CATEGORY_SEARCH_THRESHOLD` controls only search (ADR-204, partially superseding ADR-144). |
+| 2026-10-18 | 38.12 | Category delete is one destructive confirm with plain counts and details behind a toggle (an in-use category no longer takes two Keep taps to back out); Categories is the reference for the shared drag + ⋯ list (ADR-246). |
