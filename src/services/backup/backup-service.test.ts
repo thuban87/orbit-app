@@ -858,6 +858,60 @@ describe("skipped photos reach every writer's result (38.6 D-24)", () => {
   });
 });
 
+// 38.12 review A-IN-04, through the real export: a backup carries one
+// custom-field row per contact and field, most of them empty; the D-60
+// "linked items" count takes only the values that hold something.
+describe("linked items count only populated custom-field values (A-IN-04)", () => {
+  it("leaves the empty pairs out", async () => {
+    const actual = await vi.importActual<typeof ExportManifestModule>(
+      "@/backup/export-manifest",
+    );
+    const NOW = manifest.metadata.exportedAt;
+    const exec = nodeSqliteExecutor(openTestDb());
+    let count = 0;
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+    for (const uid of ["a", "b", "c"])
+      await exec.runAsync(
+        "INSERT INTO contacts (uid, name, interval_days, created_at, modified_at) VALUES (?, ?, 7, ?, ?)",
+        [uid, uid, NOW, NOW],
+      );
+    await exec.runAsync(
+      "INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES ('def', 'tier', 'Tier', 'text', 0, ?, ?)",
+      [NOW, NOW],
+    );
+    for (const [contact, value] of [
+      ["a", "Gold"],
+      ["b", null],
+      ["c", null],
+    ] as const)
+      await exec.runAsync(
+        "INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) SELECT ?, c.id, d.id, ?, ?, ? FROM contacts c, custom_field_defs d WHERE c.uid = ? AND d.uid = 'def'",
+        [`cfv-${contact}`, value, NOW, NOW, contact],
+      );
+    const { manifest: exported } = await actual.buildExportReport(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    const candidate = loadBackupForRestore({
+      contents: JSON.stringify(exported),
+    });
+    expect(candidate.status).toBe("ready");
+    if (candidate.status !== "ready") return;
+    expect(candidate.manifest.customFieldValues).toHaveLength(3);
+    const others = Object.entries(candidate.manifest)
+      .filter(
+        ([key, value]) =>
+          Array.isArray(value) &&
+          !["contacts", "tombstones", "customFieldValues"].includes(key),
+      )
+      .reduce((sum, [, value]) => sum + (value as unknown[]).length, 0);
+    expect(candidate.preview.relatedRowCount).toBe(others + 1);
+  });
+});
+
 // 38.6 D-29 through the real export: only a missing or empty photo (the reader
 // resolves "") is skipped and counted. An existing photo whose read fails
 // fails every writer, so retention never prunes against a photo-less backup.

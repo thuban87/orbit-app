@@ -98,14 +98,20 @@ export type ValidatedRestoreCandidate =
  * D-60: the linked-items count covers every entity the manifest carries. It is
  * enumerated from the manifest itself (every row array), not a hand list, so
  * a new entity is counted without an edit here. Contacts (people) and
- * tombstones (deleted items) have their own lines.
+ * tombstones (deleted items) have their own lines. A backup carries one
+ * custom-field row per contact and field, most of them empty, so only the
+ * custom-field values that hold something are counted (review A-IN-04).
  */
 function linkedItemCount(manifest: BackupManifest): number {
   let count = 0;
   for (const [key, value] of Object.entries(manifest) as Array<
     [keyof BackupManifest, unknown]
   >)
-    if (key !== "contacts" && key !== "tombstones" && Array.isArray(value))
+    if (key === "customFieldValues" && Array.isArray(value))
+      count += (value as Array<Record<string, unknown>>).filter(
+        (row) => row.value != null,
+      ).length;
+    else if (key !== "contacts" && key !== "tombstones" && Array.isArray(value))
       count += value.length;
   return count;
 }
