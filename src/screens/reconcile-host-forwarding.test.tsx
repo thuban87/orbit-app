@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   showSnackbar: vi.fn(),
   getReconcileContact: vi.fn(),
   deleteReviewedSnapshotCore: vi.fn(),
+  applyLifecycleTransitionEffects: vi.fn(),
   listReconcileSessionCards: vi.fn(),
   listReconcileCardIdentities: vi.fn(),
   getReconcileSessionById: vi.fn(),
@@ -126,6 +127,9 @@ vi.mock("@/services/contacts/use-read-contacts-permission", () => ({
   openContactsSettings: vi.fn(),
 }));
 vi.mock("@/services/device-region", () => ({ getDeviceRegion: () => "US" }));
+vi.mock("@/services/contact-lifecycle-effects", () => ({
+  applyLifecycleTransitionEffects: mocks.applyLifecycleTransitionEffects,
+}));
 vi.mock("@/services/import/reconcile-flow-guard", () => ({
   holdReconcileStaging: () => () => undefined,
   markReconcileSessionOpen: vi.fn(),
@@ -352,6 +356,52 @@ describe("missing-source actions act on the missing link (38.12 review B-CR-01)"
       "exec",
       expect.objectContaining({ staleLinkId: 8, contactId: CONTACT }),
     );
+  });
+});
+
+describe("a committed phone value refreshes reminders and the widget (38.12 review B-IN-07)", () => {
+  it("runs the post-commit effects after Use phone's birthday", async () => {
+    const birthday = {
+      fieldFamily: "birthday",
+      outcome: "conflict",
+      orbitBaseline: "1990-01-01",
+      sourceValue: "1991-02-03",
+      reviewedComparable: "1991-02-03",
+      reviewedValue: null,
+      sourceOptions: [
+        {
+          optionId: "birthday:1991-02-03",
+          value: "1991-02-03",
+          sourceLinkIds: [7],
+          provenanceLabels: [],
+        },
+      ],
+    };
+    mocks.applyReconcileSelections.mockResolvedValue({
+      staleFields: [],
+      pendingPhoto: null,
+    });
+    const nav = navigation();
+    const tree = renderDetail(
+      {
+        ...loadedScan(false),
+        diff: {
+          missingSource: false,
+          fields: [birthday],
+          orbitModifiedAt: null,
+        },
+      },
+      nav,
+      { seed: [[1, { birthday: "source:birthday:1991-02-03" }]] },
+    );
+    (pressableWithText(tree, /^Apply$/).props.onPress as () => void)();
+    for (let i = 0; i < 4; i++) await flush();
+    expect(mocks.applyLifecycleTransitionEffects).toHaveBeenCalledWith(
+      CONTACT,
+      "reconcile",
+      { exec: "exec" },
+    );
+    expect(nav.goBack).toHaveBeenCalled();
   });
 });
 

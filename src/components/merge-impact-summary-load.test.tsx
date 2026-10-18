@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   readMergeDroppedItems: vi.fn(),
   getContactHeader: vi.fn(),
   confirm: vi.fn(),
+  merge: vi.fn(),
+  effects: vi.fn(),
+  finishFlowOnProfile: vi.fn(),
 }));
 
 vi.mock("react", async (original) => ({
@@ -64,10 +67,13 @@ vi.mock("@/db/merge-impact-read", () => ({
 }));
 vi.mock("@/navigation/flow-host", () => ({
   DEFAULT_FLOW_HOST: { kind: "settings" },
-  finishFlowOnProfile: vi.fn(),
+  finishFlowOnProfile: mocks.finishFlowOnProfile,
 }));
 vi.mock("@/services/photos/merge-photo-rehome", () => ({
-  mergeContactsWithPhotoOwnership: vi.fn(),
+  mergeContactsWithPhotoOwnership: mocks.merge,
+}));
+vi.mock("@/services/contact-lifecycle-effects", () => ({
+  applyLifecycleTransitionEffects: mocks.effects,
 }));
 vi.mock("@/stores/confirm-store", () => ({ confirm: mocks.confirm }));
 
@@ -157,5 +163,20 @@ describe("merge summary load (38.12 review B-WR-10)", () => {
       [2, { profilePresentation: false, orrerySystemChoices: 0 }],
     ]);
     expect(pressable(tree, /Merge contacts/)?.props.disabled).toBe(false);
+  });
+
+  it("a committed merge refreshes reminders and the widget (38.12 review B-IN-07)", async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.merge.mockResolvedValue({ recoveryPending: false });
+    const tree = render([
+      [1, { interactions: 1 }],
+      [2, { profilePresentation: false, orrerySystemChoices: 0 }],
+    ]);
+    const merge = pressable(tree, /Merge contacts/);
+    if (!merge) throw new Error("no Merge button");
+    (merge.props.onPress as () => void)();
+    for (let i = 0; i < 4; i++) await flush();
+    expect(mocks.effects).toHaveBeenCalledWith(1, "merge", { exec: "exec" });
+    expect(mocks.finishFlowOnProfile).toHaveBeenCalled();
   });
 });

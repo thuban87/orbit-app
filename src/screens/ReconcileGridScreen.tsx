@@ -49,6 +49,7 @@ import {
   remainingReconcileFields,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import {
   ensureReadContactsPermission,
   openContactsSettings,
@@ -295,6 +296,7 @@ export function ReconcileGridScreen({
       const exec = getExecutor();
       const now = localDateTime();
       const failures: number[] = [];
+      let updatedAny: number | null = null;
       const settings = await getAppSettings(exec);
       // Same region rule as the scan and the detail screen (D-45).
       const effectivePhoneRegion = effectivePhoneRegionFor({
@@ -354,10 +356,16 @@ export function ReconcileGridScreen({
               removeStaged = entry.card.stagedPhotoRelPath;
           });
           if (removeStaged) deleteReconcileStaging(removeStaged);
+          if (action === "use-contact-values")
+            updatedAny = entry.card.contactId;
         } catch {
           failures.push(entry.card.id);
         }
       }
+      // Phone values written into Orbit move reminder and widget inputs:
+      // refresh once, post-commit, best-effort (38.12 review B-IN-07).
+      if (updatedAny !== null)
+        void applyLifecycleTransitionEffects(updatedAny, "reconcile", { exec });
       if (sessionId !== null) {
         await finalizeSessionIfTerminal(exec, sessionId, now);
         await refreshCards(sessionId);

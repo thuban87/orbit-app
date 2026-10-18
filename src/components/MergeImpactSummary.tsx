@@ -14,6 +14,7 @@ import {
 } from "@/db/merge-impact-read";
 import { DEFAULT_FLOW_HOST, finishFlowOnProfile } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-rehome";
 import { confirm } from "@/stores/confirm-store";
 import { useTheme } from "@/theme";
@@ -105,7 +106,14 @@ export function MergeImpactSummary({
         resolutions: typedResolutions,
         now: localDateTime(),
       })
-        .then(() => finishFlowOnProfile(navigation, host, survivorId))
+        .then(() => {
+          // The absorbed person's alerts go and the survivor's may change:
+          // refresh the schedule and the widget post-commit (B-IN-07).
+          void applyLifecycleTransitionEffects(survivorId, "merge", {
+            exec: getExecutor(),
+          });
+          finishFlowOnProfile(navigation, host, survivorId);
+        })
         .catch((error: unknown) => {
           settleMerge();
           setFailureMessage(

@@ -65,6 +65,7 @@ import {
   userPrimaryPick,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import {
   ensureReadContactsPermission,
   openContactsSettings,
@@ -445,6 +446,11 @@ export function ReconcileDetailScreen({
         }),
       );
       committed = true;
+      // A phone value written into Orbit (a birthday, a name) moves the
+      // reminder schedule and the widget: refresh them post-commit,
+      // best-effort (38.12 review B-IN-07).
+      if (selections.some((selection) => selection.useSource))
+        void applyLifecycleTransitionEffects(contactId, "reconcile", { exec });
       // Everything above has committed. From here a failure must never say
       // "kept safe" (38.12 review B-WR-03): the photo step fails on its own,
       // the card stays partial, and the message says what did happen.

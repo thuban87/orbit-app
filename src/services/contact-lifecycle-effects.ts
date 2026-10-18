@@ -17,6 +17,12 @@ import { Logger } from "@/utils/logger";
 const LOG_SOURCE = "contact-lifecycle-effects";
 
 export type LifecycleDirection = "bind" | "unbind";
+/**
+ * Contact data changes that move reminder and widget inputs without a
+ * lifecycle transition (38.12 review B-IN-07): a Check linked contacts update
+ * (name, birthday) and a merge (the absorbed person's alerts must go).
+ */
+export type ContactDataChange = "reconcile" | "merge";
 
 type EffectDeps = {
   exec: SqlExecutor;
@@ -59,7 +65,7 @@ const defaultDeps: LifecycleDeps = {
  */
 export async function applyLifecycleTransitionEffects(
   contactId: number,
-  direction: LifecycleDirection,
+  direction: LifecycleDirection | ContactDataChange,
   deps: EffectDepsOverride,
 ): Promise<void> {
   const effects: EffectDeps = {
