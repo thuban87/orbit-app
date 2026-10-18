@@ -49,6 +49,7 @@ import {
   loadBackupForPreview,
   loadBackupForRestore,
   loadBackupForRestorePreview,
+  replacementNameTime,
   resolveWriteEncryptionMode,
   withBackupServiceLock,
 } from "@/services/backup/backup-service";
@@ -1283,15 +1284,33 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
     for (const uri of autos) expect(entries.has(uri)).toBe(false);
     expect(entries.get(manual)).toBe("manual export");
     const names = folder.list(entries.keys()).map((entry) => entry.name);
-    const base = automaticBackupFileName(new Date("2026-08-25T00:00:00.000Z"));
+    // DEF-07: each replacement keeps its source's own time, never "now".
     expect(names.sort()).toEqual(
       [
-        base,
-        base.replace(/\.json$/, "-2.json"),
+        automaticBackupFileName(new Date("2026-08-22T00:00:00.000Z")),
+        "orbit-auto-2026-08-23-0930-2.json",
         "orbit-backup-2026-08-24-0930.json",
       ].sort(),
     );
   });
+  it("replacementNameTime keeps a source's own name time and falls back to now only for an unreadable name (DEF-07)", () => {
+    const now = new Date("2026-10-18T06:09:00.000Z");
+    const local = new Date(2026, 9, 18, 5, 9);
+    expect(
+      replacementNameTime("orbit-auto-2026-10-18-0509-2.json", now).getTime(),
+    ).toBe(local.getTime());
+    expect(
+      replacementNameTime(
+        "orbit-auto-2026-10-17T04-30-00-000Z.json",
+        now,
+      ).toISOString(),
+    ).toBe("2026-10-17T04:30:00.000Z");
+    expect(replacementNameTime("orbit-auto-2026-13-40-9999.json", now)).toBe(
+      now,
+    );
+    expect(replacementNameTime(undefined, now)).toBe(now);
+  });
+
   // A plaintext automatic backup written while encryption was off.
   const oversizedPlaintext = JSON.stringify({ ...manifest, oversized: true });
 
@@ -1352,14 +1371,20 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
       service.change({ currentPassphrase: "old", nextPassphrase: "new" }),
     ).resolves.toEqual({ status: "changed", reencryptedCount: 3 });
     expect(state.active).toBe("new");
-    const base = automaticBackupFileName(new Date("2026-08-25T00:00:00.000Z"));
-    const stem = base.replace(/\.json$/, "");
     const replacements = [...entries.keys()]
       .filter((uri) => uri !== manual && uri !== legacyManual)
       .map((uri) => uri.split("/").pop()!);
+    // DEF-07: every replacement keeps its source's own minute (the old UTC
+    // name as its local minute); a same-minute pair stays distinct by suffix.
     expect(replacements.sort()).toEqual(
-      [base, `${stem}-2.json`, `${stem}-3.json`].sort(),
+      [
+        automaticBackupFileName(new Date("2026-08-22T00:00:00.000Z")),
+        "orbit-auto-2026-08-23-0930-3.json",
+        "orbit-auto-2026-08-23-0930-4.json",
+      ].sort(),
     );
+    for (const name of replacements)
+      expect(name.startsWith("orbit-auto-2026-08-25")).toBe(false);
     for (const name of replacements)
       expect(isOwnedAutomaticBackupName(name)).toBe(true);
     for (const uri of sources) expect(entries.has(uri)).toBe(false);

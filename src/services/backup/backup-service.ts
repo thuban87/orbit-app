@@ -1,6 +1,7 @@
 import { isExpiredAutomaticBackup } from "@/backup/auto-backup-policy";
 import {
   automaticBackupFileName,
+  backupNameTimestampMs,
   isOwnedAutomaticBackupName,
   uniqueBackupFileName,
 } from "@/backup/backup-file-names";
@@ -463,9 +464,13 @@ export function createAutomaticBackupReencryptionService(
           const listed = await deps.storage.list(deps.directoryUri);
           // Only automatic backups are re-encrypted (38.12 D-136): a manual
           // export saved into this folder is never rewritten or removed.
-          const uris = listed
-            .filter((entry) => isOwnedAutomaticBackupName(entry.name))
-            .map((entry) => entry.uri);
+          const owned = listed.filter((entry) =>
+            isOwnedAutomaticBackupName(entry.name),
+          );
+          const uris = owned.map((entry) => entry.uri);
+          const sourceNames = new Map(
+            owned.map((entry) => [entry.uri, entry.name]),
+          );
           // Every name in the folder plus every name this run writes, so the
           // minute-precision replacements never collide (D-136).
           const taken = new Set(listed.map((entry) => entry.name));
@@ -520,8 +525,12 @@ export function createAutomaticBackupReencryptionService(
                 profile: deps.profile,
               }),
             );
+            // DEF-07: the replacement keeps the source's own time in its name,
+            // so its date stays readable and retention still prunes it on time.
             const replacementName = uniqueBackupFileName(
-              automaticBackupFileName(deps.now),
+              automaticBackupFileName(
+                replacementNameTime(sourceNames.get(sourceUri), deps.now),
+              ),
               taken,
             );
             taken.add(replacementName);
@@ -581,6 +590,20 @@ export function createAutomaticBackupReencryptionService(
         }
       }),
   };
+}
+
+/**
+ * The time a re-encrypted backup's new name carries (38.12 DEF-07): the
+ * source's own name time (local or old UTC, as `backupNameTimestampMs` reads
+ * it), so re-encryption never renames every backup to the current minute.
+ * `now` only when the source name has no readable time.
+ */
+export function replacementNameTime(
+  sourceName: string | undefined,
+  now: Date,
+): Date {
+  const ms = sourceName ? backupNameTimestampMs(sourceName) : null;
+  return ms === null ? now : new Date(ms);
 }
 
 export interface LocalExportFile {
