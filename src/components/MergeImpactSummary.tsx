@@ -41,23 +41,39 @@ export function MergeImpactSummary({
   const [counts, setCounts] = useState<MergeImpactCounts | null>(null);
   const [dropped, setDropped] = useState<MergeDroppedItems | null>(null);
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
+  // A failed read never leaves an irreversible merge confirmable with an
+  // empty summary (38.12 review B-WR-10): Merge stays disabled until the
+  // counts load; a failure shows Retry.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
+    void loadAttempt;
     const exec = getExecutor();
+    let live = true;
+    setLoadFailed(false);
     void Promise.all([
       getContactHeader(exec, survivorId),
       getContactHeader(exec, absorbedId),
       // Only what moves (B-WR-09): the survivor and the chosen resolutions.
       readMergeImpactCounts(exec, absorbedId, { survivorId, resolutions }),
       readMergeDroppedItems(exec, absorbedId),
-    ]).then(([survivor, absorbed, impact, notKept]) => {
-      setNames({
-        survivor: survivor?.name ?? "Contact",
-        absorbed: absorbed?.name ?? "Contact",
+    ])
+      .then(([survivor, absorbed, impact, notKept]) => {
+        if (!live) return;
+        setNames({
+          survivor: survivor?.name ?? "Contact",
+          absorbed: absorbed?.name ?? "Contact",
+        });
+        setCounts(impact);
+        setDropped(notKept);
+      })
+      .catch(() => {
+        if (live) setLoadFailed(true);
       });
-      setCounts(impact);
-      setDropped(notKept);
-    });
-  }, [absorbedId, resolutions, survivorId]);
+    return () => {
+      live = false;
+    };
+  }, [absorbedId, loadAttempt, resolutions, survivorId]);
   const typedResolutions: MergeResolutions = resolutions;
   // In flight from the confirm until the merge settles (38.9 review WR-01):
   // the ref blocks a second press synchronously; the state dims and disables
@@ -70,7 +86,7 @@ export function MergeImpactSummary({
   };
   // Irreversible: themed destructive confirm, not dismissable (D-30, ADR-086).
   const confirmMerge = () => {
-    if (mergingRef.current) return;
+    if (mergingRef.current || counts === null) return;
     mergingRef.current = true;
     setMerging(true);
     void confirm({
@@ -103,6 +119,8 @@ export function MergeImpactSummary({
   // One plural() line per non-zero count over every table the merge moves
   // (38.12 D-44).
   const rows = counts ? mergeImpactLines(counts) : [];
+  // Not confirmable until the summary has loaded (B-WR-10).
+  const mergeDisabled = merging || counts === null || dropped === null;
   // D-146: the survivor's Profile layout, background and Orrery choices win;
   // the absorbed person's own are listed as not kept.
   const droppedRows = dropped ? mergeDroppedLines(dropped) : [];
@@ -161,20 +179,39 @@ export function MergeImpactSummary({
         {failureMessage ? (
           <Text style={{ color: colors.danger }}>{failureMessage}</Text>
         ) : null}
+        {loadFailed ? (
+          <View style={styles.loadError}>
+            <Text style={{ color: colors.danger }}>
+              Couldn&apos;t load what this merge moves. Nothing was changed.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading the merge summary"
+              onPress={() => setLoadAttempt((attempt) => attempt + 1)}
+              style={[styles.retry, { borderColor: colors.accent }]}
+            >
+              <Text style={{ color: colors.accentText }}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: merging }}
-          disabled={merging}
+          accessibilityState={{ disabled: mergeDisabled }}
+          disabled={mergeDisabled}
           onPress={confirmMerge}
           style={[
             styles.cta,
             {
-              backgroundColor: merging ? colors.surfaceElevated : colors.accent,
+              backgroundColor: mergeDisabled
+                ? colors.surfaceElevated
+                : colors.accent,
             },
           ]}
         >
           <Text
-            style={{ color: merging ? colors.textSecondary : colors.onAccent }}
+            style={{
+              color: mergeDisabled ? colors.textSecondary : colors.onAccent,
+            }}
           >
             Merge contacts
           </Text>
@@ -189,4 +226,13 @@ const styles = StyleSheet.create({
   row: { padding: 14, borderRadius: 12, borderWidth: 1 },
   warning: { padding: 14, borderLeftWidth: 3, gap: 4 },
   cta: { padding: 16, borderRadius: 12, alignItems: "center" },
+  loadError: { gap: 8 },
+  retry: {
+    alignSelf: "flex-start",
+    borderRadius: 10,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
 });
