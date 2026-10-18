@@ -57,7 +57,7 @@ describe("persistentDangerScrim — D-50 (D25-B)", () => {
       ],
       "src/screens/ReconcileDetailScreen.tsx": [
         "persistentDangerScrim(theme)",
-        "Unlink source",
+        "UNLINK_FROM_PHONE_CONTACT",
       ],
       "src/components/PhotoSourcePicker.tsx": [
         "removeScrim && [styles.scrimmedActionBtn, removeScrim]",

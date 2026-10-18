@@ -54,6 +54,11 @@ identifiers keep their own spelling (see Gotchas).
 | Not set | `NOT_SET` | An empty always-show custom field on the Profile (38.10 D-87, D-90). |
 | Check-in reminders | `CHECK_IN_REMINDERS` | The Notifications switch for reminders to reach out to people you're overdue with. Replaces "Decay reminders" (38.12 D-130). Only the switch label changed: the status names (Stable, Wobbly, Decaying, Rogue) are not renamed (D-05). |
 | Use AI suggestions | `USE_AI_SUGGESTIONS` | The master switch on Settings → AI. Replaces "AI Enabled" (38.12 D-130). |
+| Check linked contacts | `CHECK_LINKED_CONTACTS` | The flow that compares linked people with their phone contacts. One name on the grid and the detail screen; the detail screen's "Update from Contacts" title is gone (38.12 D-49). |
+| Not in phone Contacts | `NOT_IN_PHONE_CONTACTS` | A linked phone contact that the phone no longer returns: the card chip, the detail chip and the Check complete count. Replaces the developer wording "Source missing" (38.12 D-103). |
+| Needs your choice | `NEEDS_YOUR_CHOICE` | A Check linked contacts card the person has to decide field by field. Replaces "Manual review" (38.12 D-103). |
+| Link to a different phone contact | `LINK_DIFFERENT_PHONE_CONTACT` | Points a person whose phone contact is gone at another phone contact. Replaces "Relink to another contact" (38.12 D-103). |
+| Unlink from phone contact | `UNLINK_FROM_PHONE_CONTACT` | Removes the phone-contact link only; the person and their history stay. Keeps its red danger styling. Replaces "Unlink source" (38.12 D-103, amending the ADR-179 label only). |
 
 Sentence-case copy uses the same words in lower case where a label sits inside a sentence
 ("Add favorite", "Not favorite", "3 never contacted →").
@@ -190,3 +195,4 @@ None. The constants are the configuration.
 | 2026-10-16 | 38.11 | "Rarely Responds" added as a canonical term (one Title Case spelling on the Edit Contact toggle and the Profile sheets, pinned by the glossary contract); the Bin entry follows D-93's "hidden from your lists". |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-226, ADR-228. |
 | 2026-10-17 | 38.12 | "Check-in reminders" (was "Decay reminders") and "Use AI suggestions" (was "AI Enabled") added as Settings switch labels, pinned by the glossary contract; status names unchanged (D-130, D-05; plan 14). |
+| 2026-10-17 | 38.12 | Check linked contacts wording: one flow name (D-49) and four plain-word labels replacing developer wording ("Not in phone Contacts", "Needs your choice", "Link to a different phone contact", "Unlink from phone contact"); pinned by the glossary contract; canonical terms unchanged (D-103, D-05; plan 19). |

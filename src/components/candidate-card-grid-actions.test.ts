@@ -25,6 +25,6 @@ describe("isBulkActionAvailable", () => {
   });
 
   it("keeps existing callers eligible when no predicate is supplied", () => {
-    expect(isBulkActionAvailable("apply-recommendation", mixed)).toBe(true);
+    expect(isBulkActionAvailable("keep-orbit", mixed)).toBe(true);
   });
 });

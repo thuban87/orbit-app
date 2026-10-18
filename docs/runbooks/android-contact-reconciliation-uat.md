@@ -77,7 +77,7 @@ Reconciliation reads an already-linked Android contact through `orbit-contact-pi
    adb -s "$device_serial" shell am force-stop com.bwales.orbit
    ```
 
-   Expected: Resume opens only unresolved cards and keeps the committed edit. For a deleted device source, verify `Source missing`; Keep leaves Orbit data alone, Relink retires the stale external link and reviews the replacement, and Unlink changes only the link.
+   Expected: Resume opens only unresolved cards and keeps the committed edit. For a deleted device source, verify `Not in phone Contacts` (was "Source missing", 38.12 D-103); Keep leaves Orbit data alone, Relink retires the stale external link and reviews the replacement, and Unlink changes only the link.
 
 7. **Exercise the API-37 post-pick permission path.** Start import, choose at least one contact in the system picker, and verify the Contacts prompt appears only after the non-empty pick. Grant access and confirm the selected Note is present. Repeat with denial and confirm import continues without the Note. A canceled or empty picker result must not prompt.
 

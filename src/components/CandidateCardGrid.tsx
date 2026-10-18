@@ -21,7 +21,6 @@ export type BulkAction =
   | "link"
   | "import-new"
   | "skip"
-  | "apply-recommendation"
   | "keep-orbit"
   | "use-contact-values";
 
@@ -65,8 +64,6 @@ interface CandidateCardGridProps {
     action: BulkAction,
     items: CandidateItem[],
   ) => Promise<void> | void;
-  /** Generic Phase 20 safety contract: recommendation never resolves these items. */
-  recommendationExcludes: "needs_review";
   scoring?: boolean;
   /** Defaults to import copy so existing import callers stay unchanged. */
   scoringLabel?: string;
@@ -81,7 +78,6 @@ const actionLabels: Record<BulkAction, string> = {
   link: "Link to Existing",
   "import-new": "Import as New",
   skip: "Skip",
-  "apply-recommendation": "Apply recommendation",
   "keep-orbit": "Keep Orbit Values",
   "use-contact-values": "Use Contact Values",
 };
@@ -91,7 +87,6 @@ export function CandidateCardGrid({
   bulkActions,
   onInspect,
   onBulkAction,
-  recommendationExcludes,
   scoring = false,
   scoringLabel = "Checking for matches…",
   isActionEligible,
@@ -128,12 +123,7 @@ export function CandidateCardGrid({
       setActionsOpen(false);
       return;
     }
-    const targets =
-      action === "apply-recommendation"
-        ? selectedItems.filter(
-            (item) => item.outcome !== recommendationExcludes,
-          )
-        : selectedItems;
+    const targets = selectedItems;
     setActionsOpen(false);
     if (targets.length === 0) return;
 

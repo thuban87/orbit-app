@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { NOT_IN_PHONE_CONTACTS } from "@/constants/glossary";
 import { getExecutor } from "@/db/database";
 import {
   type ReconcileCompletionCounts,
@@ -138,7 +139,7 @@ export function ReconcileCompleteScreen({
           {footerEntry("Changed", counts.changed, colors)}
           {footerEntry("Updated", counts.updated, colors)}
           {footerEntry("Kept Orbit values", counts.keptOrbitValues, colors)}
-          {footerEntry("Source missing", counts.sourceMissing, colors)}
+          {footerEntry(NOT_IN_PHONE_CONTACTS, counts.sourceMissing, colors)}
         </View>
         <View style={styles.actions}>
           {counts.unresolved > 0 ? (

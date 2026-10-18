@@ -6,6 +6,11 @@ import {
   type CandidateItem,
 } from "@/components/CandidateCardGrid";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import {
+  CHECK_LINKED_CONTACTS,
+  NEEDS_YOUR_CHOICE,
+  NOT_IN_PHONE_CONTACTS,
+} from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { applyReconcileSelections } from "@/db/reconcile-apply";
@@ -40,6 +45,7 @@ import {
 } from "@/logic/reconcile-diff";
 import {
   buildReconcileSelections,
+  type ReconcileBulkMode,
   remainingReconcileFields,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -76,7 +82,7 @@ function parseDiff(value: string): StoredDiff | null {
 }
 
 function chipLabel(diff: ReconcileDiffResult): string {
-  if (diff.missingSource) return "Source missing";
+  if (diff.missingSource) return NOT_IN_PHONE_CONTACTS;
   // Reviewed, unchanged fields never shape the chip (D-45).
   const fields = actionableReconcileFields(diff);
   if (
@@ -87,7 +93,7 @@ function chipLabel(diff: ReconcileDiffResult): string {
     return "Add";
   if (fields.every((field) => field.outcome === "removed-from-source"))
     return "Keep Orbit";
-  return "Manual review";
+  return NEEDS_YOUR_CHOICE;
 }
 
 /** Reused CandidateCardGrid workspace for one durable bulk reconciliation check. */
@@ -285,10 +291,7 @@ export function ReconcileGridScreen({
   });
 
   const onBulkAction = useCallback(
-    async (
-      action: "apply-recommendation" | "keep-orbit" | "use-contact-values",
-      targets: CandidateItem[],
-    ) => {
+    async (action: ReconcileBulkMode, targets: CandidateItem[]) => {
       const exec = getExecutor();
       const now = localDateTime();
       const failures: number[] = [];
@@ -371,7 +374,7 @@ export function ReconcileGridScreen({
   return (
     <View style={styles.root}>
       {/* The shared header and its Back (38.9 D-16). */}
-      <ShellAppBar variant="child" title="Check linked contacts" />
+      <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
       {message ? (
         <Text style={[styles.message, { color: colors.textSecondary }]}>
           {message}
@@ -389,12 +392,9 @@ export function ReconcileGridScreen({
       ) : null}
       <CandidateCardGrid
         items={items}
-        bulkActions={[
-          "apply-recommendation",
-          "keep-orbit",
-          "use-contact-values",
-        ]}
-        recommendationExcludes="needs_review"
+        // No "Apply recommendation" here (D-104); Keep Orbit and the
+        // additive-only Use Contact Values remain.
+        bulkActions={["keep-orbit", "use-contact-values"]}
         scoring={scoring}
         scoringLabel="Checking linked contacts…"
         isActionEligible={(action, selected) =>
@@ -425,13 +425,7 @@ export function ReconcileGridScreen({
             });
         }}
         onBulkAction={(action, selected) =>
-          onBulkAction(
-            action as
-              | "apply-recommendation"
-              | "keep-orbit"
-              | "use-contact-values",
-            selected,
-          )
+          onBulkAction(action as ReconcileBulkMode, selected)
         }
       />
     </View>

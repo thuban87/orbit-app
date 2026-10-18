@@ -55,10 +55,7 @@ describe("buildReconcileSelections", () => {
   it("excludes ambiguous scalars from source bulk actions and leaves them for detail review", () => {
     for (const birthday of ["1990-01-01", null]) {
       const classified = diff(birthday);
-      for (const mode of [
-        "use-contact-values",
-        "apply-recommendation",
-      ] as const) {
+      for (const mode of ["use-contact-values"] as const) {
         expect(
           buildReconcileSelections(classified, mode).some(
             (item) => item.fieldFamily === "birthday",

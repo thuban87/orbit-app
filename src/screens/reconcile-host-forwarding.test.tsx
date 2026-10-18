@@ -239,7 +239,7 @@ describe("ReconcileDetail forwards the flow host (D-110, A-1)", () => {
     const nav = navigation();
     const tree = renderDetail(loadedScan(true), nav);
     (
-      pressableWithText(tree, /Relink to another contact|different phone/).props
+      pressableWithText(tree, /different phone contact/).props
         .onPress as () => void
     )();
     await flush();
@@ -296,7 +296,8 @@ describe("ReconcileGrid forwards the flow host (D-110, A-1)", () => {
     const grid = nodes(renderGrid(nav)).find(
       (node) => node.type === "CandidateCardGrid",
     );
-    (grid?.props.onInspect as (item: { id: number }) => void)({ id: 11 });
+    if (!grid) throw new Error("CandidateCardGrid not rendered");
+    (grid.props.onInspect as (item: { id: number }) => void)({ id: 11 });
     expect(nav.navigate).toHaveBeenCalledWith("ReconcileDetail", {
       contactId: 21,
       sessionId: 3,

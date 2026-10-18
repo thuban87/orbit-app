@@ -89,3 +89,17 @@ export const ADD_THOUGHT_OF_THEM = "Add Thought of Them";
 export const CHECK_IN_REMINDERS = "Check-in reminders";
 /** Settings → AI master switch. Was "AI Enabled"; Settings → AI reads it in 38.12-15. */
 export const USE_AI_SUGGESTIONS = "Use AI suggestions";
+
+// Check linked contacts (38.12 D-49, D-103). Plain words replace developer
+// wording; the canonical terms are not renamed (D-05). The unlink action keeps
+// its red styling (D-103; amends ADR-179 D-50, label only).
+/** The flow's one name, on the grid and the detail screen (D-49). */
+export const CHECK_LINKED_CONTACTS = "Check linked contacts";
+/** A linked phone contact the provider no longer returns (D-103; the replaced wording is in docs/systems/glossary.md). */
+export const NOT_IN_PHONE_CONTACTS = "Not in phone Contacts";
+/** A card the person has to decide field by field (D-103). */
+export const NEEDS_YOUR_CHOICE = "Needs your choice";
+/** Link a person to another phone contact (D-103). */
+export const LINK_DIFFERENT_PHONE_CONTACT = "Link to a different phone contact";
+/** Remove the phone-contact link only; keeps its red styling (D-103). */
+export const UNLINK_FROM_PHONE_CONTACT = "Unlink from phone contact";

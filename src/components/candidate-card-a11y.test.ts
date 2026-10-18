@@ -14,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { NEEDS_YOUR_CHOICE } from "@/constants/glossary";
 import {
   buildCandidateCardAccessibility,
   CANDIDATE_CARD_FAILURE_COPY,
@@ -61,10 +62,10 @@ describe("buildCandidateCardAccessibility", () => {
       buildCandidateCardAccessibility({
         ...base,
         name: "Grace Hopper",
-        recommendationText: "Manual review",
+        recommendationText: NEEDS_YOUR_CHOICE,
         evidenceHint: "2 differences left",
       }).accessibilityLabel,
-    ).toBe("Grace Hopper. Manual review. 2 differences left.");
+    ).toBe("Grace Hopper. Needs your choice. 2 differences left.");
   });
 
   it("an item with no photo still announces the name, with no photo copy", () => {

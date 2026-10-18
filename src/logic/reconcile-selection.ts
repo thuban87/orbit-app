@@ -16,10 +16,7 @@ export type ReconcileFamilyChoice =
   | ReconcileChoice
   | readonly ReconcileSourceChoice[];
 export type ReconcileChoices = Partial<Record<string, ReconcileFamilyChoice>>;
-export type ReconcileBulkMode =
-  | "keep-orbit"
-  | "use-contact-values"
-  | "apply-recommendation";
+export type ReconcileBulkMode = "keep-orbit" | "use-contact-values";
 
 function isMethodFamily(field: ReconcileFieldDiff): boolean {
   return field.fieldFamily === "phones" || field.fieldFamily === "emails";

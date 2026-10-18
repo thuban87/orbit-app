@@ -213,7 +213,7 @@ describe("reconcile-session-read", () => {
     await seedCard(exec, sessionId, "resolved", "updated");
     await seedCard(exec, sessionId, "resolved", "kept-orbit");
     // The grid's bulk Keep Orbit finishes a missing-source card with a
-    // "kept-orbit" disposition; it counts once, under Source missing.
+    // "kept-orbit" disposition; it counts once, as a missing source.
     await seedCard(exec, sessionId, "missing_source", "kept-orbit");
     await seedCard(exec, sessionId, "missing_source");
     await seedCard(exec, sessionId, "partial");

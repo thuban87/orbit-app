@@ -14,6 +14,12 @@ import {
 } from "@/components/FieldChoiceGroup";
 import { KEEP_ORBIT_PHOTO, PhotoChoice } from "@/components/PhotoChoice";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import {
+  CHECK_LINKED_CONTACTS,
+  LINK_DIFFERENT_PHONE_CONTACT,
+  NOT_IN_PHONE_CONTACTS,
+  UNLINK_FROM_PHONE_CONTACT,
+} from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { setContactPhoto } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -441,7 +447,7 @@ export function ReconcileDetailScreen({
   if (!scan)
     return (
       <View style={styles.root}>
-        <ShellAppBar variant="child" title="Check linked contacts" />
+        <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
         <View style={styles.body}>
           {message ? (
             <Text style={{ color: colors.textSecondary }}>{message}</Text>
@@ -464,7 +470,7 @@ export function ReconcileDetailScreen({
   if (scan.diff.missingSource)
     return (
       <View style={styles.root}>
-        <ShellAppBar variant="child" title="Check linked contacts" />
+        <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
         <View style={styles.body}>
           <Text style={[styles.subject, { color: colors.textSecondary }]}>
             {scan.contactName}
@@ -474,7 +480,7 @@ export function ReconcileDetailScreen({
               style={[styles.chip, { backgroundColor: colors.surfaceElevated }]}
             >
               <Text style={[styles.chipLabel, { color: colors.textSecondary }]}>
-                Source missing
+                {NOT_IN_PHONE_CONTACTS}
               </Text>
             </View>
             <Text style={[styles.missingBody, { color: colors.textSecondary }]}>
@@ -494,7 +500,7 @@ export function ReconcileDetailScreen({
               style={[styles.action, { borderColor: colors.border }]}
             >
               <Text style={{ color: colors.textPrimary }}>
-                Relink to another contact
+                {LINK_DIFFERENT_PHONE_CONTACT}
               </Text>
             </Pressable>
             <Pressable
@@ -506,7 +512,9 @@ export function ReconcileDetailScreen({
                 persistentDangerScrim(theme),
               ]}
             >
-              <Text style={{ color: colors.danger }}>Unlink source</Text>
+              <Text style={{ color: colors.danger }}>
+                {UNLINK_FROM_PHONE_CONTACT}
+              </Text>
             </Pressable>
             {message ? (
               <Text style={{ color: colors.textSecondary }}>{message}</Text>
@@ -517,7 +525,7 @@ export function ReconcileDetailScreen({
     );
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Check linked contacts" />
+      <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
       <View style={styles.body}>
         <View style={styles.header}>
           <Text style={[styles.subject, { color: colors.textSecondary }]}>

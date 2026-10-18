@@ -745,6 +745,30 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
     expect(notifications).not.toContain("Decay reminders");
   });
 
+  it("pins the Check linked contacts wording (38.12 D-49, D-103)", () => {
+    expect({
+      CHECK_LINKED_CONTACTS: glossary.CHECK_LINKED_CONTACTS,
+      NOT_IN_PHONE_CONTACTS: glossary.NOT_IN_PHONE_CONTACTS,
+      NEEDS_YOUR_CHOICE: glossary.NEEDS_YOUR_CHOICE,
+      LINK_DIFFERENT_PHONE_CONTACT: glossary.LINK_DIFFERENT_PHONE_CONTACT,
+      UNLINK_FROM_PHONE_CONTACT: glossary.UNLINK_FROM_PHONE_CONTACT,
+    }).toEqual({
+      CHECK_LINKED_CONTACTS: "Check linked contacts",
+      NOT_IN_PHONE_CONTACTS: "Not in phone Contacts",
+      NEEDS_YOUR_CHOICE: "Needs your choice",
+      LINK_DIFFERENT_PHONE_CONTACT: "Link to a different phone contact",
+      UNLINK_FROM_PHONE_CONTACT: "Unlink from phone contact",
+    });
+    // The reconcile screens draw these labels from the constants.
+    const detail = read("src/screens/ReconcileDetailScreen.tsx");
+    expect(detail).toContain("{LINK_DIFFERENT_PHONE_CONTACT}");
+    expect(detail).toContain("{UNLINK_FROM_PHONE_CONTACT}");
+    expect(detail).toContain("title={CHECK_LINKED_CONTACTS}");
+    expect(read("src/screens/ReconcileGridScreen.tsx")).toContain(
+      "return NEEDS_YOUR_CHOICE;",
+    );
+  });
+
   it("the Contacts population filter uses the glossary labels (D-42, D-49)", () => {
     expect(POPULATION_LABELS["not-contacted"]).toBe(glossary.NEVER_CONTACTED);
     expect(POPULATION_LABELS.favourites).toBe(glossary.FAVORITES);

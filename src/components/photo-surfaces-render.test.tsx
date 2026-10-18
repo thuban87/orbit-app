@@ -69,7 +69,6 @@ function gridCard(item: CandidateItem): TestElement[] {
       bulkActions: [],
       onInspect: () => {},
       onBulkAction: () => {},
-      recommendationExcludes: "needs_review",
     }),
   );
   const list = tree.find((node) => node.type === "FlatList");
