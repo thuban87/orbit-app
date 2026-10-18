@@ -930,6 +930,9 @@ function backupFavouriteUids(manifest: BackupManifest): string[] {
  * missing mark (`favourite_rank IS NULL`), appending like the favourites DAO.
  * It never clears a rank, leaves `modified_at` alone (RESEARCH §3 A5, this plan
  * only), and matches nothing for a uid a newer local tombstone deleted.
+ * D-34 (38.12 review A-IN-01): like the favourites DAO, it never marks a
+ * person who is in the Bin after the merge (`archived_at IS NULL`); a rank a
+ * Bin person already holds is left as it is.
  */
 async function unionFavourites(
   exec: SqlExecutor,
@@ -937,11 +940,16 @@ async function unionFavourites(
 ): Promise<void> {
   for (const uid of backupFavouriteUids(manifest))
     await exec.runAsync(
-      "UPDATE contacts SET favourite_rank=(SELECT COALESCE(MAX(favourite_rank),-1)+1 FROM contacts) WHERE uid=? AND favourite_rank IS NULL",
+      "UPDATE contacts SET favourite_rank=(SELECT COALESCE(MAX(favourite_rank),-1)+1 FROM contacts) WHERE uid=? AND favourite_rank IS NULL AND archived_at IS NULL",
       [uid],
     );
 }
-/** True when the Merge favourite union would mark at least one existing row. */
+/**
+ * True when the Merge favourite union would mark at least one existing row.
+ * Read before any write, so a person not in the Bin here (A-IN-01, D-34); a
+ * row the merge itself moves into or out of the Bin is a contact write, which
+ * already makes the restore a change.
+ */
 async function favouriteUnionPending(
   exec: SqlExecutor,
   manifest: BackupManifest,
@@ -949,7 +957,7 @@ async function favouriteUnionPending(
   const wanted = new Set(backupFavouriteUids(manifest));
   if (wanted.size === 0) return false;
   const unmarked = await exec.getAllAsync<{ uid: string }>(
-    "SELECT uid FROM contacts WHERE favourite_rank IS NULL",
+    "SELECT uid FROM contacts WHERE favourite_rank IS NULL AND archived_at IS NULL",
   );
   return unmarked.some((row) => wanted.has(row.uid));
 }

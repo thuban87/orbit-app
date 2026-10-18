@@ -4447,6 +4447,58 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
     expect(after!.revision).toBeGreaterThan(before!.revision);
   });
 
+  it("Merge never makes a person in the Bin a favourite (D-34, A-IN-01)", async () => {
+    const backup = await backupOf([
+      // The phone keeps its newer Bin row; the backup's favourite is older.
+      { uid: "phone-binned", favourite: true },
+      // The backup's newer row moves the person to the Bin.
+      {
+        uid: "backup-binned",
+        modifiedAt: LATER,
+        favourite: true,
+        archived: true,
+      },
+      // A live person still gets the union (D-113).
+      { uid: "live", favourite: true },
+    ]);
+    const phone = await db();
+    await seed(phone, [
+      { uid: "phone-binned", archived: true, modifiedAt: LATEST },
+      { uid: "backup-binned" },
+      { uid: "live" },
+    ]);
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+    });
+    expect(await favourites(phone)).toEqual(["live"]);
+    expect(
+      (
+        await phone.getAllAsync<{ uid: string }>(
+          "SELECT uid FROM contacts WHERE archived_at IS NOT NULL ORDER BY uid",
+        )
+      ).map((row) => row.uid),
+    ).toEqual(["backup-binned", "phone-binned"]);
+  });
+
+  it("a Merge whose only backup favourite is in the phone's Bin writes nothing (D-34, A-IN-01)", async () => {
+    const backup = await backupOf([{ uid: "binned", favourite: true }]);
+    const phone = await db();
+    await seed(phone, [{ uid: "binned", archived: true, modifiedAt: LATEST }]);
+    const before = await phone.getFirstAsync<{ revision: number }>(
+      "SELECT data_revision AS revision FROM app_settings WHERE id=1",
+    );
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+      inserted: 0,
+      updated: 0,
+    });
+    expect(await favourites(phone)).toEqual([]);
+    const after = await phone.getFirstAsync<{ revision: number }>(
+      "SELECT data_revision AS revision FROM app_settings WHERE id=1",
+    );
+    expect(after!.revision).toBe(before!.revision);
+  });
+
   it("Replace-all takes exactly the backup's favourites (D-113)", async () => {
     const backup = await backupOf([
       { uid: "a", favourite: true },
