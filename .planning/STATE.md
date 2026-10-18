@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.12
 current_phase_name: People Lifecycle, Import & Settings UX (INSERTED)
 status: executing
-stopped_at: Completed 38.12-23-PLAN.md
-last_updated: "2026-10-18T01:40:00.000Z"
+stopped_at: Completed 38.12-20-PLAN.md
+last_updated: "2026-10-18T01:57:00.000Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 38.12 execution started
-state_head: 25d07f5b
+state_head: d7e19d15
 progress:
   total_phases: 38
   completed_phases: 25
   total_plans: 365
-  completed_plans: 357
+  completed_plans: 358
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -481,6 +481,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.12 P19 | 28 min | 3 tasks | 28 files |
 | Phase 38.12 P21 | 21 min | 3 tasks | 25 files |
 | Phase 38.12 P23 | 15 min | 3 tasks | 11 files |
+| Phase 38.12 P20 | 16 min | 3 tasks | 30 files |
 
 ## Accumulated Context
 
@@ -1077,6 +1078,8 @@ Foundational decisions affecting current work:
 - [Phase 38.12]: 38.12-21: Import review uses BirthdayField (unreadable phone birthday named in a hint), button-role Import, override ?? device region for method warnings; bulk setup Bound then Unbound via BULK_LIFECYCLE_OPTIONS; sanitiseImportLifecycle shared by setup restore and resume (third copy left in import-session-dao, cycle); host forwarded through BulkImportSetup/ImportProgress/DuplicateReview and Import review's two ImportComplete exits; Review matches bulk bar confirms successes in one snackbar (mixed = one error message); RG-029 M5 obsolete. Wording for owner on device pass: unreadable-birthday hint, mixed bulk message
 - [Phase 38.12]: 38.12-23: sessionSummaryCounts returns 7 mutually exclusive buckets ({ count, people[{ rowId, name, contactId }] }) classified by row_status first (F-1); only skipped rows split into Already in Orbit (B-2), Skipped — no name (B-3), Skipped by you; names = Orbit contact name, else phone displayName, else 'Unnamed contact'. Import complete shows only non-zero outcomes, 5 names then Show all (IMPORT_COMPLETE_NAME_PREVIEW), imported/linked names open via openContactFromFlow; Review possible matches forwards the host
 - [Phase 38.12]: 38.12-23: ImportLifecycle/UNBOUND_IMPORT/sanitiseImportLifecycle moved to the leaf src/db/import-lifecycle.ts (DAO lock, resume and setup share it; DAO re-exports). Legacy picker: Not now via exitFlow on denied/permanent ('Grant access' now 'Try again'), read-error EmptyState retry, import failure keeps selection + error snackbar, withImportFlowActive, host into routePickedImport, 'No contacts match' EmptyState, bottom inset, AppText roles
+- [Phase 38.12]: 38.12-20: Profile ⋯ = Snooze…/Unbind (Bound) · Check with phone Contacts… (linked, hasActiveExternalLink) · Merge with another contact… · Move to Bin · Layout · Background; Bin keeps Layout + Background only; both entries open in the current tab with a profile host; ReconcileDetail + ValueHistory are PROFILE_REACHABLE_ROUTES in all five stacks; ⋯ sheet compact with Close, titled More actions (D-42); View history opens read-only ValueHistoryScreen (readValueHistory, 'Replaced <date>'); template Save returns to the list with 'Saved layout template <name>' (finishTemplateCreate)
+- [Phase 38.12]: 38.12-20: D-144 resolves 38.12-19 deferred item 1 — buildReconcileSelections(diff, choices, tappedFamilies): only a phones/emails field the person tapped elects a primary (per field, any tap); untapped defaults are added as secondaries; bulk never elects
 
 ### Pending Todos
 
