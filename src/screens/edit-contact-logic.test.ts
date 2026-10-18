@@ -915,6 +915,18 @@ describe("resolveEditSaveExit: Edit save returns to the Profile it came from (D-
     }
   });
 
+  it("Review now list -> Edit(c) goes back to the list (C-WR-02, D-121)", () => {
+    const state = stack(
+      { name: "CustomFields" },
+      { name: "CustomFieldReview" },
+      { name: "Edit", params: { contactId: 7 } },
+    );
+    expect(resolveEditSaveExit(state, 7)).toEqual({ kind: "go-back" });
+    expect(applyExit(state, resolveEditSaveExit(state, 7)).at(-1)).toEqual(
+      expect.objectContaining({ name: "CustomFieldReview" }),
+    );
+  });
+
   it("a missing or empty state replaces with the Profile", () => {
     expect(resolveEditSaveExit(undefined, 7)).toEqual({
       kind: "replace",

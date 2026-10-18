@@ -711,9 +711,18 @@ export type EditSaveExit =
 const EDIT_RETURN_ROUTES: ReadonlySet<string> = new Set(["Profile", "Compose"]);
 
 /**
+ * Lists an Edit is opened from that belong to no single contact; Save returns
+ * to them so the user keeps working through the list. The custom-field
+ * "Review now" list reloads on focus, so the fixed person drops off (38.12
+ * D-121; review C-WR-02).
+ */
+const EDIT_RETURN_LISTS: ReadonlySet<string> = new Set(["CustomFieldReview"]);
+
+/**
  * Where Edit Contact's Save lands (38.11 D-26, D-13). Go back when the route
  * before Edit is this contact's Profile or Compose (Compose re-reads on
- * focus); otherwise replace the finished Edit with this contact's Profile. No
+ * focus), or the "Review now" list it was opened from (C-WR-02); otherwise
+ * replace the finished Edit with this contact's Profile. No
  * path pushes a second Profile or leaves the Edit form under one, so a later
  * Bin/archive `goBack` from that Profile cannot land on a stale Edit. Never
  * `popTo`: it matches the nearest route by name regardless of params and can
@@ -724,6 +733,8 @@ export function resolveEditSaveExit(
   contactId: number,
 ): EditSaveExit {
   const previous = state ? state.routes[state.index - 1] : undefined;
+  if (previous && EDIT_RETURN_LISTS.has(previous.name))
+    return { kind: "go-back" };
   const previousContactId =
     previous?.params && "contactId" in previous.params
       ? (previous.params as { contactId?: unknown }).contactId
