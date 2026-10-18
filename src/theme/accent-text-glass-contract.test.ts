@@ -137,9 +137,11 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
   // row ⋯ menus, 38.12-07 D-120), less M41–M43 (the Appearance Orbit Center
   // and profile-default values moved into the shared SettingsRow, 38.12-14
   // D-119), less M12/M13 (Backup settings' folder chooser and Open backup
-  // folder moved into the shared SettingsRow, 38.12-17 D-119).
-  it("covers the 39 swapped sites still in the tree", () => {
-    expect(done.length).toBe(39);
+  // folder moved into the shared SettingsRow, 38.12-17 D-119), less M1 (the
+  // Bin's accent-text Restore became the shared secondary Button, 38.12-22
+  // D-40).
+  it("covers the 38 swapped sites still in the tree", () => {
+    expect(done.length).toBe(38);
   });
 
   const superseded = rows.filter((row) => SUPERSEDED_STATUS.test(row.status));
