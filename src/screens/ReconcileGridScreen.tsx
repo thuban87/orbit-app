@@ -131,10 +131,13 @@ export function ReconcileGridScreen({
       setCards(next);
       const session = await getReconcileSessionById(getExecutor(), id);
       if (session?.status === "complete" && next.length === 0) {
-        navigation.replace("ReconcileComplete", { sessionId: id });
+        navigation.replace("ReconcileComplete", {
+          sessionId: id,
+          host: route.params?.host,
+        });
       }
     },
-    [navigation],
+    [navigation, route.params?.host],
   );
 
   const scan = useCallback(
@@ -417,6 +420,8 @@ export function ReconcileGridScreen({
               contactId: entry.card.contactId,
               sessionId,
               cardId: entry.card.id,
+              // The flow host travels through the check (D-110, A-1).
+              host: route.params?.host,
             });
         }}
         onBulkAction={(action, selected) =>

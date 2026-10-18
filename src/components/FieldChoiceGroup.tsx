@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Icon } from "@/components/icons/Icon";
 import { useTheme } from "@/theme";
 
 export type FieldChoiceMode = "additive" | "conflict" | "removed";
@@ -95,11 +96,18 @@ export function FieldChoiceGroup<T extends string>({
               styles.option,
               {
                 backgroundColor: colors.surface,
-                borderColor: selected ? colors.borderStrong : colors.border,
+                borderColor: selected ? colors.accent : colors.border,
               },
               selected && styles.selected,
             ]}
           >
+            {/* Every row reads as selectable before a tap: an empty radio or
+                checkbox, filled in the accent when chosen (38.12 D-48). */}
+            <Icon
+              name={multiple ? "checkbox" : "select"}
+              state={selected ? "active" : "default"}
+              tone={selected ? "accentText" : "textSecondary"}
+            />
             <View style={styles.copy}>
               <Text style={[styles.value, { color: colors.textPrimary }]}>
                 {option.value}
@@ -130,14 +138,6 @@ export function FieldChoiceGroup<T extends string>({
                 </View>
               ) : null}
             </View>
-            {selected ? (
-              <Text
-                accessibilityLabel="Selected"
-                style={[styles.check, { color: colors.accentText }]}
-              >
-                ✓
-              </Text>
-            ) : null}
           </Pressable>
         );
       })}
@@ -168,5 +168,4 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   chipText: { fontSize: 13, fontWeight: "600" },
-  check: { fontSize: 20, fontWeight: "700" },
 });

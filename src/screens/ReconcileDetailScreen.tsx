@@ -307,9 +307,11 @@ export function ReconcileDetailScreen({
           dismissable: true,
         }).then((review) => {
           if (!review) return;
+          // The flow host travels with the merge (D-110, convergence c1 A-1).
           navigation.navigate("SurvivorSelect", {
             firstContactId: contactId,
             secondContactId: result.otherContactId,
+            host: route.params.host,
           });
         });
         return;
@@ -327,7 +329,7 @@ export function ReconcileDetailScreen({
     } finally {
       if (selected?.photoTempUri) discardDerivative(selected.photoTempUri);
     }
-  }, [contactId, load, navigation, scan?.links]);
+  }, [contactId, load, navigation, route.params.host, scan?.links]);
 
   const apply = useCallback(async () => {
     if (!scan || applied || applying) return;
@@ -439,7 +441,7 @@ export function ReconcileDetailScreen({
   if (!scan)
     return (
       <View style={styles.root}>
-        <ShellAppBar variant="child" title="Update from Contacts" />
+        <ShellAppBar variant="child" title="Check linked contacts" />
         <View style={styles.body}>
           {message ? (
             <Text style={{ color: colors.textSecondary }}>{message}</Text>
@@ -462,7 +464,7 @@ export function ReconcileDetailScreen({
   if (scan.diff.missingSource)
     return (
       <View style={styles.root}>
-        <ShellAppBar variant="child" title="Update from Contacts" />
+        <ShellAppBar variant="child" title="Check linked contacts" />
         <View style={styles.body}>
           <Text style={[styles.subject, { color: colors.textSecondary }]}>
             {scan.contactName}
@@ -515,7 +517,7 @@ export function ReconcileDetailScreen({
     );
   return (
     <View style={styles.root}>
-      <ShellAppBar variant="child" title="Update from Contacts" />
+      <ShellAppBar variant="child" title="Check linked contacts" />
       <View style={styles.body}>
         <View style={styles.header}>
           <Text style={[styles.subject, { color: colors.textSecondary }]}>
@@ -525,6 +527,7 @@ export function ReconcileDetailScreen({
             onPress={() =>
               navigation.navigate("SurvivorSelect", {
                 firstContactId: contactId,
+                host: route.params.host,
               })
             }
           >
@@ -644,10 +647,18 @@ function ChoiceRow({
   const options: FieldChoiceOption<ReconcileChoice>[] = [
     {
       id: "orbit",
+      // Phones/emails show Orbit's methods one per line, never the joined
+      // serialization (D-47).
       value:
-        field.orbitBaseline != null
-          ? shown(field.orbitBaseline)
-          : "Keep Orbit value",
+        multiple && field.orbitMethods
+          ? field.orbitMethods.length > 0
+            ? field.orbitMethods
+                .map((method) => methodLine(method.value, method.label))
+                .join("\n")
+            : "Keep Orbit value"
+          : field.orbitBaseline != null
+            ? shown(field.orbitBaseline)
+            : "Keep Orbit value",
       provenance: "Orbit",
       recommended: field.outcome === "removed-from-source",
     },

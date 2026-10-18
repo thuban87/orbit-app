@@ -59,6 +59,8 @@ export const ICON_REGISTRY = {
 
   // ---- Dashboard Card View actions and selection -----------------------
   select: { outline: "ellipse-outline", filled: "checkmark-circle" },
+  // 38.12-19: a multi-pick choice row (Check linked contacts phones/emails).
+  checkbox: { outline: "square-outline", filled: "checkbox" },
   "select-all": { outline: "checkmark-done-outline", filled: "checkmark-done" },
   archive: { outline: "archive-outline", filled: "archive" },
   snooze: { outline: "alarm-outline", filled: "alarm" },

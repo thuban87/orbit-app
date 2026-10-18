@@ -82,6 +82,13 @@ export interface ReconcileFieldDiff {
   reviewedComparable: string | null;
   sourceOptions: ReconcileFieldOption[];
   reviewedValue: string | null;
+  /**
+   * Phones/emails: Orbit's current methods of that type, as stored, for the
+   * detail screen to show one per line (D-47). `orbitBaseline` stays the
+   * serialization used for memory comparison. Optional so stored diffs and
+   * scalar fields type-check.
+   */
+  orbitMethods?: ReadonlyArray<{ value: string; label: string | null }>;
 }
 
 export interface ReconcileDiffResult {
@@ -285,6 +292,11 @@ function classifyMethodFamily(
 ): ReconcileFieldDiff | null {
   const type: ContactMethodType = fieldFamily === "phones" ? "phone" : "email";
   const orbit = valuesForType(orbitMethods, type, effectivePhoneRegion);
+  const orbitOfType = orbitMethods.filter((method) => method.type === type);
+  const readableOrbit = orbitOfType.map((method) => ({
+    value: method.value,
+    label: method.label ?? null,
+  }));
   const sourceMethods = sources.flatMap((source) =>
     source.methods
       .filter((method) => method.type === type)
@@ -325,10 +337,8 @@ function classifyMethodFamily(
     return {
       fieldFamily,
       outcome: "unchanged-since-review",
-      orbitBaseline: serializeMethodFamily(
-        orbitMethods.filter((method) => method.type === type),
-        effectivePhoneRegion,
-      ),
+      orbitBaseline: serializeMethodFamily(orbitOfType, effectivePhoneRegion),
+      orbitMethods: readableOrbit,
       sourceValue: sourceSerialization,
       reviewedComparable: sourceSerialization,
       sourceOptions,
@@ -351,10 +361,8 @@ function classifyMethodFamily(
         : additions.length === 0
           ? "removed-from-source"
           : "conflict",
-    orbitBaseline: serializeMethodFamily(
-      orbitMethods.filter((method) => method.type === type),
-      effectivePhoneRegion,
-    ),
+    orbitBaseline: serializeMethodFamily(orbitOfType, effectivePhoneRegion),
+    orbitMethods: readableOrbit,
     sourceValue: sourceSerialization,
     reviewedComparable: sourceSerialization,
     sourceOptions,

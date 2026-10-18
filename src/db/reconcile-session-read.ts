@@ -199,6 +199,8 @@ export interface ReconcileCompletionCounts {
  * the detail Apply finishes it; those two buckets count only that field, so a
  * card without one (partial, unresolved, or a missing source kept as is) is in
  * neither. Missing-source and unresolved/partial cards are counted by status.
+ * The buckets are exclusive (D-141): a missing-source card is never also
+ * counted by its disposition, so every finished card is in exactly one.
  */
 export async function reconcileCompletionCounts(
   exec: SqlExecutor,
@@ -238,6 +240,10 @@ export async function reconcileCompletionCounts(
     if (row.card_status === "unresolved" || row.card_status === "partial") {
       counts.unresolved += row.count;
     }
+    // Exclusive buckets (D-141): a missing-source card counts once, under
+    // Source missing, even when the grid's bulk Keep Orbit finished it with
+    // a "kept-orbit" disposition.
+    if (row.card_status === "missing_source") continue;
     if (row.completion_disposition === "updated") counts.updated += row.count;
     if (row.completion_disposition === "kept-orbit") {
       counts.keptOrbitValues += row.count;

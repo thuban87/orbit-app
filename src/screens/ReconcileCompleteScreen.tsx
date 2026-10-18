@@ -19,12 +19,9 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
+import { plural } from "@/utils/plural";
 
 const LOG_SCOPE = "reconcile-complete";
-
-function interactionLabel(count: number): string {
-  return `${count} interaction${count === 1 ? "" : "s"}`;
-}
 
 function footerEntry(
   label: string,
@@ -43,7 +40,7 @@ function footerEntry(
         {label}
       </Text>
       <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
-        {interactionLabel(count)}
+        {plural(count, "contact")}
       </Text>
     </View>
   );
@@ -151,6 +148,7 @@ export function ReconcileCompleteScreen({
               onPress={() =>
                 navigation.navigate("ReconcileGrid", {
                   sessionId: route.params.sessionId,
+                  host: route.params.host,
                 })
               }
               style={[
