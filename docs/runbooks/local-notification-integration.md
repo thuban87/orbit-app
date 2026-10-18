@@ -4,7 +4,7 @@
 
 Use this process to add a local notification kind to Orbit's on-device reminder system. It keeps the OS request derived from SQLite state, puts privacy and channel identity under source control, and routes actions through existing DAO boundaries rather than a direct contact update.
 
-## Architecture (Phase 15)
+## Architecture (Phases 15, 38.12)
 
 The notification engine reconciles desired OS requests during launch and foreground. `notification-ids.ts` is the single source of request identifiers, channel/action IDs, frozen copy, payload shape, and action idempotency; schedulers create requests only after the application initializes immutable channels and categories. A contact-independent recurring notification may own its own reconcile service and launch-sweep hook instead of joining the contact-candidate scheduler.
 
