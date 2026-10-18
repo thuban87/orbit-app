@@ -1,7 +1,7 @@
 # Notifications
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -19,7 +19,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
   - `notifications_enabled`, `decay_enabled`, `birthday_enabled`, `digest_enabled`, `birthday_unbound_enabled` (`INTEGER`) — `0`/`1` scheduling gates.
   - `lockscreen_public` (`INTEGER`) — chooses the public decay channel only when explicitly enabled.
   - `delivery_hour`, `quiet_start_hour`, `quiet_end_hour` (`INTEGER`) — validated local-hour scheduling inputs.
-- `contacts` — supplies cadence, `last_contact`, `snooze_until`, `reminders_off`, lifecycle, and birthday values.
+- `contacts` — supplies cadence, `last_contact`, `snooze_until`, lifecycle, and birthday values. An indefinite snooze is `snooze_until = '9999-12-31'`, which the decay predicate already treats as a future snooze; `reminders_off` is retired (migration 034 converted it, ADR-234).
 - `events` — records immutable `snooze` and `unsnooze` facts; `interactions` receives notification-sourced mark-contacted touchpoints.
 
 **Types** (`src/services/notifications/notification-ids.ts`):
@@ -65,13 +65,14 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 2. `reconcileSchedule()` reads `app_settings`, Bound decay-eligible contacts, birthday candidates, and the current OS request set. The persisted birthday-Unbound setting controls only birthday eligibility.
 3. It derives a local due date, applies a future snooze as the minimum base, then calculates a quiet-windowed, staggered fire instant on the stateless weekly decay grid. A birthday stays on its birthday date: a reminder time inside quiet hours moves to the quiet-hours end that same day (`sameDayAllowedInstant`), and the occurrence is skipped only once that day's slots have passed.
 4. The scheduler keeps requests inside a 35-day, 48-request bound, reserves within-horizon birthdays first, and uses a full-request diff to cancel or replace stale `decay:<id>` and `birthday:<id>` requests. Android reads DATE triggers back with a millisecond `value`; unchanged requests remain armed.
-5. Concurrent callers coalesce through a DEFER-ONE coordinator; the final pass re-reads state so a committed mute or snooze cannot be undone by an older snapshot.
+5. Concurrent callers coalesce through a DEFER-ONE coordinator; the final pass re-reads state so a committed snooze cannot be undone by an older snapshot.
 6. Every pass checks presented decay and birthday notifications against live contact IDs and dismisses orphaned entries, even when scheduling is disabled. Failures are counted in the returned reconcile outcome. Digest and foreign notifications remain untouched.
 
 ### Changing notification preferences
 
 1. The Settings Notifications category keeps all policy controls and OS permission status together while preserving the existing settings DAO and reconcile-on-write behavior.
 2. A denied OS permission remains visible with an actionable system-settings handoff; it is not hidden or represented as an app-managed toggle.
+3. The page uses the shared Settings row and card (ADR-246). With Allow notifications off it shows one paused line and the master description reads the same in both states; "Birthday alerts for Unbound contacts" is disabled, drawn Off, unless Birthday alerts is on. The decay switch reads "Check-in reminders" (`CHECK_IN_REMINDERS`). A reminder time inside quiet hours shows when reminders actually arrive, computed with the scheduler's own `nextAllowedFireInstant` (`effectiveReminderArrival`, `reminderArrivalLine`), and the quiet-hours helper says what the schedulers do (ADR-247).
 
 ### Reconciling the weekly digest
 
@@ -135,6 +136,10 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 - **ADR-227:** One Snooze Sheet — bulk Unsnooze writes events only for the selected people who are snoozed; single-contact Unsnooze still writes on every invocation.
 - **ADR-229:** Birthday on the Profile — Birthday saves from the Profile and Add Contact reschedule reminders.
+- **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — the mute suppressor is now the indefinite snooze (ADR-039's "muted" carries a note).
+- **ADR-239:** Import Screens Keep Add Contact's Order — an Unbound import reschedules when Birthday alerts for Unbound contacts is on.
+- **ADR-246:** One Settings Row and Section Card — the Notifications page rows and "Check-in reminders".
+- **ADR-247:** Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day — `sameDayAllowedInstant`, `digestFireHour`, the arrival line.
 
 ## Gotchas
 
@@ -156,6 +161,8 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 15. **Keep DEV probes out of production ownership.** Phase-38 UAT uses `digest:uat:*` identifiers and never cancels `digest:weekly`; repeated probes must clean every matching DEV request.
 16. **Normalize Android DATE-trigger readback.** Android may return an absent notification title as `null` while Orbit's request uses `undefined`; compare their normalized forms or every foreground pass will replace an unchanged request.
 17. **Do not use the notification archive as current-state evidence.** `dumpsys notification` includes historical entries; verify presented cleanup against the live notification list or `cmd notification` output.
+18. **The indefinite snooze is a date.** Do not special-case `9999-12-31` in the scheduler; it already suppresses like any future snooze. Only display sites label it (ADR-234).
+19. **Birthdays and the digest move within their own day; decay does not.** A quiet slot moves a birthday or the Sunday digest to that day's quiet-hours end (or skips a birthday already past), while decay still rolls to the next allowed morning. Never roll a birthday into the next day (ADR-041, ADR-247).
 
 ## Related Systems
 
@@ -186,3 +193,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-10-15 | 38.10 | Reworded the no-fuel-in-bodies rule for the retired fuel store: no contact knowledge, and never Off Limits, in a scheduled body. |
 | 2026-10-16 | 38.11 | Bulk Unsnooze clears and records events only for the selected people who are snoozed (D-82); Profile birthday saves reschedule reminders (D-59). KB extraction: Decisions link ADR-227, ADR-229. |
 | 2026-10-17 | 38.12 | Quiet hours no longer lose alerts (D-142): a birthday whose reminder time is quiet fires at the quiet-hours end on the birthday, and the weekly digest fires at the quiet-hours end on Sunday; decay keeps its next-morning roll. |
+| 2026-10-18 | 38.12 | Per-person mute retired into the indefinite snooze (migration 034); Notifications page on the shared rows with a paused line, gated Unbound birthday switch, "Check-in reminders" and a true arrival line. KB extraction: Decisions link ADR-234, ADR-239, ADR-246, ADR-247. |
