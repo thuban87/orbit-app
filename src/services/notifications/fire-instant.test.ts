@@ -4,6 +4,7 @@ import {
   nextAllowedFireInstant,
   nextGridFireInstant,
   nextNudgeDate,
+  sameDayAllowedInstant,
 } from "./fire-instant";
 
 // All dates are LOCAL wall-clock (mirrors birthday-logic.test.ts). Because every
@@ -213,5 +214,91 @@ describe("nextNudgeDate — stateless weekly cadence anchored to the due date", 
     const tick = nextNudgeDate(due, now, 7);
     expect(tick.getHours()).toBe(0);
     expect(tick.getMinutes()).toBe(0);
+  });
+});
+
+describe("sameDayAllowedInstant — a date-bound slot that never leaves its day (38.12 D-142)", () => {
+  const day = new Date(2026, 8, 10); // Sep 10 2026, local midnight
+  const dayBefore = new Date(2026, 8, 9, 12, 0);
+
+  it("moves an evening slot inside an overnight window to quiet-hours end on the SAME day (+stagger)", () => {
+    // Reminder 22:00, quiet 21→08: the day's own quiet end is 08:00 that morning.
+    const fire = sameDayAllowedInstant(day, 22, 21, 8, 5, dayBefore);
+    expect(fire).toEqual(new Date(2026, 8, 10, 8, 5));
+  });
+
+  it("keeps a delivery slot outside quiet hours unchanged", () => {
+    const fire = sameDayAllowedInstant(day, 9, 21, 8, 5, dayBefore);
+    expect(fire).toEqual(new Date(2026, 8, 10, 9, 5));
+  });
+
+  it("moves a slot inside a same-day window (12→14, delivery 13) to 14:00", () => {
+    const fire = sameDayAllowedInstant(day, 13, 12, 14, 0, dayBefore);
+    expect(fire).toEqual(new Date(2026, 8, 10, 14, 0));
+  });
+
+  it("moves an early-morning slot inside an overnight window to that morning's end (+stagger)", () => {
+    const fire = sameDayAllowedInstant(day, 6, 21, 8, 10, dayBefore);
+    expect(fire).toEqual(new Date(2026, 8, 10, 8, 10));
+  });
+
+  it("treats an empty window (start = end) as never quiet", () => {
+    const fire = sameDayAllowedInstant(day, 22, 8, 8, 0, dayBefore);
+    expect(fire).toEqual(new Date(2026, 8, 10, 22, 0));
+  });
+
+  it("returns null when the day's delivery slot has already passed", () => {
+    const now = new Date(2026, 8, 10, 15, 0);
+    expect(sameDayAllowedInstant(day, 9, 21, 8, 0, now)).toBeNull();
+  });
+
+  it("returns null when the slot is quiet and the same-day quiet end has passed", () => {
+    // 22:00 is quiet; the day's quiet end (08:05) is already behind 09:00.
+    const now = new Date(2026, 8, 10, 9, 0);
+    expect(sameDayAllowedInstant(day, 22, 21, 8, 5, now)).toBeNull();
+  });
+
+  it("still returns the quiet-end slot when it is ahead of now on the day itself", () => {
+    const now = new Date(2026, 8, 10, 6, 0);
+    expect(sameDayAllowedInstant(day, 22, 21, 8, 5, now)).toEqual(
+      new Date(2026, 8, 10, 8, 5),
+    );
+  });
+
+  it("treats an invalid now as no past constraint", () => {
+    expect(
+      sameDayAllowedInstant(day, 22, 21, 8, 0, new Date(Number.NaN)),
+    ).toEqual(new Date(2026, 8, 10, 8, 0));
+  });
+
+  it("keeps the day across a spring-forward DST day", () => {
+    const dst = new Date(2026, 2, 8); // US spring-forward Sunday
+    const fire = sameDayAllowedInstant(dst, 22, 21, 8, 5, new Date(2026, 2, 7));
+    expect(fire).toEqual(new Date(2026, 2, 8, 8, 5));
+  });
+
+  it("keeps the day across a fall-back DST day", () => {
+    const dst = new Date(2026, 10, 1); // US fall-back Sunday
+    const fire = sameDayAllowedInstant(dst, 23, 22, 7, 5, new Date(2026, 9, 31));
+    expect(fire).toEqual(new Date(2026, 10, 1, 7, 5));
+  });
+
+  it("never returns a slot off its day or inside quiet hours, for every hour combination", () => {
+    const noPast = new Date(Number.NaN);
+    for (let dh = 0; dh < 24; dh++) {
+      for (let qs = 0; qs < 24; qs++) {
+        for (let qe = 0; qe < 24; qe++) {
+          const fire = sameDayAllowedInstant(day, dh, qs, qe, 55, noPast);
+          // With no past constraint a slot always exists on the day.
+          expect(fire).not.toBeNull();
+          if (fire === null) continue;
+          expect(fire.getDate()).toBe(10);
+          const h = fire.getHours();
+          const quiet =
+            qs !== qe && (qs > qe ? h >= qs || h < qe : h >= qs && h < qe);
+          expect(quiet).toBe(false);
+        }
+      }
+    }
   });
 });

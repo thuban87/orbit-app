@@ -527,6 +527,112 @@ describe("reconcileSchedule — birthday must not roll off its own day (CR-01)",
 });
 
 // ============================================================================
+// 38.12 D-142: a birthday whose reminder time sits in quiet hours fires at the
+// quiet-hours end ON THE BIRTHDAY instead of being skipped.
+// ============================================================================
+
+describe("reconcileSchedule — quiet-hours birthday moves to quiet end on the day (D-142)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("fires an evening-quiet birthday at quiet-hours end on the birthday itself", async () => {
+    // Reminder 22:00 with quiet 21→08: the birthday's own quiet end is 08:xx.
+    await enable({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 });
+    const id = await seedContact({
+      name: "Late Lou",
+      lastContact: null,
+      birthday: birthdayMMDD(7),
+    });
+
+    await reconcileSchedule(exec);
+
+    const req = scheduledFor(birthdayIdentifier(id));
+    expect(req).toBeDefined();
+    expectFireDayHour(req, dayAhead(7), 8);
+    expect(new Date(req?.trigger.date ?? Number.NaN).getMinutes()).toBe(
+      staggerFor(id),
+    );
+    expect(req?.content.body).toBe(birthdayBody("Late Lou"));
+    expect(req?.content.data).toMatchObject({
+      kind: "birthday",
+      contactId: id,
+      occurrenceKey: dateOffset(7),
+    });
+  });
+
+  it("moves a same-day quiet window slot (12→14, reminder 13) to 14:00", async () => {
+    await enable({ deliveryHour: 13, quietStartHour: 12, quietEndHour: 14 });
+    const id = await seedContact({
+      name: "Noon Nia",
+      lastContact: null,
+      birthday: birthdayMMDD(5),
+    });
+
+    await reconcileSchedule(exec);
+
+    expectFireDayHour(scheduledFor(birthdayIdentifier(id)), dayAhead(5), 14);
+  });
+
+  it("leaves a birthday outside quiet hours at the reminder time", async () => {
+    await enable({ deliveryHour: 10, quietStartHour: 21, quietEndHour: 8 });
+    const id = await seedContact({
+      name: "Ten Ted",
+      lastContact: null,
+      birthday: birthdayMMDD(3),
+    });
+
+    await reconcileSchedule(exec);
+
+    expectFireDayHour(scheduledFor(birthdayIdentifier(id)), dayAhead(3), 10);
+  });
+
+  it("fires a today birthday at today's quiet end while that is still ahead", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 16, 6, 0, 0));
+    await enable({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 });
+    const id = await seedContact({
+      name: "Dawn Dee",
+      lastContact: null,
+      birthday: birthdayMMDD(0),
+    });
+
+    await reconcileSchedule(exec);
+
+    expectFireDayHour(scheduledFor(birthdayIdentifier(id)), dayAhead(0), 8);
+  });
+
+  it("still skips a today birthday once its quiet-end slot has passed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 16, 9, 30, 0));
+    await enable({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 });
+    const id = await seedContact({
+      name: "Missed Max",
+      lastContact: null,
+      birthday: birthdayMMDD(0),
+    });
+
+    await reconcileSchedule(exec);
+
+    expect(scheduledFor(birthdayIdentifier(id))).toBeUndefined();
+  });
+
+  it("leaves decay on its next-morning roll for the same quiet settings", async () => {
+    await enable({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 });
+    // Due in 10 days: the 22:00 slot rolls to 08:00 the NEXT morning.
+    const id = await seedContact({
+      name: "Decay Dot",
+      intervalDays: 30,
+      lastContact: dateOffset(-20),
+    });
+
+    await reconcileSchedule(exec);
+
+    expectFireDayHour(scheduledFor(decayIdentifier(id)), dayAhead(11), 8);
+  });
+});
+
+// ============================================================================
 // STALE CANCEL + full-request diff (H3 + items C/F).
 // ============================================================================
 
