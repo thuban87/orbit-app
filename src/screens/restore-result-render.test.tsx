@@ -52,6 +52,8 @@ function render(params: {
     removed: number;
     movedToBin: number;
     removedFromBin: number;
+    added?: number;
+    updated?: number;
   };
 }): string[] {
   const element = RestoreResultScreen({
