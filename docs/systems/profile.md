@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -101,7 +101,7 @@ Section headings identify their section only. Module bodies own values, empty st
 - **Counts** use `plural(n, "item")`.
 - **Hide from Profile** is switched off (`HIDE_FROM_PROFILE_ENABLED = false`, D-134): no Hide controls, and every item shows whatever its stored flag (ADR-218).
 
-Unbind remains a confirmed lifecycle action for Bound contacts but lives in the Profile overflow; the meaningful Bind experience remains visible for Unbound contacts. Relationship Overview retains the existing compact/wide preference, then derives only a visual full-row span for compact row orphans. It preserves configured order and semantic size while centering every tile's content.
+Unbind remains a confirmed lifecycle action for Bound contacts but lives in the Profile overflow; the meaningful Bind experience remains visible for Unbound contacts. The Bind card shows a saved frequency ("Bind · Every 30 days") with a Change link that opens the frequency choices first; a changed frequency is written before the bind (`bindCardModel`, ADR-233). An Unbound or binned person has no Snooze tile (`overviewShowsSnooze`), and the Snooze tile reads the effective, unexpired snooze, showing "Snoozed · until you turn it off" for an indefinite one (`snoozeUntilLabel`, ADR-234). Relationship Overview retains the existing compact/wide preference, then derives only a visual full-row span for compact row orphans. It preserves configured order and semantic size while centering every tile's content.
 
 ### Layout preview geometry (38.4, RG-033)
 
@@ -137,7 +137,17 @@ Contact Frequency and Snooze settle every write through `createRelationshipSheet
 
 Layout and background resolution is independent. A Category change/deletion removes only the Category assignment; inherited contacts fall through and explicit contact/freeform choices survive. A contact's freeform layout is a snapshot, whereas editing a reusable template affects its assigned Profiles.
 
-The ⋯ order for a bound contact is Snooze…, Unbind contact, Move to Bin, separator, Profile Layout, Background; an unbound contact has no Unbind (38.11 D-64, D-65, D-69). Edit Contact is on the Hero (D-63). Snooze… opens the shared snooze sheet, where Unsnooze lives. Unbind contact is a plain entry and keeps its destructive confirm (D-68, ADR-150). Move to Bin is the red entry with the warning glyph: it asks first with the themed destructive confirm ("Move {name} to the Bin?" / "They'll be hidden from your lists. You can restore them, or delete them permanently, from Settings → Bin."; D-93; the Contacts bulk confirm shares this body, `MOVE_TO_BIN_CONFIRM_MESSAGE`, and is destructive too), then archives, leaves the Profile and shows "Moved {name} to the Bin" with no Undo; the success snackbar follows only a write that succeeded, and a failed write shows only "Couldn't move to the Bin. Try again." (`runMoveToBin`, D-71, review U-04). After the write resolves, and only then, the widget refreshes and the reminder schedule reconciles, so the binned person's scheduled reminders stop (`afterArchive`, review WR-01). The person stays restorable from Settings → Bin. Save as template and the two resets live in the sheets, not ⋯ (D-65): Profile Layout's "Reset to default" clears the layout/template and the open/closed sections, and the Background sheet's "Reset to default" clears the background. Both are presentation-only (ADR-108): they never touch contact data, Favorite, Snooze, AI permission, knowledge, or interaction history.
+The ⋯ is built by `profileOverflowEntries({ bound, archived, linked })` (ADR-233). For a live person it reads Snooze… and Unbind contact (Bound only), Check with phone Contacts… (only when actively linked, `hasActiveExternalLink`), Merge with another contact…, Move to Bin, separator, Profile Layout, Background. A binned person gets only Profile Layout and Background (ADR-232). The sheet is the compact, content-sized variant titled "More actions" with a Close. Edit Contact is on the Hero (38.11 D-63). Snooze… opens the shared snooze sheet, where Unsnooze and "Until I turn it off" live. Check with phone Contacts… opens `ReconcileDetail` for just this person, and Merge… opens the merge picker with this person first (ADR-235); both routes are registered in every Profile-hosting stack. Unbind contact is a plain entry and keeps its destructive confirm (D-68, ADR-150). Move to Bin is the red entry with the warning glyph: it asks first with the themed destructive confirm ("Move {name} to the Bin?" / "They'll be hidden from your lists. You can restore them, or delete them permanently, from Settings → Bin."; D-93; the Contacts bulk confirm shares this body, `MOVE_TO_BIN_CONFIRM_MESSAGE`, and is destructive too), then archives, leaves the Profile and shows "Moved {name} to the Bin" with no Undo; the success snackbar follows only a write that succeeded, and a failed write shows only "Couldn't move to the Bin. Try again." (`runMoveToBin`, D-71, review U-04). After the write resolves, and only then, the widget refreshes and the reminder schedule reconciles, so the binned person's scheduled reminders stop (`afterArchive`, review WR-01). The person stays restorable from Settings → Bin. Save as template and the two resets live in the sheets, not ⋯ (D-65): Profile Layout's "Reset to default" clears the layout/template and the open/closed sections, and the Background sheet's "Reset to default" clears the background. Both are presentation-only (ADR-108): they never touch contact data, Favorite, Snooze, AI permission, knowledge, or interaction history.
+
+### Lifecycle on the Profile (ADR-232, ADR-233)
+
+A binned person's Profile shows a banner below the Hero, "<name> is in the Bin", with **Open the Bin** (`binnedProfileBanner`, `openBinFromProfile`); Restore and permanent delete stay in the Bin list. The banner replaces the Bind card. Orbit Status reads **In the Bin** ("Orbit Status is paused while they're in the Bin.") and the star is disabled. The lifecycle DAOs refuse a binned person with `ContactInBinError`.
+
+Bind acts at once with "Bound <name>" and Undo (Undo unbinds and puts a changed frequency back). A confirmed Unbind closes ⋯ first, then shows "Unbound <name>" with Undo. `runProfileLifecycleTransition` runs both. On an Unbound Profile the star draws dimmed and off whatever the dormant rank; a tap shows `unboundStarExplanation` as a notice snackbar and writes nothing (`profileStarView`). The Profile favourite toggle refreshes the widget.
+
+A Profile opened from an import, check or merge result carries `returnTab`; Back switches to that tab without history and pops the Profile off the Contacts stack (ADR-241).
+
+Saving a new layout template returns to the template list (or, for Save current layout as template, to its assignment page) with "Saved layout template <name>" (`finishTemplateCreate`, `templateSavedSnackbar`).
 
 Open/closed sections and the layout editor (38.11 D-60, D-83): saving the person's own layout, whether they already had one or were on a template, keeps their open/closed choices except for the sections whose "Open by default" changed in that save; those choices clear so the new default shows (`changedDefaultExpandedIds` → `setContactFreeformLayout({ clearCollapseFor })`). Switching to a different template still clears every choice (`assignContactLayoutTemplate`, ADR-108). The editor's per-section control is a labelled "Open by default" switch. Profile Layout offers Save as template (the editor footer's one button) and, when the person has a layout template, their own layout or any open/closed override, "Reset to default": a destructive confirm (38.9 D-30), then `resetContactLayoutPresentation` clears the layout and the open/closed choices and keeps the background (presentation-only, D-65). Both resets upsert an all-default row stamped now and never delete it: `profile_contact_presentation` is an LWW backup entity with no tombstone type, so a deleted row would let a merge restore of an older backup bring the old presentation back (review WR-02). Share Undo counts an all-default row as owning nothing (`SHARE_UNDO_OWNERSHIP`, ADR-217). The editor's nested reorderable lists pass `scrollEnabled={false}` so only the outer container scrolls (D-29). Editing a template's layout from the Templates sheet skips the Profile Layout first page and opens the editor directly (`startInEditor`, D-89), so the contact-specific "Editing creates a contact-specific layout…" line never shows for a template.
 
@@ -203,6 +213,13 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-229:** Birthday on the Profile — the Birthday tile and its save-on-pick sheet.
 - **ADR-230:** Settings Page for Profile Backgrounds — the choose-only Background sheet and the Settings Profile Backgrounds page.
 - **ADR-231:** Open/Closed Sections, Layout Tools in the Sheets, All-Default Reset Row — own-layout saves keep open/closed choices; Save as template and Reset live in the sheets; Reset writes an all-default row.
+- **ADR-232:** A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards — the binned Profile's banner, status, disabled star and ⋯.
+- **ADR-233:** The Profile ⋯ Follows Lifecycle State — ⋯ by `{ bound, archived, linked }`, Bind/Unbind Undo, the Bind card frequency, the Unbound star (partially supersedes ADR-225's ⋯ list).
+- **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — "Until I turn it off" in the sheet and on the tile (partially supersedes ADR-227).
+- **ADR-235:** Merge Starts from the Profile — the ⋯ Merge entry.
+- **ADR-241:** Flows Carry a Flow Host — `returnTab` Profiles and merges that end on the survivor's Profile.
+- **ADR-245:** Flagged Custom-Field Values Open Edit at That Field — the Things to Remember marker, tap-to-fix and View history.
+- **ADR-246:** One Settings Row and Section Card — the Profile Backgrounds page uses the glass card.
 
 ## Gotchas
 
@@ -227,6 +244,9 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 19. **In-Profile scroll targets must clear the overlay app bar.** The bar sits over the scroll view, so any computed scroll target (the History reveal, for example) adds the 56 px bar height (`profileScrollTargetY`), or it lands under the bar.
 19. **The preview packs at the Profile width, not its own.** Packing against the narrower preview card would show fewer columns than the real Profile. If the Profile overview's padding or card border changes, update `PROFILE_OVERVIEW_HORIZONTAL_INSET` in `overview-geometry.ts`. The inset-chain test fails until you do.
 20. **Retire source derivatives at the producer boundary.** A completed or failed background crop must discard its ImageManipulator output; launch cleanup may remove only recognized cache residue and must never infer ownership of a durable `profile-backgrounds/` file.
+21. **Every lifecycle writer checks the Bin.** Bind, unbind, snooze, unsnooze, favourite and participation writes call `assertContactNotInBinCore`; a new one must too, or a binned Profile can change again (ADR-232).
+22. **A binned Profile's Frequency and Birthday tiles stay editable.** The owner chose not to lock them (38.12 Q5); only lifecycle actions are gated.
+23. **Never print `snooze_until` raw.** An indefinite snooze is stored as `9999-12-31`; show it through `snoozeUntilLabel` (ADR-234).
 
 ## Related systems
 
@@ -283,3 +303,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-10-16 | 38.11 | D-89: editing a template's layout from the Templates sheet opens the layout editor directly (`ProfileLayoutEditor` `startInEditor`), skipping the contact-specific Profile Layout first page. |
 | 2026-10-16 | 38.11 | Device review (38.11-14): the Hero's message button reads "Compose" (D-91); the top bar scrim is solid while the name shows (D-92); both Move to Bin confirms say "hidden from your lists" and the bulk one is destructive (D-93); the Templates Assign page shows "{name} currently uses {layout}." from the live props, so it updates after an assign (the two-line "Set for this contact: freeform layout" / "currently has its own layout" captions are removed). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-224–ADR-231. |
+| 2026-10-18 | 38.12 | Lifecycle on the Profile: binned banner with Open the Bin, In the Bin status, Bin DAO guards; ⋯ by `{ bound, archived, linked }` with Check with phone Contacts… and Merge…, compact "More actions" sheet; Bind/Unbind Undo; Bind card frequency + Change; dimmed Unbound star; no Snooze tile while Unbound; indefinite snooze label; `returnTab` Profile Back; template Save returns to the list (ADR-232–ADR-235, ADR-241, ADR-245).
