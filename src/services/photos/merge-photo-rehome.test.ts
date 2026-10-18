@@ -462,3 +462,42 @@ describe("text in a photo field (38.12 D-131)", () => {
     expect(await listJournalEntriesCore(exec)).toEqual([]);
   });
 });
+
+describe("an unusable main-photo reference (38.12 review B-WR-11)", () => {
+  it.each(["absorbed", "survivor"] as const)(
+    "a merge with an unusable reference on the %s still succeeds",
+    async (side) => {
+      const survivor = await contact("Survivor", side === "absorbed");
+      const absorbed = await contact("Absorbed", side === "survivor");
+      const unusable = "content://com.android.contacts/photo/1";
+      await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+        unusable,
+        side === "absorbed" ? absorbed.id : survivor.id,
+      ]);
+      await mergeContactsWithPhotoOwnership(exec, {
+        survivorId: survivor.id,
+        absorbedId: absorbed.id,
+        now: NOW,
+      });
+      const row = await exec.getFirstAsync<{ photo: string | null }>(
+        "SELECT photo FROM contacts WHERE id = ?",
+        [survivor.id],
+      );
+      // The survivor keeps its own value either way.
+      expect(row?.photo).toBe(side === "absorbed" ? survivor.path : unusable);
+      expect(
+        await exec.getFirstAsync<{ id: number }>(
+          "SELECT id FROM contacts WHERE id = ?",
+          [absorbed.id],
+        ),
+      ).toBeNull();
+      if (side === "absorbed")
+        expect(
+          await exec.getFirstAsync<{ old_value: string }>(
+            "SELECT old_value FROM field_history WHERE contact_id = ? AND field_col_name = 'photo' AND operation = 'merge-dropped'",
+            [survivor.id],
+          ),
+        ).toEqual({ old_value: unusable });
+    },
+  );
+});

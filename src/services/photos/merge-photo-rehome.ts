@@ -72,9 +72,20 @@ export async function mergeContactsWithPhotoOwnership(
     ),
   ]);
   const ownById = new Map(ownValues.map((row) => [row.field_def_id, row]));
+  // Only a stored photo path is a file to lock and move (38.12 review
+  // B-WR-11). contacts.photo can hold an unusable reference (38.6 D-34,
+  // "Photo unavailable"); it is never locked or staged, so it no longer
+  // makes every merge of that person fail. mergeContacts records an
+  // absorbed one in history.
+  const absorbedPhoto = isStoredPhotoPath(absorbed.photo)
+    ? absorbed.photo
+    : null;
+  const survivorPhoto = isStoredPhotoPath(survivor.photo)
+    ? survivor.photo
+    : null;
   const photoWanted =
     resolutions.photo !== "keep-survivor" &&
-    !!absorbed.photo &&
+    !!absorbedPhoto &&
     (resolutions.photo?.choice === "absorbed" || !survivor.photo);
   // Only a stored photo path takes the rehome path (38.12 D-131, T-38.12-26).
   // A photo-type field can hold text (e.g. kept after a Text→Photo type
@@ -99,8 +110,8 @@ export async function mergeContactsWithPhotoOwnership(
   const paths = [
     ...absorbedDerived,
     contactPhotoRelPath(survivor.id),
-    ...(absorbed.photo ? [absorbed.photo] : []),
-    ...(survivor.photo ? [survivor.photo] : []),
+    ...(absorbedPhoto ? [absorbedPhoto] : []),
+    ...(survivorPhoto ? [survivorPhoto] : []),
     ...selected.flatMap(({ def, source }) => [
       source,
       customFieldPhotoRelPath(survivor.id, def.col_name),
@@ -164,9 +175,9 @@ export async function mergeContactsWithPhotoOwnership(
           ...extra,
         });
       };
-      if (photoWanted && absorbed.photo)
+      if (photoWanted && absorbedPhoto)
         await stage(
-          absorbed.photo,
+          absorbedPhoto,
           contactPhotoRelPath(survivor.id),
           { kind: "contact", contactUid: survivor.uid },
           {

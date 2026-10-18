@@ -9,6 +9,7 @@ import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
   isStoredPhotoPath,
+  isUnusablePhotoReference,
 } from "@/db/photo-relative-path";
 import { recomputeLastContactCore } from "@/db/recency-dao";
 import {
@@ -593,6 +594,18 @@ export async function mergeContacts(
       )
     )
       await updateContactMetadataCore(exec, next);
+    // An unusable main-photo reference (38.6 D-34) is not a file and never
+    // moves; the survivor keeps its value and the absorbed one is kept in
+    // history like other dropped values (38.12 review B-WR-11).
+    if (!mainTransfer && isUnusablePhotoReference(absorbed.photo))
+      await snapshot(
+        exec,
+        survivor.id,
+        "photo",
+        absorbed.photo,
+        "merge-dropped",
+        input.now,
+      );
     if (mainTransfer)
       await setContactPhotoCore(
         exec,
