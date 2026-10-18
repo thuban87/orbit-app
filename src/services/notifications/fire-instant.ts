@@ -239,6 +239,24 @@ export function sameDayAllowedInstant(
 }
 
 /**
+ * The hour form of `sameDayAllowedInstant` for an hour-only trigger (the weekly
+ * digest, 38.12 D-142) and for Settings copy: the delivery hour when it is
+ * outside quiet hours, otherwise the quiet-hours end on the same day. No
+ * calendar day is involved, so it is DST-free. Hours are clamped like every
+ * other helper here.
+ */
+export function sameDayAllowedHour(
+  deliveryHour: number,
+  quietStartHour: number,
+  quietEndHour: number,
+): number {
+  const dh = clampHour(deliveryHour);
+  const qs = clampHour(quietStartHour);
+  const qe = clampHour(quietEndHour);
+  return inQuietWindow(dh, qs, qe) ? qe : dh;
+}
+
+/**
  * The stateless weekly re-nag day: the first date in {dueDate, dueDate+cadence,
  * dueDate+2·cadence, …} whose LOCAL date is not before today. An overdue due
  * date therefore advances by WHOLE `cadenceDays` to a today-or-future tick — no

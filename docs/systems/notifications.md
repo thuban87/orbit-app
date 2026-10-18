@@ -63,7 +63,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 1. After migration and channel/category initialization, `App.tsx` registers the scheduler as a launch-sweep hook.
 2. `reconcileSchedule()` reads `app_settings`, Bound decay-eligible contacts, birthday candidates, and the current OS request set. The persisted birthday-Unbound setting controls only birthday eligibility.
-3. It derives a local due date, applies a future snooze as the minimum base, then calculates a quiet-windowed, staggered fire instant on the stateless weekly decay grid. A birthday stays on its birthday date or is skipped.
+3. It derives a local due date, applies a future snooze as the minimum base, then calculates a quiet-windowed, staggered fire instant on the stateless weekly decay grid. A birthday stays on its birthday date: a reminder time inside quiet hours moves to the quiet-hours end that same day (`sameDayAllowedInstant`), and the occurrence is skipped only once that day's slots have passed.
 4. The scheduler keeps requests inside a 35-day, 48-request bound, reserves within-horizon birthdays first, and uses a full-request diff to cancel or replace stale `decay:<id>` and `birthday:<id>` requests. Android reads DATE triggers back with a millisecond `value`; unchanged requests remain armed.
 5. Concurrent callers coalesce through a DEFER-ONE coordinator; the final pass re-reads state so a committed mute or snooze cannot be undone by an older snapshot.
 6. Every pass checks presented decay and birthday notifications against live contact IDs and dismisses orphaned entries, even when scheduling is disabled. Failures are counted in the returned reconcile outcome. Digest and foreign notifications remain untouched.
@@ -76,8 +76,8 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 ### Reconciling the weekly digest
 
 1. `App.tsx` also registers the digest scheduler as a launch-sweep hook after migration and channel initialization.
-2. `reconcileDigestSchedule()` reads the master setting, `digest_enabled`, delivery hour, and pending OS requests.
-3. It keeps one `digest:weekly` Sunday request when enabled, cancels it when the master or digest toggle is off, and replaces it only when weekday or hour drift.
+2. `reconcileDigestSchedule()` reads the master setting, `digest_enabled`, delivery and quiet hours, and pending OS requests.
+3. It keeps one `digest:weekly` Sunday request when enabled, at the delivery hour or, when that hour is inside quiet hours, the quiet-hours end on Sunday (`digestFireHour` / `sameDayAllowedHour`). It cancels the request when the master or digest toggle is off, and replaces it only when weekday or hour drift, so a quiet-hours change re-arms it.
 4. The request uses a dedicated `digest-v1` low-importance private channel and frozen generic copy; it does not enter the decay/birthday scheduler’s ownership set.
 
 ### Acting from the shade
@@ -185,3 +185,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-09-23 | 38.4 | Settings Notifications keeps only the header Back; its in-body Back is removed (RG-037, D-15; ADR-175). |
 | 2026-10-15 | 38.10 | Reworded the no-fuel-in-bodies rule for the retired fuel store: no contact knowledge, and never Off Limits, in a scheduled body. |
 | 2026-10-16 | 38.11 | Bulk Unsnooze clears and records events only for the selected people who are snoozed (D-82); Profile birthday saves reschedule reminders (D-59). KB extraction: Decisions link ADR-227, ADR-229. |
+| 2026-10-17 | 38.12 | Quiet hours no longer lose alerts (D-142): a birthday whose reminder time is quiet fires at the quiet-hours end on the birthday, and the weekly digest fires at the quiet-hours end on Sunday; decay keeps its next-morning roll. |

@@ -18,8 +18,8 @@
  * H2 (defer-one coordinator): `reconcileDigestSchedule` is SELF-COORDINATING via
  * a module-level DEFER-ONE guard (`digestReconcileRunning` / `digestReconcilePending`),
  * mirroring notification-schedule.ts VERBATIM in shape. The digest reconcile is
- * now driven from all three settings paths (master toggle, digest toggle,
- * delivery-hour) AND the launch sweep, so overlapping fire-and-forget calls are
+ * now driven from every settings write (master toggle, digest toggle,
+ * delivery hour, quiet hours) AND the launch sweep, so overlapping fire-and-forget calls are
  * reachable. A stale in-flight pass that read settings BEFORE a toggle-off commit
  * must NOT finish AFTER a newer one and RE-ARM the just-cancelled digest — on
  * re-entry we coalesce (set pending + return); the in-flight run drains pending
@@ -40,6 +40,7 @@ import { getAppSettings } from "@/db/app-settings-dao";
 import type { SqlExecutor } from "@/db/types";
 import { registerSweepHook } from "@/services/launch-sweep";
 import { Logger } from "@/utils/logger";
+import { sameDayAllowedHour } from "./fire-instant";
 import {
   DIGEST_BODY,
   DIGEST_CHANNEL,
@@ -76,13 +77,31 @@ interface ScheduledEntry {
 }
 
 /**
- * Schedule the singleton weekly digest under DIGEST_IDENTIFIER. WEEKLY trigger on
- * DIGEST_WEEKDAY at `deliveryHour:00`, on the PRIVATE `digest-v1` channel, with
- * the frozen generic title/body (names no one — lock-screen safe). The arg is
- * cast like scheduleOne (notification-schedule.ts) so this module never couples
- * to expo's runtime trigger union.
+ * The hour the digest fires on DIGEST_WEEKDAY (38.12 D-142): the shared delivery
+ * hour, or — when that hour is inside quiet hours — the quiet-hours end on the
+ * same day, so the digest never fires inside quiet hours and never leaves its
+ * Sunday (ADR-055). Same rule as birthday alerts (`sameDayAllowedHour`).
  */
-export async function scheduleDigest(deliveryHour: number): Promise<void> {
+export function digestFireHour(settings: {
+  deliveryHour: number;
+  quietStartHour: number;
+  quietEndHour: number;
+}): number {
+  return sameDayAllowedHour(
+    settings.deliveryHour,
+    settings.quietStartHour,
+    settings.quietEndHour,
+  );
+}
+
+/**
+ * Schedule the singleton weekly digest under DIGEST_IDENTIFIER. WEEKLY trigger on
+ * DIGEST_WEEKDAY at `hour:00` (the quiet-adjusted `digestFireHour`), on the
+ * PRIVATE `digest-v1` channel, with the frozen generic title/body (names no one —
+ * lock-screen safe). The arg is cast like scheduleOne (notification-schedule.ts)
+ * so this module never couples to expo's runtime trigger union.
+ */
+export async function scheduleDigest(hour: number): Promise<void> {
   await scheduleNotificationAsync({
     identifier: DIGEST_IDENTIFIER,
     content: {
@@ -95,7 +114,7 @@ export async function scheduleDigest(deliveryHour: number): Promise<void> {
       type: SchedulableTriggerInputTypes.WEEKLY,
       channelId: DIGEST_CHANNEL,
       weekday: DIGEST_WEEKDAY,
-      hour: deliveryHour,
+      hour,
       minute: 0,
     },
   } as Parameters<typeof scheduleNotificationAsync>[0]);
@@ -108,13 +127,15 @@ export async function scheduleDigest(deliveryHour: number): Promise<void> {
  *   - absent & enabled           -> schedule the digest.
  *   - present & !enabled          -> cancel it (master OFF or digest toggle OFF).
  *   - present & enabled & drifted -> cancel + reschedule under the SAME id
- *                                    (delivery-hour or weekday change).
+ *                                    (delivery-hour, quiet-hours or weekday
+ *                                    change).
  *   - present & enabled & matching-> leave it untouched (idempotent).
  * `enabled` = notificationsEnabled === 1 && digestEnabled === 1 (the master
  * switch gates the digest exactly like decay/birthday).
  */
 async function runDigestReconcilePass(exec: SqlExecutor): Promise<void> {
   const settings = await getAppSettings(exec);
+  const fireHour = digestFireHour(settings);
   const desiredEnabled =
     settings.notificationsEnabled === 1 && settings.digestEnabled === 1;
 
@@ -126,7 +147,7 @@ async function runDigestReconcilePass(exec: SqlExecutor): Promise<void> {
     if (!current) {
       // Absent. Schedule iff enabled; otherwise nothing to do.
       if (desiredEnabled) {
-        await scheduleDigest(settings.deliveryHour);
+        await scheduleDigest(fireHour);
       }
       return;
     }
@@ -137,13 +158,14 @@ async function runDigestReconcilePass(exec: SqlExecutor): Promise<void> {
       return;
     }
 
-    // Present & enabled — reschedule only on a weekday/hour DRIFT.
+    // Present & enabled — reschedule only on a weekday/hour DRIFT. The hour is
+    // quiet-adjusted, so a quiet-hours change re-arms like a delivery-hour one.
     const drifted =
       current.trigger?.weekday !== DIGEST_WEEKDAY ||
-      current.trigger?.hour !== settings.deliveryHour;
+      current.trigger?.hour !== fireHour;
     if (drifted) {
       await cancelScheduledNotificationAsync(DIGEST_IDENTIFIER);
-      await scheduleDigest(settings.deliveryHour);
+      await scheduleDigest(fireHour);
     }
     // else: matching → leave untouched.
   } catch (err) {

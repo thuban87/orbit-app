@@ -3,6 +3,7 @@ import type { SqlExecutor } from "@/db/types";
 import {
   clampHour,
   nextAllowedFireInstant,
+  sameDayAllowedHour,
 } from "@/services/notifications/fire-instant";
 import { formatLocalDate } from "@/utils/dates";
 
@@ -20,11 +21,16 @@ export interface ReminderArrival {
   arrivalHour: number;
   /**
    * The roll moved the slot to the next calendar day (an evening reminder
-   * time inside a quiet window that wraps midnight). The scheduler skips a
-   * birthday alert whose slot leaves the birthday (notification-schedule.ts
-   * `buildBirthdayRequest`), so birthday alerts are not sent in that case.
+   * time inside a quiet window that wraps midnight). Check-in reminders then
+   * arrive the next morning; birthday alerts and the digest do not move day.
    */
   nextDay: boolean;
+  /**
+   * The hour birthday alerts and the weekly digest fire at: the quiet-hours
+   * end on their own day (38.12 D-142), from the schedulers' own
+   * `sameDayAllowedHour` (fire-instant.ts).
+   */
+  sameDayHour: number;
 }
 
 /**
@@ -68,29 +74,44 @@ export function effectiveReminderArrival({
   if (!nextDay && slot.getHours() === clampHour(reminderTime)) {
     return null;
   }
-  return { arrivalHour: slot.getHours(), nextDay };
+  return {
+    arrivalHour: slot.getHours(),
+    nextDay,
+    sameDayHour: sameDayAllowedHour(reminderTime, quietStart, quietEnd),
+  };
 }
 
 /**
  * The line under Reminder time when the picked time sits inside quiet hours
- * (38.12 D-78), or null when it does not. With Birthday alerts on and a roll
- * into the next day, it also says birthday alerts are not sent: the scheduler
- * skips them rather than deliver a day late.
+ * (38.12 D-78), or null when it does not. When the roll crosses midnight,
+ * check-in reminders arrive the next morning but birthday alerts and the
+ * weekly digest stay on their own day at the quiet-hours end (D-142), so the
+ * line says so for whichever of the two is on.
  */
 export function reminderArrivalLine(
   arrival: ReminderArrival | null,
   birthdayAlertsOn: boolean,
+  digestOn = false,
 ): string | null {
   if (arrival === null) return null;
   const base = `Reminders will arrive at ${formatHour(arrival.arrivalHour)}, after quiet hours end.`;
-  return arrival.nextDay && birthdayAlertsOn
-    ? `${base} Birthday alerts can't move to the next day, so they won't be sent.`
-    : base;
+  if (!arrival.nextDay) return base;
+  const at = formatHour(arrival.sameDayHour);
+  if (birthdayAlertsOn && digestOn) {
+    return `${base} Birthday alerts and the weekly digest still come on their own day, at ${at}.`;
+  }
+  if (birthdayAlertsOn) {
+    return `${base} Birthday alerts still come on the birthday, at ${at}.`;
+  }
+  if (digestOn) {
+    return `${base} The weekly digest still comes on its usual day, at ${at}.`;
+  }
+  return base;
 }
 
-/** The helper under the quiet-hours rows: what the scheduler does (D-78). */
+/** The helper under the quiet-hours rows: what the schedulers do (D-78, D-142). */
 export const QUIET_HOURS_HELPER =
-  "Reminders that fall inside quiet hours wait until quiet hours end. The weekly digest comes at your reminder time.";
+  "Nothing arrives during quiet hours. Reminders wait until quiet hours end; birthday alerts and the weekly digest come when quiet hours end on their own day.";
 
 /** The one line shown while Allow notifications is off (D-77). */
 export const NOTIFICATIONS_PAUSED_LINE =

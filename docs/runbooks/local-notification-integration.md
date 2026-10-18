@@ -108,7 +108,7 @@ The weekly digest is the model for a policy-gated singleton request. `digest-sch
 
 2. **A direct action write can duplicate or corrupt history.** Foreground and headless delivery can replay; use the shared handler plus deterministic UID and existing unique constraints.
 
-3. **A date-specific alert can roll to tomorrow.** If quiet-window or past-slot calculation leaves the intended date, skip that occurrence rather than sending incorrect “today” copy later.
+3. **A date-specific alert can roll to tomorrow.** Compute it with a day-bound helper (`sameDayAllowedInstant`): a quiet slot moves to the quiet-hours end on the same day (38.12 D-142). If no slot on the intended date is left, skip that occurrence rather than sending incorrect “today” copy later.
 
 4. **Concurrent reconciles can re-arm a muted contact.** Keep all callers behind the scheduler's DEFER-ONE coordinator so its trailing pass re-reads committed SQLite state.
 

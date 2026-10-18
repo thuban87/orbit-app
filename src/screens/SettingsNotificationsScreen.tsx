@@ -86,7 +86,9 @@ const NOTIFICATION_PERSIST_DEPS: PersistNotificationDeps = {
  * Unbound birthday row is disabled unless Birthday alerts is on, matching the
  * scheduler, which only reads birthday candidates when Birthday alerts is on
  * (D-77, D-83). A reminder time inside quiet hours shows when reminders really
- * arrive, from the scheduler's own `nextAllowedFireInstant` (D-78).
+ * arrive, from the scheduler's own `nextAllowedFireInstant` (D-78), and,
+ * when that roll crosses midnight, that birthday alerts and the digest keep
+ * their own day at the quiet-hours end (`sameDayAllowedHour`, D-142).
  *
  * Every write routes through the shared `persistNotificationSettings` helper so
  * both `reconcileSchedule` and `reconcileDigestSchedule` fire immediately
@@ -226,11 +228,12 @@ export function SettingsNotificationsScreen() {
   );
 
   const birthdayOn = settings?.birthdayEnabled === 1;
+  const digestOn = settings?.digestEnabled === 1;
   const deliveryHour = settings?.deliveryHour ?? 9;
   const quietStartHour = settings?.quietStartHour ?? 21;
   const quietEndHour = settings?.quietEndHour ?? 8;
-  // D-78: the scheduler's own roll, so the page never promises a time the
-  // reminders don't keep.
+  // D-78 / D-142: the schedulers' own roll and same-day hour, so the page
+  // never promises a time the reminders, birthday alerts or digest don't keep.
   const arrivalLine = reminderArrivalLine(
     effectiveReminderArrival({
       reminderTime: deliveryHour,
@@ -238,6 +241,7 @@ export function SettingsNotificationsScreen() {
       quietEnd: quietEndHour,
     }),
     birthdayOn,
+    digestOn,
   );
   // D-77: one paused line while the master is off. The degraded note already
   // explains a denial, so the two never show together.
