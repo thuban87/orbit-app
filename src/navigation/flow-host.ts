@@ -98,10 +98,17 @@ function dispatch(navigation: FlowNavigator, action: object): void {
   navigation.dispatch(action as never);
 }
 
+/** The Settings stack's root route (its `initialRouteName`). */
+const SETTINGS_ROOT = "Settings";
+
 /**
- * Settings host: pop to Contacts & Relationships on the current stack
- * (StackRouter POP_TO pops to it when present, else replaces the current
- * route). The merge routes are also registered in the Dashboard, Digest,
+ * Settings host: pop to Contacts & Relationships on the current stack when it
+ * is there. When it is not (a flow resumed from the app-root prompt is pushed
+ * onto whatever the Settings stack held, e.g. Settings → AI → Preview), reset
+ * this stack to `[Settings, Contacts & Relationships]`, keeping the root route
+ * by reference, so Back from the ending goes to Settings rather than an
+ * unrelated page (D-110; 38.12 D-IN-04). StackRouter POP_TO alone would only
+ * replace the top route. The merge routes are also registered in the Dashboard, Digest,
  * Events and Orrery stacks, which have no SettingsContacts, so a dropped host
  * reaching here in one of them would dispatch an unhandled POP_TO. Those stacks
  * pop to their own root instead, with a warning (convergence c1 A-1).
@@ -115,6 +122,20 @@ function endOnSettings(navigation: FlowNavigator, helper: string): void {
       state.routeNames[0],
     );
     dispatch(navigation, { type: "POP_TO_TOP" });
+    return;
+  }
+  const root = state?.routes[0];
+  if (
+    state != null &&
+    root?.name === SETTINGS_ROOT &&
+    !state.routes.some((route) => route.name === SETTINGS_FLOW_HOME)
+  ) {
+    const routes = [root, { name: SETTINGS_FLOW_HOME }];
+    dispatch(navigation, {
+      type: "RESET",
+      payload: { ...state, routes, index: routes.length - 1 },
+      target: state.key,
+    });
     return;
   }
   dispatch(navigation, {

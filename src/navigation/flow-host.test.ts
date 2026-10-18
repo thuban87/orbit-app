@@ -186,6 +186,36 @@ describe("finishFlow — settings host (D-110)", () => {
     ]);
   });
 
+  it("a resumed flow pushed over unrelated Settings pages ends on [Settings, Contacts & Relationships] (D-IN-04)", () => {
+    for (const end of [finishFlow, exitFlow]) {
+      const state = stack(
+        "settings-stack",
+        [...SETTINGS_ROUTE_NAMES, "SettingsAI", "AIPreview"],
+        [
+          r("Settings"),
+          r("SettingsAI"),
+          r("AIPreview"),
+          r("ReconcileGrid"),
+          r("ReconcileComplete"),
+        ],
+      );
+      const nav = navigatorSpy(state);
+      end(asFlow(nav), { kind: "settings" });
+      expect(nav.dispatch).toHaveBeenCalledTimes(1);
+      const action = nav.dispatch.mock.calls[0][0];
+      expect(action.type).toBe("RESET");
+      expect(action.target).toBe("settings-stack");
+      const next = applyToStack(state, action);
+      expect(next?.routes.map((x) => x.name)).toEqual([
+        "Settings",
+        "SettingsContacts",
+      ]);
+      // The Settings root is kept by reference.
+      expect(next?.routes[0].key).toBe("Settings-k");
+      expect(next?.index).toBe(1);
+    }
+  });
+
   it("missing-SettingsContacts fallback: a Digest stack pops to its root, never dispatching POP_TO (A-1)", () => {
     const warn = vi.spyOn(Logger, "warn").mockImplementation(() => {});
     for (const end of [finishFlow, exitFlow]) {
