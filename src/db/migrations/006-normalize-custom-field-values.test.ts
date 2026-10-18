@@ -526,7 +526,12 @@ ALTER TABLE interactions
     ).toEqual({ ...originalPair, value: null });
 
     const optInDef = await definitionByColName("opt_in");
-    expect(await preflightTypeChange(exec, optInDef, "number")).toMatchObject({
+    expect(
+      await preflightTypeChange(exec, optInDef, {
+        type: "number",
+        options: null,
+      }),
+    ).toMatchObject({
       total: 1,
       flag: [alex],
     });

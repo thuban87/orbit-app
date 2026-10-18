@@ -163,6 +163,15 @@ describe("definition metadata operations", () => {
     });
   });
 
+  it("never stores Allow AI on for a photo field (38.12 D-129, D-138)", async () => {
+    const photo = await makeDef({ col_name: "portrait", type: "photo" });
+    const text = await makeDef({ col_name: "motto", type: "text" });
+    await updateFieldShareWithAi(exec, photo, 1, NOW);
+    await updateFieldShareWithAi(exec, text, 1, NOW);
+    expect((await readDef(photo)).share_with_ai).toBe(0);
+    expect((await readDef(text)).share_with_ai).toBe(1);
+  });
+
   it("lists quarantined definitions only when requested", async () => {
     const live = await makeDef({ col_name: "live", label: "Live" });
     const quarantined = await makeDef({ col_name: "old", label: "Old" });

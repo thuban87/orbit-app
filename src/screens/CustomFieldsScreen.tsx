@@ -27,11 +27,14 @@
  * `applyTypeChange` with the CURRENT type so `field_history` records the
  * transition; an options edit runs `preflightOptionsChange` before
  * `changeFieldOptions` the same way. Values are never rewritten by a type
- * change.
+ * change. The type pre-flight checks the target type AND options (38.12 B-5);
+ * when it flagged values, a "Review now" / "Later" offer follows the applied
+ * change and opens the CustomFieldReview list (38.12 D-121).
  *
  * Every colour resolves through `useTheme().colors.*` — no colour literal
  * (CLAUDE.md). The executor comes from `getExecutor()` (Plan 07).
  */
+import { type NavigationProp, useNavigation } from "@react-navigation/native";
 import {
   type ReactNode,
   useCallback,
@@ -85,6 +88,7 @@ import {
 } from "@/db/field-type-change";
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import type { SettingsStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { QUARANTINE_WINDOW_DAYS } from "@/services/field-sweep";
 import { confirm, notice } from "@/stores/confirm-store";
@@ -111,14 +115,32 @@ function needsInput(count: number): string {
 /**
  * Human summary of a type-change pre-flight: the §14.4 confirmation text
  * ("8 of 12 values will convert automatically. 4 need your input — fix now or
- * later."), every count agreeing in number (38.12 D-71, D-24).
+ * later."), every count agreeing in number (38.12 D-71, D-24). With nothing to
+ * fix the "need your input" clause is left out (38.12 D-139).
  */
 export function typeSummary(pf: {
   total: number;
   convert: readonly number[];
   flag: readonly number[];
 }) {
-  return `${pf.convert.length} of ${plural(pf.total, "value")} will convert automatically. ${needsInput(pf.flag.length)}`;
+  const converts = `${pf.convert.length} of ${plural(pf.total, "value")} will convert automatically.`;
+  return pf.flag.length === 0
+    ? converts
+    : `${converts} ${needsInput(pf.flag.length)}`;
+}
+
+/**
+ * The offer after a type change that flagged values (38.12 D-121): go fix
+ * them now on the "Review now" list, or later. It is an offer, not a second
+ * confirmation to run the change (D-24); the change has already applied.
+ */
+export function reviewOffer(label: string, flagged: number) {
+  return {
+    title: `${label} changed`,
+    message: `${plural(flagged, "value")} ${pluralWord(flagged, "needs", "need")} your input.`,
+    confirmLabel: "Review now",
+    cancelLabel: "Later",
+  };
 }
 
 /** Human summary of an options-change pre-flight (same shape as typeSummary). */
@@ -362,6 +384,7 @@ function QuarantinedFieldRow({
  */
 export function CustomFieldsScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation<NavigationProp<SettingsStackParamList>>();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
   const [defs, setDefs] = useState<CustomFieldDef[]>([]);
@@ -478,6 +501,10 @@ export function CustomFieldsScreen() {
     if (!beginInFlight(savingRef)) return;
     setSaving(true);
     const exec = getExecutor();
+    // Values the type change flagged, offered for review once it has applied
+    // (38.12 D-121).
+    let flaggedByTypeChange = 0;
+    let applied = false;
     try {
       const labelChanged = draft.label !== field.label;
       const curationChanged =
@@ -496,10 +523,16 @@ export function CustomFieldsScreen() {
       // exclusive gates (a type change to dropdown carries its options through
       // the type pre-flight), mirroring the original branch structure.
       if (typeChanged) {
-        const pf = await preflightTypeChange(exec, field, draft.type);
+        // The target type AND options (convergence c2 B-5): a text →
+        // dropdown change flags values that are not among the new options.
+        const pf = await preflightTypeChange(exec, field, {
+          type: draft.type,
+          options: draft.options,
+        });
         if (!(await confirmSummary("Change field type", typeSummary(pf)))) {
           return; // cancelled — nothing has been written
         }
+        flaggedByTypeChange = pf.flag.length;
       } else if (optionsChanged) {
         const pf = await preflightOptionsChange(exec, field, draft.options);
         if (
@@ -561,6 +594,7 @@ export function CustomFieldsScreen() {
       }
 
       setEditor(null);
+      applied = true;
       await load();
     } catch (err) {
       reportError(err);
@@ -568,6 +602,19 @@ export function CustomFieldsScreen() {
       setSaving(false);
       endInFlight(savingRef);
       settleHold();
+    }
+    // 38.12 D-121: after a type change that flagged values, offer the
+    // "Review now" list. An offer to go fix, not a second confirmation to run
+    // the change (D-24): the change has already applied. No offer when
+    // nothing was flagged.
+    if (applied && flaggedByTypeChange > 0) {
+      const reviewNow = await confirm({
+        ...reviewOffer(draft.label, flaggedByTypeChange),
+        dismissable: true,
+      });
+      if (reviewNow) {
+        navigation.navigate("CustomFieldReview", { fieldDefId: field.id });
+      }
     }
   }
 

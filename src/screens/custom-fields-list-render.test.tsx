@@ -51,6 +51,10 @@ vi.mock("react", async (original) => ({
     return [hooks.states[slot], hooks.setters[slot]];
   },
 }));
+// CustomFieldsScreen reads the Settings navigator for "Review now" (38.12 D-121).
+vi.mock("@react-navigation/native", () => ({
+  useNavigation: () => ({ navigate: vi.fn() }),
+}));
 vi.mock("react-native", () => ({
   AccessibilityInfo: { setAccessibilityFocus: vi.fn() },
   findNodeHandle: vi.fn(),
@@ -381,8 +385,18 @@ describe("Custom Fields copy and labels (38.12 D-71, D-72, D-74, D-129)", () => 
     expect(typeSummary({ total: 3, convert: ids(2), flag: ids(1) })).toBe(
       "2 of 3 values will convert automatically. 1 needs your input — fix now or later.",
     );
+  });
+
+  it("the type-change summary leaves out the 'need your input' clause when nothing needs fixing (D-139)", () => {
     expect(typeSummary({ total: 1, convert: ids(1), flag: [] })).toBe(
-      "1 of 1 value will convert automatically. 0 need your input — fix now or later.",
+      "1 of 1 value will convert automatically.",
+    );
+    expect(typeSummary({ total: 0, convert: [], flag: [] })).toBe(
+      "0 of 0 values will convert automatically.",
+    );
+    // A non-zero count keeps the clause.
+    expect(typeSummary({ total: 2, convert: ids(1), flag: ids(1) })).toBe(
+      "1 of 2 values will convert automatically. 1 needs your input — fix now or later.",
     );
   });
 

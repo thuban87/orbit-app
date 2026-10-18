@@ -15,10 +15,12 @@
  * =============================================================================
  *
  * Two read-only pre-flights + one apply:
- *   • `preflightTypeChange` runs the TARGET parser (`parsers[target]`) over every
- *     stored value and partitions contacts into `convert` (parse-clean under the
- *     new type) vs `flag` (unconvertible → tap-to-fix). This produces the UI
- *     summary "N of M will convert automatically; K need your input" (§14.4).
+ *   • `preflightTypeChange` classifies every stored value against the TARGET
+ *     type AND options with `isFlaggedCustomValue` (38.12 convergence c2 B-5)
+ *     and partitions contacts into `convert` (clean under the new type and
+ *     options) vs `flag` (unconvertible or, for a dropdown target, not one of
+ *     the new options → tap-to-fix). This produces the UI summary "N of M will
+ *     convert automatically; K need your input" (§14.4).
  *   • `preflightOptionsChange` partitions on option-membership against the NEW
  *     options (`isValueInOptions`) — `keep` vs `flag` — so editing a dropdown's
  *     options to exclude a stored value shows the SAME convert/flag summary and
@@ -47,7 +49,7 @@
  */
 
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
-import { isValueInOptions, parsers } from "@/db/field-parsers";
+import { isFlaggedCustomValue, isValueInOptions } from "@/db/field-parsers";
 import type { CustomFieldDef } from "@/db/field-types";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -78,24 +80,27 @@ function readValues(
 }
 
 /**
- * READ-ONLY type-change pre-flight (FLD-04). Runs `parsers[target]` over every
- * stored value and partitions the owning contact_ids into `convert` (parse-clean
- * under the new type — renders/sorts correctly, no rewrite needed) vs `flag`
- * (unconvertible → the tap-to-fix error state). Writes NOTHING and opens no
- * transaction; this only produces the UI summary. The actual change is
- * `applyTypeChange`.
+ * READ-ONLY type-change pre-flight (FLD-04). Classifies every stored value
+ * against the TARGET type and options with `isFlaggedCustomValue` — the same
+ * predicate as the Profile marker, Edit's field error and the "Review now"
+ * list (38.12 D-121, convergence c2 B-5) — and partitions the owning
+ * contact_ids into `convert` (clean under the new type and options — renders/
+ * sorts correctly, no rewrite needed) vs `flag` (the tap-to-fix error state).
+ * `parsers.dropdown` is identity, so the options are what flag a text →
+ * dropdown change's out-of-list values; a dropdown target with null or
+ * unreadable options flags nothing. Writes NOTHING and opens no transaction;
+ * this only produces the UI summary. The actual change is `applyTypeChange`.
  */
 export async function preflightTypeChange(
   exec: SqlExecutor,
   field: Pick<CustomFieldDef, "id" | "col_name">,
-  target: FieldType,
+  target: Pick<CustomFieldDef, "type" | "options">,
 ): Promise<{ total: number; convert: number[]; flag: number[] }> {
   const rows = await readValues(exec, field.id);
-  const parse = parsers[target];
   const convert: number[] = [];
   const flag: number[] = [];
   for (const row of rows) {
-    if (parse(row.value).ok) {
+    if (!isFlaggedCustomValue(target, row.value)) {
       convert.push(row.contact_id);
     } else {
       flag.push(row.contact_id);
@@ -149,7 +154,9 @@ export async function preflightOptionsChange(
  *   (a) INSERT one field_history row per contact with a non-null value —
  *       col_name, the current (pre-change) old_value, operation
  *       `type_change:${field.type}->${target}`, and `now`;
- *   (b) UPDATE the def's `type` (and `modified_at`).
+ *   (b) UPDATE the def's `type` (and `modified_at`). A change TO photo also
+ *       turns the field's Allow AI (`share_with_ai`) off in the same statement:
+ *       photo fields are never sent to AI (38.12 D-129, D-138).
  * Unconvertible values remain, flagged at read time — never coerced or cleared.
  */
 export function applyTypeChange(
@@ -175,8 +182,12 @@ export function applyTypeChange(
     // (b) The ONLY def mutation. NO UPDATE of custom_field_values and no value
     //     normalization — that is the whole point (T-16-08).
     await exec.runAsync(
-      "UPDATE custom_field_defs SET type = ?, modified_at = ? WHERE id = ?",
-      [target, now, field.id],
+      `UPDATE custom_field_defs
+          SET type = ?,
+              share_with_ai = CASE WHEN ? = 'photo' THEN 0 ELSE share_with_ai END,
+              modified_at = ?
+        WHERE id = ?`,
+      [target, target, now, field.id],
     );
     await bumpDataRevisionCore(exec);
   });

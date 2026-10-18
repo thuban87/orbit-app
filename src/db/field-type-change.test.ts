@@ -154,7 +154,7 @@ describe("preflightTypeChange — normalized raw-TEXT parser partitions", () => 
         type,
       );
       await expect(
-        preflightTypeChange(exec, definition, type),
+        preflightTypeChange(exec, definition, { type, options: null }),
       ).resolves.toEqual({
         total: 2,
         convert: identityParser
@@ -177,7 +177,9 @@ describe("preflightTypeChange — normalized raw-TEXT parser partitions", () => 
     await value(unrelatedContact, unrelated.id, "about 60k");
     await value(emptyContact, target.id, null);
 
-    await expect(preflightTypeChange(exec, target, "number")).resolves.toEqual({
+    await expect(
+      preflightTypeChange(exec, target, { type: "number", options: null }),
+    ).resolves.toEqual({
       total: 1,
       convert: [targetContact],
       flag: [],
@@ -193,8 +195,14 @@ describe("preflightTypeChange — normalized raw-TEXT parser partitions", () => 
     await value(toggle, definition.id, "yes", "toggle-value-uid");
     const before = await rowsFor(definition.id);
 
-    await preflightTypeChange(exec, definition, "number");
-    await preflightTypeChange(exec, definition, "toggle");
+    await preflightTypeChange(exec, definition, {
+      type: "number",
+      options: null,
+    });
+    await preflightTypeChange(exec, definition, {
+      type: "toggle",
+      options: null,
+    });
 
     expect(await rowsFor(definition.id)).toEqual(before);
   });
@@ -290,3 +298,74 @@ async function rowsFor(fieldDefId: number) {
     [fieldDefId],
   );
 }
+
+describe("type change checks the target type AND options (38.12 D-121, D-24; c2 B-5)", () => {
+  it('flags a text "Gold" changed to dropdown ["Platinum"], and the stored row stays byte-identical', async () => {
+    const definition = field({ col_name: "tier", type: "text" });
+    await persistField(definition);
+    const gil = await contact("Gil");
+    await value(gil, definition.id, "Gold", "gold-value-uid");
+    const before = await rowsFor(definition.id);
+
+    await expect(
+      preflightTypeChange(exec, definition, {
+        type: "dropdown",
+        options: JSON.stringify(["Platinum"]),
+      }),
+    ).resolves.toEqual({ total: 1, convert: [], flag: [gil] });
+    await applyTypeChange(exec, definition, "dropdown", LATER);
+
+    expect(await rowsFor(definition.id)).toEqual(before);
+  });
+
+  it("a dropdown target whose options are null or unreadable flags nothing", async () => {
+    const definition = field({ col_name: "tier2", type: "text" });
+    await persistField(definition);
+    const gil = await contact("Gil");
+    await value(gil, definition.id, "Gold");
+    for (const options of [null, "{not json"]) {
+      await expect(
+        preflightTypeChange(exec, definition, { type: "dropdown", options }),
+      ).resolves.toEqual({ total: 1, convert: [gil], flag: [] });
+    }
+  });
+});
+
+describe("type change to photo clears Allow AI (38.12 D-129, D-138)", () => {
+  async function shareOf(id: number) {
+    return (
+      await exec.getFirstAsync<{ share_with_ai: number; type: string }>(
+        "SELECT share_with_ai, type FROM custom_field_defs WHERE id = ?",
+        [id],
+      )
+    )?.share_with_ai;
+  }
+
+  it("turns share_with_ai off in the same write as the type, and keeps the values", async () => {
+    const definition = field({
+      col_name: "portrait",
+      type: "text",
+      share_with_ai: 1,
+    });
+    await persistField(definition);
+    const ada = await contact("Ada");
+    await value(ada, definition.id, "left over text", "portrait-value-uid");
+    const before = await rowsFor(definition.id);
+
+    await applyTypeChange(exec, definition, "photo", LATER);
+
+    expect(await shareOf(definition.id)).toBe(0);
+    expect(await rowsFor(definition.id)).toEqual(before);
+  });
+
+  it("leaves Allow AI alone for any other target type", async () => {
+    const definition = field({
+      col_name: "count",
+      type: "text",
+      share_with_ai: 1,
+    });
+    await persistField(definition);
+    await applyTypeChange(exec, definition, "number", LATER);
+    expect(await shareOf(definition.id)).toBe(1);
+  });
+});

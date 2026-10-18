@@ -48,6 +48,10 @@ vi.mock("react", async (original) => ({
     return [hooks.states[slot], hooks.setters[slot]];
   },
 }));
+// CustomFieldsScreen reads the Settings navigator for "Review now" (38.12 D-121).
+vi.mock("@react-navigation/native", () => ({
+  useNavigation: () => ({ navigate: vi.fn() }),
+}));
 vi.mock("react-native", () => ({
   AccessibilityInfo: { setAccessibilityFocus: vi.fn() },
   findNodeHandle: vi.fn(),

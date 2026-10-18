@@ -151,8 +151,13 @@ export function updateFieldShareWithAi(
   now: string,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
+    // A photo field never stores Allow AI on (38.12 D-129, D-138), whatever
+    // the caller passes; the same clamp as the AI Data Permissions writer.
     const result = await exec.runAsync(
-      "UPDATE custom_field_defs SET share_with_ai = ?, modified_at = ? WHERE id = ?",
+      `UPDATE custom_field_defs
+          SET share_with_ai = CASE WHEN type = 'photo' THEN 0 ELSE ? END,
+              modified_at = ?
+        WHERE id = ?`,
       [shareWithAi, now, id],
     );
     assertOneChange("updateFieldShareWithAi", id, result.changes);
