@@ -146,10 +146,13 @@ describe("Backup restored counts people (38.12 D-59, D-140)", () => {
         removed: 0,
         movedToBin: 0,
         removedFromBin: 0,
+        added: 4,
+        updated: 36,
       },
     });
     expect(lines).toContain("Contacts on this phone before: 12");
-    expect(lines).toContain("Contacts restored: 40");
+    expect(lines).toContain("Contacts added: 4 · Contacts updated: 36");
+    expect(lines.some((line) => line.includes("restored"))).toBe(false);
     expect(lines.some((line) => line.includes("removed"))).toBe(false);
     expect(lines.some((line) => line.includes("Bin"))).toBe(false);
   });

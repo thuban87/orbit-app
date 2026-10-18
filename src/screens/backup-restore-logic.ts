@@ -425,8 +425,9 @@ export type RestoreResultRoute = {
 };
 
 /**
- * D-59: Backup restored counts people. Contacts on the phone before and
- * contacts restored always; for Replace-all the contacts it removed (Merge
+ * D-59: Backup restored counts people. Contacts on the phone before always;
+ * contacts restored for Replace-all, and for Merge the contacts added and
+ * updated on one line (38.12 D-165); for Replace-all the contacts it removed (Merge
  * never removes anyone, so it has no such line); and D-140 (owner
  * 2026-10-17): the phone's people the backup has in its Bin, only when there
  * are any; and (A-WR-01) the people in the phone's Bin that Replace-all
@@ -439,7 +440,11 @@ export function restoreResultPeopleLines(
 ): string[] {
   const lines = [
     `Contacts on this phone before: ${people.before}`,
-    `Contacts restored: ${people.restored}`,
+    // D-165: a Merge says what it added and updated; "Contacts restored: 0"
+    // read as "nothing happened" when it had changed people.
+    mode === "merge"
+      ? `Contacts added: ${people.added ?? 0} · Contacts updated: ${people.updated ?? 0}`
+      : `Contacts restored: ${people.restored}`,
   ];
   if (mode === "replace-all") lines.push(`Contacts removed: ${people.removed}`);
   if (people.movedToBin > 0)

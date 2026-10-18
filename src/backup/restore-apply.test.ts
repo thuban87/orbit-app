@@ -94,7 +94,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
-import { applyRestore } from "@/backup/restore-apply";
+import { applyRestore, mergePeopleChanges } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { updateAppSettingsCore } from "@/db/app-settings-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
@@ -4714,6 +4714,83 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
       status: "applied",
       people: { before: 2, restored: 2, removed: 0 },
     });
+  });
+
+  it("Merge counts people added and people updated, each once and never in the Bin (D-165)", async () => {
+    const backup = await backupOf([
+      { uid: "won", modifiedAt: LATER },
+      { uid: "kept" },
+      { uid: "new" },
+      { uid: "new-binned", archived: true },
+    ]);
+    const phone = await db();
+    await seed(phone, [
+      { uid: "won" },
+      { uid: "kept", modifiedAt: LATEST },
+      { uid: "binned", archived: true },
+    ]);
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+      // "kept" is the phone's newer row: not updated. "won" is.
+      people: { before: 2, added: 1, updated: 1 },
+    });
+  });
+
+  it("a Merge that only brings back a favourite counts that person as updated, not restored (D-165)", async () => {
+    const backup = await backupOf([{ uid: "a" }, { uid: "b" }]);
+    for (const contact of backup.contacts)
+      if (contact.uid === "a") contact.favourite = 1;
+    const phone = await db();
+    await seed(phone, [{ uid: "a" }, { uid: "b" }]);
+    expect(await applyRestore(phone, backup, "merge")).toMatchObject({
+      status: "applied",
+      people: { before: 2, restored: 0, added: 0, updated: 1 },
+    });
+  });
+
+  it("mergePeopleChanges counts a person whose rows the merge writes or deletes, once (D-165)", () => {
+    const plan = {
+      contacts: [
+        { kind: "retain", uid: "p" },
+        { kind: "retain", uid: "q" },
+        { kind: "insert", uid: "n", row: { uid: "n", archivedAt: null } },
+      ],
+      interactions: [
+        { kind: "insert", uid: "i1", row: { uid: "i1", contactUid: "p" } },
+        { kind: "update", uid: "i2", row: { uid: "i2", contactUid: "p" } },
+        { kind: "insert", uid: "i3", row: { uid: "i3", contactUid: "n" } },
+      ],
+      memories: [{ kind: "delete", uid: "m1" }],
+    } as never;
+    expect(
+      mergePeopleChanges({
+        plan,
+        localRows: {
+          contacts: [
+            { uid: "p", archivedAt: null },
+            { uid: "q", archivedAt: null },
+            { uid: "z", archivedAt: "2026-01-01 00:00:00" },
+          ],
+          memories: [{ uid: "m1", contactUid: "q" }],
+        },
+        favouriteUids: [],
+      }),
+    ).toEqual({ added: 1, updated: 2 });
+    // A person who stays in the Bin is never "updated".
+    expect(
+      mergePeopleChanges({
+        plan: {
+          contacts: [],
+          interactions: [
+            { kind: "insert", uid: "i", row: { uid: "i", contactUid: "z" } },
+          ],
+        } as never,
+        localRows: {
+          contacts: [{ uid: "z", archivedAt: "2026-01-01 00:00:00" }],
+        },
+        favouriteUids: [],
+      }),
+    ).toEqual({ added: 0, updated: 0 });
   });
 
   it("reports the safety backup step and then the restoring step, in order (D-69)", async () => {

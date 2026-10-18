@@ -832,18 +832,21 @@ describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
     ).toContain("Contacts removed: 0");
   });
 
-  it("a Merge result has no removed line", () => {
+  it("a Merge result says added and updated, never restored, and has no removed line (D-165)", () => {
     const lines = restoreResultPeopleLines("merge", {
       before: 12,
-      restored: 40,
+      restored: 0,
       removed: 0,
       movedToBin: 0,
       removedFromBin: 0,
+      added: 0,
+      updated: 3,
     });
     expect(lines).toEqual([
       "Contacts on this phone before: 12",
-      "Contacts restored: 40",
+      "Contacts added: 0 · Contacts updated: 3",
     ]);
+    expect(lines.some((line) => line.includes("restored"))).toBe(false);
     expect(lines.some((line) => line.includes("removed"))).toBe(false);
   });
 

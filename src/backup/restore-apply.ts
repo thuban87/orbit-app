@@ -110,6 +110,14 @@ export interface RestorePeopleCounts {
   removed: number;
   movedToBin: number;
   removedFromBin: number;
+  /**
+   * Merge only (38.12 D-165): people the merge added (new contacts not in the
+   * Bin) and people already here whose data it changed (their record, any of
+   * their rows, or a favourite mark), counted once each and only when they
+   * end up out of the Bin. Absent for Replace-all.
+   */
+  added?: number;
+  updated?: number;
 }
 export type PreRestoreSnapshotResult =
   /** `skippedPhotos`: photos the safety backup left out (38.6 D-24). */
@@ -956,12 +964,79 @@ async function favouriteUnionPending(
   exec: SqlExecutor,
   manifest: BackupManifest,
 ): Promise<boolean> {
+  return (await favouriteUnionUids(exec, manifest)).length > 0;
+}
+/** The existing people the Merge favourite union would mark (read before writes). */
+async function favouriteUnionUids(
+  exec: SqlExecutor,
+  manifest: BackupManifest,
+): Promise<string[]> {
   const wanted = new Set(backupFavouriteUids(manifest));
-  if (wanted.size === 0) return false;
+  if (wanted.size === 0) return [];
   const unmarked = await exec.getAllAsync<{ uid: string }>(
     "SELECT uid FROM contacts WHERE favourite_rank IS NULL AND archived_at IS NULL",
   );
-  return unmarked.some((row) => wanted.has(row.uid));
+  return unmarked.filter((row) => wanted.has(row.uid)).map((row) => row.uid);
+}
+/**
+ * 38.12 D-165: a Merge's people, for "Contacts added: N · Contacts updated:
+ * M". Added: contacts the plan inserts out of the Bin. Updated: people
+ * already here whose record the plan writes, any row of theirs it inserts,
+ * updates or deletes, or a favourite mark the union adds; each person once,
+ * never an added one, and only when they are out of the Bin after the merge.
+ * Pure over the plan and the local rows read before any write.
+ */
+export function mergePeopleChanges(input: {
+  plan: Partial<Record<MergeableEntityType, readonly ReconciliationAction[]>>;
+  localRows: Partial<
+    Record<MergeableEntityType, readonly Record<string, unknown>[]>
+  >;
+  favouriteUids: readonly string[];
+}): { added: number; updated: number } {
+  const contactActions = input.plan.contacts ?? [];
+  const localContacts = new Map(
+    (input.localRows.contacts ?? []).map((row) => [String(row.uid), row]),
+  );
+  const actionFor = new Map(contactActions.map((a) => [a.uid, a]));
+  const liveAfter = (uid: string): boolean => {
+    const action = actionFor.get(uid);
+    if (action?.kind === "delete") return false;
+    if ((action?.kind === "insert" || action?.kind === "update") && action.row)
+      return action.row.archivedAt == null;
+    const local = localContacts.get(uid);
+    return local !== undefined && local.archivedAt == null;
+  };
+  const added = new Set(
+    contactActions
+      .filter((a) => a.kind === "insert" && a.row?.archivedAt == null)
+      .map((a) => a.uid),
+  );
+  const touched = new Set<string>(input.favouriteUids);
+  for (const action of contactActions)
+    if (action.kind === "update") touched.add(action.uid);
+  for (const [entity, actions] of Object.entries(input.plan) as Array<
+    [MergeableEntityType, readonly ReconciliationAction[]]
+  >) {
+    if (entity === "contacts") continue;
+    const localByUid = new Map(
+      (input.localRows[entity] ?? []).map((row) => [String(row.uid), row]),
+    );
+    for (const action of actions) {
+      const row =
+        action.kind === "insert" || action.kind === "update"
+          ? action.row
+          : action.kind === "delete"
+            ? localByUid.get(action.uid)
+            : undefined;
+      const contactUid = row?.contactUid;
+      if (typeof contactUid === "string") touched.add(contactUid);
+    }
+  }
+  let updated = 0;
+  for (const uid of touched)
+    if (!added.has(uid) && localContacts.has(uid) && liveAfter(uid))
+      updated += 1;
+  return { added: added.size, updated };
 }
 /** D-59: people counts, read inside the restore transaction before any write. */
 async function peopleCounts(
@@ -2262,6 +2337,17 @@ export async function applyRestore(
       people.restored = writes(plan, "contacts").filter(
         (action) => action.row?.archivedAt == null,
       ).length;
+      if (mode === "merge")
+        Object.assign(
+          people,
+          mergePeopleChanges({
+            plan,
+            localRows: Object.fromEntries(
+              local.map(([entity, rows]) => [entity, rows]),
+            ),
+            favouriteUids: await favouriteUnionUids(exec, manifest),
+          }),
+        );
       const finalCategories = plan.categories
         .filter(
           (action) =>
