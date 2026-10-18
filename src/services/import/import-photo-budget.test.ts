@@ -231,6 +231,11 @@ describe("applyPhotoBudgetChoice (D-133; c1 C-3; c2 B-9)", () => {
       [null, null],
     ]);
     expect(result.discard).toEqual([full, thumb]);
+    // D-147: only a contact that had a phone photo is marked declined.
+    expect(result.contacts.map((c) => c.photoDeclined)).toEqual([
+      true,
+      undefined,
+    ]);
   });
 
   it("smaller uses the thumbnail copy and discards the full-size copy", async () => {

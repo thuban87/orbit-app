@@ -13,7 +13,10 @@
  */
 import { setContactPhoto } from "@/db/contacts-dao";
 import { retireRowStagedPhoto } from "@/db/import-session-dao";
-import { recordImportedPhotoFingerprint } from "@/db/reconcile-snapshot-dao";
+import {
+  recordDeclinedPhotoReview,
+  recordImportedPhotoFingerprint,
+} from "@/db/reconcile-snapshot-dao";
 import type { SqlExecutor } from "@/db/types";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { Logger } from "@/utils/logger";
@@ -103,6 +106,21 @@ export async function persistImportedPhotoPostCommit(
   },
 ): Promise<PersistImportedPhotoResult> {
   if (params.stagedPhotoPath === null || params.stagedPhotoPath === "") {
+    // D-147: a phone photo declined with "Import without photos" is
+    // remembered as reviewed. Best-effort: a failure costs at most one later
+    // photo question, never a failed import.
+    try {
+      await recordDeclinedPhotoReview(exec, {
+        rowId: params.rowId,
+        contactId: params.contactId,
+        now: params.now,
+      });
+    } catch (error) {
+      Logger.warn(
+        LOG_SCOPE,
+        `could not record the declined photo for row ${params.rowId}: ${String(error)}`,
+      );
+    }
     return { ok: true, skipped: true };
   }
 

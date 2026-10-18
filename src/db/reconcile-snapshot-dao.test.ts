@@ -22,6 +22,7 @@ import {
   deleteReviewedSnapshot,
   deleteReviewedSnapshotCore,
   getReviewedSnapshots,
+  recordDeclinedPhotoReview,
   recordImportedPhotoFingerprint,
   recordReviewedPhoto,
   reviewedValueFor,
@@ -234,6 +235,49 @@ describe("recordImportedPhotoFingerprint (D-132)", () => {
       now: NOW,
     });
     expect(await snapshotCount()).toBe(0);
+  });
+});
+
+describe("recordDeclinedPhotoReview (38.12 D-147)", () => {
+  const FINGERPRINT = "fp-declined";
+
+  async function insertRow(sourcePayload: string): Promise<number> {
+    const session = await exec.runAsync(
+      "INSERT INTO import_sessions (uid, mode, status, batch_tracking_enabled, total_rows, created_at, modified_at) VALUES (?, 'single', 'pending', 0, 1, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    return (
+      await exec.runAsync(
+        "INSERT INTO import_session_rows (uid, session_id, external_contact_id, source_payload, created_at, modified_at) VALUES (?, ?, 'source', ?, ?, ?)",
+        [uid(), session.lastInsertRowId, sourcePayload, NOW, NOW],
+      )
+    ).lastInsertRowId;
+  }
+
+  it("records a declined phone photo as reviewed; a not-declined row writes nothing", async () => {
+    const contactId = (await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts",
+    ))!.id;
+    const notDeclined = await insertRow(
+      JSON.stringify({ photoFingerprint: FINGERPRINT }),
+    );
+    await recordDeclinedPhotoReview(exec, {
+      rowId: notDeclined,
+      contactId,
+      now: NOW,
+    });
+    expect(await getReviewedSnapshots(exec, await linkId())).toEqual({});
+    const declined = await insertRow(
+      JSON.stringify({ photoFingerprint: FINGERPRINT, photoDeclined: true }),
+    );
+    await recordDeclinedPhotoReview(exec, {
+      rowId: declined,
+      contactId,
+      now: NOW,
+    });
+    expect(await getReviewedSnapshots(exec, await linkId())).toEqual({
+      photo: FINGERPRINT,
+    });
   });
 });
 

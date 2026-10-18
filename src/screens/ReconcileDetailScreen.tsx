@@ -41,6 +41,7 @@ import {
   setCardCompletionDispositionCore,
 } from "@/db/reconcile-session-dao";
 import {
+  deleteReviewedSnapshotCore,
   recordReviewedPhoto,
   rememberMissingSourceKeptCore,
 } from "@/db/reconcile-snapshot-dao";
@@ -113,6 +114,12 @@ interface ScanState {
   missingLinkIds: number[];
   /** The region the scan classified with; Apply uses the same one (D-45). */
   effectivePhoneRegion: string | null;
+  /**
+   * Read links whose phone photo is not offered because it was reviewed or
+   * declined ("Import without photos", D-147): "Ask about the phone's photo
+   * again" clears that memory.
+   */
+  reviewedPhotoLinkIds: number[];
 }
 
 /** Per-contact reconciliation detail with a non-destructive missing-source branch. */
@@ -230,6 +237,9 @@ export function ReconcileDetailScreen({
         setUserTicks({});
         setApplied(false);
         if (diff.fields.length === 0) setMessage("No changes from Contacts.");
+        const photoShown = diff.fields.some(
+          (field) => field.fieldFamily === "photo",
+        );
         setScan({
           contactName: contact.name,
           orbitPhoto: contact.photo,
@@ -237,10 +247,39 @@ export function ReconcileDetailScreen({
           links,
           missingLinkIds: classified.missingLinkIds ?? [],
           effectivePhoneRegion: memory.effectivePhoneRegion,
+          reviewedPhotoLinkIds: photoShown
+            ? []
+            : links
+                .filter(
+                  (link) =>
+                    stagedPhotos.has(link.id) &&
+                    memory.perLink.get(link.id)?.photo !== undefined,
+                )
+                .map((link) => link.id),
         });
       }),
     [contactId, staging],
   );
+
+  // D-147 undo: forget the photo review (e.g. "Import without photos") on the
+  // links whose phone photo is not being offered, then re-read.
+  const askAboutPhotoAgain = useCallback(async () => {
+    const linkIds = scan?.reviewedPhotoLinkIds ?? [];
+    if (linkIds.length === 0) return;
+    setApplying(true);
+    try {
+      const exec = getExecutor();
+      await inWriteTransaction(exec, async () => {
+        for (const linkId of linkIds)
+          await deleteReviewedSnapshotCore(exec, linkId, "photo");
+      });
+      await load();
+    } catch {
+      setMessage("Could not do that right now. Nothing was changed.");
+    } finally {
+      setApplying(false);
+    }
+  }, [load, scan?.reviewedPhotoLinkIds]);
   useFocusEffect(
     useCallback(() => {
       void load().catch(() => setMessage("Could not read Contacts right now."));
@@ -656,6 +695,18 @@ export function ReconcileDetailScreen({
           )}
           {message ? (
             <Text style={{ color: colors.textSecondary }}>{message}</Text>
+          ) : null}
+          {scan.reviewedPhotoLinkIds.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={applying}
+              onPress={() => void askAboutPhotoAgain()}
+              style={[styles.action, { borderColor: colors.border }]}
+            >
+              <Text style={{ color: colors.textPrimary }}>
+                Ask about the phone&apos;s photo again
+              </Text>
+            </Pressable>
           ) : null}
           <Pressable
             accessibilityRole="button"

@@ -25,6 +25,7 @@ import {
   scanLinkedContacts,
 } from "@/db/reconcile-memory-read";
 import {
+  deleteReviewedSnapshot,
   getReviewedSnapshots,
   MISSING_SOURCE_KEPT,
   recordReviewedPhoto,
@@ -632,5 +633,30 @@ describe("grid bulk Keep Orbit on a missing-source card (38.12 review B-WR-01)",
       MISSING_SOURCE_KEPT,
     );
     expect(await gridScan(provider)).toEqual([]);
+  });
+});
+
+describe("a phone photo declined at import (38.12 D-147)", () => {
+  it("is not offered; asking about it again brings the card back", async () => {
+    const contactId = await seedContact({ name: "Phone Name" });
+    const linkId = await seedLink(contactId, "lk-1");
+    // What "Import without photos" records (recordDeclinedPhotoReview).
+    await upsertReviewedSnapshot(exec, {
+      externalContactLinkId: linkId,
+      fieldFamily: "photo",
+      reviewedValue: "fp-1",
+      reviewedAt: NOW,
+    });
+    const provider = [picked("lk-1", { photoFingerprint: "fp-1" })];
+    const photos = staged([[linkId, "bytes-1"]]);
+    expect(await gridScan(provider, photos)).toEqual([]);
+    const { memory } = await detailRead(contactId, provider, photos);
+    expect(memory.perLink.get(linkId)?.photo).toBe("fp-1");
+    // The detail's "Ask about the phone's photo again".
+    await deleteReviewedSnapshot(exec, linkId, "photo");
+    const [card] = await gridScan(provider, photos);
+    expect(card.diff.fields).toEqual([
+      expect.objectContaining({ fieldFamily: "photo", outcome: "additive" }),
+    ]);
   });
 });

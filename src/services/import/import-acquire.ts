@@ -137,6 +137,9 @@ export async function acceptPickedContacts(
             // D-132: recorded as the link's reviewed photo when the import
             // adopts this phone photo (recordImportedPhotoFingerprint).
             photoFingerprint: contact.photoFingerprint ?? null,
+            // D-147: "Import without photos" — recorded as reviewed when the
+            // row commits (recordDeclinedPhotoReviewCore).
+            ...(contact.photoDeclined ? { photoDeclined: true } : {}),
           }),
           photoRelPath,
         };

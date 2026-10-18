@@ -31,6 +31,7 @@ vi.mock("@/services/photos/photo-storage", () => ({
 }));
 vi.mock("@/db/reconcile-snapshot-dao", () => ({
   recordImportedPhotoFingerprint: vi.fn().mockResolvedValue(undefined),
+  recordDeclinedPhotoReview: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/utils/logger", () => ({
   Logger: { error: vi.fn(), warn: vi.fn() },
@@ -40,7 +41,10 @@ vi.mock("@/services/photos/derivative-cache", () => ({
 }));
 
 import { retireRowStagedPhoto } from "@/db/import-session-dao";
-import { recordImportedPhotoFingerprint } from "@/db/reconcile-snapshot-dao";
+import {
+  recordDeclinedPhotoReview,
+  recordImportedPhotoFingerprint,
+} from "@/db/reconcile-snapshot-dao";
 import {
   type ImportedPhotoFs,
   importedPhotoFs,
@@ -200,6 +204,12 @@ describe("persistImportedPhotoPostCommit", () => {
       now: NOW,
     });
     expect(recordImportedPhotoFingerprint).not.toHaveBeenCalled();
+    // D-147: with no photo to adopt, a declined phone photo is remembered
+    // (the DAO checks the row's photoDeclined flag).
+    expect(recordDeclinedPhotoReview).toHaveBeenCalledWith(
+      {},
+      { rowId: 7, contactId: 42, now: NOW },
+    );
   });
 
   it("photo failure returns ok:false and does not throw", async () => {

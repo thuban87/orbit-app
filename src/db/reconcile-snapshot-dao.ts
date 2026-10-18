@@ -182,6 +182,19 @@ function payloadFingerprint(sourcePayload: string): string | null {
   }
 }
 
+function payloadPhotoDeclined(sourcePayload: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(sourcePayload);
+    return (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      (parsed as { photoDeclined?: unknown }).photoDeclined === true
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * D-132: when an import adopts the phone's photo, remember the bridge's photo
  * fingerprint as the link's reviewed 'photo' value so the first Check linked
@@ -217,6 +230,38 @@ export async function recordImportedPhotoFingerprintCore(
     reviewedValue: fingerprint,
     reviewedAt: input.now,
   });
+}
+
+/**
+ * D-147 (owner): "Import without photos" records the declined phone photo as
+ * reviewed, so the first Check linked contacts does not offer it. Writes the
+ * same value an adopted photo records (the bridge fingerprint), only when the
+ * row's payload says the photo was declined. The person can undo it from
+ * Check linked contacts ("Ask about the phone's photo again").
+ *
+ * Caller-owned transaction body; a row without the flag, a fingerprint or an
+ * active link is a silent no-op.
+ */
+export async function recordDeclinedPhotoReviewCore(
+  exec: SqlExecutor,
+  input: RecordImportedPhotoFingerprintInput,
+): Promise<void> {
+  const row = await exec.getFirstAsync<{ source_payload: string }>(
+    "SELECT source_payload FROM import_session_rows WHERE id = ?",
+    [input.rowId],
+  );
+  if (!row || !payloadPhotoDeclined(row.source_payload)) return;
+  await recordImportedPhotoFingerprintCore(exec, input);
+}
+
+/** Locked wrapper: the only form callers outside a transaction may use. */
+export function recordDeclinedPhotoReview(
+  exec: SqlExecutor,
+  input: RecordImportedPhotoFingerprintInput,
+): Promise<void> {
+  return inWriteTransaction(exec, () =>
+    recordDeclinedPhotoReviewCore(exec, input),
+  );
 }
 
 /** Locked wrapper: the only form callers outside a transaction may use. */

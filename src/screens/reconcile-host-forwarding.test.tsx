@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   setCardCompletionDispositionCore: vi.fn(),
   showSnackbar: vi.fn(),
   getReconcileContact: vi.fn(),
+  deleteReviewedSnapshotCore: vi.fn(),
   listReconcileSessionCards: vi.fn(),
   listReconcileCardIdentities: vi.fn(),
   getReconcileSessionById: vi.fn(),
@@ -112,6 +113,7 @@ vi.mock("@/db/reconcile-session-read", () => ({
   reconcileCompletionCounts: vi.fn(),
 }));
 vi.mock("@/db/reconcile-snapshot-dao", () => ({
+  deleteReviewedSnapshotCore: mocks.deleteReviewedSnapshotCore,
   recordReviewedPhoto: vi.fn(),
   rememberMissingSourceKeptCore: vi.fn(),
 }));
@@ -239,6 +241,7 @@ const loadedScan = (missingSource: boolean) => ({
   ],
   missingLinkIds: missingSource ? [7] : [],
   effectivePhoneRegion: "US",
+  reviewedPhotoLinkIds: [] as number[],
 });
 
 beforeEach(() => {
@@ -348,6 +351,31 @@ describe("missing-source actions act on the missing link (38.12 review B-CR-01)"
     expect(mocks.relinkExternalSource).toHaveBeenCalledWith(
       "exec",
       expect.objectContaining({ staleLinkId: 8, contactId: CONTACT }),
+    );
+  });
+});
+
+describe("D-147 undo: ask about a declined phone photo again", () => {
+  it("shows the action only when a phone photo is held back, and clears that memory", async () => {
+    mocks.getReconcileContact.mockResolvedValue({ contact: null, links: [] });
+    expect(
+      nodes(renderDetail(loadedScan(false), navigation()))
+        .map(textOf)
+        .join("|"),
+    ).not.toContain("Ask about the phone's photo again");
+    const tree = renderDetail(
+      { ...loadedScan(false), reviewedPhotoLinkIds: [7] },
+      navigation(),
+    );
+    (
+      pressableWithText(tree, /Ask about the phone's photo again/).props
+        .onPress as () => void
+    )();
+    await flush();
+    expect(mocks.deleteReviewedSnapshotCore).toHaveBeenCalledWith(
+      "exec",
+      7,
+      "photo",
     );
   });
 });

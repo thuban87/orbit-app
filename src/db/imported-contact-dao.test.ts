@@ -480,3 +480,38 @@ describe("a person in the Bin is never a link target (38.12 D-145)", () => {
     expect(await count("external_contact_links")).toBe(0);
   });
 });
+
+describe("a phone photo declined at import is remembered on the new link (38.12 D-147)", () => {
+  it("Link to existing records the declined photo as reviewed", async () => {
+    const existing = await exec.runAsync(
+      "INSERT INTO contacts (uid, name, tracking_enabled, created_at, modified_at) VALUES (?, 'Existing', 0, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    const rowId = await acceptRow("declined-source");
+    await exec.runAsync(
+      "UPDATE import_session_rows SET source_payload = ? WHERE id = ?",
+      [
+        JSON.stringify({
+          displayName: "Phone",
+          methods: [],
+          photoFingerprint: "fp-declined",
+          photoDeclined: true,
+        }),
+        rowId,
+      ],
+    );
+    await linkExistingContactToRow(exec, {
+      rowId,
+      contactId: existing.lastInsertRowId,
+      provider: "android",
+      externalContactId: "declined-source",
+      matchOutcome: "probable",
+      now: NOW,
+    });
+    expect(
+      await exec.getAllAsync(
+        "SELECT field_family, reviewed_value FROM reconcile_source_snapshot",
+      ),
+    ).toEqual([{ field_family: "photo", reviewed_value: "fp-declined" }]);
+  });
+});

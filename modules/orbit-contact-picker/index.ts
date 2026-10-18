@@ -48,6 +48,13 @@ export interface PickedContact {
    * already-adopted phone photo from a changed one (D-132).
    */
   readonly photoFingerprint?: string | null;
+  /**
+   * JS-only (38.12 D-147): set when the person chose "Import without photos"
+   * for a contact that had a phone photo. The import then records that photo
+   * as reviewed, so Check linked contacts does not offer it again. Never set
+   * by the native module.
+   */
+  readonly photoDeclined?: boolean;
 }
 
 export interface PickContactsOptions {

@@ -16,6 +16,7 @@ import {
   setRowMatchOutcomeCore,
 } from "@/db/import-session-dao";
 import { addMemoryCore } from "@/db/memories-dao";
+import { recordDeclinedPhotoReviewCore } from "@/db/reconcile-snapshot-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -277,6 +278,13 @@ export async function linkExistingContactToRow(
     );
     if (row?.photo_rel_path)
       await retireRowStagedPhotoCore(exec, params.rowId, params.now);
+    // D-147: a phone photo declined with "Import without photos" is
+    // remembered on the new link as reviewed.
+    await recordDeclinedPhotoReviewCore(exec, {
+      rowId: params.rowId,
+      contactId: params.contactId,
+      now: params.now,
+    });
     return row?.photo_rel_path ?? null;
   });
   if (staged) {

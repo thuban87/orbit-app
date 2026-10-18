@@ -212,7 +212,16 @@ export async function applyPhotoBudgetChoice(
     if (choice === "without") {
       if (contact.photoTempUri) discard.push(contact.photoTempUri);
       if (contact.thumbnailTempUri) discard.push(contact.thumbnailTempUri);
-      contacts.push({ ...contact, photoTempUri: null, thumbnailTempUri: null });
+      // D-147: a declined phone photo is remembered as reviewed at import.
+      const hadPhoto = Boolean(
+        contact.photoTempUri || contact.thumbnailTempUri,
+      );
+      contacts.push({
+        ...contact,
+        photoTempUri: null,
+        thumbnailTempUri: null,
+        ...(hadPhoto ? { photoDeclined: true } : {}),
+      });
       continue;
     }
     // "smaller"
