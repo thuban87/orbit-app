@@ -44,3 +44,25 @@ export const ABOUT_VERSION_FALLBACK = "1.0.0";
 export function resolveAboutVersion(): string {
   return Constants.expoConfig?.version ?? ABOUT_VERSION_FALLBACK;
 }
+
+/**
+ * The privacy line (38.12 D-125; copy at planning, the owner reviews it at the
+ * device check). It stays literally true to CLAUDE.md "Local-first":
+ *   - it speaks about CONTACT data, because Orbit makes non-AI requests that
+ *     carry none (a pasted image URL download, OpenRouter sign-in, the AI model
+ *     list — convergence c1 L-4), so "nothing is sent anywhere" would be false;
+ *   - it names the backup folder, because automatic backups write the full
+ *     contact data (unencrypted when backup encryption is off) to a folder the
+ *     user chooses, which may be cloud-synced (`backup-service.ts`
+ *     resolveWriteEncryptionMode / writeVerified — convergence c4 E-6);
+ *   - the only other egress is the user's own AI provider, on explicit use;
+ *   - Backup → Export hands the full data to whichever app the user picks in
+ *     the share sheet. 38.12 D-151 (owner) adds that clause and highlights it
+ *     ("it goes against our ethos kind of"); the D-125 wording is otherwise
+ *     kept.
+ */
+export const ABOUT_PRIVACY_LINE =
+  "Your contact data stays on this phone, and in the backup folder you choose. Orbit never sends it anywhere else, except to your own AI provider when you choose to use AI,";
+/** The highlighted Export clause that finishes the privacy line (D-151). */
+export const ABOUT_PRIVACY_EXPORT_CLAUSE =
+  "and when you use Export, which hands your full data to an app you pick.";
