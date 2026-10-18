@@ -18,12 +18,19 @@ const hooks = vi.hoisted(() => ({
   index: 0,
   runEffects: false,
   seed: new Map<number, unknown>(),
+  setters: [] as Array<ReturnType<typeof vi.fn>>,
 }));
 const mocks = vi.hoisted(() => ({
   pickContacts: vi.fn(),
   relinkExternalSource: vi.fn(),
   unlinkExternalSources: vi.fn(),
   confirm: vi.fn(),
+  applyReconcileSelections: vi.fn(),
+  promoteReconcilePhoto: vi.fn(),
+  markCardStatusCore: vi.fn(),
+  setCardCompletionDispositionCore: vi.fn(),
+  showSnackbar: vi.fn(),
+  getReconcileContact: vi.fn(),
   listReconcileSessionCards: vi.fn(),
   listReconcileCardIdentities: vi.fn(),
   getReconcileSessionById: vi.fn(),
@@ -41,7 +48,9 @@ vi.mock("react", async (original) => ({
     const slot = hooks.index++;
     const initial =
       typeof value === "function" ? (value as () => unknown)() : value;
-    return [hooks.seed.has(slot) ? hooks.seed.get(slot) : initial, vi.fn()];
+    const setter = vi.fn();
+    hooks.setters[slot] = setter;
+    return [hooks.seed.has(slot) ? hooks.seed.get(slot) : initial, setter];
   },
 }));
 vi.mock("@react-navigation/native", () => ({ useFocusEffect: () => {} }));
@@ -74,11 +83,13 @@ vi.mock("@/db/database", () => ({
 }));
 vi.mock("@/db/app-settings-dao", () => ({ getAppSettings: vi.fn() }));
 vi.mock("@/db/contacts-dao", () => ({ setContactPhoto: vi.fn() }));
-vi.mock("@/db/reconcile-apply", () => ({ applyReconcileSelections: vi.fn() }));
+vi.mock("@/db/reconcile-apply", () => ({
+  applyReconcileSelections: mocks.applyReconcileSelections,
+}));
 vi.mock("@/db/reconcile-memory-read", () => ({
   classifyLinkedContact: vi.fn(),
   effectivePhoneRegionFor: vi.fn(),
-  getReconcileContact: vi.fn(),
+  getReconcileContact: mocks.getReconcileContact,
   listLinkedContactsForScan: vi.fn(),
   loadReviewMemory: vi.fn(),
   scanLinkedContacts: vi.fn(),
@@ -91,8 +102,8 @@ vi.mock("@/db/reconcile-session-dao", () => ({
   createReconcileSessionCore: vi.fn(),
   finalizeSessionIfTerminal: vi.fn(),
   insertReconcileCardCore: vi.fn(),
-  markCardStatusCore: vi.fn(),
-  setCardCompletionDispositionCore: vi.fn(),
+  markCardStatusCore: mocks.markCardStatusCore,
+  setCardCompletionDispositionCore: mocks.setCardCompletionDispositionCore,
 }));
 vi.mock("@/db/reconcile-session-read", () => ({
   getReconcileSessionById: mocks.getReconcileSessionById,
@@ -104,7 +115,9 @@ vi.mock("@/db/reconcile-snapshot-dao", () => ({
   recordReviewedPhoto: vi.fn(),
   rememberMissingSourceKeptCore: vi.fn(),
 }));
-vi.mock("@/db/transaction", () => ({ inWriteTransaction: vi.fn() }));
+vi.mock("@/db/transaction", () => ({
+  inWriteTransaction: (_exec: unknown, work: () => unknown) => work(),
+}));
 vi.mock("@/db/uid", () => ({ newUid: () => "uid" }));
 vi.mock("@/services/contacts/use-read-contacts-permission", () => ({
   ensureReadContactsPermission: vi.fn(),
@@ -124,12 +137,14 @@ vi.mock("@/services/photos/photo-storage", () => ({
   resolveReconcileStagingUri: vi.fn(),
 }));
 vi.mock("@/services/photos/reconcile-photo", () => ({
-  promoteReconcilePhoto: vi.fn(),
+  promoteReconcilePhoto: mocks.promoteReconcilePhoto,
   reconcilePhotoFs: {},
   stageReconcileSourcePhoto: vi.fn(),
 }));
 vi.mock("@/stores/confirm-store", () => ({ confirm: mocks.confirm }));
-vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
+vi.mock("@/stores/snackbar-store", () => ({
+  showSnackbar: mocks.showSnackbar,
+}));
 vi.mock("@/navigation/back-acts-as-done", () => ({
   useBackActsAsDone: () => {},
 }));
@@ -186,18 +201,33 @@ function navigation() {
 function renderDetail(
   scan: Record<string, unknown>,
   nav: ReturnType<typeof navigation>,
+  extra: { seed?: Array<[number, unknown]>; card?: boolean } = {},
 ) {
   hooks.index = 0;
   hooks.runEffects = false;
-  hooks.seed = new Map([[0, scan]]);
+  hooks.setters = [];
+  hooks.seed = new Map([[0, scan], ...(extra.seed ?? [])]);
   return ReconcileDetailScreen({
     navigation: nav,
     route: {
       key: "ReconcileDetail-1",
       name: "ReconcileDetail",
-      params: { contactId: CONTACT, host: PROFILE_HOST },
+      params: {
+        contactId: CONTACT,
+        host: PROFILE_HOST,
+        ...(extra.card ? { sessionId: 3, cardId: 11 } : {}),
+      },
     },
   } as never);
+}
+
+/** Every string any state setter received (the message setter among them). */
+function setterStrings(): string[] {
+  return hooks.setters.flatMap((setter) =>
+    setter.mock.calls
+      .map((call) => call[0])
+      .filter((value): value is string => typeof value === "string"),
+  );
 }
 
 const loadedScan = (missingSource: boolean) => ({
@@ -318,6 +348,69 @@ describe("missing-source actions act on the missing link (38.12 review B-CR-01)"
     expect(mocks.relinkExternalSource).toHaveBeenCalledWith(
       "exec",
       expect.objectContaining({ staleLinkId: 8, contactId: CONTACT }),
+    );
+  });
+});
+
+describe("a failed phone-photo step after the commit (38.12 review B-WR-03)", () => {
+  it("leaves the card partial and never says 'kept safe'", async () => {
+    const photoField = {
+      fieldFamily: "photo",
+      outcome: "conflict",
+      orbitBaseline: "avatars/contact-4.jpg",
+      sourceValue: "fp",
+      reviewedComparable: "fp",
+      reviewedValue: null,
+      sourceOptions: [
+        {
+          optionId: "photo:fp",
+          value: "fp",
+          sourceLinkIds: [7],
+          provenanceLabels: [],
+          stagedPhotoRelative: "reconcile-staging/x.jpg",
+        },
+      ],
+    };
+    mocks.applyReconcileSelections.mockResolvedValue({
+      staleFields: [],
+      pendingPhoto: {
+        fieldFamily: "photo",
+        stagedPhotoRelative: "reconcile-staging/x.jpg",
+        sourceLinkIds: [7],
+        reviewedValue: "fp",
+      },
+    });
+    mocks.promoteReconcilePhoto.mockRejectedValue(new Error("gone"));
+    mocks.getReconcileContact.mockResolvedValue({ contact: null, links: [] });
+    const nav = navigation();
+    const tree = renderDetail(
+      {
+        ...loadedScan(false),
+        diff: {
+          missingSource: false,
+          fields: [photoField],
+          orbitModifiedAt: null,
+        },
+      },
+      nav,
+      { seed: [[1, { photo: "source:photo:fp" }]], card: true },
+    );
+    (pressableWithText(tree, /^Apply$/).props.onPress as () => void)();
+    for (let i = 0; i < 6; i++) await flush();
+    expect(mocks.markCardStatusCore).toHaveBeenCalledWith(
+      "exec",
+      11,
+      "partial",
+      1,
+      "2026-10-17 12:00:00",
+    );
+    expect(mocks.setCardCompletionDispositionCore).not.toHaveBeenCalled();
+    expect(nav.goBack).not.toHaveBeenCalled();
+    expect(mocks.showSnackbar).not.toHaveBeenCalled();
+    const messages = setterStrings();
+    expect(messages.some((text) => /kept safe/.test(text))).toBe(false);
+    expect(messages).toContain(
+      "Updated Ada Lovelace, but the phone's photo couldn't be added. Try again.",
     );
   });
 });

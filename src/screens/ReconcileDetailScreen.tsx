@@ -355,6 +355,7 @@ export function ReconcileDetailScreen({
     setApplying(true);
     const exec = getExecutor();
     const now = localDateTime();
+    let committed = false;
     try {
       const selections = buildReconcileSelections(
         scan.diff,
@@ -369,6 +370,11 @@ export function ReconcileDetailScreen({
           effectivePhoneRegion: scan.effectivePhoneRegion,
         }),
       );
+      committed = true;
+      // Everything above has committed. From here a failure must never say
+      // "kept safe" (38.12 review B-WR-03): the photo step fails on its own,
+      // the card stays partial, and the message says what did happen.
+      let photoFailed = false;
       const pendingPhoto = result.pendingPhoto;
       if (pendingPhoto?.stagedPhotoRelative) {
         try {
@@ -385,13 +391,15 @@ export function ReconcileDetailScreen({
             reviewedValue: pendingPhoto.reviewedValue,
             reviewedAt: now,
           });
+        } catch {
+          photoFailed = true;
         } finally {
           deleteReconcileStaging(pendingPhoto.stagedPhotoRelative);
           staging.release(pendingPhoto.stagedPhotoRelative);
         }
       }
+      const remaining = result.staleFields.length + (photoFailed ? 1 : 0);
       if (cardId != null && sessionId != null) {
-        const remaining = result.staleFields.length;
         await inWriteTransaction(exec, async () => {
           await markCardStatusCore(
             exec,
@@ -417,7 +425,13 @@ export function ReconcileDetailScreen({
         });
         await finalizeSessionIfTerminal(exec, sessionId, now);
       }
-      if (result.staleFields.length) {
+      if (photoFailed) {
+        // The other choices are saved; re-read so only what is left shows.
+        await load();
+        setMessage(
+          `Updated ${scan.contactName}, but the phone's photo couldn't be added. Try again.`,
+        );
+      } else if (result.staleFields.length) {
         setMessage(
           "Orbit changed while this was open. Review the highlighted fields again.",
         );
@@ -436,7 +450,9 @@ export function ReconcileDetailScreen({
       }
     } catch {
       setMessage(
-        "Could not apply those changes. Your Orbit contact was kept safe.",
+        committed
+          ? `Updated ${scan.contactName}, but this check couldn't be finished. Go back and check again.`
+          : "Could not apply those changes. Your Orbit contact was kept safe.",
       );
     } finally {
       setApplying(false);
