@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.12
 current_phase_name: People Lifecycle, Import & Settings UX (INSERTED)
 status: executing
-stopped_at: Completed 38.12-19-PLAN.md
-last_updated: "2026-10-18T00:55:00.000Z"
+stopped_at: Completed 38.12-21-PLAN.md
+last_updated: "2026-10-18T01:20:00.000Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 38.12 execution started
-state_head: cd6b8d5f
+state_head: 5635aba9
 progress:
   total_phases: 38
   completed_phases: 25
   total_plans: 365
-  completed_plans: 355
+  completed_plans: 356
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -479,6 +479,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.12 P15 | 17 min | 2 tasks | 16 files |
 | Phase 38.12 P18 | 20 min | 3 tasks | 23 files |
 | Phase 38.12 P19 | 28 min | 3 tasks | 28 files |
+| Phase 38.12 P21 | 21 min | 3 tasks | 25 files |
 
 ## Accumulated Context
 
@@ -1071,6 +1072,8 @@ Foundational decisions affecting current work:
 - [Phase 38.12]: 38.12-18: RestoreHost = FlowHost minus profile, read from route.params.host (default settings) on Backup/RestorePreview/RestoreResult, exhaustive per-host helpers; settings returns to the Settings hub, digest via finishFlow (restore routes joined FLOW_ROUTE_NAMES); Choose file again = popTo('Backup', { host }) (popTo replaces params); BackupStackParamList/BackupScreenProps/backup-tab removed. Deferred to Phase 39: on a digest result the header/system Back still lands on the Settings hub; wording check '2 contacts moved to the Bin' and the select-row mode choice on the device walk
 - [Phase 38.12]: 38.12-19: phones/emails take several picks (ReconcileFamilyChoice); additive fields open with every value picked, conflicts with none; a detail pick elects the first pick in display order primary via applyContactMethodDiffCore isPrimary drafts (canonical match flips the existing row), old primary stays secondary, nothing deleted; bulk Use Contact Values adds every value labelled and keeps Orbit's primary; labels from pickedMethodLabel ride on options, never in review memory
 - [Phase 38.12]: 38.12-19: every FieldChoiceGroup row (Merge conflicts too) shows an empty radio/checkbox, filled accentText + accent border when chosen; Apply goes back with 'Updated <name> from phone Contacts' (or 'Kept Orbit values for <name>'); Check complete buckets exclusive (D-141); host forwarded through Grid/Detail/Complete; D-104 removed; D-103 labels are glossary constants. Owner call pending: a no-tap Apply on an additive phones field can change Orbit's primary (SUMMARY deferred item 1)
+- [Phase 38.12]: 38.12-21: applyImportLifecycleEffects(exec, { anyBound, anyUnbound }) is the one awaited post-commit effects helper on single import, bulk driver, Review matches import-new and combineCluster; Bound reconciles + refreshes the widget, Unbound reconciles only when 'Birthday alerts for Unbound contacts' is on (widget not refreshed for Unbound); commitSingleImport logs a completeSession failure after create, still runs effects and returns the id (C-6)
+- [Phase 38.12]: 38.12-21: Import review uses BirthdayField (unreadable phone birthday named in a hint), button-role Import, override ?? device region for method warnings; bulk setup Bound then Unbound via BULK_LIFECYCLE_OPTIONS; sanitiseImportLifecycle shared by setup restore and resume (third copy left in import-session-dao, cycle); host forwarded through BulkImportSetup/ImportProgress/DuplicateReview and Import review's two ImportComplete exits; Review matches bulk bar confirms successes in one snackbar (mixed = one error message); RG-029 M5 obsolete. Wording for owner on device pass: unreadable-birthday hint, mixed bulk message
 
 ### Pending Todos
 
