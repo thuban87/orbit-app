@@ -9,7 +9,8 @@
  *
  * Android has NO time-of-day / quiet-hours trigger, so this is Orbit's own
  * logic. Decay walks `nextGridFireInstant()` over weekly grid ticks, while
- * birthdays use `nextAllowedFireInstant()` for their date-specific slot.
+ * birthdays use `sameDayAllowedInstant()` so their date-specific slot never leaves
+ * the birthday (38.12 D-142).
  *
  * Two invariants this module enforces:
  *   - T-11-05 (Tampering/DoS): every hour argument is `clampHour`-coerced to an
@@ -179,6 +180,62 @@ export function nextAllowedFireInstant(
     qe,
     stagger,
   );
+}
+
+/**
+ * The fire instant for a DATE-SPECIFIC alert (a birthday) on one local day,
+ * bound to that day (38.12 D-142). Unlike `nextAllowedFireInstant`, it never
+ * rolls to another day:
+ *   1. the day's delivery slot (`deliveryHour:stagger`) when it is outside quiet
+ *      hours and still after `now`;
+ *   2. otherwise, when that slot is inside quiet hours, the quiet-hours end on
+ *      the SAME day (`quietEnd:stagger`) if it is allowed and after `now`. For
+ *      an overnight window and an evening slot, this is the morning end that
+ *      opens the day (earlier than the slot), never the next morning;
+ *   3. otherwise null: the day's slots have passed (the caller skips this
+ *      occurrence).
+ *
+ * Every Date is built from LOCAL components and checked against the day's own
+ * Y/M/D after normalisation, so a DST day can shift an hour but never the day.
+ * An empty window (start = end) is never quiet. A non-Date/invalid `now` means
+ * "no past constraint".
+ */
+export function sameDayAllowedInstant(
+  day: Date,
+  deliveryHour: number,
+  quietStartHour: number,
+  quietEndHour: number,
+  staggerMinutes: number,
+  now: Date,
+): Date | null {
+  const dh = clampHour(deliveryHour);
+  const qs = clampHour(quietStartHour);
+  const qe = clampHour(quietEndHour);
+  const stagger = clampStagger(staggerMinutes);
+  const y = day.getFullYear();
+  const m = day.getMonth();
+  const d = day.getDate();
+  const nowMs =
+    now instanceof Date && Number.isFinite(now.getTime())
+      ? now.getTime()
+      : Number.NEGATIVE_INFINITY;
+
+  const onDay = (t: Date): boolean =>
+    t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
+  const usable = (t: Date): boolean =>
+    onDay(t) && !inQuietWindow(t.getHours(), qs, qe) && t.getTime() > nowMs;
+
+  const slot = new Date(y, m, d, dh, stagger);
+  if (usable(slot)) return slot;
+  // A slot that is merely past (not quiet) is lost for this occurrence.
+  if (!onDay(slot) || !inQuietWindow(slot.getHours(), qs, qe)) return null;
+
+  // Inside quiet hours → the same day's quiet end, staggered like the slot. The
+  // unstaggered end is the fallback should an oversized stagger leave the hour.
+  const end = new Date(y, m, d, qe, stagger);
+  if (usable(end)) return end;
+  const bareEnd = new Date(y, m, d, qe, 0);
+  return usable(bareEnd) ? bareEnd : null;
 }
 
 /**

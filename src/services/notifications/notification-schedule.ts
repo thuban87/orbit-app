@@ -79,7 +79,7 @@ import { daysUntilBirthday } from "@/logic/birthday-logic";
 import { registerSweepHook } from "@/services/launch-sweep";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
-import { nextAllowedFireInstant, nextGridFireInstant } from "./fire-instant";
+import { nextGridFireInstant, sameDayAllowedInstant } from "./fire-instant";
 import {
   BIRTHDAY_CHANNEL,
   birthdayBody,
@@ -274,7 +274,13 @@ function buildBirthdayRequest(
     today.getDate() + days,
   );
 
-  const fireInstant = nextAllowedFireInstant(
+  // A birthday is date-specific (ADR-041: never roll into the next day with
+  // "today" copy). sameDayAllowedInstant keeps the slot ON the birthday: a
+  // reminder time inside quiet hours moves to the quiet-hours end that same
+  // day (38.12 D-142) instead of losing the alert; null only when the
+  // birthday's slots have already passed, which skips this occurrence (next
+  // year's is scheduled once it enters the horizon).
+  const fireInstant = sameDayAllowedInstant(
     nextBday,
     settings.deliveryHour,
     settings.quietStartHour,
@@ -282,12 +288,10 @@ function buildBirthdayRequest(
     staggerFor(c.id),
     now,
   );
-
-  // A birthday is date-specific: nextAllowedFireInstant rolls a past/quiet slot
-  // to the NEXT day (correct for decay's date-agnostic re-nag, wrong here). If
-  // the roll moved the slot off the birthday day, do NOT fire a day late with
-  // "It's {name}'s birthday today." copy — skip this occurrence entirely.
-  if (formatLocalDate(fireInstant) !== formatLocalDate(nextBday)) {
+  if (
+    fireInstant === null ||
+    formatLocalDate(fireInstant) !== formatLocalDate(nextBday)
+  ) {
     return null;
   }
 

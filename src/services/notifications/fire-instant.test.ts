@@ -279,7 +279,14 @@ describe("sameDayAllowedInstant — a date-bound slot that never leaves its day 
 
   it("keeps the day across a fall-back DST day", () => {
     const dst = new Date(2026, 10, 1); // US fall-back Sunday
-    const fire = sameDayAllowedInstant(dst, 23, 22, 7, 5, new Date(2026, 9, 31));
+    const fire = sameDayAllowedInstant(
+      dst,
+      23,
+      22,
+      7,
+      5,
+      new Date(2026, 9, 31),
+    );
     expect(fire).toEqual(new Date(2026, 10, 1, 7, 5));
   });
 
