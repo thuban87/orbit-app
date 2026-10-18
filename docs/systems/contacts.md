@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`, `src/db/snooze-dao.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
@@ -24,8 +24,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
   - `archived_at` (`TEXT`) — archive lifecycle marker.
   - `photo` (`TEXT`, nullable) — validated relative path to the contact's local photo master.
   - `favourite_rank` (`INTEGER`, nullable) — legacy storage that marks membership; it is not user-facing Dashboard or widget order.
-  - `snooze_until` (`TEXT`, nullable) — bare local `YYYY-MM-DD` that delays the next decay reminder without changing the contact clock.
-  - `reminders_off` (`INTEGER`) — permanent decay-reminder mute; it does not archive, hide, or stop status progression for the contact.
+  - `snooze_until` (`TEXT`, nullable) — bare local `YYYY-MM-DD` that delays the next decay reminder without changing the contact clock. `9999-12-31` (`INDEFINITE_SNOOZE_UNTIL`) is the indefinite snooze, "Until I turn it off" (ADR-234).
+  - `reminders_off` (`INTEGER`) — the retired per-person mute. Migration 034 converted every `1` to the indefinite snooze and cleared it; no UI writes it, and a restore maps `remindersOff = 1` to the indefinite snooze (ADR-234).
 - `categories` — seeded Family, Friends, Work, and Community groups with display order.
 - `profile` — one record for the user rather than a special contact row; its nullable `photo` holds the self master’s relative path.
 - `contact_links` — ordered actionable web links belonging to a contact.
@@ -83,7 +83,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | `src/db/merge-dao.ts` | Atomically consolidates two live contacts, reparents compatible children, and tombstones the absorbed identity. |
 | `src/screens/CreateContactScreen.tsx` | Lean fixed-first create form. |
 | `src/screens/EditContactScreen.tsx` | Always-show edit form for fixed fields, links, and custom values. |
-| `src/screens/ArchivedContactsScreen.tsx` | The Bin (Settings → Bin; route id `Archived`): restore and impact-summary purge surface. Each row shows the full name on its own line above Restore and Delete permanently (38.11-14 D7). |
+| `src/screens/ArchivedContactsScreen.tsx` | The Bin (Settings → Bin; route id `Archived`): restore and impact-summary purge surface. It reloads on focus and after any failed write, and shows a loading line before its first read. Rows show avatar, name and the date moved to the Bin, a Restore button and Delete permanently behind a row ⋯ (ADR-232). |
 | `src/screens/CaptureScreen.tsx` | Uses the existing name-only contact create path when a shared item has no owner yet. |
 | `src/screens/ContactProfileScreen.tsx` | Provides the configured-provider AI draft entry without making a contact write. |
 
@@ -110,7 +110,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 1. The link DAO applies each add, edit, or remove with both the link and contact identities scoped to the intended row; phone and email live in normalized method rows rather than fixed contact columns. On Add and Edit a link row with a blank URL is dropped on Save (`buildLinksForDiff`); a row that has a label but no URL shows the warn-only caption "Add a link or this row won't be saved." and never blocks Save (`LinksEditor`, 38.11 D-88).
 2. Archive sets `archived_at` from the profile only when the contact is live, then composes an immutable archive event in the same transaction. Live reads exclude archived contacts; Settings owns the distinct Bin (Settings → Bin), the user-facing name for archived contacts since 38.11 (D-69); the profile action that archives is "Move to Bin".
-3. Restore clears the marker only when the contact is archived and records a matching restore event. Purge first verifies the archived state inside its write transaction, then explicitly counts and deletes interactions, events, Off Limits rows, normalized custom-value pairs, links, field history, and contact-knowledge children before deleting the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
+3. Restore clears the marker only when the contact is archived and records a matching restore event. The Bin list shows "Restored <name>" with Undo, which puts the original `archived_at` back, and reconciles the reminder schedule and widget after the write (ADR-232). A binned contact is refused by every lifecycle writer (bind, unbind, snooze, unsnooze, favourite rank, a participation change in `updateContactFull`) with `ContactInBinError` from `assertContactNotInBinCore`; Edit Contact disables its Bound/Unbound chips for them. Purge first verifies the archived state inside its write transaction, then explicitly counts and deletes interactions, events, Off Limits rows, normalized custom-value pairs, links, field history, and contact-knowledge children before deleting the contact. Pending interaction assists are the one child removed by FK cascade rather than the explicit fan-out (a documented exception — assists are device-local and transient; see ADR-073).
 4. Photo-file and notification cleanup are idempotent best-effort post-commit extensions registered by their owning systems.
 5. `purgeContactCore(exec, contactId, { now, requireArchived = true, bumpRevision = true })` runs the fan-out inside a caller's transaction and returns its post-commit cleanup as a closure; `purgeContact` wraps it with the archive gate on and one bump. Only share Undo of a share-created contact passes `requireArchived: false` (ADR-217). The Delete permanently dialog no longer lists a fuel line, and memory and key-person counts are live rows only (D-87, D-88).
 
@@ -119,6 +119,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 1. A profile action uses the named lifecycle DAO; an aggregate edit persists its lifecycle change in the same contact transaction.
 2. Unbind preserves cadence, favourite rank, interactions, and `last_contact`, then removes the contact from proactive projections. Bind reuses dormant cadence or requires a new positive cadence when none was assigned.
 3. After a durable change, the lifecycle-effects service reconciles notifications and refreshes the widget. An effect failure cannot roll back the committed contact state.
+4. On the Profile, Bind shows "Bound <name>" and Unbind "Unbound <name>", each with Undo running the opposite transition (`runProfileLifecycleTransition`, ADR-233). The Bind card's Change writes a new frequency through `setProfileContactFrequency` before binding, because `bindContact` keeps a dormant cadence.
 
 ### Reconciling portable contact data
 
@@ -166,9 +167,10 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 ### Snoozing reminders
 
-1. The edit form exposes the durable Mute reminders policy, while the profile's Snooze tile and ⋯ Snooze… open the shared snooze sheet (3 days, 1 week, 1 month, Choose date from tomorrow, Unsnooze when snoozed); the Contacts card and bulk snooze use the same sheet (38.11 D-45, D-37, D-64).
-2. `snoozeContact()` writes `snooze_until` with SQLite local-date arithmetic and records an immutable `snooze` event in the same transaction; Clear writes `NULL` and an `unsnooze` event.
-3. Neither path writes `last_contact`. The notification scheduler re-reads the committed contact state and cancels or re-arms the derived OS reminder.
+1. The profile's Snooze tile and ⋯ Snooze… open the shared snooze sheet (3 days, 1 week, 1 month, Choose date from tomorrow up to ten years, Until I turn it off, Unsnooze when snoozed); the Contacts card and bulk snooze use the same sheet (38.11 D-45, D-37, D-64; ADR-234). Edit Contact has no mute switch. Unbound and binned people get no Snooze entry on the Profile (ADR-233).
+2. "Until I turn it off" stores `INDEFINITE_SNOOZE_UNTIL` (`9999-12-31`). Every snooze reader treats it like any future date, so it hides the person from decay pushes, Digest, Up next and the Contacts filters exactly as a dated snooze does; only display sites special-case it, through `snoozeUntilLabel`.
+3. `snoozeContact()` writes `snooze_until` with SQLite local-date arithmetic and records an immutable `snooze` event in the same transaction; Clear writes `NULL` and an `unsnooze` event.
+4. Neither path writes `last_contact`. The notification scheduler re-reads the committed contact state and cancels or re-arms the derived OS reminder.
 
 ### Creating a contact during capture
 
@@ -283,6 +285,11 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **ADR-227:** One Snooze Sheet — bulk Snooze writes every selected id; bulk Unsnooze only the snoozed subset.
 - **ADR-229:** Birthday on the Profile — `setContactBirthday` and the shared BirthdayField.
 - **ADR-231:** Open/Closed Sections, Layout Tools in the Sheets, All-Default Reset Row — Reset's all-default presentation row and share Undo's ownership rule.
+- **ADR-232:** A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards — `ContactInBinError` on every lifecycle writer; the Bin list's reload, rows, Restore Undo.
+- **ADR-233:** The Profile ⋯ Follows Lifecycle State — Bind/Unbind Undo, the Bind card frequency, the Unbound star, the Unbound list subtitle and Settings row.
+- **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — the sentinel, migration 034's conversion and the restore mapping.
+- **ADR-235:** Merge Starts from the Profile — Merge from any live Profile.
+- **ADR-242:** Backup Format 9 Carries Favourites — favourite membership in backups; a Bin person is never favourited by a Merge restore.
 
 ## Gotchas
 
@@ -298,7 +305,7 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 10. **A by-id header can still be archived.** Live callers such as Compose must inspect `archived_at`; the header seek intentionally does not apply a live-list filter itself.
 11. **A capture is not contact.** Creating or selecting a contact for a share must leave `last_contact` unchanged and write no interaction row.
 12. **Keep snooze dates local.** `snooze_until` is already a local bare date; parse or render it as UTC and near-midnight users see the wrong day.
-13. **Mute does not hide a contact.** `reminders_off` suppresses decay scheduling only; Dashboard, status, and birthday behavior remain otherwise unchanged.
+13. **The mute is now a snooze.** `reminders_off` is retired; an indefinite snooze (`9999-12-31`) hides the person from every snooze-aware surface, unlike the old mute, which suppressed decay pushes only. Birthday alerts are unaffected (ADR-234).
 14. **Publish widget refresh only after a successful mutation.** A failed favourite mark/clear, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
 15. **Profile does not invoke AI directly.** Message routes serializable contact identity to Compose; drafting still must not record recency or a touchpoint.
 16. **Never materialize Category presentation.** Category changes preserve explicit contact overrides and let inherited layout/background resolve through the new Category or global/factory fallback.
@@ -374,3 +381,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-10-16 | 38.11 | Code review WR-04 / D-88: Add and Edit Contact's link rows with a label but no URL show the warn-only caption "Add a link or this row won't be saved."; Save is never blocked and the row is still dropped. |
 | 2026-10-16 | 38.11 | Device review (38.11-14): Add Contact's Birthday control has no Clear (`showClear={false}`; Edit Contact and the Profile Birthday sheet keep it, D-49, D-59); Settings → Bin rows show the full name above the buttons; the bulk Move to Bin confirm shares the Profile's "hidden from your lists" body and destructive confirm (D-93). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-222–ADR-227, ADR-229, ADR-231. |
+| 2026-10-18 | 38.12 | Bin guards on every lifecycle writer (`ContactInBinError`); Bin list reloads on focus with Restore + Undo and Delete behind ⋯; Bind/Unbind Undo and the Bind card frequency; mute retired into the indefinite snooze (migration 034); favourites carried by backup format 9 (ADR-232–ADR-235, ADR-242).
