@@ -199,6 +199,20 @@ export function parseIsoUtcMs(stored: string): number | null {
   return roundTrips ? ms : null;
 }
 
+/**
+ * Epoch ms of a stored stamp: Orbit's local wall-clock form
+ * (`parseLocalMs`, e.g. "2026-10-17 12:00:00") or an ISO UTC "…Z" stamp
+ * (`parseIsoUtcMs`), else NaN. Never `Date.parse`, whose handling of the
+ * space-separated local form differs between engines (38.12 D-IN-11).
+ */
+export function parseStampMsOrNaN(stored: string): number {
+  try {
+    return parseLocalMs(stored);
+  } catch {
+    return parseIsoUtcMs(stored) ?? Number.NaN;
+  }
+}
+
 /** The neutral display label shared by every `…OrFallback` formatter. */
 const UNKNOWN_TIME_LABEL = "Unknown time";
 

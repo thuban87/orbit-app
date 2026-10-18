@@ -11,6 +11,26 @@ import {
 const now = new Date("2026-08-25T12:00:00.000Z");
 
 describe("automatic backup policy", () => {
+  it("reads backup-now's local wall-clock stamp, not through Date.parse (D-IN-11)", () => {
+    const local = new Date(2026, 7, 25, 12, 0, 0);
+    const meta = (lastAutomaticBackupAt: string) => ({
+      lastAutomaticBackupAt,
+      lastBackupDataRevision: 7,
+      backupIntervalDays: 1,
+      backupRetentionDays: 7,
+    });
+    // 23 hours ago, local: not yet due.
+    expect(
+      shouldRunAutomaticBackup(meta("2026-08-24 13:00:00"), 8, local),
+    ).toBe(false);
+    // A full day ago, local: due.
+    expect(
+      shouldRunAutomaticBackup(meta("2026-08-24 12:00:00"), 8, local),
+    ).toBe(true);
+    // An unreadable stamp still runs the backup (fail-open, unchanged).
+    expect(shouldRunAutomaticBackup(meta("garbage"), 8, local)).toBe(true);
+  });
+
   it("uses revision inequality so a same-second edit is eligible", () => {
     expect(
       shouldRunAutomaticBackup(

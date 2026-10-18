@@ -2,6 +2,7 @@ import {
   backupNameTimestampMs,
   isOwnedAutomaticBackupName,
 } from "@/backup/backup-file-names";
+import { parseStampMsOrNaN } from "@/utils/dates";
 
 /** Names are built and recognised in `backup-file-names.ts` (38.12 D-116, D-136). */
 export { AUTOMATIC_BACKUP_PREFIX } from "@/backup/backup-file-names";
@@ -20,7 +21,9 @@ export function shouldRunAutomaticBackup(
 ): boolean {
   if (currentRevision === metadata.lastBackupDataRevision) return false;
   if (!metadata.lastAutomaticBackupAt) return true;
-  const previous = Date.parse(metadata.lastAutomaticBackupAt);
+  // A local "YYYY-MM-DD HH:MM:SS" stamp (backup-now's `localDateTime`); never
+  // `Date.parse`, which engines read differently (38.12 D-IN-11).
+  const previous = parseStampMsOrNaN(metadata.lastAutomaticBackupAt);
   return (
     !Number.isFinite(previous) ||
     now.getTime() - previous >= metadata.backupIntervalDays * 86_400_000

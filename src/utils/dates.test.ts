@@ -20,6 +20,7 @@ import {
   MONTH_SHORT,
   parseIsoUtcMs,
   parseLocalMs,
+  parseStampMsOrNaN,
   WEEKDAY_LONG,
   WEEKDAY_SHORT,
 } from "@/utils/dates";
@@ -396,5 +397,24 @@ describe("backup source time (38.12 D-66)", () => {
 
   it("falls back to 'Unknown time' only when neither shape parses", () => {
     expect(formatSourceTimeMinuteOrFallback("garbage")).toBe("Unknown time");
+  });
+});
+
+describe("parseStampMsOrNaN (38.12 D-IN-11)", () => {
+  it("reads Orbit's local wall-clock stamp as local time", () => {
+    expect(parseStampMsOrNaN("2026-10-17 12:00:00")).toBe(
+      new Date(2026, 9, 17, 12, 0, 0).getTime(),
+    );
+  });
+
+  it("reads an ISO UTC stamp", () => {
+    expect(parseStampMsOrNaN("2026-10-17T12:00:00.000Z")).toBe(
+      Date.UTC(2026, 9, 17, 12, 0, 0),
+    );
+  });
+
+  it("is NaN for anything else, never a throw", () => {
+    expect(parseStampMsOrNaN("yesterday")).toBeNaN();
+    expect(parseStampMsOrNaN("2026-13-40 99:00:00")).toBeNaN();
   });
 });

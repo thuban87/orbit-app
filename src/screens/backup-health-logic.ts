@@ -3,6 +3,7 @@ import {
   AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC,
   type ManualExportResult,
 } from "@/services/backup/backup-service";
+import { parseStampMsOrNaN } from "@/utils/dates";
 
 export interface BackupHealthInput {
   readonly folderUri: string | null;
@@ -155,7 +156,7 @@ export function resolveBackupNudge(
   const changedSinceSuccess =
     input.currentDataRevision !== input.lastBackupDataRevision;
   const lastSuccessMs = input.lastAutomaticBackupAt
-    ? Date.parse(input.lastAutomaticBackupAt)
+    ? parseStampMsOrNaN(input.lastAutomaticBackupAt)
     : Number.NaN;
   const staleLongEnough =
     changedSinceSuccess &&

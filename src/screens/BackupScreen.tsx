@@ -50,6 +50,7 @@ import {
 import { choose, notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { parseStampMsOrNaN } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { plural } from "@/utils/plural";
 import {
@@ -84,7 +85,7 @@ import { backupFolderDisplayName } from "./backup-settings-logic";
 const LOG_SCOPE = "backup-screen";
 
 function relativeTime(value: string): string {
-  const milliseconds = Date.parse(value);
+  const milliseconds = parseStampMsOrNaN(value);
   if (!Number.isFinite(milliseconds)) return "recently";
   const elapsedMinutes = Math.max(
     0,
