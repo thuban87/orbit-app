@@ -309,6 +309,22 @@ export function backupIntakeFailureMessage(result: {
 }
 
 /**
+ * What the Backup page does with a drained shared backup (38.12 DEF-04).
+ * Draining empties the native singleton, so a share that was drained is
+ * always loaded, even when its focus run was superseded (a warm share can
+ * route to the page more than once in quick succession): dropping it would
+ * lose the share for good. Only a failure message is skipped once the run is
+ * superseded; the newer run reports its own result.
+ */
+export function sharedBackupIntakeAction(
+  shared: { uri: string | null; failed?: boolean },
+  superseded: boolean,
+): "load" | "fail" | "none" {
+  if (shared.failed) return superseded ? "none" : "fail";
+  return shared.uri ? "load" : "none";
+}
+
+/**
  * D-61: Replace has one name everywhere: the mode option, the apply button,
  * the confirm's title and button, and the background notice. "Replace all"
  * is the shortest existing label (38.12-18).

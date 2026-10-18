@@ -1006,3 +1006,29 @@ describe("backupIntakeFailureMessage (38.12 review B-IN-01, D-117)", () => {
     );
   });
 });
+
+describe("sharedBackupIntakeAction (38.12 DEF-04)", () => {
+  it("loads a drained share even when its focus run was superseded", async () => {
+    const { sharedBackupIntakeAction } = await import("./backup-restore-logic");
+    expect(sharedBackupIntakeAction({ uri: "content://x/1" }, false)).toBe(
+      "load",
+    );
+    // A warm share can route to the open page twice; the first run drained
+    // the native singleton, so dropping its URI would lose the share.
+    expect(sharedBackupIntakeAction({ uri: "content://x/1" }, true)).toBe(
+      "load",
+    );
+  });
+
+  it("nothing staged does nothing; a failure is reported only by the current run", async () => {
+    const { sharedBackupIntakeAction } = await import("./backup-restore-logic");
+    expect(sharedBackupIntakeAction({ uri: null }, false)).toBe("none");
+    expect(sharedBackupIntakeAction({ uri: null }, true)).toBe("none");
+    expect(sharedBackupIntakeAction({ uri: null, failed: true }, false)).toBe(
+      "fail",
+    );
+    expect(sharedBackupIntakeAction({ uri: null, failed: true }, true)).toBe(
+      "none",
+    );
+  });
+});

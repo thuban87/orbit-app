@@ -81,6 +81,7 @@ import {
   isEncryptedBackupEnvelope,
   restorePreviewCache,
   restorePreviewFailure,
+  sharedBackupIntakeAction,
 } from "./backup-restore-logic";
 import {
   backupFolderDisplayName,
@@ -501,12 +502,16 @@ export function BackupScreen({
       let cancelled = false;
       void consumeSharedBackup()
         .then((shared) => {
-          const { uri, failed } = shared;
-          if (cancelled) return;
-          if (failed) {
+          // DEF-04: a drained share is loaded even when this run was
+          // superseded (a warm share can route here twice in quick
+          // succession); the native singleton is already empty, so dropping
+          // it would lose the share.
+          const action = sharedBackupIntakeAction(shared, cancelled);
+          if (action === "fail") {
             setRestoreStage("idle");
             setRestoreMessage(backupIntakeFailureMessage(shared));
-          } else if (uri) void loadRestoreDocument(uri);
+          } else if (action === "load" && shared.uri)
+            void loadRestoreDocument(shared.uri);
         })
         .catch((error: unknown) => {
           Logger.error(
