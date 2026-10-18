@@ -46,7 +46,8 @@ export function MergeImpactSummary({
     void Promise.all([
       getContactHeader(exec, survivorId),
       getContactHeader(exec, absorbedId),
-      readMergeImpactCounts(exec, absorbedId),
+      // Only what moves (B-WR-09): the survivor and the chosen resolutions.
+      readMergeImpactCounts(exec, absorbedId, { survivorId, resolutions }),
       readMergeDroppedItems(exec, absorbedId),
     ]).then(([survivor, absorbed, impact, notKept]) => {
       setNames({
@@ -56,7 +57,7 @@ export function MergeImpactSummary({
       setCounts(impact);
       setDropped(notKept);
     });
-  }, [absorbedId, survivorId]);
+  }, [absorbedId, resolutions, survivorId]);
   const typedResolutions: MergeResolutions = resolutions;
   // In flight from the confirm until the merge settles (38.9 review WR-01):
   // the ref blocks a second press synchronously; the state dims and disables

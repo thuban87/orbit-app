@@ -15,7 +15,14 @@
  * values count only non-blank values (a blank row moves nothing), and
  * interaction assists count only pending ones (a resolved assist is already an
  * interaction or was dismissed).
+ *
+ * Counts are what the merge carries over, not raw rows (38.12 review
+ * B-WR-09): external links count only active ones; given the survivor,
+ * contact methods leave out canonical duplicates of the survivor's (the merge
+ * deletes those), and custom values leave out the ones the survivor's value
+ * wins (the merge drops those to history).
  */
+import type { MergeResolutions } from "@/db/merge-dao";
 import type { SqlExecutor } from "@/db/types";
 
 export interface MergeImpactCounts {
@@ -42,15 +49,63 @@ async function count(
   exec: SqlExecutor,
   sql: string,
   contactId: number,
+  ...more: number[]
 ): Promise<number> {
-  const row = await exec.getFirstAsync<{ n: number }>(sql, [contactId]);
+  const row = await exec.getFirstAsync<{ n: number }>(sql, [
+    contactId,
+    ...more,
+  ]);
   return row?.n ?? 0;
 }
 
-/** The row counts the merge review lists for the contact being absorbed. */
+function isBlank(value: string | null): boolean {
+  return value == null || value.trim() === "";
+}
+
+/**
+ * Non-blank absorbed custom values that end up on the survivor, mirroring
+ * mergeContacts' rule: a value moves when the survivor has none for that
+ * field, or when it wins (an explicit "absorbed" choice, or no choice and a
+ * blank survivor value). A stored photo with no survivor value, or chosen,
+ * moves through the photo transfer.
+ */
+async function movedCustomValues(
+  exec: SqlExecutor,
+  absorbedId: number,
+  survivorId: number,
+  resolutions: MergeResolutions | undefined,
+): Promise<number> {
+  const [absorbed, survivor] = await Promise.all(
+    [absorbedId, survivorId].map((id) =>
+      exec.getAllAsync<{ field_def_id: number; value: string | null }>(
+        "SELECT field_def_id, value FROM custom_field_values WHERE contact_id = ?",
+        [id],
+      ),
+    ),
+  );
+  const survivorById = new Map(
+    survivor.map((row) => [row.field_def_id, row.value]),
+  );
+  return absorbed.filter((row) => {
+    if (isBlank(row.value)) return false;
+    if (!survivorById.has(row.field_def_id)) return true;
+    const choice = resolutions?.customFields?.[row.field_def_id];
+    const own = survivorById.get(row.field_def_id) ?? null;
+    if (choice === "absorbed") return true;
+    if (choice === "survivor") return false;
+    // Same fallback for text and stored photos (merge-photo-rehome `selected`).
+    return isBlank(own);
+  }).length;
+}
+
+/**
+ * The row counts the merge review lists for the contact being absorbed.
+ * With `survivor`, counts leave out what the merge drops (B-WR-09).
+ */
 export async function readMergeImpactCounts(
   exec: SqlExecutor,
   contactId: number,
+  survivor?: { survivorId: number; resolutions?: MergeResolutions },
 ): Promise<MergeImpactCounts> {
   const [
     interactions,
@@ -75,14 +130,25 @@ export async function readMergeImpactCounts(
       "SELECT COUNT(*) AS n FROM events WHERE contact_id = ?",
       contactId,
     ),
+    survivor
+      ? count(
+          exec,
+          `SELECT COUNT(*) AS n FROM contact_methods a WHERE contact_id = ?
+             AND (a.canonical_value IS NULL OR NOT EXISTS (
+               SELECT 1 FROM contact_methods s
+                WHERE s.contact_id = ? AND s.method_type = a.method_type
+                  AND s.canonical_value = a.canonical_value))`,
+          contactId,
+          survivor.survivorId,
+        )
+      : count(
+          exec,
+          "SELECT COUNT(*) AS n FROM contact_methods WHERE contact_id = ?",
+          contactId,
+        ),
     count(
       exec,
-      "SELECT COUNT(*) AS n FROM contact_methods WHERE contact_id = ?",
-      contactId,
-    ),
-    count(
-      exec,
-      "SELECT COUNT(*) AS n FROM external_contact_links WHERE contact_id = ?",
+      "SELECT COUNT(*) AS n FROM external_contact_links WHERE contact_id = ? AND is_active = 1",
       contactId,
     ),
     count(
@@ -105,11 +171,18 @@ export async function readMergeImpactCounts(
       "SELECT COUNT(*) AS n FROM off_limits WHERE contact_id = ?",
       contactId,
     ),
-    count(
-      exec,
-      "SELECT COUNT(*) AS n FROM custom_field_values WHERE contact_id = ? AND NULLIF(TRIM(COALESCE(value, '')), '') IS NOT NULL",
-      contactId,
-    ),
+    survivor
+      ? movedCustomValues(
+          exec,
+          contactId,
+          survivor.survivorId,
+          survivor.resolutions,
+        )
+      : count(
+          exec,
+          "SELECT COUNT(*) AS n FROM custom_field_values WHERE contact_id = ? AND NULLIF(TRIM(COALESCE(value, '')), '') IS NOT NULL",
+          contactId,
+        ),
     count(
       exec,
       "SELECT COUNT(*) AS n FROM contact_links WHERE contact_id = ?",

@@ -82,7 +82,8 @@ describe("readMergeImpactCounts", () => {
       interactions: 2,
       events: 1,
       methods: 3,
-      externalLinks: 2,
+      // A retired link does not move anything the person would see (B-WR-09).
+      externalLinks: 1,
     });
   });
 
@@ -316,5 +317,59 @@ describe("D-146: the survivor's Profile look and Orrery choices win; the absorbe
     ).toEqual([
       { system_ref: "user:1", contact_id: survivor, mode: "exclude" },
     ]);
+  });
+});
+
+describe("readMergeImpactCounts with the survivor counts only what moves (review B-WR-09)", () => {
+  async function phone(contactId: number, value: string) {
+    await exec.runAsync(
+      `INSERT INTO contact_methods
+         (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+          is_actionable, is_primary, display_order, created_at, modified_at)
+       VALUES (?, ?, 'phone', ?, ?, ?, 1, 0, 0, ?, ?)`,
+      [uid(), contactId, value, value, value, NOW, NOW],
+    );
+  }
+  async function value(contactId: number, defId: number, text: string) {
+    await exec.runAsync(
+      "INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [uid(), contactId, defId, text, NOW, NOW],
+    );
+  }
+  async function def(name: string): Promise<number> {
+    return (
+      await exec.runAsync(
+        "INSERT INTO custom_field_defs (uid, col_name, label, type, display_order, created_at, modified_at) VALUES (?, ?, ?, 'text', 0, ?, ?)",
+        [uid(), name, name, NOW, NOW],
+      )
+    ).lastInsertRowId;
+  }
+
+  it("leaves out duplicate methods and custom values the survivor keeps", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    await phone(survivor, "+15550000001");
+    await phone(absorbed, "+15550000001");
+    await phone(absorbed, "+15550000002");
+    const shared = await def("shared");
+    const chosen = await def("chosen");
+    const blankOwn = await def("blank_own");
+    const onlyAbsorbed = await def("only_absorbed");
+    await value(survivor, shared, "mine");
+    await value(absorbed, shared, "theirs");
+    await value(survivor, chosen, "mine");
+    await value(absorbed, chosen, "theirs");
+    await value(survivor, blankOwn, " ");
+    await value(absorbed, blankOwn, "theirs");
+    await value(absorbed, onlyAbsorbed, "theirs");
+    const counts = await readMergeImpactCounts(exec, absorbed, {
+      survivorId: survivor,
+      resolutions: { customFields: { [chosen]: "absorbed" } },
+    });
+    expect(counts.methods).toBe(1);
+    // chosen + blank_own + only_absorbed; shared keeps the survivor's.
+    expect(counts.customValues).toBe(3);
+    // Without the survivor the raw counts stay.
+    expect((await readMergeImpactCounts(exec, absorbed)).methods).toBe(2);
   });
 });
