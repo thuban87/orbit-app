@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31, 32, 38.10)
+## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31, 32, 38.10, 38.12)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -62,6 +62,7 @@ try {
 | `src/db/migrations/010-contact-method-label.ts` | Forward-only nullable method-label addition. |
 | `src/db/migrations/017-knowledge-egress-datamove.ts` | Verified copy-then-remove fuel-to-Memory data move. |
 | `src/db/migrations/033-knowledge-homes.ts` | Table rebuild plus a proven multi-destination data move, uid re-mint and table drop; exports `applyMigration033` returning a result struct. |
+| `src/db/migrations/034-snooze-review-memory-resume.ts` | Three parts in one step: a CHECK-widening table rebuild (copy, count-and-match, DROP, RENAME, throw on mismatch), two additive nullable columns, and an owner-approved legacy repair writing a sentinel literal. |
 | `src/db/legacy-fuel-mapping.ts` | Shared mapping module the migration's frozen literals are pinned against, also used by the backup converter. |
 | `src/backup/v7-v8-migration-equivalence.test.ts` | Proves the migration and the backup converter produce the same rows by uid. |
 | `src/db/migrations/018-custom-field-scope-history.ts` | Additive custom-field metadata and retained-value history. |
@@ -143,10 +144,16 @@ try {
 
 15. **Prove a one-way migration on real older data before release.** Seed the old schema through the old app's own DAOs (a throwaway hook in a `git archive` copy of the pre-migration commit in the scratchpad, never in the repo; RN `Modal` pickers are not drivable by adb), take an automatic backup, then upgrade and query the database with `run-as` on a debug build. Restore the old backup by Merge and by Replace to prove the converter (38.10 plan 19).
 
+16. **A shipped migration writes literals, not runtime constants.** Migration 034 writes the indefinite-snooze sentinel `'9999-12-31'` itself; a test pins it equal to `INDEFINITE_SNOOZE_UNTIL`. Importing the constant would silently change what a shipped migration writes if the constant ever changed.
+
+17. **Widening a CHECK means a table rebuild.** SQLite cannot alter a CHECK constraint. Copy every column into a `_new` table, count and match the copy, then DROP and RENAME, and throw on a mismatch so the runner rolls the step back. Recreate only what the old table had: 034's `reconcile_source_snapshot` had no triggers or extra indexes, only inline UNIQUE auto-indexes, which the CREATE rebuilds.
+
+18. **Legacy repair needs the owner.** With no installed base, data repair is an owner decision (38.2 D-23, 38.12 D-30); 034's mute conversion ran because the owner approved it (38.12 D-134).
+
 ## Smoke Test
 
 ```bash
-npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/033-knowledge-homes.test.ts src/backup/v7-v8-migration-equivalence.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/017-knowledge-egress-datamove.test.ts src/db/migrations/018-custom-field-scope-history.test.ts src/db/migrations/profile-presentation.test.ts
+npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/034-snooze-review-memory-resume.test.ts src/db/migrations/033-knowledge-homes.test.ts src/backup/v7-v8-migration-equivalence.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/017-knowledge-egress-datamove.test.ts src/db/migrations/018-custom-field-scope-history.test.ts src/db/migrations/profile-presentation.test.ts
 ```
 
 Expected: the runner and full-chain suites reach the registered target, while representation conversion, verified data moves, and additive schema history checks pass.
