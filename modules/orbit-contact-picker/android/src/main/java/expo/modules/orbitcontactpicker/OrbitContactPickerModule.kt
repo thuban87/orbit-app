@@ -55,6 +55,12 @@ private data class MutablePickedContact(
   // 38.12 review B-WR-06: the first Event row whose TYPE could not be read
   // (picker session without DATA2). Used only when no row reads as a birthday.
   var birthdayFallback: String? = null,
+  // 38.12 review B-WR-07: the contact's display photo (Contacts.PHOTO_ID), and
+  // the first other Photo row's thumbnail, used only if the display row
+  // yields no photo. Neither is bridged.
+  var photoId: Long? = null,
+  var hasPhotoFallback: Boolean = false,
+  var photoFallbackThumb: ByteArray? = null,
 ) {
   /** The one bridge shape every reader returns (photoFingerprint + thumbnailTempUri included). */
   fun toBridgeMap(): Map<String, Any?> = mapOf(
@@ -447,6 +453,7 @@ class OrbitContactPickerModule : Module() {
       arrayOf(
         ContactsContract.Contacts.LOOKUP_KEY,
         ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+        ContactsContract.Contacts.PHOTO_ID,
       ),
       "${ContactsContract.Contacts.LOOKUP_KEY} IN ($placeholders)",
       lookupKeys.toTypedArray(),
@@ -454,11 +461,13 @@ class OrbitContactPickerModule : Module() {
     )?.use { cursor ->
       val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Contacts.LOOKUP_KEY)
       val displayNameColumn = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+      val photoIdColumn = cursor.getColumnIndex(ContactsContract.Contacts.PHOTO_ID)
       while (cursor.moveToNext()) {
         val lookupKey = cursor.stringAt(lookupKeyColumn) ?: continue
         contacts[lookupKey] = MutablePickedContact(
           lookupKey = lookupKey,
           displayName = cursor.stringAt(displayNameColumn),
+          photoId = cursor.longAt(photoIdColumn)?.takeIf { it > 0 },
         )
       }
     }
@@ -471,6 +480,7 @@ class OrbitContactPickerModule : Module() {
       ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
     )
     val projection = arrayOf(
+      ContactsContract.Data._ID,
       ContactsContract.Data.LOOKUP_KEY,
       ContactsContract.Data.MIMETYPE,
       ContactsContract.Data.DATA1,
@@ -484,8 +494,12 @@ class OrbitContactPickerModule : Module() {
       "${ContactsContract.Data.LOOKUP_KEY} IN ($placeholders) AND " +
         "${ContactsContract.Data.MIMETYPE} IN (?, ?, ?, ?, ?)",
       lookupKeys.toTypedArray() + mimeTypes,
-      null,
+      // B-WR-07: a stable row order, so the fallback photo row (and the first
+      // method/birthday/note) does not change between reads.
+      "${ContactsContract.Data.IS_SUPER_PRIMARY} DESC, " +
+        "${ContactsContract.Data.IS_PRIMARY} DESC, ${ContactsContract.Data._ID} ASC",
     )?.use { cursor ->
+      val rowIdColumn = cursor.getColumnIndex(ContactsContract.Data._ID)
       val lookupKeyColumn = cursor.getColumnIndex(ContactsContract.Data.LOOKUP_KEY)
       val mimeTypeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
       val data1Column = cursor.getColumnIndex(ContactsContract.Data.DATA1)
@@ -523,10 +537,26 @@ class OrbitContactPickerModule : Module() {
           ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE ->
             // A provider can expose several Note rows; preserve the first non-blank value.
             contact.note = contact.note ?: cursor.stringAt(data1Column)?.takeIf { it.isNotBlank() }
-          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE ->
-            readPhotoRow(contact, cursor.blobAt(data15Column), preferFullSize)
+          ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE -> {
+            // B-WR-07: the contact's display photo (PHOTO_ID) gives the bytes
+            // and the D-132 fingerprint, matching the full-size display-photo
+            // read; another account's Photo row is only a fallback.
+            val rowId = cursor.longAt(rowIdColumn)
+            if (contact.photoId == null || rowId == contact.photoId) {
+              readPhotoRow(contact, cursor.blobAt(data15Column), preferFullSize)
+            } else if (!contact.hasPhotoFallback) {
+              contact.hasPhotoFallback = true
+              contact.photoFallbackThumb = cursor.blobAt(data15Column)
+            }
+          }
         }
       }
+    }
+    for (contact in contacts.values) {
+      if (contact.photoTempUri == null && contact.hasPhotoFallback) {
+        readPhotoRow(contact, contact.photoFallbackThumb, preferFullSize)
+      }
+      contact.photoFallbackThumb = null
     }
 
     return contacts.values.map { contact -> contact.toBridgeMap() }
@@ -534,7 +564,8 @@ class OrbitContactPickerModule : Module() {
 
   /**
    * One Photo row → the contact's photo copies and fingerprint, for all three
-   * readers. The first Photo row that yields a copy wins.
+   * readers. The first Photo row that yields a copy wins; the selected-key
+   * read offers the display photo's row first (B-WR-07).
    *
    * preferFullSize = true (import, D-118/D-135/D-137): the full-size lookup-URI
    * read first, the DATA15 thumbnail as fallback; when the full-size copy is
@@ -623,4 +654,7 @@ class OrbitContactPickerModule : Module() {
 
   private fun android.database.Cursor.intAt(columnIndex: Int): Int? =
     if (columnIndex >= 0 && !isNull(columnIndex)) getInt(columnIndex) else null
+
+  private fun android.database.Cursor.longAt(columnIndex: Int): Long? =
+    if (columnIndex >= 0 && !isNull(columnIndex)) getLong(columnIndex) else null
 }
