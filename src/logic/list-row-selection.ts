@@ -113,6 +113,6 @@ export function selectLine3(
     ((contactId % PROMPTS.length) + PROMPTS.length) % PROMPTS.length;
   return {
     kind: "prompt",
-    text: PROMPTS[promptIndex].replace("{name}", name),
+    text: PROMPTS[promptIndex].replace("{name}", () => name),
   };
 }

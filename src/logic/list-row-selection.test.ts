@@ -99,6 +99,15 @@ describe("selectLine3", () => {
     expect(selectLine3([], contactId, "Alex", NOW)).toEqual(selection);
   });
 
+  it("inserts a name holding $ patterns literally (DEF-02)", () => {
+    const contactId = 13;
+    const name = "A$&B $' $1";
+    const selection = selectLine3([], contactId, name, NOW);
+    expect(selection.text).toBe(
+      PROMPTS[contactId % PROMPTS.length].split("{name}").join(name),
+    );
+  });
+
   it("uses the UI-SPEC completeness prompts verbatim", () => {
     expect(PROMPTS).toEqual([
       "Add something to remember about {name}",

@@ -21,6 +21,15 @@ function candidate(
 }
 
 describe("selectCardLine3", () => {
+  it("inserts a name holding $ patterns literally (DEF-02)", () => {
+    const contactId = 13;
+    const name = "A$&B $' $1";
+    const selection = selectCardLine3([], contactId, name, NOW);
+    expect(selection.text).toBe(
+      CARD_PROMPTS[contactId % CARD_PROMPTS.length].split("{name}").join(name),
+    );
+  });
+
   it("keeps imminent meaningful context above a shorter ordinary candidate", () => {
     const selection = selectCardLine3(
       [

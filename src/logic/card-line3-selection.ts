@@ -136,6 +136,6 @@ export function selectCardLine3(
     CARD_PROMPTS.length;
   return {
     kind: "prompt",
-    text: CARD_PROMPTS[promptIndex].replace("{name}", name),
+    text: CARD_PROMPTS[promptIndex].replace("{name}", () => name),
   };
 }
