@@ -126,3 +126,23 @@ describe("Appearance opens Profile Backgrounds (D-84)", () => {
     );
   });
 });
+
+/**
+ * 38.12 D-97 (owner, Q-05): Settings → Contacts & Relationships → Contact
+ * Management lists "Unbound contacts" beside "Bin", so the Unbound list is
+ * registered in the Settings stack too (it was Contacts-stack only); the
+ * Contacts ⋯ entry stays.
+ */
+describe("Unbound contacts in Settings (D-97)", () => {
+  it("registers UnboundContacts in the Settings stack", () => {
+    expect(isRegistered("UnboundContacts")).toBe(true);
+  });
+
+  it("keeps the Contacts-stack registration", () => {
+    const dashboard = readFileSync(
+      join(process.cwd(), "src", "navigation", "tabs", "DashboardStack.tsx"),
+      "utf8",
+    ).replace(/\s+/g, " ");
+    expect(dashboard).toContain('<Stack.Screen name="UnboundContacts"');
+  });
+});

@@ -87,4 +87,18 @@ describe("Settings contacts model", () => {
       expect(phoneRegionIndex).toBeGreaterThan(index);
     }
   });
+
+  it("lists Unbound contacts beside the Bin in Contact Management (D-97)", () => {
+    const management = SETTINGS_CONTACTS_SECTIONS.find(
+      (section) => section.key === "contact-management",
+    );
+    const rows = (management?.rows ?? []).filter(isActiveContactsRow);
+    expect(rows.map((row) => row.title)).toEqual(["Bin", "Unbound contacts"]);
+    const unbound = rows[1];
+    expect(unbound?.kind).toBe("route");
+    expect(unbound?.kind === "route" ? unbound.route : null).toBe(
+      "UnboundContacts",
+    );
+    expect(isRegisteredScreen("UnboundContacts")).toBe(true);
+  });
 });

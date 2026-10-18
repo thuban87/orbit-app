@@ -72,6 +72,22 @@ describe("listUnbound", () => {
     expect(rows.every((row) => row.favourite_rank === null)).toBe(true);
   });
 
+  it("carries last_contact for the row subtitle (38.12 D-39)", async () => {
+    const never = await seedContact("Never", 0);
+    const talked = await seedContact("Talked", 0);
+    await exec.runAsync("UPDATE contacts SET last_contact = ? WHERE id = ?", [
+      "2026-10-13",
+      talked,
+    ]);
+
+    const rows = await listUnbound(exec);
+
+    expect(rows.find((row) => row.id === never)?.last_contact).toBeNull();
+    expect(rows.find((row) => row.id === talked)?.last_contact).toBe(
+      "2026-10-13",
+    );
+  });
+
   it("counts the same live Unbound population used by the dashboard footer", async () => {
     await seedContact("Unbound", 0);
     await seedContact("Bound", 1);
