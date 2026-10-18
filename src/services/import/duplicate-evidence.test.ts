@@ -300,3 +300,25 @@ describe("candidateEvidenceStrength (38.12 D-52)", () => {
     );
   });
 });
+
+describe("people in the Bin are excluded from import matching (38.12 D-145)", () => {
+  it("a binned person with the same phone or name is never a candidate", async () => {
+    const binned = await seedContact({
+      name: "Ann Leigh",
+      methods: [{ type: "phone", canonicalValue: "+13125550100" }],
+    });
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      binned,
+    ]);
+    const result = await scoreImportCandidate(exec, {
+      externalContactId: "incoming",
+      methodDrafts: [{ uid: "d1", type: "phone", value: "+13125550100" }],
+      name: "Ann Leigh",
+      birthday: null,
+      effectivePhoneRegion: "US",
+    });
+    expect(result.outcome).toBe("new");
+    expect(result.candidates).toEqual([]);
+  });
+});

@@ -229,10 +229,13 @@ export async function scoreImportCandidate(
     });
     if (!normalized.canonicalValue) continue;
 
+    // People in the Bin are never match candidates (38.12 D-145).
     const matchingMethods = await exec.getAllAsync<{ contact_id: number }>(
-      `SELECT DISTINCT contact_id
-         FROM contact_methods
-        WHERE method_type = ? AND canonical_value = ?`,
+      `SELECT DISTINCT m.contact_id
+         FROM contact_methods m
+         JOIN contacts c ON c.id = m.contact_id
+        WHERE m.method_type = ? AND m.canonical_value = ?
+          AND c.archived_at IS NULL`,
       [draft.type, normalized.canonicalValue],
     );
     const signal: DuplicateEvidenceSignal =
@@ -246,7 +249,7 @@ export async function scoreImportCandidate(
   }
 
   const contactRows = await exec.getAllAsync<ContactNameRow>(
-    "SELECT id, name, birthday FROM contacts",
+    "SELECT id, name, birthday FROM contacts WHERE archived_at IS NULL",
   );
   const incomingNameTokens = nameTokens(input.name);
   for (const contact of contactRows) {

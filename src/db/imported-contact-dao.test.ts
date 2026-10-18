@@ -459,3 +459,24 @@ describe("linkExistingContactToRow", () => {
     expect(deleted).toEqual(["import-staging/linked.jpg"]);
   });
 });
+
+describe("a person in the Bin is never a link target (38.12 D-145)", () => {
+  it("refuses the link and writes nothing", async () => {
+    const binned = await exec.runAsync(
+      "INSERT INTO contacts (uid, name, tracking_enabled, archived_at, created_at, modified_at) VALUES (?, 'In Bin', 0, ?, ?, ?)",
+      [uid(), NOW, NOW, NOW],
+    );
+    const rowId = await acceptRow("bin-source");
+    await expect(
+      linkExistingContactToRow(exec, {
+        rowId,
+        contactId: binned.lastInsertRowId,
+        provider: "android",
+        externalContactId: "bin-source",
+        matchOutcome: "probable",
+        now: NOW,
+      }),
+    ).rejects.toThrow();
+    expect(await count("external_contact_links")).toBe(0);
+  });
+});

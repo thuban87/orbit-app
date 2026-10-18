@@ -234,6 +234,15 @@ export async function linkExistingContactToRow(
   params: LinkExistingContactToRowInput,
 ): Promise<void> {
   const staged = await inWriteTransaction(exec, async () => {
+    // A person in the Bin is never a link target (38.12 D-145).
+    const live = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE id = ? AND archived_at IS NULL",
+      [params.contactId],
+    );
+    if (!live)
+      throw new Error(
+        `linkExistingContactToRow: contact ${params.contactId} is not live`,
+      );
     const row = await exec.getFirstAsync<{ photo_rel_path: string | null }>(
       "SELECT photo_rel_path FROM import_session_rows WHERE id = ?",
       [params.rowId],

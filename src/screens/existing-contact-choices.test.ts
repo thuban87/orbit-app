@@ -133,3 +133,19 @@ describe("Review matches order and minimum strength (38.12 D-52)", () => {
     expect(ids(result)).toEqual([3, 1, 2]);
   });
 });
+
+describe("a person in the Bin is never offered (38.12 D-145)", () => {
+  it("drops a candidate whose contact was binned after scoring", async () => {
+    const result = await resolveExistingContactChoices(
+      [
+        { contactId: 1, signals: ["phoneMatch"] },
+        { contactId: 9, signals: ["phoneMatch"] },
+      ],
+      async (contactId) =>
+        contactId === 9
+          ? { name: "Binned", photo: null, archived_at: "2026-10-01 10:00:00" }
+          : { name: "Live", photo: null, archived_at: null },
+    );
+    expect(result.map((choice) => choice.contactId)).toEqual([1]);
+  });
+});

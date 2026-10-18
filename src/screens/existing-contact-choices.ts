@@ -10,9 +10,10 @@
  *
  * Review matches (38.12 D-52) passes `REVIEW_MATCH_CHOICES`: phone/email
  * matches first (each group keeps the stored score order) and no candidate
- * scored below "possible". Import review passes no option, so its choices are
- * unchanged: every live candidate, in input order. Advisory only — evidence
- * never auto-links (ADR-067).
+ * scored below "possible". Import review passes no option: every candidate,
+ * in input order. Either way a person in the Bin is never offered (38.12
+ * D-145; a stored candidate may have been binned after scoring). Advisory
+ * only — evidence never auto-links (ADR-067).
  */
 import { candidateEvidenceStrength } from "@/services/import/duplicate-evidence";
 
@@ -20,6 +21,8 @@ import { candidateEvidenceStrength } from "@/services/import/duplicate-evidence"
 export interface ExistingContactHeader {
   name: string;
   photo: string | null;
+  /** Set for a person in the Bin, who is never offered (D-145). */
+  archived_at?: string | null;
 }
 
 export interface ExistingContactChoiceOptions {
@@ -62,22 +65,23 @@ function reviewCandidates<T extends WithSignals>(
 /**
  * Read every offered candidate's header concurrently and return, in offered
  * order, each candidate that still exists with its `name` and `photo` added.
- * A candidate whose contact is gone (null header) is dropped. Without options
- * every candidate is offered in input order.
+ * A candidate whose contact is gone (null header) or in the Bin (D-145) is
+ * dropped. Without options every such live candidate is offered in input
+ * order.
  */
 export async function resolveExistingContactChoices<T extends WithSignals>(
   candidates: readonly T[],
   readHeader: (contactId: number) => Promise<ExistingContactHeader | null>,
   options: ExistingContactChoiceOptions = {},
-): Promise<Array<T & ExistingContactHeader>> {
+): Promise<Array<T & { name: string; photo: string | null }>> {
   const offered = reviewCandidates(candidates, options);
   const headers = await Promise.all(
     offered.map((candidate) => readHeader(candidate.contactId)),
   );
-  const choices: Array<T & ExistingContactHeader> = [];
+  const choices: Array<T & { name: string; photo: string | null }> = [];
   offered.forEach((candidate, index) => {
     const header = headers[index];
-    if (header) {
+    if (header && header.archived_at == null) {
       choices.push({ ...candidate, name: header.name, photo: header.photo });
     }
   });
