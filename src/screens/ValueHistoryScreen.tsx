@@ -29,13 +29,15 @@ const FALLBACK_TITLE = "History";
  * One past value as a person reads it. The stored raw TEXT is shown as is
  * (display only, never rewritten, ADR-001); a Date reads through the one date
  * formatter (38.9 D-48), a Toggle reads Yes/No, a stored photo reads "Photo",
- * and an empty value reads "Not set".
+ * and an empty value reads "Not set". A stored photo reads "Photo" whatever
+ * the field's type is now, so a Photo field changed to another type never
+ * shows its internal file path (review C-IN-02).
  */
 function pastValueText(type: FieldType | null, value: string | null): string {
   if (value == null || value === "") return NOT_SET;
   if (type === "toggle" && (value === "1" || value === "0"))
     return value === "1" ? "Yes" : "No";
-  if (type === "photo" && isStoredPhotoPath(value)) return "Photo";
+  if (isStoredPhotoPath(value)) return "Photo";
   return type === null ? value : customValueDisplayText(type, value);
 }
 

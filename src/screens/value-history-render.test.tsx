@@ -188,6 +188,23 @@ describe("ValueHistoryScreen (38.12 D-106)", () => {
     ).toBe("Not set");
   });
 
+  it("a stored photo reads Photo after the field changed to another type (C-IN-02)", () => {
+    const { tree } = render({
+      history: {
+        field: { label: "Nickname", type: "text" },
+        entries: [entry(1, "avatars/cv-7-nickname.jpg", "2026-09-04 12:04:00")],
+      },
+      loading: false,
+    });
+    const list = must(nodes(tree).find((node) => node.type === "FlatList"));
+    const renderItem = list.props.renderItem as (input: {
+      item: unknown;
+    }) => ReactNode;
+    expect(
+      texts(renderItem({ item: (list.props.data as unknown[])[0] }))[0],
+    ).toBe("Photo");
+  });
+
   it("titles the shared child header with the field's name", () => {
     const { tree } = render({ history: THREE, loading: false });
     const header = must(
