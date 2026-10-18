@@ -241,6 +241,22 @@ describe("MatchChoiceSheet (38.12 D-107)", () => {
     ).toBe(true);
   });
 
+  it("a pick is dropped when the sheet closes: Cancel then reopening the same row starts fresh (D-IN-05)", () => {
+    press(radios(render())[1] as TestElement);
+    expect(buttonIn(render(), "Link").props.disabled).toBe(false);
+    // Cancel: the host hides the sheet and clears its entry.
+    render({ visible: false, entryKey: null });
+    // The same row is tapped again.
+    const tree = render({ visible: true, entryKey: 31 });
+    expect(buttonIn(tree, "Link").props.disabled).toBe(true);
+    expect(
+      radios(tree).every(
+        (row) =>
+          !(row.props.accessibilityState as { checked: boolean }).checked,
+      ),
+    ).toBe(true);
+  });
+
   it("Import as new, Skip and Cancel call their handlers; scrim/Back is onClose", () => {
     const tree = render();
     press(buttonIn(tree, "Import as new"));

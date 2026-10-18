@@ -14,8 +14,9 @@
  * which clears the queue (D-52).
  *
  * The picked candidate is remembered against `entryKey`, so advancing to the
- * next queued person never carries a pick over to them. Nothing is
- * preselected. Every colour resolves through `useTheme()`.
+ * next queued person never carries a pick over to them, and it is dropped
+ * whenever the sheet closes, so Cancel then reopening the same row starts
+ * fresh (38.12 D-IN-05). Nothing is preselected. Every colour resolves through `useTheme()`.
  */
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -65,6 +66,13 @@ export function MatchChoiceSheet({
     entryKey: string | number | null;
     contactId: number;
   } | null>(null);
+  // Clear the pick when the sheet closes (the adjust-state-during-render
+  // pattern: no effect, no extra frame showing a stale pick on reopen).
+  const [shownVisible, setShownVisible] = useState(visible);
+  if (shownVisible !== visible) {
+    setShownVisible(visible);
+    if (!visible) setPicked(null);
+  }
   const selected =
     picked && picked.entryKey === entryKey
       ? (choices.find((choice) => choice.contactId === picked.contactId) ??
