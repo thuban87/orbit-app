@@ -924,3 +924,17 @@ describe("restore preview people and the one Replace name (38.12 D-60, D-61)", (
     );
   });
 });
+
+describe("backupIntakeFailureMessage (38.12 review B-IN-01, D-117)", () => {
+  it("a refused non-content:// source gets the not-a-backup message", async () => {
+    const { backupIntakeFailureMessage, restorePreviewFailure } = await import(
+      "./backup-restore-logic"
+    );
+    expect(backupIntakeFailureMessage({ notBackup: true })).toBe(
+      restorePreviewFailure("damaged-or-incomplete").message,
+    );
+    expect(backupIntakeFailureMessage({})).toBe(
+      "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
+    );
+  });
+});

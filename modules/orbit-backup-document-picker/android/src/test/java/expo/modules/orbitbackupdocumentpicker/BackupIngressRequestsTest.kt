@@ -174,6 +174,7 @@ class BackupIngressRequestsTest {
       val target = file()
       val result = requests.submitPick(source, target).await()
       assertTrue(source, result.failed)
+      assertTrue(source, result.notBackup)
       assertNull(source, result.file)
       assertFalse(source, target.exists())
     }
@@ -197,6 +198,7 @@ class BackupIngressRequestsTest {
       requests.submitShare(source, target)
       val consumed = requests.consumeShare().await()
       assertTrue(source, consumed.failed)
+      assertTrue(source, consumed.notBackup)
       assertNull(source, consumed.file)
       assertFalse(source, target.exists())
       assertFalse(source, requests.hasShare())

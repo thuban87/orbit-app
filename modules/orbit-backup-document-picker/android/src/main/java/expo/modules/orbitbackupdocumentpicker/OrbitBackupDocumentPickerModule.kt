@@ -114,7 +114,11 @@ class OrbitBackupDocumentPickerModule : Module() {
   }
 
   private fun IngressResult.toMap(): Map<String, Any?> =
-    mapOf("uri" to file?.let { Uri.fromFile(it).toString() }, "failed" to failed)
+    mapOf(
+      "uri" to file?.let { Uri.fromFile(it).toString() },
+      "failed" to failed,
+      "notBackup" to notBackup,
+    )
 
   private fun normalizedMimeType(type: String?): String? =
     type?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)

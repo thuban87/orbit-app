@@ -16,7 +16,13 @@ import java.util.concurrent.atomic.AtomicLong
 internal val BACKUP_INGRESS_ACQUIRE_MS: Long? = null
 internal const val MAX_CONCURRENT_INGRESS = 4
 
-internal data class IngressResult(val file: File? = null, val failed: Boolean = false)
+/** `notBackup`: rejected by D-117 (not a content:// link), so JS shows the
+ * "not a backup" message instead of "try again" (38.12 review B-IN-01). */
+internal data class IngressResult(
+  val file: File? = null,
+  val failed: Boolean = false,
+  val notBackup: Boolean = false,
+)
 
 /** D-117: backup intake opens only content:// links. A file:// (or any other)
  * source would let another app make Orbit read its own private files, so it
@@ -78,11 +84,12 @@ internal class BackupIngressRequests(
     val request = Request(generation.incrementAndGet(), source, destination, kind, clock())
     if (kind == Kind.SHARE) currentShare = request else currentPick = request
     if (destroyed || occupied >= cap || !isContentSource(source)) {
+      val rejected = IngressResult(failed = true, notBackup = !isContentSource(source))
       request.cancelled = true
       request.counted = false
       destination.delete()
-      request.result.complete(IngressResult(failed = true))
-      if (kind == Kind.SHARE) settleShareWaiters(IngressResult(failed = true))
+      request.result.complete(rejected)
+      if (kind == Kind.SHARE) settleShareWaiters(rejected)
       return request.result
     }
     occupied++

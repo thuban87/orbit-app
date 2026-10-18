@@ -3,6 +3,11 @@ import OrbitBackupDocumentPickerModule from "./src/OrbitBackupDocumentPickerModu
 export interface ConsumedBackupShare {
   readonly uri: string | null;
   readonly failed?: boolean;
+  /**
+   * D-117: the source was refused as not a content:// link, so it is not a
+   * backup Orbit can read; "try again" can never succeed (38.12 review B-IN-01).
+   */
+  readonly notBackup?: boolean;
 }
 
 /**

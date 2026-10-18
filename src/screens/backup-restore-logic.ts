@@ -295,6 +295,20 @@ export function restorePreviewFailure(
 }
 
 /**
+ * The message for a failed backup intake (pick or share). A source D-117
+ * refuses (not a content:// link) gets the normal "not a backup" message,
+ * because trying again can never succeed; any other failure keeps "Please
+ * try again" (38.12 review B-IN-01).
+ */
+export function backupIntakeFailureMessage(result: {
+  notBackup?: boolean;
+}): string {
+  return result.notBackup
+    ? restorePreviewFailure("damaged-or-incomplete").message
+    : "Couldn't restore this backup. Your local data hasn't changed. Please try again.";
+}
+
+/**
  * D-61: Replace has one name everywhere: the mode option, the apply button,
  * the confirm's title and button, and the background notice. "Replace all"
  * is the shortest existing label (38.12-18).

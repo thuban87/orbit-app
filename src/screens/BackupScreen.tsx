@@ -74,6 +74,7 @@ import {
 } from "./backup-health-logic";
 import { readRestoreDocument } from "./backup-restore-document";
 import {
+  backupIntakeFailureMessage,
   isEncryptedBackupEnvelope,
   restorePreviewCache,
   restorePreviewFailure,
@@ -431,11 +432,10 @@ export function BackupScreen({
     if (restoreStage === "loading") return;
     setRestoreMessage(null);
     try {
-      const { uri, failed } = await pickBackupDocument();
+      const picked = await pickBackupDocument();
+      const { uri, failed } = picked;
       if (failed) {
-        setRestoreMessage(
-          "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
-        );
+        setRestoreMessage(backupIntakeFailureMessage(picked));
         return;
       }
       if (!uri) return;
@@ -457,13 +457,12 @@ export function BackupScreen({
       if (!shouldConsumeSharedBackup(host)) return;
       let cancelled = false;
       void consumeSharedBackup()
-        .then(({ uri, failed }) => {
+        .then((shared) => {
+          const { uri, failed } = shared;
           if (cancelled) return;
           if (failed) {
             setRestoreStage("idle");
-            setRestoreMessage(
-              "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
-            );
+            setRestoreMessage(backupIntakeFailureMessage(shared));
           } else if (uri) void loadRestoreDocument(uri);
         })
         .catch((error: unknown) => {
