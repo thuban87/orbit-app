@@ -9,6 +9,13 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { BirthdayField } from "@/components/BirthdayField";
+import {
+  type BirthdayFieldState,
+  birthdayFieldStateFromStored,
+  birthdayStorage,
+  EMPTY_BIRTHDAY_FIELD_STATE,
+} from "@/components/birthday-field-logic";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
@@ -16,6 +23,7 @@ import {
   choosePrimary,
   type MethodGroups,
   removeMethodDraft,
+  resolveEffectivePhoneRegion,
   toMethodDrafts,
   updateMethodDraft,
 } from "@/components/contact-methods-editor-model";
@@ -36,9 +44,11 @@ import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import { newUid } from "@/db/uid";
 import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
-import { normalizeEditedBirthday } from "@/logic/birthday-logic";
 import { resolveCategorySelection } from "@/logic/category-logic";
-import { mapPickedContact } from "@/logic/picked-contact-map";
+import {
+  isBirthdayUnreadable,
+  mapPickedContact,
+} from "@/logic/picked-contact-map";
 import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
 import {
   DEFAULT_FLOW_HOST,
@@ -105,7 +115,16 @@ export function ImportReviewScreen({
     null,
   );
   const [name, setName] = useState("");
-  const [birthdayInput, setBirthdayInput] = useState("");
+  // D-54: the shared Birthday control (Edit Contact's), seeded from the
+  // phone's birthday; storage is `birthdayStorage` (MM-DD / YYYY-MM-DD).
+  const [birthday, setBirthday] = useState<BirthdayFieldState>(
+    EMPTY_BIRTHDAY_FIELD_STATE,
+  );
+  // The phone's birthday when it could not be read, so the review says so
+  // instead of silently dropping it (the control cannot show it).
+  const [unreadableBirthday, setUnreadableBirthday] = useState<string | null>(
+    null,
+  );
   const [photoRelPath, setPhotoRelPath] = useState<string | null>(null);
   const [categories, setCategories] = useState<
     Array<{ id: number; name: string }>
@@ -118,6 +137,9 @@ export function ImportReviewScreen({
   // Import is blocked while Bound and the frequency is invalid.
   const [intervalValid, setIntervalValid] = useState(true);
   const [phoneRegion, setPhoneRegion] = useState<string | null>(null);
+  // D-54: method warnings use the effective region — the saved override, else
+  // the device's (the Settings rule, SettingsContactsScreen).
+  const [warningRegion, setWarningRegion] = useState<string | null>(null);
   const [methods, setMethods] = useState<MethodGroups>({
     phone: [],
     email: [],
@@ -205,6 +227,10 @@ export function ImportReviewScreen({
       }
       const snapshot = parseSnapshot(row.sourcePayload);
       if (!snapshot) throw new Error("invalid import snapshot");
+      const effectiveRegion = resolveEffectivePhoneRegion(
+        settings.phoneRegionOverride,
+        getDeviceRegion(),
+      );
       const mapped = mapPickedContact(
         {
           lookupKey: row.externalContactId,
@@ -215,14 +241,19 @@ export function ImportReviewScreen({
         },
         {
           categoryId: null,
-          effectivePhoneRegion:
-            settings.phoneRegionOverride ?? getDeviceRegion(),
+          effectivePhoneRegion: effectiveRegion,
         },
       );
       setRowId(row.id);
       setExternalContactId(row.externalContactId);
       setName(mapped.input.name);
-      setBirthdayInput(mapped.birthday ?? snapshot.birthday ?? "");
+      setBirthday(birthdayFieldStateFromStored(mapped.birthday));
+      setUnreadableBirthday(
+        isBirthdayUnreadable(snapshot.birthday)
+          ? (snapshot.birthday?.trim() ?? null)
+          : null,
+      );
+      setWarningRegion(effectiveRegion);
       setPhotoRelPath(row.photoRelPath);
       setPhoneRegion(session.phoneRegion);
       const methodDrafts = mapped.input.methodDrafts ?? [];
@@ -250,19 +281,13 @@ export function ImportReviewScreen({
     void requestInitialCategories();
   }, [load, requestInitialCategories]);
 
-  const normalizedBirthday = useMemo(
-    () => normalizeEditedBirthday(birthdayInput),
-    [birthdayInput],
-  );
-  const birthdayInvalid =
-    birthdayInput.trim().length > 0 && !normalizedBirthday.valid;
+  const storedBirthday = birthdayStorage(birthday);
   const canImport =
     !loading &&
     !saving &&
     rowId !== null &&
     externalContactId !== null &&
     name.trim().length > 0 &&
-    !birthdayInvalid &&
     !boundFrequencyBlocksImport(trackingEnabled, intervalValid);
   const previewUri = useMemo(
     () => (photoRelPath ? resolveImportStagingUri(photoRelPath) : null),
@@ -301,7 +326,7 @@ export function ImportReviewScreen({
       rowId,
       input,
       externalLinks: [{ provider: "android", externalContactId }],
-      birthday: normalizedBirthday.stored,
+      birthday: storedBirthday,
       now,
     });
     setDuplicateOutcome(null);
@@ -318,7 +343,7 @@ export function ImportReviewScreen({
         externalContactId,
         methodDrafts: toMethodDrafts(methods),
         name: name.trim(),
-        birthday: normalizedBirthday.stored,
+        birthday: storedBirthday,
         effectivePhoneRegion: phoneRegion,
       });
       const now = localDateTime();
@@ -331,8 +356,10 @@ export function ImportReviewScreen({
         );
         await finalizeSessionIfTerminal(exec, route.params.sessionId, now);
         markImportComplete();
+        // D-110 (convergence c2 B-1): the flow host travels to ImportComplete.
         navigation.replace("ImportComplete", {
           sessionId: route.params.sessionId,
+          host: route.params.host,
         });
         return;
       }
@@ -347,6 +374,10 @@ export function ImportReviewScreen({
       );
       setDuplicateOutcome(result.outcome);
     } catch (error) {
+      // Only creation failures reach here (D-58, convergence c1 C-6): once the
+      // contact is created, commitSingleImport absorbs a finalize failure,
+      // still runs the lifecycle effects and returns the id, so a created
+      // contact always takes the success ending above.
       Logger.error(LOG_SCOPE, "failed to commit import", error);
       showSnackbar({
         kind: "error",
@@ -410,8 +441,10 @@ export function ImportReviewScreen({
       );
       setDuplicateOutcome(null);
       markImportComplete();
+      // D-110 (convergence c2 B-1): the flow host travels to ImportComplete.
       navigation.replace("ImportComplete", {
         sessionId: route.params.sessionId,
+        host: route.params.host,
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to skip duplicate", error);
@@ -591,7 +624,11 @@ export function ImportReviewScreen({
             }}
             onUpdate={(uid, patch) => {
               setEdited(true);
-              setMethods((current) => updateMethodDraft(current, uid, patch));
+              // D-54: the warning follows the typing, against the effective
+              // region (as on Edit Contact).
+              setMethods((current) =>
+                updateMethodDraft(current, uid, patch, warningRegion),
+              );
             }}
             onRemove={(uid) => {
               setEdited(true);
@@ -603,36 +640,31 @@ export function ImportReviewScreen({
             }}
           />
         </View>
+        {/* D-54: Edit Contact's Birthday control, never a free text field.
+          Storage stays MM-DD when the year is unknown, YYYY-MM-DD when known. */}
         <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Birthday
-          </Text>
-          <TextInput
-            value={birthdayInput}
-            onChangeText={(value) => {
+          <BirthdayField
+            testID="import-review-birthday"
+            value={birthday}
+            onChange={(next) => {
               setEdited(true);
-              setBirthdayInput(value);
+              setBirthday(next);
+              setUnreadableBirthday(null);
             }}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.input,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.surface,
-                borderColor: birthdayInvalid
-                  ? colors.borderStrong
-                  : colors.border,
-              },
-            ]}
           />
-          {birthdayInvalid ? (
-            <Text style={[styles.birthdayError, { color: colors.danger }]}>
-              Enter a real date (YYYY-MM-DD or MM-DD).
+          {unreadableBirthday !== null && birthday.input === null ? (
+            <Text
+              testID="import-review-birthday-unreadable"
+              style={[styles.birthdayHint, { color: colors.textSecondary }]}
+            >
+              {`The phone's birthday (${unreadableBirthday}) couldn't be read. Set it here if you know it.`}
             </Text>
           ) : null}
         </View>
         <Pressable
+          testID="import-review-import"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canImport }}
           disabled={!canImport}
           onPress={() => void onImport()}
           style={[
@@ -720,7 +752,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 16 },
   photo: { width: 96, height: 96, borderRadius: 48 },
   field: { gap: 8 },
-  birthdayError: { fontSize: 13, fontWeight: "600" },
+  birthdayHint: { fontSize: 13 },
   label: { fontSize: 13, fontWeight: "600" },
   input: {
     minHeight: 44,

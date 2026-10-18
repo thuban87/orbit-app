@@ -161,15 +161,15 @@ vi.mock("@/services/photos/photo-storage", () => ({
   resolveImportStagingUri: (path: string) => `file:///${path}`,
 }));
 vi.mock("@/stores/confirm-store", () => ({ notice: vi.fn(async () => {}) }));
-vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: mocks.showSnackbar }));
+vi.mock("@/stores/snackbar-store", () => ({
+  showSnackbar: mocks.showSnackbar,
+}));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 vi.mock("@/utils/logger", () => ({
   Logger: { error: vi.fn(), warn: vi.fn(), debug: vi.fn(), info: vi.fn() },
 }));
 vi.mock("./existing-contact-choices", () => ({
-  resolveExistingContactChoices: async (
-    candidates: { contactId: number }[],
-  ) =>
+  resolveExistingContactChoices: async (candidates: { contactId: number }[]) =>
     candidates.map((candidate) => ({
       ...candidate,
       name: `Orbit ${candidate.contactId}`,
@@ -227,6 +227,18 @@ async function loaded(): Promise<TestElement[]> {
 
 function byTestID(tree: TestElement[], testID: string) {
   return tree.find((node) => node.props.testID === testID);
+}
+
+function ofType(tree: TestElement[], type: string): TestElement {
+  const found = tree.find((node) => node.type === type);
+  if (!found) throw new Error(`no ${type}`);
+  return found;
+}
+
+function withTestID(tree: TestElement[], testID: string): TestElement {
+  const found = byTestID(tree, testID);
+  if (!found) throw new Error(`no ${testID}`);
+  return found;
 }
 
 function text(node: TestElement): string {
@@ -324,14 +336,14 @@ describe("Import review form controls (D-54)", () => {
 
   it("imports the birthday the control holds, in storage shape", async () => {
     let tree = await loaded();
-    const field = tree.find((node) => node.type === "BirthdayField");
-    (field?.props.onChange as (next: unknown) => void)({
+    const field = ofType(tree, "BirthdayField");
+    (field.props.onChange as (next: unknown) => void)({
       input: "2000-02-29",
       yearUnknown: true,
       yearIsPlaceholder: true,
     });
     tree = render();
-    (byTestID(tree, "import-review-import")?.props.onPress as () => void)();
+    (withTestID(tree, "import-review-import").props.onPress as () => void)();
     await flush();
     expect(mocks.commitSingleImport).toHaveBeenCalledWith(
       "exec",
@@ -342,8 +354,8 @@ describe("Import review form controls (D-54)", () => {
   it("says when the phone's birthday couldn't be read, instead of dropping it silently", async () => {
     mocks.listSessionRows.mockResolvedValue([row("2021-02-29")]);
     const tree = await loaded();
-    const field = tree.find((node) => node.type === "BirthdayField");
-    expect((field?.props.value as { input: string | null }).input).toBeNull();
+    const field = ofType(tree, "BirthdayField");
+    expect((field.props.value as { input: string | null }).input).toBeNull();
     const hint = byTestID(tree, "import-review-birthday-unreadable");
     expect(hint && text(hint)).toContain("2021-02-29");
   });
@@ -365,13 +377,13 @@ describe("Import review form controls (D-54)", () => {
       mocks.getAppSettings.mockResolvedValue({ phoneRegionOverride: override });
       mocks.getDeviceRegion.mockReturnValue(device);
       const tree = await loaded();
-      const editor = tree.find((node) => node.type === "ContactMethodsEditor");
-      const groups = editor?.props.methods as {
+      const editor = ofType(tree, "ContactMethodsEditor");
+      const groups = editor.props.methods as {
         phone: { uid: string }[];
       };
       const uid = groups.phone[0]?.uid;
       expect(uid).toBeDefined();
-      (editor?.props.onUpdate as (uid: string, patch: unknown) => void)(
+      (editor.props.onUpdate as (uid: string, patch: unknown) => void)(
         uid as string,
         { value: "07700 900123" },
       );
