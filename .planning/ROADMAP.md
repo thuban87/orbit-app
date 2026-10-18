@@ -167,7 +167,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.9: UX Standards — Dialogs, Headers & Back, Feedback, Glossary** (INSERTED) - Shared rules and components the fix phases and Phase 39 apply; 17/17 plans (completed 2026-10-11)
 - [x] **Phase 38.10: Fuel Retirement, Things to Remember & Sharing** (INSERTED) - Remove fuel; each kind gets its own Profile section; share to a chosen section with Allow AI off; absorbs 999.3/999.5/999.6 (share reminders → 38.16); dossier accepted 2026-10-12 (completed 2026-10-15)
 - [x] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile and contact-form audit fixes + new-contact defaults and not-contacted status; one Edit Contact form (Update Contact retired), slimmer + and ⋯, Archive → Bin, one snooze sheet, Birthday tile, Profile backgrounds rework; dossier accepted 2026-10-16
-- [ ] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes; dossier pending
+- [x] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes (completed 2026-10-18)
 - [ ] **Phase 38.13: Contacts List, Search & Digest UX** (INSERTED) - Contacts tab, search and Digest audit fixes + list perf investigation, D-95, D-98; dossier pending
 - [ ] **Phase 38.14: Logging, History, Events & Compose UX** (INSERTED) - Logging forms, History, Group Events and Compose audit fixes + one "Did you send it?" (D-76); dossier pending
 - [ ] **Phase 38.15: Events — Plan, Create & Remind** (INSERTED) - New feature: future group events, an Events-tab create entry and reminders (audit B-23); dossier pending
@@ -1680,7 +1680,7 @@ Plans:
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 11–16 plans — rough estimate from finding titles plus the triage's per-area range; includes a possible Settings page-layout sweep (K-05) and the favourites-in-backups format bump (K-22); site counts not taken.
 **Coordination**: shares Profile files with 38.11 (not-contacted status code, ⋯ menu, merge entry) and builds on 38.11's shared snooze sheet (38.11 D-45; X-20). 38.11 renames Archive to "Bin" app-wide and makes Move to Bin a confirm without Undo (38.11 D-69, D-71) — see "Notes from 38.11" in this phase's workpaper. None blocks this phase.
 **Evidence**: `.planning/ux-audit/UX-AUDIT-REPORT.md` (297 findings, main @ 05b85252), `untracked/artifacts/ux-audit/cross-cutting.md` (themes X-01..X-43; local only), `.planning/ux-audit/NON-UX-FINDINGS.md`, and the audit-vs-39 triage (39-LEDGER Batch 13). Which findings belong here is set before the dossier session.
-**Plans**: 26/27 plans executed (7 waves; executed sequentially on main)
+**Plans**: 27/27 plans executed (7 waves; executed sequentially on main)
 **Wave 1**
 
 - [x] 38.12-01-PLAN.md — Mute becomes an indefinite snooze + migration 034 (review-memory family, resume markers, mute conversion)
@@ -1846,7 +1846,7 @@ Plans:
 | 38.9 UX Standards | 17/17 | Complete | 2026-10-11 |
 | 38.10 Fuel Retirement, Things to Remember & Sharing | 25/25 | Complete| 2026-10-15 |
 | 38.11 Everyday Screens UX | 14/14 | Complete| 2026-10-16 |
-| 38.12 People Lifecycle, Import & Settings UX | 27/27 | In Progress|  |
+| 38.12 People Lifecycle, Import & Settings UX | 27/27 | Complete | 2026-10-18 |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
