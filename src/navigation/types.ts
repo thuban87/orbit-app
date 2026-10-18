@@ -217,6 +217,12 @@ export type DashboardStackParamList = {
     absorbedId: number;
     resolutions: MergeResolutions;
   } & FlowHostParam;
+  /** The Profile ⋯ per-person phone check (38.12 D-100); Profile-reachable (RG-021). */
+  ReconcileDetail: {
+    contactId: number;
+    sessionId?: number;
+    cardId?: number;
+  } & FlowHostParam;
 };
 
 /**
@@ -310,6 +316,12 @@ export type OrreryStackParamList = {
     absorbedId: number;
     resolutions: MergeResolutions;
   } & FlowHostParam;
+  /** The Profile ⋯ per-person phone check (38.12 D-100); Profile-reachable (RG-021). */
+  ReconcileDetail: {
+    contactId: number;
+    sessionId?: number;
+    cardId?: number;
+  } & FlowHostParam;
 };
 
 export type DigestStackParamList = {
@@ -374,6 +386,12 @@ export type DigestStackParamList = {
     absorbedId: number;
     resolutions: MergeResolutions;
   } & FlowHostParam;
+  /** The Profile ⋯ per-person phone check (38.12 D-100); Profile-reachable (RG-021). */
+  ReconcileDetail: {
+    contactId: number;
+    sessionId?: number;
+    cardId?: number;
+  } & FlowHostParam;
 };
 
 export type EventsStackParamList = {
@@ -437,6 +455,12 @@ export type EventsStackParamList = {
     survivorId: number;
     absorbedId: number;
     resolutions: MergeResolutions;
+  } & FlowHostParam;
+  /** The Profile ⋯ per-person phone check (38.12 D-100); Profile-reachable (RG-021). */
+  ReconcileDetail: {
+    contactId: number;
+    sessionId?: number;
+    cardId?: number;
   } & FlowHostParam;
 };
 

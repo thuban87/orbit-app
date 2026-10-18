@@ -218,3 +218,19 @@ describe("the Profile Backgrounds page is Profile-reachable (D-58.1)", () => {
     expect(types.match(/ProfileBackgrounds: undefined;/g)).toHaveLength(5);
   });
 });
+
+/**
+ * 38.12 D-100, D-99: the Profile ⋯ opens Check with phone Contacts…
+ * (ReconcileDetail) and Merge with another contact… (SurvivorSelect) in the tab
+ * that hosts the Profile, so both are Profile-reachable and the generic checks
+ * above (plus `settings-routes.test.ts`) keep them registered in all five
+ * stacks (RG-021, T-38.12-45).
+ */
+describe("the Profile ⋯ flow routes (38.12 D-99, D-100)", () => {
+  it.each(["ReconcileDetail", "SurvivorSelect"] as const)(
+    "%s is Profile-reachable",
+    (route) => {
+      expect(PROFILE_REACHABLE_ROUTES as readonly string[]).toContain(route);
+    },
+  );
+});

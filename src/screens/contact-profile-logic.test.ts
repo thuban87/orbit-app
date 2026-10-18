@@ -23,9 +23,12 @@ import {
   PROFILE_APP_BAR_SCRIM_OPACITY_WITH_NAME,
   PROFILE_APP_BAR_SCRIM_THRESHOLD,
   PROFILE_APP_BAR_SCROLL_SCRIM,
+  PROFILE_CHECK_PHONE_CONTACTS_LABEL,
   PROFILE_HERO_AVATAR_SIZE,
   PROFILE_HERO_GAP,
   PROFILE_LEGACY_NAME_TOP,
+  PROFILE_MERGE_LABEL,
+  PROFILE_OVERFLOW_TITLE,
   pinSnackbar,
   pinUndoneSnackbar,
   profileAppBarGlyphClearance,
@@ -692,10 +695,13 @@ describe("integrated Profile controller contracts", () => {
     });
   });
 
-  it("keeps the Bound ⋯ order: Snooze…, Unbind, Move to Bin, then Layout and Background (38.11 D-63, D-64, D-65)", () => {
-    expect(profileOverflowEntries({ bound: true, archived: false })).toEqual([
+  it("keeps the Bound ⋯ order: Snooze…, Unbind, Merge, Move to Bin, then Layout and Background (38.11 D-63, D-64, D-65; 38.12 D-99)", () => {
+    expect(
+      profileOverflowEntries({ bound: true, archived: false, linked: false }),
+    ).toEqual([
       "snooze",
       "unbind",
+      "merge",
       "archive",
       "separator",
       "layout",
@@ -703,8 +709,14 @@ describe("integrated Profile controller contracts", () => {
     ]);
   });
 
-  it("offers no Snooze… while Unbound (38.12 D-94)", () => {
-    expect(profileOverflowEntries({ bound: false, archived: false })).toEqual([
+  it("adds Check with phone Contacts… beside Merge for a linked Bound person (38.12 D-100)", () => {
+    expect(
+      profileOverflowEntries({ bound: true, archived: false, linked: true }),
+    ).toEqual([
+      "snooze",
+      "unbind",
+      "update-from-contacts",
+      "merge",
       "archive",
       "separator",
       "layout",
@@ -712,14 +724,59 @@ describe("integrated Profile controller contracts", () => {
     ]);
   });
 
-  it("offers only Profile Layout and Background in the Bin, Bound or Unbound (38.12 D-34)", () => {
-    for (const bound of [true, false]) {
-      const entries = profileOverflowEntries({ bound, archived: true });
-      expect(entries).toEqual(["layout", "background"]);
-      expect(entries).not.toContain("snooze");
-      expect(entries).not.toContain("unbind");
-      expect(entries).not.toContain("archive");
-    }
+  it("offers no Snooze… while Unbound (38.12 D-94), with Merge and, when linked, the phone check", () => {
+    expect(
+      profileOverflowEntries({ bound: false, archived: false, linked: false }),
+    ).toEqual(["merge", "archive", "separator", "layout", "background"]);
+    expect(
+      profileOverflowEntries({ bound: false, archived: false, linked: true }),
+    ).toEqual([
+      "update-from-contacts",
+      "merge",
+      "archive",
+      "separator",
+      "layout",
+      "background",
+    ]);
+  });
+
+  it("puts Merge just above Move to Bin for any live person (38.12 D-99)", () => {
+    for (const bound of [true, false])
+      for (const linked of [true, false]) {
+        const entries = profileOverflowEntries({
+          bound,
+          archived: false,
+          linked,
+        });
+        expect(entries.indexOf("merge")).toBe(entries.indexOf("archive") - 1);
+        expect(entries.includes("update-from-contacts")).toBe(linked);
+      }
+  });
+
+  it("offers only Profile Layout and Background in the Bin, Bound or Unbound, linked or not (38.12 D-34)", () => {
+    for (const bound of [true, false])
+      for (const linked of [true, false]) {
+        const entries = profileOverflowEntries({
+          bound,
+          archived: true,
+          linked,
+        });
+        expect(entries).toEqual(["layout", "background"]);
+        expect(entries).not.toContain("snooze");
+        expect(entries).not.toContain("unbind");
+        expect(entries).not.toContain("archive");
+        // No merge or per-person phone check on a binned Profile (D-34).
+        expect(entries).not.toContain("merge");
+        expect(entries).not.toContain("update-from-contacts");
+      }
+  });
+
+  it("labels the new entries and titles the sheet like the ⋯ button (38.12 D-99, D-100, D-42)", () => {
+    expect(PROFILE_MERGE_LABEL).toBe("Merge with another contact…");
+    expect(PROFILE_CHECK_PHONE_CONTACTS_LABEL).toBe(
+      "Check with phone Contacts…",
+    );
+    expect(PROFILE_OVERFLOW_TITLE).toBe("More actions");
   });
 
   it("names the person in the binned Profile's banner, with Open the Bin (38.12 D-93)", () => {

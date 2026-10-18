@@ -20,6 +20,7 @@ import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
+import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { DIGEST_STACK_ROUTES } from "../shell-contract";
@@ -54,6 +55,8 @@ const DIGEST_ROUTE_COMPONENTS = {
   MergeImpactSummary,
   // 38.11 D-58.1: Profile-reachable Settings page (RG-021).
   ProfileBackgrounds: ProfileBackgroundsScreen,
+  // 38.12 D-100: the Profile ⋯ per-person phone check (RG-021).
+  ReconcileDetail: ReconcileDetailScreen,
 } as const satisfies Record<DigestRouteName, ComponentType<never>>;
 
 export function DigestStack() {

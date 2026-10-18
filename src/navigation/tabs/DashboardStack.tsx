@@ -21,6 +21,7 @@ import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
+import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
@@ -67,6 +68,8 @@ export function DashboardStack() {
         name="ProfileBackgrounds"
         component={ProfileBackgroundsScreen}
       />
+      {/* The Profile ⋯ per-person phone check (38.12 D-100, RG-021). */}
+      <Stack.Screen name="ReconcileDetail" component={ReconcileDetailScreen} />
     </Stack.Navigator>
   );
 }

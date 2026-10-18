@@ -21,6 +21,7 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { ProfileBackgroundsScreen } from "@/screens/ProfileBackgroundsScreen";
+import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { SectionEditorScreen } from "@/screens/SectionEditorScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
@@ -90,6 +91,8 @@ export function OrreryStack() {
         name="ProfileBackgrounds"
         component={ProfileBackgroundsScreen}
       />
+      {/* The Profile ⋯ per-person phone check (38.12 D-100, RG-021). */}
+      <Stack.Screen name="ReconcileDetail" component={ReconcileDetailScreen} />
     </Stack.Navigator>
   );
 }

@@ -18,6 +18,7 @@ import {
   findDuplicateNameIds,
   getContactForEdit,
   getContactHeader,
+  hasActiveExternalLink,
   isDuplicateName,
   listCategories,
 } from "@/db/contact-read";
@@ -470,5 +471,29 @@ describe("countContactsNotInBin (38.12 D-60)", () => {
     await makeContact("Binned", { archived: true });
     await makeContact("Binned Unbound", { archived: true, trackingEnabled: 0 });
     expect(await countContactsNotInBin(exec)).toBe(2);
+  });
+});
+
+describe("hasActiveExternalLink (38.12 D-100)", () => {
+  async function link(contactId: number, active: 0 | 1) {
+    await exec.runAsync(
+      `INSERT INTO external_contact_links
+         (uid, contact_id, provider, external_contact_id, is_active, created_at, modified_at)
+       VALUES (?, ?, 'android', ?, ?, ?, ?)`,
+      [uid(), contactId, `lookup-${uid()}`, active, NOW, NOW],
+    );
+  }
+
+  it("is true only with an active link to a phone contact", async () => {
+    const none = await makeContact("No link");
+    const inactive = await makeContact("Unlinked");
+    const linked = await makeContact("Linked");
+    await link(inactive, 0);
+    await link(linked, 0);
+    await link(linked, 1);
+    expect(await hasActiveExternalLink(exec, none)).toBe(false);
+    expect(await hasActiveExternalLink(exec, inactive)).toBe(false);
+    expect(await hasActiveExternalLink(exec, linked)).toBe(true);
+    expect(await hasActiveExternalLink(exec, 9999)).toBe(false);
   });
 });

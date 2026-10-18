@@ -341,6 +341,8 @@ export type ProfileOverlay =
 export type ProfileOverflowEntry =
   | "snooze"
   | "unbind"
+  | "update-from-contacts"
+  | "merge"
   | "archive"
   | "separator"
   | "layout"
@@ -597,25 +599,49 @@ export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
   return null;
 }
 
+/** The ⋯ entry that opens the merge picker with this person first (38.12 D-99, owner wording). */
+export const PROFILE_MERGE_LABEL = "Merge with another contact…";
+
+/**
+ * The ⋯ entry that opens Check linked contacts for just this person (38.12
+ * D-100; wording is Claude's Discretion, seen by the owner at the device check).
+ */
+export const PROFILE_CHECK_PHONE_CONTACTS_LABEL = "Check with phone Contacts…";
+
+/**
+ * The ⋯ sheet's title. It matches the ⋯ button's "More actions for <name>"
+ * label (38.12 D-42).
+ */
+export const PROFILE_OVERFLOW_TITLE = "More actions";
+
 /**
  * The product-mandated ⋯ order per state, independent from view rendering.
  *
  * - In the Bin (38.12 D-34): Profile Layout and Background only — no Snooze,
- *   Unbind or Move to Bin (Move to Bin on a binned person failed, 38.11
- *   IN-04). Restore and permanent delete stay in the Bin list (D-93, D-20).
- * - Bound: Snooze… · Unbind contact · Move to Bin · separator · Profile Layout
- *   · Background (38.11 D-63, D-64, D-65). "Snooze…" opens the shared snooze
- *   sheet, where Unsnooze lives.
+ *   Unbind, Merge, Check with phone Contacts or Move to Bin (Move to Bin on a
+ *   binned person failed, 38.11 IN-04; the merge picker excludes the Bin,
+ *   D-43). Restore and permanent delete stay in the Bin list (D-93, D-20).
+ * - Bound: Snooze… · Unbind contact · Check with phone Contacts… (when linked)
+ *   · Merge with another contact… · Move to Bin · separator · Profile Layout ·
+ *   Background (38.11 D-63, D-64, D-65, amended by 38.12 D-99, D-100).
+ *   "Snooze…" opens the shared snooze sheet, where Unsnooze lives.
  * - Unbound: no Snooze… while Unbound; it returns on Bind and a stored snooze
- *   is left as data (38.12 D-94, amending 38.11 D-64).
+ *   is left as data (38.12 D-94, amending 38.11 D-64). Check and Merge as for
+ *   Bound.
+ *
+ * `linked`: the person has an active link to a phone contact
+ * (`hasActiveExternalLink`, D-100).
  */
 export function profileOverflowEntries(input: {
   bound: boolean;
   archived: boolean;
+  linked: boolean;
 }): ProfileOverflowEntry[] {
   if (input.archived) return ["layout", "background"];
   return [
     ...(input.bound ? (["snooze", "unbind"] as const) : []),
+    ...(input.linked ? (["update-from-contacts"] as const) : []),
+    "merge",
     "archive",
     "separator",
     "layout",

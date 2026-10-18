@@ -86,6 +86,23 @@ export function listCategories(
 }
 
 /**
+ * Is this contact linked to a phone contact (an active `external_contact_links`
+ * row)? The Profile ⋯ offers "Check with phone Contacts…" only then (38.12
+ * D-100). Same predicate as the check's own link read (`getReconcileContact`:
+ * `is_active = 1`), so the entry never opens a detail with no source.
+ */
+export async function hasActiveExternalLink(
+  exec: ReadOnlyExecutor | SqlExecutor,
+  contactId: number,
+): Promise<boolean> {
+  const row = await exec.getFirstAsync<{ linked: number }>(
+    "SELECT EXISTS (SELECT 1 FROM external_contact_links WHERE contact_id = ? AND is_active = 1) AS linked",
+    [contactId],
+  );
+  return row?.linked === 1;
+}
+
+/**
  * The light Profile-scaffold read (Plan 04): a by-id seek returning the header
  * fields, or null for a missing id.
  *

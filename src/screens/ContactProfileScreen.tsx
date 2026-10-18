@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { MOVE_TO_BIN } from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
+import { hasActiveExternalLink } from "@/db/contact-read";
 import { archiveContact, setContactBirthday } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
@@ -63,6 +64,9 @@ import {
   knowledgeNavigateParams,
   PROFILE_APP_BAR,
   PROFILE_APP_BAR_SCROLL_SCRIM,
+  PROFILE_CHECK_PHONE_CONTACTS_LABEL,
+  PROFILE_MERGE_LABEL,
+  PROFILE_OVERFLOW_TITLE,
   type ProfileKnowledgeDestination,
   type ProfileOverlay,
   pinSnackbar,
@@ -261,6 +265,8 @@ export function ContactProfileScreen({
   // WR-06: the hero photo failed to load (initials showing) — no lightbox entry.
   const [heroPhotoFailed, setHeroPhotoFailed] = useState(false);
   const [assistEnabled, setAssistEnabled] = useState(false);
+  // 38.12 D-100: linked to a phone contact → ⋯ offers the per-person check.
+  const [linked, setLinked] = useState(false);
   // 38.3 RG-021 (D-10): History actions scroll this ScrollView to the
   // in-Profile History section — instant under reduced motion.
   const scrollRef = useRef<ScrollView>(null);
@@ -325,10 +331,12 @@ export function ContactProfileScreen({
             themeBackground: `theme:${pkg}`,
           }),
           getAppSettings(getExecutor()),
+          hasActiveExternalLink(getExecutor(), id),
         ]);
       },
-      publish: ([next, settings], revision) => {
+      publish: ([next, settings, isLinked], revision) => {
         setAssistEnabled(settings.interactionAssistEnabled === 1);
+        setLinked(isLinked);
         if (!next) {
           setSnapshot(null);
           setError("This contact is no longer available.");
@@ -1021,17 +1029,18 @@ export function ContactProfileScreen({
             <Sheet
               visible={overlay === "overflow"}
               onRequestClose={closeOverlay}
-              // The Profile action list (up to six entries, 38.11 D-65) keeps
-              // the expanded sheet so the bottom presentation actions stay
-              // reachable on a physical phone without clipping below the safe
-              // area, including at large font sizes.
-              variant="expanded"
+              // 38.12 D-42: sized to its content (compact). Its body scrolls
+              // once the list is taller than the cap (large font sizes), so
+              // the last entries and Close stay reachable (38.4 D-32).
+              variant="compact"
             >
               <View style={styles.menu}>
-                <AppText role="heading">Profile actions</AppText>
+                {/* Matches the ⋯ button's "More actions for <name>" (D-42). */}
+                <AppText role="heading">{PROFILE_OVERFLOW_TITLE}</AppText>
                 {profileOverflowEntries({
                   bound: lifecycle.kind === "bound",
                   archived,
+                  linked,
                 }).map((entry) => {
                   if (entry === "separator") {
                     return (
@@ -1050,6 +1059,9 @@ export function ContactProfileScreen({
                     // 38.11 D-64: one entry; Unsnooze lives in the sheet.
                     snooze: "Snooze…",
                     unbind: "Unbind contact",
+                    // 38.12 D-100, D-99.
+                    "update-from-contacts": PROFILE_CHECK_PHONE_CONTACTS_LABEL,
+                    merge: PROFILE_MERGE_LABEL,
                     // 38.11 D-69: Archive reads Move to Bin.
                     archive: MOVE_TO_BIN,
                     layout: "Profile Layout",
@@ -1077,6 +1089,24 @@ export function ContactProfileScreen({
                         });
                         return;
                       }
+                      // 38.12 D-100, D-99, D-110: both flows start from this
+                      // Profile and carry its route key, so a merge ends on
+                      // the survivor's Profile in this tab. The sheet closes
+                      // first.
+                      case "update-from-contacts":
+                        closeOverlay();
+                        navigation.navigate("ReconcileDetail", {
+                          contactId,
+                          host: { kind: "profile", profileKey: route.key },
+                        });
+                        return;
+                      case "merge":
+                        closeOverlay();
+                        navigation.navigate("SurvivorSelect", {
+                          firstContactId: contactId,
+                          host: { kind: "profile", profileKey: route.key },
+                        });
+                        return;
                       case "archive":
                         void moveToBin(snapshot.identity.name);
                         return;
@@ -1099,6 +1129,12 @@ export function ContactProfileScreen({
                     />
                   );
                 })}
+                <Button
+                  testID="profile-overflow-close"
+                  role="tertiary"
+                  label="Close"
+                  onPress={closeOverlay}
+                />
               </View>
             </Sheet>
             <SnoozeSheet
