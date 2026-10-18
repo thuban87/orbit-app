@@ -952,7 +952,7 @@ export function SettingsAppearanceScreen() {
                       selected={isSelected}
                       checkTone={starSwatchCheckTone(token, colors)}
                       testID={`settings-star-swatch-${index}`}
-                      accessibilityLabel={`Star colour ${index + 1}`}
+                      accessibilityLabel={`Star color ${index + 1}`}
                       onPress={() => void onPickStarColour(token)}
                     />
                   );

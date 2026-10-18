@@ -78,6 +78,10 @@ const RETIRED_FORMS: readonly RetiredForm[] = [
   // are not phrases, so these exact forms never catch them.
   { form: "Archived contact", case: "capitalised" },
   { form: "Archived Contact", case: "capitalised" },
+  // The glossary spells user-visible words the American way ("color"); the
+  // 38.12 star-color labels said "colour" (38.12-14 SUMMARY, fix-pass queue 2).
+  { form: "Colour", case: "capitalised" },
+  { form: "colour", case: "lowercase" },
 ];
 
 /**
