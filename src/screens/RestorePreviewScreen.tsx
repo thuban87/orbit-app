@@ -7,6 +7,7 @@ import {
   type RestoreProgressStep,
 } from "@/backup/restore-apply";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { OptionSelectRow, OptionSheet } from "@/components/ui";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -23,8 +24,11 @@ import {
   createRestoreApplySingleFlight,
   type RestoreApplyConfirmation,
   type RestoreApplyConfirmationResult,
+  RESTORE_MODE_OPTIONS,
   restoreApplyLabel,
   restoreApplyRecovery,
+  restoreModeLabel,
+  restorePeopleComparison,
   restorePreviewCache,
   restoreProgressLabel,
   toRestoreResultParams,
@@ -41,7 +45,7 @@ import { readStoredPhotoBase64 } from "@/services/backup/share-export";
 import { confirm } from "@/stores/confirm-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
-import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
+import { formatSourceTimeMinuteOrFallback } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "restore-preview";
@@ -108,7 +112,10 @@ export function RestorePreviewScreen({
   // A focused page (D-114): no tab bar and no +, so the last item only clears
   // the system navigation area.
   const bottomClearance = useSafeAreaInsets().bottom + 16;
+  // Merge is preselected (D-23); Replace all is explicitly confirmed.
   const [mode, setMode] = useState<RestoreMode>("merge");
+  // The shared single-choice sheet for the mode (D-61).
+  const [modeSheetOpen, setModeSheetOpen] = useState(false);
   // D-69: the step applyRestore last reported, shown in the busy state.
   const [progressStep, setProgressStep] = useState<RestoreProgressStep | null>(
     null,
@@ -353,7 +360,7 @@ export function RestorePreviewScreen({
             Backup details
           </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Source date: {formatDateTimeMinuteOrFallback(preview.exportedAt)}
+            Source date: {formatSourceTimeMinuteOrFallback(preview.exportedAt)}
           </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
             Backup version: {preview.backupFormatVersion}
@@ -364,10 +371,12 @@ export function RestorePreviewScreen({
               ? "Protected with a passphrase"
               : "Readable JSON"}
           </Text>
+          <Text style={[styles.body, { color: colors.textPrimary }]}>
+            {restorePeopleComparison(preview)}
+          </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Contacts: {preview.contactCount} · Linked items:{" "}
-            {preview.relatedRowCount} · Photos: {preview.photoCount} · Deleted
-            items kept: {preview.tombstoneCount}
+            Linked items: {preview.relatedRowCount} · Photos:{" "}
+            {preview.photoCount} · Deleted items kept: {preview.tombstoneCount}
           </Text>
         </View>
         {unavailableBackground ? (
@@ -387,58 +396,48 @@ export function RestorePreviewScreen({
             </Text>
           </View>
         ) : null}
-        <Pressable
-          testID="restore-mode-merge"
-          accessibilityRole="radio"
-          accessibilityLabel="Merge backup"
-          accessibilityState={{
-            selected: mode === "merge",
-            disabled: applying || modeLocked,
-          }}
-          disabled={applying || modeLocked}
-          onPress={() => selectMode("merge")}
+        <View
           style={[
             styles.card,
-            {
-              backgroundColor:
-                mode === "merge" ? colors.surfaceElevated : colors.surface,
-              borderColor: mode === "merge" ? colors.accent : colors.border,
-            },
+            { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
           <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-            Merge
+            Restore mode
           </Text>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Add backup changes while keeping newer local data.
+          <OptionSelectRow
+            testID="restore-mode"
+            label="Restore mode"
+            currentLabel={restoreModeLabel(mode)}
+            disabled={applying || modeLocked}
+            onPress={() => {
+              if (applyRun.acceptsModeChange()) setModeSheetOpen(true);
+            }}
+          />
+          <Text
+            testID="restore-mode-description"
+            style={[
+              styles.body,
+              {
+                color:
+                  mode === "replace-all" ? colors.danger : colors.textSecondary,
+              },
+            ]}
+          >
+            {mode === "merge"
+              ? "Add backup changes while keeping newer local data."
+              : "Replace local data with this backup. This is destructive."}
           </Text>
-        </Pressable>
-        <Pressable
-          testID="restore-mode-replace"
-          accessibilityRole="radio"
-          accessibilityLabel="Replace all local data"
-          accessibilityState={{
-            selected: mode === "replace-all",
-            disabled: applying || modeLocked,
-          }}
-          disabled={applying || modeLocked}
-          onPress={() => selectMode("replace-all")}
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.surface,
-              borderColor:
-                mode === "replace-all" ? colors.danger : colors.border,
-            },
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: colors.danger }]}>
-            Replace all
-          </Text>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Replace local data with this backup. This is destructive.
-          </Text>
-        </Pressable>
+        </View>
+        <OptionSheet
+          visible={modeSheetOpen}
+          title="Restore mode"
+          options={RESTORE_MODE_OPTIONS}
+          selected={mode}
+          searchable={false}
+          onSelect={selectMode}
+          onRequestClose={() => setModeSheetOpen(false)}
+        />
         {applyError ? (
           <View
             testID="restore-apply-error"

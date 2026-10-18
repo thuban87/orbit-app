@@ -113,12 +113,13 @@ describe("Restore Preview source date (RG-038 AUD-UIA-018, D-07)", () => {
   const preview = read("src/screens/RestorePreviewScreen.tsx");
 
   it("renders the source date through the shared minute formatter, never raw", () => {
+    // 38.12 D-66: the source-time variant also reads UTC "Z" stamps.
     expect(preview).toContain(
-      "Source date: {formatDateTimeMinuteOrFallback(preview.exportedAt)}",
+      "Source date: {formatSourceTimeMinuteOrFallback(preview.exportedAt)}",
     );
     expect(preview).not.toContain("{preview.exportedAt}");
     expect(preview).toMatch(
-      /import \{[^}]*\bformatDateTimeMinuteOrFallback\b[^}]*\} from "@\/utils\/dates"/,
+      /import \{[^}]*\bformatSourceTimeMinuteOrFallback\b[^}]*\} from "@\/utils\/dates"/,
     );
   });
 

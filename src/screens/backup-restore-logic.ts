@@ -101,7 +101,7 @@ export const UNAVAILABLE_BACKGROUND_MESSAGE =
   "A background selected in this backup is no longer available. Switch to the default background instead?";
 /** The same notice inside the Replace-all dialog, whose buttons carry the answer. */
 export const UNAVAILABLE_BACKGROUND_REPLACE_NOTE =
-  "A background selected in this backup is no longer available. Replace and restore will switch to the default background instead.";
+  "A background selected in this backup is no longer available. Replace all will switch to the default background instead.";
 
 /**
  * Whether this restore must ask the D-47 question: the validated backup holds a
@@ -140,9 +140,9 @@ export type RestoreApplyConfirmationReads = {
 
 /**
  * The ONE dialog an apply shows, or null for none (a plain Merge):
- *   - Replace-all: the destructive confirmation; with an unavailable background
- *     its message also carries the D-47 notice, and "Replace and restore" is the
- *     consent (one dialog, not two);
+ *   - Replace-all: the destructive confirmation stating the people on each
+ *     side (D-60); with an unavailable background its message also carries the
+ *     D-47 notice, and "Replace all" is the consent (one dialog, not two);
  *   - Merge whose backup settings will be written and hold an unavailable
  *     background: the D-47 question, Continue/Cancel.
  * `unavailableBackground` is `backupNeedsBackgroundConsent` (RA-a / D-49), not
@@ -152,16 +152,17 @@ export function restoreApplyConfirmation(
   mode: RestoreMode,
   destinationConfigured: boolean,
   unavailableBackground: boolean,
+  scale: RestorePeopleScale,
 ): RestoreApplyConfirmation | null {
   if (mode === "replace-all") {
-    const base = replaceAllConfirmation(destinationConfigured);
+    const base = replaceAllConfirmation(destinationConfigured, scale);
     return {
       title: base.title,
       message: unavailableBackground
         ? `${base.message}\n\n${UNAVAILABLE_BACKGROUND_REPLACE_NOTE}`
         : base.message,
       cancelLabel: "Keep local data",
-      confirmLabel: "Replace and restore",
+      confirmLabel: REPLACE_ALL_LABEL,
       destructive: true,
     };
   }
@@ -200,6 +201,7 @@ export async function confirmRestoreApply(
     mode,
     mode === "replace-all" ? await reads.destinationConfigured() : false,
     useDefaultBackgrounds,
+    candidate.preview,
   );
   if (confirmation !== null && !(await confirm(confirmation)))
     return { status: "cancelled" };
@@ -222,8 +224,8 @@ export type RestoreApplyRunSteps = {
  * re-check WR-1). It enforces D-47's "each path shows one dialog": the
  * confirmation is asked for the mode selected at the tap, and the apply runs
  * with the mode that confirmation carries, so Replace-all can never run behind
- * Merge's dialog, and a Replace-all always passes through its own "Replace all
- * local data?" confirmation, once. While locked, a mode change is refused
+ * Merge's dialog, and a Replace-all always passes through its own "Replace
+ * all?" confirmation, once. While locked, a mode change is refused
  * (`acceptsModeChange`) and a second Apply tap returns `busy` without asking
  * again. The lock is synchronous, so a tap that lands before the screen
  * re-renders its disabled radios is refused too.
@@ -292,21 +294,63 @@ export function restorePreviewFailure(
   };
 }
 
-export function restoreApplyLabel(
-  mode: RestoreMode,
-): "Merge backup" | "Replace and restore" {
-  return mode === "merge" ? "Merge backup" : "Replace and restore";
+/**
+ * D-61: Replace has one name everywhere: the mode option, the apply button,
+ * the confirm's title and button, and the background notice. "Replace all"
+ * is the shortest existing label (38.12-18).
+ */
+export const REPLACE_ALL_LABEL = "Replace all";
+
+/** D-60: the people on each side, both excluding the Bin. */
+export type RestorePeopleScale = Pick<
+  RestorePreviewAggregate,
+  "phoneContacts" | "backupContacts"
+>;
+
+/** The restore mode choice, Merge first: it is the default (D-23). */
+export const RESTORE_MODE_OPTIONS: readonly {
+  readonly value: RestoreMode;
+  readonly label: string;
+}[] = [
+  { value: "merge", label: "Merge" },
+  { value: "replace-all", label: REPLACE_ALL_LABEL },
+];
+
+export function restoreModeLabel(mode: RestoreMode): string {
+  return mode === "merge" ? "Merge" : REPLACE_ALL_LABEL;
 }
 
-export function replaceAllConfirmation(destinationConfigured: boolean): {
+/** D-60: "This phone: 12 contacts · Backup: 40 contacts". */
+export function restorePeopleComparison(scale: RestorePeopleScale): string {
+  return `This phone: ${plural(scale.phoneContacts, "contact")} · Backup: ${plural(scale.backupContacts, "contact")}`;
+}
+
+export function restoreApplyLabel(
+  mode: RestoreMode,
+): "Merge backup" | typeof REPLACE_ALL_LABEL {
+  return mode === "merge" ? "Merge backup" : REPLACE_ALL_LABEL;
+}
+
+/**
+ * The Replace all confirm (D-60, D-02): the scale on both sides, then the
+ * safety-backup sentence. The screen shows it destructive and
+ * non-dismissable.
+ */
+export function replaceAllConfirmation(
+  destinationConfigured: boolean,
+  scale: RestorePeopleScale,
+): {
   title: string;
   message: string;
 } {
+  const replaces = `This replaces the ${plural(scale.phoneContacts, "contact")} on this phone with the ${scale.backupContacts} in the backup.`;
   return {
-    title: "Replace all local data?",
-    message: destinationConfigured
-      ? "Orbit will first create and verify a fresh automatic backup of this device."
-      : "Your current local data will be lost and no automatic backup destination is configured.",
+    title: `${REPLACE_ALL_LABEL}?`,
+    message: `${replaces}\n\n${
+      destinationConfigured
+        ? "Orbit will first create and verify a fresh automatic backup of this device."
+        : "Your current local data will be lost and no automatic backup destination is configured."
+    }`,
   };
 }
 

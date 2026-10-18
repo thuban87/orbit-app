@@ -28,6 +28,8 @@ export interface OptionSelectRowProps {
   /** Shown (muted) when there is no current value. */
   placeholder?: string;
   onPress: () => void;
+  /** Locks the row (announced as disabled), e.g. while a restore applies. */
+  disabled?: boolean;
   testID?: string;
 }
 
@@ -36,6 +38,7 @@ export function OptionSelectRow({
   currentLabel,
   placeholder = "Select…",
   onPress,
+  disabled = false,
   testID,
 }: OptionSelectRowProps) {
   const { colors } = useTheme();
@@ -46,10 +49,13 @@ export function OptionSelectRow({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityValue={selectorAccessibilityValue(currentLabel)}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={[
         styles.row,
         { backgroundColor: colors.surface, borderColor: colors.border },
+        disabled ? styles.disabled : null,
       ]}
     >
       <AppText
@@ -77,4 +83,5 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   value: { flex: 1 },
+  disabled: { opacity: 0.6 },
 });

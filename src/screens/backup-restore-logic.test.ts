@@ -728,14 +728,18 @@ describe("restore apply: the confirmed mode is the executed mode (WR-1)", () => 
     expect(failing.acceptsModeChange()).toBe(true);
   });
 
-  it("the screen routes its radios through the lock and applies the confirmed mode, never its live mode", () => {
+  it("the screen routes its mode choice through the lock and applies the confirmed mode, never its live mode", () => {
     const source = readFileSync("src/screens/RestorePreviewScreen.tsx", "utf8");
-    // Both radios: disabled while locked, and the tap goes through the lock.
+    // The mode row and Apply: disabled while locked (38.12 D-61: the mode is
+    // the shared OptionSelectRow + OptionSheet), and a pick goes through the
+    // lock.
     expect(source.match(/disabled=\{applying \|\| modeLocked\}/g)).toHaveLength(
-      3,
+      2,
     );
-    expect(source).toContain('onPress={() => selectMode("merge")}');
-    expect(source).toContain('onPress={() => selectMode("replace-all")}');
+    expect(source).toContain("onSelect={selectMode}");
+    expect(source).toContain(
+      "if (applyRun.acceptsModeChange()) setModeSheetOpen(true);",
+    );
     expect(source).toMatch(
       /if \(applyRun\.acceptsModeChange\(\)\) setMode\(next\)/,
     );
@@ -892,9 +896,7 @@ describe("restore preview people and the one Replace name (38.12 D-60, D-61)", (
       "This replaces the 12 contacts on this phone with the 40 in the backup.",
     );
     expect(UNAVAILABLE_BACKGROUND_REPLACE_NOTE).toContain("Replace all");
-    expect(UNAVAILABLE_BACKGROUND_REPLACE_NOTE).not.toContain(
-      "Replace and restore",
-    );
+    expect(UNAVAILABLE_BACKGROUND_REPLACE_NOTE).not.toMatch(/Replace and /);
   });
 
   it("the confirmation reads the scale from the cached preview", async () => {

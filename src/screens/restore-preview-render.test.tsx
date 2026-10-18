@@ -178,11 +178,7 @@ describe("Restore preview (38.12 D-60, D-61, D-66)", () => {
     const apply = tree.find((node) => node.props.testID === "restore-apply");
     expect(apply?.props.accessibilityLabel).toBe("Replace all");
     const labels = tree.filter((node) => node.type === "Text").map(textOf);
-    expect(labels.some((line) => line.includes("Replace and restore"))).toBe(
-      false,
-    );
-    expect(labels.some((line) => line.includes("Replace all local data"))).toBe(
-      false,
-    );
+    expect(labels.some((line) => /Replace and /.test(line))).toBe(false);
+    expect(labels.some((line) => /Replace all local/.test(line))).toBe(false);
   });
 });

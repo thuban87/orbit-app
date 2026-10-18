@@ -155,9 +155,48 @@ export function formatMinuteClock(
  * unchanged, while visible timestamps omit seconds.
  */
 export function formatDateTimeMinute(stored: string): string {
-  const date = new Date(parseLocalMs(stored));
+  return dateTimeMinuteOf(new Date(parseLocalMs(stored)));
+}
+
+/** "Sep 26, 2026, 2:05 PM" for an instant, in the device's local time. */
+function dateTimeMinuteOf(date: Date): string {
   const month = MONTH_SHORT[date.getMonth()];
   return `${month} ${date.getDate()}, ${date.getFullYear()}, ${clockOf(date)}`;
+}
+
+/**
+ * Parse an ISO-8601 UTC timestamp ending in "Z", with optional seconds and
+ * optional milliseconds ("2026-10-17T14:30:00.123Z"), to epoch ms. Returns
+ * null for any other shape or an impossible date (38.12 D-66: a backup's
+ * `exportedAt` can be a UTC stamp, which `parseLocalMs` rejects).
+ */
+export function parseIsoUtcMs(stored: string): number | null {
+  const match = stored
+    .trim()
+    .match(
+      /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\.([0-9]{1,3}))?)?Z$/,
+    );
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second, fraction] = match;
+  const parts = [
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second ?? 0),
+    Number((fraction ?? "0").padEnd(3, "0")),
+  ] as const;
+  const ms = Date.UTC(...parts);
+  const back = new Date(ms);
+  const roundTrips =
+    back.getUTCFullYear() === parts[0] &&
+    back.getUTCMonth() === parts[1] &&
+    back.getUTCDate() === parts[2] &&
+    back.getUTCHours() === parts[3] &&
+    back.getUTCMinutes() === parts[4] &&
+    back.getUTCSeconds() === parts[5];
+  return roundTrips ? ms : null;
 }
 
 /** The neutral display label shared by every `…OrFallback` formatter. */
@@ -169,6 +208,23 @@ export function formatDateTimeMinuteOrFallback(stored: string): string {
     return formatDateTimeMinute(stored);
   } catch {
     return UNKNOWN_TIME_LABEL;
+  }
+}
+
+/**
+ * A backup's source time for display (38.12 D-66): an Orbit local wall-clock
+ * stamp, or an ISO UTC "Z" stamp shown in the device's local time, both at
+ * minute precision like `formatDateTimeMinute`. Only a value neither parses
+ * shows the neutral fallback.
+ */
+export function formatSourceTimeMinuteOrFallback(stored: string): string {
+  try {
+    return formatDateTimeMinute(stored);
+  } catch {
+    const utcMs = parseIsoUtcMs(stored);
+    return utcMs === null
+      ? UNKNOWN_TIME_LABEL
+      : dateTimeMinuteOf(new Date(utcMs));
   }
 }
 
