@@ -1,7 +1,7 @@
 # Digest
 
-**Last updated:** 2026-10-11
-**Updated by phase:** 38.9-ux-standards
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/digest-read.ts`, `src/db/up-next-read.ts`, `src/db/your-week-read.ts`, `src/logic/digest-composition.ts`, `src/screens/DigestScreen.tsx`, `src/screens/digest-refresh.ts`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -70,6 +70,7 @@ Digest reads existing state and persists only the portable app-wide period prefe
 1. `readUpNext()` uses the shared status/progress SQL; `digest-composition.ts` applies the deterministic three-person cap.
 2. Horizon independently reads its next-seven-day birthdays, overlooked people, and Never Contacted candidates. The birthday tag is display text from the shared date-only formatter with its weekday ("Tue, Oct 13"); `digest-composition.ts` keeps a separate `dateKey` from `formatLocalDate()`, so display text never becomes a key. The group label is the glossary's "Never Contacted" (ADR-205, ADR-206).
 3. Up Next receives first claim on its contacts, then Horizon removes matching overlooked conditions rather than duplicating them.
+3a. A snoozed person is left out of Up Next and Overlooked whether the snooze has a date or is indefinite ("Until I turn it off", `9999-12-31`). The per-person mute that Overlooked used to ignore no longer exists; it became the indefinite snooze (ADR-234).
 4. A scalable Horizon drill calls `setPopulationsAndFilters()` before selecting Contacts, so its persisted count, preview, and destination use the same canonical query state. The opt-in Unbound exception is limited to `not-contacted`.
 
 ### Reflecting in Your Week
@@ -125,6 +126,8 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 
 - **ADR-205:** One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates — Digest dates (birthday tag, day detail, week heatmap labels) come from the shared formatter; storage keys stay `formatLocalDate()`.
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Horizon's "Never Contacted" label.
+- **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — an indefinite snooze leaves Up Next and Overlooked like a dated one (ADR-054's mute clause carries a note).
+- **ADR-247:** Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day — the Sunday digest notification moves to the quiet-hours end on Sunday.
 
 ## Gotchas
 
@@ -164,3 +167,4 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | 2026-09-26 | 38.4 | Digest shell and foreground reads skip while the app is backgrounded (38.3 VERIFICATION W2, D-10): the refresh controller's `isVisible` is `isForegroundVisible(isFocusedRef.current, AppState.currentState)` — the synchronous app state, never a lagging React mirror — so a warm notification action's shell tick reads nothing in the background; focus and the post-sweep foreground (resume) read still run. No legacy-data repair (38.2 D-23). |
 | 2026-09-30 | 38.6 | Your Week day detail shows each interaction contact's real photo: `YourWeekDayRow.contactPhoto` is selected in both UNION arms (NULL for Group Events), bind count and index use unchanged (ADR-180, D-14). |
 | 2026-10-11 | 38.9 | Digest dates (Horizon birthday tag with weekday, Your Week day detail and heatmap labels) use the shared date-only formatter, with a separate `dateKey` for storage-form keys; Horizon reads "Never Contacted" (ADR-205, ADR-206). |
+| 2026-10-18 | 38.12 | Indefinite snooze leaves Up Next and Overlooked like any snooze (the mute it replaced is retired); the digest notification respects quiet hours on Sunday (ADR-234, ADR-247). |
