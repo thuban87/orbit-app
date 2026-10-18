@@ -12,6 +12,7 @@
  * | --- | --- | --- | --- | --- | --- |
  * | accepted | pending | NULL | NULL | unchanged | acceptImportSessionWithRows |
  * | already-linked | skipped | already_linked | NULL | unchanged | resolveAlreadyLinked(Core) |
+ * | already-linked to a person in the Bin (D-154) | skipped | already_linked (failure_reason 'in-bin') | NULL | unchanged | resolveAlreadyLinked(Core) with inBin |
  * | import as new | imported | new | set | unchanged | importer composition |
  * | link existing | linked | probable/possible | set | unchanged | link composition |
  * | ambiguous deferred | needs_review | probable/possible/needs_review | NULL | unchanged | deferNeedsReview(Core) |
@@ -416,16 +417,30 @@ export function retireRowStagedPhoto(
   );
 }
 
+/**
+ * The `failure_reason` that marks an already-linked row whose Orbit person is
+ * in the Bin (38.12 D-154): the row is skipped, never imported as a
+ * duplicate, and Import complete lists it under its own "In the Bin" outcome.
+ * A reason, not a new match_outcome, so migration 012's CHECK is unchanged.
+ */
+export const IN_BIN_REASON = "in-bin";
+
 export async function resolveAlreadyLinkedCore(
   exec: SqlExecutor,
   rowId: number,
   matchedContactId: number,
   now: string,
+  inBin = false,
 ): Promise<void> {
   const result = await exec.runAsync(
-    `UPDATE import_session_rows
-     SET row_status = 'skipped', match_outcome = 'already_linked', matched_contact_id = ?, modified_at = ?
-     WHERE id = ?`,
+    inBin
+      ? `UPDATE import_session_rows
+         SET row_status = 'skipped', match_outcome = 'already_linked', matched_contact_id = ?,
+             failure_reason = '${IN_BIN_REASON}', modified_at = ?
+         WHERE id = ?`
+      : `UPDATE import_session_rows
+         SET row_status = 'skipped', match_outcome = 'already_linked', matched_contact_id = ?, modified_at = ?
+         WHERE id = ?`,
     [matchedContactId, now, rowId],
   );
   assertOneChange(result, "resolveAlreadyLinkedCore", rowId);
@@ -436,9 +451,10 @@ export function resolveAlreadyLinked(
   rowId: number,
   matchedContactId: number,
   now: string,
+  inBin = false,
 ): Promise<void> {
   return inWriteTransaction(exec, () =>
-    resolveAlreadyLinkedCore(exec, rowId, matchedContactId, now),
+    resolveAlreadyLinkedCore(exec, rowId, matchedContactId, now, inBin),
   );
 }
 

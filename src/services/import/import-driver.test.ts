@@ -162,6 +162,7 @@ describe("runImportBatch", () => {
       imported: ["New Person"],
       linked: [],
       alreadyInOrbit: ["Already Orbit"],
+      inBin: [],
       skippedByUser: [],
       skippedNoName: [],
       failed: ["Unnamed contact"],
@@ -594,5 +595,46 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
         (row) => row.rowStatus,
       ),
     ).toEqual(["imported", "imported"]);
+  });
+});
+
+describe("a phone contact linked only to a person in the Bin (38.12 D-154)", () => {
+  it("is skipped, never imported as a duplicate, and listed under In the Bin", async () => {
+    const binnedId = await createLinkedContact("binned-link");
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      binnedId,
+    ]);
+    const before = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM contacts",
+    );
+    const session = await createSession([
+      {
+        externalContactId: "binned-link",
+        sourcePayload: payload("Phone Name", []),
+      },
+    ]);
+    const summary = await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+    });
+    expect(summary.inBin.people.map((person) => person.name)).toEqual([
+      "Already Orbit",
+    ]);
+    expect(summary.alreadyInOrbit.count).toBe(0);
+    expect(summary.imported.count).toBe(0);
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM contacts",
+      ),
+    ).toEqual(before);
+    expect(await listSessionRows(exec, session.sessionId)).toEqual([
+      expect.objectContaining({
+        rowStatus: "skipped",
+        matchOutcome: "already_linked",
+        matchedContactId: binnedId,
+        failureReason: "in-bin",
+      }),
+    ]);
   });
 });

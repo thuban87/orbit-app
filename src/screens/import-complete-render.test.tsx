@@ -223,6 +223,7 @@ function summary(overrides: Record<string, unknown> = {}) {
     imported: bucket([]),
     linked: bucket([]),
     alreadyInOrbit: bucket([]),
+    inBin: bucket([]),
     skippedByUser: bucket([]),
     skippedNoName: bucket([]),
     failed: bucket([]),
@@ -285,6 +286,17 @@ describe("Import complete shows only non-zero outcomes (D-55)", () => {
     );
     const tree = await loaded();
     expect(headers(tree)).toEqual(["Imported (1)"]);
+  });
+
+  it("a pick linked to a person in the Bin has its own In the Bin outcome (38.12 D-154)", async () => {
+    mocks.sessionSummaryCounts.mockResolvedValue(
+      summary({
+        alreadyInOrbit: bucket(people("Alr", 1, true)),
+        inBin: bucket(people("Bin", 2, true)),
+      }),
+    );
+    const tree = await loaded();
+    expect(headers(tree)).toEqual(["Already in Orbit (1)", "In the Bin (2)"]);
   });
 
   it("an already-linked-only session shows Already in Orbit and no Skipped by you (B-2)", async () => {

@@ -64,6 +64,9 @@ const OUTCOME_BUCKETS: ReadonlyArray<{
   { key: "imported", title: "Imported", opens: true },
   { key: "linked", title: "Linked", opens: true },
   { key: "alreadyInOrbit", title: "Already in Orbit", opens: false },
+  // D-154: linked to a person in the Bin; never imported as a duplicate.
+  // Names are not tappable, like "Already in Orbit".
+  { key: "inBin", title: "In the Bin", opens: false },
   { key: "skippedByUser", title: "Skipped by you", opens: false },
   // B-3 (convergence c2): name-required skips keep their own outcome.
   { key: "skippedNoName", title: "Skipped — no name", opens: false },

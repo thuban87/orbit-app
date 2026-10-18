@@ -56,6 +56,7 @@ import {
   openContactFromFlow,
 } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { restoreFromBinWithUndo } from "@/services/contacts/restore-from-bin";
 import { getDeviceRegion } from "@/services/device-region";
 import {
   type DuplicateEvidenceCandidate,
@@ -155,6 +156,8 @@ export function ImportReviewScreen({
   // 38.12 D-53: an already-linked pick, decided and resolved at load.
   const [alreadyLinked, setAlreadyLinked] =
     useState<AlreadyLinkedReview | null>(null);
+  // D-154: a Restore from the "In the Bin" view is in flight.
+  const [restoringFromBin, setRestoringFromBin] = useState(false);
 
   // 38.12 D-110: a single import or link finishes where the import was
   // started (Settings → Contacts & Relationships by default), with a View
@@ -353,6 +356,7 @@ export function ImportReviewScreen({
           rowId,
           result.deterministicContactId,
           now,
+          result.inBin,
         );
         await finalizeSessionIfTerminal(exec, route.params.sessionId, now);
         markImportComplete();
@@ -482,9 +486,32 @@ export function ImportReviewScreen({
     return (
       <ImportReviewAlreadyLinked
         name={alreadyLinked.name}
+        inBin={alreadyLinked.inBin}
+        restoring={restoringFromBin}
         onOpen={() =>
           openContactFromFlow(navigation, host, alreadyLinked.contactId)
         }
+        // D-154: Restore brings the person back (Bin effects + Undo); the
+        // phone link is kept, so the view becomes "Already in Orbit".
+        onRestore={() => {
+          if (restoringFromBin) return;
+          setRestoringFromBin(true);
+          void restoreFromBinWithUndo(getExecutor(), {
+            contactId: alreadyLinked.contactId,
+            name: alreadyLinked.name,
+            onUndone: () =>
+              setAlreadyLinked((current) =>
+                current ? { ...current, inBin: true } : current,
+              ),
+          })
+            .then((restored) => {
+              if (restored)
+                setAlreadyLinked((current) =>
+                  current ? { ...current, inBin: false } : current,
+                );
+            })
+            .finally(() => setRestoringFromBin(false));
+        }}
         onDone={finishAlreadyLinked}
       />
     );

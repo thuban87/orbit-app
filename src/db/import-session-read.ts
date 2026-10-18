@@ -1,6 +1,7 @@
 import { sanitiseImportLifecycle } from "@/db/import-lifecycle";
 import {
   discardSession,
+  IN_BIN_REASON,
   type ImportLifecycle,
   type ImportMatchOutcome,
   type ImportSessionMode,
@@ -318,6 +319,8 @@ export type SummaryBucketKey =
   | "imported"
   | "linked"
   | "alreadyInOrbit"
+  /** Already linked to a person in the Bin (38.12 D-154). */
+  | "inBin"
   | "skippedByUser"
   | "skippedNoName"
   | "failed"
@@ -359,7 +362,8 @@ function sourceDisplayName(value: string): string | null {
  * reason still set (`setRowContactCore` writes contact_id/row_status only), so
  * imported and linked ignore it. Only skipped rows split by match_outcome and
  * failure_reason: already-linked (B-2: `resolveAlreadyLinkedCore` writes
- * skipped + already_linked + NULL reason), name-required (B-3), a NULL reason
+ * skipped + already_linked; with the 'in-bin' reason it is the D-154 "In the
+ * Bin" outcome), name-required (B-3), a NULL reason
  * (the user's Skip). A skipped row with any other reason — no writer produces
  * one today — reads as failed. Pending rows have no bucket.
  */
@@ -380,7 +384,8 @@ export function summaryBucketFor(row: {
     case "pending":
       return null;
     case "skipped":
-      if (row.matchOutcome === "already_linked") return "alreadyInOrbit";
+      if (row.matchOutcome === "already_linked")
+        return row.failureReason === IN_BIN_REASON ? "inBin" : "alreadyInOrbit";
       if (row.failureReason === "name-required") return "skippedNoName";
       if (row.failureReason === null) return "skippedByUser";
       return "failed";
@@ -419,6 +424,7 @@ export async function sessionSummaryCounts(
     imported: emptyBucket(),
     linked: emptyBucket(),
     alreadyInOrbit: emptyBucket(),
+    inBin: emptyBucket(),
     skippedByUser: emptyBucket(),
     skippedNoName: emptyBucket(),
     failed: emptyBucket(),

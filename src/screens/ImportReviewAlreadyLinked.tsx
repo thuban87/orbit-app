@@ -8,6 +8,13 @@
  * already_linked branch makes, which stays as a race fallback), then shows
  * "Already in Orbit as <name>" with Open and Done. No paused import is left.
  *
+ * 38.12 D-154: when that Orbit person is in the Bin, the pick is never
+ * imported as a duplicate either. The row is resolved the same way (with the
+ * 'in-bin' reason, so Import complete counts it under "In the Bin") and the
+ * view shows "In the Bin: <name>" with Restore and Done. Restore brings the
+ * person back with the Bin list's effects and Undo; the existing phone link
+ * is kept, and the view then reads "Already in Orbit as <name>" with Open.
+ *
  * No colour literal (check:colors).
  */
 import { StyleSheet, View } from "react-native";
@@ -20,12 +27,14 @@ import {
   resolveAlreadyLinked,
 } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
-import { findActiveExternalLink } from "@/services/import/duplicate-evidence";
+import { findActiveExternalLinkTarget } from "@/services/import/duplicate-evidence";
 import { SPACING } from "@/theme/tokens/spacing";
 
 export interface AlreadyLinkedReview {
   contactId: number;
   name: string;
+  /** The linked person is in the Bin (D-154). */
+  inBin: boolean;
 }
 
 /**
@@ -44,25 +53,34 @@ export async function resolveAlreadyLinkedReview(
 ): Promise<AlreadyLinkedReview | null> {
   // The deterministic lookup scoreImportCandidate runs first (its
   // already_linked outcome), without the duplicate scoring.
-  const contactId = await findActiveExternalLink(
+  const linked = await findActiveExternalLinkTarget(
     exec,
     "android",
     input.externalContactId,
   );
-  if (contactId == null) return null;
+  if (linked == null) return null;
+  const { contactId, inBin } = linked;
   const header = await getContactHeader(exec, contactId);
-  await resolveAlreadyLinked(exec, input.rowId, contactId, input.now);
+  await resolveAlreadyLinked(exec, input.rowId, contactId, input.now, inBin);
   await finalizeSessionIfTerminal(exec, input.sessionId, input.now);
-  return { contactId, name: header?.name ?? "" };
+  return { contactId, name: header?.name ?? "", inBin };
 }
 
 export function ImportReviewAlreadyLinked({
   name,
+  inBin = false,
+  restoring = false,
   onOpen,
+  onRestore,
   onDone,
 }: {
   name: string;
+  /** D-154: the linked person is in the Bin. */
+  inBin?: boolean;
+  /** A Restore is in flight: the button is disabled. */
+  restoring?: boolean;
   onOpen: () => void;
+  onRestore?: () => void;
   onDone: () => void;
 }) {
   return (
@@ -70,10 +88,20 @@ export function ImportReviewAlreadyLinked({
       <ShellAppBar variant="child" title="Review import" onBack={onDone} />
       <View style={styles.content}>
         <AppText role="body" testID="import-review-already-linked-message">
-          {`Already in Orbit as ${name}`}
+          {inBin ? `In the Bin: ${name}` : `Already in Orbit as ${name}`}
         </AppText>
         <View style={styles.actions}>
-          <Button role="primary" label="Open" onPress={onOpen} />
+          {inBin ? (
+            <Button
+              role="primary"
+              label="Restore"
+              accessibilityLabel={`Restore ${name}`}
+              disabled={restoring}
+              onPress={() => onRestore?.()}
+            />
+          ) : (
+            <Button role="primary" label="Open" onPress={onOpen} />
+          )}
           <Button role="secondary" label="Done" onPress={onDone} />
         </View>
       </View>

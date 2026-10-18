@@ -176,6 +176,9 @@ vi.mock("./existing-contact-choices", () => ({
       photo: null,
     })),
 }));
+vi.mock("@/services/contacts/restore-from-bin", () => ({
+  restoreFromBinWithUndo: vi.fn(async () => true),
+}));
 vi.mock("./ImportReviewAlreadyLinked", () => ({
   ImportReviewAlreadyLinked: "ImportReviewAlreadyLinked",
   resolveAlreadyLinkedReview: async () => null,
@@ -423,6 +426,7 @@ describe("Import review forwards the flow host to ImportComplete (D-110, B-1)", 
     mocks.scoreImportCandidate.mockResolvedValue({
       outcome: "already_linked",
       deterministicContactId: 9,
+      inBin: false,
       candidates: [],
     });
     await pressImport();
@@ -431,6 +435,7 @@ describe("Import review forwards the flow host to ImportComplete (D-110, B-1)", 
       11,
       9,
       "2026-10-17 12:00:00",
+      false,
     );
     expect(navigation.replace).toHaveBeenCalledWith("ImportComplete", {
       sessionId: 1,

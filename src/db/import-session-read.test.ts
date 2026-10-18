@@ -693,3 +693,23 @@ describe("import-session-read shares the lifecycle sanitiser with setup (D-58)",
     },
   );
 });
+
+describe("summaryBucketFor: In the Bin (38.12 D-154)", () => {
+  it("an already-linked row with the in-bin reason is In the Bin, else Already in Orbit", async () => {
+    const { summaryBucketFor } = await import("@/db/import-session-read");
+    expect(
+      summaryBucketFor({
+        rowStatus: "skipped",
+        matchOutcome: "already_linked",
+        failureReason: "in-bin",
+      }),
+    ).toBe("inBin");
+    expect(
+      summaryBucketFor({
+        rowStatus: "skipped",
+        matchOutcome: "already_linked",
+        failureReason: null,
+      }),
+    ).toBe("alreadyInOrbit");
+  });
+});

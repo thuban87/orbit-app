@@ -56,6 +56,8 @@ export type DuplicateEvidenceResult =
   | {
       outcome: "already_linked";
       deterministicContactId: number;
+      /** The linked person is in the Bin (38.12 D-154). */
+      inBin: boolean;
       candidates: [];
     }
   | {
@@ -200,6 +202,32 @@ export async function findActiveExternalLink(
 }
 
 /**
+ * The one active link's person and whether they are in the Bin (38.12
+ * D-154). The active partial-unique index allows one active link per phone
+ * contact, so a phone contact is never linked to both a live person and a
+ * person in the Bin at once; a live link therefore always "wins".
+ */
+export async function findActiveExternalLinkTarget(
+  exec: SqlExecutor,
+  provider: string,
+  externalContactId: string,
+): Promise<{ contactId: number; inBin: boolean } | null> {
+  const row = await exec.getFirstAsync<{
+    contact_id: number;
+    archived_at: string | null;
+  }>(
+    `SELECT l.contact_id, c.archived_at
+       FROM external_contact_links l
+       JOIN contacts c ON c.id = l.contact_id
+      WHERE l.provider = ? AND l.external_contact_id = ? AND l.is_active = 1`,
+    [provider, externalContactId],
+  );
+  return row
+    ? { contactId: row.contact_id, inBin: row.archived_at !== null }
+    : null;
+}
+
+/**
  * Collect duplicate evidence without writing or exposing a numeric score.
  * Task 2 applies the conservative advisory ladder to this evidence set.
  */
@@ -207,15 +235,16 @@ export async function scoreImportCandidate(
   exec: SqlExecutor,
   input: ScoreImportCandidateInput,
 ): Promise<DuplicateEvidenceResult> {
-  const deterministicContactId = await findActiveExternalLink(
+  const linked = await findActiveExternalLinkTarget(
     exec,
     "android",
     input.externalContactId,
   );
-  if (deterministicContactId != null) {
+  if (linked) {
     return {
       outcome: "already_linked",
-      deterministicContactId,
+      deterministicContactId: linked.contactId,
+      inBin: linked.inBin,
       candidates: [],
     };
   }

@@ -96,7 +96,7 @@ describe("resolveAlreadyLinkedReview (D-53)", () => {
       now: NOW,
     });
 
-    expect(result).toEqual({ contactId, name: "Ada Lovelace" });
+    expect(result).toEqual({ contactId, name: "Ada Lovelace", inBin: false });
     expect(await listSessionRows(exec, sessionId)).toEqual([
       expect.objectContaining({
         id: rowId,
@@ -184,6 +184,58 @@ describe("ImportReviewAlreadyLinked view (D-53)", () => {
           (typeof n.type === "string" && /Input|Editor|Picker/.test(n.type)),
       ),
     ).toBe(false);
+  });
+});
+
+describe("a pick linked only to a person in the Bin (38.12 D-154)", () => {
+  it("resolves the row as In the Bin and finalizes the session", async () => {
+    const contactId = await seedLinkedContact("ext-binned");
+    await exec.runAsync("UPDATE contacts SET archived_at = ? WHERE id = ?", [
+      NOW,
+      contactId,
+    ]);
+    const { sessionId, rowId } = await singleSession("ext-binned");
+    const result = await resolveAlreadyLinkedReview(exec, {
+      sessionId,
+      rowId,
+      externalContactId: "ext-binned",
+      now: NOW,
+    });
+    expect(result).toEqual({ contactId, name: "Ada Lovelace", inBin: true });
+    expect(await listSessionRows(exec, sessionId)).toEqual([
+      expect.objectContaining({
+        rowStatus: "skipped",
+        matchOutcome: "already_linked",
+        failureReason: "in-bin",
+      }),
+    ]);
+    expect(await getSessionById(exec, sessionId)).toEqual(
+      expect.objectContaining({ status: "complete" }),
+    );
+  });
+
+  it("shows In the Bin: <name> with Restore and Done", () => {
+    const onRestore = vi.fn();
+    const onDone = vi.fn();
+    const tree = nodes(
+      ImportReviewAlreadyLinked({
+        name: "Ada Lovelace",
+        inBin: true,
+        onOpen: vi.fn(),
+        onRestore,
+        onDone,
+      }),
+    );
+    const message = tree.find(
+      (n) => n.props.testID === "import-review-already-linked-message",
+    );
+    expect(message?.props.children).toBe("In the Bin: Ada Lovelace");
+    const buttons = tree.filter((n) => n.type === "Button");
+    expect(buttons.map((b) => b.props.label)).toEqual(["Restore", "Done"]);
+    (buttons[0].props.onPress as () => void)();
+    expect(onRestore).toHaveBeenCalledOnce();
+    (buttons[1].props.onPress as () => void)();
+    expect(onDone).toHaveBeenCalledOnce();
   });
 });
 

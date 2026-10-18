@@ -219,11 +219,14 @@ async function runImportPass(
             effectivePhoneRegion: session.phoneRegion,
           });
           if (scored.outcome === "already_linked") {
+            // D-154: a person in the Bin is never imported as a duplicate;
+            // the row is skipped under its own "In the Bin" outcome.
             await resolveAlreadyLinked(
               exec,
               row.id,
               scored.deterministicContactId,
               params.now,
+              scored.inBin,
             );
           } else if (scored.outcome === "new") {
             const created = await importRowAsNew(exec, {
