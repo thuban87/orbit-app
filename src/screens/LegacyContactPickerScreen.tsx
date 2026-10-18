@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText and Button `role` are Orbit typography/button-role props, not ARIA.
 import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -6,14 +7,14 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/Avatar";
 import { usePhotoBudgetPrompt } from "@/components/PhotoBudgetSheet";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { Button, EmptyState } from "@/components/ui";
+import { AppText, Button, EmptyState } from "@/components/ui";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -64,6 +65,8 @@ export function LegacyContactPickerScreen({
   route,
 }: RootStackScreenProps<"LegacyContactPicker">) {
   const { colors } = useTheme();
+  // 38.12 D-57: the Import bar clears the system navigation area.
+  const bottomInset = useSafeAreaInsets().bottom;
   // 38.12 D-57/D-110: the flow host this picker was opened from. "Not now"
   // leaves through it (Phase 39 retargets a first-run import via the host,
   // 39 D-61) and the import carries it on to review.
@@ -220,7 +223,10 @@ export function LegacyContactPickerScreen({
   return (
     <View testID="legacy-contact-picker-screen" style={styles.root}>
       <ShellAppBar variant="child" title="Import contacts" />
-      <View style={styles.body}>
+      <View
+        testID="legacy-picker-body"
+        style={[styles.body, { paddingBottom: 16 + bottomInset }]}
+      >
         {loadState === "loading" ? (
           <PickerMessage>Checking contact access…</PickerMessage>
         ) : loadState === "priming" ? (
@@ -282,17 +288,32 @@ export function LegacyContactPickerScreen({
               ]}
             />
             {omittedCount > 0 ? (
-              <Text style={[styles.notice, { color: colors.textSecondary }]}>
+              <AppText role="caption">
                 {omittedCount} selected contact
                 {omittedCount === 1 ? " is" : "s are"} no longer available.
-              </Text>
+              </AppText>
             ) : null}
             <FlatList
               data={filteredRows}
               keyExtractor={(row) => row.lookupKey}
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={
-                <PickerMessage>No contacts on this device</PickerMessage>
+                query.trim() !== "" ? (
+                  // 38.12 D-57: a search that found nobody says so.
+                  <EmptyState
+                    testID="legacy-picker-no-match"
+                    icon="search"
+                    heading="No contacts match"
+                    term={query.trim()}
+                    body="Try a different name, number or email."
+                    action={{
+                      label: "Clear search",
+                      onPress: () => setQuery(""),
+                    }}
+                  />
+                ) : (
+                  <PickerMessage>No contacts on this device</PickerMessage>
+                )
               }
               renderItem={({ item }) => {
                 const selected = selectedLookupKeys.has(item.lookupKey);
@@ -322,22 +343,13 @@ export function LegacyContactPickerScreen({
                       <Avatar photo={null} name={item.displayName} size={40} />
                     )}
                     <View style={styles.rowCopy}>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.rowName, { color: colors.textPrimary }]}
-                      >
+                      <AppText role="body" numberOfLines={1}>
                         {item.displayName}
-                      </Text>
+                      </AppText>
                       {item.primaryMethod ? (
-                        <Text
-                          numberOfLines={1}
-                          style={[
-                            styles.subtitle,
-                            { color: colors.textSecondary },
-                          ]}
-                        >
+                        <AppText role="caption" numberOfLines={1}>
                           {item.primaryMethod}
-                        </Text>
+                        </AppText>
                       ) : null}
                     </View>
                     <View
@@ -353,9 +365,9 @@ export function LegacyContactPickerScreen({
                         },
                       ]}
                     >
-                      <Text style={{ color: colors.onAccent }}>
+                      <AppText role="label" style={{ color: colors.onAccent }}>
                         {selected ? "✓" : ""}
-                      </Text>
+                      </AppText>
                     </View>
                   </Pressable>
                 );
@@ -366,6 +378,7 @@ export function LegacyContactPickerScreen({
 
         {loadState === "ready" ? (
           <Pressable
+            testID="legacy-picker-import"
             accessibilityRole="button"
             accessibilityLabel={`Import ${plural(selectedCount, "contact")}`}
             disabled={importing || selectedCount === 0}
@@ -378,9 +391,9 @@ export function LegacyContactPickerScreen({
               },
             ]}
           >
-            <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+            <AppText role="label" style={{ color: colors.onAccent }}>
               Import ({selectedCount})
-            </Text>
+            </AppText>
           </Pressable>
         ) : null}
       </View>
@@ -393,7 +406,9 @@ function PickerMessage({ children }: { children: string }) {
   const { colors } = useTheme();
   return (
     <View style={styles.message}>
-      <Text style={{ color: colors.textSecondary }}>{children}</Text>
+      <AppText role="body" style={{ color: colors.textSecondary }}>
+        {children}
+      </AppText>
     </View>
   );
 }
@@ -417,15 +432,16 @@ function PermissionMessage({
   const { colors } = useTheme();
   return (
     <View style={styles.permissionMessage}>
-      <Text style={[styles.permissionCopy, { color: colors.textSecondary }]}>
+      <AppText
+        role="body"
+        style={[styles.permissionCopy, { color: colors.textSecondary }]}
+      >
         {copy}
-      </Text>
+      </AppText>
       <Button role="primary" label={actionLabel} onPress={onAction} />
       {secondaryAction ? (
         <View style={styles.secondaryAction}>
-          <Text style={{ color: colors.textSecondary }}>
-            {secondaryAction.copy}
-          </Text>
+          <AppText role="caption">{secondaryAction.copy}</AppText>
           <Button
             role="secondary"
             label={secondaryAction.label}
@@ -445,7 +461,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, padding: 16, gap: 16 },
   message: { flex: 1, justifyContent: "center", alignItems: "center" },
   permissionMessage: { flex: 1, justifyContent: "center", gap: 16 },
-  permissionCopy: { fontSize: 16, lineHeight: 24, textAlign: "center" },
+  permissionCopy: { textAlign: "center" },
   secondaryAction: { alignItems: "center", gap: 8 },
   search: {
     minHeight: 44,
@@ -453,7 +469,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
   },
-  notice: { fontSize: 14 },
   listContent: { gap: 8, paddingBottom: 8 },
   row: {
     minHeight: 60,
@@ -475,8 +490,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 4,
   },
-  rowName: { fontSize: 16 },
-  subtitle: { fontSize: 14 },
   importButton: {
     minHeight: 48,
     alignItems: "center",

@@ -211,9 +211,7 @@ async function flush() {
   }
 }
 
-async function settled(
-  params: Params = DIGEST_PARAMS,
-): Promise<TestElement[]> {
+async function settled(params: Params = DIGEST_PARAMS): Promise<TestElement[]> {
   render(params);
   await flush();
   return render(params);
@@ -423,5 +421,82 @@ describe("legacy picker import (D-57, D-110)", () => {
       decidePhotoBudget: mocks.askPhotoBudget,
     });
     expect(mocks.showSnackbar).not.toHaveBeenCalled();
+  });
+});
+
+describe("legacy picker polish (D-57)", () => {
+  async function loadedList(): Promise<TestElement[]> {
+    granted();
+    mocks.listContactsSummary.mockResolvedValue(SUMMARIES);
+    return settled();
+  }
+
+  function list(tree: TestElement[]): TestElement {
+    const found = tree.find((node) => node.type === "FlatList");
+    if (!found) throw new Error("no list");
+    return found;
+  }
+
+  it("an empty search shows the EmptyState 'No contacts match', and Clear search restores the list", async () => {
+    let tree = await loadedList();
+    const search = tree.find((node) => node.type === "TextInput");
+    if (!search) throw new Error("no search");
+    (search.props.onChangeText as (value: string) => void)("zzz");
+    tree = render();
+    expect(list(tree).props.data).toEqual([]);
+    const empty = list(tree).props.ListEmptyComponent as TestElement;
+    expect(empty.type).toBe("EmptyState");
+    expect(empty.props).toMatchObject({
+      testID: "legacy-picker-no-match",
+      heading: "No contacts match",
+      term: "zzz",
+    });
+    const action = empty.props.action as { label: string; onPress: () => void };
+    expect(action.label).toBe("Clear search");
+    action.onPress();
+    tree = render();
+    expect(list(tree).props.data).toHaveLength(2);
+  });
+
+  it("a device with no contacts still says so, not 'No contacts match'", async () => {
+    granted();
+    mocks.listContactsSummary.mockResolvedValue([]);
+    const tree = await settled();
+    const empty = list(tree).props.ListEmptyComponent as TestElement;
+    expect(empty.type).not.toBe("EmptyState");
+    expect(text(empty)).toBe("No contacts on this device");
+  });
+
+  it("keeps the bottom safe-area inset under the Import bar", async () => {
+    const tree = await loadedList();
+    const body = tree.find(
+      (node) => node.props.testID === "legacy-picker-body",
+    );
+    if (!body) throw new Error("no body");
+    const style = (body.props.style as object[]).flat();
+    expect(style).toContainEqual({ paddingBottom: 16 + 24 });
+    const importAt = tree.findIndex(
+      (node) => node.props.testID === "legacy-picker-import",
+    );
+    expect(importAt).toBeGreaterThan(tree.indexOf(body));
+  });
+
+  it("renders its copy through AppText roles, with no raw Text", async () => {
+    const tree = await selectAnn();
+    expect(tree.some((node) => node.type === "Text")).toBe(false);
+    const importLabel = nodes(
+      control(tree, "Import 1 contact").props.children as ReactNode,
+    ).find((node) => node.type === "AppText");
+    expect(importLabel?.props.role).toBe("label");
+    const row = (
+      list(tree).props.renderItem as (info: { item: unknown }) => TestElement
+    )({ item: (list(tree).props.data as unknown[])[0] });
+    const rowText = nodes(row).filter((node) => node.type === "AppText");
+    expect(rowText.map((node) => node.props.role)).toEqual([
+      "body",
+      "caption",
+      "label",
+    ]);
+    expect(nodes(row).some((node) => node.type === "Text")).toBe(false);
   });
 });
