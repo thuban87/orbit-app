@@ -156,6 +156,7 @@ import {
 import { navigationRef } from "@/navigation/linking";
 import { openProfileInContactsTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
@@ -307,6 +308,8 @@ export function CreateContactScreen({
   host,
 }: CreateContactScreenProps) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   // Every seeded field starts from the same seed the guard's baseline uses.
   const [seed] = useState(createFormSeedState);
 
@@ -851,7 +854,7 @@ export function CreateContactScreen({
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {/* House header (38.9 D-16, D-44): its Back calls goBack, which the
           unsaved-work guard above intercepts (D-13). While a save runs the
           guard holds Back, so the header draws it disabled (D-26; WR-02). */}

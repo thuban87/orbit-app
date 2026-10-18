@@ -17,6 +17,7 @@ import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useBackActsAsDone } from "@/navigation/back-acts-as-done";
 import { DEFAULT_FLOW_HOST, finishFlow } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { useTheme } from "@/theme";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
@@ -53,6 +54,8 @@ export function ReconcileCompleteScreen({
   route,
 }: RootStackScreenProps<"ReconcileComplete">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   // RG-035 / D-24: the initial read is a real loading state; the read-error
   // copy renders only after the read actually failed. Only the latest request
   // may publish (D-23); Retry re-reads and never re-runs the check.
@@ -90,7 +93,7 @@ export function ReconcileCompleteScreen({
   );
   if (phase.phase === "loading")
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         {header}
         <View style={styles.frame}>
           <View
@@ -108,7 +111,10 @@ export function ReconcileCompleteScreen({
     );
   if (phase.phase === "error")
     return (
-      <View testID="reconcile-complete-read-error" style={styles.root}>
+      <View
+        testID="reconcile-complete-read-error"
+        style={[styles.root, { paddingBottom: bottomInset }]}
+      >
         {header}
         <View style={styles.frame}>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
@@ -131,7 +137,10 @@ export function ReconcileCompleteScreen({
     );
   const counts = phase.data;
   return (
-    <View testID="reconcile-complete-screen" style={styles.root}>
+    <View
+      testID="reconcile-complete-screen"
+      style={[styles.root, { paddingBottom: bottomInset }]}
+    >
       {header}
       <View style={styles.frame}>
         <View style={styles.counts}>

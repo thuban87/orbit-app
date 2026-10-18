@@ -80,6 +80,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { setProfilePhoto } from "@/db/profile-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import type { CropRect } from "@/services/photos/crop-geometry";
 import { cropRectFromTransform } from "@/services/photos/crop-geometry";
 import { discardDerivative } from "@/services/photos/derivative-cache";
@@ -158,6 +159,8 @@ export function CropPhotoScreen({
   route,
 }: RootStackScreenProps<"CropPhoto">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { rawUri, target, hold } = route.params;
   const { width: screenW } = useWindowDimensions();
 
@@ -441,7 +444,10 @@ export function CropPhotoScreen({
   ]);
 
   return (
-    <View testID="crop-photo-screen" style={styles.root}>
+    <View
+      testID="crop-photo-screen"
+      style={[styles.root, { paddingBottom: bottomInset }]}
+    >
       {/* House header with the ✕ Cancel (38.9 D-16, D-59): the screen's one
           exit, so the footer Cancel is gone (D-07). It goes back without
           saving, as the footer Cancel did. */}

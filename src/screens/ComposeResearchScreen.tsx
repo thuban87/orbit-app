@@ -38,6 +38,7 @@ import {
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { useComposeSession } from "@/stores/compose-session-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -79,6 +80,8 @@ export function ComposeResearchScreen({
   contactId,
 }: ComposeResearchScreenProps) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [header, setHeader] = useState<ResearchHeader | null>(null);
   const messageFocus = useComposeSession((state) => state.messageFocus);
@@ -129,7 +132,7 @@ export function ComposeResearchScreen({
 
   // No opaque screen fill: the theme art shows (38.9 D-17).
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingBottom: bottomInset }]}>
       {/* House header titled "Research" (38.9 D-16, D-58) with the same person
           line Compose shows, so the two sibling sides stay oriented (D-45,
           D-14-010). Back pops to Compose with the session (draft + Message

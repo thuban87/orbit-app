@@ -14,6 +14,7 @@ import {
 } from "@/db/merge-impact-read";
 import { DEFAULT_FLOW_HOST, finishFlowOnProfile } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-rehome";
 import { confirm } from "@/stores/confirm-store";
@@ -27,6 +28,8 @@ export function MergeImpactSummary({
   route,
 }: RootStackScreenProps<"MergeImpactSummary">) {
   const theme = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { colors } = theme;
   const { survivorId, absorbedId, resolutions } = route.params;
   // 38.12 D-110: a merge finishes where it was started. A Profile ⋯ merge
@@ -133,7 +136,7 @@ export function MergeImpactSummary({
   // the absorbed person's own are listed as not kept.
   const droppedRows = dropped ? mergeDroppedLines(dropped) : [];
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingBottom: bottomInset }]}>
       {/* House header with the ✕ Cancel (38.9 D-16, D-59): it abandons the
           merge and goes back; nothing is written until the Merge confirm. */}
       <ShellAppBar

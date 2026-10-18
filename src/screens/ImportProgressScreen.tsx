@@ -10,6 +10,7 @@ import { ShellAppBar } from "@/components/ShellAppBar";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getSessionById, sessionRowCounts } from "@/db/import-session-read";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { runImportBatch } from "@/services/import/import-driver";
 import {
   followImportRun,
@@ -42,6 +43,8 @@ export function ImportProgressScreen({
   route,
 }: RootStackScreenProps<"ImportProgress">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const [state, setState] = useState<ImportProgressPhase>({
     phase: "running",
     done: 0,
@@ -142,7 +145,10 @@ export function ImportProgressScreen({
   if (state.phase === "stopped") {
     const readable = state.outcome === "summary-available";
     return (
-      <View testID="import-progress-stopped" style={styles.root}>
+      <View
+        testID="import-progress-stopped"
+        style={[styles.root, { paddingBottom: bottomInset }]}
+      >
         <ShellAppBar variant="child" title="Import contacts" />
         <View style={styles.body}>
           <Text
@@ -182,7 +188,7 @@ export function ImportProgressScreen({
   const { done, total } = state;
   const progress = total === 0 ? 0 : Math.min(done / total, 1);
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       <ShellAppBar variant="child" title="Import contacts" />
       <View style={styles.body}>
         <Text

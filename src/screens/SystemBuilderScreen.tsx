@@ -66,6 +66,7 @@ import {
 import { applyMembershipOverrides } from "@/logic/system-rule-resolver";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import {
   type ProvisionalOrreryScene,
   readProvisionalOrreryScene,
@@ -223,6 +224,8 @@ function BuilderBackgroundCanvas() {
 
 export function SystemBuilderScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const focused = useIsFocused();
   const systemRef = route.params?.systemRef;
   const customRef = route.params?.systemUid
@@ -560,7 +563,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
   const backKind = page === "members" || previewing ? "back" : "cancel";
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       <BuilderBackgroundCanvas />
       {previewing && previewScene ? (
         <SystemPreviewCanvas

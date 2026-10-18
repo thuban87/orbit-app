@@ -25,6 +25,7 @@ import {
   openContactFromFlow,
 } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { runImportBatch } from "@/services/import/import-driver";
 import {
   retryImportedPhoto,
@@ -127,6 +128,8 @@ export function ImportCompleteScreen({
 }: RootStackScreenProps<"ImportComplete">) {
   useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   // 38.3 review B-WR-04 (D-04, RG-035): the summary read is a ReadPhase gated
   // by one latest-request authority, like ReconcileComplete. A read failure
   // renders a read-error state with a read-only Retry; a failed Retry/Skip
@@ -247,7 +250,7 @@ export function ImportCompleteScreen({
 
   if (phase.phase === "loading") {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         {header}
         <View style={styles.frame}>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
@@ -260,7 +263,10 @@ export function ImportCompleteScreen({
 
   if (phase.phase === "error") {
     return (
-      <View testID="import-complete-read-error" style={styles.root}>
+      <View
+        testID="import-complete-read-error"
+        style={[styles.root, { paddingBottom: bottomInset }]}
+      >
         {header}
         <View style={styles.frame}>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
@@ -295,7 +301,10 @@ export function ImportCompleteScreen({
   // content scrolls and the actions sit after the scroll region, always
   // reachable (the D-49 resume-prompt shape).
   return (
-    <View testID="import-complete-screen" style={styles.root}>
+    <View
+      testID="import-complete-screen"
+      style={[styles.root, { paddingBottom: bottomInset }]}
+    >
       {header}
       <View style={styles.frame}>
         <ScrollView

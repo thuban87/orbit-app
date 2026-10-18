@@ -50,6 +50,7 @@ import {
   remainingReconcileFields,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import {
   ensureReadContactsPermission,
@@ -104,6 +105,8 @@ export function ReconcileGridScreen({
   route,
 }: RootStackScreenProps<"ReconcileGrid">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const [sessionId, setSessionId] = useState<number | null>(
     route.params?.sessionId ?? null,
   );
@@ -381,7 +384,7 @@ export function ReconcileGridScreen({
   );
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {/* The shared header and its Back (38.9 D-16). */}
       <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
       {message ? (

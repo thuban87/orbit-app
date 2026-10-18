@@ -20,6 +20,7 @@ import { recommendSurvivor } from "@/logic/survivor-recommendation";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import { DEFAULT_FLOW_HOST } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { useTheme } from "@/theme";
 import {
   canContinueToImpact,
@@ -45,6 +46,8 @@ export function SurvivorSelectScreen({
   route,
 }: RootStackScreenProps<"SurvivorSelect">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   // null while the picker read is in flight (D-43).
   const [rows, setRows] = useState<PickerContactRow[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -162,7 +165,7 @@ export function SurvivorSelectScreen({
   if (onPickerStep) {
     const state = mergePickerState(rows, loadFailed);
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, { paddingBottom: bottomInset }]}>
         {header}
         <View style={styles.root}>
           {firstPerson ? (
@@ -221,7 +224,7 @@ export function SurvivorSelectScreen({
     );
   }
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingBottom: bottomInset }]}>
       {header}
       <View style={styles.root}>
         {pair?.length === 0 ? (

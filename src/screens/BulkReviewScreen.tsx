@@ -20,6 +20,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { normalizeEditedBirthday } from "@/logic/birthday-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -28,6 +29,8 @@ const LOG_SCOPE = "bulk-review-screen";
 /** Durable resolver for the import pipeline's previously count-only birthday flags. */
 export function BulkReviewScreen(_props: RootStackScreenProps<"BulkReview">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const [flags, setFlags] = useState<BulkReviewFlag[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -104,7 +107,7 @@ export function BulkReviewScreen(_props: RootStackScreenProps<"BulkReview">) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       <ShellAppBar variant="child" title="Review flagged items" />
       <ScrollView
         testID="bulk-review-screen"

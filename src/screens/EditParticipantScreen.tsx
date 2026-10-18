@@ -41,6 +41,7 @@ import {
 } from "@/logic/group-participant-patch";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
@@ -56,6 +57,8 @@ export function EditParticipantScreen({
   route,
 }: RootStackScreenProps<"EditParticipant">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { groupEventId, interactionId, contactId } = route.params;
   const [loaded, setLoaded] = useState<LoadedParticipant | null>(null);
   const [draft, setDraft] = useState<ParticipantEditDraft | null>(null);
@@ -159,7 +162,7 @@ export function EditParticipantScreen({
 
   if (!loaded || !draft) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         <ShellAppBar variant="child" title="Edit participant" />
         <View style={styles.loading}>
           {error ? (
@@ -179,7 +182,7 @@ export function EditParticipantScreen({
   // (D-13). While a save runs the guard holds Back, so it draws disabled
   // (D-26; WR-02). No opaque screen fill: the theme art shows (D-17).
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       <ShellAppBar
         variant="child"
         title="Edit participant"

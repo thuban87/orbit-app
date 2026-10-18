@@ -58,6 +58,7 @@ import {
   openContactFromFlow,
 } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { getDeviceRegion } from "@/services/device-region";
 import {
   type DuplicateEvidenceCandidate,
@@ -116,6 +117,8 @@ export function ImportReviewScreen({
 }: RootStackScreenProps<"ImportReview">) {
   useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rowId, setRowId] = useState<number | null>(null);
@@ -509,7 +512,7 @@ export function ImportReviewScreen({
   // The shared header's Back calls goBack(), which the import leave guard
   // intercepts (beforeRemove) exactly as before (38.9 D-16).
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       <ShellAppBar variant="child" title="Review import" />
       <ScrollView contentContainerStyle={styles.content}>
         {previewUri ? (

@@ -77,6 +77,7 @@ import {
 } from "@/logic/also-save-to-logic";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -113,6 +114,8 @@ export function LogInteractionScreen({
   route,
 }: RootStackScreenProps<"LogContact">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const params = route.params ?? {};
   const prefillDate = params.prefillDate;
 
@@ -324,7 +327,7 @@ export function LogInteractionScreen({
 
   if (!value) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         <ShellAppBar variant="child" title="Log Interaction" person={person} />
         <View style={styles.loading}>
           <AppText role="caption">Loading…</AppText>
@@ -348,7 +351,7 @@ export function LogInteractionScreen({
 
   // While a save runs the guard holds Back, so it draws disabled (D-26; WR-02).
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       <ShellAppBar
         variant="child"
         title="Log Interaction"

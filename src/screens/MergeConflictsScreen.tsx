@@ -19,6 +19,7 @@ import type { MergeResolutions } from "@/db/merge-dao";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { DEFAULT_FLOW_HOST } from "@/navigation/flow-host";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import {
   customConflictDisplayValues,
   customPhotoConflictChoice,
@@ -52,6 +53,8 @@ export function MergeConflictsScreen({
   route,
 }: RootStackScreenProps<"MergeConflicts">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { survivorId, absorbedId } = route.params;
   // 38.12 D-110: the flow host passes through to the merge summary, which ends
   // the merge where it was started.
@@ -178,7 +181,7 @@ export function MergeConflictsScreen({
 
   if (failed)
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, { paddingBottom: bottomInset }]}>
         {header}
         <View style={styles.root}>
           <Text style={{ color: colors.danger }}>
@@ -189,7 +192,7 @@ export function MergeConflictsScreen({
     );
   if (!data)
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, { paddingBottom: bottomInset }]}>
         {header}
         <View style={styles.root}>
           <Text style={{ color: colors.textSecondary }}>
@@ -235,7 +238,7 @@ export function MergeConflictsScreen({
   };
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingBottom: bottomInset }]}>
       {header}
       <ScrollView contentContainerStyle={styles.root}>
         <Text style={[styles.body, { color: colors.textSecondary }]}>

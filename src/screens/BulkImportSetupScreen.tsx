@@ -21,6 +21,7 @@ import {
 } from "@/db/import-session-read";
 import { resolveCategorySelection } from "@/logic/category-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { importedPhotoFs } from "@/services/import/import-photo";
 import { isImportRunActive } from "@/services/import/import-run-guard";
 import {
@@ -75,6 +76,8 @@ export function BulkImportSetupScreen({
   const isFocused = useIsFocused();
   useOpenImportSession(route.params.sessionId, bulkSetupHoldActive(isFocused));
   const theme = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { colors } = theme;
   const [count, setCount] = useState(0);
   const [categories, setCategories] = useState<
@@ -429,7 +432,7 @@ export function BulkImportSetupScreen({
 
   if (stopped) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         {header}
         <ScrollView contentContainerStyle={styles.content}>
           <Text
@@ -473,7 +476,7 @@ export function BulkImportSetupScreen({
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {header}
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.count, { color: colors.textPrimary }]}>

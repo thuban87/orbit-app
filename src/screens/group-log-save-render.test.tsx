@@ -38,6 +38,9 @@ const hooks = vi.hoisted(() => ({
   setters: [] as ReturnType<typeof vi.fn>[],
 }));
 
+vi.mock("@/navigation/use-focused-bottom-inset", () => ({
+  useFocusedBottomInset: () => 0,
+}));
 vi.mock("react", async (original) => {
   return {
     ...(await original<typeof import("react")>()),

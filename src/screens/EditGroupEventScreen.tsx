@@ -61,6 +61,7 @@ import {
 } from "@/logic/group-participant-patch";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
@@ -88,6 +89,8 @@ export function EditGroupEventScreen({
   route,
 }: RootStackScreenProps<"EditGroupEvent">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { groupEventId } = route.params;
   const [state, dispatch] = useReducer(
     groupEventEditReducer,
@@ -329,7 +332,7 @@ export function EditGroupEventScreen({
 
   if (!event || !draft) {
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, { paddingBottom: bottomInset }]}>
         {header}
         <View style={styles.loading}>
           {state.loadError ? (
@@ -346,7 +349,7 @@ export function EditGroupEventScreen({
 
   // No opaque screen fill: pushed screens show the theme art (38.9 D-17).
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingBottom: bottomInset }]}>
       {header}
       <ScrollView contentContainerStyle={styles.content}>
         <AppText role="body">{event.title}</AppText>

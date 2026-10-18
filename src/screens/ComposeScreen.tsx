@@ -140,6 +140,7 @@ import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { countContactPromptItems } from "@/screens/settings-ai-logic";
 import { AiError, type AiErrorCode, AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
@@ -245,6 +246,8 @@ export function ComposeScreen({
   route,
 }: RootStackScreenProps<"Compose">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { contactId } = route.params;
 
   const [screenState, setScreenState] = useState<ScreenState>("loading");
@@ -1192,7 +1195,7 @@ export function ComposeScreen({
   // "missing" has already navigated home (render nothing meaningful).
   if (screenState !== "ready" || header === null) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         {appBar}
         <ScrollView
           testID="compose-screen"
@@ -1262,7 +1265,7 @@ export function ComposeScreen({
   const showPicker = pickerCandidates.length >= 2 && !hasExplicitPrimary;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {appBar}
       <ScrollView
         testID="compose-screen"

@@ -29,6 +29,9 @@ const hooks = vi.hoisted(() => ({
   effectsRun: new Set<number>(),
 }));
 
+vi.mock("@/navigation/use-focused-bottom-inset", () => ({
+  useFocusedBottomInset: () => 0,
+}));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useCallback: <T,>(callback: T) => callback,

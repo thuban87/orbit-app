@@ -61,6 +61,7 @@ import {
 } from "@/logic/also-save-to-logic";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { notice } from "@/stores/confirm-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -81,6 +82,8 @@ export function EditInteractionScreen({
   route,
 }: RootStackScreenProps<"EditInteraction">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { contactId, interactionId } = route.params;
   // Person-scoped form: the person line under the fixed title (38.9 D-45).
   const person = useContactHeader(contactId);
@@ -222,7 +225,7 @@ export function EditInteractionScreen({
 
   if (notFound) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         {header}
         <View testID="edit-interaction-missing" style={styles.loading}>
           <Text style={{ color: colors.textSecondary }}>
@@ -235,7 +238,7 @@ export function EditInteractionScreen({
 
   if (!value) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         {header}
         <View testID="edit-interaction-loading" style={styles.loading}>
           <Text style={{ color: colors.textSecondary }}>Loading…</Text>
@@ -245,7 +248,7 @@ export function EditInteractionScreen({
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {header}
       <ScrollView
         testID="edit-interaction-screen"

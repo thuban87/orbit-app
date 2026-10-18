@@ -47,6 +47,7 @@ import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { type SnackbarMessage, showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -68,6 +69,8 @@ export function MemoryAddScreen({
   route,
 }: RootStackScreenProps<"Memory">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { contactId, type } = route.params;
   // Only a user-addable type is fixed on the form (Imported never, D-35).
   const fixedType = type !== undefined && canAdd(type) ? type : undefined;
@@ -238,7 +241,7 @@ export function MemoryAddScreen({
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {/* While an add runs the guard holds Back (D-26; WR-02). */}
       <ShellAppBar
         variant="child"

@@ -40,6 +40,7 @@ import {
 import { toGroupParticipantInputs } from "@/logic/group-log-participant-inputs";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -65,6 +66,8 @@ export function GroupLogScreen({
   route,
 }: RootStackScreenProps<"GroupLog">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const initialValueRef = useRef<TouchpointRefineValue | null>(null);
   if (initialValueRef.current === null)
     initialValueRef.current = newGroupValue();
@@ -165,7 +168,7 @@ export function GroupLogScreen({
   // draws disabled (D-26; WR-02). No opaque screen fill: the theme art shows
   // (D-17).
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingBottom: bottomInset }]}>
       <ShellAppBar variant="child" title="Group Log" backDisabled={saving} />
       <ScrollView
         ref={scrollRef}

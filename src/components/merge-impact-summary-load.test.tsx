@@ -25,6 +25,9 @@ const mocks = vi.hoisted(() => ({
   finishFlowOnProfile: vi.fn(),
 }));
 
+vi.mock("@/navigation/use-focused-bottom-inset", () => ({
+  useFocusedBottomInset: () => 0,
+}));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useEffect: (effect: () => unknown) => {

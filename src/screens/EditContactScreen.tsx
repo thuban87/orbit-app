@@ -166,6 +166,7 @@ import { resolveCategorySelection } from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -388,6 +389,8 @@ export function EditContactScreen({
   route,
 }: RootStackScreenProps<"Edit">) {
   const { colors } = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { contactId, focusFieldDefId } = route.params;
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
@@ -1294,7 +1297,7 @@ export function EditContactScreen({
 
   if (!form) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         <ShellAppBar variant="child" title="Edit contact" />
         <View testID="edit-contact-loading" style={styles.loading}>
           <AppText role="body" style={{ color: colors.textSecondary }}>
@@ -1328,7 +1331,7 @@ export function EditContactScreen({
   const todayDate = new Date();
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {/* House header (38.9 D-16, D-44). Title only: this is where the name and
           photo are edited, so no person line (D-64). Its Back calls goBack,
           which the unsaved-work guard above intercepts (D-13). While a save

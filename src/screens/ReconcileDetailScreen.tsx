@@ -65,6 +65,7 @@ import {
   userPrimaryPick,
 } from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { PROFILE_MERGE_LABEL } from "@/screens/contact-profile-logic";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import {
@@ -130,6 +131,8 @@ export function ReconcileDetailScreen({
   route,
 }: RootStackScreenProps<"ReconcileDetail">) {
   const theme = useTheme();
+  // DEF-01: the root clears the system navigation bar (focused workflow).
+  const bottomInset = useFocusedBottomInset();
   const { colors } = theme;
   const { contactId, sessionId, cardId } = route.params;
   useEffect(
@@ -561,7 +564,7 @@ export function ReconcileDetailScreen({
   // shared header and its one Back (38.9 D-16, D-07).
   if (!scan)
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
         <View style={styles.body}>
           {message ? (
@@ -584,7 +587,7 @@ export function ReconcileDetailScreen({
     );
   if (scan.diff.missingSource)
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingBottom: bottomInset }]}>
         <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
         <View style={styles.body}>
           <Text style={[styles.subject, { color: colors.textSecondary }]}>
@@ -639,7 +642,7 @@ export function ReconcileDetailScreen({
       </View>
     );
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingBottom: bottomInset }]}>
       <ShellAppBar variant="child" title={CHECK_LINKED_CONTACTS} />
       <View style={styles.body}>
         <View style={styles.header}>
