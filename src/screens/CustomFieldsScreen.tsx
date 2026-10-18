@@ -676,7 +676,7 @@ export function CustomFieldsScreen() {
       : `"${field.label}" has values for ${plural(count, "contact")}, so it will be quarantined for ${QUARANTINE_WINDOW_DAYS} days. You can restore it before then.`;
     // An empty field is deleted permanently: a destructive, non-dismissable
     // confirm (D-06, ADR-086). A field with values is quarantined, which is
-    // recoverable for the window (HANDOFF §14.5; "Quarantine" stays, D-41), so
+    // recoverable for the window (HANDOFF §14.5; "Quarantine" stays, D-05, D-72), so
     // it stays a plain dismissable confirm, as before.
     const confirmed = await confirm({
       title: `${verb} field`,
