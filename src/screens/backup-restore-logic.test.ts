@@ -15,6 +15,7 @@ import {
   restoreApplyConfirmation,
   restoreApplyLabel,
   restoreApplyRecovery,
+  restorePeopleComparison,
   restorePreviewFailure,
   restoreProgressLabel,
   restoreResultPeopleLines,
@@ -35,6 +36,9 @@ const preview = {
   relatedRowCount: 8,
   tombstoneCount: 2,
 };
+
+/** The people scale the Replace-all confirm states (D-60). */
+const SCALE = { phoneContacts: 12, backupContacts: 40 };
 
 describe("restore preview route safety", () => {
   it("hands navigation only an opaque token and aggregate preview", () => {
@@ -95,11 +99,11 @@ describe("restore preview route safety", () => {
 describe("restore apply decisions", () => {
   it("defaults to Merge and makes Replace-all explicitly destructive", () => {
     expect(restoreApplyLabel("merge")).toBe("Merge backup");
-    expect(restoreApplyLabel("replace-all")).toBe("Replace and restore");
-    expect(replaceAllConfirmation(true).message).toContain(
+    expect(restoreApplyLabel("replace-all")).toBe("Replace all");
+    expect(replaceAllConfirmation(true, SCALE).message).toContain(
       "Orbit will first create and verify a fresh automatic backup of this device.",
     );
-    expect(replaceAllConfirmation(false).message).toContain(
+    expect(replaceAllConfirmation(false, SCALE).message).toContain(
       "Your current local data will be lost and no automatic backup destination is configured.",
     );
   });
@@ -353,7 +357,7 @@ describe("restore apply decisions", () => {
         "Orbit will first create and verify a fresh automatic backup of this device.",
       );
       expect(shown[0].message).toContain(UNAVAILABLE_BACKGROUND_REPLACE_NOTE);
-      expect(shown[0].confirmLabel).toBe("Replace and restore");
+      expect(shown[0].confirmLabel).toBe("Replace all");
       // Cancel on the same dialog writes nothing.
       await expect(
         confirmRestoreApply(
@@ -432,13 +436,13 @@ describe("restore apply decisions", () => {
           ),
         ).resolves.toBe(false);
     }
-    expect(restoreApplyConfirmation("merge", false, false)).toBeNull();
-    expect(restoreApplyConfirmation("merge", false, true)?.message).toBe(
+    expect(restoreApplyConfirmation("merge", false, false, SCALE)).toBeNull();
+    expect(restoreApplyConfirmation("merge", false, true, SCALE)?.message).toBe(
       UNAVAILABLE_BACKGROUND_MESSAGE,
     );
-    expect(restoreApplyConfirmation("replace-all", true, false)?.message).toBe(
-      replaceAllConfirmation(true).message,
-    );
+    expect(
+      restoreApplyConfirmation("replace-all", true, false, SCALE)?.message,
+    ).toBe(replaceAllConfirmation(true, SCALE).message);
   });
 
   it("shares one pending apply promise and never persists an applying state for a cold start", async () => {
@@ -645,15 +649,13 @@ describe("restore apply: the confirmed mode is the executed mode (WR-1)", () => 
       useDefaultBackgrounds: true,
     });
     expect(s.applied.map((c) => c.mode)).toEqual(["merge"]);
-    expect(s.dialogs.some((d) => d.title === "Replace all local data?")).toBe(
-      false,
-    );
+    expect(s.dialogs.some((d) => d.title === "Replace all?")).toBe(false);
     // Unlocked once the apply completes.
     s.tap("replace-all");
     expect(s.mode).toBe("replace-all");
   });
 
-  it("Replace-all always shows its 'Replace all local data?' confirmation exactly once", async () => {
+  it("Replace-all always shows its 'Replace all?' confirmation exactly once", async () => {
     for (const appSettings of [
       { modifiedAt: NEWER, galaxyBackground: "galaxy-comet" },
       { modifiedAt: OLDER, galaxyBackground: "galaxy-comet" },
@@ -674,7 +676,7 @@ describe("restore apply: the confirmed mode is the executed mode (WR-1)", () => 
         mode: "replace-all",
       });
       expect(
-        s.dialogs.filter((d) => d.title === "Replace all local data?"),
+        s.dialogs.filter((d) => d.title === "Replace all?"),
         JSON.stringify(appSettings),
       ).toHaveLength(1);
       expect(s.dialogs).toHaveLength(1);
@@ -843,5 +845,80 @@ describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
       movedToBin: 0,
     });
     expect(lines.join(" ")).not.toMatch(/Added|Updated|Newer local kept/);
+  });
+});
+
+describe("restore preview people and the one Replace name (38.12 D-60, D-61)", () => {
+  it("compares this phone's people with the backup's", () => {
+    expect(
+      restorePeopleComparison({ phoneContacts: 12, backupContacts: 40 }),
+    ).toBe("This phone: 12 contacts · Backup: 40 contacts");
+    expect(
+      restorePeopleComparison({ phoneContacts: 1, backupContacts: 1 }),
+    ).toBe("This phone: 1 contact · Backup: 1 contact");
+    expect(
+      restorePeopleComparison({ phoneContacts: 0, backupContacts: 3 }),
+    ).toBe("This phone: 0 contacts · Backup: 3 contacts");
+  });
+
+  it("the Replace all confirm states the scale, then the safety-backup sentence", () => {
+    const configured = replaceAllConfirmation(true, SCALE);
+    expect(configured.title).toBe("Replace all?");
+    expect(configured.message).toBe(
+      "This replaces the 12 contacts on this phone with the 40 in the backup.\n\nOrbit will first create and verify a fresh automatic backup of this device.",
+    );
+    expect(
+      replaceAllConfirmation(false, { phoneContacts: 1, backupContacts: 1 })
+        .message,
+    ).toBe(
+      "This replaces the 1 contact on this phone with the 1 in the backup.\n\nYour current local data will be lost and no automatic backup destination is configured.",
+    );
+  });
+
+  it("the Replace all confirm stays destructive and names Replace once", () => {
+    const confirmation = restoreApplyConfirmation(
+      "replace-all",
+      true,
+      true,
+      SCALE,
+    );
+    expect(confirmation).toMatchObject({
+      title: "Replace all?",
+      confirmLabel: "Replace all",
+      cancelLabel: "Keep local data",
+      destructive: true,
+    });
+    expect(confirmation?.message).toContain(
+      "This replaces the 12 contacts on this phone with the 40 in the backup.",
+    );
+    expect(UNAVAILABLE_BACKGROUND_REPLACE_NOTE).toContain("Replace all");
+    expect(UNAVAILABLE_BACKGROUND_REPLACE_NOTE).not.toContain(
+      "Replace and restore",
+    );
+  });
+
+  it("the confirmation reads the scale from the cached preview", async () => {
+    const cache = createRestorePreviewCache();
+    const route = cache.store({
+      manifest: {} as unknown as import("@/backup/types").BackupManifest,
+      preview: { ...preview, phoneContacts: 7, backupContacts: 30 },
+    });
+    const shown: RestoreApplyConfirmation[] = [];
+    await confirmRestoreApply(
+      cache,
+      route.token,
+      "replace-all",
+      {
+        destinationConfigured: async () => true,
+        localSettingsModifiedAt: async () => "2026-01-01 00:00:00",
+      },
+      async (confirmation) => {
+        shown.push(confirmation);
+        return false;
+      },
+    );
+    expect(shown[0].message).toContain(
+      "This replaces the 7 contacts on this phone with the 30 in the backup.",
+    );
   });
 });

@@ -11,12 +11,14 @@ import {
   formatLocalDate,
   formatMinuteClock,
   formatMonthDay,
+  formatSourceTimeMinuteOrFallback,
   formatStoredBirthdayForDisplay,
   formatTimeMinute,
   formatTimeMinuteOrFallback,
   isSnoozed,
   MONTH_LONG,
   MONTH_SHORT,
+  parseIsoUtcMs,
   parseLocalMs,
   WEEKDAY_LONG,
   WEEKDAY_SHORT,
@@ -339,5 +341,60 @@ describe("formatStoredBirthdayForDisplay (D-70)", () => {
     "",
   ])("returns %j raw and never throws", (stored) => {
     expect(formatStoredBirthdayForDisplay(stored)).toBe(stored);
+  });
+});
+
+describe("backup source time (38.12 D-66)", () => {
+  /** The same instant as a local wall-clock stamp, the shape Orbit stores. */
+  function localStampOf(ms: number): string {
+    const d = new Date(ms);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  it("parses a UTC 'Z' timestamp with or without milliseconds to epoch ms", () => {
+    expect(parseIsoUtcMs("2026-10-17T14:30:00.123Z")).toBe(
+      Date.UTC(2026, 9, 17, 14, 30, 0, 123),
+    );
+    expect(parseIsoUtcMs("2026-10-17T14:30:00Z")).toBe(
+      Date.UTC(2026, 9, 17, 14, 30, 0),
+    );
+    expect(parseIsoUtcMs("2026-10-17T14:30Z")).toBe(
+      Date.UTC(2026, 9, 17, 14, 30),
+    );
+  });
+
+  it("returns null for anything that is not a valid UTC 'Z' timestamp", () => {
+    for (const bad of [
+      "",
+      "not a date",
+      "2026-10-17 14:30:00",
+      "2026-10-17T14:30:00",
+      "2026-02-30T10:00:00Z",
+      "2026-10-17T24:00:00Z",
+      "2026-10-17T14:30:00.1234Z",
+      "2026-13-01T00:00:00Z",
+    ])
+      expect(parseIsoUtcMs(bad)).toBeNull();
+  });
+
+  it("shows a 'Z' source time as the local date and minute, never 'Unknown time'", () => {
+    for (const iso of ["2026-10-17T14:30:00.123Z", "2026-10-17T14:30:00Z"]) {
+      const shown = formatSourceTimeMinuteOrFallback(iso);
+      expect(shown).not.toBe("Unknown time");
+      expect(shown).toBe(
+        formatDateTimeMinute(localStampOf(Date.UTC(2026, 9, 17, 14, 30))),
+      );
+    }
+  });
+
+  it("still shows an Orbit local wall-clock stamp unchanged", () => {
+    expect(formatSourceTimeMinuteOrFallback("2026-09-26 14:05:38")).toBe(
+      "Sep 26, 2026, 2:05 PM",
+    );
+  });
+
+  it("falls back to 'Unknown time' only when neither shape parses", () => {
+    expect(formatSourceTimeMinuteOrFallback("garbage")).toBe("Unknown time");
   });
 });
