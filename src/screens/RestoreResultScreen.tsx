@@ -1,13 +1,14 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import type { RootStackScreenProps } from "@/navigation/types";
-import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   type BackupHost,
   DEFAULT_BACKUP_HOST,
   restoreReturnLabel,
   restoreReturnRouteName,
 } from "@/screens/backup-dualhome-logic";
+import { restoreResultPeopleLines } from "@/screens/backup-restore-logic";
 import {
   restoredPhotosMissingCopy,
   skippedPhotosCopy,
@@ -20,13 +21,12 @@ export function RestoreResultScreen({
   host = DEFAULT_BACKUP_HOST,
 }: RootStackScreenProps<"RestoreResult"> & { host?: BackupHost }) {
   const { colors } = useTheme();
-  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
-  const bottomClearance = useBottomClearance();
+  // A focused page (D-114): no tab bar and no +, so the last item only clears
+  // the system navigation area.
+  const bottomInset = useSafeAreaInsets().bottom;
   const {
-    added,
-    updated,
-    newerLocalKept,
-    deletionsApplied,
+    mode,
+    people,
     photosNeedingAttention,
     photoCleanupPending,
     scheduleResyncPending,
@@ -57,7 +57,7 @@ export function RestoreResultScreen({
         testID="restore-result-screen"
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: bottomClearance },
+          { paddingBottom: bottomInset + 16 },
         ]}
       >
         <View
@@ -66,10 +66,16 @@ export function RestoreResultScreen({
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Added: {added} · Updated: {updated} · Newer local kept:{" "}
-            {newerLocalKept} · Deletions applied: {deletionsApplied}
-          </Text>
+          <View testID="restore-result-people" style={styles.peopleLines}>
+            {restoreResultPeopleLines(mode, people).map((line) => (
+              <Text
+                key={line}
+                style={[styles.body, { color: colors.textPrimary }]}
+              >
+                {line}
+              </Text>
+            ))}
+          </View>
           {restoredMissing ? (
             <Text style={[styles.body, { color: colors.textSecondary }]}>
               {restoredMissing}
@@ -116,6 +122,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { padding: 16 },
   card: { borderWidth: 1, borderRadius: 10, padding: 16, gap: 16 },
+  peopleLines: { gap: 4 },
   body: { fontSize: 16, lineHeight: 24 },
   primaryButton: {
     minHeight: 44,

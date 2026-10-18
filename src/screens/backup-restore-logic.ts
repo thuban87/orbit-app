@@ -1,7 +1,13 @@
-import type { RestoreApplyResult, RestoreMode } from "@/backup/restore-apply";
+import type {
+  RestoreApplyResult,
+  RestoreMode,
+  RestorePeopleCounts,
+  RestoreProgressStep,
+} from "@/backup/restore-apply";
 import { backgroundsNeedingConsent } from "@/backup/restore-backgrounds";
 import type { BackupManifest } from "@/backup/types";
 import type { RestorePreviewAggregate } from "@/services/backup/backup-service";
+import { plural } from "@/utils/plural";
 
 export type RestorePreviewRoute = {
   readonly token: string;
@@ -322,14 +328,60 @@ export function initialRestoreApplyState(): "idle" {
   return "idle";
 }
 
+/**
+ * D-69: the busy state's label for the step `applyRestore` last reported.
+ * Before the first report the restore is still reading the file, so it reads
+ * as restoring.
+ */
+export function restoreProgressLabel(step: RestoreProgressStep | null): string {
+  return step === "safety-backup"
+    ? "Making a safety backup…"
+    : "Restoring contacts…";
+}
+
+/** The Backup restored route params (`RestoreResult`). */
+export type RestoreResultRoute = {
+  readonly mode: RestoreMode;
+  /** D-59: people, not rows (`applyRestore`'s `people`). */
+  readonly people: RestorePeopleCounts;
+  readonly photosNeedingAttention: number;
+  readonly photoCleanupPending: number;
+  readonly scheduleResyncPending: boolean;
+  readonly replaceSafetySnapshot: "verified" | "not-configured" | null;
+  /** Photos the Replace-all safety backup left out (38.6 D-24). */
+  readonly replaceSafetySnapshotSkippedPhotos: number;
+  /** Skipped-photo rows with no photo left to keep (38.6 D-26). */
+  readonly restoredPhotosMissing: number;
+};
+
+/**
+ * D-59: Backup restored counts people. Contacts on the phone before and
+ * contacts restored always; for Replace-all the contacts it removed (Merge
+ * never removes anyone, so it has no such line); and D-140 (owner
+ * 2026-10-17): the phone's people the backup has in its Bin, only when there
+ * are any. Row totals ("Added", "Updated") are not shown: they count every
+ * record, not people.
+ */
+export function restoreResultPeopleLines(
+  mode: RestoreMode,
+  people: RestorePeopleCounts,
+): string[] {
+  const lines = [
+    `Contacts on this phone before: ${people.before}`,
+    `Contacts restored: ${people.restored}`,
+  ];
+  if (mode === "replace-all") lines.push(`Contacts removed: ${people.removed}`);
+  if (people.movedToBin > 0)
+    lines.push(`${plural(people.movedToBin, "contact")} moved to the Bin`);
+  return lines;
+}
+
 export function toRestoreResultParams(
   result: Extract<RestoreApplyResult, { status: "applied" }>,
-) {
+): RestoreResultRoute {
   return {
-    added: result.inserted,
-    updated: result.updated,
-    newerLocalKept: result.retained,
-    deletionsApplied: result.deleted,
+    mode: result.mode,
+    people: result.people,
     photosNeedingAttention: result.photosNeedingAttention,
     photoCleanupPending: result.photoCleanupPending,
     scheduleResyncPending: result.scheduleResyncPending,

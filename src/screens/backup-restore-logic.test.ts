@@ -16,6 +16,8 @@ import {
   restoreApplyLabel,
   restoreApplyRecovery,
   restorePreviewFailure,
+  restoreProgressLabel,
+  restoreResultPeopleLines,
   toRestoreResultParams,
   UNAVAILABLE_BACKGROUND_MESSAGE,
   UNAVAILABLE_BACKGROUND_REPLACE_NOTE,
@@ -475,13 +477,11 @@ describe("restore apply decisions", () => {
         preRestoreSnapshotCreated: true,
         preRestoreSnapshotSkippedPhotos: 2,
         restoredPhotosMissing: 1,
-        people: { before: 5, restored: 4, removed: 1 },
+        people: { before: 5, restored: 4, removed: 1, movedToBin: 2 },
       }),
     ).toEqual({
-      added: 3,
-      updated: 2,
-      newerLocalKept: 4,
-      deletionsApplied: 1,
+      mode: "replace-all",
+      people: { before: 5, restored: 4, removed: 1, movedToBin: 2 },
       photosNeedingAttention: 2,
       photoCleanupPending: 1,
       scheduleResyncPending: true,
@@ -505,7 +505,7 @@ describe("restore apply decisions", () => {
       preRestoreSnapshotCreated: false,
       preRestoreSnapshotSkippedPhotos: 3,
       restoredPhotosMissing: 0,
-      people: { before: 0, restored: 0, removed: 0 },
+      people: { before: 0, restored: 0, removed: 0, movedToBin: 0 },
     };
     expect(
       toRestoreResultParams({ ...base, mode: "merge" })
@@ -769,5 +769,79 @@ describe("restore preview notice (scoped re-check IN-1)", () => {
     expect(effect).toContain("if (current) setUnavailableBackground(needed);");
     expect(effect).toContain("if (current) setUnavailableBackground(false);");
     expect(effect).toMatch(/return \(\) => \{\s*current = false;\s*\};/);
+  });
+});
+
+describe("restore steps and people counts (38.12 D-69, D-59, D-140)", () => {
+  it("labels each step applyRestore reports", () => {
+    expect(restoreProgressLabel("safety-backup")).toBe(
+      "Making a safety backup…",
+    );
+    expect(restoreProgressLabel("restoring")).toBe("Restoring contacts…");
+    expect(restoreProgressLabel(null)).toBe("Restoring contacts…");
+  });
+
+  it("a Replace-all result counts people, including the ones it removed", () => {
+    expect(
+      restoreResultPeopleLines("replace-all", {
+        before: 12,
+        restored: 40,
+        removed: 3,
+        movedToBin: 0,
+      }),
+    ).toEqual([
+      "Contacts on this phone before: 12",
+      "Contacts restored: 40",
+      "Contacts removed: 3",
+    ]);
+    // Replace-all always states its removed count, even when it is none.
+    expect(
+      restoreResultPeopleLines("replace-all", {
+        before: 2,
+        restored: 2,
+        removed: 0,
+        movedToBin: 0,
+      }),
+    ).toContain("Contacts removed: 0");
+  });
+
+  it("a Merge result has no removed line", () => {
+    const lines = restoreResultPeopleLines("merge", {
+      before: 12,
+      restored: 40,
+      removed: 0,
+      movedToBin: 0,
+    });
+    expect(lines).toEqual([
+      "Contacts on this phone before: 12",
+      "Contacts restored: 40",
+    ]);
+    expect(lines.some((line) => line.includes("removed"))).toBe(false);
+  });
+
+  it("says how many of the phone's people moved to the Bin, only when any did (D-140)", () => {
+    const people = { before: 5, restored: 3, removed: 1 };
+    expect(
+      restoreResultPeopleLines("replace-all", { ...people, movedToBin: 2 }),
+    ).toContain("2 contacts moved to the Bin");
+    expect(
+      restoreResultPeopleLines("replace-all", { ...people, movedToBin: 1 }),
+    ).toContain("1 contact moved to the Bin");
+    expect(
+      restoreResultPeopleLines("replace-all", {
+        ...people,
+        movedToBin: 0,
+      }).some((line) => line.includes("Bin")),
+    ).toBe(false);
+  });
+
+  it("no result line claims row totals as people", () => {
+    const lines = restoreResultPeopleLines("merge", {
+      before: 1,
+      restored: 1,
+      removed: 0,
+      movedToBin: 0,
+    });
+    expect(lines.join(" ")).not.toMatch(/Added|Updated|Newer local kept/);
   });
 });

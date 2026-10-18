@@ -40,6 +40,11 @@ const FOCUSED_WORKFLOW_ROUTES = new Set<string>([
   // D-18: Compose's read-only Research side hides the tab bar and the + like
   // Compose does.
   "ComposeResearch",
+  // 38.12 D-114 (owner, 2026-10-17): Restore preview and Backup restored are
+  // focused pages, so the + (which mirrors the tab bar, ADR-173) never covers
+  // the restore cards.
+  "RestorePreview",
+  "RestoreResult",
 ]);
 
 export function isFocusedWorkflow(routeName: string): boolean {

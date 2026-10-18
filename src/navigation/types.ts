@@ -6,7 +6,10 @@ import type {
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { CurrentStateFieldKey, MemoryTypeKey } from "@/db/memory-registry";
 import type { MergeResolutions } from "@/db/merge-dao";
-import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
+import type {
+  RestorePreviewRoute,
+  RestoreResultRoute,
+} from "@/screens/backup-restore-logic";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 import type { FlowHost, ProfileReturnTab } from "./flow-host";
@@ -309,20 +312,7 @@ export type BackupStackParamList = {
   Backup: undefined;
   BackupSettings: { section?: "automatic" | "encryption" } | undefined;
   RestorePreview: RestorePreviewRoute;
-  RestoreResult: {
-    added: number;
-    updated: number;
-    newerLocalKept: number;
-    deletionsApplied: number;
-    photosNeedingAttention: number;
-    photoCleanupPending: number;
-    scheduleResyncPending: boolean;
-    replaceSafetySnapshot: "verified" | "not-configured" | null;
-    /** Photos the Replace-all safety backup left out (38.6 D-24). */
-    replaceSafetySnapshotSkippedPhotos: number;
-    /** Skipped-photo rows with no photo left to keep (38.6 D-26). */
-    restoredPhotosMissing: number;
-  };
+  RestoreResult: RestoreResultRoute;
 };
 
 export type DigestStackParamList = {
@@ -487,20 +477,7 @@ export type SettingsStackParamList = {
   Backup: undefined;
   BackupSettings: { section?: "automatic" | "encryption" } | undefined;
   RestorePreview: RestorePreviewRoute;
-  RestoreResult: {
-    added: number;
-    updated: number;
-    newerLocalKept: number;
-    deletionsApplied: number;
-    photosNeedingAttention: number;
-    photoCleanupPending: number;
-    scheduleResyncPending: boolean;
-    replaceSafetySnapshot: "verified" | "not-configured" | null;
-    /** Photos the Replace-all safety backup left out (38.6 D-24). */
-    replaceSafetySnapshotSkippedPhotos: number;
-    /** Skipped-photo rows with no photo left to keep (38.6 D-26). */
-    restoredPhotosMissing: number;
-  };
+  RestoreResult: RestoreResultRoute;
   /**
    * Categories IA reservation (D-03 / §K). A stable internal route NAME held for
    * a FUTURE Category Management phase (CRUD + deletion cascade). Phase 37 ships

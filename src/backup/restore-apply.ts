@@ -92,12 +92,15 @@ export type RestoreProgressStep = "safety-backup" | "restoring";
  * before the restore; `restored` is the backup's contacts not in the Bin;
  * `removed` is, for Replace-all, the phone's not-in-Bin people the backup does
  * not carry (Merge never removes anyone this way: 0). Also 39 D-96's branch
- * signal.
+ * signal. `movedToBin` (D-140, owner 2026-10-17) is, for Replace-all, the
+ * phone's not-in-Bin people the backup carries in its Bin, so they end up in
+ * the Bin here (Merge: 0). `removed` and `movedToBin` never overlap.
  */
 export interface RestorePeopleCounts {
   before: number;
   restored: number;
   removed: number;
+  movedToBin: number;
 }
 export type PreRestoreSnapshotResult =
   /** `skippedPhotos`: photos the safety backup left out (38.6 D-24). */
@@ -951,14 +954,22 @@ async function peopleCounts(
     "SELECT uid FROM contacts WHERE archived_at IS NULL",
   );
   const backupUids = new Set(manifest.contacts.map((contact) => contact.uid));
+  const backupBinned = new Set(
+    manifest.contacts
+      .filter((contact) => contact.archivedAt != null)
+      .map((contact) => contact.uid),
+  );
+  const replacing = mode === "replace-all";
   return {
     before: liveBefore.length,
     restored: manifest.contacts.filter((contact) => contact.archivedAt == null)
       .length,
-    removed:
-      mode === "replace-all"
-        ? liveBefore.filter((row) => !backupUids.has(row.uid)).length
-        : 0,
+    removed: replacing
+      ? liveBefore.filter((row) => !backupUids.has(row.uid)).length
+      : 0,
+    movedToBin: replacing
+      ? liveBefore.filter((row) => backupBinned.has(row.uid)).length
+      : 0,
   };
 }
 async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {

@@ -4497,8 +4497,8 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
   );
 
   it.each([
-    ["replace-all", { before: 2, restored: 2, removed: 1 }],
-    ["merge", { before: 2, restored: 2, removed: 0 }],
+    ["replace-all", { before: 2, restored: 2, removed: 1, movedToBin: 0 }],
+    ["merge", { before: 2, restored: 2, removed: 0, movedToBin: 0 }],
   ] as const)(
     "%s reports people: before, restored and removed (D-59)",
     async (mode, people) => {
@@ -4520,6 +4520,46 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
     },
   );
 
+  it.each([
+    ["replace-all", 2],
+    ["merge", 0],
+  ] as const)(
+    "%s counts this phone's people the backup has in its Bin as moved to the Bin (D-140)",
+    async (mode, movedToBin) => {
+      const backup = await backupOf([
+        { uid: "kept" },
+        { uid: "binned-1", archived: true },
+        { uid: "binned-2", archived: true },
+        { uid: "already-binned", archived: true },
+      ]);
+      const phone = await db();
+      await seed(phone, [
+        { uid: "kept" },
+        { uid: "binned-1" },
+        { uid: "binned-2" },
+        { uid: "already-binned", archived: true },
+        { uid: "gone" },
+      ]);
+      expect(await applyRestore(phone, backup, mode)).toMatchObject({
+        status: "applied",
+        people: {
+          before: 4,
+          restored: 1,
+          removed: mode === "replace-all" ? 1 : 0,
+          movedToBin,
+        },
+      });
+      if (mode === "replace-all")
+        expect(
+          (
+            await phone.getAllAsync<{ uid: string }>(
+              "SELECT uid FROM contacts WHERE archived_at IS NOT NULL ORDER BY uid",
+            )
+          ).map((row) => row.uid),
+        ).toEqual(["already-binned", "binned-1", "binned-2"]);
+    },
+  );
+
   it("a Merge with nothing to write still reports people (D-59)", async () => {
     const backup = await backupOf([{ uid: "a" }]);
     const phone = await db();
@@ -4527,7 +4567,7 @@ describe("38.12-09 restore semantics: favourites, legacy mute, people counts, pr
     expect(await applyRestore(phone, backup, "merge")).toMatchObject({
       status: "applied",
       inserted: 0,
-      people: { before: 2, restored: 1, removed: 0 },
+      people: { before: 2, restored: 1, removed: 0, movedToBin: 0 },
     });
   });
 

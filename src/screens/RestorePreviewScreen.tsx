@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { applyRestore, type RestoreMode } from "@/backup/restore-apply";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  applyRestore,
+  type RestoreMode,
+  type RestoreProgressStep,
+} from "@/backup/restore-apply";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
-import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   type BackupHost,
   DEFAULT_BACKUP_HOST,
@@ -22,6 +26,7 @@ import {
   restoreApplyLabel,
   restoreApplyRecovery,
   restorePreviewCache,
+  restoreProgressLabel,
   toRestoreResultParams,
 } from "@/screens/backup-restore-logic";
 import { createVerifiedPreRestoreSnapshot } from "@/services/backup/backup-service";
@@ -100,9 +105,14 @@ export function RestorePreviewScreen({
   host = DEFAULT_BACKUP_HOST,
 }: RootStackScreenProps<"RestorePreview"> & { host?: BackupHost }) {
   const { colors } = useTheme();
-  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
-  const bottomClearance = useBottomClearance();
+  // A focused page (D-114): no tab bar and no +, so the last item only clears
+  // the system navigation area.
+  const bottomClearance = useSafeAreaInsets().bottom + 16;
   const [mode, setMode] = useState<RestoreMode>("merge");
+  // D-69: the step applyRestore last reported, shown in the busy state.
+  const [progressStep, setProgressStep] = useState<RestoreProgressStep | null>(
+    null,
+  );
   const [expired, setExpired] = useState(
     () => restorePreviewCache.read(route.params.token) === null,
   );
@@ -208,6 +218,7 @@ export function RestorePreviewScreen({
   executeRef.current = async (confirmed) => {
     setApplying(true);
     setApplyError(null);
+    setProgressStep(null);
     try {
       const result = await applyRestore(
         getExecutor(),
@@ -218,6 +229,7 @@ export function RestorePreviewScreen({
           unavailableBackgrounds: confirmed.useDefaultBackgrounds
             ? "use-default"
             : "reject",
+          onProgress: setProgressStep,
         },
       );
       if (result.status !== "applied") {
@@ -445,14 +457,17 @@ export function RestorePreviewScreen({
           <View
             testID="restore-applying"
             accessibilityLiveRegion="polite"
-            accessibilityLabel="Restoring backup"
+            accessibilityLabel={restoreProgressLabel(progressStep)}
             style={[
               styles.card,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
-            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-              Restoring backup…
+            <Text
+              testID="restore-progress-step"
+              style={[styles.cardTitle, { color: colors.textPrimary }]}
+            >
+              {restoreProgressLabel(progressStep)}
             </Text>
             <Text style={[styles.body, { color: colors.textSecondary }]}>
               This can take a moment. Orbit will only change local data after

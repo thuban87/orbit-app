@@ -40,6 +40,9 @@ const focusedRoutes = [
   "KeyPeopleEditor",
   // D-18: Compose's Research side hides the tab bar and the + like Compose.
   "ComposeResearch",
+  // 38.12 D-114: Restore preview and Backup restored.
+  "RestorePreview",
+  "RestoreResult",
 ];
 
 const browseRoutes = [
@@ -55,8 +58,6 @@ const browseRoutes = [
   "Digest",
   "GroupEvents",
   "GroupEventDetail",
-  "RestorePreview",
-  "RestoreResult",
 ];
 
 describe("isFocusedWorkflow", () => {

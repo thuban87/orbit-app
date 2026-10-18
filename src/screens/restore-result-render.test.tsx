@@ -19,8 +19,8 @@ vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
 vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
-vi.mock("@/navigation/use-bottom-clearance", () => ({
-  useBottomClearance: () => 0,
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 const { RestoreResultScreen } = await import("./RestoreResultScreen");
@@ -45,15 +45,20 @@ function textOf(element: TestElement): string {
 function render(params: {
   restoredPhotosMissing: number;
   replaceSafetySnapshotSkippedPhotos: number;
+  mode?: "merge" | "replace-all";
+  people?: {
+    before: number;
+    restored: number;
+    removed: number;
+    movedToBin: number;
+  };
 }): string[] {
   const element = RestoreResultScreen({
     navigation: { reset: vi.fn() },
     route: {
       params: {
-        added: 1,
-        updated: 0,
-        newerLocalKept: 0,
-        deletionsApplied: 0,
+        mode: "replace-all",
+        people: { before: 1, restored: 1, removed: 0, movedToBin: 0 },
         photosNeedingAttention: 0,
         photoCleanupPending: 0,
         scheduleResyncPending: false,
@@ -96,5 +101,37 @@ describe("Restore result photo copy (38.6 D-30/D-33)", () => {
     expect(none.some((line) => line.includes("couldn't be included"))).toBe(
       false,
     );
+  });
+});
+
+describe("Backup restored counts people (38.12 D-59, D-140)", () => {
+  const photos = {
+    restoredPhotosMissing: 0,
+    replaceSafetySnapshotSkippedPhotos: 0,
+  };
+
+  it("a Replace-all result shows people before, restored and removed, and the Bin line when any moved", () => {
+    const lines = render({
+      ...photos,
+      mode: "replace-all",
+      people: { before: 12, restored: 40, removed: 3, movedToBin: 2 },
+    });
+    expect(lines).toContain("Contacts on this phone before: 12");
+    expect(lines).toContain("Contacts restored: 40");
+    expect(lines).toContain("Contacts removed: 3");
+    expect(lines).toContain("2 contacts moved to the Bin");
+    expect(lines.some((line) => line.startsWith("Added:"))).toBe(false);
+  });
+
+  it("a Merge result shows no removed line and no Bin line", () => {
+    const lines = render({
+      ...photos,
+      mode: "merge",
+      people: { before: 12, restored: 40, removed: 0, movedToBin: 0 },
+    });
+    expect(lines).toContain("Contacts on this phone before: 12");
+    expect(lines).toContain("Contacts restored: 40");
+    expect(lines.some((line) => line.includes("removed"))).toBe(false);
+    expect(lines.some((line) => line.includes("Bin"))).toBe(false);
   });
 });
