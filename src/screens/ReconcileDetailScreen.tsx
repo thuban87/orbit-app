@@ -401,6 +401,29 @@ export function ReconcileDetailScreen({
     }
   }, [contactId, load, missingLinkIds, navigation, route.params.host]);
 
+  // Nothing to decide (38.12 review B-IN-04): Done closes a card with no
+  // disposition, so Check complete never counts a no-op as "Kept Orbit
+  // values", and no snackbar claims a choice was made.
+  const finishNoChanges = useCallback(async () => {
+    if (applying) return;
+    setApplying(true);
+    try {
+      if (cardId != null && sessionId != null) {
+        const exec = getExecutor();
+        const now = localDateTime();
+        await inWriteTransaction(exec, () =>
+          markCardStatusCore(exec, cardId, "resolved", 0, now),
+        );
+        await finalizeSessionIfTerminal(exec, sessionId, now);
+      }
+      navigation.goBack();
+    } catch {
+      setMessage("Could not close this check. Nothing was changed.");
+    } finally {
+      setApplying(false);
+    }
+  }, [applying, cardId, navigation, sessionId]);
+
   const apply = useCallback(async () => {
     if (!scan || applied || applying) return;
     setApplying(true);
@@ -722,7 +745,9 @@ export function ReconcileDetailScreen({
               disabled: Boolean(unresolved || applying || applied),
             }}
             disabled={unresolved || applying || applied}
-            onPress={() => void apply()}
+            onPress={() =>
+              void (scan.diff.fields.length === 0 ? finishNoChanges() : apply())
+            }
             style={[
               styles.apply,
               {
@@ -732,7 +757,11 @@ export function ReconcileDetailScreen({
             ]}
           >
             <Text style={{ color: colors.onAccent }}>
-              {applying ? "Applying…" : "Apply"}
+              {scan.diff.fields.length === 0
+                ? "Done"
+                : applying
+                  ? "Applying…"
+                  : "Apply"}
             </Text>
           </Pressable>
         </ScrollView>

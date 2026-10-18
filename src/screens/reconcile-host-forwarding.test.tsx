@@ -355,6 +355,27 @@ describe("missing-source actions act on the missing link (38.12 review B-CR-01)"
   });
 });
 
+describe("nothing to decide (38.12 review B-IN-04)", () => {
+  it("Done closes the card with no disposition and no snackbar", async () => {
+    const nav = navigation();
+    const tree = renderDetail(loadedScan(false), nav, { card: true });
+    (pressableWithText(tree, /^Done$/).props.onPress as () => void)();
+    await flush();
+    await flush();
+    expect(mocks.markCardStatusCore).toHaveBeenCalledWith(
+      "exec",
+      11,
+      "resolved",
+      0,
+      "2026-10-17 12:00:00",
+    );
+    expect(mocks.setCardCompletionDispositionCore).not.toHaveBeenCalled();
+    expect(mocks.applyReconcileSelections).not.toHaveBeenCalled();
+    expect(mocks.showSnackbar).not.toHaveBeenCalled();
+    expect(nav.goBack).toHaveBeenCalled();
+  });
+});
+
 describe("D-147 undo: ask about a declined phone photo again", () => {
   it("shows the action only when a phone photo is held back, and clears that memory", async () => {
     mocks.getReconcileContact.mockResolvedValue({ contact: null, links: [] });
