@@ -96,6 +96,7 @@ const dao = vi.hoisted(() => ({
   applyTypeChange: vi.fn(),
   changeFieldOptions: vi.fn(),
   preflightTypeChange: vi.fn(),
+  updateFieldShareWithAi: vi.fn(),
 }));
 vi.mock("@/db/field-defs-dao", () => ({
   changeFieldOptions: dao.changeFieldOptions,
@@ -105,7 +106,7 @@ vi.mock("@/db/field-defs-dao", () => ({
   reorderFields: vi.fn(),
   restoreField: vi.fn(),
   updateFieldCuration: vi.fn(),
-  updateFieldShareWithAi: vi.fn(),
+  updateFieldShareWithAi: dao.updateFieldShareWithAi,
 }));
 vi.mock("@/db/field-type-change", () => ({
   applyTypeChange: dao.applyTypeChange,
@@ -153,10 +154,10 @@ const TO_DROPDOWN = {
   share_with_ai: 0,
 };
 
-function submitEdit(draft: typeof TO_DROPDOWN) {
+function submitEdit(draft: typeof TO_DROPDOWN, field: CustomFieldDef = TIER) {
   hooks.states = [];
   hooks.setters = [];
-  hooks.states[EDITOR_SLOT] = { mode: "edit", field: TIER };
+  hooks.states[EDITOR_SLOT] = { mode: "edit", field };
   hooks.index = 0;
   const form = nodes(CustomFieldsScreen()).find(
     (node) => node.type === "FieldDefForm",
@@ -171,6 +172,45 @@ beforeEach(() => {
   dao.applyTypeChange.mockReset();
   dao.changeFieldOptions.mockReset();
   dao.preflightTypeChange.mockReset();
+  dao.updateFieldShareWithAi.mockReset();
+});
+
+describe("Photo → another type with Share with AI on keeps it on (C-WR-01)", () => {
+  it("applies the type change before the share write, so the clamp sees the new type", async () => {
+    const photo = {
+      ...TIER,
+      type: "photo",
+      share_with_ai: 0,
+    } as unknown as CustomFieldDef;
+    dao.preflightTypeChange.mockResolvedValue({
+      total: 0,
+      convert: [],
+      flag: [],
+    });
+    dialogs.confirm.mockResolvedValue(true);
+
+    submitEdit(
+      {
+        ...TO_DROPDOWN,
+        type: "text",
+        options: null,
+        share_with_ai: 1,
+      } as never,
+      photo,
+    );
+
+    await vi.waitFor(() =>
+      expect(dao.updateFieldShareWithAi).toHaveBeenCalledWith(
+        "exec",
+        7,
+        1,
+        "2026-10-17 12:00:00",
+      ),
+    );
+    expect(dao.applyTypeChange.mock.invocationCallOrder[0]).toBeLessThan(
+      dao.updateFieldShareWithAi.mock.invocationCallOrder[0],
+    );
+  });
 });
 
 describe('a type change that flags values offers "Review now" (38.12 D-121, D-24; B-5)', () => {

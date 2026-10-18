@@ -559,6 +559,20 @@ export function CustomFieldsScreen() {
           localDateTime(),
         );
       }
+      // Type change — applyTypeChange with the CURRENT type so field_history
+      // records the transition (blast radius zero — no value rewrite). It runs
+      // BEFORE the share write (38.12 review C-WR-01): the share writer clamps
+      // a photo field to off against the STORED type, so a Photo → Text edit
+      // with "Share with AI" turned on must reach it already as Text. A change
+      // TO photo still ends off (both writers clamp, D-129/D-138).
+      if (typeChanged) {
+        await applyTypeChange(
+          exec,
+          { id: field.id, col_name: field.col_name, type: field.type },
+          draft.type,
+          localDateTime(),
+        );
+      }
       // AI-sharing opt-in — persisted via its own DEFS-row flag writer so a
       // toggled opt-in survives the edit (H7). Same standalone-transaction idiom
       // as the curation write; never composed inside an outer transaction.
@@ -567,16 +581,6 @@ export function CustomFieldsScreen() {
           exec,
           field.id,
           draft.share_with_ai,
-          localDateTime(),
-        );
-      }
-      // Type change — applyTypeChange with the CURRENT type so field_history
-      // records the transition (blast radius zero — no value rewrite).
-      if (typeChanged) {
-        await applyTypeChange(
-          exec,
-          { id: field.id, col_name: field.col_name, type: field.type },
-          draft.type,
           localDateTime(),
         );
       }

@@ -7,6 +7,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { updateFieldShareWithAi } from "@/db/field-defs-dao";
 import {
   applyTypeChange,
   preflightOptionsChange,
@@ -398,6 +399,21 @@ describe("pre-flights count the same people as the Review now list (A-WR-04, C-W
         "SELECT contact_id, old_value FROM field_history WHERE field_col_name = 'age2'",
       ),
     ).toEqual([{ contact_id: binned, old_value: "fifty" }]);
+  });
+});
+
+describe("Photo → Text, then Share with AI on, stores it on (C-WR-01)", () => {
+  it("the share write after the type change is not clamped", async () => {
+    const definition = field({ col_name: "pic", type: "photo" });
+    await persistField(definition);
+    await applyTypeChange(exec, definition, "text", LATER);
+    await updateFieldShareWithAi(exec, definition.id, 1, LATER);
+    expect(
+      await exec.getFirstAsync(
+        "SELECT type, share_with_ai FROM custom_field_defs WHERE id = ?",
+        [definition.id],
+      ),
+    ).toEqual({ type: "text", share_with_ai: 1 });
   });
 });
 
