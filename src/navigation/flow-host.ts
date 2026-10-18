@@ -66,7 +66,7 @@ export const FLOW_ROUTE_NAMES: ReadonlySet<string> = new Set([
   "RestoreResult",
 ]);
 
-type FlowRoute = { key: string; name: string };
+type FlowRoute = { key: string; name: string; params?: object };
 
 /** The slice of a stack navigator's live state the helpers read. */
 export type FlowStackState = {
@@ -186,13 +186,30 @@ function routesBelowLaunch<R extends FlowRoute>(
   return firstFlow === -1 ? routes.slice(0, -1) : routes.slice(0, firstFlow);
 }
 
+/** The launching Profile's `returnTab`, when it carries a valid one. */
+function launchReturnTab(
+  routes: readonly FlowRoute[],
+  profileKey: string,
+): ProfileReturnTab | undefined {
+  const params = routes.find((route) => route.key === profileKey)?.params as
+    | { returnTab?: unknown }
+    | undefined;
+  const returnTab = params?.returnTab;
+  return returnTab === "SettingsTab" || returnTab === "DigestTab"
+    ? returnTab
+    : undefined;
+}
+
 /**
  * A merge started from a Profile's ⋯ ends on the surviving person's Profile
  * in that stack (D-110, 38.9 D-08). Only the current stack is reset (the
  * `CommonActions.reset` shape over the live state, so other tabs and the
  * routes below the launching Profile are untouched): the routes below the
  * launching Profile plus `Profile { contactId: survivorId }`. The launching
- * Profile is replaced, because it may show the absorbed person.
+ * Profile is replaced, because it may show the absorbed person. When that
+ * Profile was opened from a flow with `returnTab` (Import complete → View
+ * contact), the survivor's Profile keeps it, so its Back still returns to that
+ * tab (D-110; 38.12 D-IN-03).
  */
 export function finishFlowOnProfile(
   navigation: FlowNavigator,
@@ -205,9 +222,16 @@ export function finishFlowOnProfile(
   }
   const state = navigation.getState();
   if (state == null) return;
+  const returnTab = launchReturnTab(state.routes, host.profileKey);
   const routes = [
     ...routesBelowLaunch(state.routes, host.profileKey),
-    { name: "Profile", params: { contactId: survivorId } },
+    {
+      name: "Profile",
+      params:
+        returnTab === undefined
+          ? { contactId: survivorId }
+          : { contactId: survivorId, returnTab },
+    },
   ];
   dispatch(navigation, {
     type: "RESET",

@@ -303,6 +303,30 @@ describe("finishFlowOnProfile — profile host (D-110, 38.9 D-08; T-38.12-07)", 
     expect(next?.routes[1].params).toEqual({ contactId: 9 });
   });
 
+  it("carries the launching Profile's returnTab onto the survivor (D-110; D-IN-03)", () => {
+    const state = stack("dash-stack", DASHBOARD_ROUTE_NAMES, [
+      r("Home"),
+      r("Profile", "Profile-launch", {
+        contactId: 9,
+        returnTab: "SettingsTab",
+      }),
+      r("SurvivorSelect"),
+      r("MergeConflicts"),
+      r("MergeImpactSummary"),
+    ]);
+    const nav = navigatorSpy(state);
+    finishFlowOnProfile(
+      asFlow(nav),
+      { kind: "profile", profileKey: "Profile-launch" },
+      12,
+    );
+    const next = applyToStack(state, nav.dispatch.mock.calls[0][0]);
+    expect(next?.routes.map((x) => [x.name, x.params])).toEqual([
+      ["Home", undefined],
+      ["Profile", { contactId: 12, returnTab: "SettingsTab" }],
+    ]);
+  });
+
   it("falls back to the routes below the first flow route when the key is gone", () => {
     const warn = vi.spyOn(Logger, "warn").mockImplementation(() => {});
     const state = stack("dash-stack", DASHBOARD_ROUTE_NAMES, [
