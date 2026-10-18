@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppSettings, AppSettingsPatch } from "@/db/app-settings-dao";
 import type { SqlExecutor } from "@/db/types";
+import { sameDayAllowedHour } from "@/services/notifications/fire-instant";
 import {
   effectiveReminderArrival,
   formatHour,
@@ -140,7 +141,7 @@ describe("effectiveReminderArrival (D-78)", () => {
         quietEnd: 8,
         baseDate: BASE,
       }),
-    ).toEqual({ arrivalHour: 8, nextDay: false });
+    ).toEqual({ arrivalHour: 8, nextDay: false, sameDayHour: 8 });
   });
 
   it("an evening time inside a window across midnight arrives the next morning", () => {
@@ -151,7 +152,7 @@ describe("effectiveReminderArrival (D-78)", () => {
         quietEnd: 8,
         baseDate: BASE,
       }),
-    ).toEqual({ arrivalHour: 8, nextDay: true });
+    ).toEqual({ arrivalHour: 8, nextDay: true, sameDayHour: 8 });
     // Quiet start hour itself is inside the window.
     expect(
       effectiveReminderArrival({
@@ -160,7 +161,7 @@ describe("effectiveReminderArrival (D-78)", () => {
         quietEnd: 7,
         baseDate: BASE,
       }),
-    ).toEqual({ arrivalHour: 7, nextDay: true });
+    ).toEqual({ arrivalHour: 7, nextDay: true, sameDayHour: 7 });
   });
 
   it("a daytime window that does not cross midnight rolls to its end the same day", () => {
@@ -171,7 +172,7 @@ describe("effectiveReminderArrival (D-78)", () => {
         quietEnd: 14,
         baseDate: BASE,
       }),
-    ).toEqual({ arrivalHour: 14, nextDay: false });
+    ).toEqual({ arrivalHour: 14, nextDay: false, sameDayHour: 14 });
   });
 
   it("equal quiet start and end is no quiet window", () => {
@@ -194,28 +195,48 @@ describe("effectiveReminderArrival (D-78)", () => {
         quietEnd: 8,
         baseDate: lateEvening,
       }),
-    ).toEqual({ arrivalHour: 8, nextDay: false });
+    ).toEqual({ arrivalHour: 8, nextDay: false, sameDayHour: 8 });
   });
 });
 
-describe("reminderArrivalLine / copy (D-78)", () => {
+describe("reminderArrivalLine / copy (D-78, D-142)", () => {
   it("is null when there is no roll", () => {
-    expect(reminderArrivalLine(null, true)).toBeNull();
+    expect(reminderArrivalLine(null, true, true)).toBeNull();
   });
 
   it("states the arrival time after quiet hours end", () => {
-    expect(reminderArrivalLine({ arrivalHour: 8, nextDay: false }, true)).toBe(
-      "Reminders will arrive at 8:00 AM, after quiet hours end.",
+    expect(
+      reminderArrivalLine(
+        { arrivalHour: 8, nextDay: false, sameDayHour: 8 },
+        true,
+        true,
+      ),
+    ).toBe("Reminders will arrive at 8:00 AM, after quiet hours end.");
+  });
+
+  it("says birthday alerts and the digest still come on their own day when the roll crosses midnight", () => {
+    const arrival = { arrivalHour: 7, nextDay: true, sameDayHour: 7 };
+    expect(reminderArrivalLine(arrival, true, true)).toBe(
+      "Reminders will arrive at 7:00 AM, after quiet hours end. Birthday alerts and the weekly digest still come on their own day, at 7:00 AM.",
+    );
+    expect(reminderArrivalLine(arrival, true, false)).toBe(
+      "Reminders will arrive at 7:00 AM, after quiet hours end. Birthday alerts still come on the birthday, at 7:00 AM.",
+    );
+    expect(reminderArrivalLine(arrival, false, true)).toBe(
+      "Reminders will arrive at 7:00 AM, after quiet hours end. The weekly digest still comes on its usual day, at 7:00 AM.",
+    );
+    expect(reminderArrivalLine(arrival, false, false)).toBe(
+      "Reminders will arrive at 7:00 AM, after quiet hours end.",
     );
   });
 
-  it("says birthday alerts are not sent when the roll crosses midnight and they are on", () => {
-    expect(reminderArrivalLine({ arrivalHour: 7, nextDay: true }, true)).toBe(
-      "Reminders will arrive at 7:00 AM, after quiet hours end. Birthday alerts can't move to the next day, so they won't be sent.",
+  it("never says birthday alerts are not sent", () => {
+    const line = reminderArrivalLine(
+      { arrivalHour: 7, nextDay: true, sameDayHour: 7 },
+      true,
+      true,
     );
-    expect(reminderArrivalLine({ arrivalHour: 7, nextDay: true }, false)).toBe(
-      "Reminders will arrive at 7:00 AM, after quiet hours end.",
-    );
+    expect(line).not.toMatch(/won't be sent|can't move/);
   });
 
   it("formats hours as wall-clock labels", () => {
@@ -225,8 +246,51 @@ describe("reminderArrivalLine / copy (D-78)", () => {
     expect(formatHour(21)).toBe("9:00 PM");
   });
 
-  it("the quiet-hours helper no longer promises 'the next morning'", () => {
-    expect(QUIET_HOURS_HELPER).not.toMatch(/next morning/);
-    expect(QUIET_HOURS_HELPER).toContain("wait until quiet hours end");
+  it("the quiet-hours helper describes birthdays and the digest at quiet-hours end", () => {
+    expect(QUIET_HOURS_HELPER).toBe(
+      "Nothing arrives during quiet hours. Reminders wait until quiet hours end; birthday alerts and the weekly digest come when quiet hours end on their own day.",
+    );
+    expect(QUIET_HOURS_HELPER).not.toMatch(
+      /next morning|at your reminder time/,
+    );
+  });
+});
+
+/**
+ * 38.12 D-142: the page's same-day hour is the hour the birthday and digest
+ * schedulers use (`sameDayAllowedHour`), and it equals the decay arrival hour
+ * whenever the reminder time is inside quiet hours.
+ */
+describe("effectiveReminderArrival.sameDayHour matches the schedulers (D-142)", () => {
+  it("equals sameDayAllowedHour and the arrival hour for every hour combination", () => {
+    const base = new Date(2026, 9, 17);
+    for (let dh = 0; dh < 24; dh++) {
+      for (let qs = 0; qs < 24; qs++) {
+        for (let qe = 0; qe < 24; qe++) {
+          const arrival = effectiveReminderArrival({
+            reminderTime: dh,
+            quietStart: qs,
+            quietEnd: qe,
+            baseDate: base,
+          });
+          if (arrival === null) {
+            expect(sameDayAllowedHour(dh, qs, qe)).toBe(dh);
+            continue;
+          }
+          expect(arrival.sameDayHour).toBe(sameDayAllowedHour(dh, qs, qe));
+          expect(arrival.sameDayHour).toBe(arrival.arrivalHour);
+        }
+      }
+    }
+  });
+});
+
+describe("persistNotificationSettings — quiet-hours writes re-arm the digest (D-142)", () => {
+  it("fires the digest reconcile on a quiet-hours patch", async () => {
+    const { deps } = makeDeps();
+    await persistNotificationSettings(EXEC, { quietStartHour: 22 }, deps);
+    await persistNotificationSettings(EXEC, { quietEndHour: 7 }, deps);
+    expect(deps.reconcileDigestSchedule).toHaveBeenCalledTimes(2);
+    expect(deps.reconcileSchedule).toHaveBeenCalledTimes(2);
   });
 });

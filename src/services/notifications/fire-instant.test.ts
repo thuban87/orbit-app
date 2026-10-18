@@ -4,6 +4,7 @@ import {
   nextAllowedFireInstant,
   nextGridFireInstant,
   nextNudgeDate,
+  sameDayAllowedHour,
   sameDayAllowedInstant,
 } from "./fire-instant";
 
@@ -304,6 +305,35 @@ describe("sameDayAllowedInstant — a date-bound slot that never leaves its day 
           const quiet =
             qs !== qe && (qs > qe ? h >= qs || h < qe : h >= qs && h < qe);
           expect(quiet).toBe(false);
+        }
+      }
+    }
+  });
+});
+
+describe("sameDayAllowedHour — the hour form for weekly triggers (38.12 D-142)", () => {
+  it("moves a quiet delivery hour to quiet-hours end and keeps an allowed one", () => {
+    expect(sameDayAllowedHour(22, 21, 8)).toBe(8);
+    expect(sameDayAllowedHour(6, 21, 8)).toBe(8);
+    expect(sameDayAllowedHour(13, 12, 14)).toBe(14);
+    expect(sameDayAllowedHour(9, 21, 8)).toBe(9);
+    expect(sameDayAllowedHour(22, 8, 8)).toBe(22);
+  });
+
+  it("clamps malformed hours like the other helpers", () => {
+    expect(sameDayAllowedHour(Number.NaN, 21, 8)).toBe(8);
+    expect(sameDayAllowedHour(24, 21, 8)).toBe(8);
+  });
+
+  it("agrees with sameDayAllowedInstant's hour for every hour combination", () => {
+    const day = new Date(2026, 8, 10);
+    const noPast = new Date(Number.NaN);
+    for (let dh = 0; dh < 24; dh++) {
+      for (let qs = 0; qs < 24; qs++) {
+        for (let qe = 0; qe < 24; qe++) {
+          expect(sameDayAllowedHour(dh, qs, qe)).toBe(
+            sameDayAllowedInstant(day, dh, qs, qe, 0, noPast)?.getHours(),
+          );
         }
       }
     }

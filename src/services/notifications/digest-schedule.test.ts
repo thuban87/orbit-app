@@ -309,6 +309,69 @@ describe("reconcileDigestSchedule — delivery-hour / weekday drift", () => {
 });
 
 // ============================================================================
+// 38.12 D-142 — the digest respects quiet hours: a delivery hour inside quiet
+// hours moves to the quiet-hours end on the digest's own day (Sunday, ADR-055).
+// ============================================================================
+
+describe("reconcileDigestSchedule — quiet hours (D-142)", () => {
+  it("an evening delivery hour inside an overnight window fires at quiet-hours end on the digest day", async () => {
+    await enable({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 });
+
+    await reconcileDigestSchedule(exec);
+
+    const req = scheduledDigest();
+    expect(req?.trigger.weekday).toBe(DIGEST_WEEKDAY);
+    expect(req?.trigger.hour).toBe(8);
+    expect(req?.trigger.minute).toBe(0);
+  });
+
+  it("an early-morning or daytime quiet delivery hour moves to that day's quiet end", async () => {
+    await enable({ deliveryHour: 6, quietStartHour: 21, quietEndHour: 8 });
+    await reconcileDigestSchedule(exec);
+    expect(scheduledDigest()?.trigger.hour).toBe(8);
+
+    __resetExpo();
+    vi.clearAllMocks();
+    await enable({ deliveryHour: 13, quietStartHour: 12, quietEndHour: 14 });
+    await reconcileDigestSchedule(exec);
+    expect(scheduledDigest()?.trigger.hour).toBe(14);
+    expect(scheduledDigest()?.trigger.weekday).toBe(DIGEST_WEEKDAY);
+  });
+
+  it("a delivery hour outside quiet hours is unchanged", async () => {
+    await enable({ deliveryHour: 10, quietStartHour: 21, quietEndHour: 8 });
+
+    await reconcileDigestSchedule(exec);
+
+    expect(scheduledDigest()?.trigger.hour).toBe(10);
+  });
+
+  it("a quiet-hours change re-arms a digest whose hour is now quiet", async () => {
+    // Armed at 9 before; quiet hours now cover 08-10.
+    await enable({ deliveryHour: 9, quietStartHour: 8, quietEndHour: 10 });
+    __setScheduled([digestEntry(9)]);
+
+    await reconcileDigestSchedule(exec);
+
+    expect(cancelledIds().filter((x) => x === DIGEST_IDENTIFIER)).toHaveLength(
+      1,
+    );
+    expect(scheduledDigest()?.trigger.hour).toBe(10);
+    expect(scheduledDigest()?.trigger.weekday).toBe(DIGEST_WEEKDAY);
+  });
+
+  it("leaves an already quiet-adjusted digest untouched (no churn)", async () => {
+    await enable({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 });
+    __setScheduled([digestEntry(8)]);
+
+    await reconcileDigestSchedule(exec);
+
+    expect(scheduleMock).not.toHaveBeenCalled();
+    expect(cancelMock).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
 // H2 / M4 — defer-one coordinator via a DETERMINISTIC deferred barrier. A stale
 // in-flight pass must NOT re-arm a digest that a newer settings write cancelled.
 // ============================================================================

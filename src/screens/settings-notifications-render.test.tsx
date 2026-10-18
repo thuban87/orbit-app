@@ -244,13 +244,25 @@ describe("SettingsNotificationsScreen (38.12-14)", () => {
     expect(outside.props.value).toBe("9:00 AM");
   });
 
-  it("an evening reminder time in an overnight window warns about birthday alerts", () => {
+  it("an evening reminder time in an overnight window says birthdays and the digest keep their day (D-142)", () => {
     const evening = row(
       render({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 }),
       "Reminder time",
     );
     expect(evening.props.subtitle).toBe(
-      "Reminders will arrive at 8:00 AM, after quiet hours end. Birthday alerts can't move to the next day, so they won't be sent.",
+      "Reminders will arrive at 8:00 AM, after quiet hours end. Birthday alerts and the weekly digest still come on their own day, at 8:00 AM.",
+    );
+    const digestOff = row(
+      render({
+        deliveryHour: 22,
+        quietStartHour: 21,
+        quietEndHour: 8,
+        digestEnabled: 0,
+      }),
+      "Reminder time",
+    );
+    expect(digestOff.props.subtitle).toBe(
+      "Reminders will arrive at 8:00 AM, after quiet hours end. Birthday alerts still come on the birthday, at 8:00 AM.",
     );
   });
 
@@ -259,7 +271,7 @@ describe("SettingsNotificationsScreen (38.12-14)", () => {
       (n) => n.props.testID === "settings-notifications-quiet-helper",
     );
     expect(helper?.props.children).toBe(
-      "Reminders that fall inside quiet hours wait until quiet hours end. The weekly digest comes at your reminder time.",
+      "Nothing arrives during quiet hours. Reminders wait until quiet hours end; birthday alerts and the weekly digest come when quiet hours end on their own day.",
     );
   });
 
