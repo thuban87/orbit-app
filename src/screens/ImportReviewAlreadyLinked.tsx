@@ -11,9 +11,9 @@
  * 38.12 D-154: when that Orbit person is in the Bin, the pick is never
  * imported as a duplicate either. The row is resolved the same way (with the
  * 'in-bin' reason, so Import complete counts it under "In the Bin") and the
- * view shows "In the Bin: <name>" with Restore and Done. Restore brings the
- * person back with the Bin list's effects and Undo; the existing phone link
- * is kept, and the view then reads "Already in Orbit as <name>" with Open.
+ * view shows "In the Bin: <name>" with Open the Bin and Done (D-155, keeping
+ * ADR-018: restore and permanent deletion live only in the Bin list, so there
+ * is no Restore here). The existing phone link is kept either way.
  *
  * No colour literal (check:colors).
  */
@@ -69,18 +69,16 @@ export async function resolveAlreadyLinkedReview(
 export function ImportReviewAlreadyLinked({
   name,
   inBin = false,
-  restoring = false,
   onOpen,
-  onRestore,
+  onOpenBin,
   onDone,
 }: {
   name: string;
   /** D-154: the linked person is in the Bin. */
   inBin?: boolean;
-  /** A Restore is in flight: the button is disabled. */
-  restoring?: boolean;
   onOpen: () => void;
-  onRestore?: () => void;
+  /** D-155: opens the Bin list, where the person can be restored. */
+  onOpenBin?: () => void;
   onDone: () => void;
 }) {
   return (
@@ -94,10 +92,8 @@ export function ImportReviewAlreadyLinked({
           {inBin ? (
             <Button
               role="primary"
-              label="Restore"
-              accessibilityLabel={`Restore ${name}`}
-              disabled={restoring}
-              onPress={() => onRestore?.()}
+              label="Open the Bin"
+              onPress={() => onOpenBin?.()}
             />
           ) : (
             <Button role="primary" label="Open" onPress={onOpen} />

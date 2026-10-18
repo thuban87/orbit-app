@@ -145,6 +145,7 @@ vi.mock("@/navigation/back-acts-as-done", () => ({
 vi.mock("@/navigation/flow-host", () => ({
   DEFAULT_FLOW_HOST: { kind: "settings" },
   finishFlow: mocks.finishFlow,
+  openBinFromFlow: vi.fn(),
   openContactFromFlow: vi.fn(),
 }));
 vi.mock("@/services/device-region", () => ({
@@ -175,9 +176,6 @@ vi.mock("./existing-contact-choices", () => ({
       name: `Orbit ${candidate.contactId}`,
       photo: null,
     })),
-}));
-vi.mock("@/services/contacts/restore-from-bin", () => ({
-  restoreFromBinWithUndo: vi.fn(async () => true),
 }));
 vi.mock("./ImportReviewAlreadyLinked", () => ({
   ImportReviewAlreadyLinked: "ImportReviewAlreadyLinked",

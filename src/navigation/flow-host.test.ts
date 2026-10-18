@@ -15,6 +15,7 @@ import {
   type FlowParentNavigator,
   finishFlow,
   finishFlowOnProfile,
+  openBinFromFlow,
   openContactFromFlow,
   returnFromProfileToTab,
 } from "./flow-host";
@@ -560,6 +561,94 @@ describe("returnFromProfileToTab (D-110 Profile Back)", () => {
     const nav = navigatorSpy(contacts);
     returnFromProfileToTab(asFlow(nav), "DigestTab");
     expect(nav.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("openBinFromFlow — Import review's Open the Bin (38.12 D-155, ADR-018)", () => {
+  const SETTINGS_WITH_BIN = [...SETTINGS_ROUTE_NAMES, "Archived"];
+
+  it("settings host: ends the flow on Contacts & Relationships and opens the Bin above it", () => {
+    const state = stack("settings-stack", SETTINGS_WITH_BIN, [
+      r("Settings"),
+      r("SettingsContacts"),
+      r("ImportReview"),
+    ]);
+    const parent = parentSpy();
+    const nav = navigatorSpy(state, parent);
+    openBinFromFlow(asFlow(nav), { kind: "settings" });
+    expect(nav.dispatch).toHaveBeenCalledTimes(1);
+    const action = nav.dispatch.mock.calls[0][0];
+    expect(action.type).toBe("RESET");
+    expect(action.target).toBe("settings-stack");
+    const next = applyToStack(state, action);
+    expect(next?.routes.map((x) => x.name)).toEqual([
+      "Settings",
+      "SettingsContacts",
+      "Archived",
+    ]);
+    // The routes below are kept by reference; Back from the Bin lands on the
+    // flow's ending.
+    expect(next?.routes[1].key).toBe("SettingsContacts-k");
+    expect(next?.index).toBe(2);
+    expect(parent.navigate).not.toHaveBeenCalled();
+  });
+
+  it("settings host, resumed over unrelated pages: [Settings, Contacts & Relationships, Bin]", () => {
+    const state = stack(
+      "settings-stack",
+      [...SETTINGS_WITH_BIN, "SettingsAI"],
+      [r("Settings"), r("SettingsAI"), r("ImportReview")],
+    );
+    const nav = navigatorSpy(state);
+    openBinFromFlow(asFlow(nav), { kind: "settings" });
+    const next = applyToStack(state, nav.dispatch.mock.calls[0][0]);
+    expect(next?.routes.map((x) => x.name)).toEqual([
+      "Settings",
+      "SettingsContacts",
+      "Archived",
+    ]);
+    expect(next?.routes[0].key).toBe("Settings-k");
+  });
+
+  it("pops back to a Bin already beneath the flow (the Profile banner's pattern)", () => {
+    const state = stack("settings-stack", SETTINGS_WITH_BIN, [
+      r("Settings"),
+      r("SettingsContacts"),
+      r("Archived"),
+      r("ImportReview"),
+    ]);
+    const nav = navigatorSpy(state);
+    openBinFromFlow(asFlow(nav), { kind: "settings" });
+    const action = nav.dispatch.mock.calls[0][0];
+    expect(action).toEqual(StackActions.popTo("Archived"));
+    expect(applyToStack(state, action)?.routes.map((x) => x.name)).toEqual([
+      "Settings",
+      "SettingsContacts",
+      "Archived",
+    ]);
+  });
+
+  it("digest host: opens the Bin in the Contacts tab, then pops the flow off the Settings stack", () => {
+    const state = stack("settings-stack", SETTINGS_WITH_BIN, [
+      r("Settings"),
+      r("ImportReview"),
+    ]);
+    const parent = parentSpy();
+    const nav = navigatorSpy(state, parent);
+    openBinFromFlow(asFlow(nav), { kind: "digest" });
+    expect(parent.navigate).toHaveBeenCalledWith("DashboardTab", {
+      screen: "Archived",
+      params: undefined,
+      initial: false,
+    });
+    const pop = nav.dispatch.mock.calls[0][0];
+    expect(pop).toEqual({ ...StackActions.pop(1), target: "settings-stack" });
+    expect(parent.navigate.mock.invocationCallOrder[0]).toBeLessThan(
+      nav.dispatch.mock.invocationCallOrder[0],
+    );
+    expect(applyToStack(state, pop)?.routes.map((x) => x.name)).toEqual([
+      "Settings",
+    ]);
   });
 });
 

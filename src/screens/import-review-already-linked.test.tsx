@@ -214,15 +214,16 @@ describe("a pick linked only to a person in the Bin (38.12 D-154)", () => {
     );
   });
 
-  it("shows In the Bin: <name> with Restore and Done", () => {
-    const onRestore = vi.fn();
+  it("shows In the Bin: <name> with Open the Bin and Done, never Restore (D-155, ADR-018)", () => {
+    const onOpenBin = vi.fn();
+    const onOpen = vi.fn();
     const onDone = vi.fn();
     const tree = nodes(
       ImportReviewAlreadyLinked({
         name: "Ada Lovelace",
         inBin: true,
-        onOpen: vi.fn(),
-        onRestore,
+        onOpen,
+        onOpenBin,
         onDone,
       }),
     );
@@ -231,11 +232,26 @@ describe("a pick linked only to a person in the Bin (38.12 D-154)", () => {
     );
     expect(message?.props.children).toBe("In the Bin: Ada Lovelace");
     const buttons = tree.filter((n) => n.type === "Button");
-    expect(buttons.map((b) => b.props.label)).toEqual(["Restore", "Done"]);
+    expect(buttons.map((b) => b.props.label)).toEqual([
+      "Open the Bin",
+      "Done",
+    ]);
     (buttons[0].props.onPress as () => void)();
-    expect(onRestore).toHaveBeenCalledOnce();
+    expect(onOpenBin).toHaveBeenCalledOnce();
+    expect(onOpen).not.toHaveBeenCalled();
     (buttons[1].props.onPress as () => void)();
     expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it("the review wires Open the Bin to the flow host's Bin opener; no Restore path outside the Bin list", () => {
+    const screen = readFileSync(
+      join(__dirname, "ImportReviewScreen.tsx"),
+      "utf8",
+    );
+    expect(screen).toMatch(
+      /onOpenBin=\{\(\) => openBinFromFlow\(navigation, host\)\}/,
+    );
+    expect(screen).not.toMatch(/restoreFromBin|restoreContact\b|onRestore/);
   });
 });
 

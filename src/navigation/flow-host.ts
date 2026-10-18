@@ -2,6 +2,8 @@ import { Logger } from "@/utils/logger";
 import {
   type ContactsProfileNavigator,
   type ContactsProfileRootState,
+  navigateIntoTab,
+  openBinFromProfile,
   openProfileInContactsTab,
 } from "./tab-entry";
 import { switchTabWithoutHistory, type TabHistoryState } from "./tab-history";
@@ -108,10 +110,11 @@ const SETTINGS_ROOT = "Settings";
  * this stack to `[Settings, Contacts & Relationships]`, keeping the root route
  * by reference, so Back from the ending goes to Settings rather than an
  * unrelated page (D-110; 38.12 D-IN-04). StackRouter POP_TO alone would only
- * replace the top route. The merge routes are also registered in the Dashboard, Digest,
- * Events and Orrery stacks, which have no SettingsContacts, so a dropped host
- * reaching here in one of them would dispatch an unhandled POP_TO. Those stacks
- * pop to their own root instead, with a warning (convergence c1 A-1).
+ * replace the top route. The merge routes are also registered in the
+ * Dashboard, Digest, Events and Orrery stacks, which have no SettingsContacts,
+ * so a dropped host reaching here in one of them would dispatch an unhandled
+ * POP_TO. Those stacks pop to their own root instead, with a warning
+ * (convergence c1 A-1).
  */
 function endOnSettings(navigation: FlowNavigator, helper: string): void {
   const state = navigation.getState();
@@ -277,6 +280,86 @@ export function exitFlow(navigation: FlowNavigator, host: FlowHost): void {
       navigation.goBack();
       return;
   }
+}
+
+/** The Bin list's route (ArchivedContactsScreen), in the Settings and Contacts stacks. */
+const BIN_ROUTE = "Archived";
+
+/**
+ * "Open the Bin" from a flow: the single import review's "In the Bin: <name>"
+ * view (38.12 D-155). Restore and permanent deletion live only in the Bin list
+ * (ADR-018), so the view opens it, with the binned Profile banner's pattern
+ * (`openBinFromProfile`, D-93): a Bin already beneath the flow is popped back
+ * to; otherwise the Bin opens where the flow ends.
+ *
+ * - `settings`: the flow ends on Contacts & Relationships (D-110) and the Bin
+ *   opens above it, where Settings itself opens the Bin, so Back from the Bin
+ *   lands on the flow's ending. One RESET of this stack, keeping the routes
+ *   up to Contacts & Relationships by reference (or `[Settings, Contacts &
+ *   Relationships]` when it is absent, as `endOnSettings` does).
+ * - `digest`: the Bin opens in the Contacts tab (`navigateIntoTab`, RG-021),
+ *   then the flow routes are popped off the Settings stack while it is
+ *   off-screen.
+ * - `profile`: `openBinFromProfile` on this stack.
+ */
+export function openBinFromFlow(
+  navigation: FlowNavigator,
+  host: FlowHost,
+): void {
+  const state = navigation.getState();
+  if (host.kind === "profile") {
+    openBinFromProfile({
+      getState: () => state,
+      dispatch: (action: never) => navigation.dispatch(action),
+      navigate: (...args: never[]) => navigation.getParent()?.navigate(...args),
+    });
+    return;
+  }
+  if (state == null) return;
+  const firstFlow = state.routes.findIndex((route) =>
+    FLOW_ROUTE_NAMES.has(route.name),
+  );
+  const below =
+    firstFlow === -1 ? state.routes : state.routes.slice(0, firstFlow);
+  if (below.some((route) => route.name === BIN_ROUTE)) {
+    dispatch(navigation, {
+      type: "POP_TO",
+      payload: { name: BIN_ROUTE, params: undefined, merge: undefined },
+    });
+    return;
+  }
+  if (
+    host.kind === "settings" &&
+    state.routeNames.includes(SETTINGS_FLOW_HOME) &&
+    state.routeNames.includes(BIN_ROUTE)
+  ) {
+    const home = below.findIndex((route) => route.name === SETTINGS_FLOW_HOME);
+    const base: object[] =
+      home !== -1
+        ? below.slice(0, home + 1)
+        : [
+            below[0]?.name === SETTINGS_ROOT
+              ? below[0]
+              : { name: SETTINGS_ROOT },
+            { name: SETTINGS_FLOW_HOME },
+          ];
+    const routes = [...base, { name: BIN_ROUTE }];
+    dispatch(navigation, {
+      type: "RESET",
+      payload: { ...state, routes, index: routes.length - 1 },
+      target: state.key,
+    });
+    return;
+  }
+  // Digest host (or a stack without the Settings routes): open the Bin in the
+  // Contacts tab, then drop the finished flow off this stack off-screen.
+  navigateIntoTab(navigation.getParent(), "DashboardTab", BIN_ROUTE);
+  if (firstFlow === -1 || firstFlow === 0) return;
+  dispatch(navigation, {
+    type: "POP",
+    payload: { count: state.index - firstFlow + 1 },
+    target: state.key,
+  });
 }
 
 /** The container shape `openProfileInContactsTab` takes, over the tab parent. */
