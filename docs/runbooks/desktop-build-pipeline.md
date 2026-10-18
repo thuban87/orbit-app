@@ -231,6 +231,17 @@ npx expo start                                   # Metro bundler on this box (po
 6. **RN `Modal` pickers are not reliably drivable by adb (38.10-19).** To seed data through an old
    picker-heavy UI, use a throwaway hook in a `git archive` copy of that commit in the scratchpad
    (never the repo), served by Metro on :8082; see `sqlite-migration-pipeline.md` Pitfall 15.
+7. **Kotlin is compiled and tested only on the build host (38.12-26).** This box has no `kotlinc`,
+   so native module changes are unverified until the desktop build. After a native change, run the
+   modules' JVM unit tests with Gradle on droid (project names from `android/settings.gradle`)
+   before `assembleDebug`: 38.12 ran `BackupIngressRequestsTest`, `BoundedBackupCopierTest`,
+   `BackupFolderTextTest` (orbit-backup-document-picker) and `PhotoFingerprintTest`
+   (orbit-contact-picker). Save their output with the build evidence.
+8. **The auto-mode classifier may refuse a clean prebuild (38.12-26).** `rmdir src` on droid and
+   `expo prebuild --clean` were refused. When no file was deleted since the last prebuild and no
+   `app.config`, package or patch changed, a plain tar overwrite of the source plus
+   `assembleDebug` / `assembleRelease` on the existing `android/` is equivalent; verify the bundle
+   and APK contents. Otherwise ask the owner to run the clean prebuild.
 
 ## 4. Native share-target verification (Phase 10)
 
