@@ -125,6 +125,11 @@ export function ReconcileDetailScreen({
   );
   const [scan, setScan] = useState<ScanState | null>(null);
   const [choices, setChoices] = useState<ReconcileChoices>({});
+  // The fields the person tapped (38.12 D-144): only these may change Orbit's
+  // primary; pre-ticked defaults are added as secondaries.
+  const [tappedFamilies, setTappedFamilies] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -215,6 +220,7 @@ export function ReconcileDetailScreen({
         // Additive phones/emails open with every phone value picked (the
         // remembered full list); conflicts open with nothing (convergence c4 E-5).
         setChoices(defaultReconcileChoices(diff));
+        setTappedFamilies(new Set());
         setApplied(false);
         if (diff.fields.length === 0) setMessage("No changes from Contacts.");
         setScan({
@@ -343,7 +349,11 @@ export function ReconcileDetailScreen({
     const exec = getExecutor();
     const now = localDateTime();
     try {
-      const selections = buildReconcileSelections(scan.diff, choices);
+      const selections = buildReconcileSelections(
+        scan.diff,
+        choices,
+        tappedFamilies,
+      );
       const result = await inWriteTransaction(exec, () =>
         applyReconcileSelections(exec, {
           contactId,
@@ -435,6 +445,7 @@ export function ReconcileDetailScreen({
     cardId,
     sessionId,
     staging,
+    tappedFamilies,
   ]);
 
   // An unchosen field, or an emptied phone/email pick list, blocks Apply.
@@ -585,7 +596,10 @@ export function ReconcileDetailScreen({
                 key={field.fieldFamily}
                 field={field}
                 choice={choices[field.fieldFamily]}
-                onChoice={(choice) =>
+                onChoice={(choice) => {
+                  setTappedFamilies((current) =>
+                    new Set(current).add(field.fieldFamily),
+                  );
                   setChoices((current) => ({
                     ...current,
                     [field.fieldFamily]:
@@ -596,8 +610,8 @@ export function ReconcileDetailScreen({
                             choice,
                           )
                         : choice,
-                  }))
-                }
+                  }));
+                }}
               />
             ),
           )}

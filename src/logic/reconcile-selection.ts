@@ -70,7 +70,8 @@ function pickedOptions(
  *
  * | Mode | Family | Applied | Remembered |
  * |---|---|---|---|
- * | Detail picks | phones/emails | exactly the picks, labelled; first pick (display order) primary | full source serialization |
+ * | Detail picks, field tapped | phones/emails | exactly the picks, labelled; first pick (display order) primary | full source serialization |
+ * | Detail picks, untapped defaults | phones/emails | exactly the picks, labelled; Orbit primary unchanged (D-144) | full source serialization |
  * | Detail pick | name/birthday/photo | the one chosen option | as before |
  * | Bulk use-contact-values | phones/emails (additive) | every option, labelled; Orbit primary unchanged | full source serialization |
  * | Bulk use-contact-values | name/birthday (one option), photo skipped | as before | as before |
@@ -79,10 +80,16 @@ function pickedOptions(
  * Untapped options are remembered as reviewed (`reviewedValue` is the whole
  * source serialization), so they are not offered again until the phone side
  * changes (convergence c3 D-1; D-45).
+ *
+ * `tappedFamilies` (38.12 D-144, owner): the fields the person actually tapped
+ * in the detail. Pre-ticked defaults are still added, but only a tapped field
+ * can make a phone value primary; with no tap, Orbit's primary stays. Absent
+ * means nothing was tapped. Bulk ignores it and never elects.
  */
 export function buildReconcileSelections(
   diff: ReconcileDiffResult,
   choices: ReconcileChoices | ReconcileBulkMode,
+  tappedFamilies: ReadonlySet<string> = new Set(),
 ): ReconcileSelection[] {
   const bulk = typeof choices === "string" ? choices : null;
   return diff.fields.flatMap((field): ReconcileSelection[] => {
@@ -126,8 +133,12 @@ export function buildReconcileSelections(
         ...(isMethodFamily(field) && useSource
           ? { sourceOptionIds: picked.map((option) => option.optionId) }
           : {}),
-        // A detail pick names the new primary (D-102); bulk never does.
-        ...(isMethodFamily(field) && useSource && !bulk
+        // A tapped detail pick names the new primary (D-102); untapped
+        // defaults (D-144) and bulk never do.
+        ...(isMethodFamily(field) &&
+        useSource &&
+        !bulk &&
+        tappedFamilies.has(field.fieldFamily)
           ? { electPrimary: true }
           : {}),
         sourceValue:
