@@ -1,7 +1,7 @@
 # Contact Methods
 
-**Last updated:** 2026-10-16
-**Updated by phase:** 38.11-everyday-screens-ux
+**Last updated:** 2026-10-18
+**Updated by phase:** 38.12-lifecycle-import-settings-ux
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
@@ -94,9 +94,15 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 
 ### Matching imported source methods
 
-1. Contact Import canonicalizes an accepted phone or email with the stored session region before it queries `canonical_value` evidence.
+1. Contact Import canonicalizes an accepted phone or email with the stored session region before it queries `canonical_value` evidence. Each picked method carries the phone's `typeCode` and `customLabel`; import stores the phone's own label (Mobile, Work, a custom label) rather than a forced "Main" (ADR-239). Import review's method warnings use the effective phone region.
 2. An active external source link is deterministic identity; every other endpoint match remains advisory, and correlated signals from one source record contribute only their strongest signal.
 3. An explicit import create or link writes source link and method provenance in the same transaction as the resolved import row.
+
+### Applying a phone value from Check linked contacts
+
+1. Each phone option shows the phone's value with its own label (`pickedMethodLabel`); Apply adds only the options the person chose, with their labels (ADR-236).
+2. A chosen phone value becomes the type's primary through the method DAO's normal demote-then-promote path; the previous Orbit primary stays as a secondary and nothing is deleted.
+3. Pre-ticked new values are still added, but only a field the person tapped can change the primary; unticking a pre-ticked value is not a choice, and with no tap the Orbit primary stays.
 
 ### Consolidating methods during a contact merge
 
@@ -137,6 +143,9 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 - **ADR-229:** Birthday on the Profile — the Profile Birthday sheet.
 - **ADR-230:** Settings Page for Profile Backgrounds — the Profile Backgrounds page.
 - **ADR-231:** Open/Closed Sections, Layout Tools in the Sheets, All-Default Reset Row — Profile layout and background resets.
+- **ADR-236:** Check Linked Contacts Never Re-Asks a Reviewed Difference — a picked phone value is added with its label as the primary, the old Orbit value stays secondary; only a user's tick elects a primary.
+- **ADR-239:** Import Screens Keep Add Contact's Order — imported methods keep the phone's labels.
+- **ADR-246:** One Settings Row and Section Card — the phone-region picker shows bundled English country names (`country-names.ts`).
 
 ## Gotchas
 
@@ -185,3 +194,4 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 | 2026-09-23 | 38.2 | Made contact edits return committed child identities and advance post-save method baselines before any projection refresh. |
 | 2026-10-15 | 38.10 | Compose no longer reads ranked fuel; its knowledge comes from Compose Research (`readComposeResearch`) and the prompt-item count feeds the failure diagnostic (ADR-214). |
 | 2026-10-16 | 38.11 | Draft contact-method rows recompute their warning live with the effective phone region (D-30, warn only); label-only link rows warn (D-88). KB extraction: Decisions link ADR-223–ADR-227, ADR-229–ADR-231. |
+| 2026-10-18 | 38.12 | Imported methods keep the phone's labels; Check linked contacts adds tapped values with labels and elects a primary only on the user's tick; phone-region picker shows country names (ADR-236, ADR-239, ADR-246). |
