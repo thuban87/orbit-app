@@ -242,6 +242,11 @@ export function SettingsNotificationsScreen() {
     }),
     birthdayOn,
     digestOn,
+    // C-IN-03: describe only what will be sent.
+    {
+      notificationsOn: masterOn,
+      checkInRemindersOn: settings?.decayEnabled === 1,
+    },
   );
   // D-77: one paused line while the master is off. The degraded note already
   // explains a denial, so the two never show together.

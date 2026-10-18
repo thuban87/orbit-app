@@ -244,6 +244,31 @@ describe("SettingsNotificationsScreen (38.12-14)", () => {
     expect(outside.props.value).toBe("9:00 AM");
   });
 
+  it("the arrival line leaves out what will not be sent (C-IN-03)", () => {
+    const checkInsOff = row(
+      render({
+        deliveryHour: 6,
+        quietStartHour: 21,
+        quietEndHour: 8,
+        decayEnabled: 0,
+      }),
+      "Reminder time",
+    );
+    expect(checkInsOff.props.subtitle).toBe(
+      "Birthday alerts and the weekly digest will arrive at 8:00 AM, after quiet hours end.",
+    );
+    const masterOff = row(
+      render({
+        deliveryHour: 6,
+        quietStartHour: 21,
+        quietEndHour: 8,
+        notificationsEnabled: 0,
+      }),
+      "Reminder time",
+    );
+    expect(masterOff.props.subtitle).toBeNull();
+  });
+
   it("an evening reminder time in an overnight window says birthdays and the digest keep their day (D-142)", () => {
     const evening = row(
       render({ deliveryHour: 22, quietStartHour: 21, quietEndHour: 8 }),

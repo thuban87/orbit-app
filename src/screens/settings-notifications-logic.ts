@@ -87,13 +87,39 @@ export function effectiveReminderArrival({
  * check-in reminders arrive the next morning but birthday alerts and the
  * weekly digest stay on their own day at the quiet-hours end (D-142), so the
  * line says so for whichever of the two is on.
+ *
+ * It only describes what will actually be sent (review C-IN-03): no line
+ * while Allow notifications is off (the D-77 paused line says so), and with
+ * check-in reminders off it speaks only of birthday alerts and the digest,
+ * when either is on.
  */
 export function reminderArrivalLine(
   arrival: ReminderArrival | null,
   birthdayAlertsOn: boolean,
   digestOn = false,
+  sending: { notificationsOn?: boolean; checkInRemindersOn?: boolean } = {},
 ): string | null {
-  if (arrival === null) return null;
+  if (arrival === null || sending.notificationsOn === false) return null;
+  if (sending.checkInRemindersOn === false) {
+    const subject =
+      birthdayAlertsOn && digestOn
+        ? "Birthday alerts and the weekly digest"
+        : birthdayAlertsOn
+          ? "Birthday alerts"
+          : digestOn
+            ? "The weekly digest"
+            : null;
+    if (subject === null) return null;
+    const hour = arrival.nextDay ? arrival.sameDayHour : arrival.arrivalHour;
+    const sameDay = arrival.nextDay
+      ? birthdayAlertsOn && digestOn
+        ? " on their own day"
+        : birthdayAlertsOn
+          ? " on the birthday"
+          : " on its usual day"
+      : "";
+    return `${subject} will arrive${sameDay} at ${formatHour(hour)}, after quiet hours end.`;
+  }
   const base = `Reminders will arrive at ${formatHour(arrival.arrivalHour)}, after quiet hours end.`;
   if (!arrival.nextDay) return base;
   const at = formatHour(arrival.sameDayHour);

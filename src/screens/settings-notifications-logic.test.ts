@@ -230,6 +230,38 @@ describe("reminderArrivalLine / copy (D-78, D-142)", () => {
     );
   });
 
+  it("describes only what will be sent (C-IN-03)", () => {
+    const sameDay = { arrivalHour: 8, nextDay: false, sameDayHour: 8 };
+    const crossing = { arrivalHour: 7, nextDay: true, sameDayHour: 0 };
+    // Allow notifications off: the D-77 paused line speaks instead.
+    expect(
+      reminderArrivalLine(sameDay, true, true, { notificationsOn: false }),
+    ).toBeNull();
+    // Check-in reminders off: no "Reminders" sentence.
+    const off = { checkInRemindersOn: false };
+    expect(reminderArrivalLine(sameDay, true, true, off)).toBe(
+      "Birthday alerts and the weekly digest will arrive at 8:00 AM, after quiet hours end.",
+    );
+    expect(reminderArrivalLine(sameDay, false, true, off)).toBe(
+      "The weekly digest will arrive at 8:00 AM, after quiet hours end.",
+    );
+    expect(reminderArrivalLine(crossing, true, false, off)).toBe(
+      "Birthday alerts will arrive on the birthday at 12:00 AM, after quiet hours end.",
+    );
+    expect(reminderArrivalLine(crossing, true, true, off)).toBe(
+      "Birthday alerts and the weekly digest will arrive on their own day at 12:00 AM, after quiet hours end.",
+    );
+    // Nothing on: no line at all.
+    expect(reminderArrivalLine(sameDay, false, false, off)).toBeNull();
+    // Both on (the default): unchanged.
+    expect(
+      reminderArrivalLine(sameDay, true, true, {
+        notificationsOn: true,
+        checkInRemindersOn: true,
+      }),
+    ).toBe("Reminders will arrive at 8:00 AM, after quiet hours end.");
+  });
+
   it("never says birthday alerts are not sent", () => {
     const line = reminderArrivalLine(
       { arrivalHour: 7, nextDay: true, sameDayHour: 7 },
