@@ -24,8 +24,9 @@ const SLOT = {
   pending: 7,
   removeLane: 8,
   error: 9,
+  openRouterModels: 10,
 } as const;
-const SLOT_COUNT = 10;
+const SLOT_COUNT = 11;
 
 const hooks = vi.hoisted(() => ({
   index: 0,
@@ -50,6 +51,9 @@ const dao = vi.hoisted(() => ({
   upsertAiConnection: vi.fn(),
 }));
 const provider = vi.hoisted(() => ({ connectOpenRouter: vi.fn() }));
+const catalogFile = vi.hoisted(() => ({
+  readCachedOpenRouterModels: vi.fn(async (): Promise<unknown[]> => []),
+}));
 
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
@@ -80,6 +84,7 @@ vi.mock("react-native", () => ({
   View: "View",
 }));
 vi.mock("@/ai/openrouter-oauth", () => provider);
+vi.mock("@/ai/openrouter-catalog-file", () => catalogFile);
 vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/components/ui", () => ({
   AppText: "AppText",
@@ -198,7 +203,7 @@ describe("AI Connection tells the truth about a connected lane (38.12 D-84, K-36
     expect(onChooseModel).toHaveBeenCalledWith("openrouter");
   });
 
-  it("Disconnect is present but demoted — not primary and not the red destructive trigger", () => {
+  it("Disconnect is the filled red destructive button, never primary (D-157 amends D-84)", () => {
     store.state.activeConnection = "openrouter";
     const card = cardTree(
       render({
@@ -211,7 +216,7 @@ describe("AI Connection tells the truth about a connected lane (38.12 D-84, K-36
       (node) => node.props.label === "Disconnect",
     );
     expect(disconnect).toBeDefined();
-    expect(disconnect?.props.role).toBe("tertiary");
+    expect(disconnect?.props.role).toBe("destructive");
     // The connect action steps down too; it no longer says "Connect".
     const reconnect = buttons(card).find(
       (node) => node.props.label === "Reconnect",
@@ -250,8 +255,90 @@ describe("AI Connection tells the truth about a connected lane (38.12 D-84, K-36
     ).toEqual([
       ["Change model", "primary"],
       ["Replace key", "secondary"],
-      ["Remove key", "tertiary"],
+      ["Remove key", "destructive"],
     ]);
+  });
+
+  it("a saved, not-in-use card keeps Remove key as the same destructive button (D-157)", () => {
+    store.state.activeConnection = "openrouter";
+    const card = cardTree(
+      render({
+        connections: [
+          connection("openrouter"),
+          connection("openai", { rememberedModel: "gpt-live" }),
+        ],
+        credentialPresence: { openrouter: true, openai: true },
+        expanded: "openai",
+      }),
+      "openai",
+    );
+    const remove = buttons(card).find(
+      (node) => node.props.label === "Remove key",
+    );
+    expect(remove?.props.role).toBe("destructive");
+  });
+});
+
+describe("AI Connection names the saved model, not its raw id (38.12 DEF-03)", () => {
+  const captionTexts = (tree: TestElement[]) =>
+    tree
+      .filter(
+        (node) => node.type === "AppText" && node.props.role === "caption",
+      )
+      .map((node) => node.props.children);
+
+  it("an OpenRouter card shows the cached catalog's model name", () => {
+    store.state.activeConnection = "openrouter";
+    const card = cardTree(
+      render({
+        connections: [
+          connection("openrouter", {
+            rememberedModel: "anthropic/claude-sonnet-4.5",
+          }),
+        ],
+        credentialPresence: { openrouter: true },
+        openRouterModels: [
+          {
+            id: "anthropic/claude-sonnet-4.5",
+            name: "Anthropic: Claude Sonnet 4.5",
+          },
+        ],
+      }),
+      "openrouter",
+    );
+    const captions = captionTexts(card);
+    expect(captions).toContain("Anthropic: Claude Sonnet 4.5");
+    expect(captions).not.toContain("anthropic/claude-sonnet-4.5");
+  });
+
+  it("falls back to the saved id when the catalog does not know it", () => {
+    store.state.activeConnection = "openrouter";
+    const card = cardTree(
+      render({
+        connections: [
+          connection("openrouter", { rememberedModel: "vendor/unknown" }),
+        ],
+        credentialPresence: { openrouter: true },
+      }),
+      "openrouter",
+    );
+    expect(captionTexts(card)).toContain("vendor/unknown");
+  });
+
+  it("a focus reads the cached catalog locally when an OpenRouter connection exists, never the network", async () => {
+    dao.listAiConnections.mockResolvedValueOnce([connection("openrouter")]);
+    catalogFile.readCachedOpenRouterModels.mockResolvedValueOnce([
+      { id: "vendor/model", name: "Vendor Model" },
+    ]);
+    render();
+    for (const focus of hooks.focus) focus();
+    await flush();
+    await flush();
+    expect(catalogFile.readCachedOpenRouterModels).toHaveBeenCalledTimes(1);
+    expect(hooks.setters[SLOT.openRouterModels]).toHaveBeenCalledWith([
+      { id: "vendor/model", name: "Vendor Model" },
+    ]);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

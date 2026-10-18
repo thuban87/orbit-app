@@ -69,8 +69,9 @@ export interface ConnectionCardInput {
  * What a lane card shows (38.12 D-84, K-36).
  *
  *   connected  the active lane with a usable credential: the header reads
- *              "Connected", "Change model" is the primary action and
- *              Disconnect / Remove key is demoted to a plain control.
+ *              "Connected" and "Change model" is the primary action;
+ *              Disconnect / Remove key stays the filled red destructive
+ *              button (D-157 amends D-84's "demoted").
  *   connect    every other lane: the existing Connect / Save key primary.
  *
  * A Custom endpoint's credential is optional (it may be unauthenticated), so

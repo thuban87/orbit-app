@@ -8,6 +8,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import type { OpenRouterModel } from "@/ai/openrouter-catalog";
+import { readCachedOpenRouterModels } from "@/ai/openrouter-catalog-file";
 import { connectOpenRouter } from "@/ai/openrouter-oauth";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -45,6 +47,7 @@ import {
   submitDraft,
   switchLane,
 } from "./ai-connection-logic";
+import { laneModelName } from "./settings-ai-hub-logic";
 import { CUSTOM_RETENTION_CAVEAT } from "./settings-ai-logic";
 
 const LOG_SCOPE = "ai-connections";
@@ -63,8 +66,8 @@ export interface AIConnectionScreenProps {
  * focus, reads each saved lane's credential PRESENCE locally
  * (`readLaneCredentialPresence` → `readCredentialPresence`; no provider call,
  * no OAuth or egress change), and the active lane with a credential reads
- * "Connected" with "Change model" as its primary action and Disconnect /
- * Remove key demoted. "Recommended" and the default OpenRouter expansion stay
+ * "Connected" with "Change model" as its primary action; Disconnect /
+ * Remove key stays the filled red destructive button (D-157 amends D-84). "Recommended" and the default OpenRouter expansion stay
  * (D-17). Sections draw on the shared Settings section card (D-119).
  */
 export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
@@ -86,6 +89,11 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
   const [pending, setPending] = useState<AiCloudProviderId | null>(null);
   const [removeLane, setRemoveLane] = useState<AiCloudProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // DEF-03: the cached OpenRouter catalog, so a card shows the model's name
+  // (the picker's lookup), not its raw id. A local file read; no network.
+  const [openRouterModels, setOpenRouterModels] = useState<
+    readonly OpenRouterModel[]
+  >([]);
   // The Custom fields prefill from the saved connection (D-88) until the user
   // types in them; a reload never overwrites an edit in progress.
   const customFieldsEdited = useRef(false);
@@ -104,6 +112,14 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
       setCustomModel(custom.customModel || custom.rememberedModel);
     }
     await useAiConfigStore.getState().hydrate(exec);
+    if (rows.some((row) => row.lane === "openrouter")) {
+      try {
+        setOpenRouterModels(await readCachedOpenRouterModels());
+      } catch (caught) {
+        // The card falls back to the saved id; never a load failure.
+        Logger.error(LOG_SCOPE, "failed to read the model catalog", caught);
+      }
+    }
   }, []);
 
   // Reload on every focus (D-84): returning from the model picker or the
@@ -288,6 +304,11 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
     const connected = state.status === "connected";
     const isExpanded = expanded === lane;
     const removeLabel = lane === "openrouter" ? "Disconnect" : "Remove key";
+    const modelName = laneModelName(
+      lane,
+      state.rememberedModel,
+      openRouterModels,
+    );
     return (
       <View key={lane} testID={`ai-connection-card-${lane}`}>
         <Pressable
@@ -305,9 +326,9 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
         >
           <View style={styles.copy}>
             <AppText role="label">{LANE_NAMES[lane]}</AppText>
-            {state.rememberedModel ? (
+            {modelName ? (
               <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {state.rememberedModel}
+                {modelName}
               </AppText>
             ) : null}
           </View>
@@ -358,10 +379,11 @@ export function AIConnectionScreen({ onChooseModel }: AIConnectionScreenProps) {
             ) : null}
             {connection ? (
               connected ? (
-                // Demoted: a plain control; the confirm stays destructive.
+                // D-157: the same filled red button as a saved card's Remove
+                // key; Change model above stays the primary action.
                 <View style={styles.actions}>
                   <Button
-                    role="tertiary"
+                    role="destructive"
                     label={removeLabel}
                     onPress={() => setRemoveLane(lane)}
                   />

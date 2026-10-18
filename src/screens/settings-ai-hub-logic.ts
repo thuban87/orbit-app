@@ -140,9 +140,23 @@ export function hubModelName(
   connection: ResolvedAiConnection | null,
   openRouterModels: readonly OpenRouterModel[],
 ): string | null {
-  const id = connection?.model.trim() ?? "";
+  if (!connection) return null;
+  return laneModelName(connection.lane, connection.model, openRouterModels);
+}
+
+/**
+ * A lane's model display name (38.12 D-85; DEF-03 for the AI Connection
+ * card): OpenRouter's catalog name when the cached catalog knows the id, else
+ * the saved id. `null` when no model is saved.
+ */
+export function laneModelName(
+  lane: string,
+  modelId: string | null | undefined,
+  openRouterModels: readonly OpenRouterModel[],
+): string | null {
+  const id = modelId?.trim() ?? "";
   if (id === "") return null;
-  if (connection?.lane === "openrouter") {
+  if (lane === "openrouter") {
     const name =
       openRouterModels.find((model) => model.id === id)?.name.trim() ?? "";
     if (name !== "") return name;
