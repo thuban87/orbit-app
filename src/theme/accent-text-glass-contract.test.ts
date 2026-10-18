@@ -144,18 +144,16 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
 
   const superseded = rows.filter((row) => SUPERSEDED_STATUS.test(row.status));
 
-  it("records the D-69 birthday errors as superseded to danger", () => {
+  // M5 (Import Review's birthday error) is obsolete since 38.12 Plan 21: the
+  // review uses Edit Contact's BirthdayField (D-54), which cannot hold an
+  // invalid date, so only Bulk Review's D-69 error remains.
+  it("records the D-69 birthday error as superseded to danger", () => {
     expect(
       superseded.map((row) => [row.id, row.file, row.status]).sort(),
     ).toEqual([
       [
         "M29",
         "src/screens/BulkReviewScreen.tsx",
-        "superseded — D-69: reads danger",
-      ],
-      [
-        "M5",
-        "src/screens/ImportReviewScreen.tsx",
         "superseded — D-69: reads danger",
       ],
     ]);

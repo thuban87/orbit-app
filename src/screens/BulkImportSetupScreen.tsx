@@ -237,10 +237,10 @@ export function BulkImportSetupScreen({
       // and removes this screen; unmarked, the guard asked "Leave import?" or
       // silently discarded the batch's Need-review rows.
       markImportComplete();
-      // D-110 (convergence c1 A-1): the flow host travels on.
       navigation.navigate("ImportProgress", {
         sessionId: route.params.sessionId,
         batchCategoryId: currentCategoryId,
+        // D-110 (convergence c1 A-1): the flow host travels on.
         host: route.params.host,
       });
     } catch (error) {

@@ -356,9 +356,9 @@ export function ImportReviewScreen({
         );
         await finalizeSessionIfTerminal(exec, route.params.sessionId, now);
         markImportComplete();
-        // D-110 (convergence c2 B-1): the flow host travels to ImportComplete.
         navigation.replace("ImportComplete", {
           sessionId: route.params.sessionId,
+          // D-110 (convergence c2 B-1): the flow host travels to ImportComplete.
           host: route.params.host,
         });
         return;
@@ -441,9 +441,9 @@ export function ImportReviewScreen({
       );
       setDuplicateOutcome(null);
       markImportComplete();
-      // D-110 (convergence c2 B-1): the flow host travels to ImportComplete.
       navigation.replace("ImportComplete", {
         sessionId: route.params.sessionId,
+        // D-110 (convergence c2 B-1): the flow host travels to ImportComplete.
         host: route.params.host,
       });
     } catch (error) {
