@@ -72,6 +72,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useShallow } from "zustand/react/shallow";
 import { BulkActionSurface } from "@/components/BulkActionSurface";
+import { BulkFrequencySheet } from "@/components/BulkFrequencySheet";
 import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
@@ -97,9 +98,7 @@ import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { FieldError } from "@/components/ui/FieldError";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
-import { Sheet } from "@/components/ui/Sheet";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
 import { NEVER_CONTACTED } from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
@@ -222,7 +221,6 @@ import { type ThemePalette, useTheme } from "@/theme";
 import { EASING, MOTION } from "@/theme/tokens/motion";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { formatLocalDate, isSnoozed, parseLocalMs } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
@@ -808,10 +806,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     claim: BulkActionClaim;
     ids: number[];
   } | null>(null);
-  const [frequencyDraft, setFrequencyDraft] = useState("");
-  // The bulk-frequency sheet's validation error renders inline under its
-  // field, inside the sheet (38.9 D-40, D-19; A-13).
-  const [frequencyError, setFrequencyError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectionMode) return;
@@ -1751,8 +1745,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    setFrequencyDraft("");
-    setFrequencyError(null);
     setFrequencyPicker({ claim, ids });
   }, [releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
@@ -2802,71 +2794,26 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             .finally(() => releaseBulkAction(picker.claim));
         }}
       />
-      <Sheet
+      {/* 38.13 D-39: the Profile's FrequencyPicker in a compact sheet.
+          Continue still goes through the frequency confirm (D-18). */}
+      <BulkFrequencySheet
         visible={frequencyPicker !== null}
-        onRequestClose={() => {
+        onCancel={() => {
           setFrequencyPicker(null);
           releaseBulkInputClaim();
         }}
-        variant="compact"
-      >
-        <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
-          Change Contact Frequency
-        </Text>
-        <TextInput
-          testID="bulk-frequency-input"
-          accessibilityLabel="Frequency in days"
-          keyboardType="number-pad"
-          value={frequencyDraft}
-          onChangeText={(next) => {
-            setFrequencyDraft(next);
-            setFrequencyError(null);
-          }}
-          placeholder="Days"
-          placeholderTextColor={colors.textPlaceholder}
-          style={[
-            styles.bulkFrequencyInput,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-              color: colors.textPrimary,
-            },
-          ]}
-        />
-        <FieldError testID="bulk-frequency-error" message={frequencyError} />
-        <Pressable
-          testID="bulk-frequency-continue"
-          accessibilityRole="button"
-          accessibilityLabel="Confirm frequency"
-          onPress={() => {
-            const intervalDays = Number(frequencyDraft);
-            const picker = frequencyPicker;
-            if (!picker) return;
-            if (!Number.isInteger(intervalDays) || intervalDays <= 0) {
-              AccessibilityInfo.announceForAccessibility(
-                "Frequency must be a positive whole number",
-              );
-              setFrequencyError("Frequency must be a positive whole number.");
-              return;
-            }
-            setFrequencyPicker(null);
-            setBulkConfirm({
-              kind: "frequency",
-              ids: picker.ids,
-              intervalDays,
-              claim: picker.claim,
-            });
-          }}
-          style={[
-            styles.bulkFrequencyContinue,
-            { backgroundColor: colors.accent, borderColor: colors.accent },
-          ]}
-        >
-          <Text style={[styles.bulkPickerLabel, { color: colors.onAccent }]}>
-            Continue
-          </Text>
-        </Pressable>
-      </Sheet>
+        onContinue={(intervalDays) => {
+          const picker = frequencyPicker;
+          if (!picker) return;
+          setFrequencyPicker(null);
+          setBulkConfirm({
+            kind: "frequency",
+            ids: picker.ids,
+            intervalDays,
+            claim: picker.claim,
+          });
+        }}
+      />
       {/* 38.11 D-93 / 38.9 D-30: the bulk Move to Bin confirm shares the
           Profile's body and its destructive (red) confirm. */}
       <ConfirmDialog
@@ -2972,35 +2919,6 @@ const styles = StyleSheet.create({
   },
   viewToggleWrap: {
     width: 96,
-  },
-  bulkPickerTitle: {
-    fontFamily: resolveFontFamily(
-      TYPOGRAPHY.label.family,
-      TYPOGRAPHY.label.weight,
-    ),
-    fontSize: TYPOGRAPHY.label.size,
-    marginBottom: SPACING.sm,
-  },
-  bulkPickerLabel: {
-    fontFamily: resolveFontFamily(
-      TYPOGRAPHY.label.family,
-      TYPOGRAPHY.label.weight,
-    ),
-    fontSize: TYPOGRAPHY.label.size,
-  },
-  bulkFrequencyInput: {
-    borderRadius: RADII.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    minHeight: 44,
-    paddingHorizontal: SPACING.sm,
-  },
-  bulkFrequencyContinue: {
-    alignItems: "center",
-    borderRadius: RADII.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    justifyContent: "center",
-    minHeight: 44,
-    marginTop: SPACING.sm,
   },
   sortControl: {
     flexDirection: "row",

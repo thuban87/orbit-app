@@ -100,15 +100,24 @@ describe("no numeric node handle reaches measureLayout (E-X01)", () => {
   });
 });
 
-describe("bulk-frequency sheet validation is inline (D-40, A-13)", () => {
-  it("renders a FieldError under the field instead of an error snackbar", () => {
-    const source = read("src/screens/HomeScreen.tsx");
-    const sheet = source.slice(
-      source.indexOf('testID="bulk-frequency-input"'),
-      source.indexOf('testID="bulk-frequency-continue"') + 2000,
+describe("bulk-frequency sheet validation is inline (D-40, A-13; 38.13 D-39)", () => {
+  // 38.13 D-39: the raw days field became the shared FrequencyPicker, which
+  // owns its inline error; Continue is gated on the picker's validity.
+  it("uses FrequencyPicker, gates Continue on validity and never snackbars", () => {
+    const sheet = read("src/components/BulkFrequencySheet.tsx");
+    expect(sheet).toMatch(
+      /<FrequencyPicker[\s\S]*?onValidityChange=\{setValid\}/,
     );
-    expect(sheet).toMatch(/<FieldError[\s\S]*?message=\{frequencyError\}/);
-    expect(sheet).toMatch(/setFrequencyError\(/);
+    expect(sheet).toMatch(
+      /testID="bulk-frequency-continue"[\s\S]*?disabled=\{!valid\}/,
+    );
     expect(sheet).not.toMatch(/showSnackbar\(/);
+    expect(sheet).not.toMatch(/<TextInput/);
+  });
+
+  it("HomeScreen hosts the sheet instead of its own days field", () => {
+    const home = read("src/screens/HomeScreen.tsx");
+    expect(home).toMatch(/<BulkFrequencySheet\b/);
+    expect(home).not.toMatch(/bulk-frequency-input/);
   });
 });
