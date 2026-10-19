@@ -106,6 +106,42 @@ describe("createBulkActionGate", () => {
   });
 });
 
+// 38.13 D-41 (survivor under D-69): "Working…" means a write is running. The
+// gate reports pending only once a claim is consumed, never while a confirm
+// dialog or a sheet is waiting on a held claim.
+describe("createBulkActionGate pending reporting (D-41)", () => {
+  it("tryAcquire does not report pending; consume reports it once; release clears it", () => {
+    const onPendingChange = vi.fn();
+    const gate = createBulkActionGate(onPendingChange);
+    const claim = gate.tryAcquire();
+    expect(claim).not.toBeNull();
+    expect(onPendingChange).not.toHaveBeenCalled();
+    // The claim is still held: a second action cannot start.
+    expect(gate.tryAcquire()).toBeNull();
+    expect(gate.pending).toBe(true);
+
+    if (!claim) throw new Error("no claim");
+    expect(gate.consume(claim)).toBe(true);
+    expect(onPendingChange).toHaveBeenCalledExactlyOnceWith(true);
+    // A repeated consume does not report again.
+    expect(gate.consume(claim)).toBe(false);
+    expect(onPendingChange).toHaveBeenCalledTimes(1);
+
+    gate.release(claim);
+    expect(onPendingChange).toHaveBeenLastCalledWith(false);
+    expect(gate.pending).toBe(false);
+  });
+
+  it("a dismissed dialog releases without ever showing Working…", () => {
+    const onPendingChange = vi.fn();
+    const gate = createBulkActionGate(onPendingChange);
+    const claim = gate.tryAcquire();
+    if (!claim) throw new Error("no claim");
+    gate.release(claim);
+    expect(onPendingChange).not.toHaveBeenCalledWith(true);
+  });
+});
+
 describe("getCurrentSelectionIds", () => {
   it("rejects a category read that resolves after its selection session exits", async () => {
     const categories = deferred<{ id: number; name: string }[]>();

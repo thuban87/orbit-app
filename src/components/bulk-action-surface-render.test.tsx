@@ -65,6 +65,28 @@ vi.mock("react-native", () => ({
   Text: "Text",
   View: "View",
 }));
+// 38.13 D-80 (review R1-05): the bar publishes its obstacle only while
+// selection is on and Home is focused.
+const nav = vi.hoisted(() => ({ focused: true, selectionMode: true }));
+const obstacle = vi.hoisted(() => ({
+  calls: [] as { key: string; enabled: boolean }[],
+  ref: { current: null },
+  onLayout: () => {},
+}));
+vi.mock("@react-navigation/native", () => ({
+  useIsFocused: () => nav.focused,
+}));
+vi.mock("@/navigation/use-window-measurement", () => ({
+  useWindowObstacle: (key: string, enabled: boolean) => {
+    obstacle.calls.push({ key, enabled });
+    return { ref: obstacle.ref, onLayout: obstacle.onLayout, measure: vi.fn() };
+  },
+}));
+vi.mock("@/stores/dashboard-selection-store", () => ({
+  useDashboardSelectionStore: (
+    select: (state: { mode: boolean }) => unknown,
+  ) => select({ mode: nav.selectionMode }),
+}));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
 vi.mock("@/theme", () => ({
@@ -385,5 +407,44 @@ describe("BulkActionSurface — only what applies is enabled (38.13 D-40, D-74, 
     expect(textOf(bar.find("dashboard-selection-select-all"))).toBe(
       "Deselect all",
     );
+  });
+});
+
+describe("BulkActionSurface — the selection-bar obstacle (38.13 D-80; review R1-05)", () => {
+  beforeEach(() => {
+    obstacle.calls = [];
+    nav.focused = true;
+    nav.selectionMode = true;
+  });
+
+  it("publishes dashboard-selection-bar while selecting on a focused Home, with ref and onLayout on the bar root", () => {
+    const bar = mount();
+    expect(obstacle.calls.at(-1)).toEqual({
+      key: "dashboard-selection-bar",
+      enabled: true,
+    });
+    const root = bar.find("dashboard-selection-bar");
+    expect(root?.props.collapsable).toBe(false);
+    expect(root?.props.onLayout).toBe(obstacle.onLayout);
+    // React 19: `ref` is a plain prop on the element.
+    expect(root?.props.ref).toBe(obstacle.ref);
+  });
+
+  it("publishes nothing while Home is unfocused (GroupLog / LogContact with selection on), and again on refocus", () => {
+    nav.focused = false;
+    mount();
+    expect(obstacle.calls.at(-1)).toEqual({
+      key: "dashboard-selection-bar",
+      enabled: false,
+    });
+    nav.focused = true;
+    mount();
+    expect(obstacle.calls.at(-1)?.enabled).toBe(true);
+  });
+
+  it("publishes nothing once selection mode is off", () => {
+    nav.selectionMode = false;
+    mount();
+    expect(obstacle.calls.at(-1)?.enabled).toBe(false);
   });
 });

@@ -21,6 +21,7 @@ import {
   snackbarLayout,
   snackbarPadding,
   snackbarPresentation,
+  snackbarScreenKey,
 } from "./snackbar-host";
 
 describe("resolveSnackbarHostVisible (D-40)", () => {
@@ -459,6 +460,161 @@ describe("held root pill layout (38.10 D-151)", () => {
     });
     expect(profile).not.toBe(editor);
     expect(profile.layout.paddingBottom).toBe(plusRowTop + SNACKBAR_FAB_GAP);
+  });
+});
+
+// 38.13 D-80 (amending 38.10 D-151 for one case; review R2-03, R3-02): the
+// Card-view selection bar is a layout input, never part of the screen key. A
+// live pill moves up once when the bar appears and never moves back down.
+describe("the selection bar under the root pill (38.13 D-80)", () => {
+  const TAB_BAR = 80;
+  const BAR = 132;
+  const W = 393;
+  const home: SnackbarScreenContext = {
+    host: ROOT_SNACKBAR_HOST,
+    windowWidth: W,
+    tabBarHeight: TAB_BAR,
+    insetBottom: 24,
+    universalFabMayShow: true,
+    sectionFabMayShow: false,
+  };
+  const aboveBar = TAB_BAR + BAR + SNACKBAR_FAB_GAP;
+
+  it("snackbarLayout and heldSnackbarLayout put the pill above the bar on the root host", () => {
+    expect(
+      snackbarLayout({
+        ...home,
+        universalFab: false,
+        sectionFab: false,
+        bottomBarHeight: BAR,
+      }).paddingBottom,
+    ).toBeGreaterThanOrEqual(aboveBar);
+    expect(
+      heldSnackbarLayout({
+        ...home,
+        universalFab: false,
+        sectionFab: false,
+        bottomBarHeight: BAR,
+      }).paddingBottom,
+    ).toBeGreaterThanOrEqual(aboveBar);
+  });
+
+  it("with no bar (0 or absent) every layout equals today's", () => {
+    for (const universalFab of [true, false]) {
+      for (const sectionFab of [true, false]) {
+        const input = { ...home, universalFab, sectionFab };
+        expect(snackbarLayout({ ...input, bottomBarHeight: 0 })).toEqual(
+          snackbarLayout(input),
+        );
+        expect(heldSnackbarLayout({ ...input, bottomBarHeight: 0 })).toEqual(
+          heldSnackbarLayout(input),
+        );
+      }
+    }
+  });
+
+  it("an overlay host ignores the bar (no tab bar there, D-51)", () => {
+    const sheet = { ...home, host: "sheet-1" };
+    expect(
+      heldSnackbarLayout({
+        ...sheet,
+        universalFab: false,
+        sectionFab: false,
+        bottomBarHeight: BAR,
+      }),
+    ).toEqual(
+      heldSnackbarLayout({ ...sheet, universalFab: false, sectionFab: false }),
+    );
+  });
+
+  it("the screen key is the same with and without the bar", () => {
+    const withBar = { ...home, bottomBarHeight: BAR } as SnackbarScreenContext;
+    expect(snackbarScreenKey(withBar)).toBe(snackbarScreenKey(home));
+  });
+
+  it("a pill already up moves up once when the bar appears", () => {
+    const message = { kind: "success", label: "Added 2 contacts to Favorites" };
+    const first = latchSnackbarLayout(null, message, {
+      ...home,
+      universalFab: true,
+      sectionFab: false,
+    });
+    expect(first.layout.paddingBottom).toBeLessThan(aboveBar);
+    const lifted = latchSnackbarLayout(first, message, {
+      ...home,
+      universalFab: false,
+      sectionFab: false,
+      bottomBarHeight: BAR,
+    });
+    expect(lifted).not.toBe(first);
+    expect(lifted.layout.paddingBottom).toBeGreaterThanOrEqual(aboveBar);
+    // The same bar again: held.
+    expect(
+      latchSnackbarLayout(lifted, message, {
+        ...home,
+        universalFab: false,
+        sectionFab: false,
+        bottomBarHeight: BAR,
+      }),
+    ).toBe(lifted);
+  });
+
+  it("a lifted pill never moves back down when the bar goes and the + may show again", () => {
+    const message = { kind: "success", label: "Snoozed 2 contacts" };
+    const first = latchSnackbarLayout(null, message, {
+      ...home,
+      universalFab: true,
+      sectionFab: false,
+    });
+    const lifted = latchSnackbarLayout(first, message, {
+      ...home,
+      universalFab: false,
+      sectionFab: false,
+      bottomBarHeight: BAR,
+    });
+    for (const universalFab of [false, true]) {
+      expect(
+        latchSnackbarLayout(lifted, message, {
+          ...home,
+          universalFab,
+          sectionFab: false,
+          bottomBarHeight: 0,
+        }),
+      ).toBe(lifted);
+    }
+  });
+
+  it("a pill first shown while selecting stays put when the bar goes", () => {
+    const message = { kind: "warning", label: "Moved 3 contacts to the Bin" };
+    const first = latchSnackbarLayout(null, message, {
+      ...home,
+      universalFab: false,
+      sectionFab: false,
+      bottomBarHeight: BAR,
+    });
+    expect(first.layout.paddingBottom).toBeGreaterThanOrEqual(aboveBar);
+    expect(
+      latchSnackbarLayout(first, message, {
+        ...home,
+        universalFab: true,
+        sectionFab: false,
+      }),
+    ).toBe(first);
+  });
+
+  it("a new message while the bar is up is laid out above the bar", () => {
+    const first = latchSnackbarLayout(
+      null,
+      { kind: "success", label: "One" },
+      { ...home, universalFab: true, sectionFab: false },
+    );
+    const next = latchSnackbarLayout(
+      first,
+      { kind: "success", label: "Two" },
+      { ...home, universalFab: false, sectionFab: false, bottomBarHeight: BAR },
+    );
+    expect(next).not.toBe(first);
+    expect(next.layout.paddingBottom).toBeGreaterThanOrEqual(aboveBar);
   });
 });
 
