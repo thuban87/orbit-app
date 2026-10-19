@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewProps,
+} from "react-native";
 import { Avatar } from "@/components/Avatar";
 import type { YourWeekDayDetail } from "@/components/digest/your-week-section-logic";
 import { Icon } from "@/components/icons/Icon";
@@ -33,6 +39,13 @@ export interface DigestDayDetailProps {
   state: Exclude<YourWeekDayDetail, { status: "idle" }>;
   /** Re-read the same day with a fresh request (error state's Retry). */
   onRetry: () => void;
+  /**
+   * An interaction row with a contact opens that person's Profile (38.13
+   * D-46). A row whose contact is gone (null contactId) stays inert.
+   */
+  onOpenProfile: (contactId: number) => void;
+  /** A group-event row opens GroupEventDetail for that event (38.13 D-46). */
+  onOpenEvent: (groupEventId: number) => void;
   testID?: string;
 }
 
@@ -40,6 +53,8 @@ export function DigestDayDetail({
   date,
   state,
   onRetry,
+  onOpenProfile,
+  onOpenEvent,
   testID = "digest-day-detail",
 }: DigestDayDetailProps) {
   const { colors } = useTheme();
@@ -78,7 +93,10 @@ export function DigestDayDetail({
       </AppText>
     );
   } else {
-    body = renderDayRows(state.rows, testID, colors);
+    body = renderDayRows(state.rows, testID, colors, {
+      onOpenProfile,
+      onOpenEvent,
+    });
   }
 
   return (
@@ -103,22 +121,44 @@ export function groupEventRowLabel(title: string | null, time: string): string {
   return title ? `Event, ${title}, ${time}` : `Event, ${time}`;
 }
 
+/**
+ * A day-detail row container: a button when it has a destination (38.13
+ * D-46), otherwise a plain View exactly as before. The row's own testID,
+ * accessibility label and styles pass through unchanged.
+ */
+function DayRowShell({
+  onPress,
+  children,
+  ...rest
+}: ViewProps & { onPress?: () => void }) {
+  if (onPress === undefined) return <View {...rest}>{children}</View>;
+  return (
+    <Pressable {...rest} accessibilityRole="button" onPress={onPress}>
+      {children}
+    </Pressable>
+  );
+}
+
 function renderDayRows(
   rows: readonly YourWeekDayRow[],
   testID: string,
   colors: ReturnType<typeof useTheme>["colors"],
+  actions: Pick<DigestDayDetailProps, "onOpenProfile" | "onOpenEvent">,
 ): ReactNode {
   return (
     <View style={styles.list}>
-      {rows.map((row) =>
-        row.kind === "group_event" ? (
-          <View
+      {rows.map((row) => {
+        // Each callback receives the row's own id (T-38.13-11).
+        const contactId = row.contactId;
+        return row.kind === "group_event" ? (
+          <DayRowShell
             key={`group-event-${row.id}`}
             testID={`${testID}-group-event-${row.id}`}
             accessibilityLabel={groupEventRowLabel(
               row.title,
               formatTimeMinuteOrFallback(row.occurredAt),
             )}
+            onPress={() => actions.onOpenEvent(row.id)}
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Icon name="group-events" tone="textPrimary" size="sm" />
@@ -131,12 +171,17 @@ function renderDayRows(
                 {formatTimeMinuteOrFallback(row.occurredAt)}
               </AppText>
             </View>
-          </View>
+          </DayRowShell>
         ) : (
-          <View
+          <DayRowShell
             key={`interaction-${row.id}`}
             testID={`${testID}-interaction-${row.id}`}
             accessibilityLabel={`Interaction with ${row.contactName ?? "Unknown contact"}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
+            onPress={
+              contactId === null
+                ? undefined
+                : () => actions.onOpenProfile(contactId)
+            }
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Avatar
@@ -154,9 +199,9 @@ function renderDayRows(
                 {formatTimeMinuteOrFallback(row.occurredAt)}
               </AppText>
             </View>
-          </View>
-        ),
-      )}
+          </DayRowShell>
+        );
+      })}
     </View>
   );
 }

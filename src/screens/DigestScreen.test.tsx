@@ -115,6 +115,7 @@ describe("DigestScreen composition", () => {
           data,
           refreshSignal: 0,
           onOpenProfile: vi.fn(),
+          onOpenEvent: vi.fn(),
           onDrillThrough: vi.fn(),
         }),
       ),
@@ -138,6 +139,28 @@ describe("DigestScreen composition", () => {
     ).toEqual([5]);
   });
 
+  it("hands Your Week the Profile and group-event navigation callbacks (38.13 D-46)", () => {
+    const onOpenProfile = vi.fn();
+    const onOpenEvent = vi.fn();
+    const nodes = all(
+      resolve(
+        DigestLoadedBody({
+          data,
+          refreshSignal: 5,
+          onOpenProfile,
+          onOpenEvent,
+          onDrillThrough: vi.fn(),
+        }),
+      ),
+    );
+    const yourWeek = nodes.find((node) => node.type === "YourWeekSection");
+    expect(yourWeek?.props).toEqual({
+      refreshSignal: 5,
+      onOpenProfile,
+      onOpenEvent,
+    });
+  });
+
   it("keeps loading blank and renders the calm Digest error sentinel", () => {
     const loading = all(
       resolve(
@@ -146,6 +169,7 @@ describe("DigestScreen composition", () => {
           refreshSignal: 0,
           onRetry: vi.fn(),
           onOpenProfile: vi.fn(),
+          onOpenEvent: vi.fn(),
           onDrillThrough: vi.fn(),
         }),
       ),
@@ -159,6 +183,7 @@ describe("DigestScreen composition", () => {
           refreshSignal: 0,
           onRetry: vi.fn(),
           onOpenProfile: vi.fn(),
+          onOpenEvent: vi.fn(),
           onDrillThrough: vi.fn(),
         }),
       ),
@@ -170,6 +195,13 @@ describe("DigestScreen composition", () => {
 
   it("keeps the loaded body mounted across a failed refresh and clears the notice on a successful Retry", async () => {
     const onRetry = vi.fn();
+    const onOpenProfile = vi.fn();
+    const onOpenEvent = vi.fn();
+    const yourWeekProps = (refreshSignal: number) => ({
+      refreshSignal,
+      onOpenProfile,
+      onOpenEvent,
+    });
     const render = (state: DigestLoadState, refreshSignal: number) =>
       all(
         resolve(
@@ -177,7 +209,8 @@ describe("DigestScreen composition", () => {
             state,
             refreshSignal,
             onRetry,
-            onOpenProfile: vi.fn(),
+            onOpenProfile,
+            onOpenEvent,
             onDrillThrough: vi.fn(),
           }),
         ),
@@ -193,11 +226,11 @@ describe("DigestScreen composition", () => {
     );
     const before = render(loaded, 3);
     expect(notice(before)).toBeUndefined();
-    expect(yourWeek(before)?.props).toEqual({ refreshSignal: 3 });
+    expect(yourWeek(before)?.props).toEqual(yourWeekProps(3));
 
     const failed = digestLoadStateOnFail(loaded);
     const during = render(failed, 3);
-    expect(yourWeek(during)?.props).toEqual({ refreshSignal: 3 });
+    expect(yourWeek(during)?.props).toEqual(yourWeekProps(3));
     const shown = notice(during);
     expect(shown?.text).toContain("Couldn't refresh Up Next and Horizon");
     expect(during.some((node) => node.props.testID === "digest-error")).toBe(
@@ -212,7 +245,7 @@ describe("DigestScreen composition", () => {
     const retried = digestLoadStateOnPublish(failed, data);
     const after = render(retried, 4);
     expect(notice(after)).toBeUndefined();
-    expect(yourWeek(after)?.props).toEqual({ refreshSignal: 4 });
+    expect(yourWeek(after)?.props).toEqual(yourWeekProps(4));
   });
 
   it("signals Your Week on acceptance, so a failed outer read still refreshes Your Week under the notice", async () => {
@@ -243,13 +276,16 @@ describe("DigestScreen composition", () => {
     fail = true;
     await controller.request("shell");
     expect(signal).toBe(2);
+    const onOpenProfile = vi.fn();
+    const onOpenEvent = vi.fn();
     const tree = all(
       resolve(
         DigestContent({
           state,
           refreshSignal: signal,
           onRetry: vi.fn(),
-          onOpenProfile: vi.fn(),
+          onOpenProfile,
+          onOpenEvent,
           onDrillThrough: vi.fn(),
         }),
       ),
@@ -259,7 +295,7 @@ describe("DigestScreen composition", () => {
     ).toBe(true);
     expect(tree.some((node) => node.type === "UpNextSection")).toBe(true);
     expect(tree.find((node) => node.type === "YourWeekSection")?.props).toEqual(
-      { refreshSignal: 2 },
+      { refreshSignal: 2, onOpenProfile, onOpenEvent },
     );
   });
 
@@ -285,6 +321,7 @@ describe("DigestScreen composition", () => {
           refreshSignal: 0,
           onRetry: vi.fn(),
           onOpenProfile: vi.fn(),
+          onOpenEvent: vi.fn(),
           onDrillThrough: vi.fn(),
         }),
       );

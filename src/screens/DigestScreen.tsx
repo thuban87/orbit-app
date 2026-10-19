@@ -214,6 +214,9 @@ export function DigestScreen({ navigation }: DigestScreenProps) {
       onOpenProfile={(contactId) =>
         navigation.navigate("Profile", { contactId })
       }
+      onOpenEvent={(groupEventId) =>
+        navigation.navigate("GroupEventDetail", { groupEventId })
+      }
       onDrillThrough={onDrillThrough}
     />
   );
@@ -224,12 +227,15 @@ export function DigestContent({
   refreshSignal,
   onRetry,
   onOpenProfile,
+  onOpenEvent,
   onDrillThrough,
 }: {
   state: DigestLoadState;
   refreshSignal: number;
   onRetry: () => void;
   onOpenProfile: (contactId: number) => void;
+  /** A Your Week group-event row opens GroupEventDetail (38.13 D-46). */
+  onOpenEvent: (groupEventId: number) => void;
   onDrillThrough: (target: HorizonDrillTarget) => void;
 }) {
   return (
@@ -276,6 +282,7 @@ export function DigestContent({
               data={state.data}
               refreshSignal={refreshSignal}
               onOpenProfile={onOpenProfile}
+              onOpenEvent={onOpenEvent}
               onDrillThrough={onDrillThrough}
             />
           </>
@@ -289,11 +296,13 @@ export function DigestLoadedBody({
   data,
   refreshSignal,
   onOpenProfile,
+  onOpenEvent,
   onDrillThrough,
 }: {
   data: DigestData;
   refreshSignal: number;
   onOpenProfile: (contactId: number) => void;
+  onOpenEvent: (groupEventId: number) => void;
   onDrillThrough: (target: HorizonDrillTarget) => void;
 }) {
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
@@ -321,7 +330,11 @@ export function DigestLoadedBody({
         onOpenProfile={onOpenProfile}
         onDrillThrough={onDrillThrough}
       />
-      <YourWeekSection refreshSignal={refreshSignal} />
+      <YourWeekSection
+        refreshSignal={refreshSignal}
+        onOpenProfile={onOpenProfile}
+        onOpenEvent={onOpenEvent}
+      />
     </ScrollView>
   );
 }

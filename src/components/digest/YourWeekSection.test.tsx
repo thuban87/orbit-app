@@ -72,7 +72,13 @@ function nodes(node: ReactNode): TestElement[] {
 
 describe("YourWeekSection", () => {
   it("renders informational metrics and the two-option period binding", () => {
-    const tree = nodes(YourWeekSection({ refreshSignal: 0 }));
+    const tree = nodes(
+      YourWeekSection({
+        refreshSignal: 0,
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
+      }),
+    );
     const toggle = tree.find((node) => node.type === "SegmentedControl");
     expect(toggle?.props.testID).toBe("your-week-period");
     expect(toggle?.props.value).toBe("rolling7");
@@ -95,7 +101,13 @@ describe("YourWeekSection", () => {
   });
 
   it("renders no day detail while the day detail is idle (no selection)", () => {
-    const tree = nodes(YourWeekSection({ refreshSignal: 0 }));
+    const tree = nodes(
+      YourWeekSection({
+        refreshSignal: 0,
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
+      }),
+    );
     expect(tree.some((node) => node.type === "DigestDayDetail")).toBe(false);
   });
 });

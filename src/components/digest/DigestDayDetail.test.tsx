@@ -5,6 +5,7 @@ import { formatDisplayDate } from "@/utils/dates";
 
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
+  Pressable: "Pressable",
   View: "View",
   StyleSheet: { create: (styles: unknown) => styles },
 }));
@@ -25,6 +26,15 @@ function nodes(node: ReactNode): TestElement[] {
   if (!node || typeof node !== "object") return [];
   if (Array.isArray(node)) return node.flatMap(nodes);
   const element = node as TestElement;
+  // Expand local function components (the row shell); mocked primitives are
+  // strings and stay leaves.
+  if (typeof element.type === "function") {
+    return nodes(
+      (element.type as (props: Record<string, unknown>) => ReactNode)(
+        element.props,
+      ),
+    );
+  }
   return [element, ...nodes(element.props.children as ReactNode)];
 }
 
@@ -85,6 +95,8 @@ describe("DigestDayDetail", () => {
           ],
         },
         onRetry: vi.fn(),
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
       }),
     );
     expect(
@@ -132,6 +144,8 @@ describe("DigestDayDetail", () => {
           ],
         },
         onRetry: vi.fn(),
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
       }),
     );
     const avatars = tree.filter((node) => node.type === "Avatar");
@@ -153,6 +167,8 @@ describe("DigestDayDetail", () => {
         date: DATE,
         state: { status: "loaded", date: DATE, rows: [] },
         onRetry: vi.fn(),
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
       }),
     );
     expect(text(tree)).toContain("No activity on this date.");
@@ -165,6 +181,8 @@ describe("DigestDayDetail", () => {
         date: DATE,
         state: { status: "loading", date: DATE, token: 1 },
         onRetry: vi.fn(),
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
       }),
     );
     const indicator = tree.find((node) => node.type === "ActivityIndicator");
@@ -186,6 +204,8 @@ describe("DigestDayDetail", () => {
         date: DATE,
         state: { status: "error", date: DATE },
         onRetry,
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
       }),
     );
     expect(text(tree)).toContain("Couldn't load this day");
@@ -226,6 +246,8 @@ describe("DigestDayDetail", () => {
           ],
         },
         onRetry: vi.fn(),
+        onOpenProfile: vi.fn(),
+        onOpenEvent: vi.fn(),
       }),
     );
     const expected: Record<number, string> = {
@@ -247,6 +269,99 @@ describe("DigestDayDetail", () => {
     }
     expect(body).not.toMatch(/\b(00|23|09):\d{2}\b/);
     expect(body).not.toContain("garbage");
+  });
+});
+
+describe("day-detail rows open their destination (38.13 D-46)", () => {
+  function renderRows() {
+    const onOpenProfile = vi.fn();
+    const onOpenEvent = vi.fn();
+    const tree = nodes(
+      DigestDayDetail({
+        date: DATE,
+        state: {
+          status: "loaded",
+          date: DATE,
+          rows: [
+            {
+              kind: "group_event",
+              id: 3,
+              occurredAt: "2026-09-18 19:00:00",
+              title: "Book club",
+              contactId: null,
+              contactName: null,
+              contactPhoto: null,
+            },
+            {
+              kind: "interaction",
+              id: 8,
+              occurredAt: "2026-09-18 12:00:00",
+              title: null,
+              contactId: 7,
+              contactName: "Lin",
+              contactPhoto: null,
+            },
+            {
+              kind: "interaction",
+              id: 9,
+              occurredAt: "2026-09-18 10:00:00",
+              title: null,
+              contactId: null,
+              contactName: null,
+              contactPhoto: null,
+            },
+          ],
+        },
+        onRetry: vi.fn(),
+        onOpenProfile,
+        onOpenEvent,
+      }),
+    );
+    const row = (id: string) => {
+      const found = tree.find(
+        (node) => node.props.testID === `digest-day-detail-${id}`,
+      );
+      if (!found) throw new Error(`Missing row ${id}`);
+      return found;
+    };
+    return { tree, row, onOpenProfile, onOpenEvent };
+  }
+
+  it("an interaction row with a contact is a button that opens that person's Profile", () => {
+    const { row, onOpenProfile, onOpenEvent } = renderRows();
+    const interaction = row("interaction-8");
+    expect(interaction.type).toBe("Pressable");
+    expect(interaction.props.accessibilityRole).toBe("button");
+    expect(interaction.props.accessibilityLabel).toBe(
+      "Interaction with Lin, 12:00 PM",
+    );
+    (interaction.props.onPress as () => void)();
+    expect(onOpenProfile).toHaveBeenCalledTimes(1);
+    expect(onOpenProfile).toHaveBeenCalledWith(7);
+    expect(onOpenEvent).not.toHaveBeenCalled();
+  });
+
+  it("a group-event row is a button that opens that event", () => {
+    const { row, onOpenProfile, onOpenEvent } = renderRows();
+    const event = row("group-event-3");
+    expect(event.type).toBe("Pressable");
+    expect(event.props.accessibilityRole).toBe("button");
+    expect(event.props.accessibilityLabel).toBe("Event, Book club, 7:00 PM");
+    (event.props.onPress as () => void)();
+    expect(onOpenEvent).toHaveBeenCalledTimes(1);
+    expect(onOpenEvent).toHaveBeenCalledWith(3);
+    expect(onOpenProfile).not.toHaveBeenCalled();
+  });
+
+  it("an interaction row with no contact stays an inert View", () => {
+    const { row } = renderRows();
+    const orphan = row("interaction-9");
+    expect(orphan.type).toBe("View");
+    expect(orphan.props.onPress).toBeUndefined();
+    expect(orphan.props.accessibilityRole).toBeUndefined();
+    expect(orphan.props.accessibilityLabel).toBe(
+      "Interaction with Unknown contact, 10:00 AM",
+    );
   });
 });
 

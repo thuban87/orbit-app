@@ -70,8 +70,19 @@ interface LoadedWeek {
  * (38.3 RG-026): this section re-reads when Digest's `refreshSignal` changes —
  * once per accepted Digest focus / shell tick / post-sweep foreground tick —
  * and on mount. It has no focus effect of its own.
+ *
+ * Day-detail rows open the person's Profile or the group event through the
+ * Digest-owned navigation callbacks (38.13 D-46).
  */
-export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
+export function YourWeekSection({
+  refreshSignal,
+  onOpenProfile,
+  onOpenEvent,
+}: {
+  refreshSignal: number;
+  onOpenProfile: (contactId: number) => void;
+  onOpenEvent: (groupEventId: number) => void;
+}) {
   const { colors } = useTheme();
   const [controller, setController] = useState<YourWeekControllerState>(() =>
     initialYourWeekState(),
@@ -354,6 +365,8 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
               date={dayDetail.date}
               state={dayDetail}
               onRetry={onRetryDay}
+              onOpenProfile={onOpenProfile}
+              onOpenEvent={onOpenEvent}
             />
           ) : null}
         </>
