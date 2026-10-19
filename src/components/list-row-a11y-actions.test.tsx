@@ -142,3 +142,66 @@ describe("List row accessibility actions (38.13 D-26)", () => {
     for (const spy of Object.values(spies)) expect(spy).not.toHaveBeenCalled();
   });
 });
+
+/** Every node of a rendered row, for the recency line and the root. */
+function rowNodes(props: Partial<Parameters<typeof ListRow>[0]>): Node[] {
+  return all(
+    resolve(
+      ListRow({
+        contactId: 7,
+        name: "Alex",
+        photo: null,
+        categoryLabel: null,
+        lastContact: "2026-09-19 12:00:00",
+        snoozeUntil: null,
+        status: "stable",
+        now: "2026-09-20",
+        onPress: vi.fn(),
+        ...props,
+      }),
+    ),
+  );
+}
+
+function recencyAndDescription(props: Partial<Parameters<typeof ListRow>[0]>): {
+  recency: unknown;
+  description: string;
+} {
+  const nodes = rowNodes(props);
+  const meta = nodes.find(
+    (node) => node.props.testID === "dashboard-list-row-meta-7",
+  );
+  const root = nodes.find(
+    (node) => node.props.testID === "dashboard-list-row-7",
+  );
+  return {
+    recency: meta?.props.children,
+    description: String(root?.props.accessibilityLabel),
+  };
+}
+
+describe("Unbound List rows with no interactions (38.13 D-84, ADR-233)", () => {
+  it("an Unbound row with no interactions reads No contact logged, visibly and to TalkBack", () => {
+    const { recency, description } = recencyAndDescription({
+      lastContact: null,
+      status: null,
+      unbound: true,
+    });
+    expect(recency).toBe("No contact logged");
+    expect(description).toContain("No contact logged");
+    expect(description).not.toContain("No interactions yet");
+  });
+
+  it("a Bound row with no interactions keeps No interactions yet", () => {
+    const { recency, description } = recencyAndDescription({
+      lastContact: null,
+    });
+    expect(recency).toBe("No interactions yet");
+    expect(description).toContain("No interactions yet");
+  });
+
+  it("an Unbound row with a logged interaction keeps its recency", () => {
+    const { recency } = recencyAndDescription({ status: null, unbound: true });
+    expect(recency).toBe("Yesterday");
+  });
+});
