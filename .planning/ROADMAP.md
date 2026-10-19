@@ -1745,7 +1745,7 @@ Plans:
 
 - [ ] 38.13-01-PLAN.md — List-view measurement on release (D-55, D-56) + owner checkpoint on the fix direction
 - [ ] 38.13-02-PLAN.md — Control row + query store: Active row, exclusive All/Active, no dropped taps, labels, no panel after blur (D-23, D-58, D-27, D-35, D-36, D-50)
-- [ ] 38.13-03-PLAN.md — Search read layer: Unbound on All Contacts searches, needs-attention guard, typo tolerance, docstrings (D-59, D-60, D-53)
+- [ ] 38.13-03-PLAN.md — Search read layer: Unbound on All Contacts searches, needs-attention guard, typo tolerance, docstrings (D-59, D-79, D-60, D-53)
 - [ ] 38.13-04-PLAN.md — Your Week + Settings wording (D-45, D-46, D-47, D-49, D-63)
 - [ ] 38.13-05-PLAN.md — Home session + empty states: stale search, Back, Reset to top, 38.9 empty states, tucked-away buttons (D-24, D-29, D-31, D-28, D-30, D-65)
 
@@ -1760,11 +1760,11 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 38.13-09-PLAN.md — Selection mode: M3b bottom bar, More… sheet, applicability, + and rows hidden, Undo above the bar (D-69, D-72, D-76, D-40, D-74, D-75, D-41)
+- [ ] 38.13-09-PLAN.md — Selection mode: M3b bottom bar, More… sheet, applicability, + and rows hidden, Undo above the bar (D-69, D-72, D-76, D-40, D-74, D-75, D-41, D-77, D-80)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 38.13-10-PLAN.md — Bulk sheets + contact picker: FrequencyPicker, compact sheets, picker title and keyboard (D-39, D-71, D-70, D-43)
+- [ ] 38.13-10-PLAN.md — Bulk sheets + contact picker: FrequencyPicker, compact sheets, picker title and keyboard (D-39, D-71, D-78, D-70, D-43)
 
 **Wave 6** *(blocked on Wave 5 completion and the phase code review)*
 
