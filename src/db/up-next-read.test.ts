@@ -67,12 +67,14 @@ async function seedContact(input: {
   trackingEnabled?: number;
   archivedAt?: string | null;
   snoozeUntil?: string | null;
+  rarelyResponds?: number;
+  remindersOff?: number;
 }): Promise<void> {
   await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, tracking_enabled, archived_at,
-        snooze_until, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        snooze_until, rarely_responds, reminders_off, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       `uid-${++uidCounter}`,
       input.name,
@@ -83,6 +85,8 @@ async function seedContact(input: {
       input.trackingEnabled ?? 1,
       input.archivedAt ?? null,
       input.snoozeUntil ?? null,
+      input.rarelyResponds ?? 0,
+      input.remindersOff ?? 0,
       NOW,
       NOW,
     ],
@@ -137,6 +141,34 @@ describe("readUpNextCandidates", () => {
 
     expect((await readUpNextCandidates(exec)).map((row) => row.name)).toEqual([
       "Included",
+    ]);
+  });
+});
+
+describe("readUpNextCandidates as the Overlooked source (38.13 D-61)", () => {
+  // Carried over from the retired rogue-only Overlooked read's tests: these
+  // behaviours still hold for the read Overlooked is now drawn from.
+  it("includes a muted contact (reminders_off is not the decay-suppression predicate)", async () => {
+    await seedContact({
+      name: "Muted",
+      lastContact: localDateOffset(-40),
+      remindersOff: 1,
+    });
+    expect((await readUpNextCandidates(exec)).map((row) => row.name)).toEqual([
+      "Muted",
+    ]);
+  });
+
+  it("includes a rarely-responds contact with the 'unresponsive' reason", async () => {
+    // progress 1.5: decay by time, rogue through the rarely_responds branch.
+    await seedContact({
+      name: "Quiet",
+      lastContact: localDateOffset(-15),
+      rarelyResponds: 1,
+    });
+    const rows = await readUpNextCandidates(exec);
+    expect(rows.map((row) => [row.name, row.status, row.reason])).toEqual([
+      ["Quiet", "rogue", "unresponsive"],
     ]);
   });
 });

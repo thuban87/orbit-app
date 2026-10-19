@@ -187,10 +187,6 @@ const PREDICATE_OWNERS: Record<string, LedgerEntry> = {
     owner: "18.2-04",
     note: "Sun-candidate read: `archived_at IS NULL AND tracking_enabled = 1`.",
   },
-  "src/db/digest-read.ts": {
-    owner: "18.2-05",
-    note: "Active-orbit digest projections gate on `c.tracking_enabled = 1`; Unbound history stays only in the retrospective/gentle lines.",
-  },
   "src/db/notification-read.ts": {
     owner: "18.2-06",
     note: "Decay candidates gated `tracking_enabled = 1 OR ? = 1` (the birthday override parameter).",
@@ -229,9 +225,9 @@ const STATUS_FRAGMENT_CONSUMERS: Record<string, LedgerEntry> = {
     owner: "18.2-04",
     note: "Composes PROGRESS_SQL/STATUS_SQL/REASON_SQL into one by-id SELECT; returns a neutral null result for rows outside the cadence precondition.",
   },
-  "src/db/digest-read.ts": {
-    owner: "18.2-05",
-    note: "Wraps PROGRESS_SQL/STATUS_SQL/REASON_SQL for the digest; the Bound predicate makes the fragment safe over a possible NULL cadence.",
+  "src/db/up-next-read.ts": {
+    owner: "38.13-06",
+    note: "The Digest's Up Next / Overlooked read (D-61) wraps PROGRESS_SQL/STATUS_SQL/REASON_SQL over NEEDS_ATTENTION_WHERE, whose STATUS_CADENCE_PRECONDITION is the Bound gate (Unbound never included). Replaces the retired rogue-only digest-read Overlooked projection.",
   },
   "src/services/notifications/decay-suppression.ts": {
     owner: "18.2-06",
@@ -371,7 +367,6 @@ describe("lifecycle consumer ledger — orbiting/favourite Bound set (CDN-03)", 
       "src/db/orrery-read.ts",
       "src/db/ring-seq-dao.ts",
       "src/db/sun-picker-read.ts",
-      "src/db/digest-read.ts",
       "src/db/notification-read.ts",
       "src/services/notifications/decay-suppression.ts",
       "src/db/unbound-read.ts",

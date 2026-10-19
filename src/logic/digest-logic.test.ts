@@ -17,7 +17,6 @@ import {
   isAllQuiet,
   RETROSPECTIVE_WINDOW_DAYS,
   shouldShowEffortful,
-  splitOverlooked,
   WEEKDAY_LABELS,
   windowModifier,
 } from "@/logic/digest-logic";
@@ -73,29 +72,6 @@ describe("dayTag", () => {
     expect(dayTag("2026-08-18 23:59:00")).toBe("Tue");
     // A bare YYYY-MM-DD (no time component) is equally stable.
     expect(dayTag("2026-08-18")).toBe("Tue");
-  });
-});
-
-describe("splitOverlooked", () => {
-  it("routes 'overdue' -> drifting and 'unresponsive' -> goneQuiet", () => {
-    const rows = [
-      { id: 1, reason: "overdue", progress: 3.2 },
-      { id: 2, reason: "unresponsive", progress: 1.4 },
-      { id: 3, reason: "overdue", progress: 5.0 },
-    ];
-    const { drifting, goneQuiet } = splitOverlooked(rows);
-    expect(drifting.map((r) => r.id)).toEqual([1, 3]);
-    expect(goneQuiet.map((r) => r.id)).toEqual([2]);
-  });
-
-  it("splits by reason only — an 'unresponsive' row with higher progress than an 'overdue' row still lands in goneQuiet", () => {
-    const rows = [
-      { id: 10, reason: "overdue", progress: 3.1 },
-      { id: 20, reason: "unresponsive", progress: 9.9 }, // rarely_responds past ROGUE_K
-    ];
-    const { drifting, goneQuiet } = splitOverlooked(rows);
-    expect(drifting.map((r) => r.id)).toEqual([10]);
-    expect(goneQuiet.map((r) => r.id)).toEqual([20]);
   });
 });
 

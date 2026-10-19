@@ -9,8 +9,9 @@
  * as single-number edits.
  *
  * The retrospective's per-person rows come from `readRetrospective`; the
- * overlooked rows from `readOverlooked` (already `STATUS_SQL='rogue'`, mute
- * IGNORED — see digest-read.ts); the gentle-line tally from `readGentleLine`.
+ * gentle-line tally from `readGentleLine`. The Digest's Overlooked section is
+ * derived from the Up Next candidates (38.13 D-61), so the former rogue-only
+ * Drifting / Gone-quiet split is retired (D-68 dropped its reason captions).
  * This module only SHAPES those results — it issues no SQL and reads no clock
  * except `dayTag`, which parses a STORED local wall-clock value.
  */
@@ -98,37 +99,6 @@ export function dayTag(stored: string): string {
   const [, y, mo, d] = m;
   const local = new Date(Number(y), Number(mo) - 1, Number(d));
   return WEEKDAY_LABELS[local.getDay()];
-}
-
-/** The minimal shape splitOverlooked needs — the rogue REASON, or null. */
-interface HasReason {
-  reason: string | null;
-}
-
-/**
- * Split the overlooked rogue rows into the two calm sub-groups BY REASON ONLY,
- * never by the raw progress magnitude: `'overdue'` → Drifting, `'unresponsive'`
- * → Gone quiet (D-GA2 / REASON_SQL branch order, status.ts:95-99). A
- * `rarely_responds` contact past `ROGUE_K` reads `'unresponsive'` and therefore
- * lands in Gone quiet even though its progress can exceed a Drifting row's.
- * Input order is preserved within each group (readOverlooked orders by progress
- * DESC, so most-slipped stays first).
- */
-export function splitOverlooked<T extends HasReason>(
-  rows: T[],
-): { drifting: T[]; goneQuiet: T[] } {
-  const drifting: T[] = [];
-  const goneQuiet: T[] = [];
-  for (const row of rows) {
-    if (row.reason === "unresponsive") {
-      goneQuiet.push(row);
-    } else if (row.reason === "overdue") {
-      drifting.push(row);
-    }
-    // Any other reason (should not occur for a rogue row) is ignored, never
-    // mis-bucketed.
-  }
-  return { drifting, goneQuiet };
 }
 
 /**

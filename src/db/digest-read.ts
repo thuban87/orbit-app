@@ -1,32 +1,19 @@
 /**
- * Digest read chokepoint (DGST-02 / DGST-03) — the three READ-ONLY queries
- * behind the weekly "your week" screen: the retrospective ("reached this week"),
- * the overlooked (rogue split Drifting / Gone quiet), and the gentle "effortful"
- * line. Pure READ-ONLY: no transaction, no writer, no migration, no network —
- * async `getAllAsync` / `getFirstAsync` only (NEVER the sync variants).
- * On-device SQLite; local-first. The backlog count is NOT re-derived here — the
- * screen reuses `countNeverContacted` (dashboard-read.ts) verbatim.
+ * Digest read chokepoint (DGST-02 / DGST-03): the READ-ONLY retrospective
+ * ("reached this week") and gentle "effortful" line queries. Pure READ-ONLY: no
+ * transaction, no writer, no migration, no network; async `getAllAsync` /
+ * `getFirstAsync` only (NEVER the sync variants). On-device SQLite; local-first.
+ *
+ * The Digest's Overlooked section is no longer read here. Since 38.13 D-61 it is
+ * everyone needing attention minus Up Next, derived in DigestScreen from
+ * `readUpNextCandidates` (up-next-read.ts, NEEDS_ATTENTION_WHERE). The former
+ * rogue-only read and its Drifting / Gone-quiet split were retired with it
+ * (D-61, D-68).
  *
  * =============================================================================
- * IT RE-USES, NEVER RE-DERIVES:
- *   - status / progress / rogue reason: the CASE-wrapped `PROGRESS_SQL` /
- *     `STATUS_SQL` / `REASON_SQL` fragments from `status.ts` (the query-time
- *     engine — DERIVED-NEVER-STORED). Rogue is READ via the shared constant,
- *     never a second threshold (CLAUDE.md single-shared-rogue-constant rule).
- *   - the trailing-window modifier: `windowModifier` from `digest-logic.ts`,
- *     built from an INTEGER tunable — the only thing interpolated into these
- *     queries beyond the status fragments, and it can carry no user free-text.
- *
- * OVERLOOKED IS THE INVERSE OF DECAY-SUPPRESSION: it deliberately does NOT reuse
- * `DECAY_ELIGIBLE_WHERE` / the notification-read layer, which excludes rogue,
- * rarely_responds, muted, and never-contacted — exactly the populations this
- * section surfaces (RESEARCH Pitfall 3). It queries `STATUS_SQL = 'rogue'`
- * directly, OMITS the `reminders_off` mute filter (a muted rogue still appears —
- * mute governs decay PUSHES only), excludes active snoozes to match the
- * needs-attention drill target, and pre-filters `last_contact IS NOT NULL`
- * (STATUS_SQL has no NULL branch — status.ts:52-57 — so a NULL would falsely
- * read 'stable'). Drifting vs Gone quiet is split by REASON in digest-logic.ts,
- * never by the raw progress value.
+ * IT RE-USES, NEVER RE-DERIVES the trailing-window modifier: `windowModifier`
+ * from `digest-logic.ts`, built from an INTEGER tunable, the only thing
+ * interpolated into these queries, and it can carry no user free-text.
  *
  * TIMEZONE (matches status.ts / dashboard-read.ts): only `now` is converted to
  * local (`date('now','localtime', …)`); a STORED column (`occurred_at`,
@@ -36,12 +23,11 @@
  * once-fixed UTC off-by-one; dates.ts).
  *
  * INJECTION (T-15-01): every query is a static string; the ONLY interpolated
- * values are closed code-constants (the status/reason fragments and the
- * integer-derived window modifier). There is no user free-text in any digest
- * read — matching the status.ts / dashboard-read.ts injection posture.
+ * value is a closed code-constant (the integer-derived window modifier). There
+ * is no user free-text in any digest read, matching the status.ts /
+ * dashboard-read.ts injection posture.
  * =============================================================================
  */
-import { PROGRESS_SQL, REASON_SQL, STATUS_SQL } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
 import {
   EFFORTFUL_WINDOW_DAYS,
@@ -56,18 +42,6 @@ export interface RetrospectiveRow {
   photo: string | null;
   /** MAX(occurred_at) — the stored local wall-clock of the most-recent touch. */
   last_reached: string;
-}
-
-/** One overlooked (rogue) row — reason drives the Drifting / Gone-quiet split. */
-export interface OverlookedRow {
-  id: number;
-  name: string;
-  photo: string | null;
-  rarely_responds: number;
-  progress: number;
-  status: string;
-  /** 'overdue' (Drifting) | 'unresponsive' (Gone quiet) — never null for a rogue row. */
-  reason: string | null;
 }
 
 /** The gentle-line tally + the distinct people with a hard mark in the window. */
@@ -98,31 +72,6 @@ export function readRetrospective(
   GROUP BY c.id
   ORDER BY last_reached DESC, c.name COLLATE NOCASE, c.id`;
   return exec.getAllAsync<RetrospectiveRow>(sql);
-}
-
-/**
- * "The overlooked" — non-archived, contacted contacts that have gone rogue, with
- * the reminder-mute filter deliberately omitted. Active snoozes are excluded so
- * the preview matches its needs-attention drill target. `last_contact IS NOT
- * NULL` is load-bearing (it makes STATUS_SQL safe over a possible NULL). Ordered
- * most-slipped first; the Drifting / Gone-quiet split is by `reason`.
- */
-export function readOverlooked(exec: SqlExecutor): Promise<OverlookedRow[]> {
-  const sql = `SELECT c.id AS id,
-    c.name AS name,
-    c.photo AS photo,
-    c.rarely_responds AS rarely_responds,
-    (${PROGRESS_SQL}) AS progress,
-    (${STATUS_SQL}) AS status,
-    (${REASON_SQL}) AS reason
-   FROM contacts c
-  WHERE c.archived_at IS NULL
-    AND c.tracking_enabled = 1
-    AND c.last_contact IS NOT NULL
-    AND (c.snooze_until IS NULL OR date(c.snooze_until) <= date('now','localtime'))
-    AND (${STATUS_SQL}) = 'rogue'
-  ORDER BY progress DESC, c.name COLLATE NOCASE, c.id`;
-  return exec.getAllAsync<OverlookedRow>(sql);
 }
 
 /** One raw quality-mark row for the gentle-line tally. */

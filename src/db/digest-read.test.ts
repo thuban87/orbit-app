@@ -4,25 +4,21 @@
  * Drives a fresh in-memory `node:sqlite` DB through the REAL migration-1 fixture
  * (which creates `contacts` + `interactions` — the only tables these reads
  * touch; migrations 002-004 add app_settings columns the digest reads never
- * read) and the REAL digest-read module. Status/progress derive from
- * `date('now','localtime')` (the real clock), so contacts are seeded with
- * last_contact / occurred_at dates computed RELATIVE to today via
- * `localDateOffset`, making rogue buckets and the trailing windows deterministic
- * regardless of run date.
+ * read) and the REAL digest-read module. The windows derive from
+ * `date('now','localtime')` (the real clock), so interactions are seeded with
+ * occurred_at dates computed RELATIVE to today, making the trailing windows
+ * deterministic regardless of run date.
  *
- * The muted-rogue-present assertion is the proof the overlooked read does NOT
- * reuse the decay-suppression predicate (a suppression-based read would drop a
- * reminders_off contact); we rely on that behaviour, not a comment-fragile grep.
+ * The Digest's Overlooked section is no longer read here (38.13 D-61): it is
+ * derived from the Up Next candidates, tested in up-next-read.test.ts.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { countNeverContacted } from "@/db/dashboard-read";
 import {
   type GentleLine,
-  type OverlookedRow,
   type RetrospectiveRow,
   readGentleLine,
-  readOverlooked,
   readRetrospective,
 } from "@/db/digest-read";
 import { migration001 } from "@/db/migrations/001-initial";
@@ -219,123 +215,6 @@ describe("readRetrospective", () => {
     });
     expect((await readRetrospective(exec)).map((row) => row.id)).toEqual([
       unbound,
-    ]);
-  });
-});
-
-describe("readOverlooked", () => {
-  it("returns time-drift rogue as reason 'overdue' (Drifting)", async () => {
-    // interval 10, last contact 40 days ago → progress 4 >= ROGUE_K (3).
-    await seedContact({
-      name: "Drift",
-      intervalDays: 10,
-      lastContact: localDateOffset(-40),
-    });
-    const rows: OverlookedRow[] = await readOverlooked(exec);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].name).toBe("Drift");
-    expect(rows[0].status).toBe("rogue");
-    expect(rows[0].reason).toBe("overdue");
-    expect(rows[0].rarely_responds).toBe(0);
-  });
-
-  it("returns a rarely_responds gone-quiet contact as reason 'unresponsive'", async () => {
-    // interval 10, last contact 15 days ago → progress 1.5: NOT rogue by time
-    // (< 3), but rogue via the rarely_responds branch (>= WOBBLE_MAX 1.0).
-    await seedContact({
-      name: "Quiet",
-      intervalDays: 10,
-      lastContact: localDateOffset(-15),
-      rarelyResponds: 1,
-    });
-    const rows = await readOverlooked(exec);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].reason).toBe("unresponsive");
-    expect(rows[0].rarely_responds).toBe(1);
-  });
-
-  it("keeps a rarely_responds rogue as 'unresponsive' even past ROGUE_K (branch order)", async () => {
-    // progress 4 (past ROGUE_K) AND rarely_responds=1 → branch 1 wins → unresponsive.
-    await seedContact({
-      name: "DeepQuiet",
-      intervalDays: 10,
-      lastContact: localDateOffset(-40),
-      rarelyResponds: 1,
-    });
-    const rows = await readOverlooked(exec);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].reason).toBe("unresponsive");
-  });
-
-  it("INCLUDES a muted rogue (reminders_off=1 ignored — not the decay-suppression predicate)", async () => {
-    await seedContact({
-      name: "Muted",
-      intervalDays: 10,
-      lastContact: localDateOffset(-40),
-      remindersOff: 1,
-    });
-    const rows = await readOverlooked(exec);
-    expect(rows.map((r) => r.name)).toEqual(["Muted"]);
-  });
-
-  it("excludes an archived rogue and a never-contacted contact", async () => {
-    await seedContact({
-      name: "ArchivedRogue",
-      intervalDays: 10,
-      lastContact: localDateOffset(-40),
-      archivedAt: NOW,
-    });
-    await seedContact({ name: "NeverReached", lastContact: null });
-    // A stable contact (recent) must also be absent.
-    await seedContact({
-      name: "Stable",
-      intervalDays: 30,
-      lastContact: localDateOffset(-2),
-    });
-    const rows = await readOverlooked(exec);
-    expect(rows).toHaveLength(0);
-  });
-
-  it("excludes an Unbound rogue from the active overlooked projection", async () => {
-    await seedContact({
-      name: "Dormant rogue",
-      intervalDays: 10,
-      lastContact: localDateOffset(-40),
-      trackingEnabled: 0,
-    });
-    expect(await readOverlooked(exec)).toEqual([]);
-  });
-
-  it("orders most-slipped first (progress DESC)", async () => {
-    await seedContact({
-      name: "Lightly",
-      intervalDays: 10,
-      lastContact: localDateOffset(-35),
-    }); // progress 3.5
-    await seedContact({
-      name: "Badly",
-      intervalDays: 10,
-      lastContact: localDateOffset(-80),
-    }); // progress 8.0
-    const rows = await readOverlooked(exec);
-    expect(rows.map((r) => r.name)).toEqual(["Badly", "Lightly"]);
-  });
-
-  it("excludes an actively snoozed rogue but keeps an unsnoozed rogue", async () => {
-    await seedContact({
-      name: "Snoozed rogue",
-      intervalDays: 10,
-      lastContact: localDateOffset(-40),
-      snoozeUntil: localDateOffset(3),
-    });
-    await seedContact({
-      name: "Visible rogue",
-      intervalDays: 10,
-      lastContact: localDateOffset(-40),
-    });
-
-    expect((await readOverlooked(exec)).map((row) => row.name)).toEqual([
-      "Visible rogue",
     ]);
   });
 });

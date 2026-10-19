@@ -8,10 +8,10 @@ import {
   listDashboardPopulation,
 } from "@/db/dashboard-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { readOverlooked } from "@/db/digest-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { readUpNextCandidates } from "@/db/up-next-read";
 import { buildPopulationWhere } from "@/logic/dashboard-query-logic";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 
@@ -306,7 +306,8 @@ describe("dashboard query store", () => {
       ["snoozed-rogue", "Snoozed Rogue", "2026-01-01", "2099-01-01", NOW, NOW],
     );
     const id = Number(inserted.lastInsertRowId);
-    const preview = await readOverlooked(exec);
+    // The Overlooked preview is drawn from the Up Next candidates (38.13 D-61).
+    const preview = await readUpNextCandidates(exec);
     await useDashboardQueryStore
       .getState()
       .setPopulationsAndFilters(exec, [], { "needs-attention": ["on"] });

@@ -24,13 +24,13 @@ import {
   readCurrentlySnoozedIds,
 } from "@/db/dashboard-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { readOverlooked } from "@/db/digest-read";
 import { runMigrations } from "@/db/migrations/runner";
 import { INDEFINITE_SNOOZE_UNTIL, isIndefiniteSnooze } from "@/db/snooze-dao";
 import type { SqlExecutor } from "@/db/types";
 import { readUpNextCandidates } from "@/db/up-next-read";
 import { pickerRowMarkers } from "@/logic/contact-picker-order";
 import type { DashboardQueryState } from "@/logic/dashboard-query-logic";
+import { dedupOverlooked, pickUpNext } from "@/logic/digest-composition";
 import {
   BUILTIN_SYSTEMS,
   buildOrrerySystemWhere,
@@ -229,11 +229,21 @@ describe("indefinite snooze — every snooze reader agrees with a dated snooze (
 
   it("Digest Overlooked leaves it out", async () => {
     const trio = await seedTrio();
-    const rows = await readOverlooked(exec);
+    // Overlooked is the Up Next candidates after Up Next's three (38.13 D-61).
+    // Three more-overdue people fill Up Next so the trio lands in Overlooked.
+    const ahead = [
+      await seedContact("Ahead 1", null, 400),
+      await seedContact("Ahead 2", null, 400),
+      await seedContact("Ahead 3", null, 400),
+    ];
+    const candidates = await readUpNextCandidates(exec);
+    const upNextIds = pickUpNext(candidates).map((r) => r.id);
+    expect(upNextIds).toEqual(ahead);
+    const overlooked = dedupOverlooked(candidates, upNextIds);
     expect(
       membership(
         trio,
-        rows.map((r) => r.id),
+        overlooked.map((r) => r.id),
       ),
     ).toEqual(HIDDEN_LIKE_DATED);
   });
