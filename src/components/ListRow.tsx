@@ -37,6 +37,7 @@ import type { ProfileStatus } from "@/db/contact-status-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import { UNBOUND_STAR_OPACITY } from "@/logic/dashboard-unbound-row";
 import { unboundStarExplanation } from "@/screens/contact-profile-logic";
+import { unboundRowSubtitle } from "@/screens/unbound-list-logic";
 import { GlassForegroundScope, useUnscopedTheme } from "@/theme";
 import { listRowBacking } from "@/theme/art-treatments";
 import { ICON_SIZE } from "@/theme/tokens/icon-size";
@@ -205,7 +206,13 @@ export function ListRow({
       ? "snoozed"
       : status;
   const starOn = isFavourite && !unbound;
-  const recency = formatListRecency(lastContact, now);
+  // 38.13 D-84 (ADR-233; matches GridCard's D-83): an Unbound person with no
+  // interactions reads the Unbound list's wording, "No contact logged", on the
+  // row and in its description. Bound rows keep "No interactions yet".
+  const recency =
+    unbound && lastContact === null
+      ? unboundRowSubtitle(null)
+      : formatListRecency(lastContact, now);
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
   // D-37: plain labels; a missing result is the name-only case ("Name"), not
