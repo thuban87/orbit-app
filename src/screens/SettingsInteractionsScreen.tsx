@@ -200,7 +200,7 @@ export function SettingsInteractionsScreen() {
         {renderChipSection(
           "settings-your-week-period-section",
           "Your Week period",
-          "The period used by the Digest retrospective.",
+          "Which days Your Week on the Digest covers.",
           YOUR_WEEK_PERIOD_OPTIONS,
           settings?.yourWeekPeriod,
         )}

@@ -7,10 +7,15 @@ import {
 } from "react-native";
 import { fitHeatmapCell } from "@/components/heatmap-fit";
 import { classifyHeatmapCell } from "@/components/history/heatmap-cell";
+import { AppText } from "@/components/ui/AppText";
 import type { HistoryWindow, WindowCell } from "@/services/history/window";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
-import { formatDisplayDateOrFallback } from "@/utils/dates";
+import {
+  formatDisplayDateOrFallback,
+  parseLocalMs,
+  WEEKDAY_SHORT,
+} from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
 // ─── Tunables (RG-033 ui-accessibility/AUD-UIA-010, D-13) ─────────────────────
@@ -24,6 +29,8 @@ const MIN_CELL = 36;
 const MAX_CELL = 56;
 const GAP = SPACING.xs;
 const COLUMNS = 7;
+/** Height of the selected weekday label's underline bar (38.13 D-47). */
+const LABEL_UNDERLINE = 2;
 const LOG_SCOPE = "your-week-heatmap";
 
 export interface YourWeekHeatmapProps {
@@ -40,6 +47,55 @@ function weeks(cells: readonly WindowCell[]): WindowCell[][] {
     result.push(cells.slice(index, index + COLUMNS));
   }
   return result;
+}
+
+/** A real calendar day (placeholders carry no weekday of their own). */
+function realDate(cell: WindowCell | undefined): string | null {
+  return cell && !cell.isPlaceholder && cell.date !== null ? cell.date : null;
+}
+
+/**
+ * The weekday name over each of the 7 columns (38.13 D-47), from the shared
+ * `WEEKDAY_SHORT` table (38.9 D-23: no private copy). A column takes the
+ * weekday of its first real date; a column with only placeholders takes the
+ * weekday implied by the nearest column that has one (columns are consecutive
+ * days). All blank when the window has no real date. PURE.
+ */
+export function weekdayColumnLabels(
+  rows: readonly (readonly WindowCell[])[],
+): string[] {
+  const columnDay: (number | null)[] = [];
+  for (let column = 0; column < COLUMNS; column += 1) {
+    let date: string | null = null;
+    for (const row of rows) {
+      date = realDate(row[column]);
+      if (date !== null) break;
+    }
+    columnDay.push(
+      date === null ? null : new Date(parseLocalMs(date)).getDay(),
+    );
+  }
+  const anchor = columnDay.findIndex((day) => day !== null);
+  if (anchor === -1) return columnDay.map(() => "");
+  const anchorDay = columnDay[anchor] as number;
+  return columnDay.map((day, column) => {
+    const weekday =
+      day ?? (((anchorDay + column - anchor) % COLUMNS) + COLUMNS) % COLUMNS;
+    return WEEKDAY_SHORT[weekday];
+  });
+}
+
+/** The column index of `date` among the real cells, or null. */
+function selectedColumn(
+  rows: readonly (readonly WindowCell[])[],
+  date: string | null,
+): number | null {
+  if (date === null) return null;
+  for (const row of rows) {
+    const column = row.findIndex((cell) => realDate(cell) === date);
+    if (column !== -1) return column;
+  }
+  return null;
 }
 
 function fitWeekCell(availableWidth: number): number | null {
@@ -69,6 +125,8 @@ export function YourWeekHeatmap({
 }: YourWeekHeatmapProps) {
   const { colors } = useTheme();
   const rows = useMemo(() => weeks(window.cells), [window.cells]);
+  const labels = useMemo(() => weekdayColumnLabels(rows), [rows]);
+  const activeColumn = selectedColumn(rows, selectedDate);
   // Measured available width (layout measurement, not animation). 0 until the
   // first layout pass: nothing renders until then, so the grid never jumps.
   const [availableWidth, setAvailableWidth] = useState(0);
@@ -131,6 +189,59 @@ export function YourWeekHeatmap({
     );
   };
 
+  // Weekday labels (38.13 D-47) sit in their own row at the fitted cell
+  // width, so they never shrink or resize cells (ADR-174). The selected
+  // day's column label is bold with an underline bar: a shape cue beside the
+  // border, not colour alone. The bar's slot is always there, so selecting a
+  // day never shifts the grid. Hidden from accessibility: each cell already
+  // announces its weekday through `dateLabel`.
+  const labelRow = (
+    <View
+      testID={`${testID}-labels`}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.row}
+    >
+      {labels.map((label, column) => {
+        const active = column === activeColumn;
+        return (
+          <View
+            // biome-ignore lint/suspicious/noArrayIndexKey: the 7 columns are fixed positions.
+            key={column}
+            testID={`${testID}-label-${column}`}
+            style={[styles.label, { width: cellEdge ?? 0 }]}
+          >
+            {active ? (
+              // biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role.
+              <AppText role="label" numberOfLines={1}>
+                {label}
+              </AppText>
+            ) : (
+              <AppText
+                role="caption"
+                numberOfLines={1}
+                style={{ color: colors.textSecondary }}
+              >
+                {label}
+              </AppText>
+            )}
+            {active ? (
+              <View
+                testID={`${testID}-label-selected`}
+                style={[
+                  styles.underline,
+                  { backgroundColor: colors.textPrimary },
+                ]}
+              />
+            ) : (
+              <View style={styles.underline} />
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+
   // Full-width wrapper measures the available width; the grid inside is sized
   // from it and centered (D-13), so there is no empty right side and no
   // horizontal scroll.
@@ -138,6 +249,7 @@ export function YourWeekHeatmap({
     <View testID={testID} style={styles.wrapper} onLayout={onLayout}>
       {cellEdge === null ? null : (
         <View testID={`${testID}-grid`} style={styles.grid}>
+          {labelRow}
           {rows.map((row, rowIndex) => (
             <View
               key={row.map((cell) => cell.date ?? "blank").join("|")}
@@ -159,4 +271,10 @@ const styles = StyleSheet.create({
   grid: { gap: GAP, alignSelf: "center" },
   row: { flexDirection: "row", gap: GAP },
   cell: { borderRadius: SPACING.xs },
+  label: { alignItems: "center", gap: SPACING.xs },
+  underline: {
+    width: "60%",
+    height: LABEL_UNDERLINE,
+    borderRadius: LABEL_UNDERLINE / 2,
+  },
 });

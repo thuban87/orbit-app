@@ -217,7 +217,9 @@ describe("YourWeekHeatmap", () => {
       ]),
     );
     const blanks = tree.filter(
-      (node) => node.props.importantForAccessibility === "no-hide-descendants",
+      (node) =>
+        node.props.importantForAccessibility === "no-hide-descendants" &&
+        node.props.testID !== "your-week-heatmap-labels",
     );
     for (const blank of blanks) {
       expect(blank.props.style).toEqual(
@@ -385,7 +387,9 @@ describe("YourWeekHeatmap", () => {
       }),
     );
     const hidden = tree.filter(
-      (node) => node.props.importantForAccessibility === "no-hide-descendants",
+      (node) =>
+        node.props.importantForAccessibility === "no-hide-descendants" &&
+        node.props.testID !== "your-week-heatmap-labels",
     );
     expect(hidden).toHaveLength(2);
     for (const cell of hidden) {
