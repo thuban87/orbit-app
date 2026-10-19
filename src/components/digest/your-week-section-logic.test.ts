@@ -10,6 +10,7 @@ import {
   createYourWeekPeriodReader,
   directDateCounts,
   failDayRead,
+  heldWeekSurvivesFailure,
   initialYourWeekState,
   isYourWeekDayInWindow,
   persistYourWeekPeriodAccepted,
@@ -21,6 +22,7 @@ import {
   selectYourWeekPeriod,
   settleDayRead,
   startDayRead,
+  toggleYourWeekDay,
   type YourWeekControllerState,
   yourWeekPresentation,
 } from "./your-week-section-logic";
@@ -456,5 +458,55 @@ describe("yourWeekPresentation (38.3 review B-WR-06)", () => {
     expect(
       yourWeekPresentation({ hasLoaded: true, error: false, empty: false }),
     ).toEqual({ body: "loaded", refreshNotice: false });
+  });
+});
+
+describe("toggleYourWeekDay (38.13 D-45)", () => {
+  const withDay = (selectedDay: string | null): YourWeekControllerState => ({
+    ...initialYourWeekState(),
+    selectedDay,
+  });
+
+  it("re-tapping the selected day closes it", () => {
+    const result = toggleYourWeekDay(withDay("2026-10-14"), "2026-10-14");
+    expect(result.action).toBe("close");
+    expect(result.state.selectedDay).toBeNull();
+  });
+
+  it("tapping a day with nothing selected opens it", () => {
+    const result = toggleYourWeekDay(withDay(null), "2026-10-14");
+    expect(result.action).toBe("open");
+    expect(result.state.selectedDay).toBe("2026-10-14");
+  });
+
+  it("tapping another day moves the selection to it", () => {
+    const result = toggleYourWeekDay(withDay("2026-10-13"), "2026-10-14");
+    expect(result.action).toBe("open");
+    expect(result.state.selectedDay).toBe("2026-10-14");
+  });
+
+  it("changes nothing but the selected day", () => {
+    const before = { ...withDay("2026-10-14"), generation: 4 };
+    const { state } = toggleYourWeekDay(before, "2026-10-14");
+    expect(state).toEqual({ ...before, selectedDay: null });
+  });
+});
+
+describe("heldWeekSurvivesFailure (38.13 D-49, 38.3 B-WR-06)", () => {
+  it("keeps a held week only when it is the current period's", () => {
+    expect(heldWeekSurvivesFailure("rolling7", "rolling7")).toBe(true);
+    expect(heldWeekSurvivesFailure("calendar_week", "calendar_week")).toBe(
+      true,
+    );
+  });
+
+  it("drops a held week from another period", () => {
+    expect(heldWeekSurvivesFailure("rolling7", "calendar_week")).toBe(false);
+    expect(heldWeekSurvivesFailure("calendar_week", "rolling7")).toBe(false);
+  });
+
+  it("has nothing to keep when no week is held", () => {
+    expect(heldWeekSurvivesFailure(null, "rolling7")).toBe(false);
+    expect(heldWeekSurvivesFailure(null, "calendar_week")).toBe(false);
   });
 });
