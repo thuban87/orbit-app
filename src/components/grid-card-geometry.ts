@@ -42,7 +42,10 @@ export const GRID_CORNER_CLEARANCE = SPACING.xs;
 export const GRID_CORNER_OPTICAL_OFFSET = 0;
 
 export interface GridCardGeometry {
-  /** The nominal card width (a short last row's cards stretch wider). */
+  /**
+   * The nominal card width. Every card is sized to it (38.13 D-32), so a short
+   * last row keeps normal-width cards instead of stretching wider.
+   */
   cardWidth: number;
   /** The Avatar diameter. */
   avatarSize: number;

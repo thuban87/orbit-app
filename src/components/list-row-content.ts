@@ -1,6 +1,6 @@
 import type { StatusDisplayState } from "@/components/contact-card-ring";
 import { statusDisplayLabel } from "@/components/icons/status-display-label";
-import { FAVORITE, UNBOUND } from "@/constants/glossary";
+import { FAVORITE, NEVER_CONTACTED, UNBOUND } from "@/constants/glossary";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import type {
   DashboardSearchMatch,
@@ -37,6 +37,21 @@ export function formatListRecency(
   } catch {
     return "No interactions yet";
   }
+}
+
+/**
+ * The Card view's visible recency (38.13 D-33): "Never Contacted" for a person
+ * with no interactions, so it fits one card line where "No interactions yet"
+ * truncated; every other value equals the List recency. The card's
+ * accessibility description keeps `formatListRecency`'s full text. The wording
+ * is this plan's choice (D-33 names no string).
+ */
+export function formatCardRecency(
+  lastContact: string | null,
+  now: string,
+): string {
+  if (lastContact === null) return NEVER_CONTACTED;
+  return formatListRecency(lastContact, now);
 }
 
 /** Compose the single category label onto compact recency when available. */

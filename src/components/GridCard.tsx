@@ -36,6 +36,7 @@ import {
   buildRowAccessibilityDescription,
   buildSearchRowAccessibilityDescription,
   buildSearchRowContext,
+  formatCardRecency,
   formatListRecency,
   formatSearchExplanation,
   searchSnippetToShow,
@@ -251,7 +252,9 @@ export function GridCard({
       }}
       onPress={selectionMode ? (onToggleSelect ?? onPress) : onPress}
       onLongPress={selectionMode ? undefined : onLongPress}
-      style={styles.card}
+      // D-32: the nominal width, not a share of the row, so a short last row
+      // keeps normal-width cards.
+      style={[styles.card, { width: geometry.cardWidth }]}
     >
       <GlassSurface
         blurAvailable={false}
@@ -437,7 +440,7 @@ export function GridCard({
                           { color: scoped.textSecondary },
                         ]}
                       >
-                        {recency}
+                        {formatCardRecency(lastContact, now)}
                       </Text>
                     )}
                     {isSearchMode ? (
@@ -475,7 +478,8 @@ export function GridCard({
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 1,
     minWidth: 0,
   },
   surface: {
