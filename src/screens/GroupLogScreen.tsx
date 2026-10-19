@@ -292,6 +292,7 @@ export function GroupLogScreen({
       <ContactPicker
         mode="multi"
         visible={pickerVisible}
+        title="Group Log: choose contacts"
         initialSelected={participantIds}
         onDismiss={() => setPickerVisible(false)}
         onConfirm={setParticipantIds}

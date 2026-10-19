@@ -1,0 +1,74 @@
+/**
+ * The contact picker modal's chrome (38.13). PURE: no react-native import, so
+ * it is node-testable; `ContactPicker` renders what these return.
+ *
+ * - Title (D-70, audit A-24): the picker names the action that opened it, e.g.
+ *   "Quick Log: choose contact". A caller that passes no title keeps today's
+ *   "Choose contact" / "Choose contacts".
+ * - Keyboard (D-43, audit A-25): the picker's Modal window is edge-to-edge, so
+ *   Android does not resize it for the soft keyboard and its search field and
+ *   results sat behind the keyboard. It reuses the 38.9 sheet keyboard layout
+ *   (`sheetKeyboardLayout`, as CaptureScreen does outside `Sheet`). 82% is not
+ *   a Sheet variant, so the layout is computed as `expanded`; the picker keeps
+ *   its 82% cap at rest and, while the keyboard is up, is lifted above it and
+ *   capped to the room left (never taller than at rest).
+ */
+import { sheetKeyboardLayout } from "@/components/ui/sheet-contract";
+
+/** The picker sheet's height cap while the keyboard is down (today's value). */
+export const CONTACT_PICKER_RESTING_MAX_HEIGHT = "82%";
+const RESTING_FRACTION = 0.82;
+/** The picker sheet's floor (today's value); it shrinks to a smaller cap. */
+export const CONTACT_PICKER_MIN_HEIGHT = 260;
+
+/** The picker heading: the caller's action title, else today's default. */
+export function contactPickerTitle(
+  title: string | undefined,
+  isMultiSelect: boolean,
+): string {
+  if (title?.trim()) return title;
+  return isMultiSelect ? "Choose contacts" : "Choose contact";
+}
+
+export interface ContactPickerKeyboardInput {
+  /** Current height of the picker's modal root. */
+  frameHeight: number;
+  /** Tallest root height seen, i.e. the height while the keyboard is down. */
+  restingFrameHeight: number;
+  /** Height the keyboard occupies (0 when down). */
+  keyboardHeight: number;
+  /** Space kept clear at the top (status bar inset plus a margin). */
+  topClearance: number;
+}
+
+export interface ContactPickerKeyboardFrame {
+  /** Bottom padding on the modal root that lifts the sheet above the keyboard. */
+  lift: number;
+  /** The sheet's maxHeight: the resting percent, or a measured cap. */
+  maxHeight: number | typeof CONTACT_PICKER_RESTING_MAX_HEIGHT;
+  /** The sheet's minHeight, never above `maxHeight`. */
+  minHeight: number;
+}
+
+export function contactPickerKeyboardFrame(
+  input: ContactPickerKeyboardInput,
+): ContactPickerKeyboardFrame {
+  const layout = sheetKeyboardLayout({ variant: "expanded", ...input });
+  if (layout.size === null) {
+    return {
+      lift: 0,
+      maxHeight: CONTACT_PICKER_RESTING_MAX_HEIGHT,
+      minHeight: CONTACT_PICKER_MIN_HEIGHT,
+    };
+  }
+  const resting = Math.max(input.restingFrameHeight, input.frameHeight);
+  const maxHeight = Math.min(
+    layout.size,
+    Math.round(RESTING_FRACTION * resting),
+  );
+  return {
+    lift: layout.lift,
+    maxHeight,
+    minHeight: Math.min(CONTACT_PICKER_MIN_HEIGHT, maxHeight),
+  };
+}

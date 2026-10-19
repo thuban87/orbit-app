@@ -47,6 +47,7 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
+import { useRetainedWhileClosing } from "@/hooks/use-retained-while-closing";
 import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import { navigationRef } from "@/navigation/linking";
 import { navigateIntoTab } from "@/navigation/tab-entry";
@@ -174,6 +175,9 @@ export function UniversalFab() {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [currentRouteName, setCurrentRouteName] = useState("Home");
   const [pickerFlow, setPickerFlow] = useState<PickerFlow | null>(null);
+  // 38.13 D-70: the picker's title names the flow that opened it; a closing
+  // picker keeps its title while it fades out.
+  const shownPickerFlow = useRetainedWhileClosing(pickerFlow);
   const [postLogTarget, setPostLogTarget] = useState<PostLogNoteTarget | null>(
     null,
   );
@@ -391,6 +395,11 @@ export function UniversalFab() {
   const picker = (
     <ContactPicker
       visible={pickerFlow !== null}
+      title={
+        shownPickerFlow?.kind === "navigate"
+          ? "Log Interaction: choose contact"
+          : "Quick Log: choose contact"
+      }
       onDismiss={() => setPickerFlow(null)}
       onSelect={selectPickerContact}
     />

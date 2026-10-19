@@ -664,6 +664,7 @@ export function ProfileTemplateManager({
       </Sheet>
       <ContactPicker
         visible={contactPickerVisible}
+        title="Profile Layout: choose contact"
         allowArchivedSearch={false}
         onDismiss={() => setContactPickerVisible(false)}
         onSelect={(selectedContactId) => {

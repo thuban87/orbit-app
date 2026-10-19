@@ -319,6 +319,7 @@ export function LogInteractionScreen({
     return (
       <ContactPicker
         visible
+        title="Log Interaction: choose contact"
         onSelect={(id) => setContactId(id)}
         onDismiss={() => navigation.goBack()}
       />

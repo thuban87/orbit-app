@@ -448,6 +448,7 @@ export function EditGroupEventScreen({
       <ContactPicker
         mode="multi"
         visible={pickerVisible}
+        title="Add participants: choose contacts"
         excludeContactIds={excludedIds}
         onDismiss={() => setPickerVisible(false)}
         onConfirm={addSelected}

@@ -669,6 +669,7 @@ export function RelationshipEditor({
       )}
       <ContactPicker
         visible={pickerOpen}
+        title="Key People: choose contact"
         onDismiss={() => setPickerOpen(false)}
         onSelect={(linkedContactId) => {
           update("linkedContactId", linkedContactId);

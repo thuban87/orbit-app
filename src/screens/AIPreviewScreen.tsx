@@ -196,6 +196,7 @@ export function AIPreviewScreen() {
       </ScrollView>
       <ContactPicker
         visible={pickerOpen}
+        title="AI Preview: choose contact"
         onDismiss={() => setPickerOpen(false)}
         onSelect={(contactId) => void chooseContact(contactId)}
         allowArchivedSearch={false}

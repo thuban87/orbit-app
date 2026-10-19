@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
+  type LayoutChangeEvent,
   Pressable,
   type StyleProp,
   StyleSheet,
@@ -11,6 +13,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui";
@@ -20,6 +23,11 @@ import { listPickerContacts, type PickerContactRow } from "@/db/picker-read";
 import { filterPicker, pickerRowMarkers } from "@/logic/contact-picker-order";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
+import {
+  contactPickerKeyboardFrame,
+  contactPickerTitle,
+} from "./contact-picker-chrome";
 import {
   applyPickerExclusions,
   clearSelection,
@@ -37,6 +45,11 @@ interface ContactPickerBaseProps {
   excludeContactIds?: number[];
   /** Profile template assignment must never surface archived contacts, even while searching. */
   allowArchivedSearch?: boolean;
+  /**
+   * The heading, naming the action that opened the picker (38.13 D-70), e.g.
+   * "Quick Log: choose contact". Absent → "Choose contact(s)".
+   */
+  title?: string;
 }
 
 type SingleSelectContactPickerProps = ContactPickerBaseProps & {
@@ -483,7 +496,41 @@ export function ContactPicker(props: ContactPickerProps) {
     allowArchivedSearch = true,
   } = props;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const isMultiSelect = props.mode === "multi";
+
+  // 38.13 D-43: the 38.9 sheet keyboard layout (CaptureScreen's pattern). The
+  // modal window is edge-to-edge, so the sheet is lifted above the keyboard
+  // and capped to the room left; the search field stays first and the list
+  // shrinks, so both stay visible.
+  const [keyboardHeight, setKeyboardHeight] = useState(() =>
+    Keyboard.isVisible() ? (Keyboard.metrics()?.height ?? 0) : 0,
+  );
+  const [frameHeight, setFrameHeight] = useState(0);
+  const restingFrameHeight = useRef(0);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (event) =>
+      setKeyboardHeight(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardHeight(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  const onRootLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    restingFrameHeight.current = Math.max(restingFrameHeight.current, height);
+    setFrameHeight(height);
+  }, []);
+  const keyboardFrame = contactPickerKeyboardFrame({
+    frameHeight,
+    restingFrameHeight: restingFrameHeight.current,
+    keyboardHeight,
+    topClearance: insets.top + SPACING.lg,
+  });
 
   const dismiss = useCallback(() => {
     shellTransientStore.getState().closeTransient("contact-picker");
@@ -520,7 +567,11 @@ export function ContactPicker(props: ContactPickerProps) {
       visible={visible}
       onRequestClose={dismiss}
     >
-      <View accessibilityViewIsModal style={styles.modalRoot}>
+      <View
+        accessibilityViewIsModal
+        onLayout={onRootLayout}
+        style={[styles.modalRoot, { paddingBottom: keyboardFrame.lift }]}
+      >
         <Pressable
           accessibilityLabel="Dismiss picker"
           onPress={dismiss}
@@ -541,6 +592,8 @@ export function ContactPicker(props: ContactPickerProps) {
             {
               backgroundColor: colors.surfaceElevated,
               borderColor: colors.border,
+              maxHeight: keyboardFrame.maxHeight,
+              minHeight: keyboardFrame.minHeight,
             },
           ]}
         >
@@ -548,7 +601,7 @@ export function ContactPicker(props: ContactPickerProps) {
             accessibilityRole="header"
             style={[styles.title, { color: colors.textPrimary }]}
           >
-            {isMultiSelect ? "Choose contacts" : "Choose contact"}
+            {contactPickerTitle(props.title, isMultiSelect)}
           </Text>
           <ContactPickerList
             mode={isMultiSelect ? "multi" : "single"}
@@ -599,10 +652,10 @@ const styles = StyleSheet.create({
   scrim: {
     opacity: 0.85,
   },
+  // maxHeight / minHeight come from contactPickerKeyboardFrame (82% / 260
+  // at rest, D-43).
   sheet: {
     elevation: 1,
-    maxHeight: "82%",
-    minHeight: 260,
     borderTopWidth: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
