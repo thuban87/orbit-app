@@ -98,6 +98,50 @@ describe("empty-state consumers (D-20, D-71)", () => {
     );
   });
 
+  // 38.13 D-28 / D-30: the filter and population empty states render
+  // EmptyState, keeping their testIDs.
+  it.each([
+    "dashboard-empty-filter",
+    "dashboard-empty-birthdays",
+    "dashboard-empty-not-contacted",
+    "dashboard-empty-snoozed",
+  ])("Contacts %s renders EmptyState", (testID) => {
+    const home = read("src/screens/HomeScreen.tsx");
+    const start = home.indexOf(`testID="${testID}"`);
+    expect(start).toBeGreaterThan(-1);
+    const opening = home.lastIndexOf("<", start);
+    expect(home.slice(opening, start)).toMatch(/^<EmptyState\s*$/);
+  });
+
+  it("Contacts filter-empty offers Clear filters that clears the filters (D-28)", () => {
+    const home = read("src/screens/HomeScreen.tsx");
+    const start = home.indexOf('testID="dashboard-empty-filter"');
+    const region = home.slice(start, home.indexOf("/>", start));
+    expect(region).toContain("onPress: onClearFilters");
+    expect(home).toMatch(
+      /const onClearFilters = useCallback\(async \(\) => \{\s*try \{\s*await useDashboardQueryStore\.getState\(\)\.setFilters\(getExecutor\(\), \{\}\);/,
+    );
+    expect(home).not.toContain("Nothing here right now");
+  });
+
+  it("Contacts tucked-away lines lead to Never Contacted and Unbound Contacts (D-65)", () => {
+    const home = read("src/screens/HomeScreen.tsx");
+    const start = home.indexOf('testID="dashboard-empty-hidden"');
+    expect(start).toBeGreaterThan(-1);
+    const region = home.slice(start, home.indexOf("</View>", start));
+    expect(region).toContain("Everyone's tucked away");
+    expect(region).toContain("tuckedAwayLines(");
+    expect(region).toContain('"dashboard-empty-hidden-never-contacted"');
+    expect(region).toContain('"dashboard-empty-hidden-unbound"');
+    expect(region).toContain('role="tertiary"');
+    expect(home).toMatch(
+      /const onShowNeverContacted = useCallback\(async \(\) => \{\s*try \{\s*await useDashboardQueryStore\s*\.getState\(\)\s*\.setPopulationsAndFilters\(getExecutor\(\), \["not-contacted"\], \{\}\);/,
+    );
+    expect(home).toMatch(
+      /const onOpenUnbound = useCallback\(\s*\(\) => navigation\.navigate\("UnboundContacts"\),/,
+    );
+  });
+
   it("Events: Try again, Clear search and Log an event", () => {
     const events = read("src/screens/GroupEventsScreen.tsx");
     expect(events.match(/<EmptyState/g)).toHaveLength(3);
