@@ -157,6 +157,7 @@ import {
   applyCommittedMembership,
   createFavouriteOptimisticStore,
 } from "@/logic/favourite-optimistic";
+import { resolveHomeBack } from "@/logic/home-session-logic";
 import { selectLine3 } from "@/logic/list-row-selection";
 import { navigationRef } from "@/navigation/linking";
 import { navigateIntoTab } from "@/navigation/tab-entry";
@@ -185,6 +186,7 @@ import {
   useForegroundRefresh,
   useShellRefresh,
 } from "@/stores/shell-refresh-store";
+import { shellTransientStore } from "@/stores/shell-transient-store";
 import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
 import { type ThemePalette, useTheme } from "@/theme";
 import { EASING, MOTION } from "@/theme/tokens/motion";
@@ -699,7 +701,20 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     (state) => state.setSearchText,
   );
   const [searchExpanded, setSearchExpanded] = useState(false);
-  const [debouncedSearchText, setDebouncedSearchText] = useState(searchText);
+  // 38.13 D-24: the debounced twin starts empty, never from the store, so the
+  // first read can never use a term left over from an earlier mount.
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
+
+  // 38.13 D-24 (phase-04 dossier :237): the session store outlives this screen
+  // (Activity recreation keeps the JS process), so a term left there would
+  // silently filter the list on the next mount with the search row closed.
+  // Clear it once on mount. Profile → Back keeps the search because Home stays
+  // mounted under a pushed Profile (D-21). This is a mount effect declared
+  // before the debounce effect and the focus read, never a useState
+  // initialiser or a state updater (both run during render).
+  useEffect(() => {
+    useDashboardSessionStore.getState().setSearchText("");
+  }, []);
 
   useEffect(() => {
     const handle = setTimeout(
@@ -1656,18 +1671,34 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     },
   });
 
+  // Android Back (38.13 D-29; ADR-095 :18 transient-first; ADR-102). This
+  // listener runs before the root navigator's (BackHandler calls the newest
+  // first), so an open shell transient is left to the root listener; then
+  // selection exits; then an open search closes and clears through the same
+  // path as the search toggle.
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener(
         "hardwareBackPress",
         () => {
-          if (!selectionMode) return false;
-          exitBulkSelection();
-          return true;
+          const action = resolveHomeBack({
+            anyTransientOpen: shellTransientStore.getState().isAnyOpen(),
+            selectionMode,
+            searchExpanded,
+          });
+          if (action === "exit-selection") {
+            exitBulkSelection();
+            return true;
+          }
+          if (action === "close-search") {
+            onToggleSearch();
+            return true;
+          }
+          return false;
         },
       );
       return () => subscription.remove();
-    }, [exitBulkSelection, selectionMode]),
+    }, [exitBulkSelection, onToggleSearch, searchExpanded, selectionMode]),
   );
 
   // The cause-aware empty state — delegated to the pure gate (no inline count
