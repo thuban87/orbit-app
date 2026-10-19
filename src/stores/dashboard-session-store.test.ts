@@ -7,35 +7,30 @@ describe("useDashboardSessionStore", () => {
     useDashboardSessionStore.getState().clearSession();
   });
 
-  it("starts with an empty search and zero scroll offset", () => {
-    expect(useDashboardSessionStore.getInitialState()).toMatchObject({
-      searchText: "",
-      scrollOffset: 0,
-    });
+  it("starts with an empty search", () => {
+    expect(useDashboardSessionStore.getInitialState().searchText).toBe("");
   });
 
-  it("updates the ephemeral search and scroll state", () => {
+  it("holds only the search term and its two actions (38.13 D-31)", () => {
+    expect(Object.keys(useDashboardSessionStore.getState()).sort()).toEqual([
+      "clearSession",
+      "searchText",
+      "setSearchText",
+    ]);
+  });
+
+  it("updates the ephemeral search", () => {
     useDashboardSessionStore.getState().setSearchText("Ada");
-    useDashboardSessionStore.getState().setScrollOffset(240);
 
-    expect(useDashboardSessionStore.getState()).toMatchObject({
-      searchText: "Ada",
-      scrollOffset: 240,
-    });
+    expect(useDashboardSessionStore.getState().searchText).toBe("Ada");
   });
 
-  it("clears the ephemeral session back to defaults", () => {
-    useDashboardSessionStore.setState({
-      searchText: "Ada",
-      scrollOffset: 240,
-    });
+  it("clears the ephemeral session back to an empty search", () => {
+    useDashboardSessionStore.setState({ searchText: "Ada" });
 
     useDashboardSessionStore.getState().clearSession();
 
-    expect(useDashboardSessionStore.getState()).toMatchObject({
-      searchText: "",
-      scrollOffset: 0,
-    });
+    expect(useDashboardSessionStore.getState().searchText).toBe("");
   });
 
   it("has no durable-storage adapter", () => {

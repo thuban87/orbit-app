@@ -63,6 +63,45 @@ describe("HomeScreen session search on mount (D-24)", () => {
   });
 });
 
+describe("HomeScreen Reset Dashboard View (D-31, D-04)", () => {
+  function resetBody(): string {
+    const start = source.indexOf("const resetDashboard = useCallback(");
+    expect(start, "resetDashboard not found").toBeGreaterThanOrEqual(0);
+    const end = source.indexOf("} catch (error) {", start);
+    expect(end).toBeGreaterThan(start);
+    return source.slice(start, end);
+  }
+
+  it("resets the view, clears the session, then scrolls both views to the top", () => {
+    const body = resetBody();
+    const reset = body.indexOf(
+      "await useDashboardQueryStore.getState().resetDashboardView(getExecutor());",
+    );
+    const clear = body.indexOf(
+      "useDashboardSessionStore.getState().clearSession();",
+    );
+    const list = body.indexOf(
+      "listRef.current?.scrollToOffset({ offset: 0, animated: false });",
+    );
+    const grid = body.indexOf(
+      "cardGridRef.current?.scrollToOffset({ offset: 0, animated: false });",
+    );
+    expect(reset).toBeGreaterThanOrEqual(0);
+    expect(clear).toBeGreaterThan(reset);
+    expect(list).toBeGreaterThan(clear);
+    expect(grid).toBeGreaterThan(clear);
+  });
+
+  it("never changes the view mode on Reset beyond the store's own reset", () => {
+    expect(resetBody()).not.toContain("setViewMode(");
+  });
+
+  it("passes the refs to the List FlatList and the Card grid", () => {
+    expect(source).toContain("ref={listRef}");
+    expect(source).toContain("listRef={cardGridRef}");
+  });
+});
+
 describe("HomeScreen Android Back (D-29)", () => {
   it("resolves every press through resolveHomeBack with the shell transient state", () => {
     const listener = backListener();
