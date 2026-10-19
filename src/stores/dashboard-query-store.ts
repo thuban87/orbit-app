@@ -67,12 +67,16 @@ interface DashboardQueryStore extends DashboardQueryState {
  */
 let writeChain: Promise<void> = Promise.resolve();
 let writeSeq = 0;
-/** Sequence number of the latest issued write that touched each axis. */
-const latestIssued: Record<DashboardQueryAxis, number> = {
-  populations: 0,
-  filters: 0,
-  sort: 0,
-};
+/**
+ * Every issued write not yet settled, by sequence number. A write that is
+ * voided (below) skips its database write and settles quietly.
+ */
+interface QueuedWrite {
+  axes: readonly DashboardQueryAxis[];
+  next: Partial<DashboardQueryAxes>;
+  voided: boolean;
+}
+const queuedWrites = new Map<number, QueuedWrite>();
 /** Successful writes per axis; hydrate compares it to skip axes written since it began. */
 const successfulWrites: Record<DashboardQueryAxis, number> = {
   populations: 0,
@@ -121,8 +125,17 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
   (set, get) => {
     /**
      * Apply `next` at once, queue its write, and settle with that write. On
-     * failure each written axis is restored to its committed value unless a
-     * newer write for that axis is still pending; then the error is rethrown.
+     * failure each written axis is restored, then the error is rethrown.
+     *
+     * Restore rule: an axis returns to the value of the newest still-queued,
+     * non-voided write for it, else to its committed value (writes settle in
+     * issue order, so `committed` is exact here). A single-axis write carries
+     * a full value, so a newer write on that axis simply wins. A combined
+     * write (the Digest / "N Never Contacted →" drill, Reset) chose its axes
+     * together, so a newer queued write on any of them was made on top of a
+     * pair that never got saved: it is voided (skips its write, settles
+     * quietly) and every axis it touched is restored too, so the view never
+     * shows "old population + new chip" (38.13 review A-IN-02).
      */
     const queueWrite = (
       exec: SqlExecutor,
@@ -131,21 +144,33 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
     ): Promise<void> => {
       const axes = QUERY_AXES.filter((axis) => next[axis] !== undefined);
       const seq = ++writeSeq;
-      for (const axis of axes) latestIssued[axis] = seq;
+      const entry: QueuedWrite = { axes, next, voided: false };
+      queuedWrites.set(seq, entry);
       set((state) => ({
         ...next,
         generation: state.generation + 1,
         pendingAxes: adjustPending(state.pendingAxes, axes, 1),
       }));
-      const write = writeChain.then(() =>
-        updateAppSettings(exec, patch, localDateTime()),
-      );
+      const write = writeChain.then(async () => {
+        if (entry.voided) return false;
+        await updateAppSettings(exec, patch, localDateTime());
+        return true;
+      });
       writeChain = write.then(
         () => undefined,
         () => undefined,
       );
       return write.then(
-        () => {
+        (landed) => {
+          queuedWrites.delete(seq);
+          if (!landed) {
+            // Voided by an earlier combined write's failure, which already
+            // restored the view and reported the failure.
+            set((state) => ({
+              pendingAxes: adjustPending(state.pendingAxes, axes, -1),
+            }));
+            return;
+          }
           for (const axis of axes) successfulWrites[axis] += 1;
           set((state) => ({
             committed: { ...state.committed, ...next },
@@ -153,11 +178,31 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
           }));
         },
         (error: unknown) => {
+          queuedWrites.delete(seq);
+          const affected = new Set<DashboardQueryAxis>(axes);
+          if (axes.length > 1) {
+            const later = [...queuedWrites.entries()]
+              .filter(([laterSeq, w]) => laterSeq > seq && !w.voided)
+              .sort(([a], [b]) => a - b);
+            for (const [, w] of later) {
+              if (!w.axes.some((axis) => affected.has(axis))) continue;
+              w.voided = true;
+              for (const axis of w.axes) affected.add(axis);
+            }
+          }
           set((state) => {
             const restore: Partial<DashboardQueryAxes> = {};
-            for (const axis of axes) {
-              if (latestIssued[axis] !== seq) continue;
-              Object.assign(restore, { [axis]: state.committed[axis] });
+            for (const axis of affected) {
+              let value: unknown = state.committed[axis];
+              for (const [, w] of [...queuedWrites.entries()].sort(
+                ([a], [b]) => a - b,
+              )) {
+                if (!w.voided && w.next[axis] !== undefined) {
+                  value = w.next[axis];
+                }
+              }
+              if (value !== state[axis])
+                Object.assign(restore, { [axis]: value });
             }
             const restored = Object.keys(restore).length > 0;
             return {

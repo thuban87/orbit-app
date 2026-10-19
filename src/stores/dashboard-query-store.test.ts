@@ -427,6 +427,72 @@ describe("dashboard query store: optimistic serial writes (D-27)", () => {
     });
   });
 
+  it("rolls back both axes of a failed combined write when a newer filters-only write is pending (38.13 review A-IN-02)", async () => {
+    await useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(exec, ["favourites"], {
+        "needs-attention": ["on"],
+      });
+    const gate = deferred();
+    const { exec: scripted, attempted } = scriptedExec([
+      { gate: gate.promise, outcome: "fail" },
+      "ok",
+    ]);
+    // The "N Never Contacted →" drill, then a Filters chip before it lands.
+    const drill = useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(scripted, ["not-contacted"], {});
+    const chip = useDashboardQueryStore
+      .getState()
+      .setFilters(scripted, { "social-battery": ["low"] });
+    expect(useDashboardQueryStore.getState()).toMatchObject({
+      populations: ["not-contacted"],
+      filters: { "social-battery": ["low"] },
+    });
+    gate.resolve();
+    await expect(drill).rejects.toThrow("write failed");
+    // The chip was chosen on top of the failed drill: both axes return to
+    // the last stored pair, never "old population + new chip".
+    expect(useDashboardQueryStore.getState()).toMatchObject({
+      populations: ["favourites"],
+      filters: { "needs-attention": ["on"] },
+    });
+    await chip;
+    expect(attempted).toHaveLength(1);
+    expect(useDashboardQueryStore.getState()).toMatchObject({
+      populations: ["favourites"],
+      filters: { "needs-attention": ["on"] },
+      pendingAxes: { populations: 0, filters: 0, sort: 0 },
+    });
+    const row = await exec.getFirstAsync<{ dashboard_filters: string }>(
+      "SELECT dashboard_filters FROM app_settings WHERE id = 1",
+    );
+    expect(JSON.parse(row?.dashboard_filters ?? "null")).toEqual({
+      "needs-attention": ["on"],
+    });
+    expect(await storedPopulations()).toEqual(["favourites"]);
+  });
+
+  it("keeps a later write on an axis the failed combined write did not touch", async () => {
+    await useDashboardQueryStore.getState().setSort(exec, "name-asc");
+    const gate = deferred();
+    const { exec: scripted } = scriptedExec([
+      { gate: gate.promise, outcome: "fail" },
+      "ok",
+    ]);
+    const drill = useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(scripted, ["not-contacted"], {});
+    const sort = useDashboardQueryStore
+      .getState()
+      .setSort(scripted, "name-desc");
+    gate.resolve();
+    await expect(drill).rejects.toThrow("write failed");
+    await sort;
+    expect(useDashboardQueryStore.getState().sort).toBe("name-desc");
+    expect(await storedSort()).toBe("name-desc");
+  });
+
   it("resolves the drill and Reset setters only after their write lands", async () => {
     for (const run of [
       (scripted: SqlExecutor) =>
