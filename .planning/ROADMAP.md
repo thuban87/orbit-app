@@ -1737,7 +1737,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`. A-14 and the bulk snooze sheet moved to 38.11 (38.11 D-45) — see "Notes from 38.11" in the workpaper.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 6–9 plans — rough estimate; the perf fix depends on what the investigation finds.
-**Plans**: 5/11 plans executed (38.13-01 paused at its owner checkpoint)
+**Plans**: 6/11 plans executed (38.13-01 paused at its owner checkpoint)
 
 Plans:
 
@@ -1752,7 +1752,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 38.13-06-PLAN.md — Digest Overlooked = needs attention minus Up Next; Horizon birthday avatars (D-61, D-48)
-- [ ] 38.13-07-PLAN.md — Rows and cards: Unbound search rows, plain search labels and descriptions, no stale "1 match", card width and text (D-59, D-37, D-51, D-44, D-32, D-33)
+- [x] 38.13-07-PLAN.md — Rows and cards: Unbound search rows, plain search labels and descriptions, no stale "1 match", card width and text (D-59, D-37, D-51, D-44, D-32, D-33)
 
 **Wave 3** *(blocked on Wave 2 completion and the 38.13-01 owner checkpoint)*
 
