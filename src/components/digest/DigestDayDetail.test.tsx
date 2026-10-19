@@ -306,8 +306,8 @@ describe("day-detail rows open their destination (38.13 D-46)", () => {
               id: 9,
               occurredAt: "2026-09-18 10:00:00",
               title: null,
-              contactId: null,
-              contactName: null,
+              contactId: 11,
+              contactName: "Mo",
               contactPhoto: null,
             },
           ],
@@ -353,15 +353,17 @@ describe("day-detail rows open their destination (38.13 D-46)", () => {
     expect(onOpenProfile).not.toHaveBeenCalled();
   });
 
-  it("an interaction row with no contact stays an inert View", () => {
-    const { row } = renderRows();
-    const orphan = row("interaction-9");
-    expect(orphan.type).toBe("View");
-    expect(orphan.props.onPress).toBeUndefined();
-    expect(orphan.props.accessibilityRole).toBeUndefined();
-    expect(orphan.props.accessibilityLabel).toBe(
-      "Interaction with Unknown contact, 10:00 AM",
+  // 38.13 review B-IN-01: the day read inner-joins a live contact, so every
+  // interaction row has one (the "contact gone" branch was unreachable).
+  it("every interaction row is a button to its own person's Profile", () => {
+    const { row, onOpenProfile } = renderRows();
+    const second = row("interaction-9");
+    expect(second.type).toBe("Pressable");
+    expect(second.props.accessibilityLabel).toBe(
+      "Interaction with Mo, 10:00 AM",
     );
+    (second.props.onPress as () => void)();
+    expect(onOpenProfile).toHaveBeenCalledWith(11);
   });
 });
 

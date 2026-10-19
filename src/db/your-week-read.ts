@@ -27,20 +27,35 @@ export interface YourWeekDateCount {
   readonly n: number;
 }
 
-export interface YourWeekDayRow {
-  readonly kind: "group_event" | "interaction";
-  readonly id: number;
-  readonly occurredAt: string;
-  readonly title: string | null;
-  readonly contactId: number | null;
-  readonly contactName: string | null;
-  /**
-   * The contact's stored RELATIVE photo path (`contacts.photo`) for an
-   * interaction row, rendered through `Avatar` (38.6 D-02/D-14); null for a
-   * contact without a photo and always null for a group-event row.
-   */
-  readonly contactPhoto: string | null;
-}
+/**
+ * One Your Week day row. The interaction arm INNER JOINs a live (non-Bin)
+ * contact and `interactions.contact_id` / `contacts.name` are NOT NULL, so an
+ * interaction row always names its person (38.13 review B-IN-01); a group-event
+ * row never carries contact fields.
+ */
+export type YourWeekDayRow =
+  | {
+      readonly kind: "group_event";
+      readonly id: number;
+      readonly occurredAt: string;
+      readonly title: string | null;
+      readonly contactId: null;
+      readonly contactName: null;
+      readonly contactPhoto: null;
+    }
+  | {
+      readonly kind: "interaction";
+      readonly id: number;
+      readonly occurredAt: string;
+      readonly title: null;
+      readonly contactId: number;
+      readonly contactName: string;
+      /**
+       * The contact's stored RELATIVE photo path (`contacts.photo`), rendered
+       * through `Avatar` (38.6 D-02/D-14); null for a contact without a photo.
+       */
+      readonly contactPhoto: string | null;
+    };
 
 /**
  * Headline-count SQL, exported so the EXPLAIN proof runs the exact text the

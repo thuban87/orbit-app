@@ -118,6 +118,21 @@ describe("Your Week app-wide reads", () => {
     ]);
   });
 
+  it("every interaction row names a live contact; a Bin contact's interaction is left out (38.13 review B-IN-01)", async () => {
+    const ada = await contact("ada-live", "Ada");
+    const binned = await contact("bin-cal", "Cal", true);
+    await interaction("live", ada, "2026-09-19 09:00:00");
+    await interaction("binned", binned, "2026-09-19 10:00:00");
+    const rows = await readYourWeekDay(exec, "2026-09-19");
+    expect(rows).toEqual([
+      expect.objectContaining({
+        kind: "interaction",
+        contactId: ada,
+        contactName: "Ada",
+      }),
+    ]);
+  });
+
   it("retains a group event whose participants are all archived as one activity", async () => {
     const archivedA = await contact("arch-a", "Archived A", true);
     const archivedB = await contact("arch-b", "Archived B", true);

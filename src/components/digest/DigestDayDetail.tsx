@@ -40,8 +40,8 @@ export interface DigestDayDetailProps {
   /** Re-read the same day with a fresh request (error state's Retry). */
   onRetry: () => void;
   /**
-   * An interaction row with a contact opens that person's Profile (38.13
-   * D-46). A row whose contact is gone (null contactId) stays inert.
+   * An interaction row opens that person's Profile (38.13 D-46). The day read
+   * guarantees a live contact on every interaction row (review B-IN-01).
    */
   onOpenProfile: (contactId: number) => void;
   /** A group-event row opens GroupEventDetail for that event (38.13 D-46). */
@@ -122,16 +122,15 @@ export function groupEventRowLabel(title: string | null, time: string): string {
 }
 
 /**
- * A day-detail row container: a button when it has a destination (38.13
- * D-46), otherwise a plain View exactly as before. The row's own testID,
- * accessibility label and styles pass through unchanged.
+ * A day-detail row: a button to its destination (38.13 D-46). Every row has
+ * one (review B-IN-01). The row's testID, accessibility label and styles pass
+ * through unchanged.
  */
 function DayRowShell({
   onPress,
   children,
   ...rest
-}: ViewProps & { onPress?: () => void }) {
-  if (onPress === undefined) return <View {...rest}>{children}</View>;
+}: ViewProps & { onPress: () => void }) {
   return (
     <Pressable {...rest} accessibilityRole="button" onPress={onPress}>
       {children}
@@ -149,7 +148,6 @@ function renderDayRows(
     <View style={styles.list}>
       {rows.map((row) => {
         // Each callback receives the row's own id (T-38.13-11).
-        const contactId = row.contactId;
         return row.kind === "group_event" ? (
           <DayRowShell
             key={`group-event-${row.id}`}
@@ -176,24 +174,20 @@ function renderDayRows(
           <DayRowShell
             key={`interaction-${row.id}`}
             testID={`${testID}-interaction-${row.id}`}
-            accessibilityLabel={`Interaction with ${row.contactName ?? "Unknown contact"}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
-            onPress={
-              contactId === null
-                ? undefined
-                : () => actions.onOpenProfile(contactId)
-            }
+            accessibilityLabel={`Interaction with ${row.contactName}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
+            onPress={() => actions.onOpenProfile(row.contactId)}
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Avatar
-              photo={row.contactPhoto ?? null}
-              name={row.contactName ?? ""}
-              contactId={row.contactId ?? undefined}
+              photo={row.contactPhoto}
+              name={row.contactName}
+              contactId={row.contactId}
               size={AVATAR_SIZE}
             />
             <View style={styles.body}>
               {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
               <AppText role="body" numberOfLines={1}>
-                {row.contactName ?? "Unknown contact"}
+                {row.contactName}
               </AppText>
               <AppText role="caption" style={{ color: colors.textSecondary }}>
                 {formatTimeMinuteOrFallback(row.occurredAt)}
