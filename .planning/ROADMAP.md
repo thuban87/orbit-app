@@ -1737,7 +1737,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`. A-14 and the bulk snooze sheet moved to 38.11 (38.11 D-45) — see "Notes from 38.11" in the workpaper.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 6–9 plans — rough estimate; the perf fix depends on what the investigation finds.
-**Plans**: 1/11 plans executed (38.13-01 paused at its owner checkpoint)
+**Plans**: 2/11 plans executed (38.13-01 paused at its owner checkpoint)
 
 Plans:
 
@@ -1745,7 +1745,7 @@ Plans:
 
 - [ ] 38.13-01-PLAN.md — List-view measurement on release (D-55, D-56) + owner checkpoint on the fix direction
 - [x] 38.13-02-PLAN.md — Control row + query store: Active row, exclusive All/Active, no dropped taps, labels, no panel after blur (D-23, D-58, D-27, D-35, D-36, D-50)
-- [ ] 38.13-03-PLAN.md — Search read layer: Unbound on All Contacts searches, needs-attention guard, typo tolerance, docstrings (D-59, D-79, D-60, D-53)
+- [x] 38.13-03-PLAN.md — Search read layer: Unbound on All Contacts searches, needs-attention guard, typo tolerance, docstrings (D-59, D-79, D-60, D-53)
 - [ ] 38.13-04-PLAN.md — Your Week + Settings wording (D-45, D-46, D-47, D-49, D-63)
 - [ ] 38.13-05-PLAN.md — Home session + empty states: stale search, Back, Reset to top, 38.9 empty states, tucked-away buttons (D-24, D-29, D-31, D-28, D-30, D-65)
 
