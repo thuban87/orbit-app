@@ -17,6 +17,11 @@ vi.mock("react-native", () => ({
   StyleSheet: { create: (styles: unknown) => styles },
   TextInput: "TextInput",
   View: "View",
+  // A Pixel 6 Pro window at default text (38.13 D-85 sizing input).
+  useWindowDimensions: () => ({ height: 891, width: 412, fontScale: 1 }),
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
 }));
 // 38.9 D-28: CategoryChoiceSheet wraps the shared OptionSheet, which renders
 // the Sheet, search field and list; its leaf primitives are mocked here.
@@ -295,10 +300,14 @@ describe("CategoryChoiceSheet", () => {
         }) as unknown as { props: Record<string, unknown> }
       ).props;
 
-    it("counts its own unfiltered rows, Uncategorized included", () => {
-      // 2 + Uncategorized = 3 rows; 7 + 1 = 8; 24 + 1 = 25.
+    it("sizes from its own unfiltered rows' height, Uncategorized included (D-85)", () => {
+      // 52dp rows + 117dp chrome against a 891dp window (40% 356, 60% 535):
+      // 2 + Uncategorized = 3 rows (273) compact; 4 + 1 = 5 rows (377, the
+      // fresh-install list) detail; 7 + 1 = 8 (533) detail; 24 + 1 expanded.
       expect(optionSheetProps(2, true).size).toBe("compact");
+      expect(optionSheetProps(4, true).size).toBe("detail");
       expect(optionSheetProps(7, true).size).toBe("detail");
+      expect(optionSheetProps(8, true).size).toBeUndefined();
       expect(optionSheetProps(24, true).size).toBeUndefined();
     });
 

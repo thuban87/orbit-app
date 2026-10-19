@@ -15,22 +15,164 @@
  * are listed by the caller through `selectorItems` (RG-030), not here.
  */
 import { CATEGORY_SEARCH_THRESHOLD } from "@/logic/category-logic";
+import { ICON_SIZE } from "@/theme/tokens/icon-size";
+import { SPACING } from "@/theme/tokens/spacing";
+import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import {
+  SHEET_BODY_PADDING_BOTTOM,
+  SHEET_BODY_PADDING_HORIZONTAL,
+  SHEET_HANDLE_BLOCK_HEIGHT,
+  SHEET_HEIGHT_PERCENT,
+} from "./sheet-contract";
+
+/*
+ * Option-sheet geometry (tunables; 38.13 D-85). `OptionSheet.tsx` lays its
+ * rows, section gap and search floor out from these values, so the sized-sheet
+ * prediction below reads the same numbers the render uses.
+ */
+/** A row's touch-target floor (dp). */
+export const OPTION_ROW_MIN_HEIGHT = 44;
+/** A row's vertical padding, each side (dp). */
+export const OPTION_ROW_PADDING_VERTICAL = SPACING.sm;
+/** A row's horizontal padding, each side (dp). */
+export const OPTION_ROW_PADDING_HORIZONTAL = SPACING.md;
+/** The space below every row, the last one included (dp). */
+export const OPTION_ROW_SPACING = SPACING.sm;
+/** Room a row keeps for the selected glyph and its gap (dp). */
+export const OPTION_ROW_GLYPH_RESERVE = ICON_SIZE.md + SPACING.sm;
+/** Gap between the heading, the search field and the list (dp). */
+export const OPTION_SHEET_SECTION_GAP = SPACING.md;
+/** The search field's floor (dp). */
+export const OPTION_SEARCH_MIN_HEIGHT = 44;
+/**
+ * The search field's predicted vertical padding, each side (dp): the field
+ * sets none, so Android's default text-field padding applies; this errs high.
+ */
+export const OPTION_SEARCH_PADDING_ESTIMATE = SPACING.md;
+/**
+ * Average glyph width as a share of the font size, used to predict when a row
+ * label wraps (deliberately wide, so a prediction errs toward a taller sheet).
+ */
+export const OPTION_LABEL_CHAR_WIDTH_RATIO = 0.6;
+/**
+ * Spare height the prediction keeps for hairline borders and rounding (dp),
+ * so a list that only just fits still opens with its last row whole.
+ */
+export const OPTION_SHEET_FIT_SLACK = SPACING.sm;
+
+/** Inputs to the sized-sheet prediction (38.13 D-71, D-78, D-85). */
+export interface OptionSheetFitInput {
+  /** The row labels, unfiltered (a search never resizes an open sheet). */
+  labels: readonly string[];
+  /** Whether the sheet shows its search field. */
+  searchable: boolean;
+  /** Window size in dp (`useWindowDimensions`). */
+  windowHeight: number;
+  windowWidth: number;
+  /** The OS text scale (`useWindowDimensions().fontScale`); AppText honours it. */
+  fontScale: number;
+  /** Bottom safe-area inset in dp; the Sheet pads its bottom edge by it. */
+  bottomInset: number;
+}
+
+function scaledLine(lineHeight: number, fontScale: number): number {
+  return Math.ceil(lineHeight * Math.max(1, fontScale));
+}
+
+/** Lines a row label is predicted to take at this width and text scale. */
+export function optionLabelLines(
+  label: string,
+  windowWidth: number,
+  fontScale: number,
+): number {
+  const available =
+    windowWidth -
+    2 * SHEET_BODY_PADDING_HORIZONTAL -
+    2 * OPTION_ROW_PADDING_HORIZONTAL -
+    OPTION_ROW_GLYPH_RESERVE;
+  const charWidth =
+    TYPOGRAPHY.body.size *
+    Math.max(1, fontScale) *
+    OPTION_LABEL_CHAR_WIDTH_RATIO;
+  if (available <= charWidth) return Math.max(1, label.length);
+  const perLine = Math.floor(available / charWidth);
+  return Math.max(1, Math.ceil(label.length / perLine));
+}
+
+/** Height one row takes in the list, its spacing below included (dp). */
+export function optionRowPitch(
+  label: string,
+  windowWidth: number,
+  fontScale: number,
+): number {
+  const text =
+    optionLabelLines(label, windowWidth, fontScale) *
+    scaledLine(TYPOGRAPHY.body.lineHeight, fontScale);
+  const row = Math.max(
+    OPTION_ROW_MIN_HEIGHT,
+    text + 2 * OPTION_ROW_PADDING_VERTICAL,
+  );
+  return row + OPTION_ROW_SPACING;
+}
+
+/** Everything a sized option sheet draws besides its rows (dp). */
+export function optionSheetChromeHeight({
+  searchable,
+  fontScale,
+  bottomInset,
+}: Pick<
+  OptionSheetFitInput,
+  "searchable" | "fontScale" | "bottomInset"
+>): number {
+  const heading = scaledLine(TYPOGRAPHY.heading.lineHeight, fontScale);
+  const search = searchable
+    ? Math.max(
+        OPTION_SEARCH_MIN_HEIGHT,
+        scaledLine(TYPOGRAPHY.body.lineHeight, fontScale) +
+          2 * OPTION_SEARCH_PADDING_ESTIMATE,
+      ) + OPTION_SHEET_SECTION_GAP
+    : 0;
+  return (
+    SHEET_HANDLE_BLOCK_HEIGHT +
+    heading +
+    OPTION_SHEET_SECTION_GAP +
+    search +
+    SHEET_BODY_PADDING_BOTTOM +
+    Math.max(0, bottomInset) +
+    OPTION_SHEET_FIT_SLACK
+  );
+}
+
+/** The full height a sized option sheet needs to show every row (dp). */
+export function optionSheetContentHeight(input: OptionSheetFitInput): number {
+  const rows = input.labels.reduce(
+    (sum, label) =>
+      sum + optionRowPitch(label, input.windowWidth, input.fontScale),
+    0,
+  );
+  return rows + optionSheetChromeHeight(input);
+}
+
+function sheetCap(variant: "compact" | "detail", windowHeight: number): number {
+  return (
+    (Number.parseFloat(SHEET_HEIGHT_PERCENT[variant]) / 100) * windowHeight
+  );
+}
 
 /**
- * Sized-to-content option sheets (38.13 D-71, D-78; this plan's tunables): a
- * caller that opts in opens its sheet at the size its list needs, decided when
- * it opens. Up to this many rows open at the compact size...
+ * The size a sized option sheet opens at (38.13 D-71, D-78, D-85; the bulk Set
+ * Category sheet only): the smallest of compact and detail whose height cap
+ * (`SHEET_HEIGHT_PERCENT`, against the window) holds every row and the sheet's
+ * chrome at the current text scale, decided when it opens. A list that fits
+ * neither opens expanded and scrolls. Every other option sheet stays expanded
+ * (ADR-204 L1).
  */
-export const OPTION_SHEET_COMPACT_MAX_ROWS = 5;
-/** ...up to this many at the detail size; longer lists open expanded. */
-export const OPTION_SHEET_DETAIL_MAX_ROWS = 10;
-
-/** The sheet size an opted-in option sheet opens at for `count` rows. */
 export function optionSheetVariantFor(
-  count: number,
+  input: OptionSheetFitInput,
 ): "compact" | "detail" | "expanded" {
-  if (count <= OPTION_SHEET_COMPACT_MAX_ROWS) return "compact";
-  if (count <= OPTION_SHEET_DETAIL_MAX_ROWS) return "detail";
+  const needed = optionSheetContentHeight(input);
+  if (needed <= sheetCap("compact", input.windowHeight)) return "compact";
+  if (needed <= sheetCap("detail", input.windowHeight)) return "detail";
   return "expanded";
 }
 

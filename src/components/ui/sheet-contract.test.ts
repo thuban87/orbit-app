@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { SPACING } from "@/theme/tokens/spacing";
 import {
   SHEET_BODY_FLEX,
+  SHEET_BODY_PADDING_BOTTOM,
+  SHEET_BODY_PADDING_HORIZONTAL,
   SHEET_BODY_SCROLLS,
   SHEET_HEIGHT_PERCENT,
   SHEET_VARIANTS,
@@ -79,8 +82,12 @@ describe("Sheet body scrolls at large text (D-32)", () => {
     expect(scroll).toContain("flexGrow: 0");
     expect(scroll).toContain("flexShrink: 1");
     const body = styleBlock("body");
-    expect(body).toContain("paddingHorizontal: SPACING.lg");
-    expect(body).toContain("paddingBottom: SPACING.lg");
+    // 38.13 D-85: the paddings live in sheet-contract so a sized sheet's
+    // height prediction reads the same values.
+    expect(body).toContain("paddingHorizontal: SHEET_BODY_PADDING_HORIZONTAL");
+    expect(body).toContain("paddingBottom: SHEET_BODY_PADDING_BOTTOM");
+    expect(SHEET_BODY_PADDING_HORIZONTAL).toBe(SPACING.lg);
+    expect(SHEET_BODY_PADDING_BOTTOM).toBe(SPACING.lg);
   });
 
   it("gives an opted-out non-expanded body a shrinkable View so the consumer's own scroll is bounded", () => {

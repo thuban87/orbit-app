@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { selectorItems } from "@/components/selector-a11y";
 import { CATEGORY_SEARCH_THRESHOLD } from "@/logic/category-logic";
 import {
-  OPTION_SHEET_COMPACT_MAX_ROWS,
-  OPTION_SHEET_DETAIL_MAX_ROWS,
+  type OptionSheetFitInput,
   optionKey,
+  optionRowPitch,
+  optionSheetChromeHeight,
+  optionSheetContentHeight,
   optionSheetModel,
   optionSheetVariantFor,
   shouldSearch,
@@ -170,26 +172,108 @@ describe("optionKey", () => {
   });
 });
 
-describe("optionSheetVariantFor (38.13 D-71, D-78: sized when it opens)", () => {
-  it("opens a short list compact, a medium list at detail, a long list expanded", () => {
-    expect(optionSheetVariantFor(3)).toBe("compact");
-    expect(optionSheetVariantFor(8)).toBe("detail");
-    expect(optionSheetVariantFor(25)).toBe("expanded");
+describe("optionSheetVariantFor (38.13 D-71, D-78, D-85: sized from row height)", () => {
+  // Test-phone windows in dp (review B-WR-02 arithmetic): Pixel 6 Pro and
+  // Pixel 3a, gesture-nav bottom inset about 24.
+  const PIXEL_6_PRO = { windowHeight: 891, windowWidth: 412 };
+  const PIXEL_3A = { windowHeight: 807, windowWidth: 393 };
+  const labels = (count: number, name = "Family") =>
+    Array.from({ length: count }, (_, i) => `${name} ${i + 1}`);
+  const sized = (
+    count: number,
+    over: Partial<OptionSheetFitInput> = {},
+  ): OptionSheetFitInput => ({
+    labels: labels(count),
+    searchable: false,
+    fontScale: 1,
+    bottomInset: 24,
+    ...PIXEL_6_PRO,
+    ...over,
+  });
+  const cap = (variant: "compact" | "detail", windowHeight: number) =>
+    (variant === "compact" ? 0.4 : 0.6) * windowHeight;
+
+  it("reads the render geometry: a 52dp row pitch and the sheet chrome at default text", () => {
+    // minHeight 44 (body line 24 + 2 x 8 padding = 40 < 44) plus 8 below.
+    expect(optionRowPitch("Family", 412, 1)).toBe(52);
+    // handle 24 + heading 25 + gap 12 + body padding 24 + inset 24 + slack 8.
+    expect(
+      optionSheetChromeHeight({
+        searchable: false,
+        fontScale: 1,
+        bottomInset: 24,
+      }),
+    ).toBe(117);
   });
 
-  it("switches exactly at the row thresholds", () => {
-    expect(OPTION_SHEET_COMPACT_MAX_ROWS).toBe(5);
-    expect(OPTION_SHEET_DETAIL_MAX_ROWS).toBe(10);
-    expect(optionSheetVariantFor(0)).toBe("compact");
-    expect(optionSheetVariantFor(OPTION_SHEET_COMPACT_MAX_ROWS)).toBe(
-      "compact",
+  it("opens the default 4 categories + Uncategorized at detail, where all 5 rows fit (B-WR-02)", () => {
+    // 5 x 52 + 117 = 377: over the 40% compact cap on both phones.
+    expect(optionSheetVariantFor(sized(5))).toBe("detail");
+    expect(optionSheetVariantFor(sized(5, PIXEL_3A))).toBe("detail");
+    expect(optionSheetContentHeight(sized(5))).toBeLessThanOrEqual(
+      cap("detail", PIXEL_6_PRO.windowHeight),
     );
-    expect(optionSheetVariantFor(OPTION_SHEET_COMPACT_MAX_ROWS + 1)).toBe(
-      "detail",
+  });
+
+  it("opens a short list compact when it really fits", () => {
+    expect(optionSheetVariantFor(sized(3))).toBe("compact");
+    expect(optionSheetVariantFor(sized(3, PIXEL_3A))).toBe("compact");
+    expect(optionSheetVariantFor(sized(0))).toBe("compact");
+  });
+
+  it("opens expanded (scrolling) when no sized sheet holds every row", () => {
+    // 9 x 52 + 117 = 585 > 60% of 891 (534.6).
+    expect(optionSheetVariantFor(sized(9))).toBe("expanded");
+    expect(optionSheetVariantFor(sized(25))).toBe("expanded");
+  });
+
+  it("always picks the smallest size whose cap holds every row", () => {
+    for (const phone of [PIXEL_6_PRO, PIXEL_3A]) {
+      for (const fontScale of [0.85, 1, 1.3, 2]) {
+        for (let count = 0; count <= 16; count += 1) {
+          const input = sized(count, { ...phone, fontScale });
+          const needed = optionSheetContentHeight(input);
+          const variant = optionSheetVariantFor(input);
+          const compact = cap("compact", phone.windowHeight);
+          const detail = cap("detail", phone.windowHeight);
+          if (variant === "compact")
+            expect(needed).toBeLessThanOrEqual(compact);
+          if (variant === "detail") {
+            expect(needed).toBeGreaterThan(compact);
+            expect(needed).toBeLessThanOrEqual(detail);
+          }
+          if (variant === "expanded") expect(needed).toBeGreaterThan(detail);
+        }
+      }
+    }
+  });
+
+  it("counts large text: the same list needs a bigger sheet at a higher font scale", () => {
+    expect(optionSheetVariantFor(sized(3))).toBe("compact");
+    expect(optionSheetVariantFor(sized(3, { fontScale: 2 }))).toBe("detail");
+    expect(optionRowPitch("Family", 412, 2)).toBe(48 + 16 + 8);
+  });
+
+  it("counts a long label that wraps as a taller row", () => {
+    const long = "A very long category name that will not fit on one line";
+    expect(optionRowPitch(long, 412, 1)).toBeGreaterThan(
+      optionRowPitch("Family", 412, 1),
     );
-    expect(optionSheetVariantFor(OPTION_SHEET_DETAIL_MAX_ROWS)).toBe("detail");
-    expect(optionSheetVariantFor(OPTION_SHEET_DETAIL_MAX_ROWS + 1)).toBe(
-      "expanded",
+  });
+
+  it("counts the search field when the list is searchable", () => {
+    expect(
+      optionSheetChromeHeight({
+        searchable: true,
+        fontScale: 1,
+        bottomInset: 0,
+      }),
+    ).toBeGreaterThan(
+      optionSheetChromeHeight({
+        searchable: false,
+        fontScale: 1,
+        bottomInset: 0,
+      }),
     );
   });
 });

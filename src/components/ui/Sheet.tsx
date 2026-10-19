@@ -42,7 +42,12 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { BaseOverlay, type OverlayLifecycle } from "./overlay-base";
 import {
   SHEET_BODY_FLEX,
+  SHEET_BODY_PADDING_BOTTOM,
+  SHEET_BODY_PADDING_HORIZONTAL,
   SHEET_BODY_SCROLLS,
+  SHEET_HANDLE_HEIGHT,
+  SHEET_HANDLE_PADDING_BOTTOM,
+  SHEET_HANDLE_PADDING_TOP,
   SHEET_HEIGHT_PERCENT,
   type SheetVariant,
   sheetKeyboardLayout,
@@ -183,17 +188,17 @@ const styles = StyleSheet.create({
   },
   handleWrap: {
     alignItems: "center",
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm,
+    paddingTop: SHEET_HANDLE_PADDING_TOP,
+    paddingBottom: SHEET_HANDLE_PADDING_BOTTOM,
   },
   handle: {
     width: 40,
-    height: 4,
+    height: SHEET_HANDLE_HEIGHT,
     borderRadius: RADII.pill,
   },
   body: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    paddingHorizontal: SHEET_BODY_PADDING_HORIZONTAL,
+    paddingBottom: SHEET_BODY_PADDING_BOTTOM,
   },
   expandedBody: { flex: 1 },
   // Content-sized until the percent cap, then shrinks and scrolls (D-32).

@@ -6,12 +6,16 @@
  * the rows to the one themed option sheet. `categoryChoiceSheetModel` stays
  * the tested policy seam.
  *
- * `sizeToContent` (38.13 D-71, D-78; the bulk Set Category sheet only): the
- * sheet opens at the size its own unfiltered rows need, Uncategorized
- * included: compact for a short list, detail for a medium one, and today's
- * expanded sheet for a long one. Without it, nothing changes.
+ * `sizeToContent` (38.13 D-71, D-78, D-85; the bulk Set Category sheet only):
+ * the sheet opens at the smallest size whose height holds its own unfiltered
+ * rows, Uncategorized included, computed from the row height at the current
+ * window size and text scale plus the sheet's chrome (`optionSheetVariantFor`):
+ * compact, then detail, else today's expanded sheet, which scrolls. Without
+ * it, nothing changes (ADR-204 L1 for every other caller).
  */
 import { useMemo } from "react";
+import { useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OptionSheet } from "@/components/ui/OptionSheet";
 import { optionSheetVariantFor } from "@/components/ui/option-sheet-logic";
 import {
@@ -118,9 +122,18 @@ export function CategoryChoiceSheet({
     [model.rows, getAccessibilityLabel],
   );
 
+  const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   // Decided from the unfiltered rows, so typing a search never resizes it.
   const variant = sizeToContent
-    ? optionSheetVariantFor(model.rows.length)
+    ? optionSheetVariantFor({
+        labels: model.rows.map((row) => row.name),
+        searchable: model.searchable,
+        windowHeight: window.height,
+        windowWidth: window.width,
+        fontScale: window.fontScale,
+        bottomInset: insets.bottom,
+      })
     : "expanded";
   const size = variant === "expanded" ? undefined : variant;
 

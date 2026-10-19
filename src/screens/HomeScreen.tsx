@@ -2745,8 +2745,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         selectedId={null}
         allowUncategorized
         title="Set category"
-        // 38.13 D-71 / D-78: opens at the bulk compact size, taller only
-        // when the category list needs it.
+        // 38.13 D-71 / D-78 / D-85: opens at the smallest sheet size that
+        // shows every row (computed from row height), else expanded.
         sizeToContent
         onRequestClose={() => {
           setCategoryPicker(null);

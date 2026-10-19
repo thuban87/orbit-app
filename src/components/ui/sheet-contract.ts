@@ -1,4 +1,6 @@
 /** Render-free Sheet variant contract, kept testable outside the RN runtime. */
+import { SPACING } from "@/theme/tokens/spacing";
+
 export const SHEET_VARIANTS = ["compact", "detail", "expanded"] as const;
 
 export type SheetVariant = (typeof SHEET_VARIANTS)[number];
@@ -10,6 +12,21 @@ export const SHEET_HEIGHT_PERCENT: Readonly<Record<SheetVariant, string>> =
     // Focused workflows need room for a scrollable editor plus reachable actions.
     expanded: "92%",
   });
+
+/**
+ * The Sheet's own chrome, shared with code that predicts a sheet's height
+ * (38.13 D-85: the sized bulk Set Category sheet). `Sheet.tsx` lays its drag
+ * handle and body out from these values, so a prediction cannot drift from
+ * the render.
+ */
+export const SHEET_HANDLE_PADDING_TOP = SPACING.md;
+export const SHEET_HANDLE_HEIGHT = 4;
+export const SHEET_HANDLE_PADDING_BOTTOM = SPACING.sm;
+/** Total height of the drag-handle block above the body. */
+export const SHEET_HANDLE_BLOCK_HEIGHT =
+  SHEET_HANDLE_PADDING_TOP + SHEET_HANDLE_HEIGHT + SHEET_HANDLE_PADDING_BOTTOM;
+export const SHEET_BODY_PADDING_HORIZONTAL = SPACING.lg;
+export const SHEET_BODY_PADDING_BOTTOM = SPACING.lg;
 
 /**
  * Compact and detail sheets size to their content; expanded workflows reserve

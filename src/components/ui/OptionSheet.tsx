@@ -14,7 +14,7 @@
  *   never depends on colour alone (38.4 RG-030): the row carries
  *   `accessibilityState.selected` and a filled `select` glyph in `onAccent`.
  * - A pick calls `onSelect` and then `onRequestClose`.
- * - Sized path (38.13 D-71, D-78): with `size` set the sheet opens at that
+ * - Sized path (38.13 D-71, D-78, D-85): with `size` set the sheet opens at that
  *   compact or detail size instead, as a content-sized sheet that opts out of
  *   the scroll body (`scrollBody={false}`), so its FlatList is the only scroll
  *   container and shrinks under the cap. Without `size` (every caller but the
@@ -33,6 +33,12 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { AppText } from "./AppText";
 import {
+  OPTION_ROW_MIN_HEIGHT,
+  OPTION_ROW_PADDING_HORIZONTAL,
+  OPTION_ROW_PADDING_VERTICAL,
+  OPTION_ROW_SPACING,
+  OPTION_SEARCH_MIN_HEIGHT,
+  OPTION_SHEET_SECTION_GAP,
   type OptionSheetOption,
   type OptionSheetRow,
   type OptionValue,
@@ -56,8 +62,9 @@ export interface OptionSheetProps<T extends OptionValue> {
   /** Copy shown when a search matches nothing. */
   emptyText?: (query: string) => string;
   /**
-   * Opens the sheet at this size, sized to its content (38.13 D-71). Absent →
-   * today's expanded sheet. A caller picks it from `optionSheetVariantFor`.
+   * Opens the sheet at this size, sized to its content (38.13 D-71, D-85).
+   * Absent → today's expanded sheet (ADR-204 L1). A caller picks it from
+   * `optionSheetVariantFor`, which predicts the height from the row geometry.
    */
   size?: "compact" | "detail";
   onSelect: (value: T) => void;
@@ -196,27 +203,28 @@ export function OptionSheet<T extends OptionValue>({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, gap: SPACING.md },
+  root: { flex: 1, gap: OPTION_SHEET_SECTION_GAP },
   // Sized path (D-71): content height until the sheet's cap, then the list
   // shrinks and scrolls (the opted-out Sheet body is a shrinkable View).
-  sizedRoot: { flexShrink: 1, minHeight: 0, gap: SPACING.md },
+  sizedRoot: { flexShrink: 1, minHeight: 0, gap: OPTION_SHEET_SECTION_GAP },
   sizedList: { flexGrow: 0, flexShrink: 1 },
   search: {
-    minHeight: 44,
+    minHeight: OPTION_SEARCH_MIN_HEIGHT,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: RADII.md,
     paddingHorizontal: SPACING.md,
   },
+  // The sized-sheet prediction (option-sheet-logic, D-85) reads these values.
   row: {
-    minHeight: 44,
+    minHeight: OPTION_ROW_MIN_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: RADII.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.sm,
+    paddingHorizontal: OPTION_ROW_PADDING_HORIZONTAL,
+    paddingVertical: OPTION_ROW_PADDING_VERTICAL,
+    marginBottom: OPTION_ROW_SPACING,
   },
   rowLabel: { flex: 1 },
 });
