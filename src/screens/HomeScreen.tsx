@@ -1320,6 +1320,21 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [],
   );
 
+  // 38.13 review A-IN-01: the claim an action holds while it reads what it
+  // applies to (before any write). The bar shows busy and disabled meanwhile,
+  // so a second tap is visibly unavailable rather than silently dropped;
+  // "Working…" still waits for a write (D-41).
+  const [bulkReadingClaim, setBulkReadingClaim] =
+    useState<BulkActionClaim | null>(null);
+  const readForBulkAction = useCallback(
+    <T,>(claim: BulkActionClaim, read: Promise<T>): Promise<T> => {
+      setBulkReadingClaim(claim);
+      return read.finally(() =>
+        setBulkReadingClaim((current) => (current === claim ? null : current)),
+      );
+    },
+    [],
+  );
   const tryAcquireBulkAction = useCallback(() => {
     const claim = bulkActionGateRef.current?.tryAcquire() ?? null;
     if (claim) bulkActionInputClaimRef.current = claim;
@@ -1528,7 +1543,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    void readSelectionLifecycle(getExecutor(), ids)
+    void readForBulkAction(claim, readSelectionLifecycle(getExecutor(), ids))
       .then((entries) => {
         // The selection ended (or the claim was released) during the read.
         if (bulkActionInputClaimRef.current !== claim) return;
@@ -1565,6 +1580,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     reportBulkFailure,
     selectedIds,
     tryAcquireBulkAction,
+    readForBulkAction,
   ]);
 
   // 38.13 D-75, D-77: removes every selected Bound favourite (read from the
@@ -1577,7 +1593,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    void readSelectionLifecycle(getExecutor(), ids)
+    void readForBulkAction(claim, readSelectionLifecycle(getExecutor(), ids))
       .then((entries) => {
         if (bulkActionInputClaimRef.current !== claim) return;
         const writeIds = bulkWriteIds(
@@ -1617,6 +1633,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     reportBulkFailure,
     selectedIds,
     tryAcquireBulkAction,
+    readForBulkAction,
   ]);
 
   // 38.11 D-82 (review V-01): the bulk bar's Snooze always opens the shared
@@ -1634,10 +1651,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     // 38.13 D-77 (ADR-233: no Snooze for Unbound people): only the selected
     // people the database classifies as Bound reach the sheet, its write and
     // its count (review R1-04).
-    void Promise.all([
-      readSelectionLifecycle(getExecutor(), ids),
-      readCurrentlySnoozedIds(getExecutor(), ids),
-    ])
+    void readForBulkAction(
+      claim,
+      Promise.all([
+        readSelectionLifecycle(getExecutor(), ids),
+        readCurrentlySnoozedIds(getExecutor(), ids),
+      ]),
+    )
       .then(([entries, snoozedIds]) => {
         // The selection ended during the read: nothing opens.
         if (bulkActionInputClaimRef.current !== claim) return;
@@ -1656,7 +1676,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         releaseBulkAction(claim);
         reportBulkFailure("open snooze", readError);
       });
-  }, [releaseBulkAction, reportBulkFailure, selectedIds, tryAcquireBulkAction]);
+  }, [
+    releaseBulkAction,
+    reportBulkFailure,
+    selectedIds,
+    tryAcquireBulkAction,
+    readForBulkAction,
+  ]);
 
   // 38.11 D-45 (review U-01, V-02): one bulk snooze/unsnooze write under the
   // shared sheet's settlement. The sheet stays open while it runs; success
@@ -1713,7 +1739,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    void listCategories(getExecutor())
+    void readForBulkAction(claim, listCategories(getExecutor()))
       .then((categories) => {
         const currentIds = getCurrentSelectionIds(
           useDashboardSelectionStore.getState(),
@@ -1733,7 +1759,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           onBulkOpenCategoryPicker,
         );
       });
-  }, [releaseBulkAction, reportBulkFailure, tryAcquireBulkAction]);
+  }, [
+    releaseBulkAction,
+    reportBulkFailure,
+    tryAcquireBulkAction,
+    readForBulkAction,
+  ]);
 
   const onBulkArchive = useCallback(() => {
     const claim = tryAcquireBulkAction();
@@ -2613,6 +2644,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         <BulkActionSurface
           selectedCount={selectionCount}
           pending={bulkActionPending}
+          reading={bulkReadingClaim !== null}
           selectAllLabel={applicability.selectAllLabel}
           availability={applicability}
           onExit={exitBulkSelection}

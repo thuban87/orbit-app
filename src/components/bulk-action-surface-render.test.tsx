@@ -401,6 +401,24 @@ describe("BulkActionSurface — only what applies is enabled (38.13 D-40, D-74, 
     expect(disabledOf(bar.find("bulk-action-favorite"))).toBe(true);
   });
 
+  it("while an action reads what it applies to, the buttons are busy and disabled, with no Working… (38.13 review A-IN-01; D-41)", () => {
+    const bar = mount({ reading: true });
+    for (const id of [
+      "bulk-action-quick-log",
+      "bulk-action-snooze",
+      "bulk-action-favorite",
+      "bulk-action-more",
+    ]) {
+      const button = bar.find(id);
+      expect(disabledOf(button)).toBe(true);
+      const state = button?.props.accessibilityState as
+        | { busy?: boolean }
+        | undefined;
+      expect(state?.busy).toBe(true);
+    }
+    expect(bar.find("dashboard-selection-working")).toBeUndefined();
+  });
+
   it("reads Deselect all when the host says so", () => {
     const bar = mount({ selectAllLabel: "Deselect all" });
     expect(textOf(bar.find("dashboard-selection-select-all"))).toBe(

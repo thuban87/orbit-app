@@ -220,3 +220,22 @@ describe("selection layout (D-72, D-76)", () => {
     expect(overlayHost).toBeGreaterThan(bar);
   });
 });
+
+describe("a bar action's pre-write read shows busy, never a silent drop (38.13 review A-IN-01)", () => {
+  it("Favorite, Remove from Favorites, Snooze and Set Category read under readForBulkAction", () => {
+    for (const name of [
+      "onBulkAddFavourites",
+      "onBulkRemoveFavourites",
+      "onBulkOpenSnoozePicker",
+      "onBulkOpenCategoryPicker",
+    ]) {
+      expect(bodyOf(name)).toMatch(/void readForBulkAction\(\s*claim,/);
+    }
+  });
+
+  it("the bar receives the reading state", () => {
+    expect(source).toMatch(
+      /<BulkActionSurface[\s\S]*?reading=\{bulkReadingClaim !== null\}/,
+    );
+  });
+});

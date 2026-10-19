@@ -33,6 +33,14 @@ export interface BulkActionSurfaceProps {
   selectedCount: number;
   /** A confirmed bulk write is running (D-41): "Working…" shows. */
   pending: boolean;
+  /**
+   * An action holds the bulk claim while it reads what it applies to, before
+   * any write (Favorite, Remove from Favorites, Snooze). The buttons are
+   * disabled and announce busy, so a second tap is not silently dropped, but
+   * "Working…" does not show: no write is running yet (D-41; 38.13 review
+   * A-IN-01). Default false.
+   */
+  reading?: boolean;
   /** "Select All" or "Deselect all" (D-40). */
   selectAllLabel: string;
   /**
@@ -68,6 +76,7 @@ type SheetRow = BarButton;
 export function BulkActionSurface({
   selectedCount,
   pending,
+  reading = false,
   selectAllLabel,
   availability,
   onExit,
@@ -94,9 +103,11 @@ export function BulkActionSurface({
     "dashboard-selection-bar",
     selectionMode && focused,
   );
-  // A running write disables every action; otherwise each follows its own
-  // applicability flag (D-40). Favorite always adds and never flips (D-74).
-  const enabledNow = (enabled: boolean) => enabled && !pending;
+  // A running write, or an action's pre-write read (A-IN-01), disables every
+  // action; otherwise each follows its own applicability flag (D-40).
+  // Favorite always adds and never flips (D-74).
+  const busy = pending || reading;
+  const enabledNow = (enabled: boolean) => enabled && !busy;
 
   const buttons: BarButton[] = [
     {
@@ -276,7 +287,7 @@ export function BulkActionSurface({
                 testID={`bulk-action-${button.id}`}
                 accessibilityRole="button"
                 accessibilityLabel={button.label}
-                accessibilityState={{ disabled, busy: pending }}
+                accessibilityState={{ disabled, busy }}
                 disabled={disabled}
                 onPress={button.onPress}
                 style={({ pressed }) => [
