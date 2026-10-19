@@ -134,6 +134,8 @@ export interface BirthdayCandidate {
   id: number;
   name: string;
   birthday: string;
+  /** The contact's photo, for the Digest Horizon birthday avatar (38.13 D-48). */
+  photo: string | null;
 }
 
 /**
@@ -657,7 +659,7 @@ export function listBirthdayCandidates(
   exec: SqlExecutor,
 ): Promise<BirthdayCandidate[]> {
   return exec.getAllAsync<BirthdayCandidate>(
-    `SELECT id, name, birthday
+    `SELECT id, name, birthday, photo
        FROM contacts
       WHERE archived_at IS NULL AND birthday IS NOT NULL`,
   );

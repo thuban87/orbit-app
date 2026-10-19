@@ -27,6 +27,8 @@ export interface HorizonSectionProps {
     id: number;
     name: string;
     birthday: string | null;
+    /** The avatar photo, carried by the birthday-candidate read (38.13 D-48). */
+    photo: string | null;
   }>[];
   /**
    * Everyone needing attention after Up Next's three, already deduplicated by
@@ -49,6 +51,7 @@ export function HorizonSection({
   onDrillThrough,
 }: HorizonSectionProps) {
   const { colors } = useTheme();
+  const neutralRing = ringVisual(null, colors);
   const overlookedPreview = previewWithOverflow(overlooked, PREVIEW_CAP);
   const never = neverContactedConditional(neverContactedCount);
   const neverPreview = previewWithOverflow(neverContactedRows, PREVIEW_CAP);
@@ -82,6 +85,25 @@ export function HorizonSection({
                   onPress={() => onOpenProfile(birthday.id)}
                   style={styles.row}
                 >
+                  {/* The same avatar treatment as every other Digest row, in
+                      the neutral ring (no status; 38.13 D-48). */}
+                  <View
+                    style={[
+                      styles.avatarRing,
+                      {
+                        borderColor: neutralRing.color,
+                        borderWidth: neutralRing.width,
+                        opacity: neutralRing.opacity,
+                      },
+                    ]}
+                  >
+                    <Avatar
+                      photo={birthday.contact.photo}
+                      name={birthday.name}
+                      contactId={birthday.id}
+                      size={40}
+                    />
+                  </View>
                   <AppText
                     numberOfLines={1}
                     ellipsizeMode="tail"
