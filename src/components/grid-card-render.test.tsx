@@ -192,10 +192,13 @@ describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
     return nodes[0]?.props.accessibilityLabel;
   }
 
-  it("List row announces the rendered search explanation and snippet after identity", () => {
+  // 38.13 D-51: in search mode the description reads only what is shown —
+  // the name and the match context; no hidden category, recency, favourite or
+  // status parts (the status glyph stays visible but is not announced here).
+  it("List row announces only the name and the rendered search context (D-51)", () => {
     const nodes = resolve(ListRow({ ...baseProps, searchResult }));
     expect(rootLabel(nodes)).toBe(
-      `${summary} 1 match · Memory · "Met at the climbing gym".`,
+      `Alex. 1 match · Memory · "Met at the climbing gym".`,
     );
   });
 
@@ -213,16 +216,82 @@ describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
     ).toBe(summary);
   });
 
-  it("List row name-only hit (no corpus result) announces the explanation alone", () => {
+  it("List row name-only hit (no corpus result) reads Name (D-37)", () => {
     const nodes = resolve(ListRow({ ...baseProps, searchResult: null }));
-    expect(rootLabel(nodes)).toBe(`${summary} 1 match.`);
+    expect(rootLabel(nodes)).toBe("Alex. Name.");
+    expect(
+      all(nodes).find(
+        (node) =>
+          node.props.testID === "dashboard-list-row-match-explanation-7",
+      )?.props.children,
+    ).toBe("Name");
   });
 
-  it("Grid card announces the rendered search context", () => {
+  it("Grid card announces only the name and the rendered search context (D-51)", () => {
     const nodes = resolve(GridCard({ ...baseProps, searchResult }));
     expect(rootLabel(nodes)).toBe(
-      `${summary} 1 match · Memory · "Met at the climbing gym".`,
+      `Alex. 1 match · Memory · "Met at the climbing gym".`,
     );
+  });
+
+  it("a name match hides the snippet that repeats the name (D-37)", () => {
+    const nameResult = {
+      contactId: 7,
+      score: 1,
+      totalMatchCount: 1,
+      matches: [
+        {
+          sourceKind: "identity" as const,
+          fieldLabel: "Name",
+          snippet: "Alex",
+          highlights: [{ start: 0, length: 4 }],
+          priority: 1,
+        },
+      ],
+    };
+    const list = resolve(ListRow({ ...baseProps, searchResult: nameResult }));
+    expect(rootLabel(list)).toBe("Alex. 1 match · Name.");
+    expect(
+      all(list).find(
+        (node) => node.props.testID === "dashboard-list-row-search-snippet-7",
+      ),
+    ).toBeUndefined();
+    const card = resolve(GridCard({ ...baseProps, searchResult: nameResult }));
+    expect(rootLabel(card)).toBe("Alex. 1 match · Name.");
+    const cardSnippet = all(card).find(
+      (node) => node.props.testID === "dashboard-grid-card-search-snippet-7",
+    );
+    expect(
+      all(cardSnippet ? [cardSnippet] : []).some(
+        (node) => node.type === "Text" && node.children.length > 0,
+      ),
+    ).toBe(false);
+  });
+
+  it("an identity match reads its own label (Phone), never Identity (D-37)", () => {
+    const phoneResult = {
+      contactId: 7,
+      score: 1,
+      totalMatchCount: 1,
+      matches: [
+        {
+          sourceKind: "identity" as const,
+          fieldLabel: "Phone",
+          snippet: "555 0100",
+          highlights: [{ start: 0, length: 3 }],
+          priority: 1,
+        },
+      ],
+    };
+    const nodes = all(
+      resolve(GridCard({ ...baseProps, searchResult: phoneResult })),
+    );
+    expect(
+      nodes.find(
+        (node) =>
+          node.props.testID === "dashboard-grid-card-match-explanation-7",
+      )?.props.children,
+    ).toBe("1 match · Phone");
   });
 
   it("Grid selection state still follows the context-bearing description", () => {
@@ -235,7 +304,7 @@ describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
       }),
     );
     expect(rootLabel(nodes)).toBe(
-      `${summary} 1 match · Memory · "Met at the climbing gym". Selected.`,
+      `Alex. 1 match · Memory · "Met at the climbing gym". Selected.`,
     );
   });
 

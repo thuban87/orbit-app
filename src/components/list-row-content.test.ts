@@ -1,12 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRowAccessibilityDescription,
+  buildSearchRowAccessibilityDescription,
   buildSearchRowContext,
   formatLine2,
   formatListRecency,
   formatMatchCategories,
   formatMatchExplanation,
+  formatSearchExplanation,
+  searchSnippetToShow,
 } from "@/components/list-row-content";
+import type {
+  DashboardSearchMatch,
+  DashboardSearchResult,
+  DashboardSearchSourceKind,
+} from "@/logic/dashboard-search-match";
+
+function match(
+  sourceKind: DashboardSearchSourceKind,
+  fieldLabel: string,
+  snippet = "",
+): DashboardSearchMatch {
+  return { sourceKind, fieldLabel, snippet, highlights: [], priority: 1 };
+}
+
+function kinds(...sourceKinds: DashboardSearchSourceKind[]) {
+  return sourceKinds.map((sourceKind) => match(sourceKind, "unused"));
+}
 
 describe("ListRow content", () => {
   const now = "2026-08-15 12:00:00";
@@ -36,11 +56,13 @@ describe("ListRow content", () => {
     expect(
       formatMatchExplanation(
         3,
-        formatMatchCategories([
-          "memory-or-custom-field",
-          "relationship",
-          "memory-or-custom-field",
-        ]),
+        formatMatchCategories(
+          kinds(
+            "memory-or-custom-field",
+            "relationship",
+            "memory-or-custom-field",
+          ),
+        ),
         "+2 more",
       ),
     ).toBe("3 matches · Memory, Relationship · +2 more");
@@ -48,15 +70,17 @@ describe("ListRow content", () => {
 
   it("labels the section kinds with their Things to Remember section names", () => {
     expect(
-      formatMatchExplanation(1, formatMatchCategories(["off-limits"])),
+      formatMatchExplanation(1, formatMatchCategories(kinds("off-limits"))),
     ).toBe("1 match · Off Limits");
     expect(
-      formatMatchCategories([
-        "last-talked-about",
-        "current-location",
-        "gift-idea",
-        "thought-of-them",
-      ]),
+      formatMatchCategories(
+        kinds(
+          "last-talked-about",
+          "current-location",
+          "gift-idea",
+          "thought-of-them",
+        ),
+      ),
     ).toEqual([
       "Last Talked About",
       "Current Location",
@@ -176,7 +200,7 @@ describe("ListRow content", () => {
     it("composes a search-mode context from the explanation and displayed snippet", () => {
       const explanation = formatMatchExplanation(
         2,
-        formatMatchCategories(["memory-or-custom-field"]),
+        formatMatchCategories(kinds("memory-or-custom-field")),
       );
       const context = buildSearchRowContext(explanation, "coffee in Lisbon");
       expect(context).toBe('2 matches · Memory · "coffee in Lisbon"');
@@ -193,5 +217,123 @@ describe("ListRow content", () => {
         '"snippet only"',
       );
     });
+  });
+});
+
+describe("search labels (38.13 D-37)", () => {
+  function result(
+    matches: DashboardSearchMatch[],
+    extra: Partial<DashboardSearchResult> = {},
+  ): DashboardSearchResult {
+    return {
+      contactId: 1,
+      score: 1,
+      matches,
+      totalMatchCount: matches.length,
+      ...extra,
+    };
+  }
+
+  it("a name-only match (null result) reads Name", () => {
+    expect(formatSearchExplanation(null)).toBe("Name");
+  });
+
+  it("an identity match reads its own field label, never Identity", () => {
+    expect(formatSearchExplanation(result([match("identity", "Phone")]))).toBe(
+      "1 match · Phone",
+    );
+    expect(formatSearchExplanation(result([match("identity", "Email")]))).toBe(
+      "1 match · Email",
+    );
+    expect(
+      formatSearchExplanation(result([match("identity", "Category")])),
+    ).toBe("1 match · Category");
+    expect(formatSearchExplanation(result([match("identity", "Name")]))).toBe(
+      "1 match · Name",
+    );
+  });
+
+  it("memory and note matches read their section labels", () => {
+    expect(
+      formatSearchExplanation(
+        result([
+          match("memory-or-custom-field", "Memory"),
+          match("note-or-body", "Note"),
+        ]),
+      ),
+    ).toBe("2 matches · Memory, Note");
+  });
+
+  it("keeps distinct labels and the more-matches label", () => {
+    expect(
+      formatSearchExplanation(
+        result(
+          [
+            match("identity", "Name"),
+            match("identity", "Phone"),
+            match("note-or-body", "Note"),
+          ],
+          { totalMatchCount: 5, moreMatchesLabel: "+2 more" },
+        ),
+      ),
+    ).toBe("5 matches · Name, Phone, Note · +2 more");
+  });
+
+  it("hides a snippet identical to the contact's name (ignoring case and surrounding spaces)", () => {
+    expect(searchSnippetToShow("Ann Lee", "ann lee")).toBeNull();
+    expect(searchSnippetToShow("  Ann Lee ", "Ann Lee")).toBeNull();
+    expect(searchSnippetToShow("likes jazz", "Ann Lee")).toBe("likes jazz");
+    expect(searchSnippetToShow(null, "Ann Lee")).toBeNull();
+    expect(searchSnippetToShow("   ", "Ann Lee")).toBeNull();
+  });
+});
+
+describe("search-mode description reads only what is shown (38.13 D-51)", () => {
+  it("names the person, then the shown context, with no hidden parts", () => {
+    const description = buildSearchRowAccessibilityDescription({
+      name: "Ann",
+      unbound: false,
+      context: '1 match · Note · "jazz"',
+    });
+    expect(description).toBe('Ann. 1 match · Note · "jazz".');
+    for (const hidden of [
+      "No category",
+      "Friend",
+      "Yesterday",
+      "No interactions yet",
+      "favorite",
+      "Favorite",
+      "Stable",
+      "Never Contacted",
+    ]) {
+      expect(description).not.toContain(hidden);
+    }
+  });
+
+  it("adds the Unbound marker when it is shown", () => {
+    expect(
+      buildSearchRowAccessibilityDescription({
+        name: "Ann",
+        unbound: true,
+        context: "Name",
+      }),
+    ).toBe("Ann. Unbound. Name.");
+  });
+
+  it("drops an empty context and keeps terminal punctuation single", () => {
+    expect(
+      buildSearchRowAccessibilityDescription({
+        name: "Ann",
+        unbound: false,
+        context: null,
+      }),
+    ).toBe("Ann.");
+    expect(
+      buildSearchRowAccessibilityDescription({
+        name: "Ann",
+        unbound: false,
+        context: '1 match · Note · "so it goes…"',
+      }),
+    ).toBe('Ann. 1 match · Note · "so it goes…".');
   });
 });

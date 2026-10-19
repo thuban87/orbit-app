@@ -54,6 +54,7 @@ function recordingSinks() {
       calls.filter(([n]) => n === name).map(([, v]) => v),
     sinks: {
       setRows: sink("rows"),
+      setSearchTerm: sink("searchTerm"),
       setLine3: sink("line3"),
       setSearchMatches: sink("searchMatches"),
       setListNow: sink("listNow"),
@@ -80,6 +81,7 @@ function okOutcome(
     counts: { live: label === "B" ? 2 : 1 },
     populationCounts: { favourites: label === "B" ? 20 : 10 },
     fadeStart: label === "B" ? 0 : 1,
+    searchTerm: `${label}-term`,
   };
 }
 
@@ -216,6 +218,7 @@ describe("publishDashboardRead", () => {
     expect(published).toBe(true);
     expect(rec.names()).toEqual([
       "rows",
+      "searchTerm",
       "line3",
       "searchMatches",
       "listNow",
@@ -236,11 +239,12 @@ describe("publishDashboardRead", () => {
     const rec = recordingSinks();
     publishDashboardRead({
       token: 1,
-      outcome: { kind: "error" },
+      outcome: { kind: "error", searchTerm: "jazz" },
       isCurrent: () => true,
       sinks: rec.sinks,
     });
     expect(rec.valuesOf("rows")).toEqual([[]]);
+    expect(rec.valuesOf("searchTerm")).toEqual(["jazz"]);
     expect(rec.valuesOf("error")).toEqual([true]);
     expect(rec.valuesOf("refreshing")).toEqual([false]);
     expect(rec.valuesOf("initialLoad")).toEqual([false]);
@@ -249,6 +253,55 @@ describe("publishDashboardRead", () => {
     expect(rec.valuesOf("listNow")).toEqual([]);
     expect(rec.valuesOf("fadeStart")).toEqual([]);
     expect(rec.valuesOf("generation")).toEqual([]);
+  });
+
+  it("publishes the ok outcome's search term exactly once, with the rows (D-44)", () => {
+    const rec = recordingSinks();
+    publishDashboardRead({
+      token: 1,
+      outcome: { ...okOutcome("A"), searchTerm: "jazz" },
+      isCurrent: () => true,
+      sinks: rec.sinks,
+    });
+    expect(rec.valuesOf("searchTerm")).toEqual(["jazz"]);
+    expect(rec.valuesOf("rows")).toHaveLength(1);
+    // Same publication: the term lands right beside the rows.
+    const names = rec.names();
+    expect(names.indexOf("searchTerm")).toBe(names.indexOf("rows") + 1);
+  });
+
+  it("publishes a failed read's term too, so 'Searching…' cannot stick (review R1-15)", () => {
+    const rec = recordingSinks();
+    let published = "";
+    const live = "jazz";
+    const sinks = {
+      ...rec.sinks,
+      setSearchTerm: (term: string) => {
+        rec.calls.push(["searchTerm", term]);
+        published = term;
+      },
+    };
+    publishDashboardRead({
+      token: 1,
+      outcome: { kind: "error", searchTerm: live },
+      isCurrent: () => true,
+      sinks,
+    });
+    expect(rec.valuesOf("searchTerm")).toEqual([live]);
+    expect(rec.valuesOf("error")).toEqual([true]);
+    // HomeScreen's `searching` = live input !== published term.
+    expect(live !== published).toBe(false);
+  });
+
+  it("a stale token publishes no search term", () => {
+    const rec = recordingSinks();
+    publishDashboardRead({
+      token: 1,
+      outcome: { kind: "error", searchTerm: "jazz" },
+      isCurrent: () => false,
+      sinks: rec.sinks,
+    });
+    expect(rec.valuesOf("searchTerm")).toEqual([]);
   });
 
   it("calls NO sink for a stale token", () => {
@@ -299,7 +352,7 @@ function harness() {
           try {
             outcome = await d.promise;
           } catch {
-            outcome = { kind: "error" };
+            outcome = { kind: "error", searchTerm: "" };
           }
           publishDashboardRead({
             token,
