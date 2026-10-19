@@ -776,3 +776,43 @@ describe("Card width and one-line recency (38.13 D-32, D-33)", () => {
     );
   });
 });
+
+describe("Unbound cards with no interactions (38.13 D-83, ADR-233)", () => {
+  it("an Unbound card with no interactions reads No contact logged on one line and in its description", () => {
+    const nodes = resolve(
+      GridCard({
+        ...baseProps,
+        lastContact: null,
+        status: null,
+        unbound: true,
+      }),
+    );
+    const recency = all(nodes).find(
+      (node) => node.props.testID === "dashboard-grid-card-recency-7",
+    );
+    expect(recency?.props.children).toBe("No contact logged");
+    expect(recency?.props.numberOfLines).toBe(1);
+    const description = String(nodes[0]?.props.accessibilityLabel);
+    expect(description).toContain("No contact logged");
+    expect(description).not.toContain("Never Contacted");
+    expect(description).not.toContain("No interactions yet");
+  });
+
+  it("a Bound card with no interactions keeps Never Contacted (D-33)", () => {
+    const nodes = resolve(GridCard({ ...baseProps, lastContact: null }));
+    const recency = all(nodes).find(
+      (node) => node.props.testID === "dashboard-grid-card-recency-7",
+    );
+    expect(recency?.props.children).toBe("Never Contacted");
+  });
+
+  it("an Unbound card with a logged interaction keeps its recency", () => {
+    const nodes = resolve(
+      GridCard({ ...baseProps, status: null, unbound: true }),
+    );
+    const recency = all(nodes).find(
+      (node) => node.props.testID === "dashboard-grid-card-recency-7",
+    );
+    expect(recency?.props.children).toBe("Yesterday");
+  });
+});

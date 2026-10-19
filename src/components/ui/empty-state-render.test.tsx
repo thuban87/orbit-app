@@ -113,6 +113,47 @@ describe("empty-state consumers (D-20, D-71)", () => {
     expect(home.slice(opening, start)).toMatch(/^<EmptyState\s*$/);
   });
 
+  // 38.13 D-82 (38.9 D-20/D-71 one-action empty state): each empty
+  // population offers "Show Active Contacts", which writes the Active
+  // population ([]) through the store's population setter, keeping filters.
+  it.each([
+    ["dashboard-empty-birthdays", "birthdaysEmptyCopy"],
+    ["dashboard-empty-not-contacted", "notContactedEmptyCopy"],
+    ["dashboard-empty-snoozed", "snoozedEmptyCopy"],
+  ])(
+    "Contacts %s offers one action, Show Active Contacts (D-82)",
+    (testID, copy) => {
+      const home = read("src/screens/HomeScreen.tsx");
+      const start = home.indexOf(`testID="${testID}"`);
+      const region = home.slice(start, home.indexOf("/>", start));
+      expect(region.match(/action=/g)).toHaveLength(1);
+      expect(region).toContain(`label: ${copy}.actionLabel`);
+      expect(region).toContain("onPress: onShowActiveContacts");
+    },
+  );
+
+  it("Show Active Contacts writes [] through setPopulations and reports a failure with Retry (D-82)", () => {
+    const home = read("src/screens/HomeScreen.tsx");
+    expect(home).toMatch(
+      /const onShowActiveContacts = useCallback\(async \(\) => \{\s*try \{\s*await useDashboardQueryStore\s*\.getState\(\)\s*\.setPopulations\(getExecutor\(\), \[\]\);/,
+    );
+    const start = home.indexOf("const onShowActiveContacts = useCallback(");
+    const body = home.slice(start, home.indexOf("}, []);", start));
+    expect(body).toContain('kind: "error"');
+    expect(body).toContain('label: "Retry"');
+    expect(body).toContain("void onShowActiveContacts();");
+    expect(body).not.toContain("setFilters");
+    expect(body).not.toContain("setPopulationsAndFilters");
+  });
+
+  it("Contacts filter-empty keeps only Clear filters (D-28, D-82)", () => {
+    const home = read("src/screens/HomeScreen.tsx");
+    const start = home.indexOf('testID="dashboard-empty-filter"');
+    const region = home.slice(start, home.indexOf("/>", start));
+    expect(region).not.toContain("onShowActiveContacts");
+    expect(region.match(/onPress:/g)).toHaveLength(1);
+  });
+
   it("Contacts filter-empty offers Clear filters that clears the filters (D-28)", () => {
     const home = read("src/screens/HomeScreen.tsx");
     const start = home.indexOf('testID="dashboard-empty-filter"');

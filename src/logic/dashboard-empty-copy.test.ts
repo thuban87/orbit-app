@@ -71,7 +71,7 @@ describe("populationEmptyCopy (D-30)", () => {
     );
   });
 
-  it("every population uses a registered icon and no action", () => {
+  it("every population uses a registered icon", () => {
     for (const population of [
       "birthdays",
       "not-contacted",
@@ -79,7 +79,18 @@ describe("populationEmptyCopy (D-30)", () => {
     ] as const) {
       const copy = populationEmptyCopy(population);
       expect(copy.icon in ICON_REGISTRY).toBe(true);
-      expect(copy.actionLabel).toBeUndefined();
+    }
+  });
+
+  it("every population offers one action, Show Active Contacts (38.13 D-82)", () => {
+    for (const population of [
+      "birthdays",
+      "not-contacted",
+      "snoozed",
+    ] as const) {
+      expect(populationEmptyCopy(population).actionLabel).toBe(
+        "Show Active Contacts",
+      );
     }
   });
 });
