@@ -195,6 +195,21 @@ export function selectYourWeekDay(
 }
 
 /**
+ * A day tap (38.13 D-45): tapping the day that is already selected closes it
+ * (selection cleared; the caller retires the outstanding day read); any other
+ * tap selects that day and the caller reads it. PURE.
+ */
+export function toggleYourWeekDay(
+  state: YourWeekControllerState,
+  date: string,
+): { state: YourWeekControllerState; action: "open" | "close" } {
+  if (state.selectedDay === date) {
+    return { state: selectYourWeekDay(state, null), action: "close" };
+  }
+  return { state: selectYourWeekDay(state, date), action: "open" };
+}
+
+/**
  * Selected-day detail (38.3 D-16; reliability-testing/AUD-REL-014; closes
  * Phase 38 WR-01). A pending or failed read is never shown as "No activity":
  * only `loaded` with zero rows is a truthful empty day.
@@ -259,6 +274,23 @@ export function directDateCounts(
     if (counts.has(row.d)) counts.set(row.d, row.n);
   }
   return counts;
+}
+
+/**
+ * Whether a held week survives a failed period read (38.13 D-49 with 38.3
+ * review B-WR-06 kept). A period change keeps the old week on screen until the
+ * new read lands, so a failure can arrive while the held week belongs to a
+ * DIFFERENT period (the new period's read, or a rollback read while the
+ * abandoned period's week is held). Only a held week of the CURRENT period
+ * stays, under the "Couldn't refresh" notice; otherwise the caller drops it
+ * and the error body shows. The reader fails only a current-generation read,
+ * so `currentPeriod` is that read's period. PURE.
+ */
+export function heldWeekSurvivesFailure(
+  heldPeriod: YourWeekPeriod | null,
+  currentPeriod: YourWeekPeriod,
+): boolean {
+  return heldPeriod !== null && heldPeriod === currentPeriod;
 }
 
 export interface YourWeekPresentationInput {

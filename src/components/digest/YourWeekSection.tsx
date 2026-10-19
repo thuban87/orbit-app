@@ -8,14 +8,15 @@ import {
   createYourWeekPeriodReader,
   directDateCounts,
   failDayRead,
+  heldWeekSurvivesFailure,
   initialYourWeekState,
   persistYourWeekPeriodAccepted,
   persistYourWeekPeriodRejected,
   resolveYourWeekRefreshPeriod,
   retainYourWeekDay,
-  selectYourWeekDay,
   settleDayRead,
   startDayRead,
+  toggleYourWeekDay,
   type YourWeekControllerState,
   type YourWeekDayDetail,
   type YourWeekPeriodReader,
@@ -60,6 +61,8 @@ const EMPTY_METRICS: YourWeekMetrics = {
 };
 
 interface LoadedWeek {
+  /** The period this week was read for (38.13 D-49 stale-body rule). */
+  period: YourWeekPeriod;
   window: HistoryWindow;
   metrics: YourWeekMetrics;
   counts: Map<string, number>;
@@ -107,52 +110,6 @@ export function YourWeekSection({
     setDayDetail(next);
   }, []);
 
-  // ONE request authority for every period read (refresh signal, toggle,
-  // rollback): the most recently begun read wins; the generation check inside
-  // the reader keeps its period-intent role.
-  const readerRef = useRef<YourWeekPeriodReader<LoadedWeek> | null>(null);
-  if (readerRef.current === null) {
-    readerRef.current = createYourWeekPeriodReader<LoadedWeek>({
-      getState: () => controllerRef.current,
-      accept: (state, week) => {
-        commitController(state);
-        setLoaded(week);
-        setError(false);
-      },
-      fail: (cause) => {
-        Logger.error(LOG_SCOPE, "failed to load Your Week", cause);
-        setError(true);
-      },
-    });
-  }
-  const reader = readerRef.current;
-  useEffect(() => () => reader.invalidate(), [reader]);
-
-  const loadPeriod = useCallback(
-    (period: YourWeekPeriod, generation: number, window?: HistoryWindow) => {
-      const target =
-        window ??
-        buildYourWeekWindow(
-          period,
-          formatLocalDate(new Date()),
-          resolveFirstWeekday(),
-        );
-      return reader.load(generation, async () => {
-        const exec = getExecutor();
-        const [metrics, rows] = await Promise.all([
-          readYourWeekMetrics(exec, target.start, target.end),
-          readYourWeekDateCounts(exec, target.start, target.end),
-        ]);
-        return {
-          window: target,
-          metrics,
-          counts: directDateCounts(target, rows),
-        };
-      });
-    },
-    [reader],
-  );
-
   // Day-detail reads (38.3 D-16, closes Phase 38 WR-01). A tap, Retry and a
   // refresh that retained the day ALL start a fresh request here, so the stale
   // guard is request-scoped: an older read for any date — including the same
@@ -193,6 +150,75 @@ export function YourWeekSection({
     dayAuthority.invalidate();
     commitDayDetail(clearDayDetail());
   }, [commitDayDetail, dayAuthority]);
+
+  // ONE request authority for every period read (refresh signal, toggle,
+  // rollback): the most recently begun read wins; the generation check inside
+  // the reader keeps its period-intent role. Created below `clearDay`, which
+  // its accept callback calls.
+  const readerRef = useRef<YourWeekPeriodReader<LoadedWeek> | null>(null);
+  if (readerRef.current === null) {
+    readerRef.current = createYourWeekPeriodReader<LoadedWeek>({
+      getState: () => controllerRef.current,
+      // A day tapped on the held heatmap during a period switch survives only
+      // while it is a real day in the new window; otherwise it is cleared and
+      // its outstanding read retired (38.13 D-49, D-45). On the refresh path
+      // the effect already retained against this same window (idempotent).
+      accept: (state, week) => {
+        const retained = commitController(
+          retainYourWeekDay(state, week.window),
+        );
+        if (state.selectedDay !== null && retained.selectedDay === null) {
+          clearDay();
+        }
+        setLoaded(week);
+        setError(false);
+      },
+      // A period switch holds the old week until the new read lands (D-49),
+      // so a failure may arrive while the held week is another period's. Only
+      // a held week of the current period stays, under the refresh notice
+      // (38.3 B-WR-06); otherwise it is dropped and the error body shows. The
+      // reader fails only a current-generation read, so the controller's
+      // period is the failed read's period.
+      fail: (cause) => {
+        Logger.error(LOG_SCOPE, "failed to load Your Week", cause);
+        setError(true);
+        const currentPeriod = controllerRef.current.period;
+        setLoaded((held) =>
+          heldWeekSurvivesFailure(held?.period ?? null, currentPeriod)
+            ? held
+            : null,
+        );
+      },
+    });
+  }
+  const reader = readerRef.current;
+  useEffect(() => () => reader.invalidate(), [reader]);
+
+  const loadPeriod = useCallback(
+    (period: YourWeekPeriod, generation: number, window?: HistoryWindow) => {
+      const target =
+        window ??
+        buildYourWeekWindow(
+          period,
+          formatLocalDate(new Date()),
+          resolveFirstWeekday(),
+        );
+      return reader.load(generation, async () => {
+        const exec = getExecutor();
+        const [metrics, rows] = await Promise.all([
+          readYourWeekMetrics(exec, target.start, target.end),
+          readYourWeekDateCounts(exec, target.start, target.end),
+        ]);
+        return {
+          period,
+          window: target,
+          metrics,
+          counts: directDateCounts(target, rows),
+        };
+      });
+    },
+    [reader],
+  );
 
   // Digest-owned refresh (RG-026): on mount and on every `refreshSignal`
   // change. Keeps the chosen period and re-windows to today (D-15), adopting a
@@ -250,7 +276,8 @@ export function YourWeekSection({
       const next = beginYourWeekPeriodWrite(controllerRef.current, period);
       commitController(next);
       clearDay();
-      setLoaded(null);
+      // The current week stays on screen until the new period's read lands,
+      // so the page does not jump (38.13 D-49).
       void loadPeriod(period, next.generation);
       try {
         await updateAppSettings(
@@ -268,7 +295,6 @@ export function YourWeekSection({
           next.generation,
         );
         commitController(rolledBack);
-        setLoaded(null);
         clearDay();
         void loadPeriod(rolledBack.period, rolledBack.generation);
       }
@@ -276,12 +302,19 @@ export function YourWeekSection({
     [clearDay, commitController, loadPeriod],
   );
 
+  // Tapping the selected day again closes it and retires its read (38.13
+  // D-45); any other tap selects and reads that day.
   const onSelectDay = useCallback(
     async (date: string) => {
-      commitController(selectYourWeekDay(controllerRef.current, date));
+      const toggled = toggleYourWeekDay(controllerRef.current, date);
+      commitController(toggled.state);
+      if (toggled.action === "close") {
+        clearDay();
+        return;
+      }
       await loadDay(date);
     },
-    [commitController, loadDay],
+    [clearDay, commitController, loadDay],
   );
 
   // Retry re-reads the selected day with a NEW request (same date, new token).
