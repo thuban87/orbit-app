@@ -1,6 +1,6 @@
 /** Shared, renderer-independent Dashboard query state and closed SQL fragments. */
 
-import { PROGRESS_SQL, STABLE_MAX } from "@/db/status";
+import { NEEDS_ATTENTION_WHERE } from "@/db/status";
 
 export const DASHBOARD_POPULATIONS = [
   "favourites",
@@ -171,8 +171,10 @@ export function buildFilterWhere(
   }
 
   if (selections("needs-attention").includes(NEEDS_ATTENTION_VALUE)) {
-    groups.push(`(${PROGRESS_SQL}) >= ${STABLE_MAX}
-     AND (c.snooze_until IS NULL OR date(c.snooze_until) <= date('now','localtime'))`);
+    // One shared predicate (38.13 D-59): it carries the status cadence
+    // precondition, so needs-attention can never admit an Unbound person, even
+    // in a search scope that admits Unbound rows (All Contacts + a term).
+    groups.push(NEEDS_ATTENTION_WHERE);
   }
 
   // The gravity family is intentionally recognized but handled after the SQL

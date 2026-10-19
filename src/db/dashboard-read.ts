@@ -21,10 +21,11 @@
  * HIGH-1 (never-contacted status): STATUS_SQL has NO NULL branch — over a NULL
  * `last_contact` every comparison is false → its ELSE buckets the row as the
  * literal 'stable' (status.ts:67-73). Every card projection here therefore wraps
- * status/progress in `CASE WHEN c.last_contact IS NULL THEN NULL ELSE (…) END`,
- * so a never-contacted row — surfaced by listDashboardPopulation's not-contacted
- * population, the favourites archived-only relaxation, or the term-widened search
- * — always reads status=null / progress=null, never 'stable'. This mirrors the
+ * status/progress in `CASE WHEN c.tracking_enabled = 0 OR c.last_contact IS NULL
+ * THEN NULL ELSE (…) END`, so a never-contacted or Unbound row — surfaced by
+ * listDashboardPopulation's not-contacted population, the Favorites population
+ * (which keeps never-contacted favourites), or the term-widened search — always
+ * reads status=null / progress=null, never 'stable'. This mirrors the
  * getContactStatus guard (contact-status-read.ts:70-80).
  *
  * TIMEZONE (matches status.ts): only `now` is converted to local
@@ -37,10 +38,18 @@
  * bare `date()`. The snoozed count + the 'snoozed' filter segment are LEGITIMATELY
  * empty until Phase 11 ships that writer — this is not a bug.
  *
- * SEARCH SCOPE (FLAGGED owner decision A3): when a term is present the
- * never-contacted + snooze exclusions RELAX to archived-only, so search finds
- * anyone non-archived (incl. never-contacted people saved via capture). The
- * default (no-term) list keeps the full exclusion.
+ * SEARCH SCOPE (38.13 D-53; one seam, `searchScope`): with a term,
+ *   - on the implicit Active default (owner decision A3) the never-contacted and
+ *     snooze exclusions relax, so search finds every non-archived Bound person
+ *     (incl. never-contacted people saved via capture);
+ *   - on exactly All Contacts it finds every non-archived person, Unbound
+ *     included (D-59);
+ *   - on exactly Never Contacted it keeps that population's own scope, which
+ *     includes never-contacted Unbound people when the D-10 / ADR-062 opt-in is
+ *     on (D-79);
+ *   - on every other population or mix it keeps that population's Bound scope.
+ * With no term nothing widens: every list, population and count stays Bound
+ * (ADR-093), except the Never Contacted population's own opt-in.
  *
  * INJECTION (T-08-01/02): every query is a static string; the ONLY interpolated
  * values are closed code-constants (the status/threshold fragments and the
@@ -347,17 +356,37 @@ async function applyPopulationPostProcessing(
 }
 
 /**
- * Search intentionally widens only the implicit Active scope (A3). Keeping the
- * construction here makes the term-bearing name read and the term-free
- * corpus eligibility read provably share the exact same population boundary.
+ * The single search-scope seam. Keeping the construction here makes the
+ * term-bearing name read and the term-free corpus eligibility read provably
+ * share the exact same population boundary. A search only narrows the list
+ * being searched, except for these two widenings:
+ *   - `[]` (the implicit Active default, A3): non-archived Bound people,
+ *     never-contacted and snoozed included.
+ *   - exactly `["all-contacts"]` (38.13 D-59): every non-archived person,
+ *     Unbound included.
+ * Every other selection keeps `composition.where.sql`: exactly
+ * `["not-contacted"]` keeps NOT_CONTACTED_INCLUSIVE_WHERE, so the search finds
+ * the never-contacted Unbound people that population lists when the D-10 /
+ * ADR-062 opt-in is on (D-79); every other population and every mix stays
+ * Bound-only (D-59).
+ *
+ * Both callers always spread `composition.where.params`. That is safe only
+ * because `[]` and `["all-contacts"]` build no params (RESEARCH Pitfall 2), so
+ * never extend a widening to a param-bearing population such as birthdays.
+ * The returned strings are closed constants, never user input (T-08-01/02).
  */
 function searchScope(
   query: DashboardQueryState,
   composition: PopulationReadComposition,
 ): string {
-  return query.populations.length === 0
-    ? `c.archived_at IS NULL\n       AND ${DASHBOARD_BOUND_WHERE}`
-    : composition.where.sql;
+  if (query.populations.length === 0) {
+    return `c.archived_at IS NULL\n       AND ${DASHBOARD_BOUND_WHERE}`;
+  }
+  const selected = [...new Set(query.populations)];
+  if (selected.length === 1 && selected[0] === "all-contacts") {
+    return "c.archived_at IS NULL";
+  }
+  return composition.where.sql;
 }
 
 export async function listDashboardPopulation(
@@ -392,9 +421,16 @@ export async function listDashboardPopulation(
 }
 
 /**
- * Population-aware Dashboard search. The A3 owner decision applies only to the
- * implicit Active default: a present term relaxes its never-contacted/snooze
- * exclusions to archived-only, while an explicit population keeps its own scope.
+ * Population-aware Dashboard search (scope set by `searchScope`, 38.13 D-53):
+ *   - a term on the implicit Active default widens to non-archived Bound
+ *     people, never-contacted and snoozed included (A3);
+ *   - a term on exactly All Contacts widens to every non-archived person,
+ *     Unbound included (D-59);
+ *   - a term on exactly Never Contacted keeps that population's own scope, which
+ *     includes never-contacted Unbound people when the D-10 / ADR-062 opt-in is
+ *     on (D-79: a search only narrows the list being searched);
+ *   - every other population, and every mix, keeps its own Bound scope.
+ * No term never widens anything.
  */
 export async function listDashboardSearch(
   exec: SqlExecutor,
@@ -440,7 +476,8 @@ export async function listDashboardSearch(
 }
 
 /**
- * Term-free, A3-aware search eligibility. This is deliberately a sibling of
+ * Term-free search eligibility over the same `searchScope` as
+ * `listDashboardSearch` (A3, D-59, D-79). This is deliberately a sibling of
  * `listDashboardSearch`: corpus search needs every structurally eligible row,
  * including memory-only matches, while retaining population/filter/gravity
  * post-processing and Dashboard order as its tie-break universe.

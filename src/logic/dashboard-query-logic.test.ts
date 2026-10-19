@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  NEEDS_ATTENTION_WHERE,
+  STATUS_CADENCE_PRECONDITION,
+} from "@/db/status";
+import {
   ACTIVE_SEGREGATION_WHERE,
   buildFilterWhere,
   buildPopulationWhere,
@@ -22,6 +26,24 @@ describe("dashboard query logic", () => {
     expect(where.sql).toContain("AND");
     expect(where.sql).toContain("snooze_until IS NULL");
     expect(where.params).toEqual([1, 2, "Charger", "Neutral"]);
+  });
+
+  it("routes needs-attention through the shared predicate with the cadence precondition (D-59)", () => {
+    const where = buildFilterWhere({ "needs-attention": ["on"] });
+
+    expect(where).toEqual({ sql: `(${NEEDS_ATTENTION_WHERE})`, params: [] });
+    expect(NEEDS_ATTENTION_WHERE).toContain(STATUS_CADENCE_PRECONDITION);
+    expect(where.sql).toContain("tracking_enabled = 1");
+    expect(where.sql).toContain("interval_days IS NOT NULL");
+  });
+
+  it("builds no params for exactly All Contacts, the only widened search population (Pitfall 2)", () => {
+    expect(buildPopulationWhere(["all-contacts"]).params).toEqual([]);
+    expect(
+      buildPopulationWhere(["all-contacts", "all-contacts"], {
+        birthdayIds: [7, 8],
+      }).params,
+    ).toEqual([]);
   });
 
   it("keeps gravity out of SQL and drops unknown restored filter tokens", () => {

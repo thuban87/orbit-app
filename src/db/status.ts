@@ -64,6 +64,20 @@ export const STATUS_CADENCE_PRECONDITION = `tracking_enabled = 1
      AND last_contact IS NOT NULL`;
 
 /**
+ * The one needs-attention predicate (38.13 D-59; RESEARCH Pattern 8 trap 2 /
+ * Pattern 10): the status cadence precondition, progress at or beyond
+ * STABLE_MAX, and no active snooze. Carrying the precondition here is what
+ * keeps an Unbound person (tracking_enabled = 0) out of needs-attention in every
+ * population and every search, even one that admits Unbound rows (D-59's All
+ * Contacts search). Built only from this module's closed constants; columns are
+ * unqualified like PROGRESS_SQL, so it works with or without a `c` alias.
+ * Shared by the Dashboard needs-attention filter and (38.13-06) the Digest.
+ */
+export const NEEDS_ATTENTION_WHERE = `${STATUS_CADENCE_PRECONDITION}
+     AND (${PROGRESS_SQL}) >= ${STABLE_MAX}
+     AND (snooze_until IS NULL OR date(snooze_until) <= date('now','localtime'))`;
+
+/**
  * Query-time status bucket over PROGRESS_SQL. `rogue` is a 4th threshold
  * (`progress >= ROGUE_K`) OR the "Rarely responds" non-time path
  * (`rarely_responds = 1 AND progress >= WOBBLE_MAX`). Only code CONSTANTS are
