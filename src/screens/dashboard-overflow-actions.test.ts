@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
 
@@ -11,6 +12,7 @@ describe("buildDashboardOverflowActions", () => {
       navigation,
       onReset,
       onSelectContacts,
+      selectionMode: false,
     });
 
     expect(actions).toHaveLength(5);
@@ -52,5 +54,25 @@ describe("buildDashboardOverflowActions", () => {
     expect(onReset).toHaveBeenCalledOnce();
     actions[3]?.onPress();
     expect(onSelectContacts).toHaveBeenCalledOnce();
+  });
+
+  it("offers no Select Contacts or Reset Contacts View while selecting (D-76, ADR-102 frozen universe; review A-WR-02)", () => {
+    const actions = buildDashboardOverflowActions({
+      navigation: { navigate: vi.fn(), openEvents: vi.fn() },
+      onReset: vi.fn(),
+      onSelectContacts: vi.fn(),
+      selectionMode: true,
+    });
+    expect(actions.map(({ testID }) => testID)).toEqual([
+      "dashboard-group-events-overflow-entry",
+      "dashboard-unbound-overflow-entry",
+      "dashboard-archived-overflow-entry",
+    ]);
+  });
+
+  it("HomeScreen passes its selection mode into the builder", () => {
+    const home = readFileSync("src/screens/HomeScreen.tsx", "utf8");
+    const call = home.slice(home.indexOf("buildDashboardOverflowActions({"));
+    expect(call.slice(0, call.indexOf("});"))).toMatch(/\bselectionMode,?\s/);
   });
 });

@@ -2107,6 +2107,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     onSelectContacts: () => {
       void onSelectContacts();
     },
+    // D-76 / ADR-102: no query change while selecting (review A-WR-02).
+    selectionMode,
   });
 
   // Android Back (38.13 D-29; ADR-095 :18 transient-first; ADR-102). This
