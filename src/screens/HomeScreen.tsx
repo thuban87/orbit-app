@@ -488,11 +488,19 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     (state) => state.removeFromUniverse,
   );
   const bottomClearance = useBottomClearance();
+  // The List FlatList and the Card grid's FlatList; whichever is mounted is
+  // scrolled to the top by Reset Dashboard View (38.13 D-31).
+  const listRef = useRef<FlatList<DashboardRow> | null>(null);
+  const cardGridRef = useRef<FlatList<DashboardRow> | null>(null);
 
   const resetDashboard = useCallback(async () => {
     try {
       await useDashboardQueryStore.getState().resetDashboardView(getExecutor());
       useDashboardSessionStore.getState().clearSession();
+      // D-31: Reset returns the list to the top. The view mode is untouched
+      // (D-04); scroll position is memory-only and nothing else stores it.
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      cardGridRef.current?.scrollToOffset({ offset: 0, animated: false });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to reset dashboard view", error);
       showSnackbar({
@@ -2028,6 +2036,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           {query.viewMode === "list" ? (
             <Animated.View style={[styles.listRegion, resultTransitionStyle]}>
               <FlatList
+                ref={listRef}
                 data={error || showInitialSkeleton ? [] : rows}
                 keyExtractor={(item) => String(item.id)}
                 renderItem={({ item }) => (
@@ -2112,6 +2121,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 refreshing={refreshing}
                 onRefresh={onRefresh}
                 bottomClearance={bottomClearance}
+                listRef={cardGridRef}
               />
             </Animated.View>
           )}

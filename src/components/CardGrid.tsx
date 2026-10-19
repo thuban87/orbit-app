@@ -1,5 +1,5 @@
 /** Virtualized, responsive Dashboard card renderer over the shared result model. */
-import { type ReactElement, useMemo } from "react";
+import { type ReactElement, type RefObject, useMemo } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -49,6 +49,8 @@ export interface CardGridProps {
   refreshing: boolean;
   onRefresh: () => void;
   bottomClearance: number;
+  /** The grid's FlatList, so the host can scroll it (Reset → top, 38.13 D-31). */
+  listRef?: RefObject<FlatList<DashboardRow> | null>;
 }
 
 export function CardGrid({
@@ -78,6 +80,7 @@ export function CardGrid({
   refreshing,
   onRefresh,
   bottomClearance,
+  listRef,
 }: CardGridProps) {
   const { colors } = useTheme();
   const { fontScale, width } = useWindowDimensions();
@@ -90,6 +93,7 @@ export function CardGrid({
 
   return (
     <FlatList
+      ref={listRef}
       key={`grid-${numColumns}`}
       data={error || showInitialSkeleton ? [] : rows}
       extraData={{
