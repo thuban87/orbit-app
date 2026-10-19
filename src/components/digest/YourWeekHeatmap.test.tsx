@@ -20,8 +20,12 @@ vi.mock("react-native", () => ({
 vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
 }));
+vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 
-const { YourWeekHeatmap } = await import("./YourWeekHeatmap");
+const { YourWeekHeatmap, weekdayColumnLabels } = await import(
+  "./YourWeekHeatmap"
+);
+const COLORS = THEME_PRESETS.galaxy.dark;
 
 type TestElement = ReactElement<Record<string, unknown>>;
 
@@ -43,6 +47,120 @@ const window: HistoryWindow = {
     { date: null, isPlaceholder: true, isFuture: false },
   ],
 };
+
+/** A real Sunday-to-Saturday week (Sep 13–19, 2026). */
+const SEPT_WEEK: HistoryWindow = {
+  lens: "7days",
+  ref: "2026-09-19",
+  start: "2026-09-13",
+  end: "2026-09-19",
+  cells: [13, 14, 15, 16, 17, 18, 19].map((day) => ({
+    date: `2026-09-${day}`,
+    isPlaceholder: false,
+    isFuture: false,
+  })),
+};
+
+/** The weekday label texts in column order. */
+function labelTexts(tree: TestElement[]): TestElement[] {
+  const row = tree.find(
+    (node) => node.props.testID === "your-week-heatmap-labels",
+  );
+  return nodes(row?.props.children as ReactNode).filter(
+    (node) => node.type === "AppText",
+  );
+}
+
+const cell = (date: string | null, isPlaceholder = false) => ({
+  date,
+  isPlaceholder,
+  isFuture: false,
+});
+
+describe("weekdayColumnLabels (38.13 D-47)", () => {
+  it("labels each column with the weekday of its first real date", () => {
+    expect(
+      weekdayColumnLabels([
+        [
+          "2026-10-14",
+          "2026-10-15",
+          "2026-10-16",
+          "2026-10-17",
+          "2026-10-18",
+          "2026-10-19",
+          "2026-10-20",
+        ].map((date) => cell(date)),
+      ]),
+    ).toEqual(["Wed", "Thu", "Fri", "Sat", "Sun", "Mon", "Tue"]);
+  });
+
+  it("names a placeholder column from the neighbouring real date", () => {
+    // Oct 1, 2026 is a Thursday; the two leading placeholders are Tue and Wed.
+    const first = [
+      cell(null, true),
+      cell(null, true),
+      cell("2026-10-01"),
+      cell("2026-10-02"),
+      cell("2026-10-03"),
+      cell("2026-10-04"),
+      cell("2026-10-05"),
+    ];
+    expect(weekdayColumnLabels([first])).toEqual([
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun",
+      "Mon",
+    ]);
+  });
+
+  it("takes a column's weekday from a later row when its first row is a placeholder", () => {
+    // Oct 31, 2026 is a Saturday; trailing placeholders follow in row one.
+    const rows = [
+      [
+        cell("2026-10-25"),
+        cell("2026-10-26"),
+        cell("2026-10-27"),
+        cell("2026-10-28"),
+        cell("2026-10-29"),
+        cell("2026-10-30"),
+        cell("2026-10-31"),
+      ],
+      [
+        cell(null, true),
+        cell(null, true),
+        cell(null, true),
+        cell(null, true),
+        cell(null, true),
+        cell(null, true),
+        cell(null, true),
+      ],
+    ];
+    expect(weekdayColumnLabels(rows)).toEqual([
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+    ]);
+  });
+
+  it("returns blank labels when no column has a real date", () => {
+    expect(weekdayColumnLabels([[cell(null, true)]])).toEqual([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ]);
+  });
+});
 
 describe("YourWeekHeatmap", () => {
   beforeEach(() => {
@@ -130,10 +248,10 @@ describe("YourWeekHeatmap", () => {
     );
   });
 
-  it("marks the selected real day structurally and accessibly", () => {
+  it("marks the selected real day by border, accessibility state and a bold underlined weekday label (38.13 D-47)", () => {
     const tree = nodes(
       YourWeekHeatmap({
-        window,
+        window: SEPT_WEEK,
         counts: new Map([["2026-09-18", 2]]),
         selectedDate: "2026-09-18",
         onSelectDay: vi.fn(),
@@ -145,6 +263,115 @@ describe("YourWeekHeatmap", () => {
     expect(selected?.props.accessibilityState).toEqual({ selected: true });
     expect(selected?.props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ borderWidth: 2 })]),
+    );
+    // The non-colour cue: Friday's column label is bold (label role) with a
+    // 2dp underline bar; every other label is a regular caption with no bar.
+    const labels = labelTexts(tree);
+    expect(labels.map((label) => label.props.role)).toEqual([
+      "caption",
+      "caption",
+      "caption",
+      "caption",
+      "caption",
+      "label",
+      "caption",
+    ]);
+    const bars = tree.filter(
+      (node) => node.props.testID === "your-week-heatmap-label-selected",
+    );
+    expect(bars).toHaveLength(1);
+    expect(bars[0].props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ height: 2 }),
+        expect.objectContaining({ backgroundColor: COLORS.textPrimary }),
+      ]),
+    );
+    const fridayColumn = tree.find(
+      (node) => node.props.testID === "your-week-heatmap-label-5",
+    );
+    expect(
+      nodes(fridayColumn?.props.children as ReactNode).some(
+        (node) => node.props.testID === "your-week-heatmap-label-selected",
+      ),
+    ).toBe(true);
+  });
+
+  it("an unselected heatmap has no bold label and no underline bar", () => {
+    const tree = nodes(
+      YourWeekHeatmap({
+        window: SEPT_WEEK,
+        counts: new Map(),
+        selectedDate: null,
+        onSelectDay: vi.fn(),
+      }),
+    );
+    expect(
+      labelTexts(tree).every((label) => label.props.role === "caption"),
+    ).toBe(true);
+    expect(
+      tree.some(
+        (node) => node.props.testID === "your-week-heatmap-label-selected",
+      ),
+    ).toBe(false);
+  });
+
+  it("renders one hidden weekday label row over the columns without resizing cells (D-47, ADR-174)", () => {
+    measuredWidth = 379;
+    const tree = nodes(
+      YourWeekHeatmap({
+        window: SEPT_WEEK,
+        counts: new Map(),
+        selectedDate: null,
+        onSelectDay: vi.fn(),
+      }),
+    );
+    const rows = tree.filter(
+      (node) => node.props.testID === "your-week-heatmap-labels",
+    );
+    expect(rows).toHaveLength(1);
+    const labelRow = rows[0];
+    expect(labelRow.props.accessibilityElementsHidden).toBe(true);
+    expect(labelRow.props.importantForAccessibility).toBe(
+      "no-hide-descendants",
+    );
+    const grid = tree.find(
+      (node) => node.props.testID === "your-week-heatmap-grid",
+    );
+    // The label row is the grid's first child, so it shares the grid's
+    // centring and the row gap.
+    const gridChildren = grid?.props.children as unknown[];
+    expect((gridChildren[0] as TestElement).props.testID).toBe(
+      "your-week-heatmap-labels",
+    );
+    expect(labelTexts(tree).map((label) => label.props.children)).toEqual([
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+    ]);
+    for (const label of labelTexts(tree)) {
+      expect(label.props.style).toEqual(
+        expect.objectContaining({ color: COLORS.textSecondary }),
+      );
+    }
+    for (let column = 0; column < 7; column += 1) {
+      const slot = tree.find(
+        (node) => node.props.testID === `your-week-heatmap-label-${column}`,
+      );
+      expect(slot?.props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ width: 50 })]),
+      );
+    }
+    const cell = tree.find(
+      (node) => node.props.testID === "your-week-heatmap-cell-2026-09-13",
+    );
+    expect(cell?.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ width: 50, height: 50 }),
+      ]),
     );
   });
 
