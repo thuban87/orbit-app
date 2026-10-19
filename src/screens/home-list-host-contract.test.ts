@@ -243,8 +243,10 @@ describe("row callbacks are query-independent (D-55 F1; review R5-01)", () => {
       [
         "goToProfile",
         "onFavouriteTap",
-        "onLogInteraction",
+        "onSwipeRightAction",
         "onEditContact",
+        "logQuickly",
+        "openLogInteraction",
       ].sort(),
     );
   });
@@ -273,9 +275,10 @@ describe("row callbacks are query-independent (D-55 F1; review R5-01)", () => {
     expect(depsOf("goToProfile")).toEqual(["navigation"]);
     expect(depsOf("onFavouriteTap")).toEqual(["toggleFavourite"]);
     expect(depsOf("toggleFavourite")).toEqual(["favouriteStore", "scheduler"]);
-    expect(depsOf("onLogInteraction")).toEqual(["logQuickly"]);
+    expect(depsOf("onSwipeRightAction")).toEqual(["logQuickly"]);
     expect(depsOf("onEditContact")).toEqual([]);
     expect(depsOf("logQuickly")).toEqual([]);
+    expect(depsOf("openLogInteraction")).toEqual([]);
   });
 
   it("the favourite read goes through the scheduler, never reload", () => {
@@ -314,5 +317,85 @@ describe("the List FlatList is windowed (D-55 F2)", () => {
   it("uses no getItemLayout and leaves removeClippedSubviews at its default", () => {
     expect(source).not.toContain("getItemLayout");
     expect(listFlatListAttributes().has("removeClippedSubviews")).toBe(false);
+  });
+});
+
+/** The memoised host's source, between its declaration and ListRowLine3. */
+function hostSource(): string {
+  return source.slice(
+    source.indexOf("function SwipeableListRow("),
+    source.indexOf("interface ListRowLine3"),
+  );
+}
+
+describe("a swiped row closes once its action fires (D-25)", () => {
+  function swipeOpenBody(): string {
+    const host = hostSource();
+    const start = host.indexOf("const onSwipeableOpen = useCallback(");
+    expect(start).toBeGreaterThan(-1);
+    return host.slice(start, host.indexOf("return (", start));
+  }
+
+  it("fires the right-swipe action, then closes the row", () => {
+    expect(swipeOpenBody()).toMatch(
+      /if \(direction === "right"\) \{\s*void onSwipeRightAction\(contactId\);\s*\} else \{\s*onEditContact\(contactId\);\s*\}\s*swipeableRef\.current\?\.close\(\);/,
+    );
+  });
+
+  it("the host keeps no React state; openRowRef is cleared by the existing onClose", () => {
+    const host = hostSource();
+    expect(host).not.toMatch(/useState\(/);
+    expect(host).toMatch(
+      /const onClose = useCallback\(\(\) => \{\s*if \(isThisRowOpen\(\)\) openRowRef\.current = null;/,
+    );
+    expect(host).toContain("onSwipeableClose={onClose}");
+  });
+});
+
+describe("the List row's TalkBack actions run what they are named for (D-26)", () => {
+  it("onSwipeRightAction is the one right-swipe function, used only for the right swipe", () => {
+    expect(source.match(/const onSwipeRightAction = useCallback\(/g)).toHaveLength(1);
+    const attributes = rowAttributes();
+    expect(
+      attributeExpression(
+        attributes.get("onSwipeRightAction") as ts.JsxAttribute,
+      ).getText(file),
+    ).toBe("onSwipeRightAction");
+    // Host-side: the swipe calls it; no accessibility action does.
+    const host = hostSource();
+    expect(host).toContain("void onSwipeRightAction(contactId);");
+    expect(host).not.toMatch(/onQuickLog=\{[^}]*onSwipeRightAction/);
+    expect(host).not.toMatch(/onLogInteraction=\{[^}]*onSwipeRightAction/);
+    expect(source).not.toMatch(/\bconst onLogInteraction = useCallback\(/);
+  });
+
+  it("the accessibility Quick Log runs logQuickly and Log Interaction opens Log Interaction", () => {
+    const attributes = rowAttributes();
+    expect(
+      attributeExpression(attributes.get("onQuickLog") as ts.JsxAttribute)
+        .getText(file),
+    ).toBe("logQuickly");
+    expect(
+      attributeExpression(attributes.get("onLogInteraction") as ts.JsxAttribute)
+        .getText(file),
+    ).toBe("openLogInteraction");
+    const open = callbackInitialiserOf("openLogInteraction")
+      .arguments[0]?.getText(file);
+    expect(open).toContain(
+      'navigateDashboardContactAction(contactId, "LogContact")',
+    );
+  });
+
+  it("the host hands ListRow all three accessibility handlers", () => {
+    const host = hostSource();
+    expect(host).toContain("onQuickLog={onRowQuickLog}");
+    expect(host).toContain("onLogInteraction={onRowLogInteraction}");
+    expect(host).toContain("onEditContact={onRowEditContact}");
+    expect(host).toMatch(
+      /const onRowQuickLog = useCallback\(\(\) => \{\s*onQuickLog\(contactId\);/,
+    );
+    expect(host).toMatch(
+      /const onRowLogInteraction = useCallback\(\(\) => \{\s*onLogInteraction\(contactId\);/,
+    );
   });
 });
