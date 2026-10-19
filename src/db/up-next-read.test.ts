@@ -1,5 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { listDashboardPopulation } from "@/db/dashboard-read";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -12,7 +17,9 @@ import { migration010 } from "@/db/migrations/010-contact-method-label";
 import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import { newUid } from "@/db/uid";
 import { readUpNextCandidates } from "@/db/up-next-read";
+import { dedupOverlooked, pickUpNext } from "@/logic/digest-composition";
 
 const NOW = "2026-08-15 12:00:00";
 let uidCounter = 0;
@@ -131,5 +138,88 @@ describe("readUpNextCandidates", () => {
     expect((await readUpNextCandidates(exec)).map((row) => row.name)).toEqual([
       "Included",
     ]);
+  });
+});
+
+describe("Up Next and Overlooked agree with the needs-attention drill (38.13 D-61)", () => {
+  beforeEach(async () => {
+    // The drill reads the Contacts population machinery, so this block runs on
+    // the real, complete migration chain.
+    exec = nodeSqliteExecutor(openTestDb());
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid });
+  });
+
+  async function seedMixedAttention(): Promise<void> {
+    await seedContact({ name: "Wobble", lastContact: localDateOffset(-8) });
+    await seedContact({ name: "Decay", lastContact: localDateOffset(-15) });
+    await seedContact({ name: "Rogue", lastContact: localDateOffset(-40) });
+    await seedContact({ name: "Rogue Two", lastContact: localDateOffset(-35) });
+    await seedContact({ name: "Decay Two", lastContact: localDateOffset(-12) });
+    await seedContact({
+      name: "Snoozed Rogue",
+      lastContact: localDateOffset(-40),
+      snoozeUntil: localDateOffset(5),
+    });
+    await seedContact({
+      name: "Unbound Old",
+      intervalDays: 10,
+      lastContact: localDateOffset(-60),
+      trackingEnabled: 0,
+    });
+    await seedContact({ name: "Stable", lastContact: localDateOffset(-2) });
+  }
+
+  it("Up Next candidates are exactly the set the drill opens; snoozed and Unbound people are in neither", async () => {
+    await seedMixedAttention();
+    const candidates = await readUpNextCandidates(exec);
+    const drill = await listDashboardPopulation(
+      exec,
+      {
+        viewMode: "list",
+        populations: [],
+        filters: { "needs-attention": ["on"] },
+        sort: "default",
+      },
+      NOW,
+    );
+    const candidateNames = new Set(candidates.map((row) => row.name));
+    const drillNames = new Set(drill.map((row) => row.name));
+    expect(candidateNames).toEqual(drillNames);
+    expect(candidateNames).toEqual(
+      new Set(["Wobble", "Decay", "Rogue", "Rogue Two", "Decay Two"]),
+    );
+    for (const excluded of ["Snoozed Rogue", "Unbound Old", "Stable"]) {
+      expect(candidateNames.has(excluded)).toBe(false);
+      expect(drillNames.has(excluded)).toBe(false);
+    }
+  });
+
+  it("Up Next plus Overlooked covers the drill set with no overlap", async () => {
+    await seedMixedAttention();
+    const candidates = await readUpNextCandidates(exec);
+    const upNext = pickUpNext(candidates);
+    const overlooked = dedupOverlooked(
+      candidates,
+      upNext.map((row) => row.id),
+    );
+    expect(upNext.map((row) => row.name)).toEqual([
+      "Rogue",
+      "Rogue Two",
+      "Decay",
+    ]);
+    expect(overlooked.map((row) => row.name)).toEqual(["Decay Two", "Wobble"]);
+    const drill = await listDashboardPopulation(
+      exec,
+      {
+        viewMode: "list",
+        populations: [],
+        filters: { "needs-attention": ["on"] },
+        sort: "default",
+      },
+      NOW,
+    );
+    expect(new Set([...upNext, ...overlooked].map((row) => row.id))).toEqual(
+      new Set(drill.map((row) => row.id)),
+    );
   });
 });

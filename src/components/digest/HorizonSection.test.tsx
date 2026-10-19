@@ -53,7 +53,6 @@ const overlooked = (id: number) => ({
   id,
   name: `Overlooked ${id}`,
   photo: null,
-  rarely_responds: 0,
   progress: 4,
   status: "rogue",
   reason: "overdue",
@@ -80,7 +79,6 @@ const render = (overrides: Record<string, unknown> = {}) =>
         overlooked: [],
         neverContactedRows: [],
         neverContactedCount: 0,
-        upNextIds: [],
         onOpenProfile: vi.fn(),
         onDrillThrough: vi.fn(),
         ...overrides,
@@ -120,18 +118,23 @@ describe("HorizonSection", () => {
     expect(emptyText).toContain("Nothing on the horizon");
   });
 
-  it("deduplicates Up Next and uses only a non-numeric Overlooked drill", () => {
+  it("previews at most three Overlooked names and uses only a non-numeric drill", () => {
     const drill = vi.fn();
     const nodes = render({
-      overlooked: [1, 2, 3, 4, 5].map(overlooked),
-      upNextIds: [1],
+      overlooked: [4, 5, 6, 7, 8].map(overlooked),
       onDrillThrough: drill,
     });
     expect(
-      nodes.filter((node) =>
-        String(node.props.testID).startsWith("digest-horizon-contact-"),
-      ),
-    ).toHaveLength(3);
+      nodes
+        .filter((node) =>
+          String(node.props.testID).startsWith("digest-horizon-contact-"),
+        )
+        .map((node) => node.props.testID),
+    ).toEqual([
+      "digest-horizon-contact-4",
+      "digest-horizon-contact-5",
+      "digest-horizon-contact-6",
+    ]);
     const more = nodes.find(
       (node) => node.props.testID === "digest-overlooked-more",
     );
@@ -140,6 +143,22 @@ describe("HorizonSection", () => {
     expect(more?.text).not.toMatch(/\+\d/);
     (more.props.onPress as () => void)();
     expect(drill).toHaveBeenCalledWith("overlooked");
+  });
+
+  it("renders the Overlooked list as given, with no second dedupe and no drill row at three or fewer (38.13 D-61)", () => {
+    const nodes = render({ overlooked: [1, 2].map(overlooked) });
+    expect(
+      nodes
+        .filter((node) =>
+          String(node.props.testID).startsWith("digest-horizon-contact-"),
+        )
+        .map((node) => node.props.testID),
+    ).toEqual(["digest-horizon-contact-1", "digest-horizon-contact-2"]);
+    expect(
+      nodes.some((node) => node.props.testID === "digest-overlooked-more"),
+    ).toBe(false);
+    const text = nodes.map((node) => node.text).join(" ");
+    expect(text).not.toContain("Nothing on the horizon");
   });
 
   it("renders Never Contacted only above zero with honest numeric overflow", () => {

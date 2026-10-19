@@ -9,10 +9,9 @@ import {
 import { AppText } from "@/components/ui/AppText";
 import { NEVER_CONTACTED } from "@/constants/glossary";
 import type { DashboardRow } from "@/db/dashboard-read";
-import type { OverlookedRow } from "@/db/digest-read";
+import type { UpNextCandidateRow } from "@/db/up-next-read";
 import type { UpcomingBirthday } from "@/logic/digest-composition";
 import {
-  dedupOverlooked,
   neverContactedConditional,
   previewWithOverflow,
 } from "@/logic/digest-composition";
@@ -29,11 +28,14 @@ export interface HorizonSectionProps {
     name: string;
     birthday: string | null;
   }>[];
-  overlooked: readonly OverlookedRow[];
+  /**
+   * Everyone needing attention after Up Next's three, already deduplicated by
+   * DigestScreen (38.13 D-61; one dedupe only, RESEARCH Pitfall 10).
+   */
+  overlooked: readonly UpNextCandidateRow[];
   /** Full `listDashboardPopulation` result for the `not-contacted` population. */
   neverContactedRows: readonly DashboardRow[];
   neverContactedCount: number;
-  upNextIds: readonly number[];
   onOpenProfile: (contactId: number) => void;
   onDrillThrough: (target: HorizonDrillTarget) => void;
 }
@@ -43,22 +45,15 @@ export function HorizonSection({
   overlooked,
   neverContactedRows,
   neverContactedCount,
-  upNextIds,
   onOpenProfile,
   onDrillThrough,
 }: HorizonSectionProps) {
   const { colors } = useTheme();
-  const remainingOverlooked = dedupOverlooked(overlooked, upNextIds);
-  const overlookedPreview = previewWithOverflow(
-    remainingOverlooked,
-    PREVIEW_CAP,
-  );
+  const overlookedPreview = previewWithOverflow(overlooked, PREVIEW_CAP);
   const never = neverContactedConditional(neverContactedCount);
   const neverPreview = previewWithOverflow(neverContactedRows, PREVIEW_CAP);
   const empty =
-    birthdays.length === 0 &&
-    remainingOverlooked.length === 0 &&
-    !never.present;
+    birthdays.length === 0 && overlooked.length === 0 && !never.present;
 
   return (
     <View testID="digest-horizon" style={styles.section}>
@@ -108,7 +103,7 @@ export function HorizonSection({
         </View>
       ) : null}
 
-      {remainingOverlooked.length > 0 ? (
+      {overlooked.length > 0 ? (
         <View testID="digest-horizon-overlooked" style={styles.group}>
           <AppText role="label">Overlooked</AppText>
           <DigestListGroup>
@@ -182,7 +177,7 @@ function CompactContactRow({
   id: number;
   name: string;
   photo: string | null;
-  status: OverlookedRow["status"] | null;
+  status: UpNextCandidateRow["status"] | null;
   onPress: (contactId: number) => void;
 }) {
   const { colors } = useTheme();

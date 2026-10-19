@@ -97,18 +97,14 @@ const upNext = (id: number) => ({
   reason: null,
 });
 const data = {
-  upNextCandidates: [upNext(1), upNext(2), upNext(3), upNext(4)],
-  overlooked: [
-    { ...upNext(1), rarely_responds: 0 },
-    { ...upNext(5), rarely_responds: 0 },
-  ],
+  upNextCandidates: [upNext(1), upNext(2), upNext(3), upNext(4), upNext(5)],
   birthdayCandidates: [],
   neverContactedCount: 0,
   neverContactedRows: [],
 };
 
 describe("DigestScreen composition", () => {
-  it("renders the fixed Up Next, Horizon, Your Week order and flows claimed ids", () => {
+  it("renders the fixed Up Next, Horizon, Your Week order; Overlooked is the candidates after Up Next (38.13 D-61)", () => {
     const nodes = all(
       resolve(
         DigestLoadedBody({
@@ -131,12 +127,18 @@ describe("DigestScreen composition", () => {
     ).toEqual(["UpNextSection", "HorizonSection", "YourWeekSection"]);
     const upNextNode = nodes.find((node) => node.type === "UpNextSection");
     const horizon = nodes.find((node) => node.type === "HorizonSection");
-    if (!horizon) throw new Error("Missing Horizon module");
-    expect(upNextNode?.props.candidates).toHaveLength(3);
-    expect(horizon?.props.upNextIds).toEqual([1, 2, 3]);
+    if (!horizon || !upNextNode) throw new Error("Missing Digest module");
+    expect(
+      (upNextNode.props.candidates as Array<{ id: number }>).map(
+        (row) => row.id,
+      ),
+    ).toEqual([1, 2, 3]);
+    // One dedupe only (RESEARCH Pitfall 10): Horizon gets the list ready-made
+    // and no Up Next ids to dedupe again.
+    expect(horizon.props).not.toHaveProperty("upNextIds");
     expect(
       (horizon.props.overlooked as Array<{ id: number }>).map((row) => row.id),
-    ).toEqual([5]);
+    ).toEqual([4, 5]);
   });
 
   it("hands Your Week the Profile and group-event navigation callbacks (38.13 D-46)", () => {

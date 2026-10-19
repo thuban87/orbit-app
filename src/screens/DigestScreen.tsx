@@ -24,7 +24,6 @@ import {
   listDashboardPopulation,
 } from "@/db/dashboard-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { type OverlookedRow, readOverlooked } from "@/db/digest-read";
 import {
   readUpNextCandidates,
   type UpNextCandidateRow,
@@ -65,8 +64,11 @@ const NEVER_CONTACTED_QUERY = {
 };
 
 interface DigestData {
+  /**
+   * Everyone needing attention (NEEDS_ATTENTION_WHERE), most overdue first. Up
+   * Next is the first three; Overlooked is the rest (38.13 D-61).
+   */
   upNextCandidates: UpNextCandidateRow[];
-  overlooked: OverlookedRow[];
   birthdayCandidates: BirthdayCandidate[];
   neverContactedCount: number;
   neverContactedRows: DashboardRow[];
@@ -74,26 +76,23 @@ interface DigestData {
 
 export type DigestLoadState = DigestRefreshLoadState<DigestData>;
 
-/** The five Digest reads, unchanged; one bundle per accepted refresh. */
+/** The four Digest reads; one bundle per accepted refresh. */
 async function readDigestData(): Promise<DigestData> {
   const exec = getExecutor();
   const now = localDateTime();
   const [
     upNextCandidates,
-    overlooked,
     birthdayCandidates,
     neverContactedCount,
     neverContactedRows,
   ] = await Promise.all([
     readUpNextCandidates(exec),
-    readOverlooked(exec),
     listBirthdayCandidates(exec),
     countNeverContacted(exec),
     listDashboardPopulation(exec, NEVER_CONTACTED_QUERY, now),
   ]);
   return {
     upNextCandidates,
-    overlooked,
     birthdayCandidates,
     neverContactedCount,
     neverContactedRows,
@@ -313,7 +312,9 @@ export function DigestLoadedBody({
     data.birthdayCandidates,
     new Date(),
   );
-  const overlooked = dedupOverlooked(data.overlooked, upNextIds);
+  // Overlooked = everyone needing attention minus the people Up Next shows
+  // (38.13 D-61). The one dedupe lives here; Horizon receives it ready-made.
+  const overlooked = dedupOverlooked(data.upNextCandidates, upNextIds);
   const never = neverContactedConditional(data.neverContactedCount);
 
   return (
@@ -326,7 +327,6 @@ export function DigestLoadedBody({
         overlooked={overlooked}
         neverContactedRows={data.neverContactedRows}
         neverContactedCount={never.count}
-        upNextIds={upNextIds}
         onOpenProfile={onOpenProfile}
         onDrillThrough={onDrillThrough}
       />
