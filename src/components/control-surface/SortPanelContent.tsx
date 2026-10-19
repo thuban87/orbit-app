@@ -14,14 +14,12 @@ import {
 export interface SortPanelContentProps {
   state: DashboardQueryState;
   onSelectSort: (mode: DashboardSortMode) => void;
-  disabled?: boolean;
 }
 
 /** Presentation-only sort content; the trigger owner serializes persistence. */
 export function SortPanelContent({
   state,
   onSelectSort,
-  disabled = false,
 }: SortPanelContentProps) {
   const { colors } = useTheme();
   return (
@@ -38,9 +36,8 @@ export function SortPanelContent({
             key={mode}
             testID={`dashboard-sort-option-${mode}`}
             accessibilityRole="button"
-            accessibilityState={{ selected, disabled }}
+            accessibilityState={{ selected }}
             accessibilityLabel={label}
-            disabled={disabled}
             onPress={() => onSelectSort(mode)}
             style={[
               styles.option,

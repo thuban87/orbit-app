@@ -75,6 +75,7 @@ import { BulkActionSurface } from "@/components/BulkActionSurface";
 import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
+import { AXIS_DEFAULT_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import {
@@ -149,6 +150,7 @@ import {
 import {
   filterEmptyCopy,
   populationEmptyCopy,
+  SHOW_ACTIVE_CONTACTS_LABEL,
   tuckedAwayLines,
 } from "@/logic/dashboard-empty-copy";
 import {
@@ -1671,6 +1673,33 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     }
   }, []);
 
+  // 38.13 D-82: an empty Birthdays / Never Contacted / Snoozed population's
+  // one action switches the Population back to Active Contacts: the same
+  // store write the Population panel's Active row makes ([]), filters kept.
+  // A rejected write is reported with the error snackbar and a Retry.
+  const onShowActiveContacts = useCallback(async () => {
+    try {
+      await useDashboardQueryStore.getState().setPopulations(getExecutor(), []);
+    } catch (populationError) {
+      Logger.error(
+        LOG_SCOPE,
+        "failed to show the Active Contacts population",
+        populationError,
+      );
+      showSnackbar({
+        kind: "error",
+        label: `Couldn't show ${AXIS_DEFAULT_LABELS.population}`,
+        action: {
+          label: "Retry",
+          accessibilityLabel: `Retry showing ${AXIS_DEFAULT_LABELS.population}`,
+          onPress: () => {
+            void onShowActiveContacts();
+          },
+        },
+      });
+    }
+  }, []);
+
   // 38.13 D-65 (39 D-98): "N Never Contacted →" saves the Never Contacted
   // population with filters cleared, the same save the Digest "+N more" drill
   // makes (runDigestDrillThrough), so the list shows the people it counted.
@@ -2146,6 +2175,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         icon={birthdaysEmptyCopy.icon}
         heading={birthdaysEmptyCopy.heading}
         body={birthdaysEmptyCopy.body}
+        action={{
+          label: birthdaysEmptyCopy.actionLabel ?? SHOW_ACTIVE_CONTACTS_LABEL,
+          onPress: onShowActiveContacts,
+        }}
       />
     ) : emptyState === "not-contacted-empty" ? (
       <EmptyState
@@ -2153,6 +2186,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         icon={notContactedEmptyCopy.icon}
         heading={notContactedEmptyCopy.heading}
         body={notContactedEmptyCopy.body}
+        action={{
+          label:
+            notContactedEmptyCopy.actionLabel ?? SHOW_ACTIVE_CONTACTS_LABEL,
+          onPress: onShowActiveContacts,
+        }}
       />
     ) : emptyState === "snoozed-empty" ? (
       <EmptyState
@@ -2160,6 +2198,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         icon={snoozedEmptyCopy.icon}
         heading={snoozedEmptyCopy.heading}
         body={snoozedEmptyCopy.body}
+        action={{
+          label: snoozedEmptyCopy.actionLabel ?? SHOW_ACTIVE_CONTACTS_LABEL,
+          onPress: onShowActiveContacts,
+        }}
       />
     ) : emptyState === "firstrun" ? (
       <View style={styles.emptyState}>

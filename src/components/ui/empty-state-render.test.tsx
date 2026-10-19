@@ -127,7 +127,7 @@ describe("empty-state consumers (D-20, D-71)", () => {
       const start = home.indexOf(`testID="${testID}"`);
       const region = home.slice(start, home.indexOf("/>", start));
       expect(region.match(/action=/g)).toHaveLength(1);
-      expect(region).toContain(`label: ${copy}.actionLabel`);
+      expect(region).toMatch(new RegExp(`label:\\s*${copy}\\.actionLabel`));
       expect(region).toContain("onPress: onShowActiveContacts");
     },
   );

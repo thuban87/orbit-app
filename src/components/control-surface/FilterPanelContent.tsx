@@ -23,7 +23,6 @@ export interface FilterPanelContentProps {
   categories: Category[];
   onToggleFilter: (family: DashboardFilterFamily, value: string) => void;
   onClearFilters: () => void;
-  disabled?: boolean;
 }
 
 /** Presentation-only filter content; the trigger owner serializes persistence. */
@@ -32,7 +31,6 @@ export function FilterPanelContent({
   categories,
   onToggleFilter,
   onClearFilters,
-  disabled = false,
 }: FilterPanelContentProps) {
   const { colors } = useTheme();
   const optionsFor = (
@@ -92,9 +90,8 @@ export function FilterPanelContent({
                 key={value}
                 testID={`dashboard-filter-option-${family}-${value}`}
                 accessibilityRole="button"
-                accessibilityState={{ selected, disabled }}
+                accessibilityState={{ selected }}
                 accessibilityLabel={label}
-                disabled={disabled}
                 onPress={() => onToggleFilter(family, value)}
                 style={[
                   styles.option,
@@ -139,8 +136,6 @@ export function FilterPanelContent({
         testID="dashboard-filters-clear"
         accessibilityRole="button"
         accessibilityLabel={CONTROL_ACTION_LABELS.clearFilters}
-        accessibilityState={{ disabled }}
-        disabled={disabled}
         onPress={onClearFilters}
         style={[styles.clear, { borderColor: colors.borderStrong }]}
       >

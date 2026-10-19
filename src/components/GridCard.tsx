@@ -18,6 +18,7 @@ import type { ProfileStatus } from "@/db/contact-status-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import { UNBOUND_STAR_OPACITY } from "@/logic/dashboard-unbound-row";
 import { unboundStarExplanation } from "@/screens/contact-profile-logic";
+import { unboundRowSubtitle } from "@/screens/unbound-list-logic";
 import { useTheme, useUnscopedTheme } from "@/theme";
 import { ICON_SIZE } from "@/theme/tokens/icon-size";
 import { RADII } from "@/theme/tokens/radii";
@@ -170,7 +171,17 @@ export function GridCard({
       ? "snoozed"
       : status;
   const starOn = isFavourite && !unbound;
-  const recency = formatListRecency(lastContact, now);
+  // 38.13 D-83 (ADR-233): an Unbound person with no interactions reads the
+  // Unbound list's wording, "No contact logged", both on the card and in its
+  // description. Every other card keeps D-33 ("Never Contacted" on one line,
+  // the full recency in the description).
+  const unboundNeverLogged = unbound && lastContact === null;
+  const recency = unboundNeverLogged
+    ? unboundRowSubtitle(null)
+    : formatListRecency(lastContact, now);
+  const cardRecency = unboundNeverLogged
+    ? recency
+    : formatCardRecency(lastContact, now);
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
   // D-37: plain labels; a missing result is the name-only case ("Name"), not
@@ -440,7 +451,7 @@ export function GridCard({
                           { color: scoped.textSecondary },
                         ]}
                       >
-                        {formatCardRecency(lastContact, now)}
+                        {cardRecency}
                       </Text>
                     )}
                     {isSearchMode ? (

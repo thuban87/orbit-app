@@ -18,14 +18,12 @@ const POPULATION_ORDER: DashboardPopulation[] = [
 export interface PopulationPanelContentProps {
   state: DashboardQueryState;
   onTogglePopulation: (key: PopulationPanelKey) => void;
-  disabled?: boolean;
 }
 
 /** Presentation-only option content; persistence remains with the trigger owner. */
 export function PopulationPanelContent({
   state,
   onTogglePopulation,
-  disabled = false,
 }: PopulationPanelContentProps) {
   const { colors } = useTheme();
   // D-23: Active Contacts is a listed row, first, selected whenever nothing
@@ -56,9 +54,8 @@ export function PopulationPanelContent({
           key={key}
           testID={testID}
           accessibilityRole="button"
-          accessibilityState={{ selected, disabled }}
+          accessibilityState={{ selected }}
           accessibilityLabel={label}
-          disabled={disabled}
           onPress={() => onTogglePopulation(key)}
           style={[
             styles.option,

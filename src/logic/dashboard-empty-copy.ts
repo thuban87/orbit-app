@@ -10,7 +10,10 @@
  * plan's choice within the glossary (38.13 CONTEXT, Claude's discretion).
  */
 
-import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
+import {
+  AXIS_DEFAULT_LABELS,
+  POPULATION_LABELS,
+} from "@/components/control-surface/control-labels";
 import type { IconName } from "@/components/icons/icon-registry";
 import { BIN, NEVER_CONTACTED, UNBOUND } from "@/constants/glossary";
 import { pluralWord } from "@/utils/plural";
@@ -50,12 +53,19 @@ export function filterEmptyCopy(input: FilterEmptyInput): DashboardEmptyCopy {
   };
 }
 
+/**
+ * The empty populations' one action (38.13 D-82; 38.9 D-20/D-71): switch the
+ * Population back to Active Contacts, named as the Population panel names it.
+ */
+export const SHOW_ACTIVE_CONTACTS_LABEL = `Show ${AXIS_DEFAULT_LABELS.population}`;
+
 /** The populations with their own empty copy (D-30). */
 export type DescribedPopulation = "birthdays" | "not-contacted" | "snoozed";
 
 /**
  * An empty Birthdays / Never Contacted / Snoozed population says what that
- * population is (D-30). The Birthdays window matches the 0–30 day read in
+ * population is (D-30) and offers one action, Show Active Contacts (D-82).
+ * The Birthdays window matches the 0–30 day read in
  * `src/db/dashboard-read.ts` (resolveBirthdayWindow).
  */
 export function populationEmptyCopy(
@@ -67,18 +77,21 @@ export function populationEmptyCopy(
         icon: "your-week",
         heading: "No birthdays coming up",
         body: `${POPULATION_LABELS.birthdays} shows people whose birthday is in the next 30 days.`,
+        actionLabel: SHOW_ACTIVE_CONTACTS_LABEL,
       };
     case "not-contacted":
       return {
         icon: "contacts",
         heading: "Everyone's been contacted",
         body: `${NEVER_CONTACTED} shows people you haven't logged an interaction with yet.`,
+        actionLabel: SHOW_ACTIVE_CONTACTS_LABEL,
       };
     case "snoozed":
       return {
         icon: "snooze",
         heading: "No one is snoozed",
         body: `${POPULATION_LABELS.snoozed} shows people whose check-ins you've paused.`,
+        actionLabel: SHOW_ACTIVE_CONTACTS_LABEL,
       };
   }
 }
