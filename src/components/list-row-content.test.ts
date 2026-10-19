@@ -3,6 +3,7 @@ import {
   buildRowAccessibilityDescription,
   buildSearchRowAccessibilityDescription,
   buildSearchRowContext,
+  formatCardRecency,
   formatLine2,
   formatListRecency,
   formatMatchCategories,
@@ -335,5 +336,25 @@ describe("search-mode description reads only what is shown (38.13 D-51)", () => 
         context: '1 match · Note · "so it goes…"',
       }),
     ).toBe('Ann. 1 match · Note · "so it goes…".');
+  });
+});
+
+describe("card recency (38.13 D-33)", () => {
+  const now = "2026-08-15 12:00:00";
+
+  it("reads Never Contacted for a person with no interactions", () => {
+    expect(formatCardRecency(null, now)).toBe("Never Contacted");
+  });
+
+  it("matches the List recency for every other value", () => {
+    for (const lastContact of [
+      "2026-08-15 00:00:00",
+      "2026-08-14 23:00:00",
+      "2026-07-28",
+    ]) {
+      expect(formatCardRecency(lastContact, now)).toBe(
+        formatListRecency(lastContact, now),
+      );
+    }
   });
 });

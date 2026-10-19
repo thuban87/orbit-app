@@ -747,3 +747,32 @@ describe("CardContextMenu for an Unbound person (ADR-233)", () => {
     expect(ids).toContain("card-context-menu-favourite");
   });
 });
+
+describe("Card width and one-line recency (38.13 D-32, D-33)", () => {
+  it("sizes the card from geometry.cardWidth with no flex grow, so a short last row keeps normal width", () => {
+    for (const geometry of [
+      gridCardGeometry(393, 3),
+      gridCardGeometry(393, 2),
+    ]) {
+      const nodes = resolve(GridCard({ ...baseProps, geometry }));
+      const style = flattenStyle(nodes[0]?.props.style);
+      expect(nodes[0]?.props.testID).toBe("dashboard-grid-card-7");
+      expect(style.width).toBe(geometry.cardWidth);
+      expect(style.flexGrow).toBe(0);
+      expect(style.flex).toBeUndefined();
+      expect(style.minWidth).toBe(0);
+    }
+  });
+
+  it("shows Never Contacted on one line for a person with no interactions; the description keeps No interactions yet", () => {
+    const nodes = resolve(GridCard({ ...baseProps, lastContact: null }));
+    const recency = all(nodes).find(
+      (node) => node.props.testID === "dashboard-grid-card-recency-7",
+    );
+    expect(recency?.props.children).toBe("Never Contacted");
+    expect(recency?.props.numberOfLines).toBe(1);
+    expect(String(nodes[0]?.props.accessibilityLabel)).toContain(
+      "No interactions yet",
+    );
+  });
+});
