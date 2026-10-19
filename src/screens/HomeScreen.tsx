@@ -802,6 +802,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     sessionId: number;
     categories: { id: number; name: string }[];
   } | null>(null);
+  // 38.13 review B-WR-04: the sized Set Category sheet (D-85) keeps the
+  // categories it opened with while it fades out, so it does not collapse to
+  // a one-row compact sheet mid-close. `visible` and every write still read
+  // the live state.
+  const categoryPickerShown = useRetainedWhileClosing(categoryPicker);
   const [frequencyPicker, setFrequencyPicker] = useState<{
     claim: BulkActionClaim;
     ids: number[];
@@ -2741,7 +2746,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       />
       <CategoryChoiceSheet
         visible={categoryPicker !== null}
-        categories={categoryPicker?.categories ?? []}
+        categories={categoryPickerShown?.categories ?? []}
         selectedId={null}
         allowUncategorized
         title="Set category"
