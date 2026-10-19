@@ -1737,7 +1737,38 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`. A-14 and the bulk snooze sheet moved to 38.11 (38.11 D-45) — see "Notes from 38.11" in the workpaper.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 6–9 plans — rough estimate; the perf fix depends on what the investigation finds.
-**Plans**: TBD
+**Plans**: 11 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 38.13-01-PLAN.md — List-view measurement on release (D-55, D-56) + owner checkpoint on the fix direction
+- [ ] 38.13-02-PLAN.md — Control row + query store: Active row, exclusive All/Active, no dropped taps, labels, no panel after blur (D-23, D-58, D-27, D-35, D-36, D-50)
+- [ ] 38.13-03-PLAN.md — Search read layer: Unbound on All Contacts searches, needs-attention guard, typo tolerance, docstrings (D-59, D-60, D-53)
+- [ ] 38.13-04-PLAN.md — Your Week + Settings wording (D-45, D-46, D-47, D-49, D-63)
+- [ ] 38.13-05-PLAN.md — Home session + empty states: stale search, Back, Reset to top, 38.9 empty states, tucked-away buttons (D-24, D-29, D-31, D-28, D-30, D-65)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 38.13-06-PLAN.md — Digest Overlooked = needs attention minus Up Next; Horizon birthday avatars (D-61, D-48)
+- [ ] 38.13-07-PLAN.md — Rows and cards: Unbound search rows, plain search labels and descriptions, no stale "1 match", card width and text (D-59, D-37, D-51, D-44, D-32, D-33)
+
+**Wave 3** *(blocked on Wave 2 completion and the 38.13-01 owner checkpoint)*
+
+- [ ] 38.13-08-PLAN.md — List row host: the owner-chosen perf fix, row closes after swipe, two TalkBack log actions, fade after commit, hidden-Home favourite reload (D-55, D-25, D-26, D-44, D-52)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 38.13-09-PLAN.md — Selection mode: M3b bottom bar, More… sheet, applicability, + and rows hidden, Undo above the bar (D-69, D-72, D-76, D-40, D-74, D-75, D-41)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 38.13-10-PLAN.md — Bulk sheets + contact picker: FrequencyPicker, compact sheets, picker title and keyboard (D-39, D-71, D-70, D-43)
+
+**Wave 6** *(blocked on Wave 5 completion and the phase code review)*
+
+- [ ] 38.13-11-PLAN.md — Device pass: D-55 proven on release, device checks, owner batch, one fix pass, one release build, Phase 39 amendment rows
 
 ### Phase 38.14: Logging, History, Events & Compose UX (INSERTED)
 
