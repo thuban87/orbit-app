@@ -1,7 +1,7 @@
 /**
  * HomeScreen — the dashboard CORE (DASH-01/03/04/05/07). This IS the app's home
  * surface: the Phase 25 query-state population (`listDashboardPopulation`, or
- * `listDashboardSearch` when a term is present) rendered as ListRows or a CardGrid,
+ * `composeDashboardSearch` when a term is present) rendered as ListRows or a CardGrid,
  * the contact-count header, the Population/Filters/Sort control row, the Row 3
  * collapsible session-backed search + List/Card toggle, a reliable freshness
  * path, and cause-aware empty/error states.
@@ -18,7 +18,7 @@
  * foreground tick + pull is the only path that reflects those writes.
  *
  * READS (threat T-08-16/17): every read is async on-device SQLite (the D-12
- * `listDashboardPopulation` / `listDashboardSearch` read + the counts via
+ * `listDashboardPopulation` / `composeDashboardSearch` read + the counts via
  * `getExecutor()`) issued by the one `createDashboardRefreshScheduler` and
  * published only through `publishDashboardRead`, whose latest-request token
  * means a stale async result can never clobber a newer one (RG-022, D-23); no
@@ -127,7 +127,6 @@ import {
   countSnoozed,
   type DashboardRow,
   listDashboardPopulation,
-  listDashboardSearch,
   readCurrentlySnoozedIds,
   readSelectionLifecycle,
 } from "@/db/dashboard-read";
@@ -1151,10 +1150,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 ),
               }),
             )
-          : (term !== ""
-              ? listDashboardSearch(exec, query, term, now)
-              : listDashboardPopulation(exec, query, now)
-            ).then((rows) => ({
+          : listDashboardPopulation(exec, query, now).then((rows) => ({
               rows,
               resultsByContactId: new Map<
                 number,
