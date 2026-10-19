@@ -37,6 +37,7 @@ const VIRTUALIZED_LIST = /<(FlatList|SectionList)\b/;
 const EXPECTED_OPT_OUTS = [
   "src/components/orrery/OrreryContactsSheet.tsx",
   "src/components/profile/ProfileRelationshipSheets.tsx",
+  "src/components/ui/OptionSheet.tsx",
 ];
 
 function tsxFiles(dir: string): string[] {

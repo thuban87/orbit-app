@@ -59,9 +59,13 @@ describe("RelationshipEditor switches (AUD-UIA-003, D-20)", () => {
   });
 });
 
-/** The option-row Pressable inside a FlatList `renderItem` (first `<Pressable` after it). */
-function optionRegion(src: string): string {
-  const start = src.indexOf("renderItem=");
+/**
+ * The option-row Pressable after `anchor` (first `<Pressable` after it). The
+ * default anchor is a FlatList `renderItem`; OptionSheet hoists its row into
+ * one `renderOption` callback both of its lists use (38.13 D-71).
+ */
+function optionRegion(src: string, anchor = "renderItem="): string {
+  const start = src.indexOf(anchor);
   expect(start).toBeGreaterThan(-1);
   const pressable = src.indexOf("<Pressable", start);
   const end = src.indexOf("</Pressable>", pressable);
@@ -96,8 +100,15 @@ describe("Custom-field dropdown (AUD-UIA-005, out-of-list preserved)", () => {
     );
   });
 
+  it("renders every option list through the one shared row", () => {
+    // 38.13 D-71: the default (expanded) and the sized block each have a
+    // FlatList; both render the same row, so the assertions below cover both.
+    expect(sheet.match(/<FlatList\b/g)).toHaveLength(2);
+    expect(sheet.match(/renderItem=\{renderOption\}/g)).toHaveLength(2);
+  });
+
   it("marks the selected option with state, a non-colour glyph and the D-05 top tier", () => {
-    const option = optionRegion(sheet);
+    const option = optionRegion(sheet, "const renderOption");
     expect(option).toContain("accessibilityState={{ selected: isSelected }}");
     expect(option).toMatch(/<Icon name="select" state="active"/);
     // D-05 top tier: accent fill with an onAccent label and glyph.

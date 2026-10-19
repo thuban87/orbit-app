@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import { selectorItems } from "@/components/selector-a11y";
 import { CATEGORY_SEARCH_THRESHOLD } from "@/logic/category-logic";
 import {
+  OPTION_SHEET_COMPACT_MAX_ROWS,
+  OPTION_SHEET_DETAIL_MAX_ROWS,
   optionKey,
   optionSheetModel,
+  optionSheetVariantFor,
   shouldSearch,
 } from "./option-sheet-logic";
 
@@ -164,5 +167,29 @@ describe("optionKey", () => {
       ]).size,
     ).toBe(4);
     expect(optionKey("call")).toBe(optionKey("call"));
+  });
+});
+
+describe("optionSheetVariantFor (38.13 D-71, D-78: sized when it opens)", () => {
+  it("opens a short list compact, a medium list at detail, a long list expanded", () => {
+    expect(optionSheetVariantFor(3)).toBe("compact");
+    expect(optionSheetVariantFor(8)).toBe("detail");
+    expect(optionSheetVariantFor(25)).toBe("expanded");
+  });
+
+  it("switches exactly at the row thresholds", () => {
+    expect(OPTION_SHEET_COMPACT_MAX_ROWS).toBe(5);
+    expect(OPTION_SHEET_DETAIL_MAX_ROWS).toBe(10);
+    expect(optionSheetVariantFor(0)).toBe("compact");
+    expect(optionSheetVariantFor(OPTION_SHEET_COMPACT_MAX_ROWS)).toBe(
+      "compact",
+    );
+    expect(optionSheetVariantFor(OPTION_SHEET_COMPACT_MAX_ROWS + 1)).toBe(
+      "detail",
+    );
+    expect(optionSheetVariantFor(OPTION_SHEET_DETAIL_MAX_ROWS)).toBe("detail");
+    expect(optionSheetVariantFor(OPTION_SHEET_DETAIL_MAX_ROWS + 1)).toBe(
+      "expanded",
+    );
   });
 });

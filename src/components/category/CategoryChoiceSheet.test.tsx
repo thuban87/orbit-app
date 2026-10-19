@@ -271,4 +271,76 @@ describe("CategoryChoiceSheet", () => {
     for (const effect of reactMocks.effects) effect();
     expect(reactMocks.setQuery).toHaveBeenCalledWith("");
   });
+
+  // 38.13 D-71 / D-78: the bulk Set Category sheet is sized when it opens.
+  describe("sizeToContent (D-71, D-78)", () => {
+    const named = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: index + 1,
+        name: `Category ${index + 1}`,
+      }));
+    const optionSheetProps = (
+      count: number,
+      sizeToContent?: boolean,
+    ): Record<string, unknown> =>
+      (
+        renderCategoryChoiceSheet({
+          visible: true,
+          categories: named(count),
+          selectedId: null,
+          allowUncategorized: true,
+          sizeToContent,
+          onSelect: vi.fn(),
+          onRequestClose: vi.fn(),
+        }) as unknown as { props: Record<string, unknown> }
+      ).props;
+
+    it("counts its own unfiltered rows, Uncategorized included", () => {
+      // 2 + Uncategorized = 3 rows; 7 + 1 = 8; 24 + 1 = 25.
+      expect(optionSheetProps(2, true).size).toBe("compact");
+      expect(optionSheetProps(7, true).size).toBe("detail");
+      expect(optionSheetProps(24, true).size).toBeUndefined();
+    });
+
+    it("never passes a size without the flag (every other caller unchanged)", () => {
+      expect(optionSheetProps(2).size).toBeUndefined();
+      expect(optionSheetProps(7, false).size).toBeUndefined();
+    });
+
+    it("renders a content-sized compact/detail sheet whose list is the only scroll", () => {
+      const render = (count: number) =>
+        CategoryChoiceSheet({
+          visible: true,
+          categories: named(count),
+          selectedId: null,
+          sizeToContent: true,
+          onSelect: vi.fn(),
+          onRequestClose: vi.fn(),
+        }) as { type: unknown; props: Record<string, unknown> };
+      const compact = render(2);
+      expect(compact.type).toBe("Sheet");
+      expect(compact.props.variant).toBe("compact");
+      expect(compact.props.scrollBody).toBe(false);
+      expect(findElements(compact, "FlatList")).toHaveLength(1);
+      const detail = render(7);
+      expect(detail.props.variant).toBe("detail");
+      expect(detail.props.scrollBody).toBe(false);
+      const long = render(24);
+      expect(long.props.variant).toBe("expanded");
+      expect(long.props.scrollBody).toBeUndefined();
+      expect(findElements(long, "FlatList")).toHaveLength(1);
+    });
+
+    it("keeps today's expanded sheet without the flag", () => {
+      const tree = CategoryChoiceSheet({
+        visible: true,
+        categories: named(2),
+        selectedId: null,
+        onSelect: vi.fn(),
+        onRequestClose: vi.fn(),
+      }) as { props: Record<string, unknown> };
+      expect(tree.props.variant).toBe("expanded");
+      expect(tree.props.scrollBody).toBeUndefined();
+    });
+  });
 });
