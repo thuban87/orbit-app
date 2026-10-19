@@ -3,9 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor } from "@/db/database";
+import {
+  nextPopulations,
+  type PopulationPanelKey,
+  samePopulations,
+} from "@/logic/dashboard-population-toggle";
 import type {
   DashboardFilterFamily,
-  DashboardPopulation,
   DashboardSortMode,
 } from "@/logic/dashboard-query-logic";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
@@ -112,14 +116,15 @@ export function DashboardControlRow() {
   }, []);
 
   const togglePopulation = useCallback(
-    async (key: DashboardPopulation) => {
+    async (key: PopulationPanelKey) => {
       if (pending) return;
+      // D-23/D-58: the pure toggle owns exclusivity; "active" stores [].
+      const current = useDashboardQueryStore.getState().populations;
+      const next = nextPopulations(current, key);
+      // Review R1-16: re-tapping the selected row writes and reloads nothing.
+      if (samePopulations(next, current)) return;
       setPending(true);
       setWriteError(false);
-      const current = useDashboardQueryStore.getState().populations;
-      const next = current.includes(key)
-        ? current.filter((value) => value !== key)
-        : [...current, key];
       try {
         await useDashboardQueryStore
           .getState()
