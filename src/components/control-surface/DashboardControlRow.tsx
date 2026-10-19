@@ -1,4 +1,4 @@
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -29,6 +29,7 @@ import { useArtTreatment } from "@/theme/use-art-treatment";
 import {
   AXIS_DEFAULT_LABELS,
   CONTROL_AXIS_LABELS,
+  defaultSortLabel,
   POPULATION_LABELS,
   sortModeLabel,
 } from "./control-labels";
@@ -37,6 +38,7 @@ import { dashboardPanelStore } from "./dashboard-panel-store";
 import { FilterPanelContent } from "./FilterPanelContent";
 import { selectedFilterLabels } from "./filter-summary";
 import { PopulationPanelContent } from "./PopulationPanelContent";
+import { openIfStillFocused } from "./panel-open-guard";
 import { SortPanelContent } from "./SortPanelContent";
 import { controlTriggerLook } from "./trigger-look";
 
@@ -91,6 +93,12 @@ export function DashboardControlRow() {
   useShellRefresh(() => setShellRevision((revision) => revision + 1));
   const activePanelId = dashboardPanelStore((state) => state.request?.id);
   const panelIsOpen = activePanelId === PANEL_ID;
+  // D-50: read at measure-callback time, so a blur between the tap and the
+  // callback stops the panel opening on a hidden Contacts screen.
+  const isFocused = useIsFocused();
+  const isFocusedRef = useRef(isFocused);
+  isFocusedRef.current = isFocused;
+  const stillFocused = useCallback(() => isFocusedRef.current, []);
   const triggerRef = useRef<View>(null);
   const filtersTriggerRef = useRef<View>(null);
   const sortTriggerRef = useRef<View>(null);
@@ -210,20 +218,22 @@ export function DashboardControlRow() {
       return;
     }
     triggerRef.current?.measureInWindow((x, y, width, height) => {
-      dashboardPanelStore.getState().open({
-        id: PANEL_ID,
-        anchorRect: { x, y, width, height },
-        size: "medium",
-        content: (
-          <PopulationPanelContent
-            state={useDashboardQueryStore.getState()}
-            onTogglePopulation={togglePopulation}
-          />
-        ),
-        onDismiss: dismiss,
-      });
+      openIfStillFocused(stillFocused, () =>
+        dashboardPanelStore.getState().open({
+          id: PANEL_ID,
+          anchorRect: { x, y, width, height },
+          size: "medium",
+          content: (
+            <PopulationPanelContent
+              state={useDashboardQueryStore.getState()}
+              onTogglePopulation={togglePopulation}
+            />
+          ),
+          onDismiss: dismiss,
+        }),
+      );
     });
-  }, [dismiss, togglePopulation]);
+  }, [dismiss, stillFocused, togglePopulation]);
 
   const openFilters = useCallback(() => {
     if (dashboardPanelStore.getState().request?.id === FILTER_PANEL_ID) {
@@ -231,22 +241,24 @@ export function DashboardControlRow() {
       return;
     }
     filtersTriggerRef.current?.measureInWindow((x, y, width, height) => {
-      dashboardPanelStore.getState().open({
-        id: FILTER_PANEL_ID,
-        anchorRect: { x, y, width, height },
-        size: "large",
-        content: (
-          <FilterPanelContent
-            state={useDashboardQueryStore.getState()}
-            categories={categories}
-            onToggleFilter={toggleFilter}
-            onClearFilters={clearFilters}
-          />
-        ),
-        onDismiss: dismiss,
-      });
+      openIfStillFocused(stillFocused, () =>
+        dashboardPanelStore.getState().open({
+          id: FILTER_PANEL_ID,
+          anchorRect: { x, y, width, height },
+          size: "large",
+          content: (
+            <FilterPanelContent
+              state={useDashboardQueryStore.getState()}
+              categories={categories}
+              onToggleFilter={toggleFilter}
+              onClearFilters={clearFilters}
+            />
+          ),
+          onDismiss: dismiss,
+        }),
+      );
     });
-  }, [categories, clearFilters, dismiss, toggleFilter]);
+  }, [categories, clearFilters, dismiss, stillFocused, toggleFilter]);
 
   const openSort = useCallback(() => {
     if (dashboardPanelStore.getState().request?.id === SORT_PANEL_ID) {
@@ -254,20 +266,22 @@ export function DashboardControlRow() {
       return;
     }
     sortTriggerRef.current?.measureInWindow((x, y, width, height) => {
-      dashboardPanelStore.getState().open({
-        id: SORT_PANEL_ID,
-        anchorRect: { x, y, width, height },
-        size: "compact",
-        content: (
-          <SortPanelContent
-            state={useDashboardQueryStore.getState()}
-            onSelectSort={selectSort}
-          />
-        ),
-        onDismiss: dismiss,
-      });
+      openIfStillFocused(stillFocused, () =>
+        dashboardPanelStore.getState().open({
+          id: SORT_PANEL_ID,
+          anchorRect: { x, y, width, height },
+          size: "compact",
+          content: (
+            <SortPanelContent
+              state={useDashboardQueryStore.getState()}
+              onSelectSort={selectSort}
+            />
+          ),
+          onDismiss: dismiss,
+        }),
+      );
     });
-  }, [dismiss, selectSort]);
+  }, [dismiss, selectSort, stillFocused]);
 
   // The host owns the presentation node, so refresh the pure content props as
   // store state changes without coupling the content component to persistence.
@@ -328,7 +342,7 @@ export function DashboardControlRow() {
   const filtersActive = Object.values(filters).some((values) => values?.length);
   const sortLabel = CONTROL_AXIS_LABELS.sort;
   const sortSummary =
-    sort === "default" ? AXIS_DEFAULT_LABELS.sort : sortModeLabel(sort);
+    sort === "default" ? defaultSortLabel(populations) : sortModeLabel(sort);
   const sortActive = sort !== "default";
   const populationLook = triggerLook(active);
   const filtersLook = triggerLook(filtersActive);

@@ -1,8 +1,10 @@
 import { FAVORITES, NEVER_CONTACTED } from "@/constants/glossary";
-import type {
-  DashboardFilterFamily,
-  DashboardPopulation,
-  DashboardSortMode,
+import {
+  type DashboardFilterFamily,
+  type DashboardPopulation,
+  type DashboardSortMode,
+  type ResolvedDashboardSort,
+  resolveDefaultSort,
 } from "@/logic/dashboard-query-logic";
 
 /** The single source of dashboard control copy. */
@@ -16,7 +18,8 @@ export const POPULATION_LABELS: Record<DashboardPopulation, string> = {
 
 export const AXIS_DEFAULT_LABELS = {
   population: "Active Contacts",
-  filters: "Filters",
+  // D-36: the Filters chip summary reads a plain word when nothing is set.
+  filters: "None",
   sort: "Default",
 } as const;
 
@@ -68,6 +71,34 @@ export const SORT_MODE_LABELS: Record<DashboardSortMode, string> = {
   "most-recent": "Most recent",
   status: "Status",
 };
+
+/**
+ * What a Default sort resolves to, shown in brackets after "Default" (D-35).
+ * The wording for the population-specific orders is this plan's choice; it
+ * mirrors dashboard-read.ts POPULATION_SORT (created_at ASC, snooze_until ASC,
+ * soonest birthday). Status stays a separate sort option (D-19).
+ */
+export const RESOLVED_DEFAULT_SORT_LABELS: Record<
+  ResolvedDashboardSort,
+  string
+> = {
+  status: SORT_MODE_LABELS.status,
+  "name-asc": SORT_MODE_LABELS["name-asc"],
+  "name-desc": SORT_MODE_LABELS["name-desc"],
+  "least-recent": SORT_MODE_LABELS["least-recent"],
+  "most-recent": SORT_MODE_LABELS["most-recent"],
+  "natural-not-contacted": "Oldest added",
+  "natural-snooze": "Snooze ends soonest",
+  "soonest-birthday": "Soonest birthday",
+};
+
+/** "Default (X)", where X is what Default resolves to for `populations` (D-35). */
+export function defaultSortLabel(
+  populations: readonly DashboardPopulation[],
+): string {
+  const resolved = resolveDefaultSort("default", populations);
+  return `${AXIS_DEFAULT_LABELS.sort} (${RESOLVED_DEFAULT_SORT_LABELS[resolved]})`;
+}
 
 export const CONTROL_ACTION_LABELS = {
   clearFilters: "Clear filters",

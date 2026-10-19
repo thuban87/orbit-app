@@ -5,7 +5,11 @@ import {
   type DashboardSortMode,
 } from "@/logic/dashboard-query-logic";
 import { useTheme } from "@/theme";
-import { CONTROL_ACTION_LABELS, sortModeLabel } from "./control-labels";
+import {
+  CONTROL_ACTION_LABELS,
+  defaultSortLabel,
+  sortModeLabel,
+} from "./control-labels";
 
 export interface SortPanelContentProps {
   state: DashboardQueryState;
@@ -24,7 +28,11 @@ export function SortPanelContent({
     <View testID="dashboard-sort-panel" style={styles.content}>
       {DASHBOARD_SORT_MODES.map((mode) => {
         const selected = state.sort === mode;
-        const label = sortModeLabel(mode);
+        // D-35: Default says what it resolves to for the selected population.
+        const label =
+          mode === "default"
+            ? defaultSortLabel(state.populations)
+            : sortModeLabel(mode);
         return (
           <Pressable
             key={mode}
