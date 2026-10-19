@@ -393,8 +393,14 @@ type SwipeableListRowProps = Pick<
   unbound: boolean;
   onOpenProfile: (contactId: number) => void;
   onFavouriteTap: (contactId: number, nextMembership: boolean) => void;
-  onLogInteraction: (contactId: number) => Promise<void>;
+  /** The right swipe: follows the swipe preference (one function, 39 D-53). */
+  onSwipeRightAction: (contactId: number) => Promise<void>;
+  /** The left swipe and the Edit Contact accessibility action. */
   onEditContact: (contactId: number) => void;
+  /** The Quick Log accessibility action (D-26). */
+  onQuickLog: (contactId: number) => void;
+  /** The Log Interaction accessibility action: opens Log Interaction (D-26). */
+  onLogInteraction: (contactId: number) => void;
   openRowRef: { current: SwipeableMethods | null };
 };
 
@@ -406,8 +412,10 @@ const SwipeableListRow = memo(function SwipeableListRow({
   line3IconName,
   onOpenProfile,
   onFavouriteTap,
-  onLogInteraction,
+  onSwipeRightAction,
   onEditContact,
+  onQuickLog,
+  onLogInteraction,
   openRowRef,
   ...rowProps
 }: SwipeableListRowProps) {
@@ -454,23 +462,30 @@ const SwipeableListRow = memo(function SwipeableListRow({
     onFavouriteTap(contactId, !isFavourite);
   }, [contactId, isFavourite, onFavouriteTap]);
 
+  const onRowQuickLog = useCallback(() => {
+    onQuickLog(contactId);
+  }, [contactId, onQuickLog]);
+
   const onRowLogInteraction = useCallback(() => {
-    void onLogInteraction(contactId);
+    onLogInteraction(contactId);
   }, [contactId, onLogInteraction]);
 
   const onRowEditContact = useCallback(() => {
     onEditContact(contactId);
   }, [contactId, onEditContact]);
 
+  // D-25: the row closes once its action fires, in either direction. The
+  // close animates back and `onClose` clears `openRowRef`; no React state.
   const onSwipeableOpen = useCallback(
     (direction: "left" | "right") => {
       if (direction === "right") {
-        void onLogInteraction(contactId);
-        return;
+        void onSwipeRightAction(contactId);
+      } else {
+        onEditContact(contactId);
       }
-      onEditContact(contactId);
+      swipeableRef.current?.close();
     },
-    [contactId, onEditContact, onLogInteraction],
+    [contactId, onEditContact, onSwipeRightAction],
   );
 
   return (
@@ -506,6 +521,7 @@ const SwipeableListRow = memo(function SwipeableListRow({
         swipeTranslation={swipeTranslation}
         onPress={onPress}
         onToggleFavourite={onToggleFavourite}
+        onQuickLog={onRowQuickLog}
         onLogInteraction={onRowLogInteraction}
         onEditContact={onRowEditContact}
       />
@@ -768,7 +784,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     );
   }, []);
 
-  const onLogInteraction = useCallback(
+  // The one right-swipe function (38.13 D-26; 39 D-53 hooks here later): it
+  // follows the swipe preference. TalkBack's Quick Log and Log Interaction
+  // run their own handlers, never this one.
+  const onSwipeRightAction = useCallback(
     async (contactId: number) => {
       try {
         const { dashboardRightSwipeAction } = await getAppSettings(
@@ -791,7 +810,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             label: "Retry",
             accessibilityLabel: "Retry reading swipe action",
             onPress: () => {
-              void onLogInteraction(contactId);
+              void onSwipeRightAction(contactId);
             },
           },
         });
@@ -1739,7 +1758,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     setContextMenuContactId(contactId);
   }, []);
 
-  const logCardInteraction = useCallback((contactId: number) => {
+  // Log Interaction for a card, the card menu and the List row's TalkBack
+  // action (D-26): always the detailed Log Interaction screen.
+  const openLogInteraction = useCallback((contactId: number) => {
     navigateDashboardContactAction(contactId, "LogContact");
   }, []);
 
@@ -1964,8 +1985,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           unbound={isUnboundRow(item)}
           onOpenProfile={goToProfile}
           onFavouriteTap={onFavouriteTap}
-          onLogInteraction={onLogInteraction}
+          onSwipeRightAction={onSwipeRightAction}
           onEditContact={onEditContact}
+          onQuickLog={logQuickly}
+          onLogInteraction={openLogInteraction}
           openRowRef={openRowRef}
         />
       );
@@ -1976,9 +1999,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       isSearchMode,
       line3ByContactId,
       listDay,
+      logQuickly,
       onEditContact,
       onFavouriteTap,
-      onLogInteraction,
+      onSwipeRightAction,
+      openLogInteraction,
       searchResultsByContactId,
     ],
   );
@@ -2376,7 +2401,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 onLongPressContact={openCardContextMenu}
                 onViewProfile={goToProfile}
                 onQuickLog={logQuickly}
-                onLogInteraction={logCardInteraction}
+                onLogInteraction={openLogInteraction}
                 onMessage={messageContact}
                 onEditContact={onEditContact}
                 onSelect={enterCardSelection}
@@ -2418,7 +2443,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           if (contextMenuContact) logQuickly(contextMenuContact.id);
         }}
         onLogInteraction={() => {
-          if (contextMenuContact) logCardInteraction(contextMenuContact.id);
+          if (contextMenuContact) openLogInteraction(contextMenuContact.id);
         }}
         onMessage={() => {
           if (contextMenuContact) messageContact(contextMenuContact.id);

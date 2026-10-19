@@ -354,7 +354,9 @@ describe("a swiped row closes once its action fires (D-25)", () => {
 
 describe("the List row's TalkBack actions run what they are named for (D-26)", () => {
   it("onSwipeRightAction is the one right-swipe function, used only for the right swipe", () => {
-    expect(source.match(/const onSwipeRightAction = useCallback\(/g)).toHaveLength(1);
+    expect(
+      source.match(/const onSwipeRightAction = useCallback\(/g),
+    ).toHaveLength(1);
     const attributes = rowAttributes();
     expect(
       attributeExpression(
@@ -372,15 +374,17 @@ describe("the List row's TalkBack actions run what they are named for (D-26)", (
   it("the accessibility Quick Log runs logQuickly and Log Interaction opens Log Interaction", () => {
     const attributes = rowAttributes();
     expect(
-      attributeExpression(attributes.get("onQuickLog") as ts.JsxAttribute)
-        .getText(file),
+      attributeExpression(
+        attributes.get("onQuickLog") as ts.JsxAttribute,
+      ).getText(file),
     ).toBe("logQuickly");
     expect(
-      attributeExpression(attributes.get("onLogInteraction") as ts.JsxAttribute)
-        .getText(file),
+      attributeExpression(
+        attributes.get("onLogInteraction") as ts.JsxAttribute,
+      ).getText(file),
     ).toBe("openLogInteraction");
-    const open = callbackInitialiserOf("openLogInteraction")
-      .arguments[0]?.getText(file);
+    const open =
+      callbackInitialiserOf("openLogInteraction").arguments[0]?.getText(file);
     expect(open).toContain(
       'navigateDashboardContactAction(contactId, "LogContact")',
     );

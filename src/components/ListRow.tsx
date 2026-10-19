@@ -151,7 +151,13 @@ export interface ListRowProps {
   onToggleFavourite?: () => void;
   /** The selected adaptive third content line, owned by HomeScreen. */
   line3?: { text: string; iconName?: IconName } | null;
-  /** Gesture-equivalent actions injected by the list host. */
+  /**
+   * TalkBack actions injected by the list host (38.13 D-26): each one runs
+   * only what it is named for. Quick Log and Log Interaction are both offered,
+   * as on a Card view card; the right swipe follows the swipe preference in
+   * the host and is not one of these.
+   */
+  onQuickLog?: () => void;
   onLogInteraction?: () => void;
   onEditContact?: () => void;
   /** Reserved for Plan 06's search-specific row presentation. */
@@ -182,6 +188,7 @@ export function ListRow({
   isFavourite = false,
   onToggleFavourite,
   line3 = null,
+  onQuickLog,
   onLogInteraction,
   onEditContact,
   searchResult,
@@ -234,6 +241,13 @@ export function ListRow({
         context: line3?.text ?? null,
       });
 
+  // D-26: the gesture-equivalent actions the host passed, in GridCard's order.
+  const accessibilityActions = [
+    onQuickLog && { name: "quick-log", label: "Quick Log" },
+    onLogInteraction && { name: "log-interaction", label: "Log Interaction" },
+    onEditContact && { name: "edit-contact", label: "Edit Contact" },
+  ].filter(Boolean) as { name: string; label: string }[];
+
   // D-59: the Unbound marker. An opaque chip like the category chip, so its
   // text keeps the ROOT palette inside a see-through row's scope (C2-L4).
   const unboundChip = unbound ? (
@@ -267,18 +281,19 @@ export function ListRow({
             accessibilityRole="button"
             accessibilityLabel={accessibilityLabel}
             accessibilityActions={
-              onLogInteraction && onEditContact
-                ? [
-                    { name: "log-interaction", label: "Log Interaction" },
-                    { name: "edit-contact", label: "Edit Contact" },
-                  ]
-                : undefined
+              accessibilityActions.length > 0 ? accessibilityActions : undefined
             }
             onAccessibilityAction={(event) => {
-              if (event.nativeEvent.actionName === "log-interaction") {
-                onLogInteraction?.();
-              } else if (event.nativeEvent.actionName === "edit-contact") {
-                onEditContact?.();
+              switch (event.nativeEvent.actionName) {
+                case "quick-log":
+                  onQuickLog?.();
+                  break;
+                case "log-interaction":
+                  onLogInteraction?.();
+                  break;
+                case "edit-contact":
+                  onEditContact?.();
+                  break;
               }
             }}
             onPress={onPress}
