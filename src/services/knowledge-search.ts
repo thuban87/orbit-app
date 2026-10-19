@@ -13,6 +13,13 @@
 /** Maximum raw input characters considered by one tokenization operation. */
 export const MAX_TOKENIZE_LEN = 4096;
 
+/**
+ * Typo tolerance (38.13 D-60, owner): a search term shorter than this many
+ * letters allows at most one typo; a term of this length or longer allows two.
+ * An adjacent swap counts as one typo (see `boundedEditDistance`).
+ */
+export const TYPO_TWO_EDIT_MIN_LENGTH = 8;
+
 export interface KnowledgeSearchItem {
   readonly custom_label: string | null;
   readonly value: string | null;
@@ -105,9 +112,13 @@ function tokenizeWithOffsets(text: string): OffsetToken[] {
 }
 
 /**
- * Return the Levenshtein distance when it is at most `limit`; otherwise return
- * `limit + 1`. The calculation visits only the edit-distance band, so it exits
- * quickly once a candidate cannot meet the caller's threshold.
+ * Return the restricted Damerau-Levenshtein distance (adjacent swap = one edit,
+ * the "optimal string alignment" form; 38.13 D-60) when it is at most `limit`;
+ * otherwise return `limit + 1`. The calculation visits only the edit-distance
+ * band, so it exits quickly once a candidate cannot meet the caller's threshold.
+ * The early exit stays sound with the swap step: if every cell of row i-1
+ * exceeds `limit`, every d[i-2][j-2] >= limit, so a swap into row i costs at
+ * least limit + 1 (RESEARCH Pattern 9).
  */
 export function boundedEditDistance(
   left: string,
@@ -120,6 +131,9 @@ export function boundedEditDistance(
   let previous = Array.from({ length: right.length + 1 }, (_, index) =>
     index <= limit ? index : exceeded,
   );
+  // Row i-2, read only by the swap step (i > 1). Cells outside the band hold
+  // `exceeded`, the same as `previous`.
+  let beforePrevious = previous;
 
   for (let i = 1; i <= left.length; i += 1) {
     const current = new Array<number>(right.length + 1).fill(exceeded);
@@ -129,14 +143,24 @@ export function boundedEditDistance(
     let rowMinimum = current[0];
 
     for (let j = start; j <= end; j += 1) {
-      current[j] = Math.min(
+      let cell = Math.min(
         previous[j] + 1,
         current[j - 1] + 1,
         previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1),
       );
+      if (
+        i > 1 &&
+        j > 1 &&
+        left[i - 1] === right[j - 2] &&
+        left[i - 2] === right[j - 1]
+      ) {
+        cell = Math.min(cell, beforePrevious[j - 2] + 1);
+      }
+      current[j] = cell;
       rowMinimum = Math.min(rowMinimum, current[j]);
     }
     if (rowMinimum > limit) return exceeded;
+    beforePrevious = previous;
     previous = current;
   }
 
@@ -147,7 +171,7 @@ function tokenScore(term: string, token: string): number | null {
   if (term === token) return 4;
   if (token.startsWith(term)) return 3;
   if (token.includes(term)) return 2;
-  const limit = term.length >= 6 ? 2 : 1;
+  const limit = term.length >= TYPO_TWO_EDIT_MIN_LENGTH ? 2 : 1;
   return boundedEditDistance(term, token, limit) <= limit ? 1 : null;
 }
 
