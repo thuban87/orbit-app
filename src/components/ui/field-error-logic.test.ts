@@ -101,18 +101,34 @@ describe("no numeric node handle reaches measureLayout (E-X01)", () => {
 });
 
 describe("bulk-frequency sheet validation is inline (D-40, A-13; 38.13 D-39)", () => {
-  // 38.13 D-39: the raw days field became the shared FrequencyPicker, which
-  // owns its inline error; Continue is gated on the picker's validity.
-  it("uses FrequencyPicker, gates Continue on validity and never snackbars", () => {
+  // ADR-199 (38.9 D-19) names this sheet: FieldError under the field, Save
+  // stays pressable, and a blocked Save reveals the error. 38.13 D-39 made the
+  // field the shared FrequencyPicker; its Custom… error renders through
+  // FieldError for this sheet, and a blocked Continue forces and announces it
+  // (38.13 review B-CR-01 restored this control after 38.13-10 inverted it).
+  it("keeps Continue pressable and reveals the picker's FieldError, never snackbars", () => {
     const sheet = read("src/components/BulkFrequencySheet.tsx");
     expect(sheet).toMatch(
       /<FrequencyPicker[\s\S]*?onValidityChange=\{setValid\}/,
     );
     expect(sheet).toMatch(
-      /testID="bulk-frequency-continue"[\s\S]*?disabled=\{!valid\}/,
+      /<FrequencyPicker[\s\S]*?errorForced=\{forceError\}[\s\S]*?errorAsFieldError/,
     );
+    const button = sheet.slice(
+      sheet.indexOf('testID="bulk-frequency-continue"'),
+    );
+    expect(button).not.toMatch(/disabled=/);
+    expect(button).toMatch(/if \(!valid\) \{[\s\S]*?setForceError\(true\)/);
+    expect(button).toMatch(/announceForAccessibility\(/);
     expect(sheet).not.toMatch(/showSnackbar\(/);
     expect(sheet).not.toMatch(/<TextInput/);
+  });
+
+  it("the picker renders that opt-in error through FieldError", () => {
+    const picker = read("src/components/FrequencyPicker.tsx");
+    expect(picker).toMatch(
+      /errorAsFieldError \? \([\s\S]*?<FieldError[\s\S]*?message=\{showError \? INVALID_INTERVAL_MESSAGE : null\}/,
+    );
   });
 
   it("HomeScreen hosts the sheet instead of its own days field", () => {

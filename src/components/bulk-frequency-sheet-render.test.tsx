@@ -10,6 +10,7 @@ import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BulkFrequencySheetProps } from "./BulkFrequencySheet";
 
+const announce = vi.hoisted(() => vi.fn());
 const hooks = vi.hoisted(() => ({
   stateIndex: 0,
   states: [] as unknown[],
@@ -36,6 +37,7 @@ vi.mock("react", async (original) => ({
   },
 }));
 vi.mock("react-native", () => ({
+  AccessibilityInfo: { announceForAccessibility: announce },
   StyleSheet: { create: <T,>(styles: T) => styles },
   View: "View",
 }));
@@ -134,6 +136,7 @@ describe("BulkFrequencySheet (D-39)", () => {
   beforeEach(() => {
     hooks.states = [];
     hooks.setters = [];
+    announce.mockClear();
   });
 
   it("is a compact sheet titled Change Contact Frequency, starting on 30 days", () => {
@@ -143,16 +146,33 @@ describe("BulkFrequencySheet (D-39)", () => {
     expect(root?.props.visible).toBe(true);
     expect(textOf(sheet.byType("AppText"))).toBe("Change Contact Frequency");
     expect(sheet.picker().props.value).toBe(30);
-    expect(sheet.continueButton().props.disabled).toBe(false);
+    expect(sheet.continueButton().props.disabled).toBeUndefined();
+    // ADR-199: the picker's error is the FieldError, shown after typing or
+    // when a blocked Continue forces it.
+    expect(sheet.picker().props.errorAsFieldError).toBe(true);
+    expect(sheet.picker().props.errorAfterTyping).toBe(true);
+    expect(sheet.picker().props.errorForced).toBe(false);
   });
 
-  it("blocks Continue while the picker reports an invalid custom entry", () => {
+  it("keeps Continue pressable on an invalid entry and reveals the error (ADR-199, B-CR-01)", () => {
     const sheet = mount();
     (sheet.picker().props.onValidityChange as (valid: boolean) => void)(false);
     sheet.render();
-    expect(sheet.continueButton().props.disabled).toBe(true);
+    expect(sheet.continueButton().props.disabled).toBeUndefined();
     (sheet.continueButton().props.onPress as () => void)();
+    sheet.render();
     expect(sheet.props.onContinue).not.toHaveBeenCalled();
+    expect(sheet.picker().props.errorForced).toBe(true);
+    expect(announce).toHaveBeenCalledWith(
+      "Enter a whole number greater than 0.",
+    );
+    // A new valid value clears the forced error.
+    (sheet.picker().props.onChange as (days: number) => void)(14);
+    (sheet.picker().props.onValidityChange as (valid: boolean) => void)(true);
+    sheet.render();
+    expect(sheet.picker().props.errorForced).toBe(false);
+    (sheet.continueButton().props.onPress as () => void)();
+    expect(sheet.props.onContinue).toHaveBeenCalledWith(14);
   });
 
   it("continues with the picker's value", () => {
@@ -169,13 +189,16 @@ describe("BulkFrequencySheet (D-39)", () => {
     (sheet.picker().props.onChange as (days: number) => void)(12);
     (sheet.picker().props.onValidityChange as (valid: boolean) => void)(false);
     sheet.render();
+    (sheet.continueButton().props.onPress as () => void)();
+    sheet.render();
+    expect(sheet.picker().props.errorForced).toBe(true);
     const firstKey = sheet.picker().key;
     sheet.props.visible = false;
     sheet.render();
     sheet.props.visible = true;
     sheet.render();
     expect(sheet.picker().props.value).toBe(30);
-    expect(sheet.continueButton().props.disabled).toBe(false);
+    expect(sheet.picker().props.errorForced).toBe(false);
     expect(sheet.picker().key).not.toBe(firstKey);
   });
 

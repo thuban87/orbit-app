@@ -16,6 +16,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FieldError } from "@/components/ui/FieldError";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS, type Frequency } from "@/types";
 import {
@@ -65,6 +66,14 @@ interface FrequencyPickerProps {
    * (D-36): the host renders no second message for frequency.
    */
   errorForced?: boolean;
+  /**
+   * Render the Custom… error through the shared `FieldError` primitive (38.9
+   * D-19 / ADR-199: a polite live region TalkBack reads when it appears)
+   * instead of the picker's own caption. Off by default, so every other host
+   * keeps today's caption; the bulk Change Contact Frequency sheet opts in
+   * (38.13 review B-CR-01).
+   */
+  errorAsFieldError?: boolean;
 }
 
 const PRESETS = Object.entries(FREQUENCY_DAYS) as [Frequency, number][];
@@ -86,6 +95,7 @@ export function FrequencyPicker({
   disabled = false,
   errorAfterTyping = false,
   errorForced = false,
+  errorAsFieldError = false,
 }: FrequencyPickerProps) {
   const { colors } = useTheme();
 
@@ -269,7 +279,12 @@ export function FrequencyPicker({
             </View>
           </View>
 
-          {showError ? (
+          {errorAsFieldError ? (
+            <FieldError
+              testID={`${testID}-error`}
+              message={showError ? INVALID_INTERVAL_MESSAGE : null}
+            />
+          ) : showError ? (
             <Text
               testID={`${testID}-error`}
               accessibilityLabel={INVALID_INTERVAL_MESSAGE}

@@ -6,17 +6,24 @@
  *
  * A mixed selection has no single current frequency, so the picker starts on
  * the Monthly preset (`FREQUENCY_DAYS.Monthly`, 30 days; this plan only) and
- * is reset to it each time the sheet opens. The picker owns its inline error
- * (no snackbar is used for validation); Continue is blocked while it reports
- * an invalid Custom… entry. Continue only hands the interval back: the host
- * still shows its confirm dialog before anything is written (D-18, D-75).
+ * is reset to it each time the sheet opens.
+ *
+ * Validation follows ADR-199 (38.9 D-19; review B-CR-01): Continue stays
+ * pressable. The picker's Custom… error renders through `FieldError` (a
+ * polite live region) once the user types; pressing Continue on an invalid
+ * entry forces that error and announces it, which is this one-field sheet's
+ * first-error reveal (the error sits directly under the only field). No
+ * snackbar is used for validation. Continue only hands a valid interval back:
+ * the host still shows its confirm dialog before anything is written (D-18,
+ * D-75).
  *
  * Every bulk sheet opens at the same compact size (D-71). No colour literal
  * (check:colors).
  */
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { AccessibilityInfo, StyleSheet, View } from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { INVALID_INTERVAL_MESSAGE } from "@/components/frequency-picker-logic";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -41,6 +48,8 @@ export function BulkFrequencySheet({
 }: BulkFrequencySheetProps) {
   const [intervalDays, setIntervalDays] = useState(BULK_FREQUENCY_START_DAYS);
   const [valid, setValid] = useState(true);
+  // A blocked Continue asks the picker to show its error now (ADR-199).
+  const [forceError, setForceError] = useState(false);
   // Bumped on every open; it keys the picker so its Custom… text and unit
   // (transient state the picker owns) start fresh too.
   const [openCount, setOpenCount] = useState(0);
@@ -50,6 +59,7 @@ export function BulkFrequencySheet({
     if (visible) {
       setIntervalDays(BULK_FREQUENCY_START_DAYS);
       setValid(true);
+      setForceError(false);
       setOpenCount((count) => count + 1);
     }
   }
@@ -64,17 +74,28 @@ export function BulkFrequencySheet({
           key={openCount}
           testID="bulk-frequency-picker"
           value={intervalDays}
-          onChange={setIntervalDays}
+          onChange={(days) => {
+            setIntervalDays(days);
+            setForceError(false);
+          }}
           onValidityChange={setValid}
+          errorAfterTyping
+          errorForced={forceError}
+          errorAsFieldError
         />
         <Button
           testID="bulk-frequency-continue"
           role="primary"
           label="Continue"
           accessibilityLabel="Confirm frequency"
-          disabled={!valid}
           onPress={() => {
-            if (!valid) return;
+            if (!valid) {
+              setForceError(true);
+              AccessibilityInfo.announceForAccessibility(
+                INVALID_INTERVAL_MESSAGE,
+              );
+              return;
+            }
             onContinue(intervalDays);
           }}
         />
