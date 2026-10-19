@@ -40,6 +40,9 @@ python3 scripts/dev/contacts-perf/list_memory.py --model "Pixel 6 Pro" --curve l
   List again -> 5 sort pairs in List (Name A-Z then Default; a sample after each
   pair) -> `am send-trim-memory com.bwales.orbit RUNNING_CRITICAL` -> sample.
 - `--curve card`: the control. Card idle -> 5 sort pairs in Card -> trim -> sample.
+- `--curve scroll`: card idle -> List -> `--pairs` scroll cycles (30 flings down, 30
+  back up; a sample after each cycle) -> trim -> sample. Checks whether rows mounting
+  and unmounting while scrolling a windowed list grows memory cycle after cycle.
 - `--cold` force-stops and relaunches first. Both curves end by switching the view
   back to Card (not sampled), so the next cold start opens in Card.
 - Taps use `uiautomator dump` bounds of the dashboard test IDs

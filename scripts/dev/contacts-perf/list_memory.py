@@ -13,6 +13,10 @@ Curves (the workpaper §4.0 M1 method):
                  N sort pairs in List (Name A-Z, then Default; a sample after
                  each pair) -> `am send-trim-memory RUNNING_CRITICAL` -> sample
   --curve card   the control: card idle -> N sort pairs in Card -> trim -> sample
+  --curve scroll card idle -> List (settled) -> N scroll cycles (fling to the
+                 end of the list and back; a sample after each cycle) -> trim
+                 -> sample. Checks whether rows mounting and unmounting while
+                 scrolling (a windowed list) grows memory.
 
 Taps go through `uiautomator dump` bounds of the dashboard test IDs
 (`dashboard-view-toggle-list/-card`, `dashboard-sort-control`,
@@ -55,6 +59,9 @@ IDLE_WINDOWS = 3              # ... for this many consecutive windows = settled
 IDLE_WINDOW_S = 0.5
 IDLE_TIMEOUT_S = 120.0
 DEFAULT_PAIRS = 5
+FLINGS_PER_HALF_CYCLE = 30    # flings to travel from the top of ~1,000 rows to the end
+FLING_MS = 120
+FLING_GAP_S = 0.35
 SORT_A = "name-asc"
 SORT_B = "default"
 
@@ -314,7 +321,24 @@ def run(serial: str, curve: str, pairs: int, cold: bool, raw_dir: str | None) ->
     steps.append({"step": "card", "js_settle_s": settle})
     time.sleep(CARD_IDLE_S)
     sample(serial, "card-idle", t0, raw_dir, results)
-    if curve == "list":
+    if curve == "scroll":
+        _, settle = set_view(serial, controls, "list")
+        steps.append({"step": "list", "js_settle_s": settle})
+        time.sleep(POST_SWITCH_DWELL_S)
+        sample(serial, "list-top", t0, raw_dir, results)
+        region = find_rid(nodes, "dashboard-card-results") or find_rid(nodes, "dashboard-root")
+        left, top, right, bottom = region["bounds"]
+        x = (left + right) // 2
+        y_low, y_high = bottom - (bottom - top) // 6, top + (bottom - top) // 6
+        for cycle in range(1, pairs + 1):
+            for direction, (y0, y1) in (("down", (y_low, y_high)), ("up", (y_high, y_low))):
+                mark(serial, f"scroll-cycle{cycle}-{direction}")
+                for _ in range(FLINGS_PER_HALF_CYCLE):
+                    adb_device.shell(serial, f"input touchscreen swipe {x} {y0} {x} {y1} {FLING_MS}")
+                    time.sleep(FLING_GAP_S)
+                steps.append({"step": f"scroll-cycle{cycle}-{direction}", "js_settle_s": wait_js_idle(serial)})
+            sample(serial, f"scroll-cycle{cycle}", t0, raw_dir, results)
+    elif curve == "list":
         tap = tap_xy(serial, controls["view-list"], "view-list-first")
         for at in LIST_SAMPLES_S:
             time.sleep(max(0.0, at - (time.monotonic() - tap)))
@@ -350,8 +374,8 @@ def run(serial: str, curve: str, pairs: int, cold: bool, raw_dir: str | None) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     adb_device.add_model_arg(parser)
-    parser.add_argument("--curve", choices=["list", "card"], required=True)
-    parser.add_argument("--pairs", type=int, default=DEFAULT_PAIRS)
+    parser.add_argument("--curve", choices=["list", "card", "scroll"], required=True)
+    parser.add_argument("--pairs", type=int, default=DEFAULT_PAIRS, help="sort pairs, or scroll cycles for --curve scroll")
     parser.add_argument("--cold", action="store_true", help="force-stop and relaunch first")
     parser.add_argument("--label", default="", help="free text recorded in the JSON (build, data set)")
     parser.add_argument("--raw-dir", help="also save each raw dumpsys here")
