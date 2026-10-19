@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { openIfStillFocused } from "./panel-open-guard";
 
@@ -15,5 +16,18 @@ describe("openIfStillFocused (D-50)", () => {
     focused = false;
     measureCallback();
     expect(open).not.toHaveBeenCalled();
+  });
+});
+
+describe("DashboardControlRow's focus check reads live navigation state (D-50; 38.13 review A-IN-03)", () => {
+  it("asks navigation.isFocused() at callback time, not a render-time ref", () => {
+    const row = readFileSync(
+      "src/components/control-surface/DashboardControlRow.tsx",
+      "utf8",
+    );
+    expect(row).toMatch(
+      /const stillFocused = useCallback\(\s*\(\) => navigation\.isFocused\(\),\s*\[navigation\],?\s*\)/,
+    );
+    expect(row).not.toContain("isFocusedRef");
   });
 });

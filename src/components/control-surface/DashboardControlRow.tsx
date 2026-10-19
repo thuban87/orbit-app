@@ -1,4 +1,4 @@
-import { useFocusEffect, useIsFocused } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -94,11 +94,11 @@ export function DashboardControlRow() {
   const activePanelId = dashboardPanelStore((state) => state.request?.id);
   const panelIsOpen = activePanelId === PANEL_ID;
   // D-50: read at measure-callback time, so a blur between the tap and the
-  // callback stops the panel opening on a hidden Contacts screen.
-  const isFocused = useIsFocused();
-  const isFocusedRef = useRef(isFocused);
-  isFocusedRef.current = isFocused;
-  const stillFocused = useCallback(() => isFocusedRef.current, []);
+  // callback stops the panel opening on a hidden Contacts screen. It asks the
+  // navigator directly (38.13 review A-IN-03): a render-time ref could still
+  // read true if the callback lands after the blur but before the re-render.
+  const navigation = useNavigation();
+  const stillFocused = useCallback(() => navigation.isFocused(), [navigation]);
   const triggerRef = useRef<View>(null);
   const filtersTriggerRef = useRef<View>(null);
   const sortTriggerRef = useRef<View>(null);
