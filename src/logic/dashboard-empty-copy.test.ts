@@ -2,6 +2,7 @@
  * Contacts empty-state copy (38.13 D-28, D-30, D-65). The decision of WHICH
  * empty state shows stays in dashboard-empty-logic; this pins what each says.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ICON_REGISTRY } from "@/components/icons/icon-registry";
 import {
@@ -167,5 +168,13 @@ describe("tuckedAwayLines (D-65)", () => {
         archived: 0,
       })[0]?.accessibilityLabel,
     ).toBe("Show 1 Never Contacted person");
+  });
+});
+
+describe("layering (38.13 review A-IN-06)", () => {
+  it("takes its labels from src/constants, never from the components layer", () => {
+    const source = readFileSync("src/logic/dashboard-empty-copy.ts", "utf8");
+    expect(source).not.toMatch(/from "@\/components\/control-surface\//);
+    expect(source).toMatch(/from "@\/constants\/dashboard-labels"/);
   });
 });

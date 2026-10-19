@@ -6,15 +6,15 @@
  * supplies its icon, heading, help line and action label, which HomeScreen
  * renders through the 38.9 `EmptyState` (D-14; ADR-199/204/205/206). Labels
  * come from the glossary (`src/constants/glossary.ts`) and the dashboard
- * control labels; counts go through `plural()`. The exact wording is this
+ * labels (`src/constants/dashboard-labels.ts`); counts go through `plural()`. The exact wording is this
  * plan's choice within the glossary (38.13 CONTEXT, Claude's discretion).
  */
 
+import type { IconName } from "@/components/icons/icon-registry";
 import {
   AXIS_DEFAULT_LABELS,
   POPULATION_LABELS,
-} from "@/components/control-surface/control-labels";
-import type { IconName } from "@/components/icons/icon-registry";
+} from "@/constants/dashboard-labels";
 import { BIN, NEVER_CONTACTED, UNBOUND } from "@/constants/glossary";
 import { pluralWord } from "@/utils/plural";
 

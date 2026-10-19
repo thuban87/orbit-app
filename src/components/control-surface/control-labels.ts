@@ -1,4 +1,7 @@
-import { FAVORITES, NEVER_CONTACTED } from "@/constants/glossary";
+import {
+  AXIS_DEFAULT_LABELS,
+  POPULATION_LABELS,
+} from "@/constants/dashboard-labels";
 import {
   type DashboardFilterFamily,
   type DashboardPopulation,
@@ -7,21 +10,12 @@ import {
   resolveDefaultSort,
 } from "@/logic/dashboard-query-logic";
 
-/** The single source of dashboard control copy. */
-export const POPULATION_LABELS: Record<DashboardPopulation, string> = {
-  "all-contacts": "All Contacts",
-  favourites: FAVORITES,
-  birthdays: "Birthdays",
-  "not-contacted": NEVER_CONTACTED,
-  snoozed: "Snoozed",
-};
-
-export const AXIS_DEFAULT_LABELS = {
-  population: "Active Contacts",
-  // D-36: the Filters chip summary reads a plain word when nothing is set.
-  filters: "None",
-  sort: "Default",
-} as const;
+/**
+ * The single source of dashboard control copy. The population and axis-default
+ * labels live in `src/constants/dashboard-labels.ts` so the logic layer can
+ * read them (38.13 review A-IN-06); they are re-exported here.
+ */
+export { AXIS_DEFAULT_LABELS, POPULATION_LABELS };
 
 export const CONTROL_AXIS_LABELS = {
   population: "Population",
