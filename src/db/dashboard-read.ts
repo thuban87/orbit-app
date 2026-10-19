@@ -582,8 +582,11 @@ export function countSnoozed(exec: SqlExecutor): Promise<number> {
  * `snooze_until` does not count — but not its bound filter, so a selected
  * snoozed Unbound person counts too: the user selected them (review IN-01). The
  * bulk snooze sheet reads this when it opens instead of trusting on-screen
- * rows, which a filter or search can drop the selected people from. Every id
- * is bound as `?`; an empty list returns [] without a query.
+ * rows, which a filter or search can drop the selected people from. Since
+ * 38.13 D-77 (ADR-233) HomeScreen keeps only the selected people
+ * `readSelectionLifecycle` classifies as Bound, so the bulk sheet never
+ * offers Snooze or Unsnooze for an Unbound person. Every id is bound as `?`;
+ * an empty list returns [] without a query.
  */
 export async function readCurrentlySnoozedIds(
   exec: SqlExecutor,
