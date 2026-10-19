@@ -58,6 +58,7 @@ import {
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
 import { runQuickLog } from "@/services/quick-log-command";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -188,7 +189,13 @@ export function UniversalFab() {
     ),
   );
   const bottomOffset = tabBarHeight + FAB_EDGE_GAP;
-  const hidden = keyboardOpen || isFocusedWorkflow(currentRouteName);
+  // 38.13 D-72: the + is hidden while Card-view selection is on, on Contacts
+  // only; the selection bar takes its place above the tab bar.
+  const selectionMode = useDashboardSelectionStore((state) => state.mode);
+  const hidden =
+    keyboardOpen ||
+    isFocusedWorkflow(currentRouteName) ||
+    (selectionMode && currentRouteName === "Home");
   const fabMeasurement = useWindowObstacle("shell-fab", !hidden, bottomOffset);
   const fabRef = fabMeasurement.ref;
   const rowRefs = useRef<(DialRowInstance | null)[]>([]);

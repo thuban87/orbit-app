@@ -1,34 +1,58 @@
 /**
- * Presentational action surface for Dashboard Card View multi-select mode.
- * The host owns all writes, navigation, dialogs, pickers, and feedback; this
- * component deliberately contains only explicit, guarded action affordances.
+ * The Card-view selection bar (38.13 D-69, mockup M3b) and its More… sheet
+ * (D-75). It sits at the bottom of Contacts, directly above the tab bar, as
+ * the last in-flow child of HomeScreen's root view (D-72).
+ *
+ * Row 1: [✕] "N selected" … Select All. Row 2: four equal bordered buttons,
+ * icon over label: Quick Log, Snooze, Favorite, More….
+ *
+ * Presentational only: the host owns every write, dialog, picker, navigation
+ * and feedback, and the More… sheet closes itself before it calls the host.
  */
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
 import { Sheet } from "@/components/ui/Sheet";
-import { MOVE_TO_BIN } from "@/constants/glossary";
+import {
+  FAVORITE,
+  FAVORITES,
+  LOG_INTERACTION,
+  MOVE_TO_BIN,
+} from "@/constants/glossary";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 
 export interface BulkActionSurfaceProps {
   selectedCount: number;
+  /** A confirmed bulk write is running (D-41): "Working…" shows. */
   pending: boolean;
-  onQuickLog: () => void;
-  onLogInteraction: () => void;
-  onAddFavourites: () => void;
-  onRemoveFavourites: () => void;
-  /** Opens the shared snooze sheet, the one bulk snooze/unsnooze hub (D-82). */
-  onSnooze: () => void;
-  onSetCategory: () => void;
-  onArchive: () => void;
-  onChangeFrequency: () => void;
+  /** "Select All" or "Deselect all" (D-40). */
+  selectAllLabel: string;
   onExit: () => void;
+  onToggleSelectAll: () => void;
+  onQuickLog: () => void;
+  /** Opens the shared snooze sheet (38.11 D-82; D-16). */
+  onSnooze: () => void;
+  onAddFavourites: () => void;
+  // The More… sheet's rows (D-75).
+  onLogInteraction: () => void;
+  onRemoveFavourites: () => void;
+  onSetCategory: () => void;
+  onChangeFrequency: () => void;
+  onArchive: () => void;
 }
 
-interface BulkAction {
+interface BarButton {
+  id: string;
+  label: string;
+  icon: IconName;
+  onPress: () => void;
+}
+
+interface SheetRow {
   id: string;
   label: string;
   icon: IconName;
@@ -38,188 +62,320 @@ interface BulkAction {
 export function BulkActionSurface({
   selectedCount,
   pending,
-  onQuickLog,
-  onLogInteraction,
-  onAddFavourites,
-  onRemoveFavourites,
-  onSnooze,
-  onSetCategory,
-  onArchive,
-  onChangeFrequency,
+  selectAllLabel,
   onExit,
+  onToggleSelectAll,
+  onQuickLog,
+  onSnooze,
+  onAddFavourites,
+  onLogInteraction,
+  onRemoveFavourites,
+  onSetCategory,
+  onChangeFrequency,
+  onArchive,
 }: BulkActionSurfaceProps) {
   const { colors } = useTheme();
-  const [sensitiveVisible, setSensitiveVisible] = useState(false);
+  const [moreVisible, setMoreVisible] = useState(false);
   const disabled = selectedCount === 0 || pending;
-  const actions: BulkAction[] = [
+
+  const buttons: BarButton[] = [
     { id: "quick-log", label: "Quick Log", icon: "add", onPress: onQuickLog },
+    { id: "snooze", label: "Snooze", icon: "snooze", onPress: onSnooze },
     {
-      id: "log-interaction",
-      label: "Log Interaction",
-      icon: "call",
-      onPress: onLogInteraction,
-    },
-    {
-      id: "add-favorites",
-      label: "Add to Favorites",
+      id: "favorite",
+      label: FAVORITE,
       icon: "favorite",
       onPress: onAddFavourites,
     },
     {
-      id: "remove-favorites",
-      label: "Remove from Favorites",
-      icon: "favorite",
-      onPress: onRemoveFavourites,
+      id: "more",
+      label: "More…",
+      icon: "overflow",
+      onPress: () => setMoreVisible(true),
     },
-    { id: "snooze", label: "Snooze", icon: "snooze", onPress: onSnooze },
+  ];
+
+  // Each row closes the sheet before it calls the host (D-75).
+  const closeThen = (run: () => void) => () => {
+    setMoreVisible(false);
+    run();
+  };
+  const routineRows: SheetRow[] = [
+    {
+      id: "log-interaction",
+      label: LOG_INTERACTION,
+      icon: "call",
+      onPress: closeThen(onLogInteraction),
+    },
+    {
+      id: "remove-favorites",
+      label: `Remove from ${FAVORITES}`,
+      icon: "favorite",
+      onPress: closeThen(onRemoveFavourites),
+    },
     {
       id: "set-category",
       label: "Set Category",
       icon: "category",
-      onPress: onSetCategory,
+      onPress: closeThen(onSetCategory),
     },
-    // "Move to Bin" is the user-facing name for archive (38.11 D-69).
-    { id: "archive", label: MOVE_TO_BIN, icon: "archive", onPress: onArchive },
   ];
+  // Careful (sensitive) actions stay a separate group (D-18; ADR-102).
+  const carefulRows: SheetRow[] = [
+    {
+      id: "frequency",
+      label: "Change Contact Frequency",
+      icon: "frequency",
+      onPress: closeThen(onChangeFrequency),
+    },
+    {
+      // "Move to Bin" is the user-facing name for archive (38.11 D-69).
+      id: "archive",
+      label: MOVE_TO_BIN,
+      icon: "archive",
+      onPress: closeThen(onArchive),
+    },
+  ];
+
+  const renderRow = (row: SheetRow) => (
+    <Pressable
+      key={row.id}
+      testID={`bulk-more-${row.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={row.label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={row.onPress}
+      style={({ pressed }) => [
+        styles.sheetRow,
+        {
+          borderBottomColor: colors.border,
+          opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
+        },
+      ]}
+    >
+      <Icon name={row.icon} size="md" tone="textPrimary" />
+      <Text style={[styles.sheetRowLabel, { color: colors.textPrimary }]}>
+        {row.label}
+      </Text>
+    </Pressable>
+  );
 
   return (
     <>
-      <View testID="dashboard-selection-bulk-actions" style={styles.actions}>
-        {pending ? (
-          <Text
-            accessibilityLiveRegion="polite"
-            style={[styles.pendingLabel, { color: colors.textSecondary }]}
-          >
-            Working…
-          </Text>
-        ) : null}
-        {actions.map((action) => (
+      <View
+        testID="dashboard-selection-bar"
+        style={[
+          styles.bar,
+          { backgroundColor: colors.surface, borderTopColor: colors.border },
+        ]}
+      >
+        <View style={styles.headerRow}>
           <Pressable
-            key={action.id}
-            testID={`bulk-action-${action.id}`}
+            testID="bulk-action-exit"
             accessibilityRole="button"
-            accessibilityLabel={action.label}
-            accessibilityState={{ disabled, busy: pending }}
-            disabled={disabled}
-            onPress={action.onPress}
-            style={({ pressed }) => [
-              styles.action,
-              {
-                borderColor: colors.border,
-                backgroundColor: colors.surfaceElevated,
-                opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
-              },
-            ]}
+            accessibilityLabel="Exit selection"
+            onPress={onExit}
+            hitSlop={SPACING.xs}
+            style={styles.exit}
           >
-            <Icon name={action.icon} size="sm" tone="textPrimary" />
-            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
-              {action.label}
+            <Icon name="close" size="md" tone="textPrimary" />
+          </Pressable>
+          <Text
+            testID="dashboard-selection-count"
+            accessibilityLiveRegion="polite"
+            style={[styles.count, { color: colors.textPrimary }]}
+          >
+            {selectedCount} selected
+          </Text>
+          {pending ? (
+            <Text
+              testID="dashboard-selection-working"
+              accessibilityLiveRegion="polite"
+              style={[styles.working, { color: colors.textSecondary }]}
+            >
+              Working…
+            </Text>
+          ) : null}
+          <View style={styles.headerSpacer} />
+          <Pressable
+            testID="dashboard-selection-select-all"
+            accessibilityRole="button"
+            accessibilityLabel={selectAllLabel}
+            onPress={onToggleSelectAll}
+            style={styles.selectAll}
+          >
+            <Icon name="select-all" size="sm" tone="accentText" />
+            <Text style={[styles.selectAllLabel, { color: colors.accentText }]}>
+              {selectAllLabel}
             </Text>
           </Pressable>
-        ))}
-        <Pressable
-          testID="bulk-action-sensitive-operations"
-          accessibilityRole="button"
-          accessibilityLabel="More careful actions"
-          accessibilityState={{ disabled, busy: pending }}
-          disabled={disabled}
-          onPress={() => setSensitiveVisible(true)}
-          style={({ pressed }) => [
-            styles.action,
-            {
-              borderColor: colors.border,
-              backgroundColor: colors.surfaceElevated,
-              opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          <Icon name="overflow" size="sm" tone="textPrimary" />
-          <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
-            More
-          </Text>
-        </Pressable>
-        <Pressable
-          testID="bulk-action-exit"
-          accessibilityRole="button"
-          accessibilityLabel="Exit selection"
-          onPress={onExit}
-          style={[styles.action, { borderColor: colors.border }]}
-        >
-          <Icon name="close" size="sm" tone="textPrimary" />
-          <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
-            Done
-          </Text>
-        </Pressable>
+        </View>
+        <View style={styles.buttonRow}>
+          {buttons.map((button) => (
+            <Pressable
+              key={button.id}
+              testID={`bulk-action-${button.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={button.label}
+              accessibilityState={{ disabled, busy: pending }}
+              disabled={disabled}
+              onPress={button.onPress}
+              style={({ pressed }) => [
+                styles.button,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Icon name={button.icon} size="md" tone="textPrimary" />
+              <Text
+                numberOfLines={1}
+                style={[styles.buttonLabel, { color: colors.textPrimary }]}
+              >
+                {button.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
       <Sheet
-        visible={sensitiveVisible}
-        onRequestClose={() => setSensitiveVisible(false)}
+        visible={moreVisible}
+        onRequestClose={() => setMoreVisible(false)}
         variant="compact"
       >
-        <Text style={[styles.sheetTitle, { color: colors.textSecondary }]}>
+        <Text
+          testID="bulk-more-title"
+          style={[styles.sheetTitle, { color: colors.textPrimary }]}
+        >
+          {selectedCount} selected
+        </Text>
+        {routineRows.map(renderRow)}
+        <Text
+          testID="bulk-more-careful-heading"
+          accessibilityRole="header"
+          style={[styles.sheetSection, { color: colors.textSecondary }]}
+        >
           Careful actions
         </Text>
-        <Pressable
-          testID="bulk-sensitive-frequency"
-          accessibilityRole="button"
-          accessibilityLabel="Change Contact Frequency"
-          accessibilityState={{ disabled, busy: pending }}
-          disabled={disabled}
-          onPress={() => {
-            setSensitiveVisible(false);
-            onChangeFrequency();
-          }}
-          style={[styles.sensitiveAction, { borderColor: colors.border }]}
-        >
-          <Icon name="frequency" size="md" tone="textPrimary" />
-          <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
-            Change Contact Frequency
-          </Text>
-        </Pressable>
+        {carefulRows.map(renderRow)}
       </Sheet>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
-  pendingLabel: {
+  bar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.sm,
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: SPACING.base,
+    paddingTop: SPACING.xs,
+  },
+  headerRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.sm,
+    minHeight: 44,
+  },
+  exit: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 44,
+  },
+  count: {
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.heading.family,
+      TYPOGRAPHY.heading.weight,
+    ),
+    fontSize: TYPOGRAPHY.body.size,
+    lineHeight: TYPOGRAPHY.body.lineHeight,
+  },
+  working: {
     fontFamily: resolveFontFamily(
       TYPOGRAPHY.caption.family,
       TYPOGRAPHY.caption.weight,
     ),
     fontSize: TYPOGRAPHY.caption.size,
-    width: "100%",
+    lineHeight: TYPOGRAPHY.caption.lineHeight,
   },
-  action: {
+  headerSpacer: {
+    flex: 1,
+  },
+  selectAll: {
     alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: SPACING.xs,
-    justifyContent: "center",
     minHeight: 44,
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
   },
-  actionLabel: {
+  selectAllLabel: {
     fontFamily: resolveFontFamily(
       TYPOGRAPHY.label.family,
       TYPOGRAPHY.label.weight,
     ),
     fontSize: TYPOGRAPHY.label.size,
+    lineHeight: TYPOGRAPHY.label.lineHeight,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  button: {
+    alignItems: "center",
+    borderRadius: RADII.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    gap: SPACING.xs,
+    justifyContent: "center",
+    minHeight: 64,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.sm,
+  },
+  buttonLabel: {
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.label.family,
+      TYPOGRAPHY.label.weight,
+    ),
+    fontSize: TYPOGRAPHY.label.size,
+    lineHeight: TYPOGRAPHY.label.lineHeight,
   },
   sheetTitle: {
     fontFamily: resolveFontFamily(
-      TYPOGRAPHY.label.family,
-      TYPOGRAPHY.label.weight,
+      TYPOGRAPHY.heading.family,
+      TYPOGRAPHY.heading.weight,
     ),
-    fontSize: TYPOGRAPHY.label.size,
+    fontSize: TYPOGRAPHY.heading.size,
+    lineHeight: TYPOGRAPHY.heading.lineHeight,
     marginBottom: SPACING.sm,
   },
-  sensitiveAction: {
+  sheetSection: {
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.caption.family,
+      TYPOGRAPHY.caption.weight,
+    ),
+    fontSize: TYPOGRAPHY.caption.size,
+    letterSpacing: 1,
+    lineHeight: TYPOGRAPHY.caption.lineHeight,
+    marginTop: SPACING.base,
+    textTransform: "uppercase",
+  },
+  sheetRow: {
     alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    gap: SPACING.md,
-    minHeight: 44,
+    gap: SPACING.base,
+    minHeight: 52,
+  },
+  sheetRowLabel: {
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.body.family,
+      TYPOGRAPHY.body.weight,
+    ),
+    fontSize: TYPOGRAPHY.body.size,
+    lineHeight: TYPOGRAPHY.body.lineHeight,
   },
 });

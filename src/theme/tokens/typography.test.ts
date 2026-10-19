@@ -120,9 +120,9 @@ describe("resolveFontFamily (RG-031 ui-accessibility/AUD-UIA-015)", () => {
   // Plan 08 deferred nit (38.4-20): each swapped site is counted exactly, so a
   // new bare family or a lost swap fails.
   it.each([
-    ["src/screens/HomeScreen.tsx", 4],
+    ["src/screens/HomeScreen.tsx", 2],
     ["src/components/CardContextMenu.tsx", 2],
-    ["src/components/BulkActionSurface.tsx", 3],
+    ["src/components/BulkActionSurface.tsx", 7],
   ])(
     "%s assigns registered font keys only (%i resolveFontFamily sites)",
     (relPath, expected) => {

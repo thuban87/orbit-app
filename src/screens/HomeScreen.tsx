@@ -2304,60 +2304,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           artComponent="contactsHeader"
         />
       </View>
-      {selectionMode ? (
-        <View
-          testID="dashboard-selection-controls"
-          accessibilityLabel={`${selectionCount} selected`}
-          style={[
-            styles.selectionControls,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <Text
-            accessibilityLiveRegion="polite"
-            style={[styles.selectionCount, { color: colors.textPrimary }]}
-          >
-            {selectionCount} selected
-          </Text>
-          <View style={styles.selectionActions}>
-            <Pressable
-              testID="dashboard-selection-select-all"
-              accessibilityRole="button"
-              accessibilityLabel="Select All"
-              onPress={selectAll}
-              style={styles.selectionAction}
-            >
-              <Icon name="select-all" size="sm" tone="textPrimary" />
-              <Text
-                style={[
-                  styles.selectionActionLabel,
-                  { color: colors.textPrimary },
-                ]}
-              >
-                Select All
-              </Text>
-            </Pressable>
-          </View>
-          <BulkActionSurface
-            selectedCount={selectionCount}
-            pending={bulkActionPending}
-            onQuickLog={onBulkQuickLog}
-            onLogInteraction={onBulkLogInteraction}
-            onAddFavourites={onBulkAddFavourites}
-            onRemoveFavourites={onBulkRemoveFavourites}
-            onSnooze={onBulkOpenSnoozePicker}
-            onSetCategory={onBulkOpenCategoryPicker}
-            onArchive={onBulkArchive}
-            onChangeFrequency={onBulkOpenFrequencyPicker}
-            onExit={exitBulkSelection}
-          />
-        </View>
-      ) : (
-        <DashboardControlRow />
-      )}
+      {/* 38.13 D-76: the Population/Filters/Sort row (and the search row
+          below) are hidden while selecting; they return when selection
+          ends. The selection bar renders at the bottom instead (D-72). */}
+      {selectionMode ? null : <DashboardControlRow />}
       <View
         accessible={!panelOpen}
         importantForAccessibility={panelOpen ? "no-hide-descendants" : "auto"}
@@ -2499,6 +2449,26 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           )}
         </View>
       </View>
+      {/* 38.13 D-69, D-72: the M3b selection bar is the root view's last
+          in-flow child, so it sits directly above the tab bar (RESEARCH
+          Pattern 11; no measurement needed for placement). */}
+      {selectionMode ? (
+        <BulkActionSurface
+          selectedCount={selectionCount}
+          pending={bulkActionPending}
+          selectAllLabel="Select All"
+          onExit={exitBulkSelection}
+          onToggleSelectAll={selectAll}
+          onQuickLog={onBulkQuickLog}
+          onSnooze={onBulkOpenSnoozePicker}
+          onAddFavourites={onBulkAddFavourites}
+          onLogInteraction={onBulkLogInteraction}
+          onRemoveFavourites={onBulkRemoveFavourites}
+          onSetCategory={onBulkOpenCategoryPicker}
+          onChangeFrequency={onBulkOpenFrequencyPicker}
+          onArchive={onBulkArchive}
+        />
+      ) : null}
       <DashboardOverlayHost />
       <CardContextMenu
         visible={contextMenuContact !== null}
@@ -2847,41 +2817,6 @@ const styles = StyleSheet.create({
   },
   viewToggleWrap: {
     width: 96,
-  },
-  selectionControls: {
-    borderBottomWidth: 1,
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.sm,
-  },
-  selectionCount: {
-    fontFamily: resolveFontFamily(
-      TYPOGRAPHY.body.family,
-      TYPOGRAPHY.body.weight,
-    ),
-    fontSize: TYPOGRAPHY.body.size,
-    fontWeight: TYPOGRAPHY.body.weight,
-    lineHeight: TYPOGRAPHY.body.lineHeight,
-  },
-  selectionActions: {
-    flexDirection: "row",
-    gap: SPACING.sm,
-  },
-  selectionAction: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.xs,
-    minHeight: SPACING["2xl"],
-    paddingHorizontal: SPACING.sm,
-  },
-  selectionActionLabel: {
-    fontFamily: resolveFontFamily(
-      TYPOGRAPHY.label.family,
-      TYPOGRAPHY.label.weight,
-    ),
-    fontSize: TYPOGRAPHY.label.size,
-    fontWeight: TYPOGRAPHY.label.weight,
-    lineHeight: TYPOGRAPHY.label.lineHeight,
   },
   bulkPickerTitle: {
     fontFamily: resolveFontFamily(
