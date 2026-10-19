@@ -1737,7 +1737,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`. A-14 and the bulk snooze sheet moved to 38.11 (38.11 D-45) — see "Notes from 38.11" in the workpaper.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 6–9 plans — rough estimate; the perf fix depends on what the investigation finds.
-**Plans**: 7/11 plans executed
+**Plans**: 8/11 plans executed
 
 Plans:
 
@@ -1756,7 +1756,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion and the 38.13-01 owner checkpoint)*
 
-- [ ] 38.13-08-PLAN.md — List row host: the owner-chosen perf fix, row closes after swipe, two TalkBack log actions, fade after commit, hidden-Home favourite reload (D-55, D-25, D-26, D-44, D-52)
+- [x] 38.13-08-PLAN.md — List row host: the owner-chosen perf fix, row closes after swipe, two TalkBack log actions, fade after commit, hidden-Home favourite reload (D-55, D-25, D-26, D-44, D-52)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
