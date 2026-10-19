@@ -83,9 +83,8 @@ vi.mock("@/navigation/use-window-measurement", () => ({
   },
 }));
 vi.mock("@/stores/dashboard-selection-store", () => ({
-  useDashboardSelectionStore: (
-    select: (state: { mode: boolean }) => unknown,
-  ) => select({ mode: nav.selectionMode }),
+  useDashboardSelectionStore: (select: (state: { mode: boolean }) => unknown) =>
+    select({ mode: nav.selectionMode }),
 }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));

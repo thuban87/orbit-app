@@ -3,6 +3,7 @@
  * owns the synchronous claim while HomeScreen owns rendering and side effects.
  */
 export interface BulkActionGate {
+  /** A claim is held (waiting for a choice, or its writer is running). */
   readonly pending: boolean;
   tryAcquire: () => BulkActionClaim | null;
   /** Marks a claimed dialog or picker choice as having started its one writer. */
@@ -49,12 +50,15 @@ export function createBulkActionGate(
       if (current) return null;
       const claim = { id: ++nextId };
       current = { claim, consumed: false };
-      onPendingChange?.(true);
       return claim;
     },
     consume: (claim) => {
       if (!current || current.claim !== claim || current.consumed) return false;
       current.consumed = true;
+      // 38.13 D-41: "Working…" means a write is running, so pending is
+      // reported once a claim starts its writer, never while a confirm
+      // dialog or a sheet waits on a held claim.
+      onPendingChange?.(true);
       return true;
     },
     release: (claim) => {

@@ -79,6 +79,12 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
     (s) => !isFocusedWorkflow(s.routeName ?? "Home"),
   );
   const sectionFabMayShow = useSectionFabStore(selectSectionFabAvailable);
+  // 38.13 D-80: the Card-view selection bar's height. Its rect exists only
+  // while selection is on AND Contacts is focused (BulkActionSurface), so on
+  // any other screen this is 0. A layout input only, never the screen key.
+  const bottomBarHeight = useShellObstacleStore(
+    (s) => s.rects["dashboard-selection-bar"]?.height ?? 0,
+  );
   const latchRef = useRef<SnackbarLayoutLatch | null>(null);
 
   if (!snackbar || !hostVisible) return null;
@@ -88,7 +94,8 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
   const look = snackbarPresentation(snackbar.kind);
   const actionColor = colors[look.actionTone];
   // Re-latched only for a new message or a new screen, never for a FAB
-  // showing or hiding (D-151).
+  // showing or hiding (D-151); lifted once, upward, when the selection bar
+  // appears under a live pill (38.13 D-80).
   const latch = latchSnackbarLayout(latchRef.current, snackbar, {
     host,
     windowWidth,
@@ -98,6 +105,7 @@ export function Snackbar({ host = ROOT_SNACKBAR_HOST }: SnackbarProps) {
     insetBottom: insets.bottom,
     universalFabMayShow,
     sectionFabMayShow,
+    bottomBarHeight,
   });
   latchRef.current = latch;
   const layout = latch.layout;

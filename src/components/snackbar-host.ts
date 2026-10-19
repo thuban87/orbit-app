@@ -87,6 +87,11 @@ export function snackbarLayout(input: {
   tabBarHeight: number;
   /** The safe-area bottom inset. */
   insetBottom: number;
+  /**
+   * The Card-view selection bar's height (38.13 D-72, D-80), sitting directly
+   * on the tab bar; 0 or absent when no bar shows. A layout input only.
+   */
+  bottomBarHeight?: number;
 }): SnackbarLayout {
   const {
     host,
@@ -96,19 +101,42 @@ export function snackbarLayout(input: {
     tabBarHeight,
     insetBottom,
   } = input;
-  if (host !== ROOT_SNACKBAR_HOST || (!universalFab && !sectionFab)) {
-    return {
-      alignItems: "center",
-      width: undefined,
-      paddingBottom: snackbarBottomPadding(host, insetBottom),
-    };
-  }
-  const fabRowBottom =
-    (universalFab ? tabBarHeight : insetBottom) + FAB_EDGE_GAP;
+  const live: SnackbarLayout =
+    host !== ROOT_SNACKBAR_HOST || (!universalFab && !sectionFab)
+      ? {
+          alignItems: "center",
+          width: undefined,
+          paddingBottom: snackbarBottomPadding(host, insetBottom),
+        }
+      : {
+          alignItems: "center",
+          width: windowWidth - 2 * SPACING.base,
+          paddingBottom:
+            (universalFab ? tabBarHeight : insetBottom) +
+            FAB_EDGE_GAP +
+            FAB_SIZE +
+            SNACKBAR_FAB_GAP,
+        };
+  return withSelectionBar(live, input);
+}
+
+/**
+ * 38.13 D-80 (RESEARCH Pitfall 3): on the root host the pill's bottom edge
+ * sits at least `SNACKBAR_FAB_GAP` above the selection bar, which sits on the
+ * tab bar. With no bar the layout is unchanged. PURE.
+ */
+function withSelectionBar(
+  layout: SnackbarLayout,
+  input: { host: string; tabBarHeight: number; bottomBarHeight?: number },
+): SnackbarLayout {
+  const bar = input.bottomBarHeight ?? 0;
+  if (input.host !== ROOT_SNACKBAR_HOST || bar <= 0) return layout;
   return {
-    alignItems: "center",
-    width: windowWidth - 2 * SPACING.base,
-    paddingBottom: fabRowBottom + FAB_SIZE + SNACKBAR_FAB_GAP,
+    ...layout,
+    paddingBottom: Math.max(
+      layout.paddingBottom,
+      input.tabBarHeight + bar + SNACKBAR_FAB_GAP,
+    ),
   };
 }
 
@@ -157,10 +185,16 @@ export function heldSnackbarLayout(
   input: SnackbarScreenContext & {
     universalFab: boolean;
     sectionFab: boolean;
+    /** The selection bar's height (38.13 D-80); 0 or absent = none. */
+    bottomBarHeight?: number;
   },
 ): SnackbarLayout {
   const live = snackbarLayout(input);
   if (input.host !== ROOT_SNACKBAR_HOST) return live;
+  // 38.13 D-72, D-80: while the selection bar shows, the + cannot (it hides
+  // on Home while selecting), so the + row is ignored and the pill sits above
+  // the bar (`snackbarLayout` already put it there).
+  if ((input.bottomBarHeight ?? 0) > 0) return live;
   if (!input.universalFabMayShow && !input.sectionFabMayShow) return live;
   // The highest row that may appear: the + row on a non-focused route (where
   // a section FAB shares it), else the focused route's section FAB row.
@@ -182,12 +216,16 @@ export interface SnackbarLayoutLatch {
   /** The screen it was computed on (`snackbarScreenKey`). */
   screenKey: string;
   layout: SnackbarLayout;
+  /** The selection bar height it was laid out with (38.13 D-80); 0 = none. */
+  bottomBarHeight: number;
 }
 
 /**
  * The screen facts a held layout depends on. FAB PRESENCE is deliberately not
  * part of it: the section button morphing in or out, or the + hiding for the
- * keyboard, must not move the pill (D-151). PURE.
+ * keyboard, must not move the pill (D-151). Nor is the selection bar (38.13
+ * D-80): a key change would re-lay the pill out in both directions, and the
+ * bar may only lift it. PURE.
  */
 export function snackbarScreenKey(context: SnackbarScreenContext): string {
   return [
@@ -206,7 +244,13 @@ export function snackbarScreenKey(context: SnackbarScreenContext): string {
  * meanwhile; a new or replacing message is laid out afresh. So is a message
  * that outlives its screen (Save then Back): the next screen has different
  * buttons, and holding the old place could put the pill over the + there.
- * PURE.
+ *
+ * 38.13 D-80 (amending D-151 for this one case; review R2-03): when the
+ * Card-view selection bar appears (or grows) under a live pill, the pill is
+ * re-laid out once, upward only, so Undo stays reachable above the bar. When
+ * the bar goes away the higher latch is kept: the pill never moves back down.
+ * The trigger is the bar alone, so no other input (FAB presence, keyboard)
+ * can move a live pill. PURE.
  */
 export function latchSnackbarLayout(
   previous: SnackbarLayoutLatch | null,
@@ -214,17 +258,31 @@ export function latchSnackbarLayout(
   input: SnackbarScreenContext & {
     universalFab: boolean;
     sectionFab: boolean;
+    /** The selection bar's height (38.13 D-80); 0 or absent = none. */
+    bottomBarHeight?: number;
   },
 ): SnackbarLayoutLatch {
   const screenKey = snackbarScreenKey(input);
+  const bottomBarHeight = input.bottomBarHeight ?? 0;
   if (
     previous !== null &&
     previous.message === message &&
     previous.screenKey === screenKey
   ) {
+    if (bottomBarHeight > previous.bottomBarHeight) {
+      const lifted = heldSnackbarLayout(input);
+      if (lifted.paddingBottom > previous.layout.paddingBottom) {
+        return { message, screenKey, layout: lifted, bottomBarHeight };
+      }
+    }
     return previous;
   }
-  return { message, screenKey, layout: heldSnackbarLayout(input) };
+  return {
+    message,
+    screenKey,
+    layout: heldSnackbarLayout(input),
+    bottomBarHeight,
+  };
 }
 
 /**

@@ -9,6 +9,7 @@
  * Presentational only: the host owns every write, dialog, picker, navigation
  * and feedback, and the More… sheet closes itself before it calls the host.
  */
+import { useIsFocused } from "@react-navigation/native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
@@ -21,6 +22,8 @@ import {
   MOVE_TO_BIN,
 } from "@/constants/glossary";
 import type { BulkActionAvailability } from "@/logic/dashboard-selection-applicability";
+import { useWindowObstacle } from "@/navigation/use-window-measurement";
+import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -80,6 +83,17 @@ export function BulkActionSurface({
 }: BulkActionSurfaceProps) {
   const { colors } = useTheme();
   const [moreVisible, setMoreVisible] = useState(false);
+  // 38.13 D-80 (review R1-05): the bar's window rect feeds the root snackbar
+  // so an Undo pill sits above it. Published only while selecting AND Home is
+  // focused (as OrreryObstacle gates on focus): bulk Log Interaction opens
+  // GroupLog / LogContact with selection still on, and a pill there must not
+  // be lifted by a bar nobody can see. Refocusing publishes it again.
+  const selectionMode = useDashboardSelectionStore((state) => state.mode);
+  const focused = useIsFocused();
+  const obstacle = useWindowObstacle(
+    "dashboard-selection-bar",
+    selectionMode && focused,
+  );
   // A running write disables every action; otherwise each follows its own
   // applicability flag (D-40). Favorite always adds and never flips (D-74).
   const enabledNow = (enabled: boolean) => enabled && !pending;
@@ -199,6 +213,9 @@ export function BulkActionSurface({
     <>
       <View
         testID="dashboard-selection-bar"
+        ref={obstacle.ref}
+        onLayout={obstacle.onLayout}
+        collapsable={false}
         style={[
           styles.bar,
           { backgroundColor: colors.surface, borderTopColor: colors.border },
