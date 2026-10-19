@@ -41,6 +41,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -992,7 +993,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // applied. Only a newer generation re-applies a start; a focus, app-state or
   // reduced-motion re-run never re-fades the list from 0 (D-55; review R1-02).
   const lastAppliedGenerationRef = useRef(0);
-  useEffect(() => {
+  // A layout effect (38.13 review A-WR-01): it runs after the new rows commit
+  // but before they paint, so they never show at full opacity before the fade
+  // starts. The fade itself (start, duration, easing, gating) is unchanged.
+  useLayoutEffect(() => {
     if (resultGeneration === 0) return;
     const canAnimate = isFocused && appActive && !reducedMotion;
     const toFullOpacity = withTiming(1, {

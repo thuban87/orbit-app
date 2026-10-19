@@ -423,7 +423,12 @@ describe("the result fade is applied after commit (D-44; review R1-02)", () => {
       "const lastAppliedGenerationRef = useRef(0);",
     );
     expect(marker).toBeGreaterThan(-1);
-    const start = source.indexOf("useEffect(() => {", marker);
+    // 38.13 review A-WR-01: a LAYOUT effect, so the start value is applied
+    // before the new rows paint (a passive effect let them flash at full
+    // opacity first). It is the hook right after the marker.
+    const start = source.indexOf("useLayoutEffect(() => {", marker);
+    expect(start).toBeGreaterThan(-1);
+    expect(source.slice(marker, start)).not.toMatch(/useEffect\(/);
     return source.slice(
       start,
       source.indexOf("const resultTransitionStyle", start),
