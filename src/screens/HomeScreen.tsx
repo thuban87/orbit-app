@@ -129,6 +129,7 @@ import {
   listDashboardPopulation,
   listDashboardSearch,
   readCurrentlySnoozedIds,
+  readSelectionLifecycle,
 } from "@/db/dashboard-read";
 import { composeDashboardSearch } from "@/db/dashboard-search-read";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -163,6 +164,18 @@ import {
 } from "@/logic/dashboard-header-count";
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
+import {
+  bulkWriteIds,
+  lifecycleFromRows,
+  lifecycleMapFrom,
+  SELECTION_INCLUDES_UNBOUND,
+  type SelectionLifecycleMap,
+  selectAllLabelFor,
+  selectionApplicability,
+  selectionUniverseIds,
+  shouldApplyLifecycleRefresh,
+  withFavouriteOverlay,
+} from "@/logic/dashboard-selection-applicability";
 import {
   favouriteTapOutcome,
   isUnboundRow,
@@ -572,6 +585,9 @@ const ZERO_POPULATION_COUNTS: DashboardPopulationCounts = {
   snoozed: 0,
 };
 
+/** The lifecycle map outside selection (one identity, so React bails out). */
+const EMPTY_SELECTION_LIFECYCLE: SelectionLifecycleMap = new Map();
+
 export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const { colors } = useTheme();
   // useShallow is required: this selector returns a fresh object, and Zustand v5
@@ -594,7 +610,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     (state) => state.frozenUniverse,
   );
   const toggleSelection = useDashboardSelectionStore((state) => state.toggle);
-  const selectAll = useDashboardSelectionStore((state) => state.selectAll);
   const exitSelection = useDashboardSelectionStore(
     (state) => state.exitSelection,
   );
@@ -674,6 +689,82 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     ? rows.filter((row) => frozenIds.has(row.id))
     : rows;
   const selectionCount = selectedIds.size;
+  // 38.13 D-77 (review R1-03, R3-01, R4-01, R5-02): Bound/favourite for the
+  // frozen universe, captured from the entry rows and then refreshed from the
+  // database, never from the current rows (a filter, search or Set Category
+  // can drop a selected person from them). React state, so every replacement
+  // re-renders the bar. An id absent from it is unknown, never Bound.
+  const [selectionLifecycle, setSelectionLifecycle] =
+    useState<SelectionLifecycleMap>(EMPTY_SELECTION_LIFECYCLE);
+  // The latest lifecycle request; bumped on every request, on entry and on
+  // exit, so a stale read never applies (R5-02).
+  const lifecycleRequestTokenRef = useRef(0);
+  const refreshSelectionLifecycle = useCallback(() => {
+    const { mode, sessionId, frozenUniverse } =
+      useDashboardSelectionStore.getState();
+    if (!mode) return;
+    lifecycleRequestTokenRef.current += 1;
+    const requestToken = lifecycleRequestTokenRef.current;
+    void readSelectionLifecycle(getExecutor(), frozenUniverse)
+      .then((entries) => {
+        const current = useDashboardSelectionStore.getState();
+        if (
+          shouldApplyLifecycleRefresh({
+            requestToken,
+            currentToken: lifecycleRequestTokenRef.current,
+            requestSessionId: sessionId,
+            currentSessionId: current.sessionId,
+            selectionMode: current.mode,
+          })
+        ) {
+          setSelectionLifecycle(lifecycleMapFrom(entries));
+        }
+      })
+      .catch((readError: unknown) => {
+        // A failed refresh keeps the previous map.
+        Logger.error(
+          LOG_SCOPE,
+          "failed to refresh the selection lifecycle",
+          readError,
+        );
+      });
+  }, []);
+  // Selection ended: drop the map and retire any read still in flight.
+  useEffect(() => {
+    if (selectionMode) return;
+    lifecycleRequestTokenRef.current += 1;
+    setSelectionLifecycle(EMPTY_SELECTION_LIFECYCLE);
+  }, [selectionMode]);
+  // Every Home publish while selecting re-reads the map (R3-01).
+  useEffect(() => {
+    void rows;
+    if (selectionMode) refreshSelectionLifecycle();
+  }, [refreshSelectionLifecycle, rows, selectionMode]);
+  // What the bar may do now (D-40, D-74, D-75, D-77). The individual star's
+  // optimistic overlay still overrides `favourite` for the ids it covers.
+  const effectiveSelectionLifecycle = useMemo(
+    () => withFavouriteOverlay(selectionLifecycle, favouriteOverlay),
+    [favouriteOverlay, selectionLifecycle],
+  );
+  const applicability = selectionApplicability(
+    selectedIds,
+    frozenUniverse.length,
+    effectiveSelectionLifecycle,
+  );
+  // D-40: Select All, or Deselect all once the whole universe is selected.
+  const onToggleSelectAll = useCallback(() => {
+    const selection = useDashboardSelectionStore.getState();
+    if (
+      selectAllLabelFor(
+        selection.selectedIds.size,
+        selection.frozenUniverse.length,
+      ) === "Deselect all"
+    ) {
+      selection.deselectAll();
+    } else {
+      selection.selectAll();
+    }
+  }, []);
   const [bulkActionPending, setBulkActionPending] = useState(false);
   const bulkActionGateRef = useRef<ReturnType<
     typeof createBulkActionGate
@@ -1258,6 +1349,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       // consumer exactly once (D-23). Do not reseed frozenUniverse.
       notifyWidgetDataChanged();
       bumpShellRefresh();
+      // D-77 (review R3-01): the bar's Bound/favourite flags follow the write.
+      refreshSelectionLifecycle();
       AccessibilityInfo.announceForAccessibility(label);
       showSnackbar({
         kind,
@@ -1269,7 +1362,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         },
       });
     },
-    [],
+    [refreshSelectionLifecycle],
   );
 
   const performBulkQuickLog = useCallback(
@@ -1421,6 +1514,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     releaseBulkAction(claim);
   }, [navigation, releaseBulkAction, selectedIds, tryAcquireBulkAction]);
 
+  // 38.13 D-74, D-77 (ADR-233; review R1-03, R1-04): Favorite always adds,
+  // and only Bound people who are not yet favourites are written, classified
+  // from the database at action time. The copy counts only them.
   const onBulkAddFavourites = useCallback(() => {
     const claim = tryAcquireBulkAction();
     if (!claim) return;
@@ -1429,13 +1525,27 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    if (!consumeBulkAction(claim)) return;
-    void bulkAddFavourites(getExecutor(), ids, localDateTime())
-      .then(() =>
-        commitBulkOutcome(
-          `Added ${plural(ids.length, "contact")} to Favorites`,
-        ),
-      )
+    void readSelectionLifecycle(getExecutor(), ids)
+      .then((entries) => {
+        // The selection ended (or the claim was released) during the read.
+        if (bulkActionInputClaimRef.current !== claim) return;
+        const writeIds = bulkWriteIds(
+          "add-favorites",
+          ids,
+          lifecycleMapFrom(entries),
+        );
+        if (writeIds.length === 0) {
+          releaseBulkAction(claim);
+          return;
+        }
+        if (!consumeBulkAction(claim)) return;
+        return bulkAddFavourites(getExecutor(), writeIds, localDateTime()).then(
+          () =>
+            commitBulkOutcome(
+              `Added ${plural(writeIds.length, "contact")} to Favorites`,
+            ),
+        );
+      })
       .catch((writeError: unknown) => {
         releaseBulkAction(claim);
         reportBulkFailure(
@@ -1454,6 +1564,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     tryAcquireBulkAction,
   ]);
 
+  // 38.13 D-75, D-77: removes every selected Bound favourite (read from the
+  // database at action time); the copy counts only them.
   const onBulkRemoveFavourites = useCallback(() => {
     const claim = tryAcquireBulkAction();
     if (!claim) return;
@@ -1462,14 +1574,30 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    if (!consumeBulkAction(claim)) return;
-    void bulkRemoveFavourites(getExecutor(), ids, localDateTime())
-      .then(() =>
-        commitBulkOutcome(
-          `Removed ${plural(ids.length, "contact")} from Favorites`,
-          "warning",
-        ),
-      )
+    void readSelectionLifecycle(getExecutor(), ids)
+      .then((entries) => {
+        if (bulkActionInputClaimRef.current !== claim) return;
+        const writeIds = bulkWriteIds(
+          "remove-favorites",
+          ids,
+          lifecycleMapFrom(entries),
+        );
+        if (writeIds.length === 0) {
+          releaseBulkAction(claim);
+          return;
+        }
+        if (!consumeBulkAction(claim)) return;
+        return bulkRemoveFavourites(
+          getExecutor(),
+          writeIds,
+          localDateTime(),
+        ).then(() =>
+          commitBulkOutcome(
+            `Removed ${plural(writeIds.length, "contact")} from Favorites`,
+            "warning",
+          ),
+        );
+      })
       .catch((writeError: unknown) => {
         releaseBulkAction(claim);
         reportBulkFailure(
@@ -1500,11 +1628,26 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       releaseBulkAction(claim);
       return;
     }
-    void readCurrentlySnoozedIds(getExecutor(), ids)
-      .then((snoozedIds) => {
+    // 38.13 D-77 (ADR-233: no Snooze for Unbound people): only the selected
+    // people the database classifies as Bound reach the sheet, its write and
+    // its count (review R1-04).
+    void Promise.all([
+      readSelectionLifecycle(getExecutor(), ids),
+      readCurrentlySnoozedIds(getExecutor(), ids),
+    ])
+      .then(([entries, snoozedIds]) => {
         // The selection ended during the read: nothing opens.
         if (bulkActionInputClaimRef.current !== claim) return;
-        setSnoozePicker({ ids, snoozedIds });
+        const writeIds = bulkWriteIds("snooze", ids, lifecycleMapFrom(entries));
+        if (writeIds.length === 0) {
+          releaseBulkAction(claim);
+          return;
+        }
+        const writeSet = new Set(writeIds);
+        setSnoozePicker({
+          ids: writeIds,
+          snoozedIds: snoozedIds.filter((id) => writeSet.has(id)),
+        });
       })
       .catch((readError: unknown) => {
         releaseBulkAction(claim);
@@ -1894,25 +2037,36 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [snoozeCardContact, unsnoozeCardContact],
   );
 
+  // 38.13 D-77 / ADR-102: the universe is frozen at entry from the rows on
+  // screen (Unbound people included by the one constant), and the bar's
+  // lifecycle map is captured from the same rows at the same moment.
   const enterCardSelection = useCallback(
     (contactId: number) => {
-      useDashboardSelectionStore.getState().enterSelection(
-        rows.map((row) => row.id),
-        contactId,
-      );
+      const universe = selectionUniverseIds(rows, SELECTION_INCLUDES_UNBOUND);
+      if (useDashboardSelectionStore.getState().mode) return;
+      lifecycleRequestTokenRef.current += 1;
+      setSelectionLifecycle(lifecycleFromRows(rows, universe));
+      useDashboardSelectionStore.getState().enterSelection(universe, contactId);
     },
     [rows],
   );
 
   const onSelectContacts = useCallback(async () => {
-    const currentEligibleIds = rows.map((row) => row.id);
+    // Captured before the view switch: the rows on screen when Select was
+    // chosen are the frozen universe (ADR-102; D-77).
+    const entryRows = rows;
+    const universe = selectionUniverseIds(rows, SELECTION_INCLUDES_UNBOUND);
     const { viewMode, setViewMode } = useDashboardQueryStore.getState();
 
     try {
       if (viewMode !== "card") {
         await setViewMode(getExecutor(), "card");
       }
-      useDashboardSelectionStore.getState().enterSelection(currentEligibleIds);
+      if (!useDashboardSelectionStore.getState().mode) {
+        lifecycleRequestTokenRef.current += 1;
+        setSelectionLifecycle(lifecycleFromRows(entryRows, universe));
+      }
+      useDashboardSelectionStore.getState().enterSelection(universe);
     } catch (selectContactsError) {
       Logger.error(
         LOG_SCOPE,
@@ -2456,9 +2610,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         <BulkActionSurface
           selectedCount={selectionCount}
           pending={bulkActionPending}
-          selectAllLabel="Select All"
+          selectAllLabel={applicability.selectAllLabel}
+          availability={applicability}
           onExit={exitBulkSelection}
-          onToggleSelectAll={selectAll}
+          onToggleSelectAll={onToggleSelectAll}
           onQuickLog={onBulkQuickLog}
           onSnooze={onBulkOpenSnoozePicker}
           onAddFavourites={onBulkAddFavourites}

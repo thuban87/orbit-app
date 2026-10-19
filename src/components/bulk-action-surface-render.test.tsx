@@ -311,9 +311,9 @@ describe("BulkActionSurface — only what applies is enabled (38.13 D-40, D-74, 
     const favorite = bar.find("bulk-action-favorite");
     expect(textOf(favorite)).toBe("Favorite");
     expect(disabledOf(favorite)).toBe(true);
-    expect(
-      bar.nodes.some((node) => textOf(node).includes("Unfavorite")),
-    ).toBe(false);
+    expect(bar.nodes.some((node) => textOf(node).includes("Unfavorite"))).toBe(
+      false,
+    );
   });
 
   it("Remove from Favorites shows only when some selected Bound person is a favourite (D-75)", () => {

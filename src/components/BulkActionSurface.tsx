@@ -20,6 +20,7 @@ import {
   LOG_INTERACTION,
   MOVE_TO_BIN,
 } from "@/constants/glossary";
+import type { BulkActionAvailability } from "@/logic/dashboard-selection-applicability";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -31,6 +32,12 @@ export interface BulkActionSurfaceProps {
   pending: boolean;
   /** "Select All" or "Deselect all" (D-40). */
   selectAllLabel: string;
+  /**
+   * What applies to the current selection (D-40, D-74, D-75, D-77): from
+   * `selectionApplicability`. Favorite and Snooze count only selected Bound
+   * people; Remove from Favorites shows only when one is a favourite.
+   */
+  availability: BulkActionAvailability;
   onExit: () => void;
   onToggleSelectAll: () => void;
   onQuickLog: () => void;
@@ -49,20 +56,17 @@ interface BarButton {
   id: string;
   label: string;
   icon: IconName;
+  enabled: boolean;
   onPress: () => void;
 }
 
-interface SheetRow {
-  id: string;
-  label: string;
-  icon: IconName;
-  onPress: () => void;
-}
+type SheetRow = BarButton;
 
 export function BulkActionSurface({
   selectedCount,
   pending,
   selectAllLabel,
+  availability,
   onExit,
   onToggleSelectAll,
   onQuickLog,
@@ -76,21 +80,37 @@ export function BulkActionSurface({
 }: BulkActionSurfaceProps) {
   const { colors } = useTheme();
   const [moreVisible, setMoreVisible] = useState(false);
-  const disabled = selectedCount === 0 || pending;
+  // A running write disables every action; otherwise each follows its own
+  // applicability flag (D-40). Favorite always adds and never flips (D-74).
+  const enabledNow = (enabled: boolean) => enabled && !pending;
 
   const buttons: BarButton[] = [
-    { id: "quick-log", label: "Quick Log", icon: "add", onPress: onQuickLog },
-    { id: "snooze", label: "Snooze", icon: "snooze", onPress: onSnooze },
+    {
+      id: "quick-log",
+      label: "Quick Log",
+      icon: "add",
+      enabled: availability.canQuickLog,
+      onPress: onQuickLog,
+    },
+    {
+      id: "snooze",
+      label: "Snooze",
+      icon: "snooze",
+      enabled: availability.canSnooze,
+      onPress: onSnooze,
+    },
     {
       id: "favorite",
       label: FAVORITE,
       icon: "favorite",
+      enabled: availability.canAddFavorites,
       onPress: onAddFavourites,
     },
     {
       id: "more",
       label: "More…",
       icon: "overflow",
+      enabled: availability.canOpenMore,
       onPress: () => setMoreVisible(true),
     },
   ];
@@ -105,18 +125,27 @@ export function BulkActionSurface({
       id: "log-interaction",
       label: LOG_INTERACTION,
       icon: "call",
+      enabled: availability.canLogInteraction,
       onPress: closeThen(onLogInteraction),
     },
-    {
-      id: "remove-favorites",
-      label: `Remove from ${FAVORITES}`,
-      icon: "favorite",
-      onPress: closeThen(onRemoveFavourites),
-    },
+    // D-75: shown only when a selected Bound person is a favourite; removes
+    // every selected favourite.
+    ...(availability.showRemoveFavorites
+      ? [
+          {
+            id: "remove-favorites",
+            label: `Remove from ${FAVORITES}`,
+            icon: "favorite" as const,
+            enabled: true,
+            onPress: closeThen(onRemoveFavourites),
+          },
+        ]
+      : []),
     {
       id: "set-category",
       label: "Set Category",
       icon: "category",
+      enabled: availability.canSetCategory,
       onPress: closeThen(onSetCategory),
     },
   ];
@@ -126,6 +155,7 @@ export function BulkActionSurface({
       id: "frequency",
       label: "Change Contact Frequency",
       icon: "frequency",
+      enabled: availability.canChangeFrequency,
       onPress: closeThen(onChangeFrequency),
     },
     {
@@ -133,33 +163,37 @@ export function BulkActionSurface({
       id: "archive",
       label: MOVE_TO_BIN,
       icon: "archive",
+      enabled: availability.canMoveToBin,
       onPress: closeThen(onArchive),
     },
   ];
 
-  const renderRow = (row: SheetRow) => (
-    <Pressable
-      key={row.id}
-      testID={`bulk-more-${row.id}`}
-      accessibilityRole="button"
-      accessibilityLabel={row.label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={row.onPress}
-      style={({ pressed }) => [
-        styles.sheetRow,
-        {
-          borderBottomColor: colors.border,
-          opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
-        },
-      ]}
-    >
-      <Icon name={row.icon} size="md" tone="textPrimary" />
-      <Text style={[styles.sheetRowLabel, { color: colors.textPrimary }]}>
-        {row.label}
-      </Text>
-    </Pressable>
-  );
+  const renderRow = (row: SheetRow) => {
+    const disabled = !enabledNow(row.enabled);
+    return (
+      <Pressable
+        key={row.id}
+        testID={`bulk-more-${row.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={row.label}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={row.onPress}
+        style={({ pressed }) => [
+          styles.sheetRow,
+          {
+            borderBottomColor: colors.border,
+            opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
+          },
+        ]}
+      >
+        <Icon name={row.icon} size="md" tone="textPrimary" />
+        <Text style={[styles.sheetRowLabel, { color: colors.textPrimary }]}>
+          {row.label}
+        </Text>
+      </Pressable>
+    );
+  };
 
   return (
     <>
@@ -202,8 +236,13 @@ export function BulkActionSurface({
             testID="dashboard-selection-select-all"
             accessibilityRole="button"
             accessibilityLabel={selectAllLabel}
+            accessibilityState={{ disabled: !availability.canToggleSelectAll }}
+            disabled={!availability.canToggleSelectAll}
             onPress={onToggleSelectAll}
-            style={styles.selectAll}
+            style={[
+              styles.selectAll,
+              { opacity: availability.canToggleSelectAll ? 1 : 0.5 },
+            ]}
           >
             <Icon name="select-all" size="sm" tone="accentText" />
             <Text style={[styles.selectAllLabel, { color: colors.accentText }]}>
@@ -212,33 +251,36 @@ export function BulkActionSurface({
           </Pressable>
         </View>
         <View style={styles.buttonRow}>
-          {buttons.map((button) => (
-            <Pressable
-              key={button.id}
-              testID={`bulk-action-${button.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={button.label}
-              accessibilityState={{ disabled, busy: pending }}
-              disabled={disabled}
-              onPress={button.onPress}
-              style={({ pressed }) => [
-                styles.button,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              <Icon name={button.icon} size="md" tone="textPrimary" />
-              <Text
-                numberOfLines={1}
-                style={[styles.buttonLabel, { color: colors.textPrimary }]}
+          {buttons.map((button) => {
+            const disabled = !enabledNow(button.enabled);
+            return (
+              <Pressable
+                key={button.id}
+                testID={`bulk-action-${button.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={button.label}
+                accessibilityState={{ disabled, busy: pending }}
+                disabled={disabled}
+                onPress={button.onPress}
+                style={({ pressed }) => [
+                  styles.button,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                    opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
+                  },
+                ]}
               >
-                {button.label}
-              </Text>
-            </Pressable>
-          ))}
+                <Icon name={button.icon} size="md" tone="textPrimary" />
+                <Text
+                  numberOfLines={1}
+                  style={[styles.buttonLabel, { color: colors.textPrimary }]}
+                >
+                  {button.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
       <Sheet

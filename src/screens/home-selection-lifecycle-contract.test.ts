@@ -140,7 +140,14 @@ describe("the lifecycle map is React state, refreshed and gated (R4-01, R5-02)",
     const guardCall = refresh.slice(guard, refresh.indexOf("})", guard) + 2);
     expect(guardCall).toContain("requestSessionId");
     expect(guardCall).toContain("currentSessionId");
-    expect(guardCall).toContain("useDashboardSelectionStore.getState()");
+    // The current session is read from the store when the read resolves.
+    const resolveRead = refresh.indexOf(".then(");
+    const storeRead = refresh.indexOf(
+      "useDashboardSelectionStore.getState()",
+      resolveRead,
+    );
+    expect(storeRead).toBeGreaterThan(resolveRead);
+    expect(guard).toBeGreaterThan(storeRead);
   });
 
   it("the bar's enabled states come from selectionApplicability", () => {
@@ -160,7 +167,7 @@ describe("Favorite, Remove from Favorites and Snooze skip Unbound people (D-77; 
     (name, action, sink) => {
       const body = bodyOf(name);
       const read = body.indexOf("readSelectionLifecycle(getExecutor(), ids)");
-      const filter = body.indexOf(`bulkWriteIds("${action}"`);
+      const filter = body.search(new RegExp(`bulkWriteIds\\(\\s*"${action}"`));
       const write = body.indexOf(sink);
       expect(read).toBeGreaterThanOrEqual(0);
       expect(filter).toBeGreaterThan(read);
@@ -192,7 +199,9 @@ describe("Favorite, Remove from Favorites and Snooze skip Unbound people (D-77; 
 
 describe("selection layout (D-72, D-76)", () => {
   it("hides the control row while selecting", () => {
-    expect(source).toContain("{selectionMode ? null : <DashboardControlRow />}");
+    expect(source).toContain(
+      "{selectionMode ? null : <DashboardControlRow />}",
+    );
     expect(source).not.toContain("dashboard-selection-controls");
   });
 

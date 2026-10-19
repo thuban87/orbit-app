@@ -8,6 +8,8 @@ export interface DashboardSelectionStore {
   enterSelection: (universe: number[], seedId?: number) => void;
   toggle: (id: number) => void;
   selectAll: () => void;
+  /** Empties the selection; mode, session and frozen universe stay (D-40). */
+  deselectAll: () => void;
   removeFromUniverse: (ids: number[]) => void;
   exitSelection: () => void;
 }
@@ -61,6 +63,7 @@ export const useDashboardSelectionStore = create<DashboardSelectionStore>()(
     },
     selectAll: () =>
       set((state) => ({ selectedIds: new Set(state.frozenUniverse) })),
+    deselectAll: () => set({ selectedIds: new Set() }),
     removeFromUniverse: (ids) => {
       const idsToRemove = new Set(ids);
       set((state) => ({

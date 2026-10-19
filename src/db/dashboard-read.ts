@@ -602,6 +602,48 @@ export async function readCurrentlySnoozedIds(
   return rows.map((row) => row.id);
 }
 
+/** One selected person's lifecycle facts at action time (38.13 D-77). */
+export interface SelectionLifecycleRow {
+  id: number;
+  /** `tracking_enabled = 1`. */
+  bound: boolean;
+  /** `favourite_rank IS NOT NULL` (raw, not the card projection's mask). */
+  favourite: boolean;
+}
+
+/**
+ * Bound and favourite for each non-archived id in `ids` (38.13 D-77, ADR-233;
+ * review R1-04). Card-view selection reads this when Favorite, Remove from
+ * Favorites or Snooze runs, and to refresh the bar, instead of trusting the
+ * on-screen rows: a filter, search or Set Category can drop a selected person
+ * from them while the selection keeps the id. Raw `tracking_enabled` and
+ * `favourite_rank`, not `CARD_FAVOURITE_RANK` (an Unbound person's dormant
+ * rank reads favourite = true, bound = false). Archived or missing ids are
+ * absent. Every id is bound as `?`; an empty list returns [] without a query.
+ */
+export async function readSelectionLifecycle(
+  exec: SqlExecutor,
+  ids: readonly number[],
+): Promise<SelectionLifecycleRow[]> {
+  if (ids.length === 0) return [];
+  const rows = await exec.getAllAsync<{
+    id: number;
+    tracking_enabled: number;
+    favourite_rank: number | null;
+  }>(
+    `SELECT id, tracking_enabled, favourite_rank FROM contacts
+      WHERE id IN (${ids.map(() => "?").join(", ")})
+        AND archived_at IS NULL
+      ORDER BY id`,
+    [...ids],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    bound: row.tracking_enabled === 1,
+    favourite: row.favourite_rank !== null,
+  }));
+}
+
 /** Bound, non-archived favourite membership count for Dashboard empty states. */
 export function countFavourites(exec: SqlExecutor): Promise<number> {
   return count(
