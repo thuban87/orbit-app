@@ -38,6 +38,7 @@ import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -215,6 +216,16 @@ import { plural, pluralWord } from "@/utils/plural";
 const SEARCHING_LABEL = "Searching…";
 /** The debounce interval (ms) that collapses a keystroke burst to one read. */
 const SEARCH_DEBOUNCE_MS = 220;
+/**
+ * List view windowing (38.13 D-55 / D-81 F2): how many rows the List FlatList
+ * keeps mounted. The values are the 38.13-01 B5 bisect's (16 rows mounted,
+ * List memory ~300 MB on the ~1,000-contact set, from 1,749 MB). They are set
+ * explicitly because the defaults mounted every row and why was not isolated.
+ * Row heights are never declared up front: they grow with large text (Phase 40).
+ */
+const LIST_WINDOW_SIZE = 5;
+const LIST_INITIAL_NUM_TO_RENDER = 8;
+const LIST_MAX_TO_RENDER_PER_BATCH = 5;
 /** Small selections remain instantly reversible; larger batches ask first. */
 const BULK_QUICK_LOG_CONFIRM_THRESHOLD = 5;
 const dismissSnackbar = () => snackbarStore.getState().dismiss();
@@ -351,23 +362,71 @@ function SwipeTranslationMirror({
   return null;
 }
 
-function SwipeableListRow({
+/**
+ * The memoised List row host's props (38.13 D-55 / D-81 F1). Scalars only, plus
+ * callbacks that take a contact id and keep one identity for the screen's life,
+ * so an unchanged contact gets identical props across publishes and a
+ * Population, Filters, Sort or search change re-renders only the rows whose own
+ * props changed. Line 3 travels as its two strings and time as the read's local
+ * day, never as a per-read object or a seconds timestamp (review R1-01).
+ */
+type SwipeableListRowProps = Pick<
+  ListRowProps,
+  | "contactId"
+  | "name"
+  | "photo"
+  | "categoryLabel"
+  | "lastContact"
+  | "snoozeUntil"
+  | "status"
+  | "searchResult"
+> & {
+  /**
+   * The read's local day (`YYYY-MM-DD`). ListRow's only uses of `now` are
+   * calendar-day granular (`isSnoozed`, `formatListRecency`), so the day key
+   * renders exactly what the full timestamp did.
+   */
+  listDay: string;
+  isFavourite: boolean;
+  line3Text: string | undefined;
+  line3IconName: IconName | undefined;
+  unbound: boolean;
+  onOpenProfile: (contactId: number) => void;
+  onFavouriteTap: (contactId: number, nextMembership: boolean) => void;
+  onLogInteraction: (contactId: number) => Promise<void>;
+  onEditContact: (contactId: number) => void;
+  openRowRef: { current: SwipeableMethods | null };
+};
+
+const SwipeableListRow = memo(function SwipeableListRow({
+  contactId,
+  listDay,
+  isFavourite,
+  line3Text,
+  line3IconName,
+  onOpenProfile,
+  onFavouriteTap,
   onLogInteraction,
   onEditContact,
   openRowRef,
   ...rowProps
-}: Omit<ListRowProps, "onLogInteraction" | "onEditContact"> & {
-  onLogInteraction: (contactId: number) => Promise<void>;
-  onEditContact: (contactId: number) => void;
-  openRowRef: { current: SwipeableMethods | null };
-}) {
+}: SwipeableListRowProps) {
   const swipeableRef = useRef<SwipeableMethods | null>(null);
   const swipeTranslation = useSharedValue(0);
+  // ListRow's line-3 object, rebuilt only when its two strings change.
+  const line3 = useMemo(
+    () =>
+      line3Text === undefined
+        ? null
+        : line3IconName === undefined
+          ? { text: line3Text }
+          : { text: line3Text, iconName: line3IconName },
+    [line3IconName, line3Text],
+  );
   const isThisRowOpen = useCallback(
     () => openRowRef.current === swipeableRef.current,
     [openRowRef],
   );
-  const rowOnPress = rowProps.onPress;
 
   const onWillOpen = useCallback(() => {
     const previousRow = openRowRef.current;
@@ -387,18 +446,31 @@ function SwipeableListRow({
       openRowRef.current = null;
       return;
     }
-    rowOnPress();
-  }, [isThisRowOpen, openRowRef, rowOnPress]);
+    onOpenProfile(contactId);
+  }, [contactId, isThisRowOpen, onOpenProfile, openRowRef]);
+
+  // The star flips what this row renders; the host's gate decides the rest.
+  const onToggleFavourite = useCallback(() => {
+    onFavouriteTap(contactId, !isFavourite);
+  }, [contactId, isFavourite, onFavouriteTap]);
+
+  const onRowLogInteraction = useCallback(() => {
+    void onLogInteraction(contactId);
+  }, [contactId, onLogInteraction]);
+
+  const onRowEditContact = useCallback(() => {
+    onEditContact(contactId);
+  }, [contactId, onEditContact]);
 
   const onSwipeableOpen = useCallback(
     (direction: "left" | "right") => {
       if (direction === "right") {
-        void onLogInteraction(rowProps.contactId);
+        void onLogInteraction(contactId);
         return;
       }
-      onEditContact(rowProps.contactId);
+      onEditContact(contactId);
     },
-    [onEditContact, onLogInteraction, rowProps.contactId],
+    [contactId, onEditContact, onLogInteraction],
   );
 
   return (
@@ -427,16 +499,19 @@ function SwipeableListRow({
     >
       <ListRow
         {...rowProps}
+        contactId={contactId}
+        now={listDay}
+        isFavourite={isFavourite}
+        line3={line3}
         swipeTranslation={swipeTranslation}
         onPress={onPress}
-        onLogInteraction={() => {
-          void onLogInteraction(rowProps.contactId);
-        }}
-        onEditContact={() => onEditContact(rowProps.contactId)}
+        onToggleFavourite={onToggleFavourite}
+        onLogInteraction={onRowLogInteraction}
+        onEditContact={onRowEditContact}
       />
     </ReanimatedSwipeable>
   );
-}
+});
 
 interface ListRowLine3 {
   text: string;
@@ -1856,6 +1931,75 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     cardSnoozeShown !== null && isSnoozed(cardSnoozeShown.snoozeUntil, listNow)
       ? cardSnoozeShown.snoozeUntil
       : null;
+  // 38.13 D-55 F1 (review R1-01): the List rows get the read's local day, so
+  // a same-day publish hands every unchanged row identical props. Card view
+  // and the card snooze sheet keep the full `listNow`.
+  const listDay = listNow.slice(0, 10);
+  // The List renderItem builds no per-row closures: every callback it passes
+  // is stable for the screen's life (review R5-01), so a memoised row
+  // re-renders only when its own scalars change.
+  const renderListRow = useCallback(
+    ({ item }: { item: DashboardRow }) => {
+      const line3Entry = line3ByContactId.get(item.id);
+      return (
+        <SwipeableListRow
+          contactId={item.id}
+          name={item.name}
+          photo={item.photo}
+          categoryLabel={item.categoryLabel}
+          lastContact={item.last_contact}
+          snoozeUntil={item.snooze_until}
+          status={item.status}
+          listDay={listDay}
+          isFavourite={
+            favouriteOverlay.get(item.id) ?? item.favourite_rank !== null
+          }
+          line3Text={line3Entry?.text}
+          line3IconName={line3Entry?.iconName}
+          searchResult={
+            isSearchMode
+              ? (searchResultsByContactId.get(item.id) ?? null)
+              : undefined
+          }
+          unbound={isUnboundRow(item)}
+          onOpenProfile={goToProfile}
+          onFavouriteTap={onFavouriteTap}
+          onLogInteraction={onLogInteraction}
+          onEditContact={onEditContact}
+          openRowRef={openRowRef}
+        />
+      );
+    },
+    [
+      favouriteOverlay,
+      goToProfile,
+      isSearchMode,
+      line3ByContactId,
+      listDay,
+      onEditContact,
+      onFavouriteTap,
+      onLogInteraction,
+      searchResultsByContactId,
+    ],
+  );
+  // Everything renderListRow reads beyond `rows`, so the FlatList re-renders
+  // its cells when the favourite overlay, line 3, search matches or day change.
+  const listExtraData = useMemo(
+    () => ({
+      favouriteOverlay,
+      line3ByContactId,
+      searchResultsByContactId,
+      isSearchMode,
+      listDay,
+    }),
+    [
+      favouriteOverlay,
+      isSearchMode,
+      line3ByContactId,
+      listDay,
+      searchResultsByContactId,
+    ],
+  );
   const todayLocal = formatLocalDate(new Date());
   const emptyState = selectDashboardEmptyState({
     live: counts.live,
@@ -2197,39 +2341,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 ref={listRef}
                 data={error || showInitialSkeleton ? [] : rows}
                 keyExtractor={(item) => String(item.id)}
-                renderItem={({ item }) => (
-                  <SwipeableListRow
-                    contactId={item.id}
-                    name={item.name}
-                    photo={item.photo}
-                    categoryLabel={item.categoryLabel}
-                    lastContact={item.last_contact}
-                    snoozeUntil={item.snooze_until}
-                    status={item.status}
-                    now={listNow}
-                    onPress={() => goToProfile(item.id)}
-                    isFavourite={
-                      favouriteOverlay.get(item.id) ??
-                      item.favourite_rank !== null
-                    }
-                    onToggleFavourite={() => {
-                      const renderedMembership =
-                        favouriteOverlay.get(item.id) ??
-                        item.favourite_rank !== null;
-                      onFavouriteTap(item.id, !renderedMembership);
-                    }}
-                    line3={line3ByContactId.get(item.id) ?? null}
-                    searchResult={
-                      isSearchMode
-                        ? (searchResultsByContactId.get(item.id) ?? null)
-                        : undefined
-                    }
-                    unbound={isUnboundRow(item)}
-                    onLogInteraction={onLogInteraction}
-                    onEditContact={onEditContact}
-                    openRowRef={openRowRef}
-                  />
-                )}
+                renderItem={renderListRow}
+                extraData={listExtraData}
+                windowSize={LIST_WINDOW_SIZE}
+                initialNumToRender={LIST_INITIAL_NUM_TO_RENDER}
+                maxToRenderPerBatch={LIST_MAX_TO_RENDER_PER_BATCH}
                 ListHeaderComponent={listHeader}
                 ListEmptyComponent={
                   showInitialSkeleton ? <ListLoadingSkeleton /> : listEmpty

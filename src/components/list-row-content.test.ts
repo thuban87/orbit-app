@@ -16,6 +16,7 @@ import type {
   DashboardSearchResult,
   DashboardSearchSourceKind,
 } from "@/logic/dashboard-search-match";
+import { isSnoozed } from "@/utils/dates";
 
 function match(
   sourceKind: DashboardSearchSourceKind,
@@ -355,6 +356,41 @@ describe("card recency (38.13 D-33)", () => {
       expect(formatCardRecency(lastContact, now)).toBe(
         formatListRecency(lastContact, now),
       );
+    }
+  });
+});
+
+/**
+ * 38.13 D-55 F1 (review R1-01): the memoised List row host passes the read's
+ * local day (`YYYY-MM-DD`) as ListRow's `now` instead of the seconds-granular
+ * timestamp. ListRow's only uses of `now` are calendar-day granular, so the
+ * day key renders exactly what the full timestamp did.
+ */
+describe("the List day key renders what the full timestamp did (38.13 D-55)", () => {
+  const day = "2026-08-15";
+  const stamps = [`${day} 00:00:00`, `${day} 12:34:56`, `${day} 23:59:59`];
+
+  it.each([
+    ["today", "2026-08-15 08:00:00"],
+    ["yesterday", "2026-08-14 23:00:00"],
+    ["N days ago", "2026-07-28"],
+    ["null (no interactions)", null],
+  ])("formatListRecency: %s", (_label, lastContact) => {
+    for (const now of stamps) {
+      expect(formatListRecency(lastContact, day)).toBe(
+        formatListRecency(lastContact, now),
+      );
+    }
+  });
+
+  it.each([
+    ["snoozed until tomorrow", "2026-08-16", true],
+    ["snoozed until today", "2026-08-15", false],
+    ["no snooze", null, false],
+  ])("isSnoozed: %s", (_label, snoozeUntil, expected) => {
+    expect(isSnoozed(snoozeUntil, day)).toBe(expected);
+    for (const now of stamps) {
+      expect(isSnoozed(snoozeUntil, now)).toBe(expected);
     }
   });
 });

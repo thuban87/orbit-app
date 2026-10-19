@@ -116,7 +116,10 @@ describe("HomeScreen star taps go through one gate (ADR-233; review R2-04)", () 
   });
 
   it("the List star, the CardGrid star and the card-menu star all call onFavouriteTap", () => {
-    expect(source).toContain("onFavouriteTap(item.id, !renderedMembership);");
+    // 38.13-08: the memoised List row host flips what it renders and calls
+    // the gate it receives as `onFavouriteTap={onFavouriteTap}`.
+    expect(source).toContain("onFavouriteTap(contactId, !isFavourite);");
+    expect(source).toContain("onFavouriteTap={onFavouriteTap}");
     expect(source).toContain("onToggleFavourite={onFavouriteTap}");
     expect(source).toContain(
       "onFavouriteTap(contextMenuContact.id, !contextMenuIsFavourite);",
