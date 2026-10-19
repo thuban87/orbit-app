@@ -12,7 +12,11 @@ vi.mock("@/components/digest/DigestListTransition", () => ({
   DigestListItem: ({ children }: { children: unknown }) => children,
 }));
 vi.mock("@/components/ContactCard", () => ({
-  ringVisual: () => ({ color: "theme-token", opacity: 1, width: 2 }),
+  // The real null/never-contacted ring is faint (opacity 0.5).
+  ringVisual: (status: string | null) =>
+    status === null
+      ? { color: "faint-token", opacity: 0.5, width: 2 }
+      : { color: "theme-token", opacity: 1, width: 3 },
 }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
@@ -86,7 +90,63 @@ const render = (overrides: Record<string, unknown> = {}) =>
     ),
   );
 
+/** Every node with the chain of its ancestors, outermost first. */
+function withAncestors(
+  nodes: Node[],
+  chain: Node[] = [],
+): { node: Node; ancestors: Node[] }[] {
+  return nodes.flatMap((node) => [
+    { node, ancestors: chain },
+    ...withAncestors(node.children, [...chain, node]),
+  ]);
+}
+
+function opacityOf(node: Node): number {
+  const style = ([] as unknown[]).concat(node.props.style ?? []);
+  let opacity = 1;
+  for (const part of style.flat(Infinity)) {
+    if (part && typeof part === "object" && "opacity" in part) {
+      opacity = (part as { opacity: number }).opacity;
+    }
+  }
+  return opacity;
+}
+
 describe("HorizonSection", () => {
+  it("draws every avatar at full opacity; the faint ring opacity reaches the ring only (38.13 review B-WR-03)", () => {
+    const tree = resolve(
+      HorizonSection({
+        birthdays: [
+          {
+            contact: { id: 1, name: "Bea", birthday: "2000-09-19", photo: "p" },
+            id: 1,
+            name: "Bea",
+            birthday: "2000-09-19",
+            daysUntil: 0,
+            tag: "Today",
+          },
+        ],
+        overlooked: [overlooked(4)],
+        neverContactedRows: [never(9)],
+        neverContactedCount: 1,
+        onOpenProfile: vi.fn(),
+        onDrillThrough: vi.fn(),
+      } as never),
+    );
+    const entries = withAncestors(tree);
+    const avatars = entries.filter((entry) => entry.node.type === "Avatar");
+    expect(avatars).toHaveLength(3);
+    for (const { ancestors } of avatars) {
+      for (const ancestor of ancestors) expect(opacityOf(ancestor)).toBe(1);
+    }
+    // The birthday and Never Contacted rings keep their faint opacity, on a
+    // sibling of the avatar.
+    const faintRings = entries.filter(
+      ({ node }) => opacityOf(node) === 0.5 && node.children.length === 0,
+    );
+    expect(faintRings).toHaveLength(2);
+  });
+
   it("hides empty subgroups while keeping Horizon's neutral empty state", () => {
     const nodes = render({
       birthdays: [

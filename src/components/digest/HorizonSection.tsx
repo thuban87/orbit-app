@@ -87,23 +87,12 @@ export function HorizonSection({
                 >
                   {/* The same avatar treatment as every other Digest row, in
                       the neutral ring (no status; 38.13 D-48). */}
-                  <View
-                    style={[
-                      styles.avatarRing,
-                      {
-                        borderColor: neutralRing.color,
-                        borderWidth: neutralRing.width,
-                        opacity: neutralRing.opacity,
-                      },
-                    ]}
-                  >
-                    <Avatar
-                      photo={birthday.contact.photo}
-                      name={birthday.name}
-                      contactId={birthday.id}
-                      size={40}
-                    />
-                  </View>
+                  <RingedAvatar
+                    id={birthday.id}
+                    name={birthday.name}
+                    photo={birthday.contact.photo}
+                    ring={neutralRing}
+                  />
                   <AppText
                     numberOfLines={1}
                     ellipsizeMode="tail"
@@ -220,19 +209,13 @@ function CompactContactRow({
       onPress={() => onPress(id)}
       style={styles.row}
     >
-      <View
+      <RingedAvatar
+        id={id}
+        name={name}
+        photo={photo}
+        ring={ring}
         accessibilityLabel={status ? `${status} status` : NEVER_CONTACTED}
-        style={[
-          styles.avatarRing,
-          {
-            borderColor: ring.color,
-            borderWidth: ring.width,
-            opacity: ring.opacity,
-          },
-        ]}
-      >
-        <Avatar photo={photo} name={name} contactId={id} size={40} />
-      </View>
+      />
       <AppText
         numberOfLines={1}
         ellipsizeMode="tail"
@@ -242,6 +225,49 @@ function CompactContactRow({
         {name}
       </AppText>
     </Pressable>
+  );
+}
+
+/**
+ * A 40dp avatar inside its status ring. The ring is an absolutely positioned
+ * sibling, so its opacity (0.5 for the faint no-status ring) never reaches the
+ * photo (38.13 review B-WR-03; the ContactCard / GridCard pattern). The slot
+ * pads by the ring width, so the footprint matches the old bordered wrapper.
+ */
+function RingedAvatar({
+  id,
+  name,
+  photo,
+  ring,
+  accessibilityLabel,
+}: {
+  id: number;
+  name: string;
+  photo: string | null;
+  ring: ReturnType<typeof ringVisual>;
+  accessibilityLabel?: string;
+}) {
+  return (
+    <View
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.avatarSlot, { padding: SPACING.xs + ring.width }]}
+    >
+      <View
+        pointerEvents="none"
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.avatarRing,
+          {
+            borderColor: ring.color,
+            borderWidth: ring.width,
+            opacity: ring.opacity,
+          },
+        ]}
+      />
+      <Avatar photo={photo} name={name} contactId={id} size={40} />
+    </View>
   );
 }
 
@@ -281,6 +307,14 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   name: { flex: 1 },
-  avatarRing: { borderRadius: 24, padding: SPACING.xs },
+  avatarSlot: { borderRadius: 24 },
+  avatarRing: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 24,
+  },
   drill: { minHeight: 44, justifyContent: "center" },
 });
