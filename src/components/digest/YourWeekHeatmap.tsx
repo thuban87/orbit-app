@@ -29,7 +29,10 @@ const MIN_CELL = 36;
 const MAX_CELL = 56;
 const GAP = SPACING.xs;
 const COLUMNS = 7;
-/** Height of the selected weekday label's underline bar (38.13 D-47). */
+/**
+ * Height of the selected weekday label's underline bar (38.13-04 only; D-47
+ * requires a non-colour cue, not this value).
+ */
 const LABEL_UNDERLINE = 2;
 const LOG_SCOPE = "your-week-heatmap";
 
