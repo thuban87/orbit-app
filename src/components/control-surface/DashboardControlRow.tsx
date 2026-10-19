@@ -1,6 +1,12 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor } from "@/db/database";
 import {
@@ -12,7 +18,10 @@ import type {
   DashboardFilterFamily,
   DashboardSortMode,
 } from "@/logic/dashboard-query-logic";
-import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
+import {
+  type DashboardQueryAxis,
+  useDashboardQueryStore,
+} from "@/stores/dashboard-query-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { controlTriggerBacking } from "@/theme/art-treatments";
@@ -31,9 +40,33 @@ import { PopulationPanelContent } from "./PopulationPanelContent";
 import { SortPanelContent } from "./SortPanelContent";
 import { controlTriggerLook } from "./trigger-look";
 
+/**
+ * D-27 pending state (look is this plan's choice): a write still pending after
+ * this many ms shows a small spinner inside its trigger. Taps are never dropped
+ * meanwhile; the store already shows the new choice.
+ */
+const PENDING_INDICATOR_DELAY_MS = 250;
+
 const PANEL_ID = "dashboard-population";
 const FILTER_PANEL_ID = "dashboard-filters";
 const SORT_PANEL_ID = "dashboard-sort";
+
+/** True once `axis` has had a write pending for PENDING_INDICATOR_DELAY_MS. */
+function useSlowPending(axis: DashboardQueryAxis): boolean {
+  const pending = useDashboardQueryStore(
+    (state) => state.pendingAxes[axis] > 0,
+  );
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!pending) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), PENDING_INDICATOR_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [pending]);
+  return slow;
+}
 
 export function DashboardControlRow() {
   const { colors } = useTheme();
@@ -61,9 +94,9 @@ export function DashboardControlRow() {
   const triggerRef = useRef<View>(null);
   const filtersTriggerRef = useRef<View>(null);
   const sortTriggerRef = useRef<View>(null);
-  const [pending, setPending] = useState(false);
-  const [filtersPending, setFiltersPending] = useState(false);
-  const [sortPending, setSortPending] = useState(false);
+  const populationsSlow = useSlowPending("populations");
+  const filtersSlow = useSlowPending("filters");
+  const sortSlow = useSlowPending("sort");
   const [writeError, setWriteError] = useState(false);
   const [filterWriteError, setFilterWriteError] = useState(false);
   const [sortWriteError, setSortWriteError] = useState(false);
@@ -115,33 +148,26 @@ export function DashboardControlRow() {
     dashboardPanelStore.getState().close();
   }, []);
 
-  const togglePopulation = useCallback(
-    async (key: PopulationPanelKey) => {
-      if (pending) return;
-      // D-23/D-58: the pure toggle owns exclusivity; "active" stores [].
-      const current = useDashboardQueryStore.getState().populations;
-      const next = nextPopulations(current, key);
-      // Review R1-16: re-tapping the selected row writes and reloads nothing.
-      if (samePopulations(next, current)) return;
-      setPending(true);
-      setWriteError(false);
-      try {
-        await useDashboardQueryStore
-          .getState()
-          .setPopulations(getExecutor(), next);
-      } catch {
-        setWriteError(true);
-      } finally {
-        setPending(false);
-      }
-    },
-    [pending],
-  );
+  const togglePopulation = useCallback(async (key: PopulationPanelKey) => {
+    // D-23/D-58: the pure toggle owns exclusivity; "active" stores [].
+    // D-27: computed from the store's current (optimistic) state, so a quick
+    // second tap builds on the first; the store queues both writes in order.
+    const current = useDashboardQueryStore.getState().populations;
+    const next = nextPopulations(current, key);
+    // Review R1-16: re-tapping the selected row writes and reloads nothing.
+    if (samePopulations(next, current)) return;
+    setWriteError(false);
+    try {
+      await useDashboardQueryStore
+        .getState()
+        .setPopulations(getExecutor(), next);
+    } catch {
+      setWriteError(true);
+    }
+  }, []);
 
   const toggleFilter = useCallback(
     async (family: DashboardFilterFamily, value: string) => {
-      if (filtersPending) return;
-      setFiltersPending(true);
       setFilterWriteError(false);
       const current = useDashboardQueryStore.getState().filters;
       const values = current[family] ?? [];
@@ -155,41 +181,28 @@ export function DashboardControlRow() {
         await useDashboardQueryStore.getState().setFilters(getExecutor(), next);
       } catch {
         setFilterWriteError(true);
-      } finally {
-        setFiltersPending(false);
       }
     },
-    [filtersPending],
+    [],
   );
 
   const clearFilters = useCallback(async () => {
-    if (filtersPending) return;
-    setFiltersPending(true);
     setFilterWriteError(false);
     try {
       await useDashboardQueryStore.getState().setFilters(getExecutor(), {});
     } catch {
       setFilterWriteError(true);
-    } finally {
-      setFiltersPending(false);
     }
-  }, [filtersPending]);
+  }, []);
 
-  const selectSort = useCallback(
-    async (mode: DashboardSortMode) => {
-      if (sortPending) return;
-      setSortPending(true);
-      setSortWriteError(false);
-      try {
-        await useDashboardQueryStore.getState().setSort(getExecutor(), mode);
-      } catch {
-        setSortWriteError(true);
-      } finally {
-        setSortPending(false);
-      }
-    },
-    [sortPending],
-  );
+  const selectSort = useCallback(async (mode: DashboardSortMode) => {
+    setSortWriteError(false);
+    try {
+      await useDashboardQueryStore.getState().setSort(getExecutor(), mode);
+    } catch {
+      setSortWriteError(true);
+    }
+  }, []);
 
   const open = useCallback(() => {
     if (dashboardPanelStore.getState().request?.id === PANEL_ID) {
@@ -205,13 +218,12 @@ export function DashboardControlRow() {
           <PopulationPanelContent
             state={useDashboardQueryStore.getState()}
             onTogglePopulation={togglePopulation}
-            disabled={pending}
           />
         ),
         onDismiss: dismiss,
       });
     });
-  }, [dismiss, pending, togglePopulation]);
+  }, [dismiss, togglePopulation]);
 
   const openFilters = useCallback(() => {
     if (dashboardPanelStore.getState().request?.id === FILTER_PANEL_ID) {
@@ -229,13 +241,12 @@ export function DashboardControlRow() {
             categories={categories}
             onToggleFilter={toggleFilter}
             onClearFilters={clearFilters}
-            disabled={filtersPending}
           />
         ),
         onDismiss: dismiss,
       });
     });
-  }, [categories, clearFilters, dismiss, filtersPending, toggleFilter]);
+  }, [categories, clearFilters, dismiss, toggleFilter]);
 
   const openSort = useCallback(() => {
     if (dashboardPanelStore.getState().request?.id === SORT_PANEL_ID) {
@@ -251,13 +262,12 @@ export function DashboardControlRow() {
           <SortPanelContent
             state={useDashboardQueryStore.getState()}
             onSelectSort={selectSort}
-            disabled={sortPending}
           />
         ),
         onDismiss: dismiss,
       });
     });
-  }, [dismiss, selectSort, sortPending]);
+  }, [dismiss, selectSort]);
 
   // The host owns the presentation node, so refresh the pure content props as
   // store state changes without coupling the content component to persistence.
@@ -271,11 +281,10 @@ export function DashboardControlRow() {
         <PopulationPanelContent
           state={useDashboardQueryStore.getState()}
           onTogglePopulation={togglePopulation}
-          disabled={pending}
         />
       ),
     });
-  }, [pending, populations, togglePopulation]);
+  }, [populations, togglePopulation]);
 
   useEffect(() => {
     void filters;
@@ -289,11 +298,10 @@ export function DashboardControlRow() {
           categories={categories}
           onToggleFilter={toggleFilter}
           onClearFilters={clearFilters}
-          disabled={filtersPending}
         />
       ),
     });
-  }, [categories, clearFilters, filters, filtersPending, toggleFilter]);
+  }, [categories, clearFilters, filters, toggleFilter]);
 
   useEffect(() => {
     void sort;
@@ -305,11 +313,10 @@ export function DashboardControlRow() {
         <SortPanelContent
           state={useDashboardQueryStore.getState()}
           onSelectSort={selectSort}
-          disabled={sortPending}
         />
       ),
     });
-  }, [selectSort, sort, sortPending]);
+  }, [selectSort, sort]);
 
   const labels = populations.map((population) => POPULATION_LABELS[population]);
   const summary = collapseSummary(labels, 2) || AXIS_DEFAULT_LABELS.population;
@@ -334,7 +341,11 @@ export function DashboardControlRow() {
           ref={triggerRef}
           testID="dashboard-population-control"
           accessibilityRole="button"
-          accessibilityState={{ expanded: panelIsOpen, selected: active }}
+          accessibilityState={{
+            expanded: panelIsOpen,
+            selected: active,
+            busy: populationsSlow,
+          }}
           accessibilityLabel={`Population, ${summary}`}
           onPress={open}
           style={[
@@ -354,6 +365,9 @@ export function DashboardControlRow() {
           >
             {summary}
           </Text>
+          {populationsSlow ? (
+            <PendingSpinner color={colors.accentText} />
+          ) : null}
         </Pressable>
         <Pressable
           ref={filtersTriggerRef}
@@ -362,6 +376,7 @@ export function DashboardControlRow() {
           accessibilityState={{
             expanded: activePanelId === FILTER_PANEL_ID,
             selected: filtersActive,
+            busy: filtersSlow,
           }}
           accessibilityLabel={`${filterLabel}, ${filterSummary}`}
           onPress={openFilters}
@@ -382,6 +397,7 @@ export function DashboardControlRow() {
           >
             {filterSummary}
           </Text>
+          {filtersSlow ? <PendingSpinner color={colors.accentText} /> : null}
         </Pressable>
         <Pressable
           ref={sortTriggerRef}
@@ -390,6 +406,7 @@ export function DashboardControlRow() {
           accessibilityState={{
             expanded: activePanelId === SORT_PANEL_ID,
             selected: sortActive,
+            busy: sortSlow,
           }}
           accessibilityLabel={`${sortLabel}, ${sortSummary}`}
           onPress={openSort}
@@ -410,6 +427,7 @@ export function DashboardControlRow() {
           >
             {sortSummary}
           </Text>
+          {sortSlow ? <PendingSpinner color={colors.accentText} /> : null}
         </Pressable>
       </View>
       {writeError ? (
@@ -440,6 +458,19 @@ export function DashboardControlRow() {
   );
 }
 
+/** Absolutely positioned inside its trigger: no element joins the row's flow. */
+function PendingSpinner({ color }: { color: string }) {
+  return (
+    <ActivityIndicator
+      size="small"
+      color={color}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.pending}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   wrapper: { zIndex: 20, elevation: 20 },
   row: { flexDirection: "row", gap: 8 },
@@ -454,4 +485,5 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: "600" },
   summary: { fontSize: 14, fontWeight: "400" },
   error: { fontSize: 14, marginTop: 4 },
+  pending: { position: "absolute", top: 6, right: 6 },
 });
