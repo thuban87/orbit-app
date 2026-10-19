@@ -67,6 +67,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { useShallow } from "zustand/react/shallow";
@@ -725,6 +726,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     AccessibilityInfo.announceForAccessibility(label);
   }, [selectionCount, selectionMode]);
   const [resultGeneration, setResultGeneration] = useState(0);
+  // 38.13 D-44: the result-fade start published with the rows (same batch as
+  // the generation bump). The fade effect applies it after the rows commit.
+  const [publishedFadeStart, setPublishedFadeStart] = useState(1);
   // Derived from the single panel-store owner (RG-020): never mirror it in
   // local state, or a missed close leaves both wrappers inert.
   const panelOpen = dashboardPanelStore(selectPanelOpen);
@@ -892,19 +896,43 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     transform: [{ translateY: (1 - searchProgress.value) * SPACING.sm }],
   }));
   const resultProgress = useSharedValue(1);
+  // 38.13 D-44: the last result generation whose published fade start was
+  // applied. Only a newer generation re-applies a start; a focus, app-state or
+  // reduced-motion re-run never re-fades the list from 0 (D-55; review R1-02).
+  const lastAppliedGenerationRef = useRef(0);
   useEffect(() => {
     if (resultGeneration === 0) return;
     const canAnimate = isFocused && appActive && !reducedMotion;
-    resultProgress.value = canAnimate
-      ? withTiming(1, {
-          duration: MOTION.fast,
-          easing:
-            EASING.decelerate === "out"
-              ? Easing.out(Easing.ease)
-              : Easing.inOut(Easing.ease),
-        })
-      : 1;
-  }, [appActive, isFocused, reducedMotion, resultGeneration, resultProgress]);
+    const toFullOpacity = withTiming(1, {
+      duration: MOTION.fast,
+      easing:
+        EASING.decelerate === "out"
+          ? Easing.out(Easing.ease)
+          : Easing.inOut(Easing.ease),
+    });
+    if (resultGeneration > lastAppliedGenerationRef.current) {
+      lastAppliedGenerationRef.current = resultGeneration;
+      // The new rows have committed: start them from the published value and
+      // fade them in. Until now the old rows and the count stayed at full
+      // opacity (D-44, D-02; ADR-100).
+      resultProgress.value = canAnimate
+        ? withSequence(
+            withTiming(publishedFadeStart, { duration: 0 }),
+            toFullOpacity,
+          )
+        : 1;
+      return;
+    }
+    // No new results: as before, animate or settle toward 1 only.
+    resultProgress.value = canAnimate ? toFullOpacity : 1;
+  }, [
+    appActive,
+    isFocused,
+    publishedFadeStart,
+    reducedMotion,
+    resultGeneration,
+    resultProgress,
+  ]);
   const resultTransitionStyle = useAnimatedStyle(() => ({
     opacity: resultProgress.value,
     transform: [{ translateY: (1 - resultProgress.value) * SPACING.xs }],
@@ -985,9 +1013,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       setCounts,
       setPopulationCounts,
       setError,
-      setFadeStart: (value) => {
-        resultProgress.value = value;
-      },
+      // D-44: recorded with the rows and applied after they commit (the
+      // fade effect), never written to resultProgress here.
+      setFadeStart: (value) => setPublishedFadeStart(value),
       bumpResultGeneration: () =>
         setResultGeneration((generation) => generation + 1),
       setRefreshing,
@@ -1703,8 +1731,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           // this callback never depends on the query (review R5-01). The
           // committed write is visible to this newer read, whose token retires
           // any in-flight stale read (which could otherwise revert the star)
-          // and re-reads the population counts. Never deferred; published
-          // with fade start 1 (no list re-fade).
+          // and re-reads the population counts. Deferred to the next focus
+          // read while Home is hidden or backgrounded (38.13 D-52); published
+          // with fade start 1 (no list re-fade). The Profile star (38.12) is a
+          // second toggle that does not use this scheduler.
           scheduler.request("favourite");
         })
         .catch((writeError: unknown) => {

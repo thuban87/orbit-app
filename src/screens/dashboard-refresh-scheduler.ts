@@ -5,7 +5,7 @@
  *
  * ONE scheduler owns every Home read:
  * - `request(source)` issues a read with a latest-request token, or returns
- *   `null` for a shell / foreground request while Home is hidden. A hidden
+ *   `null` for a shell / foreground / favourite request while Home is hidden. A hidden
  *   refresh is never run in the background: the next Home focus read covers it
  *   (D-23).
  * - `isCurrent(token)` is the only publication authority. An older read can
@@ -27,11 +27,13 @@ import { isForegroundVisible } from "@/utils/screen-visibility";
 
 /**
  * Every trigger that may issue a Home read. `favourite` is the committed star
- * toggle (38.3 REVIEW A-WR-05 / VERIFICATION W4, 38.4 D-10): it is requested
- * only after the favourite write commits, so its newer token retires any
- * in-flight stale read that could otherwise revert the star, and it re-reads
- * the population counts. It is NOT deferrable — the toggle is a user action on
- * a visible Home.
+ * toggle on Home (38.3 REVIEW A-WR-05 / VERIFICATION W4, 38.4 D-10): it is
+ * requested only after the favourite write commits, so its newer token retires
+ * any in-flight stale read that could otherwise revert the star, and it
+ * re-reads the population counts. A favourite read that would run while Home
+ * is hidden or backgrounded is deferred to the next focus read (38.13 D-52,
+ * 38.4 IN-04; D-23). The Profile star (38.12) is a second toggle that does not
+ * use this scheduler; Home's next focus read reflects it.
  */
 export type DashboardRefreshSource =
   | "focus"
@@ -55,10 +57,14 @@ export function dashboardFadeStart(
   return canAnimate ? 0 : 1;
 }
 
-/** Sources deferred to the next focus read while Home is hidden (D-23). */
+/**
+ * Sources deferred to the next focus read while Home is hidden (D-23), the
+ * favourite read included (38.13 D-52).
+ */
 const DEFERRABLE_WHILE_HIDDEN: ReadonlySet<DashboardRefreshSource> = new Set([
   "shell",
   "foreground",
+  "favourite",
 ]);
 
 /**
@@ -157,7 +163,11 @@ export interface DashboardReadSinks<
   setCounts(counts: TCounts): void;
   setPopulationCounts(counts: TPopulationCounts): void;
   setError(error: boolean): void;
-  /** Assigns the result-fade shared value's start. */
+  /**
+   * Records the result-fade start published with these rows (38.13 D-44). The
+   * screen applies it after the rows commit, never at publish time, so the
+   * current rows and the count stay at full opacity through the commit.
+   */
   setFadeStart(value: number): void;
   bumpResultGeneration(): void;
   setRefreshing(refreshing: boolean): void;
