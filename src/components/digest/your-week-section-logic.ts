@@ -216,8 +216,14 @@ export function toggleYourWeekDay(
  *
  * The stale guard is REQUEST-scoped, not date-only: every read (tap, Retry, a
  * refresh that retained the day) starts with a fresh token, and only the
- * current `loading` token may settle or fail — so an older read for the SAME
- * date can never publish over a newer one.
+ * current token may settle or fail — so an older read for the SAME date can
+ * never publish over a newer one.
+ *
+ * A re-read of the day already shown (a Digest refresh after Profile → Back,
+ * D-46) keeps its rows on screen while it reads: `loaded` carries the pending
+ * `token` instead of dropping to the spinner, so the page does not shrink and
+ * jump (38.13 review B-WR-05; the D-49 posture). A failed re-read keeps the
+ * shown rows, as a failed refresh keeps the week body (38.3 B-WR-06).
  */
 export type YourWeekDayDetail =
   | { readonly status: "idle" }
@@ -230,6 +236,8 @@ export type YourWeekDayDetail =
       readonly status: "loaded";
       readonly date: string;
       readonly rows: readonly YourWeekDayRow[];
+      /** A re-read of this same day is in flight (rows stay shown). */
+      readonly token?: number;
     }
   | { readonly status: "error"; readonly date: string };
 
@@ -238,11 +246,25 @@ export function clearDayDetail(): YourWeekDayDetail {
 }
 
 export function startDayRead(
-  _state: YourWeekDayDetail,
+  state: YourWeekDayDetail,
   date: string,
   token: number,
 ): YourWeekDayDetail {
+  if (state.status === "loaded" && state.date === date) {
+    return { status: "loaded", date, rows: state.rows, token };
+  }
   return { status: "loading", date, token };
+}
+
+/** Whether `state` is waiting on the read `token` (spinner or held rows). */
+function awaitsDayRead(
+  state: YourWeekDayDetail,
+  token: number,
+): state is Extract<YourWeekDayDetail, { status: "loading" | "loaded" }> {
+  return (
+    (state.status === "loading" || state.status === "loaded") &&
+    state.token === token
+  );
 }
 
 export function settleDayRead(
@@ -250,7 +272,7 @@ export function settleDayRead(
   token: number,
   rows: readonly YourWeekDayRow[],
 ): YourWeekDayDetail {
-  if (state.status !== "loading" || state.token !== token) return state;
+  if (!awaitsDayRead(state, token)) return state;
   return { status: "loaded", date: state.date, rows };
 }
 
@@ -258,7 +280,10 @@ export function failDayRead(
   state: YourWeekDayDetail,
   token: number,
 ): YourWeekDayDetail {
-  if (state.status !== "loading" || state.token !== token) return state;
+  if (!awaitsDayRead(state, token)) return state;
+  if (state.status === "loaded") {
+    return { status: "loaded", date: state.date, rows: state.rows };
+  }
   return { status: "error", date: state.date };
 }
 

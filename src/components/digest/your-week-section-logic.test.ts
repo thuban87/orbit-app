@@ -421,6 +421,42 @@ describe("Your Week day detail (38.3 D-16, request-scoped)", () => {
     });
   });
 
+  it("a refresh re-read of the shown day keeps its rows on screen (38.13 review B-WR-05)", () => {
+    const shown = settleDayRead(
+      startDayRead(clearDayDetail(), "2026-09-24", 1),
+      1,
+      rows,
+    );
+    // Profile -> Back: the Digest refresh retains the day and re-reads it.
+    const refreshing = startDayRead(shown, "2026-09-24", 2);
+    expect(refreshing).toEqual({
+      status: "loaded",
+      date: "2026-09-24",
+      rows,
+      token: 2,
+    });
+    // The newer rows replace the shown ones; an older token is ignored.
+    expect(settleDayRead(refreshing, 1, [])).toBe(refreshing);
+    expect(settleDayRead(refreshing, 2, [])).toEqual({
+      status: "loaded",
+      date: "2026-09-24",
+      rows: [],
+    });
+    // A failed refresh keeps the shown rows (the week body's posture).
+    expect(failDayRead(refreshing, 1)).toBe(refreshing);
+    expect(failDayRead(refreshing, 2)).toEqual({
+      status: "loaded",
+      date: "2026-09-24",
+      rows,
+    });
+    // A different day still starts from the spinner.
+    expect(startDayRead(shown, "2026-09-23", 3)).toEqual({
+      status: "loading",
+      date: "2026-09-23",
+      token: 3,
+    });
+  });
+
   it("a late settle or failure after clearing publishes nothing", () => {
     const cleared = clearDayDetail();
     expect(cleared).toEqual({ status: "idle" });

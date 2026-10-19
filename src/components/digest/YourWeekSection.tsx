@@ -114,7 +114,9 @@ export function YourWeekSection({
   // refresh that retained the day ALL start a fresh request here, so the stale
   // guard is request-scoped: an older read for any date — including the same
   // date — can never publish rows or an error over a newer one. A pending or
-  // failed read renders as loading/error, never as "No activity".
+  // failed read renders as loading/error, never as "No activity". A refresh
+  // re-read of the day already shown keeps its rows until it settles (38.13
+  // review B-WR-05), so Profile → Back does not collapse the detail.
   const dayAuthorityRef = useRef<ReturnType<
     typeof createLatestRequestAuthority
   > | null>(null);
