@@ -28,8 +28,62 @@ beforeEach(async () => {
     sort: "default",
     hydrated: false,
     generation: 0,
+    committed: { populations: [], filters: {}, sort: "default" },
+    pendingAxes: { populations: 0, filters: 0, sort: 0 },
   });
 });
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+type WriteStep =
+  | "ok"
+  | "fail"
+  | { gate: Promise<void>; outcome: "ok" | "fail" };
+
+/**
+ * Wrap the real executor so each dashboard app_settings write follows the next
+ * scripted step (pass, fail, or wait on a gate first). A failed step throws
+ * inside updateAppSettings' transaction, so SQLite rolls the write back.
+ */
+function scriptedExec(steps: WriteStep[]) {
+  const landed: string[] = [];
+  const attempted: string[] = [];
+  const scripted: SqlExecutor = {
+    ...exec,
+    runAsync: async (sql: string, params?: unknown[]) => {
+      if (sql.includes("UPDATE app_settings") && sql.includes("dashboard_")) {
+        attempted.push(JSON.stringify(params));
+        const step = steps.shift() ?? "ok";
+        const outcome = typeof step === "string" ? step : step.outcome;
+        if (typeof step !== "string") await step.gate;
+        if (outcome === "fail") throw new Error("write failed");
+        landed.push(JSON.stringify(params));
+      }
+      return exec.runAsync(sql, params);
+    },
+  };
+  return { exec: scripted, landed, attempted };
+}
+
+async function storedPopulations(): Promise<unknown> {
+  const row = await exec.getFirstAsync<{ dashboard_populations: string }>(
+    "SELECT dashboard_populations FROM app_settings WHERE id = 1",
+  );
+  return JSON.parse(row?.dashboard_populations ?? "null");
+}
+
+async function storedSort(): Promise<unknown> {
+  const row = await exec.getFirstAsync<{ dashboard_sort: string }>(
+    "SELECT dashboard_sort FROM app_settings WHERE id = 1",
+  );
+  return row?.dashboard_sort;
+}
 
 describe("dashboard query store", () => {
   it("persists sort through app_settings, rehydrates it, and feeds the Active read", async () => {
@@ -263,5 +317,255 @@ describe("dashboard query store", () => {
     );
     expect(preview.some((row) => row.id === id)).toBe(false);
     expect(drill.some((row) => row.id === id)).toBe(false);
+  });
+});
+
+describe("dashboard query store: optimistic serial writes (D-27)", () => {
+  it("lands two back-to-back population writes in issue order and shows the second at once", async () => {
+    const { exec: scripted, landed } = scriptedExec(["ok", "ok"]);
+    const store = useDashboardQueryStore.getState();
+    const first = store.setPopulations(scripted, ["favourites"]);
+    expect(useDashboardQueryStore.getState().populations).toEqual([
+      "favourites",
+    ]);
+    const second = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["favourites", "birthdays"]);
+    expect(useDashboardQueryStore.getState().populations).toEqual([
+      "favourites",
+      "birthdays",
+    ]);
+    await Promise.all([first, second]);
+    expect(landed).toHaveLength(2);
+    expect(landed[0]).toContain('[\\"favourites\\"]');
+    expect(landed[1]).toContain('[\\"favourites\\",\\"birthdays\\"]');
+    expect(await storedPopulations()).toEqual(["favourites", "birthdays"]);
+    expect(useDashboardQueryStore.getState().committed.populations).toEqual([
+      "favourites",
+      "birthdays",
+    ]);
+  });
+
+  it("keeps the newer optimistic value when a superseded write fails", async () => {
+    const gate = deferred();
+    const { exec: scripted } = scriptedExec([
+      "fail",
+      { gate: gate.promise, outcome: "ok" },
+    ]);
+    const failed = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["favourites"]);
+    const newer = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["snoozed"]);
+    await expect(failed).rejects.toThrow("write failed");
+    expect(useDashboardQueryStore.getState().populations).toEqual(["snoozed"]);
+    gate.resolve();
+    await newer;
+    expect(useDashboardQueryStore.getState().populations).toEqual(["snoozed"]);
+    expect(await storedPopulations()).toEqual(["snoozed"]);
+  });
+
+  it("restores the last committed value when the latest write fails", async () => {
+    await useDashboardQueryStore
+      .getState()
+      .setPopulations(exec, ["favourites"]);
+    const { exec: scripted } = scriptedExec(["fail"]);
+    await expect(
+      useDashboardQueryStore.getState().setPopulations(scripted, ["birthdays"]),
+    ).rejects.toThrow("write failed");
+    expect(useDashboardQueryStore.getState().populations).toEqual([
+      "favourites",
+    ]);
+    expect(await storedPopulations()).toEqual(["favourites"]);
+  });
+
+  it("restores durable A after B and C both fail (review R1-07)", async () => {
+    await useDashboardQueryStore.getState().setPopulations(exec, ["birthdays"]);
+    const { exec: scripted } = scriptedExec(["fail", "fail"]);
+    const b = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["favourites"]);
+    const c = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["snoozed"]);
+    await expect(b).rejects.toThrow("write failed");
+    await expect(c).rejects.toThrow("write failed");
+    expect(useDashboardQueryStore.getState().populations).toEqual([
+      "birthdays",
+    ]);
+    expect(await storedPopulations()).toEqual(["birthdays"]);
+  });
+
+  it("restores B when durable A, then B succeeds, then C fails", async () => {
+    await useDashboardQueryStore.getState().setSort(exec, "name-asc");
+    const { exec: scripted } = scriptedExec(["ok", "fail"]);
+    const b = useDashboardQueryStore.getState().setSort(scripted, "name-desc");
+    const c = useDashboardQueryStore.getState().setSort(scripted, "status");
+    await b;
+    await expect(c).rejects.toThrow("write failed");
+    expect(useDashboardQueryStore.getState().sort).toBe("name-desc");
+    expect(await storedSort()).toBe("name-desc");
+  });
+
+  it("restores both axes when a combined drill write fails with nothing newer pending", async () => {
+    await useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(exec, ["favourites"], {
+        "needs-attention": ["on"],
+      });
+    const { exec: scripted } = scriptedExec(["fail"]);
+    await expect(
+      useDashboardQueryStore
+        .getState()
+        .setPopulationsAndFilters(scripted, ["not-contacted"], {}),
+    ).rejects.toThrow("write failed");
+    expect(useDashboardQueryStore.getState()).toMatchObject({
+      populations: ["favourites"],
+      filters: { "needs-attention": ["on"] },
+    });
+  });
+
+  it("resolves the drill and Reset setters only after their write lands", async () => {
+    for (const run of [
+      (scripted: SqlExecutor) =>
+        useDashboardQueryStore
+          .getState()
+          .setPopulationsAndFilters(scripted, ["not-contacted"], {}),
+      (scripted: SqlExecutor) =>
+        useDashboardQueryStore.getState().resetDashboardView(scripted),
+    ]) {
+      const gate = deferred();
+      const { exec: scripted, landed } = scriptedExec([
+        { gate: gate.promise, outcome: "ok" },
+      ]);
+      let settled = false;
+      const write = run(scripted).then(() => {
+        settled = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(settled).toBe(false);
+      expect(landed).toHaveLength(0);
+      gate.resolve();
+      await write;
+      expect(settled).toBe(true);
+      expect(landed).toHaveLength(1);
+    }
+    expect(await storedPopulations()).toEqual([]);
+  });
+
+  it("does not let a hydrate overwrite an optimistic value whose write is still pending", async () => {
+    await exec.runAsync(
+      `UPDATE app_settings SET dashboard_populations = '["favourites"]' WHERE id = 1`,
+    );
+    const read = deferred();
+    const delayedExec: SqlExecutor = {
+      ...exec,
+      getFirstAsync: async <T>(sql: string, params?: unknown[]) => {
+        await read.promise;
+        return exec.getFirstAsync<T>(sql, params);
+      },
+    };
+    const writeGate = deferred();
+    const { exec: scripted } = scriptedExec([
+      { gate: writeGate.promise, outcome: "ok" },
+    ]);
+    const hydration = useDashboardQueryStore.getState().hydrate(delayedExec);
+    const write = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["snoozed"]);
+    read.resolve();
+    await hydration;
+    expect(useDashboardQueryStore.getState().populations).toEqual(["snoozed"]);
+    writeGate.resolve();
+    await write;
+    expect(useDashboardQueryStore.getState().populations).toEqual(["snoozed"]);
+  });
+
+  it("restores the hydrated stored value, not the initial default, when the first write fails after a dropped hydrate (review R2-05)", async () => {
+    await exec.runAsync(
+      `UPDATE app_settings SET dashboard_populations = '["favourites"]' WHERE id = 1`,
+    );
+    const read = deferred();
+    const delayedExec: SqlExecutor = {
+      ...exec,
+      getFirstAsync: async <T>(sql: string, params?: unknown[]) => {
+        await read.promise;
+        return exec.getFirstAsync<T>(sql, params);
+      },
+    };
+    const writeGate = deferred();
+    const { exec: scripted } = scriptedExec([
+      { gate: writeGate.promise, outcome: "fail" },
+    ]);
+    const hydration = useDashboardQueryStore.getState().hydrate(delayedExec);
+    const write = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["snoozed"]);
+    read.resolve();
+    await hydration;
+    expect(useDashboardQueryStore.getState().populations).toEqual(["snoozed"]);
+    writeGate.resolve();
+    await expect(write).rejects.toThrow("write failed");
+    expect(useDashboardQueryStore.getState().populations).toEqual([
+      "favourites",
+    ]);
+  });
+
+  it("never lets an older hydrate snapshot overwrite the committed value of an axis written since it began", async () => {
+    const read = deferred();
+    const snapshotTaken = deferred();
+    const staleExec: SqlExecutor = {
+      ...exec,
+      getFirstAsync: async <T>(sql: string, params?: unknown[]) => {
+        const row = await exec.getFirstAsync<T>(sql, params);
+        snapshotTaken.resolve();
+        await read.promise;
+        return row;
+      },
+    };
+    const hydration = useDashboardQueryStore.getState().hydrate(staleExec);
+    await snapshotTaken.promise;
+    await useDashboardQueryStore.getState().setSort(exec, "name-asc");
+    read.resolve();
+    await hydration;
+    expect(useDashboardQueryStore.getState().sort).toBe("name-asc");
+    expect(useDashboardQueryStore.getState().committed.sort).toBe("name-asc");
+
+    const { exec: scripted } = scriptedExec(["fail"]);
+    await expect(
+      useDashboardQueryStore.getState().setSort(scripted, "status"),
+    ).rejects.toThrow("write failed");
+    expect(useDashboardQueryStore.getState().sort).toBe("name-asc");
+  });
+
+  it("counts pending writes per axis while queued and releases them on settle", async () => {
+    const gate = deferred();
+    const { exec: scripted } = scriptedExec([
+      { gate: gate.promise, outcome: "ok" },
+      "fail",
+      "ok",
+    ]);
+    const populations = useDashboardQueryStore
+      .getState()
+      .setPopulations(scripted, ["favourites"]);
+    const sort = useDashboardQueryStore.getState().setSort(scripted, "status");
+    const combined = useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(scripted, [], { "needs-attention": ["on"] });
+    expect(useDashboardQueryStore.getState().pendingAxes).toEqual({
+      populations: 2,
+      filters: 1,
+      sort: 1,
+    });
+    gate.resolve();
+    await populations;
+    await expect(sort).rejects.toThrow("write failed");
+    await combined;
+    expect(useDashboardQueryStore.getState().pendingAxes).toEqual({
+      populations: 0,
+      filters: 0,
+      sort: 0,
+    });
   });
 });
