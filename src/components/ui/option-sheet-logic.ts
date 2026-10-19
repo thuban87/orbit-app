@@ -16,6 +16,24 @@
  */
 import { CATEGORY_SEARCH_THRESHOLD } from "@/logic/category-logic";
 
+/**
+ * Sized-to-content option sheets (38.13 D-71, D-78; this plan's tunables): a
+ * caller that opts in opens its sheet at the size its list needs, decided when
+ * it opens. Up to this many rows open at the compact size...
+ */
+export const OPTION_SHEET_COMPACT_MAX_ROWS = 5;
+/** ...up to this many at the detail size; longer lists open expanded. */
+export const OPTION_SHEET_DETAIL_MAX_ROWS = 10;
+
+/** The sheet size an opted-in option sheet opens at for `count` rows. */
+export function optionSheetVariantFor(
+  count: number,
+): "compact" | "detail" | "expanded" {
+  if (count <= OPTION_SHEET_COMPACT_MAX_ROWS) return "compact";
+  if (count <= OPTION_SHEET_DETAIL_MAX_ROWS) return "detail";
+  return "expanded";
+}
+
 /** The value types an option sheet can choose between. */
 export type OptionValue = string | number | null;
 

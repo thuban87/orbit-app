@@ -2745,6 +2745,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         selectedId={null}
         allowUncategorized
         title="Set category"
+        // 38.13 D-71 / D-78: opens at the bulk compact size, taller only
+        // when the category list needs it.
+        sizeToContent
         onRequestClose={() => {
           setCategoryPicker(null);
           releaseBulkInputClaim();

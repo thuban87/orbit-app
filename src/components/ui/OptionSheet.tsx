@@ -4,7 +4,7 @@
  * "Met via" dropdown, at every list length. Built from `CategoryChoiceSheet`,
  * which is now a thin wrapper over it.
  *
- * - `Sheet variant="expanded"` + a `FlatList` (the proven category-sheet
+ * - An expanded `Sheet` + a `FlatList` (the proven category-sheet
  *   shape; `sheet-consumers-contract.test.ts` needs no opt-out for it). It is
  *   a BaseOverlay sheet, so it registers as open and hosts snackbars (D-24).
  * - Search shows only when `searchable` (default: `shouldSearch` over the
@@ -14,6 +14,12 @@
  *   never depends on colour alone (38.4 RG-030): the row carries
  *   `accessibilityState.selected` and a filled `select` glyph in `onAccent`.
  * - A pick calls `onSelect` and then `onRequestClose`.
+ * - Sized path (38.13 D-71, D-78): with `size` set the sheet opens at that
+ *   compact or detail size instead, as a content-sized sheet that opts out of
+ *   the scroll body (`scrollBody={false}`), so its FlatList is the only scroll
+ *   container and shrinks under the cap. Without `size` (every caller but the
+ *   bulk Set Category sheet) the expanded block renders exactly as before.
+ *   Both blocks render the same `renderOption` row.
  *
  * Colours come from `useUnscopedTheme()` because this component sits in its
  * caller's (possibly glass) scope while it draws an opaque overlay surface,
@@ -28,6 +34,7 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { AppText } from "./AppText";
 import {
   type OptionSheetOption,
+  type OptionSheetRow,
   type OptionValue,
   optionKey,
   optionSheetModel,
@@ -48,6 +55,11 @@ export interface OptionSheetProps<T extends OptionValue> {
   searchLabel?: string;
   /** Copy shown when a search matches nothing. */
   emptyText?: (query: string) => string;
+  /**
+   * Opens the sheet at this size, sized to its content (38.13 D-71). Absent →
+   * today's expanded sheet. A caller picks it from `optionSheetVariantFor`.
+   */
+  size?: "compact" | "detail";
   onSelect: (value: T) => void;
   onRequestClose: () => void;
 }
@@ -60,6 +72,7 @@ export function OptionSheet<T extends OptionValue>({
   searchable: searchableProp,
   searchLabel = "Search",
   emptyText = (query) => `Nothing matches “${query}”.`,
+  size,
   onSelect,
   onRequestClose,
 }: OptionSheetProps<T>) {
@@ -74,75 +87,108 @@ export function OptionSheet<T extends OptionValue>({
     if ((!visible || !searchable) && query) setQuery("");
   }, [searchable, query, visible]);
 
-  return (
-    <Sheet visible={visible} onRequestClose={onRequestClose} variant="expanded">
-      <View style={styles.root}>
-        <AppText role="heading" accessibilityRole="header">
-          {title}
+  // The one option row both lists render (RG-030: selection is never colour
+  // alone; D-05 top tier).
+  const renderOption = ({ item }: { item: OptionSheetRow<T> }) => {
+    const isSelected = item.selected;
+    return (
+      <Pressable
+        accessibilityRole="radio"
+        accessibilityLabel={item.accessibilityLabel ?? item.label}
+        accessibilityState={{ selected: isSelected }}
+        onPress={() => {
+          onSelect(item.value);
+          onRequestClose();
+        }}
+        style={[
+          styles.row,
+          {
+            backgroundColor: isSelected ? colors.accent : colors.surface,
+            borderColor: isSelected ? colors.accent : colors.border,
+          },
+        ]}
+      >
+        <AppText
+          style={[
+            styles.rowLabel,
+            {
+              color: isSelected ? colors.onAccent : colors.textPrimary,
+            },
+          ]}
+        >
+          {item.label}
         </AppText>
-        {searchable ? (
-          <TextInput
-            accessibilityLabel={searchLabel}
-            value={query}
-            onChangeText={setQuery}
-            placeholder={searchLabel}
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.search,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          />
+        {isSelected ? (
+          <Icon name="select" state="active" tone="onAccent" />
         ) : null}
+      </Pressable>
+    );
+  };
+  const heading = (
+    <AppText role="heading" accessibilityRole="header">
+      {title}
+    </AppText>
+  );
+  const search = searchable ? (
+    <TextInput
+      accessibilityLabel={searchLabel}
+      value={query}
+      onChangeText={setQuery}
+      placeholder={searchLabel}
+      placeholderTextColor={colors.textPlaceholder}
+      style={[
+        styles.search,
+        {
+          color: colors.textPrimary,
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+    />
+  ) : null;
+  const emptyList = (
+    <AppText style={{ color: colors.textSecondary }}>
+      {emptyText(model.query)}
+    </AppText>
+  );
+
+  if (size === undefined) {
+    return (
+      <Sheet
+        visible={visible}
+        onRequestClose={onRequestClose}
+        variant="expanded"
+      >
+        <View style={styles.root}>
+          {heading}
+          {search}
+          <FlatList
+            data={model.rows}
+            keyExtractor={(row) => optionKey(row.value)}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={emptyList}
+            renderItem={renderOption}
+          />
+        </View>
+      </Sheet>
+    );
+  }
+
+  const fitsCompact = size === "compact";
+  // biome-ignore format: one-line opener, so the sheet-consumers contract and
+  // the plan's acceptance check read the sized variant and opt-out together.
+  return (
+    <Sheet visible={visible} onRequestClose={onRequestClose} variant={fitsCompact ? "compact" : "detail"} scrollBody={false}>
+      <View style={styles.sizedRoot}>
+        {heading}
+        {search}
         <FlatList
+          style={styles.sizedList}
           data={model.rows}
           keyExtractor={(row) => optionKey(row.value)}
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <AppText style={{ color: colors.textSecondary }}>
-              {emptyText(model.query)}
-            </AppText>
-          }
-          renderItem={({ item }) => {
-            const isSelected = item.selected;
-            return (
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityLabel={item.accessibilityLabel ?? item.label}
-                accessibilityState={{ selected: isSelected }}
-                onPress={() => {
-                  onSelect(item.value);
-                  onRequestClose();
-                }}
-                style={[
-                  styles.row,
-                  {
-                    backgroundColor: isSelected
-                      ? colors.accent
-                      : colors.surface,
-                    borderColor: isSelected ? colors.accent : colors.border,
-                  },
-                ]}
-              >
-                <AppText
-                  style={[
-                    styles.rowLabel,
-                    {
-                      color: isSelected ? colors.onAccent : colors.textPrimary,
-                    },
-                  ]}
-                >
-                  {item.label}
-                </AppText>
-                {isSelected ? (
-                  <Icon name="select" state="active" tone="onAccent" />
-                ) : null}
-              </Pressable>
-            );
-          }}
+          ListEmptyComponent={emptyList}
+          renderItem={renderOption}
         />
       </View>
     </Sheet>
@@ -151,6 +197,10 @@ export function OptionSheet<T extends OptionValue>({
 
 const styles = StyleSheet.create({
   root: { flex: 1, gap: SPACING.md },
+  // Sized path (D-71): content height until the sheet's cap, then the list
+  // shrinks and scrolls (the opted-out Sheet body is a shrinkable View).
+  sizedRoot: { flexShrink: 1, minHeight: 0, gap: SPACING.md },
+  sizedList: { flexGrow: 0, flexShrink: 1 },
   search: {
     minHeight: 44,
     borderWidth: StyleSheet.hairlineWidth,

@@ -5,9 +5,15 @@
  * `CATEGORY_SEARCH_THRESHOLD` real categories, the category copy) and hands
  * the rows to the one themed option sheet. `categoryChoiceSheetModel` stays
  * the tested policy seam.
+ *
+ * `sizeToContent` (38.13 D-71, D-78; the bulk Set Category sheet only): the
+ * sheet opens at the size its own unfiltered rows need, Uncategorized
+ * included: compact for a short list, detail for a medium one, and today's
+ * expanded sheet for a long one. Without it, nothing changes.
  */
 import { useMemo } from "react";
 import { OptionSheet } from "@/components/ui/OptionSheet";
+import { optionSheetVariantFor } from "@/components/ui/option-sheet-logic";
 import {
   buildCategoryChoices,
   type CategoryChoice,
@@ -63,6 +69,8 @@ export interface CategoryChoiceSheetProps {
   excludeCategoryUid?: string;
   title?: string;
   getAccessibilityLabel?: (category: CategoryChoiceRow) => string;
+  /** Open at the size the list needs (D-71, D-78). Default false. */
+  sizeToContent?: boolean;
   onSelect: (categoryId: number | null) => void;
   onRequestClose: () => void;
 }
@@ -76,6 +84,7 @@ export function CategoryChoiceSheet({
   excludeCategoryUid,
   title = "Choose category",
   getAccessibilityLabel,
+  sizeToContent = false,
   onSelect,
   onRequestClose,
 }: CategoryChoiceSheetProps) {
@@ -109,6 +118,12 @@ export function CategoryChoiceSheet({
     [model.rows, getAccessibilityLabel],
   );
 
+  // Decided from the unfiltered rows, so typing a search never resizes it.
+  const variant = sizeToContent
+    ? optionSheetVariantFor(model.rows.length)
+    : "expanded";
+  const size = variant === "expanded" ? undefined : variant;
+
   return (
     <OptionSheet
       visible={visible}
@@ -118,6 +133,7 @@ export function CategoryChoiceSheet({
       searchable={model.searchable}
       searchLabel="Search categories"
       emptyText={categoryNoMatchCopy}
+      size={size}
       onSelect={onSelect}
       onRequestClose={onRequestClose}
     />
