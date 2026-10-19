@@ -1737,7 +1737,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas A and C (plus K-33), minus items owned by 38.9 or 38.10; the A-X01/A-X02 List-view investigation first (owner, Batch 14 R4); Phase 39's D-95 and D-98 (39-CONTEXT D-101). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.13-WORKPAPER-audit-intake.md`. A-14 and the bulk snooze sheet moved to 38.11 (38.11 D-45) — see "Notes from 38.11" in the workpaper.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 6–9 plans — rough estimate; the perf fix depends on what the investigation finds.
-**Plans**: 9/11 plans executed
+**Plans**: 10/11 plans executed
 
 Plans:
 
@@ -1764,7 +1764,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 38.13-10-PLAN.md — Bulk sheets + contact picker: FrequencyPicker, compact sheets, picker title and keyboard (D-39, D-71, D-78, D-70, D-43)
+- [x] 38.13-10-PLAN.md — Bulk sheets + contact picker: FrequencyPicker, compact sheets, picker title and keyboard (D-39, D-71, D-78, D-70, D-43)
 
 **Wave 6** *(blocked on Wave 5 completion and the phase code review)*
 
