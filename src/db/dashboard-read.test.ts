@@ -1018,6 +1018,26 @@ describe("listBirthdayCandidates", () => {
     expect(ids(rows)).toEqual([withBday]);
     expect(rows[0]?.birthday).toBe("1990-03-14");
   });
+
+  it("carries each candidate's photo, null when there is none (38.13 D-48)", async () => {
+    const withPhoto = await seedContact({
+      name: "Photo",
+      birthday: "1990-03-14",
+    });
+    const noPhoto = await seedContact({
+      name: "NoPhoto",
+      birthday: "1991-07-02",
+    });
+    await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+      "file:///photos/photo.jpg",
+      withPhoto,
+    ]);
+    const rows = await listBirthdayCandidates(exec);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get(withPhoto)?.photo).toBe("file:///photos/photo.jpg");
+    expect(byId.get(noPhoto)?.photo).toBeNull();
+    expect(byId.get(noPhoto)).toHaveProperty("photo");
+  });
 });
 
 // 38.11 D-82 (review V-01): the bulk snooze sheet reads which selected people

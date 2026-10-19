@@ -161,6 +161,46 @@ describe("HorizonSection", () => {
     expect(text).not.toContain("Nothing on the horizon");
   });
 
+  it("shows each birthday row's avatar with its photo, name, label and date tag (38.13 D-48)", () => {
+    const onOpenProfile = vi.fn();
+    const nodes = render({
+      onOpenProfile,
+      birthdays: [
+        {
+          contact: {
+            id: 7,
+            name: "Ada",
+            birthday: "2000-09-21",
+            photo: "file:///ada.jpg",
+          },
+          id: 7,
+          name: "Ada",
+          birthday: "2000-09-21",
+          daysUntil: 2,
+          tag: "Mon, Sep 21",
+          dateKey: "2026-09-21",
+        },
+      ],
+    });
+    const row = nodes.find(
+      (node) => node.props.testID === "digest-birthday-row-7",
+    );
+    if (!row) throw new Error("Missing birthday row");
+    expect(row.props.accessibilityLabel).toBe("Ada, Mon, Sep 21");
+    const rowNodes = all([row]);
+    const avatar = rowNodes.find((node) => node.type === "Avatar");
+    expect(avatar?.props).toMatchObject({
+      photo: "file:///ada.jpg",
+      name: "Ada",
+      contactId: 7,
+      size: 40,
+    });
+    expect(row.text).toContain("Ada");
+    expect(row.text).toContain("Mon, Sep 21");
+    (row.props.onPress as () => void)();
+    expect(onOpenProfile).toHaveBeenCalledWith(7);
+  });
+
   it("renders Never Contacted only above zero with honest numeric overflow", () => {
     const drill = vi.fn();
     const nodes = render({
