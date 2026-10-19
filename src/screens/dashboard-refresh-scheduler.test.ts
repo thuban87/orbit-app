@@ -519,17 +519,46 @@ describe("isDashboardVisible — backgrounded Home defers reads (38.3 review A-W
 /**
  * 38.3 REVIEW A-WR-05 / VERIFICATION W4 (38.4 D-10): the Home favourite toggle
  * publishes through the scheduler. After the write commits it requests a
- * non-deferrable "favourite" read, whose newer token retires any in-flight
- * stale read (which could otherwise revert the star), re-reads population
- * counts, and settles with fade start 1 so a star tap never re-fades the list.
+ * "favourite" read, whose newer token retires any in-flight stale read (which
+ * could otherwise revert the star), re-reads population counts, and settles
+ * with fade start 1 so a star tap never re-fades the list. 38.13 D-52 (38.4
+ * IN-04): a favourite read that would run while Home is hidden or backgrounded
+ * is deferred to the next focus read, like shell and foreground (D-23).
  */
-describe("favourite source (38.3 A-WR-05 / W4)", () => {
-  it("a favourite request while hidden still issues a read (never deferred)", () => {
+describe("favourite source (38.3 A-WR-05 / W4; 38.13 D-52)", () => {
+  it("a favourite request while hidden is deferred: no read, no log (D-52)", () => {
     const reads: DashboardRefreshSource[] = [];
     const logged: DashboardRefreshSource[] = [];
     const scheduler = createDashboardRefreshScheduler({
       read: (_token, source) => reads.push(source),
       isVisible: () => false,
+      log: (source) => logged.push(source),
+    });
+    expect(scheduler.request("favourite")).toBeNull();
+    expect(reads).toEqual([]);
+    expect(logged).toEqual([]);
+  });
+
+  it("a favourite request while backgrounded is deferred; the next focus read covers it (D-52, D-23)", () => {
+    let appState = "background";
+    const reads: DashboardRefreshSource[] = [];
+    const scheduler = createDashboardRefreshScheduler({
+      read: (_token, source) => reads.push(source),
+      isVisible: () => isDashboardVisible(true, appState),
+    });
+    expect(scheduler.request("favourite")).toBeNull();
+    expect(reads).toEqual([]);
+    appState = "active";
+    expect(scheduler.request("focus")).not.toBeNull();
+    expect(reads).toEqual(["focus"]);
+  });
+
+  it("a favourite request while visible issues exactly one read", () => {
+    const reads: DashboardRefreshSource[] = [];
+    const logged: DashboardRefreshSource[] = [];
+    const scheduler = createDashboardRefreshScheduler({
+      read: (_token, source) => reads.push(source),
+      isVisible: () => true,
       log: (source) => logged.push(source),
     });
     expect(scheduler.request("favourite")).not.toBeNull();

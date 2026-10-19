@@ -403,3 +403,78 @@ describe("the List row's TalkBack actions run what they are named for (D-26)", (
     );
   });
 });
+
+/**
+ * D-44 (fade half; ADR-100:18, D-02): the result fade's start is recorded with
+ * the rows and applied after they commit, so the current rows and the count
+ * stay at full opacity through a change. A focus, app-state or reduced-motion
+ * re-run without a new generation never re-applies the start (D-55: the fade
+ * behaves as today; review R1-02).
+ */
+describe("the result fade is applied after commit (D-44; review R1-02)", () => {
+  function fadeStartSink(): string {
+    const start = source.indexOf("setFadeStart: (value) =>");
+    expect(start).toBeGreaterThan(-1);
+    return source.slice(start, source.indexOf("bumpResultGeneration:", start));
+  }
+
+  function fadeEffect(): string {
+    const marker = source.indexOf(
+      "const lastAppliedGenerationRef = useRef(0);",
+    );
+    expect(marker).toBeGreaterThan(-1);
+    const start = source.indexOf("useEffect(() => {", marker);
+    return source.slice(
+      start,
+      source.indexOf("const resultTransitionStyle", start),
+    );
+  }
+
+  it("the setFadeStart sink records the start in state and never writes resultProgress", () => {
+    const sink = fadeStartSink();
+    expect(sink).toContain("setPublishedFadeStart(value)");
+    expect(sink).not.toContain("resultProgress");
+    expect(source).toMatch(
+      /const \[publishedFadeStart, setPublishedFadeStart\] = useState\(1\);/,
+    );
+  });
+
+  it("applies the published start only when resultGeneration has advanced, then records it", () => {
+    const effect = fadeEffect();
+    const branch = effect.indexOf(
+      "if (resultGeneration > lastAppliedGenerationRef.current) {",
+    );
+    expect(branch).toBeGreaterThan(-1);
+    const advanced = effect.slice(branch, effect.indexOf("return;", branch));
+    expect(advanced).toContain(
+      "lastAppliedGenerationRef.current = resultGeneration;",
+    );
+    expect(advanced).toMatch(
+      /withSequence\(\s*withTiming\(publishedFadeStart, \{ duration: 0 \}\),\s*toFullOpacity,?\s*\)/,
+    );
+    // The published start appears nowhere else in the effect body (only in
+    // that branch and the deps list).
+    const body = effect.slice(0, effect.lastIndexOf("}, ["));
+    const outside =
+      body.slice(0, branch) + body.slice(branch + advanced.length);
+    expect(outside).not.toContain("publishedFadeStart");
+  });
+
+  it("a re-run with no new generation only animates or settles toward 1, gated as today", () => {
+    const effect = fadeEffect();
+    expect(effect).toContain(
+      "const canAnimate = isFocused && appActive && !reducedMotion;",
+    );
+    expect(effect).toMatch(
+      /resultProgress\.value = canAnimate \? toFullOpacity : 1;\s*\}, \[/,
+    );
+    expect(effect).toContain("if (resultGeneration === 0) return;");
+  });
+
+  it("the advanced branch settles at 1 when it cannot animate", () => {
+    const effect = fadeEffect();
+    expect(effect).toMatch(
+      /resultProgress\.value = canAnimate\s*\? withSequence\([\s\S]*?\)\s*: 1;/,
+    );
+  });
+});
