@@ -32,8 +32,11 @@ import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
 import { StatusGlyph } from "@/components/icons/StatusGlyph";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
+import { UNBOUND } from "@/constants/glossary";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
+import { UNBOUND_STAR_OPACITY } from "@/logic/dashboard-unbound-row";
+import { unboundStarExplanation } from "@/screens/contact-profile-logic";
 import { GlassForegroundScope, useUnscopedTheme } from "@/theme";
 import { listRowBacking } from "@/theme/art-treatments";
 import { ICON_SIZE } from "@/theme/tokens/icon-size";
@@ -153,6 +156,12 @@ export interface ListRowProps {
   /** Reserved for Plan 06's search-specific row presentation. */
   searchResult?: DashboardSearchResult | null;
   /**
+   * The person is Unbound (38.13 D-59, ADR-233): an "Unbound" chip starts line
+   * two, the ring stays neutral, and the star draws off and dimmed with the
+   * Bind explanation as its hint. The host decides what a star tap does.
+   */
+  unbound?: boolean;
+  /**
    * The list host's swipe translation (px), mirrored from `ReanimatedSwipeable`.
    * A see-through row raises its tint while it is non-zero (D-48).
    */
@@ -175,14 +184,19 @@ export function ListRow({
   onLogInteraction,
   onEditContact,
   searchResult,
+  unbound = false,
   swipeTranslation,
 }: ListRowProps) {
   const backing = listRowBacking(useArtTreatment("contactsListEntries"));
   // The chip's opaque fill keeps the root text hierarchy inside a scope (C2-L4).
   const { colors: rootColors } = useUnscopedTheme();
-  const displayState: StatusDisplayState = isSnoozed(snoozeUntil, now)
-    ? "snoozed"
-    : status;
+  // An Unbound person has no status and no snooze (ADR-233): neutral ring.
+  const displayState: StatusDisplayState = unbound
+    ? null
+    : isSnoozed(snoozeUntil, now)
+      ? "snoozed"
+      : status;
+  const starOn = isFavourite && !unbound;
   const recency = formatListRecency(lastContact, now);
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
@@ -208,10 +222,30 @@ export function ListRow({
     recency,
     isFavourite,
     displayState,
+    unbound,
     context: isSearchMode
       ? buildSearchRowContext(searchExplanation, displayedSearchSnippet)
       : (line3?.text ?? null),
   });
+
+  // D-59: the Unbound marker. An opaque chip like the category chip, so its
+  // text keeps the ROOT palette inside a see-through row's scope (C2-L4).
+  const unboundChip = unbound ? (
+    <View
+      testID={`dashboard-list-row-unbound-${contactId}`}
+      style={[
+        styles.unboundChip,
+        { backgroundColor: rootColors.surfaceElevated },
+      ]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[styles.meta, { color: rootColors.textSecondary }]}
+      >
+        {UNBOUND}
+      </Text>
+    </View>
+  ) : null;
 
   const row = (
     <ScopedPalette>
@@ -283,16 +317,24 @@ export function ListRow({
                 {name}
               </Text>
               {isSearchMode ? (
-                <Text
-                  testID={`dashboard-list-row-match-explanation-${contactId}`}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={[styles.meta, { color: scoped.textSecondary }]}
-                >
-                  {searchExplanation}
-                </Text>
+                <View style={styles.metaRow}>
+                  {unboundChip}
+                  <Text
+                    testID={`dashboard-list-row-match-explanation-${contactId}`}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[
+                      styles.meta,
+                      styles.recency,
+                      { color: scoped.textSecondary },
+                    ]}
+                  >
+                    {searchExplanation}
+                  </Text>
+                </View>
               ) : (
                 <View style={styles.metaRow}>
+                  {unboundChip}
                   <Text
                     testID={`dashboard-list-row-meta-${contactId}`}
                     numberOfLines={1}
@@ -383,19 +425,23 @@ export function ListRow({
               <Pressable
                 testID={`dashboard-list-row-favourite-${contactId}`}
                 accessibilityRole="button"
-                accessibilityLabel={
-                  isFavourite ? "Remove favorite" : "Add favorite"
+                accessibilityLabel={starOn ? "Remove favorite" : "Add favorite"}
+                accessibilityHint={
+                  unbound ? unboundStarExplanation(name) : undefined
                 }
-                accessibilityState={{ selected: isFavourite }}
+                accessibilityState={{ selected: starOn }}
                 hitSlop={SPACING.sm}
                 onPress={onToggleFavourite}
-                style={styles.favouriteButton}
+                style={[
+                  styles.favouriteButton,
+                  unbound ? styles.unboundStar : null,
+                ]}
               >
                 <Icon
                   name="favorite"
-                  state={isFavourite ? "active" : "default"}
+                  state={starOn ? "active" : "default"}
                   size="md"
-                  tone={isFavourite ? "accentText" : "textSecondary"}
+                  tone={starOn ? "accentText" : "textSecondary"}
                 />
               </Pressable>
               {displayState !== null ? (
@@ -472,6 +518,11 @@ const styles = StyleSheet.create({
     maxWidth: SPACING["2xl"] * 3,
     paddingHorizontal: SPACING.xs,
   },
+  unboundChip: {
+    borderRadius: RADII.sm,
+    flexShrink: 0,
+    paddingHorizontal: SPACING.xs,
+  },
   line3: {
     alignItems: "center",
     flexDirection: "row",
@@ -499,6 +550,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: SPACING["2xl"],
     minWidth: SPACING["2xl"],
+  },
+  unboundStar: {
+    opacity: UNBOUND_STAR_OPACITY,
   },
   statusGlyph: {
     height: ICON_SIZE.md,

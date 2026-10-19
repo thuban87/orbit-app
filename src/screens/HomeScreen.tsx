@@ -160,6 +160,10 @@ import {
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import {
+  favouriteTapOutcome,
+  isUnboundRow,
+} from "@/logic/dashboard-unbound-row";
+import {
   applyCommittedMembership,
   createFavouriteOptimisticStore,
 } from "@/logic/favourite-optimistic";
@@ -169,7 +173,10 @@ import { navigationRef } from "@/navigation/linking";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { DashboardScreenProps, TabParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
-import { bulkBinConfirmation } from "@/screens/contact-profile-logic";
+import {
+  bulkBinConfirmation,
+  unboundStarExplanation,
+} from "@/screens/contact-profile-logic";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
 import {
   createDashboardRefreshScheduler,
@@ -534,6 +541,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     void resetDashboard();
   }, [resetDashboard]);
   const [rows, setRows] = useState<DashboardRow[]>([]);
+  // Review R2-04: every Contacts star tap looks its row up here by id, so a
+  // tap callback never names `rows` in its deps (38.13-08 keeps those
+  // callbacks stable). Rebuilt from the published rows each time they change.
+  const rowsByIdRef = useRef(new Map<number, DashboardRow>());
+  rowsByIdRef.current = useMemo(
+    () => new Map(rows.map((row) => [row.id, row])),
+    [rows],
+  );
   const [line3ByContactId, setLine3ByContactId] = useState<
     ReadonlyMap<number, ListRowLine3>
   >(() => new Map());
@@ -1578,12 +1593,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           setRows((previousRows) =>
             applyCommittedMembership(previousRows, contactId, nextMembership),
           );
-          // 38.3 REVIEW A-WR-05 / VERIFICATION W4 (D-10): publish through the
-          // scheduler. The committed write is visible to this newer read, whose
-          // token retires any in-flight stale read (which could otherwise
-          // revert the star) and re-reads the population counts. Never
-          // deferred; published with fade start 1 (no list re-fade).
-          reload("favourite");
+          // 38.3 REVIEW A-WR-05 / VERIFICATION W4 (D-10): request the read
+          // directly from the once-created scheduler (what `reload` does), so
+          // this callback never depends on the query (review R5-01). The
+          // committed write is visible to this newer read, whose token retires
+          // any in-flight stale read (which could otherwise revert the star)
+          // and re-reads the population counts. Never deferred; published
+          // with fade start 1 (no list re-fade).
+          scheduler.request("favourite");
         })
         .catch((writeError: unknown) => {
           Logger.error(LOG_SCOPE, "failed to update favourite", writeError);
@@ -1603,7 +1620,33 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           }
         });
     },
-    [favouriteStore, reload],
+    [favouriteStore, scheduler],
+  );
+
+  // The one gate for every Contacts star tap: the List star, the Card star and
+  // the card menu (ADR-233; review R2-04). A Bound row toggles; an Unbound row
+  // explains in a notice and writes nothing (the dormant rank is kept, 38.12
+  // D-21); an id with no published row does nothing (unknown never toggles).
+  const onFavouriteTap = useCallback(
+    (contactId: number, nextMembership: boolean) => {
+      const row = rowsByIdRef.current.get(contactId);
+      switch (favouriteTapOutcome(row)) {
+        case "explain":
+          if (row) {
+            showSnackbar({
+              kind: "success",
+              label: unboundStarExplanation(row.name),
+            });
+          }
+          return;
+        case "toggle":
+          toggleFavourite(contactId, nextMembership);
+          return;
+        case "ignore":
+          return;
+      }
+    },
+    [toggleFavourite],
   );
 
   const openCardContextMenu = useCallback((contactId: number) => {
@@ -2155,7 +2198,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                       const renderedMembership =
                         favouriteOverlay.get(item.id) ??
                         item.favourite_rank !== null;
-                      toggleFavourite(item.id, !renderedMembership);
+                      onFavouriteTap(item.id, !renderedMembership);
                     }}
                     line3={line3ByContactId.get(item.id) ?? null}
                     searchResult={
@@ -2163,6 +2206,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                         ? (searchResultsByContactId.get(item.id) ?? null)
                         : undefined
                     }
+                    unbound={isUnboundRow(item)}
                     onLogInteraction={onLogInteraction}
                     onEditContact={onEditContact}
                     openRowRef={openRowRef}
@@ -2206,7 +2250,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelection}
                 favouriteOverlay={favouriteOverlay}
-                onToggleFavourite={toggleFavourite}
+                onToggleFavourite={onFavouriteTap}
                 line3ByContactId={line3ByContactId}
                 searchResultsByContactId={searchResultsByContactId}
                 isSearchMode={isSearchMode}
@@ -2230,6 +2274,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         contactId={contextMenuContact?.id ?? null}
         name={contextMenuContact?.name ?? ""}
         isFavourite={contextMenuIsFavourite}
+        unbound={
+          contextMenuContact !== null && isUnboundRow(contextMenuContact)
+        }
         onViewProfile={() => {
           if (contextMenuContact) goToProfile(contextMenuContact.id);
         }}
@@ -2247,7 +2294,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         }}
         onToggleFavourite={() => {
           if (contextMenuContact) {
-            toggleFavourite(contextMenuContact.id, !contextMenuIsFavourite);
+            onFavouriteTap(contextMenuContact.id, !contextMenuIsFavourite);
           }
         }}
         onOpenSnooze={() => {

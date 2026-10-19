@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { View } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
+import { CardContextMenu } from "./CardContextMenu";
 import { GridCard } from "./GridCard";
 import {
   GRID_CARD_BORDER,
@@ -34,6 +35,12 @@ vi.mock("@/components/icons/StatusGlyph", () => ({
 }));
 vi.mock("@/components/ui/GlassSurface", () => ({
   GlassSurface: "GlassSurface",
+}));
+vi.mock("@/components/ui/overlay-base", () => ({
+  BaseOverlay: "BaseOverlay",
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  SafeAreaView: "SafeAreaView",
 }));
 // GlassSurface itself renders unmocked in the contentStyle cases below (D-09).
 vi.mock("expo-blur", () => ({ BlurView: "BlurView" }));
@@ -521,5 +528,153 @@ describe("List row photos are 72 (D-05)", () => {
     expect(
       nodes.find((node) => node.props.testID === "dashboard-list-row-line3-7"),
     ).toBeDefined();
+  });
+});
+
+describe("Unbound rows and cards (38.13 D-59, ADR-233)", () => {
+  const unboundProps = {
+    ...baseProps,
+    lastContact: "2026-09-01 12:00:00",
+    status: null,
+    unbound: true,
+  };
+  const searchResult = {
+    contactId: 7,
+    score: 1,
+    totalMatchCount: 1,
+    matches: [
+      {
+        sourceKind: "note-or-body" as const,
+        fieldLabel: "Note",
+        snippet: "likes jazz",
+        highlights: [{ start: 6, length: 4 }],
+        priority: 9,
+      },
+    ],
+  };
+
+  function byTestId(nodes: readonly Node[], testID: string): Node | undefined {
+    return nodes.find((node) => node.props.testID === testID);
+  }
+
+  function textOf(node: Node | undefined): string {
+    if (!node) return "";
+    const own = node.props.children;
+    const ownText =
+      typeof own === "string" || typeof own === "number" ? String(own) : "";
+    return ownText + node.children.map(textOf).join("");
+  }
+
+  const renders = [
+    {
+      label: "List row",
+      render: (props: Record<string, unknown>) =>
+        resolve(ListRow({ ...unboundProps, ...props })),
+      chip: "dashboard-list-row-unbound-7",
+      star: "dashboard-list-row-favourite-7",
+    },
+    {
+      label: "Card",
+      render: (props: Record<string, unknown>) =>
+        resolve(GridCard({ ...unboundProps, ...props })),
+      chip: "dashboard-grid-card-unbound-7",
+      star: "dashboard-grid-card-favourite-7",
+    },
+  ];
+
+  for (const { label, render, chip, star } of renders) {
+    it(`${label}: an Unbound search result shows the Unbound chip and is announced as Unbound`, () => {
+      const nodes = render({ searchResult });
+      const marker = byTestId(all(nodes), chip);
+      expect(marker).toBeDefined();
+      expect(textOf(marker)).toBe("Unbound");
+      const description = String(nodes[0]?.props.accessibilityLabel);
+      expect(description).toContain("Unbound");
+      expect(description).not.toContain("Never Contacted");
+    });
+
+    it(`${label}: an Unbound row outside search (Never Contacted opt-in) gets the same chip and description (review R1-14)`, () => {
+      const nodes = render({ searchResult: undefined, lastContact: null });
+      expect(byTestId(all(nodes), chip)).toBeDefined();
+      const description = String(nodes[0]?.props.accessibilityLabel);
+      expect(description).toContain("Unbound");
+      expect(description).not.toContain("Never Contacted");
+    });
+
+    it(`${label}: the Unbound star draws off and dimmed with the Bind explanation as its hint`, () => {
+      // Even a dormant favourite rank never draws the star on (38.12 D-21).
+      const nodes = all(render({ searchResult, isFavourite: true }));
+      const starNode = byTestId(nodes, star);
+      expect(starNode?.props.accessibilityHint).toBe(
+        "Bind Alex to make them a Favorite.",
+      );
+      expect(starNode?.props.accessibilityState).toEqual({ selected: false });
+      expect(flattenStyle(starNode?.props.style).opacity).toBe(0.5);
+      const icon = starNode?.children.find((child) => child.type === "Icon");
+      expect(icon?.props.state).toBe("default");
+      expect(icon?.props.tone).toBe("textSecondary");
+    });
+
+    it(`${label}: a Bound row shows no Unbound chip and no hint`, () => {
+      const nodes = all(render({ unbound: false, status: "stable" }));
+      expect(byTestId(nodes, chip)).toBeUndefined();
+      expect(byTestId(nodes, star)?.props.accessibilityHint).toBeUndefined();
+    });
+  }
+
+  it("leaves the Card ring neutral and draws no status glyph for an Unbound person", () => {
+    const nodes = all(
+      resolve(GridCard({ ...unboundProps, snoozeUntil: "2099-01-01" })),
+    );
+    expect(nodes.find((node) => node.type === "StatusGlyph")).toBeUndefined();
+  });
+});
+
+describe("CardContextMenu for an Unbound person (ADR-233)", () => {
+  const menuProps = {
+    visible: true,
+    contactId: 7,
+    name: "Alex",
+    isFavourite: false,
+    onViewProfile: vi.fn(),
+    onQuickLog: vi.fn(),
+    onLogInteraction: vi.fn(),
+    onMessage: vi.fn(),
+    onEditContact: vi.fn(),
+    onToggleFavourite: vi.fn(),
+    onOpenSnooze: vi.fn(),
+    onSelect: vi.fn(),
+    onRequestClose: vi.fn(),
+  };
+
+  function actionIds(unbound: boolean): string[] {
+    return all(resolve(CardContextMenu({ ...menuProps, unbound })))
+      .map((node) => node.props.testID)
+      .filter(
+        (id): id is string =>
+          typeof id === "string" &&
+          id.startsWith("card-context-menu-") &&
+          !id.startsWith("card-context-menu-title-"),
+      );
+  }
+
+  it("offers no Snooze and no Favorite when unbound", () => {
+    const ids = actionIds(true);
+    expect(ids).not.toContain("card-context-menu-snooze");
+    expect(ids).not.toContain("card-context-menu-favourite");
+    expect(ids).toEqual([
+      "card-context-menu-view-profile",
+      "card-context-menu-quick-log",
+      "card-context-menu-log-interaction",
+      "card-context-menu-message",
+      "card-context-menu-edit-contact",
+      "card-context-menu-select",
+    ]);
+  });
+
+  it("keeps every entry for a Bound person", () => {
+    const ids = actionIds(false);
+    expect(ids).toContain("card-context-menu-snooze");
+    expect(ids).toContain("card-context-menu-favourite");
   });
 });

@@ -13,9 +13,12 @@ import type { IconName } from "@/components/icons/icon-registry";
 import { StatusGlyph } from "@/components/icons/StatusGlyph";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
+import { UNBOUND } from "@/constants/glossary";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
-import { useTheme } from "@/theme";
+import { UNBOUND_STAR_OPACITY } from "@/logic/dashboard-unbound-row";
+import { unboundStarExplanation } from "@/screens/contact-profile-logic";
+import { useTheme, useUnscopedTheme } from "@/theme";
 import { ICON_SIZE } from "@/theme/tokens/icon-size";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -121,6 +124,12 @@ export interface GridCardProps {
   line3?: { text: string; iconName?: IconName } | null;
   /** Reserved for Plan 04's search-mode card presentation. */
   searchResult?: DashboardSearchResult | null;
+  /**
+   * The person is Unbound (38.13 D-59, ADR-233): an "Unbound" chip sits above
+   * the explanation line, the ring stays neutral, and the star draws off and
+   * dimmed with the Bind explanation as its hint.
+   */
+  unbound?: boolean;
 }
 
 export function GridCard({
@@ -147,11 +156,18 @@ export function GridCard({
   isFavourite = false,
   onToggleFavourite,
   searchResult,
+  unbound = false,
 }: GridCardProps) {
   const { colors } = useTheme();
-  const displayState: StatusDisplayState = isSnoozed(snoozeUntil, now)
-    ? "snoozed"
-    : status;
+  // The opaque Unbound chip keeps the root text hierarchy (C2-L4, as ListRow).
+  const { colors: rootColors } = useUnscopedTheme();
+  // An Unbound person has no status and no snooze (ADR-233): neutral ring.
+  const displayState: StatusDisplayState = unbound
+    ? null
+    : isSnoozed(snoozeUntil, now)
+      ? "snoozed"
+      : status;
+  const starOn = isFavourite && !unbound;
   const recency = formatListRecency(lastContact, now);
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
@@ -177,6 +193,7 @@ export function GridCard({
     recency,
     isFavourite,
     displayState,
+    unbound,
     context: isSearchMode
       ? buildSearchRowContext(searchExplanation, displayedSearchSnippet)
       : null,
@@ -279,9 +296,9 @@ export function GridCard({
                   >
                     <Icon
                       name="favorite"
-                      state={isFavourite ? "active" : "default"}
+                      state={starOn ? "active" : "default"}
                       size="md"
-                      tone={isFavourite ? "accentText" : "textSecondary"}
+                      tone={starOn ? "accentText" : "textSecondary"}
                     />
                   </View>
                 ) : (
@@ -289,17 +306,24 @@ export function GridCard({
                     testID={`dashboard-grid-card-favourite-${contactId}`}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      isFavourite ? "Remove favorite" : "Add favorite"
+                      starOn ? "Remove favorite" : "Add favorite"
                     }
-                    accessibilityState={{ selected: isFavourite }}
+                    accessibilityHint={
+                      unbound ? unboundStarExplanation(name) : undefined
+                    }
+                    accessibilityState={{ selected: starOn }}
                     onPress={onToggleFavourite}
-                    style={[styles.corner, styles.cornerRight]}
+                    style={[
+                      styles.corner,
+                      styles.cornerRight,
+                      unbound ? styles.unboundStar : null,
+                    ]}
                   >
                     <Icon
                       name="favorite"
-                      state={isFavourite ? "active" : "default"}
+                      state={starOn ? "active" : "default"}
                       size="md"
-                      tone={isFavourite ? "accentText" : "textSecondary"}
+                      tone={starOn ? "accentText" : "textSecondary"}
                     />
                   </Pressable>
                 )}
@@ -364,6 +388,26 @@ export function GridCard({
                       one-line name reserve line 2 only in a row where another
                       name wraps. No text measurement, no second layout pass. */}
                   <View style={styles.secondary}>
+                    {unbound ? (
+                      // D-59: the Unbound marker, an opaque chip (root palette).
+                      <View
+                        testID={`dashboard-grid-card-unbound-${contactId}`}
+                        style={[
+                          styles.unboundChip,
+                          { backgroundColor: rootColors.surfaceElevated },
+                        ]}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.recency,
+                            { color: rootColors.textSecondary },
+                          ]}
+                        >
+                          {UNBOUND}
+                        </Text>
+                      </View>
+                    ) : null}
                     {isSearchMode ? (
                       <Text
                         testID={`dashboard-grid-card-match-explanation-${contactId}`}
@@ -471,6 +515,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 0,
+  },
+  unboundStar: {
+    opacity: UNBOUND_STAR_OPACITY,
+  },
+  unboundChip: {
+    borderRadius: RADII.sm,
+    maxWidth: "100%",
+    paddingHorizontal: SPACING.xs,
   },
   statusGlyph: {
     alignItems: "center",

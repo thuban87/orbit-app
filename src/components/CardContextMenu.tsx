@@ -17,6 +17,12 @@ export interface CardContextMenuProps {
   contactId: number | null;
   name: string;
   isFavourite: boolean;
+  /**
+   * The person is Unbound (38.13 D-59, ADR-233): the menu offers no Snooze
+   * (ADR-233) and no Favorite (this plan's choice; the card's star still
+   * explains). Logging, Message and Edit stay.
+   */
+  unbound: boolean;
   onViewProfile: () => void;
   onQuickLog: () => void;
   onLogInteraction: () => void;
@@ -41,6 +47,7 @@ export function CardContextMenu({
   contactId,
   name,
   isFavourite,
+  unbound,
   onViewProfile,
   onQuickLog,
   onLogInteraction,
@@ -52,7 +59,7 @@ export function CardContextMenu({
   onRequestClose,
 }: CardContextMenuProps) {
   const { colors } = useTheme();
-  const actions: MenuAction[] = [
+  const allActions: MenuAction[] = [
     {
       id: "view-profile",
       label: "View Profile",
@@ -89,6 +96,11 @@ export function CardContextMenu({
     },
     { id: "select", label: "Select", icon: "select", onPress: onSelect },
   ];
+  const actions = unbound
+    ? allActions.filter(
+        (action) => action.id !== "favourite" && action.id !== "snooze",
+      )
+    : allActions;
 
   return (
     <BaseOverlay

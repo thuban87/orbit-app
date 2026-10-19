@@ -9,6 +9,7 @@ import {
 import type { IconName } from "@/components/icons/icon-registry";
 import type { DashboardRow } from "@/db/dashboard-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
+import { isUnboundRow } from "@/logic/dashboard-unbound-row";
 import { useTheme } from "@/theme";
 import { GridCard } from "./GridCard";
 import {
@@ -167,6 +168,7 @@ export function CardGrid({
                 ? (searchResultsByContactId.get(item.id) ?? null)
                 : undefined
             }
+            unbound={isUnboundRow(item)}
           />
         );
       }}

@@ -1,6 +1,6 @@
 import type { StatusDisplayState } from "@/components/contact-card-ring";
 import { statusDisplayLabel } from "@/components/icons/status-display-label";
-import { FAVORITE } from "@/constants/glossary";
+import { FAVORITE, UNBOUND } from "@/constants/glossary";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import type { DashboardSearchSourceKind } from "@/logic/dashboard-search-match";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
@@ -88,6 +88,11 @@ interface RowAccessibilityDescriptionInput {
   isFavourite: boolean;
   displayState: StatusDisplayState;
   /**
+   * An Unbound person (38.13 D-59, ADR-233): the status part reads "Unbound"
+   * (never the null-status "Never Contacted") and the star is announced off.
+   */
+  unbound?: boolean;
+  /**
    * The distinguishing context the row ACTUALLY renders (search explanation +
    * snippet, or the List-only adaptive line three). Announced after the
    * identity summary; blank/absent context leaves the summary byte-identical.
@@ -109,14 +114,15 @@ export function buildRowAccessibilityDescription({
   recency,
   isFavourite,
   displayState,
+  unbound = false,
   context,
 }: RowAccessibilityDescriptionInput): string {
   const summary = [
     name,
     category ?? "No category",
     recency,
-    isFavourite ? FAVORITE : "Not favorite",
-    statusDisplayLabel(displayState),
+    isFavourite && !unbound ? FAVORITE : "Not favorite",
+    unbound ? UNBOUND : statusDisplayLabel(displayState),
   ]
     .map((part) => `${part}.`)
     .join(" ");
