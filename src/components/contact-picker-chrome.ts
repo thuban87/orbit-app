@@ -72,3 +72,39 @@ export function contactPickerKeyboardFrame(
     minHeight: Math.min(CONTACT_PICKER_MIN_HEIGHT, maxHeight),
   };
 }
+
+/**
+ * The picker's resting (keyboard-down) frame height, tracked against the
+ * window height it was measured in (38.13 review B-IN-05). The FAB's picker
+ * lives for the whole session, so a max-only resting height kept the tallest
+ * window ever seen: after the window shrank (the Razr's cover display, split
+ * screen) the keyboard lift was under-computed and the sheet sat behind the
+ * keyboard.
+ */
+export interface RestingFrame {
+  height: number;
+  windowHeight: number;
+}
+
+/** A window-height change starts the resting height again (0 = unmeasured). */
+export function rebaseRestingFrame(
+  resting: RestingFrame,
+  windowHeight: number,
+): RestingFrame {
+  if (resting.windowHeight === windowHeight) return resting;
+  return { height: 0, windowHeight };
+}
+
+/**
+ * A root layout. Within one window size the resting height only grows: the
+ * keyboard resizing the window shrinks the frame, never the window size.
+ */
+export function growRestingFrame(
+  resting: RestingFrame,
+  frameHeight: number,
+): RestingFrame {
+  return {
+    height: Math.max(resting.height, frameHeight),
+    windowHeight: resting.windowHeight,
+  };
+}

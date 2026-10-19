@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ViewStyle,
 } from "react-native";
@@ -27,6 +28,9 @@ import { SPACING } from "@/theme/tokens/spacing";
 import {
   contactPickerKeyboardFrame,
   contactPickerTitle,
+  growRestingFrame,
+  type RestingFrame,
+  rebaseRestingFrame,
 } from "./contact-picker-chrome";
 import {
   applyPickerExclusions,
@@ -507,7 +511,12 @@ export function ContactPicker(props: ContactPickerProps) {
     Keyboard.isVisible() ? (Keyboard.metrics()?.height ?? 0) : 0,
   );
   const [frameHeight, setFrameHeight] = useState(0);
-  const restingFrameHeight = useRef(0);
+  // The keyboard-down frame height, tracked per window height so a shrunken
+  // window (cover display, split screen) is measured again instead of keeping
+  // the tallest height ever seen (38.13 review B-IN-05).
+  const windowHeight = useWindowDimensions().height;
+  const restingFrame = useRef<RestingFrame>({ height: 0, windowHeight });
+  restingFrame.current = rebaseRestingFrame(restingFrame.current, windowHeight);
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", (event) =>
       setKeyboardHeight(event.endCoordinates.height),
@@ -522,12 +531,12 @@ export function ContactPicker(props: ContactPickerProps) {
   }, []);
   const onRootLayout = useCallback((event: LayoutChangeEvent) => {
     const height = event.nativeEvent.layout.height;
-    restingFrameHeight.current = Math.max(restingFrameHeight.current, height);
+    restingFrame.current = growRestingFrame(restingFrame.current, height);
     setFrameHeight(height);
   }, []);
   const keyboardFrame = contactPickerKeyboardFrame({
     frameHeight,
-    restingFrameHeight: restingFrameHeight.current,
+    restingFrameHeight: restingFrame.current.height,
     keyboardHeight,
     topClearance: insets.top + SPACING.lg,
   });
