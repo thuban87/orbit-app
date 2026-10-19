@@ -7,6 +7,7 @@ import {
   rankCandidates,
   rankCandidatesWithCoverage,
   searchKnowledge,
+  TYPO_TWO_EDIT_MIN_LENGTH,
   tokenize,
 } from "@/services/knowledge-search";
 
@@ -28,7 +29,17 @@ describe("knowledge search scorer", () => {
     expect(searchKnowledge(corpus, "zzzzzz")).toEqual([]);
   });
 
-  it("uses the D-07 edit-distance threshold boundaries", () => {
+  it("counts an adjacent swap as one edit (D-60 restricted Damerau-Levenshtein)", () => {
+    expect(boundedEditDistance("gfit", "gift", 1)).toBe(1);
+    expect(boundedEditDistance("birthdya", "birthday", 2)).toBe(1);
+    expect(boundedEditDistance("brithdya", "birthday", 2)).toBe(2);
+    expect(boundedEditDistance("climbing", "climbng")).toBe(1);
+    expect(boundedEditDistance("ab", "ba", 1)).toBe(1);
+    // A swap is still two edits away from a three-letter rotation.
+    expect(boundedEditDistance("abc", "cab", 1)).toBe(2);
+  });
+
+  it("uses the D-60 edit-distance threshold boundaries", () => {
     const candidates = [
       { entries: [{ text: "gift birthday" }] },
       { entries: [{ text: "ordinary" }] },
@@ -36,9 +47,27 @@ describe("knowledge search scorer", () => {
 
     expect(rankCandidates("gift", candidates)).toEqual([candidates[0]]);
     expect(rankCandidates("gft", candidates)).toEqual([candidates[0]]);
-    expect(rankCandidates("gfit", candidates)).toEqual([]);
+    // D-60: an adjacent swap is one typo, so "gfit" now finds "gift".
+    expect(rankCandidates("gfit", candidates)).toEqual([candidates[0]]);
     expect(rankCandidates("birthdya", candidates)).toEqual([candidates[0]]);
     expect(rankCandidates("birtxxxx", candidates)).toEqual([]);
+  });
+
+  it("allows two typos only from TYPO_TWO_EDIT_MIN_LENGTH letters (D-60)", () => {
+    expect(TYPO_TWO_EDIT_MIN_LENGTH).toBe(8);
+    // 6 letters, two edits: "denver" no longer matches "dense".
+    expect(
+      rankCandidates("denver", [{ entries: [{ text: "Dense" }] }]),
+    ).toEqual([]);
+    // 7 letters, two edits: rejected.
+    expect(
+      rankCandidates("kitchxx", [{ entries: [{ text: "kitchen" }] }]),
+    ).toEqual([]);
+    // 8 letters, two edits: matches.
+    const birthday = { entries: [{ text: "birthday" }] };
+    expect(rankCandidates("birthdxx", [birthday])).toEqual([birthday]);
+    // 8 letters, two adjacent swaps: matches.
+    expect(rankCandidates("brithdya", [birthday])).toEqual([birthday]);
   });
 
   it("matches prefixes and substrings, with AND semantics across query terms", () => {
