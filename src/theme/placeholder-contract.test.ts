@@ -121,7 +121,10 @@ describe("placeholder token contract (RG-029, D-24)", () => {
     // EntryTextField, already counted once (+0). 60 since 38.12-21
     // (2026-10-17): Import Review's free-text birthday became Edit Contact's
     // BirthdayField (D-54), so its "YYYY-MM-DD" placeholder is gone (-1).
-    expect(sites.length).toBeGreaterThanOrEqual(60);
+    // 59 since 38.13-10 (2026-10-19): the bulk frequency sheet's raw days
+    // field became the shared FrequencyPicker (D-39), whose own placeholder
+    // is already counted (-1).
+    expect(sites.length).toBeGreaterThanOrEqual(59);
   });
 
   it("every placeholderTextColor uses colors.textPlaceholder", () => {
