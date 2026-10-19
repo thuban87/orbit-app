@@ -109,4 +109,32 @@ describe("useDashboardSelectionStore", () => {
       selectDashboardSelectionCount(useDashboardSelectionStore.getState()),
     ).toBe(0);
   });
+
+  // 38.13 D-40: the bar's Select All becomes Deselect all.
+  it("deselectAll empties the selection and keeps mode, sessionId and the frozen universe", () => {
+    useDashboardSelectionStore.getState().enterSelection([1, 2, 3]);
+    useDashboardSelectionStore.getState().selectAll();
+    const before = useDashboardSelectionStore.getState();
+    useDashboardSelectionStore.getState().deselectAll();
+
+    expect(useDashboardSelectionStore.getState()).toMatchObject({
+      mode: true,
+      sessionId: before.sessionId,
+      frozenUniverse: [1, 2, 3],
+      selectedIds: new Set(),
+    });
+  });
+
+  // Review R5-03: Select All, then Move to Bin of everyone.
+  it("removing the whole universe after Select All leaves universe and selection empty with mode on", () => {
+    useDashboardSelectionStore.getState().enterSelection([1, 2, 3]);
+    useDashboardSelectionStore.getState().selectAll();
+    useDashboardSelectionStore.getState().removeFromUniverse([1, 2, 3]);
+
+    expect(useDashboardSelectionStore.getState()).toMatchObject({
+      mode: true,
+      frozenUniverse: [],
+      selectedIds: new Set(),
+    });
+  });
 });

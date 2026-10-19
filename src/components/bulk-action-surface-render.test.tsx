@@ -7,7 +7,21 @@
  */
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { BulkActionAvailability } from "@/logic/dashboard-selection-applicability";
 import type { BulkActionSurfaceProps } from "./BulkActionSurface";
+
+const ALL_ENABLED: BulkActionAvailability = {
+  canQuickLog: true,
+  canSnooze: true,
+  canAddFavorites: true,
+  canOpenMore: true,
+  canLogInteraction: true,
+  showRemoveFavorites: true,
+  canSetCategory: true,
+  canChangeFrequency: true,
+  canMoveToBin: true,
+  canToggleSelectAll: true,
+};
 
 const hooks = vi.hoisted(() => ({
   stateIndex: 0,
@@ -116,6 +130,7 @@ function baseProps(
     selectedCount: 3,
     pending: false,
     selectAllLabel: "Select All",
+    availability: ALL_ENABLED,
     onExit: vi.fn(),
     onToggleSelectAll: vi.fn(),
     onQuickLog: vi.fn(),
@@ -272,6 +287,103 @@ describe("BulkActionSurface — the More… sheet (38.13 D-75)", () => {
     expect(bar.props[handler]).toHaveBeenCalledOnce();
     expect(bar.nodes.find((node) => node.type === "Sheet")?.props.visible).toBe(
       false,
+    );
+  });
+});
+
+describe("BulkActionSurface — only what applies is enabled (38.13 D-40, D-74, D-77)", () => {
+  const disabledOf = (node: { props: Record<string, unknown> } | undefined) =>
+    node?.props.disabled === true &&
+    (node.props.accessibilityState as { disabled?: boolean }).disabled === true;
+
+  it("the Snooze button is disabled when no selected Bound person can be snoozed", () => {
+    const bar = mount({
+      availability: { ...ALL_ENABLED, canSnooze: false },
+    });
+    expect(disabledOf(bar.find("bulk-action-snooze"))).toBe(true);
+    expect(disabledOf(bar.find("bulk-action-quick-log"))).toBe(false);
+  });
+
+  it("Favorite always reads Favorite and is disabled when everyone selected is already a favourite (D-74)", () => {
+    const bar = mount({
+      availability: { ...ALL_ENABLED, canAddFavorites: false },
+    });
+    const favorite = bar.find("bulk-action-favorite");
+    expect(textOf(favorite)).toBe("Favorite");
+    expect(disabledOf(favorite)).toBe(true);
+    expect(
+      bar.nodes.some((node) => textOf(node).includes("Unfavorite")),
+    ).toBe(false);
+  });
+
+  it("Remove from Favorites shows only when some selected Bound person is a favourite (D-75)", () => {
+    const without = mount({
+      availability: { ...ALL_ENABLED, showRemoveFavorites: false },
+    });
+    without.press("bulk-action-more");
+    expect(without.find("bulk-more-remove-favorites")).toBeUndefined();
+    expect(without.find("bulk-more-log-interaction")).toBeDefined();
+
+    const withFav = mount();
+    withFav.press("bulk-action-more");
+    expect(withFav.find("bulk-more-remove-favorites")).toBeDefined();
+  });
+
+  it("each More… row follows its own flag", () => {
+    const bar = mount({
+      availability: {
+        ...ALL_ENABLED,
+        canSetCategory: false,
+        canMoveToBin: false,
+      },
+    });
+    bar.press("bulk-action-more");
+    expect(disabledOf(bar.find("bulk-more-set-category"))).toBe(true);
+    expect(disabledOf(bar.find("bulk-more-archive"))).toBe(true);
+    expect(disabledOf(bar.find("bulk-more-frequency"))).toBe(false);
+  });
+
+  it("after an emptied universe the bar reads 0 selected and Select All, with every action disabled (R5-03)", () => {
+    const none: BulkActionAvailability = {
+      canQuickLog: false,
+      canSnooze: false,
+      canAddFavorites: false,
+      canOpenMore: false,
+      canLogInteraction: false,
+      showRemoveFavorites: false,
+      canSetCategory: false,
+      canChangeFrequency: false,
+      canMoveToBin: false,
+      canToggleSelectAll: false,
+    };
+    const bar = mount({
+      selectedCount: 0,
+      selectAllLabel: "Select All",
+      availability: none,
+    });
+    expect(textOf(bar.find("dashboard-selection-count"))).toBe("0 selected");
+    expect(textOf(bar.find("dashboard-selection-select-all"))).toBe(
+      "Select All",
+    );
+    for (const id of [
+      "bulk-action-quick-log",
+      "bulk-action-snooze",
+      "bulk-action-favorite",
+      "bulk-action-more",
+    ]) {
+      expect(disabledOf(bar.find(id))).toBe(true);
+    }
+  });
+
+  it("a pending write disables every bar button", () => {
+    const bar = mount({ pending: true });
+    expect(disabledOf(bar.find("bulk-action-favorite"))).toBe(true);
+  });
+
+  it("reads Deselect all when the host says so", () => {
+    const bar = mount({ selectAllLabel: "Deselect all" });
+    expect(textOf(bar.find("dashboard-selection-select-all"))).toBe(
+      "Deselect all",
     );
   });
 });

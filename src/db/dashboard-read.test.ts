@@ -9,7 +9,12 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { bulkSnooze, bulkUnsnooze } from "@/db/bulk-actions-dao";
+import {
+  bulkAddFavourites,
+  bulkRemoveFavourites,
+  bulkSnooze,
+  bulkUnsnooze,
+} from "@/db/bulk-actions-dao";
 import {
   type BirthdayCandidate,
   countAllContacts,
@@ -29,6 +34,7 @@ import {
   listDashboardSearchEligible,
   listFavourites,
   readCurrentlySnoozedIds,
+  readSelectionLifecycle,
 } from "@/db/dashboard-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -43,6 +49,11 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import type { DashboardQueryState } from "@/logic/dashboard-query-logic";
+import {
+  bulkWriteIds,
+  lifecycleMapFrom,
+  selectionApplicability,
+} from "@/logic/dashboard-selection-applicability";
 
 const NOW = "2026-08-15 12:00:00";
 
@@ -1113,5 +1124,126 @@ describe("readCurrentlySnoozedIds", () => {
     expect(snoozedIds).toEqual([a, b]);
     await bulkUnsnooze(exec, snoozedIds, NOW);
     expect(await readCurrentlySnoozedIds(exec, [a, b])).toEqual([]);
+  });
+});
+
+// 38.13 D-77 / ADR-233 (review R1-04, R3-01): the bulk Favorite, Remove from
+// Favorites and Snooze writes classify the selected ids from the database at
+// action time, never from the on-screen rows.
+describe("readSelectionLifecycle", () => {
+  it("returns Bound and favourite from the raw columns for each non-archived id; archived and missing ids are absent", async () => {
+    const bound = await seedContact({ name: "Bound", lastContact: STABLE() });
+    const favourite = await seedContact({
+      name: "Fav",
+      lastContact: STABLE(),
+      favouriteRank: 0,
+    });
+    // An Unbound person with a dormant rank: favourite stays data, never Bound.
+    const unbound = await seedContact({
+      name: "Unbound",
+      trackingEnabled: 0,
+      favouriteRank: 1,
+    });
+    const binned = await seedContact({
+      name: "Binned",
+      lastContact: STABLE(),
+      archivedAt: NOW,
+    });
+
+    expect(
+      await readSelectionLifecycle(exec, [
+        unbound,
+        bound,
+        favourite,
+        binned,
+        9999,
+      ]),
+    ).toEqual([
+      { id: bound, bound: true, favourite: false },
+      { id: favourite, bound: true, favourite: true },
+      { id: unbound, bound: false, favourite: true },
+    ]);
+  });
+
+  it("returns [] for an empty id list without querying", async () => {
+    let calls = 0;
+    const counting: SqlExecutor = {
+      ...exec,
+      getAllAsync: async <T>(sql: string, params?: unknown[]) => {
+        calls += 1;
+        return exec.getAllAsync<T>(sql, params);
+      },
+    };
+    expect(await readSelectionLifecycle(counting, [])).toEqual([]);
+    expect(calls).toBe(0);
+  });
+
+  it("skips an Unbound person whose row has left the results (Set Category) for Favorite and Snooze", async () => {
+    const bound = await seedContact({ name: "Bound", lastContact: STABLE() });
+    const unbound = await seedContact({ name: "Unbound", trackingEnabled: 0 });
+    // The current rows no longer include the Unbound person.
+    const rowsNow = [bound];
+    expect(rowsNow).not.toContain(unbound);
+
+    const selected = [bound, unbound];
+    const lifecycle = lifecycleMapFrom(
+      await readSelectionLifecycle(exec, selected),
+    );
+    const snoozeIds = bulkWriteIds("snooze", selected, lifecycle);
+    const favouriteIds = bulkWriteIds("add-favorites", selected, lifecycle);
+    expect(snoozeIds).toEqual([bound]);
+    expect(favouriteIds).toEqual([bound]);
+
+    await bulkSnooze(exec, snoozeIds, "1w", NOW);
+    await bulkAddFavourites(exec, favouriteIds, NOW);
+    expect(await readCurrentlySnoozedIds(exec, selected)).toEqual([bound]);
+    const after = lifecycleMapFrom(
+      await readSelectionLifecycle(exec, selected),
+    );
+    expect(after.get(unbound)).toEqual({ bound: false, favourite: false });
+  });
+
+  it("Remove from Favorites then Favorite in the same session: the refreshed map re-enables Favorite and hides Remove (R3-01)", async () => {
+    const fav = await seedContact({
+      name: "Fav",
+      lastContact: STABLE(),
+      favouriteRank: 0,
+    });
+    const universe = [fav];
+    const selected = new Set([fav]);
+
+    let lifecycle = lifecycleMapFrom(
+      await readSelectionLifecycle(exec, universe),
+    );
+    let bar = selectionApplicability(selected, universe.length, lifecycle);
+    expect(bar.canAddFavorites).toBe(false);
+    expect(bar.showRemoveFavorites).toBe(true);
+
+    const removeIds = bulkWriteIds("remove-favorites", [fav], lifecycle);
+    expect(removeIds).toEqual([fav]);
+    await bulkRemoveFavourites(exec, removeIds, NOW);
+    // The row leaves the Favorites population; the selection keeps the id.
+    const favouritesNow = await listDashboardPopulation(
+      exec,
+      {
+        viewMode: "card",
+        populations: ["favourites"],
+        filters: {},
+        sort: "default",
+      },
+      NOW,
+    );
+    expect(ids(favouritesNow)).not.toContain(fav);
+
+    lifecycle = lifecycleMapFrom(await readSelectionLifecycle(exec, universe));
+    bar = selectionApplicability(selected, universe.length, lifecycle);
+    expect(bar.canAddFavorites).toBe(true);
+    expect(bar.showRemoveFavorites).toBe(false);
+
+    const addIds = bulkWriteIds("add-favorites", [fav], lifecycle);
+    expect(addIds).toEqual([fav]);
+    await bulkAddFavourites(exec, addIds, NOW);
+    lifecycle = lifecycleMapFrom(await readSelectionLifecycle(exec, universe));
+    expect(lifecycle.get(fav)).toEqual({ bound: true, favourite: true });
   });
 });
