@@ -73,7 +73,6 @@ import { BulkActionSurface } from "@/components/BulkActionSurface";
 import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
-import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import {
@@ -91,6 +90,7 @@ import {
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { SnoozeSheet } from "@/components/SnoozeSheet";
+import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -98,6 +98,7 @@ import { FieldError } from "@/components/ui/FieldError";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
+import { NEVER_CONTACTED } from "@/constants/glossary";
 import { getAppSettings } from "@/db/app-settings-dao";
 import {
   bulkAddFavourites,
@@ -143,6 +144,11 @@ import {
   getCurrentSelectionIds,
   runClaimedBulkWrite,
 } from "@/logic/dashboard-bulk-action-session";
+import {
+  filterEmptyCopy,
+  populationEmptyCopy,
+  tuckedAwayLines,
+} from "@/logic/dashboard-empty-copy";
 import {
   type DashboardPopulationCounts,
   selectDashboardEmptyState,
@@ -213,6 +219,11 @@ const VIEW_TOGGLE_OPTIONS: {
   { label: "List view", value: "list", icon: "list" },
   { label: "Card view", value: "card", icon: "grid" },
 ];
+
+/** 38.13 D-30: what each empty population says (fixed copy). */
+const birthdaysEmptyCopy = populationEmptyCopy("birthdays");
+const notContactedEmptyCopy = populationEmptyCopy("not-contacted");
+const snoozedEmptyCopy = populationEmptyCopy("snoozed");
 
 const LOG_SCOPE = "dashboard-home";
 const SWIPE_ACTION_WIDTH = 96;
@@ -1491,6 +1502,61 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [navigation],
   );
 
+  // 38.13 D-28: the filter-empty state's one action clears every filter. A
+  // rejected write is reported with the error snackbar and a Retry.
+  const onClearFilters = useCallback(async () => {
+    try {
+      await useDashboardQueryStore.getState().setFilters(getExecutor(), {});
+    } catch (clearError) {
+      Logger.error(LOG_SCOPE, "failed to clear filters", clearError);
+      showSnackbar({
+        kind: "error",
+        label: "Couldn't clear filters",
+        action: {
+          label: "Retry",
+          accessibilityLabel: "Retry clearing filters",
+          onPress: () => {
+            void onClearFilters();
+          },
+        },
+      });
+    }
+  }, []);
+
+  // 38.13 D-65 (39 D-98): "N Never Contacted →" saves the Never Contacted
+  // population with filters cleared, the same save the Digest "+N more" drill
+  // makes (runDigestDrillThrough), so the list shows the people it counted.
+  const onShowNeverContacted = useCallback(async () => {
+    try {
+      await useDashboardQueryStore
+        .getState()
+        .setPopulationsAndFilters(getExecutor(), ["not-contacted"], {});
+    } catch (populationError) {
+      Logger.error(
+        LOG_SCOPE,
+        "failed to show the Never Contacted population",
+        populationError,
+      );
+      showSnackbar({
+        kind: "error",
+        label: `Couldn't show ${NEVER_CONTACTED}`,
+        action: {
+          label: "Retry",
+          accessibilityLabel: `Retry showing ${NEVER_CONTACTED}`,
+          onPress: () => {
+            void onShowNeverContacted();
+          },
+        },
+      });
+    }
+  }, []);
+
+  // 38.13 D-65: "N Unbound →" opens Unbound Contacts.
+  const onOpenUnbound = useCallback(
+    () => navigation.navigate("UnboundContacts"),
+    [navigation],
+  );
+
   const toggleFavourite = useCallback(
     (contactId: number, nextMembership: boolean) => {
       const generation = favouriteStore.begin(contactId, nextMembership);
@@ -1779,6 +1845,17 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     </View>
   );
 
+  // 38.13 D-28: the filter-empty copy; Clear filters shows only while a
+  // filter is active.
+  const filterEmpty = filterEmptyCopy({
+    filtersActive: Object.values(query.filters).some(
+      (values) => (values?.length ?? 0) > 0,
+    ),
+    favouritesOnlyAndNone:
+      query.populations.includes("favourites") &&
+      populationCounts.favourites === 0,
+  });
+
   // Built from the palette ScopedPalette resolves INSIDE the ChromeScrim below
   // (D-34), so the empty-state captions render the glass variant.
   const renderListEmptyContent = (palette: ThemePalette) =>
@@ -1803,23 +1880,27 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         action={{ label: "Clear search", onPress: onClearSearch }}
       />
     ) : emptyState === "birthdays-empty" ? (
-      <View testID="dashboard-empty-birthdays" style={styles.emptyState}>
-        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-          {`Nothing in ${POPULATION_LABELS.birthdays}.`}
-        </Text>
-      </View>
+      // 38.13 D-30: each empty population says what that population is.
+      <EmptyState
+        testID="dashboard-empty-birthdays"
+        icon={birthdaysEmptyCopy.icon}
+        heading={birthdaysEmptyCopy.heading}
+        body={birthdaysEmptyCopy.body}
+      />
     ) : emptyState === "not-contacted-empty" ? (
-      <View testID="dashboard-empty-not-contacted" style={styles.emptyState}>
-        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-          {`Nothing in ${POPULATION_LABELS["not-contacted"]}.`}
-        </Text>
-      </View>
+      <EmptyState
+        testID="dashboard-empty-not-contacted"
+        icon={notContactedEmptyCopy.icon}
+        heading={notContactedEmptyCopy.heading}
+        body={notContactedEmptyCopy.body}
+      />
     ) : emptyState === "snoozed-empty" ? (
-      <View testID="dashboard-empty-snoozed" style={styles.emptyState}>
-        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-          {`Nothing in ${POPULATION_LABELS.snoozed}.`}
-        </Text>
-      </View>
+      <EmptyState
+        testID="dashboard-empty-snoozed"
+        icon={snoozedEmptyCopy.icon}
+        heading={snoozedEmptyCopy.heading}
+        body={snoozedEmptyCopy.body}
+      />
     ) : emptyState === "firstrun" ? (
       <View style={styles.emptyState}>
         <Pressable
@@ -1842,43 +1923,59 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         <Text style={[styles.emptyHeading, { color: palette.textPrimary }]}>
           Everyone's tucked away
         </Text>
-        {counts.neverContacted > 0 ? (
-          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-            {`${counts.neverContacted} never contacted →`}
-          </Text>
-        ) : null}
-        {counts.snoozed > 0 ? (
-          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-            {`${counts.snoozed} snoozed`}
-          </Text>
-        ) : null}
-        {counts.archived > 0 ? (
-          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-            {`${counts.archived} in the Bin`}
-          </Text>
-        ) : null}
-      </View>
-    ) : emptyState === "filter-empty" ? (
-      <View testID="dashboard-empty-filter" style={styles.emptyState}>
-        {query.populations.includes("favourites") &&
-        populationCounts.favourites === 0 ? (
-          // Only the genuine "no favourites exist" case gets the onboarding copy.
-          // A favourites-population list zeroed by an active filter still HAS
-          // favourites, so it falls through to the neutral filtered-empty copy (WR-03).
-          <>
-            <Text style={[styles.emptyHeading, { color: palette.textPrimary }]}>
-              No favorites yet
+        {/* 38.13 D-65 (39 D-98): Never Contacted and Unbound lead somewhere;
+            snoozed and the Bin stay text. */}
+        {tuckedAwayLines(counts).map((line) =>
+          line.kind === "button" ? (
+            // biome-ignore lint/a11y/useValidAriaRole: Button role is the design-system hierarchy role.
+            <Button
+              key={line.target}
+              role="tertiary"
+              label={line.label}
+              accessibilityLabel={line.accessibilityLabel}
+              testID={
+                line.target === "never-contacted"
+                  ? "dashboard-empty-hidden-never-contacted"
+                  : "dashboard-empty-hidden-unbound"
+              }
+              onPress={
+                line.target === "never-contacted"
+                  ? () => {
+                      void onShowNeverContacted();
+                    }
+                  : onOpenUnbound
+              }
+            />
+          ) : (
+            <Text
+              key={line.target}
+              accessibilityLabel={line.accessibilityLabel}
+              style={[styles.emptyBody, { color: palette.textSecondary }]}
+            >
+              {line.label}
             </Text>
-            <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-              Tap the star on a contact's profile to add them here.
-            </Text>
-          </>
-        ) : (
-          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
-            Nothing here right now.
-          </Text>
+          ),
         )}
       </View>
+    ) : emptyState === "filter-empty" ? (
+      // 38.13 D-28: a list filtered to nothing. Only the genuine "no favourites
+      // exist" case keeps the onboarding copy; a favourites-population list
+      // zeroed by an active filter still HAS favourites, so it gets the
+      // filtered-empty copy and its Clear filters action (WR-03).
+      <EmptyState
+        testID="dashboard-empty-filter"
+        icon={filterEmpty.icon}
+        heading={filterEmpty.heading}
+        body={filterEmpty.body}
+        action={
+          filterEmpty.actionLabel
+            ? {
+                label: filterEmpty.actionLabel,
+                onPress: onClearFilters,
+              }
+            : undefined
+        }
+      />
     ) : null;
 
   // Chrome scrim (31.1-05): empty-state copy sits on the bare background, so back

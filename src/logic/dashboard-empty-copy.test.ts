@@ -104,7 +104,7 @@ describe("tuckedAwayLines (D-65)", () => {
         kind: "button",
         target: "unbound",
         label: "2 Unbound →",
-        accessibilityLabel: "Open Unbound Contacts, 2 people",
+        accessibilityLabel: "Open Unbound contacts, 2 people",
       },
       {
         kind: "text",
@@ -134,7 +134,7 @@ describe("tuckedAwayLines (D-65)", () => {
         kind: "button",
         target: "unbound",
         label: "1 Unbound →",
-        accessibilityLabel: "Open Unbound Contacts, 1 person",
+        accessibilityLabel: "Open Unbound contacts, 1 person",
       },
     ]);
     expect(
