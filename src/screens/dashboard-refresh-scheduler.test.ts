@@ -607,3 +607,36 @@ describe("favourite source (38.3 A-WR-05 / W4)", () => {
     expect(rec.valuesOf("fadeStart")).toEqual([0]);
   });
 });
+
+/**
+ * 38.13 D-44 (review R1-15): HomeScreen renders search mode only for the term
+ * its published rows belong to, and both read outcomes carry that term.
+ */
+describe("HomeScreen publishes the search term with the rows (D-44)", () => {
+  const home = readFileSync("src/screens/HomeScreen.tsx", "utf8");
+
+  it("feeds the published term from the read sink, ok and error alike", () => {
+    expect(home).toContain("setSearchTerm: setPublishedSearchTerm,");
+    expect(home).toContain("searchTerm: term,");
+    expect(home).toContain('outcome = { kind: "error", searchTerm: term };');
+  });
+
+  it("derives search mode from the published term and 'searching' from the live input", () => {
+    expect(home).toContain("const term = publishedSearchTerm;");
+    expect(home).toContain('const isSearchMode = term !== "";');
+    expect(home).toContain(
+      "const searching = searchText.trim() !== publishedSearchTerm;",
+    );
+  });
+
+  it("shows Searching… in place of the count while searching, rows kept", () => {
+    const header = home.slice(
+      home.indexOf("const listHeader = ("),
+      home.indexOf("const filterEmpty"),
+    );
+    expect(header).toMatch(
+      /searching\s*\?\s*SEARCHING_LABEL\s*:\s*dashboardHeaderCountLabel\(headerCount\)/,
+    );
+    expect(home).toContain('const SEARCHING_LABEL = "Searching…";');
+  });
+});

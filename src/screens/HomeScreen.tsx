@@ -211,6 +211,8 @@ import { formatLocalDate, isSnoozed, parseLocalMs } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { plural, pluralWord } from "@/utils/plural";
 
+/** The list header while a newer search term is being read (38.13 D-44). */
+const SEARCHING_LABEL = "Searching…";
 /** The debounce interval (ms) that collapses a keystroke burst to one read. */
 const SEARCH_DEBOUNCE_MS = 220;
 /** Small selections remain instantly reversible; larger batches ask first. */
@@ -541,6 +543,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     void resetDashboard();
   }, [resetDashboard]);
   const [rows, setRows] = useState<DashboardRow[]>([]);
+  // 38.13 D-44: the trimmed search term the published rows belong to, set by
+  // the read publication beside the rows (and by a failed read too, review
+  // R1-15). Search mode and the search empty state follow THIS term, never the
+  // live input, so the list never shows a count that belongs to no search.
+  const [publishedSearchTerm, setPublishedSearchTerm] = useState("");
   // Review R2-04: every Contacts star tap looks its row up here by id, so a
   // tap callback never names `rows` in its deps (38.13-08 keeps those
   // callbacks stable). Rebuilt from the published rows each time they change.
@@ -877,6 +884,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       DashboardPopulationCounts
     > = {
       setRows,
+      setSearchTerm: setPublishedSearchTerm,
       setLine3: setLine3ByContactId,
       setSearchMatches: setSearchResultsByContactId,
       setListNow,
@@ -998,10 +1006,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             appActiveRef.current &&
             !reducedMotionRef.current,
         ),
+        // D-44: the term these rows belong to, published with them.
+        searchTerm: term,
       };
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load dashboard", err);
-      outcome = { kind: "error" };
+      // A failed read publishes its term too, so "Searching…" settles.
+      outcome = { kind: "error", searchTerm: term };
     }
     publishDashboardRead({ token, outcome, isCurrent, sinks });
   };
@@ -1824,8 +1835,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // 'search-empty' BEFORE any filter/population branch, so a no-match search over
   // a non-empty population (or with a filter also active) never shows the
   // hidden-population or filter copy (MEDIUM-4).
-  const term = debouncedSearchText.trim();
+  // 38.13 D-44: rows render in search mode only for the term their results
+  // belong to (the published term). While the live input differs, a newer
+  // search is pending: the header reads "Searching…" and the current rows stay
+  // visible (D-02, ADR-100; no skeleton per update).
+  const term = publishedSearchTerm;
   const isSearchMode = term !== "";
+  const searching = searchText.trim() !== publishedSearchTerm;
   const contextMenuContact =
     contextMenuContactId === null
       ? null
@@ -1879,7 +1895,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 testID="dashboard-header-count"
                 style={[styles.countHeader, { color: scoped.textSecondary }]}
               >
-                {dashboardHeaderCountLabel(headerCount)}
+                {searching
+                  ? SEARCHING_LABEL
+                  : dashboardHeaderCountLabel(headerCount)}
               </Text>
             )}
           </ScopedPalette>

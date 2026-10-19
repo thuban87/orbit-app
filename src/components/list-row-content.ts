@@ -2,7 +2,11 @@ import type { StatusDisplayState } from "@/components/contact-card-ring";
 import { statusDisplayLabel } from "@/components/icons/status-display-label";
 import { FAVORITE, UNBOUND } from "@/constants/glossary";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
-import type { DashboardSearchSourceKind } from "@/logic/dashboard-search-match";
+import type {
+  DashboardSearchMatch,
+  DashboardSearchResult,
+  DashboardSearchSourceKind,
+} from "@/logic/dashboard-search-match";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
 import {
   calendarDaysBetween,
@@ -43,12 +47,13 @@ export function formatLine2(recency: string, category: string | null): string {
 /**
  * UI-SPEC names for the closed shared corpus descriptor kinds. The section kinds
  * use their Things to Remember section names (D-44), read from the registries.
+ * An identity match has no generic label: it reads its own field label (Name,
+ * Phone, Email, Category; 38.13 D-37), so `identity` is not in this table.
  */
 export const DASHBOARD_SEARCH_CATEGORY_LABELS: Record<
-  DashboardSearchSourceKind,
+  Exclude<DashboardSearchSourceKind, "identity">,
   string
 > = {
-  identity: "Identity",
   relationship: "Relationship",
   "last-talked-about": PROFILE_MODULE_REGISTRY["last-talked-about"].label,
   "current-location": PROFILE_MODULE_REGISTRY["current-location"].label,
@@ -59,13 +64,20 @@ export const DASHBOARD_SEARCH_CATEGORY_LABELS: Record<
   "note-or-body": "Note",
 };
 
-/** Map descriptor-priority source kinds to distinct, render-ready labels. */
+/** One match's plain label: an identity match's own field, else its section. */
+export function searchMatchLabel(
+  match: Pick<DashboardSearchMatch, "sourceKind" | "fieldLabel">,
+): string {
+  return match.sourceKind === "identity"
+    ? match.fieldLabel
+    : DASHBOARD_SEARCH_CATEGORY_LABELS[match.sourceKind];
+}
+
+/** Map descriptor-priority matches to distinct, render-ready labels. */
 export function formatMatchCategories(
-  sourceKinds: readonly DashboardSearchSourceKind[],
+  matches: readonly Pick<DashboardSearchMatch, "sourceKind" | "fieldLabel">[],
 ): string[] {
-  return [...new Set(sourceKinds)].map(
-    (sourceKind) => DASHBOARD_SEARCH_CATEGORY_LABELS[sourceKind],
-  );
+  return [...new Set(matches.map(searchMatchLabel))];
 }
 
 /** Compact, action-free search explanation shared by corpus and name-only rows. */
@@ -79,6 +91,40 @@ export function formatMatchExplanation(
   if (categories.length > 0) parts.push(categories.join(", "));
   if (moreMatchesLabel) parts.push(moreMatchesLabel);
   return parts.join(" · ");
+}
+
+/**
+ * The search explanation a row or card shows (38.13 D-37). A null result is
+ * the name-only case (the contact matched by name alone, no corpus match) and
+ * reads "Name"; otherwise the match count, the distinct plain labels and the
+ * more-matches label.
+ */
+export function formatSearchExplanation(
+  result: DashboardSearchResult | null,
+): string {
+  if (result === null) return "Name";
+  return formatMatchExplanation(
+    result.totalMatchCount,
+    formatMatchCategories(result.matches),
+    result.moreMatchesLabel,
+  );
+}
+
+/**
+ * The snippet a search row or card shows, or null (38.13 D-37). The name
+ * corpus entry's snippet is the contact's name, which the row already shows,
+ * so a snippet equal to the name (ignoring case and surrounding spaces) is
+ * hidden; a blank snippet is too.
+ */
+export function searchSnippetToShow(
+  snippet: string | null,
+  name: string,
+): string | null {
+  const shown = snippet?.trim() ?? "";
+  if (shown.length === 0) return null;
+  return shown.toLocaleLowerCase() === name.trim().toLocaleLowerCase()
+    ? null
+    : snippet;
 }
 
 interface RowAccessibilityDescriptionInput {
@@ -145,4 +191,29 @@ export function buildSearchRowContext(
   if (shownExplanation.length > 0) parts.push(shownExplanation);
   if (shownSnippet.length > 0) parts.push(`"${shownSnippet}"`);
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * A search-mode row/card description (38.13 D-51): only what is shown — the
+ * name, the Unbound marker when it is shown, then the match explanation and the
+ * shown snippet. No category, recency, favourite or status parts: search mode
+ * does not show them as text (the status glyph stays visible but is not
+ * announced here, as D-51 is written).
+ */
+export function buildSearchRowAccessibilityDescription({
+  name,
+  unbound,
+  context,
+}: {
+  name: string;
+  unbound: boolean;
+  context: string | null;
+}): string {
+  const parts = [`${name}.`];
+  if (unbound) parts.push(`${UNBOUND}.`);
+  const trimmed = context?.trim() ?? "";
+  if (trimmed.length > 0) {
+    parts.push(SENTENCE_END.test(trimmed) ? trimmed : `${trimmed}.`);
+  }
+  return parts.join(" ");
 }

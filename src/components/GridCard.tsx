@@ -34,10 +34,11 @@ import {
 } from "./grid-card-geometry";
 import {
   buildRowAccessibilityDescription,
+  buildSearchRowAccessibilityDescription,
   buildSearchRowContext,
   formatListRecency,
-  formatMatchCategories,
-  formatMatchExplanation,
+  formatSearchExplanation,
+  searchSnippetToShow,
 } from "./list-row-content";
 
 function HighlightedSnippet({
@@ -171,33 +172,39 @@ export function GridCard({
   const recency = formatListRecency(lastContact, now);
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
+  // D-37: plain labels; a missing result is the name-only case ("Name"), not
+  // a default count of one.
   const searchExplanation = isSearchMode
-    ? formatMatchExplanation(
-        searchResult?.totalMatchCount ?? 1,
-        searchResult
-          ? formatMatchCategories(
-              searchResult.matches.map((match) => match.sourceKind),
-            )
-          : [],
-        searchResult?.moreMatchesLabel,
-      )
+    ? formatSearchExplanation(searchResult ?? null)
     : null;
-  // Only the corpus match carries a snippet; a name-only hit (null result)
-  // shows the explanation alone.
-  const displayedSearchSnippet = strongestMatch?.snippet ?? null;
+  // Only a corpus match carries a snippet; a snippet that repeats the name is
+  // hidden (D-37), and a name-only hit shows the explanation alone.
+  const displayedSearchSnippet = searchSnippetToShow(
+    strongestMatch?.snippet ?? null,
+    name,
+  );
   // Announce the search context this card renders (RG-031 AUD-UIA-007). Normal
   // Grid intentionally omits List's adaptive line three (38.1), so it has none.
-  const baseAccessibilityLabel = buildRowAccessibilityDescription({
-    name,
-    category: categoryLabel,
-    recency,
-    isFavourite,
-    displayState,
-    unbound,
-    context: isSearchMode
-      ? buildSearchRowContext(searchExplanation, displayedSearchSnippet)
-      : null,
-  });
+  // Search mode (D-51) reads only what is shown: the name, the Unbound marker
+  // when shown, the explanation and the shown snippet.
+  const baseAccessibilityLabel = isSearchMode
+    ? buildSearchRowAccessibilityDescription({
+        name,
+        unbound,
+        context: buildSearchRowContext(
+          searchExplanation,
+          displayedSearchSnippet,
+        ),
+      })
+    : buildRowAccessibilityDescription({
+        name,
+        category: categoryLabel,
+        recency,
+        isFavourite,
+        displayState,
+        unbound,
+        context: null,
+      });
   const accessibilityLabel = selectionMode
     ? `${baseAccessibilityLabel} ${selected ? "Selected." : "Not selected."}`
     : baseAccessibilityLabel;
@@ -446,7 +453,11 @@ export function GridCard({
                       >
                         <HighlightedSnippet
                           text={displayedSearchSnippet ?? ""}
-                          highlights={strongestMatch?.highlights ?? []}
+                          highlights={
+                            displayedSearchSnippet !== null
+                              ? (strongestMatch?.highlights ?? [])
+                              : []
+                          }
                           color={colors.textPrimary}
                         />
                       </Text>

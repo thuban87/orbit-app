@@ -13,7 +13,7 @@
  * - `invalidate()` retires every outstanding token (unmount).
  *
  * `publishDashboardRead` is the ONLY place a read's result reaches Home's state:
- * rows, line-3, search matches, `listNow`, counts, population counts, error,
+ * rows, the search term those rows belong to (38.13 D-44), line-3, search matches, `listNow`, counts, population counts, error,
  * the result-fade start, the result-animation generation and the
  * refreshing/initial-load settle all go through one `isCurrent` check, so no
  * individual setter can publish stale data on its own.
@@ -107,7 +107,13 @@ export function createDashboardRefreshScheduler(input: {
   };
 }
 
-/** What one Home read produced. The error shape carries no data by design. */
+/**
+ * What one Home read produced. Both shapes carry `searchTerm`: the trimmed term
+ * the read was issued for (not read data), published beside the rows so the
+ * screen renders search mode only for the term its results belong to, and a
+ * failed read still settles "Searching…" (38.13 D-44; review R1-15). Apart from
+ * that term, the error shape carries no data by design.
+ */
 export type DashboardReadOutcome<
   TRow,
   TLine3,
@@ -125,8 +131,14 @@ export type DashboardReadOutcome<
       populationCounts: TPopulationCounts;
       /** Result-fade start value (0 animates in, 1 settles instantly). */
       fadeStart: number;
+      /** The trimmed search term this read was issued for ("" = no search). */
+      searchTerm: string;
     }
-  | { kind: "error" };
+  | {
+      kind: "error";
+      /** The trimmed search term this read was issued for ("" = no search). */
+      searchTerm: string;
+    };
 
 /** Every Home publication a read can make — nothing else may be set by a read. */
 export interface DashboardReadSinks<
@@ -137,6 +149,8 @@ export interface DashboardReadSinks<
   TPopulationCounts,
 > {
   setRows(rows: TRow[]): void;
+  /** The search term the published rows belong to (38.13 D-44). */
+  setSearchTerm(term: string): void;
   setLine3(line3: ReadonlyMap<number, TLine3>): void;
   setSearchMatches(matches: ReadonlyMap<number, TMatch | null>): void;
   setListNow(now: string): void;
@@ -180,6 +194,7 @@ export function publishDashboardRead<
   if (!isCurrent(token)) return false;
   if (outcome.kind === "ok") {
     sinks.setRows(outcome.rows);
+    sinks.setSearchTerm(outcome.searchTerm);
     sinks.setLine3(outcome.line3);
     sinks.setSearchMatches(outcome.searchMatches);
     sinks.setListNow(outcome.listNow);
@@ -190,6 +205,7 @@ export function publishDashboardRead<
     sinks.bumpResultGeneration();
   } else {
     sinks.setRows([]);
+    sinks.setSearchTerm(outcome.searchTerm);
     sinks.setLine3(new Map());
     sinks.setSearchMatches(new Map());
     sinks.setError(true);

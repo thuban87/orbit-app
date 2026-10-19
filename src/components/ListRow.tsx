@@ -47,10 +47,11 @@ import { useArtTreatment } from "@/theme/use-art-treatment";
 import { isSnoozed } from "@/utils/dates";
 import {
   buildRowAccessibilityDescription,
+  buildSearchRowAccessibilityDescription,
   buildSearchRowContext,
   formatListRecency,
-  formatMatchCategories,
-  formatMatchExplanation,
+  formatSearchExplanation,
+  searchSnippetToShow,
 } from "./list-row-content";
 import { swipeRowTintOpacity } from "./list-row-swipe-backing";
 
@@ -200,33 +201,38 @@ export function ListRow({
   const recency = formatListRecency(lastContact, now);
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
+  // D-37: plain labels; a missing result is the name-only case ("Name"), not
+  // a default count of one.
   const searchExplanation = isSearchMode
-    ? formatMatchExplanation(
-        searchResult?.totalMatchCount ?? 1,
-        searchResult
-          ? formatMatchCategories(
-              searchResult.matches.map((match) => match.sourceKind),
-            )
-          : [],
-        searchResult?.moreMatchesLabel,
-      )
+    ? formatSearchExplanation(searchResult ?? null)
     : null;
-  // Only the corpus match carries a snippet; a name-only hit (null result)
-  // shows the explanation alone.
-  const displayedSearchSnippet = strongestMatch?.snippet ?? null;
-  // Announce exactly the context this row renders (RG-031 AUD-UIA-007): the
-  // search explanation + displayed snippet, else the adaptive line three.
-  const accessibilityLabel = buildRowAccessibilityDescription({
+  // Only a corpus match carries a snippet; a snippet that repeats the name is
+  // hidden (D-37), and a name-only hit shows the explanation alone.
+  const displayedSearchSnippet = searchSnippetToShow(
+    strongestMatch?.snippet ?? null,
     name,
-    category: categoryLabel,
-    recency,
-    isFavourite,
-    displayState,
-    unbound,
-    context: isSearchMode
-      ? buildSearchRowContext(searchExplanation, displayedSearchSnippet)
-      : (line3?.text ?? null),
-  });
+  );
+  // Announce exactly what this row renders (RG-031 AUD-UIA-007). Search mode
+  // (D-51): the name, the Unbound marker when shown, the explanation and the
+  // shown snippet only. Normal mode: the identity summary + line three.
+  const accessibilityLabel = isSearchMode
+    ? buildSearchRowAccessibilityDescription({
+        name,
+        unbound,
+        context: buildSearchRowContext(
+          searchExplanation,
+          displayedSearchSnippet,
+        ),
+      })
+    : buildRowAccessibilityDescription({
+        name,
+        category: categoryLabel,
+        recency,
+        isFavourite,
+        displayState,
+        unbound,
+        context: line3?.text ?? null,
+      });
 
   // D-59: the Unbound marker. An opaque chip like the category chip, so its
   // text keeps the ROOT palette inside a see-through row's scope (C2-L4).
