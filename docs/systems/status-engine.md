@@ -1,7 +1,7 @@
 # Status Engine
 
-**Last updated:** 2026-10-18
-**Updated by phase:** 38.12-lifecycle-import-settings-ux
+**Last updated:** 2026-10-19
+**Updated by phase:** 38.13-contacts-list-search-digest-ux
 **Owners:** `src/db/status.ts`, `src/db/contact-status-read.ts`, `src/db/queries.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -34,7 +34,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 
 | File | Role |
 |---|---|
-| `src/db/status.ts` | Query-time progress, status thresholds, and rogue rule. |
+| `src/db/status.ts` | Query-time progress, status thresholds, rogue rule, and the shared `NEEDS_ATTENTION_WHERE` predicate. |
 | `src/db/contact-status-read.ts` | Guards and returns an individual contact's status and rogue reason. |
 | `src/db/queries.ts` | Normal-population status scan and newest-per-contact reads. |
 | `src/db/recency-dao.ts` | Preserves the source recency invariant. |
@@ -48,6 +48,11 @@ Status is a query-time projection over the contacts and interactions schema; no 
 3. The query maps continuous progress to stable, wobble, decay, or rogue. A Rarely-responds contact becomes rogue when qualifying recency reaches wobble; contacts past `ROGUE_K` become rogue because they are overdue.
 4. A separate newest-per-contact query uses `occurred_at DESC, id DESC` to deterministically choose the latest interaction row.
 5. The shared precondition requires `tracking_enabled = 1` and a positive cadence before any status arithmetic. An Unbound contact returns null status, reason, and progress even when it retains interaction history.
+
+### The shared needs-attention predicate
+
+1. `NEEDS_ATTENTION_WHERE` is `STATUS_CADENCE_PRECONDITION` AND progress at or past `STABLE_MAX` (wobble, decay or rogue) AND not currently snoozed, built only from code constants and with unqualified columns like `PROGRESS_SQL`, so it works with or without the `c` alias.
+2. It is the one definition of "needs attention": the Contacts Needs Attention filter (`buildFilterWhere`), the Orrery needs-attention system and system-rule resolver through that filter, and the Digest's Up Next / Overlooked candidates (`readUpNextCandidates`) all use it (ADR-256). Its cadence precondition keeps Unbound people out.
 
 ### Rendering status outside the app
 
@@ -85,6 +90,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — guards nullable cadence and leaves Status derived from its established inputs.
 - **ADR-228:** Truthful Relationship Overview — Profile-only unavailable reasons; `getContactStatus` unchanged.
 - **ADR-232:** A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards — `getContactStatus` returns no status for a binned row; the Profile reads In the Bin first.
+- **ADR-256:** Digest Overlooked Lists Everyone Who Needs Attention — `NEEDS_ATTENTION_WHERE` is the one shared needs-attention predicate.
 
 ## Gotchas
 
@@ -96,6 +102,7 @@ Status is a query-time projection over the contacts and interactions schema; no 
 4. **Keep status and reason branch order identical.** A `REASON_SQL` change must mirror `STATUS_SQL`, with Rarely-responds first, or the profile can explain a rogue state incorrectly.
 5. **Do not give a never-contacted widget tile a status colour.** The widget must carry the dashboard's null value rather than applying the status CASE independently.
 6. **Never run status SQL for an Unbound contact.** NULL cadence must produce neutral output, never an implicit stable state.
+7. **Do not write a second needs-attention predicate.** Reuse `NEEDS_ATTENTION_WHERE`; a Digest-local rogue-only read once disagreed with the drill it linked to (ADR-256).
 
 ## Related Systems
 
@@ -115,3 +122,4 @@ Status is a query-time projection over the contacts and interactions schema; no 
 | 2026-10-16 | 38.11 | Profile Status unavailable reasons: Bound never-contacted reads Never Contacted (no progress or bucket), Unbound and no-frequency read Not tracked with honest context, archived keeps its previous result; `getContactStatus` unchanged (D-05, D-20, D-23, D-24). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-228. |
 | 2026-10-18 | 38.12 | A binned contact has no live status: `getContactStatus` nulls it and the Profile reads "In the Bin" before any other state (ADR-232). |
+| 2026-10-19 | 38.13 | Added `NEEDS_ATTENTION_WHERE`, the one needs-attention predicate shared by the Contacts filter, Orrery and the Digest's Up Next and Overlooked (ADR-256). |
