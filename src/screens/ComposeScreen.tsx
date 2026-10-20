@@ -966,9 +966,15 @@ export function ComposeScreen({
   // focused (ComposeResearch, Edit). Each claim therefore re-reads the record's
   // status and closes the panel when it is no longer pending, so "No, don't
   // log" can never claim "Didn't log …" for a record that was logged elsewhere.
+  //
+  // The claim is held only while Compose can show the panel (review A-IN-01):
+  // a refocus load that fails ("error") or a contact that is gone ("missing")
+  // renders no panel, so the claim is released and the banner asks instead.
+  // "loading" keeps it, so a refocus never flashes the record onto the banner.
+  const panelCanShow = screenState !== "error" && screenState !== "missing";
   useFocusEffect(
     useCallback(() => {
-      if (confirm === null) {
+      if (confirm === null || !panelCanShow) {
         return undefined;
       }
       const { assistUid } = confirm;
@@ -991,7 +997,7 @@ export function ComposeScreen({
         live = false;
         useAssistBanner.getState().releasePanelOwned(assistUid);
       };
-    }, [confirm]),
+    }, [confirm, panelCanShow]),
   );
 
   // Re-read the contact's method groups after a primary swap so the picker

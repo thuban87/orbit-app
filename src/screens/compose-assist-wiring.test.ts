@@ -71,7 +71,12 @@ describe("ComposeScreen assist panel wiring", () => {
     expect(claimBlocks).toHaveLength(1);
     const [claim] = claimBlocks;
     expect(claim).toContain("releasePanelOwned(");
-    expect(claim).toMatch(/\}, \[confirm\]\)/);
+    expect(claim).toMatch(/\}, \[confirm, panelCanShow\]\)/);
+    // Held only while the panel can show (review A-IN-01).
+    expect(claim).toMatch(/if \(confirm === null \|\| !panelCanShow\) \{/);
+    expect(code).toMatch(
+      /const panelCanShow = screenState !== "error" && screenState !== "missing";/,
+    );
     expect(claim.indexOf("releasePanelOwned(")).toBeGreaterThan(
       claim.indexOf("return () =>"),
     );
