@@ -108,3 +108,17 @@ export function growRestingFrame(
     windowHeight: resting.windowHeight,
   };
 }
+
+/**
+ * The modal picker's search reset key (38.14 D-40). The FAB's picker stays
+ * mounted, so its list kept the last search across opens. A new key on every
+ * hidden -> visible transition lets `ContactPickerList`'s `searchResetKey`
+ * effect clear the term each time the picker opens; otherwise the key holds.
+ */
+export function nextPickerResetKey(
+  prevKey: number,
+  wasVisible: boolean,
+  visible: boolean,
+): number {
+  return visible && !wasVisible ? prevKey + 1 : prevKey;
+}

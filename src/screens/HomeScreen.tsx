@@ -873,6 +873,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         openPostLogEditor: setPostLogTarget,
       },
       contactId,
+      // 38.14 D-63: the snackbar names the person. Looked up from the
+      // published rows by id (as the star and snooze taps do), so this
+      // callback keeps empty deps and never names `rows`.
+      rowsByIdRef.current.get(contactId)?.name ?? null,
     );
   }, []);
 

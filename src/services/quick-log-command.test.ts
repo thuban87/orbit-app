@@ -40,7 +40,7 @@ describe("runQuickLog", () => {
   it("records once, announces success, and refreshes", async () => {
     const { deps, snackbars } = createDeps();
 
-    runQuickLog(deps, 7);
+    runQuickLog(deps, 7, "Maya");
     await vi.waitFor(() => expect(snackbars).toHaveLength(1));
 
     expect(deps.recordTouchpoint).toHaveBeenCalledWith({
@@ -54,7 +54,11 @@ describe("runQuickLog", () => {
       quality: null,
       source: "manual",
     });
-    expect(snackbars[0]).toMatchObject({ kind: "success", label: "Logged" });
+    // D-63, D-39: the one logging pattern names the channel and the person.
+    expect(snackbars[0]).toMatchObject({
+      kind: "success",
+      label: "Logged Message with Maya",
+    });
     expect(deps.notifySuccessHaptic).toHaveBeenCalledOnce();
     expect(deps.notifyWidgetDataChanged).toHaveBeenCalledOnce();
     expect(deps.bumpShellRefresh).toHaveBeenCalledOnce();
@@ -63,10 +67,10 @@ describe("runQuickLog", () => {
   it("offers Undo AND Add Note on success; Add Note opens the post-log editor", async () => {
     const { deps, snackbars } = createDeps();
 
-    runQuickLog(deps, 7);
+    runQuickLog(deps, 7, "Maya");
     await vi.waitFor(() => expect(snackbars).toHaveLength(1));
 
-    expect(snackbars[0].action.label).toBe("Undo");
+    expect(snackbars[0].action?.label).toBe("Undo");
     expect(snackbars[0].secondaryAction?.label).toBe("Add Note");
 
     snackbars[0].secondaryAction?.onPress();
@@ -81,7 +85,7 @@ describe("runQuickLog", () => {
       recordTouchpoint: vi.fn(() => Promise.reject(new Error("write failed"))),
     });
 
-    runQuickLog(deps, 7);
+    runQuickLog(deps, 7, "Maya");
     await vi.waitFor(() => expect(snackbars).toHaveLength(1));
 
     expect(snackbars[0]).toMatchObject({
@@ -102,7 +106,7 @@ describe("runQuickLog", () => {
         }),
       ),
     });
-    runQuickLog(remembered.deps, 7);
+    runQuickLog(remembered.deps, 7, "Maya");
     await vi.waitFor(() =>
       expect(remembered.deps.recordTouchpoint).toHaveBeenCalledOnce(),
     );
@@ -115,7 +119,7 @@ describe("runQuickLog", () => {
         Promise.resolve({ pref: "In Person" as const, remembered: null }),
       ),
     });
-    runQuickLog(concrete.deps, 7);
+    runQuickLog(concrete.deps, 7, "Maya");
     await vi.waitFor(() =>
       expect(concrete.deps.recordTouchpoint).toHaveBeenCalledOnce(),
     );
@@ -136,7 +140,7 @@ describe("runQuickLog", () => {
         }),
       ),
     });
-    runQuickLog(deps, 7);
+    runQuickLog(deps, 7, "Maya");
     await vi.waitFor(() =>
       expect(deps.recordTouchpoint).toHaveBeenCalledOnce(),
     );
@@ -152,8 +156,8 @@ describe("runQuickLog", () => {
       recordTouchpoint: vi.fn(() => write.promise),
     });
 
-    runQuickLog(deps, 7);
-    runQuickLog(deps, 7);
+    runQuickLog(deps, 7, "Maya");
+    runQuickLog(deps, 7, "Maya");
 
     // The second call is rejected synchronously by pendingRef before it can reach
     // the (async) write, so recordTouchpoint runs exactly once.
@@ -168,7 +172,7 @@ describe("runQuickLog", () => {
       recordTouchpoint: vi.fn(() => Promise.reject(new Error("write failed"))),
     });
 
-    runQuickLog(deps, 7);
+    runQuickLog(deps, 7, "Maya");
     await vi.waitFor(() => expect(snackbars).toHaveLength(1));
 
     expect(snackbars[0]).toMatchObject({
@@ -178,12 +182,16 @@ describe("runQuickLog", () => {
     await vi.waitFor(() => expect(deps.pendingRef.current).toBe(false));
   });
 
-  it("undoes the logged interaction and refreshes", async () => {
-    const { deps, snackbars } = createDeps();
+  it("undoes the logged interaction, refreshes, and confirms the Undo (D-38)", async () => {
+    const { deps, snackbars } = createDeps({
+      readChannelPreference: vi.fn(() =>
+        Promise.resolve({ pref: "In Person" as const, remembered: null }),
+      ),
+    });
 
-    runQuickLog(deps, 7);
+    runQuickLog(deps, 7, "Maya");
     await vi.waitFor(() => expect(snackbars).toHaveLength(1));
-    snackbars[0].action.onPress();
+    snackbars[0].action?.onPress();
 
     await vi.waitFor(() =>
       expect(deps.undoController.undo).toHaveBeenCalledWith({
@@ -195,5 +203,124 @@ describe("runQuickLog", () => {
       expect(deps.notifyWidgetDataChanged).toHaveBeenCalledTimes(2),
     );
     expect(deps.bumpShellRefresh).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(snackbars).toHaveLength(2));
+    // A warning-kind confirmation (destructive result, 38.10 D-132 / D-140)
+    // naming the channel and person, with no action (D-38: action optional).
+    expect(snackbars[1]).toMatchObject({
+      kind: "warning",
+      label: "Undid In Person with Maya",
+    });
+    expect(snackbars[1].action).toBeUndefined();
+    expect(snackbars[1].secondaryAction).toBeUndefined();
+  });
+
+  it("keeps Couldn't undo + Retry when the Undo fails, and Retry confirms", async () => {
+    let attempt = 0;
+    const { deps, snackbars } = createDeps({
+      undoController: {
+        undo: vi.fn(() => {
+          attempt += 1;
+          return attempt === 1
+            ? Promise.reject(new Error("undo failed"))
+            : Promise.resolve();
+        }),
+      },
+    });
+
+    runQuickLog(deps, 7, "Maya");
+    await vi.waitFor(() => expect(snackbars).toHaveLength(1));
+    snackbars[0].action?.onPress();
+    await vi.waitFor(() => expect(snackbars).toHaveLength(2));
+    expect(snackbars[1]).toMatchObject({
+      kind: "error",
+      label: "Couldn't undo",
+      action: { label: "Retry" },
+    });
+
+    snackbars[1].action?.onPress();
+    await vi.waitFor(() => expect(snackbars).toHaveLength(3));
+    expect(snackbars[2]).toMatchObject({
+      kind: "warning",
+      label: "Undid Message with Maya",
+    });
+  });
+
+  it("names only the channel when the person is unknown", async () => {
+    const { deps, snackbars } = createDeps({
+      readChannelPreference: vi.fn(() =>
+        Promise.resolve({ pref: "In Person" as const, remembered: null }),
+      ),
+    });
+
+    runQuickLog(deps, 7, null);
+    await vi.waitFor(() => expect(snackbars).toHaveLength(1));
+    expect(snackbars[0].label).toBe("Logged In Person");
+  });
+
+  it("resolves a lazy name inside the guard: one write, the resolved name in the label (R5-01)", async () => {
+    const name = deferred<string | null>();
+    const lazy = vi.fn(() => name.promise);
+    const { deps, snackbars } = createDeps({
+      readChannelPreference: vi.fn(() =>
+        Promise.resolve({ pref: "In Person" as const, remembered: null }),
+      ),
+    });
+
+    runQuickLog(deps, 7, lazy);
+    // A second + Quick Log while the first is in flight is ignored by the
+    // guard; the name read never runs for it.
+    runQuickLog(deps, 7, lazy);
+    expect(lazy).toHaveBeenCalledOnce();
+    name.resolve("Maya");
+
+    await vi.waitFor(() => expect(snackbars).toHaveLength(1));
+    expect(deps.recordTouchpoint).toHaveBeenCalledOnce();
+    expect(snackbars[0].label).toBe("Logged In Person with Maya");
+  });
+
+  it("a rejected lazy name read still writes and names only the channel", async () => {
+    const { deps, snackbars } = createDeps({
+      readChannelPreference: vi.fn(() =>
+        Promise.resolve({ pref: "In Person" as const, remembered: null }),
+      ),
+    });
+
+    runQuickLog(deps, 7, () => Promise.reject(new Error("header read failed")));
+    await vi.waitFor(() => expect(snackbars).toHaveLength(1));
+    expect(deps.recordTouchpoint).toHaveBeenCalledOnce();
+    expect(snackbars[0]).toMatchObject({
+      kind: "success",
+      label: "Logged In Person",
+    });
+  });
+
+  it("Retry after a failed write carries the resolved name", async () => {
+    const lazy = vi.fn(() => Promise.resolve("Maya"));
+    let attempt = 0;
+    const { deps, snackbars } = createDeps({
+      recordTouchpoint: vi.fn(() => {
+        attempt += 1;
+        return attempt === 1
+          ? Promise.reject(new Error("write failed"))
+          : Promise.resolve({ interactionId: 13 });
+      }),
+    });
+
+    runQuickLog(deps, 7, lazy);
+    await vi.waitFor(() => expect(snackbars).toHaveLength(1));
+    await vi.waitFor(() => expect(deps.pendingRef.current).toBe(false));
+    snackbars[0].action?.onPress();
+    await vi.waitFor(() => expect(snackbars).toHaveLength(2));
+    expect(snackbars[1].label).toBe("Logged Message with Maya");
+    // The name was read once; Retry reused the resolved value.
+    expect(lazy).toHaveBeenCalledOnce();
+  });
+
+  it("has no dependency that could write the remembered channel (D-63)", () => {
+    const { deps } = createDeps();
+    const writeLike = Object.keys(deps).filter((key) =>
+      /update|write|save|remember/i.test(key),
+    );
+    expect(writeLike).toEqual([]);
   });
 });

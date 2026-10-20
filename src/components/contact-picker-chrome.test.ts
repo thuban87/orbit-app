@@ -7,6 +7,7 @@ import {
   contactPickerKeyboardFrame,
   contactPickerTitle,
   growRestingFrame,
+  nextPickerResetKey,
   rebaseRestingFrame,
 } from "./contact-picker-chrome";
 
@@ -131,5 +132,37 @@ describe("the picker's resting frame height (38.13 review B-IN-05)", () => {
   it("keeps the same object when nothing changes", () => {
     const resting = { height: 891, windowHeight: 891 };
     expect(rebaseRestingFrame(resting, 891)).toBe(resting);
+  });
+});
+
+describe("nextPickerResetKey (38.14 D-40)", () => {
+  it("moves to a new key on every hidden -> visible transition", () => {
+    // First open of a picker mounted hidden.
+    expect(nextPickerResetKey(0, false, true)).not.toBe(0);
+  });
+
+  it("keeps the key while the picker stays open or stays closed", () => {
+    expect(nextPickerResetKey(3, true, true)).toBe(3);
+    expect(nextPickerResetKey(3, false, false)).toBe(3);
+    // Closing does not change the key; the next open does.
+    expect(nextPickerResetKey(3, true, false)).toBe(3);
+  });
+
+  it("a reopen after a search yields a new key, so the search clears", () => {
+    // open -> (search typed: key steady) -> close -> reopen.
+    let key = 0;
+    let wasVisible = false;
+    const step = (visible: boolean) => {
+      key = nextPickerResetKey(key, wasVisible, visible);
+      wasVisible = visible;
+      return key;
+    };
+    const firstOpen = step(true);
+    const whileSearching = step(true);
+    expect(whileSearching).toBe(firstOpen);
+    const closed = step(false);
+    expect(closed).toBe(firstOpen);
+    const reopened = step(true);
+    expect(reopened).not.toBe(firstOpen);
   });
 });

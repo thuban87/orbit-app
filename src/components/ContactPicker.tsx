@@ -29,6 +29,7 @@ import {
   contactPickerKeyboardFrame,
   contactPickerTitle,
   growRestingFrame,
+  nextPickerResetKey,
   type RestingFrame,
   rebaseRestingFrame,
 } from "./contact-picker-chrome";
@@ -541,6 +542,16 @@ export function ContactPicker(props: ContactPickerProps) {
     topClearance: insets.top + SPACING.lg,
   });
 
+  // 38.14 D-40: the FAB keeps this picker mounted, so its list would keep the
+  // last search across opens. A new reset key on every open clears it.
+  const searchReset = useRef({ key: 0, wasVisible: false });
+  const searchResetKey = nextPickerResetKey(
+    searchReset.current.key,
+    searchReset.current.wasVisible,
+    visible,
+  );
+  searchReset.current = { key: searchResetKey, wasVisible: visible };
+
   const dismiss = useCallback(() => {
     shellTransientStore.getState().closeTransient("contact-picker");
     onDismiss();
@@ -624,6 +635,7 @@ export function ContactPicker(props: ContactPickerProps) {
             excludeContactId={excludeContactId}
             excludeContactIds={excludeContactIds}
             allowArchivedSearch={allowArchivedSearch}
+            searchResetKey={searchResetKey}
           />
         </View>
       </View>

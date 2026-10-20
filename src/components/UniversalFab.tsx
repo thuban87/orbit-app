@@ -290,21 +290,25 @@ export function UniversalFab() {
         pendingRef: quickLogPending,
         undoController: quickLogUndoController.current,
         recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
-        readChannelPreference: async () => {
-          // Same app-settings read as the detailed Log Interaction screen; a
-          // read failure falls back to Message so the immediate write is never
-          // blocked (local-first, no network on this read path).
-          try {
-            const s = await getAppSettings(getExecutor());
-            return {
+        // Same app-settings read as the detailed Log Interaction screen; a
+        // read failure falls back to Message so the immediate write is never
+        // blocked (local-first, no network on this read path). A promise
+        // chain, so logContact itself stays synchronous (38.14 R5-01).
+        readChannelPreference: () =>
+          getAppSettings(getExecutor()).then(
+            (s) => ({
               pref: s.defaultInteractionChannel,
               remembered: s.rememberedInteractionChannel,
-            };
-          } catch (error) {
-            Logger.error(LOG_SCOPE, "failed to read channel preference", error);
-            return { pref: "Message", remembered: null };
-          }
-        },
+            }),
+            (error: unknown) => {
+              Logger.error(
+                LOG_SCOPE,
+                "failed to read channel preference",
+                error,
+              );
+              return { pref: "Message" as const, remembered: null };
+            },
+          ),
         localDateTime,
         newUid,
         showSnackbar,
@@ -315,6 +319,14 @@ export function UniversalFab() {
         openPostLogEditor: setPostLogTarget,
       },
       contactId,
+      // 38.14 D-63: the snackbar names the person. A lazy local read the
+      // command resolves inside its in-flight guard; not resolved here, so a
+      // second tap cannot pass the guard (R5-01). A failed read names only
+      // the channel and never blocks the write.
+      () =>
+        getContactHeader(getExecutor(), contactId).then(
+          (header) => header?.name ?? null,
+        ),
     );
   }, []);
 
