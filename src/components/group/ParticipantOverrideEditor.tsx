@@ -15,6 +15,7 @@ import { resolveDisplay } from "@/logic/group-inheritance";
 import { channelOptionsFor } from "@/screens/log-interaction-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { followLineLabel } from "./participant-summary-logic";
 
 export interface ParticipantFollowState {
   channel: boolean;
@@ -144,9 +145,8 @@ export function ParticipantOverrideEditor({
                   size="sm"
                 />
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  {following
-                    ? "Same as event"
-                    : `${label}: changed for this person`}
+                  {/* 38.14 D-29: every line names its field. */}
+                  {followLineLabel(label, following)}
                 </AppText>
               </View>
               {!following ? (

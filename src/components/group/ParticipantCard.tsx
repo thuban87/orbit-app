@@ -12,6 +12,7 @@ import { resolveDisplay } from "@/logic/group-inheritance";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
+import { participantChangeSummary } from "./participant-summary-logic";
 
 interface ParticipantCardProps {
   event: GroupEventDetail;
@@ -21,21 +22,18 @@ interface ParticipantCardProps {
   onRemove: () => void;
 }
 
+/** Names what is changed for this person, compactly (38.14 D-29). */
 function summary(
   event: GroupEventDetail,
   participant: GroupEventParticipant,
 ): string {
-  const display = resolveDisplay(participant, {
-    channel: event.channel ?? "In Person",
-    quality: event.quality,
-    duration: event.duration,
-  });
-  const follows = [display.channel, display.quality, display.duration]
-    .filter((field) => field.following)
-    .map((field) => field.label);
-  return follows.length > 0
-    ? `Same as event: ${follows.join(", ")}`
-    : "Changes for this person";
+  return participantChangeSummary(
+    resolveDisplay(participant, {
+      channel: event.channel ?? "In Person",
+      quality: event.quality,
+      duration: event.duration,
+    }),
+  );
 }
 
 /** Compact read row; persistence and the shared remove Sheet remain Detail-owned. */

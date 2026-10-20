@@ -8,7 +8,7 @@
  * pre-check runs inside the guarded save; the DAO's `LinkedNoteBlankError`
  * maps to the same error; every other failure keeps the generic message.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import {
   type ParticipantEditDraft,
@@ -45,6 +45,7 @@ import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { publishInteractionWrite } from "@/services/publish-interaction-write";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
 
 interface LoadedParticipant {
@@ -73,9 +74,15 @@ export function EditParticipantScreen({
   const baselineRef = useRef<string | null>(null);
   const bypassRef = useRef(false);
 
+  // Only the latest load may publish; unmount invalidates it (38.14 D-25;
+  // ADR-162), so a late read can never overwrite newer state.
+  const loadAuthority = useMemo(() => createLatestRequestAuthority(), []);
+
   const load = useCallback(async () => {
+    const token = loadAuthority.begin();
     try {
       const event = await readGroupEventDetail(getExecutor(), { groupEventId });
+      if (!loadAuthority.isCurrent(token)) return;
       const participant = event?.participants.find(
         (row) =>
           row.interactionId === interactionId && row.contactId === contactId,
@@ -89,13 +96,15 @@ export function EditParticipantScreen({
       setLoaded({ event, participant, draft: nextDraft });
       setDraft(nextDraft);
     } catch {
+      if (!loadAuthority.isCurrent(token)) return;
       setError("Couldn't load this participant. Please go back and retry.");
     }
-  }, [contactId, groupEventId, interactionId]);
+  }, [contactId, groupEventId, interactionId, loadAuthority]);
 
   useEffect(() => {
     void load();
-  }, [load]);
+    return () => loadAuthority.invalidate();
+  }, [load, loadAuthority]);
   const hasUnsavedChanges =
     draft !== null && JSON.stringify(draft) !== baselineRef.current;
   // A save in flight holds every exit, with no prompt (fix-pass WR-02).
