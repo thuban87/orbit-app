@@ -90,8 +90,8 @@ describe("fitHeatmapCell (RG-033 ui-accessibility/AUD-UIA-010, D-13)", () => {
 
 describe("fitHeatmapCell — ActivityHeatmap lens shapes (RG-033, D-13)", () => {
   // Profile History's available width at a 320dp window: ContactProfileScreen
-  // content padding (16/side) + ProfileSection sectionBody padding (16/side) +
-  // GlassSurface border (1/side) = 320 − 66 = 254.
+  // content padding (16/side) + History card padding (16/side) + its
+  // GlassSurface border (1/side) = 320 − 66 = 254 (38.14 D-53).
   const PROFILE_320 = 320 - 66;
 
   it("day lens (7 columns, cap 38) fits a 320dp Profile and never overflows 200–900", () => {

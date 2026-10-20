@@ -167,6 +167,7 @@ import { JumpToDateSheet } from "@/components/history/JumpToDateSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GlassSurface } from "@/components/ui/GlassSurface";
 import {
   getAppSettings,
   type HistoryCycleCount,
@@ -1052,29 +1053,36 @@ export function HistorySection({
     streamState,
   ]);
 
+  // 38.14 D-51 / D-53 (ADR-115 :18): the Profile section card is gone, so
+  // every History state sits on a History card styled like the populated
+  // ones (1 dp GlassSurface border + SPACING.base padding).
   if (readState.phase === "error") {
     return (
-      <View
-        testID={`${testID}-error`}
-        style={styles.empty}
-        onLayout={onContentLayout}
-      >
-        <AppText role="caption">Couldn't load history</AppText>
-        <Button
-          role="tertiary"
-          label="Retry"
-          accessibilityLabel="Retry loading history"
-          onPress={() => void load()}
-        />
-      </View>
+      <GlassSurface style={styles.card}>
+        <View
+          testID={`${testID}-error`}
+          style={styles.empty}
+          onLayout={onContentLayout}
+        >
+          <AppText role="caption">Couldn't load history</AppText>
+          <Button
+            role="tertiary"
+            label="Retry"
+            accessibilityLabel="Retry loading history"
+            onPress={() => void load()}
+          />
+        </View>
+      </GlassSurface>
     );
   }
 
   if (!history) {
     return (
-      <View testID={`${testID}-loading`} style={styles.stack}>
-        <AppText role="caption">Loading history…</AppText>
-      </View>
+      <GlassSurface style={styles.card}>
+        <View testID={`${testID}-loading`} style={styles.stack}>
+          <AppText role="caption">Loading history…</AppText>
+        </View>
+      </GlassSurface>
     );
   }
 
@@ -1093,126 +1101,139 @@ export function HistorySection({
 
   if (isEmptyHistory(history)) {
     return (
-      // The one empty-state component (38.9 D-20); History keeps its
-      // "Log interaction" action (D-71), testID, layout signal and notice.
-      <EmptyState
-        testID={`${testID}-empty`}
-        icon="your-week"
-        heading="No history yet"
-        body="Log an interaction to start seeing activity here."
-        action={{ label: "Log interaction", onPress: () => log(today) }}
-        onLayout={onContentLayout}
-        style={styles.empty}
-      >
-        {refreshNotice}
-      </EmptyState>
+      <GlassSurface style={styles.card}>
+        {/* The one empty-state component (38.9 D-20); History keeps its
+            "Log interaction" action (D-71), testID, layout signal and notice. */}
+        <EmptyState
+          testID={`${testID}-empty`}
+          icon="your-week"
+          heading="No history yet"
+          body="Log an interaction to start seeing activity here."
+          action={{ label: "Log interaction", onPress: () => log(today) }}
+          onLayout={onContentLayout}
+          style={styles.empty}
+        >
+          {refreshNotice}
+        </EmptyState>
+      </GlassSurface>
     );
   }
 
+  // 38.14 D-53: two History cards — (1) the refresh notice, the heatmap, its
+  // empty-target note and Intensity; (2) Jump to date, the empty-month state
+  // and the stream. Each card's 1 dp border + SPACING.base padding keeps the
+  // heatmap's available width at window − 66 dp (ADR-174). Jump to date and
+  // the reveal measure window-relative, so the wrappers don't move them.
   return (
     <View testID={testID} style={styles.stack}>
-      {refreshNotice}
-      <ActivityHeatmap
-        lens={lens}
-        cycleCount={cycleCount}
-        window={window}
-        counts={counts}
-        cycles={cyclesResult}
-        cycleCounts={cycleCounts}
-        onLensChange={onLensChange}
-        onPresetChange={onPresetChange}
-        onCellPress={onCellPress}
-        onPrev={onPrev}
-        onNext={onNext}
-        canGoNext={canGoNext}
-        today={today}
-        fallbackNote={effective.fallback ? NO_CADENCE_FALLBACK_NOTE : null}
-        // The populated section is fully laid out once the heatmap's final
-        // grid is (its only width-measured child; Year's grid is final on its
-        // first layout): settle a reveal (D-72).
-        onLaidOut={onContentLayout}
-      />
-      {note ? (
-        // The measured slot (D-73) is a plain wrapper: the note keeps its D-55
-        // place directly under the heatmap.
-        <View
-          ref={noteViewRef}
-          collapsable={false}
-          testID="history-target-note-slot"
-        >
+      <GlassSurface style={styles.card} contentStyle={styles.stack}>
+        {refreshNotice}
+        <ActivityHeatmap
+          lens={lens}
+          cycleCount={cycleCount}
+          window={window}
+          counts={counts}
+          cycles={cyclesResult}
+          cycleCounts={cycleCounts}
+          onLensChange={onLensChange}
+          onPresetChange={onPresetChange}
+          onCellPress={onCellPress}
+          onPrev={onPrev}
+          onNext={onNext}
+          canGoNext={canGoNext}
+          today={today}
+          fallbackNote={effective.fallback ? NO_CADENCE_FALLBACK_NOTE : null}
+          // The populated section is fully laid out once the heatmap's final
+          // grid is (its only width-measured child; Year's grid is final on its
+          // first layout): settle a reveal (D-72).
+          onLaidOut={onContentLayout}
+        />
+        {note ? (
+          // The measured slot (D-73) is a plain wrapper: the note keeps its D-55
+          // place directly under the heatmap.
+          <View
+            ref={noteViewRef}
+            collapsable={false}
+            testID="history-target-note-slot"
+          >
+            <HistoryTargetNote
+              text={
+                note.kind === "empty-day"
+                  ? emptyDayNoteText(note.date, today)
+                  : emptySpanNoteText(note.start, note.end, today)
+              }
+              // Dated for an empty day; an empty span carries no date (D-28). The
+              // note closes as Log opens, so it never survives the new record.
+              onLog={() => {
+                closeNote();
+                if (note.kind === "empty-day") log(note.date);
+                else log();
+              }}
+              onClose={closeNote}
+            />
+          </View>
+        ) : null}
+        <IntensityChart intensity={intensity} />
+      </GlassSurface>
+      <GlassSurface style={styles.card} contentStyle={styles.stack}>
+        {streamModel ? (
+          // The stream header's only control (D-29, D-32, D-51): directly above
+          // the first record, below Intensity; nothing is sticky.
+          <View style={styles.jumpRow}>
+            <Button
+              role="secondary"
+              label="Jump to date"
+              testID="history-jump"
+              onPress={openJump}
+            />
+          </View>
+        ) : null}
+        {monthNote ? (
+          // The empty-month state: directly under Jump to date, above the stream,
+          // never in the heatmap note slot (D-64). Nearest dates: after first.
           <HistoryTargetNote
-            text={
-              note.kind === "empty-day"
-                ? emptyDayNoteText(note.date, today)
-                : emptySpanNoteText(note.start, note.end, today)
-            }
-            // Dated for an empty day; an empty span carries no date (D-28). The
-            // note closes as Log opens, so it never survives the new record.
+            testID="history-month-note"
+            text={emptyMonthNoteText(monthNote.monthKey)}
+            nearest={[monthNote.after, monthNote.before]
+              .filter((date): date is string => date !== null)
+              .map((date) => ({
+                date,
+                label: nearestDateLabel(date),
+                accessibilityLabel: `Jump to ${dayAccessibilityLabel(date, today)}`,
+              }))}
+            onNearest={onNearest}
+            // Undated (D-28): the Log form starts at now. The state closes as
+            // Log opens, so it never survives the new record.
             onLog={() => {
-              closeNote();
-              if (note.kind === "empty-day") log(note.date);
-              else log();
+              closeMonthNote();
+              const route = buildLogRoute(contactId);
+              navigation.navigate(route.screen, route.params);
             }}
-            onClose={closeNote}
+            onClose={closeMonthNote}
           />
-        </View>
-      ) : null}
-      <IntensityChart intensity={intensity} />
-      {streamModel ? (
-        // The stream header's only control (D-29, D-32, D-51): directly above
-        // the first record, below Intensity; nothing is sticky.
-        <View style={styles.jumpRow}>
-          <Button
-            role="secondary"
-            label="Jump to date"
-            testID="history-jump"
-            onPress={openJump}
+        ) : null}
+        {streamModel ? (
+          <HistoryStream
+            model={streamModel}
+            state={streamState}
+            onExpandYear={(year) => {
+              commitPending({ type: "stream-action" });
+              setStreamState((s) => streamStateOnExpandYear(s, year));
+            }}
+            onShowOlder={(year) => {
+              commitPending({ type: "stream-action" });
+              setStreamState((s) =>
+                streamStateOnShowOlder(s, streamModel, year),
+              );
+            }}
+            onOpenInteraction={onOpenInteraction}
+            onOpenKnowledgeChange={onOpenKnowledgeRow}
+            registerNode={registerNode}
+            onNodeLayout={onNodeLayout}
+            highlight={highlight}
           />
-        </View>
-      ) : null}
-      {monthNote ? (
-        // The empty-month state: directly under Jump to date, above the stream,
-        // never in the heatmap note slot (D-64). Nearest dates: after first.
-        <HistoryTargetNote
-          testID="history-month-note"
-          text={emptyMonthNoteText(monthNote.monthKey)}
-          nearest={[monthNote.after, monthNote.before]
-            .filter((date): date is string => date !== null)
-            .map((date) => ({
-              date,
-              label: nearestDateLabel(date),
-              accessibilityLabel: `Jump to ${dayAccessibilityLabel(date, today)}`,
-            }))}
-          onNearest={onNearest}
-          // Undated (D-28): the Log form starts at now. The state closes as
-          // Log opens, so it never survives the new record.
-          onLog={() => {
-            closeMonthNote();
-            const route = buildLogRoute(contactId);
-            navigation.navigate(route.screen, route.params);
-          }}
-          onClose={closeMonthNote}
-        />
-      ) : null}
-      {streamModel ? (
-        <HistoryStream
-          model={streamModel}
-          state={streamState}
-          onExpandYear={(year) => {
-            commitPending({ type: "stream-action" });
-            setStreamState((s) => streamStateOnExpandYear(s, year));
-          }}
-          onShowOlder={(year) => {
-            commitPending({ type: "stream-action" });
-            setStreamState((s) => streamStateOnShowOlder(s, streamModel, year));
-          }}
-          onOpenInteraction={onOpenInteraction}
-          onOpenKnowledgeChange={onOpenKnowledgeRow}
-          registerNode={registerNode}
-          onNodeLayout={onNodeLayout}
-          highlight={highlight}
-        />
-      ) : null}
+        ) : null}
+      </GlassSurface>
       {detailInteraction ? (
         <InteractionDetail
           visible
@@ -1313,6 +1334,8 @@ export function HistorySection({
 
 const styles = StyleSheet.create({
   stack: { gap: SPACING.lg },
+  // A History card (38.14 D-53): with the GlassSurface's 1 dp border.
+  card: { padding: SPACING.base },
   empty: { gap: SPACING.sm },
   jumpRow: { alignItems: "flex-end" },
   notice: {

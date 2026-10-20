@@ -668,35 +668,36 @@ describe("ProfileModuleHost History reveal", () => {
     expect(onRequestScrollTo).toHaveBeenCalledExactlyOnceWith(840);
   });
 
-  it("treats a History read error as History's laid-out content (D-72)", () => {
-    const nodes = all(
-      resolve(
-        ProfileModuleHost({
-          snapshot: {
-            identity: { id: 7, name: "Ada", intervalDays: 30 },
-            knowledge: { status: "ready", data: {} },
-            history: { status: "error", message: "Couldn't load" },
-          } as unknown as ProfileSnapshot,
-          presentation: historyPresentation({ visible: true, expanded: true }),
-          todayLocal: "2026-09-19",
-          historyRevision: 0,
-          onRequestScrollTo: vi.fn(),
-          onSetFrequency: vi.fn(async () => {}),
-          onSnooze: vi.fn(async () => {}),
-          onUnsnooze: vi.fn(async () => {}),
-          onSaveBirthday: vi.fn(async () => {}),
-          onKnowledgeAction: vi.fn(),
-          onKnowledgeViewAll: vi.fn(),
-          onOpenValueHistory: vi.fn(),
-          onOpenKnowledgeChange: vi.fn(),
-          onContactMethodAction: vi.fn(),
-        }),
-      ),
+  it("treats a History read error as History's laid-out content (D-72), on a History card (38.14 D-53)", () => {
+    const tree = resolve(
+      ProfileModuleHost({
+        snapshot: {
+          identity: { id: 7, name: "Ada", intervalDays: 30 },
+          knowledge: { status: "ready", data: {} },
+          history: { status: "error", message: "Couldn't load" },
+        } as unknown as ProfileSnapshot,
+        presentation: historyPresentation({ visible: true, expanded: true }),
+        todayLocal: "2026-09-19",
+        historyRevision: 0,
+        onRequestScrollTo: vi.fn(),
+        onSetFrequency: vi.fn(async () => {}),
+        onSnooze: vi.fn(async () => {}),
+        onUnsnooze: vi.fn(async () => {}),
+        onSaveBirthday: vi.fn(async () => {}),
+        onKnowledgeAction: vi.fn(),
+        onKnowledgeViewAll: vi.fn(),
+        onOpenValueHistory: vi.fn(),
+        onOpenKnowledgeChange: vi.fn(),
+        onContactMethodAction: vi.fn(),
+      }),
     );
-    const error = nodes.find(
-      (node) => node.props.testID === "profile-history-error",
+    const error = withAncestors(tree).find(
+      ({ node }) => node.props.testID === "profile-history-error",
     );
-    expect(error?.props.onLayout).toBeTypeOf("function");
+    expect(error?.node.props.onLayout).toBeTypeOf("function");
+    // The section card is gone (D-51), so the error text sits on a History
+    // GlassSurface card (ADR-115 :18).
+    expect(error?.ancestors).toContain("GlassSurface");
   });
 
   it("reports a failed measure only to a current request", () => {

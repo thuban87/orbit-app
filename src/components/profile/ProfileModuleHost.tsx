@@ -498,68 +498,77 @@ export function ProfileModuleHost({
     );
   };
 
+  // 38.14 D-54: the Contact Methods content sits on one card.
   const renderContactMethods = () => {
     const methods = [...snapshot.methods.phone, ...snapshot.methods.email];
-    if (methods.length === 0) {
-      return <AppText role="body">Contact Methods · None</AppText>;
-    }
     return (
-      <View style={styles.stack}>
-        {methods.map((method) => (
-          <View key={method.uid} style={styles.method}>
-            <AppText role="label">{method.label ?? method.method_type}</AppText>
-            <AppText role="body">{method.display_value}</AppText>
-            {method.is_actionable === 0 ? (
-              <AppText role="caption">
-                {method.method_type === "phone"
-                  ? "This number can’t be used for calls or messages yet."
-                  : "This email address can’t be used yet."}
-              </AppText>
-            ) : null}
-            {method.method_type === "phone" ? (
-              <View style={styles.methodActions}>
-                <Button
-                  role="tertiary"
-                  label="Call"
-                  disabled={method.is_actionable !== 1}
-                  accessibilityLabel={`Call ${method.display_value}`}
-                  onPress={() => onContactMethodAction(method, "call")}
-                />
-                <Button
-                  role="tertiary"
-                  label="Message"
-                  disabled={method.is_actionable !== 1}
-                  accessibilityLabel={`Message ${method.display_value}`}
-                  onPress={() => onContactMethodAction(method, "message")}
-                />
+      <GlassSurface style={styles.card}>
+        {methods.length === 0 ? (
+          <AppText role="body">Contact Methods · None</AppText>
+        ) : (
+          <View style={styles.stack}>
+            {methods.map((method) => (
+              <View key={method.uid} style={styles.method}>
+                <AppText role="label">
+                  {method.label ?? method.method_type}
+                </AppText>
+                <AppText role="body">{method.display_value}</AppText>
+                {method.is_actionable === 0 ? (
+                  <AppText role="caption">
+                    {method.method_type === "phone"
+                      ? "This number can’t be used for calls or messages yet."
+                      : "This email address can’t be used yet."}
+                  </AppText>
+                ) : null}
+                {method.method_type === "phone" ? (
+                  <View style={styles.methodActions}>
+                    <Button
+                      role="tertiary"
+                      label="Call"
+                      disabled={method.is_actionable !== 1}
+                      accessibilityLabel={`Call ${method.display_value}`}
+                      onPress={() => onContactMethodAction(method, "call")}
+                    />
+                    <Button
+                      role="tertiary"
+                      label="Message"
+                      disabled={method.is_actionable !== 1}
+                      accessibilityLabel={`Message ${method.display_value}`}
+                      onPress={() => onContactMethodAction(method, "message")}
+                    />
+                  </View>
+                ) : (
+                  <Button
+                    role="tertiary"
+                    label="Email"
+                    disabled={method.is_actionable !== 1}
+                    accessibilityLabel={`Email ${method.display_value}`}
+                    onPress={() => onContactMethodAction(method, "email")}
+                  />
+                )}
               </View>
-            ) : (
-              <Button
-                role="tertiary"
-                label="Email"
-                disabled={method.is_actionable !== 1}
-                accessibilityLabel={`Email ${method.display_value}`}
-                onPress={() => onContactMethodAction(method, "email")}
-              />
-            )}
+            ))}
           </View>
-        ))}
-      </View>
+        )}
+      </GlassSurface>
     );
   };
 
   const renderHistory = () => {
     if (snapshot.history.status === "error") {
       // History's laid-out content too, so an expanding reveal settles on it
-      // (38.8 D-72).
+      // (38.8 D-72). On a History card like the populated ones, since the
+      // section card is gone (38.14 D-51, D-53; ADR-115 :18).
       return (
-        <AppText
-          role="body"
-          testID="profile-history-error"
-          onLayout={scroller.historyContentLayout}
-        >
-          {snapshot.history.message}
-        </AppText>
+        <GlassSurface style={styles.card}>
+          <AppText
+            role="body"
+            testID="profile-history-error"
+            onLayout={scroller.historyContentLayout}
+          >
+            {snapshot.history.message}
+          </AppText>
+        </GlassSurface>
       );
     }
     // The assembled Profile History section (Plan 08; 38.8 D-10): the heatmap,
@@ -779,6 +788,9 @@ const styles = StyleSheet.create({
   },
   sectionCopy: { flex: 1, gap: SPACING.xs },
   sectionBody: { gap: SPACING.sm, padding: SPACING.base },
+  // An inner Profile card (Contact Methods, D-54; History states, D-53): the
+  // GlassSurface's 1 dp border + SPACING.base padding.
+  card: { padding: SPACING.base },
   method: { gap: SPACING.xs },
   methodActions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
 });

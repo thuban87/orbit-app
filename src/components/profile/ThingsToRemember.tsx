@@ -24,6 +24,7 @@ import {
 } from "@/profile/knowledge-presentation";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { ProfileHeading } from "./ProfileHeading";
 
 export type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 
@@ -319,7 +320,7 @@ export function KnowledgeChild({
         <View style={styles.temporal}>
           {mostRecent.length > 0 ? (
             <View style={styles.temporalGroup}>
-              <AppText role="label">MOST RECENT</AppText>
+              <ProfileHeading level="h3">MOST RECENT</ProfileHeading>
               {mostRecent.map((item) => (
                 <KnowledgeCard
                   key={item.id}
@@ -334,7 +335,7 @@ export function KnowledgeChild({
           ) : null}
           {previous.length > 0 ? (
             <View style={styles.temporalGroup}>
-              <AppText role="label">PREVIOUS</AppText>
+              <ProfileHeading level="h3">PREVIOUS</ProfileHeading>
               {previous.map((item) => (
                 <KnowledgeCard
                   key={item.id}
@@ -353,7 +354,7 @@ export function KnowledgeChild({
         ? child.groups.map((group, index) => (
             <View key={group.name ?? `direct-${index}`} style={styles.group}>
               {group.heading ? (
-                <AppText role="label">{group.heading}</AppText>
+                <ProfileHeading level="h3">{group.heading}</ProfileHeading>
               ) : null}
               {group.items.map((item) => (
                 <KnowledgeCard
