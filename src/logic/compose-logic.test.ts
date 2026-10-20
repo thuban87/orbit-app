@@ -316,7 +316,7 @@ describe("composeExitDisposition — per-path session + navigation table (COMP-1
     });
   });
 
-  it.each<ComposeExit>(["transmit-pending", "not-yet", "copy"])(
+  it.each<ComposeExit>(["transmit-pending", "later", "dismissed", "copy"])(
     "preserves the session and stays on Compose for the non-finishing exit '%s'",
     (exit) => {
       expect(composeExitDisposition(exit)).toEqual({
@@ -331,7 +331,8 @@ describe("composeExitDisposition — per-path session + navigation table (COMP-1
     const exits: ComposeExit[] = [
       "back",
       "transmit-pending",
-      "not-yet",
+      "later",
+      "dismissed",
       "copy",
     ];
     for (const exit of exits) {

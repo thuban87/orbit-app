@@ -241,3 +241,89 @@ describe("panel claim (38.14 D-23)", () => {
     });
   });
 });
+
+describe("Later (38.14 D-77)", () => {
+  it("keeps a deferred record off the banner and list across every refresh", async () => {
+    await useAssistBanner.getState().refresh();
+    useAssistBanner.getState().deferUntilReturn("newer");
+    expect(useAssistBanner.getState().newest?.uid).toBe("older");
+
+    // Publications and the Settings toggle only refresh; they never release.
+    await useAssistBanner.getState().refresh();
+    await useAssistBanner.getState().refresh();
+    expect(useAssistBanner.getState().laterUids.has("newer")).toBe(true);
+    expect(useAssistBanner.getState().queue.map((row) => row.uid)).toEqual([
+      "older",
+    ]);
+    expect(useAssistBanner.getState().newest?.uid).toBe("older");
+    expect(useAssistBanner.getState().morePendingCount).toBe(0);
+  });
+
+  it("releaseDeferred empties the set WITHOUT publishing; the next refresh publishes", async () => {
+    await useAssistBanner.getState().refresh();
+    useAssistBanner.getState().deferUntilReturn("newer");
+    const before = useAssistBanner.getState();
+    const readsBefore = mocks.listEligiblePendingAssists.mock.calls.length;
+
+    useAssistBanner.getState().releaseDeferred();
+    const after = useAssistBanner.getState();
+    expect(after.laterUids.size).toBe(0);
+    expect(after.queue).toBe(before.queue);
+    expect(after.newest).toBe(before.newest);
+    expect(after.morePendingCount).toBe(before.morePendingCount);
+    expect(mocks.listEligiblePendingAssists.mock.calls.length).toBe(
+      readsBefore,
+    );
+
+    await useAssistBanner.getState().refresh();
+    expect(useAssistBanner.getState().newest?.uid).toBe("newer");
+    expect(useAssistBanner.getState().morePendingCount).toBe(1);
+  });
+
+  it("a background-to-active return releases Later'd records; inactive-to-active does not", async () => {
+    const fake = makeFakeAppState();
+    subscribeAppState(fake.appState);
+    await useAssistBanner.getState().refresh();
+    useAssistBanner.getState().deferUntilReturn("newer");
+
+    fake.fire("inactive");
+    fake.fire("active");
+    await flush();
+    expect(useAssistBanner.getState().laterUids.has("newer")).toBe(true);
+    expect(useAssistBanner.getState().newest?.uid).toBe("older");
+
+    fake.fire("background");
+    fake.fire("active");
+    // Released synchronously, before the refresh it triggers.
+    expect(useAssistBanner.getState().laterUids.size).toBe(0);
+    await flush();
+    expect(useAssistBanner.getState().newest?.uid).toBe("newer");
+  });
+
+  it("a Later tapped while a refresh read is in flight stays hidden when the read publishes", async () => {
+    const read = deferred<typeof queue>();
+    mocks.listEligiblePendingAssists.mockReturnValueOnce(read.promise);
+
+    const pending = useAssistBanner.getState().refresh();
+    await vi.waitFor(() =>
+      expect(mocks.listEligiblePendingAssists).toHaveBeenCalledTimes(1),
+    );
+    useAssistBanner.getState().deferUntilReturn("newer");
+
+    read.resolve(queue);
+    await pending;
+    expect(useAssistBanner.getState().queue.map((row) => row.uid)).toEqual([
+      "older",
+    ]);
+    expect(useAssistBanner.getState().newest?.uid).toBe("older");
+  });
+
+  it("Later then a panel release keeps the record quiet (claim gone, Later remains)", async () => {
+    await useAssistBanner.getState().refresh();
+    useAssistBanner.getState().setPanelOwned("newer");
+    useAssistBanner.getState().deferUntilReturn("newer");
+    useAssistBanner.getState().releasePanelOwned("newer");
+    expect(useAssistBanner.getState().panelOwnedUid).toBeNull();
+    expect(useAssistBanner.getState().newest?.uid).toBe("older");
+  });
+});
