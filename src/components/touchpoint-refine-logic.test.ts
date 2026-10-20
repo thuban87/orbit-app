@@ -14,6 +14,8 @@ import { describe, expect, it } from "vitest";
 import {
   coerceAllowAi,
   combineDateAndTime,
+  customMinutesDisplay,
+  customMinutesSeed,
   DURATION_PRESETS,
   durationChipTone,
   formatDurationLabel,
@@ -21,6 +23,7 @@ import {
   MAX_DURATION_SECONDS,
   parseCustomDurationMinutes,
   parseLocalDateTime,
+  showDurationReadout,
 } from "@/components/touchpoint-refine-logic";
 
 describe("combineDateAndTime", () => {
@@ -220,5 +223,40 @@ describe("durationChipTone (D-30)", () => {
       "accessibilityState={{ selected: value.duration === null }}",
     );
     expect(block.match(/styles\.chip,/g)?.length).toBe(2);
+  });
+});
+
+describe("custom duration on reopen (38.14 D-31)", () => {
+  it("customMinutesSeed shows a stored non-preset duration as whole minutes", () => {
+    expect(customMinutesSeed(1020)).toBe("17");
+    expect(customMinutesSeed(90 * 60)).toBe("90");
+  });
+
+  it("customMinutesSeed is empty for a preset, none or a non-positive value", () => {
+    expect(customMinutesSeed(1800)).toBe("");
+    for (const preset of DURATION_PRESETS) {
+      expect(customMinutesSeed(preset.seconds)).toBe("");
+    }
+    expect(customMinutesSeed(null)).toBe("");
+    expect(customMinutesSeed(0)).toBe("");
+  });
+
+  it("customMinutesDisplay keeps what the user typed while it matches the value", () => {
+    // In-progress or invalid entries persist null, and stay as typed.
+    expect(customMinutesDisplay("", null)).toBe("");
+    expect(customMinutesDisplay("0", null)).toBe("0");
+    expect(customMinutesDisplay("17", 1020)).toBe("17");
+  });
+
+  it("customMinutesDisplay follows a value changed elsewhere (a preset, Follow event)", () => {
+    expect(customMinutesDisplay("", 1020)).toBe("17");
+    expect(customMinutesDisplay("17", 1800)).toBe("");
+    expect(customMinutesDisplay("17", null)).toBe("");
+  });
+
+  it("showDurationReadout hides the 'None' readout", () => {
+    expect(showDurationReadout(null)).toBe(false);
+    expect(showDurationReadout(0)).toBe(false);
+    expect(showDurationReadout(600)).toBe(true);
   });
 });

@@ -637,6 +637,34 @@ describe("glossary contract — canonical terms (D-41, D-21)", () => {
     });
   });
 
+  it("pins the channel and direction label maps (38.14 D-33, D-64)", () => {
+    expect(glossary.CHANNEL_LABEL).toEqual({
+      Message: "Message",
+      Call: "Call",
+      "In Person": "In Person",
+      other: "Other",
+      unspecified: "Unspecified",
+    });
+    expect(glossary.DIRECTION_LABEL).toEqual({
+      outbound: "Outbound",
+      inbound: "Inbound",
+      mutual: "Mutual",
+    });
+  });
+
+  it("the shared refine form reads its channel and direction labels from the glossary (38.14 D-33)", () => {
+    const form = read("src/components/TouchpointRefineForm.tsx");
+    expect(form).toContain("DIRECTION_LABEL[");
+    expect(form).toMatch(
+      /import \{[^}]*\bDIRECTION_LABEL\b[^}]*\} from "@\/constants\/glossary"/,
+    );
+    const logic = read("src/screens/log-interaction-logic.ts");
+    expect(logic).toContain("CHANNEL_LABEL[");
+    expect(logic).not.toMatch(
+      /label: "(Message|Call|In Person|Other|Unspecified)"/,
+    );
+  });
+
   it("pins the Things to Remember terms (38.10 D-90)", () => {
     expect({
       OFF_LIMITS: glossary.OFF_LIMITS,

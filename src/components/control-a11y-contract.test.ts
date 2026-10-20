@@ -256,7 +256,9 @@ describe("Touchpoint refine form (AUD-UIA-005, AUD-UIA-006, AUD-UIA-018, D-07)",
 
   it("exposes the date/time value and shows it through the shared minute formatter", () => {
     expect(dateTime).toBeDefined();
-    expect(dateTime).toContain('accessibilityLabel="Correct date and time"');
+    // 38.14 D-39: the accessibility label matches the visible label.
+    expect(dateTime).toContain('accessibilityLabel="Date & time"');
+    expect(form).not.toContain("Correct date and time");
     expect(dateTime).toContain(
       "accessibilityValue={{ text: occurredAtLabel }}",
     );
@@ -265,6 +267,24 @@ describe("Touchpoint refine form (AUD-UIA-005, AUD-UIA-006, AUD-UIA-018, D-07)",
     );
     expect(form).toContain("{occurredAtLabel}");
     expect(form).not.toContain("{value.occurredAt}");
+  });
+
+  it("the More / Hide options label toggles with its visible text (38.14 D-39)", () => {
+    const toggle = pressables.find((region) =>
+      region.includes("-more-options`"),
+    );
+    expect(toggle).toBeDefined();
+    expect(toggle).toContain("accessibilityLabel={moreOptionsLabel}");
+    expect(toggle).toContain("{moreOptionsLabel}");
+    expect(form).toContain(
+      'const moreOptionsLabel = showMore ? "Hide options" : "More Options";',
+    );
+  });
+
+  it("the date picker cannot pick a day after today (38.14 D-24)", () => {
+    expect(form).toContain("maximumDate={parseLocalDateTime(now)}");
+    // The time-of-day guard for today stays.
+    expect(form).toContain("isCombinedInFuture(combined, now)");
   });
 
   it("keeps full stored precision for the native picker seed", () => {
