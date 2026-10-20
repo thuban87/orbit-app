@@ -95,9 +95,15 @@ describe("Opening Compose for another person over a typed draft asks first (D-72
   it("the load focus effect gates startSession on the standard discard prompt", () => {
     const effect = loadFocusEffect();
     expect(effect).toContain("shouldPromptDraftSwitch(");
-    expect(effect).toContain("confirmDiscard(");
+    expect(effect).toContain("askDraftSwitch(");
     expect(effect.indexOf("shouldPromptDraftSwitch(")).toBeLessThan(
-      effect.indexOf("confirmDiscard("),
+      effect.indexOf("askDraftSwitch("),
+    );
+    // The effect never calls single-flight confirmDiscard() directly: its
+    // immediate false is not the user's "Keep editing" (review A-WR-05).
+    expect(effect).not.toContain("confirmDiscard(");
+    expect(code).toMatch(
+      /const askDraftSwitch = createSharedDraftSwitchPrompt\(confirmDiscard\);/,
     );
     expect(code).toMatch(
       /import \{ confirmDiscard \} from "@\/navigation\/discard-keep-guard"/,

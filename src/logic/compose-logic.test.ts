@@ -12,7 +12,7 @@
  * irrelevant — the no-phone row (1) fires FIRST, so (false, true) reads identically
  * to (false, false). Pure: same inputs → same output; never throws.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   actionablePrimaryPhoneDestination,
@@ -22,6 +22,7 @@ import {
   composeDraftMaxHeight,
   composeExitDisposition,
   composeModePresentation,
+  createSharedDraftSwitchPrompt,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
@@ -491,6 +492,42 @@ describe("composeDraftMaxHeight — the message box grows to a cap, then scrolls
     expect(composeDraftMaxHeight(2)).toBeGreaterThan(composeDraftMaxHeight(1));
     expect(composeDraftMaxHeight(Number.NaN)).toBe(composeDraftMaxHeight(1));
     expect(composeDraftMaxHeight(0)).toBe(composeDraftMaxHeight(1));
+  });
+});
+
+describe("createSharedDraftSwitchPrompt (38.14 D-72; review A-WR-05)", () => {
+  function deferredAsk() {
+    const resolvers: Array<(value: boolean) => void> = [];
+    const ask = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    return { ask, resolvers };
+  }
+
+  it("a second caller while the prompt is open awaits the user's real answer, not an immediate false", async () => {
+    const { ask, resolvers } = deferredAsk();
+    const prompt = createSharedDraftSwitchPrompt(ask);
+    const first = prompt();
+    const second = prompt();
+    expect(ask).toHaveBeenCalledTimes(1);
+    resolvers[0](true);
+    await expect(first).resolves.toBe(true);
+    await expect(second).resolves.toBe(true);
+  });
+
+  it("asks again once the earlier prompt has settled", async () => {
+    const { ask, resolvers } = deferredAsk();
+    const prompt = createSharedDraftSwitchPrompt(ask);
+    const first = prompt();
+    resolvers[0](false);
+    await first;
+    const next = prompt();
+    expect(ask).toHaveBeenCalledTimes(2);
+    resolvers[1](true);
+    await expect(next).resolves.toBe(true);
   });
 });
 

@@ -153,6 +153,7 @@ import {
   composeDraftMaxHeight,
   composeExitDisposition,
   composeModePresentation,
+  createSharedDraftSwitchPrompt,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
@@ -191,6 +192,14 @@ import { plural } from "@/utils/plural";
 import type { InFlightRef } from "@/utils/single-flight";
 
 const LOG_SCOPE = "compose";
+
+/**
+ * The D-72 draft-switch prompt, shared across focus runs AND Compose mounts
+ * (a widget or notification entry resets the stack to a new Compose while the
+ * prompt is open), so no run reads single-flight's immediate false as the
+ * user's "Keep editing" (review A-WR-05).
+ */
+const askDraftSwitch = createSharedDraftSwitchPrompt(confirmDiscard);
 
 /**
  * The BASE generation temperature (AI-SPEC §4 — a single-number tuning surface).
@@ -897,7 +906,9 @@ export function ComposeScreen({
           subject: stored.subject,
         })
       ) {
-        void confirmDiscard().then((discard) => {
+        // Every run while the prompt is open awaits the same answer; the run
+        // still current when it settles acts on it (review A-WR-05).
+        void askDraftSwitch().then((discard) => {
           if (cancelled) {
             return;
           }

@@ -331,6 +331,31 @@ export function shouldPromptDraftSwitch({
 }
 
 /**
+ * One draft-switch prompt shared by every Compose focus run (38.14 D-72;
+ * review A-WR-05). `confirmDiscard()` is single-flight: while a discard
+ * prompt is queued, a second call resolves false at once, which the D-72
+ * branch would read as "Keep editing" and act on with no user choice (a
+ * re-entry while the prompt is open, or a re-run of the focus effect that
+ * cancelled the run holding the real answer). Every caller while the prompt
+ * is open gets the SAME pending answer instead; the next call after it
+ * settles asks again. The run that is still current acts on it.
+ */
+export function createSharedDraftSwitchPrompt(
+  ask: () => Promise<boolean>,
+): () => Promise<boolean> {
+  let pending: Promise<boolean> | null = null;
+  return () => {
+    if (pending === null) {
+      const asked = ask().finally(() => {
+        if (pending === asked) pending = null;
+      });
+      pending = asked;
+    }
+    return pending;
+  };
+}
+
+/**
  * Resolve the effective compose mode from the stored default. The `remember`
  * sentinel resolves to the remembered concrete mode; a fixed default is used
  * verbatim. Pure; never throws. (COMP-02: equality is over the fixed lowercase
