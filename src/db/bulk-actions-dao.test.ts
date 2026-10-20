@@ -365,6 +365,41 @@ describe("rechannelBulkQuickLog (38.14 D-62, D-82)", () => {
     expect(await lastContact(survivor)).toBe(NOW);
   });
 
+  it("Undo deletes a row a contact merge moved to the survivor and recomputes the survivor (review A-WR-03b)", async () => {
+    const survivor = await seedContact("Survivor");
+    const [absorbed, other] = await Promise.all([
+      seedContact("Absorbed"),
+      seedContact("Other"),
+    ]);
+    const receipt = await bulkQuickLog(exec, [absorbed, other], NOW, "Message");
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: NOW,
+    });
+    const before = await count("tombstones");
+
+    await undoBulkQuickLog(exec, receipt, LATER);
+
+    expect(await count("interactions")).toBe(0);
+    expect(await count("tombstones")).toBe(before + 2);
+    expect(await lastContact(survivor)).toBeNull();
+    expect(await lastContact(other)).toBeNull();
+  });
+
+  it("Undo refuses, and rolls back, when a receipt row's id now belongs to a different row", async () => {
+    const [a, b] = await Promise.all([seedContact("A"), seedContact("B")]);
+    const receipt = await bulkQuickLog(exec, [a], NOW, "Message");
+    await undoBulkQuickLog(exec, receipt, NOW);
+    const [reused] = await bulkQuickLog(exec, [b], NOW, "Message");
+    expect(reused.interactionId).toBe(receipt[0].interactionId);
+
+    await expect(undoBulkQuickLog(exec, receipt, LATER)).rejects.toThrow(
+      /no interaction matched/,
+    );
+    expect((await storedInteraction(reused.interactionId)).contact_id).toBe(b);
+  });
+
   it("never re-channels a different row that reused a deleted receipt row's id", async () => {
     const [a, b] = await Promise.all([seedContact("A"), seedContact("B")]);
     const receipt = await bulkQuickLog(exec, [a], NOW, "Message");

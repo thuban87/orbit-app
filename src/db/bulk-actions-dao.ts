@@ -96,6 +96,15 @@ export function bulkQuickLog(
   });
 }
 
+/**
+ * Undo a bulk Quick Log by its receipt, all-or-nothing, in one transaction
+ * with one revision bump. Each row is found by `id` AND its `uid` and deleted
+ * under its CURRENT `contact_id` (review A-WR-03b, as the re-channel does), so
+ * a row a contact merge moved to the survivor is still undone and the
+ * survivor's recency is recomputed. A row that is gone (or whose id was reused
+ * by another row) refuses the whole Undo, as before; the core still scopes its
+ * delete by (id, contact_id), writes the tombstone and asserts one row.
+ */
 export function undoBulkQuickLog(
   exec: SqlExecutor,
   receipt: QuickLogBatchReceipt,
@@ -103,8 +112,21 @@ export function undoBulkQuickLog(
 ): Promise<void> {
   if (receipt.length === 0) return Promise.resolve();
   return inWriteTransaction(exec, async () => {
-    for (const { contactId, interactionId } of receipt) {
-      await deleteInteractionCore(exec, { contactId, interactionId, now });
+    for (const { interactionId, uid } of receipt) {
+      const row = await exec.getFirstAsync<{ contact_id: number }>(
+        "SELECT contact_id FROM interactions WHERE id = ? AND uid = ?",
+        [interactionId, uid],
+      );
+      if (!row) {
+        throw new Error(
+          `undoBulkQuickLog: no interaction matched id=${interactionId} for its receipt uid (changed 0)`,
+        );
+      }
+      await deleteInteractionCore(exec, {
+        contactId: row.contact_id,
+        interactionId,
+        now,
+      });
     }
     await bumpDataRevisionCore(exec);
   });
