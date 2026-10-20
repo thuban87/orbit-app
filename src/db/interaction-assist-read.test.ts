@@ -167,4 +167,156 @@ describe("interaction assist queue reads", () => {
       hidden: true,
     });
   });
+
+  describe("endpoint_display (38.14 D-74, D-79)", () => {
+    async function methodRow(
+      contactId: number,
+      input: {
+        type: "phone" | "email";
+        display: string;
+        canonical: string | null;
+        primary?: 0 | 1;
+        order?: number;
+      },
+    ): Promise<void> {
+      await exec.runAsync(
+        `INSERT INTO contact_methods
+           (uid, contact_id, method_type, raw_value, display_value, canonical_value,
+            is_actionable, is_primary, display_order, created_at, modified_at)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+        [
+          uid(),
+          contactId,
+          input.type,
+          input.display,
+          input.display,
+          input.canonical,
+          input.primary ?? 0,
+          input.order ?? 0,
+          NOW,
+          NOW,
+        ],
+      );
+    }
+
+    async function assistTo(
+      contactId: number,
+      channel: "call" | "text" | "email",
+      endpoint: string | null,
+    ): Promise<void> {
+      await exec.runAsync(
+        `INSERT INTO interaction_assists
+           (uid, contact_id, channel, endpoint_value, status, handoff_at, created_at, modified_at)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+        [
+          uid(),
+          contactId,
+          channel,
+          endpoint,
+          "2026-08-31 11:30:00",
+          "2026-08-31 11:30:00",
+          "2026-08-31 11:30:00",
+        ],
+      );
+    }
+
+    it("shows the matching phone method's display value for text and call", async () => {
+      const maya = await contact("Maya");
+      await methodRow(maya, {
+        type: "phone",
+        display: "(555) 010-1010",
+        canonical: "+15550101010",
+        primary: 1,
+      });
+      await assistTo(maya, "text", "+15550101010");
+      await assistTo(maya, "call", "+15550101010");
+
+      const rows = await listEligiblePendingAssists(exec, NOW);
+      expect(rows.map((row) => row.endpoint_display)).toEqual([
+        "(555) 010-1010",
+        "(555) 010-1010",
+      ]);
+      expect(rows[0].endpoint_value).toBe("+15550101010");
+    });
+
+    it("matches an email assist only against email methods", async () => {
+      const maya = await contact("Maya");
+      // A phone method that happens to share the canonical text must not match.
+      await methodRow(maya, {
+        type: "phone",
+        display: "phone-shaped",
+        canonical: "maya@example.com",
+        primary: 1,
+      });
+      await methodRow(maya, {
+        type: "email",
+        display: "Maya@Example.com",
+        canonical: "maya@example.com",
+      });
+      await assistTo(maya, "email", "maya@example.com");
+
+      const [row] = await listEligiblePendingAssists(exec, NOW);
+      expect(row.endpoint_display).toBe("Maya@Example.com");
+    });
+
+    it("prefers the primary, then the lowest display order, when several methods match", async () => {
+      const maya = await contact("Maya");
+      await methodRow(maya, {
+        type: "phone",
+        display: "second",
+        canonical: "+15550101010",
+        order: 1,
+      });
+      await methodRow(maya, {
+        type: "phone",
+        display: "first",
+        canonical: "+15550101010",
+        order: 0,
+      });
+      await assistTo(maya, "text", "+15550101010");
+      expect(
+        (await listEligiblePendingAssists(exec, NOW))[0].endpoint_display,
+      ).toBe("first");
+
+      await methodRow(maya, {
+        type: "phone",
+        display: "primary",
+        canonical: "+15550101010",
+        primary: 1,
+        order: 5,
+      });
+      expect(
+        (await listEligiblePendingAssists(exec, NOW))[0].endpoint_display,
+      ).toBe("primary");
+    });
+
+    it("never reads another contact's method", async () => {
+      const maya = await contact("Maya");
+      const other = await contact("Other");
+      await methodRow(other, {
+        type: "phone",
+        display: "not Maya's",
+        canonical: "+15550101010",
+        primary: 1,
+      });
+      await assistTo(maya, "text", "+15550101010");
+      expect(
+        (await listEligiblePendingAssists(exec, NOW))[0].endpoint_display,
+      ).toBe("+15550101010");
+    });
+
+    it("falls back to the stored endpoint when the method is gone, and is null without one", async () => {
+      const maya = await contact("Maya");
+      await assistTo(maya, "text", "+15550101010");
+      await assistTo(maya, "call", null);
+
+      const rows = await listEligiblePendingAssists(exec, NOW);
+      expect(
+        rows.map((row) => [row.channel, row.endpoint_display]).sort(),
+      ).toEqual([
+        ["call", null],
+        ["text", "+15550101010"],
+      ]);
+    });
+  });
 });
