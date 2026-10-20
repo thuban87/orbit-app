@@ -47,4 +47,4 @@ We will use two snackbar looks (D-132, D-140): a **notice**, accent background w
 - `src/logic/share-card-logic.ts` — share Undo snackbars with their kinds.
 
 **Depends on:** ADR-198 (Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays); ADR-199 (App-Wide Destructive-Action, Feedback and Validation Standards); ADR-173 (Universal FAB Semantic Visibility)
-**Required by:** None
+**Required by:** ADR-254 (Selection Mode Uses a Bottom Two-Row Bar and a More… Sheet)

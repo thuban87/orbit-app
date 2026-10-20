@@ -64,4 +64,4 @@ Settings → Contacts & Relationships lists "Unbound contacts" beside "Bin", and
 - `src/screens/contact-profile-logic.test.ts` — the ⋯ entries per state.
 
 **Depends on:** ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-225 (Profile Top — a Full-Width Edit Contact Button, a "Compose" Label, the Name in a Solid Top Bar, and a Slimmer ⋯); ADR-232 (A Binned Person Gets a Bin Banner, an "In the Bin" Status and DAO Guards, and the Bin List Reloads with Restore and Undo)
-**Required by:** None
+**Required by:** ADR-251 (An All Contacts Search Also Finds Unbound People); ADR-254 (Selection Mode Uses a Bottom Two-Row Bar and a More… Sheet)

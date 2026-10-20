@@ -52,4 +52,4 @@ Dashboard List search preserves `searchDashboard()` relevance ordering for corpu
 - `src/screens/HomeScreen.tsx` — runs the scoped List search and applies cause-aware loading and motion state.
 
 **Depends on:** ADR-094 (Eligibility-Scoped Semantic Dashboard Search); ADR-097 (Scoped Dashboard Search and Dedicated Unbound Retrieval)
-**Required by:** ADR-215 (Search and Glanceable Surfaces After Fuel)
+**Required by:** ADR-215 (Search and Glanceable Surfaces After Fuel); ADR-250 (List View Measured First, Then Fixed with Memoised Rows and Windowing)

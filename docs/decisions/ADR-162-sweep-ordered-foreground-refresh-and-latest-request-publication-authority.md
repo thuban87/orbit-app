@@ -54,4 +54,4 @@ The system publishes a **foreground tick**, a second counter in the existing she
 - `src/services/notifications/notification-actions.ts` — warm Mark/Snooze publish the shell tick.
 
 **Depends on:** ADR-070 (Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out); ADR-095 (Live-Applying Dashboard Floating Control Surface); ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing); ADR-156 (Foreground Maintenance Fault Isolation with Per-Pass Dependencies)
-**Required by:** ADR-163 (Live Digest Refresh with Truthful Day-Detail States); ADR-164 (Shared Post-Commit Assist Publisher with Surfaced Assist Failures); ADR-165 (In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History)
+**Required by:** ADR-163 (Live Digest Refresh with Truthful Day-Detail States); ADR-164 (Shared Post-Commit Assist Publisher with Surfaced Assist Failures); ADR-165 (In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History); ADR-250 (List View Measured First, Then Fixed with Memoised Rows and Windowing)

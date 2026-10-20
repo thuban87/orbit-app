@@ -61,4 +61,4 @@ ADR-177 limits the signed per-combination table to five components, and D-28 rou
 - `src/screens/GroupEventDetailScreen.tsx` — the Event detail on the art with full cards.
 
 **Depends on:** ADR-177 (Mode-Specific Background Art and Signed Per-Combination Art Treatments); ADR-115 (Visible Mode-Aware Background Surface Composition)
-**Required by:** None
+**Required by:** ADR-250 (List View Measured First, Then Fixed with Memoised Rows and Windowing)

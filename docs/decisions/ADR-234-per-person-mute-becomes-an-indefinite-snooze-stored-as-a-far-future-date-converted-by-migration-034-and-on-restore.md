@@ -64,4 +64,4 @@ The Overview Snooze tile reads the effective, unexpired snooze, like ⋯ and the
 - `src/backup/restore-apply.ts` — `remindersOff = 1` restores as the indefinite snooze.
 
 **Depends on:** ADR-227 (One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar); ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** None
+**Required by:** ADR-256 (Digest Overlooked Lists Everyone Who Needs Attention)

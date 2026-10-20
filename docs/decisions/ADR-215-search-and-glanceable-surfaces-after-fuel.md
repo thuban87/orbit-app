@@ -51,4 +51,4 @@ We will search the knowledge corpus instead of fuel. Contacts search matches Off
 - `src/components/ContactCard.tsx` — the dead fuel line removed.
 
 **Depends on:** ADR-207 (Knowledge Homes After Fuel); ADR-094 (Eligibility-Scoped Semantic Dashboard Search); ADR-100 (Relevance-First, Visibility-Safe Dashboard List Search)
-**Required by:** None
+**Required by:** ADR-252 (Search Typo Tolerance Tightened)

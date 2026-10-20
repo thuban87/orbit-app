@@ -56,4 +56,4 @@ The system uses one themed single-choice `OptionSheet` (built from `CategoryChoi
 - `package.json` — `@react-native-picker/picker` removed.
 
 **Depends on:** ADR-144 (Complete Category Selection and Grouped Orrery System Discovery); ADR-176 (Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs); ADR-198 (Themed Dialogs Through One Imperative Host, an Overlay Registry, and Snackbars Above Overlays)
-**Required by:** ADR-205 (One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates)
+**Required by:** ADR-205 (One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates); ADR-255 (Bulk Sheets Open Sized to Their Rows)

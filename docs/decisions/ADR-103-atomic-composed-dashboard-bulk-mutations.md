@@ -52,4 +52,4 @@ Dashboard bulk actions validate and then compose one non-mutexed single-contact 
 - `src/db/events-dao.ts` — supplies the immutable lifecycle-event core used by archive and snooze paths.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine); ADR-018 (Archive-Gated Contact Purge with Explicit Fan-Out); ADR-024 (Editable Touchpoint History and Recomputed Recency); ADR-025 (Immutable Lifecycle Events in a Unified Timeline); ADR-071 (User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer); ADR-075 (Binary Favourite Membership Without a User-Facing Order)
-**Required by:** ADR-227 (One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar)
+**Required by:** ADR-227 (One Snooze Sheet for the Profile Tile, Profile ⋯, Contacts Card and Bulk Bar); ADR-254 (Selection Mode Uses a Bottom Two-Row Bar and a More… Sheet)

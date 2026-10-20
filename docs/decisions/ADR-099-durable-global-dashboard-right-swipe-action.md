@@ -50,4 +50,4 @@ The system persists one global `dashboard_right_swipe_action` setting with the c
 - `src/screens/HomeScreen.tsx` — resolves the action only at List-gesture commitment and routes it through shared flows.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-092 (Durable Shared Dashboard Query State)
-**Required by:** None
+**Required by:** ADR-250 (List View Measured First, Then Fixed with Memoised Rows and Windowing)
