@@ -78,3 +78,23 @@ describe("Event detail actions and sheet (38.14 D-71, D-28, D-30)", () => {
     expect(detail).not.toMatch(/onViewGroupEvent/);
   });
 });
+
+describe("Participant wording and Edit participant load (38.14 D-29, D-25)", () => {
+  it("the editor's follow lines and the card summary go through the named-field helpers", () => {
+    const editor = read("src/components/group/ParticipantOverrideEditor.tsx");
+    const card = read("src/components/group/ParticipantCard.tsx");
+    expect(editor).toMatch(/followLineLabel\(label, following\)/);
+    expect(editor).not.toMatch(/"Same as event"/);
+    expect(card).toMatch(/participantChangeSummary\(/);
+    expect(card).not.toMatch(/Changes for this person/);
+  });
+
+  it("Edit participant loads through a latest-request authority (ADR-162)", () => {
+    const screen = read("src/screens/EditParticipantScreen.tsx");
+    expect(screen).toMatch(
+      /useMemo\(\(\) => createLatestRequestAuthority\(\), \[\]\)/,
+    );
+    expect(screen).toMatch(/loadAuthority\.isCurrent\(token\)/);
+    expect(screen).toMatch(/\(\) => loadAuthority\.invalidate\(\)/);
+  });
+});
