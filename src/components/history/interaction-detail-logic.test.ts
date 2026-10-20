@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type {
   GroupLinkedDetailInput,
@@ -7,6 +9,7 @@ import {
   buildDetailRows,
   buildGroupContext,
   showSparkle,
+  showsConnected,
 } from "./interaction-detail-logic";
 
 const base: InteractionDetailInput = {
@@ -172,5 +175,42 @@ describe("buildGroupContext — dormant inert seam (D-12)", () => {
     expect(ctx?.participantNote).toBe("My side of it");
     expect(ctx?.groupNote).not.toBe(ctx?.participantNote);
     expect(ctx?.showViewGroupEvent).toBe(true);
+  });
+});
+
+describe("showsConnected — the one Connected rule on every surface (D-30, D-87)", () => {
+  it("hides Connected for In Person and for an event child", () => {
+    expect(showsConnected({ channel: "In Person", groupEventId: null })).toBe(
+      false,
+    );
+    expect(showsConnected({ channel: "Call", groupEventId: 4 })).toBe(false);
+  });
+
+  it("shows it for any other standalone channel, including legacy values", () => {
+    for (const channel of ["Call", "Message", "unspecified", "other", null]) {
+      expect(showsConnected({ channel, groupEventId: null })).toBe(true);
+    }
+    expect(showsConnected({ channel: "Call" })).toBe(true);
+  });
+});
+
+describe("the participant editor and Edit interaction use the shared rule (D-87)", () => {
+  const read = (file: string) =>
+    readFileSync(join(__dirname, "..", "..", "..", file), "utf8");
+
+  it("Edit participant never lists Connected for its event child", () => {
+    const editor = read("src/components/group/ParticipantOverrideEditor.tsx");
+    expect(editor).toMatch(
+      /showsConnected\(\{\s*channel: draft\.value\.channel,\s*groupEventId: event\.id,\s*\}\)/,
+    );
+    expect(editor).not.toMatch(/^\s*"connected",$/m);
+  });
+
+  it("Edit interaction filters Connected through the shared rule", () => {
+    const edit = read("src/screens/EditInteractionScreen.tsx");
+    expect(edit).toMatch(
+      /showsConnected\(\{ channel: value\.channel, groupEventId: null \}\)/,
+    );
+    expect(edit).toMatch(/visibleFields=\{EDIT_FIELDS\.filter\(/);
   });
 });

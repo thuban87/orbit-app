@@ -96,6 +96,23 @@ const hasText = (value: string | null | undefined): value is string =>
  * child (the same `isGroupLinked` seam `buildGroupContext` reads). The widened
  * `GroupLinkedDetailInput` parameter is a superset of `InteractionDetailInput`.
  */
+/**
+ * Whether "Connected" / "No reply" means something for this interaction
+ * (38.14 D-30, made app-wide by D-87, owner, code review B-WR-05): not for an
+ * In Person interaction and not for an event child. The ONE predicate the
+ * interaction sheet, the History stream row, Edit participant and Edit
+ * interaction share. Display only: the stored `connected` value is kept.
+ */
+export function showsConnected(interaction: {
+  channel: string | null;
+  groupEventId?: number | null;
+}): boolean {
+  return (
+    interaction.channel !== "In Person" &&
+    !isGroupLinked({ groupEventId: interaction.groupEventId })
+  );
+}
+
 export function buildDetailRows(
   interaction: GroupLinkedDetailInput,
 ): DetailRow[] {
@@ -131,8 +148,7 @@ export function buildDetailRows(
 
   // Connected is a known state surfaced textually (never colour-only), shown
   // only where it means something (D-30).
-  const eventChild = isGroupLinked({ groupEventId: interaction.groupEventId });
-  if (interaction.channel !== "In Person" && !eventChild) {
+  if (showsConnected(interaction)) {
     rows.push({
       key: "connected",
       label: "Connected",

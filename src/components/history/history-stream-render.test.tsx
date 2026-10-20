@@ -228,6 +228,28 @@ describe("HistoryRecordRow", () => {
     );
   });
 
+  it.each([
+    ["In Person", { channel: "In Person" }],
+    [
+      "an event child",
+      { groupEventId: 2, groupTitle: "Dinner", groupLinked: true },
+    ],
+  ])("never shows No reply for %s (D-87, D-30)", (_label, overrides) => {
+    const { tree } = renderRow(
+      recordOf({
+        interactions: [
+          interaction(9, "2026-10-06 14:05:00", {
+            connected: 0,
+            quality: null,
+            ...overrides,
+          }),
+        ],
+      }),
+    );
+    expect(textOf(tree[0])).not.toContain("No reply");
+    expect(String(tree[0].props.accessibilityLabel)).not.toContain("No reply");
+  });
+
   it("shows the group-event label inside the same Pressable for a group-linked child", () => {
     const { tree, onOpenInteraction } = renderRow(
       recordOf({

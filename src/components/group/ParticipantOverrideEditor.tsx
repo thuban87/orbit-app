@@ -1,6 +1,7 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button and AppText use a
 // domain-specific semantic `role` prop, not a web ARIA role.
 import { StyleSheet, View } from "react-native";
+import { showsConnected } from "@/components/history/interaction-detail-logic";
 import { Icon } from "@/components/icons/Icon";
 import {
   TouchpointRefineForm,
@@ -124,10 +125,18 @@ export function ParticipantOverrideEditor({
           participantDraft(participant, event).value.channel,
         )}
         noteError={noteError}
+        // D-87 (owner, code review B-WR-05): a participant is an event child,
+        // so Connected is hidden as in the sheet (D-30); the stored value is
+        // kept (the patch builders write only changed fields).
         visibleFields={[
           "channel",
           "direction",
-          "connected",
+          ...(showsConnected({
+            channel: draft.value.channel,
+            groupEventId: event.id,
+          })
+            ? (["connected"] as const)
+            : []),
           "tone",
           "note",
           "duration",

@@ -47,6 +47,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatTimeMinuteOrFallback } from "@/utils/dates";
 import { EVENT_LABELS, type StreamRecord } from "./history-stream-logic";
+import { showsConnected } from "./interaction-detail-logic";
 
 /** Channel/type → semantic icon (families read by silhouette, never colour). */
 const CHANNEL_ICON: Record<string, IconName> = {
@@ -98,7 +99,8 @@ export function HistoryRecordRow({
       : null;
     const metaParts = [
       direction,
-      r.connected === 0 ? "No reply" : null,
+      // D-87 (owner): no "No reply" for In Person or an event child (D-30).
+      showsConnected(r) && r.connected === 0 ? "No reply" : null,
       r.quality,
     ].filter((part): part is string => !!part);
     const meta = metaParts.join(" · ");

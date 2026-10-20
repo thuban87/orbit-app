@@ -44,8 +44,10 @@ import {
   useState,
 } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { showsConnected } from "@/components/history/interaction-detail-logic";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
+  type TouchpointRefineField,
   TouchpointRefineForm,
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
@@ -88,6 +90,18 @@ import {
 import { channelOptionsFor } from "./log-interaction-logic";
 
 const LOG_SCOPE = "edit-interaction";
+
+/** Every editable field in the form's order; Connected is filtered (D-87). */
+const EDIT_FIELDS: readonly TouchpointRefineField[] = [
+  "datetime",
+  "channel",
+  "direction",
+  "connected",
+  "tone",
+  "note",
+  "duration",
+  "allowAi",
+];
 
 export function EditInteractionScreen({
   navigation,
@@ -299,6 +313,14 @@ export function EditInteractionScreen({
             }}
             now={now}
             channelOptions={channelOptionsFor(savedChannel)}
+            // D-87 (owner, code review B-WR-05): Connected follows the one
+            // shared rule (D-30), hidden while the channel is In Person; the
+            // stored value is kept and saved unchanged.
+            visibleFields={EDIT_FIELDS.filter(
+              (field) =>
+                field !== "connected" ||
+                showsConnected({ channel: value.channel, groupEventId: null }),
+            )}
             noteError={fieldErrors.note ?? null}
             allowAiLockedReason={
               noteAiLocked ? aiLockReason("off_limits") : undefined
