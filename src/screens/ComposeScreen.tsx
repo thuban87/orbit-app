@@ -112,6 +112,7 @@ import {
   markAssistDismissed,
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
+import { readAssistStatus } from "@/db/interaction-assist-read";
 import {
   getWritingStyle,
   listPersonalizationSections,
@@ -944,6 +945,12 @@ export function ComposeScreen({
   // on refocus while the panel is still up. App backgrounding (the SMS / mail
   // handoff) fires no focus blur, so the claim survives the trip out of Orbit.
   // No answer handler claims or releases on its own.
+  //
+  // "While pending" (review A-WR-01): the claim is released on blur, so the
+  // banner or the pending list may answer the record while Compose is not
+  // focused (ComposeResearch, Edit). Each claim therefore re-reads the record's
+  // status and closes the panel when it is no longer pending, so "No, don't
+  // log" can never claim "Didn't log …" for a record that was logged elsewhere.
   useFocusEffect(
     useCallback(() => {
       if (confirm === null) {
@@ -951,7 +958,22 @@ export function ComposeScreen({
       }
       const { assistUid } = confirm;
       useAssistBanner.getState().setPanelOwned(assistUid);
+      let live = true;
+      void readAssistStatus(getExecutor(), assistUid)
+        .then((status) => {
+          if (live && status !== "pending") {
+            setConfirm((current) =>
+              current?.assistUid === assistUid ? null : current,
+            );
+          }
+        })
+        .catch((err) => {
+          // A rare local read failure leaves the panel up, as before this
+          // check; Yes still re-checks pending inside its transaction.
+          Logger.error(LOG_SCOPE, "failed to re-read assist status", err);
+        });
       return () => {
+        live = false;
         useAssistBanner.getState().releasePanelOwned(assistUid);
       };
     }, [confirm]),

@@ -77,6 +77,25 @@ describe("ComposeScreen assist panel wiring", () => {
     );
   });
 
+  it("each claim re-reads the record's status and closes a panel answered elsewhere (review A-WR-01)", () => {
+    const [claim] = focusEffectBlocks().filter((block) =>
+      block.includes("setPanelOwned("),
+    );
+    expect(code).toMatch(
+      /import \{ readAssistStatus \} from "@\/db\/interaction-assist-read";/,
+    );
+    const read = claim.indexOf("readAssistStatus(getExecutor(), assistUid)");
+    expect(read).toBeGreaterThan(claim.indexOf("setPanelOwned("));
+    expect(claim).toMatch(/if \(live && status !== "pending"\)/);
+    expect(claim).toMatch(
+      /current\?\.assistUid === assistUid \? null : current/,
+    );
+    // The cleanup stops a late read from closing a later panel.
+    expect(claim.indexOf("live = false;")).toBeGreaterThan(
+      claim.indexOf("return () =>"),
+    );
+  });
+
   it("no answer handler claims or releases on its own; the focus effect does", () => {
     for (const name of [
       "onConfirmYes",

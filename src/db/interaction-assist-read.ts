@@ -75,6 +75,32 @@ export function listEligiblePendingAssists(
   );
 }
 
+/** An assist record's lifecycle status (ADR-070), or null when the row is gone. */
+export type AssistStatus =
+  | "pending"
+  | "logged"
+  | "dismissed"
+  | "expired"
+  | "failed";
+
+/**
+ * Read one assist's current status. Read-only (no write, no schema change).
+ * Compose's "Did you send it?" panel uses it when it re-claims its record on
+ * refocus, so a record answered on the banner or the pending list while Compose
+ * was not focused closes the panel instead of being answered twice (38.14 D-23
+ * "re-sets it on refocus while pending"; review A-WR-01).
+ */
+export async function readAssistStatus(
+  exec: SqlExecutor,
+  assistUid: string,
+): Promise<AssistStatus | null> {
+  const row = await exec.getFirstAsync<{ status: AssistStatus }>(
+    "SELECT status FROM interaction_assists WHERE uid = ?",
+    [assistUid],
+  );
+  return row?.status ?? null;
+}
+
 /** Count banner-eligible pending assists using the same durable time window. */
 export async function countPending(
   exec: SqlExecutor,

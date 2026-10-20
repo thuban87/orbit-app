@@ -5,6 +5,7 @@ import { selectActionablePrimaryMethods } from "@/db/contact-methods-read";
 import {
   deriveReachRoutes,
   listEligiblePendingAssists,
+  readAssistStatus,
 } from "@/db/interaction-assist-read";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -137,6 +138,22 @@ describe("interaction assist queue reads", () => {
       ["Plain Parker", null],
       ["Archived Alex", `avatars/contact-${archived}.jpg`],
     ]);
+  });
+
+  it("reads one assist's current status, null when the row is gone (review A-WR-01)", async () => {
+    const casey = await contact("Current Casey");
+    await assist(casey, "2026-08-31 11:00:00", "2026-08-31 11:00:00");
+    const { uid: assistUid } = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM interaction_assists",
+    )) as { uid: string };
+
+    expect(await readAssistStatus(exec, assistUid)).toBe("pending");
+    await exec.runAsync(
+      "UPDATE interaction_assists SET status = 'logged' WHERE uid = ?",
+      [assistUid],
+    );
+    expect(await readAssistStatus(exec, assistUid)).toBe("logged");
+    expect(await readAssistStatus(exec, "no-such-assist")).toBeNull();
   });
 
   it("selects actionable primaries and derives routes with no database read", () => {
