@@ -74,8 +74,6 @@ export interface GroupContext {
   readonly groupTitle: string;
   /** Shared group note — a DISTINCT field, never merged into the participant note. */
   readonly groupNote: string | null;
-  /** The participant's own note, kept separate from the group note. */
-  readonly participantNote: string | null;
   readonly showViewGroupEvent: true;
 }
 
@@ -184,6 +182,9 @@ export function showSparkle(interaction: { allowAi?: number }): boolean {
  * seam predicate is true — which requires a group-event id that no Phase-32 record
  * carries, so this is null for every real interaction this phase. The group note
  * is preserved as its own field, never concatenated into the participant note.
+ * The participant's own note is NOT repeated here: the sheet's Note row shows
+ * it right after When (D-66), so the card carries only the shared context
+ * (review B-IN-01: it was shown twice).
  */
 export function buildGroupContext(
   interaction: GroupLinkedDetailInput,
@@ -195,7 +196,6 @@ export function buildGroupContext(
     badge: "Event",
     groupTitle: interaction.groupTitle ?? "",
     groupNote: hasText(interaction.groupNote) ? interaction.groupNote : null,
-    participantNote: hasText(interaction.note) ? interaction.note : null,
     showViewGroupEvent: true,
   };
 }

@@ -172,9 +172,23 @@ describe("buildGroupContext — dormant inert seam (D-12)", () => {
     expect(ctx?.groupTitle).toBe("Dinner with the crew");
     // The group note is a DISTINCT field, never concatenated into the participant note.
     expect(ctx?.groupNote).toBe("Shared group recap — never sent to AI");
-    expect(ctx?.participantNote).toBe("My side of it");
-    expect(ctx?.groupNote).not.toBe(ctx?.participantNote);
     expect(ctx?.showViewGroupEvent).toBe(true);
+  });
+
+  it("shows the participant's own note once, in the Note row, not again in the group card (review B-IN-01)", () => {
+    const child: GroupLinkedDetailInput = {
+      ...base,
+      note: "My side of it",
+      groupEventId: 7,
+      groupTitle: "Dinner with the crew",
+      groupNote: "Shared group recap",
+    };
+    expect(buildDetailRows(child).find((r) => r.key === "note")?.value).toBe(
+      "My side of it",
+    );
+    expect(Object.values(buildGroupContext(child) ?? {})).not.toContain(
+      "My side of it",
+    );
   });
 });
 

@@ -228,9 +228,6 @@ export function InteractionDetail({
                   <AppText role="body">{group.groupNote}</AppText>
                 </View>
               ) : null}
-              {group.participantNote ? (
-                <AppText role="body">{group.participantNote}</AppText>
-              ) : null}
               {groupEventId != null && onViewGroupEvent ? (
                 <Button
                   role="tertiary"
