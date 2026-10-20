@@ -63,7 +63,7 @@
 // NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
 // IMPORTANT: ADR-0052 [SUPERSEDED BY ADR-079 (partial — acknowledgement and Profile entry)] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
-// IMPORTANT: ADR-0054 [SUPERSEDED BY ADR-147 (partial); ADR-234 (note — the decay-push mute it ignores is now an indefinite snooze; the rest unchanged)] Live Weekly Digest Retrospective and Overlooke
+// IMPORTANT: ADR-0054 [SUPERSEDED BY ADR-147 (partial); ADR-234 (note — the decay-push mute it ignores is now an indefinite snooze; the rest unchanged); ADR-256 (partial)] Live Weekly Digest Retrospe
 // NOTE: ADR-0055 [ACCEPTED] Dedicated Weekly Digest Scheduling and Persisted Notification Policy
 // IMPORTANT: ADR-0056 [SUPERSEDED BY ADR-060 (partial)] Tombstone-Backed UID Reconciliation for Portable Restores
 // NOTE: ADR-0057 [ACCEPTED] Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots
@@ -102,16 +102,16 @@
 // NOTE: ADR-0090 [ACCEPTED] Additive Custom-Field Value History and Deferred Contact Scope
 // NOTE: ADR-0091 [ACCEPTED] Imported Contact Notes as AI-Off Typed Memories
 // NOTE: ADR-0092 [ACCEPTED] Durable Shared Dashboard Query State
-// NOTE: ADR-0093 [ACCEPTED] Scoped Composable Dashboard Population and Filter Model
-// NOTE: ADR-0094 [ACCEPTED] Eligibility-Scoped Semantic Dashboard Search
+// IMPORTANT: ADR-0093 [SUPERSEDED BY ADR-251 (partial)] Scoped Composable Dashboard Population and Filter Model
+// IMPORTANT: ADR-0094 [SUPERSEDED BY ADR-251 (partial)] Eligibility-Scoped Semantic Dashboard Search
 // NOTE: ADR-0095 [ACCEPTED] Live-Applying Dashboard Floating Control Surface
 // NOTE: ADR-0096 [ACCEPTED] Dashboard Header and Overflow Discovery Paths
-// NOTE: ADR-0097 [ACCEPTED] Scoped Dashboard Search and Dedicated Unbound Retrieval
+// IMPORTANT: ADR-0097 [SUPERSEDED BY ADR-251 (partial)] Scoped Dashboard Search and Dedicated Unbound Retrieval
 // NOTE: ADR-0098 [ACCEPTED] Scan-First, Accessible Dashboard List Rows
 // NOTE: ADR-0099 [ACCEPTED] Durable Global Dashboard Right-Swipe Action
 // IMPORTANT: ADR-0100 [SUPERSEDED BY ADR-215 (partial)] Relevance-First, Visibility-Safe Dashboard List Search
 // IMPORTANT: ADR-0101 [SUPERSEDED BY ADR-153 (partial — normal Grid card context row)] Avatar-First Accessible Dashboard Card Renderer
-// NOTE: ADR-0102 [ACCEPTED] Frozen-Universe Dashboard Multi-Select
+// IMPORTANT: ADR-0102 [SUPERSEDED BY ADR-254 (partial)] Frozen-Universe Dashboard Multi-Select
 // IMPORTANT: ADR-0103 [SUPERSEDED BY ADR-227 (partial)] Atomic Composed Dashboard Bulk Mutations
 // NOTE: ADR-0104 [ACCEPTED] Durable Orrery Preferences and Live System Scope
 // NOTE: ADR-0105 [ACCEPTED] Scoped Relationship Satellites for System-Member Context
@@ -156,7 +156,7 @@
 // IMPORTANT: ADR-0144 [SUPERSEDED BY ADR-204 (partial)] Complete Category Selection and Grouped Orrery System Discovery
 // IMPORTANT: ADR-0145 [SUPERSEDED BY ADR-148 (partial)] Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore
 // NOTE: ADR-0146 [ACCEPTED] Digest-Centered Five-Tab Shell and Semantic Root Routing
-// NOTE: ADR-0147 [ACCEPTED] Derived Digest Composition and Canonical Contacts Drill-Through
+// IMPORTANT: ADR-0147 [SUPERSEDED BY ADR-256 (partial)] Derived Digest Composition and Canonical Contacts Drill-Through
 // NOTE: ADR-0148 [ACCEPTED] Portable Your Week Period and Group-Deduplicated Activity Aggregation
 // NOTE: ADR-0149 [ACCEPTED] Orrery-Specific Translucent Overlay Treatment and Icon Controls
 // IMPORTANT: ADR-0150 [SUPERSEDED BY ADR-218 (partial); ADR-219 (partial)] Semantic Profile Hierarchy and Source-Owned Knowledge Editing
@@ -213,7 +213,7 @@
 // NOTE: ADR-0201 [ACCEPTED] Shared Child Header with a Chevron Back and a Person Line on Every Pushed Screen
 // NOTE: ADR-0202 [ACCEPTED] History Back Across Tabs and + Forms Over the Current Tab
 // NOTE: ADR-0203 [ACCEPTED] One Orbit Switch, the Disabled Look, Chip Tiers and Visible Swatch Selection
-// NOTE: ADR-0204 [ACCEPTED] One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay
+// IMPORTANT: ADR-0204 [SUPERSEDED BY ADR-255 (partial)] One Themed Option Sheet Replaces Every Native Picker; Native Date and Time Pickers Stay
 // IMPORTANT: ADR-0205 [SUPERSEDED BY ADR-210 (partial)] One Date-Only Display Formatter, and Native Pickers for Memory and Custom-Field Dates
 // NOTE: ADR-0206 [ACCEPTED] Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper
 // NOTE: ADR-0207 [ACCEPTED] Knowledge Homes After Fuel — an Off Limits Table, Gift Ideas and Thought of Them Memory Types, and Labels on Every Memory
@@ -230,7 +230,7 @@
 // NOTE: ADR-0218 [ACCEPTED] Things to Remember on the Profile — Section Order, Heading Actions, Empty Add, Pin, and Hide from Profile Switched Off
 // NOTE: ADR-0219 [ACCEPTED] Per-Section Editors Replace the Things to Remember and Memory Screens, with Card Edit Mode and a Section Add Button
 // NOTE: ADR-0220 [ACCEPTED] Things to Remember Inline on Add and Edit Contact, and the Shared Entry Field
-// NOTE: ADR-0221 [ACCEPTED] Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place
+// IMPORTANT: ADR-0221 [SUPERSEDED BY ADR-254 (partial)] Two Snackbar Looks, Shown Full Width Above the Round Buttons and Held in Place
 // NOTE: ADR-0222 [ACCEPTED] Add Contact Opens Bound, Monthly and Not Yet, with Relationship Basics Open
 // NOTE: ADR-0223 [ACCEPTED] Birthday, Social Battery, Links and a Held Photo on Add Contact, and Open Existing on a Duplicate Name
 // NOTE: ADR-0224 [ACCEPTED] One Contact Form — Update Contact Retired to the Archive, and a Four-Action +
@@ -259,5 +259,12 @@
 // NOTE: ADR-0247 [ACCEPTED] Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day, and Notifications Shows When Reminders Really Arrive
 // NOTE: ADR-0248 [ACCEPTED] AI Egress Narrows — Custom Guidance Only When a Choice Uses It, Instruction Paragraphs Without Hard Breaks, and Photo Fields Never Sent or Offered
 // NOTE: ADR-0249 [ACCEPTED] AI Settings Tell the Truth — a Connected Lane Shows Connected, the Hub Shows Current Values, and One "Style and Context" Row Replaces Two
+// NOTE: ADR-0250 [ACCEPTED] List View Measured First, Then Fixed with Memoised Rows and Windowing — Swipe, Tint, Fade and View Mode Unchanged
+// NOTE: ADR-0251 [ACCEPTED] An All Contacts Search Also Finds Unbound People, Marked "Unbound" and Reading "No contact logged"
+// NOTE: ADR-0252 [ACCEPTED] Search Typo Tolerance Tightened — an Adjacent Swap Is One Typo, and Two Typos Only from Eight Letters
+// NOTE: ADR-0253 [ACCEPTED] The Population Menu Lists Active Contacts, All and Active Are Exclusive, Control Writes Queue Instead of Dropping Taps, and Contacts Empty States Lead Somewhere
+// NOTE: ADR-0254 [ACCEPTED] Selection Mode Uses a Bottom Two-Row Bar and a More… Sheet with Careful Actions, and Long-Press on a Card Enters Selection Instead of a Card Menu
+// NOTE: ADR-0255 [ACCEPTED] Bulk Set Category, More… and Bulk Snooze Sheets Open Sized to Their Rows, and Bulk Frequency Uses the Shared Frequency Picker with a Pressable Continue
+// NOTE: ADR-0256 [ACCEPTED] Digest Overlooked Lists Everyone Who Needs Attention, Minus Up Next, from One Shared Needs-Attention Predicate, and Horizon Birthdays Show Avatars
 
-export const ADR_COUNT = 249;
+export const ADR_COUNT = 256;
