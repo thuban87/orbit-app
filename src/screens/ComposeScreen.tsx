@@ -1137,7 +1137,9 @@ export function ComposeScreen({
   // EXACT assist.
   const onTransmit = useCallback(async () => {
     // D-76: nothing typed, nothing to send (the button is disabled too).
-    if (sending || header === null || body.trim() === "") {
+    // While a panel answer is being written (`logging`), a second handoff
+    // would replace the panel mid-write (review A-IN-12): wait for it.
+    if (sending || logging || header === null || body.trim() === "") {
       return;
     }
     const usable = resolveUsableMode(
@@ -1197,6 +1199,7 @@ export function ComposeScreen({
     }
   }, [
     sending,
+    logging,
     header,
     contactId,
     mode,
@@ -2095,7 +2098,8 @@ export function ComposeScreen({
           />
 
           {/* Transmit — only when the usable mode can hand off. In-flight latched;
-          disabled until the body has text (D-76). */}
+          disabled until the body has text (D-76) and while a panel answer is
+          being written (review A-IN-12). */}
           {controls.send === "shown" ? (
             <Button
               key="transmit"
@@ -2103,7 +2107,7 @@ export function ComposeScreen({
               role="primary"
               label="Transmit"
               accessibilityLabel="Transmit"
-              disabled={sending || availability.transmitDisabled}
+              disabled={sending || logging || availability.transmitDisabled}
               onPress={() => void onTransmit()}
             />
           ) : null}

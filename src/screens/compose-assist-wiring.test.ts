@@ -119,4 +119,14 @@ describe("ComposeScreen assist panel wiring", () => {
       "composeLoggedSnackbar(channel, personName)",
     );
   });
+
+  it("Transmit waits while a panel answer is being written (review A-IN-12)", () => {
+    expect(handlerBody("onTransmit")).toMatch(
+      /if \(sending \|\| logging \|\| header === null \|\| body\.trim\(\) === ""\)/,
+    );
+    const transmit = code.slice(code.indexOf('testID="compose-transmit"'));
+    expect(transmit).toMatch(
+      /disabled=\{sending \|\| logging \|\| availability\.transmitDisabled\}/,
+    );
+  });
 });
