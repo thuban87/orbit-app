@@ -340,11 +340,25 @@ describe("Edit Contact opened at a custom field (38.12 D-70; C-4, C-5)", () => {
       join(__dirname, "EditContactScreen.tsx"),
       "utf8",
     );
+    // 38.14 D-42 adds focusSection beside focusFieldDefId.
     expect(source).toContain(
-      "const { contactId, focusFieldDefId } = route.params;",
+      "const { contactId, focusFieldDefId, focusSection } = route.params;",
     );
     expect(source).toContain("useFocusFieldReveal({");
     expect(source).toContain("onRowLayout={focusFieldReveal.onRowLayout}");
     expect(source).toContain("setSectionExpanded(CUSTOM_SECTION_ID, true)");
+  });
+
+  it("EditContactScreen expands and reveals Contact Methods once for focusSection (38.14 D-42)", () => {
+    const source = readFileSync(
+      join(__dirname, "EditContactScreen.tsx"),
+      "utf8",
+    );
+    expect(source).toContain(
+      'if (focusSection !== "methods" || !formReady) return;',
+    );
+    expect(source).toContain("if (focusSectionHandledRef.current) return;");
+    expect(source).toContain("setSectionExpanded(focusSection, true);");
+    expect(source).toContain("sectionRefs.current[focusSection]");
   });
 });
