@@ -8,6 +8,7 @@ import {
   SHEET_BODY_SCROLLS,
   SHEET_HEIGHT_PERCENT,
   SHEET_VARIANTS,
+  keyboardLift,
   sheetKeyboardLayout,
 } from "./sheet-contract";
 
@@ -208,5 +209,56 @@ describe("Sheet stays above the keyboard (38.4 D-72, Plan 17 G1-f)", () => {
     expect(source).toMatch(/paddingBottom: keyboardLayout\.lift/);
     expect(source).toMatch(/maxHeight: keyboardLayout\.size/);
     expect(source).toMatch(/height: keyboardLayout\.size/);
+  });
+});
+
+describe("keyboardLift — a screen's lift above the keyboard (38.14 D-75)", () => {
+  it("lifts by the whole keyboard when the window did not resize", () => {
+    expect(
+      keyboardLift({
+        frameHeight: 800,
+        restingFrameHeight: 800,
+        keyboardHeight: 300,
+      }),
+    ).toBe(300);
+  });
+
+  it("does not lift when the window already resized for the keyboard", () => {
+    expect(
+      keyboardLift({
+        frameHeight: 500,
+        restingFrameHeight: 800,
+        keyboardHeight: 300,
+      }),
+    ).toBe(0);
+  });
+
+  it("is 0 with the keyboard down or before the first layout", () => {
+    expect(
+      keyboardLift({
+        frameHeight: 800,
+        restingFrameHeight: 800,
+        keyboardHeight: 0,
+      }),
+    ).toBe(0);
+    expect(
+      keyboardLift({
+        frameHeight: 0,
+        restingFrameHeight: 0,
+        keyboardHeight: 300,
+      }),
+    ).toBe(0);
+  });
+
+  it("matches the lift sheetKeyboardLayout computes", () => {
+    const input = {
+      frameHeight: 700,
+      restingFrameHeight: 800,
+      keyboardHeight: 320,
+    };
+    expect(keyboardLift(input)).toBe(
+      sheetKeyboardLayout({ ...input, variant: "compact", topClearance: 24 })
+        .lift,
+    );
   });
 });

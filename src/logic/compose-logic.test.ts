@@ -17,7 +17,9 @@ import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   actionablePrimaryPhoneDestination,
   type ComposeExit,
+  COMPOSE_DRAFT_VISIBLE_LINES,
   composeActionAvailability,
+  composeDraftMaxHeight,
   composeExitDisposition,
   composeModePresentation,
   effectiveMode,
@@ -474,5 +476,19 @@ describe("composeActionAvailability — nothing to send or copy disables the act
       copyDisabled: false,
       copySubjectDisabled: true,
     });
+  });
+});
+
+describe("composeDraftMaxHeight — the message box grows to a cap, then scrolls (38.14 D-75)", () => {
+  it("fits whole body lines plus the box padding at the default scale", () => {
+    expect(COMPOSE_DRAFT_VISIBLE_LINES).toBeGreaterThan(3);
+    const cap = composeDraftMaxHeight(1);
+    expect(cap).toBeGreaterThan(120);
+  });
+
+  it("grows with the font scale and treats a bad scale as 1", () => {
+    expect(composeDraftMaxHeight(2)).toBeGreaterThan(composeDraftMaxHeight(1));
+    expect(composeDraftMaxHeight(Number.NaN)).toBe(composeDraftMaxHeight(1));
+    expect(composeDraftMaxHeight(0)).toBe(composeDraftMaxHeight(1));
   });
 });
