@@ -25,11 +25,18 @@
  * The group-context block (badge / group title / distinct Group Note /
  * participant note / View Group Event) is gated on the child context shaper.
  *
+ * 38.14 (D-66, D-26, D-58): the header and rows scroll in their own ScrollView
+ * (the Sheet's body scroll is opted out) above a pinned action block, so Edit
+ * and Delete are always visible. "Make this an event" (ADR-206) is a visible
+ * text button there; the single-item overflow menu is gone. The action row is
+ * `ConfirmActions` measure-and-stack (D-11 / ADR-174) — never plain flexWrap.
+ * A confirmed delete then shows an "Interaction deleted" snackbar (no Undo).
+ *
  * All colours resolve through theme tokens (check:colors); record families and
  * the sparkle read by icon + label, never colour alone.
  */
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { GroupScopePrompt } from "@/components/history/GroupScopePrompt";
 import {
   buildDetailRows,
@@ -37,16 +44,16 @@ import {
   showSparkle,
 } from "@/components/history/interaction-detail-logic";
 import { Icon } from "@/components/icons/Icon";
-import { OverflowMenu } from "@/components/OverflowMenu";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ConfirmActions, ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sheet } from "@/components/ui/Sheet";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { HistoryInteractionRecord } from "@/db/history-read";
 import { deleteTouchpoint } from "@/db/recency-dao";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -58,6 +65,8 @@ const DELETE_CONFIRM = "Delete interaction";
 /** Inline error when the hard delete fails — the interaction is preserved. */
 const DELETE_FAILED_MESSAGE =
   "Couldn't delete this interaction. Please try again.";
+/** Snackbar after a confirmed delete (38.14 D-58; no Undo). */
+const DELETED_MESSAGE = "Interaction deleted";
 
 export interface InteractionDetailProps {
   visible: boolean;
@@ -137,6 +146,10 @@ export function InteractionDetail({
       bumpShellRefresh();
       setConfirmVisible(false);
       setDeleting(false);
+      // 38.14 D-58: confirm the result. Warning is the destructive-result look
+      // (38.10 D-132 / D-140, carried by D-14); there is no Undo (R4 rejected,
+      // D-19 hard delete).
+      showSnackbar({ kind: "warning", label: DELETED_MESSAGE });
       onDeleted();
     } catch {
       // No optimistic vanish: the interaction + its derived metrics are intact.
@@ -148,91 +161,110 @@ export function InteractionDetail({
   };
 
   return (
-    <Sheet visible={visible} onRequestClose={onRequestClose} variant="detail">
-      <View style={styles.header}>
-        <AppText role="heading">Interaction</AppText>
-        {showSparkle(interaction) ? (
-          <View accessibilityLabel="Shared with AI" accessible>
-            <Icon name="sparkle" tone="accentText" size="sm" />
-          </View>
-        ) : null}
-        {!interaction.groupLinked && onConvertToGroup ? (
-          <OverflowMenu
-            actions={[
-              {
-                label: "Make this an event",
-                onPress: onConvertToGroup,
-              },
-            ]}
-          />
-        ) : null}
-      </View>
-
-      <View style={styles.rows}>
-        {rows.map((row) => (
-          <View key={row.key} style={styles.row}>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {row.label}
-            </AppText>
-            <AppText role="body">{row.value}</AppText>
-          </View>
-        ))}
-      </View>
-
-      {group ? (
-        <View
-          style={[styles.groupCard, { borderColor: colors.border }]}
-          accessibilityLabel={`${group.badge}: ${group.groupTitle}`}
+    <Sheet
+      visible={visible}
+      onRequestClose={onRequestClose}
+      variant="detail"
+      scrollBody={false}
+    >
+      {/* 38.14 D-66 / D-26: the header and rows scroll inside the sheet's cap
+          while the action block below stays pinned and visible. */}
+      <View style={styles.content}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator
         >
-          <View style={styles.groupBadge}>
-            <Icon name="group-events" tone="textSecondary" size="sm" />
-            <AppText role="label" style={{ color: colors.textSecondary }}>
-              {group.badge}
-            </AppText>
+          <View style={styles.header}>
+            <AppText role="heading">Interaction</AppText>
+            {showSparkle(interaction) ? (
+              <View accessibilityLabel="Shared with AI" accessible>
+                <Icon name="sparkle" tone="accentText" size="sm" />
+              </View>
+            ) : null}
           </View>
-          <AppText role="label">{group.groupTitle}</AppText>
-          {group.groupNote ? (
-            <View style={styles.row}>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Group Note
-              </AppText>
-              <AppText role="body">{group.groupNote}</AppText>
+
+          <View style={styles.rows}>
+            {rows.map((row) => (
+              <View key={row.key} style={styles.row}>
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  {row.label}
+                </AppText>
+                <AppText role="body">{row.value}</AppText>
+              </View>
+            ))}
+          </View>
+
+          {group ? (
+            <View
+              style={[styles.groupCard, { borderColor: colors.border }]}
+              accessibilityLabel={`${group.badge}: ${group.groupTitle}`}
+            >
+              <View style={styles.groupBadge}>
+                <Icon name="group-events" tone="textSecondary" size="sm" />
+                <AppText role="label" style={{ color: colors.textSecondary }}>
+                  {group.badge}
+                </AppText>
+              </View>
+              <AppText role="label">{group.groupTitle}</AppText>
+              {group.groupNote ? (
+                <View style={styles.row}>
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    Group Note
+                  </AppText>
+                  <AppText role="body">{group.groupNote}</AppText>
+                </View>
+              ) : null}
+              {group.participantNote ? (
+                <AppText role="body">{group.participantNote}</AppText>
+              ) : null}
+              {groupEventId != null && onViewGroupEvent ? (
+                <Button
+                  role="tertiary"
+                  label="View Event"
+                  onPress={() => onViewGroupEvent(groupEventId)}
+                />
+              ) : null}
             </View>
           ) : null}
-          {group.participantNote ? (
-            <AppText role="body">{group.participantNote}</AppText>
-          ) : null}
-          {groupEventId != null && onViewGroupEvent ? (
-            <Button
-              role="tertiary"
-              label="View Event"
-              onPress={() => onViewGroupEvent(groupEventId)}
-            />
-          ) : null}
-        </View>
-      ) : null}
+        </ScrollView>
 
-      {error ? (
-        <AppText role="caption" style={{ color: colors.danger }}>
-          {error}
-        </AppText>
-      ) : null}
-
-      <View style={styles.actions}>
-        {onViewProfile ? (
-          <Button
-            role="tertiary"
-            label="View profile"
-            onPress={onViewProfile}
+        {/* Pinned actions (D-66). "Make this an event" is a visible text
+            button above the row (placement is Claude's Discretion); the
+            single-item overflow is gone. Edit / Delete (and View profile)
+            measure and stack via ConfirmActions (D-26, D-11, ADR-174), so
+            Delete is never cut off. Delete still opens the destructive
+            ConfirmDialog first (D-19). */}
+        <View style={styles.actions}>
+          {/* A failed delete's error sits with the actions, always visible. */}
+          {error ? (
+            <AppText role="caption" style={{ color: colors.danger }}>
+              {error}
+            </AppText>
+          ) : null}
+          {!interaction.groupLinked && onConvertToGroup ? (
+            <View style={styles.convert}>
+              <Button
+                role="tertiary"
+                label="Make this an event"
+                onPress={onConvertToGroup}
+              />
+            </View>
+          ) : null}
+          <ConfirmActions
+            cancelLabel="Edit"
+            confirmLabel="Delete"
+            destructive
+            confirmDisabled={deleting}
+            secondaryLabel={onViewProfile ? "View profile" : undefined}
+            onSecondary={onViewProfile}
+            onCancel={onEditPress}
+            onConfirm={() => setConfirmVisible(true)}
           />
-        ) : null}
-        <Button role="secondary" label="Edit" onPress={onEditPress} />
-        <Button
-          role="destructive"
-          label="Delete"
-          disabled={deleting}
-          onPress={() => setConfirmVisible(true)}
-        />
+        </View>
       </View>
 
       <ConfirmDialog
@@ -268,6 +300,11 @@ export function InteractionDetail({
 }
 
 const styles = StyleSheet.create({
+  // Shrinks inside the detail sheet's cap so the pinned actions stay on
+  // screen while the rows scroll (D-66, D-26).
+  content: { flexShrink: 1, minHeight: 0 },
+  scroll: { flexGrow: 0, flexShrink: 1 },
+  scrollContent: { paddingBottom: SPACING.sm },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -294,9 +331,10 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
+    marginTop: SPACING.base,
     gap: SPACING.sm,
-    marginTop: SPACING.lg,
+  },
+  convert: {
+    alignSelf: "flex-start",
   },
 });

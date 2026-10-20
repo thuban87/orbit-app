@@ -37,6 +37,8 @@ const VIRTUALIZED_LIST = /<(FlatList|SectionList)\b/;
 const EXPECTED_OPT_OUTS = [
   // 38.14 D-74: the pending list owns its ScrollView inside a sized sheet.
   "src/components/PendingConfirmationsSheet.tsx",
+  // 38.14 D-66 / D-26: the rows scroll above pinned Edit / Delete actions.
+  "src/components/history/InteractionDetail.tsx",
   "src/components/orrery/OrreryContactsSheet.tsx",
   "src/components/profile/ProfileRelationshipSheets.tsx",
   "src/components/ui/OptionSheet.tsx",

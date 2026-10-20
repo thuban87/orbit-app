@@ -880,7 +880,8 @@ describe("glossary contract — the conversion entry uses the event noun (D-22; 
   const SITES: readonly { file: string; approved: string }[] = [
     {
       file: "src/components/history/InteractionDetail.tsx",
-      approved: 'label: "Make this an event"',
+      // 38.14 D-66: a visible text Button now (the overflow action is gone).
+      approved: 'label="Make this an event"',
     },
     {
       file: "src/components/group/GroupTitlePromptSheet.tsx",

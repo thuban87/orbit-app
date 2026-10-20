@@ -41,22 +41,35 @@ describe("buildDetailRows — no blank fields (HIST-11)", () => {
     expect(rowKeys({ ...base, direction: null })).not.toContain("direction");
   });
 
-  it("omits the channel row when the channel is unspecified", () => {
-    expect(rowKeys({ ...base, channel: "unspecified" })).not.toContain(
-      "channel",
-    );
+  it("reads a legacy channel through the glossary (D-64)", () => {
+    const channelOf = (channel: string) =>
+      buildDetailRows({ ...base, channel }).find((r) => r.key === "channel")
+        ?.value;
+    expect(channelOf("unspecified")).toBe("Unspecified");
+    expect(channelOf("other")).toBe("Other");
+    expect(channelOf("In Person")).toBe("In Person");
   });
 
-  it("renders every present field with a non-empty value (no blanks)", () => {
+  it("reads direction through the glossary, falling back to the raw value (D-33, D-64)", () => {
+    const directionOf = (direction: string) =>
+      buildDetailRows({ ...base, direction }).find((r) => r.key === "direction")
+        ?.value;
+    expect(directionOf("mutual")).toBe("Mutual");
+    expect(directionOf("outbound")).toBe("Outbound");
+    expect(directionOf("inbound")).toBe("Inbound");
+    expect(directionOf("Outgoing")).toBe("Outgoing");
+  });
+
+  it("orders the rows with the note right after When (D-66)", () => {
     const rows = buildDetailRows(base);
     expect(rows.map((r) => r.key)).toEqual([
       "channel",
       "datetime",
+      "note",
       "direction",
       "connected",
       "tone",
       "duration",
-      "note",
     ]);
     for (const row of rows) {
       expect(row.value.trim().length).toBeGreaterThan(0);
@@ -68,14 +81,58 @@ describe("buildDetailRows — no blank fields (HIST-11)", () => {
     expect(rows.find((r) => r.key === "duration")?.value).toBe("25m");
   });
 
+  it("keeps the order without a note (When is followed by Direction)", () => {
+    expect(rowKeys({ ...base, note: null })).toEqual([
+      "channel",
+      "datetime",
+      "direction",
+      "connected",
+      "tone",
+      "duration",
+    ]);
+  });
+
   it("uses a neutral label rather than the raw timestamp when parsing fails", () => {
     const rows = buildDetailRows({ ...base, occurredAt: "not a timestamp" });
     expect(rows.find((r) => r.key === "datetime")?.value).toBe("Unknown time");
   });
+});
 
-  it("shows the connected state textually for a no-reply interaction", () => {
+describe("buildDetailRows — Connected only where it means something (D-30)", () => {
+  it("shows the connected state textually for a no-reply standalone interaction", () => {
     const rows = buildDetailRows({ ...base, connected: 0 });
     expect(rows.find((r) => r.key === "connected")?.value).toBe("No reply");
+  });
+
+  it("shows Connected for a standalone Message or Call (groupEventId null or absent)", () => {
+    expect(rowKeys(base)).toContain("connected");
+    const standalone: GroupLinkedDetailInput = {
+      ...base,
+      channel: "Call",
+      groupEventId: null,
+    };
+    expect(buildDetailRows(standalone).map((r) => r.key)).toContain(
+      "connected",
+    );
+  });
+
+  it("hides Connected for an In Person interaction", () => {
+    expect(rowKeys({ ...base, channel: "In Person" })).not.toContain(
+      "connected",
+    );
+    expect(
+      rowKeys({ ...base, channel: "In Person", connected: 0 }),
+    ).not.toContain("connected");
+  });
+
+  it("hides Connected for an event child (the group-aware input shape)", () => {
+    const child: GroupLinkedDetailInput = {
+      ...base,
+      channel: "Message",
+      groupEventId: 7,
+      groupTitle: "Dinner with the crew",
+    };
+    expect(buildDetailRows(child).map((r) => r.key)).not.toContain("connected");
   });
 });
 

@@ -25,6 +25,7 @@
  * No SQL, no react-native, no network — a pure value transform.
  */
 import { formatDurationLabel } from "@/components/touchpoint-refine-logic";
+import { CHANNEL_LABEL, DIRECTION_LABEL } from "@/constants/glossary";
 import { isGroupLinked } from "@/db/history-read";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 
@@ -83,16 +84,29 @@ const hasText = (value: string | null | undefined): value is string =>
 
 /**
  * Project an interaction into its ordered present-only detail rows. Absent fields
- * (unspecified channel, null direction, null Tone, null/zero duration, blank note)
- * produce NO row — there are never blank fields (HIST-11).
+ * (null direction, null Tone, null/zero duration, blank note) produce NO row —
+ * there are never blank fields (HIST-11).
+ *
+ * 38.14 order (D-66; phase-11 §V :676-690 permits it): Channel, When, Note,
+ * Direction, Connected, Tone, Duration — the note reads right after When.
+ * Channel and direction values come from the glossary maps (D-33, D-64), so a
+ * legacy channel reads "Unspecified" / "Other"; an unmapped value falls back to
+ * itself. Connected is omitted where it would mislead (D-30, enforcing phase-13
+ * §S :382 and phase-12 :212): for an In Person interaction, and for an event
+ * child (the same `isGroupLinked` seam `buildGroupContext` reads). The widened
+ * `GroupLinkedDetailInput` parameter is a superset of `InteractionDetailInput`.
  */
 export function buildDetailRows(
-  interaction: InteractionDetailInput,
+  interaction: GroupLinkedDetailInput,
 ): DetailRow[] {
   const rows: DetailRow[] = [];
 
-  if (hasText(interaction.channel) && interaction.channel !== "unspecified") {
-    rows.push({ key: "channel", label: "Channel", value: interaction.channel });
+  if (hasText(interaction.channel)) {
+    rows.push({
+      key: "channel",
+      label: "Channel",
+      value: CHANNEL_LABEL[interaction.channel] ?? interaction.channel,
+    });
   }
 
   // occurredAt is required — always present. Keep stored data intact while using
@@ -103,20 +117,28 @@ export function buildDetailRows(
     value: formatDateTimeMinuteOrFallback(interaction.occurredAt),
   });
 
+  if (hasText(interaction.note)) {
+    rows.push({ key: "note", label: "Note", value: interaction.note.trim() });
+  }
+
   if (hasText(interaction.direction)) {
     rows.push({
       key: "direction",
       label: "Direction",
-      value: interaction.direction,
+      value: DIRECTION_LABEL[interaction.direction] ?? interaction.direction,
     });
   }
 
-  // Connected is always a known state — surfaced textually (never colour-only).
-  rows.push({
-    key: "connected",
-    label: "Connected",
-    value: interaction.connected === 0 ? "No reply" : "Connected",
-  });
+  // Connected is a known state surfaced textually (never colour-only), shown
+  // only where it means something (D-30).
+  const eventChild = isGroupLinked({ groupEventId: interaction.groupEventId });
+  if (interaction.channel !== "In Person" && !eventChild) {
+    rows.push({
+      key: "connected",
+      label: "Connected",
+      value: interaction.connected === 0 ? "No reply" : "Connected",
+    });
+  }
 
   if (hasText(interaction.quality)) {
     rows.push({ key: "tone", label: "Tone", value: interaction.quality });
@@ -128,10 +150,6 @@ export function buildDetailRows(
       label: "Duration",
       value: formatDurationLabel(interaction.duration),
     });
-  }
-
-  if (hasText(interaction.note)) {
-    rows.push({ key: "note", label: "Note", value: interaction.note.trim() });
   }
 
   return rows;
