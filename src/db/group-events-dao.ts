@@ -62,6 +62,11 @@ export interface CreateGroupEventInput {
 }
 
 export interface UpdateGroupEventPatch {
+  /**
+   * The event's name (38.14 D-69). Trimmed and refused when blank, as
+   * `createGroupEvent` does. Parent-only: titles never materialize on children.
+   */
+  title?: { value: string };
   /** Channel is non-nullable because interaction rows require a channel. */
   channel?: { value: string };
   quality?: { value: string | null };
@@ -437,6 +442,11 @@ export function updateGroupEvent(
   exec: SqlExecutor,
   input: UpdateGroupEventInput,
 ): Promise<void> {
+  if (isBlankTitlePatch(input.patch)) {
+    return Promise.reject(
+      new Error("updateGroupEvent: title must not be blank"),
+    );
+  }
   try {
     if (input.occurredAt !== undefined) {
       rejectFutureOccurredAt(input.occurredAt, input.now);
@@ -451,6 +461,13 @@ export function updateGroupEvent(
   });
 }
 
+/** A title patch whose value is not a string or is blank once trimmed. */
+function isBlankTitlePatch(patch: UpdateGroupEventPatch): boolean {
+  const title = patch.title;
+  if (title === undefined) return false;
+  return typeof title.value !== "string" || title.value.trim().length === 0;
+}
+
 /**
  * The Edit Group Event body for a caller that already owns the transaction.
  * The single writer of `group_events.group_note` (checker W9). Opens no
@@ -461,9 +478,25 @@ export async function updateGroupEventCore(
   exec: SqlExecutor,
   input: UpdateGroupEventInput,
 ): Promise<{ changed: boolean }> {
+  // Exported, so guarded again (38.14 D-69): refused before any statement.
+  if (isBlankTitlePatch(input.patch)) {
+    throw new Error("updateGroupEventCore: title must not be blank");
+  }
   // This guarded read intentionally remains the transaction's first statement.
   await loadGroupEvent(exec, input.groupEventId);
   let changed = false;
+
+  if (input.patch.title !== undefined) {
+    // Parent-only (D-69): no child row carries the title.
+    const result = await exec.runAsync(
+      "UPDATE group_events SET title = ?, modified_at = ? WHERE id = ?",
+      [input.patch.title.value.trim(), input.now, input.groupEventId],
+    );
+    if (result.changes !== 1) {
+      throw new Error(`Group Event id=${input.groupEventId} no longer exists`);
+    }
+    changed = true;
+  }
 
   if (input.occurredAt !== undefined) {
     await exec.runAsync(

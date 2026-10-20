@@ -26,6 +26,8 @@ import {
 } from "@/utils/single-flight";
 
 export interface EventDraft {
+  /** The event's name (38.14 D-69); saved trimmed, never blank. */
+  title: string;
   value: TouchpointRefineValue;
   groupNote: string;
 }
@@ -33,6 +35,7 @@ export interface EventDraft {
 /** The editable parent fields as last saved. Also the base of Save's patch. */
 export function eventDraft(event: GroupEventDetail): EventDraft {
   return {
+    title: event.title,
     value: {
       occurredAt: event.occurredAt,
       channel: event.channel ?? "In Person",

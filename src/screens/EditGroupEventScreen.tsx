@@ -11,6 +11,12 @@
  *   ux-standards.md "Validation errors inside a sheet render inline"). Its
  *   "Save participant" is single-flight on its own ref (38.9 standards via
  *   D-19; convergence c11, Claude C-10).
+ *
+ * 38.14 D-69: the title is editable here, inside the parent draft and its
+ * discard guard. A blank title is refused on Save with the not-blank rule
+ * under the field (Save stays pressable, ux-standards rule 9); the DAO trims
+ * and refuses blank again. D-27: a committed save publishes the widget notify
+ * and the shell refresh.
  */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
@@ -31,11 +37,13 @@ import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantShee
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { TouchpointRefineForm } from "@/components/TouchpointRefineForm";
 import { AppText, Button, Sheet } from "@/components/ui";
+import { FieldError } from "@/components/ui/FieldError";
 import {
   clearFieldError,
   type FieldErrors,
   toFieldErrors,
 } from "@/components/ui/field-error-logic";
+import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addParticipants,
@@ -62,6 +70,7 @@ import {
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
+import { publishInteractionWrite } from "@/services/publish-interaction-write";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
@@ -84,6 +93,8 @@ import {
 import { channelOptionsFor } from "./log-interaction-logic";
 
 const GROUP_FUTURE_DATE_MESSAGE = "Events can't be in the future.";
+/** Group Log's not-blank rule, shown under Title (38.14 D-69; 38.9 D-19). */
+const TITLE_REQUIRED_MESSAGE = "An event needs a title.";
 
 export function EditGroupEventScreen({
   navigation,
@@ -119,6 +130,12 @@ export function EditGroupEventScreen({
   // Inline errors in the participant Sheet (Research Q4; 38.9 D-19).
   const [participantFieldErrors, setParticipantFieldErrors] =
     useState<FieldErrors>({});
+  // The title's not-blank error under the field, cleared as the title changes
+  // (38.14 D-69; 38.9 D-19). Save failures stay in `error`.
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
+  const titleFieldRef = useRef<View>(null);
+  const titleInputRef = useRef<TextInput>(null);
 
   // Mount-only seed: the ONE path that sets the draft and its baseline (D-17).
   useEffect(() => {
@@ -170,11 +187,23 @@ export function EditGroupEventScreen({
   );
 
   async function saveEvent() {
-    if (!event || !draft || !beginInFlight(savingRef)) return;
+    if (!event || !draft || savingRef.current) return;
+    const title = draft.title.trim();
+    if (title.length === 0) {
+      // Save stays pressable (ux-standards rule 9): the rule shows under
+      // Title, which is scrolled into view and focused (38.9 D-19).
+      setTitleError(TITLE_REQUIRED_MESSAGE);
+      reveal(titleFieldRef, titleInputRef);
+      return;
+    }
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
+    setTitleError(null);
     setError(null);
     const initial = eventDraft(event);
     const patch = {
+      // D-69: only a real rename is written; the DAO trims and guards again.
+      ...(title !== event.title ? { title: { value: title } } : {}),
       ...(draft.value.channel !== initial.value.channel
         ? { channel: { value: draft.value.channel } }
         : {}),
@@ -197,6 +226,8 @@ export function EditGroupEventScreen({
           : {}),
         patch,
       });
+      // D-27: the widget and every screen reflect the saved event.
+      publishInteractionWrite();
       bypassRef.current = true;
       navigation.goBack();
     } catch {
@@ -352,8 +383,44 @@ export function EditGroupEventScreen({
   return (
     <View style={[styles.screen, { paddingBottom: bottomInset }]}>
       {header}
-      <ScrollView contentContainerStyle={styles.content}>
-        <AppText role="body">{event.title}</AppText>
+      <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
+        contentContainerStyle={styles.content}
+      >
+        <View
+          ref={titleFieldRef}
+          testID="edit-group-event-title-field"
+          style={styles.field}
+        >
+          <AppText role="label" style={{ color: colors.textSecondary }}>
+            Title
+          </AppText>
+          <TextInput
+            ref={titleInputRef}
+            testID="edit-group-event-title"
+            accessibilityLabel="Event title"
+            value={draft.title}
+            onChangeText={(title) => {
+              setTitleError(null);
+              dispatch({ type: "draftChanged", draft: { ...draft, title } });
+            }}
+            placeholder="Name this event"
+            placeholderTextColor={colors.textPlaceholder}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
+          />
+          <FieldError
+            testID="edit-group-event-title-error"
+            message={titleError}
+          />
+        </View>
         <TouchpointRefineForm
           testID="edit-group-event-form"
           value={draft.value}
@@ -509,6 +576,12 @@ const styles = StyleSheet.create({
   },
   content: { padding: SPACING.base, gap: SPACING.base },
   field: { gap: SPACING.sm },
+  input: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: SPACING.md,
+  },
   note: {
     minHeight: 88,
     borderWidth: 1,
