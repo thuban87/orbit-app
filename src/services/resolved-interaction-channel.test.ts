@@ -12,7 +12,10 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { readResolvedInteractionChannel } from "./resolved-interaction-channel";
+import {
+  readInteractionChannelPreference,
+  readResolvedInteractionChannel,
+} from "./resolved-interaction-channel";
 
 const NOW = "2026-10-20 12:00:00";
 let uidCounter = 0;
@@ -85,5 +88,42 @@ describe("readResolvedInteractionChannel", () => {
     await expect(readResolvedInteractionChannel(broken)).resolves.toBe(
       "Message",
     );
+  });
+});
+
+describe("readInteractionChannelPreference (review A-IN-05)", () => {
+  it("returns the stored preference and remembered channel as is", async () => {
+    await setChannels("remember", "Call");
+    await expect(readInteractionChannelPreference(exec)).resolves.toEqual({
+      pref: "remember",
+      remembered: "Call",
+    });
+  });
+
+  it("falls back to Message and never rejects when the read throws", async () => {
+    const broken: ReadOnlyExecutor = {
+      ...exec,
+      getFirstAsync: (() => {
+        throw new Error("database closed");
+      }) as ReadOnlyExecutor["getFirstAsync"],
+    };
+    await expect(readInteractionChannelPreference(broken)).resolves.toEqual({
+      pref: "Message",
+      remembered: null,
+    });
+  });
+
+  it("single Quick Log on Home and the universal + reads through it", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const file of [
+      "src/screens/HomeScreen.tsx",
+      "src/components/UniversalFab.tsx",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source).toMatch(
+        /readChannelPreference: \(\) =>\s*readInteractionChannelPreference\(getExecutor\(\)\)/,
+      );
+      expect(source).not.toContain("failed to read channel preference");
+    }
   });
 });

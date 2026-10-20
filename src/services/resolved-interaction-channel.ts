@@ -22,7 +22,11 @@
  * node-testability; headless JS runs the same bundle, so it is not a headless
  * requirement). The resolver's import chain is RN-free (RESEARCH Pattern 5).
  */
-import { getAppSettings } from "@/db/app-settings-dao";
+import {
+  type DefaultInteractionChannel,
+  getAppSettings,
+  type RememberedInteractionChannel,
+} from "@/db/app-settings-dao";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 import { resolveInitialChannel } from "@/screens/log-interaction-logic";
 import { Logger } from "@/utils/logger";
@@ -32,21 +36,41 @@ const LOG_SCOPE = "resolved-channel";
 /** The channel used when the settings cannot be read (REMEMBERED_FALLBACK). */
 export const RESOLVED_CHANNEL_FALLBACK = "Message";
 
-export async function readResolvedInteractionChannel(
+/** The two settings the resolver reads (single Quick Log's input shape). */
+export interface InteractionChannelPreference {
+  pref: DefaultInteractionChannel;
+  remembered: RememberedInteractionChannel | null;
+}
+
+/**
+ * The raw Default Interaction Channel settings, with the same never-rejecting
+ * Message fallback (review A-IN-05): the ONE settings read behind every
+ * one-tap channel. Single Quick Log (Home, the universal +) passes it to
+ * `runQuickLog`, which resolves it; bulk, widget and notification use
+ * `readResolvedInteractionChannel` below, which is built on it.
+ */
+export async function readInteractionChannelPreference(
   exec: ReadOnlyExecutor,
-): Promise<string> {
+): Promise<InteractionChannelPreference> {
   try {
     const settings = await getAppSettings(exec);
-    return resolveInitialChannel(
-      settings.defaultInteractionChannel,
-      settings.rememberedInteractionChannel,
-    );
+    return {
+      pref: settings.defaultInteractionChannel,
+      remembered: settings.rememberedInteractionChannel,
+    };
   } catch {
     // Content-free: no names, notes or settings values in the log.
     Logger.warn(
       LOG_SCOPE,
       "could not read the default interaction channel; using Message",
     );
-    return RESOLVED_CHANNEL_FALLBACK;
+    return { pref: RESOLVED_CHANNEL_FALLBACK, remembered: null };
   }
+}
+
+export async function readResolvedInteractionChannel(
+  exec: ReadOnlyExecutor,
+): Promise<string> {
+  const { pref, remembered } = await readInteractionChannelPreference(exec);
+  return resolveInitialChannel(pref, remembered);
 }

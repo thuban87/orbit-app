@@ -42,7 +42,6 @@ import {
   UNIVERSAL_FAB_ACTIONS,
   type UniversalFabAction,
 } from "@/components/universal-fab-logic";
-import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
@@ -58,6 +57,7 @@ import {
 } from "@/navigation/use-bottom-clearance";
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
 import { runQuickLog } from "@/services/quick-log-command";
+import { readInteractionChannelPreference } from "@/services/resolved-interaction-channel";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
@@ -65,10 +65,8 @@ import { shellTransientStore } from "@/stores/shell-transient-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useMeasuredTabBarHeight } from "@/stores/tab-bar-layout-store";
 import { useTheme } from "@/theme";
-import { Logger } from "@/utils/logger";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const LOG_SCOPE = "universal-fab";
 const DIAL_ANIMATION_DURATION = 180;
 const DIAL_ROW_SPACING = 60;
 const DIAL_FIRST_ROW_OFFSET = 68;
@@ -290,25 +288,12 @@ export function UniversalFab() {
         pendingRef: quickLogPending,
         undoController: quickLogUndoController.current,
         recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
-        // Same app-settings read as the detailed Log Interaction screen; a
-        // read failure falls back to Message so the immediate write is never
-        // blocked (local-first, no network on this read path). A promise
-        // chain, so logContact itself stays synchronous (38.14 R5-01).
+        // The one shared settings read (review A-IN-05); a read failure
+        // falls back to Message so the immediate write is never blocked
+        // (local-first, no network on this read path). It returns a promise,
+        // so logContact itself stays synchronous (38.14 R5-01).
         readChannelPreference: () =>
-          getAppSettings(getExecutor()).then(
-            (s) => ({
-              pref: s.defaultInteractionChannel,
-              remembered: s.rememberedInteractionChannel,
-            }),
-            (error: unknown) => {
-              Logger.error(
-                LOG_SCOPE,
-                "failed to read channel preference",
-                error,
-              );
-              return { pref: "Message" as const, remembered: null };
-            },
-          ),
+          readInteractionChannelPreference(getExecutor()),
         localDateTime,
         newUid,
         showSnackbar,

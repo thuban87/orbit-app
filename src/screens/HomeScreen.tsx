@@ -215,7 +215,10 @@ import {
 import { ORDINARY_LOG_CHANNEL_OPTIONS } from "@/screens/log-interaction-logic";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { runQuickLog } from "@/services/quick-log-command";
-import { readResolvedInteractionChannel } from "@/services/resolved-interaction-channel";
+import {
+  readInteractionChannelPreference,
+  readResolvedInteractionChannel,
+} from "@/services/resolved-interaction-channel";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
@@ -884,21 +887,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         pendingRef: quickLogPending,
         undoController: quickLogUndoController.current,
         recordTouchpoint: (input) => recordTouchpoint(getExecutor(), input),
-        readChannelPreference: async () => {
-          // The same app-settings read the detailed Log Interaction screen uses;
-          // a read failure falls back to Message so the immediate write is never
-          // blocked (local-first, no network on this read path).
-          try {
-            const s = await getAppSettings(getExecutor());
-            return {
-              pref: s.defaultInteractionChannel,
-              remembered: s.rememberedInteractionChannel,
-            };
-          } catch (error) {
-            Logger.error(LOG_SCOPE, "failed to read channel preference", error);
-            return { pref: "Message", remembered: null };
-          }
-        },
+        // The one shared settings read (review A-IN-05); a read failure falls
+        // back to Message so the immediate write is never blocked
+        // (local-first, no network on this read path).
+        readChannelPreference: () =>
+          readInteractionChannelPreference(getExecutor()),
         localDateTime,
         newUid,
         showSnackbar,
