@@ -43,7 +43,13 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { AlsoSaveToPicker } from "@/components/AlsoSaveToPicker";
 import { ContactPicker } from "@/components/ContactPicker";
@@ -54,6 +60,8 @@ import {
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
 import { AppText, Button } from "@/components/ui";
+import { KeyboardCenteringProvider } from "@/components/ui/KeyboardCenteringProvider";
+import { useKeyboardCentering } from "@/components/ui/use-keyboard-centering";
 import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
 import {
   getAppSettings,
@@ -91,6 +99,7 @@ import {
   ORDINARY_LOG_CHANNEL_OPTIONS,
   resolveInitialAllowAi,
   resolveInitialChannel,
+  seedOccurredAtForDay,
   shouldUpdateRemembered,
 } from "./log-interaction-logic";
 
@@ -100,14 +109,6 @@ const SAVE_FAILED_MESSAGE = "Couldn't save. Please try again.";
 const ALLOW_AI_CAPTION = "Let AI use this note's text. Off by default.";
 /** Duration lives under the collapsed "More Options" disclosure (CAPT-07). */
 const MORE_OPTIONS_FIELDS: ReadonlyArray<TouchpointRefineField> = ["duration"];
-
-/** The occurred_at seed: a History-originated prefillDate day, else local now. */
-function seedOccurredAt(prefillDate: string | undefined, now: string): string {
-  // A History empty-date "Log interaction" prefills exactly that local day at
-  // midnight (matches create-contact-logic's `${date} 00:00:00`); otherwise the
-  // interaction defaults to now (freely backdateable, no age warnings).
-  return prefillDate ? `${prefillDate} 00:00:00` : now;
-}
 
 export function LogInteractionScreen({
   navigation,
@@ -143,6 +144,14 @@ export function LogInteractionScreen({
   // D-45: the person line under the fixed title, once a contact is chosen (the
   // picker branch shows no header).
   const person = useContactHeader(contactId);
+  // 38.14 D-34: the focused field stays above the keyboard (38.10 primitives).
+  // Called before the early returns below so the hook order never changes.
+  const scrollRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null) as RefObject<View>;
+  const { centering, bottomSpacer } = useKeyboardCentering({
+    scrollRef,
+    contentRef,
+  });
 
   // Seed the form Channel from the Default Interaction Channel preference. Pure
   // on-device SQLite read — no network on this read path (local-first). Renders
@@ -161,7 +170,7 @@ export function LogInteractionScreen({
       );
       const defaults = defaultsForChannel(channel);
       const seeded: TouchpointRefineValue = {
-        occurredAt: seedOccurredAt(prefillDate, now),
+        occurredAt: seedOccurredAtForDay(prefillDate, now),
         channel,
         direction: defaults.direction,
         connected: defaults.connected,
@@ -179,7 +188,7 @@ export function LogInteractionScreen({
       Logger.error(LOG_SCOPE, "failed to read channel preference", err);
       const defaults = defaultsForChannel("Message");
       const seeded: TouchpointRefineValue = {
-        occurredAt: seedOccurredAt(prefillDate, now),
+        occurredAt: seedOccurredAtForDay(prefillDate, now),
         channel: "Message",
         direction: defaults.direction,
         connected: defaults.connected,
@@ -360,45 +369,53 @@ export function LogInteractionScreen({
         backDisabled={saving}
       />
       <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
         testID="log-interaction-screen"
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
       >
-        <TouchpointRefineForm
-          testID="log-interaction-form"
-          value={value}
-          onChange={handleChange}
-          now={localDateTime()}
-          visibleFields={visibleFields}
-          channelOptions={ORDINARY_LOG_CHANNEL_OPTIONS}
-          moreOptionsFields={MORE_OPTIONS_FIELDS}
-          allowAiCaption={ALLOW_AI_CAPTION}
-        />
+        <KeyboardCenteringProvider value={centering}>
+          <TouchpointRefineForm
+            testID="log-interaction-form"
+            value={value}
+            onChange={handleChange}
+            now={localDateTime()}
+            visibleFields={visibleFields}
+            channelOptions={ORDINARY_LOG_CHANNEL_OPTIONS}
+            moreOptionsFields={MORE_OPTIONS_FIELDS}
+            allowAiCaption={ALLOW_AI_CAPTION}
+          />
 
-        <AlsoSaveToPicker
-          testID="log-interaction-also-save-to"
-          value={alsoSaveTo}
-          onChange={setAlsoSaveTo}
-          disabled={saving || !canAlsoSave(value.note)}
-        />
+          <AlsoSaveToPicker
+            testID="log-interaction-also-save-to"
+            value={alsoSaveTo}
+            onChange={setAlsoSaveTo}
+            disabled={saving || !canAlsoSave(value.note)}
+          />
 
-        {saveError ? (
-          <AppText
-            testID="log-interaction-save-error"
-            role="caption"
-            accessibilityLabel={saveError}
-            style={{ color: colors.danger }}
-          >
-            {saveError}
-          </AppText>
-        ) : null}
+          {saveError ? (
+            <AppText
+              testID="log-interaction-save-error"
+              role="caption"
+              accessibilityLabel={saveError}
+              style={{ color: colors.danger }}
+            >
+              {saveError}
+            </AppText>
+          ) : null}
 
-        <Button
-          testID={saveError ? "log-interaction-retry" : "log-interaction-save"}
-          role="primary"
-          label={saveError ? "Retry" : "Save"}
-          disabled={saving}
-          onPress={() => void handleSave()}
-        />
+          <Button
+            testID={
+              saveError ? "log-interaction-retry" : "log-interaction-save"
+            }
+            role="primary"
+            label={saveError ? "Retry" : "Save"}
+            disabled={saving}
+            onPress={() => void handleSave()}
+          />
+        </KeyboardCenteringProvider>
+        {bottomSpacer}
       </ScrollView>
     </View>
   );

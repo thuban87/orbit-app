@@ -26,7 +26,9 @@ import {
 } from "@/components/TouchpointRefineForm";
 import { AppText, Button } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
+import { KeyboardCenteringProvider } from "@/components/ui/KeyboardCenteringProvider";
 import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
+import { useKeyboardCentering } from "@/components/ui/use-keyboard-centering";
 import { getExecutor, localDateTime } from "@/db/database";
 import { createGroupEvent } from "@/db/group-events-dao";
 import type { LinkedSection } from "@/db/linked-entry-dao";
@@ -95,6 +97,13 @@ export function GroupLogScreen({
   const { scrollRef, contentRef, reveal } = useFirstErrorReveal();
   const titleFieldRef = useRef<View>(null);
   const titleInputRef = useRef<TextInput>(null);
+  const groupNoteInputRef = useRef<TextInput>(null);
+  // 38.14 D-34: the focused field stays above the keyboard; the same
+  // ScrollView pair the first-error reveal uses (38.10 primitives).
+  const { centering, bottomSpacer } = useKeyboardCentering({
+    scrollRef,
+    contentRef,
+  });
   const seedRef = useRef(
     JSON.stringify({
       title: "",
@@ -175,122 +184,133 @@ export function GroupLogScreen({
         ref={scrollRef}
         innerViewRef={contentRef}
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
       >
-        <View
-          ref={titleFieldRef}
-          testID="group-log-title-field"
-          style={styles.field}
-        >
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Title
-          </AppText>
-          <TextInput
-            ref={titleInputRef}
-            testID="group-log-title"
-            accessibilityLabel="Event title"
-            value={title}
-            onChangeText={(next) => {
-              setTitle(next);
-              setTitleError(null);
-            }}
-            placeholder="What happened?"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.input,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          <FieldError testID="group-log-title-error" message={titleError} />
-        </View>
-        <TouchpointRefineForm
-          testID="group-log-form"
-          value={value}
-          onChange={setValue}
-          now={localDateTime()}
-          // 38.14 D-60: Message / Call / In Person, In Person by default.
-          channelOptions={ORDINARY_LOG_CHANNEL_OPTIONS}
-          visibleFields={["datetime", "channel", "tone", "duration"]}
-          futureDateMessage={GROUP_FUTURE_DATE_MESSAGE}
-        />
-        <View style={styles.field}>
-          <AppText role="label" style={{ color: colors.textSecondary }}>
-            Group Note
-          </AppText>
-          <TextInput
-            testID="group-log-group-note"
-            accessibilityLabel="Group Note"
-            value={groupNote}
-            onChangeText={(next) => {
-              setGroupNote(next);
-              setAlsoSaveTo((chosen) =>
-                alsoSaveChoiceAfterNoteChange(next, chosen),
-              );
-            }}
-            multiline
-            placeholder="Add shared context"
-            placeholderTextColor={colors.textPlaceholder}
-            style={[
-              styles.note,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-        </View>
-        <AlsoSaveToPicker
-          testID="group-log-also-save-to"
-          value={alsoSaveTo}
-          onChange={setAlsoSaveTo}
-          disabled={saving || !canAlsoSave(groupNote)}
-        />
-        <View style={[styles.participants, { borderColor: colors.border }]}>
-          <AppText role="label">Participants</AppText>
-          {participantIds.length === 0 ? (
-            <View style={styles.field}>
-              <AppText role="body">No participants yet</AppText>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                Add the people who were there — or save now and add them later.
-              </AppText>
-            </View>
-          ) : (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {participantIds.length} participant
-              {participantIds.length === 1 ? "" : "s"} selected
+        <KeyboardCenteringProvider value={centering}>
+          <View
+            ref={titleFieldRef}
+            testID="group-log-title-field"
+            style={styles.field}
+          >
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Title
             </AppText>
-          )}
-          <Button
-            role="secondary"
-            label="Add participants"
-            onPress={() => setPickerVisible(true)}
+            <TextInput
+              ref={titleInputRef}
+              testID="group-log-title"
+              accessibilityLabel="Event title"
+              value={title}
+              onChangeText={(next) => {
+                setTitle(next);
+                setTitleError(null);
+              }}
+              onFocus={() => centering.onFieldFocus(titleInputRef)}
+              onBlur={() => centering.onFieldBlur(titleInputRef)}
+              placeholder="Name this event"
+              placeholderTextColor={colors.textPlaceholder}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+            />
+            <FieldError testID="group-log-title-error" message={titleError} />
+          </View>
+          <TouchpointRefineForm
+            testID="group-log-form"
+            value={value}
+            onChange={setValue}
+            now={localDateTime()}
+            // 38.14 D-60: Message / Call / In Person, In Person by default.
+            channelOptions={ORDINARY_LOG_CHANNEL_OPTIONS}
+            visibleFields={["datetime", "channel", "tone", "duration"]}
+            futureDateMessage={GROUP_FUTURE_DATE_MESSAGE}
           />
-        </View>
-        {error ? (
-          <AppText role="caption" style={{ color: colors.danger }}>
-            {error}
-          </AppText>
-        ) : null}
-        <Pressable
-          testID="group-log-save"
-          accessibilityRole="button"
-          accessibilityLabel="Log event"
-          accessibilityState={{ disabled: saving }}
-          disabled={saving}
-          onPress={() => void save()}
-          style={[
-            styles.primary,
-            { backgroundColor: colors.accent, opacity: saving ? 0.5 : 1 },
-          ]}
-        >
-          <AppText role="label" style={{ color: colors.onAccent }}>
-            Log event
-          </AppText>
-        </Pressable>
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Group Note
+            </AppText>
+            <TextInput
+              ref={groupNoteInputRef}
+              testID="group-log-group-note"
+              accessibilityLabel="Group Note"
+              value={groupNote}
+              onChangeText={(next) => {
+                setGroupNote(next);
+                setAlsoSaveTo((chosen) =>
+                  alsoSaveChoiceAfterNoteChange(next, chosen),
+                );
+              }}
+              // Raw multi-line TextInput: typed line breaks survive (38.14 D-34).
+              onFocus={() => centering.onFieldFocus(groupNoteInputRef)}
+              onBlur={() => centering.onFieldBlur(groupNoteInputRef)}
+              multiline
+              placeholder="Add shared context"
+              placeholderTextColor={colors.textPlaceholder}
+              style={[
+                styles.note,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+            />
+          </View>
+          <AlsoSaveToPicker
+            testID="group-log-also-save-to"
+            value={alsoSaveTo}
+            onChange={setAlsoSaveTo}
+            disabled={saving || !canAlsoSave(groupNote)}
+          />
+          <View style={[styles.participants, { borderColor: colors.border }]}>
+            <AppText role="label">Participants</AppText>
+            {participantIds.length === 0 ? (
+              <View style={styles.field}>
+                <AppText role="body">No participants yet</AppText>
+                <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  Add the people who were there — or save now and add them
+                  later.
+                </AppText>
+              </View>
+            ) : (
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                {participantIds.length} participant
+                {participantIds.length === 1 ? "" : "s"} selected
+              </AppText>
+            )}
+            <Button
+              role="secondary"
+              label="Add participants"
+              onPress={() => setPickerVisible(true)}
+            />
+          </View>
+          {error ? (
+            <AppText role="caption" style={{ color: colors.danger }}>
+              {error}
+            </AppText>
+          ) : null}
+          <Pressable
+            testID="group-log-save"
+            accessibilityRole="button"
+            accessibilityLabel="Log event"
+            accessibilityState={{ disabled: saving }}
+            disabled={saving}
+            onPress={() => void save()}
+            style={[
+              styles.primary,
+              { backgroundColor: colors.accent, opacity: saving ? 0.5 : 1 },
+            ]}
+          >
+            <AppText role="label" style={{ color: colors.onAccent }}>
+              Log event
+            </AppText>
+          </Pressable>
+        </KeyboardCenteringProvider>
+        {bottomSpacer}
       </ScrollView>
       <ContactPicker
         mode="multi"

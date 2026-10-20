@@ -14,9 +14,10 @@
  * transaction — the inline `FUTURE_DATETIME_MESSAGE` the embedded form shows is
  * UX-only feedback, not a second source of truth.
  *
- * On a successful save the route returns to the caller; derived consumers (heatmap
- * buckets, Intensity, Last Interaction, Status, Gravity) recompute from the moved
- * recency on their next focused read, and the widget is nudged. A failed save
+ * On a successful save the route confirms "Changes saved", publishes the widget
+ * notify plus the shell refresh (38.14 D-58, as InteractionDetail's delete does)
+ * and returns to the caller; derived consumers (heatmap buckets, Intensity, Last
+ * Interaction, Status, Gravity) recompute from the moved recency. A failed save
  * preserves the full form state and never navigates away (the CAPT/refine idiom).
  *
  * Modeled on `EditContactScreen`: headerShown:false + the shared house header
@@ -34,7 +35,14 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -46,6 +54,8 @@ import {
   type FieldErrors,
   toFieldErrors,
 } from "@/components/ui/field-error-logic";
+import { KeyboardCenteringProvider } from "@/components/ui/KeyboardCenteringProvider";
+import { useKeyboardCentering } from "@/components/ui/use-keyboard-centering";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   readInteractionForEdit,
@@ -64,6 +74,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { notice } from "@/stores/confirm-store";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -159,6 +170,14 @@ export function EditInteractionScreen({
     busyRef: savingRef,
   });
 
+  // 38.14 D-34: the focused field stays above the keyboard (38.10 primitives).
+  const scrollRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null) as RefObject<View>;
+  const { centering, bottomSpacer } = useKeyboardCentering({
+    scrollRef,
+    contentRef,
+  });
+
   async function handleSave() {
     if (!value || !canSave(value, localDateTime(), saving)) {
       return;
@@ -189,9 +208,13 @@ export function EditInteractionScreen({
         getExecutor(),
         buildEditInput(value, { interactionId, contactId, now: writeNow }),
       );
-      // Committed: nudge the widget; in-app derived consumers recompute on their
-      // next focused read (heatmap, Intensity, Last Interaction, Status, Gravity).
+      // Committed: publish once to every consumer (widget + shell tick), as
+      // InteractionDetail's delete does, so Profile, History, Home, Digest
+      // and Orrery converge (38.14 D-58; 38.3 RG-024). Then confirm the
+      // silent write by name (38.9 D-39, carried D-20).
       notifyWidgetDataChanged();
+      bumpShellRefresh();
+      showSnackbar({ kind: "success", label: "Changes saved" });
       bypassRef.current = true;
       navigation.goBack();
     } catch (err) {
@@ -257,61 +280,67 @@ export function EditInteractionScreen({
     <View style={[styles.root, { paddingBottom: bottomInset }]}>
       {header}
       <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
         testID="edit-interaction-screen"
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
       >
-        <TouchpointRefineForm
-          testID="edit-interaction-form"
-          value={value}
-          onChange={(next) => {
-            // Editing the note clears its error (38.9 D-19).
-            if (next.note !== value.note) {
-              setFieldErrors((errors) => clearFieldError(errors, "note"));
-            }
-            setValue(next);
-          }}
-          now={now}
-          channelOptions={channelOptionsFor(savedChannel)}
-          noteError={fieldErrors.note ?? null}
-          allowAiLockedReason={
-            noteAiLocked ? aiLockReason("off_limits") : undefined
-          }
-        />
-
-        {saveError ? (
-          <Text
-            testID="edit-interaction-save-error"
-            accessibilityLabel={saveError}
-            style={[styles.error, { color: colors.danger }]}
-          >
-            {saveError}
-          </Text>
-        ) : null}
-
-        <Pressable
-          testID="edit-interaction-save"
-          accessibilityRole="button"
-          accessibilityLabel="Save changes"
-          accessibilityState={{ disabled: !savable }}
-          disabled={!savable}
-          onPress={() => void handleSave()}
-          style={[
-            styles.saveBtn,
-            {
-              backgroundColor: savable ? colors.accent : colors.surface,
-              borderColor: savable ? colors.accent : colors.border,
-            },
-          ]}
-        >
-          <Text
-            style={{
-              color: savable ? colors.onAccent : colors.textSecondary,
-              fontWeight: "600",
+        <KeyboardCenteringProvider value={centering}>
+          <TouchpointRefineForm
+            testID="edit-interaction-form"
+            value={value}
+            onChange={(next) => {
+              // Editing the note clears its error (38.9 D-19).
+              if (next.note !== value.note) {
+                setFieldErrors((errors) => clearFieldError(errors, "note"));
+              }
+              setValue(next);
             }}
+            now={now}
+            channelOptions={channelOptionsFor(savedChannel)}
+            noteError={fieldErrors.note ?? null}
+            allowAiLockedReason={
+              noteAiLocked ? aiLockReason("off_limits") : undefined
+            }
+          />
+
+          {saveError ? (
+            <Text
+              testID="edit-interaction-save-error"
+              accessibilityLabel={saveError}
+              style={[styles.error, { color: colors.danger }]}
+            >
+              {saveError}
+            </Text>
+          ) : null}
+
+          <Pressable
+            testID="edit-interaction-save"
+            accessibilityRole="button"
+            accessibilityLabel="Save changes"
+            accessibilityState={{ disabled: !savable }}
+            disabled={!savable}
+            onPress={() => void handleSave()}
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor: savable ? colors.accent : colors.surface,
+                borderColor: savable ? colors.accent : colors.border,
+              },
+            ]}
           >
-            Save changes
-          </Text>
-        </Pressable>
+            <Text
+              style={{
+                color: savable ? colors.onAccent : colors.textSecondary,
+                fontWeight: "600",
+              }}
+            >
+              Save changes
+            </Text>
+          </Pressable>
+        </KeyboardCenteringProvider>
+        {bottomSpacer}
       </ScrollView>
     </View>
   );

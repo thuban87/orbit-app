@@ -88,6 +88,23 @@ export function channelOptionsFor(
     : ORDINARY_LOG_CHANNEL_OPTIONS;
 }
 
+/**
+ * The occurred_at seed for Log Interaction (38.14 D-61). Opened from an empty
+ * History day (`prefillDate`), the form starts on that day at now's time of
+ * day, not midnight. With no day (the empty-month case, 38.8 D-28) it starts
+ * at now. Both are local `YYYY-MM-DD HH:MM:SS` strings, so they compare as
+ * text; a day after today (never offered by History) clamps to now, so the
+ * seed is never in the future.
+ */
+export function seedOccurredAtForDay(
+  prefillDate: string | undefined,
+  now: string,
+): string {
+  if (!prefillDate) return now;
+  const seeded = `${prefillDate} ${now.slice(11)}`;
+  return seeded > now ? now : seeded;
+}
+
 /** Message-first fallback when a remembered value is somehow absent (CAPT-11). */
 const REMEMBERED_FALLBACK: RememberedInteractionChannel = "Message";
 

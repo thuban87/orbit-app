@@ -12,7 +12,10 @@
  * With no provider the context is null and the field behaves the same minus
  * centring, so a screen outside D-66's scope never centres by accident. D-66
  * scope: Add/Edit Contact and the D-75 per-section editors only; an app-wide
- * rollout is out of scope (CONTEXT D-66).
+ * rollout is out of scope (CONTEXT D-66). 38.14 D-34 adds the three logging
+ * forms: Log Interaction, Edit interaction and Group Log. Their multi-line
+ * notes keep a raw TextInput and call the context directly (line breaks
+ * survive; EntryTextField would turn them into spaces).
  */
 import {
   createContext,

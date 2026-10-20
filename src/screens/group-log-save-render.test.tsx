@@ -91,6 +91,17 @@ vi.mock("@/components/ui/use-first-error-reveal", () => ({
     reveal,
   }),
 }));
+// 38.14 D-34: the keyboard centring hook keeps its own state; stub it so the
+// screen's useState slots stay pinned, and keep the provider a plain tag.
+const { centering } = vi.hoisted(() => ({
+  centering: { onFieldFocus: vi.fn(), onFieldBlur: vi.fn() },
+}));
+vi.mock("@/components/ui/use-keyboard-centering", () => ({
+  useKeyboardCentering: () => ({ centering, bottomSpacer: null }),
+}));
+vi.mock("@/components/ui/KeyboardCenteringProvider", () => ({
+  KeyboardCenteringProvider: "KeyboardCenteringProvider",
+}));
 vi.mock("@/db/database", () => ({
   getExecutor: () => "exec",
   localDateTime: () => "2026-10-11 12:00:00",
@@ -405,5 +416,26 @@ describe("GroupLogScreen channels (38.14 D-60)", () => {
     ]);
     // No "No channel" choice (Q26 rejected) and no legacy value.
     expect(options.map((o) => o.label)).not.toContain("No channel");
+  });
+});
+
+describe("GroupLogScreen keyboard centring (38.14 D-34)", () => {
+  it("wraps the form in the provider and centres the title and Group Note on focus", () => {
+    centering.onFieldFocus.mockClear();
+    centering.onFieldBlur.mockClear();
+    const tree = render();
+    const provider = tree.find(
+      (element) => element.type === "KeyboardCenteringProvider",
+    );
+    expect(provider?.props.value).toBe(centering);
+    const title = byTestId(tree, "group-log-title");
+    (title.props.onFocus as () => void)();
+    (title.props.onBlur as () => void)();
+    expect(centering.onFieldFocus).toHaveBeenCalledWith(title.props.ref);
+    expect(centering.onFieldBlur).toHaveBeenCalledWith(title.props.ref);
+    const note = byTestId(tree, "group-log-group-note");
+    expect(note.props.multiline).toBe(true);
+    (note.props.onFocus as () => void)();
+    expect(centering.onFieldFocus).toHaveBeenLastCalledWith(note.props.ref);
   });
 });

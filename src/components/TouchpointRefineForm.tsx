@@ -44,7 +44,7 @@
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   coerceAllowAi,
@@ -63,6 +63,7 @@ import {
 import { OptionSelectRow, OptionSheet, OrbitSwitch } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { FieldError } from "@/components/ui/FieldError";
+import { useKeyboardCenteringContext } from "@/components/ui/KeyboardCenteringProvider";
 import { DIRECTION_LABEL } from "@/constants/glossary";
 import { ORDINARY_LOG_CHANNEL_OPTIONS } from "@/screens/log-interaction-logic";
 import { useTheme } from "@/theme";
@@ -244,6 +245,12 @@ export function TouchpointRefineForm({
     customMinutesSeed(value.duration),
   );
   const [openSheet, setOpenSheet] = useState<ChoiceSheet | null>(null);
+  // 38.14 D-34: the note and the custom minutes tell the nearest host's
+  // keyboard centring on focus and blur (null outside a host: no centring).
+  // Raw TextInputs, so the multi-line note keeps its line breaks.
+  const centering = useKeyboardCenteringContext();
+  const noteInputRef = useRef<TextInput>(null);
+  const customMinutesRef = useRef<TextInput>(null);
   const fields = visibleFields ? new Set(visibleFields) : ALL_FIELDS;
   // Channel options default to the three canonical channels (38.14 D-60).
   const channels = channelOptions ?? ORDINARY_LOG_CHANNEL_OPTIONS;
@@ -407,10 +414,13 @@ export function TouchpointRefineForm({
               Note
             </Text>
             <TextInput
+              ref={noteInputRef}
               testID={`${testID}-note`}
               accessibilityLabel="Note"
               value={value.note ?? ""}
               onChangeText={(t) => set("note", t === "" ? null : t)}
+              onFocus={() => centering?.onFieldFocus(noteInputRef)}
+              onBlur={() => centering?.onFieldBlur(noteInputRef)}
               multiline
               placeholder="Add a detail"
               placeholderTextColor={colors.textPlaceholder}
@@ -486,7 +496,10 @@ export function TouchpointRefineForm({
               </Pressable>
             </View>
             <TextInput
+              ref={customMinutesRef}
               testID={`${testID}-duration-custom`}
+              onFocus={() => centering?.onFieldFocus(customMinutesRef)}
+              onBlur={() => centering?.onFieldBlur(customMinutesRef)}
               accessibilityLabel="Custom duration in minutes"
               // Follows a duration changed elsewhere (a chip, Follow event).
               value={customMinutesDisplay(customMinutes, value.duration)}
