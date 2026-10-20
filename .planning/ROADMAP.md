@@ -1781,14 +1781,25 @@ Plans:
 **Plans:** 9 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 38.14-01-PLAN.md — "Did you send it?" seam: panel claim, Later until return, No keeps draft, banner/list Yes right + destination + bottom sheet (wave 1)
-- [ ] 38.14-02-PLAN.md — Compose UX: usable-mode label/Subject/destination, empty disables, pinned Copy/Transmit bar, one scrim, copy snackbar, draft-switch prompt (wave 2)
 - [ ] 38.14-03-PLAN.md — One-tap logging: Quick Log snackbar + Undo confirm, resolved channel on bulk/widget/notification, bulk Undo · Edit re-channel, Group Log label, frozen order, picker reset (wave 1)
 - [ ] 38.14-04-PLAN.md — Logging forms: three channels, maximumDate, custom duration, glossary labels, keyboard centring, empty-day time, Edit save snackbar (wave 1)
-- [ ] 38.14-05-PLAN.md — Interaction sheet + History: note after When, pinned stacking actions, Intensity in plain words, heatmap labels/centring, distinct icons (wave 2)
 - [ ] 38.14-06-PLAN.md — Profile layout P-D + heading scale S2, History two cards, Contact Methods card, Overview inset (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 38.14-02-PLAN.md — Compose UX: usable-mode label/Subject/destination, empty disables, pinned Copy/Transmit bar, one scrim, copy snackbar, draft-switch prompt (wave 2)
+- [ ] 38.14-05-PLAN.md — Interaction sheet + History: note after When, pinned stacking actions, Intensity in plain words, heatmap labels/centring, distinct icons (wave 2)
 - [ ] 38.14-07-PLAN.md — Edit Event: rename, one participant editor, named snackbars, Remove-from-event order + confirm, publication at every group-event write (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 38.14-08-PLAN.md — Event detail + Events list: latest-request search + Back, visible actions, stale-sheet fix, override summaries (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 38.14-09-PLAN.md — Final device plan (after phase code review) + 39-AMENDMENTS-PENDING rows (D-49) + one release build (wave 4)
 
 ### Phase 38.15: Events — Plan, Create & Remind (INSERTED)
