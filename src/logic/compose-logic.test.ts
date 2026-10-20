@@ -17,7 +17,9 @@ import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   actionablePrimaryPhoneDestination,
   type ComposeExit,
+  composeActionAvailability,
   composeExitDisposition,
+  composeModePresentation,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
@@ -339,5 +341,138 @@ describe("composeExitDisposition — per-path session + navigation table (COMP-1
       expect(composeExitDisposition(exit).clearSession).toBe(false);
     }
     expect(composeExitDisposition("logged").clearSession).toBe(true);
+  });
+});
+
+const primaryEmail: ContactMethodRow = {
+  ...primaryPhone,
+  id: 2,
+  uid: "method-email",
+  method_type: "email",
+  raw_value: "maya@example.com",
+  display_value: "maya@example.com",
+  canonical_value: "maya@example.com",
+  canonical_region: null,
+  extension: null,
+  label: "Home",
+};
+
+describe("composeModePresentation — what Compose shows follows the usable mode (38.14 D-42)", () => {
+  it("Email preferred with only a phone: shows Text, no Subject, the phone destination and a hint", () => {
+    const p = composeModePresentation({
+      mode: "email",
+      phone: primaryPhone,
+      email: null,
+    });
+    expect(p.usable).toBe("text");
+    expect(p.modeLabel).toBe("Text");
+    expect(p.showSubject).toBe(false);
+    expect(p.destinationLine).toBe("Text to +1 312 555 1234");
+    expect(p.noDestinationHint).toMatch(/email/i);
+  });
+
+  it("Text preferred with both: Text to the phone, no Subject, no hint", () => {
+    const p = composeModePresentation({
+      mode: "text",
+      phone: primaryPhone,
+      email: primaryEmail,
+    });
+    expect(p.usable).toBe("text");
+    expect(p.showSubject).toBe(false);
+    expect(p.destinationLine).toBe("Text to +1 312 555 1234");
+    expect(p.noDestinationHint).toBeNull();
+  });
+
+  it("Email preferred with only an email: Email to the address, Subject shown", () => {
+    const p = composeModePresentation({
+      mode: "email",
+      phone: null,
+      email: primaryEmail,
+    });
+    expect(p.usable).toBe("email");
+    expect(p.modeLabel).toBe("Email");
+    expect(p.showSubject).toBe(true);
+    expect(p.destinationLine).toBe("Email to maya@example.com");
+    expect(p.noDestinationHint).toBeNull();
+  });
+
+  it("neither method: no usable mode and no destination line", () => {
+    const p = composeModePresentation({
+      mode: "text",
+      phone: null,
+      email: null,
+    });
+    expect(p.usable).toBeNull();
+    expect(p.destinationLine).toBeNull();
+    expect(p.modeLabel).toBe("Text");
+    expect(p.showSubject).toBe(false);
+  });
+
+  it("a destination-free Email draft keeps Subject and Copy subject (phase-14 :134, §E)", () => {
+    const p = composeModePresentation({
+      mode: "email",
+      phone: null,
+      email: null,
+    });
+    expect(p.usable).toBeNull();
+    expect(p.showSubject).toBe(true);
+    expect(p.modeLabel).toBe("Email");
+    expect(p.destinationLine).toBeNull();
+  });
+
+  it("an email-only contact shows the same mode and destination for either session mode; the hint only while Text is chosen (R3-02)", () => {
+    const asText = composeModePresentation({
+      mode: "text",
+      phone: null,
+      email: primaryEmail,
+    });
+    const asEmail = composeModePresentation({
+      mode: "email",
+      phone: null,
+      email: primaryEmail,
+    });
+    expect(asText.modeLabel).toBe("Email");
+    expect(asEmail.modeLabel).toBe("Email");
+    expect(asText.destinationLine).toBe("Email to maya@example.com");
+    expect(asEmail.destinationLine).toBe(asText.destinationLine);
+    expect(asText.noDestinationHint).not.toBeNull();
+    expect(asEmail.noDestinationHint).toBeNull();
+  });
+
+  it("a non-actionable method counts as absent", () => {
+    const p = composeModePresentation({
+      mode: "text",
+      phone: { ...primaryPhone, is_actionable: 0 },
+      email: primaryEmail,
+    });
+    expect(p.usable).toBe("email");
+  });
+
+  it("session Text with a usable Email: Copy subject copies the subject (R1-05)", () => {
+    const usable =
+      composeModePresentation({
+        mode: "text",
+        phone: null,
+        email: primaryEmail,
+      }).usable ?? "text";
+    expect(resolveCopyTargets(usable, "hi", "Re: x").subject).toBe("Re: x");
+  });
+});
+
+describe("composeActionAvailability — nothing to send or copy disables the action (38.14 D-46, D-76)", () => {
+  it("a blank body disables Transmit and Copy; a subject still copies", () => {
+    expect(composeActionAvailability({ body: "  ", subject: "x" })).toEqual({
+      transmitDisabled: true,
+      copyDisabled: true,
+      copySubjectDisabled: false,
+    });
+  });
+
+  it("a typed body enables Transmit and Copy; a blank subject disables Copy subject", () => {
+    expect(composeActionAvailability({ body: "hi", subject: "" })).toEqual({
+      transmitDisabled: false,
+      copyDisabled: false,
+      copySubjectDisabled: true,
+    });
   });
 });

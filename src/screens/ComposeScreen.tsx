@@ -144,7 +144,9 @@ import {
   actionablePrimaryPhoneDestination,
   type ComposeControls,
   type ComposeExit,
+  composeActionAvailability,
   composeExitDisposition,
+  composeModePresentation,
   effectiveMode,
   nextRememberedMode,
   resolveComposeControls,
@@ -240,6 +242,13 @@ type Header = {
   actionablePhone: string | null;
   /** DAO-selected actionable primary email destination, or null when none. */
   actionableEmail: string | null;
+  /**
+   * The DAO-selected primary rows behind those destinations, for the displayed
+   * destination line (38.14 D-42; `display_value` is how the Profile shows a
+   * method).
+   */
+  primaryPhone: ContactMethodRow | null;
+  primaryEmail: ContactMethodRow | null;
   /**
    * The full ordered per-type method groups (per-row is_primary/is_actionable).
    * Consumed to decide WHEN the establish-primary picker is shown —
@@ -757,6 +766,8 @@ export function ComposeScreen({
             archived_at: row.archived_at,
             actionablePhone: actionablePrimaryPhoneDestination(primaries.phone),
             actionableEmail: actionablePrimaryPhoneDestination(primaries.email),
+            primaryPhone: primaries.phone,
+            primaryEmail: primaries.email,
             methodGroups,
           });
           setScreenState("ready");
@@ -886,6 +897,8 @@ export function ComposeScreen({
             ...prev,
             actionablePhone: actionablePrimaryPhoneDestination(primaries.phone),
             actionableEmail: actionablePrimaryPhoneDestination(primaries.email),
+            primaryPhone: primaries.phone,
+            primaryEmail: primaries.email,
             methodGroups,
           },
     );
@@ -1012,7 +1025,8 @@ export function ComposeScreen({
   // handoff. CONSUMES the handoff outcome so the confirmation panel logs the
   // EXACT assist.
   const onTransmit = useCallback(async () => {
-    if (sending || header === null) {
+    // D-76: nothing typed, nothing to send (the button is disabled too).
+    if (sending || header === null || body.trim() === "") {
       return;
     }
     const usable = resolveUsableMode(
@@ -1081,12 +1095,27 @@ export function ComposeScreen({
     persistRememberedMode,
   ]);
 
+  // What Compose SHOWS follows the mode Transmit SENDS in (38.14 D-42, defect
+  // #8): the displayed mode name, the Subject and Copy subject, and the
+  // destination line. Computed here, above the copy handlers, so Copy and Copy
+  // subject resolve their targets from the same usable mode (falling back to
+  // the session mode only when nothing is usable) — a shown Copy subject always
+  // copies (D-18: never an impossible state).
+  const presentation = composeModePresentation({
+    mode,
+    phone: header?.primaryPhone ?? null,
+    email: header?.primaryEmail ?? null,
+  });
+  const copyMode = presentation.usable ?? mode;
+  // Nothing to send or copy disables the action (D-76, D-46).
+  const availability = composeActionAvailability({ body, subject });
+
   // Copy — the guaranteed handoff, NEVER gated by `sending`, NEVER opens the
   // confirmation panel. Copies the BODY only in any mode (resolveCopyTargets.body,
   // never inlined here); on success shows a transient "Message copied" for ~2s.
   const onCopy = useCallback(async () => {
     try {
-      const targets = resolveCopyTargets(mode, body, subject);
+      const targets = resolveCopyTargets(copyMode, body, subject);
       await Clipboard.setStringAsync(targets.body);
       flashCopyFeedback("Message copied");
       // Copy is a commit — advance the remembered mode (COMP-02).
@@ -1098,14 +1127,14 @@ export function ComposeScreen({
         label: "Couldn't copy. Please try again.",
       });
     }
-  }, [mode, body, subject, flashCopyFeedback, persistRememberedMode]);
+  }, [copyMode, body, subject, flashCopyFeedback, persistRememberedMode]);
 
   // Subject copy — the separate lightweight affordance (Email mode only). Copies
   // the SUBJECT only (resolveCopyTargets.subject, null in Text so it no-ops);
   // shows "Subject copied". It is NOT the main Copy commit, so it does not
   // advance the remembered mode.
   const onCopySubject = useCallback(async () => {
-    const targets = resolveCopyTargets(mode, body, subject);
+    const targets = resolveCopyTargets(copyMode, body, subject);
     if (targets.subject === null) {
       return;
     }
@@ -1119,7 +1148,7 @@ export function ComposeScreen({
         label: "Couldn't copy. Please try again.",
       });
     }
-  }, [mode, body, subject, flashCopyFeedback]);
+  }, [copyMode, body, subject, flashCopyFeedback]);
 
   // Apply one panel answer's pure outcome (compose-assist-panel.ts). Closing the
   // panel (confirm → null) is also what releases the store claim: the D-23 focus
@@ -1363,8 +1392,9 @@ export function ComposeScreen({
   const aiPosture = selectAiAffordance(aiAvailability);
 
   // The mode actually usable after preferred-then-fallback drives which type the
-  // establish-primary picker targets (COMP-03).
-  const usable = resolveUsableMode(mode, hasPhone, hasEmail);
+  // establish-primary picker targets (COMP-03) — the same usable mode the
+  // presentation above shows (38.14 D-42).
+  const usable = presentation.usable;
   const pickerType: ContactMethodType | null =
     usable === "email" ? "email" : usable === "text" ? "phone" : null;
   const pickerCandidates =
@@ -1393,7 +1423,7 @@ export function ComposeScreen({
           Body. Bound to the session store `subject`/`setSubject` (owned by plan
           35-01), so it survives nav/background exactly like the body. Its own
           lightweight Copy affordance copies the Subject only. */}
-        {mode === "email" ? (
+        {presentation.showSubject ? (
           <View testID="compose-subject" style={styles.section}>
             <ChromeScrim style={styles.labelScrim} radius={RADII.sm}>
               <AppText role="label">Subject</AppText>
@@ -1422,6 +1452,7 @@ export function ComposeScreen({
                 role="tertiary"
                 label="Copy subject"
                 accessibilityLabel="Copy subject"
+                disabled={availability.copySubjectDisabled}
                 onPress={() => void onCopySubject()}
               />
             </View>
@@ -1456,18 +1487,37 @@ export function ComposeScreen({
           />
         </View>
 
-        {/* Ad-hoc mode switch (COMP-02) — flips the session mode ONLY (never the
-          durable preference), tertiary accentText link tone. */}
-        <View style={styles.affordance}>
-          <Button
-            testID="compose-mode-switch"
-            role="tertiary"
-            label={mode === "email" ? "Make this a text" : "Make this an email"}
-            accessibilityLabel={
-              mode === "email" ? "Make this a text" : "Make this an email"
-            }
-            onPress={onSwitchMode}
-          />
+        {/* Where this goes (38.14 D-42): the destination line names the mode
+          Transmit sends in ("Text to …" / "Email to …"); with no usable
+          destination the displayed mode name stands alone. Beside it, the ad-hoc
+          mode switch (COMP-02, phase-14 :112) flips the session mode ONLY (never
+          the durable preference); its action text names what the tap does, so
+          it stays keyed on the session mode (R3-02). When the chosen mode has no
+          destination a plain line says so; the no-destination caption below
+          covers the case where nothing is usable. */}
+        <View testID="compose-mode" style={styles.section}>
+          <AppText testID="compose-destination" role="label">
+            {presentation.destinationLine ?? presentation.modeLabel}
+          </AppText>
+          <View style={styles.affordance}>
+            <Button
+              testID="compose-mode-switch"
+              role="tertiary"
+              label={
+                mode === "email" ? "Make this a text" : "Make this an email"
+              }
+              accessibilityLabel={
+                mode === "email" ? "Make this a text" : "Make this an email"
+              }
+              onPress={onSwitchMode}
+            />
+          </View>
+          {presentation.noDestinationHint !== null &&
+          presentation.usable !== null ? (
+            <AppText testID="compose-mode-hint" role="caption">
+              {presentation.noDestinationHint}
+            </AppText>
+          ) : null}
         </View>
 
         {/* Things to Remember Research entry (COMP-08) — a tertiary accentText link to
@@ -1912,6 +1962,7 @@ export function ComposeScreen({
             role={copyPrimary ? "primary" : "secondary"}
             label="Copy"
             accessibilityLabel="Copy"
+            disabled={availability.copyDisabled}
             onPress={() => void onCopy()}
           />
 
@@ -1922,7 +1973,7 @@ export function ComposeScreen({
               role="primary"
               label="Transmit"
               accessibilityLabel="Transmit"
-              disabled={sending}
+              disabled={sending || availability.transmitDisabled}
               onPress={() => void onTransmit()}
             />
           ) : null}

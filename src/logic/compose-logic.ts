@@ -184,6 +184,103 @@ export function resolveUsableMode(
   return hasPhone ? "text" : null;
 }
 
+/** What Compose shows for the current mode (38.14 D-42). */
+export interface ComposeModePresentation {
+  /** The mode Transmit sends in (resolveUsableMode), or null with no destination. */
+  usable: UsableMode;
+  /**
+   * The displayed mode name ("Text" / "Email") — the usable mode, else the
+   * session mode. NOT the mode switch's action text, which names what a tap
+   * does and stays keyed on the session mode (R3-02).
+   */
+  modeLabel: "Text" | "Email";
+  /** Whether the Subject field and Copy subject render (usable ?? session is email). */
+  showSubject: boolean;
+  /** "Text to …" / "Email to …" from the usable mode's method; null when none. */
+  destinationLine: string | null;
+  /**
+   * A plain line under the mode switch when the session mode has no
+   * destination (it differs from the usable mode, or nothing is usable).
+   */
+  noDestinationHint: string | null;
+}
+
+/**
+ * Resolve what Compose SHOWS so it agrees with what Transmit SENDS (38.14 D-42,
+ * defect #8). `phone` / `email` are the DAO-selected actionable primaries
+ * (`selectActionablePrimaryMethods`); a row without an actionable destination
+ * counts as absent, exactly as the Transmit endpoint does
+ * (`actionablePrimaryPhoneDestination`).
+ *
+ * The displayed mode name and the Subject follow `usable ?? mode`: with no
+ * destination at all Compose stays a drafting / Copy surface (phase-14 dossier
+ * :134), and an Email draft keeps its Subject and Copy subject (§E :142-150).
+ * The destination line is capability-based: it exists only for a usable mode.
+ * The hint wording stays true whatever Transmit can do (writing and copying
+ * always work; the destination line says where Transmit sends). Pure.
+ */
+export function composeModePresentation({
+  mode,
+  phone,
+  email,
+}: {
+  mode: MessageMode;
+  phone: ContactMethodRow | null;
+  email: ContactMethodRow | null;
+}): ComposeModePresentation {
+  const phoneRow =
+    actionablePrimaryPhoneDestination(phone) !== null ? phone : null;
+  const emailRow =
+    actionablePrimaryPhoneDestination(email) !== null ? email : null;
+  const usable = resolveUsableMode(mode, phoneRow !== null, emailRow !== null);
+  const shown: MessageMode = usable ?? mode;
+  const destinationLine =
+    usable === "text" && phoneRow !== null
+      ? `Text to ${phoneRow.display_value}`
+      : usable === "email" && emailRow !== null
+        ? `Email to ${emailRow.display_value}`
+        : null;
+  const noDestinationHint =
+    usable === mode
+      ? null
+      : mode === "email"
+        ? "No email address — you can still write and copy."
+        : "No phone number — you can still write and copy.";
+  return {
+    usable,
+    modeLabel: shown === "email" ? "Email" : "Text",
+    showSubject: shown === "email",
+    destinationLine,
+    noDestinationHint,
+  };
+}
+
+/** Which Compose actions are disabled for lack of anything to send or copy. */
+export interface ComposeActionAvailability {
+  transmitDisabled: boolean;
+  copyDisabled: boolean;
+  copySubjectDisabled: boolean;
+}
+
+/**
+ * Transmit and Copy need a non-blank body (38.14 D-76, D-46); Copy subject
+ * needs a non-blank subject (D-46). Pure.
+ */
+export function composeActionAvailability({
+  body,
+  subject,
+}: {
+  body: string;
+  subject: string;
+}): ComposeActionAvailability {
+  const blankBody = body.trim() === "";
+  return {
+    transmitDisabled: blankBody,
+    copyDisabled: blankBody,
+    copySubjectDisabled: subject.trim() === "",
+  };
+}
+
 /**
  * Resolve the effective compose mode from the stored default. The `remember`
  * sentinel resolves to the remembered concrete mode; a fixed default is used
