@@ -112,8 +112,15 @@ describe("ComposeScreen assist panel wiring", () => {
       expect(body).not.toContain("setPanelOwned(");
       expect(body).not.toContain("releasePanelOwned(");
     }
-    expect(code.match(/setPanelOwned\(/g)).toHaveLength(1);
+    // The focus effect plus one synchronous claim beside setConfirm in
+    // onTransmit (review A-IN-03); only the focus effect releases.
+    expect(code.match(/setPanelOwned\(/g)).toHaveLength(2);
     expect(code.match(/releasePanelOwned\(/g)).toHaveLength(1);
+    const transmit = handlerBody("onTransmit");
+    expect(transmit).toMatch(
+      /setPanelOwned\(outcome\.assistUid\);\s*setConfirm\(\{ assistUid: outcome\.assistUid, channel: usable \}\);/,
+    );
+    expect(transmit).not.toContain("releasePanelOwned(");
   });
 
   it("Yes confirms with the logged snackbar naming channel and person (D-43)", () => {

@@ -25,7 +25,8 @@
  *     Later writes nothing and keeps the record quiet on the banner and pending
  *     list until the next return to Orbit (assist-store Later set, D-77).
  *   - One asker per record (D-23): while the panel shows, Compose claims its
- *     record in the assist store (one focus effect keyed on `confirm`), so the
+ *     record in the assist store (a focus effect keyed on `confirm` owns the
+ *     claim, its release and the refocus re-claim), so the
  *     app-global AssistBanner + PendingConfirmationsSheet skip it. They stay
  *     mounted and ask about every other record as before (D-04; R11 rejected).
  *   - Session draft state lives in `compose-session-store` (survives nav /
@@ -954,8 +955,9 @@ export function ComposeScreen({
 
   // One asker per record (38.14 D-23, built from 39 D-76): while the "Did you
   // send it?" panel shows, Compose claims its record in the assist store so the
-  // banner and the pending list skip it. This single effect covers every claim
-  // point — it claims when `setConfirm` opens the panel, releases when an answer
+  // banner and the pending list skip it. This effect owns every release and
+  // every re-claim (onTransmit also claims at once beside `setConfirm`, review
+  // A-IN-03) — it claims when `setConfirm` opens the panel, releases when an answer
   // closes it (confirm → null), releases on blur and unmount, and claims again
   // on refocus while the panel is still up. App backgrounding (the SMS / mail
   // handoff) fires no focus blur, so the claim survives the trip out of Orbit.
@@ -1183,6 +1185,11 @@ export function ComposeScreen({
       // assist. A failed launch (handoffStarted false) or opted-out assists
       // (assistUid null) show nothing and attempt no re-query.
       if (outcome.handoffStarted && outcome.assistUid !== null) {
+        // Claim at once, beside opening the panel (review A-IN-03): the focus
+        // effect's claim lands only after paint, so a return-to-Orbit refresh
+        // in between could flash the record onto the banner. The focus effect
+        // still owns the release (compare-and-clear) and the refocus re-claim.
+        useAssistBanner.getState().setPanelOwned(outcome.assistUid);
         setConfirm({ assistUid: outcome.assistUid, channel: usable });
       }
       // A started handoff is a commit — advance the remembered mode (COMP-02).
