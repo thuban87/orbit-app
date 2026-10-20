@@ -11,7 +11,8 @@
  *   transaction (recordTouchpoint already owns the transaction; nesting the
  *   non-reentrant mutex would permanently hang — mutex.ts). It is deliberately
  *   the analog of the notification headless mark (notification-actions.ts):
- *   same one-tap 04-log defaults, same DAO, same invariant.
+ *   same one-tap defaults (the resolved Default Interaction Channel, 38.14
+ *   D-59), same DAO, same invariant.
  *
  * FRESH UID PER TAP (LOG-06 / RESEARCH Assumption A1):
  *   The interaction `uid` is minted with `newUid()`, so every GENUINE repeat tap
@@ -31,23 +32,29 @@
 import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { readResolvedInteractionChannel } from "@/services/resolved-interaction-channel";
 
 /**
  * Record a single widget-sourced touchpoint against `contactId`, recomputing
  * recency via the single-writer DAO. `now` is the local wall-clock
  * `YYYY-MM-DD HH:MM:SS` occurrence stamp (also the immutable recorded_at).
  *
- * Values are the 04-log canonical one-tap defaults, identical to the
- * notification mark (A6): `source='widget'`, `direction='outbound'`,
- * `channel='unspecified'`, `connected=1`, `quality=null`. The uid is freshly
- * minted so a genuine repeat tap is a distinct row. Returns the DAO's
+ * Values are the one-tap defaults, identical to the notification mark and
+ * bulk Quick Log (A6): `source='widget'`, `direction='outbound'`,
+ * `connected=1`, `quality=null`, and the channel is the resolved Default
+ * Interaction Channel, the same one single Quick Log records (38.14 D-59,
+ * superseding the former `'unspecified'`). The channel is read BEFORE
+ * `recordTouchpoint` opens its transaction (the mutex is non-reentrant) and
+ * falls back to Message, so a settings failure never drops the tap. The uid is
+ * freshly minted so a genuine repeat tap is a distinct row. Returns the DAO's
  * `{ interactionId }`.
  */
-export function widgetMarkContacted(
+export async function widgetMarkContacted(
   exec: SqlExecutor,
   contactId: number,
   now: string,
 ): Promise<{ interactionId: number }> {
+  const channel = await readResolvedInteractionChannel(exec);
   return recordTouchpoint(exec, {
     contactId,
     uid: newUid(),
@@ -55,7 +62,7 @@ export function widgetMarkContacted(
     now,
     source: "widget",
     direction: "outbound",
-    channel: "unspecified",
+    channel,
     connected: 1,
     quality: null,
   });

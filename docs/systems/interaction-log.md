@@ -79,7 +79,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 ### Logging and refining a touchpoint
 
-1. The profile's one-tap action creates an outbound, connected, `unspecified`-channel manual touchpoint.
+1. The profile's one-tap action creates an outbound, connected manual touchpoint on the resolved Default Interaction Channel (the user's fixed choice, or the channel last saved in Log Interaction for Remember last choice; Message when the settings cannot be read).
 2. `recordTouchpoint()` rejects a future `occurred_at`, opens the serialized transaction, inserts the row, and recomputes qualifying `last_contact`.
 3. The profile reloads its status, timeline, and impact views together.
 4. The user can open `TouchpointRefineForm` to correct channel, direction, connection, quality, note, and local date/time; `editTouchpointFull()` writes every editable column then recomputes recency.
@@ -88,7 +88,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 ### Quick Logging from the shell
 
 1. The universal FAB and Dashboard List right-swipe action both select the current Profile contact or canonical picker as needed, then run `runQuickLog()` with established outbound, connected, manual defaults and the resolved ordinary Channel preference.
-2. The shared command shows success, Undo, and Add Note only after `recordTouchpoint()` resolves. Undo calls `deleteTouchpoint()` with both the interaction and contact IDs; Add Note opens a post-log editor bound to the committed row; a failed write or undo shows retryable feedback rather than a false success.
+2. The shared command shows success, Undo, and Add Note only after `recordTouchpoint()` resolves. The success snackbar uses the one logging pattern, "Logged <Channel> with <Name>" (`loggedInteractionSnackbar`), naming the channel it just wrote; the + FAB reads the name lazily inside the command's in-flight guard, and a failed name read names only the channel. Quick Log never writes the remembered channel; Log Interaction stays its only app-UI writer (38.14 D-63). Undo calls `deleteTouchpoint()` with both the interaction and contact IDs and, once it commits, confirms with a warning snackbar naming what was undone (D-38); Add Note opens a post-log editor bound to the committed row; a failed write or undo shows retryable feedback rather than a false success.
    - The post-log editor, the Add Note sheet (`src/components/PostLogNoteEditor.tsx`), saves the note and, through its "Also save to" chip row (`AlsoSaveToPicker`, one section or None), a linked entry in Last Talked About, Gift Ideas, Thought of Them or Memories in the same transaction (`saveNoteWithLinkedEntry`; ADR-211). "Create Memory Instead" is gone (D-42). The sheet sizes to fit and keeps its chips and Cancel/Save visible with the keyboard up (D-136 O4, D-146). A save shows "Added note for <name>" plus the section. It publishes the shell refresh tick after a committed write only (38.3 D-21).
 3. The command publishes browse and widget refreshes only after a committed write or delete. Its single-flight guards prevent a rapid tap or swipe from creating or deleting more than one row.
 
@@ -102,20 +102,20 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 ### Quick Logging and archiving a Dashboard selection
 
-1. Dashboard Card View validates a selection, then `bulkQuickLog()` opens one transaction and writes one canonical outbound, connected, manual, unspecified-channel interaction per selected contact.
+1. Dashboard Card View validates a selection, reads the resolved Default Interaction Channel with `readResolvedInteractionChannel()` before any transaction (Message fallback, never rejects), then `bulkQuickLog()` opens one transaction and writes one outbound, connected, manual interaction on that channel per selected contact. The snackbar reads "Logged <Channel> with <N> people" (or the person's name for one).
 2. The composer runs `insertInteractionCore()` and `recomputeLastContactCore()` for each row, returns the exact interaction receipt, and bumps data revision once. Undo composes `deleteInteractionCore()` for that receipt in one transaction, so it cannot remove another batch's history.
 3. `bulkArchive()` invokes the guarded archive core for every selected contact in its one transaction. Each archive receives its immutable event; a failed ID rolls the entire batch back.
 
 ### Recording notification actions
 
-1. The shared notification action handler routes Mark contacted through `recordTouchpoint()` with `source='notification'`, `direction='outbound'`, `channel='unspecified'`, `connected=1`, and `quality=NULL`.
+1. The shared notification action handler reads the resolved Default Interaction Channel (`readResolvedInteractionChannel()`, before the write transaction, Message fallback) and routes Mark contacted through `recordTouchpoint()` with `source='notification'`, `direction='outbound'`, that channel, `connected=1`, and `quality=NULL`.
 2. Snooze and Clear use the snooze DAO, which composes `recordEventCore()` inside its one write transaction to append `snooze` or `unsnooze` history.
 3. Deterministic action UIDs make a re-delivered notification response collide harmlessly with the existing unique event or interaction row.
 
 ### Recording a widget mark
 
 1. A headless `WIDGET_MARK` validates its contact ID, opens and migrates SQLite, and calls `widgetMarkContacted()`.
-2. That seam delegates to `recordTouchpoint()` with `source='widget'`, outbound, connected, unspecified-channel defaults, and `quality=NULL`.
+2. That seam reads the resolved Default Interaction Channel (`readResolvedInteractionChannel()`, before the write transaction, Message fallback so a settings failure never drops the tap) and delegates to `recordTouchpoint()` with `source='widget'`, outbound, connected, that channel, and `quality=NULL`.
 3. Each genuine widget tap receives a fresh UID and produces a complete interaction row; the renderer refreshes only after this serialized write commits.
 
 ### Recording an assist confirmation
@@ -278,3 +278,4 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-23 | 38.4 | Touchpoint refine form: the selected duration chip is filled with the accent and labelled with `onAccent` (`durationChipTone`, D-30; ADR-169), chips meet `MIN_TOUCH_TARGET`, and the date/time value renders through the shared minute formatter (RG-030, RG-038). The post-log note editor scrolls at large text (D-72; ADR-174). |
 | 2026-10-11 | 38.9 | Deleted the unrendered `TimelineRow` component; its `EVENT_LABELS` map moved unchanged to `history-stream-logic.ts` (review IN-05). |
 | 2026-10-15 | 38.10 | "Also save to" on Log Interaction and the Add Note sheet saves a linked entry in one transaction; Create Memory Instead removed; notes moved into Off Limits lock AI off; success snackbars name the person and section (ADR-211, ADR-213). |
+| 2026-10-20 | 38.14 | One-tap logs record the resolved Default Interaction Channel instead of `unspecified`: bulk Quick Log, the widget Mark and the notification Mark use the same resolver as Quick Log (`readResolvedInteractionChannel`, Message fallback, read outside the write mutex), direction stays outbound (D-59, D-63). Quick Log's snackbar names the channel and person and its Undo confirms (D-38, D-39). |

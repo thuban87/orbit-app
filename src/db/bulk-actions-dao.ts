@@ -47,10 +47,18 @@ function rejectInvalidFrequency(intervalDays: number): void {
   }
 }
 
+/**
+ * Bulk Quick Log (ADR-103): one outbound, connected interaction per id in one
+ * transaction, with one revision bump and an exact receipt for Undo / Edit.
+ * `channel` is the resolved Default Interaction Channel (38.14 D-59, amending
+ * ADR-103's canonical shape), read by the caller BEFORE this transaction with
+ * `readResolvedInteractionChannel` — never inside the non-reentrant mutex.
+ */
 export function bulkQuickLog(
   exec: SqlExecutor,
   ids: number[],
   now: string,
+  channel: string,
 ): Promise<QuickLogBatchReceipt> {
   try {
     rejectFutureOccurredAt(now, now);
@@ -65,7 +73,7 @@ export function bulkQuickLog(
       const interactionId = await insertInteractionCore(exec, contactId, now, {
         uid: newUid(),
         occurredAt: now,
-        channel: "unspecified",
+        channel,
         direction: "outbound",
         connected: 1,
         quality: null,

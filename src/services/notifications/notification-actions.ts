@@ -52,6 +52,7 @@ import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { snoozeContact } from "@/db/snooze-dao";
 import { getDeviceRegion } from "@/services/device-region";
+import { readResolvedInteractionChannel } from "@/services/resolved-interaction-channel";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { Logger } from "@/utils/logger";
@@ -150,8 +151,13 @@ export async function handleNotificationAction(
 
   try {
     if (actionIdentifier === ACTION_MARK) {
-      // The 04-log canonical one-tap values (A6): a notification-sourced,
-      // outbound, unspecified-channel, connected touchpoint with no quality.
+      // 38.14 D-59: the Mark records the resolved Default Interaction Channel,
+      // the same one single Quick Log records. Read BEFORE recordTouchpoint
+      // opens its (non-reentrant) write transaction; it never rejects and
+      // falls back to Message, so a settings failure never drops the tap.
+      const channel = await readResolvedInteractionChannel(exec);
+      // The one-tap values (A6): a notification-sourced, outbound, connected
+      // touchpoint with no quality, on the resolved channel (D-59).
       await recordTouchpoint(exec, {
         contactId: data.contactId,
         uid: key,
@@ -159,7 +165,7 @@ export async function handleNotificationAction(
         now,
         source: "notification",
         direction: "outbound",
-        channel: "unspecified",
+        channel,
         connected: 1,
         quality: null,
       });

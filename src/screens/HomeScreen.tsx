@@ -140,6 +140,7 @@ import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
 import { countUnbound } from "@/db/unbound-read";
 import { useRetainedWhileClosing } from "@/hooks/use-retained-while-closing";
+import { loggedInteractionSnackbar } from "@/logic/also-save-to-logic";
 import {
   type BulkActionClaim,
   createBulkActionGate,
@@ -205,6 +206,7 @@ import {
 } from "@/screens/dashboard-refresh-scheduler";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { runQuickLog } from "@/services/quick-log-command";
+import { readResolvedInteractionChannel } from "@/services/resolved-interaction-channel";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
@@ -1383,9 +1385,29 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     (ids: number[], claimed?: BulkActionClaim) => {
       const claim = claimed ?? tryAcquireBulkAction();
       if (!claim || (!claimed && !consumeBulkAction(claim))) return;
-      void bulkQuickLog(getExecutor(), ids, localDateTime())
-        .then((receipt) => {
-          const label = `Logged ${plural(ids.length, "interaction")}`;
+      const now = localDateTime();
+      // 38.14 D-59: the resolved Default Interaction Channel, read BEFORE the
+      // write transaction (never inside the non-reentrant mutex). It never
+      // rejects: a settings failure falls back to Message.
+      void readResolvedInteractionChannel(getExecutor())
+        .then((channel) =>
+          bulkQuickLog(getExecutor(), ids, now, channel).then((receipt) => ({
+            receipt,
+            channel,
+          })),
+        )
+        .then(({ receipt, channel }) => {
+          // D-39: the one logging pattern; bulk names the count. One person
+          // is named from the published rows (this plan only); a missing row
+          // names only the channel.
+          const label = loggedInteractionSnackbar({
+            channel,
+            personName:
+              ids.length === 1
+                ? (rowsByIdRef.current.get(ids[0])?.name ?? null)
+                : `${ids.length} people`,
+            section: null,
+          });
           notifyWidgetDataChanged();
           bumpShellRefresh();
           AccessibilityInfo.announceForAccessibility(label);
