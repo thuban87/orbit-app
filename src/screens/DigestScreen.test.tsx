@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -360,6 +361,7 @@ describe("DigestScreen composition", () => {
   it("awaits the complete query write before navigating and never navigates on rejection", async () => {
     const order: string[] = [];
     await runDigestDrillThrough("never-contacted", {
+      endSelection: () => order.push("selection-ended"),
       setPopulationsAndFilters: (async (
         _exec: unknown,
         populations: string[],
@@ -371,11 +373,12 @@ describe("DigestScreen composition", () => {
       }) as never,
       navigateToContacts: () => order.push("navigated"),
     });
-    expect(order).toEqual(["persisted", "navigated"]);
+    expect(order).toEqual(["selection-ended", "persisted", "navigated"]);
 
     const navigate = vi.fn();
     await expect(
       runDigestDrillThrough("overlooked", {
+        endSelection: vi.fn(),
         setPopulationsAndFilters: vi
           .fn()
           .mockRejectedValue(new Error("write failed")),
@@ -383,5 +386,36 @@ describe("DigestScreen composition", () => {
       }),
     ).rejects.toThrow("write failed");
     expect(navigate).not.toHaveBeenCalled();
+  });
+  it("ends a selection before the drill changes the Contacts list, for both targets (38.13 D-89 F1; ADR-102)", async () => {
+    const { useDashboardSelectionStore } = await import(
+      "@/stores/dashboard-selection-store"
+    );
+    for (const target of ["never-contacted", "overlooked"] as const) {
+      useDashboardSelectionStore.getState().enterSelection([1, 2, 3], 2);
+      let selectingWhenWritten: boolean | null = null;
+      await runDigestDrillThrough(target, {
+        endSelection: useDashboardSelectionStore.getState().exitSelection,
+        setPopulationsAndFilters: (async () => {
+          selectingWhenWritten = useDashboardSelectionStore.getState().mode;
+        }) as never,
+        navigateToContacts: vi.fn(),
+      });
+      expect(selectingWhenWritten).toBe(false);
+      const after = useDashboardSelectionStore.getState();
+      expect(after.mode).toBe(false);
+      expect(after.selectedIds.size).toBe(0);
+      expect(after.frozenUniverse).toEqual([]);
+    }
+  });
+
+  it("DigestScreen wires the drill to the selection store's exit (38.13 D-89 F1)", () => {
+    const source = readFileSync(
+      new URL("./DigestScreen.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain(
+      "endSelection: useDashboardSelectionStore.getState().exitSelection,",
+    );
   });
 });

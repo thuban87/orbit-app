@@ -45,6 +45,7 @@ import {
   digestLoadStateOnPublish,
 } from "@/screens/digest-refresh";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
+import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import {
   useForegroundRefresh,
   useShellRefresh,
@@ -100,17 +101,28 @@ async function readDigestData(): Promise<DigestData> {
 }
 
 interface DrillThroughDeps {
+  /**
+   * Ends a Contacts selection still on from before the user left Contacts
+   * (38.13 D-89 F1). Selection's universe is frozen at entry (ADR-102), so a
+   * drill that changes the list would leave Select All choosing people the
+   * new list does not show.
+   */
+  endSelection: () => void;
   setPopulationsAndFilters: ReturnType<
     typeof useDashboardQueryStore.getState
   >["setPopulationsAndFilters"];
   navigateToContacts: () => void;
 }
 
-/** Persist the complete Contacts query before crossing the tab boundary. */
+/**
+ * Persist the complete Contacts query before crossing the tab boundary. Any
+ * selection ends first, before the list changes (38.13 D-89 F1).
+ */
 export async function runDigestDrillThrough(
   target: HorizonDrillTarget,
   deps: DrillThroughDeps,
 ): Promise<void> {
+  deps.endSelection();
   const exec = getExecutor();
   if (target === "never-contacted") {
     await deps.setPopulationsAndFilters(exec, ["not-contacted"], {});
@@ -190,6 +202,9 @@ export function DigestScreen({ navigation }: DigestScreenProps) {
       const parent =
         navigation.getParent<BottomTabNavigationProp<TabParamList>>();
       void runDigestDrillThrough(target, {
+        // The store's exit is enough here: Home's bulk sheets and pickers are
+        // modal over the tab bar, so none can be open while Digest is shown.
+        endSelection: useDashboardSelectionStore.getState().exitSelection,
         setPopulationsAndFilters:
           useDashboardQueryStore.getState().setPopulationsAndFilters,
         navigateToContacts: () =>
