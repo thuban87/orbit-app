@@ -66,10 +66,11 @@ async function lastContact(contactId: number): Promise<string | null> {
 }
 
 describe("bulkQuickLog", () => {
-  it("records one canonical outbound interaction and a receipt per contact", async () => {
+  it("records one outbound interaction on the resolved channel and a receipt per contact (D-59)", async () => {
     const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const revisionBefore = await readDataRevision(exec);
 
-    const receipt = await bulkQuickLog(exec, ids, NOW);
+    const receipt = await bulkQuickLog(exec, ids, NOW, "In Person");
 
     expect(receipt.map((entry) => entry.contactId)).toEqual(ids);
     expect(
@@ -79,7 +80,7 @@ describe("bulkQuickLog", () => {
     ).toEqual([
       {
         contact_id: ids[0],
-        channel: "unspecified",
+        channel: "In Person",
         direction: "outbound",
         connected: 1,
         quality: null,
@@ -87,7 +88,7 @@ describe("bulkQuickLog", () => {
       },
       {
         contact_id: ids[1],
-        channel: "unspecified",
+        channel: "In Person",
         direction: "outbound",
         connected: 1,
         quality: null,
@@ -95,18 +96,20 @@ describe("bulkQuickLog", () => {
       },
     ]);
     expect(await Promise.all(ids.map(lastContact))).toEqual([NOW, NOW]);
+    // One revision bump for the whole batch (ADR-103).
+    expect(await readDataRevision(exec)).toBe(revisionBefore + 1);
   });
 
   it("advances recency for a rarely-responding contact because the log is connected", async () => {
     const contactId = await seedContact("Responds", 1);
-    await bulkQuickLog(exec, [contactId], NOW);
+    await bulkQuickLog(exec, [contactId], NOW, "Message");
     expect(await lastContact(contactId)).toBe(NOW);
   });
 
   it("rejects malformed current-time input before it opens a write transaction", async () => {
     const contactId = await seedContact("Guarded");
     await expect(
-      bulkQuickLog(exec, [contactId], "not-a-local-time"),
+      bulkQuickLog(exec, [contactId], "not-a-local-time", "Message"),
     ).rejects.toThrow(/valid local/);
     expect(await count("interactions")).toBe(0);
   });
@@ -124,7 +127,7 @@ describe("bulkQuickLog", () => {
       contactId,
     ]);
 
-    const receipt = await bulkQuickLog(exec, [contactId], NOW);
+    const receipt = await bulkQuickLog(exec, [contactId], NOW, "Message");
     await undoBulkQuickLog(exec, receipt, NOW);
 
     expect(await count("interactions")).toBe(1);
@@ -134,7 +137,7 @@ describe("bulkQuickLog", () => {
 
   it("rolls all undo rows back when one receipt item no longer matches", async () => {
     const ids = await Promise.all([seedContact("A"), seedContact("B")]);
-    const receipt = await bulkQuickLog(exec, ids, NOW);
+    const receipt = await bulkQuickLog(exec, ids, NOW, "Message");
     await expect(
       undoBulkQuickLog(
         exec,
@@ -382,7 +385,7 @@ describe("other bulk action composers", () => {
       interactions: await count("interactions"),
       events: await count("events"),
     };
-    await expect(bulkQuickLog(exec, [], NOW)).resolves.toEqual([]);
+    await expect(bulkQuickLog(exec, [], NOW, "Message")).resolves.toEqual([]);
     await Promise.all([
       undoBulkQuickLog(exec, [], NOW),
       bulkArchive(exec, [], NOW),

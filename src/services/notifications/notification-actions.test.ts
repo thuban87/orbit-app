@@ -37,6 +37,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("expo-notifications");
+vi.mock("expo-sqlite", () => ({}));
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: h.notifyWidget,
 }));
@@ -192,7 +193,10 @@ describe("handleNotificationAction — mark", () => {
     expect(row.uid).toBe(actionUid(ACTION_MARK, DATA));
     expect(row.source).toBe("notification");
     expect(row.direction).toBe("outbound");
-    expect(row.channel).toBe("unspecified");
+    // 38.14 D-59: the resolved Default Interaction Channel. This minimal schema
+    // predates the channel settings (migration 027), so the read fails and the
+    // Mark still writes, on Message.
+    expect(row.channel).toBe("Message");
     expect(row.connected).toBe(1);
     expect(row.quality).toBeNull();
 
@@ -201,6 +205,51 @@ describe("handleNotificationAction — mark", () => {
     // A mark changes last_contact/derived status → the widget is refreshed once
     // (headless-safe fire-and-forget, 12-07).
     expect(h.notifyWidget).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("handleNotificationAction — mark records the resolved channel (38.14 D-59)", () => {
+  it("still writes, outbound on Message, when the settings row is missing", async () => {
+    db.exec("DELETE FROM app_settings");
+    const { handleNotificationAction } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_MARK);
+
+    expect(interactionCount()).toBe(1);
+    const row = firstInteraction();
+    expect(row.channel).toBe("Message");
+    expect(row.direction).toBe("outbound");
+  });
+
+  it("records the user's default channel, outbound, on the full schema", async () => {
+    const { MIGRATIONS, TARGET_VERSION } =
+      await vi.importActual<typeof import("@/db/database")>("@/db/database");
+    db.close();
+    db = openTestDb();
+    const full = nodeSqliteExecutor(db);
+    let n = 0;
+    await runMigrations(full, MIGRATIONS, TARGET_VERSION, {
+      now: h.now,
+      newUid: () => `full-uid-${++n}`,
+      defaultPhoneRegion: "US",
+    });
+    await full.runAsync(
+      "UPDATE app_settings SET default_interaction_channel = 'Call' WHERE id = 1",
+    );
+    await full.runAsync(
+      `INSERT INTO contacts (id, uid, name, interval_days, created_at, modified_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [CONTACT_ID, "c1", "Ada", 30, h.now, h.now],
+    );
+    h.exec = full;
+
+    const { handleNotificationAction } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_MARK);
+
+    expect(interactionCount()).toBe(1);
+    const row = firstInteraction();
+    expect(row.channel).toBe("Call");
+    expect(row.direction).toBe("outbound");
+    expect(row.source).toBe("notification");
   });
 });
 

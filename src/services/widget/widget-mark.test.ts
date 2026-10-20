@@ -5,7 +5,8 @@
  * and the REAL single-writer recency DAO (via `widgetMarkContacted`), asserting
  * the load-bearing widget-tap contract WITHOUT a device:
  *   - exactly ONE interactions row per genuine tap, source='widget',
- *     direction='outbound', channel='unspecified', connected=1, quality null;
+ *     direction='outbound', the resolved Default Interaction Channel (38.14
+ *     D-59; Message when the settings cannot be read), connected=1, quality null;
  *   - `contacts.last_contact` recomputed to the marked timestamp (the DAO's MAX);
  *   - a SECOND genuine tap inserts a SECOND distinct row (no accidental dedup —
  *     LOG-06 mints a fresh uid per tap, unlike the notification path's
@@ -14,8 +15,12 @@
  * The killed-app native round-trip (WIDGET_CLICK → headless task) is device-only
  * (12-08); this proves the write core over the same harness as recency-dao.test.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
@@ -96,7 +101,9 @@ describe("widget-mark — headless single-writer mark (WDG-02)", () => {
     const r = all[0];
     expect(r.source).toBe("widget");
     expect(r.direction).toBe("outbound");
-    expect(r.channel).toBe("unspecified");
+    // This minimal schema predates the channel settings (migration 027), so
+    // the settings read fails and the tap still writes, on Message (D-59).
+    expect(r.channel).toBe("Message");
     expect(r.connected).toBe(1);
     expect(r.quality).toBeNull();
     expect(r.note).toBeNull();
@@ -124,5 +131,51 @@ describe("widget-mark — headless single-writer mark (WDG-02)", () => {
     expect(all.every((r) => r.source === "widget")).toBe(true);
     // last_contact equals the (identical) marked timestamp.
     expect(await lastContact(c)).toBe(NOW);
+  });
+});
+
+describe("widget-mark — the resolved Default Interaction Channel (38.14 D-59)", () => {
+  it("still writes, on Message, when the settings row is missing", async () => {
+    const c = await makeContact();
+    await exec.runAsync("DELETE FROM app_settings");
+
+    await widgetMarkContacted(exec, c, NOW);
+
+    const all = await rows(c);
+    expect(all).toHaveLength(1);
+    expect(all[0].channel).toBe("Message");
+    expect(all[0].direction).toBe("outbound");
+  });
+
+  it("records the user's default channel, outbound, on the full schema", async () => {
+    const full = nodeSqliteExecutor(openTestDb());
+    await runMigrations(full, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: uid,
+      defaultPhoneRegion: "US",
+    });
+    await full.runAsync(
+      "UPDATE app_settings SET default_interaction_channel = 'remember', remembered_interaction_channel = 'In Person' WHERE id = 1",
+    );
+    const { contactId } = await createContactWithInteraction(full, {
+      uid: uid(),
+      name: "Alex",
+      intervalDays: 30,
+      now: NOW,
+    });
+
+    await widgetMarkContacted(full, contactId, NOW);
+
+    const stored = await full.getAllAsync<{
+      channel: string;
+      direction: string | null;
+      source: string;
+    }>(
+      "SELECT channel, direction, source FROM interactions WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(stored).toEqual([
+      { channel: "In Person", direction: "outbound", source: "widget" },
+    ]);
   });
 });
