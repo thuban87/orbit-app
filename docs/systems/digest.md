@@ -1,7 +1,7 @@
 # Digest
 
-**Last updated:** 2026-10-18
-**Updated by phase:** 38.12-lifecycle-import-settings-ux
+**Last updated:** 2026-10-19
+**Updated by phase:** 38.13-contacts-list-search-digest-ux
 **Owners:** `src/db/digest-read.ts`, `src/db/up-next-read.ts`, `src/db/your-week-read.ts`, `src/logic/digest-composition.ts`, `src/screens/DigestScreen.tsx`, `src/screens/digest-refresh.ts`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -20,18 +20,20 @@ Digest reads existing state and persists only the portable app-wide period prefe
 - `app_settings` — supplies `your_week_period` (`rolling-7-days` or `calendar-week`) and the independent digest notification policy.
 
 **Types:**
-- `UpNextRow` (`src/db/up-next-read.ts`) — one canonically ranked relationship-attention candidate.
+- `UpNextCandidateRow` (`src/db/up-next-read.ts`) — one canonically ranked needs-attention candidate; the list feeds both Up Next and Overlooked.
 - `DigestComposition` (`src/logic/digest-composition.ts`) — capped Up Next and deduplicated Horizon section inputs.
-- `YourWeekDayRow` (`src/db/your-week-read.ts`) — one visible interaction or Group Event day-detail record.
+- `YourWeekDayRow` (`src/db/your-week-read.ts`) — one visible interaction (always a live contact: `contactId`, `contactName` non-null) or Group Event day-detail record, as a discriminated union.
+- `BirthdayCandidate` (`src/db/dashboard-read.ts`) — a birthday candidate with its `photo`.
 
 ### Store, Service & DAO Layer
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| Read DAO | `src/db/up-next-read.ts` | Reads canonical status/progress-ranked outreach candidates. |
-| Read DAO | `src/db/digest-read.ts` | Reads Horizon birthdays, overlooked people, and Never Contacted inputs. |
+| Read DAO | `src/db/up-next-read.ts` | `readUpNextCandidates`: every non-archived person matching `NEEDS_ATTENTION_WHERE`, ranked by status/progress, with no LIMIT (ADR-256). |
+| Read DAO | `src/db/dashboard-read.ts` | `listBirthdayCandidates` (with `photo`) and `countNeverContacted` for Horizon. |
+| Legacy read | `src/db/digest-read.ts` | Retrospective and gentle-line reads with no production consumer; the rogue-only Overlooked read is gone (ADR-256). |
 | Read DAO | `src/db/your-week-read.ts` | Aggregates app-wide metrics, heatmap counts, and group-deduplicated day detail. |
-| Pure logic | `src/logic/digest-composition.ts` | Caps Up Next at three and removes its claims from Horizon. |
+| Pure logic | `src/logic/digest-composition.ts` | `pickUpNext` caps Up Next at three; `dedupOverlooked` is the one dedupe that removes Up Next's people from Overlooked. |
 | Period service | `src/services/history/week-window.ts` | Defines Rolling 7 Days and locale-aware Calendar Week once. |
 | Screen | `src/screens/DigestScreen.tsx` | Owns every Digest refresh trigger (focus, shell tick, post-sweep foreground tick) and canonical Contacts drill navigation. |
 | Refresh controller | `src/screens/digest-refresh.ts` | Defers hidden triggers to focus, gates publication with one latest-request authority, and keeps a loaded body mounted across a failed refresh. |
@@ -43,12 +45,12 @@ Digest reads existing state and persists only the portable app-wide period prefe
 |---|---|
 | `src/screens/DigestScreen.tsx` | Mounts Up Next, Horizon, and Your Week in fixed order; opens Profiles and Contacts drills. |
 | `src/components/digest/UpNextSection.tsx` | Shows at most three explainable Profile-opening candidates without inline outreach writes. |
-| `src/components/digest/HorizonSection.tsx` | Shows separate conditional birthdays, overlooked, and Never Contacted groups. |
+| `src/components/digest/HorizonSection.tsx` | Shows separate conditional birthdays, Overlooked and Never Contacted groups; receives Overlooked already deduplicated; `RingedAvatar` on birthday and compact rows. |
 | `src/components/digest/YourWeekSection.tsx` | Follows Digest's `refreshSignal`, synchronizes the period preference, and mounts selected-day detail inline. |
 | `src/components/digest/your-week-section-logic.ts` | Pure period controller: in-flight write marker, safe Settings adoption, re-window day retention, shared period-read authority; the token-scoped day-detail state machine (`startDayRead` / `settleDayRead` / `failDayRead` / `clearDayDetail`). |
-| `src/components/digest/DigestDayDetail.tsx` | Renders the selected day from its read state: inline loading indicator, "Couldn't load this day" with Retry, empty copy only after a successful empty read, or the day's rows. |
+| `src/components/digest/DigestDayDetail.tsx` | Renders the selected day from its read state: inline loading indicator, "Couldn't load this day" with Retry, empty copy only after a successful empty read, or the day's rows as buttons (`onOpenProfile` / `onOpenEvent`). |
 | `src/components/digest/DigestListTransition.tsx` | The standard Up Next/Horizon list transition, skipped on first render and off under reduced motion. |
-| `src/components/digest/YourWeekHeatmap.tsx` | Reuses shared heatmap language with a non-colour-only selected state; sizes its cells from the measured width and centers the grid. |
+| `src/components/digest/YourWeekHeatmap.tsx` | Reuses shared heatmap language; a weekday label row (`weekdayColumnLabels`) marks the selected day with bold text and an underline, not colour alone; sizes its cells from the measured width and centers the grid. |
 | `src/components/heatmap-fit.ts` | Pure `fitHeatmapCell` fit-to-width helper shared with the Profile History heatmap. |
 | `src/db/your-week-read.ts` | Excludes group-linked child interactions and includes each Group Event parent once. |
 
@@ -63,15 +65,15 @@ Digest reads existing state and persists only the portable app-wide period prefe
    - on the post-sweep foreground tick, published after the launch/foreground sweep settles, so a resume reflects the sweep's purges and expiry (D-14).
 
    A shell or foreground trigger while Digest is hidden reads nothing — "hidden" means not the focused route **or** the app backgrounded, via the shared `isForegroundVisible(focused, AppState.currentState)` predicate (`src/utils/screen-visibility.ts`; 38.3 VERIFICATION W2, 38.4 D-10), so a warm notification Mark/Snooze delivered while the app is in the background costs no Digest read. `inactive` still counts as visible (the A-WR-01 rule); the next focus read covers it (no background reads). One latest-request authority gates publication, so an older read never overwrites a newer one. A failed refresh over an already-loaded Digest keeps the body mounted and shows a compact "Couldn't refresh Up Next and Horizon" notice with Retry; only a failure before anything has loaded shows the full error. Each accepted trigger also bumps a Digest-owned `refreshSignal` that Your Week follows instead of its own focus effect — on acceptance, not success, so Your Week still re-windows when the outer read fails.
-3. An Up Next or Horizon birthday row opens Profile in the Digest stack, so Back returns to Digest.
+3. An Up Next, Overlooked or Horizon birthday row, and a Your Week interaction row, opens Profile in the Digest stack, so Back returns to Digest; a Your Week Group Event row opens `GroupEventDetail` there.
 
 ### Composing Up Next and Horizon
 
-1. `readUpNext()` uses the shared status/progress SQL; `digest-composition.ts` applies the deterministic three-person cap.
-2. Horizon independently reads its next-seven-day birthdays, overlooked people, and Never Contacted candidates. The birthday tag is display text from the shared date-only formatter with its weekday ("Tue, Oct 13"); `digest-composition.ts` keeps a separate `dateKey` from `formatLocalDate()`, so display text never becomes a key. The group label is the glossary's "Never Contacted" (ADR-205, ADR-206).
-3. Up Next receives first claim on its contacts, then Horizon removes matching overlooked conditions rather than duplicating them.
+1. `readUpNextCandidates()` reads everyone who needs attention through `NEEDS_ATTENTION_WHERE` (`src/db/status.ts`: cadence precondition, progress at or past `STABLE_MAX`, not snoozed), the same predicate as the Contacts Needs Attention filter; `pickUpNext` takes the top three (ADR-256).
+2. Horizon reads its next-seven-day birthdays and the Never Contacted count, and gets Overlooked from the same candidates: `dedupOverlooked(upNextCandidates, upNextIds)` in `DigestScreen` — nearing decay, decaying and rogue people minus Up Next's three. Overlooked previews three names; its "See everyone needing attention →" link opens that same set on Contacts. Birthday rows show the contact's avatar in a neutral ring. The birthday tag is display text from the shared date-only formatter with its weekday ("Tue, Oct 13"); `digest-composition.ts` keeps a separate `dateKey` from `formatLocalDate()`, so display text never becomes a key. The group label is the glossary's "Never Contacted" (ADR-205, ADR-206).
+3. Up Next receives first claim on its contacts; Overlooked is the rest of the needs-attention set, so Up Next plus Overlooked is exactly the drill set with no overlap.
 3a. A snoozed person is left out of Up Next and Overlooked whether the snooze has a date or is indefinite ("Until I turn it off", `9999-12-31`). The per-person mute that Overlooked used to ignore no longer exists; it became the indefinite snooze (ADR-234).
-4. A scalable Horizon drill calls `setPopulationsAndFilters()` before selecting Contacts, so its persisted count, preview, and destination use the same canonical query state. The opt-in Unbound exception is limited to `not-contacted`.
+4. A scalable Horizon drill calls `setPopulationsAndFilters()` before selecting Contacts, so its persisted count, preview, and destination use the same canonical query state; it ends any Contacts selection first (`runDigestDrillThrough`, D-89). Drills keep saving the Contacts view with no banner or Undo (D-62). The opt-in Unbound exception is limited to `not-contacted`.
 
 ### Reflecting in Your Week
 
@@ -81,9 +83,9 @@ Digest reads existing state and persists only the portable app-wide period prefe
    - the original `date(occurred_at)` residual (`BETWEEN date(?) AND date(?)`, or `= date(?)` for one day), which keeps results exact — e.g. a malformed value the string range admits but `date()` rejects stays excluded.
 
    Every bound is a `?` parameter. Results are identical to the pre-38.4 reads for every stored form a live writer produces (`YYYY-MM-DD HH:MM:SS` via `rejectFutureOccurredAt`), plus date-only, `T`-separated, fractional-second, and malformed values; `src/db/your-week-read.test.ts` proves this against the legacy predicates as an oracle, alongside EXPLAIN QUERY PLAN and growing-history fixtures. **Accepted edge (not repaired, 38.2 D-23):** a timezone-suffixed `occurred_at` — reachable only through a hand-crafted backup, since `restore-apply.ts` writes backup strings without format validation — can fall outside the string range where `date()` would have shifted it across a UTC day, so it may drop out of a Your Week window it previously appeared in.
-3. A heatmap selection expands `DigestDayDetail` beneath the heatmap. Each interaction row shows the contact's real photo (`contactPhoto`, selected as `c.photo` in the interaction arm of `YOUR_WEEK_DAY_SQL` and `NULL` in the Group Event arm), or initials without one (ADR-180). The visual language and count classification reuse the Profile History helpers without adding rotary or long-range navigation.
+3. A heatmap selection expands `DigestDayDetail` beneath the heatmap; tapping the selected day again closes it (`toggleYourWeekDay`, D-45). Rows are tappable: an interaction opens the person's Profile, a Group Event opens `GroupEventDetail` (D-46). Re-reading the day already loaded (e.g. returning from a Profile) keeps its rows instead of collapsing to the spinner. Each interaction row shows the contact's real photo (`contactPhoto`, selected as `c.photo` in the interaction arm of `YOUR_WEEK_DAY_SQL` and `NULL` in the Group Event arm), or initials without one (ADR-180). The visual language and count classification reuse the Profile History helpers without adding rotary or long-range navigation.
    The grid fits its measured width (38.4 RG-033, `ui-accessibility/AUD-UIA-010`, D-13). A full-width wrapper measures the available width with `onLayout`. `fitHeatmapCell` then picks the cell edge `min(MAX_CELL, floor((width − 6·gap) / 7))`, and the grid is centered. Cells are whole dp, so seven cells plus six gaps never exceed the width, and nothing renders until the width is measured. `MAX_CELL` stops cells ballooning on wide screens. `MIN_CELL` is the design floor for supported (≥320dp) widths, not a clamp: on a narrower width the cells keep shrinking so every day stays visible, with no horizontal scroll.
-4. Settings and the in-context toggle both write the same validated portable `your_week_period` setting; Horizon birthdays and weekly notification cadence do not use it.
+4. Settings ("Which days Your Week on the Digest covers.") and the in-context toggle both write the same validated portable `your_week_period` setting; Horizon birthdays and weekly notification cadence do not use it (D-63). Switching Rolling 7 Days / Calendar Week keeps the current body mounted until the new read lands, so the page does not jump; a failed read of another period drops the held body (`heldWeekSurvivesFailure`, D-49).
 5. On each `refreshSignal`, Your Week keeps the chosen period and re-windows to the current local day (D-15). No timer detects the new day (D-22). A selected day survives while it is still a real day in the new window, including across a tab return (D-26), and is re-read; otherwise it clears.
 6. A period changed in Settings is adopted on the next refresh, but only when no in-context toggle write is in flight and no toggle has begun since that settings read started. A refresh can therefore never revert an in-flight toggle. Every period read (refresh, toggle, rollback) goes through one request authority, so the most recently begun read wins.
 7. Selected-day detail is an explicit `idle | loading | loaded | error` state (D-16). A heatmap tap, the detail's Retry, and a refresh that retained the day each start a **new** request with a fresh token from a latest-request authority; only the current `loading` token may settle or fail. The stale guard is therefore request-scoped, not date equality: re-selecting the same date or retrying makes any older read for that date — or any other — unable to publish rows or an error. Loading shows a small inline indicator; a failure shows "Couldn't load this day" with Retry; "No activity on this date." appears only after a successful empty read. Clearing the selection (period change, rollback, a day outside the new window) returns to `idle` and retires the outstanding read. A debug-only fault hook (`applyUatFault("digest-day-read")`, inert outside `__DEV__`) can delay or reject the next day read for device UAT.
@@ -103,7 +105,7 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | Up Next cap | `3` | `src/logic/digest-composition.ts` | Bounds the action-oriented home module. |
-| Birthday window | next `7` days | `src/db/digest-read.ts` | Horizon-only forward-looking birthday range. |
+| Birthday window | today through day 6 | `src/logic/digest-composition.ts` (`filterUpcomingBirthdays`) | Horizon-only forward-looking birthday range. |
 | `your_week_period` default | `rolling-7-days` | `src/db/migrations/030-your-week-period.ts` | Portable default selected for metrics and detail. |
 | `DIGEST_WEEKDAY` | `1` | `src/services/notifications/digest-schedule.ts` | Sunday weekly delivery. |
 | `MAX_CELL` | `56` | `src/components/digest/YourWeekHeatmap.tsx` | Your Week cell-edge cap on wide screens. |
@@ -111,11 +113,11 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 
 ## Decisions
 
-- **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — partially superseded by the fixed home composition; its local live-read boundary remains.
+- **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — partially superseded by the fixed home composition (ADR-147) and by ADR-256 (its rogue-only Overlooked read is retired); its local live-read boundary remains.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — retains the separate weekly prompt and durable notification gate.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — is partially superseded only for opted-in Unbound Never Contacted population semantics.
 - **ADR-076:** Population-Reached Birthdays Without a Dashboard Banner — moves richer birthday presentation to Horizon.
-- **ADR-147:** Derived Digest Composition and Canonical Contacts Drill-Through — establishes the fixed sections, canonical reads, claim deduplication, and drill contract.
+- **ADR-147:** Derived Digest Composition and Canonical Contacts Drill-Through — establishes the fixed sections, canonical reads, claim deduplication, and drill contract (partly superseded by ADR-256 on what "overlooked" means).
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — establishes the period setting and aggregate boundary.
 - **ADR-162:** Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority — supplies the shell and sweep-ordered foreground ticks Digest subscribes to.
 - **ADR-163:** Live Digest Refresh with Truthful Day-Detail States — re-reads Digest on committed writes and every resume, re-windows Your Week on a new day, and makes day detail truthful.
@@ -128,11 +130,13 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Horizon's "Never Contacted" label.
 - **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — an indefinite snooze leaves Up Next and Overlooked like a dated one (ADR-054's mute clause carries a note).
 - **ADR-247:** Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day — the Sunday digest notification moves to the quiet-hours end on Sunday.
+- **ADR-254:** Selection Mode Uses a Bottom Two-Row Bar and a More… Sheet — a Digest drill ends a Contacts selection before writing the query.
+- **ADR-256:** Digest Overlooked Lists Everyone Who Needs Attention, Minus Up Next — one `NEEDS_ATTENTION_WHERE` for Up Next, Overlooked and the drill; birthday avatars.
 
 ## Gotchas
 
 1. **Do not cache or persist a Digest snapshot.** The screen is a derived local read surface; `your_week_period` is an app preference, not Digest state.
-2. **Do not invent urgency or rewrite status SQL.** Up Next uses canonical relationship/orbit semantics and Horizon respects its first claim.
+2. **Do not invent urgency or rewrite status SQL.** Up Next and Overlooked read `NEEDS_ATTENTION_WHERE`, the same predicate the Contacts drill applies; a second needs-attention predicate would split the section from its link again (it once did: Overlooked read rogue only while its link opened wobble + decay + rogue). Dedupe only in `DigestScreen`; `HorizonSection` receives the list ready-made.
 3. **Birthdays are not Your Week activity.** Their independent next-seven-day window never changes with the period toggle.
 4. **Keep the Unbound exception exact.** It applies only to opted-in `not-contacted`, never to other active-cadence populations.
 5. **Do not double-count Group Events.** Exclude their linked child interactions from event activity and project the parent once.
@@ -140,6 +144,8 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 7. **A selected day is not immediately empty.** Day detail is `idle | loading | loaded | error`. A pending read shows the inline indicator, a failed one "Couldn't load this day" with Retry; never render "No activity on this date." for anything but a successful empty read. Every read (tap, Retry, retained-day refresh) takes a fresh request token. Never guard publication with `selectedDay === date` — a slower older read for the same date would overwrite the newer one.
 8. **Never give the Your Week grid a fixed cell edge again.** The old fixed 44dp cells overflowed narrow screens and left an empty right side on wider ones. Cells come from the measured width through `fitHeatmapCell`, and `MIN_CELL` must never become a clamp that could push a day off-screen (D-13). On screens narrower than about 366dp the cells are smaller than 44dp. That is the accepted cost of keeping all seven days visible.
 9. **Keep both halves of every Your Week predicate.** Dropping the `occurred_at` range falls back to a lifetime-history scan; dropping the `date()` residual lets malformed values the range admits into the counts. Never wrap the range column in a function, and never interpolate a period bound.
+10. **Put a ring's opacity on the ring, not on the avatar's wrapper.** Horizon avatars once rendered at 50% because the ring opacity sat on the wrapper holding the photo (review B-WR-03, fixed with `RingedAvatar`).
+11. **The drill's selection exit relies on modality.** `runDigestDrillThrough` calls the selection store's `exitSelection`, which is enough only because Home's bulk sheets are modal over the tab bar; a non-modal bulk surface would leave a sheet or claim behind.
 
 ## Related Systems
 
@@ -168,3 +174,4 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | 2026-09-30 | 38.6 | Your Week day detail shows each interaction contact's real photo: `YourWeekDayRow.contactPhoto` is selected in both UNION arms (NULL for Group Events), bind count and index use unchanged (ADR-180, D-14). |
 | 2026-10-11 | 38.9 | Digest dates (Horizon birthday tag with weekday, Your Week day detail and heatmap labels) use the shared date-only formatter, with a separate `dateKey` for storage-form keys; Horizon reads "Never Contacted" (ADR-205, ADR-206). |
 | 2026-10-18 | 38.12 | Indefinite snooze leaves Up Next and Overlooked like any snooze (the mute it replaced is retired); the digest notification respects quiet hours on Sunday (ADR-234, ADR-247). |
+| 2026-10-19 | 38.13 | Overlooked = everyone needing attention minus Up Next through one shared `NEEDS_ATTENTION_WHERE`; the rogue-only read is removed (ADR-256). Birthday rows show avatars. Your Week: re-tap closes the day, day rows open Profile or `GroupEventDetail`, weekday labels with a non-colour selected cue, the period switch holds the body; Settings period wording. A drill ends Contacts selection first. Corrected the stale "digest-read reads birthdays / overlooked" rows (A7). |
