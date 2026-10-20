@@ -32,6 +32,7 @@ import { useSheetFitEnvironment } from "@/components/use-sheet-fit-environment";
 import {
   FAVORITE,
   FAVORITES,
+  GROUP_LOG,
   LOG_INTERACTION,
   MOVE_TO_BIN,
 } from "@/constants/glossary";
@@ -168,11 +169,17 @@ export function BulkActionSurface({
     setMoreVisible(false);
     run();
   };
+  // 38.14 D-32: the log row names where it goes. 2+ selected open Group Log,
+  // one opens Log Interaction (the host's routing is count-aware, 38.13
+  // D-80); label, accessibility label and icon follow the count the sheet
+  // opened with. The + dial's Group Log action has no icon, so the row uses
+  // the Events glyph the group surfaces already use.
+  const groupLogRow = openedWith.current.selectedCount >= 2;
   const routineRows: SheetRow[] = [
     {
       id: "log-interaction",
-      label: LOG_INTERACTION,
-      icon: "call",
+      label: groupLogRow ? GROUP_LOG : LOG_INTERACTION,
+      icon: groupLogRow ? "group-events" : "call",
       enabled: sheetAvailability.canLogInteraction,
       onPress: closeThen(onLogInteraction),
     },

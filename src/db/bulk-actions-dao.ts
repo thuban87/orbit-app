@@ -17,6 +17,7 @@ import {
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import {
   deleteInteractionCore,
+  editTouchpointFullCore,
   insertInteractionCore,
   recomputeLastContactCore,
 } from "@/db/recency-dao";
@@ -98,6 +99,89 @@ export function undoBulkQuickLog(
       await deleteInteractionCore(exec, { contactId, interactionId, now });
     }
     await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Bulk Quick Log's "Edit" (38.14 D-62, D-82): re-channel every interaction
+ * from one batch, by its receipt, in ONE transaction with ONE revision bump.
+ *
+ * - Per row through the single interaction-edit core (`editTouchpointFullCore`,
+ *   ADR-122 :18), never a set-based UPDATE over the receipt. Each row is read
+ *   by `id` AND `contact_id` and rewritten with only `channel` replaced; every
+ *   other column is passed as stored (`lockNoteAi` omitted, so an existing
+ *   note AI lock is kept). The stored direction is kept: changing it would
+ *   reopen the withdrawn In Person-as-Mutual rule (former D-57).
+ * - Resolves to the number of rows re-channelled (0 when every row was
+ *   skipped, or for an empty receipt).
+ * - The only skips are D-82's two: a row deleted since the log, and a row
+ *   converted into an event (`group_event_id` set). A row edited in Edit
+ *   interaction during the Undo window is NOT skipped: Edit re-channels
+ *   "every interaction from that batch" (D-62), so its channel is overwritten.
+ * - All-or-nothing: any failing row rolls every earlier row and the revision
+ *   bump back.
+ * - No future-date guard: `occurred_at` is passed through unchanged, so this
+ *   never writes a new date (a Quick Log row is stamped at log time, and Edit
+ *   interaction refuses a future date). `editTouchpointFull`'s guard exists
+ *   for writes that set a date.
+ * - Linked notes: `editTouchpointFullCore` throws `LinkedNoteBlankError` only
+ *   when a note-linked entry exists AND the passed note is blank. The stored
+ *   note is passed through, and no writer can leave a note-linked interaction
+ *   with a blank note (checked 38.14-03): links are created only with
+ *   non-blank text equal to the note (`insertLinkedEntryCore`, from
+ *   `recordTouchpointWithLinkedEntry` / `saveNoteWithLinkedEntry`); every note
+ *   edit goes through `editTouchpointFullCore`, which refuses a blank note
+ *   while linked (Edit interaction, `editInteractionNoteCore` from the memory
+ *   and Last Talked About editors, the group cascades, the knowledge move's
+ *   AI lock); Undo restore relinks only to a non-blank note
+ *   (`resolveUndoLinkCore`); backup restore detaches a note link whose
+ *   interaction note is blank (`repairKnowledgeLinks`). So the throw is not
+ *   reachable here and there is no third skip category.
+ */
+export function rechannelBulkQuickLog(
+  exec: SqlExecutor,
+  receipt: QuickLogBatchReceipt,
+  channel: string,
+  now: string,
+): Promise<number> {
+  if (receipt.length === 0) return Promise.resolve(0);
+  return inWriteTransaction(exec, async () => {
+    let changed = 0;
+    for (const { contactId, interactionId } of receipt) {
+      const row = await exec.getFirstAsync<{
+        occurred_at: string;
+        direction: string | null;
+        connected: number;
+        quality: string | null;
+        note: string | null;
+        duration: number | null;
+        allow_ai: number;
+        group_event_id: number | null;
+      }>(
+        `SELECT occurred_at, direction, connected, quality, note, duration,
+                allow_ai, group_event_id
+           FROM interactions WHERE id = ? AND contact_id = ?`,
+        [interactionId, contactId],
+      );
+      // D-82: deleted, or converted into an event, since the log.
+      if (!row || row.group_event_id !== null) continue;
+      await editTouchpointFullCore(exec, {
+        interactionId,
+        contactId,
+        now,
+        occurredAt: row.occurred_at,
+        channel,
+        direction: row.direction,
+        connected: row.connected,
+        quality: row.quality,
+        note: row.note,
+        duration: row.duration,
+        allowAi: row.allow_ai,
+      });
+      changed += 1;
+    }
+    if (changed > 0) await bumpDataRevisionCore(exec);
+    return changed;
   });
 }
 

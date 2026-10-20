@@ -98,6 +98,7 @@ import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { OptionSheet } from "@/components/ui/OptionSheet";
 import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
 import { NEVER_CONTACTED } from "@/constants/glossary";
@@ -112,6 +113,8 @@ import {
   bulkSnooze,
   bulkSnoozeUntil,
   bulkUnsnooze,
+  type QuickLogBatchReceipt,
+  rechannelBulkQuickLog,
   undoBulkQuickLog,
 } from "@/db/bulk-actions-dao";
 import { listCategories } from "@/db/contact-read";
@@ -175,6 +178,7 @@ import {
   shouldApplyLifecycleRefresh,
   withFavouriteOverlay,
 } from "@/logic/dashboard-selection-applicability";
+import { orderRowsByFrozenUniverse } from "@/logic/dashboard-selection-order";
 import {
   favouriteTapOutcome,
   isUnboundRow,
@@ -204,6 +208,7 @@ import {
   isDashboardVisible,
   publishDashboardRead,
 } from "@/screens/dashboard-refresh-scheduler";
+import { ORDINARY_LOG_CHANNEL_OPTIONS } from "@/screens/log-interaction-logic";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { runQuickLog } from "@/services/quick-log-command";
 import { readResolvedInteractionChannel } from "@/services/resolved-interaction-channel";
@@ -683,10 +688,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
 
-  const frozenIds = useMemo(() => new Set(frozenUniverse), [frozenUniverse]);
-  const cardRows = selectionMode
-    ? rows.filter((row) => frozenIds.has(row.id))
-    : rows;
+  // 38.14 D-41: while selecting, the cards keep their entry-time order (the
+  // frozen universe, captured in on-screen order) through refreshes.
+  const cardRows = useMemo(
+    () =>
+      selectionMode ? orderRowsByFrozenUniverse(rows, frozenUniverse) : rows,
+    [frozenUniverse, rows, selectionMode],
+  );
   const selectionCount = selectedIds.size;
   // 38.13 D-77 (review R1-03, R3-01, R4-01, R5-02): Bound/favourite for the
   // frozen universe, captured from the entry rows and then refreshed from the
@@ -777,6 +785,17 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(
     null,
   );
+  // 38.14 D-62: the batch bulk Quick Log's "Edit" re-channels, captured from
+  // the snackbar exactly as its Undo captures the receipt, with the channel it
+  // was logged on (the sheet marks it). Held while the sheet fades closed.
+  const [rechannelTarget, setRechannelTarget] = useState<{
+    receipt: QuickLogBatchReceipt;
+    channel: string;
+  } | null>(null);
+  const rechannelShownRef = useRef(rechannelTarget);
+  if (rechannelTarget) rechannelShownRef.current = rechannelTarget;
+  // Single flight: a double tap on a channel runs one re-channel.
+  const rechannelPendingRef = useRef(false);
   // 38.11 D-45/D-82: the bulk snooze sheet's ids (the selection) and the
   // currently snoozed subset, both captured when it opens. The bulk claim is
   // never stored here: it lives in `bulkActionInputClaimRef` and every write
@@ -1431,6 +1450,13 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   );
               },
             },
+            // 38.14 D-62 (owner Q-23: "Just use 'Edit'"): change the channel
+            // of every interaction from this batch, while the snackbar shows.
+            secondaryAction: {
+              label: "Edit",
+              accessibilityLabel: `Change the channel of ${plural(ids.length, "logged interaction")}`,
+              onPress: () => setRechannelTarget({ receipt, channel }),
+            },
           });
         })
         .catch((writeError: unknown) => {
@@ -1448,6 +1474,46 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       reportBulkFailure,
       tryAcquireBulkAction,
     ],
+  );
+
+  // 38.14 D-62, D-82: re-channel the batch in one transaction through the
+  // per-row edit core, then publish and confirm. Rows deleted or turned into
+  // an event since the log are skipped by the DAO.
+  const runBulkRechannel = useCallback(
+    (receipt: QuickLogBatchReceipt, channel: string) => {
+      if (rechannelPendingRef.current) return;
+      rechannelPendingRef.current = true;
+      void rechannelBulkQuickLog(
+        getExecutor(),
+        receipt,
+        channel,
+        localDateTime(),
+      )
+        .then((changed) => {
+          if (changed === 0) {
+            AccessibilityInfo.announceForAccessibility(
+              "No logged interactions left to change",
+            );
+            showSnackbar({
+              kind: "success",
+              label: "No logged interactions left to change",
+            });
+            return;
+          }
+          commitBulkOutcome(
+            `Changed ${plural(changed, "interaction")} to ${channel}`,
+          );
+        })
+        .catch((editError: unknown) =>
+          reportBulkFailure("change the channel", editError, () =>
+            runBulkRechannel(receipt, channel),
+          ),
+        )
+        .finally(() => {
+          rechannelPendingRef.current = false;
+        });
+    },
+    [commitBulkOutcome, reportBulkFailure],
   );
 
   const performBulkArchive = useCallback(
@@ -2853,6 +2919,20 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             claim: picker.claim,
           });
         }}
+      />
+      {/* 38.14 D-62: bulk Quick Log's Edit — Message / Call / In Person. */}
+      <OptionSheet<string>
+        visible={rechannelTarget !== null}
+        title="Change channel"
+        options={ORDINARY_LOG_CHANNEL_OPTIONS}
+        selected={rechannelShownRef.current?.channel ?? null}
+        searchable={false}
+        onSelect={(channel) => {
+          const target = rechannelTarget;
+          setRechannelTarget(null);
+          if (target) runBulkRechannel(target.receipt, channel);
+        }}
+        onRequestClose={() => setRechannelTarget(null)}
       />
       {/* 38.11 D-93 / 38.9 D-30: the bulk Move to Bin confirm shares the
           Profile's body and its destructive (red) confirm. */}

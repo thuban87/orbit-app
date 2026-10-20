@@ -18,10 +18,10 @@ import {
 } from "@/db/bulk-actions-dao";
 import { createContactFull } from "@/db/contacts-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
-import { convertInteractionToGroupEvent } from "@/db/group-events-dao";
-import { editTouchpointFull, saveNoteWithLinkedEntry } from "@/db/recency-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { convertInteractionToGroupEvent } from "@/db/group-events-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { editTouchpointFull, saveNoteWithLinkedEntry } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
 import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
 
@@ -196,7 +196,9 @@ describe("rechannelBulkQuickLog (38.14 D-62, D-82)", () => {
     );
     const revisionBefore = await readDataRevision(exec);
 
-    await rechannelBulkQuickLog(exec, receipt, "Call", LATER);
+    await expect(
+      rechannelBulkQuickLog(exec, receipt, "Call", LATER),
+    ).resolves.toBe(2);
 
     const after = await Promise.all(
       receipt.map((entry) => storedInteraction(entry.interactionId)),
@@ -215,9 +217,9 @@ describe("rechannelBulkQuickLog (38.14 D-62, D-82)", () => {
 
   it("is a no-op with no revision bump for an empty receipt", async () => {
     const revisionBefore = await readDataRevision(exec);
-    await expect(
-      rechannelBulkQuickLog(exec, [], "Call", LATER),
-    ).resolves.toBeUndefined();
+    await expect(rechannelBulkQuickLog(exec, [], "Call", LATER)).resolves.toBe(
+      0,
+    );
     expect(await readDataRevision(exec)).toBe(revisionBefore);
   });
 
@@ -226,7 +228,9 @@ describe("rechannelBulkQuickLog (38.14 D-62, D-82)", () => {
     const receipt = await bulkQuickLog(exec, ids, NOW, "Message");
     await undoBulkQuickLog(exec, [receipt[0]], NOW);
 
-    await rechannelBulkQuickLog(exec, receipt, "In Person", LATER);
+    await expect(
+      rechannelBulkQuickLog(exec, receipt, "In Person", LATER),
+    ).resolves.toBe(1);
 
     expect((await storedInteraction(receipt[1].interactionId)).channel).toBe(
       "In Person",
@@ -317,7 +321,7 @@ describe("rechannelBulkQuickLog (38.14 D-62, D-82)", () => {
 
     await expect(
       rechannelBulkQuickLog(exec, [entry], "In Person", LATER),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(1);
 
     const after = await storedInteraction(entry.interactionId);
     expect(after.channel).toBe("In Person");
