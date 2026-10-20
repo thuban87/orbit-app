@@ -14,6 +14,40 @@ const ROOT = join(__dirname, "..", "..");
 const read = (file: string) =>
   readFileSync(join(ROOT, file), "utf8").replace(/\r\n/g, "\n");
 
+/**
+ * The source from the bracket at `open` through its matching close (review
+ * B-IN-08: a slice ending at a substring was cut short by a comment). Skips
+ * string, template and comment text, so a bracket inside them never counts.
+ */
+function balanced(source: string, open: number): string {
+  const pairs: Record<string, string> = { "(": ")", "{": "}", "[": "]" };
+  const stack: string[] = [];
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === "/" && source[i + 1] === "/") {
+      i = source.indexOf("\n", i);
+      if (i === -1) break;
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "*") {
+      i = source.indexOf("*/", i + 2) + 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      for (i++; i < source.length && source[i] !== ch; i++) {
+        if (source[i] === "\\") i++;
+      }
+      continue;
+    }
+    if (pairs[ch]) stack.push(pairs[ch]);
+    else if (ch === stack[stack.length - 1]) {
+      stack.pop();
+      if (stack.length === 0) return source.slice(open, i + 1);
+    }
+  }
+  throw new Error(`unbalanced source from ${open}`);
+}
+
 const SITES: readonly { file: string; min: number; sites: string }[] = [
   {
     file: "src/screens/GroupEventDetailScreen.tsx",
@@ -66,17 +100,26 @@ describe("group-event writes publish (38.14 D-27, D-81)", () => {
       "src/screens/EditGroupEventScreen.tsx",
     ]) {
       const source = read(file);
-      for (const seam of ["runParticipantAdd({", "runParticipantRemove({"]) {
+      for (const seam of ["runParticipantAdd(", "runParticipantRemove("]) {
         const start = source.indexOf(seam);
         expect(start, `${file} ${seam}`).toBeGreaterThan(-1);
-        const body = source.slice(
-          start,
-          source.indexOf("refresh", start + seam.length + 1) + 200,
+        // The whole seam call, bracket-matched (review B-IN-08).
+        const call = balanced(source, start + seam.length - 1);
+        const committedAt = call.indexOf("onCommitted: () => {");
+        expect(committedAt, `${file} ${seam} onCommitted`).toBeGreaterThan(-1);
+        // The onCommitted body itself holds the publish.
+        const committed = balanced(
+          call,
+          committedAt + "onCommitted: () => ".length,
         );
-        const committed = body.indexOf("onCommitted");
-        const publish = body.indexOf("publishInteractionWrite();");
-        expect(committed, `${file} ${seam} onCommitted`).toBeGreaterThan(-1);
-        expect(publish, `${file} ${seam} publish`).toBeGreaterThan(committed);
+        expect(committed, `${file} ${seam} publish`).toContain(
+          "publishInteractionWrite();",
+        );
+        // Nothing outside onCommitted publishes (never before the write).
+        expect(
+          call.replace(committed, "").includes("publishInteractionWrite();"),
+          `${file} ${seam} publishes outside onCommitted`,
+        ).toBe(false);
       }
     }
   });
@@ -95,5 +138,13 @@ describe("group-event writes publish (38.14 D-27, D-81)", () => {
     expect(log.indexOf("publishInteractionWrite();")).toBeGreaterThan(
       log.indexOf("await createGroupEvent("),
     );
+  });
+});
+
+describe("balanced (review B-IN-08)", () => {
+  it("matches across nested brackets and ignores brackets in comments and strings", () => {
+    const source =
+      'f({ a: () => { g("(", `}`); /* ) */ // }\n }, b: [1] }) tail';
+    expect(balanced(source, 1)).toBe(source.slice(1, source.indexOf(" tail")));
   });
 });
