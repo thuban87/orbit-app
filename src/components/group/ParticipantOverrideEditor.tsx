@@ -12,6 +12,7 @@ import type {
   GroupEventParticipant,
 } from "@/db/group-events-read";
 import { resolveDisplay } from "@/logic/group-inheritance";
+import { channelOptionsFor } from "@/screens/log-interaction-logic";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -115,6 +116,12 @@ export function ParticipantOverrideEditor({
         value={draft.value}
         onChange={changeValue}
         now={event.occurredAt}
+        // 38.14 D-60: options from the participant's STORED channel (or the
+        // event's when following), never the draft, so a stored legacy value
+        // stays selectable after switching away.
+        channelOptions={channelOptionsFor(
+          participantDraft(participant, event).value.channel,
+        )}
         noteError={noteError}
         visibleFields={[
           "channel",

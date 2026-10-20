@@ -384,3 +384,26 @@ describe("GroupLogScreen Also save to (38.10 D-96; c10 C-01)", () => {
     expect(tree.some((element) => element.type === "OrbitSwitch")).toBe(false);
   });
 });
+
+describe("GroupLogScreen channels (38.14 D-60)", () => {
+  it("defaults to In Person and offers only Message / Call / In Person", () => {
+    const tree = render();
+    expect((hooks.initial[SLOT.value] as { channel: string }).channel).toBe(
+      "In Person",
+    );
+    const form = tree.find(
+      (element) => element.type === "TouchpointRefineForm",
+    );
+    const options = form?.props.channelOptions as ReadonlyArray<{
+      value: string;
+      label: string;
+    }>;
+    expect(options.map((o) => o.value)).toEqual([
+      "Message",
+      "Call",
+      "In Person",
+    ]);
+    // No "No channel" choice (Q26 rejected) and no legacy value.
+    expect(options.map((o) => o.label)).not.toContain("No channel");
+  });
+});

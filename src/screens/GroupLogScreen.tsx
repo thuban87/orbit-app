@@ -45,6 +45,7 @@ import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
+import { ORDINARY_LOG_CHANNEL_OPTIONS } from "./log-interaction-logic";
 
 const GROUP_FUTURE_DATE_MESSAGE = "Events can't be in the future.";
 
@@ -210,6 +211,8 @@ export function GroupLogScreen({
           value={value}
           onChange={setValue}
           now={localDateTime()}
+          // 38.14 D-60: Message / Call / In Person, In Person by default.
+          channelOptions={ORDINARY_LOG_CHANNEL_OPTIONS}
           visibleFields={["datetime", "channel", "tone", "duration"]}
           futureDateMessage={GROUP_FUTURE_DATE_MESSAGE}
         />

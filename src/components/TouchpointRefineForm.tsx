@@ -25,9 +25,11 @@
  *
  * CHOICES (38.9 D-28): Channel, Direction and Tone open the one themed
  * `OptionSheet` from an `OptionSelectRow` trigger (no native spinner). "No
- * selection" is the null option. A stored value outside the option set (e.g. a
- * legacy channel with a scoped `channelOptions`) is shown raw on the trigger
- * and is never rewritten unless the user picks another option.
+ * selection" is the null option for Direction and Tone; Channel has none (38.14
+ * D-60, Q26 rejected). Channel offers Message / Call / In Person by default;
+ * an edit host adds a record's own legacy value through `channelOptionsFor`.
+ * A stored value outside the option set is shown raw on the trigger and is
+ * never rewritten unless the user picks another option.
  *
  * 38.10 additive props (plan 12; every other consumer unchanged):
  * - `noteError` renders a `FieldError` directly under the note field (Research
@@ -56,6 +58,7 @@ import {
 import { OptionSelectRow, OptionSheet, OrbitSwitch } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { FieldError } from "@/components/ui/FieldError";
+import { ORDINARY_LOG_CHANNEL_OPTIONS } from "@/screens/log-interaction-logic";
 import { useTheme } from "@/theme";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 
@@ -85,18 +88,6 @@ export interface TouchpointRefineValue {
  * logic (Plan 04) can import the SAME single copy without loading react-native.
  */
 export { FUTURE_DATETIME_MESSAGE };
-
-/**
- * The channel control (D-06): Message/Call/In Person are the primary labels;
- * other/unspecified stay representable so a legacy row is never silently rewritten.
- */
-const CHANNEL_OPTIONS = [
-  { value: "Message", label: "Message" },
-  { value: "Call", label: "Call" },
-  { value: "In Person", label: "In Person" },
-  { value: "other", label: "Other" },
-  { value: "unspecified", label: "Unspecified" },
-] as const;
 
 /** The direction enum; null = unset ("No selection"). */
 const DIRECTION_OPTIONS = ["outbound", "inbound", "mutual"] as const;
@@ -150,11 +141,12 @@ interface TouchpointRefineFormProps {
   /** Optional caller-specific copy for the inline future-date validation. */
   futureDateMessage?: string;
   /**
-   * Optional scoped Channel option set. DEFAULTS to the internal five-entry
-   * `CHANNEL_OPTIONS` so every existing consumer (Edit Interaction, Group Log)
-   * keeps rendering all five — legacy `other`/`unspecified` rows stay representable.
-   * The ordinary Log Interaction surface passes only the three canonical channels
-   * (Message/Call/In Person) to satisfy CAPT-08 without editing the global constant.
+   * Optional Channel option set. DEFAULTS to the three canonical channels
+   * (Message / Call / In Person, `ORDINARY_LOG_CHANNEL_OPTIONS`; 38.14 D-60).
+   * Edit surfaces pass `channelOptionsFor(saved channel)`, which adds a
+   * record's own legacy value (Other / Unspecified) only when it holds one. A
+   * stored value outside the set is shown raw and never rewritten unless the
+   * user picks another option.
    */
   channelOptions?: ReadonlyArray<{ value: string; label: string }>;
   /**
@@ -240,8 +232,8 @@ export function TouchpointRefineForm({
   const [customMinutes, setCustomMinutes] = useState("");
   const [openSheet, setOpenSheet] = useState<ChoiceSheet | null>(null);
   const fields = visibleFields ? new Set(visibleFields) : ALL_FIELDS;
-  // Channel options default to the internal five entries (legacy representable).
-  const channels = channelOptions ?? CHANNEL_OPTIONS;
+  // Channel options default to the three canonical channels (38.14 D-60).
+  const channels = channelOptions ?? ORDINARY_LOG_CHANNEL_OPTIONS;
   // Fields deferred to the "More Options" disclosure; empty = everything inline.
   const moreSet = moreOptionsFields ? new Set(moreOptionsFields) : null;
   const showInline = (field: TouchpointRefineField): boolean =>

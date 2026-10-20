@@ -74,6 +74,7 @@ import {
   resolveSave,
   seedRefineValue,
 } from "./edit-interaction-logic";
+import { channelOptionsFor } from "./log-interaction-logic";
 
 const LOG_SCOPE = "edit-interaction";
 
@@ -89,6 +90,10 @@ export function EditInteractionScreen({
   const person = useContactHeader(contactId);
 
   const [value, setValue] = useState<TouchpointRefineValue | null>(null);
+  // The loaded row's SAVED channel (38.14 D-60): the channel options come from
+  // it, never from the draft, so a legacy Other / Unspecified stays offered
+  // after the user switches away and back before saving.
+  const [savedChannel, setSavedChannel] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
   // Synchronous in-flight flag: `saving` state lags a render, so the guard
@@ -122,6 +127,7 @@ export function EditInteractionScreen({
       const seeded = seedRefineValue(loaded);
       seedRef.current = JSON.stringify(seeded);
       setNoteAiLocked(loaded.noteAiLocked === 1);
+      setSavedChannel(loaded.channel);
       setValue(seeded);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load interaction for edit", err);
@@ -265,6 +271,7 @@ export function EditInteractionScreen({
             setValue(next);
           }}
           now={now}
+          channelOptions={channelOptionsFor(savedChannel)}
           noteError={fieldErrors.note ?? null}
           allowAiLockedReason={
             noteAiLocked ? aiLockReason("off_limits") : undefined

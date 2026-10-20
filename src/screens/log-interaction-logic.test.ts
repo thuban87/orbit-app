@@ -3,6 +3,7 @@ import type { TouchpointRefineValue } from "@/components/TouchpointRefineForm";
 import {
   applyChannelChange,
   buildLogInteractionInput,
+  channelOptionsFor,
   defaultsForChannel,
   isLogInteractionDirty,
   ORDINARY_LOG_CHANNEL_OPTIONS,
@@ -239,5 +240,50 @@ describe("isLogInteractionDirty (F-01; D-13, D-15)", () => {
     expect(
       isLogInteractionDirty({ contactId: 5, seedSnapshot: "x", current: "y" }),
     ).toBe(true);
+  });
+});
+
+describe("log-interaction-logic — channelOptionsFor (38.14 D-60)", () => {
+  const THREE = [
+    { value: "Message", label: "Message" },
+    { value: "Call", label: "Call" },
+    { value: "In Person", label: "In Person" },
+  ];
+
+  it("a canonical or empty stored channel offers exactly the three", () => {
+    expect(channelOptionsFor("Call")).toEqual(THREE);
+    expect(channelOptionsFor("In Person")).toEqual(THREE);
+    expect(channelOptionsFor("Message")).toEqual(THREE);
+    expect(channelOptionsFor(null)).toEqual(THREE);
+  });
+
+  it("a stored legacy value adds only its own option, labelled from the form's wording (D-64)", () => {
+    expect(channelOptionsFor("other")).toEqual([
+      ...THREE,
+      { value: "other", label: "Other" },
+    ]);
+    expect(channelOptionsFor("unspecified")).toEqual([
+      ...THREE,
+      { value: "unspecified", label: "Unspecified" },
+    ]);
+  });
+
+  it("never offers a 'No channel' choice (Q26 rejected)", () => {
+    for (const stored of [null, "Call", "other", "unspecified"]) {
+      const options = channelOptionsFor(stored);
+      expect(options.every((o) => typeof o.value === "string")).toBe(true);
+      expect(options.map((o) => o.label)).not.toContain("No channel");
+    }
+  });
+
+  it("options come from the SAVED channel, so switching away and back keeps the legacy option", () => {
+    // Saved row holds `other`; the draft switches to Call. The host keeps
+    // passing channelOptionsFor(saved), so Other stays offered.
+    const saved = "other";
+    const draftChannel = "Call";
+    expect(channelOptionsFor(saved).map((o) => o.value)).toContain("other");
+    expect(channelOptionsFor(draftChannel).map((o) => o.value)).not.toContain(
+      "other",
+    );
   });
 });

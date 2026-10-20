@@ -44,9 +44,9 @@ import type { RecordTouchpointInput } from "@/db/recency-dao";
  * set LogInteractionScreen passes to TouchpointRefineForm's `channelOptions` prop
  * (CAPT-08) — EXACTLY Message/Call/In Person, in that order, with NO legacy
  * `other`/`unspecified`. Shaped to match the form's channel-option element so the
- * screen can pass it straight through. The shared Edit Interaction / Group Log
- * surfaces pass NO channelOptions and keep the form's default five entries, so a
- * legacy `other`/`unspecified` row stays representable there (no Phase-32 regression).
+ * screen can pass it straight through. 38.14 D-60: these three are also the
+ * form's own default and what Group Log passes; the edit surfaces pass
+ * `channelOptionsFor(saved channel)`, which adds a record's own legacy value.
  */
 export const ORDINARY_LOG_CHANNEL_OPTIONS: ReadonlyArray<{
   value: string;
@@ -56,6 +56,35 @@ export const ORDINARY_LOG_CHANNEL_OPTIONS: ReadonlyArray<{
   { value: "Call", label: "Call" },
   { value: "In Person", label: "In Person" },
 ] as const;
+
+/**
+ * The legacy channel values a stored record may still hold (38.14 D-10 carried,
+ * ADR-116), with the form's existing option labels (D-64: no new term).
+ */
+const LEGACY_CHANNEL_OPTIONS: ReadonlyArray<{ value: string; label: string }> =
+  [
+    { value: "other", label: "Other" },
+    { value: "unspecified", label: "Unspecified" },
+  ];
+
+/**
+ * The channel options for an edit surface (38.14 D-60): Message / Call /
+ * In Person, plus the record's own legacy value (Other / Unspecified) only
+ * when the STORED record already holds it. There is no "No channel" choice
+ * (Q26 rejected).
+ *
+ * Hosts pass the SAVED channel (the loaded row, the refreshed event, the
+ * participant's stored value), never the draft, so a legacy option does not
+ * vanish when the user switches away and back before saving.
+ */
+export function channelOptionsFor(
+  stored: string | null,
+): ReadonlyArray<{ value: string; label: string }> {
+  const legacy = LEGACY_CHANNEL_OPTIONS.find((o) => o.value === stored);
+  return legacy
+    ? [...ORDINARY_LOG_CHANNEL_OPTIONS, legacy]
+    : ORDINARY_LOG_CHANNEL_OPTIONS;
+}
 
 /** Message-first fallback when a remembered value is somehow absent (CAPT-11). */
 const REMEMBERED_FALLBACK: RememberedInteractionChannel = "Message";

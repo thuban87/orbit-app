@@ -81,6 +81,7 @@ import {
   runParticipantRemove,
   visibleParticipants,
 } from "./group-event-refresh";
+import { channelOptionsFor } from "./log-interaction-logic";
 
 const GROUP_FUTURE_DATE_MESSAGE = "Events can't be in the future.";
 
@@ -360,6 +361,8 @@ export function EditGroupEventScreen({
             dispatch({ type: "draftChanged", draft: { ...draft, value } })
           }
           now={localDateTime()}
+          // 38.14 D-60: options from the refreshed SAVED event, not the draft.
+          channelOptions={channelOptionsFor(event.channel)}
           visibleFields={["datetime", "channel", "tone", "duration"]}
           futureDateMessage={GROUP_FUTURE_DATE_MESSAGE}
         />
