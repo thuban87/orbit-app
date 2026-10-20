@@ -43,6 +43,7 @@ import { toGroupParticipantInputs } from "@/logic/group-log-participant-inputs";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
+import { publishInteractionWrite } from "@/services/publish-interaction-write";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -153,6 +154,8 @@ export function GroupLogScreen({
         alsoSaveTo: savedSection,
         participants: toGroupParticipantInputs(participantIds, newUid),
       });
+      // 38.14 D-27: a committed Group Log tells the widget and the shell.
+      publishInteractionWrite();
       // 38.9 D-39 / D-46: Group Log was silent; verb first, then whom.
       showSnackbar({
         kind: "success",

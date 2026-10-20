@@ -42,6 +42,7 @@ import {
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
+import { publishInteractionWrite } from "@/services/publish-interaction-write";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
@@ -136,6 +137,9 @@ export function EditParticipantScreen({
         follow,
         fields,
       });
+      // 38.14 D-81: a committed participant save tells the widget and the
+      // shell; Edit Event re-reads on its own focus (D-68).
+      publishInteractionWrite();
       bypassRef.current = true;
       navigation.goBack();
     } catch (err) {

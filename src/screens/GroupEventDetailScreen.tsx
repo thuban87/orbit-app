@@ -24,6 +24,7 @@ import {
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { publishInteractionWrite } from "@/services/publish-interaction-write";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -124,10 +125,13 @@ export function GroupEventDetailScreen({
           })),
           now: localDateTime(),
         }),
-      onCommitted: () =>
+      onCommitted: () => {
         setCommittedPendingIds((current) => [
           ...new Set([...current, ...contactIds]),
-        ]),
+        ]);
+        // 38.14 D-81: a committed add tells the widget and the shell.
+        publishInteractionWrite();
+      },
       refresh,
     });
   // 38.3 review A-WR-03 (D-04): latched, and only a rejected first write shows
@@ -160,6 +164,8 @@ export function GroupEventDetailScreen({
             : [...current, target.interactionId],
         );
         setRemoving(null);
+        // 38.14 D-27: detach and delete both publish once committed.
+        publishInteractionWrite();
       },
       onWriteFailed: () => {
         setRemoving(null);
@@ -173,16 +179,21 @@ export function GroupEventDetailScreen({
     if (!confirm) return;
     setWriteError(false);
     try {
-      if (confirm === "dissolve")
+      if (confirm === "dissolve") {
         await dissolveGroupEvent(getExecutor(), {
           groupEventId,
           now: localDateTime(),
         });
-      else
+        // 38.14 D-27: dissolve publishes once committed.
+        publishInteractionWrite();
+      } else {
         await deleteGroupEventAndInteractions(getExecutor(), {
           groupEventId,
           now: localDateTime(),
         });
+        // 38.14 D-27: delete event publishes once committed.
+        publishInteractionWrite();
+      }
       setConfirm(null);
       navigation.goBack();
     } catch {

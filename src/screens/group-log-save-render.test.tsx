@@ -109,6 +109,13 @@ vi.mock("@/db/database", () => ({
 const { createGroupEvent } = vi.hoisted(() => ({ createGroupEvent: vi.fn() }));
 vi.mock("@/db/group-events-dao", () => ({ createGroupEvent }));
 vi.mock("@/db/uid", () => ({ newUid: () => "uid" }));
+// 38.14 D-27: a committed Group Log publishes (widget notify + shell refresh).
+const { publishInteractionWrite } = vi.hoisted(() => ({
+  publishInteractionWrite: vi.fn(),
+}));
+vi.mock("@/services/publish-interaction-write", () => ({
+  publishInteractionWrite,
+}));
 vi.mock("@/logic/group-log-participant-inputs", () => ({
   toGroupParticipantInputs: () => [],
 }));
@@ -176,6 +183,7 @@ beforeEach(() => {
   for (const spy of hooks.setters) spy?.mockClear();
   reveal.mockReset();
   createGroupEvent.mockReset();
+  publishInteractionWrite.mockReset();
   navigation.goBack.mockReset();
 });
 
@@ -221,6 +229,16 @@ describe("GroupLogScreen Save (38.9 D-19; F-12)", () => {
     }
     expect(reveal).not.toHaveBeenCalled();
     expect(navigation.goBack).not.toHaveBeenCalled();
+    // 38.14 D-27: a failed write publishes nothing.
+    expect(publishInteractionWrite).not.toHaveBeenCalled();
+  });
+
+  it("a committed save publishes once, before leaving (38.14 D-27)", async () => {
+    createGroupEvent.mockResolvedValueOnce({ groupEventId: 1 });
+    const tree = render({ title: "Dinner" });
+    await pressSave(tree);
+    expect(publishInteractionWrite).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
   });
 
   it("renders titleError under Title and the operation error elsewhere", () => {

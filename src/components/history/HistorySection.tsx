@@ -193,6 +193,7 @@ import {
   nextWindow,
   prevWindow,
 } from "@/services/history/window";
+import { publishInteractionWrite } from "@/services/publish-interaction-write";
 import { useShellObstacleStore } from "@/stores/shell-obstacle-store";
 import { useShellTopOffset } from "@/stores/shell-offset-store";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -1308,6 +1309,9 @@ export function HistorySection({
             }),
             {
               onCreated: ({ groupEventId }) => {
+                // 38.14 D-27 (planner reading): converting an interaction into
+                // an event is a group-event write, so it publishes too.
+                publishInteractionWrite();
                 setConverting(false);
                 setDetailId(null);
                 navigation.navigate("GroupEventDetail", { groupEventId });

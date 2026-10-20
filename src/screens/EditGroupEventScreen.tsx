@@ -274,6 +274,8 @@ export function EditGroupEventScreen({
           ...(pendingAddedRef.current ?? []),
           ...contactIds,
         ];
+        // D-81: a committed add tells the widget and the shell.
+        publishInteractionWrite();
       },
       refresh: refreshEvent,
     });
@@ -314,6 +316,8 @@ export function EditGroupEventScreen({
           kind: keep ? "success" : "warning",
           label: participantRemovedSnackbar(target.contactName, !keep),
         });
+        // D-27: detach and delete both publish once committed.
+        publishInteractionWrite();
       },
       onWriteFailed: () =>
         setError("Couldn't update the event. Your changes weren't saved."),

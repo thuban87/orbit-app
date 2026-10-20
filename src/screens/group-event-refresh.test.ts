@@ -16,9 +16,9 @@ import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { resolveDisplay } from "@/logic/group-inheritance";
 import {
+  addedParticipantNames,
   createGroupEventRefreshController,
   eventDraft,
-  addedParticipantNames,
   excludedParticipantIds,
   type GroupEventEditState,
   groupEventEditReducer,
@@ -723,5 +723,58 @@ describe("Edit Event participant snackbars (38.14 D-67)", () => {
     );
     expect(source).toContain("participantsAddedSnackbar(");
     expect(source).toContain("participantRemovedSnackbar(");
+  });
+});
+
+describe("participant seams publish only after a commit (38.14 D-27, D-81)", () => {
+  // The call sites put publishInteractionWrite() inside onCommitted; these
+  // cases prove the seam contract they rely on. The source scan in
+  // group-event-publication-contract.test.ts pins that every site calls it.
+  it("runParticipantAdd: a rejected add never publishes", async () => {
+    const publish = vi.fn();
+    await expect(
+      runParticipantAdd({
+        add: () => Promise.reject(new Error("write failed")),
+        onCommitted: publish,
+        refresh: async () => {},
+      }),
+    ).rejects.toThrow("write failed");
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("runParticipantAdd: a committed add publishes exactly once", async () => {
+    const publish = vi.fn();
+    await runParticipantAdd({
+      add: async () => {},
+      onCommitted: publish,
+      refresh: async () => {},
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it("runParticipantRemove: a rejected remove returns failed and never publishes", async () => {
+    const publish = vi.fn();
+    const result = await runParticipantRemove({
+      latch: { current: false },
+      remove: () => Promise.reject(new Error("write failed")),
+      onCommitted: publish,
+      onWriteFailed: vi.fn(),
+      refresh: async () => {},
+    });
+    expect(result).toBe("failed");
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("runParticipantRemove: a committed remove publishes exactly once", async () => {
+    const publish = vi.fn();
+    const result = await runParticipantRemove({
+      latch: { current: false },
+      remove: async () => {},
+      onCommitted: publish,
+      onWriteFailed: vi.fn(),
+      refresh: async () => {},
+    });
+    expect(result).toBe("committed");
+    expect(publish).toHaveBeenCalledTimes(1);
   });
 });
