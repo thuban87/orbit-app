@@ -1778,12 +1778,12 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half, B-24 and the Events tab header/empty-state copy are 38.15's). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–9 plans — rough estimate; recurring-problem sweeps not counted.
-**Plans:** 9 plans
+**Plans:** 1/9 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 38.14-01-PLAN.md — "Did you send it?" seam: panel claim, Later until return, No keeps draft, banner/list Yes right + destination + bottom sheet (wave 1)
+- [x] 38.14-01-PLAN.md — "Did you send it?" seam: panel claim, Later until return, No keeps draft, banner/list Yes right + destination + bottom sheet (wave 1)
 - [ ] 38.14-03-PLAN.md — One-tap logging: Quick Log snackbar + Undo confirm, resolved channel on bulk/widget/notification, bulk Undo · Edit re-channel, Group Log label, frozen order, picker reset (wave 1)
 - [ ] 38.14-04-PLAN.md — Logging forms: three channels, maximumDate, custom duration, glossary labels, keyboard centring, empty-day time, Edit save snackbar (wave 1)
 - [ ] 38.14-06-PLAN.md — Profile layout P-D + heading scale S2, History two cards, Contact Methods card, Overview inset (wave 1)
