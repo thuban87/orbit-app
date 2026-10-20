@@ -361,6 +361,14 @@ export interface ParticipantAddAnnouncer {
    * when the readback has them, by count otherwise.
    */
   settle(refreshed: GroupEventDetail | null): void;
+  /**
+   * The screen is blurring or unmounting (38.14 review B-WR-07): announce a
+   * still-pending batch now, by count, before the screen invalidates its
+   * readback. A committed add is never left unconfirmed, and a readback that
+   * settles later can never announce over another screen. No-op when nothing
+   * is pending.
+   */
+  flush(): void;
 }
 
 /**
@@ -384,6 +392,12 @@ export function createParticipantAddAnnouncer(
       const names =
         refreshed === null ? [] : addedParticipantNames(refreshed, added);
       announce(participantsAddedSnackbar(names, added.length));
+    },
+    flush: () => {
+      const added = pending;
+      if (added === null) return;
+      pending = null;
+      announce(participantsAddedSnackbar([], added.length));
     },
   };
 }

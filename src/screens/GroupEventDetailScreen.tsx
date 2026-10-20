@@ -139,12 +139,26 @@ export function GroupEventDetailScreen({
       }),
     [groupEventId, announcer],
   );
-  useEffect(() => () => refreshController.invalidate(), [refreshController]);
+  // Review B-WR-07 (ADR-162: invalidate on blur and on unmount): a blur or an
+  // unmount first confirms a still-pending add by count, then drops the
+  // readback, so it can never announce over the next screen. Every focus
+  // re-reads.
+  useEffect(
+    () => () => {
+      announcer.flush();
+      refreshController.invalidate();
+    },
+    [announcer, refreshController],
+  );
   const refresh = refreshController.refresh;
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh]),
+      return () => {
+        announcer.flush();
+        refreshController.invalidate();
+      };
+    }, [refresh, announcer, refreshController]),
   );
   const excludedIds = useMemo(
     () => excludedParticipantIds(event, committedPendingIds),

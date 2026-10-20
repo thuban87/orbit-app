@@ -832,6 +832,37 @@ describe("participant add announcer (38.14 D-67, D-84)", () => {
     createParticipantAddAnnouncer(announce).settle(event());
     expect(announce).not.toHaveBeenCalled();
   });
+
+  it("a blur or unmount before the readback confirms the add by count, and the late readback stays silent (review B-WR-07)", () => {
+    const announce = vi.fn();
+    const announcer = createParticipantAddAnnouncer(announce);
+    announcer.queue([2, 3]);
+    announcer.flush();
+    announcer.settle(event());
+    announcer.flush();
+    expect(announce.mock.calls).toEqual([["Added 2 people"]]);
+  });
+
+  it("flush with nothing queued announces nothing", () => {
+    const announce = vi.fn();
+    createParticipantAddAnnouncer(announce).flush();
+    expect(announce).not.toHaveBeenCalled();
+  });
+
+  it.each(["./EditGroupEventScreen.tsx", "./GroupEventDetailScreen.tsx"])(
+    "%s flushes then invalidates on blur and on unmount (ADR-162)",
+    (file) => {
+      const source = readFileSync(new URL(file, import.meta.url), "utf8");
+      const pairs = source.match(
+        /announcer\.flush\(\);\s*refreshController\.invalidate\(\);/g,
+      );
+      expect(pairs).toHaveLength(2);
+      const focus = source.slice(source.indexOf("useFocusEffect("));
+      expect(focus).toMatch(
+        /return \(\) => \{\s*announcer\.flush\(\);\s*refreshController\.invalidate\(\);/,
+      );
+    },
+  );
 });
 
 describe("participant seams publish only after a commit (38.14 D-27, D-81)", () => {

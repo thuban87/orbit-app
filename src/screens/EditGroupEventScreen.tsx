@@ -165,7 +165,17 @@ export function EditGroupEventScreen({
       }),
     [groupEventId, announcer],
   );
-  useEffect(() => () => refreshController.invalidate(), [refreshController]);
+  // Review B-WR-07 (ADR-162: invalidate on blur and on unmount): a blur or an
+  // unmount (Save, Back) first confirms a still-pending add by count, then
+  // drops the readback, so the add is never left unconfirmed and a late
+  // readback never announces over another screen.
+  useEffect(
+    () => () => {
+      announcer.flush();
+      refreshController.invalidate();
+    },
+    [announcer, refreshController],
+  );
   const refreshEvent = refreshController.refresh;
 
   // D-68: back from EditParticipant, re-read the event only (eventRefreshed
@@ -176,10 +186,14 @@ export function EditGroupEventScreen({
     useCallback(() => {
       if (!seenFocusRef.current) {
         seenFocusRef.current = true;
-        return;
+      } else {
+        void refreshEvent();
       }
-      void refreshEvent();
-    }, [refreshEvent]),
+      return () => {
+        announcer.flush();
+        refreshController.invalidate();
+      };
+    }, [refreshEvent, announcer, refreshController]),
   );
 
   const hasUnsavedChanges = isGroupEventDraftDirty(state);
