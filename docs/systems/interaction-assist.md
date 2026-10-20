@@ -1,7 +1,7 @@
 # Interaction Assist & Reach Out
 
-**Last updated:** 2026-09-30
-**Updated by phase:** 38.6-photo-handling
+**Last updated:** 2026-10-20
+**Updated by phase:** 38.14-logging-history-events-compose-ux
 **Owners:** `src/services/assist-commit.ts`, `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
 
 ## Purpose
@@ -33,12 +33,12 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | DAO (write) | `src/db/interaction-assist-dao.ts` | Cap-5 `createPendingAssist`, and the status-guarded `markAssistLogged` / `markAssistDismissed` / `markAssistFailed` transitions — each inside the shared write mutex. |
-| DAO (read) | `src/db/interaction-assist-read.ts` | The eligible pending queue (15s–24h window) and pending count, joined to `contacts`. |
+| DAO (read) | `src/db/interaction-assist-read.ts` | The eligible pending queue (15s–24h window) and pending count, joined to `contacts`; `readAssistStatus` (one record's status, read-only) for Compose's panel re-check. |
 | Logic | `src/logic/assist-eligibility.ts` | Pure 15s/24h local-wall-clock eligibility + newest-eligible banner selection. |
 | Service | `src/services/reach-out/handoff.ts` | `performReachOut`: shared write-before-launch handoff that returns launch status and the created assist UID when one exists. |
 | Service | `src/services/interaction-assist-sweep.ts` | Foreground launch-sweep: 24h expiry of pending rows + 30-day prune of terminal rows. |
 | Service | `src/services/assist-commit.ts` | The shared confirmation contract: `runAssistAction` (synchronous in-flight latch, typed failure classification) and the post-commit publishers `publishAssistCommit` (widget + shell tick + queue) / `publishAssistDismissal` (queue). Node-testable; callers inject the real side effects. |
-| Store | `src/stores/assist-store.ts` | SQLite-backed eligible-queue state; refreshed at launch, on a real background→active return, and after every committed confirm/dismiss. Only the most recently started refresh may publish (latest-request authority). |
+| Store | `src/stores/assist-store.ts` | SQLite-backed eligible-queue state; refreshed at launch, on a real background→active return, and after every committed confirm/dismiss. Only the most recently started refresh may publish (latest-request authority). Two in-memory skips (38.14): the record Compose's panel is showing (`setPanelOwned` / `releasePanelOwned`, D-23) and the Later set (`deferUntilReturn` / `releaseDeferred`, D-77); both are read at publish time. |
 
 ### Key Files
 
@@ -50,7 +50,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | `src/components/AssistBanner.tsx` | App-global non-modal banner, in flow above the tab navigator (38.6 D-38); runs confirm/dismiss through the shared `assist-commit` runner and publishers. |
 | `src/components/AssistConfirmation.tsx` | Presentational attestation controls (Yes / No answer / Don't log) + optional Notes expander; disabled while the owner's write is `pending`. |
 | `src/components/PendingConfirmationsSheet.tsx` | Transient multi-item pending-queue review surface. |
-| `src/screens/ComposeScreen.tsx` | Compose-attached Yes / Not yet panel that supplements, never replaces, the durable queue surfaces. |
+| `src/screens/ComposeScreen.tsx` | Compose-attached Yes, log it / No, don't log / Later panel that supplements, never replaces, the durable queue surfaces. |
 | `src/screens/SettingsInteractionsScreen.tsx` | Hosts the toggle through the specialized queue-clearing settings writer. |
 
 ## How It Works
@@ -66,8 +66,10 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 ### Compose-attached confirmation
 
 1. `ComposeScreen` presents `Did you send it?` only when `performReachOut()` reports both a started handoff and an assist UID.
-2. `Yes, log interaction` calls `markAssistLogged()` with that UID and `connected: 1` through the shared `runAssistAction`; the DAO re-reads the pending row and writes at its original `handoff_at` through the sole recency writer. After the commit it publishes through `publishAssistCommit` (widget, shell tick, queue) before leaving Compose.
-3. `Not yet` closes only the local panel and preserves the Compose session. It does not dismiss the assist, leaving the app-global banner and pending-confirmations sheet available after navigation, process death, or the 24-hour window.
+2. **One asker per record (38.14 D-23, from 39 D-76).** While the panel shows, Compose claims its record in `assist-store` (`setPanelOwned`), so the banner and the pending list skip that record and keep asking about every other one. One focus effect keyed on the panel owns the claim: it claims when the panel opens, releases when an answer closes it, releases on blur and unmount, and claims again on refocus. Backgrounding for the SMS / mail handoff fires no blur, so the claim survives the trip out of Orbit. Each claim also re-reads the record (`readAssistStatus`) and closes the panel when it is no longer pending, because a record answered on the banner while Compose was not focused must not be answered twice (review A-WR-01).
+3. **Yes, log it** calls `markAssistLogged()` with that UID and `connected: 1` through the shared `runAssistAction`; the DAO re-reads the pending row and writes at its original `handoff_at` through the sole recency writer. After the commit it publishes through `publishAssistCommit` (widget, shell tick, queue), confirms with a snackbar naming channel and person (D-43), and leaves Compose.
+4. **No, don't log** calls `markAssistDismissed()` through the same runner and publishes through `publishAssistDismissal` (queue). It closes the panel, confirms "Didn't log …", and keeps the user on Compose with the draft intact (D-78).
+5. **Later** writes nothing; the record stays pending. Compose adds it to the store's Later set before closing the panel, so it never flashes onto the banner. The Later set keeps it off the banner and the pending list until the next return to Orbit: it is released only on a background→active return and at launch, each time just before the refresh that publishes, and never inside `refresh()` (which also runs on every assist publication and the Settings toggle; re-asking there was owner-rejected, Q17-A / Q17-B). No timer; ADR-070's 15 s eligibility and 24 h expiry are unchanged (D-77). Leaving Compose with the panel unanswered releases the claim, and the banner and pending list ask as before (carried D-01).
 
 ### Returning and confirming
 
@@ -120,7 +122,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
    - Do not bypass the runner with a direct DAO call from a new surface, and do not change the guard, the handoff-time timestamp or the pending recheck (ADR-071).
 5. **`endpoint_value` is not history.** It exists only to perform the handoff; the interaction row records the coarse `channel` only. Do not add endpoint/provider columns to `interactions` — that is explicitly out of scope.
 6. **Failed = the native launch threw**, not "the user didn't send." `expo-sms` returns `unknown` on Android and `tel:`/`mailto:` only report that some app can handle them, so "sent" is never observable — confirmation is user attestation.
-7. **Not yet is not Don't log.** The Compose panel must not call `markAssistDismissed`; durable dismissal remains available from the pending-confirmations sheet.
+7. **Later is not No, don't log.** Compose's panel has three answers (38.14 D-01 / D-23 / D-77 / D-78, replacing the old "Not yet is not Don't log" rule). **No, don't log** dismisses through `runAssistAction` + `markAssistDismissed`, like the banner's Don't log. **Later** must never call `markAssistDismissed`, and must never release the Later set from `refresh()`: the record stays pending and returns on the next return to Orbit.
 8. **Do not use generic settings persistence for this toggle.** It would skip the atomic pending-row expiry and immediate banner refresh required by ADR-070.
 
 ## Related Systems
@@ -144,3 +146,4 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | 2026-09-23 | 38.4 | While the FAB speed dial is open, the AssistBanner is hidden from accessibility, and its root is `collapsable={false}` so Fabric cannot re-form it as a touch sink (D-42 A, D-33/GAP-G2; ADR-173). The pending-confirmations sheet was checked at maximum text and kept as an RN `Modal` with explicit-action exits; its minor large-text findings are in todo `2026-09-28-pending-confirmations-sheet-large-text.md` (D-49). |
 | 2026-09-30 | 38.6 | The banner renders in flow at the top of the navigator's safe-area column instead of as an absolute overlay, so it no longer covers other screens' app bars (D-38). |
 | 2026-09-30 | 38.6 | Pending confirmations rows and the banner show the contact's photo (`EligiblePendingAssist.contact_photo`, `PENDING_AVATAR_SIZE` / `ASSIST_BANNER_AVATAR_SIZE` 40); the question rows carry one accessible label (ADR-180, D-14/D-25). |
+| 2026-10-20 | 38.14 | Compose's panel answers Yes, log it / No, don't log / Later (D-01). The store gains the panel claim (D-23: the banner and pending list skip the record Compose is asking about) and the Later set (D-77: quiet until the next return to Orbit, released only on background→active and launch, never in `refresh()`). No, don't log dismisses through the runner and stays on Compose (D-78). Each claim re-reads the record's status with the read-only `readAssistStatus` and closes a panel answered elsewhere (review A-WR-01). Gotcha 7 rewritten (review A-WR-06). |
