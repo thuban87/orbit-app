@@ -296,6 +296,7 @@ describe("groupEventEditReducer — participant work preserves the parent draft 
     return groupEventEditReducer(seeded, {
       type: "draftChanged",
       draft: {
+        ...base,
         value: { ...base.value, quality: "Negative" },
         groupNote: "Unsaved note",
       },
@@ -383,6 +384,32 @@ describe("groupEventEditReducer — participant work preserves the parent draft 
 
     expect(eventDraft(refreshed.event)).toEqual(JSON.parse(refreshed.baseline));
     expect(eventDraft(refreshed.event).groupNote).toBe("Saved note");
+  });
+
+  it("seeds the draft title from the saved event (38.14 D-69)", () => {
+    expect(eventDraft(saved).title).toBe("Supper");
+  });
+
+  it("a title edit makes the draft dirty and a participant refresh keeps it (D-69, D-17)", () => {
+    const seeded = groupEventEditReducer(initialGroupEventEditState, {
+      type: "initialLoaded",
+      event: saved,
+    });
+    const base = seeded.draft;
+    if (!base) throw new Error("expected a seeded draft");
+    const renamed = groupEventEditReducer(seeded, {
+      type: "draftChanged",
+      draft: { ...base, title: "Brunch" },
+    });
+    expect(isGroupEventDraftDirty(renamed)).toBe(true);
+
+    const refreshed = groupEventEditReducer(renamed, {
+      type: "eventRefreshed",
+      event: detail([participant(1), participant(2)], { title: "Supper" }),
+    });
+    expect(refreshed.draft?.title).toBe("Brunch");
+    expect(refreshed.baseline).toBe(renamed.baseline);
+    expect(isGroupEventDraftDirty(refreshed)).toBe(true);
   });
 
   it("EditGroupEventScreen has no reseeding reload after participant work", () => {

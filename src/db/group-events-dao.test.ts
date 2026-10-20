@@ -19,6 +19,7 @@ import {
   setParticipantFields,
   setParticipantOverride,
   updateGroupEvent,
+  updateGroupEventCore,
 } from "@/db/group-events-dao";
 import {
   insertLinkedEntryCore,
@@ -1928,5 +1929,130 @@ describe("Group Note copies on participant and event lifecycle (D-102, F-D12)", 
       participants: [{ contactId: riley, uid: uid() }],
     });
     expect(await copyRows()).toEqual([]);
+  });
+});
+
+// --- Event title rename (38.14 D-69, D-48) -----------------------------------
+
+describe("updateGroupEvent title (38.14 D-69, D-48)", () => {
+  const EDIT_NOW = "2026-09-12 13:00:00";
+
+  async function eventRow(groupEventId: number) {
+    return exec.getFirstAsync<{
+      title: string;
+      modified_at: string;
+      group_note: string | null;
+    }>("SELECT title, modified_at, group_note FROM group_events WHERE id = ?", [
+      groupEventId,
+    ]);
+  }
+
+  async function childStamps(groupEventId: number) {
+    return exec.getAllAsync<{ id: number; modified_at: string }>(
+      "SELECT id, modified_at FROM interactions WHERE group_event_id = ? ORDER BY id",
+      [groupEventId],
+    );
+  }
+
+  it("stores the trimmed title, stamps modified_at, bumps the revision once and leaves children unchanged", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const children = await groupChildren(groupEventId);
+    const stamps = await childStamps(groupEventId);
+    const revision = await readDataRevision(exec);
+
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: EDIT_NOW,
+      patch: { title: { value: "  Brunch  " } },
+    });
+
+    expect(await eventRow(groupEventId)).toMatchObject({
+      title: "Brunch",
+      modified_at: EDIT_NOW,
+    });
+    expect(await readDataRevision(exec)).toBe(revision + 1);
+    expect(await groupChildren(groupEventId)).toEqual(children);
+    expect(await childStamps(groupEventId)).toEqual(stamps);
+  });
+
+  it.each(["", "   "])(
+    "refuses the blank title %j before any write: title kept, no revision bump",
+    async (blank) => {
+      const { groupEventId } = await groupWithThreeChildren();
+      const before = await eventRow(groupEventId);
+      const revision = await readDataRevision(exec);
+
+      await expect(
+        updateGroupEvent(exec, {
+          groupEventId,
+          now: EDIT_NOW,
+          patch: { title: { value: blank } },
+        }),
+      ).rejects.toThrow("updateGroupEvent: title must not be blank");
+
+      expect(await eventRow(groupEventId)).toEqual(before);
+      expect(await readDataRevision(exec)).toBe(revision);
+    },
+  );
+
+  it("guards the exported core too: a blank title throws and writes nothing", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const before = await eventRow(groupEventId);
+    const revision = await readDataRevision(exec);
+
+    await expect(
+      inWriteTransaction(exec, () =>
+        updateGroupEventCore(exec, {
+          groupEventId,
+          now: EDIT_NOW,
+          patch: { title: { value: "  " }, groupNote: { value: "not saved" } },
+        }),
+      ),
+    ).rejects.toThrow("updateGroupEventCore: title must not be blank");
+
+    expect(await eventRow(groupEventId)).toEqual(before);
+    expect(await readDataRevision(exec)).toBe(revision);
+  });
+
+  it("rejects a title for an unknown event and changes nothing", async () => {
+    const revision = await readDataRevision(exec);
+    await expect(
+      updateGroupEvent(exec, {
+        groupEventId: 9999,
+        now: EDIT_NOW,
+        patch: { title: { value: "Brunch" } },
+      }),
+    ).rejects.toThrow(/no longer exists/);
+    expect(await readDataRevision(exec)).toBe(revision);
+  });
+
+  it("rolls the title back when a later write in the same save fails", async () => {
+    const { groupEventId } = await groupWithThreeChildren();
+    const before = await eventRow(groupEventId);
+    const revision = await readDataRevision(exec);
+    const baseRun = exec.runAsync.bind(exec);
+    const failingExec: SqlExecutor = {
+      ...exec,
+      runAsync: async (sql, params) => {
+        if (sql.startsWith("UPDATE group_events SET group_note")) {
+          throw new Error("forced note failure");
+        }
+        return baseRun(sql, params);
+      },
+    };
+
+    await expect(
+      updateGroupEvent(failingExec, {
+        groupEventId,
+        now: EDIT_NOW,
+        patch: {
+          title: { value: "Brunch" },
+          groupNote: { value: "Changed" },
+        },
+      }),
+    ).rejects.toThrow(/forced note failure/);
+
+    expect(await eventRow(groupEventId)).toEqual(before);
+    expect(await readDataRevision(exec)).toBe(revision);
   });
 });
