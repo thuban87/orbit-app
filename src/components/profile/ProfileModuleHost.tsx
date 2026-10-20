@@ -88,9 +88,12 @@ const TOP_LEVEL_MODULE_IDS = new Set<ProfileTopLevelModuleId>([
  *  - `section` — a top-level section. No card: an H1 heading sits on the page
  *    with a thin rule under it, and the header and body carry NO horizontal
  *    padding, so the H1, its rule and the inner cards share the screen's 16 dp
- *    edge (R3-04). The H1, its rule and the fold chevron in its toggle row stay
- *    bare on the background with no `ChromeScrim` (D-83, owner-signed exception
- *    to ADR-115 :18 for the Profile H1 headings only). The "Saving…" / error
+ *    edge (R3-04). The H1 and its rule stay bare on the background with no
+ *    `ChromeScrim` (D-83, owner-signed exception to ADR-115 :18 for the
+ *    Profile H1 headings only), and so does the fold chevron in the H1's
+ *    toggle row (D-85, owner, code review B-WR-04: D-83's exception covers
+ *    it). The device plan's four-combination contrast check includes the
+ *    chevron (D-83, D-85). The "Saving…" / error
  *    captions and the Retry button lost the card that backed them, so each
  *    sits on a local `ChromeScrim` (ADR-115 :18).
  *  - `subsection` — a Things to Remember part: keeps its `GlassSurface` card,
