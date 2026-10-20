@@ -111,14 +111,24 @@ export interface GridCardProps {
   /** Captured once by HomeScreen for a deterministic render pass. */
   now: string;
   onPress: () => void;
-  /** Opens the host-owned per-contact action menu. */
+  /**
+   * Long-press enters multi-select with this card selected (38.13 D-90; the
+   * per-card context menu is retired). Not offered while selecting.
+   */
   onLongPress?: () => void;
-  /** Assistive-tech equivalents for the normal-mode card menu actions. */
+  /**
+   * Accessibility actions (38.13 D-90; phase-07 dossier :379): every
+   * per-contact action the retired card menu offered stays reachable without
+   * long-press dexterity. Favorite and Snooze are not offered for an Unbound
+   * person (ADR-233), as the menu did not offer them.
+   */
   onViewProfile?: () => void;
   onQuickLog?: () => void;
   onLogInteraction?: () => void;
   onMessage?: () => void;
   onEditContact?: () => void;
+  /** Opens the shared snooze sheet for this contact (38.11 D-45, D-81). */
+  onOpenSnooze?: () => void;
   onSelect?: () => void;
   /** Selection-mode presentation and card-level toggle behavior. */
   selectionMode?: boolean;
@@ -156,6 +166,7 @@ export function GridCard({
   onLogInteraction,
   onMessage,
   onEditContact,
+  onOpenSnooze,
   onSelect,
   selectionMode = false,
   selected = false,
@@ -228,12 +239,20 @@ export function GridCard({
   const accessibilityLabel = selectionMode
     ? `${baseAccessibilityLabel} ${selected ? "Selected." : "Not selected."}`
     : baseAccessibilityLabel;
+  // D-90: the retired card menu's actions, in its order and with its labels.
   const accessibilityActions = [
     onViewProfile && { name: "view-profile", label: "View Profile" },
     onQuickLog && { name: "quick-log", label: "Quick Log" },
     onLogInteraction && { name: "log-interaction", label: "Log Interaction" },
     onMessage && { name: "message", label: "Message" },
     onEditContact && { name: "edit-contact", label: "Edit Contact" },
+    !unbound &&
+      onToggleFavourite && {
+        name: "favourite",
+        label: isFavourite ? "Unfavorite" : "Favorite",
+      },
+    // 38.11 D-81: "Snooze…" in both states; the sheet holds Unsnooze.
+    !unbound && onOpenSnooze && { name: "snooze", label: "Snooze…" },
     onSelect && { name: "select", label: "Select" },
   ].filter(Boolean) as { name: string; label: string }[];
 
@@ -263,6 +282,12 @@ export function GridCard({
             break;
           case "edit-contact":
             onEditContact?.();
+            break;
+          case "favourite":
+            if (!unbound) onToggleFavourite?.();
+            break;
+          case "snooze":
+            if (!unbound) onOpenSnooze?.();
             break;
           case "select":
             onSelect?.();

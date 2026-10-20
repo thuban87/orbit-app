@@ -74,7 +74,6 @@ import Animated, {
 import { useShallow } from "zustand/react/shallow";
 import { BulkActionSurface } from "@/components/BulkActionSurface";
 import { BulkFrequencySheet } from "@/components/BulkFrequencySheet";
-import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { AXIS_DEFAULT_LABELS } from "@/components/control-surface/control-labels";
@@ -785,8 +784,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     snoozedIds: number[];
   } | null>(null);
   // 38.11 D-45/D-81 (review V-07): the card snooze sheet's target, captured
-  // when the card menu entry is tapped (the menu then closes itself and nulls
-  // its own contact).
+  // when the card's Snooze… accessibility action runs (38.13 D-90 retired the
+  // card menu that used to open it).
   const [cardSnooze, setCardSnooze] = useState<{
     contactId: number;
     name: string;
@@ -828,9 +827,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // focus (tab switch, pushed screen), so it never sits hidden and eats the
   // first Back or tab re-tap elsewhere. Query state is untouched (ADR-092).
   useFocusEffect(dashboardPanelFocusEffect);
-  const [contextMenuContactId, setContextMenuContactId] = useState<
-    number | null
-  >(null);
   const openRowRef = useRef<SwipeableMethods | null>(null);
   const [postLogTarget, setPostLogTarget] = useState<PostLogNoteTarget | null>(
     null,
@@ -1984,12 +1980,22 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [toggleFavourite],
   );
 
-  const openCardContextMenu = useCallback((contactId: number) => {
-    setContextMenuContactId(contactId);
+  // 38.13 D-90: the card's Snooze… accessibility action opens the shared
+  // snooze sheet for that person, read from the published row by id. An
+  // Unbound person has no snooze (ADR-233); GridCard does not offer it, and
+  // an id with no published row does nothing.
+  const openCardSnooze = useCallback((contactId: number) => {
+    const row = rowsByIdRef.current.get(contactId);
+    if (!row || isUnboundRow(row)) return;
+    setCardSnooze({
+      contactId: row.id,
+      name: row.name,
+      snoozeUntil: row.snooze_until,
+    });
   }, []);
 
-  // Log Interaction for a card, the card menu and the List row's TalkBack
-  // action (D-26): always the detailed Log Interaction screen.
+  // Log Interaction for a card's accessibility action and the List row's
+  // TalkBack action (D-26): always the detailed Log Interaction screen.
   const openLogInteraction = useCallback((contactId: number) => {
     navigateDashboardContactAction(contactId, "LogContact");
   }, []);
@@ -2181,14 +2187,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const term = publishedSearchTerm;
   const isSearchMode = term !== "";
   const searching = searchText.trim() !== publishedSearchTerm;
-  const contextMenuContact =
-    contextMenuContactId === null
-      ? null
-      : (rows.find((row) => row.id === contextMenuContactId) ?? null);
-  const contextMenuIsFavourite =
-    contextMenuContact !== null &&
-    (favouriteOverlay.get(contextMenuContact.id) ??
-      contextMenuContact.favourite_rank !== null);
   // The card sheet's EFFECTIVE snooze end (review W-01): an expired
   // `snooze_until` reads as not snoozed.
   const cardSnoozeUntil =
@@ -2615,12 +2613,15 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 rows={cardRows}
                 now={listNow}
                 onPressContact={goToProfile}
-                onLongPressContact={openCardContextMenu}
+                // 38.13 D-90: long-press enters multi-select with that
+                // card selected; the per-card menu is retired.
+                onLongPressContact={enterCardSelection}
                 onViewProfile={goToProfile}
                 onQuickLog={logQuickly}
                 onLogInteraction={openLogInteraction}
                 onMessage={messageContact}
                 onEditContact={onEditContact}
+                onOpenSnooze={openCardSnooze}
                 onSelect={enterCardSelection}
                 selectionMode={selectionMode}
                 selectedIds={selectedIds}
@@ -2667,48 +2668,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         />
       ) : null}
       <DashboardOverlayHost />
-      <CardContextMenu
-        visible={contextMenuContact !== null}
-        contactId={contextMenuContact?.id ?? null}
-        name={contextMenuContact?.name ?? ""}
-        isFavourite={contextMenuIsFavourite}
-        unbound={
-          contextMenuContact !== null && isUnboundRow(contextMenuContact)
-        }
-        onViewProfile={() => {
-          if (contextMenuContact) goToProfile(contextMenuContact.id);
-        }}
-        onQuickLog={() => {
-          if (contextMenuContact) logQuickly(contextMenuContact.id);
-        }}
-        onLogInteraction={() => {
-          if (contextMenuContact) openLogInteraction(contextMenuContact.id);
-        }}
-        onMessage={() => {
-          if (contextMenuContact) messageContact(contextMenuContact.id);
-        }}
-        onEditContact={() => {
-          if (contextMenuContact) onEditContact(contextMenuContact.id);
-        }}
-        onToggleFavourite={() => {
-          if (contextMenuContact) {
-            onFavouriteTap(contextMenuContact.id, !contextMenuIsFavourite);
-          }
-        }}
-        onOpenSnooze={() => {
-          if (contextMenuContact) {
-            setCardSnooze({
-              contactId: contextMenuContact.id,
-              name: contextMenuContact.name,
-              snoozeUntil: contextMenuContact.snooze_until,
-            });
-          }
-        }}
-        onSelect={() => {
-          if (contextMenuContact) enterCardSelection(contextMenuContact.id);
-        }}
-        onRequestClose={() => setContextMenuContactId(null)}
-      />
       <SnoozeSheet
         // 38.11 D-45/D-81 (review V-07, W-01, X-01): the card's sheet renders
         // from the captured `cardSnooze` only (its last value while closing,

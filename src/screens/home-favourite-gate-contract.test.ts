@@ -115,15 +115,17 @@ describe("HomeScreen star taps go through one gate (ADR-233; review R2-04)", () 
     );
   });
 
-  it("the List star, the CardGrid star and the card-menu star all call onFavouriteTap", () => {
+  it("the List star and the CardGrid star (and the card's Favorite accessibility action) call onFavouriteTap", () => {
     // 38.13-08: the memoised List row host flips what it renders and calls
     // the gate it receives as `onFavouriteTap={onFavouriteTap}`.
     expect(source).toContain("onFavouriteTap(contactId, !isFavourite);");
     expect(source).toContain("onFavouriteTap={onFavouriteTap}");
+    // CardGrid hands the same callback to both the card's star and its
+    // Favorite accessibility action (GridCard onToggleFavourite).
     expect(source).toContain("onToggleFavourite={onFavouriteTap}");
-    expect(source).toContain(
-      "onFavouriteTap(contextMenuContact.id, !contextMenuIsFavourite);",
-    );
+    // 38.13 D-90 retired the per-card context menu and its star.
+    expect(source).not.toContain("contextMenuContact");
+    expect(source).not.toContain("CardContextMenu");
     expect(source).not.toContain("onToggleFavourite={toggleFavourite}");
   });
 
@@ -133,11 +135,13 @@ describe("HomeScreen star taps go through one gate (ADR-233; review R2-04)", () 
     );
   });
 
-  it("the card menu receives the Unbound flag of its contact", () => {
-    expect(source).toMatch(
-      /unbound=\{\s*contextMenuContact !== null && isUnboundRow\(contextMenuContact\)\s*\}/,
-    );
+  it("the card receives the Unbound flag of its contact, and the card's Snooze… never opens for an Unbound person (ADR-233; 38.13 D-90)", () => {
+    // D-90 retired the card menu that used to receive this flag; GridCard now
+    // drops Favorite and Snooze from its accessibility actions on it.
     expect(source).toContain("unbound={isUnboundRow(item)}");
+    const body = bodyOf("openCardSnooze");
+    expect(body).toContain("rowsByIdRef.current.get(contactId)");
+    expect(body).toContain("if (!row || isUnboundRow(row)) return;");
   });
 });
 

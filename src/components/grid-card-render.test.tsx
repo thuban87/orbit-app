@@ -3,7 +3,6 @@ import { View } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { FIT_TEXT_MIN_SCALE } from "@/theme/tokens/typography";
-import { CardContextMenu } from "./CardContextMenu";
 import { GridCard } from "./GridCard";
 import {
   GRID_CARD_BORDER,
@@ -700,12 +699,9 @@ describe("Unbound rows and cards (38.13 D-59, ADR-233)", () => {
   });
 });
 
-describe("CardContextMenu for an Unbound person (ADR-233)", () => {
-  const menuProps = {
-    visible: true,
-    contactId: 7,
-    name: "Alex",
-    isFavourite: false,
+describe("Card long-press and accessibility actions after the card menu (38.13 D-90)", () => {
+  const handlers = () => ({
+    onLongPress: vi.fn(),
     onViewProfile: vi.fn(),
     onQuickLog: vi.fn(),
     onLogInteraction: vi.fn(),
@@ -714,38 +710,113 @@ describe("CardContextMenu for an Unbound person (ADR-233)", () => {
     onToggleFavourite: vi.fn(),
     onOpenSnooze: vi.fn(),
     onSelect: vi.fn(),
-    onRequestClose: vi.fn(),
+  });
+  const actionsOf = (node: Node | undefined) =>
+    (
+      (node?.props.accessibilityActions ?? []) as {
+        name: string;
+        label: string;
+      }[]
+    ).map((action) => action.name);
+  type CardAction = { name: string; label: string };
+  const actionList = (node: Node | undefined): CardAction[] =>
+    (node?.props.accessibilityActions ?? []) as CardAction[];
+  const run = (node: Node | undefined, actionName: string) => {
+    const handler = node?.props.onAccessibilityAction as
+      | ((event: { nativeEvent: { actionName: string } }) => void)
+      | undefined;
+    if (!handler) throw new Error("no onAccessibilityAction");
+    handler({ nativeEvent: { actionName } });
   };
 
-  function actionIds(unbound: boolean): string[] {
-    return all(resolve(CardContextMenu({ ...menuProps, unbound })))
-      .map((node) => node.props.testID)
-      .filter(
-        (id): id is string =>
-          typeof id === "string" &&
-          id.startsWith("card-context-menu-") &&
-          !id.startsWith("card-context-menu-title-"),
-      );
-  }
-
-  it("offers no Snooze and no Favorite when unbound", () => {
-    const ids = actionIds(true);
-    expect(ids).not.toContain("card-context-menu-snooze");
-    expect(ids).not.toContain("card-context-menu-favourite");
-    expect(ids).toEqual([
-      "card-context-menu-view-profile",
-      "card-context-menu-quick-log",
-      "card-context-menu-log-interaction",
-      "card-context-menu-message",
-      "card-context-menu-edit-contact",
-      "card-context-menu-select",
-    ]);
+  it("long-press calls the host's onLongPress (enter selection with this card) and is off while selecting", () => {
+    const h = handlers();
+    const card = resolve(GridCard({ ...baseProps, ...h }))[0];
+    expect(card?.props.onLongPress).toBe(h.onLongPress);
+    const selecting = resolve(
+      GridCard({ ...baseProps, ...h, selectionMode: true }),
+    )[0];
+    expect(selecting?.props.onLongPress).toBeUndefined();
   });
 
-  it("keeps every entry for a Bound person", () => {
-    const ids = actionIds(false);
-    expect(ids).toContain("card-context-menu-snooze");
-    expect(ids).toContain("card-context-menu-favourite");
+  it("keeps every per-contact action the menu offered, in its order and with its labels, for a Bound person", () => {
+    const h = handlers();
+    const card = resolve(GridCard({ ...baseProps, ...h }))[0];
+    expect(actionsOf(card)).toEqual([
+      "view-profile",
+      "quick-log",
+      "log-interaction",
+      "message",
+      "edit-contact",
+      "favourite",
+      "snooze",
+      "select",
+    ]);
+    const labels = actionList(card).map((action) => action.label);
+    expect(labels).toEqual([
+      "View Profile",
+      "Quick Log",
+      "Log Interaction",
+      "Message",
+      "Edit Contact",
+      "Favorite",
+      "Snooze…",
+      "Select",
+    ]);
+    const favourite = resolve(
+      GridCard({ ...baseProps, ...h, isFavourite: true }),
+    )[0];
+    expect(
+      actionList(favourite).find((action) => action.name === "favourite")
+        ?.label,
+    ).toBe("Unfavorite");
+  });
+
+  it("each action calls its handler", () => {
+    const h = handlers();
+    const card = resolve(GridCard({ ...baseProps, ...h }))[0];
+    for (const [name, handler] of [
+      ["view-profile", h.onViewProfile],
+      ["quick-log", h.onQuickLog],
+      ["log-interaction", h.onLogInteraction],
+      ["message", h.onMessage],
+      ["edit-contact", h.onEditContact],
+      ["favourite", h.onToggleFavourite],
+      ["snooze", h.onOpenSnooze],
+      ["select", h.onSelect],
+    ] as const) {
+      run(card, name);
+      expect(handler).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("offers no Favorite and no Snooze for an Unbound person (ADR-233), as the menu did not", () => {
+    const h = handlers();
+    const card = resolve(
+      GridCard({ ...baseProps, ...h, status: null, unbound: true }),
+    )[0];
+    expect(actionsOf(card)).toEqual([
+      "view-profile",
+      "quick-log",
+      "log-interaction",
+      "message",
+      "edit-contact",
+      "select",
+    ]);
+    run(card, "favourite");
+    run(card, "snooze");
+    expect(h.onToggleFavourite).not.toHaveBeenCalled();
+    expect(h.onOpenSnooze).not.toHaveBeenCalled();
+    // D-77: an Unbound card can still be selected.
+    run(card, "select");
+    expect(h.onSelect).toHaveBeenCalledOnce();
+  });
+
+  it("offers no actions while selecting", () => {
+    const card = resolve(
+      GridCard({ ...baseProps, ...handlers(), selectionMode: true }),
+    )[0];
+    expect(card?.props.accessibilityActions).toBeUndefined();
   });
 });
 

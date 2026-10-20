@@ -26,12 +26,15 @@ export interface CardGridProps {
   rows: DashboardRow[];
   now: string;
   onPressContact: (contactId: number) => void;
+  /** Long-press: enter multi-select with this card selected (38.13 D-90). */
   onLongPressContact?: (contactId: number) => void;
   onViewProfile?: (contactId: number) => void;
   onQuickLog?: (contactId: number) => void;
   onLogInteraction?: (contactId: number) => void;
   onMessage?: (contactId: number) => void;
   onEditContact?: (contactId: number) => void;
+  /** The card's Snooze… accessibility action (38.13 D-90). */
+  onOpenSnooze?: (contactId: number) => void;
   onSelect?: (contactId: number) => void;
   selectionMode?: boolean;
   selectedIds?: ReadonlySet<number>;
@@ -64,6 +67,7 @@ export function CardGrid({
   onLogInteraction,
   onMessage,
   onEditContact,
+  onOpenSnooze,
   onSelect,
   selectionMode = false,
   selectedIds = new Set<number>(),
@@ -151,6 +155,9 @@ export function CardGrid({
             onMessage={onMessage ? () => onMessage(item.id) : undefined}
             onEditContact={
               onEditContact ? () => onEditContact(item.id) : undefined
+            }
+            onOpenSnooze={
+              onOpenSnooze ? () => onOpenSnooze(item.id) : undefined
             }
             onSelect={onSelect ? () => onSelect(item.id) : undefined}
             selectionMode={selectionMode}

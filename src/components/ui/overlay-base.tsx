@@ -1,9 +1,9 @@
 /**
  * overlay-base (THEME-10 / dossier §O) — the shared scaffolding EVERY overlay
- * variant (Sheet / ConfirmDialog, plus CardContextMenu) is built on, so they
- * share ONE scrim, lifecycle and dismissal contract rather than re-implementing
- * it. (The full-screen `ui/Modal` variant had no consumer and was removed in
- * 38.9.)
+ * variant (Sheet / ConfirmDialog) is built on, so they share ONE scrim,
+ * lifecycle and dismissal contract rather than re-implementing it. (The
+ * full-screen `ui/Modal` variant had no consumer and was removed in 38.9; the
+ * Card view's CardContextMenu was retired in 38.13, D-90.)
  *
  * Scrim idiom (dossier §O): `colors.background` at a fixed opacity — NEVER a
  * colour literal — matching the existing `DropdownFieldWidget` pattern.

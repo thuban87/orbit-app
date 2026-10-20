@@ -239,3 +239,27 @@ describe("a bar action's pre-write read shows busy, never a silent drop (38.13 r
     );
   });
 });
+
+describe("long-press on a card enters selection (38.13 D-90)", () => {
+  it("CardGrid's long-press is enterCardSelection, the same entry as the Select action", () => {
+    expect(source).toContain("onLongPressContact={enterCardSelection}");
+    expect(source).toContain("onSelect={enterCardSelection}");
+  });
+
+  it("the per-card context menu is retired: no import, state or render remains", () => {
+    expect(source).not.toContain("CardContextMenu");
+    expect(source).not.toContain("contextMenuContactId");
+    expect(source).not.toContain("openCardContextMenu");
+  });
+
+  it("the card's Snooze… accessibility action still opens the shared card snooze sheet (38.11 D-81)", () => {
+    expect(source).toContain("onOpenSnooze={openCardSnooze}");
+    expect(bodyOf("openCardSnooze")).toContain("setCardSnooze({");
+  });
+
+  it("enterCardSelection seeds the long-pressed card into the frozen universe", () => {
+    expect(bodyOf("enterCardSelection")).toContain(
+      "enterSelection(universe, contactId)",
+    );
+  });
+});

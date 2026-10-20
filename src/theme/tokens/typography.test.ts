@@ -123,7 +123,7 @@ describe("resolveFontFamily (RG-031 ui-accessibility/AUD-UIA-015)", () => {
     // 38.13-10 (D-39): the bulk-frequency sheet's two label styles left
     // HomeScreen with its days field; the sheet uses AppText and Button.
     ["src/screens/HomeScreen.tsx", 0],
-    ["src/components/CardContextMenu.tsx", 2],
+    // 38.13 D-90 retired CardContextMenu.tsx (its 2 sites went with it).
     ["src/components/BulkActionSurface.tsx", 7],
   ])(
     "%s assigns registered font keys only (%i resolveFontFamily sites)",
