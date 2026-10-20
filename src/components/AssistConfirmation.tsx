@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ConfirmActions } from "@/components/ui/ConfirmDialog";
 import type { InteractionAssistChannel } from "@/db/interaction-assist-dao";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -72,60 +73,29 @@ export function AssistConfirmation({
 
   return (
     <View style={styles.panel}>
-      <View style={styles.actions}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Yes"
-          accessibilityState={{ disabled: pending }}
-          disabled={pending}
-          onPress={() => confirm(1)}
-          style={[
-            styles.button,
-            { backgroundColor: colors.accent, borderColor: colors.accent },
-          ]}
-        >
-          <Text style={[styles.buttonText, { color: colors.onAccent }]}>
-            Yes
-          </Text>
-        </Pressable>
-
-        {channel === "call" ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="No answer"
-            accessibilityState={{ disabled: pending }}
-            disabled={pending}
-            onPress={() => confirm(0)}
-            style={[
-              styles.button,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Text style={[styles.buttonText, { color: colors.textSecondary }]}>
-              No answer
-            </Text>
-          </Pressable>
-        ) : null}
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Don't log"
-          accessibilityState={{ disabled: pending }}
-          disabled={pending}
-          onPress={dismiss}
-          style={[
-            styles.button,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.buttonText, { color: colors.textSecondary }]}>
-            Don't log
-          </Text>
-        </Pressable>
-      </View>
+      {/* 38.14 D-80 / D-73: the answers sit in a ConfirmActions
+          measure-and-stack row (D-11, ADR-174 :38 rejected plain wrapping), so
+          Yes is on the right like dialogs. The answer set per channel is
+          unchanged (D-09, ADR-071): Call offers Yes / No answer / Don't log;
+          Text and Email offer Yes / Don't log. */}
+      <ConfirmActions
+        cancelLabel="Don't log"
+        confirmLabel="Yes"
+        {...(channel === "call"
+          ? { secondaryLabel: "No answer", onSecondary: () => confirm(0) }
+          : {})}
+        destructive={false}
+        cancelDisabled={pending}
+        secondaryDisabled={pending}
+        confirmDisabled={pending}
+        onCancel={dismiss}
+        onConfirm={() => confirm(1)}
+        testIDs={{
+          cancel: "assist-dont-log",
+          secondary: "assist-no-answer",
+          confirm: "assist-yes",
+        }}
+      />
 
       <Pressable
         accessibilityRole="button"
@@ -163,25 +133,6 @@ export function AssistConfirmation({
 const styles = StyleSheet.create({
   panel: {
     gap: 10,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-    gap: 8,
-  },
-  button: {
-    minWidth: 44,
-    minHeight: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "700",
   },
   noteToggle: {
     minWidth: 44,

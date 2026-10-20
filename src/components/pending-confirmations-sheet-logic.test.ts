@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   markNoteDirty,
+  pendingSheetContentHeight,
+  pendingSheetVariantFor,
   pruneDirtyNotes,
   shouldPromptOnSheetClose,
 } from "./pending-confirmations-sheet-logic";
@@ -82,5 +84,51 @@ describe("pruneDirtyNotes follows the queue (review M6)", () => {
     );
     expect(shouldPromptOnSheetClose(pruneDirtyNotes(dirty, []))).toBe(false);
     expect([...pruneDirtyNotes(dirty, ["assist-2"])]).toEqual(["assist-2"]);
+  });
+});
+
+describe("pendingSheetVariantFor (38.14 D-74, ADR-255)", () => {
+  const env = { windowWidth: 400, bottomInset: 0 };
+  const row = {
+    question: "Did you text Grace Hopper?",
+    destination: "Text to 555-0101 · 9:00 AM",
+    answers: ["Don't log", "Yes"],
+  };
+
+  it("opens compact for one row in a tall window", () => {
+    expect(
+      pendingSheetVariantFor({
+        ...env,
+        windowHeight: 2000,
+        fontScale: 1,
+        title: "Pending confirmations",
+        rows: [row],
+      }),
+    ).toBe("compact");
+  });
+
+  it("grows with the rows and the text scale", () => {
+    const five = Array.from({ length: 5 }, () => row);
+    const base = { ...env, title: "Pending confirmations", rows: five };
+    expect(
+      pendingSheetContentHeight({ ...base, windowHeight: 900, fontScale: 2 }),
+    ).toBeGreaterThan(
+      pendingSheetContentHeight({ ...base, windowHeight: 900, fontScale: 1 }),
+    );
+    expect(
+      pendingSheetVariantFor({ ...base, windowHeight: 900, fontScale: 2 }),
+    ).toBe("expanded");
+  });
+
+  it("sizes the empty state too", () => {
+    expect(
+      pendingSheetVariantFor({
+        ...env,
+        windowHeight: 800,
+        fontScale: 1,
+        title: "Pending confirmations",
+        rows: [],
+      }),
+    ).toBe("compact");
   });
 });

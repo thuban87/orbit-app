@@ -19,8 +19,7 @@
  *
  * Node-testable by construction: no react-native, store or database import.
  */
-import { remapLegacyChannel } from "@/db/interaction-vocabulary";
-import { loggedInteractionSnackbar } from "@/logic/also-save-to-logic";
+import { assistAnswerSnackbar } from "@/logic/assist-display";
 import type { ComposeExit } from "@/logic/compose-logic";
 import type { AssistActionResult } from "@/services/assist-commit";
 
@@ -100,28 +99,24 @@ export function composePanelOutcome(
 
 /**
  * Compose's success snackbar after "Yes, log it" (D-43): "Logged Message with
- * Maya". Text and email both log as Message (D-10, ADR-116) through the single
- * vocabulary map; the wording is the shared logging pattern (D-39).
+ * Maya". Text and email both log as Message (D-10, ADR-116). One wording with
+ * the banner and pending list (`assistAnswerSnackbar`, D-39).
  */
 export function composeLoggedSnackbar(
   channel: "text" | "email",
   personName: string | null,
 ): string {
-  return loggedInteractionSnackbar({
-    channel: remapLegacyChannel(channel),
-    personName,
-    section: null,
-  });
+  return assistAnswerSnackbar({ channel, personName, answer: "logged" });
 }
 
 /**
  * Compose's confirmation after "No, don't log" (D-78, D-20 named snackbar):
- * "Didn't log Message with Maya". Wording is Claude's Discretion (CONTEXT).
+ * "Didn't log Message with Maya" — the same wording the banner and pending
+ * list use for "Don't log".
  */
 export function composeDismissedSnackbar(
   channel: "text" | "email",
   personName: string | null,
 ): string {
-  const whom = personName ? ` with ${personName}` : "";
-  return `Didn't log ${remapLegacyChannel(channel)}${whom}`;
+  return assistAnswerSnackbar({ channel, personName, answer: "dismissed" });
 }

@@ -63,24 +63,28 @@ vi.mock("@/components/PendingConfirmationsSheet", () => ({
 }));
 vi.mock("@/db/database", () => ({
   getExecutor: vi.fn(),
-  localDateTime: vi.fn(),
+  localDateTime: () => "2026-09-30 10:00:00",
 }));
 vi.mock("@/db/interaction-assist-dao", () => ({
   markAssistDismissed: vi.fn(),
   markAssistLogged: vi.fn(),
 }));
+const runner = vi.hoisted(() => ({ runAssistAction: vi.fn() }));
 vi.mock("@/services/assist-commit", () => ({
   ASSIST_FAILURE_COPY: {},
   publishAssistCommit: vi.fn(),
   publishAssistDismissal: vi.fn(),
-  runAssistAction: vi.fn(),
+  runAssistAction: runner.runAssistAction,
 }));
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: vi.fn(),
 }));
 vi.mock("@/stores/confirm-store", () => ({ notice: vi.fn() }));
 vi.mock("@/stores/shell-refresh-store", () => ({ bumpShellRefresh: vi.fn() }));
-vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
+const snackbar = vi.hoisted(() => ({ showSnackbar: vi.fn() }));
+vi.mock("@/stores/snackbar-store", () => ({
+  showSnackbar: snackbar.showSnackbar,
+}));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
 
 const { AssistBanner } = await import("./AssistBanner");
@@ -113,7 +117,8 @@ const NEWEST: EligiblePendingAssist = {
   uid: "assist-2",
   contact_id: 12,
   channel: "text",
-  endpoint_value: null,
+  endpoint_value: "+15550101",
+  endpoint_display: "555-0101",
   handoff_at: "2026-09-30 09:00:00",
   created_at: "2026-09-30 09:00:01",
   contact_name: "Grace Hopper",
@@ -142,7 +147,7 @@ describe("AssistBanner photo (38.6 D-25 F-2)", () => {
     ]);
   });
 
-  it("sits the Avatar before the one-line question in one row", () => {
+  it("sits the Avatar before the one-line question and the destination line in one row (38.14 D-74)", () => {
     const tree = render(NEWEST);
     const row = tree.find((node) => {
       if (node.type !== "View") return false;
@@ -153,16 +158,30 @@ describe("AssistBanner photo (38.6 D-25 F-2)", () => {
       );
     });
     const kids = row?.props.children as TestElement[];
-    expect(kids.map((kid) => kid.type)).toEqual(["Avatar", "Text"]);
+    expect(kids.map((kid) => kid.type)).toEqual(["Avatar", "View"]);
     expect(flatStyle(row)).toMatchObject({
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
     });
-    const question = kids[1];
+    const column = kids[1];
+    expect(flatStyle(column)).toMatchObject({ flex: 1 });
+    const [question, destination] = (column?.props.children ??
+      []) as TestElement[];
     expect(textOf(question)).toBe("Did you text Grace Hopper?");
     expect(question?.props.numberOfLines).toBe(1);
-    expect(flatStyle(question)).toMatchObject({ flex: 1 });
+    // Channel, destination (as the contact method writes it, D-79) and time.
+    expect(textOf(destination)).toBe("Text to 555-0101 · 9:00 AM");
+    expect(destination?.props.numberOfLines).toBe(1);
+  });
+
+  it("falls back to channel and time when no destination was stored", () => {
+    const tree = render({
+      ...NEWEST,
+      endpoint_value: null,
+      endpoint_display: null,
+    });
+    expect(tree.some((node) => textOf(node) === "Text · 9:00 AM")).toBe(true);
   });
 
   it("gives the row one accessible label so TalkBack reads the name once (review WR2-04)", () => {
@@ -175,7 +194,9 @@ describe("AssistBanner photo (38.6 D-25 F-2)", () => {
         ),
     );
     expect(row?.props.accessible).toBe(true);
-    expect(row?.props.accessibilityLabel).toBe("Did you text Grace Hopper?");
+    expect(row?.props.accessibilityLabel).toBe(
+      "Did you text Grace Hopper? Text to 555-0101 · 9:00 AM",
+    );
   });
 
   it("gives the Avatar null (initials) when the contact has no photo", () => {
@@ -278,5 +299,62 @@ describe("AssistBanner shell offset (38.6 review WR5-01)", () => {
     expect(offset()).toBe(184);
     unmount();
     expect(offset()).toBe(0);
+  });
+});
+
+describe("AssistBanner answer snackbars (38.14 D-74)", () => {
+  const confirmation = () =>
+    render(NEWEST).find(
+      (node) => node.type === "AssistConfirmation",
+    ) as TestElement;
+
+  it("passes the newest record's channel to the confirmation controls", () => {
+    expect(confirmation().props.channel).toBe("text");
+    const call = render({ ...NEWEST, channel: "call" }).find(
+      (node) => node.type === "AssistConfirmation",
+    );
+    expect(call?.props.channel).toBe("call");
+  });
+
+  it("confirms Yes with a snackbar naming channel and person", async () => {
+    snackbar.showSnackbar.mockClear();
+    runner.runAssistAction.mockResolvedValueOnce("done");
+    await (confirmation().props.onConfirm as (c: 0 | 1) => Promise<void>)(1);
+    expect(snackbar.showSnackbar).toHaveBeenCalledWith({
+      kind: "success",
+      label: "Logged Message with Grace Hopper",
+    });
+  });
+
+  it("confirms a Call's No answer as a logged call with no answer", async () => {
+    snackbar.showSnackbar.mockClear();
+    runner.runAssistAction.mockResolvedValueOnce("done");
+    const call = render({ ...NEWEST, channel: "call" }).find(
+      (node) => node.type === "AssistConfirmation",
+    ) as TestElement;
+    await (call.props.onConfirm as (c: 0 | 1) => Promise<void>)(0);
+    expect(snackbar.showSnackbar).toHaveBeenCalledWith({
+      kind: "success",
+      label: "Logged Call with Grace Hopper, no answer",
+    });
+  });
+
+  it("confirms Don't log with a snackbar", async () => {
+    snackbar.showSnackbar.mockClear();
+    runner.runAssistAction.mockResolvedValueOnce("done");
+    await (confirmation().props.onDismiss as () => Promise<void>)();
+    expect(snackbar.showSnackbar).toHaveBeenCalledWith({
+      kind: "success",
+      label: "Didn't log Message with Grace Hopper",
+    });
+  });
+
+  it("shows no success snackbar when the write failed or was busy", async () => {
+    snackbar.showSnackbar.mockClear();
+    runner.runAssistAction.mockResolvedValueOnce("failed");
+    await (confirmation().props.onConfirm as (c: 0 | 1) => Promise<void>)(1);
+    runner.runAssistAction.mockResolvedValueOnce("busy");
+    await (confirmation().props.onDismiss as () => Promise<void>)();
+    expect(snackbar.showSnackbar).not.toHaveBeenCalled();
   });
 });

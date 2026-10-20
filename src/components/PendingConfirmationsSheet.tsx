@@ -1,18 +1,33 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
 import { Avatar } from "@/components/Avatar";
 import {
   markNoteDirty,
+  PENDING_AVATAR_SIZE,
+  PENDING_ROW_GAP,
+  PENDING_ROW_INNER_GAP,
+  PENDING_ROW_PADDING_BOTTOM,
+  PENDING_SHEET_GAP,
+  pendingSheetVariantFor,
   pruneDirtyNotes,
   shouldPromptOnSheetClose,
 } from "@/components/pending-confirmations-sheet-logic";
-import { RegisteredModal } from "@/components/ui/RegisteredModal";
+import { Button } from "@/components/ui/Button";
+import type { SizedSheetVariant } from "@/components/ui/option-sheet-logic";
+import { Sheet } from "@/components/ui/Sheet";
+import { useSheetFitEnvironment } from "@/components/use-sheet-fit-environment";
+import { CLOSE } from "@/constants/glossary";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   markAssistDismissed,
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
+import type { EligiblePendingAssist } from "@/db/interaction-assist-read";
+import {
+  assistAnswerSnackbar,
+  assistDestinationLine,
+} from "@/logic/assist-display";
 import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import {
   ASSIST_FAILURE_COPY,
@@ -26,14 +41,19 @@ import { notice } from "@/stores/confirm-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
-import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import type { InFlightRef } from "@/utils/single-flight";
 
-/** Per-row contact avatar diameter (40): the queued contact's photo or initials (38.6 D-14). */
-const PENDING_AVATAR_SIZE = SPACING["2xl"] - SPACING.sm;
-
 const LOG_SCOPE = "pending-confirmations";
+
+const TITLE = "Pending confirmations";
+
+/** A row's answer labels in ConfirmActions order (D-09 sets, D-73 Yes right). */
+function answerLabels(channel: "call" | "text" | "email"): string[] {
+  return channel === "call"
+    ? ["Don't log", "No answer", "Yes"]
+    : ["Don't log", "Yes"];
+}
 
 const NO_DIRTY_NOTES: ReadonlySet<string> = new Set();
 
@@ -52,7 +72,14 @@ function questionFor(channel: "call" | "text" | "email", name: string): string {
   }
 }
 
-/** A transient queue review surface for pending Interaction Assist confirmations. */
+/**
+ * A transient queue review surface for pending Interaction Assist
+ * confirmations: a sized bottom sheet with a Close button (38.14 D-74; ADR-255
+ * sizing). Each row reads "<channel> to <destination> · <time>" and every
+ * answer confirms with a named snackbar. Its `queue` is the assist store's
+ * visible queue, so a record Compose's panel shows, or one answered "Later",
+ * is not offered here (D-23, D-77).
+ */
 export function PendingConfirmationsSheet({
   visible,
   onClose,
@@ -61,6 +88,7 @@ export function PendingConfirmationsSheet({
   onClose: () => void;
 }) {
   const { colors } = useTheme();
+  const sheetFit = useSheetFitEnvironment();
   const queue = useAssistBanner((state) => state.queue);
   const refresh = useAssistBanner((state) => state.refresh);
   // 38.3 RG-023 / D-08: one synchronous latch PER ASSIST (a double tap on one
@@ -87,7 +115,8 @@ export function PendingConfirmationsSheet({
     onClose();
   };
 
-  // The one close for Back (onRequestClose) and the scrim tap. A second close
+  // The one close for Back and the scrim tap (the Sheet's onRequestClose) and
+  // the Close button. A second close
   // request while the prompt is pending gets false from the single-flight
   // confirmDiscard(), so onClose runs at most once (review C2-L3).
   const requestSheetClose = () => {
@@ -126,7 +155,12 @@ export function PendingConfirmationsSheet({
   // Same contract as AssistBanner (src/services/assist-commit.ts): handlers
   // always resolve; a write failure shows a snackbar or notice and leaves the assist
   // pending; a post-commit publication failure is logged only (D-04).
-  const confirm = async (uid: string, connected: 0 | 1, note?: string) => {
+  const confirm = async (
+    assist: EligiblePendingAssist,
+    connected: 0 | 1,
+    note?: string,
+  ) => {
+    const { uid } = assist;
     markPending(uid, true);
     const result = await runAssistAction({
       latch: latchFor(uid),
@@ -168,9 +202,21 @@ export function PendingConfirmationsSheet({
       logFailure,
     });
     if (result !== "busy") markPending(uid, false);
+    // 38.14 D-74: answering confirms with a named snackbar.
+    if (result === "done") {
+      showSnackbar({
+        kind: "success",
+        label: assistAnswerSnackbar({
+          channel: assist.channel,
+          personName: assist.contact_name,
+          answer: connected === 0 ? "no-answer" : "logged",
+        }),
+      });
+    }
   };
 
-  const dismiss = async (uid: string) => {
+  const dismiss = async (assist: EligiblePendingAssist) => {
+    const { uid } = assist;
     markPending(uid, true);
     const result = await runAssistAction({
       latch: latchFor(uid),
@@ -189,126 +235,191 @@ export function PendingConfirmationsSheet({
       logFailure,
     });
     if (result !== "busy") markPending(uid, false);
+    if (result === "done") {
+      showSnackbar({
+        kind: "success",
+        label: assistAnswerSnackbar({
+          channel: assist.channel,
+          personName: assist.contact_name,
+          answer: "dismissed",
+        }),
+      });
+    }
   };
 
-  return (
-    <RegisteredModal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={requestSheetClose}
+  const now = localDateTime();
+  const rows = queue.map((assist) => ({
+    assist,
+    question: questionFor(assist.channel, assist.contact_name),
+    destination: assistDestinationLine(assist, now),
+  }));
+  // ADR-255: the size is decided when the sheet opens and held until it next
+  // opens — answering a row, or the close animation, must never swap the Sheet
+  // between its expanded and compact/detail blocks (a remount would drop a
+  // typed note or cut the animation).
+  const sizingRef = useRef<{ open: boolean; variant: SizedSheetVariant }>({
+    open: false,
+    variant: "compact",
+  });
+  if (visible && !sizingRef.current.open) {
+    sizingRef.current = {
+      open: true,
+      variant: pendingSheetVariantFor({
+        ...sheetFit,
+        title: TITLE,
+        rows: rows.map((row) => ({
+          question: row.question,
+          destination: row.destination,
+          answers: answerLabels(row.assist.channel),
+        })),
+      }),
+    };
+  } else if (!visible && sizingRef.current.open) {
+    sizingRef.current = { ...sizingRef.current, open: false };
+  }
+  const variant = sizingRef.current.variant;
+
+  const title = (
+    <Text
+      accessibilityRole="header"
+      style={[styles.title, { color: colors.textPrimary }]}
     >
-      <View style={styles.modalRoot}>
-        <Pressable
-          accessibilityLabel="Dismiss pending confirmations"
-          style={StyleSheet.absoluteFill}
-          onPress={requestSheetClose}
-        >
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.scrim,
-              { backgroundColor: colors.background },
-            ]}
-          />
-        </Pressable>
+      {TITLE}
+    </Text>
+  );
+
+  const list =
+    queue.length === 0 ? (
+      <View style={styles.empty}>
+        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+          You're all caught up
+        </Text>
+        <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+          No confirmations waiting.
+        </Text>
+      </View>
+    ) : (
+      rows.map(({ assist, question, destination }) => (
         <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-            },
-          ]}
+          key={assist.uid}
+          style={[styles.item, { borderColor: colors.border }]}
         >
-          <Text
-            accessibilityRole="header"
-            style={[styles.title, { color: colors.textPrimary }]}
+          {/* One TalkBack stop with one label (review WR2-04): the
+              Avatar's "Photo of …" must not read the name twice. */}
+          <View
+            accessible
+            accessibilityLabel={`${question} ${destination}`}
+            style={styles.questionRow}
           >
-            Pending confirmations
-          </Text>
-          {queue.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-                You're all caught up
+            <Avatar
+              photo={assist.contact_photo}
+              name={assist.contact_name}
+              contactId={assist.contact_id}
+              size={PENDING_AVATAR_SIZE}
+            />
+            <View style={styles.questionText}>
+              <Text
+                numberOfLines={1}
+                style={[styles.question, { color: colors.textPrimary }]}
+              >
+                {question}
               </Text>
-              <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-                No confirmations waiting.
+              <Text
+                numberOfLines={1}
+                style={[styles.destination, { color: colors.textSecondary }]}
+              >
+                {destination}
               </Text>
             </View>
-          ) : (
-            <ScrollView contentContainerStyle={styles.list}>
-              {queue.map((assist) => (
-                <View
-                  key={assist.uid}
-                  style={[styles.item, { borderColor: colors.border }]}
-                >
-                  {/* One TalkBack stop with one label (review WR2-04): the
-                      Avatar's "Photo of …" must not read the name twice. */}
-                  <View
-                    accessible
-                    accessibilityLabel={questionFor(
-                      assist.channel,
-                      assist.contact_name,
-                    )}
-                    style={styles.questionRow}
-                  >
-                    <Avatar
-                      photo={assist.contact_photo}
-                      name={assist.contact_name}
-                      contactId={assist.contact_id}
-                      size={PENDING_AVATAR_SIZE}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.question, { color: colors.textPrimary }]}
-                    >
-                      {questionFor(assist.channel, assist.contact_name)}
-                    </Text>
-                  </View>
-                  <AssistConfirmation
-                    channel={assist.channel}
-                    onConfirm={(connected, note) =>
-                      confirm(assist.uid, connected, note)
-                    }
-                    onDismiss={() => dismiss(assist.uid)}
-                    pending={pendingUids.has(assist.uid)}
-                    onNoteDirtyChange={(dirty) =>
-                      setDirtyNotes((previous) =>
-                        markNoteDirty(previous, assist.uid, dirty),
-                      )
-                    }
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          )}
+          </View>
+          <AssistConfirmation
+            channel={assist.channel}
+            onConfirm={(connected, note) => confirm(assist, connected, note)}
+            onDismiss={() => dismiss(assist)}
+            pending={pendingUids.has(assist.uid)}
+            onNoteDirtyChange={(dirty) =>
+              setDirtyNotes((previous) =>
+                markNoteDirty(previous, assist.uid, dirty),
+              )
+            }
+          />
         </View>
+      ))
+    );
+
+  const closeRow = (
+    <View style={styles.closeRow}>
+      {/* biome-ignore lint/a11y/useValidAriaRole: Button role is the design-system hierarchy role. */}
+      <Button
+        testID="pending-confirmations-close"
+        role="tertiary"
+        label={CLOSE}
+        onPress={requestSheetClose}
+      />
+    </View>
+  );
+
+  // 38.13 D-87: an expanded Sheet's body does not scroll; its consumer owns the
+  // scroll. A compact / detail sheet passes scrollBody={false} because the list
+  // owns its ScrollView (sheet-consumers-contract EXPECTED_OPT_OUTS).
+  return variant === "expanded" ? (
+    <Sheet
+      visible={visible}
+      onRequestClose={requestSheetClose}
+      variant="expanded"
+    >
+      <View style={styles.content}>
+        {title}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+        >
+          {list}
+        </ScrollView>
+        {closeRow}
       </View>
-    </RegisteredModal>
+    </Sheet>
+  ) : (
+    <Sheet
+      visible={visible}
+      onRequestClose={requestSheetClose}
+      variant={variant === "compact" ? "compact" : "detail"}
+      scrollBody={false}
+    >
+      <View style={styles.content}>
+        {title}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+        >
+          {list}
+        </ScrollView>
+        {closeRow}
+      </View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  scrim: { opacity: 0.85 },
-  sheet: {
-    maxHeight: "80%",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
+  // Shrinks inside the sheet's cap so the Close row always stays on screen
+  // while the list scrolls.
+  content: { flexShrink: 1, gap: PENDING_SHEET_GAP },
+  scroll: { flexGrow: 0, flexShrink: 1 },
   title: { fontSize: 20, fontWeight: "700" },
-  list: { gap: 12 },
+  list: { gap: PENDING_ROW_GAP },
   item: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingBottom: 12,
-    gap: 10,
+    paddingBottom: PENDING_ROW_PADDING_BOTTOM,
+    gap: PENDING_ROW_INNER_GAP,
   },
   questionRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  question: { flex: 1, fontSize: 16, fontWeight: "700" },
+  questionText: { flex: 1, gap: 2 },
+  question: { fontSize: 16, fontWeight: "700" },
+  destination: { fontSize: 14 },
   empty: { gap: 4, paddingVertical: 12 },
   emptyTitle: { fontSize: 17, fontWeight: "700" },
   emptyBody: { fontSize: 15 },
+  closeRow: { flexDirection: "row", justifyContent: "flex-end" },
 });

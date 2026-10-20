@@ -5,12 +5,17 @@ import { THEME_PRESETS } from "@/theme/theme-presets";
 
 /**
  * Shallow render of Pending confirmations (38.6 D-14): each queued assist shows
- * the contact's photo (or initials) through `Avatar` beside its question.
+ * the contact's photo (or initials) through `Avatar` beside its question and,
+ * since 38.14 D-74, a "<channel> to <destination> · <time>" line.
  *
- * 38.9 D-13 / D-14 (J-07): both close paths (Back via `onRequestClose`, the
- * scrim tap) go through one dirty-aware close that prompts while a queued
- * confirmation note holds typed text. A tiny hook harness keeps `useState`
- * values across "renders" so the close lifecycle is observable.
+ * 38.14 D-74: the list is a sized bottom `Sheet` (ADR-255) with a Close button,
+ * and each answer confirms with a named snackbar.
+ *
+ * 38.9 D-13 / D-14 (J-07): every close path (Back and the scrim tap via the
+ * Sheet's `onRequestClose`, and the Close button) goes through one dirty-aware
+ * close that prompts while a queued confirmation note holds typed text. A tiny
+ * hook harness keeps `useState` values across "renders" so the close lifecycle
+ * is observable.
  */
 
 const QUEUE: EligiblePendingAssist[] = [
@@ -19,7 +24,8 @@ const QUEUE: EligiblePendingAssist[] = [
     uid: "assist-2",
     contact_id: 12,
     channel: "text",
-    endpoint_value: null,
+    endpoint_value: "+15550101",
+    endpoint_display: "555-0101",
     handoff_at: "2026-09-30 09:00:00",
     created_at: "2026-09-30 09:00:01",
     contact_name: "Grace Hopper",
@@ -31,7 +37,8 @@ const QUEUE: EligiblePendingAssist[] = [
     contact_id: 11,
     channel: "call",
     endpoint_value: null,
-    handoff_at: "2026-09-30 08:00:00",
+    endpoint_display: null,
+    handoff_at: "2026-09-29 20:30:00",
     created_at: "2026-09-30 08:00:01",
     contact_name: "Ada Lovelace",
     contact_photo: null,
@@ -67,13 +74,15 @@ vi.mock("react", async (original) => ({
     hooks.effects.push(effect);
   },
 }));
-// 38.9 D-24: raw RN Modal sites render through RegisteredModal; the window
-// itself is unchanged, so the wrapper is the mocked RN Modal here.
-vi.mock("@/components/ui/RegisteredModal", () => ({
-  RegisteredModal: "Modal",
+vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
+vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
+const fit = vi.hoisted(() => ({
+  env: { windowHeight: 2000, windowWidth: 400, fontScale: 1, bottomInset: 0 },
+}));
+vi.mock("@/components/use-sheet-fit-environment", () => ({
+  useSheetFitEnvironment: () => fit.env,
 }));
 vi.mock("react-native", () => ({
-  Modal: "Modal",
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   Text: "Text",
@@ -93,24 +102,28 @@ vi.mock("@/components/AssistConfirmation", () => ({
 }));
 vi.mock("@/db/database", () => ({
   getExecutor: vi.fn(),
-  localDateTime: vi.fn(),
+  localDateTime: () => "2026-09-30 10:00:00",
 }));
 vi.mock("@/db/interaction-assist-dao", () => ({
   markAssistDismissed: vi.fn(),
   markAssistLogged: vi.fn(),
 }));
+const runner = vi.hoisted(() => ({ runAssistAction: vi.fn() }));
 vi.mock("@/services/assist-commit", () => ({
   ASSIST_FAILURE_COPY: {},
   publishAssistCommit: vi.fn(),
   publishAssistDismissal: vi.fn(),
-  runAssistAction: vi.fn(),
+  runAssistAction: runner.runAssistAction,
 }));
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: vi.fn(),
 }));
 vi.mock("@/stores/confirm-store", () => ({ notice: vi.fn() }));
 vi.mock("@/stores/shell-refresh-store", () => ({ bumpShellRefresh: vi.fn() }));
-vi.mock("@/stores/snackbar-store", () => ({ showSnackbar: vi.fn() }));
+const snackbar = vi.hoisted(() => ({ showSnackbar: vi.fn() }));
+vi.mock("@/stores/snackbar-store", () => ({
+  showSnackbar: snackbar.showSnackbar,
+}));
 const live = vi.hoisted(() => ({ queue: [] as unknown[] }));
 vi.mock("@/stores/assist-store", () => ({
   useAssistBanner: (
@@ -186,7 +199,7 @@ describe("PendingConfirmationsSheet photos (38.6 D-14)", () => {
     ]);
   });
 
-  it("sits each Avatar beside its question in one row", () => {
+  it("sits each Avatar beside its question and destination line in one row (38.14 D-74)", () => {
     const rows = tree.filter((node) => {
       const kids = nodes(node.props.children as ReactNode);
       return (
@@ -199,21 +212,24 @@ describe("PendingConfirmationsSheet photos (38.6 D-14)", () => {
     const [first, second] = rows.map((row) =>
       (row.props.children as TestElement[]).map((kid) => kid.type),
     );
-    expect(first).toEqual(["Avatar", "Text"]);
-    expect(second).toEqual(["Avatar", "Text"]);
-    const questions = rows.map((row) =>
-      textOf((row.props.children as TestElement[])[1]),
+    expect(first).toEqual(["Avatar", "View"]);
+    expect(second).toEqual(["Avatar", "View"]);
+    const lines = rows.map((row) =>
+      (
+        (row.props.children as TestElement[])[1].props.children as TestElement[]
+      ).map(textOf),
     );
-    expect(questions).toEqual([
-      "Did you text Grace Hopper?",
-      "Did you reach Ada Lovelace?",
+    expect(lines).toEqual([
+      ["Did you text Grace Hopper?", "Text to 555-0101 · 9:00 AM"],
+      // No stored destination; a handoff on the previous local day (D-09).
+      ["Did you reach Ada Lovelace?", "Call · Yesterday 8:30 PM"],
     ]);
     // One TalkBack stop per row with one label (review WR2-04).
     expect(
       rows.map((row) => [row.props.accessible, row.props.accessibilityLabel]),
     ).toEqual([
-      [true, "Did you text Grace Hopper?"],
-      [true, "Did you reach Ada Lovelace?"],
+      [true, "Did you text Grace Hopper? Text to 555-0101 · 9:00 AM"],
+      [true, "Did you reach Ada Lovelace? Call · Yesterday 8:30 PM"],
     ]);
   });
 });
@@ -222,23 +238,27 @@ describe("PendingConfirmationsSheet close guard (38.9 D-13, D-14; J-07)", () => 
   beforeEach(resetHarness);
 
   const modalOf = (tree: TestElement[]) =>
-    tree.find((node) => node.type === "Modal") as TestElement;
+    tree.find((node) => node.type === "Sheet") as TestElement;
+  // The Close button (38.14 D-74); the Sheet owns the scrim and Back, both of
+  // which arrive through its onRequestClose.
   const scrimOf = (tree: TestElement[]) =>
     tree.find(
       (node) =>
-        node.props.accessibilityLabel === "Dismiss pending confirmations",
+        node.type === "Button" &&
+        node.props.testID === "pending-confirmations-close",
     ) as TestElement;
   const confirmationFor = (tree: TestElement[], index: number) =>
     tree.filter((node) => node.type === "AssistConfirmation")[index];
 
-  it("routes Back and the scrim through one close that is not the raw onClose", () => {
+  it("routes Back, the scrim and Close through one close that is not the raw onClose", () => {
     const onClose = vi.fn();
     const tree = render({ visible: true, onClose });
     const back = modalOf(tree).props.onRequestClose;
-    const scrim = scrimOf(tree).props.onPress;
+    const close = scrimOf(tree).props.onPress;
     expect(typeof back).toBe("function");
     expect(back).not.toBe(onClose);
-    expect(scrim).not.toBe(onClose);
+    expect(close).not.toBe(onClose);
+    expect(close).toBe(back);
   });
 
   it("gives every queued confirmation a note-dirty reporter", () => {
@@ -326,5 +346,66 @@ describe("PendingConfirmationsSheet close guard (38.9 D-13, D-14; J-07)", () => 
     (scrimOf(tree).props.onPress as () => void)();
     expect(confirmDiscard).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("PendingConfirmationsSheet bottom sheet (38.14 D-74)", () => {
+  beforeEach(resetHarness);
+
+  const sheetsOf = (tree: TestElement[]) =>
+    tree.filter((node) => node.type === "Sheet");
+
+  it("is a bottom Sheet with a Close button, not a centred modal", () => {
+    const tree = render({ visible: true, onClose: () => {} });
+    expect(sheetsOf(tree)).toHaveLength(1);
+    expect(tree.some((node) => node.type === "Modal")).toBe(false);
+    const close = tree.find(
+      (node) =>
+        node.type === "Button" &&
+        node.props.testID === "pending-confirmations-close",
+    );
+    expect(close?.props.label).toBe("Close");
+  });
+
+  it("opens at its sized variant and owns the list scroll (ADR-255, D-32)", () => {
+    // Two rows fit a tall window: the smallest size, list scroll owned here.
+    let [sheet] = sheetsOf(render({ visible: true, onClose: () => {} }));
+    expect(sheet.props.variant).toBe("compact");
+    expect(sheet.props.scrollBody).toBe(false);
+
+    // A short window at large text needs the expanded size.
+    resetHarness();
+    fit.env = { ...fit.env, windowHeight: 600, fontScale: 2 };
+    [sheet] = sheetsOf(render({ visible: true, onClose: () => {} }));
+    expect(sheet.props.variant).toBe("expanded");
+    fit.env = { ...fit.env, windowHeight: 2000, fontScale: 1 };
+  });
+
+  it("confirms each answer with a named snackbar", async () => {
+    snackbar.showSnackbar.mockClear();
+    const tree = render({ visible: true, onClose: () => {} });
+    const [grace, ada] = tree.filter(
+      (node) => node.type === "AssistConfirmation",
+    );
+    runner.runAssistAction.mockResolvedValueOnce("done");
+    await (grace.props.onConfirm as (c: 0 | 1) => Promise<void>)(1);
+    runner.runAssistAction.mockResolvedValueOnce("done");
+    await (ada.props.onConfirm as (c: 0 | 1) => Promise<void>)(0);
+    runner.runAssistAction.mockResolvedValueOnce("done");
+    await (ada.props.onDismiss as () => Promise<void>)();
+    expect(snackbar.showSnackbar.mock.calls.map(([arg]) => arg.label)).toEqual([
+      "Logged Message with Grace Hopper",
+      "Logged Call with Ada Lovelace, no answer",
+      "Didn't log Call with Ada Lovelace",
+    ]);
+  });
+
+  it("keeps each row's channel so Call still offers No answer (D-09)", () => {
+    const tree = render({ visible: true, onClose: () => {} });
+    expect(
+      tree
+        .filter((node) => node.type === "AssistConfirmation")
+        .map((node) => node.props.channel),
+    ).toEqual(["text", "call"]);
   });
 });

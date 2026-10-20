@@ -13,6 +13,10 @@ import {
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
 import {
+  assistAnswerSnackbar,
+  assistDestinationLine,
+} from "@/logic/assist-display";
+import {
   ASSIST_FAILURE_COPY,
   publishAssistCommit,
   publishAssistDismissal,
@@ -96,7 +100,11 @@ export function AssistBanner() {
   }
 
   const assistUid = newest.uid;
-  const question = questionFor(newest.channel, newest.contact_name);
+  const { channel, contact_name: personName } = newest;
+  const question = questionFor(channel, personName);
+  // 38.14 D-74: where it went and when, from the stored endpoint (shown as the
+  // contact method writes it, D-79) and handoff time. Device-only display.
+  const destinationLine = assistDestinationLine(newest, localDateTime());
 
   // Confirm/dismiss run through the shared runner + publisher
   // (src/services/assist-commit.ts). Both handlers always resolve: a write
@@ -144,6 +152,17 @@ export function AssistBanner() {
       logFailure,
     });
     if (result !== "busy") setPending(false);
+    // 38.14 D-74: answering confirms with a named snackbar.
+    if (result === "done") {
+      showSnackbar({
+        kind: "success",
+        label: assistAnswerSnackbar({
+          channel,
+          personName,
+          answer: connected === 0 ? "no-answer" : "logged",
+        }),
+      });
+    }
   };
 
   const dismiss = async () => {
@@ -165,6 +184,16 @@ export function AssistBanner() {
       logFailure,
     });
     if (result !== "busy") setPending(false);
+    if (result === "done") {
+      showSnackbar({
+        kind: "success",
+        label: assistAnswerSnackbar({
+          channel,
+          personName,
+          answer: "dismissed",
+        }),
+      });
+    }
   };
 
   return (
@@ -187,7 +216,7 @@ export function AssistBanner() {
             (review WR2-04). */}
         <View
           accessible
-          accessibilityLabel={question}
+          accessibilityLabel={`${question} ${destinationLine}`}
           style={styles.questionRow}
         >
           <Avatar
@@ -196,12 +225,20 @@ export function AssistBanner() {
             contactId={newest.contact_id}
             size={ASSIST_BANNER_AVATAR_SIZE}
           />
-          <Text
-            numberOfLines={1}
-            style={[styles.question, { color: colors.textPrimary }]}
-          >
-            {question}
-          </Text>
+          <View style={styles.questionText}>
+            <Text
+              numberOfLines={1}
+              style={[styles.question, { color: colors.textPrimary }]}
+            >
+              {question}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.destination, { color: colors.textSecondary }]}
+            >
+              {destinationLine}
+            </Text>
+          </View>
         </View>
         {morePendingCount > 0 ? (
           <Pressable
@@ -249,10 +286,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: SPACING.md,
   },
-  question: {
+  questionText: {
     flex: 1,
+    gap: 2,
+  },
+  question: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  destination: {
+    fontSize: 14,
   },
   pendingCount: {
     minHeight: 44,

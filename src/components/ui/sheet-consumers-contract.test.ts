@@ -35,6 +35,8 @@ const VIRTUALIZED_LIST = /<(FlatList|SectionList)\b/;
 
 /** The files that own a scroll container inside a compact/detail sheet. */
 const EXPECTED_OPT_OUTS = [
+  // 38.14 D-74: the pending list owns its ScrollView inside a sized sheet.
+  "src/components/PendingConfirmationsSheet.tsx",
   "src/components/orrery/OrreryContactsSheet.tsx",
   "src/components/profile/ProfileRelationshipSheets.tsx",
   "src/components/ui/OptionSheet.tsx",
