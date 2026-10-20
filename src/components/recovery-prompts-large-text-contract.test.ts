@@ -165,21 +165,44 @@ describe("both resume prompts use the shared sheet (D-56)", () => {
 describe("PendingConfirmationsSheet keeps every confirmation reachable (D-49)", () => {
   const text = source("src/components/PendingConfirmationsSheet.tsx");
 
+  // 38.14 D-74: the list is now a sized bottom `Sheet` (ADR-255). The Sheet's
+  // variant supplies the height bound (compact / detail percent caps, or the
+  // 92% expanded sheet), and the list owns the one bounded scroll.
   it("height-bounds the sheet", () => {
-    expect(styleBody(text, "sheet")).toMatch(/maxHeight:\s*"\d+%"/);
+    const sheets = text.split("<Sheet").length - 1;
+    expect(sheets).toBeGreaterThan(0);
+    expect(text).toMatch(/variant="expanded"/);
+    expect(text).toMatch(
+      /variant=\{variant === "compact" \? "compact" : "detail"\}\s+scrollBody=\{false\}/,
+    );
+    expect(styleBody(text, "content")).toMatch(/flexShrink:\s*1/);
+    expect(styleBody(text, "scroll")).toMatch(/flexShrink:\s*1/);
   });
 
   it("scrolls the queue, with the title outside and every confirmation inside", () => {
-    const open = text.indexOf("<ScrollView");
-    const close = text.indexOf("</ScrollView>");
-    expect(open).toBeGreaterThan(-1);
-    expect(close).toBeGreaterThan(open);
-    const title = text.indexOf("Pending confirmations\n");
-    expect(title).toBeGreaterThan(-1);
-    expect(title).toBeLessThan(open);
-    const inside = text.slice(open, close);
-    expect(inside).toContain("queue.map(");
-    expect(inside).toContain("<AssistConfirmation");
+    expect(text).toContain('const TITLE = "Pending confirmations";');
+    // Every Sheet block puts the title before the scroll and the list inside it.
+    let from = text.indexOf("<Sheet");
+    expect(from).toBeGreaterThan(-1);
+    while (from !== -1) {
+      const end = text.indexOf("</Sheet>", from);
+      const block = text.slice(from, end);
+      const open = block.indexOf("<ScrollView");
+      const close = block.indexOf("</ScrollView>");
+      expect(open).toBeGreaterThan(-1);
+      expect(close).toBeGreaterThan(open);
+      expect(block.indexOf("{title}")).toBeGreaterThan(-1);
+      expect(block.indexOf("{title}")).toBeLessThan(open);
+      expect(block.slice(open, close)).toContain("{list}");
+      expect(block.indexOf("{closeRow}")).toBeGreaterThan(close);
+      from = text.indexOf("<Sheet", end);
+    }
+    const list = text.slice(
+      text.indexOf("const list ="),
+      text.indexOf("const closeRow ="),
+    );
+    expect(list).toContain("rows.map(");
+    expect(list).toContain("<AssistConfirmation");
     expect(text.split("<AssistConfirmation").length - 1).toBe(1);
   });
 

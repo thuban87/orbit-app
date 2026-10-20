@@ -400,6 +400,23 @@ describe("PendingConfirmationsSheet bottom sheet (38.14 D-74)", () => {
     ]);
   });
 
+  it("shows the empty state without a scroll, and the list inside one", () => {
+    live.queue = [];
+    let tree = render({ visible: true, onClose: () => {} });
+    expect(tree.some((node) => node.type === "ScrollView")).toBe(false);
+    expect(tree.some((node) => textOf(node) === "You're all caught up")).toBe(
+      true,
+    );
+    live.queue = QUEUE;
+    tree = render({ visible: true, onClose: () => {} });
+    const scroll = tree.find((node) => node.type === "ScrollView");
+    expect(
+      nodes(scroll?.props.children as ReactNode).filter(
+        (node) => node.type === "AssistConfirmation",
+      ),
+    ).toHaveLength(2);
+  });
+
   it("keeps each row's channel so Call still offers No answer (D-09)", () => {
     const tree = render({ visible: true, onClose: () => {} });
     expect(

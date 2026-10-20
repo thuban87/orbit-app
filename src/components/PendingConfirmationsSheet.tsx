@@ -288,7 +288,8 @@ export function PendingConfirmationsSheet({
     </Text>
   );
 
-  const list =
+  // The empty state shows without a scroll (D-49 large-text contract).
+  const empty =
     queue.length === 0 ? (
       <View style={styles.empty}>
         <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
@@ -298,54 +299,54 @@ export function PendingConfirmationsSheet({
           No confirmations waiting.
         </Text>
       </View>
-    ) : (
-      rows.map(({ assist, question, destination }) => (
-        <View
-          key={assist.uid}
-          style={[styles.item, { borderColor: colors.border }]}
-        >
-          {/* One TalkBack stop with one label (review WR2-04): the
-              Avatar's "Photo of …" must not read the name twice. */}
-          <View
-            accessible
-            accessibilityLabel={`${question} ${destination}`}
-            style={styles.questionRow}
+    ) : null;
+
+  const list = rows.map(({ assist, question, destination }) => (
+    <View
+      key={assist.uid}
+      style={[styles.item, { borderColor: colors.border }]}
+    >
+      {/* One TalkBack stop with one label (review WR2-04): the
+          Avatar's "Photo of …" must not read the name twice. */}
+      <View
+        accessible
+        accessibilityLabel={`${question} ${destination}`}
+        style={styles.questionRow}
+      >
+        <Avatar
+          photo={assist.contact_photo}
+          name={assist.contact_name}
+          contactId={assist.contact_id}
+          size={PENDING_AVATAR_SIZE}
+        />
+        <View style={styles.questionText}>
+          <Text
+            numberOfLines={1}
+            style={[styles.question, { color: colors.textPrimary }]}
           >
-            <Avatar
-              photo={assist.contact_photo}
-              name={assist.contact_name}
-              contactId={assist.contact_id}
-              size={PENDING_AVATAR_SIZE}
-            />
-            <View style={styles.questionText}>
-              <Text
-                numberOfLines={1}
-                style={[styles.question, { color: colors.textPrimary }]}
-              >
-                {question}
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={[styles.destination, { color: colors.textSecondary }]}
-              >
-                {destination}
-              </Text>
-            </View>
-          </View>
-          <AssistConfirmation
-            channel={assist.channel}
-            onConfirm={(connected, note) => confirm(assist, connected, note)}
-            onDismiss={() => dismiss(assist)}
-            pending={pendingUids.has(assist.uid)}
-            onNoteDirtyChange={(dirty) =>
-              setDirtyNotes((previous) =>
-                markNoteDirty(previous, assist.uid, dirty),
-              )
-            }
-          />
+            {question}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={[styles.destination, { color: colors.textSecondary }]}
+          >
+            {destination}
+          </Text>
         </View>
-      ))
-    );
+      </View>
+      <AssistConfirmation
+        channel={assist.channel}
+        onConfirm={(connected, note) => confirm(assist, connected, note)}
+        onDismiss={() => dismiss(assist)}
+        pending={pendingUids.has(assist.uid)}
+        onNoteDirtyChange={(dirty) =>
+          setDirtyNotes((previous) =>
+            markNoteDirty(previous, assist.uid, dirty),
+          )
+        }
+      />
+    </View>
+  ));
 
   const closeRow = (
     <View style={styles.closeRow}>
@@ -370,13 +371,15 @@ export function PendingConfirmationsSheet({
     >
       <View style={styles.content}>
         {title}
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-        >
-          {list}
-        </ScrollView>
+        {empty ?? (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+          >
+            {list}
+          </ScrollView>
+        )}
         {closeRow}
       </View>
     </Sheet>
@@ -389,13 +392,15 @@ export function PendingConfirmationsSheet({
     >
       <View style={styles.content}>
         {title}
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-        >
-          {list}
-        </ScrollView>
+        {empty ?? (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+          >
+            {list}
+          </ScrollView>
+        )}
         {closeRow}
       </View>
     </Sheet>
