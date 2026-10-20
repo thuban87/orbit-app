@@ -1,7 +1,7 @@
 # UX Standards
 
-**Last updated:** 2026-10-18
-**Updated by phase:** 38.12-lifecycle-import-settings-ux
+**Last updated:** 2026-10-19
+**Updated by phase:** 38.13-contacts-list-search-digest-ux
 **Owners:** `src/stores/confirm-store.ts`, `src/components/ui/DialogHost.tsx`, `src/stores/overlay-registry-store.ts`, `src/components/ui/RegisteredModal.tsx`, `src/navigation/discard-keep-guard.ts`, `src/components/ShellAppBar.tsx`, `src/navigation/tab-history.ts`, `src/stores/snackbar-store.ts`, `src/components/ui/` (OrbitSwitch, OptionSheet, FieldError, EmptyState, chip-tone), `src/utils/dates.ts`, `src/utils/plural.ts`
 
 ## Purpose
@@ -105,7 +105,9 @@ Behaviour:
 - A **root** snackbar sits full width just above the round buttons, whether only the universal +
   or also a section Add button shows, with taller padding (D-143). It keeps the position it appeared
   at for its whole life (D-151) and passes touches through while the + dial is open (gap review
-  CR-01). Overlay hosts keep their placement but share the padding (accepted, D-155).
+  CR-01). One exception: when the Contacts selection bar appears under a live pill, the pill lifts
+  once to sit above the bar and never drops back (`bottomBarHeight` in `snackbar-host.ts`; 38.13
+  D-80, ADR-254). Overlay hosts keep their placement but share the padding (accepted, D-155).
 
 **Snackbar or notice** (D-27): an error or info message where the user can carry on is an error
 snackbar; one where the user is blocked is a themed one-button **notice**. Every decision is a
@@ -254,18 +256,36 @@ Every single choice uses the one themed `OptionSheet` (trigger: `OptionSelectRow
 length; search appears on long lists. No `@react-native-picker/picker` import remains (D-28);
 `src/components/ui/no-native-picker-contract.test.ts` enforces this.
 
+**Sized sheets (38.13, ADR-255).** Option sheets are the tall expanded sheet, except three bulk
+sheets on Contacts that open sized to their rows: bulk Set Category (`CategoryChoiceSheet
+sizeToContent`), the selection More… sheet and the bulk Snooze sheet (`SnoozeSheet sizeToContent`).
+One rule decides the size when the sheet opens, `sizedSheetVariantFor` in
+`src/components/ui/option-sheet-logic.ts`: the smallest of compact (40%) and detail (60%) whose cap
+holds every row and the chrome at the current text scale, else expanded with a scroll. Heights come
+from row geometry (`optionSheetContentHeight`, `bulkMoreSheetContentHeight` in
+`src/components/bulk-sheet-fit.ts`), never from row counts, and a sized sheet keeps the rows and
+size it opened with while it fades closed. Every other option sheet and snooze host is unchanged.
+
+**Contact picker (38.13 D-70, D-43).** The modal picker's title names the action that opened it
+(`contactPickerTitle`, e.g. "Quick Log: choose contact"), and its frame follows the 38.9 sheet
+keyboard layout so the search field and first results stay above the keyboard
+(`contactPickerKeyboardFrame` in `src/components/contact-picker-chrome.ts`).
+
 ## Validation
 
 One inline-validation primitive (D-19): error text under the field (`FieldError`), cleared when
 the field changes; on Save, scroll and focus to the first blocking problem
-(`useFirstErrorReveal`). Save stays pressable.
+(`useFirstErrorReveal`). Save stays pressable. Where a sheet cannot expose its scroll view or
+input, a pressed Save forces the error visible and announces it instead; the bulk frequency sheet
+does this (`errorAsFieldError`, 38.13 review B-CR-01).
 
 ## Empty state
 
 One `EmptyState` component (D-20): an icon, a heading saying what is empty, one help line, one
 action. A search-term echo is truncated. Action labels (D-71): a search that found nothing →
 "Clear search"; Events with none logged yet → "Log an event"; Events failed to load →
-"Try again"; History keeps "Log interaction".
+"Try again"; History keeps "Log interaction"; a Contacts list filtered to nothing → "Clear
+filters"; an empty Contacts population → "Show Active Contacts" (38.13, ADR-253).
 
 ## Dates
 
@@ -331,6 +351,9 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 - **ADR-237:** A Paused Import or Check Asks Once — one shared resume-prompt layout.
 - **ADR-246:** One Settings Row and Section Card on Every Settings Page, One Drag-and-⋯ List Pattern — the shared row and card, and the list pattern.
 - **ADR-243:** Restore Runs on Focused Pages — `parseIsoUtcMs` and `formatSourceTimeMinuteOrFallback` in `src/utils/dates.ts` read UTC "Z" and millisecond source times.
+- **ADR-253:** The Population Menu Lists Active Contacts — Contacts empty states use `EmptyState` with one action.
+- **ADR-254:** Selection Mode Uses a Bottom Two-Row Bar — the one upward lift of a root snackbar above the bar (partly supersedes ADR-221).
+- **ADR-255:** Bulk Sheets Open Sized to Their Rows — `sizedSheetVariantFor`; the bulk frequency sheet's pressable Continue (partly supersedes ADR-204).
 
 ## Gotchas
 
@@ -349,6 +372,8 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
    and vitest cannot catch it.
 6. **New Settings pages use the shared row and card.** A page that draws its own rows drifts; the settings chrome contract checks only the header (ADR-246).
 7. **A chevron means the row opens something.** Never put one on an info-only row or a row with a trailing switch.
+8. **Sized sheets are border-box.** RN sizes rows border-box, so a height predictor must not add borders on top of `minHeight`; one that did overstated rows and opened sheets too tall (fixed in 38.13). A sized sheet that can reach expanded needs two literal `<Sheet>` blocks so `sheet-consumers-contract.test.ts` can police its scroll.
+9. **Never disable a Save to block invalid input.** 38.13's bulk frequency sheet first disabled Continue and rewrote the control test to match; the phase review caught it as a reversal of ADR-199 and restored the pressable button.
 
 ## Related Systems
 
@@ -376,3 +401,4 @@ action. A search-term echo is truncated. Action labels (D-71): a search that fou
 | 2026-10-16 | 38.11 | Move to Bin asks first with the themed destructive confirm and shows no Undo (D-71, superseding 38.9 D-32 for this action); Restore and Bind keep act-at-once with Undo; the Profile ⋯ Unbind entry loses its red look and keeps its confirm (D-68). |
 | 2026-10-16 | 38.11 | KB extraction: Decisions link ADR-222, ADR-223, ADR-226, ADR-227; reversible-action and snackbar examples use the Bin wording. |
 | 2026-10-18 | 38.12 | Shared `SettingsRow` / `SettingsSectionCard` on every Settings sub-page; one drag + ⋯ list pattern; Bin Restore, Bind and Unbind snackbars with self-confirming Undo; one resume-prompt layout (ADR-232, ADR-233, ADR-237, ADR-246). |
+| 2026-10-19 | 38.13 | Bulk Set Category, More… and bulk Snooze open sized to their rows through `sizedSheetVariantFor` (ADR-255); the bulk frequency sheet keeps Continue pressable with a forced, announced `FieldError`; the picker title names its action and the picker stays above the keyboard; a root snackbar lifts once above the selection bar (ADR-254); Contacts empty-state actions (ADR-253). |
