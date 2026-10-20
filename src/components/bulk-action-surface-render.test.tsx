@@ -320,6 +320,32 @@ describe("BulkActionSurface — the More… sheet (38.13 D-75)", () => {
   });
 });
 
+describe("BulkActionSurface — the More… log row by count (38.14 D-32, F-05)", () => {
+  const iconOf = (node: Node | undefined) =>
+    node?.children.find((child) => child.type === "Icon")?.props.name;
+
+  it("reads Group Log, with its label, accessibility label and icon, when 2+ are selected", () => {
+    const bar = mount({ selectedCount: 2 });
+    bar.press("bulk-action-more");
+    const row = bar.find("bulk-more-log-interaction");
+    expect(textOf(row)).toBe("Group Log");
+    expect(row?.props.accessibilityLabel).toBe("Group Log");
+    expect(iconOf(row)).toBe("group-events");
+    bar.press("bulk-more-log-interaction");
+    // Routing stays the host's count-aware handler (38.13 D-80).
+    expect(bar.props.onLogInteraction).toHaveBeenCalledOnce();
+  });
+
+  it("reads Log Interaction with the call icon for one selected", () => {
+    const bar = mount({ selectedCount: 1 });
+    bar.press("bulk-action-more");
+    const row = bar.find("bulk-more-log-interaction");
+    expect(textOf(row)).toBe("Log Interaction");
+    expect(row?.props.accessibilityLabel).toBe("Log Interaction");
+    expect(iconOf(row)).toBe("call");
+  });
+});
+
 describe("BulkActionSurface — only what applies is enabled (38.13 D-40, D-74, D-77)", () => {
   const disabledOf = (node: { props: Record<string, unknown> } | undefined) =>
     node?.props.disabled === true &&

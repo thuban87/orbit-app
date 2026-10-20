@@ -13,10 +13,13 @@ import {
   bulkSnooze,
   bulkSnoozeUntil,
   bulkUnsnooze,
+  rechannelBulkQuickLog,
   undoBulkQuickLog,
 } from "@/db/bulk-actions-dao";
 import { createContactFull } from "@/db/contacts-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
+import { convertInteractionToGroupEvent } from "@/db/group-events-dao";
+import { editTouchpointFull, saveNoteWithLinkedEntry } from "@/db/recency-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -147,6 +150,212 @@ describe("bulkQuickLog", () => {
     ).rejects.toThrow(/no interaction matched/);
     expect(await count("interactions")).toBe(2);
     expect(await count("tombstones")).toBe(0);
+  });
+});
+
+interface StoredInteraction {
+  id: number;
+  contact_id: number;
+  occurred_at: string;
+  channel: string;
+  direction: string | null;
+  connected: number;
+  quality: string | null;
+  note: string | null;
+  duration: number | null;
+  allow_ai: number;
+  group_event_id: number | null;
+}
+
+async function storedInteraction(id: number): Promise<StoredInteraction> {
+  const row = await exec.getFirstAsync<StoredInteraction>(
+    `SELECT id, contact_id, occurred_at, channel, direction, connected,
+            quality, note, duration, allow_ai, group_event_id
+       FROM interactions WHERE id = ?`,
+    [id],
+  );
+  if (!row) throw new Error(`interaction ${id} missing`);
+  return row;
+}
+
+const LATER = "2026-09-06 12:05:00";
+
+describe("rechannelBulkQuickLog (38.14 D-62, D-82)", () => {
+  it("sets the channel on exactly the receipt rows, keeps every other column, and bumps the revision once", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const other = await seedContact("Other");
+    const receipt = await bulkQuickLog(exec, ids, NOW, "Message");
+    const [outside] = await bulkQuickLog(exec, [other], NOW, "Message");
+    // Give one batch row non-default fields so "every other column" is real.
+    await exec.runAsync(
+      "UPDATE interactions SET quality = 'Positive', note = 'hi', duration = 300, allow_ai = 1 WHERE id = ?",
+      [receipt[0].interactionId],
+    );
+    const before = await Promise.all(
+      receipt.map((entry) => storedInteraction(entry.interactionId)),
+    );
+    const revisionBefore = await readDataRevision(exec);
+
+    await rechannelBulkQuickLog(exec, receipt, "Call", LATER);
+
+    const after = await Promise.all(
+      receipt.map((entry) => storedInteraction(entry.interactionId)),
+    );
+    after.forEach((row, index) => {
+      expect(row).toEqual({ ...before[index], channel: "Call" });
+    });
+    // Rows outside the receipt are untouched.
+    expect((await storedInteraction(outside.interactionId)).channel).toBe(
+      "Message",
+    );
+    expect(await readDataRevision(exec)).toBe(revisionBefore + 1);
+    // Recency recomputed and unchanged (occurred_at is kept).
+    expect(await Promise.all(ids.map(lastContact))).toEqual([NOW, NOW]);
+  });
+
+  it("is a no-op with no revision bump for an empty receipt", async () => {
+    const revisionBefore = await readDataRevision(exec);
+    await expect(
+      rechannelBulkQuickLog(exec, [], "Call", LATER),
+    ).resolves.toBeUndefined();
+    expect(await readDataRevision(exec)).toBe(revisionBefore);
+  });
+
+  it("skips a receipt row deleted since the log and re-channels the rest (D-82)", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const receipt = await bulkQuickLog(exec, ids, NOW, "Message");
+    await undoBulkQuickLog(exec, [receipt[0]], NOW);
+
+    await rechannelBulkQuickLog(exec, receipt, "In Person", LATER);
+
+    expect((await storedInteraction(receipt[1].interactionId)).channel).toBe(
+      "In Person",
+    );
+    expect(await count("interactions")).toBe(1);
+  });
+
+  it("skips a receipt row converted into an event and re-channels the rest (D-82)", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const receipt = await bulkQuickLog(exec, ids, NOW, "Message");
+    await convertInteractionToGroupEvent(exec, {
+      interactionId: receipt[0].interactionId,
+      contactId: receipt[0].contactId,
+      uid: uid(),
+      title: "Dinner",
+      now: NOW,
+    });
+    const converted = await storedInteraction(receipt[0].interactionId);
+    expect(converted.group_event_id).not.toBeNull();
+
+    await rechannelBulkQuickLog(exec, receipt, "Call", LATER);
+
+    expect(await storedInteraction(receipt[0].interactionId)).toEqual(
+      converted,
+    );
+    expect((await storedInteraction(receipt[1].interactionId)).channel).toBe(
+      "Call",
+    );
+  });
+
+  it("rolls every earlier row and the revision bump back when a later row fails", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const receipt = await bulkQuickLog(exec, ids, NOW, "Message");
+    const revisionBefore = await readDataRevision(exec);
+    // Fail the SECOND row's interaction UPDATE (a contact mismatch would be
+    // read as a missing row and skipped, so inject at the write).
+    let interactionUpdates = 0;
+    const failing: typeof exec = {
+      ...exec,
+      runAsync: (sql, params) => {
+        if (/UPDATE interactions/.test(sql)) {
+          interactionUpdates += 1;
+          if (interactionUpdates === 2) {
+            return Promise.reject(new Error("disk I/O error"));
+          }
+        }
+        return exec.runAsync(sql, params);
+      },
+    };
+
+    await expect(
+      rechannelBulkQuickLog(failing, receipt, "Call", LATER),
+    ).rejects.toThrow(/disk I\/O/);
+
+    const rows = await Promise.all(
+      receipt.map((entry) => storedInteraction(entry.interactionId)),
+    );
+    expect(rows.map((row) => row.channel)).toEqual(["Message", "Message"]);
+    expect(await readDataRevision(exec)).toBe(revisionBefore);
+  });
+
+  it("re-channels a row whose note was saved to a section, leaving the linked entry's text unchanged", async () => {
+    const [contactId] = [await seedContact("Linked")];
+    const [entry] = await bulkQuickLog(exec, [contactId], NOW, "Message");
+    const stored = await storedInteraction(entry.interactionId);
+    await saveNoteWithLinkedEntry(
+      exec,
+      {
+        interactionId: entry.interactionId,
+        contactId,
+        now: NOW,
+        occurredAt: stored.occurred_at,
+        channel: stored.channel,
+        direction: stored.direction,
+        connected: stored.connected,
+        quality: stored.quality,
+        note: "Talked about the trip",
+        duration: stored.duration,
+        allowAi: stored.allow_ai,
+      },
+      "gift_idea",
+    );
+    const linkedBefore = await exec.getFirstAsync<{ value: string }>(
+      "SELECT value FROM memories WHERE interaction_id = ? AND link_source = 'note'",
+      [entry.interactionId],
+    );
+    expect(linkedBefore?.value).toBe("Talked about the trip");
+
+    await expect(
+      rechannelBulkQuickLog(exec, [entry], "In Person", LATER),
+    ).resolves.toBeUndefined();
+
+    const after = await storedInteraction(entry.interactionId);
+    expect(after.channel).toBe("In Person");
+    expect(after.note).toBe("Talked about the trip");
+    expect(
+      await exec.getFirstAsync<{ value: string }>(
+        "SELECT value FROM memories WHERE interaction_id = ? AND link_source = 'note'",
+        [entry.interactionId],
+      ),
+    ).toEqual(linkedBefore);
+  });
+
+  it("overwrites a channel changed in Edit interaction during the Undo window (D-62)", async () => {
+    const ids = await Promise.all([seedContact("A"), seedContact("B")]);
+    const receipt = await bulkQuickLog(exec, ids, NOW, "Call");
+    const edited = await storedInteraction(receipt[0].interactionId);
+    await editTouchpointFull(exec, {
+      interactionId: edited.id,
+      contactId: edited.contact_id,
+      now: NOW,
+      occurredAt: edited.occurred_at,
+      channel: "Message",
+      direction: edited.direction,
+      connected: edited.connected,
+      quality: edited.quality,
+      note: edited.note,
+      duration: edited.duration,
+      allowAi: edited.allow_ai,
+    });
+
+    await rechannelBulkQuickLog(exec, receipt, "In Person", LATER);
+
+    const rows = await Promise.all(
+      receipt.map((entry) => storedInteraction(entry.interactionId)),
+    );
+    expect(rows.map((row) => row.channel)).toEqual(["In Person", "In Person"]);
+    // The stored direction is kept (outbound; the withdrawn former D-57).
+    expect(rows.map((row) => row.direction)).toEqual(["outbound", "outbound"]);
   });
 });
 
