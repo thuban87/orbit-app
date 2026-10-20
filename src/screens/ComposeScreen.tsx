@@ -32,18 +32,19 @@
  *     background, cleared on Transmit-confirmed, NOT restored across relaunch —
  *     COMP-07 / D-10). Never persisted to any durable store.
  *   - The Transmit channel derives from the session-store `mode` field (default
- *     'text'), never a hardcoded channel literal — Email is an additive branch in
- *     a later plan.
+ *     'text') through `resolveUsableMode` (text or email, falling back to the
+ *     mode the contact can receive, D-18 / D-42), never a hardcoded channel
+ *     literal.
  *   - Every colour resolves through `useTheme().colors.*` — zero hex literals
  *     (CLAUDE.md / check:colors). New/rebuilt UI speaks in `AppText` and `Button`
  *     ROLES, never hand-rolled Pressables or raw font sizes.
  *
- * AI is intentionally ABSENT here: the old single-suggestion AI-lifecycle wiring
- * (its construction, the acknowledgement gate, the replace-confirm state, and the
- * AI render + error-mapping helpers) was removed so plan 35-04 can narrow the
- * reshaped AI exports without a stale consumer failing its `tsc` gate. AI is
- * re-wired against the reshaped lifecycle in plan 35-08; the sanitized
- * error-code to line mapping is RE-CREATED there.
+ * AI (COMP-09 / COMP-12, re-wired in plan 35-04): one deliberate Draft /
+ * Rewrite action over the reshaped lifecycle, never auto-started; three
+ * reviewed suggestions, and only "Choose this" writes the editor. Its
+ * availability comes from the pure `computeAiAvailability` adapter; failures
+ * map to sanitized codes (`aiErrorText`). Nothing new reaches the provider
+ * (38.14 D-22).
  * =============================================================================
  */
 import { type NavigationProp, useFocusEffect } from "@react-navigation/native";
@@ -466,7 +467,8 @@ export function ComposeScreen({
   // Consume the pure per-path disposition (COMP-14 / D-10) instead of scattering
   // ad-hoc clear/reset calls: clear the session ONLY on a confirmed log, and
   // navigate toward origin for Back + the confirmed log (the latter removing the
-  // finished route). transmit-pending / "Not yet" / Copy are no-ops here (stay).
+  // finished route). transmit-pending / Later / No, don't log / Copy are no-ops
+  // here (stay).
   const performExit = useCallback(
     (exit: ComposeExit) => {
       const disposition = composeExitDisposition(exit);
