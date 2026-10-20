@@ -7,7 +7,7 @@ import { ParticipantCard } from "@/components/group/ParticipantCard";
 import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantSheet";
 import { InteractionDetail } from "@/components/history/InteractionDetail";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, Button, ConfirmDialog } from "@/components/ui";
+import { AppText, Button, ConfirmDialog, EmptyState } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addParticipants,
@@ -35,6 +35,7 @@ import {
   buildGroupEventDetailInteraction,
   closeThenOpenParticipantProfile,
   groupEventDurationLabel,
+  resolveDetailParticipant,
 } from "./group-event-detail-logic";
 import {
   createGroupEventRefreshController,
@@ -87,7 +88,10 @@ export function GroupEventDetailScreen({
   const [committedRemovedIds, setCommittedRemovedIds] = useState<
     readonly number[]
   >([]);
-  const [detail, setDetail] = useState<GroupEventParticipant | null>(null);
+  // The sheet holds an id, never a participant snapshot (38.14 D-28).
+  const [detailInteractionId, setDetailInteractionId] = useState<number | null>(
+    null,
+  );
   const [confirm, setConfirm] = useState<"dissolve" | "delete" | null>(null);
 
   // 38.14 D-84 (owner): adds confirm by name like Edit Event (D-67) — the
@@ -225,6 +229,19 @@ export function GroupEventDetailScreen({
       setWriteError(true);
     }
   };
+  // D-28: re-derived from the refreshed event on every render; null once the
+  // participant left the event or their remove committed.
+  const detail = resolveDetailParticipant(
+    event,
+    committedRemovedIds,
+    detailInteractionId,
+  );
+  const detailGone = detailInteractionId !== null && detail === null;
+  useEffect(() => {
+    // The sheet closes when its participant is gone.
+    if (detailGone) setDetailInteractionId(null);
+  }, [detailGone]);
+  const closeDetail = () => setDetailInteractionId(null);
   const interaction =
     detail && event ? buildGroupEventDetailInteraction(event, detail) : null;
   const confirmCopy = confirm === "dissolve" ? DISSOLVE : DELETE;
@@ -253,13 +270,9 @@ export function GroupEventDetailScreen({
       <ShellAppBar
         variant="child"
         title="Event"
+        // D-71: Edit Event and Add participants are visible buttons in the
+        // summary; the ⋯ keeps only the careful actions.
         overflow={[
-          {
-            label: "Edit Event",
-            onPress: () =>
-              navigation.navigate("EditGroupEvent", { groupEventId }),
-          },
-          { label: "Add Participant", onPress: () => setPickerVisible(true) },
           { label: "Dissolve", onPress: () => setConfirm("dissolve") },
           {
             label: "Delete Event & Interactions",
@@ -309,23 +322,44 @@ export function GroupEventDetailScreen({
                 value={groupEventDurationLabel(event.duration)}
               />
               <DetailField label="Group Note" value={event.groupNote} />
+              <View style={styles.actions}>
+                <Button
+                  role="secondary"
+                  label="Edit Event"
+                  onPress={() =>
+                    navigation.navigate("EditGroupEvent", { groupEventId })
+                  }
+                />
+                <Button
+                  role="secondary"
+                  label="Add participants"
+                  onPress={() => setPickerVisible(true)}
+                />
+              </View>
             </View>
             <AppText role="label">Participants</AppText>
           </View>
         }
         ListEmptyComponent={
-          <View style={[styles.card, styles.empty, cardColors]}>
-            <AppText role="heading">No participants yet</AppText>
-            <AppText role="body" style={{ color: colors.textSecondary }}>
-              Add the people who were there — or save now and add them later.
-            </AppText>
+          <View style={[styles.card, cardColors]}>
+            {/* The one empty state (38.9 D-20) with its one action (D-71). */}
+            <EmptyState
+              testID="event-participants-empty"
+              icon="group-events"
+              heading="No participants yet"
+              body="Add the people who were at this event."
+              action={{
+                label: "Add participants",
+                onPress: () => setPickerVisible(true),
+              }}
+            />
           </View>
         }
         renderItem={({ item }) => (
           <ParticipantCard
             event={event}
             participant={item}
-            onPress={() => setDetail(item)}
+            onPress={() => setDetailInteractionId(item.interactionId)}
             onEdit={() =>
               navigation.navigate("EditParticipant", {
                 groupEventId,
@@ -366,7 +400,7 @@ export function GroupEventDetailScreen({
       {interaction && detail ? (
         <InteractionDetail
           visible
-          onRequestClose={() => setDetail(null)}
+          onRequestClose={closeDetail}
           interaction={interaction}
           contactId={detail.contactId}
           onEdit={() =>
@@ -378,12 +412,12 @@ export function GroupEventDetailScreen({
           }
           onViewProfile={() =>
             closeThenOpenParticipantProfile({
-              close: () => setDetail(null),
+              close: closeDetail,
               navigate: navigation.navigate,
               contactId: detail.contactId,
             })
           }
-          onViewGroupEvent={() => setDetail(null)}
+          // D-30: no View Event while already on this event.
           onEditGroupEvent={() =>
             navigation.navigate("EditGroupEvent", { groupEventId })
           }
@@ -395,7 +429,7 @@ export function GroupEventDetailScreen({
             })
           }
           onDeleted={() => {
-            setDetail(null);
+            closeDetail();
             void refresh();
           }}
         />
@@ -436,6 +470,6 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     padding: SPACING.base,
   },
-  empty: { gap: SPACING.sm, paddingVertical: SPACING.lg },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   inlineError: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
 });

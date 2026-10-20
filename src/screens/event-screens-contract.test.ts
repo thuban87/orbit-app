@@ -72,7 +72,9 @@ describe("Event detail actions and sheet (38.14 D-71, D-28, D-30)", () => {
 
   it("the sheet re-derives its participant each render; no View Event on its own event", () => {
     expect(detail).toMatch(/resolveDetailParticipant\(/);
-    expect(detail).toMatch(/useState<number \| null>\(null\)/);
+    expect(detail).toMatch(
+      /\[detailInteractionId, setDetailInteractionId\] = useState<\s*number \| null\s*>\(\s*null,?\s*\)/,
+    );
     expect(detail).not.toMatch(/onViewGroupEvent/);
   });
 });

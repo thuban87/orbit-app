@@ -75,9 +75,10 @@ describe("resolveDetailParticipant (38.14 D-28)", () => {
   });
 
   it("returns the participant from the refreshed event, not a snapshot", () => {
-    expect(resolveDetailParticipant(refreshed("edited"), [], 8)).toMatchObject(
-      { interactionId: 8, note: "edited" },
-    );
+    expect(resolveDetailParticipant(refreshed("edited"), [], 8)).toMatchObject({
+      interactionId: 8,
+      note: "edited",
+    });
   });
 
   it("returns null once the participant left the event", () => {

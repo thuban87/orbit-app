@@ -51,3 +51,23 @@ export function buildGroupEventDetailInteraction(
     linkedSections: [],
   };
 }
+
+/**
+ * The event-detail interaction sheet's participant, re-derived from the
+ * refreshed event on every render (38.14 D-28): an edit shows at once, and a
+ * participant who left the event, or whose remove committed this session, is
+ * gone (null), so the sheet closes instead of acting on a stale snapshot.
+ */
+export function resolveDetailParticipant(
+  event: GroupEventDetail | null,
+  committedRemovedIds: readonly number[],
+  interactionId: number | null,
+): GroupEventParticipant | null {
+  if (event === null || interactionId === null) return null;
+  if (committedRemovedIds.includes(interactionId)) return null;
+  return (
+    event.participants.find(
+      (participant) => participant.interactionId === interactionId,
+    ) ?? null
+  );
+}
