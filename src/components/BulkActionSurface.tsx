@@ -8,13 +8,27 @@
  *
  * Presentational only: the host owns every write, dialog, picker, navigation
  * and feedback, and the More… sheet closes itself before it calls the host.
+ *
+ * The More… sheet opens sized to its rows (38.13 D-87, amending D-71): compact
+ * when every row fits, taller when not, through the bulk Set Category sheet's
+ * rule (`bulkMoreSheetVariantFor` → `sizedSheetVariantFor`, D-85). Its rows
+ * are laid out from the same geometry the prediction reads.
  */
 import { useIsFocused } from "@react-navigation/native";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  BULK_MORE_ROW_ICON_GAP,
+  BULK_MORE_ROW_MIN_HEIGHT,
+  BULK_MORE_SECTION_GAP,
+  BULK_MORE_SECTION_LETTER_SPACING,
+  BULK_MORE_TITLE_GAP,
+  bulkMoreSheetVariantFor,
+} from "@/components/bulk-sheet-fit";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
 import { Sheet } from "@/components/ui/Sheet";
+import { useSheetFitEnvironment } from "@/components/use-sheet-fit-environment";
 import {
   FAVORITE,
   FAVORITES,
@@ -92,6 +106,7 @@ export function BulkActionSurface({
 }: BulkActionSurfaceProps) {
   const { colors } = useTheme();
   const [moreVisible, setMoreVisible] = useState(false);
+  const sheetFit = useSheetFitEnvironment();
   // 38.13 D-80 (review R1-05): the bar's window rect feeds the root snackbar
   // so an Undo pill sits above it. Published only while selecting AND Home is
   // focused (as OrreryObstacle gates on focus): bulk Log Interaction opens
@@ -140,6 +155,14 @@ export function BulkActionSurface({
     },
   ];
 
+  // D-87: the sheet keeps the rows, title and size it opened with while it
+  // fades closed (as the sized Set Category sheet does, D-85 / B-WR-02), so a
+  // row that a just-chosen action removes cannot shrink it mid-fade. Busy
+  // state stays live.
+  const openedWith = useRef({ availability, selectedCount });
+  if (moreVisible) openedWith.current = { availability, selectedCount };
+  const sheetAvailability = openedWith.current.availability;
+
   // Each row closes the sheet before it calls the host (D-75).
   const closeThen = (run: () => void) => () => {
     setMoreVisible(false);
@@ -150,12 +173,12 @@ export function BulkActionSurface({
       id: "log-interaction",
       label: LOG_INTERACTION,
       icon: "call",
-      enabled: availability.canLogInteraction,
+      enabled: sheetAvailability.canLogInteraction,
       onPress: closeThen(onLogInteraction),
     },
     // D-75: shown only when a selected Bound person is a favourite; removes
     // every selected favourite.
-    ...(availability.showRemoveFavorites
+    ...(sheetAvailability.showRemoveFavorites
       ? [
           {
             id: "remove-favorites",
@@ -170,7 +193,7 @@ export function BulkActionSurface({
       id: "set-category",
       label: "Set Category",
       icon: "category",
-      enabled: availability.canSetCategory,
+      enabled: sheetAvailability.canSetCategory,
       onPress: closeThen(onSetCategory),
     },
   ];
@@ -180,7 +203,7 @@ export function BulkActionSurface({
       id: "frequency",
       label: "Change Contact Frequency",
       icon: "frequency",
-      enabled: availability.canChangeFrequency,
+      enabled: sheetAvailability.canChangeFrequency,
       onPress: closeThen(onChangeFrequency),
     },
     {
@@ -188,10 +211,21 @@ export function BulkActionSurface({
       id: "archive",
       label: MOVE_TO_BIN,
       icon: "archive",
-      enabled: availability.canMoveToBin,
+      enabled: sheetAvailability.canMoveToBin,
       onPress: closeThen(onArchive),
     },
   ];
+
+  // D-87: sized from the rows this selection shows (Remove from Favorites
+  // only when it applies), the title and the careful heading.
+  const moreTitle = `${openedWith.current.selectedCount} selected`;
+  const moreSectionLabel = MORE_CAREFUL_HEADING;
+  const moreVariant = bulkMoreSheetVariantFor({
+    ...sheetFit,
+    title: moreTitle,
+    rowLabels: [...routineRows, ...carefulRows].map((row) => row.label),
+    sectionLabel: moreSectionLabel.toUpperCase(),
+  });
 
   const renderRow = (row: SheetRow) => {
     const disabled = !enabledNow(row.enabled);
@@ -219,6 +253,27 @@ export function BulkActionSurface({
       </Pressable>
     );
   };
+
+  const closeMore = () => setMoreVisible(false);
+  const moreSheetContent = (
+    <>
+      <Text
+        testID="bulk-more-title"
+        style={[styles.sheetTitle, { color: colors.textPrimary }]}
+      >
+        {moreTitle}
+      </Text>
+      {routineRows.map(renderRow)}
+      <Text
+        testID="bulk-more-careful-heading"
+        accessibilityRole="header"
+        style={[styles.sheetSection, { color: colors.textSecondary }]}
+      >
+        {moreSectionLabel}
+      </Text>
+      {carefulRows.map(renderRow)}
+    </>
+  );
 
   return (
     <>
@@ -311,30 +366,33 @@ export function BulkActionSurface({
           })}
         </View>
       </View>
-      <Sheet
-        visible={moreVisible}
-        onRequestClose={() => setMoreVisible(false)}
-        variant="compact"
-      >
-        <Text
-          testID="bulk-more-title"
-          style={[styles.sheetTitle, { color: colors.textPrimary }]}
+      {moreVariant === "expanded" ? (
+        <Sheet
+          visible={moreVisible}
+          onRequestClose={closeMore}
+          variant="expanded"
         >
-          {selectedCount} selected
-        </Text>
-        {routineRows.map(renderRow)}
-        <Text
-          testID="bulk-more-careful-heading"
-          accessibilityRole="header"
-          style={[styles.sheetSection, { color: colors.textSecondary }]}
+          {/* An expanded Sheet's body does not scroll; its consumer owns the
+              scroll (Sheet.tsx). */}
+          <ScrollView testID="bulk-more-scroll" style={styles.sheetScroll}>
+            {moreSheetContent}
+          </ScrollView>
+        </Sheet>
+      ) : (
+        <Sheet
+          visible={moreVisible}
+          onRequestClose={closeMore}
+          variant={moreVariant === "compact" ? "compact" : "detail"}
         >
-          Careful actions
-        </Text>
-        {carefulRows.map(renderRow)}
-      </Sheet>
+          {moreSheetContent}
+        </Sheet>
+      )}
     </>
   );
 }
+
+/** The careful-group heading (drawn upper-cased). */
+const MORE_CAREFUL_HEADING = "Careful actions";
 
 const styles = StyleSheet.create({
   bar: {
@@ -420,7 +478,7 @@ const styles = StyleSheet.create({
     ),
     fontSize: TYPOGRAPHY.heading.size,
     lineHeight: TYPOGRAPHY.heading.lineHeight,
-    marginBottom: SPACING.sm,
+    marginBottom: BULK_MORE_TITLE_GAP,
   },
   sheetSection: {
     fontFamily: resolveFontFamily(
@@ -428,18 +486,19 @@ const styles = StyleSheet.create({
       TYPOGRAPHY.caption.weight,
     ),
     fontSize: TYPOGRAPHY.caption.size,
-    letterSpacing: 1,
+    letterSpacing: BULK_MORE_SECTION_LETTER_SPACING,
     lineHeight: TYPOGRAPHY.caption.lineHeight,
-    marginTop: SPACING.base,
+    marginTop: BULK_MORE_SECTION_GAP,
     textTransform: "uppercase",
   },
   sheetRow: {
     alignItems: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    gap: SPACING.base,
-    minHeight: 52,
+    gap: BULK_MORE_ROW_ICON_GAP,
+    minHeight: BULK_MORE_ROW_MIN_HEIGHT,
   },
+  sheetScroll: { flex: 1 },
   sheetRowLabel: {
     fontFamily: resolveFontFamily(
       TYPOGRAPHY.body.family,
@@ -447,5 +506,8 @@ const styles = StyleSheet.create({
     ),
     fontSize: TYPOGRAPHY.body.size,
     lineHeight: TYPOGRAPHY.body.lineHeight,
+    // A long label wraps inside the row at large text instead of running
+    // past the sheet edge; the D-87 prediction counts the wrapped lines.
+    flexShrink: 1,
   },
 });

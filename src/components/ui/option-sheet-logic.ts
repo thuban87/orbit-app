@@ -75,8 +75,34 @@ export interface OptionSheetFitInput {
   bottomInset: number;
 }
 
-function scaledLine(lineHeight: number, fontScale: number): number {
+/** A text role's line height at the OS text scale (dp; never below 1×). */
+export function scaledLineHeight(
+  lineHeight: number,
+  fontScale: number,
+): number {
   return Math.ceil(lineHeight * Math.max(1, fontScale));
+}
+const scaledLine = scaledLineHeight;
+
+/**
+ * Lines `text` is predicted to take in `available` dp at `fontSize` and the
+ * OS text scale (38.13 D-85, D-87). The glyph width is the deliberately wide
+ * `OPTION_LABEL_CHAR_WIDTH_RATIO` plus any unscaled `letterSpacing`, so a
+ * prediction errs toward a taller sheet.
+ */
+export function predictedTextLines(
+  text: string,
+  available: number,
+  fontSize: number,
+  fontScale: number,
+  letterSpacing = 0,
+): number {
+  const charWidth =
+    fontSize * Math.max(1, fontScale) * OPTION_LABEL_CHAR_WIDTH_RATIO +
+    letterSpacing;
+  if (available <= charWidth) return Math.max(1, text.length);
+  const perLine = Math.floor(available / charWidth);
+  return Math.max(1, Math.ceil(text.length / perLine));
 }
 
 /** Lines a row label is predicted to take at this width and text scale. */
@@ -90,13 +116,7 @@ export function optionLabelLines(
     2 * SHEET_BODY_PADDING_HORIZONTAL -
     2 * OPTION_ROW_PADDING_HORIZONTAL -
     OPTION_ROW_GLYPH_RESERVE;
-  const charWidth =
-    TYPOGRAPHY.body.size *
-    Math.max(1, fontScale) *
-    OPTION_LABEL_CHAR_WIDTH_RATIO;
-  if (available <= charWidth) return Math.max(1, label.length);
-  const perLine = Math.floor(available / charWidth);
-  return Math.max(1, Math.ceil(label.length / perLine));
+  return predictedTextLines(label, available, TYPOGRAPHY.body.size, fontScale);
 }
 
 /** Height one row takes in the list, its spacing below included (dp). */
@@ -159,6 +179,24 @@ function sheetCap(variant: "compact" | "detail", windowHeight: number): number {
   );
 }
 
+/** The size a sized sheet opens at. */
+export type SizedSheetVariant = "compact" | "detail" | "expanded";
+
+/**
+ * The one sized-sheet rule (38.13 D-85; D-87 for More… and bulk Snooze): the
+ * smallest of compact and detail whose height cap (`SHEET_HEIGHT_PERCENT`,
+ * against the window) holds `needed` dp, decided when the sheet opens. A sheet
+ * that fits neither opens expanded and scrolls.
+ */
+export function sizedSheetVariantFor(
+  needed: number,
+  windowHeight: number,
+): SizedSheetVariant {
+  if (needed <= sheetCap("compact", windowHeight)) return "compact";
+  if (needed <= sheetCap("detail", windowHeight)) return "detail";
+  return "expanded";
+}
+
 /**
  * The size a sized option sheet opens at (38.13 D-71, D-78, D-85; the bulk Set
  * Category sheet only): the smallest of compact and detail whose height cap
@@ -169,11 +207,11 @@ function sheetCap(variant: "compact" | "detail", windowHeight: number): number {
  */
 export function optionSheetVariantFor(
   input: OptionSheetFitInput,
-): "compact" | "detail" | "expanded" {
-  const needed = optionSheetContentHeight(input);
-  if (needed <= sheetCap("compact", input.windowHeight)) return "compact";
-  if (needed <= sheetCap("detail", input.windowHeight)) return "detail";
-  return "expanded";
+): SizedSheetVariant {
+  return sizedSheetVariantFor(
+    optionSheetContentHeight(input),
+    input.windowHeight,
+  );
 }
 
 /** The value types an option sheet can choose between. */

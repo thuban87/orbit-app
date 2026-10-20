@@ -50,6 +50,7 @@ vi.mock("react", async (original) => ({
 vi.mock("react-native", () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
   Pressable: "Pressable",
+  ScrollView: "ScrollView",
   StyleSheet: { create: <T,>(styles: T) => styles },
   View: "View",
 }));
@@ -59,6 +60,13 @@ vi.mock("@react-native-community/datetimepicker", () => ({
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
+// 38.13 D-87: the sized sheets read the window and inset through one hook.
+const sheetFit = vi.hoisted(() => ({
+  env: { windowHeight: 891, windowWidth: 412, fontScale: 1, bottomInset: 24 },
+}));
+vi.mock("@/components/use-sheet-fit-environment", () => ({
+  useSheetFitEnvironment: () => sheetFit.env,
+}));
 vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: { border: "border", surface: "surface" } }),
 }));
@@ -669,5 +677,19 @@ describe("SnoozeSheet bulk settlement (review U-01, V-02)", () => {
     expect(outcome).toHaveBeenCalledExactlyOnceWith("Unsnoozed 1 contact");
     expect(sheet.onClose).toHaveBeenCalledOnce();
     expect(gate.pending).toBe(false);
+  });
+});
+
+describe("SnoozeSheet size (38.13 D-87)", () => {
+  it("stays compact for every host that does not ask to be sized", () => {
+    expect(mount().sheet()?.props.variant).toBe("compact");
+  });
+
+  it("opens sized to its rows when asked (the Contacts bulk Snooze)", () => {
+    const sheet = mount({ sizeToContent: true, title: "Snooze 3 contacts" });
+    // 6 Pro window at default text: the five choices and Close need more than
+    // the 40% compact cap.
+    expect(sheet.sheet()?.props.variant).toBe("detail");
+    expect(sheet.byTestId("snooze-sheet-close")).toBeDefined();
   });
 });

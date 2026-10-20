@@ -61,6 +61,7 @@ vi.mock("react", async (original) => ({
 }));
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
+  ScrollView: "ScrollView",
   StyleSheet: { create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   Text: "Text",
   View: "View",
@@ -88,6 +89,13 @@ vi.mock("@/stores/dashboard-selection-store", () => ({
 }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
+// 38.13 D-87: the sized sheets read the window and inset through one hook.
+const sheetFit = vi.hoisted(() => ({
+  env: { windowHeight: 891, windowWidth: 412, fontScale: 1, bottomInset: 24 },
+}));
+vi.mock("@/components/use-sheet-fit-environment", () => ({
+  useSheetFitEnvironment: () => sheetFit.env,
+}));
 vi.mock("@/theme", () => ({
   useTheme: () => ({
     colors: {
@@ -463,5 +471,60 @@ describe("BulkActionSurface — the selection-bar obstacle (38.13 D-80; review R
     nav.selectionMode = false;
     mount();
     expect(obstacle.calls.at(-1)?.enabled).toBe(false);
+  });
+});
+
+describe("BulkActionSurface — the More… sheet opens sized to its rows (38.13 D-87)", () => {
+  const sheetOf = (bar: ReturnType<typeof mount>) =>
+    bar.nodes.find((node) => node.type === "Sheet");
+  const withEnv = (env: Partial<typeof sheetFit.env>, run: () => void) => {
+    const saved = { ...sheetFit.env };
+    Object.assign(sheetFit.env, env);
+    try {
+      run();
+    } finally {
+      Object.assign(sheetFit.env, saved);
+    }
+  };
+
+  it("opens taller than compact when Remove from Favorites is listed (6 Pro window, default text)", () => {
+    expect(sheetOf(mount())?.props.variant).toBe("detail");
+  });
+
+  it("opens compact when every row fits", () => {
+    withEnv({ windowHeight: 1400 }, () => {
+      expect(sheetOf(mount())?.props.variant).toBe("compact");
+    });
+  });
+
+  it("keeps the rows, title and size it opened with while it fades closed (D-85 B-WR-02 pattern)", () => {
+    const bar = mount();
+    bar.press("bulk-action-more");
+    expect(sheetOf(bar)?.props.variant).toBe("detail");
+    bar.press("bulk-more-remove-favorites");
+    // The write lands while the sheet fades: no favourite is selected now.
+    bar.props.availability = { ...ALL_ENABLED, showRemoveFavorites: false };
+    bar.props.selectedCount = 2;
+    bar.render();
+    expect(sheetOf(bar)?.props.visible).toBe(false);
+    expect(sheetOf(bar)?.props.variant).toBe("detail");
+    expect(bar.find("bulk-more-remove-favorites")).toBeDefined();
+    expect(textOf(bar.find("bulk-more-title"))).toBe("3 selected");
+    // The bar itself follows the live props.
+    expect(textOf(bar.find("dashboard-selection-count"))).toBe("2 selected");
+    // The next opening reads the live selection.
+    bar.press("bulk-action-more");
+    expect(bar.find("bulk-more-remove-favorites")).toBeUndefined();
+    expect(textOf(bar.find("bulk-more-title"))).toBe("2 selected");
+  });
+
+  it("scrolls its rows itself only at the expanded size", () => {
+    expect(mount().find("bulk-more-scroll")).toBeUndefined();
+    withEnv({ windowHeight: 500, fontScale: 2 }, () => {
+      const bar = mount();
+      expect(sheetOf(bar)?.props.variant).toBe("expanded");
+      expect(bar.find("bulk-more-scroll")).toBeDefined();
+      expect(bar.find("bulk-more-archive")).toBeDefined();
+    });
   });
 });

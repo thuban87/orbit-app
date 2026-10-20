@@ -2746,6 +2746,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         // and unsnoozes exactly those people. Bulk keeps its count snackbar,
         // so no confirmName.
         visible={snoozePicker !== null}
+        // 38.13 D-87: opens sized to its rows, like bulk Set Category.
+        sizeToContent
         title={`Snooze ${plural(snoozePickerShown?.ids.length ?? 0, "contact")}`}
         snoozedUntil={null}
         showUnsnooze={(snoozePickerShown?.snoozedIds.length ?? 0) > 0}
