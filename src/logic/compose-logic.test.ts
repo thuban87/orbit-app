@@ -27,6 +27,7 @@ import {
   resolveComposeControls,
   resolveCopyTargets,
   resolveUsableMode,
+  shouldPromptDraftSwitch,
 } from "@/logic/compose-logic";
 
 const primaryPhone: ContactMethodRow = {
@@ -490,5 +491,59 @@ describe("composeDraftMaxHeight — the message box grows to a cap, then scrolls
     expect(composeDraftMaxHeight(2)).toBeGreaterThan(composeDraftMaxHeight(1));
     expect(composeDraftMaxHeight(Number.NaN)).toBe(composeDraftMaxHeight(1));
     expect(composeDraftMaxHeight(0)).toBe(composeDraftMaxHeight(1));
+  });
+});
+
+describe("shouldPromptDraftSwitch — ask before discarding a typed draft for another person (38.14 D-72)", () => {
+  it("asks when a different person is opened over a typed draft", () => {
+    expect(
+      shouldPromptDraftSwitch({
+        storeContactId: 1,
+        nextContactId: 2,
+        body: "hi",
+        subject: "",
+      }),
+    ).toBe(true);
+    expect(
+      shouldPromptDraftSwitch({
+        storeContactId: 1,
+        nextContactId: 2,
+        body: "",
+        subject: "Re: dinner",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not ask for the same person", () => {
+    expect(
+      shouldPromptDraftSwitch({
+        storeContactId: 2,
+        nextContactId: 2,
+        body: "hi",
+        subject: "x",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not ask when the draft is blank", () => {
+    expect(
+      shouldPromptDraftSwitch({
+        storeContactId: 1,
+        nextContactId: 2,
+        body: "  ",
+        subject: "",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not ask before any session exists", () => {
+    expect(
+      shouldPromptDraftSwitch({
+        storeContactId: null,
+        nextContactId: 2,
+        body: "hi",
+        subject: "",
+      }),
+    ).toBe(false);
   });
 });

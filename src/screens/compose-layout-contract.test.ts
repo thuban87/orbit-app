@@ -73,3 +73,63 @@ describe("Copy confirmations are snackbars (D-45)", () => {
     expect(handlerBody("onCopySubject")).not.toContain("setTimeout(");
   });
 });
+
+/** The first `useFocusEffect(` block (the load effect), up to the next one. */
+function loadFocusEffect(): string {
+  const start = code.indexOf("useFocusEffect(");
+  expect(start).toBeGreaterThan(-1);
+  const next = code.indexOf("useFocusEffect(", start + 1);
+  return code.slice(start, next === -1 ? undefined : next);
+}
+
+/** The lifecycle's injected `resolvePrompt:` body, up to `generate:`. */
+function resolvePromptBody(): string {
+  const start = code.indexOf("resolvePrompt: async (");
+  expect(start).toBeGreaterThan(-1);
+  const end = code.indexOf("generate: (", start);
+  expect(end).toBeGreaterThan(start);
+  return code.slice(start, end);
+}
+
+describe("Opening Compose for another person over a typed draft asks first (D-72)", () => {
+  it("the load focus effect gates startSession on the standard discard prompt", () => {
+    const effect = loadFocusEffect();
+    expect(effect).toContain("shouldPromptDraftSwitch(");
+    expect(effect).toContain("confirmDiscard(");
+    expect(effect.indexOf("shouldPromptDraftSwitch(")).toBeLessThan(
+      effect.indexOf("confirmDiscard("),
+    );
+    expect(code).toMatch(
+      /import \{ confirmDiscard \} from "@\/navigation\/discard-keep-guard"/,
+    );
+  });
+
+  it("Keep editing restores the stored person and clears origin, so Back returns to the dashboard (R3-03)", () => {
+    expect(loadFocusEffect()).toMatch(
+      /setParams\(\{\s*contactId: storedContactId,\s*origin: undefined,?\s*\}\)/,
+    );
+  });
+
+  it("AI context is read for the on-screen person at request time (R4-01)", () => {
+    expect(code).toContain("contactIdRef.current = contactId;");
+    const body = resolvePromptBody();
+    expect(body).toContain("const requestContactId = contactIdRef.current;");
+    expect(body).toContain("readPromptContext(exec, requestContactId)");
+    expect(body).toContain("readComposeResearch(exec, requestContactId)");
+    expect(body).not.toContain("readPromptContext(exec, contactId)");
+    expect(body).not.toContain("readComposeResearch(exec, contactId)");
+    expect(code.match(/readPromptContext\(exec, contactId\)/g)).toBeNull();
+    // Only the focus effect's Research count reads the route param directly.
+    expect(code.match(/readComposeResearch\(exec, contactId\)/g)).toHaveLength(
+      1,
+    );
+  });
+});
+
+describe("Add a phone number or email opens Edit at Contact Methods (D-42)", () => {
+  it("navigates Edit with focusSection methods", () => {
+    expect(code).toMatch(
+      /navigation\.navigate\("Edit", \{\s*contactId,\s*focusSection: "methods",?\s*\}\)/,
+    );
+  });
+});
