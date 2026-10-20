@@ -311,6 +311,23 @@ describe("GroupEventsScreen search (38.14 D-25, D-48)", () => {
     expect(spinnerShown()).toBe(false);
   });
 
+  it("the empty state echoes the term the shown rows were read for, not one still reading (review B-IN-03)", async () => {
+    await mountWithSearchOpen();
+    const emptyTerm = () => {
+      const empty = tree.find((el) => el.type === "FlatList")?.props
+        .ListEmptyComponent as TestElement | undefined;
+      return nodes(empty).find((el) => el.type === "EmptyState")?.props.term;
+    };
+    await type("zz");
+    await resolveRead("zz", []);
+    expect(emptyTerm()).toBe("zz");
+    await type("zzq");
+    // The newer read is still in flight: the empty list is still "zz"'s.
+    expect(emptyTerm()).toBe("zz");
+    await resolveRead("zzq", []);
+    expect(emptyTerm()).toBe("zzq");
+  });
+
   it("closing search with the toggle clears the term", async () => {
     await mountWithSearchOpen();
     await type("din");

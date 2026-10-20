@@ -40,6 +40,10 @@ export function GroupEventsScreen({
   const isFocused = useIsFocused();
   const [items, setItems] = useState<readonly GroupEventListItem[]>([]);
   const [term, setTerm] = useState("");
+  // The term `items` were read for (review B-IN-03): the list keeps the
+  // previous term's rows while a newer search reads (D-25), so the empty
+  // state echoes the term those rows belong to, never the one still reading.
+  const [publishedTerm, setPublishedTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -63,6 +67,7 @@ export function GroupEventsScreen({
             return;
           }
           setItems(patch.items);
+          setPublishedTerm(nextTerm);
           setFailed(patch.failed);
           setLoading(false);
         },
@@ -113,7 +118,7 @@ export function GroupEventsScreen({
   // The one empty-state component (38.9 D-20), each state with its one action
   // (D-71): failed → "Try again", a search that found nothing → "Clear
   // search", none yet → "Log an event" (opens Group Log, no params; D-22 noun).
-  const searchTerm = term.trim();
+  const searchTerm = publishedTerm.trim();
   const emptyState = failed ? (
     <EmptyState
       testID="events-empty-failed"
