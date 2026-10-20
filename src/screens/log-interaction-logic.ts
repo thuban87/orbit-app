@@ -26,13 +26,15 @@
  *     type-default seam.
  *
  * Pure and react-native-free — it imports only the node-safe `coerceAllowAi` from
- * `touchpoint-refine-logic` and TYPE-only shapes (erased at compile), so it never
+ * `touchpoint-refine-logic`, the glossary's `CHANNEL_LABEL` (38.14 D-33) and
+ * TYPE-only shapes (erased at compile), so it never
  * pulls react-native into the vitest env. It builds NO SQL and performs NO write —
  * `recordTouchpoint` is the single recency chokepoint (ADR-010/024/071).
  */
 
 import type { TouchpointRefineValue } from "@/components/TouchpointRefineForm";
 import { coerceAllowAi } from "@/components/touchpoint-refine-logic";
+import { CHANNEL_LABEL } from "@/constants/glossary";
 import type {
   DefaultInteractionChannel,
   RememberedInteractionChannel,
@@ -52,10 +54,10 @@ export const ORDINARY_LOG_CHANNEL_OPTIONS: ReadonlyArray<{
   value: string;
   label: string;
 }> = [
-  { value: "Message", label: "Message" },
-  { value: "Call", label: "Call" },
-  { value: "In Person", label: "In Person" },
-] as const;
+  { value: "Message", label: CHANNEL_LABEL.Message },
+  { value: "Call", label: CHANNEL_LABEL.Call },
+  { value: "In Person", label: CHANNEL_LABEL["In Person"] },
+];
 
 /**
  * The legacy channel values a stored record may still hold (38.14 D-10 carried,
@@ -63,8 +65,8 @@ export const ORDINARY_LOG_CHANNEL_OPTIONS: ReadonlyArray<{
  */
 const LEGACY_CHANNEL_OPTIONS: ReadonlyArray<{ value: string; label: string }> =
   [
-    { value: "other", label: "Other" },
-    { value: "unspecified", label: "Unspecified" },
+    { value: "other", label: CHANNEL_LABEL.other },
+    { value: "unspecified", label: CHANNEL_LABEL.unspecified },
   ];
 
 /**

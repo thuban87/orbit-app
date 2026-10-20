@@ -103,3 +103,25 @@ export const NEEDS_YOUR_CHOICE = "Needs your choice";
 export const LINK_DIFFERENT_PHONE_CONTACT = "Link to a different phone contact";
 /** Remove the phone-contact link only; keeps its red styling (D-103). */
 export const UNLINK_FROM_PHONE_CONTACT = "Unlink from phone contact";
+
+// Interaction channel and direction labels (38.14 D-33, D-64). One map each,
+// read by the logging forms, the interaction sheet and History. The keys are
+// the stored values; no new term (D-64).
+/**
+ * Stored channel → its label. Message / Call / In Person are the canonical
+ * channels (ADR-116); `other` / `unspecified` are legacy values a record may
+ * still hold and read "Other" / "Unspecified" (38.14 D-60, D-64).
+ */
+export const CHANNEL_LABEL: Readonly<Record<string, string>> = {
+  Message: "Message",
+  Call: "Call",
+  "In Person": "In Person",
+  other: "Other",
+  unspecified: "Unspecified",
+};
+/** Stored direction → its label (38.14 D-64; was History's local map). */
+export const DIRECTION_LABEL: Readonly<Record<string, string>> = {
+  outbound: "Outbound",
+  inbound: "Inbound",
+  mutual: "Mutual",
+};

@@ -187,6 +187,38 @@ export function formatDurationLabel(seconds: number | null): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
+/**
+ * The Custom-minutes text to seed when the form opens (38.14 D-31): a stored
+ * duration that matches no preset reopens as its whole minutes; a preset, none
+ * or a non-positive value leaves the field empty (the chip shows it).
+ */
+export function customMinutesSeed(seconds: number | null): string {
+  if (seconds === null || seconds <= 0) return "";
+  if (DURATION_PRESETS.some((p) => p.seconds === seconds)) return "";
+  return String(Math.round(seconds / 60));
+}
+
+/**
+ * The Custom-minutes text to show (38.14 D-31). While what the user typed
+ * still matches the stored duration (including an in-progress or invalid
+ * entry that persists none), the typed text stays. When the duration changed
+ * elsewhere (a preset chip, None, or a participant's "Follow event"), the
+ * field follows it through `customMinutesSeed`.
+ */
+export function customMinutesDisplay(
+  typed: string,
+  seconds: number | null,
+): string {
+  return parseCustomDurationMinutes(typed) === seconds
+    ? typed
+    : customMinutesSeed(seconds);
+}
+
+/** Whether the duration readout shows: hidden for none, never "None" (38.14 D-31). */
+export function showDurationReadout(seconds: number | null): boolean {
+  return seconds !== null && seconds > 0;
+}
+
 // --- Per-interaction Allow-AI gate (D-04) -----------------------------------
 
 /**

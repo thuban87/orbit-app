@@ -7,13 +7,15 @@
  * direction, connected, quality, note — plus the correctable date+time.
  *
  * ANDROID TWO-DIALOG DATE+TIME (dossier F7): Android has no combined picker, so
- * "Correct date & time" opens the native DATE dialog then chains into the TIME
+ * "Date & time" opens the native DATE dialog then chains into the TIME
  * dialog; the Y-M-D and H:M:S are stitched by the node-tested
  * `touchpoint-refine-logic.ts` into a LOCAL `YYYY-MM-DD HH:MM:SS` (never
  * toISOString). A combined datetime later than `now` is rejected inline in
  * `colors.danger` and the PRIOR selection is kept (mirrors TriStateLastSpoke /
  * LOG-06). Seeding the dialogs uses `parseLocalDateTime` (time-of-day preserved),
  * never `types.ts parseDate`.
+ * The date dialog's `maximumDate` is `now`, so no later day can be picked
+ * (38.14 D-24); the inline rejection still covers a later time today.
  *
  * VISIBLE TIMESTAMP (38.4 RG-038, ui-accessibility/AUD-UIA-018, D-07): the
  * date/time control DISPLAYS `formatDateTimeMinuteOrFallback(occurredAt)`
@@ -47,6 +49,8 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   coerceAllowAi,
   combineDateAndTime,
+  customMinutesDisplay,
+  customMinutesSeed,
   DURATION_PRESETS,
   durationChipTone,
   FUTURE_DATETIME_MESSAGE,
@@ -54,10 +58,12 @@ import {
   isCombinedInFuture,
   parseCustomDurationMinutes,
   parseLocalDateTime,
+  showDurationReadout,
 } from "@/components/touchpoint-refine-logic";
 import { OptionSelectRow, OptionSheet, OrbitSwitch } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { FieldError } from "@/components/ui/FieldError";
+import { DIRECTION_LABEL } from "@/constants/glossary";
 import { ORDINARY_LOG_CHANNEL_OPTIONS } from "@/screens/log-interaction-logic";
 import { useTheme } from "@/theme";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
@@ -95,13 +101,17 @@ const DIRECTION_OPTIONS = ["outbound", "inbound", "mutual"] as const;
 /** The Tone enum (D-06); null = unset ("No selection"), never treated as Neutral. */
 const TONE_OPTIONS = ["Positive", "Neutral", "Negative"] as const;
 
-/** Direction and Tone sheet options: "No selection" is the null value. */
+/**
+ * Direction and Tone sheet options: "No selection" is the null value.
+ * Direction labels come from the glossary (Outbound / Inbound / Mutual;
+ * 38.14 D-33, D-64); the stored value stays lower case.
+ */
 const DIRECTION_SHEET_OPTIONS: ReadonlyArray<{
   value: string | null;
   label: string;
 }> = [
   { value: null, label: "No selection" },
-  ...DIRECTION_OPTIONS.map((o) => ({ value: o, label: o })),
+  ...DIRECTION_OPTIONS.map((o) => ({ value: o, label: DIRECTION_LABEL[o] })),
 ];
 const TONE_SHEET_OPTIONS: ReadonlyArray<{
   value: string | null;
@@ -229,7 +239,10 @@ export function TouchpointRefineForm({
   const [showMore, setShowMore] = useState(false);
   // Raw text of the Custom-duration entry (minutes). The persisted seconds live on
   // `value.duration`; this only backs the free-text field while the user types.
-  const [customMinutes, setCustomMinutes] = useState("");
+  // A saved custom duration reopens as its minutes (38.14 D-31).
+  const [customMinutes, setCustomMinutes] = useState(() =>
+    customMinutesSeed(value.duration),
+  );
   const [openSheet, setOpenSheet] = useState<ChoiceSheet | null>(null);
   const fields = visibleFields ? new Set(visibleFields) : ALL_FIELDS;
   // Channel options default to the three canonical channels (38.14 D-60).
@@ -246,6 +259,9 @@ export function TouchpointRefineForm({
   const seed = parseLocalDateTime(value.occurredAt);
   // Display-only minute presentation; never written back (D-07).
   const occurredAtLabel = formatDateTimeMinuteOrFallback(value.occurredAt);
+  // The More / Hide options toggle reads the same words aloud as it shows
+  // (38.14 D-39).
+  const moreOptionsLabel = showMore ? "Hide options" : "More Options";
 
   function set<K extends keyof TouchpointRefineValue>(
     key: K,
@@ -302,7 +318,7 @@ export function TouchpointRefineForm({
             <Pressable
               testID={`${testID}-datetime`}
               accessibilityRole="button"
-              accessibilityLabel="Correct date and time"
+              accessibilityLabel="Date & time"
               accessibilityValue={{ text: occurredAtLabel }}
               onPress={openDateTime}
               style={[
@@ -472,7 +488,8 @@ export function TouchpointRefineForm({
             <TextInput
               testID={`${testID}-duration-custom`}
               accessibilityLabel="Custom duration in minutes"
-              value={customMinutes}
+              // Follows a duration changed elsewhere (a chip, Follow event).
+              value={customMinutesDisplay(customMinutes, value.duration)}
               onChangeText={(t) => {
                 setCustomMinutes(t);
                 // parseCustomDurationMinutes returns null for empty/invalid/out-of-range
@@ -492,12 +509,15 @@ export function TouchpointRefineForm({
                 },
               ]}
             />
-            <Text
-              testID={`${testID}-duration-label`}
-              style={[styles.hint, { color: colors.textSecondary }]}
-            >
-              {formatDurationLabel(value.duration)}
-            </Text>
+            {/* No "None" readout: the None chip already shows it (38.14 D-31). */}
+            {showDurationReadout(value.duration) ? (
+              <Text
+                testID={`${testID}-duration-label`}
+                style={[styles.hint, { color: colors.textSecondary }]}
+              >
+                {formatDurationLabel(value.duration)}
+              </Text>
+            ) : null}
           </View>
         );
       }
@@ -551,13 +571,13 @@ export function TouchpointRefineForm({
           <Pressable
             testID={`${testID}-more-options`}
             accessibilityRole="button"
-            accessibilityLabel="More Options"
+            accessibilityLabel={moreOptionsLabel}
             accessibilityState={{ expanded: showMore }}
             onPress={() => setShowMore((prev) => !prev)}
             style={styles.moreToggle}
           >
             <Text style={[styles.moreLabel, { color: colors.accentText }]}>
-              {showMore ? "Hide options" : "More Options"}
+              {moreOptionsLabel}
             </Text>
           </Pressable>
           {showMore
@@ -598,6 +618,8 @@ export function TouchpointRefineForm({
           testID={`${testID}-date-picker`}
           value={seed}
           mode="date"
+          // No day after today (38.14 D-24); the time guard covers today.
+          maximumDate={parseLocalDateTime(now)}
           onChange={onDateChange}
         />
       ) : null}
