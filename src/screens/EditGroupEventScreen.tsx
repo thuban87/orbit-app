@@ -60,6 +60,7 @@ import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { publishInteractionWrite } from "@/services/publish-interaction-write";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import {
@@ -531,20 +532,20 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 44,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: RADII.sm,
     paddingHorizontal: SPACING.md,
   },
   note: {
     minHeight: 88,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: RADII.sm,
     padding: SPACING.md,
     textAlignVertical: "top",
   },
   participants: {
     gap: SPACING.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
+    borderRadius: RADII.sm,
     padding: SPACING.base,
   },
   participantRow: { gap: SPACING.xs, paddingVertical: SPACING.xs },
