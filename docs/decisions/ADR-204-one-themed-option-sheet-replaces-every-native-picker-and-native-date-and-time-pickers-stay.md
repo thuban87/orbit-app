@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** ADR-144 (partial — the native picker for catalogs of 12 or fewer categories dies; the searchable sheet at 13+, the complete catalog, canonical ordering, the NULL Uncategorized policy and the grouped Orrery System selector survive)
-**Superseded by:** None
+**Superseded by:** ADR-255 (partial)
 
 ## Context
 

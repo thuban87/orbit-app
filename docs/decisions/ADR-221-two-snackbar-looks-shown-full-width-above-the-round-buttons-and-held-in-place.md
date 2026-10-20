@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** ADR-198 (partial — error snackbars' own look, "a `danger` outline, a warning glyph", dies: errors share the warning look; their assertive announcement and alert role, and per-window snackbar hosts above overlays, survive)
-**Superseded by:** None
+**Superseded by:** ADR-254 (partial)
 
 ## Context
 
