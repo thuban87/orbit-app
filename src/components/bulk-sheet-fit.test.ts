@@ -101,8 +101,9 @@ describe("More… sheet opens sized to its rows (38.13 D-87, amends D-71)", () =
 
   it("reads the render geometry at default text", () => {
     // handle 24 + body padding 24 + inset 24 + slack 8 = 80 chrome;
-    // title 25 + 8; 5 rows x (52 + 1 hairline); careful heading 16 + 20.
-    expect(bulkMoreSheetContentHeight(more())).toBe(80 + 33 + 5 * 53 + 36);
+    // title 25 + 8; 5 rows x 52 (the hairline sits inside the floor,
+    // border-box; measured 52 dp on the 6 Pro); careful heading 16 + 20.
+    expect(bulkMoreSheetContentHeight(more())).toBe(80 + 33 + 5 * 52 + 36);
   });
 
   it("stays compact when every row fits (a tall window)", () => {
@@ -182,11 +183,20 @@ describe("bulk Snooze sheet opens sized to its rows (38.13 D-87, amends D-71)", 
   });
 
   it("reads the render geometry at default text", () => {
-    // chrome 80; heading 25; 5 choices x (44 + 2 border); Close 8 + 46;
-    // 6 gaps x 8; padding 16.
+    // chrome 80; heading 25; 5 choices x 44 (borders inside the floor,
+    // border-box; measured 44 dp on the 3a); Close 8 + 46 (label 20 + 2 x 12
+    // padding + 2 border room; the bordered Unsnooze measured 46 dp on the
+    // 3a at 1.0); 6 gaps x 8; padding 16.
     expect(snoozeSheetContentHeight(snooze())).toBe(
-      80 + 25 + 5 * 46 + 8 + 46 + 6 * 8 + 16,
+      80 + 25 + 5 * 44 + 8 + 46 + 6 * 8 + 16,
     );
+    // At 1.15 the label line sets the button: 23 + 2 x 12 + 2 = 49 dp
+    // (Unsnooze measured 49 dp on the 3a at 1.15).
+    expect(
+      snoozeSheetContentHeight(
+        snooze({ fontScale: 1.15, showUnsnooze: true }),
+      ) - snoozeSheetContentHeight(snooze({ fontScale: 1.15 })),
+    ).toBe(49 + 8);
   });
 
   it("counts Unsnooze and the current line", () => {

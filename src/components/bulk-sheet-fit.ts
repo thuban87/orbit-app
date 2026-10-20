@@ -38,6 +38,9 @@ export interface SheetFitEnvironment {
 /**
  * Room a hairline border may take (dp). `StyleSheet.hairlineWidth` is under
  * 1 dp on these phones; counting a full dp errs toward a taller sheet.
+ *
+ * React Native sizes boxes border-box: a border sits inside `minHeight`, so it
+ * only adds height when the text, not the floor, sets the row's height.
  */
 const HAIRLINE_ESTIMATE = 1;
 
@@ -105,9 +108,10 @@ export function bulkMoreSheetContentHeight(
           labelWidth,
           TYPOGRAPHY.body.size,
           input.fontScale,
-        ) * scaledLineHeight(TYPOGRAPHY.body.lineHeight, input.fontScale),
-      ) +
-      HAIRLINE_ESTIMATE,
+        ) *
+          scaledLineHeight(TYPOGRAPHY.body.lineHeight, input.fontScale) +
+          HAIRLINE_ESTIMATE,
+      ),
     0,
   );
   const section =
@@ -152,16 +156,16 @@ export const SNOOZE_CLOSE_MARGIN_TOP = SPACING.sm;
 
 /**
  * A design-system `Button`'s height (dp): its 44 dp floor, or one label line
- * plus its vertical padding (`Button.tsx`: `SPACING.md` each side), plus room
- * for a 1 dp border. Labels here are short, so one line is assumed.
+ * plus its vertical padding (`Button.tsx`: `SPACING.md` each side) and room
+ * for a 1 dp border (inside the floor, border-box). Labels here are short, so
+ * one line is assumed.
  */
 function buttonHeight(fontScale: number): number {
-  return (
-    Math.max(
-      44,
-      scaledLineHeight(TYPOGRAPHY.label.lineHeight, fontScale) + 2 * SPACING.md,
-    ) +
-    2 * HAIRLINE_ESTIMATE
+  return Math.max(
+    44,
+    scaledLineHeight(TYPOGRAPHY.label.lineHeight, fontScale) +
+      2 * SPACING.md +
+      2 * HAIRLINE_ESTIMATE,
   );
 }
 
@@ -209,9 +213,10 @@ export function snoozeSheetContentHeight(input: SnoozeSheetFitInput): number {
           choiceWidth,
           TYPOGRAPHY.body.size,
           input.fontScale,
-        ) * scaledLineHeight(TYPOGRAPHY.body.lineHeight, input.fontScale),
-      ) +
-      2 * SNOOZE_CHOICE_BORDER_WIDTH,
+        ) *
+          scaledLineHeight(TYPOGRAPHY.body.lineHeight, input.fontScale) +
+          2 * SNOOZE_CHOICE_BORDER_WIDTH,
+      ),
     0,
   );
   const unsnooze = input.showUnsnooze ? buttonHeight(input.fontScale) : 0;
