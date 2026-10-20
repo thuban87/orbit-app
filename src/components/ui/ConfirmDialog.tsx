@@ -206,6 +206,8 @@ type ActionsLayout = "measuring" | "row" | "stacked";
  * Primary `confirmLabel` button, right-aligned like the row layout.
  * `cancelDisabled` draws Cancel with the Button disabled look (D-26) for a
  * host that holds its exits while work runs (38.9 fix-pass WR-01).
+ * `secondaryDisabled` does the same for the third choice (38.14: every
+ * "Did you send it?" answer is disabled while one is being written).
  */
 export function ConfirmActions({
   notice = false,
@@ -216,6 +218,8 @@ export function ConfirmActions({
   destructive,
   confirmDisabled,
   cancelDisabled = false,
+  secondaryDisabled = false,
+  testIDs,
   onCancel,
   onSecondary,
   onConfirm,
@@ -230,6 +234,10 @@ export function ConfirmActions({
   destructive: boolean;
   confirmDisabled: boolean;
   cancelDisabled?: boolean;
+  /** Draw the third choice disabled (additive; default false). */
+  secondaryDisabled?: boolean;
+  /** Optional per-choice testIDs for hosts that need stable handles (38.14). */
+  testIDs?: { cancel?: string; secondary?: string; confirm?: string };
   onCancel: () => void;
   onSecondary?: () => void;
   onConfirm: () => void;
@@ -289,6 +297,7 @@ export function ConfirmActions({
           label={cancelLabel}
           disabled={cancelDisabled}
           onPress={onCancel}
+          testID={testIDs?.cancel}
         />
       </View>
       {hasSecondary ? (
@@ -296,7 +305,9 @@ export function ConfirmActions({
           <Button
             role={secondaryDestructive ? "destructive" : "secondary"}
             label={secondaryLabel}
+            disabled={secondaryDisabled}
             onPress={onSecondary}
+            testID={testIDs?.secondary}
           />
         </View>
       ) : null}
@@ -306,6 +317,7 @@ export function ConfirmActions({
           label={confirmLabel}
           disabled={confirmDisabled}
           onPress={onConfirm}
+          testID={testIDs?.confirm}
         />
       </View>
     </View>

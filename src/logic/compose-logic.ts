@@ -240,15 +240,21 @@ export function resolveCopyTargets(
  *   - `back`             — ordinary Back, no send.
  *   - `transmit-pending` — Transmit fired, the "Did you send it?" panel is open but
  *                          the send is not yet confirmed.
- *   - `not-yet`          — the user dismissed that panel ("Not yet").
- *   - `logged`           — the user confirmed the send ("Yes, log interaction") and
- *                          the assist row logged successfully.
+ *   - `later`            — the user answered the panel "Later": the record stays
+ *                          pending and quiet until the next return to Orbit
+ *                          (38.14 D-77); the user stays on Compose.
+ *   - `dismissed`        — the user answered the panel "No, don't log": the record
+ *                          is dismissed and the user stays on Compose with the
+ *                          draft intact (38.14 D-78).
+ *   - `logged`           — the user confirmed the send ("Yes, log it") and the
+ *                          assist row logged successfully.
  *   - `copy`             — the user copied the draft.
  */
 export type ComposeExit =
   | "back"
   | "transmit-pending"
-  | "not-yet"
+  | "later"
+  | "dismissed"
   | "logged"
   | "copy";
 
@@ -268,7 +274,7 @@ export interface ComposeExitDisposition {
   /**
    * Navigate AWAY toward the launch origin (vs staying on Compose). TRUE for Back
    * (returns toward origin) and the confirmed log; FALSE for transmit-pending,
-   * "Not yet", and Copy (all stay on the Compose surface).
+   * "Later", "No, don't log" and Copy (all stay on the Compose surface).
    */
   navigatesToOrigin: boolean;
 }
@@ -281,7 +287,8 @@ export interface ComposeExitDisposition {
  *
  * ONLY the confirmed `logged` path is a "finished" flow: it clears the session and
  * removes the finished route. Back preserves the session but still returns toward
- * origin. Transmit-pending / "Not yet" / Copy preserve everything and stay put.
+ * origin. Transmit-pending / "Later" / "No, don't log" / Copy preserve everything
+ * and stay put (38.14 D-78: No keeps the draft).
  */
 export function composeExitDisposition(
   exit: ComposeExit,
@@ -300,7 +307,8 @@ export function composeExitDisposition(
         navigatesToOrigin: true,
       };
     case "transmit-pending":
-    case "not-yet":
+    case "later":
+    case "dismissed":
     case "copy":
       return {
         clearSession: false,

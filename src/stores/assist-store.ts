@@ -41,6 +41,17 @@ type AssistBannerStore = {
   setPanelOwned: (uid: string) => void;
   /** Compare-and-clear: releases only when `uid` is the current claim. */
   releasePanelOwned: (uid: string) => void;
+  /**
+   * "Later" on Compose's panel: keep this record off the banner and the pending
+   * list until the next return to Orbit (38.14 D-77). Re-derives at once.
+   */
+  deferUntilReturn: (uid: string) => void;
+  /**
+   * Empty the Later set WITHOUT publishing and without a database read. Called
+   * only on a background-to-active return and at launch, each time immediately
+   * before the `refresh()` that publishes (D-77). Never called from `refresh()`.
+   */
+  releaseDeferred: () => void;
 };
 
 /** The skip inputs the derive step reads, always from CURRENT state. */
@@ -112,17 +123,38 @@ export const useAssistBanner = create<AssistBannerStore>()((set) => ({
         : state,
     );
   },
+  deferUntilReturn(uid) {
+    set((state) => {
+      const laterUids = new Set(state.laterUids);
+      laterUids.add(uid);
+      return { laterUids, ...deriveVisible({ ...state, laterUids }) };
+    });
+  },
+  releaseDeferred() {
+    // Deliberately NOT re-derived: re-publishing here would run over the old
+    // rawQueue, and only `newest` is eligibility-filtered, so after a long
+    // background the pending list could briefly show expired rows. The refresh
+    // that always follows reads fresh rows and publishes.
+    set({ laterUids: new Set<string>() });
+  },
 }));
 
-/** Re-query after a real app return; inactive-to-active is deliberately ignored. */
+/**
+ * Re-query after a real app return; inactive-to-active is deliberately ignored.
+ * A real return is also when "Later" records become askable again (38.14 D-77):
+ * the set is released synchronously BEFORE the refresh, never inside it —
+ * refresh also runs on every assist publication and the Settings toggle, and
+ * releasing there would re-ask within seconds (owner-rejected Q17-A / Q17-B).
+ */
 export function subscribeAppState(appState: AssistAppStateLike): {
   remove(): void;
 } {
   let previous = "active";
   return appState.addEventListener("change", (next) => {
     if (previous === "background" && next === "active") {
-      useAssistBanner
-        .getState()
+      const store = useAssistBanner.getState();
+      store.releaseDeferred();
+      store
         .refresh()
         .catch((error) =>
           Logger.error("assist-store", "queue refresh failed", error),

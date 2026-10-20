@@ -18,11 +18,16 @@
  *     (handoffStarted false — markAssistFailed already ran) or an assists-opted-out
  *     session (assistUid null) shows NO panel and attempts NO fragile re-query
  *     (HIGH-1, T-35-05/T-35-21).
- *   - "Not yet" closes ONLY this local panel and leaves the durable assist row
- *     PENDING — it does NOT call markAssistDismissed. The durable "Don't log"
- *     path stays on the app-global PendingConfirmationsSheet (D-05).
- *   - This is ADDITIVE: the app-global AssistBanner + PendingConfirmationsSheet
- *     (App.tsx) remain mounted and functional (D-04, ESCALATE trip-wire).
+ *   - The panel answers Yes, log it / No, don't log / Later (38.14, carried
+ *     D-01 from 39 D-76). Yes logs and exits with a snackbar naming channel and
+ *     person (D-43); No dismisses through the one assist runner +
+ *     markAssistDismissed and keeps the user on Compose with the draft (D-78);
+ *     Later writes nothing and keeps the record quiet on the banner and pending
+ *     list until the next return to Orbit (assist-store Later set, D-77).
+ *   - One asker per record (D-23): while the panel shows, Compose claims its
+ *     record in the assist store (one focus effect keyed on `confirm`), so the
+ *     app-global AssistBanner + PendingConfirmationsSheet skip it. They stay
+ *     mounted and ask about every other record as before (D-04; R11 rejected).
  *   - Session draft state lives in `compose-session-store` (survives nav /
  *     background, cleared on Transmit-confirmed, NOT restored across relaunch —
  *     COMP-07 / D-10). Never persisted to any durable store.
@@ -72,6 +77,7 @@ import { resolvePrompt, SENT_PROMPT_TEMPLATE } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { AIComposeContextReview } from "@/components/AIComposeContextReview";
+import { ComposeConfirmPanel } from "@/components/ComposeConfirmPanel";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -98,7 +104,10 @@ import {
 } from "@/db/contact-methods-read";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { markAssistLogged } from "@/db/interaction-assist-dao";
+import {
+  markAssistDismissed,
+  markAssistLogged,
+} from "@/db/interaction-assist-dao";
 import {
   getWritingStyle,
   listPersonalizationSections,
@@ -125,6 +134,12 @@ import {
   AiSuggestionLifecycle,
   type AiSuggestionState,
 } from "@/logic/ai-suggestion-logic";
+import {
+  type ComposePanelOutcome,
+  composeDismissedSnackbar,
+  composeLoggedSnackbar,
+  composePanelOutcome,
+} from "@/logic/compose-assist-panel";
 import {
   actionablePrimaryPhoneDestination,
   type ComposeControls,
@@ -262,14 +277,17 @@ export function ComposeScreen({
   // single setState + setTimeout (NOT a per-frame animation, per CLAUDE.md).
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The additive "Did you send it?" panel — non-null (carrying the assist UID to
-  // log) ONLY after a started handoff that created an assist. `logging` latches
-  // the "Yes" write so a double-tap cannot double-log (T-35-05).
-  const [confirm, setConfirm] = useState<{ assistUid: string } | null>(null);
+  // The "Did you send it?" panel — non-null (carrying the assist UID and the
+  // channel actually handed off) ONLY after a started handoff that created an
+  // assist. `logging` disables every answer while a Yes / No write runs.
+  const [confirm, setConfirm] = useState<{
+    assistUid: string;
+    channel: "text" | "email";
+  } | null>(null);
   const [logging, setLogging] = useState(false);
-  // Synchronous double-tap latch for the "Yes" write (38.3 RG-023 / D-08): the
-  // `logging` state above only drives the disabled UI and cannot stop two taps
-  // dispatched in one tick; this ref can.
+  // Synchronous double-tap latch shared by the Yes and No writes (38.3 RG-023 /
+  // D-08): the `logging` state above only drives the disabled UI and cannot stop
+  // two taps dispatched in one tick; this ref can.
   const confirmLatchRef = useRef<InFlightRef>({ current: false });
   // The count of populated Things-to-Remember Research items for this contact,
   // driving the compact 'Things to Remember · N' entry (COMP-08). A local SQLite
@@ -1032,7 +1050,7 @@ export function ComposeScreen({
       // assist. A failed launch (handoffStarted false) or opted-out assists
       // (assistUid null) show nothing and attempt no re-query.
       if (outcome.handoffStarted && outcome.assistUid !== null) {
-        setConfirm({ assistUid: outcome.assistUid });
+        setConfirm({ assistUid: outcome.assistUid, channel: usable });
       }
       // A started handoff is a commit — advance the remembered mode (COMP-02).
       if (outcome.handoffStarted) {
@@ -1103,11 +1121,56 @@ export function ComposeScreen({
     }
   }, [mode, body, subject, flashCopyFeedback]);
 
-  // "Yes, log interaction" — log THIS assist through the sole recency writer at
-  // its handoff_at (markAssistLogged reused UNCHANGED, D-06). connected=1 matches
-  // the app-global text/email confirmation (its only affirmative is confirm(1)).
-  // Latched so a re-tap during the write cannot double-log (T-35-05). On success,
-  // this is the ONLY "finished" exit (COMP-14 / D-10): the disposition helper
+  // Apply one panel answer's pure outcome (compose-assist-panel.ts). Closing the
+  // panel (confirm → null) is also what releases the store claim: the D-23 focus
+  // effect's cleanup runs, so no handler releases the claim itself.
+  const applyPanelOutcome = useCallback(
+    (outcome: ComposePanelOutcome, channel: "text" | "email") => {
+      const personName = header?.name ?? null;
+      if (outcome.snackbar === "logged") {
+        showSnackbar({
+          kind: "success",
+          label: composeLoggedSnackbar(channel, personName),
+        });
+      } else if (outcome.snackbar === "dismissed") {
+        showSnackbar({
+          kind: "success",
+          label: composeDismissedSnackbar(channel, personName),
+        });
+      } else if (outcome.snackbar === "closed") {
+        // 38.3 review B-WR-05: the assist was dismissed or expired before this
+        // answer, so nothing was written. Informational, not an error.
+        showSnackbar({
+          kind: "success",
+          label: `${ASSIST_FAILURE_COPY.closed.title}. ${ASSIST_FAILURE_COPY.closed.body}`,
+        });
+      }
+      if (outcome.closePanel) {
+        setConfirm(null);
+      }
+      if (outcome.exit !== null) {
+        performExit(outcome.exit);
+      }
+    },
+    [header, performExit],
+  );
+
+  // Queue-only refresh after a "closed" no-op (the runner never rejects it).
+  const publishClosed = useCallback(
+    () =>
+      publishAssistDismissal({
+        refreshQueue: () => useAssistBanner.getState().refresh(),
+        logFailure: (message, error) => Logger.error(LOG_SCOPE, message, error),
+      }),
+    [],
+  );
+
+  // "Yes, log it" — log THIS assist through the sole recency writer at its
+  // handoff_at (markAssistLogged reused UNCHANGED, D-06). connected=1 matches the
+  // app-global text/email confirmation (its only affirmative is confirm(1)).
+  // Latched so a re-tap during the write cannot double-log (T-35-05). On success
+  // it confirms with a snackbar naming channel and person (38.14 D-43), then
+  // takes the ONLY "finished" exit (COMP-14 / D-10): the disposition helper
   // clears the session and returns toward origin, removing the finished Compose
   // route from Back history so the sent draft can't resurrect (T-35-20).
   //
@@ -1120,7 +1183,7 @@ export function ComposeScreen({
     if (confirm === null) {
       return;
     }
-    const { assistUid } = confirm;
+    const { assistUid, channel } = confirm;
     setLogging(true);
     const result = await runAssistAction({
       latch: confirmLatchRef.current,
@@ -1155,43 +1218,77 @@ export function ComposeScreen({
             "Couldn't log that yet. The reminder is saved — you can log it from the banner.",
         });
       },
-      // 38.3 review B-WR-05: the assist was dismissed or expired before this
-      // confirm, so no interaction was written. Close the panel without the
-      // "logged" exit — the session stays as it is.
-      // Informational, not an error: neutral (success-kind) snackbar.
-      onClosed: () =>
-        showSnackbar({
-          kind: "success",
-          label: `${ASSIST_FAILURE_COPY.closed.title}. ${ASSIST_FAILURE_COPY.closed.body}`,
-        }),
-      publishClosed: () =>
-        publishAssistDismissal({
-          refreshQueue: () => useAssistBanner.getState().refresh(),
-          logFailure: (message, error) =>
-            Logger.error(LOG_SCOPE, message, error),
-        }),
+      // "closed" (already dismissed / expired): the outcome shows the neutral
+      // snackbar and closes the panel without the "logged" exit.
+      publishClosed,
       logFailure: (message, error) => Logger.error(LOG_SCOPE, message, error),
     });
     if (result === "busy") {
       return;
     }
     setLogging(false);
-    if (result === "closed") {
-      setConfirm(null);
+    applyPanelOutcome(composePanelOutcome("yes", result), channel);
+  }, [confirm, applyPanelOutcome, publishClosed]);
+
+  // "No, don't log" (38.14 D-78, D-23) — dismiss THIS assist through the one
+  // assist runner + markAssistDismissed (D-08, ADR-164: one runner, no
+  // per-surface publication). It closes the panel and keeps the user on Compose
+  // with the draft intact; only Yes exits.
+  const onConfirmDismiss = useCallback(async () => {
+    if (confirm === null) {
       return;
     }
-    if (result === "done") {
-      setConfirm(null);
-      performExit("logged");
+    const { assistUid, channel } = confirm;
+    setLogging(true);
+    const result = await runAssistAction({
+      latch: confirmLatchRef.current,
+      write: () =>
+        markAssistDismissed(getExecutor(), {
+          assistUid,
+          now: localDateTime(),
+        }),
+      publish: () =>
+        publishAssistDismissal({
+          refreshQueue: () => useAssistBanner.getState().refresh(),
+          logFailure: (message, error) =>
+            Logger.error(LOG_SCOPE, message, error),
+        }),
+      onError: (_kind, err) => {
+        // The assist row stays pending; the panel stays so the user can retry,
+        // and the banner offers it again once the panel is gone.
+        Logger.error(LOG_SCOPE, "failed to dismiss assist", err);
+        showSnackbar({
+          kind: "error",
+          label:
+            "Couldn't dismiss that yet. The reminder is saved — you can answer it from the banner.",
+        });
+      },
+      publishClosed,
+      logFailure: (message, error) => Logger.error(LOG_SCOPE, message, error),
+    });
+    if (result === "busy") {
+      return;
     }
-  }, [confirm, performExit]);
+    setLogging(false);
+    applyPanelOutcome(composePanelOutcome("dismiss", result), channel);
+  }, [confirm, applyPanelOutcome, publishClosed]);
 
-  // "Not yet" — close ONLY the local panel and leave the durable assist row
-  // PENDING (D-05). Do NOT call markAssistDismissed; the durable "Don't log" path
-  // stays on the app-global PendingConfirmationsSheet.
-  const onConfirmNotYet = useCallback(() => {
+  // "Later" (38.14 D-77) — no write; the record stays PENDING. Defer it in the
+  // assist store FIRST, then close the panel: closing releases the panel claim
+  // (focus effect cleanup), and deferring before that stops the record flashing
+  // onto the banner in between. It stays quiet on the banner and pending list
+  // until the next return to Orbit (background → active, or launch).
+  const onConfirmLater = useCallback(() => {
+    if (confirm === null) {
+      return;
+    }
+    const outcome = composePanelOutcome("later");
+    if (outcome.deferUid) {
+      useAssistBanner.getState().deferUntilReturn(confirm.assistUid);
+    }
     setConfirm(null);
-  }, []);
+    performExit("later");
+  }, [confirm, performExit]);
 
   // ---- Render --------------------------------------------------------------
 
@@ -1788,36 +1885,16 @@ export function ComposeScreen({
           </View>
         ) : null}
 
-        {/* Additive "Did you send it?" panel — shown ONLY for a started handoff that
-          created an assist. Yes logs THIS assist at handoff_at; Not yet closes the
-          panel and leaves the assist PENDING (the app-global banner keeps it). */}
+        {/* "Did you send it?" panel — shown ONLY for a started handoff that created
+          an assist. Yes, log it / No, don't log / Later (38.14 D-01, D-43, D-77,
+          D-78); while it shows, the banner and pending list skip this record. */}
         {confirm !== null ? (
-          <View
-            testID="compose-confirm"
-            style={[
-              styles.panel,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <AppText role="heading">Did you send it?</AppText>
-            <View style={styles.panelActions}>
-              <Button
-                testID="compose-confirm-not-yet"
-                role="secondary"
-                label="Not yet"
-                accessibilityLabel="Not yet"
-                onPress={onConfirmNotYet}
-              />
-              <Button
-                testID="compose-confirm-yes"
-                role="primary"
-                label="Yes, log interaction"
-                accessibilityLabel="Yes, log interaction"
-                disabled={logging}
-                onPress={() => void onConfirmYes()}
-              />
-            </View>
-          </View>
+          <ComposeConfirmPanel
+            pending={logging}
+            onYes={() => void onConfirmYes()}
+            onDismiss={() => void onConfirmDismiss()}
+            onLater={onConfirmLater}
+          />
         ) : null}
 
         {/* Action row. */}

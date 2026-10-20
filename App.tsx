@@ -242,6 +242,9 @@ function AppShell() {
     }
     // The confirmation queue has its own per-return subscription: unlike the
     // launch sweep, it refreshes for every real background-to-active return.
+    // Launch is a return to Orbit, so "Later" records are released first
+    // (38.14 D-77; the set is empty on a cold start, but the order is explicit).
+    useAssistBanner.getState().releaseDeferred();
     void useAssistBanner.getState().refresh();
     const assistSubscription = subscribeAppState(AppState);
     // Register the launch field sweep (FLD-05) on the registry BEFORE the trigger
