@@ -1768,7 +1768,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion and the phase code review)*
 
-- [ ] 38.13-11-PLAN.md — Device pass: D-55 proven on release, device checks, owner batch, one fix pass, one release build, Phase 39 amendment rows
+- [x] 38.13-11-PLAN.md — Device pass: D-55 proven on release, device checks, owner batch, one fix pass, one release build, Phase 39 amendment rows
 
 ### Phase 38.14: Logging, History, Events & Compose UX (INSERTED)
 
