@@ -127,6 +127,15 @@ export const ICON_REGISTRY = {
   "show-secret": { outline: "eye-outline", filled: "eye" },
   "hide-secret": { outline: "eye-off-outline", filled: "eye-off" },
 
+  // ---- History record icons (38.14 D-47) --------------------------------
+  // In Person interactions and Bound / Unbound lifecycle rows each get their
+  // own silhouette (they shared `group-events`). Planner glyph picks: a raised
+  // hand (a greeting in person) and link / unlink; the owner reviews them on
+  // the device pass and can swap any glyph here (ADR-086 swap seam).
+  "in-person": { outline: "hand-left-outline", filled: "hand-left" },
+  bound: { outline: "link-outline", filled: "link" },
+  unbound: { outline: "unlink-outline", filled: "unlink" },
+
   // ---- Plan 07 destructive affordance -----------------------------------
   warning: { outline: "warning-outline", filled: "warning" },
 

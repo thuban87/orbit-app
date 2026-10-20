@@ -34,7 +34,7 @@
  * adjacent cell (`cellHitSlop`, owner default D-42 B), so tap zones never
  * overlap a neighbour.
  */
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   type LayoutChangeEvent,
   Pressable,
@@ -148,11 +148,45 @@ const LENS_OPTIONS: { label: string; value: HistoryLens }[] = [
   { label: "Year", value: "year" },
 ];
 
-const PRESET_OPTIONS: { label: string; value: `${HistoryCycleCount}` }[] =
-  HISTORY_CYCLE_COUNTS.map((n) => ({
-    label: String(n),
-    value: String(n) as `${HistoryCycleCount}`,
-  }));
+/**
+ * The Cycles preset chips (5/10/15/20). Each carries a caption and a spoken
+ * label naming its span (38.14 D-36): the number alone did not say "cycles".
+ */
+const PRESET_OPTIONS: {
+  label: string;
+  value: `${HistoryCycleCount}`;
+  caption: string;
+  accessibilityLabel: string;
+}[] = HISTORY_CYCLE_COUNTS.map((n) => ({
+  label: String(n),
+  value: String(n) as `${HistoryCycleCount}`,
+  caption: "cycles",
+  accessibilityLabel: `Last ${n} cycles`,
+}));
+
+/**
+ * Weekday initials over the Month columns (38.14 D-36), Sunday-first like the
+ * Month grid (`window.ts` buildMonth). Visual only: every cell's spoken label
+ * already names its date.
+ */
+const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"] as const;
+
+/**
+ * The month whose 1st falls in a Year row, or null (38.14 D-36). A two-week
+ * row holds at most one 1st (every month is longer than 14 days).
+ */
+function monthStartingIn(
+  weeks: readonly (readonly WindowCell[])[],
+): string | null {
+  for (const week of weeks) {
+    for (const cell of week) {
+      if (!cell.isPlaceholder && cell.date?.endsWith("-01")) {
+        return MONTH_SHORT[Number(cell.date.slice(5, 7)) - 1] ?? null;
+      }
+    }
+  }
+  return null;
+}
 
 /**
  * The tapped cell, for the parent's heatmap → History stream jump (38.8
@@ -507,36 +541,88 @@ export function ActivityHeatmap({
       ) : lens === "year" ? (
         // Year: two adjacent whole weeks per row (14 cells) keeps the vertical
         // mobile view compact while preserving weekday alignment and no x-scroll.
-        <View testID={`${testID}-year-grid`}>
-          {yearWeekPairs.map((weeks, row) => (
-            <View
-              key={`row-${weeks[0]?.find((c) => c.date)?.date ?? row}`}
-              testID={`${testID}-year-row-${row}`}
-              style={styles.yearRow}
-            >
-              {weeks.map((week, weekIndex) => (
+        // Centred like Day and Cycles (38.14 D-37). Each month's short label
+        // sits on its own line directly above the row holding its 1st (D-36):
+        // it adds height, never width, so `yearCellEdge` and the gaps keep the
+        // row at 238dp (Phase 40 owns Year density, D-16).
+        <View testID={`${testID}-year-grid`} style={styles.yearGrid}>
+          {yearWeekPairs.map((weeks, row) => {
+            const month = monthStartingIn(weeks);
+            return (
+              <Fragment
+                key={`row-${weeks[0]?.find((c) => c.date)?.date ?? row}`}
+              >
+                {month ? (
+                  <AppText
+                    testID={`${testID}-year-month-${row}`}
+                    role="caption"
+                    style={[
+                      styles.yearMonthLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {month}
+                  </AppText>
+                ) : null}
                 <View
-                  key={`week-${week.find((c) => c.date)?.date ?? weekIndex}`}
-                  testID={`${testID}-year-week-${row}-${weekIndex}`}
-                  style={styles.yearWeek}
+                  testID={`${testID}-year-row-${row}`}
+                  style={styles.yearRow}
                 >
-                  {week.map((cell, day) =>
-                    renderDayCell(
-                      cell,
-                      `y-${row}-${weekIndex}-${cell.date ?? `p${day}`}`,
-                      HEATMAP_GEOMETRY.yearCellEdge,
-                      yearCellGaps(day, week.length, weekIndex, weeks.length),
-                    ),
-                  )}
+                  {weeks.map((week, weekIndex) => (
+                    <View
+                      key={`week-${week.find((c) => c.date)?.date ?? weekIndex}`}
+                      testID={`${testID}-year-week-${row}-${weekIndex}`}
+                      style={styles.yearWeek}
+                    >
+                      {week.map((cell, day) =>
+                        renderDayCell(
+                          cell,
+                          `y-${row}-${weekIndex}-${cell.date ?? `p${day}`}`,
+                          HEATMAP_GEOMETRY.yearCellEdge,
+                          yearCellGaps(
+                            day,
+                            week.length,
+                            weekIndex,
+                            weeks.length,
+                          ),
+                        ),
+                      )}
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          ))}
+              </Fragment>
+            );
+          })}
         </View>
       ) : dayCellEdge === null ? null : (
         // 7 Days / Month: weeks as ROWS (traditional weekday-aligned grid),
         // sized from the measured width and centered (D-13).
         <View testID={`${testID}-day-grid`} style={styles.dayGrid}>
+          {lens === "month" ? (
+            // Weekday initials, one per column at the cell width (38.14 D-36).
+            // A row above the weeks, so the fit math is unchanged.
+            <View
+              testID={`${testID}-weekday-row`}
+              style={styles.dayRow}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {WEEKDAY_INITIALS.map((initial, i) => (
+                <AppText
+                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed seven-column header; initials repeat (T, S).
+                  key={`weekday-${i}`}
+                  role="caption"
+                  numberOfLines={1}
+                  style={[
+                    styles.weekdayInitial,
+                    { width: dayCellEdge, color: colors.textSecondary },
+                  ]}
+                >
+                  {initial}
+                </AppText>
+              ))}
+            </View>
+          ) : null}
           {dayWeeks.map((week, w) => (
             <View
               key={`row-${week.find((c) => c.date)?.date ?? w}`}
@@ -574,6 +660,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   dayGrid: { alignSelf: "center" },
+  // 38.14 D-37: the Year grid centres like Day and Cycles.
+  yearGrid: { alignSelf: "center" },
+  // 38.14 D-36: a month label line above its Year row (height, not width).
+  yearMonthLabel: { marginTop: SPACING.xs, marginBottom: SPACING.xs },
+  weekdayInitial: { textAlign: "center" },
   dayRow: {
     flexDirection: "row",
     gap: CELL_GAP,

@@ -36,6 +36,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
 import { AppText } from "@/components/ui/AppText";
+import { CHANNEL_LABEL, DIRECTION_LABEL } from "@/constants/glossary";
 import {
   CURRENT_STATE_FIELD_REGISTRY,
   type CurrentStateFieldKey,
@@ -51,7 +52,8 @@ import { EVENT_LABELS, type StreamRecord } from "./history-stream-logic";
 const CHANNEL_ICON: Record<string, IconName> = {
   Message: "message",
   Call: "call",
-  "In Person": "group-events",
+  // 38.14 D-47: its own silhouette, no longer the Events icon.
+  "In Person": "in-person",
 };
 
 /** Lifecycle event type → semantic icon. Distinct silhouette from interactions. */
@@ -60,20 +62,14 @@ const EVENT_ICON: Record<string, IconName> = {
   restore: "archive",
   snooze: "snooze",
   unsnooze: "snooze",
-  bind: "group-events",
-  unbind: "group-events",
+  // 38.14 D-47: Bound / Unbound read as link / unlink, not the Events icon.
+  bind: "bound",
+  unbind: "unbound",
 };
 
-/**
- * Display-only title case for the stored direction value ("Outbound · Great",
- * per the accepted mockup). The stored value is untouched; an unknown stored
- * value falls back to itself.
- */
-const DIRECTION_LABEL: Record<string, string> = {
-  outbound: "Outbound",
-  inbound: "Inbound",
-  mutual: "Mutual",
-};
+// Direction and channel labels come from the shared glossary maps (38.14 D-33,
+// D-64): display-only ("Outbound · Great"); the stored value is untouched and
+// an unknown stored value falls back to itself.
 
 export interface HistoryRecordRowProps {
   item: StreamRecord;
@@ -96,6 +92,7 @@ export function HistoryRecordRow({
   if (item.family === "interaction") {
     const r = item.record;
     const icon = CHANNEL_ICON[r.channel] ?? "message";
+    const channel = CHANNEL_LABEL[r.channel] ?? r.channel;
     const direction = r.direction
       ? (DIRECTION_LABEL[r.direction] ?? r.direction)
       : null;
@@ -126,14 +123,14 @@ export function HistoryRecordRow({
       <Pressable
         testID={`history-row-${item.key}`}
         accessibilityRole="button"
-        accessibilityLabel={`Interaction, ${r.channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}${metaSuffix}${groupSuffix}${linkedSuffix}${noteSuffix}`}
+        accessibilityLabel={`Interaction, ${channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}${metaSuffix}${groupSuffix}${linkedSuffix}${noteSuffix}`}
         style={styles.row}
         onPress={() => onOpenInteraction(r.id, item.date)}
       >
         <Icon name={icon} tone="textPrimary" size="sm" />
         <View style={styles.rowBody}>
           <View style={styles.rowHead}>
-            <AppText role="label">{r.channel}</AppText>
+            <AppText role="label">{channel}</AppText>
             <AppText role="caption" style={{ color: colors.textSecondary }}>
               {formatTimeMinuteOrFallback(r.occurredAt)}
             </AppText>

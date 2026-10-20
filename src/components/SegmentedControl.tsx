@@ -47,6 +47,16 @@ export interface SegmentedControlOption<V extends string> {
   label: string;
   value: V;
   icon?: IconName;
+  /**
+   * Optional small caption under a text label (38.14 D-36: "cycles" under the
+   * History preset numbers). Absent → the segment renders exactly as before.
+   */
+  caption?: string;
+  /**
+   * Optional spoken label when the visible label alone does not say what the
+   * segment is (38.14 D-36: "Last 5 cycles"). Absent → `label` (unchanged).
+   */
+  accessibilityLabel?: string;
 }
 
 export interface SegmentedControlProps<V extends string> {
@@ -106,7 +116,7 @@ export function SegmentedControl<V extends string>({
             testID={`${testID}-${option.value}`}
             accessibilityRole="button"
             accessibilityState={{ selected: isActive, disabled }}
-            accessibilityLabel={option.label}
+            accessibilityLabel={option.accessibilityLabel ?? option.label}
             disabled={disabled}
             onPress={() => {
               if (disabled) return;
@@ -149,6 +159,19 @@ export function SegmentedControl<V extends string>({
                 {option.label}
               </Text>
             )}
+            {!option.icon && option.caption ? (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.caption,
+                  {
+                    color: isActive ? colors.onAccent : colors.textSecondary,
+                  },
+                ]}
+              >
+                {option.caption}
+              </Text>
+            ) : null}
           </Pressable>
         );
       })}
@@ -174,5 +197,9 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: "500",
   },
 });
