@@ -729,14 +729,23 @@ describe("Card long-press and accessibility actions after the card menu (38.13 D
     handler({ nativeEvent: { actionName } });
   };
 
-  it("long-press calls the host's onLongPress (enter selection with this card) and is off while selecting", () => {
+  it("long-press calls the host's onLongPress (enter selection with this card)", () => {
     const h = handlers();
     const card = resolve(GridCard({ ...baseProps, ...h }))[0];
     expect(card?.props.onLongPress).toBe(h.onLongPress);
+  });
+
+  it("while selecting, long-press stays defined and toggles the card, so the entering long-press's release never toggles the seeded card off", () => {
+    // RN Pressability cancels onPress after a long-press only when
+    // onLongPress is still set at release; selection starts mid-press.
+    const h = handlers();
+    const onToggleSelect = vi.fn();
     const selecting = resolve(
-      GridCard({ ...baseProps, ...h, selectionMode: true }),
+      GridCard({ ...baseProps, ...h, selectionMode: true, onToggleSelect }),
     )[0];
-    expect(selecting?.props.onLongPress).toBeUndefined();
+    expect(selecting?.props.onLongPress).toBe(onToggleSelect);
+    expect(selecting?.props.onPress).toBe(onToggleSelect);
+    expect(selecting?.props.onLongPress).not.toBeUndefined();
   });
 
   it("keeps every per-contact action the menu offered, in its order and with its labels, for a Bound person", () => {

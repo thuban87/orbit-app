@@ -113,7 +113,8 @@ export interface GridCardProps {
   onPress: () => void;
   /**
    * Long-press enters multi-select with this card selected (38.13 D-90; the
-   * per-card context menu is retired). Not offered while selecting.
+   * per-card context menu is retired). While selecting, long-press toggles
+   * the card instead (`onToggleSelect`).
    */
   onLongPress?: () => void;
   /**
@@ -295,7 +296,14 @@ export function GridCard({
         }
       }}
       onPress={selectionMode ? (onToggleSelect ?? onPress) : onPress}
-      onLongPress={selectionMode ? undefined : onLongPress}
+      // 38.13 D-90: long-press enters selection with this card selected.
+      // While selecting, long-press toggles the card. It must stay defined:
+      // Pressability decides at release whether a long-press cancels onPress
+      // from the CURRENT onLongPress, so dropping it once selection starts
+      // let the entering long-press's release toggle the seeded card off.
+      onLongPress={
+        selectionMode ? (onToggleSelect ?? onLongPress) : onLongPress
+      }
       // D-32: the nominal width, not a share of the row, so a short last row
       // keeps normal-width cards.
       style={[styles.card, { width: geometry.cardWidth }]}
