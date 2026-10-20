@@ -40,3 +40,26 @@ export function selectBannerState<T extends PendingAssistForBanner>(
     morePendingCount: Math.max(eligible.length - 1, 0),
   };
 }
+
+/** What the assist store hides from the banner and pending list right now. */
+export type AssistSkips = {
+  /** The record Compose's "Did you send it?" panel is showing (D-23). */
+  panelOwnedUid: string | null;
+  /** Records answered "Later" since the last return to Orbit (D-77). */
+  laterUids: ReadonlySet<string>;
+};
+
+/**
+ * Drop the panel-owned record and every Later'd record from a pending queue
+ * (38.14 D-23 / D-77, built from 39 D-76). Pure: keeps input order and returns
+ * a new array without touching the caller's. Keyed on `uid` because that is the
+ * identity Compose holds and the banner and pending list already key on.
+ */
+export function applyAssistSkips<T extends { uid: string }>(
+  rows: readonly T[],
+  skips: AssistSkips,
+): T[] {
+  return rows.filter(
+    (row) => row.uid !== skips.panelOwnedUid && !skips.laterUids.has(row.uid),
+  );
+}

@@ -100,8 +100,23 @@ beforeEach(() => {
   mocks.getExecutor.mockReturnValue({});
   mocks.localDateTime.mockReturnValue(now);
   mocks.listEligiblePendingAssists.mockResolvedValue(queue);
-  useAssistBanner.setState({ queue: [], newest: null, morePendingCount: 0 });
+  useAssistBanner.setState({
+    rawQueue: [],
+    panelOwnedUid: null,
+    laterUids: new Set<string>(),
+    queue: [],
+    newest: null,
+    morePendingCount: 0,
+  });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
 
 describe("useAssistBanner", () => {
   it("maps the SQLite queue to the newest banner item and remaining count", async () => {
@@ -163,6 +178,65 @@ describe("useAssistBanner", () => {
     expect(useAssistBanner.getState()).toMatchObject({
       queue: [],
       newest: null,
+      morePendingCount: 0,
+    });
+  });
+});
+
+describe("panel claim (38.14 D-23)", () => {
+  it("skips the claimed record on the banner and the list, and brings it back on release", async () => {
+    await useAssistBanner.getState().refresh();
+    expect(useAssistBanner.getState().newest?.uid).toBe("newer");
+
+    useAssistBanner.getState().setPanelOwned("newer");
+    expect(useAssistBanner.getState()).toMatchObject({
+      panelOwnedUid: "newer",
+      queue: [queue[1]],
+      newest: queue[1],
+      morePendingCount: 0,
+    });
+    // The claim re-derives synchronously; it never reads the database.
+    expect(mocks.listEligiblePendingAssists).toHaveBeenCalledTimes(1);
+
+    // A later refresh (any publication) keeps the claimed record out.
+    await useAssistBanner.getState().refresh();
+    expect(useAssistBanner.getState().queue.map((row) => row.uid)).toEqual([
+      "older",
+    ]);
+    expect(useAssistBanner.getState().newest?.uid).toBe("older");
+
+    // Compare-and-clear: releasing a different uid changes nothing.
+    useAssistBanner.getState().releasePanelOwned("someone-else");
+    expect(useAssistBanner.getState().panelOwnedUid).toBe("newer");
+    expect(useAssistBanner.getState().queue.map((row) => row.uid)).toEqual([
+      "older",
+    ]);
+
+    useAssistBanner.getState().releasePanelOwned("newer");
+    expect(useAssistBanner.getState()).toMatchObject({
+      panelOwnedUid: null,
+      queue,
+      newest: queue[0],
+      morePendingCount: 1,
+    });
+  });
+
+  it("honours a claim made while a refresh read is still in flight", async () => {
+    const read = deferred<typeof queue>();
+    mocks.listEligiblePendingAssists.mockReturnValueOnce(read.promise);
+
+    const pending = useAssistBanner.getState().refresh();
+    await vi.waitFor(() =>
+      expect(mocks.listEligiblePendingAssists).toHaveBeenCalledTimes(1),
+    );
+    useAssistBanner.getState().setPanelOwned("newer");
+
+    read.resolve(queue);
+    await pending;
+    expect(useAssistBanner.getState()).toMatchObject({
+      rawQueue: queue,
+      queue: [queue[1]],
+      newest: queue[1],
       morePendingCount: 0,
     });
   });

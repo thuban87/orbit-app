@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyAssistSkips,
   isAssistEligible,
   selectBannerState,
 } from "@/logic/assist-eligibility";
@@ -46,6 +47,58 @@ describe("assist eligibility", () => {
     expect(selectBannerState(rows, NOW)).toEqual({
       newest: rows[2],
       morePendingCount: 2,
+    });
+  });
+
+  describe("applyAssistSkips (38.14 D-23 / D-77)", () => {
+    const rows = [
+      { uid: "a", id: 1 },
+      { uid: "b", id: 2 },
+      { uid: "c", id: 3 },
+      { uid: "d", id: 4 },
+    ];
+    const none = new Set<string>();
+
+    it("drops the panel-owned record and every Later'd record, keeping order", () => {
+      expect(
+        applyAssistSkips(rows, {
+          panelOwnedUid: "b",
+          laterUids: new Set(["d"]),
+        }).map((row) => row.uid),
+      ).toEqual(["a", "c"]);
+    });
+
+    it("drops the claimed record alone when nothing is Later'd", () => {
+      expect(
+        applyAssistSkips(rows, { panelOwnedUid: "c", laterUids: none }).map(
+          (row) => row.uid,
+        ),
+      ).toEqual(["a", "b", "d"]);
+    });
+
+    it("drops Later'd records alone when nothing is claimed", () => {
+      expect(
+        applyAssistSkips(rows, {
+          panelOwnedUid: null,
+          laterUids: new Set(["a", "c"]),
+        }).map((row) => row.uid),
+      ).toEqual(["b", "d"]);
+    });
+
+    it("never mutates the input and is a no-op with no skips", () => {
+      const input = [...rows];
+      const snapshot = JSON.stringify(input);
+      const out = applyAssistSkips(input, {
+        panelOwnedUid: null,
+        laterUids: none,
+      });
+      expect(out).toEqual(rows);
+      expect(out).not.toBe(input);
+      applyAssistSkips(input, {
+        panelOwnedUid: "a",
+        laterUids: new Set(["b"]),
+      });
+      expect(JSON.stringify(input)).toBe(snapshot);
     });
   });
 });

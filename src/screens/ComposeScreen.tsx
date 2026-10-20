@@ -809,6 +809,27 @@ export function ComposeScreen({
     }, [onBack]),
   );
 
+  // One asker per record (38.14 D-23, built from 39 D-76): while the "Did you
+  // send it?" panel shows, Compose claims its record in the assist store so the
+  // banner and the pending list skip it. This single effect covers every claim
+  // point — it claims when `setConfirm` opens the panel, releases when an answer
+  // closes it (confirm → null), releases on blur and unmount, and claims again
+  // on refocus while the panel is still up. App backgrounding (the SMS / mail
+  // handoff) fires no focus blur, so the claim survives the trip out of Orbit.
+  // No answer handler claims or releases on its own.
+  useFocusEffect(
+    useCallback(() => {
+      if (confirm === null) {
+        return undefined;
+      }
+      const { assistUid } = confirm;
+      useAssistBanner.getState().setPanelOwned(assistUid);
+      return () => {
+        useAssistBanner.getState().releasePanelOwned(assistUid);
+      };
+    }, [confirm]),
+  );
+
   // Clear a pending "Message copied" timer on unmount (no setState after teardown).
   useEffect(() => {
     return () => {
