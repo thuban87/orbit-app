@@ -19,6 +19,9 @@ import {
   addedParticipantNames,
   createGroupEventRefreshController,
   createParticipantAddAnnouncer,
+  EVENT_SAVED_SNACKBAR,
+  eventDeletedSnackbar,
+  eventDissolvedSnackbar,
   eventDraft,
   excludedParticipantIds,
   type GroupEventEditState,
@@ -26,6 +29,7 @@ import {
   initialGroupEventEditState,
   isGroupEventDraftDirty,
   participantRemovedSnackbar,
+  participantSavedSnackbar,
   participantsAddedSnackbar,
   runParticipantAdd,
   runParticipantRemove,
@@ -733,6 +737,58 @@ describe("Edit Event participant snackbars (38.14 D-67)", () => {
     );
     expect(source).toMatch(
       /kind: keep \? "success" : "warning",\s*label: participantRemovedSnackbar\(target\.contactName, !keep\),/,
+    );
+  });
+});
+
+describe("group-event writes confirm (ADR-199 via D-20; review B-WR-03)", () => {
+  it("words each confirmation in the phase's named style", () => {
+    expect(EVENT_SAVED_SNACKBAR).toBe("Changes saved");
+    expect(participantSavedSnackbar("Maya")).toBe("Changes saved for Maya");
+    expect(eventDissolvedSnackbar("Dinner")).toBe("Dissolved Dinner");
+    expect(eventDeletedSnackbar("Dinner")).toBe(
+      "Deleted Dinner and its interactions",
+    );
+  });
+
+  const source = (file: string) =>
+    readFileSync(new URL(file, import.meta.url), "utf8");
+
+  it("Edit Event's save confirms after the commit and before leaving", () => {
+    const edit = source("./EditGroupEventScreen.tsx");
+    const write = edit.indexOf("await updateGroupEvent(");
+    const shown = edit.indexOf(
+      'showSnackbar({ kind: "success", label: EVENT_SAVED_SNACKBAR })',
+    );
+    expect(shown).toBeGreaterThan(write);
+    expect(edit.indexOf("navigation.goBack()", write)).toBeGreaterThan(shown);
+  });
+
+  it("Edit participant's save confirms by name after the commit", () => {
+    const edit = source("./EditParticipantScreen.tsx");
+    const write = edit.indexOf("await saveParticipantEdits(");
+    const shown = edit.indexOf(
+      "participantSavedSnackbar(loaded.participant.contactName)",
+    );
+    expect(shown).toBeGreaterThan(write);
+    expect(edit.indexOf("navigation.goBack()", write)).toBeGreaterThan(shown);
+  });
+
+  it("Dissolve confirms as success and Delete Event as a warning, each after its write", () => {
+    const detailScreen = source("./GroupEventDetailScreen.tsx");
+    const dissolve = detailScreen.indexOf("await dissolveGroupEvent(");
+    const dissolved = detailScreen.indexOf("eventDissolvedSnackbar(title)");
+    expect(dissolved).toBeGreaterThan(dissolve);
+    expect(detailScreen.slice(dissolved - 80, dissolved)).toContain(
+      'kind: "success"',
+    );
+    const remove = detailScreen.indexOf(
+      "await deleteGroupEventAndInteractions(",
+    );
+    const deleted = detailScreen.indexOf("eventDeletedSnackbar(title)");
+    expect(deleted).toBeGreaterThan(remove);
+    expect(detailScreen.slice(deleted - 80, deleted)).toContain(
+      'kind: "warning"',
     );
   });
 });

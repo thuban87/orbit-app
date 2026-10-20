@@ -43,10 +43,12 @@ import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { publishInteractionWrite } from "@/services/publish-interaction-write";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { beginInFlight, endInFlight } from "@/utils/single-flight";
+import { participantSavedSnackbar } from "./group-event-refresh";
 
 interface LoadedParticipant {
   event: GroupEventDetail;
@@ -149,6 +151,11 @@ export function EditParticipantScreen({
       // 38.14 D-81: a committed participant save tells the widget and the
       // shell; Edit Event re-reads on its own focus (D-68).
       publishInteractionWrite();
+      // ADR-199 / D-20 (review B-WR-03): confirm by name, like D-67.
+      showSnackbar({
+        kind: "success",
+        label: participantSavedSnackbar(loaded.participant.contactName),
+      });
       bypassRef.current = true;
       navigation.goBack();
     } catch (err) {

@@ -48,6 +48,8 @@ import {
 import {
   createGroupEventRefreshController,
   createParticipantAddAnnouncer,
+  eventDeletedSnackbar,
+  eventDissolvedSnackbar,
   excludedParticipantIds,
   participantRemovedSnackbar,
   runParticipantAdd,
@@ -213,6 +215,8 @@ export function GroupEventDetailScreen({
   };
   const lifecycle = async () => {
     if (!confirm) return;
+    // The title as shown when the user confirmed, for the snackbar.
+    const title = event?.title ?? null;
     setWriteError(false);
     try {
       if (confirm === "dissolve") {
@@ -222,6 +226,13 @@ export function GroupEventDetailScreen({
         });
         // 38.14 D-27: dissolve publishes once committed.
         publishInteractionWrite();
+        // ADR-199 / D-20 (review B-WR-03): confirm by name.
+        if (title !== null) {
+          showSnackbar({
+            kind: "success",
+            label: eventDissolvedSnackbar(title),
+          });
+        }
       } else {
         await deleteGroupEventAndInteractions(getExecutor(), {
           groupEventId,
@@ -229,6 +240,14 @@ export function GroupEventDetailScreen({
         });
         // 38.14 D-27: delete event publishes once committed.
         publishInteractionWrite();
+        // ADR-199 / D-20 (review B-WR-03): a destructive result reads as a
+        // warning (38.10 D-132 / D-140 via D-14).
+        if (title !== null) {
+          showSnackbar({
+            kind: "warning",
+            label: eventDeletedSnackbar(title),
+          });
+        }
       }
       setConfirm(null);
       navigation.goBack();

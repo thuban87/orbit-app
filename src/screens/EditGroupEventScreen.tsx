@@ -70,6 +70,7 @@ import {
 import {
   createGroupEventRefreshController,
   createParticipantAddAnnouncer,
+  EVENT_SAVED_SNACKBAR,
   eventDraft,
   excludedParticipantIds,
   groupEventEditReducer,
@@ -235,6 +236,9 @@ export function EditGroupEventScreen({
       });
       // D-27: the widget and every screen reflect the saved event.
       publishInteractionWrite();
+      // ADR-199 / D-20 (review B-WR-03): the save confirms, like Edit
+      // interaction's "Changes saved" (D-58).
+      showSnackbar({ kind: "success", label: EVENT_SAVED_SNACKBAR });
       bypassRef.current = true;
       navigation.goBack();
     } catch {

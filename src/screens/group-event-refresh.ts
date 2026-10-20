@@ -329,6 +329,29 @@ export function participantRemovedSnackbar(
     : `Removed ${name}`;
 }
 
+/**
+ * The confirmations for the four group-event writes that were silent (ADR-199
+ * via carried D-20; 38.14 review B-WR-03). One wording with Edit interaction's
+ * "Changes saved" (D-58) and the named participant snackbars (D-67); the
+ * glossary's "Dissolve" (D-05). The event title is the stored, non-blank one.
+ */
+export const EVENT_SAVED_SNACKBAR = "Changes saved";
+
+/** Edit participant save: "Changes saved for Maya". */
+export function participantSavedSnackbar(name: string): string {
+  return `Changes saved for ${name}`;
+}
+
+/** Dissolve: "Dissolved Dinner" (a success look). */
+export function eventDissolvedSnackbar(title: string): string {
+  return `Dissolved ${title}`;
+}
+
+/** Delete Event & Interactions: a destructive result (38.10 D-132 / D-140). */
+export function eventDeletedSnackbar(title: string): string {
+  return `Deleted ${title} and its interactions`;
+}
+
 export interface ParticipantAddAnnouncer {
   /** Record ids whose add just committed (inside `onCommitted`). */
   queue(contactIds: readonly number[]): void;
