@@ -9,6 +9,7 @@ import {
   ORDINARY_LOG_CHANNEL_OPTIONS,
   resolveInitialAllowAi,
   resolveInitialChannel,
+  seedOccurredAtForDay,
   shouldUpdateRemembered,
 } from "@/screens/log-interaction-logic";
 
@@ -284,6 +285,32 @@ describe("log-interaction-logic — channelOptionsFor (38.14 D-60)", () => {
     expect(channelOptionsFor(saved).map((o) => o.value)).toContain("other");
     expect(channelOptionsFor(draftChannel).map((o) => o.value)).not.toContain(
       "other",
+    );
+  });
+});
+
+describe("log-interaction-logic — seedOccurredAtForDay (38.14 D-61)", () => {
+  it("an empty History day opens on that day at now's time of day", () => {
+    expect(seedOccurredAtForDay("2026-10-12", "2026-10-20 14:05:09")).toBe(
+      "2026-10-12 14:05:09",
+    );
+  });
+
+  it("no day (the empty-month case, 38.8 D-28) seeds now", () => {
+    expect(seedOccurredAtForDay(undefined, "2026-10-20 14:05:09")).toBe(
+      "2026-10-20 14:05:09",
+    );
+  });
+
+  it("today seeds exactly now, never a later time", () => {
+    expect(seedOccurredAtForDay("2026-10-20", "2026-10-20 14:05:09")).toBe(
+      "2026-10-20 14:05:09",
+    );
+  });
+
+  it("never seeds a future value, even for a later day", () => {
+    expect(seedOccurredAtForDay("2026-10-21", "2026-10-20 14:05:09")).toBe(
+      "2026-10-20 14:05:09",
     );
   });
 });
