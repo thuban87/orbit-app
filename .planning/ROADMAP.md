@@ -1778,7 +1778,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half, B-24 and the Events tab header/empty-state copy are 38.15's). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–9 plans — rough estimate; recurring-problem sweeps not counted.
-**Plans:** 6/9 plans executed
+**Plans:** 7/9 plans executed
 
 Plans:
 **Wave 1**
@@ -1792,7 +1792,7 @@ Plans:
 
 - [x] 38.14-02-PLAN.md — Compose UX: usable-mode label/Subject/destination, empty disables, pinned Copy/Transmit bar, one scrim, copy snackbar, draft-switch prompt (wave 2)
 - [x] 38.14-05-PLAN.md — Interaction sheet + History: note after When, pinned stacking actions, Intensity in plain words, heatmap labels/centring, distinct icons (wave 2)
-- [ ] 38.14-07-PLAN.md — Edit Event: rename, one participant editor, named snackbars, Remove-from-event order + confirm, publication at every group-event write (wave 2)
+- [x] 38.14-07-PLAN.md — Edit Event: rename, one participant editor, named snackbars, Remove-from-event order + confirm, publication at every group-event write (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
