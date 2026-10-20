@@ -60,6 +60,11 @@ export type ProfileRouteParams = {
 export type EditContactParams = {
   contactId: number;
   focusFieldDefId?: number;
+  /**
+   * 38.14 D-42: opens the form with that section expanded and scrolled into
+   * view once, e.g. Compose's "Add a phone number or email" → Contact Methods.
+   */
+  focusSection?: "methods";
 };
 
 /**

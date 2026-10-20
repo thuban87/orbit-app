@@ -391,7 +391,7 @@ export function EditContactScreen({
   const { colors } = useTheme();
   // DEF-01: the root clears the system navigation bar (focused workflow).
   const bottomInset = useFocusedBottomInset();
-  const { contactId, focusFieldDefId } = route.params;
+  const { contactId, focusFieldDefId, focusSection } = route.params;
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
     [],
@@ -556,6 +556,25 @@ export function EditContactScreen({
     (node: View | null) => reveal(node),
     [reveal],
   );
+  // 38.14 D-42: opened from Compose's "Add a phone number or email". Once the
+  // form has hydrated, Contact Methods expands and its section is revealed
+  // with the same helper as revealAndFocus — once, never on later renders.
+  // The section's top does not depend on its own expansion, so the reveal
+  // one frame later (useFirstErrorReveal) lands on it.
+  const formReady = form !== null;
+  const focusSectionHandledRef = useRef(false);
+  useEffect(() => {
+    if (focusSection !== "methods" || !formReady) return;
+    if (focusSectionHandledRef.current) return;
+    focusSectionHandledRef.current = true;
+    setSectionExpanded(focusSection, true);
+    reveal({
+      get current() {
+        return sectionRefs.current[focusSection] ?? null;
+      },
+    });
+  }, [focusSection, formReady, reveal, setSectionExpanded]);
+
   const focusFieldReveal = useFocusFieldReveal({
     focusFieldDefId,
     ready:

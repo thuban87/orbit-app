@@ -157,8 +157,10 @@ import {
   resolveComposeControls,
   resolveCopyTargets,
   resolveUsableMode,
+  shouldPromptDraftSwitch,
 } from "@/logic/compose-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
+import { confirmDiscard } from "@/navigation/discard-keep-guard";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
@@ -278,6 +280,13 @@ export function ComposeScreen({
   // DEF-01: the root clears the system navigation bar (focused workflow).
   const bottomInset = useFocusedBottomInset();
   const { contactId } = route.params;
+  // The route's person, read at USE time by the AI lifecycle (38.14 R4-01).
+  // The lifecycle is built once per mount, so its injected resolvePrompt must
+  // not close over the first render's contactId: after the draft-switch
+  // prompt's Keep editing (D-72) the same mounted Compose shows another person.
+  // Assigned every render, so it is current before any effect or tap.
+  const contactIdRef = useRef(contactId);
+  contactIdRef.current = contactId;
 
   const [screenState, setScreenState] = useState<ScreenState>("loading");
   // Device SMS capability — null = UNKNOWN (probe pending), never rendered as
@@ -513,15 +522,18 @@ export function ComposeScreen({
         ephemeralAdjustGuidance?: string,
       ): Promise<ResolvedPrompt> => {
         const exec = getExecutor();
-        const contactContext = await readPromptContext(exec, contactId);
+        // One snapshot of the on-screen person for BOTH egress reads (R4-01;
+        // CLAUDE.md "Local-first": AI egress is the intended contact only).
+        const requestContactId = contactIdRef.current;
+        const contactContext = await readPromptContext(exec, requestContactId);
         // Message Focus never grants permission. Re-read the normalized Research
         // boundary for this request and intersect by stable identity so a
         // permission withdrawn after selection takes effect before egress. Only
         // fresh label/value data survives; stale session content is never sent.
-        const currentResearch = await readComposeResearch(exec, contactId);
+        const research = await readComposeResearch(exec, requestContactId);
         const focusedContext = projectMessageFocus(
           useComposeSession.getState().messageFocus,
-          currentResearch,
+          research,
         );
         const writingStyle = await getWritingStyle(exec);
         const personalizationSections = await listPersonalizationSections(exec);
@@ -684,174 +696,222 @@ export function ComposeScreen({
       let cancelled = false;
       focusedRef.current = true;
       // Whether THIS focus begins a brand-new session (a different contact than
-      // the store currently holds). Captured BEFORE startSession so the mode is
-      // seeded from the durable preference on a fresh start ONLY — an in-app
-      // return to the SAME contact preserves the in-session mode (COMP-02).
-      const freshSession = useComposeSession.getState().contactId !== contactId;
-      // Begin (or resume) the session for this contact — a no-op for the same
-      // contact, so an in-app return preserves the in-progress draft (COMP-07).
-      startSession(contactId);
+      // the store currently holds). Captured BEFORE the draft-switch prompt and
+      // startSession so the mode is seeded from the durable preference on a
+      // fresh start ONLY — an in-app return to the SAME contact (including the
+      // Keep-editing re-run below) preserves the in-session mode (COMP-02).
+      const stored = useComposeSession.getState();
+      const freshSession = stored.contactId !== contactId;
       setScreenState("loading");
       setSmsAvailable(null);
       setResearchCount(0);
 
-      const exec = getExecutor();
-      void (async () => {
-        try {
-          const [row, methodGroups, settings, connection] = await Promise.all([
-            getContactHeader(exec, contactId),
-            listContactMethodGroups(exec, contactId),
-            getAppSettings(exec),
-            resolveActiveAiConnection(exec),
-            useAiConfigStore.getState().hydrate(exec),
-          ]);
+      // Begin (or resume) the session for this contact — a no-op for the same
+      // contact, so an in-app return preserves the in-progress draft (COMP-07)
+      // — then load this person's header, Research count and SMS capability.
+      const load = () => {
+        startSession(contactId);
+        const exec = getExecutor();
+        void (async () => {
+          try {
+            const [row, methodGroups, settings, connection] = await Promise.all(
+              [
+                getContactHeader(exec, contactId),
+                listContactMethodGroups(exec, contactId),
+                getAppSettings(exec),
+                resolveActiveAiConnection(exec),
+                useAiConfigStore.getState().hydrate(exec),
+              ],
+            );
+            if (cancelled) {
+              return;
+            }
+            // Publish the prompt template and exact active-connection resolution.
+            // The pointer is hydrated into the durable store by the same focus read;
+            // a dangling pointer deliberately resolves to null.
+            settingsRef.current = settings;
+            activeConnectionRef.current = connection;
+            setActiveConnection(connection);
+            const cachedOpenRouterCatalog =
+              connection?.lane === "openrouter"
+                ? await loadCachedOpenRouterCatalog({
+                    async read() {
+                      const file = new File(
+                        Paths.document,
+                        "ai",
+                        "openrouter-model-catalog.json",
+                      );
+                      return file.exists ? file.text() : null;
+                    },
+                    async write() {
+                      // Compose only reads the cache. Catalog refresh remains an
+                      // explicit/settings-owned operation.
+                    },
+                  })
+                : null;
+            openRouterModelsRef.current = cachedOpenRouterCatalog?.models ?? [];
+            setModelAvailable(
+              isSelectedConnectionModelAvailable(
+                connection,
+                openRouterModelsRef.current,
+              ),
+            );
+            // Best-effort refresh of the active model catalog (cache-overrides-seed)
+            // so Anthropic's required max_tokens uses the freshest per-model max.
+            // Non-blocking + failure-tolerant — the seed default already works, and
+            // this never sits on the render path.
+            void loadCachedCatalog(createFileCatalogStorage())
+              .then((cached) => {
+                if (!cancelled) {
+                  catalogRef.current = resolveActiveCatalog(cached);
+                  setModelAvailable(
+                    isSelectedConnectionModelAvailable(
+                      connection,
+                      openRouterModelsRef.current,
+                    ),
+                  );
+                }
+              })
+              .catch(() => undefined);
+            // Source AI availability (COMP-09): reset the session-local observed-
+            // unauthorized lever, then read the active lane's
+            // credential PRESENCE off the key store (presence only, never the value)
+            // concurrently so it never blocks header render. readCredentialPresence
+            // narrows 'none' out BEFORE any getKey call (A4). Guarded by `cancelled`.
+            setCredentialFailed(false);
+            void readCredentialPresence(connection?.lane ?? "none", (p) =>
+              aiKeyStore.getKey(
+                p,
+                p === "custom" ? connection?.customEndpoint : undefined,
+              ),
+            )
+              .then((present) => {
+                if (!cancelled) setCredentialPresent(present);
+              })
+              .catch(() => {
+                if (!cancelled) setCredentialPresent(false);
+              });
+            // Resolve the EFFECTIVE actionable primary for BOTH types from the same
+            // loaded groups (one read serves resolution AND the picker decision).
+            const primaries = selectActionablePrimaryMethods(methodGroups);
+            // Seed the session mode from the durable preference on a FRESH session
+            // only (COMP-02). effectiveMode resolves the 'remember' sentinel to the
+            // last remembered concrete mode; a fixed default is used verbatim. This
+            // is a local SQLite read — the render path never blocks on network.
+            if (freshSession) {
+              setMode(
+                effectiveMode(
+                  settings.defaultMessageMode,
+                  settings.rememberedMessageMode,
+                ),
+              );
+            }
+            // A stale/deleted OR archived contact — exit to the dashboard, never
+            // render a Compose surface. Archiving must hide the contact everywhere,
+            // so treat archived exactly like missing.
+            if (row === null || row.archived_at !== null) {
+              setScreenState("missing");
+              resetToDashboard();
+              return;
+            }
+            setHeader({
+              id: row.id,
+              name: row.name,
+              photo: row.photo,
+              modified_at: row.modified_at,
+              archived_at: row.archived_at,
+              actionablePhone: actionablePrimaryPhoneDestination(
+                primaries.phone,
+              ),
+              actionableEmail: actionablePrimaryPhoneDestination(
+                primaries.email,
+              ),
+              primaryPhone: primaries.phone,
+              primaryEmail: primaries.email,
+              methodGroups,
+            });
+            setScreenState("ready");
+          } catch (err) {
+            Logger.error(LOG_SCOPE, "failed to load contact", err);
+            if (!cancelled) {
+              void notice({
+                title: "Couldn't load this contact",
+                message: "Please go back and retry.",
+              });
+              setScreenState("error");
+            }
+          }
+        })();
+
+        // Populated Things-to-Remember Research count (COMP-08) — SEPARATE from the
+        // header load and non-blocking, so a slow/failed read never gates the editor.
+        // The count reflects the same normalized projection the Research side renders;
+        // the cancelled guard prevents a stale focus's read overwriting the current.
+        readComposeResearch(exec, contactId)
+          .then((rows) => {
+            if (!cancelled) {
+              setResearchCount(rows.length);
+            }
+          })
+          .catch((err) => {
+            Logger.error(LOG_SCOPE, "failed to load research count", err);
+            if (!cancelled) {
+              setResearchCount(0);
+            }
+          });
+
+        // SMS capability probe — SEPARATE from the header load so a rejected probe
+        // degrades to `false` WITHOUT failing the contact load. The cancelled guard
+        // prevents a slow prior-focus probe clobbering the fresh `null`.
+        SMS.isAvailableAsync()
+          .then((ok) => {
+            if (!cancelled) {
+              setSmsAvailable(ok);
+            }
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setSmsAvailable(false);
+            }
+          });
+      };
+
+      // 38.14 D-72: opening Compose for a different person while a typed draft
+      // is held asks first with the standard discard prompt (38.9 D-13 / D-14),
+      // before the session starts. Discard starts this person's draft. Keep
+      // editing points this Compose back at the person whose draft exists
+      // (the effect re-runs on the contactId change and startSession is a no-op
+      // there) and clears `origin`, so Back takes the default dashboard return
+      // instead of popping onto this person's Profile (R3-03; the dashboard
+      // return is this plan only). The prompt lives here, not at the callers,
+      // because Compose is reached by plain navigate and by stack resets
+      // (notification / widget). One draft at a time (R12 rejected; ADR-133).
+      const storedContactId = stored.contactId;
+      if (
+        storedContactId !== null &&
+        shouldPromptDraftSwitch({
+          storeContactId: storedContactId,
+          nextContactId: contactId,
+          body: stored.body,
+          subject: stored.subject,
+        })
+      ) {
+        void confirmDiscard().then((discard) => {
           if (cancelled) {
             return;
           }
-          // Publish the prompt template and exact active-connection resolution.
-          // The pointer is hydrated into the durable store by the same focus read;
-          // a dangling pointer deliberately resolves to null.
-          settingsRef.current = settings;
-          activeConnectionRef.current = connection;
-          setActiveConnection(connection);
-          const cachedOpenRouterCatalog =
-            connection?.lane === "openrouter"
-              ? await loadCachedOpenRouterCatalog({
-                  async read() {
-                    const file = new File(
-                      Paths.document,
-                      "ai",
-                      "openrouter-model-catalog.json",
-                    );
-                    return file.exists ? file.text() : null;
-                  },
-                  async write() {
-                    // Compose only reads the cache. Catalog refresh remains an
-                    // explicit/settings-owned operation.
-                  },
-                })
-              : null;
-          openRouterModelsRef.current = cachedOpenRouterCatalog?.models ?? [];
-          setModelAvailable(
-            isSelectedConnectionModelAvailable(
-              connection,
-              openRouterModelsRef.current,
-            ),
-          );
-          // Best-effort refresh of the active model catalog (cache-overrides-seed)
-          // so Anthropic's required max_tokens uses the freshest per-model max.
-          // Non-blocking + failure-tolerant — the seed default already works, and
-          // this never sits on the render path.
-          void loadCachedCatalog(createFileCatalogStorage())
-            .then((cached) => {
-              if (!cancelled) {
-                catalogRef.current = resolveActiveCatalog(cached);
-                setModelAvailable(
-                  isSelectedConnectionModelAvailable(
-                    connection,
-                    openRouterModelsRef.current,
-                  ),
-                );
-              }
-            })
-            .catch(() => undefined);
-          // Source AI availability (COMP-09): reset the session-local observed-
-          // unauthorized lever, then read the active lane's
-          // credential PRESENCE off the key store (presence only, never the value)
-          // concurrently so it never blocks header render. readCredentialPresence
-          // narrows 'none' out BEFORE any getKey call (A4). Guarded by `cancelled`.
-          setCredentialFailed(false);
-          void readCredentialPresence(connection?.lane ?? "none", (p) =>
-            aiKeyStore.getKey(
-              p,
-              p === "custom" ? connection?.customEndpoint : undefined,
-            ),
-          )
-            .then((present) => {
-              if (!cancelled) setCredentialPresent(present);
-            })
-            .catch(() => {
-              if (!cancelled) setCredentialPresent(false);
-            });
-          // Resolve the EFFECTIVE actionable primary for BOTH types from the same
-          // loaded groups (one read serves resolution AND the picker decision).
-          const primaries = selectActionablePrimaryMethods(methodGroups);
-          // Seed the session mode from the durable preference on a FRESH session
-          // only (COMP-02). effectiveMode resolves the 'remember' sentinel to the
-          // last remembered concrete mode; a fixed default is used verbatim. This
-          // is a local SQLite read — the render path never blocks on network.
-          if (freshSession) {
-            setMode(
-              effectiveMode(
-                settings.defaultMessageMode,
-                settings.rememberedMessageMode,
-              ),
-            );
-          }
-          // A stale/deleted OR archived contact — exit to the dashboard, never
-          // render a Compose surface. Archiving must hide the contact everywhere,
-          // so treat archived exactly like missing.
-          if (row === null || row.archived_at !== null) {
-            setScreenState("missing");
-            resetToDashboard();
+          if (discard) {
+            load();
             return;
           }
-          setHeader({
-            id: row.id,
-            name: row.name,
-            photo: row.photo,
-            modified_at: row.modified_at,
-            archived_at: row.archived_at,
-            actionablePhone: actionablePrimaryPhoneDestination(primaries.phone),
-            actionableEmail: actionablePrimaryPhoneDestination(primaries.email),
-            primaryPhone: primaries.phone,
-            primaryEmail: primaries.email,
-            methodGroups,
+          navigation.setParams({
+            contactId: storedContactId,
+            origin: undefined,
           });
-          setScreenState("ready");
-        } catch (err) {
-          Logger.error(LOG_SCOPE, "failed to load contact", err);
-          if (!cancelled) {
-            void notice({
-              title: "Couldn't load this contact",
-              message: "Please go back and retry.",
-            });
-            setScreenState("error");
-          }
-        }
-      })();
-
-      // Populated Things-to-Remember Research count (COMP-08) — SEPARATE from the
-      // header load and non-blocking, so a slow/failed read never gates the editor.
-      // The count reflects the same normalized projection the Research side renders;
-      // the cancelled guard prevents a stale focus's read overwriting the current.
-      readComposeResearch(exec, contactId)
-        .then((rows) => {
-          if (!cancelled) {
-            setResearchCount(rows.length);
-          }
-        })
-        .catch((err) => {
-          Logger.error(LOG_SCOPE, "failed to load research count", err);
-          if (!cancelled) {
-            setResearchCount(0);
-          }
         });
-
-      // SMS capability probe — SEPARATE from the header load so a rejected probe
-      // degrades to `false` WITHOUT failing the contact load. The cancelled guard
-      // prevents a slow prior-focus probe clobbering the fresh `null`.
-      SMS.isAvailableAsync()
-        .then((ok) => {
-          if (!cancelled) {
-            setSmsAvailable(ok);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setSmsAvailable(false);
-          }
-        });
+      } else {
+        load();
+      }
 
       return () => {
         cancelled = true;
@@ -861,7 +921,7 @@ export function ComposeScreen({
         focusedRef.current = false;
         lifecycleRef.current?.dispose();
       };
-    }, [contactId, resetToDashboard, startSession, setMode]),
+    }, [contactId, navigation, resetToDashboard, startSession, setMode]),
   );
 
   // Android hardware/system Back → origin-aware return (consume the event so
@@ -1927,7 +1987,12 @@ export function ComposeScreen({
                   role="tertiary"
                   label="Add a phone number or email"
                   accessibilityLabel="Add a phone number or email"
-                  onPress={() => navigation.navigate("Edit", { contactId })}
+                  onPress={() =>
+                    navigation.navigate("Edit", {
+                      contactId,
+                      focusSection: "methods",
+                    })
+                  }
                 />
               </View>
             </>

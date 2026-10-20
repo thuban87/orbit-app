@@ -306,6 +306,31 @@ export function composeActionAvailability({
 }
 
 /**
+ * Whether opening Compose for `nextContactId` must first ask before the typed
+ * draft held for another person is discarded (38.14 D-72). True only when a
+ * DIFFERENT person is being opened while the stored draft has a non-blank
+ * body or subject; the same person resumes the draft (COMP-07), a blank draft
+ * is replaced silently, and there is nothing to lose before any session.
+ * One draft at a time stays (R12 rejected; ADR-133). Pure.
+ */
+export function shouldPromptDraftSwitch({
+  storeContactId,
+  nextContactId,
+  body,
+  subject,
+}: {
+  storeContactId: number | null;
+  nextContactId: number;
+  body: string;
+  subject: string;
+}): boolean {
+  if (storeContactId === null || storeContactId === nextContactId) {
+    return false;
+  }
+  return body.trim() !== "" || subject.trim() !== "";
+}
+
+/**
  * Resolve the effective compose mode from the stored default. The `remember`
  * sentinel resolves to the remembered concrete mode; a fixed default is used
  * verbatim. Pure; never throws. (COMP-02: equality is over the fixed lowercase

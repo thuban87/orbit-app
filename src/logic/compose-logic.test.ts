@@ -16,8 +16,8 @@ import { describe, expect, it } from "vitest";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import {
   actionablePrimaryPhoneDestination,
-  type ComposeExit,
   COMPOSE_DRAFT_VISIBLE_LINES,
+  type ComposeExit,
   composeActionAvailability,
   composeDraftMaxHeight,
   composeExitDisposition,
