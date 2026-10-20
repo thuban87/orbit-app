@@ -13,12 +13,18 @@
  *   committed ids stay excluded from the picker so a re-pick cannot trip the
  *   (unchanged) DAO duplicate-participant guard.
  *
- * Pure: type-only imports plus the latest-request authority and the
- * single-flight latch. No React, no react-native, no database runtime.
+ * 38.14 D-67: participant adds and removes on Edit Event confirm by name with
+ * a snackbar; the copy helpers live here. D-68: Edit Event's one participant
+ * editor is the EditParticipant screen; returning refreshes the event only.
+ *
+ * Pure: type-only imports plus the latest-request authority, the
+ * single-flight latch and the plural helper. No React, no react-native, no
+ * database runtime.
  */
 import type { TouchpointRefineValue } from "@/components/TouchpointRefineForm";
 import type { GroupEventDetail } from "@/db/group-events-read";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
+import { plural } from "@/utils/plural";
 import {
   beginInFlight,
   endInFlight,
@@ -282,4 +288,43 @@ export async function runParticipantRemove({
   } finally {
     endInFlight(latch);
   }
+}
+
+/**
+ * The names of the just-added participants, read from the refreshed SAVED
+ * event (the picker hands back ids only), in the event's participant order.
+ */
+export function addedParticipantNames(
+  event: GroupEventDetail,
+  contactIds: readonly number[],
+): string[] {
+  const added = new Set(contactIds);
+  return event.participants
+    .filter(({ contactId }) => added.has(contactId))
+    .map(({ contactName }) => contactName);
+}
+
+/**
+ * "Added Maya" / "Added Maya and Sam" / "Added 3 people" (38.14 D-67). When
+ * the names could not all be read (a failed readback), the count form.
+ */
+export function participantsAddedSnackbar(
+  names: readonly string[],
+  count: number,
+): string {
+  if (names.length === count && count === 1) return `Added ${names[0]}`;
+  if (names.length === count && count === 2) {
+    return `Added ${names[0]} and ${names[1]}`;
+  }
+  return `Added ${plural(count, "person", "people")}`;
+}
+
+/** "Removed Maya", naming the deleted interaction when it was (D-67, D-70). */
+export function participantRemovedSnackbar(
+  name: string,
+  deleted: boolean,
+): string {
+  return deleted
+    ? `Removed ${name} and deleted the interaction`
+    : `Removed ${name}`;
 }

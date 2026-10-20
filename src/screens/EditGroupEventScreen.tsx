@@ -1,16 +1,16 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button and AppText use a
 // domain-specific semantic `role` prop, not a web ARIA role.
 /**
- * Edit Event. 38.10:
- * - The Group Note is NOT pre-checked (D-113; convergence c1 F-U13): clearing
- *   it saves through the normal event save, and the DAO detaches its copies
- *   in the same transaction. No error, confirm or message for it.
- * - The per-participant editor refuses clearing a participant's OWN note while
- *   it is also saved to a section (Research Q4; checker cycle 2 W-13): an
- *   inline error under the note, inside the Sheet (docs/systems/
- *   ux-standards.md "Validation errors inside a sheet render inline"). Its
- *   "Save participant" is single-flight on its own ref (38.9 standards via
- *   D-19; convergence c11, Claude C-10).
+ * Edit Event. 38.10 D-113 (convergence c1 F-U13): the Group Note is NOT
+ * pre-checked: clearing it saves through the normal event save, and the DAO
+ * detaches its copies in the same transaction. No error, confirm or message
+ * for it.
+ *
+ * 38.14 D-68: there is one participant editor app-wide, the EditParticipant
+ * screen (the inline participant sheet is gone). Returning here re-reads the
+ * event through the refresh controller only, so the unsaved parent draft and
+ * its baseline survive (D-07; ADR-167). D-67: adds and removes still commit
+ * at once and confirm by name with a snackbar.
  *
  * 38.14 D-69: the title is editable here, inside the parent draft and its
  * discard guard. A blank title is refused on Save with the not-blank rule
@@ -18,7 +18,15 @@
  * and refuses blank again. D-27: a committed save publishes the widget notify
  * and the shell refresh.
  */
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -28,49 +36,30 @@ import {
   View,
 } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
-import {
-  type ParticipantEditDraft,
-  ParticipantOverrideEditor,
-  participantDraft,
-} from "@/components/group/ParticipantOverrideEditor";
 import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantSheet";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { TouchpointRefineForm } from "@/components/TouchpointRefineForm";
-import { AppText, Button, Sheet } from "@/components/ui";
+import { AppText, Button } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
-import {
-  clearFieldError,
-  type FieldErrors,
-  toFieldErrors,
-} from "@/components/ui/field-error-logic";
 import { useFirstErrorReveal } from "@/components/ui/use-first-error-reveal";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addParticipants,
   deleteGroupChild,
   detachParticipant,
-  saveParticipantEdits,
   updateGroupEvent,
 } from "@/db/group-events-dao";
 import {
+  type GroupEventDetail,
   type GroupEventParticipant,
   readGroupEventDetail,
 } from "@/db/group-events-read";
-import { readOwnNoteLinkedSection } from "@/db/interaction-edit-read";
-import { LinkedNoteBlankError } from "@/db/linked-entry-dao";
 import { newUid } from "@/db/uid";
-import {
-  canAlsoSave,
-  linkedNoteBlankMessage,
-} from "@/logic/also-save-to-logic";
-import {
-  buildParticipantFieldPatch,
-  buildParticipantFollowPatch,
-} from "@/logic/group-participant-patch";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useFocusedBottomInset } from "@/navigation/use-focused-bottom-inset";
 import { publishInteractionWrite } from "@/services/publish-interaction-write";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
@@ -80,12 +69,15 @@ import {
   type InFlightRef,
 } from "@/utils/single-flight";
 import {
+  addedParticipantNames,
   createGroupEventRefreshController,
   eventDraft,
   excludedParticipantIds,
   groupEventEditReducer,
   initialGroupEventEditState,
   isGroupEventDraftDirty,
+  participantRemovedSnackbar,
+  participantsAddedSnackbar,
   runParticipantAdd,
   runParticipantRemove,
   visibleParticipants,
@@ -109,9 +101,6 @@ export function EditGroupEventScreen({
     initialGroupEventEditState,
   );
   const { event, draft } = state;
-  const [editing, setEditing] = useState<GroupEventParticipant | null>(null);
-  const [participantDraftState, setParticipantDraftState] =
-    useState<ParticipantEditDraft | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [removing, setRemoving] = useState<GroupEventParticipant | null>(null);
   const [removePending, setRemovePending] = useState(false);
@@ -122,14 +111,9 @@ export function EditGroupEventScreen({
   const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const bypassRef = useRef(false);
-  // "Save participant" single-flight (convergence c11, Claude C-10; this plan
-  // only): its own ref, separate from the event save's `savingRef`, mirrored
-  // in state for the disabled look.
-  const participantSavingRef = useRef(false);
-  const [participantSaving, setParticipantSaving] = useState(false);
-  // Inline errors in the participant Sheet (Research Q4; 38.9 D-19).
-  const [participantFieldErrors, setParticipantFieldErrors] =
-    useState<FieldErrors>({});
+  // Contact ids whose add committed and whose names the next readback will
+  // supply for the "Added …" snackbar (D-67; the picker returns ids only).
+  const pendingAddedRef = useRef<number[] | null>(null);
   // The title's not-blank error under the field, cleared as the title changes
   // (38.14 D-69; 38.9 D-19). Save failures stay in `error`.
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -161,18 +145,48 @@ export function EditGroupEventScreen({
   }, [groupEventId]);
 
   // Post-commit readback replaces the saved `event` only; never the draft.
-  const refreshController = useMemo(
-    () =>
-      createGroupEventRefreshController({
-        read: () => readGroupEventDetail(getExecutor(), { groupEventId }),
-        onRefreshed: (refreshed) =>
-          dispatch({ type: "eventRefreshed", event: refreshed }),
-        onRefreshFailed: () => dispatch({ type: "refreshFailed" }),
-      }),
-    [groupEventId],
-  );
+  const refreshController = useMemo(() => {
+    // D-67: name who was just added, once, from the first readback after the
+    // commit; a failed readback still confirms the add, by count.
+    const announceAdded = (refreshed: GroupEventDetail | null) => {
+      const added = pendingAddedRef.current;
+      if (added === null) return;
+      pendingAddedRef.current = null;
+      const names =
+        refreshed === null ? [] : addedParticipantNames(refreshed, added);
+      showSnackbar({
+        kind: "success",
+        label: participantsAddedSnackbar(names, added.length),
+      });
+    };
+    return createGroupEventRefreshController({
+      read: () => readGroupEventDetail(getExecutor(), { groupEventId }),
+      onRefreshed: (refreshed) => {
+        dispatch({ type: "eventRefreshed", event: refreshed });
+        announceAdded(refreshed);
+      },
+      onRefreshFailed: () => {
+        dispatch({ type: "refreshFailed" });
+        announceAdded(null);
+      },
+    });
+  }, [groupEventId]);
   useEffect(() => () => refreshController.invalidate(), [refreshController]);
   const refreshEvent = refreshController.refresh;
+
+  // D-68: back from EditParticipant, re-read the event only (eventRefreshed
+  // never reseeds the draft, D-07). The first focus is the mount, which the
+  // seed above already loads.
+  const seenFocusRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!seenFocusRef.current) {
+        seenFocusRef.current = true;
+        return;
+      }
+      void refreshEvent();
+    }, [refreshEvent]),
+  );
 
   const hasUnsavedChanges = isGroupEventDraftDirty(state);
   // The event save in flight holds every exit, with no prompt (fix-pass WR-02).
@@ -255,6 +269,11 @@ export function EditGroupEventScreen({
         // A stale failure must not sit beside a fresh success (A-WR-04, D-04).
         setError(null);
         dispatch({ type: "participantsCommitted", contactIds });
+        // D-67: the readback that follows names them in a snackbar.
+        pendingAddedRef.current = [
+          ...(pendingAddedRef.current ?? []),
+          ...contactIds,
+        ];
       },
       refresh: refreshEvent,
     });
@@ -289,70 +308,18 @@ export function EditGroupEventScreen({
           interactionId: target.interactionId,
         });
         setRemoving(null);
+        // D-67: confirm by name; a delete reads as a destructive result
+        // (38.10 D-132 / D-140 via D-14).
+        showSnackbar({
+          kind: keep ? "success" : "warning",
+          label: participantRemovedSnackbar(target.contactName, !keep),
+        });
       },
       onWriteFailed: () =>
         setError("Couldn't update the event. Your changes weren't saved."),
       refresh: refreshEvent,
     });
     if (result !== "busy") setRemovePending(false);
-  }
-
-  async function saveParticipant() {
-    if (!editing || !participantDraftState || !event) return;
-    if (!beginInFlight(participantSavingRef)) return;
-    setParticipantSaving(true);
-    const initial = participantDraft(editing, event);
-    const draftParticipant = participantDraftState;
-    setError(null);
-    try {
-      // Q4 pre-check, inside the guarded save: the participant's own note,
-      // blank while also saved to a section, is refused under the field. A
-      // Group Note copy never blocks (D-113).
-      if (!canAlsoSave(draftParticipant.value.note)) {
-        const section = await readOwnNoteLinkedSection(
-          getExecutor(),
-          editing.interactionId,
-        );
-        if (section !== null) {
-          setParticipantFieldErrors(
-            toFieldErrors([
-              { field: "note", message: linkedNoteBlankMessage(section) },
-            ]),
-          );
-          return;
-        }
-      }
-      await saveParticipantEdits(getExecutor(), {
-        interactionId: editing.interactionId,
-        contactId: editing.contactId,
-        groupEventId,
-        now: localDateTime(),
-        follow: buildParticipantFollowPatch(initial, draftParticipant),
-        fields: buildParticipantFieldPatch(initial, draftParticipant),
-      });
-      setEditing(null);
-      setParticipantDraftState(null);
-      setParticipantFieldErrors({});
-      void refreshEvent();
-    } catch (err) {
-      if (err instanceof LinkedNoteBlankError) {
-        // The DAO's own refusal (fails closed): the same error under the note.
-        const section = await readOwnNoteLinkedSection(
-          getExecutor(),
-          editing.interactionId,
-        ).catch(() => null);
-        setParticipantFieldErrors(
-          toFieldErrors([
-            { field: "note", message: linkedNoteBlankMessage(section) },
-          ]),
-        );
-        return;
-      }
-      setError("Couldn't save this participant. Please try again.");
-    } finally {
-      setParticipantSaving(false);
-      endInFlight(participantSavingRef);
-    }
   }
 
   // House header (38.9 D-16, D-44): its Back calls goBack, which the
@@ -469,11 +436,15 @@ export function EditGroupEventScreen({
                   <Button
                     role="tertiary"
                     label="Edit"
-                    onPress={() => {
-                      setEditing(item);
-                      setParticipantDraftState(participantDraft(item, event));
-                      setParticipantFieldErrors({});
-                    }}
+                    accessibilityLabel={`Edit for ${item.contactName}`}
+                    // D-68: the one participant editor.
+                    onPress={() =>
+                      navigation.navigate("EditParticipant", {
+                        groupEventId,
+                        interactionId: item.interactionId,
+                        contactId: item.contactId,
+                      })
+                    }
                   />
                   <Button
                     role="tertiary"
@@ -531,37 +502,6 @@ export function EditGroupEventScreen({
         onDelete={() => void removeParticipant(false)}
         onKeep={() => void removeParticipant(true)}
       />
-      <Sheet
-        visible={editing !== null}
-        onRequestClose={() => setEditing(null)}
-        variant="expanded"
-      >
-        {editing && participantDraftState ? (
-          <View style={styles.inlineEditor}>
-            <ParticipantOverrideEditor
-              event={event}
-              participant={editing}
-              draft={participantDraftState}
-              onChange={(next) => {
-                // Editing the note clears its error (38.9 D-19).
-                if (next.value.note !== participantDraftState.value.note) {
-                  setParticipantFieldErrors((errors) =>
-                    clearFieldError(errors, "note"),
-                  );
-                }
-                setParticipantDraftState(next);
-              }}
-              noteError={participantFieldErrors.note ?? null}
-            />
-            <Button
-              role="primary"
-              label="Save participant"
-              disabled={participantSaving}
-              onPress={() => void saveParticipant()}
-            />
-          </View>
-        ) : null}
-      </Sheet>
     </View>
   );
 }
@@ -597,7 +537,6 @@ const styles = StyleSheet.create({
   },
   participantRow: { gap: SPACING.xs, paddingVertical: SPACING.xs },
   rowActions: { flexDirection: "row", gap: SPACING.sm },
-  inlineEditor: { gap: SPACING.base },
   refreshError: {
     flexDirection: "row",
     alignItems: "center",
