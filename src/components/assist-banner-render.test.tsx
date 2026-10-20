@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from "react";
+import { Fragment, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { EligiblePendingAssist } from "@/db/interaction-assist-read";
 import { THEME_PRESETS } from "@/theme/theme-presets";
@@ -95,7 +95,18 @@ function nodes(node: ReactNode): TestElement[] {
   if (!node || typeof node !== "object") return [];
   if (Array.isArray(node)) return node.flatMap(nodes);
   const element = node as TestElement;
+  // The banner returns a fragment (review A-IN-09); walk through it.
+  if (element.type === Fragment) {
+    return nodes(element.props.children as ReactNode);
+  }
   return [element, ...nodes(element.props.children as ReactNode)];
+}
+
+/** The rendered fragment's direct children, in tree position. */
+function slots(): unknown[] {
+  const element = AssistBanner() as TestElement;
+  expect(element.type).toBe(Fragment);
+  return element.props.children as unknown[];
 }
 
 function textOf(element: TestElement | undefined): string {
@@ -258,7 +269,24 @@ describe("AssistBanner layout (38.6 D-38)", () => {
   });
 
   it("renders nothing in the layout when no question is pending", () => {
-    expect(render(null)).toEqual([]);
+    // Only the (closed) pending sheet, an RN Modal with no in-flow box.
+    expect(render(null).map((node) => node.type)).toEqual([
+      "PendingConfirmationsSheet",
+    ]);
+    expect(render(null)[0]?.props.visible).toBe(false);
+  });
+
+  it("keeps the pending sheet in one tree position with or without a banner (review A-IN-09)", () => {
+    render(null);
+    const empty = slots();
+    render(NEWEST);
+    const shown = slots();
+    expect(empty).toHaveLength(2);
+    expect(shown).toHaveLength(2);
+    expect(empty[0]).toBeNull();
+    expect((shown[0] as TestElement).type).toBe("View");
+    expect((empty[1] as TestElement).type).toBe("PendingConfirmationsSheet");
+    expect((shown[1] as TestElement).type).toBe("PendingConfirmationsSheet");
   });
 });
 

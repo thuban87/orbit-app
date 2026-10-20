@@ -90,13 +90,23 @@ export function AssistBanner() {
   }, [shown]);
   useEffect(() => () => setShellTopOffset(0), []);
 
+  // Review A-IN-09: the pending sheet is rendered in ONE tree position (the
+  // second child of the returned fragment) whether or not a banner shows, so
+  // answering the last pending row inside the sheet (`newest` → null) neither
+  // remounts it nor replays its opening animation and drops its held size.
+  const sheet = (
+    <PendingConfirmationsSheet
+      visible={reviewOpen}
+      onClose={() => setReviewOpen(false)}
+    />
+  );
   if (!newest) {
-    return reviewOpen ? (
-      <PendingConfirmationsSheet
-        visible={reviewOpen}
-        onClose={() => setReviewOpen(false)}
-      />
-    ) : null;
+    return (
+      <>
+        {null}
+        {sheet}
+      </>
+    );
   }
 
   const assistUid = newest.uid;
@@ -197,74 +207,73 @@ export function AssistBanner() {
   };
 
   return (
-    <View
-      // G2 (38.4 D-33): never flattened/re-created, so `box-none` always holds.
-      collapsable={false}
-      pointerEvents="box-none"
-      style={styles.root}
-      onLayout={(event) => setShellTopOffset(event.nativeEvent.layout.height)}
-      {...fabDialBackgroundA11y(fabDialOpen)}
-    >
+    <>
       <View
-        style={[
-          styles.banner,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
+        // G2 (38.4 D-33): never flattened/re-created, so `box-none` always holds.
+        collapsable={false}
+        pointerEvents="box-none"
+        style={styles.root}
+        onLayout={(event) => setShellTopOffset(event.nativeEvent.layout.height)}
+        {...fabDialBackgroundA11y(fabDialOpen)}
       >
-        {/* One TalkBack stop with one label, like the import choice rows:
+        <View
+          style={[
+            styles.banner,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          {/* One TalkBack stop with one label, like the import choice rows:
             the Avatar's own "Photo of …" must not read the name twice
             (review WR2-04). */}
-        <View
-          accessible
-          accessibilityLabel={`${question} ${destinationLine}`}
-          style={styles.questionRow}
-        >
-          <Avatar
-            photo={newest.contact_photo}
-            name={newest.contact_name}
-            contactId={newest.contact_id}
-            size={ASSIST_BANNER_AVATAR_SIZE}
-          />
-          <View style={styles.questionText}>
-            <Text
-              numberOfLines={1}
-              style={[styles.question, { color: colors.textPrimary }]}
-            >
-              {question}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[styles.destination, { color: colors.textSecondary }]}
-            >
-              {destinationLine}
-            </Text>
-          </View>
-        </View>
-        {morePendingCount > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${morePendingCount} more pending`}
-            onPress={() => setReviewOpen(true)}
-            style={styles.pendingCount}
+          <View
+            accessible
+            accessibilityLabel={`${question} ${destinationLine}`}
+            style={styles.questionRow}
           >
-            <Text style={{ color: colors.accentText }}>
-              {morePendingCount} more pending
-            </Text>
-          </Pressable>
-        ) : null}
-        <AssistConfirmation
-          key={newest.uid}
-          channel={newest.channel}
-          onConfirm={confirm}
-          onDismiss={dismiss}
-          pending={pending}
-        />
+            <Avatar
+              photo={newest.contact_photo}
+              name={newest.contact_name}
+              contactId={newest.contact_id}
+              size={ASSIST_BANNER_AVATAR_SIZE}
+            />
+            <View style={styles.questionText}>
+              <Text
+                numberOfLines={1}
+                style={[styles.question, { color: colors.textPrimary }]}
+              >
+                {question}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.destination, { color: colors.textSecondary }]}
+              >
+                {destinationLine}
+              </Text>
+            </View>
+          </View>
+          {morePendingCount > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${morePendingCount} more pending`}
+              onPress={() => setReviewOpen(true)}
+              style={styles.pendingCount}
+            >
+              <Text style={{ color: colors.accentText }}>
+                {morePendingCount} more pending
+              </Text>
+            </Pressable>
+          ) : null}
+          <AssistConfirmation
+            key={newest.uid}
+            channel={newest.channel}
+            onConfirm={confirm}
+            onDismiss={dismiss}
+            pending={pending}
+          />
+        </View>
       </View>
-      <PendingConfirmationsSheet
-        visible={reviewOpen}
-        onClose={() => setReviewOpen(false)}
-      />
-    </View>
+      {sheet}
+    </>
   );
 }
 
