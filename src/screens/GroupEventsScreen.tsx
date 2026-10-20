@@ -1,8 +1,9 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   FlatList,
   Pressable,
   StyleSheet,
@@ -15,17 +16,18 @@ import { AppText, Button, EmptyState } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { EVENTS } from "@/constants/product-labels";
 import { getExecutor } from "@/db/database";
-import {
-  type GroupEventListItem,
-  listGroupEvents,
-  searchGroupEvents,
-} from "@/db/group-events-read";
+import type { GroupEventListItem } from "@/db/group-events-read";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
+import {
+  readEventsForTerm,
+  runEventsSearch,
+} from "./group-events-search-logic";
 
 export function GroupEventsScreen({
   navigation,
@@ -33,33 +35,81 @@ export function GroupEventsScreen({
   const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
-  const [items, setItems] = useState<GroupEventListItem[]>([]);
+  // Drives the term load: a refocus (Back from Event detail or Edit Event)
+  // rereads the current term once, picking up a rename, dissolve or delete.
+  const isFocused = useIsFocused();
+  const [items, setItems] = useState<readonly GroupEventListItem[]>([]);
   const [term, setTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  // Only the latest search may publish; blur invalidates outstanding reads
+  // (38.14 D-25; ADR-162).
+  const searchAuthority = useMemo(() => createLatestRequestAuthority(), []);
+  // The spinner replaces the list only until a read settles while current, so
+  // a first read cut off by a blur leaves the next one a first load.
+  const firstLoadPendingRef = useRef(true);
 
-  const load = useCallback(async (nextTerm: string) => {
-    setLoading(true);
-    setFailed(false);
-    try {
-      const next = nextTerm.trim()
-        ? await searchGroupEvents(getExecutor(), { term: nextTerm })
-        : await listGroupEvents(getExecutor(), {});
-      setItems(next);
-    } catch {
-      setFailed(true);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(
+    async (nextTerm: string) => {
+      const settledCurrent = await runEventsSearch({
+        gate: searchAuthority,
+        term: nextTerm,
+        isFirstLoad: firstLoadPendingRef.current,
+        read: (searchTerm) => readEventsForTerm(getExecutor(), searchTerm),
+        publish: (patch) => {
+          if (patch.loading) {
+            setLoading(true);
+            return;
+          }
+          setItems(patch.items);
+          setFailed(patch.failed);
+          setLoading(false);
+        },
+      });
+      if (settledCurrent) firstLoadPendingRef.current = false;
+    },
+    [searchAuthority],
+  );
+
+  // Closing search clears its term (D-25 "clears on close"). It does not
+  // invalidate: a changed term starts a newer read that supersedes the old
+  // one, and an unchanged blank term lets the in-flight read of that same
+  // blank term publish, so the first-load spinner cannot stick.
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setTerm("");
   }, []);
 
+  // Focus lifecycle (stable deps, never `term`, so typing never runs it):
+  // leaving the screen stops any in-flight read from publishing. It keeps the
+  // term: opening a result and coming Back returns to the same search.
+  useFocusEffect(
+    useCallback(() => () => searchAuthority.invalidate(), [searchAuthority]),
+  );
+
+  // Term-driven load: every term change and every refocus reads once.
+  useEffect(() => {
+    if (!isFocused) return;
+    void load(term);
+  }, [isFocused, term, load]);
+
+  // Android Back closes an open search first (D-25). Registered per focus, so
+  // it is back after a blur and refocus with search still open.
   useFocusEffect(
     useCallback(() => {
-      void load(term);
-    }, [load, term]),
+      if (!searchOpen) return undefined;
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          closeSearch();
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [searchOpen, closeSearch]),
   );
+
   // The one empty-state component (38.9 D-20), each state with its one action
   // (D-71): failed → "Try again", a search that found nothing → "Clear
   // search", none yet → "Log an event" (opens Group Log, no params; D-22 noun).
@@ -108,7 +158,7 @@ export function GroupEventsScreen({
             role="iconOnly"
             icon="search"
             accessibilityLabel="Search events"
-            onPress={() => setSearchOpen((open) => !open)}
+            onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
           />
         }
       />
