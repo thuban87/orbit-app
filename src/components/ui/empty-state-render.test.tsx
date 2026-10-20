@@ -175,6 +175,14 @@ describe("empty-state consumers (D-20, D-71)", () => {
     expect(region).toContain('"dashboard-empty-hidden-never-contacted"');
     expect(region).toContain('"dashboard-empty-hidden-unbound"');
     expect(region).toContain('role="tertiary"');
+    // 38.13 D-89: centred like the other Contacts empty states.
+    expect(region).toContain("style={styles.tuckedAway}");
+    expect(home).toMatch(
+      /tuckedAway: \{\s*gap: 8,\s*alignItems: "center",\s*\}/,
+    );
+    expect(home).toMatch(
+      /tuckedAwayText: \{\s*alignSelf: "stretch",\s*textAlign: "center",\s*\}/,
+    );
     expect(home).toMatch(
       /const onShowNeverContacted = useCallback\(async \(\) => \{\s*try \{\s*await useDashboardQueryStore\s*\.getState\(\)\s*\.setPopulationsAndFilters\(getExecutor\(\), \["not-contacted"\], \{\}\);/,
     );

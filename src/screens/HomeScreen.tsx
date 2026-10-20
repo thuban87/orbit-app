@@ -2405,8 +2405,15 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         </Pressable>
       </View>
     ) : emptyState === "hidden" ? (
-      <View testID="dashboard-empty-hidden" style={styles.emptyState}>
-        <Text style={[styles.emptyHeading, { color: palette.textPrimary }]}>
+      // 38.13 D-89: centred like the other Contacts empty states (EmptyState).
+      <View testID="dashboard-empty-hidden" style={styles.tuckedAway}>
+        <Text
+          style={[
+            styles.emptyHeading,
+            styles.tuckedAwayText,
+            { color: palette.textPrimary },
+          ]}
+        >
           Everyone's tucked away
         </Text>
         {/* 38.13 D-65 (39 D-98): Never Contacted and Unbound lead somewhere;
@@ -2436,7 +2443,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             <Text
               key={line.target}
               accessibilityLabel={line.accessibilityLabel}
-              style={[styles.emptyBody, { color: palette.textSecondary }]}
+              style={[
+                styles.emptyBody,
+                styles.tuckedAwayText,
+                { color: palette.textSecondary },
+              ]}
             >
               {line.label}
             </Text>
@@ -2991,6 +3002,15 @@ const styles = StyleSheet.create({
   emptyState: {
     gap: 8,
     alignItems: "flex-start",
+  },
+  // 38.13 D-89: the tucked-away state is centred like EmptyState.
+  tuckedAway: {
+    gap: 8,
+    alignItems: "center",
+  },
+  tuckedAwayText: {
+    alignSelf: "stretch",
+    textAlign: "center",
   },
   emptyPanel: {
     marginTop: 24,
