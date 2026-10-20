@@ -20,6 +20,7 @@ import { createContactFull } from "@/db/contacts-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { convertInteractionToGroupEvent } from "@/db/group-events-dao";
+import { mergeContacts } from "@/db/merge-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import { editTouchpointFull, saveNoteWithLinkedEntry } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -144,7 +145,7 @@ describe("bulkQuickLog", () => {
     await expect(
       undoBulkQuickLog(
         exec,
-        [receipt[0], { contactId: ids[1], interactionId: 9999 }],
+        [receipt[0], { contactId: ids[1], interactionId: 9999, uid: "gone" }],
         NOW,
       ),
     ).rejects.toThrow(/no interaction matched/);
@@ -332,6 +333,52 @@ describe("rechannelBulkQuickLog (38.14 D-62, D-82)", () => {
         [entry.interactionId],
       ),
     ).toEqual(linkedBefore);
+  });
+
+  it("re-channels a row a contact merge moved to the survivor, recomputing the survivor (review A-WR-03)", async () => {
+    const survivor = await seedContact("Survivor");
+    const [absorbed, other] = await Promise.all([
+      seedContact("Absorbed"),
+      seedContact("Other"),
+    ]);
+    const receipt = await bulkQuickLog(exec, [absorbed, other], NOW, "Message");
+    await mergeContacts(exec, {
+      survivorId: survivor,
+      absorbedId: absorbed,
+      now: NOW,
+    });
+    expect((await storedInteraction(receipt[0].interactionId)).contact_id).toBe(
+      survivor,
+    );
+
+    await expect(
+      rechannelBulkQuickLog(exec, receipt, "Call", LATER),
+    ).resolves.toBe(2);
+
+    const rows = await Promise.all(
+      receipt.map((entry) => storedInteraction(entry.interactionId)),
+    );
+    expect(rows.map((row) => [row.contact_id, row.channel])).toEqual([
+      [survivor, "Call"],
+      [other, "Call"],
+    ]);
+    expect(await lastContact(survivor)).toBe(NOW);
+  });
+
+  it("never re-channels a different row that reused a deleted receipt row's id", async () => {
+    const [a, b] = await Promise.all([seedContact("A"), seedContact("B")]);
+    const receipt = await bulkQuickLog(exec, [a], NOW, "Message");
+    await undoBulkQuickLog(exec, receipt, NOW);
+    // A plain rowid (no AUTOINCREMENT) reuses the freed id for the next row.
+    const [reused] = await bulkQuickLog(exec, [b], NOW, "Message");
+    expect(reused.interactionId).toBe(receipt[0].interactionId);
+
+    await expect(
+      rechannelBulkQuickLog(exec, receipt, "Call", LATER),
+    ).resolves.toBe(0);
+    expect((await storedInteraction(reused.interactionId)).channel).toBe(
+      "Message",
+    );
   });
 
   it("overwrites a channel changed in Edit interaction during the Undo window (D-62)", async () => {

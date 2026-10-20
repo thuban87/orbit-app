@@ -38,6 +38,13 @@ const LOG_SCOPE = "bulk-actions";
 export type QuickLogBatchReceipt = Array<{
   contactId: number;
   interactionId: number;
+  /**
+   * The row's stable uid (38.14 review A-WR-03). The re-channel finds the row
+   * by `interactionId` AND `uid`, so it follows a row a contact merge moved to
+   * the survivor, and never matches a different row that later reused the id
+   * (`interactions.id` is a plain rowid, without AUTOINCREMENT).
+   */
+  uid: string;
 }>;
 
 function rejectInvalidFrequency(intervalDays: number): void {
@@ -71,8 +78,9 @@ export function bulkQuickLog(
   return inWriteTransaction(exec, async () => {
     const receipt: QuickLogBatchReceipt = [];
     for (const contactId of ids) {
+      const uid = newUid();
       const interactionId = await insertInteractionCore(exec, contactId, now, {
-        uid: newUid(),
+        uid,
         occurredAt: now,
         channel,
         direction: "outbound",
@@ -80,7 +88,7 @@ export function bulkQuickLog(
         quality: null,
         source: "manual",
       });
-      receipt.push({ contactId, interactionId });
+      receipt.push({ contactId, interactionId, uid });
       await recomputeLastContactCore(exec, contactId, now);
     }
     await bumpDataRevisionCore(exec);
@@ -108,9 +116,14 @@ export function undoBulkQuickLog(
  *
  * - Per row through the single interaction-edit core (`editTouchpointFullCore`,
  *   ADR-122 :18), never a set-based UPDATE over the receipt. Each row is read
- *   by `id` AND `contact_id` and rewritten with only `channel` replaced; every
- *   other column is passed as stored (`lockNoteAi` omitted, so an existing
- *   note AI lock is kept). The stored direction is kept: changing it would
+ *   by `id` AND its `uid` and rewritten under its CURRENT `contact_id` with
+ *   only `channel` replaced; every other column is passed as stored
+ *   (`lockNoteAi` omitted, so an existing note AI lock is kept). Reading by
+ *   the current contact (review A-WR-03) follows a row that a contact merge
+ *   moved to the survivor (`merge-dao.ts` reparents `interactions`), so a
+ *   merge is not a third skip, and the core's recency recompute hits the
+ *   person who holds the row now. The core still scopes its UPDATE by
+ *   (id, contact_id) and asserts one changed row. The stored direction is kept: changing it would
  *   reopen the withdrawn In Person-as-Mutual rule (former D-57).
  * - Resolves to the number of rows re-channelled (0 when every row was
  *   skipped, or for an empty receipt).
@@ -147,8 +160,9 @@ export function rechannelBulkQuickLog(
   if (receipt.length === 0) return Promise.resolve(0);
   return inWriteTransaction(exec, async () => {
     let changed = 0;
-    for (const { contactId, interactionId } of receipt) {
+    for (const { interactionId, uid } of receipt) {
       const row = await exec.getFirstAsync<{
+        contact_id: number;
         occurred_at: string;
         direction: string | null;
         connected: number;
@@ -158,16 +172,16 @@ export function rechannelBulkQuickLog(
         allow_ai: number;
         group_event_id: number | null;
       }>(
-        `SELECT occurred_at, direction, connected, quality, note, duration,
-                allow_ai, group_event_id
-           FROM interactions WHERE id = ? AND contact_id = ?`,
-        [interactionId, contactId],
+        `SELECT contact_id, occurred_at, direction, connected, quality, note,
+                duration, allow_ai, group_event_id
+           FROM interactions WHERE id = ? AND uid = ?`,
+        [interactionId, uid],
       );
       // D-82: deleted, or converted into an event, since the log.
       if (!row || row.group_event_id !== null) continue;
       await editTouchpointFullCore(exec, {
         interactionId,
-        contactId,
+        contactId: row.contact_id,
         now,
         occurredAt: row.occurred_at,
         channel,
