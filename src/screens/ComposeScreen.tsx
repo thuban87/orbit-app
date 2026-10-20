@@ -896,7 +896,8 @@ export function ComposeScreen({
       // (the effect re-runs on the contactId change and startSession is a no-op
       // there) and clears `origin`, so Back takes the default dashboard return
       // instead of popping onto this person's Profile (R3-03; the dashboard
-      // return is this plan only). The prompt lives here, not at the callers,
+      // return is Claude's Discretion in 38.14-02: Compose's default return,
+      // never another person's Profile). The prompt lives here, not at the callers,
       // because Compose is reached by plain navigate and by stack resets
       // (notification / widget). One draft at a time (R12 rejected; ADR-133).
       const storedContactId = stored.contactId;

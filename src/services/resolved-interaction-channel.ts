@@ -18,8 +18,9 @@
  * aborting the write.
  *
  * Kept free of react-native imports so it is unit-tested under vitest in node,
- * like the other `src/services` helpers (this plan only). The resolver's import
- * chain is RN-free (RESEARCH Pattern 5).
+ * like the other `src/services` helpers (a 38.14-03 planning choice, for
+ * node-testability; headless JS runs the same bundle, so it is not a headless
+ * requirement). The resolver's import chain is RN-free (RESEARCH Pattern 5).
  */
 import { getAppSettings } from "@/db/app-settings-dao";
 import type { ReadOnlyExecutor } from "@/db/transaction";
