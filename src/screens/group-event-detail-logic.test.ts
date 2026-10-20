@@ -3,6 +3,7 @@ import {
   buildGroupEventDetailInteraction,
   closeThenOpenParticipantProfile,
   groupEventDurationLabel,
+  resolveDetailParticipant,
 } from "./group-event-detail-logic";
 
 const event = {
@@ -61,5 +62,38 @@ describe("Group Event Detail view model", () => {
     });
 
     expect(calls).toEqual(["close", "navigate:Profile:9"]);
+  });
+});
+
+describe("resolveDetailParticipant (38.14 D-28)", () => {
+  const refreshed = (note: string) => ({
+    ...event,
+    participants: [
+      { ...participant, note },
+      { ...participant, interactionId: 10, contactId: 11, contactName: "Sam" },
+    ],
+  });
+
+  it("returns the participant from the refreshed event, not a snapshot", () => {
+    expect(resolveDetailParticipant(refreshed("edited"), [], 8)).toMatchObject(
+      { interactionId: 8, note: "edited" },
+    );
+  });
+
+  it("returns null once the participant left the event", () => {
+    const left = { ...event, participants: [refreshed("x").participants[1]] };
+    expect(resolveDetailParticipant(left, [], 8)).toBeNull();
+  });
+
+  it("returns null when the participant was removed in this session", () => {
+    expect(resolveDetailParticipant(refreshed("x"), [8], 8)).toBeNull();
+    expect(resolveDetailParticipant(refreshed("x"), [8], 10)).toMatchObject({
+      contactName: "Sam",
+    });
+  });
+
+  it("returns null with no id or no event", () => {
+    expect(resolveDetailParticipant(refreshed("x"), [], null)).toBeNull();
+    expect(resolveDetailParticipant(null, [], 8)).toBeNull();
   });
 });

@@ -45,3 +45,34 @@ describe("Events list search wiring (38.14 D-25; ADR-162)", () => {
     expect(events).not.toMatch(/getParent/);
   });
 });
+
+describe("Event detail actions and sheet (38.14 D-71, D-28, D-30)", () => {
+  const detail = read("src/screens/GroupEventDetailScreen.tsx");
+
+  it("the ⋯ keeps only the two careful actions", () => {
+    const start = detail.indexOf("overflow={[");
+    expect(start).toBeGreaterThan(-1);
+    const region = detail.slice(start, detail.indexOf("]}", start));
+    const labels = [...region.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);
+    expect(labels).toEqual(["Dissolve", "Delete Event & Interactions"]);
+  });
+
+  it("Edit Event and Add participants are visible buttons", () => {
+    expect(detail).toMatch(/<Button\s[^>]*?label="Edit Event"/);
+    expect(detail).toMatch(/<Button\s[^>]*?label="Add participants"/);
+  });
+
+  it("the empty participant state offers Add participants and never says save now", () => {
+    const start = detail.indexOf("<EmptyState");
+    expect(start).toBeGreaterThan(-1);
+    const region = detail.slice(start, detail.indexOf("/>", start));
+    expect(region).toMatch(/label: "Add participants"/);
+    expect(detail).not.toMatch(/save now/i);
+  });
+
+  it("the sheet re-derives its participant each render; no View Event on its own event", () => {
+    expect(detail).toMatch(/resolveDetailParticipant\(/);
+    expect(detail).toMatch(/useState<number \| null>\(null\)/);
+    expect(detail).not.toMatch(/onViewGroupEvent/);
+  });
+});
