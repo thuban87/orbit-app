@@ -34,6 +34,30 @@ import type {
   RememberedMessageMode,
 } from "@/db/app-settings-dao";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
+import { TYPOGRAPHY } from "@/theme/tokens/typography";
+
+/**
+ * How many body lines the Compose message box shows before it scrolls inside
+ * itself (38.14 D-75). A single-number tuning surface (CLAUDE.md conventions).
+ */
+export const COMPOSE_DRAFT_VISIBLE_LINES = 8;
+
+/** The message box's vertical padding (ComposeScreen `draftInput`). */
+export const COMPOSE_DRAFT_VERTICAL_PADDING = 10;
+
+/**
+ * The message box's height cap: `COMPOSE_DRAFT_VISIBLE_LINES` whole body
+ * lines at the system font scale plus the box padding, following the
+ * `entryFieldMaxHeight` precedent. A non-finite or non-positive scale counts
+ * as 1. PURE.
+ */
+export function composeDraftMaxHeight(fontScale: number): number {
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  return Math.ceil(
+    COMPOSE_DRAFT_VISIBLE_LINES * TYPOGRAPHY.body.lineHeight * scale +
+      2 * COMPOSE_DRAFT_VERTICAL_PADDING,
+  );
+}
 
 /**
  * A concrete compose message mode — the transport the user is composing for.

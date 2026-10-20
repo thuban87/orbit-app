@@ -45,7 +45,7 @@ describe("Compose keeps Copy and Transmit reachable (D-75)", () => {
     expect(input).toContain("multiline");
     expect(input).toContain("scrollEnabled");
     // EntryTextField turns typed line breaks into spaces (RESEARCH Pattern 3).
-    expect(code).not.toContain("EntryTextField");
+    expect(code).not.toMatch(/<EntryTextField\b/);
   });
 });
 

@@ -90,3 +90,30 @@ export function sheetKeyboardLayout({
   const percent = Number.parseFloat(SHEET_HEIGHT_PERCENT[variant]) / 100;
   return { lift, size: Math.min(Math.round(percent * resting), room) };
 }
+
+export interface KeyboardLiftInput {
+  /** Current height of the screen's root frame. */
+  frameHeight: number;
+  /** Tallest frame height seen, i.e. the height while the keyboard is down. */
+  restingFrameHeight: number;
+  /** Height the keyboard occupies (0 when down). */
+  keyboardHeight: number;
+}
+
+/**
+ * The bottom padding that keeps a screen's pinned actions above the soft
+ * keyboard (38.14 D-75, Compose). The same lift `sheetKeyboardLayout`
+ * computes: the part of the keyboard the system did not already absorb by
+ * resizing the window, so it is right whether or not the window resized
+ * (manifest `adjustResize`, edge-to-edge). 0 with the keyboard down or before
+ * the first layout. PURE.
+ */
+export function keyboardLift({
+  frameHeight,
+  restingFrameHeight,
+  keyboardHeight,
+}: KeyboardLiftInput): number {
+  if (keyboardHeight <= 0 || frameHeight <= 0) return 0;
+  const resting = Math.max(restingFrameHeight, frameHeight);
+  return Math.max(0, Math.round(keyboardHeight - (resting - frameHeight)));
+}
