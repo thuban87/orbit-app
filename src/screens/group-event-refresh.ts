@@ -328,3 +328,39 @@ export function participantRemovedSnackbar(
     ? `Removed ${name} and deleted the interaction`
     : `Removed ${name}`;
 }
+
+export interface ParticipantAddAnnouncer {
+  /** Record ids whose add just committed (inside `onCommitted`). */
+  queue(contactIds: readonly number[]): void;
+  /**
+   * Call from the refresh controller: the refreshed SAVED event on success,
+   * `null` on a failed readback. Announces once per queued batch, by name
+   * when the readback has them, by count otherwise.
+   */
+  settle(refreshed: GroupEventDetail | null): void;
+}
+
+/**
+ * The "Added …" snackbar glue shared by Edit Event (38.14 D-67) and event
+ * detail (D-84): the picker hands back ids only, so the names come from the
+ * first readback after the commit, and a failed readback still confirms the
+ * add by count. Pure: the caller passes the snackbar call in.
+ */
+export function createParticipantAddAnnouncer(
+  announce: (label: string) => void,
+): ParticipantAddAnnouncer {
+  let pending: number[] | null = null;
+  return {
+    queue: (contactIds) => {
+      pending = [...(pending ?? []), ...contactIds];
+    },
+    settle: (refreshed) => {
+      const added = pending;
+      if (added === null) return;
+      pending = null;
+      const names =
+        refreshed === null ? [] : addedParticipantNames(refreshed, added);
+      announce(participantsAddedSnackbar(names, added.length));
+    },
+  };
+}

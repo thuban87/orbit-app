@@ -18,6 +18,7 @@ import { resolveDisplay } from "@/logic/group-inheritance";
 import {
   addedParticipantNames,
   createGroupEventRefreshController,
+  createParticipantAddAnnouncer,
   eventDraft,
   excludedParticipantIds,
   type GroupEventEditState,
@@ -716,13 +717,60 @@ describe("Edit Event participant snackbars (38.14 D-67)", () => {
     );
   });
 
-  it("Edit Event shows both snackbars after the commit", () => {
-    const source = readFileSync(
-      new URL("./EditGroupEventScreen.tsx", import.meta.url),
-      "utf8",
+  it.each([
+    "./EditGroupEventScreen.tsx",
+    // 38.14 D-84 (owner): event detail confirms adds and removes the same way.
+    "./GroupEventDetailScreen.tsx",
+  ])("%s shows both snackbars after the commit", (file) => {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    expect(source).toContain("createParticipantAddAnnouncer(");
+    expect(source).toMatch(/announcer\.queue\(contactIds\)/);
+    expect(source).toMatch(/onRefreshed: \(\w+\) => \{[\s\S]*?announcer\.settle\(\w+\);/);
+    expect(source).toMatch(/onRefreshFailed: \(\) => \{[\s\S]*?announcer\.settle\(null\);/);
+    expect(source).toMatch(
+      /kind: keep \? "success" : "warning",\s*label: participantRemovedSnackbar\(target\.contactName, !keep\),/,
     );
-    expect(source).toContain("participantsAddedSnackbar(");
-    expect(source).toContain("participantRemovedSnackbar(");
+  });
+});
+
+describe("participant add announcer (38.14 D-67, D-84)", () => {
+  const event = () =>
+    detail([
+      participant(1, { contactName: "Ada" }),
+      participant(2, { contactName: "Maya" }),
+      participant(3, { contactName: "Sam" }),
+    ]);
+
+  it("names the queued people from the readback, once", () => {
+    const announce = vi.fn();
+    const announcer = createParticipantAddAnnouncer(announce);
+    announcer.queue([3, 2]);
+    announcer.settle(event());
+    announcer.settle(event());
+    expect(announce.mock.calls).toEqual([["Added Maya and Sam"]]);
+  });
+
+  it("merges batches queued before one readback", () => {
+    const announce = vi.fn();
+    const announcer = createParticipantAddAnnouncer(announce);
+    announcer.queue([1]);
+    announcer.queue([2, 3]);
+    announcer.settle(event());
+    expect(announce.mock.calls).toEqual([["Added 3 people"]]);
+  });
+
+  it("a failed readback confirms by count", () => {
+    const announce = vi.fn();
+    const announcer = createParticipantAddAnnouncer(announce);
+    announcer.queue([2]);
+    announcer.settle(null);
+    expect(announce.mock.calls).toEqual([["Added 1 person"]]);
+  });
+
+  it("a readback with nothing queued (a focus refresh) announces nothing", () => {
+    const announce = vi.fn();
+    createParticipantAddAnnouncer(announce).settle(event());
+    expect(announce).not.toHaveBeenCalled();
   });
 });
 
