@@ -33,6 +33,8 @@ import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 import type { InFlightRef } from "@/utils/single-flight";
 import {
   buildGroupEventDetailInteraction,
+  closeThenOpenEventEditor,
+  closeThenOpenParticipantEditor,
   closeThenOpenParticipantProfile,
   groupEventDurationLabel,
   resolveDetailParticipant,
@@ -403,8 +405,12 @@ export function GroupEventDetailScreen({
           onRequestClose={closeDetail}
           interaction={interaction}
           contactId={detail.contactId}
+          // B-CR-01: every route off the modal sheet closes it before the
+          // push, or the pushed editor opens hidden under the sheet.
           onEdit={() =>
-            navigation.navigate("EditParticipant", {
+            closeThenOpenParticipantEditor({
+              close: closeDetail,
+              navigate: navigation.navigate,
               groupEventId,
               interactionId: detail.interactionId,
               contactId: detail.contactId,
@@ -419,10 +425,16 @@ export function GroupEventDetailScreen({
           }
           // D-30: no View Event while already on this event.
           onEditGroupEvent={() =>
-            navigation.navigate("EditGroupEvent", { groupEventId })
+            closeThenOpenEventEditor({
+              close: closeDetail,
+              navigate: navigation.navigate,
+              groupEventId,
+            })
           }
           onEditParticipant={() =>
-            navigation.navigate("EditParticipant", {
+            closeThenOpenParticipantEditor({
+              close: closeDetail,
+              navigate: navigation.navigate,
               groupEventId,
               interactionId: detail.interactionId,
               contactId: detail.contactId,

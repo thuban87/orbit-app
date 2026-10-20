@@ -77,6 +77,20 @@ describe("Event detail actions and sheet (38.14 D-71, D-28, D-30)", () => {
     );
     expect(detail).not.toMatch(/onViewGroupEvent/);
   });
+
+  it("every navigating sheet callback closes the sheet first (review B-CR-01)", () => {
+    const start = detail.indexOf("<InteractionDetail");
+    expect(start).toBeGreaterThan(-1);
+    const sheet = detail.slice(start, detail.indexOf("/>", start));
+    expect(sheet).not.toMatch(/navigation\.navigate\(/);
+    for (const prop of ["onEdit", "onEditGroupEvent", "onEditParticipant"]) {
+      const at = sheet.indexOf(`${prop}={`);
+      expect(at, prop).toBeGreaterThan(-1);
+      expect(sheet.slice(at, at + 160), prop).toMatch(
+        /closeThenOpen(ParticipantEditor|EventEditor)\(\{\s*close: closeDetail,/,
+      );
+    }
+  });
 });
 
 describe("Participant wording and Edit participant load (38.14 D-29, D-25)", () => {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGroupEventDetailInteraction,
+  closeThenOpenEventEditor,
+  closeThenOpenParticipantEditor,
   closeThenOpenParticipantProfile,
   groupEventDurationLabel,
   resolveDetailParticipant,
@@ -62,6 +64,34 @@ describe("Group Event Detail view model", () => {
     });
 
     expect(calls).toEqual(["close", "navigate:Profile:9"]);
+  });
+});
+
+describe("close-before-push editors (38.14 review B-CR-01)", () => {
+  it("closes the sheet before pushing Edit participant, with the captured ids", () => {
+    const calls: string[] = [];
+    closeThenOpenParticipantEditor({
+      close: () => calls.push("close"),
+      navigate: (route, params) =>
+        calls.push(
+          `navigate:${route}:${params.groupEventId}:${params.interactionId}:${params.contactId}`,
+        ),
+      groupEventId: 7,
+      interactionId: 8,
+      contactId: 9,
+    });
+    expect(calls).toEqual(["close", "navigate:EditParticipant:7:8:9"]);
+  });
+
+  it("closes the sheet before pushing Edit Event", () => {
+    const calls: string[] = [];
+    closeThenOpenEventEditor({
+      close: () => calls.push("close"),
+      navigate: (route, params) =>
+        calls.push(`navigate:${route}:${params.groupEventId}`),
+      groupEventId: 7,
+    });
+    expect(calls).toEqual(["close", "navigate:EditGroupEvent:7"]);
   });
 });
 

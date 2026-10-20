@@ -20,6 +20,50 @@ export function closeThenOpenParticipantProfile({
   navigate("Profile", { contactId });
 }
 
+interface ParticipantEditorCommand {
+  close: () => void;
+  navigate: (
+    route: "EditParticipant",
+    params: { groupEventId: number; interactionId: number; contactId: number },
+  ) => void;
+  groupEventId: number;
+  interactionId: number;
+  contactId: number;
+}
+
+/**
+ * Close the modal interaction sheet before pushing Edit participant (38.14
+ * review B-CR-01): the sheet is an RN `Modal`, so a push under it stays hidden
+ * until the sheet is dismissed. The target ids are taken as arguments, so the
+ * caller captures them before `close()` clears the sheet's participant.
+ */
+export function closeThenOpenParticipantEditor({
+  close,
+  navigate,
+  groupEventId,
+  interactionId,
+  contactId,
+}: ParticipantEditorCommand): void {
+  close();
+  navigate("EditParticipant", { groupEventId, interactionId, contactId });
+}
+
+interface EventEditorCommand {
+  close: () => void;
+  navigate: (route: "EditGroupEvent", params: { groupEventId: number }) => void;
+  groupEventId: number;
+}
+
+/** Close the modal interaction sheet before pushing Edit Event (B-CR-01). */
+export function closeThenOpenEventEditor({
+  close,
+  navigate,
+  groupEventId,
+}: EventEditorCommand): void {
+  close();
+  navigate("EditGroupEvent", { groupEventId });
+}
+
 /** The existing duration vocabulary, applied to stored whole seconds. */
 export function groupEventDurationLabel(
   duration: number | null,
