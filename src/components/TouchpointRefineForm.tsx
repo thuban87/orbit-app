@@ -49,6 +49,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   coerceAllowAi,
   combineDateAndTime,
+  customDurationError,
   customMinutesDisplay,
   customMinutesSeed,
   DURATION_PRESETS,
@@ -521,6 +522,11 @@ export function TouchpointRefineForm({
                   color: colors.textPrimary,
                 },
               ]}
+            />
+            {/* A refused entry says so; nothing else on screen would (A-WR-04). */}
+            <FieldError
+              testID={`${testID}-duration-error`}
+              message={customDurationError(customMinutes, value.duration)}
             />
             {/* No "None" readout: the None chip already shows it (38.14 D-31). */}
             {showDurationReadout(value.duration) ? (

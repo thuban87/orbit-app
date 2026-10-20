@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   coerceAllowAi,
   combineDateAndTime,
+  customDurationError,
   customMinutesDisplay,
   customMinutesSeed,
   DURATION_PRESETS,
@@ -246,6 +247,16 @@ describe("custom duration on reopen (38.14 D-31)", () => {
     expect(customMinutesDisplay("", null)).toBe("");
     expect(customMinutesDisplay("0", null)).toBe("0");
     expect(customMinutesDisplay("17", 1020)).toBe("17");
+  });
+
+  it("customDurationError names a refused entry and stays quiet otherwise (review A-WR-04)", () => {
+    expect(customDurationError("", null)).toBeNull();
+    expect(customDurationError("17", 1020)).toBeNull();
+    expect(customDurationError("0", null)).toBe("Enter 1 to 1440 minutes");
+    expect(customDurationError("1500", null)).toBe("Enter 1 to 1440 minutes");
+    expect(customDurationError("1440", 86400)).toBeNull();
+    // A duration changed elsewhere replaces the refused text, and the error.
+    expect(customDurationError("1500", 1800)).toBeNull();
   });
 
   it("customMinutesDisplay follows a value changed elsewhere (a preset, Follow event)", () => {

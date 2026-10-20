@@ -214,6 +214,24 @@ export function customMinutesDisplay(
     : customMinutesSeed(seconds);
 }
 
+/**
+ * The inline error under the Custom-minutes field (38.14 review A-WR-04): the
+ * shown text was refused by `parseCustomDurationMinutes` ("0", over 24 hours,
+ * or not a whole number), so no duration will be saved from it. With the
+ * "None" readout gone (D-31) this is the only sign the entry was not taken.
+ * Null for an empty field or an accepted entry.
+ */
+export function customDurationError(
+  typed: string,
+  seconds: number | null,
+): string | null {
+  const shown = customMinutesDisplay(typed, seconds);
+  if (shown.trim() === "" || parseCustomDurationMinutes(shown) !== null) {
+    return null;
+  }
+  return `Enter 1 to ${MAX_DURATION_SECONDS / 60} minutes`;
+}
+
 /** Whether the duration readout shows: hidden for none, never "None" (38.14 D-31). */
 export function showDurationReadout(seconds: number | null): boolean {
   return seconds !== null && seconds > 0;
