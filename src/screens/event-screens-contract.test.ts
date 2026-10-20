@@ -93,6 +93,16 @@ describe("Event detail actions and sheet (38.14 D-71, D-28, D-30)", () => {
   });
 });
 
+describe("event detail labels its channel from the glossary (D-33, D-64; review B-IN-02)", () => {
+  it("never renders the raw stored channel", () => {
+    const detail = read("src/screens/GroupEventDetailScreen.tsx");
+    expect(detail).not.toMatch(/label="Channel" value=\{event\.channel\}/);
+    expect(detail).toMatch(
+      /CHANNEL_LABEL\[event\.channel\] \?\? event\.channel/,
+    );
+  });
+});
+
 describe("destructive confirms are single-flight (review B-WR-06)", () => {
   it("Dissolve / Delete Event claim a synchronous latch and disable the confirm", () => {
     const detail = read("src/screens/GroupEventDetailScreen.tsx");

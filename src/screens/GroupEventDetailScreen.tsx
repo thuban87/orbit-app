@@ -14,6 +14,7 @@ import {
   EmptyState,
   MeasuredActionRow,
 } from "@/components/ui";
+import { CHANNEL_LABEL } from "@/constants/glossary";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addParticipants,
@@ -368,7 +369,16 @@ export function GroupEventDetailScreen({
                 label="When"
                 value={formatDateTimeMinuteOrFallback(event.occurredAt)}
               />
-              <DetailField label="Channel" value={event.channel} />
+              {/* The shared glossary label (D-33 / D-64; review B-IN-02):
+                  a legacy row reads "Unspecified" / "Other", as in the sheet. */}
+              <DetailField
+                label="Channel"
+                value={
+                  event.channel === null
+                    ? null
+                    : (CHANNEL_LABEL[event.channel] ?? event.channel)
+                }
+              />
               <DetailField label="Tone" value={event.quality} />
               <DetailField
                 label="Duration"
