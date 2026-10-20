@@ -25,6 +25,7 @@ import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { publishInteractionWrite } from "@/services/publish-interaction-write";
+import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -37,7 +38,9 @@ import {
 } from "./group-event-detail-logic";
 import {
   createGroupEventRefreshController,
+  createParticipantAddAnnouncer,
   excludedParticipantIds,
+  participantRemovedSnackbar,
   runParticipantAdd,
   runParticipantRemove,
   visibleParticipants,
@@ -87,6 +90,15 @@ export function GroupEventDetailScreen({
   const [detail, setDetail] = useState<GroupEventParticipant | null>(null);
   const [confirm, setConfirm] = useState<"dissolve" | "delete" | null>(null);
 
+  // 38.14 D-84 (owner): adds confirm by name like Edit Event (D-67) — the
+  // first readback after the commit names them; a failed one counts them.
+  const announcer = useMemo(
+    () =>
+      createParticipantAddAnnouncer((label) =>
+        showSnackbar({ kind: "success", label }),
+      ),
+    [],
+  );
   const refreshController = useMemo(
     () =>
       createGroupEventRefreshController({
@@ -96,10 +108,14 @@ export function GroupEventDetailScreen({
           setReadFailed(false);
           setCommittedPendingIds([]);
           setCommittedRemovedIds([]);
+          announcer.settle(loaded);
         },
-        onRefreshFailed: () => setReadFailed(true),
+        onRefreshFailed: () => {
+          setReadFailed(true);
+          announcer.settle(null);
+        },
       }),
-    [groupEventId],
+    [groupEventId, announcer],
   );
   useEffect(() => () => refreshController.invalidate(), [refreshController]);
   const refresh = refreshController.refresh;
@@ -129,6 +145,8 @@ export function GroupEventDetailScreen({
         setCommittedPendingIds((current) => [
           ...new Set([...current, ...contactIds]),
         ]);
+        // D-84: the readback that follows names them in a snackbar.
+        announcer.queue(contactIds);
         // 38.14 D-81: a committed add tells the widget and the shell.
         publishInteractionWrite();
       },
@@ -164,6 +182,12 @@ export function GroupEventDetailScreen({
             : [...current, target.interactionId],
         );
         setRemoving(null);
+        // D-84: confirm by name; a delete reads as a destructive result
+        // (38.10 D-132 / D-140 via D-14), as on Edit Event (D-67).
+        showSnackbar({
+          kind: keep ? "success" : "warning",
+          label: participantRemovedSnackbar(target.contactName, !keep),
+        });
         // 38.14 D-27: detach and delete both publish once committed.
         publishInteractionWrite();
       },

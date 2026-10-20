@@ -50,7 +50,6 @@ import {
   updateGroupEvent,
 } from "@/db/group-events-dao";
 import {
-  type GroupEventDetail,
   type GroupEventParticipant,
   readGroupEventDetail,
 } from "@/db/group-events-read";
@@ -69,15 +68,14 @@ import {
   type InFlightRef,
 } from "@/utils/single-flight";
 import {
-  addedParticipantNames,
   createGroupEventRefreshController,
+  createParticipantAddAnnouncer,
   eventDraft,
   excludedParticipantIds,
   groupEventEditReducer,
   initialGroupEventEditState,
   isGroupEventDraftDirty,
   participantRemovedSnackbar,
-  participantsAddedSnackbar,
   runParticipantAdd,
   runParticipantRemove,
   visibleParticipants,
@@ -111,9 +109,6 @@ export function EditGroupEventScreen({
   const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const bypassRef = useRef(false);
-  // Contact ids whose add committed and whose names the next readback will
-  // supply for the "Added …" snackbar (D-67; the picker returns ids only).
-  const pendingAddedRef = useRef<number[] | null>(null);
   // The title's not-blank error under the field, cleared as the title changes
   // (38.14 D-69; 38.9 D-19). Save failures stay in `error`.
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -145,32 +140,30 @@ export function EditGroupEventScreen({
   }, [groupEventId]);
 
   // Post-commit readback replaces the saved `event` only; never the draft.
-  const refreshController = useMemo(() => {
-    // D-67: name who was just added, once, from the first readback after the
-    // commit; a failed readback still confirms the add, by count.
-    const announceAdded = (refreshed: GroupEventDetail | null) => {
-      const added = pendingAddedRef.current;
-      if (added === null) return;
-      pendingAddedRef.current = null;
-      const names =
-        refreshed === null ? [] : addedParticipantNames(refreshed, added);
-      showSnackbar({
-        kind: "success",
-        label: participantsAddedSnackbar(names, added.length),
-      });
-    };
-    return createGroupEventRefreshController({
-      read: () => readGroupEventDetail(getExecutor(), { groupEventId }),
-      onRefreshed: (refreshed) => {
-        dispatch({ type: "eventRefreshed", event: refreshed });
-        announceAdded(refreshed);
-      },
-      onRefreshFailed: () => {
-        dispatch({ type: "refreshFailed" });
-        announceAdded(null);
-      },
-    });
-  }, [groupEventId]);
+  // D-67: name who was just added, once, from the first readback after the
+  // commit; a failed readback still confirms the add, by count.
+  const announcer = useMemo(
+    () =>
+      createParticipantAddAnnouncer((label) =>
+        showSnackbar({ kind: "success", label }),
+      ),
+    [],
+  );
+  const refreshController = useMemo(
+    () =>
+      createGroupEventRefreshController({
+        read: () => readGroupEventDetail(getExecutor(), { groupEventId }),
+        onRefreshed: (refreshed) => {
+          dispatch({ type: "eventRefreshed", event: refreshed });
+          announcer.settle(refreshed);
+        },
+        onRefreshFailed: () => {
+          dispatch({ type: "refreshFailed" });
+          announcer.settle(null);
+        },
+      }),
+    [groupEventId, announcer],
+  );
   useEffect(() => () => refreshController.invalidate(), [refreshController]);
   const refreshEvent = refreshController.refresh;
 
@@ -270,10 +263,7 @@ export function EditGroupEventScreen({
         setError(null);
         dispatch({ type: "participantsCommitted", contactIds });
         // D-67: the readback that follows names them in a snackbar.
-        pendingAddedRef.current = [
-          ...(pendingAddedRef.current ?? []),
-          ...contactIds,
-        ];
+        announcer.queue(contactIds);
         // D-81: a committed add tells the widget and the shell.
         publishInteractionWrite();
       },

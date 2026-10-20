@@ -725,8 +725,12 @@ describe("Edit Event participant snackbars (38.14 D-67)", () => {
     const source = readFileSync(new URL(file, import.meta.url), "utf8");
     expect(source).toContain("createParticipantAddAnnouncer(");
     expect(source).toMatch(/announcer\.queue\(contactIds\)/);
-    expect(source).toMatch(/onRefreshed: \(\w+\) => \{[\s\S]*?announcer\.settle\(\w+\);/);
-    expect(source).toMatch(/onRefreshFailed: \(\) => \{[\s\S]*?announcer\.settle\(null\);/);
+    expect(source).toMatch(
+      /onRefreshed: \(\w+\) => \{[\s\S]*?announcer\.settle\(\w+\);/,
+    );
+    expect(source).toMatch(
+      /onRefreshFailed: \(\) => \{[\s\S]*?announcer\.settle\(null\);/,
+    );
     expect(source).toMatch(
       /kind: keep \? "success" : "warning",\s*label: participantRemovedSnackbar\(target\.contactName, !keep\),/,
     );
