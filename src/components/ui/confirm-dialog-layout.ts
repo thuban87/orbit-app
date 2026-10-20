@@ -40,3 +40,27 @@ export function confirmActionsFit({
   if (secondary <= 0) return null;
   return cancel + gap + secondary + gap + confirm <= row + FIT_TOLERANCE;
 }
+
+/**
+ * The n-ary form of {@link confirmActionsFit} for `MeasuredActionRow`
+ * (38.14 review B-WR-02 / A-IN-08; D-11, ADR-174 :38): `true` when every
+ * action fits side by side in `row`, `false` when they must stack, `null`
+ * until every width has been measured. One action always fits.
+ */
+export function actionRowFit({
+  items,
+  row,
+  gap,
+}: {
+  items: readonly number[];
+  row: number;
+  gap: number;
+}): boolean | null {
+  if (row <= 0 || items.length === 0) return null;
+  if (items.some((width) => !(width > 0))) return null;
+  // A lone action has nothing to share the row with (its view caps at 100%).
+  if (items.length === 1) return true;
+  const total =
+    items.reduce((sum, width) => sum + width, 0) + gap * (items.length - 1);
+  return total <= row + FIT_TOLERANCE;
+}

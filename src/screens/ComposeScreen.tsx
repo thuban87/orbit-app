@@ -85,6 +85,7 @@ import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { MeasuredActionRow } from "@/components/ui/MeasuredActionRow";
 import { keyboardLift } from "@/components/ui/sheet-contract";
 import {
   type ResolvedAiConnection,
@@ -2074,30 +2075,36 @@ export function ComposeScreen({
         Transmit stay reachable above the keyboard (root lift) and above the
         gesture bar (focused bottom inset) while the header stays visible. */}
       <View testID="compose-action-bar" style={styles.actionBar}>
-        {/* Copy — always present; primary (accent fill) when it is the sole
+        {/* Copy · Transmit measure and stack (D-11, ADR-174 :38; review
+          A-IN-08): never a plain wrapping row on the always-visible bar. */}
+        <MeasuredActionRow align="end" gap={12}>
+          {/* Copy — always present; primary (accent fill) when it is the sole
           primary, else secondary. NEVER gated by `sending`; disabled with a
           blank body (D-46). Confirms with a snackbar (D-45). */}
-        <Button
-          testID="compose-copy"
-          role={copyPrimary ? "primary" : "secondary"}
-          label="Copy"
-          accessibilityLabel="Copy"
-          disabled={availability.copyDisabled}
-          onPress={() => void onCopy()}
-        />
-
-        {/* Transmit — only when the usable mode can hand off. In-flight latched;
-          disabled until the body has text (D-76). */}
-        {controls.send === "shown" ? (
           <Button
-            testID="compose-transmit"
-            role="primary"
-            label="Transmit"
-            accessibilityLabel="Transmit"
-            disabled={sending || availability.transmitDisabled}
-            onPress={() => void onTransmit()}
+            key="copy"
+            testID="compose-copy"
+            role={copyPrimary ? "primary" : "secondary"}
+            label="Copy"
+            accessibilityLabel="Copy"
+            disabled={availability.copyDisabled}
+            onPress={() => void onCopy()}
           />
-        ) : null}
+
+          {/* Transmit — only when the usable mode can hand off. In-flight latched;
+          disabled until the body has text (D-76). */}
+          {controls.send === "shown" ? (
+            <Button
+              key="transmit"
+              testID="compose-transmit"
+              role="primary"
+              label="Transmit"
+              accessibilityLabel="Transmit"
+              disabled={sending || availability.transmitDisabled}
+              onPress={() => void onTransmit()}
+            />
+          ) : null}
+        </MeasuredActionRow>
       </View>
 
       {/* The "Review what is shared" modal is an opaque surface: it renders
@@ -2180,11 +2187,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   actionBar: {
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    flexWrap: "wrap",
     paddingHorizontal: 16,
     paddingVertical: 8,
   },

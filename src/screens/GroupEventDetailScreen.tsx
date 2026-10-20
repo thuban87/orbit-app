@@ -7,7 +7,13 @@ import { ParticipantCard } from "@/components/group/ParticipantCard";
 import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantSheet";
 import { InteractionDetail } from "@/components/history/InteractionDetail";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, Button, ConfirmDialog, EmptyState } from "@/components/ui";
+import {
+  AppText,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  MeasuredActionRow,
+} from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addParticipants,
@@ -324,8 +330,11 @@ export function GroupEventDetailScreen({
                 value={groupEventDurationLabel(event.duration)}
               />
               <DetailField label="Group Note" value={event.groupNote} />
-              <View style={styles.actions}>
+              {/* D-71's visible actions measure and stack (D-11, ADR-174
+                  :38; review B-WR-02): never a plain wrapping row. */}
+              <MeasuredActionRow align="start" testID="event-detail-actions">
                 <Button
+                  key="edit-event"
                   role="secondary"
                   label="Edit Event"
                   onPress={() =>
@@ -333,11 +342,12 @@ export function GroupEventDetailScreen({
                   }
                 />
                 <Button
+                  key="add-participants"
                   role="secondary"
                   label="Add participants"
                   onPress={() => setPickerVisible(true)}
                 />
-              </View>
+              </MeasuredActionRow>
             </View>
             <AppText role="label">Participants</AppText>
           </View>
@@ -482,6 +492,5 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     padding: SPACING.base,
   },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   inlineError: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
 });
