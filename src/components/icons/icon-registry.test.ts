@@ -180,6 +180,26 @@ describe("ICON_REGISTRY", () => {
     );
   });
 
+  it("registers distinct History icons for In Person and Bound / Unbound (38.14 D-47)", () => {
+    const registry: Record<string, { outline: string; filled: string }> =
+      ICON_REGISTRY;
+    const names = ["in-person", "bound", "unbound"];
+    for (const name of names) {
+      expect(registry[name], name).toBeDefined();
+      expect(registry[name].outline).toBeTruthy();
+      expect(registry[name].filled).toBeTruthy();
+      // Not the Events silhouette they used to share.
+      expect(registry[name].outline).not.toBe(
+        ICON_REGISTRY["group-events"].outline,
+      );
+      expect(registry[name].filled).not.toBe(
+        ICON_REGISTRY["group-events"].filled,
+      );
+    }
+    // Bound and Unbound read as opposites, and neither is the In Person glyph.
+    expect(new Set(names.map((name) => registry[name].outline)).size).toBe(3);
+  });
+
   it("reserves the `warning` name required by Plan 07 (REVIEWS 23-05 LOW)", () => {
     expect(ICON_REGISTRY.warning).toBeDefined();
     expect(ICON_REGISTRY.warning.outline).toBeTruthy();

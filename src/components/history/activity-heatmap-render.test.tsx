@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildWindow } from "@/services/history/window";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { ActivityHeatmap, type ActivityHeatmapProps } from "./ActivityHeatmap";
 
@@ -180,7 +181,7 @@ describe("ActivityHeatmap fit-to-width (RG-033 ui-accessibility/AUD-UIA-010, D-1
     ).toBe(false);
   });
 
-  it("sizes day-lens cells from the measured width and centers the grid", () => {
+  it("sizes day-lens cells from the measured width and centers the grid like Year and Cycles (D-37)", () => {
     measuredWidth = 254; // 320dp window − 66dp Profile inset chain
     const nodes = all(resolve(ActivityHeatmap(props({}))));
     const grid = nodes.find(
@@ -226,6 +227,7 @@ describe("ActivityHeatmap fit-to-width (RG-033 ui-accessibility/AUD-UIA-010, D-1
       (node) => node.props.testID === "activity-heatmap-cycles-grid",
     );
     const gridStyle = flatStyle(grid?.props.style);
+    // Centred like the day and Year grids (38.14 D-37).
     expect(gridStyle.alignSelf).toBe("center");
     // 5·47 + 4·4 = 251 ≤ 254 — exactly five per row, never overflowing.
     expect(gridStyle.width).toBe(251);
@@ -756,3 +758,170 @@ describe("ActivityHeatmap lens labels read in full (38.8 D-24)", () => {
     expect(preset?.props.density).toBeUndefined();
   });
 });
+
+// 38.14 D-36 / D-37 (enforces phase-11 §J :370): month labels on Year, weekday
+// initials on Month, captions and accessibility labels on the Cycles preset
+// chips; the Year grid is centred like Day and Cycles. Labels add height, never
+// width: every grid still fits `window − 66` (ADR-174).
+describe("ActivityHeatmap labels and Year centring (38.14 D-36, D-37)", () => {
+  const PROFILE_320 = 320 - 66;
+  const YEAR = buildWindow("year", "2026-06-15", "2026-12-31");
+  const renderYear = () =>
+    all(resolve(ActivityHeatmap(props({ lens: "year", window: YEAR }))));
+  const byID = (nodes: Node[], id: string) =>
+    nodes.find((node) => node.props.testID === id);
+
+  it("centres the Year grid like Day and Cycles (D-37)", () => {
+    measuredWidth = PROFILE_320;
+    const grid = byID(renderYear(), "activity-heatmap-year-grid");
+    expect(flatStyle(grid?.props.style).alignSelf).toBe("center");
+  });
+
+  it("puts each month's label on its own line directly above the row holding its 1st", () => {
+    measuredWidth = PROFILE_320;
+    const nodes = renderYear();
+    const grid = byID(nodes, "activity-heatmap-year-grid");
+    const children = grid?.children ?? [];
+    const labels = children.filter((node) =>
+      String(node.props.testID).startsWith("activity-heatmap-year-month-"),
+    );
+    expect(labels).toHaveLength(12);
+    const MONTHS = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    MONTHS.forEach((month, m) => {
+      const first = `2026-${String(m + 1).padStart(2, "0")}-01`;
+      const rowIndex = children.findIndex((node) =>
+        all([node]).some(
+          (cell) => cell.props.testID === `activity-heatmap-cell-${first}`,
+        ),
+      );
+      expect(rowIndex, `row holding ${first}`).toBeGreaterThan(0);
+      const row = children[rowIndex];
+      expect(String(row.props.testID)).toMatch(/^activity-heatmap-year-row-/);
+      const label = children[rowIndex - 1];
+      const rowNumber = String(row.props.testID).split("-").pop();
+      expect(label.props.testID).toBe(
+        `activity-heatmap-year-month-${rowNumber}`,
+      );
+      expect(label.type).toBe("AppText");
+      expect(label.props.children).toBe(month);
+      expect(flatStyle(label.props.style).color).toBe(
+        THEME_PRESETS.galaxy.dark.textSecondary,
+      );
+    });
+    // Rows where no month starts carry no caption line.
+    const rows = children.filter((node) =>
+      String(node.props.testID).startsWith("activity-heatmap-year-row-"),
+    );
+    expect(rows.length).toBeGreaterThan(12);
+    expect(children).toHaveLength(rows.length + 12);
+  });
+
+  it("keeps the Year row width: 13dp cells, 4dp day gaps, 8dp week gap = 238 ≤ 254", () => {
+    measuredWidth = PROFILE_320;
+    const nodes = renderYear();
+    const rows = nodes.filter((node) =>
+      String(node.props.testID).startsWith("activity-heatmap-year-row-"),
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const rowGap = flatStyle(row.props.style).gap as number;
+      expect(rowGap).toBe(8);
+      const weeks = row.children;
+      let width = (weeks.length - 1) * rowGap;
+      for (const week of weeks) {
+        const dayGap = flatStyle(week.props.style).gap as number;
+        expect(dayGap).toBe(4);
+        for (const cell of week.children) {
+          expect(flatStyle(cell.props.style)).toMatchObject({
+            width: 13,
+            height: 13,
+          });
+        }
+        width += week.children.length * 13 + (week.children.length - 1) * 4;
+      }
+      if (weeks.length === 2) expect(width).toBe(238);
+      expect(width).toBeLessThanOrEqual(PROFILE_320);
+    }
+  });
+
+  it("shows seven weekday initials above the Month columns, one per column", () => {
+    measuredWidth = PROFILE_320; // 32dp cells
+    const MONTH = buildWindow("month", "2026-10-01", "2026-10-20");
+    const nodes = all(
+      resolve(ActivityHeatmap(props({ lens: "month", window: MONTH }))),
+    );
+    const grid = byID(nodes, "activity-heatmap-day-grid");
+    const header = grid?.children[0];
+    expect(header?.props.testID).toBe("activity-heatmap-weekday-row");
+    const initials = header?.children ?? [];
+    expect(initials).toHaveLength(7);
+    expect(initials.map((node) => textOfNode(node))).toEqual([
+      "S",
+      "M",
+      "T",
+      "W",
+      "T",
+      "F",
+      "S",
+    ]);
+    for (const initial of initials) {
+      expect(flatStyle(initial.props.style).width).toBe(32);
+    }
+    // Same 4dp gap as the cell rows, so the initials sit over their columns.
+    expect(flatStyle(header?.props.style).gap).toBe(4);
+    // The cell size is unchanged by the label row (fit math untouched).
+    expect(
+      flatStyle(byID(nodes, "activity-heatmap-cell-2026-10-01")?.props.style),
+    ).toMatchObject({ width: 32, height: 32 });
+  });
+
+  it("does not add weekday initials to the 7 Days lens", () => {
+    measuredWidth = PROFILE_320;
+    const nodes = all(resolve(ActivityHeatmap(props({}))));
+    expect(byID(nodes, "activity-heatmap-weekday-row")).toBeUndefined();
+  });
+
+  it("gives every Cycles preset chip a caption and an accessibility label naming its span", () => {
+    measuredWidth = PROFILE_320;
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({ lens: "cycles", window: null, cycles: CYCLES }),
+        ),
+      ),
+    );
+    const preset = byID(nodes, "activity-heatmap-preset");
+    const options = preset?.props.options as {
+      label: string;
+      value: string;
+      caption?: string;
+      accessibilityLabel?: string;
+    }[];
+    expect(options.map((o) => o.value)).toEqual(["5", "10", "15", "20"]);
+    for (const option of options) {
+      expect(option.caption).toBe("cycles");
+      expect(option.accessibilityLabel).toBe(`Last ${option.label} cycles`);
+    }
+  });
+});
+
+/** The text rendered directly inside a node and its descendants. */
+function textOfNode(node: Node): string {
+  const own = node.props.children;
+  const mine =
+    typeof own === "string" || typeof own === "number" ? String(own) : "";
+  return mine + node.children.map(textOfNode).join("");
+}

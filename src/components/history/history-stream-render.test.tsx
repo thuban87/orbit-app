@@ -314,6 +314,43 @@ describe("HistoryRecordRow", () => {
     expect(tree[0].props.accessibilityLabel).not.toContain("also saved to");
   });
 
+  it("gives In Person its own icon, not the Events icon (38.14 D-47)", () => {
+    const { tree } = renderRow(
+      recordOf({
+        interactions: [
+          interaction(8, "2026-10-06 14:05:00", { channel: "In Person" }),
+        ],
+      }),
+    );
+    const icon = all(tree).find((n) => n.type === "Icon");
+    expect(icon?.props.name).toBe("in-person");
+  });
+
+  it("reads a legacy channel through the glossary (38.14 D-33, D-64)", () => {
+    const { tree } = renderRow(
+      recordOf({
+        interactions: [
+          interaction(10, "2026-10-06 14:05:00", { channel: "unspecified" }),
+        ],
+      }),
+    );
+    const [root] = tree;
+    expect(textOf(root)).toContain("Unspecified");
+    expect(String(root.props.accessibilityLabel)).toMatch(
+      /^Interaction, Unspecified, /,
+    );
+  });
+
+  it.each([
+    ["bind", "bound"],
+    ["unbind", "unbound"],
+  ])("gives a %s lifecycle row its own icon (38.14 D-47)", (type, icon) => {
+    const { tree } = renderRow(
+      recordOf({ lifecycleEvents: [{ ...LIFECYCLE, type, detail: null }] }),
+    );
+    expect(all(tree).find((n) => n.type === "Icon")?.props.name).toBe(icon);
+  });
+
   it("renders no group label for a standalone interaction", () => {
     const { tree } = renderRow(
       recordOf({ interactions: [interaction(9, "2026-10-06 19:30:00")] }),
