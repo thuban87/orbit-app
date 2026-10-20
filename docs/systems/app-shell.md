@@ -371,6 +371,7 @@ Destructive actions follow the app-wide rule in [ux-standards.md](ux-standards.m
 - **ADR-219:** Per-Section Editors Replace the Things to Remember and Memory Screens — the section routes in every stack.
 - **ADR-221:** Two Snackbar Looks — root snackbar placement above the round buttons (partly superseded by ADR-254: one upward lift above the Contacts selection bar).
 - **ADR-254:** Selection Mode Uses a Bottom Two-Row Bar — the + hides on Contacts while selecting; the root snackbar lifts once above the bar.
+- **ADR-250, ADR-251, ADR-253, ADR-255, ADR-256:** 38.13 Contacts and Digest decisions that touch the `HomeScreen` / `DigestScreen` tab roots; their content lives in `dashboard.md` and `digest.md`.
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — retires the shell's Manage favourites route and Settings entry.
 - **ADR-076:** Population-Reached Birthdays Without a Dashboard Banner — removes the Dashboard banner without changing local refresh ownership.
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — retires the Never Contacted route and leaves its next visible control to Dashboard work.

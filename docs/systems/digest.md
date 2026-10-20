@@ -130,6 +130,7 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 - **ADR-206:** Glossary — Canonical Terms Kept, Retired Forms Enforced, Plain-Word Rewrites, and a Shared Plural Helper — Horizon's "Never Contacted" label.
 - **ADR-234:** Per-Person Mute Becomes an Indefinite Snooze — an indefinite snooze leaves Up Next and Overlooked like a dated one (ADR-054's mute clause carries a note).
 - **ADR-247:** Quiet Hours Move Birthday Alerts and the Weekly Digest to the Quiet-Hours End on the Same Day — the Sunday digest notification moves to the quiet-hours end on Sunday.
+- **ADR-251:** An All Contacts Search Also Finds Unbound People — shares `dashboard-read.ts` (where `BirthdayCandidate` lives); no Digest effect.
 - **ADR-254:** Selection Mode Uses a Bottom Two-Row Bar and a More… Sheet — a Digest drill ends a Contacts selection before writing the query.
 - **ADR-256:** Digest Overlooked Lists Everyone Who Needs Attention, Minus Up Next — one `NEEDS_ATTENTION_WHERE` for Up Next, Overlooked and the drill; birthday avatars.
 
