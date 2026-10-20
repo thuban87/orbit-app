@@ -35,7 +35,7 @@
  * All colours resolve through theme tokens (check:colors); record families and
  * the sparkle read by icon + label, never colour alone.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { GroupScopePrompt } from "@/components/history/GroupScopePrompt";
 import {
@@ -56,6 +56,11 @@ import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import {
+  beginInFlight,
+  endInFlight,
+  type InFlightRef,
+} from "@/utils/single-flight";
 
 /** Destructive confirmation copy (UI-SPEC Copywriting Contract / dossier §X). */
 const DELETE_TITLE = "Delete this interaction?";
@@ -115,6 +120,9 @@ export function InteractionDetail({
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [scopeVisible, setScopeVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Synchronous double-tap latch for the delete (review B-WR-06): `deleting`
+  // lags a render, so two taps in one tick would both pass it.
+  const deleteLatch = useRef<InFlightRef>({ current: false });
   const [error, setError] = useState<string | null>(null);
 
   // Standalone -> EditInteraction directly; group-linked -> explicit scope prompt.
@@ -127,7 +135,7 @@ export function InteractionDetail({
   };
 
   const onConfirmDelete = async () => {
-    if (deleting) {
+    if (!beginInFlight(deleteLatch.current)) {
       return;
     }
     setDeleting(true);
@@ -157,6 +165,8 @@ export function InteractionDetail({
       setDeleting(false);
       setConfirmVisible(false);
       setError(DELETE_FAILED_MESSAGE);
+    } finally {
+      endInFlight(deleteLatch.current);
     }
   };
 
@@ -273,6 +283,7 @@ export function InteractionDetail({
         title={DELETE_TITLE}
         message={DELETE_BODY}
         confirmLabel={DELETE_CONFIRM}
+        confirmDisabled={deleting}
         onConfirm={onConfirmDelete}
         onRequestClose={() => setConfirmVisible(false)}
       />

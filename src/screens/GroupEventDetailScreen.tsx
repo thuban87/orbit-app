@@ -36,7 +36,11 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
-import type { InFlightRef } from "@/utils/single-flight";
+import {
+  beginInFlight,
+  endInFlight,
+  type InFlightRef,
+} from "@/utils/single-flight";
 import {
   buildGroupEventDetailInteraction,
   closeThenOpenEventEditor,
@@ -103,6 +107,10 @@ export function GroupEventDetailScreen({
     null,
   );
   const [confirm, setConfirm] = useState<"dissolve" | "delete" | null>(null);
+  // Dissolve / Delete Event single flight (review B-WR-06): the ref stops two
+  // taps in one tick; the state draws the confirm disabled while it runs.
+  const lifecycleLatch = useRef<InFlightRef>({ current: false });
+  const [lifecyclePending, setLifecyclePending] = useState(false);
 
   // 38.14 D-84 (owner): adds confirm by name like Edit Event (D-67) — the
   // first readback after the commit names them; a failed one counts them.
@@ -214,10 +222,11 @@ export function GroupEventDetailScreen({
     if (result !== "busy") setRemovePending(false);
   };
   const lifecycle = async () => {
-    if (!confirm) return;
+    if (!confirm || !beginInFlight(lifecycleLatch.current)) return;
     // The title as shown when the user confirmed, for the snackbar.
     const title = event?.title ?? null;
     setWriteError(false);
+    setLifecyclePending(true);
     try {
       if (confirm === "dissolve") {
         await dissolveGroupEvent(getExecutor(), {
@@ -254,6 +263,9 @@ export function GroupEventDetailScreen({
     } catch {
       setConfirm(null);
       setWriteError(true);
+    } finally {
+      endInFlight(lifecycleLatch.current);
+      setLifecyclePending(false);
     }
   };
   // D-28: re-derived from the refreshed event on every render; null once the
@@ -425,6 +437,7 @@ export function GroupEventDetailScreen({
         title={confirmCopy.title}
         message={confirmCopy.message}
         confirmLabel={confirmCopy.confirm}
+        confirmDisabled={lifecyclePending}
         onConfirm={() => void lifecycle()}
         onRequestClose={() => setConfirm(null)}
       />

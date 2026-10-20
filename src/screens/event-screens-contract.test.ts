@@ -93,6 +93,34 @@ describe("Event detail actions and sheet (38.14 D-71, D-28, D-30)", () => {
   });
 });
 
+describe("destructive confirms are single-flight (review B-WR-06)", () => {
+  it("Dissolve / Delete Event claim a synchronous latch and disable the confirm", () => {
+    const detail = read("src/screens/GroupEventDetailScreen.tsx");
+    const start = detail.indexOf("const lifecycle = async () => {");
+    const body = detail.slice(start, detail.indexOf("\n  };", start));
+    expect(body).toMatch(
+      /if \(!confirm \|\| !beginInFlight\(lifecycleLatch\.current\)\) return;/,
+    );
+    expect(body).toMatch(
+      /finally \{\s*endInFlight\(lifecycleLatch\.current\);/,
+    );
+    expect(detail).toMatch(
+      /confirmDisabled=\{lifecyclePending\}\s*onConfirm=\{\(\) => void lifecycle\(\)\}/,
+    );
+  });
+
+  it("the interaction sheet's delete claims a synchronous latch and disables its confirm", () => {
+    const sheet = read("src/components/history/InteractionDetail.tsx");
+    const start = sheet.indexOf("const onConfirmDelete = async () => {");
+    const body = sheet.slice(start, sheet.indexOf("\n  };", start));
+    expect(body).toMatch(/if \(!beginInFlight\(deleteLatch\.current\)\) \{/);
+    expect(body).toMatch(/finally \{\s*endInFlight\(deleteLatch\.current\);/);
+    expect(sheet).toMatch(
+      /confirmDisabled=\{deleting\}\s*onConfirm=\{onConfirmDelete\}/,
+    );
+  });
+});
+
 describe("Participant wording and Edit participant load (38.14 D-29, D-25)", () => {
   it("the editor's follow lines and the card summary go through the named-field helpers", () => {
     const editor = read("src/components/group/ParticipantOverrideEditor.tsx");
