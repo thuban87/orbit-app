@@ -145,6 +145,10 @@ import { countUnbound } from "@/db/unbound-read";
 import { useRetainedWhileClosing } from "@/hooks/use-retained-while-closing";
 import { loggedInteractionSnackbar } from "@/logic/also-save-to-logic";
 import {
+  createRechannelSheetState,
+  type RechannelSheetState,
+} from "@/logic/bulk-rechannel-sheet";
+import {
   type BulkActionClaim,
   createBulkActionGate,
   getCurrentSelectionIds,
@@ -791,7 +795,18 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [rechannelTarget, setRechannelTarget] = useState<{
     receipt: QuickLogBatchReceipt;
     channel: string;
+    ids: number[];
   } | null>(null);
+  // Review A-WR-02: whichever of the sheet's pick / close takes the batch owns
+  // it; a close without a pick re-shows the batch's Undo · Edit snackbar.
+  const rechannelSheetRef = useRef<RechannelSheetState<{
+    receipt: QuickLogBatchReceipt;
+    channel: string;
+    ids: number[];
+  }> | null>(null);
+  if (rechannelSheetRef.current === null) {
+    rechannelSheetRef.current = createRechannelSheetState();
+  }
   const rechannelShownRef = useRef(rechannelTarget);
   if (rechannelTarget) rechannelShownRef.current = rechannelTarget;
   // Single flight: a double tap on a channel runs one re-channel.
@@ -1400,6 +1415,59 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [refreshSelectionLifecycle],
   );
 
+  // The batch's Undo · Edit snackbar (38.14 D-62). Shown after the write and
+  // shown again when the Edit sheet closes without a pick (review A-WR-02), so
+  // both stay identical.
+  const showBulkLoggedSnackbar = useCallback(
+    (receipt: QuickLogBatchReceipt, channel: string, ids: number[]) => {
+      // D-39: the one logging pattern; bulk names the count. One person is
+      // named from the published rows (Claude's Discretion, 38.14-03); a
+      // missing row names only the channel.
+      const label = loggedInteractionSnackbar({
+        channel,
+        personName:
+          ids.length === 1
+            ? (rowsByIdRef.current.get(ids[0])?.name ?? null)
+            : `${ids.length} people`,
+        section: null,
+      });
+      showSnackbar({
+        kind: "success",
+        label,
+        action: {
+          label: "Undo",
+          accessibilityLabel: `Undo logging ${plural(ids.length, "interaction")}`,
+          onPress: () => {
+            void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
+              .then(() => {
+                // The Undo hard-deletes the logged interactions: a removal.
+                commitBulkOutcome(
+                  `Undid ${ids.length} logged ${pluralWord(ids.length, "interaction")}`,
+                  "warning",
+                );
+              })
+              .catch((undoError: unknown) =>
+                reportBulkFailure("undo bulk quick log", undoError),
+              );
+          },
+        },
+        // 38.14 D-62 (owner Q-23: "Just use 'Edit'"): change the channel
+        // of every interaction from this batch, while the snackbar shows.
+        secondaryAction: {
+          label: "Edit",
+          accessibilityLabel: `Change the channel of ${plural(ids.length, "logged interaction")}`,
+          onPress: () => {
+            const target = { receipt, channel, ids };
+            rechannelSheetRef.current?.open(target);
+            setRechannelTarget(target);
+          },
+        },
+      });
+      return label;
+    },
+    [commitBulkOutcome, reportBulkFailure],
+  );
+
   const performBulkQuickLog = useCallback(
     (ids: number[], claimed?: BulkActionClaim) => {
       const claim = claimed ?? tryAcquireBulkAction();
@@ -1416,48 +1484,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           })),
         )
         .then(({ receipt, channel }) => {
-          // D-39: the one logging pattern; bulk names the count. One person
-          // is named from the published rows (this plan only); a missing row
-          // names only the channel.
-          const label = loggedInteractionSnackbar({
-            channel,
-            personName:
-              ids.length === 1
-                ? (rowsByIdRef.current.get(ids[0])?.name ?? null)
-                : `${ids.length} people`,
-            section: null,
-          });
           notifyWidgetDataChanged();
           bumpShellRefresh();
+          const label = showBulkLoggedSnackbar(receipt, channel, ids);
           AccessibilityInfo.announceForAccessibility(label);
-          showSnackbar({
-            kind: "success",
-            label,
-            action: {
-              label: "Undo",
-              accessibilityLabel: `Undo logging ${plural(ids.length, "interaction")}`,
-              onPress: () => {
-                void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
-                  .then(() => {
-                    // The Undo hard-deletes the logged interactions: a removal.
-                    commitBulkOutcome(
-                      `Undid ${ids.length} logged ${pluralWord(ids.length, "interaction")}`,
-                      "warning",
-                    );
-                  })
-                  .catch((undoError: unknown) =>
-                    reportBulkFailure("undo bulk quick log", undoError),
-                  );
-              },
-            },
-            // 38.14 D-62 (owner Q-23: "Just use 'Edit'"): change the channel
-            // of every interaction from this batch, while the snackbar shows.
-            secondaryAction: {
-              label: "Edit",
-              accessibilityLabel: `Change the channel of ${plural(ids.length, "logged interaction")}`,
-              onPress: () => setRechannelTarget({ receipt, channel }),
-            },
-          });
         })
         .catch((writeError: unknown) => {
           releaseBulkAction(claim);
@@ -1468,10 +1498,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         .finally(() => releaseBulkAction(claim));
     },
     [
-      commitBulkOutcome,
       consumeBulkAction,
       releaseBulkAction,
       reportBulkFailure,
+      showBulkLoggedSnackbar,
       tryAcquireBulkAction,
     ],
   );
@@ -2928,11 +2958,23 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         selected={rechannelShownRef.current?.channel ?? null}
         searchable={false}
         onSelect={(channel) => {
-          const target = rechannelTarget;
+          const target = rechannelSheetRef.current?.take() ?? null;
           setRechannelTarget(null);
           if (target) runBulkRechannel(target.receipt, channel);
         }}
-        onRequestClose={() => setRechannelTarget(null)}
+        onRequestClose={() => {
+          // A close without a pick (the pick already took the batch) gives the
+          // batch its Undo · Edit snackbar back (review A-WR-02).
+          const cancelled = rechannelSheetRef.current?.take() ?? null;
+          setRechannelTarget(null);
+          if (cancelled) {
+            showBulkLoggedSnackbar(
+              cancelled.receipt,
+              cancelled.channel,
+              cancelled.ids,
+            );
+          }
+        }}
       />
       {/* 38.11 D-93 / 38.9 D-30: the bulk Move to Bin confirm shares the
           Profile's body and its destructive (red) confirm. */}
