@@ -26,6 +26,7 @@
  */
 import { StyleSheet, View } from "react-native";
 import { IntensityLine } from "@/components/IntensityLine";
+import { intensityShare } from "@/components/intensity-line-caption";
 import { AppText } from "@/components/ui/AppText";
 import type { IntensityWindowResult } from "@/services/history/intensity-window";
 import { useTheme } from "@/theme";
@@ -64,11 +65,21 @@ export function IntensityChart({
     );
   }
 
-  // Progress toward the intended cadence this window. Capped at 1 — hitting or
-  // exceeding the floor fills the bar (a floor met, never a scold).
-  const { currentCount, intendedPerPeriod } = intensity;
-  const denom = intendedPerPeriod > 0 ? intendedPerPeriod : 1;
-  const fillFraction = Math.max(0, Math.min(1, currentCount / denom));
+  // 38.14 D-65: the bar shows the count's share of the contact's rhythm over
+  // the window (count × cadence ÷ window), the same share the caption names.
+  // Capped at 1 — meeting or exceeding the rhythm fills the bar (a floor met,
+  // never a scold).
+  const fillFraction = Math.max(
+    0,
+    Math.min(
+      1,
+      intensityShare({
+        currentCount: intensity.currentCount,
+        periodDays: intensity.periodDays,
+        cadenceDays: intensity.cadenceDays,
+      }),
+    ),
+  );
 
   return (
     <View testID={testID} style={styles.container}>

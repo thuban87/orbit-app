@@ -8,8 +8,8 @@
  * data loading, NO DAO/service import — the screen derives intensity via
  * `computeContactIntensity` and passes the result in.
  *
- * NEUTRAL BY DESIGN. The rate is stated as FACT ("5× this period · Monthly
- * intended · 12-day average"), never a scold — frequency is a FLOOR, not a
+ * NEUTRAL BY DESIGN. The rate is stated as FACT ("2 logs · about ⅕ of your
+ * monthly rhythm" / "Usually about 12 days apart", 38.14 D-65), never a scold — frequency is a FLOOR, not a
  * ceiling, so contacting MORE than intended is not "too much" and MUST NOT get a
  * warning colour. Intensity does NOT consume the gravityTiers / rogue tokens
  * (those are for gravity/status); it stays on `colors.textPrimary` (the figure)
@@ -28,7 +28,10 @@
  * `intensity-line-caption` sibling so it stays node-testable.
  */
 import { StyleSheet, Text, View } from "react-native";
-import { intendedCaption } from "@/components/intensity-line-caption";
+import {
+  averageGapPhrase,
+  intensityShareCaption,
+} from "@/components/intensity-line-caption";
 import type { IntensityResult } from "@/services/intensity-logic";
 import { useTheme } from "@/theme";
 
@@ -46,11 +49,20 @@ interface IntensityLineProps {
 
 export function IntensityLine({ intensity, cadenceDays }: IntensityLineProps) {
   const { colors } = useTheme();
-  const { currentCount, multiple, periodDays, trailingAvgGapDays } = intensity;
+  const { currentCount, periodDays, trailingAvgGapDays } = intensity;
   // The cadence label describes the CONTACT. On the profile tile periodDays is
   // the contact's interval; the window-scoped chart overrides it with the real
   // interval so a window span never masquerades as the cadence.
   const effectiveCadenceDays = cadenceDays ?? periodDays;
+  // 38.14 D-65: the count and its share of the contact's rhythm over the
+  // window, then the trailing gap in plain words (never "0-day").
+  const shareLine = intensityShareCaption({
+    currentCount,
+    periodDays,
+    cadenceDays: effectiveCadenceDays,
+  });
+  const gap = averageGapPhrase(trailingAvgGapDays);
+  const gapLine = gap === null ? null : gap[0].toUpperCase() + gap.slice(1);
 
   // Neutral empty state: no you-reached-out history at all (nothing to state as
   // a rate). Still factual, still no judgement.
@@ -79,14 +91,16 @@ export function IntensityLine({ intensity, cadenceDays }: IntensityLineProps) {
         testID="contact-profile-intensity-rate"
         style={[styles.rate, { color: colors.textPrimary }]}
       >
-        {multiple}× this period
+        {shareLine}
       </Text>
-      <Text
-        testID="contact-profile-intensity-caption"
-        style={[styles.caption, { color: colors.textSecondary }]}
-      >
-        {intendedCaption(effectiveCadenceDays, trailingAvgGapDays)}
-      </Text>
+      {gapLine === null ? null : (
+        <Text
+          testID="contact-profile-intensity-caption"
+          style={[styles.caption, { color: colors.textSecondary }]}
+        >
+          {gapLine}
+        </Text>
+      )}
     </View>
   );
 }
