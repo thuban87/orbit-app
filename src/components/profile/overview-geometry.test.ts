@@ -21,11 +21,12 @@ const FONT_SCALE = 1;
 
 /**
  * The Profile overview's measured width, derived independently from the
- * rendered inset chain: ContactProfileScreen content padding (16/side) +
- * ProfileSection sectionBody padding (16/side) + GlassSurface border (1/side).
+ * rendered inset chain: ContactProfileScreen content padding (16/side) only.
+ * The top-level section has no card and its body no horizontal padding
+ * (38.14 D-51, D-55).
  */
 function actualOverviewWidth(windowWidth: number): number {
-  return windowWidth - 2 * 16 - 2 * 16 - 2 * 1;
+  return windowWidth - 2 * 16;
 }
 
 /**
@@ -92,7 +93,7 @@ describe("overview geometry helpers (RG-033 ui-accessibility/AUD-UIA-021)", () =
     expect(overviewTileWidth(2, 140)).toBe(2 * 140 + SPACING.sm);
   });
 
-  it("the Profile overview width basis is window − 66dp today", () => {
+  it("the Profile overview width basis is window − 32dp (38.14 D-55)", () => {
     for (const width of WINDOWS) {
       expect(profileOverviewWidthBasis(width)).toBe(actualOverviewWidth(width));
     }
@@ -138,21 +139,24 @@ describe("layout preview parity with the actual Relationship Overview", () => {
     }
   }
 
-  it("pins the 360dp column boundary: the real overview packs ONE column, so the preview does too", () => {
-    // 360 − 66 = 294 < 2·144 + 8 = 296.
-    expect(actualOverviewWidth(360)).toBe(294);
+  it("pins the column boundary: the real overview packs ONE column at 320dp and TWO at 360dp, so the preview does too (38.14 D-55)", () => {
+    // Two columns need 2·144 + 8 = 296: 320 − 32 = 288 < 296 ≤ 360 − 32 = 328.
     expect(2 * OVERVIEW_MIN_TILE_WIDTH + SPACING.sm).toBe(296);
-    const preview = packProfileOverviewPreview(
-      createAllSectionsPreview(FACTORY_PROFILE_LAYOUT).overview,
-      360,
-      FONT_SCALE,
-    );
-    expect(preview.columns).toBe(1);
-    // The old window − 48 basis (and a − 64 basis) would wrongly pack two.
+    expect(actualOverviewWidth(320)).toBe(288);
+    expect(actualOverviewWidth(360)).toBe(328);
+    const at = (windowWidth: number) =>
+      packProfileOverviewPreview(
+        createAllSectionsPreview(FACTORY_PROFILE_LAYOUT).overview,
+        windowWidth,
+        FONT_SCALE,
+      ).columns;
+    expect(at(320)).toBe(1);
+    expect(at(360)).toBe(2);
+    // The old carded window − 66 basis would wrongly pack one at 360.
     expect(
-      packOverviewModules([], { width: 360 - 64, fontScale: FONT_SCALE })
+      packOverviewModules([], { width: 360 - 66, fontScale: FONT_SCALE })
         .columns,
-    ).toBe(2);
+    ).toBe(1);
   });
 });
 
@@ -167,16 +171,34 @@ describe("Profile overview inset chain is pinned to its style sites", () => {
     );
   });
 
-  it("ProfileModuleHost sectionBody padding is SPACING.base", () => {
+  it("a top-level ProfileSection body has no card and no horizontal padding (38.14 D-51, D-55)", () => {
     const source = read("./ProfileModuleHost.tsx");
-    expect(source).toMatch(/sectionBody: \{[^}]*\bpadding: SPACING\.base\b/);
-    expect(source).toContain(
-      "<View style={styles.sectionBody}>{children}</View>",
+    const pageBody = source.match(/\n {2}pageBody: \{([^}]*)\}/);
+    expect(pageBody).not.toBeNull();
+    expect(pageBody?.[1]).not.toMatch(
+      /\bpadding(Horizontal|Left|Right|Start|End)?:/,
     );
+    expect(source).toContain("<View style={styles.pageBody}>{children}</View>");
+    // The section level renders a plain View, not a GlassSurface card.
+    const section = source.slice(
+      source.indexOf("function ProfileSection("),
+      source.indexOf("export interface ProfileModuleHostProps"),
+    );
+    const pageBranch = section.slice(
+      section.indexOf('if (level === "subsection")'),
+    );
+    const afterSubsection = pageBranch.slice(
+      pageBranch.indexOf("</GlassSurface>"),
+    );
+    expect(afterSubsection).not.toContain("<GlassSurface");
   });
 
-  it("GlassSurface container border is 1dp", () => {
-    const source = read("../ui/GlassSurface.tsx");
-    expect(source).toMatch(/container: \{[^}]*\bborderWidth: 1,/);
+  it("the Relationship Overview renders as a top-level section", () => {
+    const source = read("./ProfileModuleHost.tsx");
+    const overview = source.slice(
+      source.indexOf('renderer === "relationship-overview"'),
+      source.indexOf("<RelationshipOverview"),
+    );
+    expect(overview).toContain('level="section"');
   });
 });

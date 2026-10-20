@@ -88,6 +88,77 @@ export const TYPOGRAPHY: Record<TypographyRole, TypographyStyle> = {
 };
 
 /**
+ * The Profile heading levels (38.14 D-52 scale S2, D-56).
+ *
+ * A Profile-ONLY scale, kept apart from `TYPOGRAPHY` so the global five-role /
+ * four-size contract above (dossier §H) stays intact. Used by
+ * `ProfileHeading` on the Profile alone; no other screen adopts it (D-56).
+ *  - `h1` — a top-level Profile section heading (26), on the page with a rule;
+ *  - `h2` — a sub-section heading on its card (20), in the accent text tone;
+ *  - `h3` — a group label such as MOST RECENT / PREVIOUS (14), upper-case,
+ *    letter-spaced and muted. The bundled font has no true small caps, so
+ *    upper-case + letter-spacing is the rendering, as the owner-picked S2
+ *    mockup draws it (RESEARCH A4).
+ * All three use the bundled Space Grotesk SemiBold (no new font file). Colour
+ * is a TOKEN name resolved through `useTheme()` at render, never a literal.
+ */
+export type ProfileHeadingLevel = "h1" | "h2" | "h3";
+
+export type ProfileHeadingColorToken =
+  | "textPrimary"
+  | "textSecondary"
+  | "accentText";
+
+export interface ProfileHeadingStyle {
+  family: FontFamily;
+  size: number;
+  weight: FontWeight;
+  /** Absolute line height in px (size × multiplier), reflow-friendly. */
+  lineHeight: number;
+  colorToken: ProfileHeadingColorToken;
+  /** Extra tracking in px; 0 for none. */
+  letterSpacing: number;
+  /** Whether the label renders upper-case (the H3 small-caps rendering). */
+  uppercase: boolean;
+}
+
+export const PROFILE_HEADING_SCALE: Record<
+  ProfileHeadingLevel,
+  ProfileHeadingStyle
+> = {
+  // 26 × 1.2
+  h1: {
+    family: "Space Grotesk",
+    size: 26,
+    weight: 600,
+    lineHeight: 31,
+    colorToken: "textPrimary",
+    letterSpacing: 0,
+    uppercase: false,
+  },
+  // 20 × 1.25
+  h2: {
+    family: "Space Grotesk",
+    size: 20,
+    weight: 600,
+    lineHeight: 25,
+    colorToken: "accentText",
+    letterSpacing: 0,
+    uppercase: false,
+  },
+  // 14 × 1.4
+  h3: {
+    family: "Space Grotesk",
+    size: 14,
+    weight: 600,
+    lineHeight: 20,
+    colorToken: "textSecondary",
+    letterSpacing: 1.2,
+    uppercase: true,
+  },
+};
+
+/**
  * The smallest share of its role size a one-line label may shrink to when it
  * is allowed to shrink rather than truncate (`adjustsFontSizeToFit` with
  * `minimumFontScale`). Below this floor the label truncates as usual.

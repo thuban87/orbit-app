@@ -19,16 +19,14 @@ export const OVERVIEW_GAP = SPACING.sm;
 /**
  * Total horizontal inset between the window edge and the rendered Relationship
  * Overview grid, summed over its full ancestor chain:
- *  - `ContactProfileScreen.tsx` `styles.content.padding` — SPACING.base per side;
- *  - `ProfileModuleHost.tsx` `ProfileSection` body `styles.sectionBody.padding`
- *    — SPACING.base per side;
- *  - `ui/GlassSurface.tsx` `styles.container.borderWidth: 1` on the
- *    ProfileSection card — 1dp per side.
- * = 2·16 + 2·16 + 2·1 = 66dp today. `overview-geometry.test.ts` reads those
- * three style sites and fails if any of them changes without this constant.
+ *  - `ContactProfileScreen.tsx` `styles.content.padding` — SPACING.base per side.
+ * The Overview's top-level `ProfileSection` has no card and its body
+ * (`ProfileModuleHost.tsx` `styles.pageBody`) carries no horizontal padding
+ * (38.14 D-51 layout P-D, D-55), so the tiles sit 16 dp from the screen edges.
+ * = 2·16 = 32dp. `overview-geometry.test.ts` reads those style sites and fails
+ * if any of them changes without this constant.
  */
-export const PROFILE_OVERVIEW_HORIZONTAL_INSET =
-  2 * SPACING.base + 2 * SPACING.base + 2 * 1;
+export const PROFILE_OVERVIEW_HORIZONTAL_INSET = 2 * SPACING.base;
 
 /** The width the Profile's Relationship Overview grid measures in a window. */
 export function profileOverviewWidthBasis(windowWidth: number): number {

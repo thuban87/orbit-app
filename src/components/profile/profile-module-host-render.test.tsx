@@ -37,6 +37,13 @@ vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("@/components/ui/GlassSurface", () => ({
   GlassSurface: "GlassSurface",
 }));
+vi.mock("@/components/ui/ChromeScrim", () => ({
+  ChromeScrim: "ChromeScrim",
+}));
+vi.mock("./ProfileHeading", () => ({ ProfileHeading: "ProfileHeading" }));
+vi.mock("@/theme", () => ({
+  useTheme: () => ({ colors: { borderStrong: "borderStrong" } }),
+}));
 vi.mock("@/components/history/HistorySection", () => ({
   HistorySection: "HistorySection",
 }));
@@ -96,6 +103,23 @@ function all(nodes: readonly Node[]): Node[] {
   return nodes.flatMap((node) => [node, ...all(node.children)]);
 }
 
+/** Every node with the host-element types above it, outermost first. */
+function withAncestors(
+  nodes: readonly Node[],
+  above: readonly string[] = [],
+): { node: Node; ancestors: readonly string[] }[] {
+  return nodes.flatMap((node) => [
+    { node, ancestors: above },
+    ...withAncestors(node.children, [...above, node.type]),
+  ]);
+}
+
+function text(node: Node): string {
+  return all(node.children)
+    .map((child) => child.text)
+    .join("");
+}
+
 const presentation = {
   collapse: {},
   layout: {
@@ -136,15 +160,11 @@ function sectionHeaderCaptions(
       }),
     ),
   );
-  const header = nodes.find(
-    (node) =>
-      node.type === "Pressable" && node.props.accessibilityRole === "button",
+  // 38.14 D-51: a top-level section's captions sit under its heading row
+  // (on a local ChromeScrim), no longer inside the toggle.
+  return nodes.filter(
+    (node) => node.type === "AppText" && node.props.role === "caption",
   );
-  return header
-    ? all([header]).filter(
-        (node) => node.type === "AppText" && node.props.role === "caption",
-      )
-    : [];
 }
 
 const oneEntry = <T,>(item: T) => ({
@@ -256,8 +276,8 @@ describe("ProfileModuleHost section-header captions", () => {
     expect(
       nodes.filter(
         (node) =>
-          node.type === "AppText" &&
-          node.props.role === "heading" &&
+          node.type === "ProfileHeading" &&
+          node.props.level === "h2" &&
           node.children.some(
             (child) => child.type === "literal" && child.text === "Off Limits",
           ),
@@ -924,5 +944,154 @@ describe("ProfileModuleHost section chevrons (38.11 D-28)", () => {
     expect(chevrons(false)).toEqual([
       { expanded: false, icon: "chevron-down" },
     ]);
+  });
+});
+
+// 38.14 D-51 / D-52 / D-83 (ADR-115 :18, ADR-218 :18): a top-level section has
+// no card — its H1, rule and chevron sit bare on the page; its captions and
+// Retry sit on a local ChromeScrim. A sub-section keeps its card and H2.
+describe("ProfileModuleHost section levels (38.14 D-51, D-52, D-83)", () => {
+  /** The host's useState order: collapse, pending, failed, activeSheet. */
+  const PENDING_SLOT = 1;
+  const FAILED_SLOT = 2;
+
+  function levelNodes(options: {
+    pending?: boolean;
+    failed?: boolean;
+    knowledge?: ProfileSnapshot["knowledge"];
+    children?: KnowledgeChildId[];
+  }) {
+    hooks.index = 0;
+    hooks.seed.clear();
+    if (options.pending) {
+      hooks.seed.set(PENDING_SLOT, new Set(["things-to-remember"]));
+    }
+    if (options.failed) hooks.seed.set(FAILED_SLOT, "things-to-remember");
+    try {
+      return withAncestors(
+        resolve(
+          ProfileModuleHost({
+            snapshot: snapshot(
+              options.knowledge ?? { status: "ready", data: fullKnowledge },
+            ),
+            presentation: {
+              ...presentation,
+              layout: {
+                document: {
+                  ...presentation.layout.document,
+                  thingsToRemember: (options.children ?? []).map((id) => ({
+                    id,
+                    visible: true,
+                    expanded: true,
+                  })),
+                },
+              },
+            } as unknown as ProfilePresentation,
+            todayLocal: "2026-09-19",
+            historyRevision: 0,
+            onRequestScrollTo: vi.fn(),
+            onSetFrequency: vi.fn(async () => {}),
+            onSnooze: vi.fn(async () => {}),
+            onUnsnooze: vi.fn(async () => {}),
+            onSaveBirthday: vi.fn(async () => {}),
+            onKnowledgeAction: vi.fn(),
+            onKnowledgeViewAll: vi.fn(),
+            onOpenValueHistory: vi.fn(),
+            onOpenKnowledgeChange: vi.fn(),
+            onContactMethodAction: vi.fn(),
+          }),
+        ),
+      );
+    } finally {
+      hooks.seed.clear();
+    }
+  }
+
+  const h1 = (entries: ReturnType<typeof levelNodes>) =>
+    entries.find(
+      ({ node }) => node.type === "ProfileHeading" && node.props.level === "h1",
+    );
+
+  it("renders the top-level heading as a bare H1 with no card and no ChromeScrim", () => {
+    const entries = levelNodes({});
+    const heading = h1(entries);
+    expect(heading).toBeDefined();
+    expect(heading && text(heading.node)).toBe("Things to Remember");
+    expect(heading?.ancestors).not.toContain("ChromeScrim");
+    expect(heading?.ancestors).not.toContain("GlassSurface");
+    const chevron = entries.find(
+      ({ node }) =>
+        node.type === "Icon" && String(node.props.name).startsWith("chevron-"),
+    );
+    expect(chevron).toBeDefined();
+    expect(chevron?.ancestors).not.toContain("ChromeScrim");
+    expect(chevron?.ancestors).not.toContain("GlassSurface");
+  });
+
+  it("draws a token-coloured rule under the H1 row and gives the header no horizontal padding (R3-04)", () => {
+    const entries = levelNodes({});
+    const header = entries.find(
+      ({ node }) =>
+        node.type === "View" &&
+        all(node.children).some(
+          (child) =>
+            child.type === "ProfileHeading" && child.props.level === "h1",
+        ) &&
+        node.children.some((child) => child.type === "Pressable"),
+    );
+    const style = Object.assign(
+      {},
+      ...([] as unknown[])
+        .concat(header?.node.props.style)
+        .map((entry) => (entry ?? {}) as Record<string, unknown>),
+    ) as Record<string, unknown>;
+    expect(style.borderBottomWidth).toBe(1);
+    expect(style.borderBottomColor).toBe("borderStrong");
+    expect(style.paddingHorizontal).toBeUndefined();
+    expect(style.padding).toBeUndefined();
+  });
+
+  it("puts the Saving… caption and Retry on a ChromeScrim each, never the H1", () => {
+    const entries = levelNodes({ pending: true, failed: true });
+    const caption = entries.find(
+      ({ node }) => node.type === "AppText" && text(node) === "Saving…",
+    );
+    expect(caption?.ancestors).toContain("ChromeScrim");
+    const retry = entries.find(
+      ({ node }) =>
+        node.type === "Button" &&
+        node.props.accessibilityLabel === "Retry saving Things to Remember",
+    );
+    expect(retry?.ancestors).toContain("ChromeScrim");
+    expect(
+      entries.filter(({ node }) => node.type === "ChromeScrim"),
+    ).toHaveLength(2);
+    expect(h1(entries)?.ancestors).not.toContain("ChromeScrim");
+  });
+
+  it("puts the error caption on a ChromeScrim", () => {
+    const entries = levelNodes({
+      knowledge: { status: "error", message: "Knowledge is unavailable." },
+    });
+    const caption = entries.find(
+      ({ node }) =>
+        node.type === "AppText" && text(node) === "Knowledge is unavailable.",
+    );
+    expect(caption?.node.props.role).toBe("caption");
+    expect(caption?.ancestors).toContain("ChromeScrim");
+  });
+
+  it("keeps a sub-section on its card with an H2 heading and its header action", () => {
+    const entries = levelNodes({ children: ["memories"] });
+    const heading = entries.find(
+      ({ node }) => node.type === "ProfileHeading" && node.props.level === "h2",
+    );
+    expect(heading && text(heading.node)).toBe("Memories");
+    expect(heading?.ancestors).toContain("GlassSurface");
+    expect(heading?.ancestors).not.toContain("ChromeScrim");
+    const action = entries.find(
+      ({ node }) => node.props.accessibilityLabel === "Add Memories",
+    );
+    expect(action?.ancestors).toContain("GlassSurface");
   });
 });

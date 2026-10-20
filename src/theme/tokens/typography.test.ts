@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { RADII } from "./radii";
 import { SPACING } from "./spacing";
 import {
+  PROFILE_HEADING_SCALE,
   resolveFontFamily,
   TYPOGRAPHY,
   type TypographyRole,
@@ -82,6 +83,51 @@ describe("TYPOGRAPHY", () => {
   it("every role has a positive line height (reflow-friendly)", () => {
     for (const r of roles) {
       expect(TYPOGRAPHY[r].lineHeight).toBeGreaterThan(TYPOGRAPHY[r].size);
+    }
+  });
+});
+
+// 38.14 D-52 / D-56: the Profile-only S2 heading scale, separate from
+// TYPOGRAPHY so the §H five-role / four-size contract above stays unchanged.
+describe("PROFILE_HEADING_SCALE (38.14 D-52, D-56)", () => {
+  it("has exactly the three Profile heading levels", () => {
+    expect(Object.keys(PROFILE_HEADING_SCALE).sort()).toEqual([
+      "h1",
+      "h2",
+      "h3",
+    ]);
+  });
+
+  it("pins the S2 sizes 26 / 20 / 14", () => {
+    expect(PROFILE_HEADING_SCALE.h1.size).toBe(26);
+    expect(PROFILE_HEADING_SCALE.h2.size).toBe(20);
+    expect(PROFILE_HEADING_SCALE.h3.size).toBe(14);
+  });
+
+  it("colours H1 primary, H2 accent text and H3 muted, by token name only", () => {
+    expect(PROFILE_HEADING_SCALE.h1.colorToken).toBe("textPrimary");
+    expect(PROFILE_HEADING_SCALE.h2.colorToken).toBe("accentText");
+    expect(PROFILE_HEADING_SCALE.h3.colorToken).toBe("textSecondary");
+  });
+
+  it("renders H3 upper-case and letter-spaced; H1 and H2 neither", () => {
+    expect(PROFILE_HEADING_SCALE.h3.uppercase).toBe(true);
+    expect(PROFILE_HEADING_SCALE.h3.letterSpacing).toBeGreaterThan(0);
+    for (const level of ["h1", "h2"] as const) {
+      expect(PROFILE_HEADING_SCALE[level].uppercase).toBe(false);
+      expect(PROFILE_HEADING_SCALE[level].letterSpacing).toBe(0);
+    }
+  });
+
+  it("uses the bundled Space Grotesk SemiBold for every level (no new font file)", () => {
+    const keys = registeredFontKeys();
+    for (const level of ["h1", "h2", "h3"] as const) {
+      const { family, weight, lineHeight, size } = PROFILE_HEADING_SCALE[level];
+      expect(family).toBe("Space Grotesk");
+      expect(weight).toBe(600);
+      expect(resolveFontFamily(family, weight)).toBe("SpaceGrotesk-SemiBold");
+      expect(keys).toContain(resolveFontFamily(family, weight));
+      expect(lineHeight).toBeGreaterThan(size);
     }
   });
 });

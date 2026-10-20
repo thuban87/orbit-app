@@ -11,6 +11,7 @@ import { Icon } from "@/components/icons/Icon";
 import { SnoozeSheet } from "@/components/SnoozeSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
@@ -42,10 +43,13 @@ import type {
   ProfileTopLevelModuleId,
 } from "@/profile/persisted-contract";
 import type { ProfilePresentation } from "@/profile/types";
+import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { isSnoozed } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import { BirthdaySheet } from "./BirthdaySheet";
+import { ProfileHeading } from "./ProfileHeading";
 import { ProfileRelationshipSheets } from "./ProfileRelationshipSheets";
 import {
   RelationshipOverview,
@@ -78,8 +82,25 @@ const TOP_LEVEL_MODULE_IDS = new Set<ProfileTopLevelModuleId>([
   "interaction-history",
 ]);
 
+/**
+ * One collapsible Profile section (38.14 D-51 layout P-D, D-52 scale S2).
+ *
+ *  - `section` — a top-level section. No card: an H1 heading sits on the page
+ *    with a thin rule under it, and the header and body carry NO horizontal
+ *    padding, so the H1, its rule and the inner cards share the screen's 16 dp
+ *    edge (R3-04). The H1, its rule and the fold chevron in its toggle row stay
+ *    bare on the background with no `ChromeScrim` (D-83, owner-signed exception
+ *    to ADR-115 :18 for the Profile H1 headings only). The "Saving…" / error
+ *    captions and the Retry button lost the card that backed them, so each
+ *    sits on a local `ChromeScrim` (ADR-115 :18).
+ *  - `subsection` — a Things to Remember part: keeps its `GlassSurface` card,
+ *    its header padding and an accent H2 heading; captions and Retry stay on
+ *    the card.
+ * Both levels keep the chevron, the toggle and the heading action (ADR-218 :18).
+ */
 function ProfileSection({
   id,
+  level,
   defaultExpanded,
   collapse,
   pending,
@@ -90,6 +111,7 @@ function ProfileSection({
   children,
 }: {
   id: ProfileCollapsibleModuleId;
+  level: "section" | "subsection";
   defaultExpanded: boolean;
   collapse: ProfileCollapseMap;
   pending: boolean;
@@ -99,52 +121,83 @@ function ProfileSection({
   headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const { colors } = useTheme();
   const state = resolveProfileModuleHostState({
     id,
     defaultExpanded,
     collapse,
   });
   const label = PROFILE_MODULE_REGISTRY[id].label;
+  const caption = pending ? (
+    <AppText role="caption">Saving…</AppText>
+  ) : errorMessage ? (
+    <AppText role="caption">{errorMessage}</AppText>
+  ) : null;
+  const toggle = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={state.accessibilityLabel}
+      accessibilityState={{ expanded: state.expanded, disabled: pending }}
+      disabled={pending}
+      onPress={() => onToggle({ id, expanded: defaultExpanded })}
+      style={styles.sectionToggle}
+    >
+      <View style={styles.sectionCopy}>
+        <ProfileHeading level={level === "section" ? "h1" : "h2"}>
+          {label}
+        </ProfileHeading>
+        {level === "subsection" ? caption : null}
+      </View>
+      {/* 38.11 D-28: an open section's chevron points up. */}
+      <Icon
+        name={state.expanded ? "chevron-up" : "chevron-down"}
+        state={state.expanded ? "active" : "default"}
+      />
+    </Pressable>
+  );
+  const retry = failed ? (
+    <Button
+      role="tertiary"
+      label="Retry"
+      accessibilityLabel={`Retry saving ${label}`}
+      onPress={() => onToggle({ id, expanded: defaultExpanded })}
+    />
+  ) : null;
+
+  if (level === "subsection") {
+    return (
+      <GlassSurface style={styles.section}>
+        <View style={styles.cardHeader}>
+          {toggle}
+          {headerAction}
+        </View>
+        {state.expanded ? (
+          <View style={styles.sectionBody}>{children}</View>
+        ) : null}
+        {retry}
+      </GlassSurface>
+    );
+  }
   return (
-    <GlassSurface style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={state.accessibilityLabel}
-          accessibilityState={{ expanded: state.expanded, disabled: pending }}
-          disabled={pending}
-          onPress={() => onToggle({ id, expanded: defaultExpanded })}
-          style={styles.sectionToggle}
-        >
-          <View style={styles.sectionCopy}>
-            <AppText role="heading" accessibilityRole="header">
-              {label}
-            </AppText>
-            {pending ? <AppText role="caption">Saving…</AppText> : null}
-            {!pending && errorMessage ? (
-              <AppText role="caption">{errorMessage}</AppText>
-            ) : null}
-          </View>
-          {/* 38.11 D-28: an open section's chevron points up. */}
-          <Icon
-            name={state.expanded ? "chevron-up" : "chevron-down"}
-            state={state.expanded ? "active" : "default"}
-          />
-        </Pressable>
+    <View style={styles.page}>
+      <View
+        style={[styles.pageHeader, { borderBottomColor: colors.borderStrong }]}
+      >
+        {toggle}
         {headerAction}
       </View>
-      {state.expanded ? (
-        <View style={styles.sectionBody}>{children}</View>
+      {caption ? (
+        <ChromeScrim style={styles.pageChrome} radius={RADII.sm}>
+          {caption}
+        </ChromeScrim>
       ) : null}
-      {failed ? (
-        <Button
-          role="tertiary"
-          label="Retry"
-          accessibilityLabel={`Retry saving ${label}`}
-          onPress={() => onToggle({ id, expanded: defaultExpanded })}
-        />
+      {state.expanded ? <View style={styles.pageBody}>{children}</View> : null}
+      {retry ? (
+        <ChromeScrim style={styles.pageChrome} radius={RADII.sm}>
+          {retry}
+        </ChromeScrim>
       ) : null}
-    </GlassSurface>
+    </View>
   );
 }
 
@@ -375,6 +428,7 @@ export function ProfileModuleHost({
         <ProfileSection
           key={placement.id}
           id={placement.id as ProfileCollapsibleModuleId}
+          level="subsection"
           defaultExpanded={placement.expanded}
           collapse={collapse}
           pending={pending.has(placement.id as ProfileCollapsibleModuleId)}
@@ -531,7 +585,7 @@ export function ProfileModuleHost({
   return (
     <View
       testID="profile-module-host"
-      style={styles.stack}
+      style={styles.sections}
       onLayout={(event: LayoutChangeEvent) =>
         scroller.hostLayout(event.nativeEvent.layout.y)
       }
@@ -544,6 +598,7 @@ export function ProfileModuleHost({
             <ProfileSection
               key={id}
               id={id}
+              level="section"
               defaultExpanded={placement.expanded}
               collapse={collapse}
               pending={pending.has(id)}
@@ -566,6 +621,7 @@ export function ProfileModuleHost({
             <ProfileSection
               key={id}
               id={id}
+              level="section"
               defaultExpanded={placement.expanded}
               collapse={collapse}
               pending={pending.has(id)}
@@ -586,6 +642,7 @@ export function ProfileModuleHost({
             <ProfileSection
               key={id}
               id={id}
+              level="section"
               defaultExpanded={placement.expanded}
               collapse={collapse}
               pending={pending.has(id)}
@@ -612,6 +669,7 @@ export function ProfileModuleHost({
           >
             <ProfileSection
               id={id}
+              level="section"
               defaultExpanded={placement.expanded}
               collapse={collapse}
               pending={pending.has(id)}
@@ -674,8 +732,12 @@ export function ProfileModuleHost({
 
 const styles = StyleSheet.create({
   stack: { gap: SPACING.sm },
+  // Space between the card-less top-level sections (D-51; Claude's
+  // Discretion within the S2 mockup).
+  sections: { gap: SPACING.xl },
   section: { overflow: "hidden" },
-  sectionHeader: {
+  // A sub-section card's header (D-51): padded inside its card.
+  cardHeader: {
     minHeight: 44,
     paddingHorizontal: SPACING.base,
     paddingVertical: SPACING.sm,
@@ -683,6 +745,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: SPACING.sm,
   },
+  page: { gap: SPACING.sm },
+  // A top-level section's header (D-51, R3-04): NO horizontal padding, so the
+  // H1 and its rule start at the screen's own 16 dp edge, with the inner cards.
+  pageHeader: {
+    minHeight: 44,
+    paddingVertical: SPACING.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    borderBottomWidth: 1,
+  },
+  pageChrome: {
+    alignSelf: "flex-start",
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  // A top-level section's body: NO horizontal padding (D-51, D-55), so inner
+  // cards and the Overview tiles sit 16 dp from the screen edges.
+  pageBody: { gap: SPACING.sm, paddingTop: SPACING.sm },
   sectionToggle: {
     alignItems: "center",
     flex: 1,
