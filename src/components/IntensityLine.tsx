@@ -45,9 +45,19 @@ interface IntensityLineProps {
    * describing the contact, not the window span (Phase 32 review #1).
    */
   cadenceDays?: number;
+  /**
+   * The days the share is measured over. Defaults to the result's
+   * `periodDays`; the window-scoped IntensityChart passes the elapsed days of
+   * a period still in progress (38.14 D-86).
+   */
+  shareDays?: number;
 }
 
-export function IntensityLine({ intensity, cadenceDays }: IntensityLineProps) {
+export function IntensityLine({
+  intensity,
+  cadenceDays,
+  shareDays,
+}: IntensityLineProps) {
   const { colors } = useTheme();
   const { currentCount, periodDays, trailingAvgGapDays } = intensity;
   // The cadence label describes the CONTACT. On the profile tile periodDays is
@@ -58,7 +68,7 @@ export function IntensityLine({ intensity, cadenceDays }: IntensityLineProps) {
   // window, then the trailing gap in plain words (never "0-day").
   const shareLine = intensityShareCaption({
     currentCount,
-    periodDays,
+    periodDays: shareDays ?? periodDays,
     cadenceDays: effectiveCadenceDays,
   });
   const gap = averageGapPhrase(trailingAvgGapDays);

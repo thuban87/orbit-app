@@ -8,9 +8,12 @@
  * window-scoped. Node-pure: the caption logic lives in the RN-free sibling so it
  * is testable without loading react-native.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   averageGapPhrase,
+  elapsedWindowDays,
   intendedLabel,
   intensityShare,
   intensityShareCaption,
@@ -264,5 +267,84 @@ describe("window-scoped caption reports the contact's TRUE cadence (Phase 32 #1)
     expect(caption).toMatch(/^2 logs · /);
     const gap = averageGapPhrase(result.trailingAvgGapDays);
     expect(gap ?? "").not.toContain("0-day");
+  });
+});
+
+describe("elapsedWindowDays — a period in progress is measured to today (38.14 D-86; review B-WR-01)", () => {
+  it("measures the current Year only over its elapsed days, inclusive of today", () => {
+    const year = buildWindow("year", "2026-10-20", "2026-10-20");
+    // Jan 1 .. Oct 20 2026 inclusive = 293 days, not the whole 365.
+    expect(elapsedWindowDays(year, "2026-10-20")).toBe(293);
+  });
+
+  it("measures the current Month only over its elapsed days", () => {
+    const month = buildWindow("month", "2026-10-20", "2026-10-20");
+    expect(elapsedWindowDays(month, "2026-10-20")).toBe(20);
+  });
+
+  it("keeps a past period's whole span", () => {
+    const pastYear = buildWindow("year", "2025-06-01", "2026-10-20");
+    expect(elapsedWindowDays(pastYear, "2026-10-20")).toBe(365);
+    const pastMonth = buildWindow("month", "2026-09-10", "2026-10-20");
+    expect(elapsedWindowDays(pastMonth, "2026-10-20")).toBe(30);
+  });
+
+  it("is 1 on the period's first day and 0 for a window that starts after today", () => {
+    const month = buildWindow("month", "2026-10-01", "2026-10-01");
+    expect(elapsedWindowDays(month, "2026-10-01")).toBe(1);
+    expect(
+      elapsedWindowDays(
+        { start: "2026-11-01", end: "2026-11-30" },
+        "2026-10-20",
+      ),
+    ).toBe(0);
+  });
+
+  it("counts across a DST change by local calendar day", () => {
+    expect(
+      elapsedWindowDays(
+        { start: "2026-03-01", end: "2026-03-31" },
+        "2026-03-31",
+      ),
+    ).toBe(31);
+    expect(
+      elapsedWindowDays(
+        { start: "2026-11-01", end: "2026-11-30" },
+        "2026-11-30",
+      ),
+    ).toBe(30);
+  });
+
+  it("the reviewer's example: 8 logs on Oct 20 reads on rhythm for a monthly contact, not about ⅔", () => {
+    const year = buildWindow("year", "2026-10-20", "2026-10-20");
+    const cadenceDays = FREQUENCY_DAYS.Monthly;
+    const whole = intensityShareCaption({
+      currentCount: 8,
+      periodDays: 365,
+      cadenceDays,
+    });
+    expect(whole).toBe("8 logs · about ⅔ of your monthly rhythm");
+    expect(
+      intensityShareCaption({
+        currentCount: 8,
+        periodDays: elapsedWindowDays(year, "2026-10-20"),
+        cadenceDays,
+      }),
+    ).toBe("8 logs · about ⅘ of your monthly rhythm");
+  });
+
+  it("History passes the elapsed days into the chart's bar and caption", () => {
+    const history = readFileSync(
+      join(__dirname, "history", "HistorySection.tsx"),
+      "utf8",
+    );
+    expect(history).toMatch(/elapsedWindowDays\(intensitySource, today\)/);
+    expect(history).toMatch(/shareDays=\{intensityShareDays\}/);
+    const chart = readFileSync(
+      join(__dirname, "history", "IntensityChart.tsx"),
+      "utf8",
+    );
+    expect(chart).toMatch(/periodDays: measuredDays,/);
+    expect(chart).toMatch(/shareDays=\{measuredDays\}/);
   });
 });

@@ -21,6 +21,7 @@
  * (D-35, D-22). Frequency stays a floor, never a scold (intensity-logic header).
  */
 import { FREQUENCY_DAYS, type Frequency } from "@/types";
+import { calendarDaysBetween, parseLocalMs } from "@/utils/dates";
 import { plural } from "@/utils/plural";
 
 /** Reverse of FREQUENCY_DAYS (days → label) for exact-interval phrasing. */
@@ -53,13 +54,41 @@ export function rhythmName(cadenceDays: number): string {
 export interface IntensityShareInput {
   /** Qualifying logs in the lens window (`IntensityResult.currentCount`). */
   readonly currentCount: number;
-  /** The lens window's day-span (`IntensityWindowResult.periodDays`). */
+  /**
+   * The days the share is measured over: the lens window's day-span, or for a
+   * window still in progress its elapsed days (`elapsedWindowDays`, D-86).
+   */
   readonly periodDays: number;
   /** The contact's configured interval (`IntensityWindowResult.cadenceDays`). */
   readonly cadenceDays: number;
 }
 
 const isPositive = (n: number): boolean => Number.isFinite(n) && n > 0;
+
+/**
+ * The days the share is measured over (38.14 D-86, owner, review B-WR-01):
+ * the window from its first day up to today, inclusive. A period still in
+ * progress (the current Month or Year, whose window runs to the end of the
+ * month or year) is measured only over its elapsed days, so it reads fairly
+ * instead of always "behind"; a past period ends before today and keeps its
+ * whole span. 0 for a window that starts after today. `start`, `end` and
+ * `today` are local `YYYY-MM-DD` dates (formatLocalDate), compared as strings
+ * and counted through local calendar-day math, never UTC slicing. Caption
+ * layer only: `computeIntensity` and `intensity-window` are unchanged (D-35).
+ */
+export function elapsedWindowDays(
+  window: { readonly start: string; readonly end: string },
+  today: string,
+): number {
+  const last = window.end < today ? window.end : today;
+  if (last < window.start) return 0;
+  return (
+    calendarDaysBetween(
+      parseLocalMs(`${window.start} 00:00:00`),
+      parseLocalMs(`${last} 00:00:00`),
+    ) + 1
+  );
+}
 
 /**
  * The count's share of the contact's rhythm over the window: logs ÷ the logs

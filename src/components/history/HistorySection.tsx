@@ -164,6 +164,7 @@ import {
 import { IntensityChart } from "@/components/history/IntensityChart";
 import { InteractionDetail } from "@/components/history/InteractionDetail";
 import { JumpToDateSheet } from "@/components/history/JumpToDateSheet";
+import { elapsedWindowDays } from "@/components/intensity-line-caption";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -570,8 +571,8 @@ export function HistorySection({
         : [],
     [cyclesResult, interactions],
   );
-  const intensity: IntensityWindowResult = useMemo(() => {
-    const source =
+  const intensitySource: HistoryWindow | null = useMemo(
+    () =>
       lens === "cycles"
         ? cyclesResult.available
           ? spanWindow(
@@ -579,11 +580,22 @@ export function HistorySection({
               cyclesResult.blocks[cyclesResult.blocks.length - 1].end,
             )
           : null
-        : window;
-    return source
-      ? intensityWindow(impactInputs, source)
-      : { available: false };
-  }, [lens, cyclesResult, window, impactInputs]);
+        : window,
+    [lens, cyclesResult, window],
+  );
+  const intensity: IntensityWindowResult = useMemo(
+    () =>
+      intensitySource
+        ? intensityWindow(impactInputs, intensitySource)
+        : { available: false },
+    [intensitySource, impactInputs],
+  );
+  // 38.14 D-86 (owner, review B-WR-01): the share is measured only over the
+  // days of the window that have happened, so the current Month / Year reads
+  // fairly; a past window keeps its whole span. Caption layer only (D-35).
+  const intensityShareDays = intensitySource
+    ? elapsedWindowDays(intensitySource, today)
+    : undefined;
 
   // Paging (D-25): a day lens steps one window; Cycles steps one whole
   // displayed page (the preset count), and next stops at the page ending
@@ -1174,7 +1186,7 @@ export function HistorySection({
             />
           </View>
         ) : null}
-        <IntensityChart intensity={intensity} />
+        <IntensityChart intensity={intensity} shareDays={intensityShareDays} />
       </GlassSurface>
       <GlassSurface style={styles.card} contentStyle={styles.stack}>
         {streamModel ? (

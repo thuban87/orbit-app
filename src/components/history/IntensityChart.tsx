@@ -35,11 +35,18 @@ import { SPACING } from "@/theme/tokens/spacing";
 export interface IntensityChartProps {
   /** The window-scoped intensity result the parent derived for the selected window. */
   intensity: IntensityWindowResult;
+  /**
+   * The days the share is measured over (38.14 D-86): the elapsed days of a
+   * window still in progress (`elapsedWindowDays`). Defaults to the window's
+   * whole span (`intensity.periodDays`), which a past period keeps.
+   */
+  shareDays?: number;
   testID?: string;
 }
 
 export function IntensityChart({
   intensity,
+  shareDays,
   testID = "intensity-chart",
 }: IntensityChartProps) {
   const { colors } = useTheme();
@@ -67,15 +74,17 @@ export function IntensityChart({
 
   // 38.14 D-65: the bar shows the count's share of the contact's rhythm over
   // the window (count × cadence ÷ window), the same share the caption names.
+  // A period in progress is measured over its elapsed days only (D-86).
   // Capped at 1 — meeting or exceeding the rhythm fills the bar (a floor met,
   // never a scold).
+  const measuredDays = shareDays ?? intensity.periodDays;
   const fillFraction = Math.max(
     0,
     Math.min(
       1,
       intensityShare({
         currentCount: intensity.currentCount,
-        periodDays: intensity.periodDays,
+        periodDays: measuredDays,
         cadenceDays: intensity.cadenceDays,
       }),
     ),
@@ -90,6 +99,7 @@ export function IntensityChart({
       <IntensityLine
         intensity={intensity}
         cadenceDays={intensity.cadenceDays}
+        shareDays={measuredDays}
       />
       {/* Neutral progress bar (structure tokens only, never a warning hue). */}
       <View
