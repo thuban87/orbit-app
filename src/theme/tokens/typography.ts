@@ -88,6 +88,14 @@ export const TYPOGRAPHY: Record<TypographyRole, TypographyStyle> = {
 };
 
 /**
+ * The smallest share of its role size a one-line label may shrink to when it
+ * is allowed to shrink rather than truncate (`adjustsFontSizeToFit` with
+ * `minimumFontScale`). Below this floor the label truncates as usual.
+ * First consumer: the Card view's one-line no-contact text (38.13 D-88).
+ */
+export const FIT_TEXT_MIN_SCALE = 0.75;
+
+/**
  * Map the semantic family + weight to the concrete expo-font key registered in
  * `src/theme/fonts.ts` (`Inter-Regular` / `Inter-SemiBold` /
  * `SpaceGrotesk-SemiBold`). A distinct key per weight is required because

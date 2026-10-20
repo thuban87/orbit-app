@@ -23,7 +23,11 @@ import { useTheme, useUnscopedTheme } from "@/theme";
 import { ICON_SIZE } from "@/theme/tokens/icon-size";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
+import {
+  FIT_TEXT_MIN_SCALE,
+  resolveFontFamily,
+  TYPOGRAPHY,
+} from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
 import {
   GRID_CARD_BORDER,
@@ -182,6 +186,10 @@ export function GridCard({
   const cardRecency = unboundNeverLogged
     ? recency
     : formatCardRecency(lastContact, now);
+  // 38.13 D-88: the no-contact text ("Never Contacted"; "No contact logged"
+  // for Unbound, D-83) keeps its words and shrinks to fit its one line; a
+  // dated recency keeps the normal tail truncation.
+  const shrinkRecencyToFit = lastContact === null;
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
   // D-37: plain labels; a missing result is the name-only case ("Name"), not
@@ -446,6 +454,10 @@ export function GridCard({
                         testID={`dashboard-grid-card-recency-${contactId}`}
                         numberOfLines={1}
                         ellipsizeMode="tail"
+                        adjustsFontSizeToFit={shrinkRecencyToFit}
+                        minimumFontScale={
+                          shrinkRecencyToFit ? FIT_TEXT_MIN_SCALE : undefined
+                        }
                         style={[
                           styles.recency,
                           { color: scoped.textSecondary },

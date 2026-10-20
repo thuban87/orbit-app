@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { View } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
+import { FIT_TEXT_MIN_SCALE } from "@/theme/tokens/typography";
 import { CardContextMenu } from "./CardContextMenu";
 import { GridCard } from "./GridCard";
 import {
@@ -774,6 +775,57 @@ describe("Card width and one-line recency (38.13 D-32, D-33)", () => {
     expect(String(nodes[0]?.props.accessibilityLabel)).toContain(
       "No interactions yet",
     );
+  });
+});
+
+describe("The no-contact line shrinks to fit (38.13 D-88)", () => {
+  function recencyOf(props: Partial<Parameters<typeof GridCard>[0]>) {
+    const nodes = resolve(GridCard({ ...baseProps, ...props }));
+    return {
+      nodes,
+      recency: all(nodes).find(
+        (node) => node.props.testID === "dashboard-grid-card-recency-7",
+      ),
+    };
+  }
+
+  it("Never Contacted keeps its words and shrinks on one line, floored by the typography token", () => {
+    const { nodes, recency } = recencyOf({ lastContact: null });
+    expect(recency?.props.children).toBe("Never Contacted");
+    expect(recency?.props.numberOfLines).toBe(1);
+    expect(recency?.props.adjustsFontSizeToFit).toBe(true);
+    expect(recency?.props.minimumFontScale).toBe(FIT_TEXT_MIN_SCALE);
+    // The spoken description keeps the full text.
+    expect(String(nodes[0]?.props.accessibilityLabel)).toContain(
+      "No interactions yet",
+    );
+  });
+
+  it("an Unbound card's No contact logged shrinks the same way (D-83)", () => {
+    const { nodes, recency } = recencyOf({
+      lastContact: null,
+      status: null,
+      unbound: true,
+    });
+    expect(recency?.props.children).toBe("No contact logged");
+    expect(recency?.props.adjustsFontSizeToFit).toBe(true);
+    expect(recency?.props.minimumFontScale).toBe(FIT_TEXT_MIN_SCALE);
+    expect(String(nodes[0]?.props.accessibilityLabel)).toContain(
+      "No contact logged",
+    );
+  });
+
+  it("a dated recency keeps tail truncation and does not shrink", () => {
+    const { recency } = recencyOf({});
+    expect(recency?.props.children).toBe("Yesterday");
+    expect(recency?.props.adjustsFontSizeToFit).toBe(false);
+    expect(recency?.props.minimumFontScale).toBeUndefined();
+    expect(recency?.props.ellipsizeMode).toBe("tail");
+  });
+
+  it("the floor is a sensible shrink, not a collapse", () => {
+    expect(FIT_TEXT_MIN_SCALE).toBeGreaterThanOrEqual(0.7);
+    expect(FIT_TEXT_MIN_SCALE).toBeLessThan(1);
   });
 });
 
