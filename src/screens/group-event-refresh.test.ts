@@ -18,11 +18,14 @@ import { resolveDisplay } from "@/logic/group-inheritance";
 import {
   createGroupEventRefreshController,
   eventDraft,
+  addedParticipantNames,
   excludedParticipantIds,
   type GroupEventEditState,
   groupEventEditReducer,
   initialGroupEventEditState,
   isGroupEventDraftDirty,
+  participantRemovedSnackbar,
+  participantsAddedSnackbar,
   runParticipantAdd,
   runParticipantRemove,
   visibleParticipants,
@@ -643,7 +646,8 @@ describe("EditGroupEventScreen clears a stale failure when a later write starts 
     return source.slice(start, next);
   }
 
-  it.each(["removeParticipant", "saveParticipant", "saveEvent"])(
+  // 38.14 D-68 removed the inline participant editor and its saveParticipant.
+  it.each(["removeParticipant", "saveEvent"])(
     "%s clears the previous error before its write",
     (name) => {
       expect(body(name)).toContain("setError(null)");
@@ -654,5 +658,70 @@ describe("EditGroupEventScreen clears a stale failure when a later write starts 
     const add = body("addSelected");
     const committed = add.slice(add.indexOf("onCommitted"));
     expect(committed).toContain("setError(null)");
+  });
+});
+
+describe("Edit Event has one participant editor (38.14 D-68, D-07)", () => {
+  const source = readFileSync(
+    new URL("./EditGroupEventScreen.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("opens the EditParticipant screen for a participant", () => {
+    expect(source).toContain('navigate("EditParticipant"');
+  });
+
+  it("no longer hosts the inline participant editor", () => {
+    expect(source).not.toContain("ParticipantOverrideEditor");
+    expect(source).not.toContain("function saveParticipant");
+    expect(source).not.toContain("participantDraftState");
+  });
+
+  it("refreshes on a later focus through the controller, skipping the first", () => {
+    expect(source).toContain("useFocusEffect(");
+    expect(source).toMatch(/seenFocusRef\.current/);
+  });
+});
+
+describe("Edit Event participant snackbars (38.14 D-67)", () => {
+  it("names one or two added people and counts more", () => {
+    expect(participantsAddedSnackbar(["Maya"], 1)).toBe("Added Maya");
+    expect(participantsAddedSnackbar(["Maya", "Sam"], 2)).toBe(
+      "Added Maya and Sam",
+    );
+    expect(participantsAddedSnackbar(["Maya", "Sam", "Jo"], 3)).toBe(
+      "Added 3 people",
+    );
+  });
+
+  it("falls back to a count when the names could not be read", () => {
+    expect(participantsAddedSnackbar([], 1)).toBe("Added 1 person");
+    expect(participantsAddedSnackbar(["Maya"], 2)).toBe("Added 2 people");
+  });
+
+  it("reads the added names from the refreshed event in its order", () => {
+    const event = detail([
+      participant(1, { contactName: "Ada" }),
+      participant(2, { contactName: "Maya" }),
+      participant(3, { contactName: "Sam" }),
+    ]);
+    expect(addedParticipantNames(event, [3, 2])).toEqual(["Maya", "Sam"]);
+    expect(addedParticipantNames(event, [9])).toEqual([]);
+  });
+
+  it("names who was removed, and says when the interaction was deleted", () => {
+    expect(participantRemovedSnackbar("Maya", false)).toBe("Removed Maya");
+    expect(participantRemovedSnackbar("Maya", true)).toBe(
+      "Removed Maya and deleted the interaction",
+    );
+  });
+
+  it("Edit Event shows both snackbars after the commit", () => {
+    const source = readFileSync(
+      new URL("./EditGroupEventScreen.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("participantsAddedSnackbar(");
+    expect(source).toContain("participantRemovedSnackbar(");
   });
 });

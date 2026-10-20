@@ -853,6 +853,12 @@ describe("glossary contract — leftover event sites use the event noun (D-22, D
       approved: '{ label: "Remove from event"',
     },
     {
+      // 38.14 D-70 / D-05: the Remove from event sheet says "event".
+      file: "src/components/group/RemoveParticipantSheet.tsx",
+      retired: "from this group?",
+      approved: "from this event?",
+    },
+    {
       file: "src/screens/GroupLogScreen.tsx",
       retired: 'accessibilityLabel="Log group"',
       approved: 'accessibilityLabel="Log event"',
