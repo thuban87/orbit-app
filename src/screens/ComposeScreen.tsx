@@ -55,6 +55,7 @@ import { File, Paths } from "expo-file-system";
 import * as SMS from "expo-sms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AppState,
   BackHandler,
   Keyboard,
   type LayoutChangeEvent,
@@ -358,6 +359,17 @@ export function ComposeScreen({
     channel: "text" | "email";
   } | null>(null);
   const [logging, setLogging] = useState(false);
+  // D-89: the panel keeps its place at the end of the page, and Compose
+  // scrolls it into view when it appears. Set beside `setConfirm` opening the
+  // panel and consumed by the panel's first layout (a ref, so the scroll runs
+  // once per appearance and never chases the page while the user types).
+  const scrollRef = useRef<ScrollView>(null);
+  const panelScrollPendingRef = useRef(false);
+  const onPanelLayout = useCallback(() => {
+    if (!panelScrollPendingRef.current) return;
+    panelScrollPendingRef.current = false;
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, []);
   // Synchronous double-tap latch shared by the Yes and No writes (38.3 RG-023 /
   // D-08): the `logging` state above only drives the disabled UI and cannot stop
   // two taps dispatched in one tick; this ref can.
@@ -1006,6 +1018,23 @@ export function ComposeScreen({
     }, [confirm, panelCanShow]),
   );
 
+  // D-89, on return from the SMS / mail app (or any trip out of Orbit) while
+  // the panel shows: scroll it back into view and keep the keyboard closed.
+  // Registered only while Compose is focused, so it never reaches a field on
+  // another screen.
+  const panelShown = confirm !== null && panelCanShow;
+  useFocusEffect(
+    useCallback(() => {
+      if (!panelShown) return undefined;
+      const sub = AppState.addEventListener("change", (next) => {
+        if (next !== "active") return;
+        Keyboard.dismiss();
+        scrollRef.current?.scrollToEnd({ animated: true });
+      });
+      return () => sub.remove();
+    }, [panelShown]),
+  );
+
   // Re-read the contact's method groups after a primary swap so the picker
   // condition and resolved destinations reflect the new explicit primary without
   // a full navigation round-trip. Local SQLite read; no network on this path.
@@ -1169,6 +1198,10 @@ export function ComposeScreen({
       return;
     }
     setSending(true);
+    // D-89: the keyboard stays closed when the panel appears. Android gives a
+    // field that still has focus the keyboard back when Orbit returns from the
+    // SMS / mail app, so the message box lets go of focus before the handoff.
+    Keyboard.dismiss();
     try {
       const exec = getExecutor();
       const settings = await getAppSettings(exec);
@@ -1194,6 +1227,7 @@ export function ComposeScreen({
         // in between could flash the record onto the banner. The focus effect
         // still owns the release (compare-and-clear) and the refocus re-claim.
         useAssistBanner.getState().setPanelOwned(outcome.assistUid);
+        panelScrollPendingRef.current = true;
         setConfirm({ assistUid: outcome.assistUid, channel: usable });
       }
       // A started handoff is a commit — advance the remembered mode (COMP-02).
@@ -1556,6 +1590,7 @@ export function ComposeScreen({
     >
       {appBar}
       <ScrollView
+        ref={scrollRef}
         testID="compose-screen"
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -2084,12 +2119,14 @@ export function ComposeScreen({
           an assist. Yes, log it / No, don't log / Later (38.14 D-01, D-43, D-77,
           D-78); while it shows, the banner and pending list skip this record. */}
           {confirm !== null ? (
-            <ComposeConfirmPanel
-              pending={logging}
-              onYes={() => void onConfirmYes()}
-              onDismiss={() => void onConfirmDismiss()}
-              onLater={onConfirmLater}
-            />
+            <View testID="compose-confirm-slot" onLayout={onPanelLayout}>
+              <ComposeConfirmPanel
+                pending={logging}
+                onYes={() => void onConfirmYes()}
+                onDismiss={() => void onConfirmDismiss()}
+                onLater={onConfirmLater}
+              />
+            </View>
           ) : null}
         </ChromeScrim>
       </ScrollView>

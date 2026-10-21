@@ -19,14 +19,15 @@ function handlerBody(name: string): string {
   return code.slice(start, end);
 }
 
-/** Every `useFocusEffect(` block, sliced up to the next one (or the render). */
+/** Every `useFocusEffect(` call, sliced up to its closing `  );` line. */
 function focusEffectBlocks(): string[] {
   const blocks: string[] = [];
-  let from = code.indexOf("useFocusEffect(");
+  let from = code.indexOf("\n  useFocusEffect(");
   while (from !== -1) {
-    const next = code.indexOf("useFocusEffect(", from + 1);
-    blocks.push(code.slice(from, next === -1 ? undefined : next));
-    from = next;
+    const end = code.indexOf("\n  );\n", from);
+    expect(end).toBeGreaterThan(from);
+    blocks.push(code.slice(from, end));
+    from = code.indexOf("\n  useFocusEffect(", end);
   }
   return blocks;
 }
@@ -118,7 +119,7 @@ describe("ComposeScreen assist panel wiring", () => {
     expect(code.match(/releasePanelOwned\(/g)).toHaveLength(1);
     const transmit = handlerBody("onTransmit");
     expect(transmit).toMatch(
-      /setPanelOwned\(outcome\.assistUid\);\s*setConfirm\(\{ assistUid: outcome\.assistUid, channel: usable \}\);/,
+      /setPanelOwned\(outcome\.assistUid\);\s*panelScrollPendingRef\.current = true;\s*setConfirm\(\{ assistUid: outcome\.assistUid, channel: usable \}\);/,
     );
     expect(transmit).not.toContain("releasePanelOwned(");
   });
@@ -139,6 +140,61 @@ describe("ComposeScreen assist panel wiring", () => {
     const transmit = code.slice(code.indexOf('testID="compose-transmit"'));
     expect(transmit).toMatch(
       /disabled=\{sending \|\| logging \|\| availability\.transmitDisabled\}/,
+    );
+  });
+});
+
+describe("the panel is seen when it appears, with the keyboard closed (D-89)", () => {
+  it("keeps the panel last in the page's ScrollView", () => {
+    const slot = code.indexOf('testID="compose-confirm-slot"');
+    expect(slot).toBeGreaterThan(-1);
+    expect(code.indexOf("<ComposeConfirmPanel")).toBeGreaterThan(slot);
+    // Nothing but the panel's closers sits between it and the end of the
+    // column; the pinned bar stays outside the ScrollView (D-75).
+    const tail = code.slice(slot, code.lastIndexOf("</ScrollView>"));
+    expect(tail).toMatch(/\) : null\}\s*<\/ChromeScrim>\s*$/);
+  });
+
+  it("scrolls to the panel once, on its first layout after Transmit opens it", () => {
+    expect(code).toMatch(
+      /<ScrollView\s+ref=\{scrollRef\}\s+testID="compose-screen"/,
+    );
+    expect(code).toMatch(
+      /testID="compose-confirm-slot" onLayout=\{onPanelLayout\}/,
+    );
+    const layout = handlerBody("onPanelLayout");
+    expect(layout).toContain("if (!panelScrollPendingRef.current) return;");
+    expect(
+      layout.indexOf("panelScrollPendingRef.current = false;"),
+    ).toBeLessThan(layout.indexOf("scrollToEnd("));
+    // The only place the pending flag is armed is beside the panel opening.
+    expect(code.match(/panelScrollPendingRef\.current = true;/g)).toHaveLength(
+      1,
+    );
+  });
+
+  it("Transmit lets go of the message box before the handoff", () => {
+    const transmit = handlerBody("onTransmit");
+    const dismiss = transmit.indexOf("Keyboard.dismiss();");
+    expect(dismiss).toBeGreaterThan(-1);
+    expect(dismiss).toBeLessThan(transmit.indexOf("performReachOut("));
+    // After the empty-body and in-flight guards, so a refused tap keeps focus.
+    expect(dismiss).toBeGreaterThan(transmit.indexOf("setSending(true);"));
+  });
+
+  it("on return to Orbit while the panel shows, scrolls it back and closes the keyboard", () => {
+    const blocks = focusEffectBlocks().filter((block) =>
+      block.includes('AppState.addEventListener("change"'),
+    );
+    expect(blocks).toHaveLength(1);
+    const [onReturn] = blocks;
+    expect(onReturn).toContain("if (!panelShown) return undefined;");
+    expect(onReturn).toContain('if (next !== "active") return;');
+    expect(onReturn).toContain("Keyboard.dismiss();");
+    expect(onReturn).toContain("scrollToEnd(");
+    expect(onReturn).toContain("sub.remove()");
+    expect(code).toMatch(
+      /const panelShown = confirm !== null && panelCanShow;/,
     );
   });
 });
