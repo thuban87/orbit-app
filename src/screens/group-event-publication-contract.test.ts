@@ -141,6 +141,43 @@ describe("group-event writes publish (38.14 D-27, D-81)", () => {
   });
 });
 
+describe("Edit Event hands a saved rename back to detail (38.14 D-91)", () => {
+  const edit = read("src/screens/EditGroupEventScreen.tsx");
+  const saveStart = edit.indexOf("async function saveEvent(");
+  const save = balanced(edit, edit.indexOf("{", edit.indexOf(")", saveStart)));
+
+  it("hands the title back only after the write commits and publishes, before Back", () => {
+    const committed = save.indexOf("await updateGroupEvent(");
+    const published = save.indexOf("publishInteractionWrite();");
+    const handOff = save.indexOf(
+      "CommonActions.setParams({ savedTitle: title })",
+    );
+    const back = save.indexOf("navigation.goBack();");
+    expect(committed).toBeGreaterThan(-1);
+    // The publication still follows the commit directly (D-27, D-04).
+    expect(published).toBeGreaterThan(committed);
+    expect(handOff).toBeGreaterThan(published);
+    expect(back).toBeGreaterThan(handOff);
+    // Only to the detail of this event, directly below Edit Event.
+    expect(save).toContain("eventDetailRouteKeyBelow(");
+    expect(save).toContain("source: detailKey");
+    // Never from the failure path.
+    const failure = save.slice(save.indexOf("} catch"));
+    expect(failure).not.toContain("savedTitle");
+  });
+
+  it("detail folds the hand-off in, clears it, and still re-reads on focus", () => {
+    const detail = read("src/screens/GroupEventDetailScreen.tsx");
+    expect(detail).toContain("withSavedTitle(current, savedTitle)");
+    expect(detail).toContain("navigation.setParams({ savedTitle: undefined })");
+    const focus = detail.indexOf("useFocusEffect(");
+    expect(focus).toBeGreaterThan(-1);
+    expect(balanced(detail, focus + "useFocusEffect".length)).toContain(
+      "void refresh();",
+    );
+  });
+});
+
 describe("balanced (review B-IN-08)", () => {
   it("matches across nested brackets and ignores brackets in comments and strings", () => {
     const source =

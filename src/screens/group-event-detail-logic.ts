@@ -115,3 +115,41 @@ export function resolveDetailParticipant(
     ) ?? null
   );
 }
+
+/** The slice of a stack navigator's state the rename hand-off reads. */
+interface StackStateSlice {
+  index: number;
+  routes: readonly { key: string; name: string; params?: object }[];
+}
+
+/**
+ * The key of the event detail Edit Event returns to, or null (38.14 D-91).
+ * Only the route directly below Edit Event counts, and only when it shows the
+ * same event: Edit Event also opens from a Profile's history, where Back lands
+ * somewhere that has no title to hand back. PURE.
+ */
+export function eventDetailRouteKeyBelow(
+  state: StackStateSlice,
+  groupEventId: number,
+): string | null {
+  const below = state.routes[state.index - 1];
+  if (below?.name !== "GroupEventDetail") return null;
+  const params = below.params as { groupEventId?: unknown } | undefined;
+  return params?.groupEventId === groupEventId ? below.key : null;
+}
+
+/**
+ * The event with a just-saved title handed back from Edit Event applied
+ * (38.14 D-91), so detail shows the rename at once instead of after its focus
+ * re-read lands. The re-read stays the source of truth and overwrites it.
+ * A missing or blank hand-off, or no loaded event, changes nothing. PURE.
+ */
+export function withSavedTitle<T extends { title: string }>(
+  event: T | null,
+  savedTitle: string | undefined,
+): T | null {
+  if (event === null || savedTitle === undefined) return event;
+  const title = savedTitle.trim();
+  if (title.length === 0 || title === event.title) return event;
+  return { ...event, title };
+}

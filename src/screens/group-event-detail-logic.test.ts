@@ -4,8 +4,10 @@ import {
   closeThenOpenEventEditor,
   closeThenOpenParticipantEditor,
   closeThenOpenParticipantProfile,
+  eventDetailRouteKeyBelow,
   groupEventDurationLabel,
   resolveDetailParticipant,
+  withSavedTitle,
 } from "./group-event-detail-logic";
 
 const event = {
@@ -126,5 +128,83 @@ describe("resolveDetailParticipant (38.14 D-28)", () => {
   it("returns null with no id or no event", () => {
     expect(resolveDetailParticipant(refreshed("x"), [], null)).toBeNull();
     expect(resolveDetailParticipant(null, [], 8)).toBeNull();
+  });
+});
+
+describe("rename hand-off from Edit Event (38.14 D-91)", () => {
+  const stack = (routes: { key: string; name: string; params?: object }[]) => ({
+    index: routes.length - 1,
+    routes,
+  });
+
+  it("finds the detail of the same event directly below Edit Event", () => {
+    expect(
+      eventDetailRouteKeyBelow(
+        stack([
+          { key: "list", name: "GroupEvents" },
+          {
+            key: "detail",
+            name: "GroupEventDetail",
+            params: { groupEventId: 7 },
+          },
+          { key: "edit", name: "EditGroupEvent", params: { groupEventId: 7 } },
+        ]),
+        7,
+      ),
+    ).toBe("detail");
+  });
+
+  it("hands nothing back when Back lands elsewhere or on another event", () => {
+    // Opened from a Profile's history: Back returns to the Profile.
+    expect(
+      eventDetailRouteKeyBelow(
+        stack([
+          { key: "profile", name: "Profile", params: { contactId: 9 } },
+          { key: "edit", name: "EditGroupEvent", params: { groupEventId: 7 } },
+        ]),
+        7,
+      ),
+    ).toBeNull();
+    expect(
+      eventDetailRouteKeyBelow(
+        stack([
+          {
+            key: "detail",
+            name: "GroupEventDetail",
+            params: { groupEventId: 8 },
+          },
+          { key: "edit", name: "EditGroupEvent", params: { groupEventId: 7 } },
+        ]),
+        7,
+      ),
+    ).toBeNull();
+    // A detail further down the stack is not the one Back returns to.
+    expect(
+      eventDetailRouteKeyBelow(
+        stack([
+          {
+            key: "detail",
+            name: "GroupEventDetail",
+            params: { groupEventId: 7 },
+          },
+          { key: "profile", name: "Profile", params: { contactId: 9 } },
+          { key: "edit", name: "EditGroupEvent", params: { groupEventId: 7 } },
+        ]),
+        7,
+      ),
+    ).toBeNull();
+    expect(eventDetailRouteKeyBelow(stack([]), 7)).toBeNull();
+  });
+
+  it("shows the saved title at once and otherwise leaves the event alone", () => {
+    expect(withSavedTitle(event, "Supper")).toEqual({
+      ...event,
+      title: "Supper",
+    });
+    expect(withSavedTitle(event, "  Supper  ")?.title).toBe("Supper");
+    expect(withSavedTitle(event, undefined)).toBe(event);
+    expect(withSavedTitle(event, "   ")).toBe(event);
+    expect(withSavedTitle(event, "Dinner")).toBe(event);
+    expect(withSavedTitle(null, "Supper")).toBeNull();
   });
 });

@@ -49,6 +49,7 @@ import {
   closeThenOpenParticipantProfile,
   groupEventDurationLabel,
   resolveDetailParticipant,
+  withSavedTitle,
 } from "./group-event-detail-logic";
 import {
   createGroupEventRefreshController,
@@ -82,7 +83,7 @@ export function GroupEventDetailScreen({
   const { colors } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
-  const { groupEventId } = route.params;
+  const { groupEventId, savedTitle } = route.params;
   const [event, setEvent] = useState<GroupEventDetail | null>(null);
   // One read-failure flag, split by whether an event is already on screen:
   // no event → the full "Couldn't load" view; an event → an inline refresh
@@ -151,6 +152,14 @@ export function GroupEventDetailScreen({
     },
     [announcer, refreshController],
   );
+  // 38.14 D-91: a rename Edit Event just saved arrives as `savedTitle`. It is
+  // folded into the shown event and cleared, so the new title shows at once;
+  // the focus re-read below still lands and stays the source of truth.
+  useEffect(() => {
+    if (savedTitle === undefined) return;
+    setEvent((current) => withSavedTitle(current, savedTitle));
+    navigation.setParams({ savedTitle: undefined });
+  }, [savedTitle, navigation]);
   const refresh = refreshController.refresh;
   useFocusEffect(
     useCallback(() => {
@@ -344,7 +353,9 @@ export function GroupEventDetailScreen({
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={[styles.card, cardColors]}>
-              <AppText role="heading">{event.title}</AppText>
+              <AppText role="heading">
+                {withSavedTitle(event, savedTitle)?.title ?? event.title}
+              </AppText>
               {refreshFailed ? (
                 <View style={styles.inlineError}>
                   <AppText role="caption" style={{ color: colors.danger }}>

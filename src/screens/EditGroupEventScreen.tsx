@@ -18,7 +18,7 @@
  * and refuses blank again. D-27: a committed save publishes the widget notify
  * and the shell refresh.
  */
-import { useFocusEffect } from "@react-navigation/native";
+import { CommonActions, useFocusEffect } from "@react-navigation/native";
 import {
   useCallback,
   useEffect,
@@ -68,6 +68,7 @@ import {
   endInFlight,
   type InFlightRef,
 } from "@/utils/single-flight";
+import { eventDetailRouteKeyBelow } from "./group-event-detail-logic";
 import {
   createGroupEventRefreshController,
   createParticipantAddAnnouncer,
@@ -254,6 +255,20 @@ export function EditGroupEventScreen({
       // ADR-199 / D-20 (review B-WR-03): the save confirms, like Edit
       // interaction's "Changes saved" (D-58).
       showSnackbar({ kind: "success", label: EVENT_SAVED_SNACKBAR });
+      // 38.14 D-91: hand a committed rename back to the event detail below,
+      // so it shows the new title at once; its focus re-read still follows.
+      if (patch.title !== undefined) {
+        const detailKey = eventDetailRouteKeyBelow(
+          navigation.getState(),
+          groupEventId,
+        );
+        if (detailKey !== null) {
+          navigation.dispatch({
+            ...CommonActions.setParams({ savedTitle: title }),
+            source: detailKey,
+          });
+        }
+      }
       bypassRef.current = true;
       navigation.goBack();
     } catch {

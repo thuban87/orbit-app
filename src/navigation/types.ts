@@ -78,6 +78,16 @@ type FlowHostParam = { host?: FlowHost };
 type RestoreHostParam = { host?: RestoreHost };
 
 /**
+ * Event detail's params. `savedTitle` is the title Edit Event just saved,
+ * handed back so detail shows a rename at once (38.14 D-91); detail applies it
+ * and clears it, and its focus re-read stays the source of truth.
+ */
+export type GroupEventDetailParams = {
+  groupEventId: number;
+  savedTitle?: string;
+};
+
+/**
  * Where a Compose session was launched from, driving origin-aware return
  * (COMP-14 / HIGH-8). A serializable primitive only. `profile` returns toward the
  * contact Profile (pop within whichever stack hosted it); `dashboard`/`deep-link`
@@ -118,7 +128,7 @@ export type DashboardStackParamList = {
    * Serializable primitives only: no callbacks or contact data cross routes.
    */
   GroupLog: { participantIds?: number[] } | undefined;
-  GroupEventDetail: { groupEventId: number };
+  GroupEventDetail: GroupEventDetailParams;
   EditGroupEvent: { groupEventId: number };
   EditParticipant: {
     groupEventId: number;
@@ -310,7 +320,7 @@ export type OrreryStackParamList = {
    * Orrery stack. RootStackParamList is a type intersection, so the history
    * surface must resolve these routes in every stack that can host Profile.
    */
-  GroupEventDetail: { groupEventId: number };
+  GroupEventDetail: GroupEventDetailParams;
   EditGroupEvent: { groupEventId: number };
   EditParticipant: {
     groupEventId: number;
@@ -353,7 +363,7 @@ export type OrreryStackParamList = {
 export type DigestStackParamList = {
   Digest: undefined;
   Profile: ProfileRouteParams;
-  GroupEventDetail: { groupEventId: number };
+  GroupEventDetail: GroupEventDetailParams;
   EditGroupEvent: { groupEventId: number };
   EditParticipant: {
     groupEventId: number;
@@ -427,7 +437,7 @@ export type DigestStackParamList = {
 
 export type EventsStackParamList = {
   GroupEvents: undefined;
-  GroupEventDetail: { groupEventId: number };
+  GroupEventDetail: GroupEventDetailParams;
   Profile: ProfileRouteParams;
   EditGroupEvent: { groupEventId: number };
   EditParticipant: {
@@ -624,7 +634,7 @@ export type SettingsStackParamList = {
    * (Archived → Profile). RootStackParamList is a type intersection, so the
    * history surface must resolve these routes in every stack that can host Profile.
    */
-  GroupEventDetail: { groupEventId: number };
+  GroupEventDetail: GroupEventDetailParams;
   EditGroupEvent: { groupEventId: number };
   EditParticipant: {
     groupEventId: number;
