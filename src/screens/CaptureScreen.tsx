@@ -65,7 +65,10 @@ import {
   type ShareConfirmationCardHandle,
 } from "@/components/ShareConfirmationCard";
 import { Button } from "@/components/ui/Button";
-import { sheetKeyboardLayout } from "@/components/ui/sheet-contract";
+import {
+  keyboardLift,
+  nextRestingFrameHeight,
+} from "@/components/ui/sheet-contract";
 import { NEW_CONTACT_DEFAULT_INTERVAL_DAYS } from "@/constants/new-contact-defaults";
 import {
   applyShareNote,
@@ -294,18 +297,27 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   }, []);
   const onRootLayout = useCallback((event: LayoutChangeEvent) => {
     const height = event.nativeEvent.layout.height;
-    restingFrameHeight.current = Math.max(restingFrameHeight.current, height);
+    // 38.14-09 D-92: the first layout is the full window, before the root
+    // settles below the status bar; only a keyboard-down layout is resting.
+    restingFrameHeight.current = nextRestingFrameHeight({
+      previous: restingFrameHeight.current,
+      height,
+      keyboardMayBeUp:
+        Keyboard.isVisible() || TextInput.State.currentlyFocusedInput() != null,
+    });
     setFrameHeight(height);
   }, []);
-  const { lift } = sheetKeyboardLayout({
-    variant: "compact",
+  // The keyboard event's height leaves out the navigation bar, and this root
+  // reaches the screen bottom, so the lift adds the bottom inset back, as in
+  // Compose (38.14-09 D-92, the DEF-1 fix).
+  const lift = keyboardLift({
     frameHeight,
     restingFrameHeight: restingFrameHeight.current,
     keyboardHeight,
-    topClearance: insets.top,
+    bottomInset: insets.bottom,
   });
-  const bottomOffset =
-    BOTTOM_SURFACE_MARGIN + (lift > 0 ? lift : insets.bottom);
+  const bottomPadding = keyboardHeight > 0 ? lift : insets.bottom;
+  const bottomOffset = BOTTOM_SURFACE_MARGIN + bottomPadding;
   // D-147: the card stops below the safe-area top and its body scrolls. This
   // root already starts below the status bar (the shell's top-edge
   // SafeAreaView wraps every tab stack), so the safe-area top is y = 0 here.
@@ -763,12 +775,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           then share recency, never archived, never-contacted included (D-30,
           D-12). Keyed on the share sequence so a new share starts fresh (I-14).
           Inert while the card is up or a pick is pending (WR-01). */}
-      <View
-        style={[
-          styles.listArea,
-          { paddingBottom: lift > 0 ? lift : insets.bottom },
-        ]}
-      >
+      <View style={[styles.listArea, { paddingBottom: bottomPadding }]}>
         <ContactPickerList
           key={seq}
           style={styles.list}

@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SPACING } from "@/theme/tokens/spacing";
 import {
+  keyboardLift,
+  nextRestingFrameHeight,
   SHEET_BODY_FLEX,
   SHEET_BODY_PADDING_BOTTOM,
   SHEET_BODY_PADDING_HORIZONTAL,
   SHEET_BODY_SCROLLS,
   SHEET_HEIGHT_PERCENT,
   SHEET_VARIANTS,
-  keyboardLift,
   sheetKeyboardLayout,
 } from "./sheet-contract";
 
@@ -287,5 +288,49 @@ describe("keyboardLift — a screen's lift above the keyboard (38.14 D-75)", () 
       sheetKeyboardLayout({ ...input, variant: "compact", topClearance: 24 })
         .lift + bottomInset,
     );
+  });
+});
+
+describe("nextRestingFrameHeight — the keyboard-down baseline (38.14-09 D-92)", () => {
+  it("takes the latest layout while the keyboard is down", () => {
+    // Pixel 3a Capture: first layout is the full window (807 dp), then the
+    // root settles below the 28 dp status bar.
+    let resting = nextRestingFrameHeight({
+      previous: 0,
+      height: 807,
+      keyboardMayBeUp: false,
+    });
+    resting = nextRestingFrameHeight({
+      previous: resting,
+      height: 779,
+      keyboardMayBeUp: false,
+    });
+    expect(resting).toBe(779);
+    // So the lift is not cut by a phantom 28 dp "resize".
+    expect(
+      keyboardLift({
+        frameHeight: 779,
+        restingFrameHeight: resting,
+        keyboardHeight: 359,
+        bottomInset: 16,
+      }),
+    ).toBe(375);
+  });
+
+  it("keeps the tallest height while the keyboard may be up, so a resize is still measured", () => {
+    expect(
+      nextRestingFrameHeight({
+        previous: 779,
+        height: 404,
+        keyboardMayBeUp: true,
+      }),
+    ).toBe(779);
+    expect(
+      nextRestingFrameHeight({
+        previous: 0,
+        height: 779,
+        keyboardMayBeUp: true,
+      }),
+    ).toBe(779);
   });
 });

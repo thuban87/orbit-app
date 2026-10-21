@@ -272,3 +272,35 @@ describe("share card stays below the status bar (38.10 D-147)", () => {
     );
   });
 });
+
+describe("Capture clears the keyboard like Compose (38.14-09 D-92)", () => {
+  it("lifts by keyboardLift with the bottom inset, and pads the gesture bar when the keyboard is down", () => {
+    const start = CAPTURE_SOURCE.indexOf("keyboardLift({");
+    expect(start).toBeGreaterThan(-1);
+    const call = CAPTURE_SOURCE.slice(
+      start,
+      CAPTURE_SOURCE.indexOf("});", start),
+    );
+    // The keyboard height leaves out the navigation bar; the root reaches the
+    // screen bottom, so the inset is added back (the DEF-1 fix).
+    expect(call).toContain("bottomInset: insets.bottom");
+    expect(CAPTURE_SOURCE).toContain(
+      "const bottomPadding = keyboardHeight > 0 ? lift : insets.bottom;",
+    );
+    expect(CAPTURE_SOURCE).toContain(
+      "const bottomOffset = BOTTOM_SURFACE_MARGIN + bottomPadding;",
+    );
+    expect(CAPTURE_SOURCE).toContain("{ paddingBottom: bottomPadding }");
+    expect(CAPTURE_SOURCE).not.toContain("sheetKeyboardLayout(");
+  });
+
+  it("records the resting frame from keyboard-down layouts, not the tallest ever seen", () => {
+    expect(CAPTURE_SOURCE).toContain("nextRestingFrameHeight({");
+    expect(CAPTURE_SOURCE).not.toContain(
+      "Math.max(restingFrameHeight.current, height)",
+    );
+    expect(CAPTURE_SOURCE).toMatch(
+      /keyboardMayBeUp:\s*Keyboard\.isVisible\(\) \|\| TextInput\.State\.currentlyFocusedInput\(\) != null/,
+    );
+  });
+});

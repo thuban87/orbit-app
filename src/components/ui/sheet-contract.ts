@@ -133,3 +133,33 @@ export function keyboardLift({
   const covered = keyboardHeight + Math.max(0, bottomInset);
   return Math.max(0, Math.round(covered - (resting - frameHeight)));
 }
+
+export interface RestingFrameInput {
+  /** The resting frame height recorded so far (0 before the first layout). */
+  previous: number;
+  /** The height this layout reports. */
+  height: number;
+  /**
+   * The keyboard is up or a text field is focused, so this layout may be a
+   * window resize for the keyboard rather than a new resting size.
+   */
+  keyboardMayBeUp: boolean;
+}
+
+/**
+ * The frame height while the keyboard is down, the baseline `keyboardLift`
+ * measures a resize against (38.14-09 D-92). With the keyboard down and no
+ * field focused, the latest layout IS the resting frame, so a taller transient
+ * first layout cannot stick: Capture first lays out at the full window height,
+ * then settles 28 dp shorter below the status bar, and keeping the tallest
+ * height read that as a 28 dp resize and lifted the screen 28 dp too little.
+ * While the keyboard may be up the tallest height is kept, so a resize that
+ * lands before the keyboard event is still measured. PURE.
+ */
+export function nextRestingFrameHeight({
+  previous,
+  height,
+  keyboardMayBeUp,
+}: RestingFrameInput): number {
+  return keyboardMayBeUp ? Math.max(previous, height) : height;
+}
